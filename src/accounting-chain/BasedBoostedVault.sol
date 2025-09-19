@@ -75,6 +75,13 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
      */
     mapping(address account => AccountPosition position) _positions;
 
+    /// TODO: Decide what to do and how to handle the invariant of _activeBuckets[0] == "no-boost" bucket. Some ideas:
+    /// - Do it an edge case and do not remove from active buckets when shares get down to 0
+    /// - Lock some initial deposit in the constructor so it can never reach 0 liquidity, then its fixed at 0 index
+    /// - Do all generic code, do not assume the invariant, treat it as all the rest of the buckets
+    ///      + In this case we need to check how to handle some edge cases, like the isActiveBucket function to be like:
+    ///      + _activeBuckets[_bucketIndexByBoostRate[perSecondRateBoost]].perSecondRateBoost == perSecondRateBoost
+
     /**
      * @dev Constructor.
      * @param owner The admin/manager of the vault.
@@ -133,12 +140,13 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
             _bucketIndexByBoostRate[newPerSecondRateBoost] = _activeBuckets.length - 1;
         }
 
+        uint256 currentBucketIndex = _bucketIndexByBoostRate[currentBoostRate];
+
         // Calculate current account balance including the accrued interest
-        uint256 currentTotalConversionRate = _rayMul(_baseConversionRate, currentBoostRate);
-        uint256 accountBalance = _wadMulByRay(_positions[account].shares, currentTotalConversionRate);
+        uint256 currentConversionRate = _rayMul(_baseConversionRate, _activeBuckets[currentBucketIndex].conversionRate);
+        uint256 accountBalance = _wadMulByRay(_positions[account].shares, currentConversionRate);
 
         // Get account out of his current bucket
-        uint256 currentBucketIndex = _bucketIndexByBoostRate[currentBoostRate];
         _activeBuckets[currentBucketIndex].totalShares -= _positions[account].shares;
 
         if (_activeBuckets[currentBucketIndex].totalShares == 0) {
@@ -150,8 +158,8 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         }
 
         // Put account in the new corresponding bucket
-        uint256 newTotalConversionRate = _rayMul(_baseConversionRate, newPerSecondRateBoost);
-        uint256 newShares = _wadDivByRay(accountBalance, newTotalConversionRate);
+        uint256 newConversionRate = _rayMul(_baseConversionRate, newPerSecondRateBoost);
+        uint256 newShares = _wadDivByRay(accountBalance, newConversionRate);
         _activeBuckets[_bucketIndexByBoostRate[newPerSecondRateBoost]].totalShares += newShares;
         _positions[account].boostRate = newPerSecondRateBoost;
         _positions[account].shares = newShares;
@@ -159,6 +167,29 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
 
     function deposit(address account, address asset, uint256 amount) external override {
         require(msg.sender == account);
+        require(amount > 0);
+        require(_isAssetSupported(asset));
+
+        _accrueBaseConversionRate();
+
+        // TODO: We assume the invariant of _activeBuckets[0] being the "no-boost" bucket
+        // If account does not have any deposited assets yet, assign it to the "no-boost" base rate bucket
+        uint256 bucketIndex;
+        if (_positions[account].shares > 0) {
+            bucketIndex = _bucketIndexByBoostRate[_positions[account].boostRate];
+        } else {
+            _positions[account].boostRate = RAY;
+        }
+
+        _accrueBucketConversionRate(bucketIndex);
+
+        uint256 conversionRate = _rayMul(_baseConversionRate, _activeBuckets[bucketIndex].conversionRate);
+        uint256 shares = _wadDivByRay(amount, conversionRate);
+
+        _activeBuckets[bucketIndex].totalShares += shares;
+        _positions[account].shares += shares;
+
+        IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
     }
 
     function withdraw(address account, address asset, uint256 amount) external override {
@@ -189,6 +220,11 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         });
     }
 
+    function _isAssetSupported(address asset) internal view returns (bool) {
+        // TODO: Implement whitelist for assets
+        return true;
+    }
+
     function _accrueBaseConversionRate() internal {
         uint256 secondsSinceLastAccrual = block.timestamp - _lastBaseConversionRateAccrualTimestamp;
         if (secondsSinceLastAccrual != 0) {
@@ -200,6 +236,7 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
     }
 
     function _accrueBucketConversionRate(uint256 bucketIndex) internal {
+        // TODO: Maybe if _activeBuckets[bucketIndex].perSecondRateBoost == 1 we skip the accrual?
         uint256 secondsSinceLastAccrual = block.timestamp - _activeBuckets[bucketIndex].lastAccrualTimestamp;
         if (secondsSinceLastAccrual != 0) {
             uint256 growthFactor = _rpow(_activeBuckets[bucketIndex].perSecondRateBoost, secondsSinceLastAccrual);
@@ -211,10 +248,8 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
     }
 
     function _isActiveBucket(uint256 perSecondRateBoost) internal view returns (bool) {
-        // TODO: Second part could maybe even be optimized to perSecondRateBoost == 1, if we assume the invariant of
-        // the _activeBuckets[0] being always the "no-boost" bucket, which must hold...
-        return _bucketIndexByBoostRate[perSecondRateBoost] != 0
-            || _activeBuckets[0].perSecondRateBoost == perSecondRateBoost;
+        // TODO: We assume the invariant of _activeBuckets[0] == "no-boost" bucket
+        return _bucketIndexByBoostRate[perSecondRateBoost] != 0 || perSecondRateBoost == RAY;
     }
 
     /////////////////////////////// MATH HELPERS ///////////////////////////////
