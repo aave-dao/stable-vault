@@ -16,11 +16,11 @@ interface IBasedBoostedVault {
 
     function withdraw(address account, address asset, uint256 amount) external;
 
-    function getTotalObligations() external view returns (uint256);
+    function getVaultObligations() external view returns (uint256);
 
-    function getTotalAssets() external view returns (uint256);
+    function getVaultAssets() external view returns (uint256);
 
-    function getBalance(address account) external view returns (uint256);
+    function getAccountBalance(address account) external view returns (uint256);
 
     // function emergencyWithdraw(address account, uint256 amount) external;
 

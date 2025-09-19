@@ -163,6 +163,8 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         _activeBuckets[_bucketIndexByBoostRate[newPerSecondRateBoost]].totalShares += newShares;
         _positions[account].boostRate = newPerSecondRateBoost;
         _positions[account].shares = newShares;
+
+        // TODO: event :)
     }
 
     function deposit(address account, address asset, uint256 amount) external override {
@@ -190,25 +192,33 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         _positions[account].shares += shares;
 
         IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
+
+        // TODO: event :)
     }
 
     function withdraw(address account, address asset, uint256 amount) external override {
         require(msg.sender == account);
+        // TODO: check notes on withdrawal scenarios (profitable | unprofitable, sufficient balance on acct. chain | insufficient balance on acct. chain)
+        // TODO: Create withdrawal queue item
     }
 
-    function getTotalObligations() external view override returns (uint256) {
+    function getVaultObligations() external view override returns (uint256) {
+        for (uint256 i = 0; i < _activeBuckets.length; i++) {}
+        return 0;
+    }
+
+    function getVaultAssets() external view override returns (uint256) {
         // TODO: Implement
         return 0;
     }
 
-    function getTotalAssets() external view override returns (uint256) {
-        // TODO: Implement
-        return 0;
-    }
-
-    function getBalance(address account) external view override returns (uint256) {
-        // TODO: Implement
-        return 0;
+    function getAccountBalance(address account) external view override returns (uint256) {
+        if (_positions[account].shares == 0) {
+            return 0;
+        }
+        uint256 bucketIndex = _bucketIndexByBoostRate[_positions[account].boostRate];
+        uint256 conversionRate = _rayMul(_baseConversionRate, _activeBuckets[bucketIndex].conversionRate);
+        return _wadMulByRay(_positions[account].shares, conversionRate);
     }
 
     function getRateData(address account) external view returns (RateData memory) {
