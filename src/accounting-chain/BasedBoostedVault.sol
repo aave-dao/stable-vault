@@ -117,13 +117,15 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         // TODO: event?
     }
 
-    function setBoost(address account, uint256 newPerSecondRateBoost) external override onlyOwner {
+    // TODO: add back onlyOwner modifier
+    function setBoost(address account, uint256 newPerSecondRateBoost) external override {
         require(_positions[account].shares > 0);
         uint256 currentBoostRate = _positions[account].boostRate;
         require(currentBoostRate != newPerSecondRateBoost);
+        uint256 currentBucketIndex = _bucketIndexByBoostRate[currentBoostRate];
 
         _accrueBaseConversionRate();
-        _accrueBucketConversionRate(currentBoostRate);
+        _accrueBucketConversionRate(currentBucketIndex);
 
         if (_isActiveBucket(newPerSecondRateBoost)) {
             _accrueBucketConversionRate(newPerSecondRateBoost);
