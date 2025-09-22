@@ -5,13 +5,13 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
+import {MathLib} from "../libraries/MathLib.sol";
 import {IBasedBoostedVault} from "./IBasedBoostedVault.sol";
 
 contract BasedBoostedVault is IBasedBoostedVault, Ownable {
+    using MathLib for uint256;
     using SafeERC20 for IERC20;
 
-    uint256 internal constant WAD = 1e18;
-    uint256 internal constant RAY = 1e27;
     uint256 internal constant SECONDS_PER_YEAR = 365 days;
 
     /**
@@ -88,11 +88,11 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
      */
     constructor(address owner, uint256 basePerSecondRate) Ownable(owner) {
         // Initialize base conversion rate at 1
-        _baseConversionRate = RAY;
+        _baseConversionRate = MathLib.RAY;
         // Base conversion rate was just accrued
         _lastBaseConversionRateAccrualTimestamp = uint256(block.timestamp);
 
-        require(basePerSecondRate >= RAY);
+        require(basePerSecondRate >= MathLib.RAY);
         _basePerSecondRate = basePerSecondRate;
 
         // TODO: Do we need to accrue() the base conversion rate? I don't think so because it's the same timestamp
@@ -102,13 +102,13 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         // Create the default bucket which has no boost and just grows at the base rate
         _activeBuckets.push(
             Bucket({
-                perSecondRateBoost: RAY,
-                conversionRate: RAY,
+                perSecondRateBoost: MathLib.RAY,
+                conversionRate: MathLib.RAY,
                 lastAccrualTimestamp: uint256(block.timestamp),
                 totalShares: 0
             })
         );
-        _bucketIndexByBoostRate[RAY] = 0;
+        _bucketIndexByBoostRate[MathLib.RAY] = 0;
     }
 
     function setBasePerSecondRate(uint256 newBasePerSecondRate) external override onlyOwner {
@@ -134,7 +134,7 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
             _activeBuckets.push(
                 Bucket({
                     perSecondRateBoost: newPerSecondRateBoost,
-                    conversionRate: RAY,
+                    conversionRate: MathLib.RAY,
                     lastAccrualTimestamp: uint256(block.timestamp),
                     totalShares: 0
                 })
@@ -142,11 +142,9 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
             _bucketIndexByBoostRate[newPerSecondRateBoost] = _activeBuckets.length - 1;
         }
 
-        uint256 currentBucketIndex = _bucketIndexByBoostRate[currentBoostRate];
-
         // Calculate current account balance including the accrued interest
-        uint256 currentConversionRate = _rayMul(_baseConversionRate, _activeBuckets[currentBucketIndex].conversionRate);
-        uint256 accountBalance = _wadMulByRay(_positions[account].shares, currentConversionRate);
+        uint256 currentConversionRate = _baseConversionRate.mulByRay(_activeBuckets[currentBucketIndex].conversionRate);
+        uint256 accountBalance = _positions[account].shares.mulByRay(currentConversionRate);
 
         // Get account out of his current bucket
         _activeBuckets[currentBucketIndex].totalShares -= _positions[account].shares;
@@ -160,8 +158,8 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         }
 
         // Put account in the new corresponding bucket
-        uint256 newConversionRate = _rayMul(_baseConversionRate, newPerSecondRateBoost);
-        uint256 newShares = _wadDivByRay(accountBalance, newConversionRate);
+        uint256 newConversionRate = _baseConversionRate.mulByRay(newPerSecondRateBoost);
+        uint256 newShares = accountBalance.wadDivByRay(newConversionRate);
         _activeBuckets[_bucketIndexByBoostRate[newPerSecondRateBoost]].totalShares += newShares;
         _positions[account].boostRate = newPerSecondRateBoost;
         _positions[account].shares = newShares;
@@ -182,13 +180,13 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         if (_positions[account].shares > 0) {
             bucketIndex = _bucketIndexByBoostRate[_positions[account].boostRate];
         } else {
-            _positions[account].boostRate = RAY;
+            _positions[account].boostRate = MathLib.RAY;
         }
 
         _accrueBucketConversionRate(bucketIndex);
 
-        uint256 conversionRate = _rayMul(_baseConversionRate, _activeBuckets[bucketIndex].conversionRate);
-        uint256 shares = _wadDivByRay(amount, conversionRate);
+        uint256 conversionRate = _baseConversionRate.mulByRay(_activeBuckets[bucketIndex].conversionRate);
+        uint256 shares = amount.wadDivByRay(conversionRate);
 
         _activeBuckets[bucketIndex].totalShares += shares;
         _positions[account].shares += shares;
@@ -198,7 +196,7 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         // TODO: event :)
     }
 
-    function withdraw(address account, address asset, uint256 amount) external override {
+    function withdraw(address account, address, /* asset */ uint256 /* amount */ ) external view override {
         require(msg.sender == account);
         // TODO: check notes on withdrawal scenarios (profitable | unprofitable, sufficient balance on acct. chain | insufficient balance on acct. chain)
         // TODO: Create withdrawal queue item
@@ -209,7 +207,7 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         return 0;
     }
 
-    function getVaultAssets() external view override returns (uint256) {
+    function getVaultAssets() external pure override returns (uint256) {
         // TODO: Implement
         return 0;
     }
@@ -272,9 +270,9 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         // TODO: Maybe if _activeBuckets[bucketIndex].perSecondRateBoost == 1 we skip the accrual?
         uint256 secondsSinceLastAccrual = block.timestamp - _activeBuckets[bucketIndex].lastAccrualTimestamp;
         if (secondsSinceLastAccrual != 0) {
-            uint256 growthFactor = _rpow(_activeBuckets[bucketIndex].perSecondRateBoost, secondsSinceLastAccrual);
+            uint256 growthFactor = _activeBuckets[bucketIndex].perSecondRateBoost.rpow(secondsSinceLastAccrual);
             _activeBuckets[bucketIndex].conversionRate =
-                _rayMul(_activeBuckets[bucketIndex].conversionRate, growthFactor);
+                _activeBuckets[bucketIndex].conversionRate.mulByRay(growthFactor);
             _activeBuckets[bucketIndex].lastAccrualTimestamp = block.timestamp;
             // TODO: add accrual event
         }
@@ -282,58 +280,6 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
 
     function _isActiveBucket(uint256 perSecondRateBoost) internal view returns (bool) {
         // TODO: We assume the invariant of _activeBuckets[0] == "no-boost" bucket
-        return _bucketIndexByBoostRate[perSecondRateBoost] != 0 || perSecondRateBoost == RAY;
-    }
-
-    /////////////////////////////// MATH HELPERS ///////////////////////////////
-
-    function _rayMul(uint256 a, uint256 b) internal pure returns (uint256) {
-        unchecked {
-            return (a * b + RAY / 2) / RAY; // bankers' rounding
-        }
-    }
-
-    function _wadMulByRay(uint256 wadAmount, uint256 rayFactor) internal pure returns (uint256) {
-        unchecked {
-            return (wadAmount * rayFactor + RAY / 2) / RAY;
-        }
-    }
-
-    function _wadDivByRay(uint256 wadAmount, uint256 rayDivisor) internal pure returns (uint256) {
-        require(rayDivisor != 0, "DIV_BY_ZERO");
-        unchecked {
-            return (wadAmount * RAY + rayDivisor / 2) / rayDivisor;
-        }
-    }
-
-    function _rpow(uint256 x, uint256 n) internal pure returns (uint256 z) {
-        assembly {
-            switch x
-            case 0 {
-                switch n
-                case 0 { z := RAY }
-                default { z := 0 }
-            }
-            default {
-                switch mod(n, 2)
-                case 0 { z := RAY }
-                default { z := x }
-                let half := div(RAY, 2)
-                for { n := div(n, 2) } n { n := div(n, 2) } {
-                    let xx := mul(x, x)
-                    if iszero(eq(div(xx, x), x)) { revert(0, 0) }
-                    let xxRound := add(xx, half)
-                    if lt(xxRound, xx) { revert(0, 0) }
-                    x := div(xxRound, RAY)
-                    if mod(n, 2) {
-                        let zx := mul(z, x)
-                        if and(iszero(iszero(x)), iszero(eq(div(zx, x), z))) { revert(0, 0) }
-                        let zxRound := add(zx, half)
-                        if lt(zxRound, zx) { revert(0, 0) }
-                        z := div(zxRound, RAY)
-                    }
-                }
-            }
-        }
+        return _bucketIndexByBoostRate[perSecondRateBoost] != 0 || perSecondRateBoost == MathLib.RAY;
     }
 }
