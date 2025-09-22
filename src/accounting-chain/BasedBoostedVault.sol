@@ -219,29 +219,50 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
             return 0;
         }
         uint256 bucketIndex = _bucketIndexByBoostRate[_positions[account].boostRate];
-        uint256 conversionRate = _rayMul(_baseConversionRate, _activeBuckets[bucketIndex].conversionRate);
-        return _wadMulByRay(_positions[account].shares, conversionRate);
+        uint256 conversionRate = _previewBaseConversionRate().mulByRay(_previewBucketConversionRate(bucketIndex));
+        return _positions[account].shares.mulByRay(conversionRate);
     }
 
     function getRateData(address account) external view returns (RateData memory) {
         Bucket memory bucket = _activeBuckets[_bucketIndexByBoostRate[_positions[account].boostRate]];
         return RateData({
+            // TODO: need to return composite of base rate and boost rate
             perSecondRate: bucket.perSecondRateBoost,
             conversionRate: bucket.conversionRate,
             lastAccrualTimestamp: bucket.lastAccrualTimestamp
         });
     }
 
-    function _isAssetSupported(address asset) internal view returns (bool) {
+    function _isAssetSupported(address /* asset */ ) internal pure returns (bool) {
         // TODO: Implement whitelist for assets
         return true;
+    }
+
+    function _previewBaseConversionRate() internal view returns (uint256) {
+        uint256 secondsSinceLastAccrual = block.timestamp - _lastBaseConversionRateAccrualTimestamp;
+        uint256 newBaseConversionRate = _baseConversionRate;
+        if (secondsSinceLastAccrual != 0) {
+            uint256 growthFactor = _basePerSecondRate.rpow(secondsSinceLastAccrual);
+            newBaseConversionRate = _baseConversionRate.mulByRay(growthFactor);
+        }
+        return newBaseConversionRate;
+    }
+
+    function _previewBucketConversionRate(uint256 bucketIndex) internal view returns (uint256) {
+        uint256 secondsSinceLastAccrual = block.timestamp - _activeBuckets[bucketIndex].lastAccrualTimestamp;
+        uint256 newConversionRate = _activeBuckets[bucketIndex].conversionRate;
+        if (secondsSinceLastAccrual != 0) {
+            uint256 growthFactor = _activeBuckets[bucketIndex].perSecondRateBoost.rpow(secondsSinceLastAccrual);
+            newConversionRate = _activeBuckets[bucketIndex].conversionRate.mulByRay(growthFactor);
+        }
+        return newConversionRate;
     }
 
     function _accrueBaseConversionRate() internal {
         uint256 secondsSinceLastAccrual = block.timestamp - _lastBaseConversionRateAccrualTimestamp;
         if (secondsSinceLastAccrual != 0) {
-            uint256 growthFactor = _rpow(_basePerSecondRate, secondsSinceLastAccrual);
-            _baseConversionRate = _rayMul(_baseConversionRate, growthFactor);
+            uint256 growthFactor = _basePerSecondRate.rpow(secondsSinceLastAccrual);
+            _baseConversionRate = _baseConversionRate.mulByRay(growthFactor);
             _lastBaseConversionRateAccrualTimestamp = block.timestamp;
             // TODO: add accrual event
         }
