@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import {MathLib} from "../../src/libraries/MathLib.sol";
 import {BasedBoostedVault} from "../../src/accounting-chain/BasedBoostedVault.sol";
 
 contract ExtendedBasedBoostedVault is BasedBoostedVault {
@@ -20,7 +21,7 @@ contract ExtendedBasedBoostedVault is BasedBoostedVault {
 
     /// @notice APR can be converted to APY/AEY given 365 compounding periods (similar to Spark)
     function getBaseAPR() public view returns (uint256) {
-        return (getBasePerSecondRate() - RAY) * SECONDS_PER_YEAR;
+        return (getBasePerSecondRate() - MathLib.RAY) * SECONDS_PER_YEAR;
     }
 
     function forceAccrueBaseConversionRate() public {
