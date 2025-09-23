@@ -196,10 +196,31 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         // TODO: event :)
     }
 
-    function withdraw(address account, address, /* asset */ uint256 /* amount */ ) external view override {
-        require(msg.sender == account);
+    // For now, for simplicity, we assume we are handling a single asset, the user passes the same asset he deposited.
+    // We are also ignoring the amount parameter, and redeeming the full shares, returning the full amount of assets
+    function withdraw(address account, address asset, uint256 amount) external override returns (uint256) {
         // TODO: check notes on withdrawal scenarios (profitable | unprofitable, sufficient balance on acct. chain | insufficient balance on acct. chain)
         // TODO: Create withdrawal queue item
+        (account, asset, amount);
+        require(msg.sender == account);
+        require(_positions[account].shares > 0);
+
+        uint256 bucketIndex = _bucketIndexByBoostRate[_positions[account].boostRate];
+
+        _accrueBaseConversionRate();
+        _accrueBucketConversionRate(bucketIndex);
+
+        uint256 conversionRate = _baseConversionRate.mulByRay(_activeBuckets[bucketIndex].conversionRate);
+        uint256 assetsAmount = _positions[account].shares.mulByRay(conversionRate);
+
+        _activeBuckets[bucketIndex].totalShares -= _positions[account].shares;
+        delete _positions[account];
+
+        IERC20(asset).safeTransfer(msg.sender, assetsAmount);
+
+        // TODO: event :)
+
+        return assetsAmount;
     }
 
     function getVaultObligations() external view override returns (uint256) {
