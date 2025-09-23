@@ -8,6 +8,8 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {MathLib} from "../libraries/MathLib.sol";
 import {IBasedBoostedVault} from "./IBasedBoostedVault.sol";
 
+import {console2} from "forge-std/console2.sol";
+
 contract BasedBoostedVault is IBasedBoostedVault, Ownable {
     using MathLib for uint256;
     using SafeERC20 for IERC20;
@@ -143,8 +145,9 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         }
 
         // Calculate current account balance including the accrued interest
-        uint256 currentConversionRate = _baseConversionRate.mulByRay(_activeBuckets[currentBucketIndex].conversionRate);
-        uint256 accountBalance = _positions[account].shares.mulByRay(currentConversionRate);
+        uint256 currentConversionRate =
+            _baseConversionRate.rayMulDown(_activeBuckets[currentBucketIndex].conversionRate);
+        uint256 accountBalance = _positions[account].shares.rayMulDown(currentConversionRate);
 
         // Get account out of his current bucket
         _activeBuckets[currentBucketIndex].totalShares -= _positions[account].shares;
@@ -158,8 +161,8 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         }
 
         // Put account in the new corresponding bucket
-        uint256 newConversionRate = _baseConversionRate.mulByRay(newPerSecondRateBoost);
-        uint256 newShares = accountBalance.wadDivByRay(newConversionRate);
+        uint256 newConversionRate = _baseConversionRate.rayMulDown(newPerSecondRateBoost);
+        uint256 newShares = accountBalance.rayDivDown(newConversionRate);
         _activeBuckets[_bucketIndexByBoostRate[newPerSecondRateBoost]].totalShares += newShares;
         _positions[account].boostRate = newPerSecondRateBoost;
         _positions[account].shares = newShares;
@@ -185,8 +188,8 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
 
         _accrueBucketConversionRate(bucketIndex);
 
-        uint256 conversionRate = _baseConversionRate.mulByRay(_activeBuckets[bucketIndex].conversionRate);
-        uint256 shares = amount.wadDivByRay(conversionRate);
+        uint256 conversionRate = _baseConversionRate.rayMulDown(_activeBuckets[bucketIndex].conversionRate);
+        uint256 shares = amount.rayDivDown(conversionRate);
 
         _activeBuckets[bucketIndex].totalShares += shares;
         _positions[account].shares += shares;
@@ -203,15 +206,19 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         // TODO: Create withdrawal queue item
         (account, asset, amount);
         require(msg.sender == account);
+        console2.log("positions[account].shares:", _positions[account].shares);
         require(_positions[account].shares > 0);
 
         uint256 bucketIndex = _bucketIndexByBoostRate[_positions[account].boostRate];
+        console2.log("bucketIndex:", bucketIndex);
 
         _accrueBaseConversionRate();
         _accrueBucketConversionRate(bucketIndex);
 
-        uint256 conversionRate = _baseConversionRate.mulByRay(_activeBuckets[bucketIndex].conversionRate);
-        uint256 assetsAmount = _positions[account].shares.mulByRay(conversionRate);
+        uint256 conversionRate = _baseConversionRate.rayMulDown(_activeBuckets[bucketIndex].conversionRate);
+        console2.log("conversionRate:", conversionRate);
+        uint256 assetsAmount = _positions[account].shares.rayMulDown(conversionRate);
+        console2.log("assetsAmount:", assetsAmount);
 
         _activeBuckets[bucketIndex].totalShares -= _positions[account].shares;
         delete _positions[account];
@@ -229,7 +236,7 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
     }
 
     function getVaultAssets() external pure override returns (uint256) {
-        // TODO: Implement
+        // TODO: Implement by checking latest earning strategy balances
         return 0;
     }
 
@@ -238,8 +245,8 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
             return 0;
         }
         uint256 bucketIndex = _bucketIndexByBoostRate[_positions[account].boostRate];
-        uint256 conversionRate = _previewBaseConversionRate().mulByRay(_previewBucketConversionRate(bucketIndex));
-        return _positions[account].shares.mulByRay(conversionRate);
+        uint256 conversionRate = _previewBaseConversionRate().rayMulDown(_previewBucketConversionRate(bucketIndex));
+        return _positions[account].shares.rayMulDown(conversionRate);
     }
 
     function getRateData(address account) external view returns (RateData memory) {
@@ -262,7 +269,7 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         uint256 newBaseConversionRate = _baseConversionRate;
         if (secondsSinceLastAccrual != 0) {
             uint256 growthFactor = _basePerSecondRate.rpow(secondsSinceLastAccrual);
-            newBaseConversionRate = _baseConversionRate.mulByRay(growthFactor);
+            newBaseConversionRate = _baseConversionRate.rayMulDown(growthFactor);
         }
         return newBaseConversionRate;
     }
@@ -272,7 +279,7 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         uint256 newConversionRate = _activeBuckets[bucketIndex].conversionRate;
         if (secondsSinceLastAccrual != 0) {
             uint256 growthFactor = _activeBuckets[bucketIndex].perSecondRateBoost.rpow(secondsSinceLastAccrual);
-            newConversionRate = _activeBuckets[bucketIndex].conversionRate.mulByRay(growthFactor);
+            newConversionRate = _activeBuckets[bucketIndex].conversionRate.rayMulDown(growthFactor);
         }
         return newConversionRate;
     }
@@ -281,7 +288,7 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         uint256 secondsSinceLastAccrual = block.timestamp - _lastBaseConversionRateAccrualTimestamp;
         if (secondsSinceLastAccrual != 0) {
             uint256 growthFactor = _basePerSecondRate.rpow(secondsSinceLastAccrual);
-            _baseConversionRate = _baseConversionRate.mulByRay(growthFactor);
+            _baseConversionRate = _baseConversionRate.rayMulDown(growthFactor);
             _lastBaseConversionRateAccrualTimestamp = block.timestamp;
             // TODO: add accrual event
         }
@@ -293,7 +300,7 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         if (secondsSinceLastAccrual != 0) {
             uint256 growthFactor = _activeBuckets[bucketIndex].perSecondRateBoost.rpow(secondsSinceLastAccrual);
             _activeBuckets[bucketIndex].conversionRate =
-                _activeBuckets[bucketIndex].conversionRate.mulByRay(growthFactor);
+                _activeBuckets[bucketIndex].conversionRate.rayMulDown(growthFactor);
             _activeBuckets[bucketIndex].lastAccrualTimestamp = block.timestamp;
             // TODO: add accrual event
         }
