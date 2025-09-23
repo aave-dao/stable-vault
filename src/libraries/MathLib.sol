@@ -7,6 +7,7 @@ library MathLib {
     function mulByRay(uint256 a, uint256 b) internal pure returns (uint256) {
         unchecked {
             return (a * b + RAY / 2) / RAY; // bankers' rounding
+                //return (a * b) / RAY; // bankers' rounding
         }
     }
 

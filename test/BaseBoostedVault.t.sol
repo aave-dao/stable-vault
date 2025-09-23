@@ -171,4 +171,275 @@ contract ExtendedBasedBoostedVaultT is Test {
         console2.log("Delta:", delta);
         assertLt(delta, 1e18);
     }
+
+    function testSameBlockDepositAndWithdrawMax(uint256 amount) public {
+        amount = bound(amount, 1, 1_000_000_000_000 ether);
+
+        uint256 blockTimestamp = block.timestamp;
+
+        address owner = address(this);
+        uint256 initialBasePerSecondRate = 1000000001243680656318820313; // ~4% APY
+        ExtendedBasedBoostedVault vault = new ExtendedBasedBoostedVault(owner, initialBasePerSecondRate);
+
+        TestErc20 asset = new TestErc20();
+        address account1 = makeAddr("account1");
+        vm.prank(account1);
+        asset.mint(account1, amount);
+        vm.prank(account1);
+        asset.approve(address(vault), amount);
+        vm.prank(account1);
+        vault.deposit(account1, address(asset), amount);
+
+        uint256 assetBalance = vault.getAccountBalance(account1);
+        assertEq(assetBalance, amount, "Asset balance does not match initial deposited amount");
+
+        // Without advancing the block or timestamp, call full withdrawal
+        vm.prank(account1);
+        uint256 assetsWithdrawn = vault.withdraw(account1, address(asset), assetBalance);
+
+        uint256 assetBalanceAfterWithdraw = vault.getAccountBalance(account1);
+
+        assertEq(assetBalance, assetsWithdrawn, "Asset balance does not match withdrawn amount");
+        assertEq(assetBalanceAfterWithdraw, 0, "Asset balance after withdrawal is not 0");
+
+        assertEq(block.timestamp, blockTimestamp, "Final block timestamp does not match initial timestamp");
+    }
+
+    function testMultiBlockDepositAndWithdrawMax(uint256 amount, uint256 elapsedTime) public {
+        uint256 maxYearsThatCanBeElapsed = 1_354;
+        amount = bound(amount, 1, 1_000_000_000_000 ether);
+        elapsedTime = bound(elapsedTime, 0, 365 days * maxYearsThatCanBeElapsed);
+
+        uint256 blockTimestamp = block.timestamp;
+
+        address owner = address(this);
+        uint256 initialBasePerSecondRate = 1000000001243680656318820313; // ~4% APY
+        ExtendedBasedBoostedVault vault = new ExtendedBasedBoostedVault(owner, initialBasePerSecondRate);
+
+        TestErc20 asset = new TestErc20();
+        address account1 = makeAddr("account1");
+        vm.prank(account1);
+        asset.mint(account1, amount);
+        vm.prank(account1);
+        asset.approve(address(vault), amount);
+        vm.prank(account1);
+        vault.deposit(account1, address(asset), amount);
+
+        uint256 assetBalance = vault.getAccountBalance(account1);
+        assertEq(assetBalance, amount, "Asset balance does not match initial deposited amount");
+
+        // Withdraw after advancing block some time
+        vm.warp(blockTimestamp + elapsedTime);
+
+        assetBalance = vault.getAccountBalance(account1);
+
+        uint256 assetsEarned = assetBalance - amount;
+        asset.mint(address(vault), assetsEarned);
+
+        vm.prank(account1);
+        uint256 assetsWithdrawn = vault.withdraw(account1, address(asset), assetBalance);
+
+        uint256 assetBalanceAfterWithdraw = vault.getAccountBalance(account1);
+
+        assertEq(assetBalance, assetsWithdrawn, "Asset balance does not match withdrawn amount");
+        assertEq(assetBalanceAfterWithdraw, 0, "Asset balance after withdrawal is not 0");
+    }
+
+    function testOneUnitDepositSameBlock(uint256 previousDepositAmount) public {
+        previousDepositAmount = bound(previousDepositAmount, 0, 1_000_000_000_000 ether);
+
+        uint256 blockTimestamp = block.timestamp;
+
+        address owner = address(this);
+        uint256 initialBasePerSecondRate = 1000000001243680656318820313; // ~4% APY
+        ExtendedBasedBoostedVault vault = new ExtendedBasedBoostedVault(owner, initialBasePerSecondRate);
+
+        TestErc20 asset = new TestErc20();
+        address account1 = makeAddr("account1");
+        if (previousDepositAmount > 0) {
+            vm.prank(account1);
+            asset.mint(account1, previousDepositAmount);
+            vm.prank(account1);
+            asset.approve(address(vault), previousDepositAmount);
+            vm.prank(account1);
+            vault.deposit(account1, address(asset), previousDepositAmount);
+        }
+
+        uint256 initialAssetBalance = vault.getAccountBalance(account1);
+        assertEq(initialAssetBalance, previousDepositAmount, "Asset balance does not match initial deposited amount");
+
+        vm.prank(account1);
+        asset.mint(account1, 1);
+        vm.prank(account1);
+        asset.approve(address(vault), 1);
+        vm.prank(account1);
+        vault.deposit(account1, address(asset), 1);
+
+        // Without advancing the block or timestamp, call full withdrawal
+        vm.prank(account1);
+        uint256 assetsWithdrawn = vault.withdraw(account1, address(asset), initialAssetBalance + 1);
+
+        uint256 assetBalanceAfterWithdraw = vault.getAccountBalance(account1);
+
+        assertEq(assetBalanceAfterWithdraw, 0, "Asset balance after withdrawal is not 0");
+        assertEq(
+            assetsWithdrawn, initialAssetBalance + 1, "Assets withdrawn does not take into account the 1 unit deposit"
+        );
+
+        assertEq(block.timestamp, blockTimestamp, "Final block timestamp does not match initial timestamp");
+    }
+
+    function testMultiBlockDepositAndWithdrawMax_largeApy(uint256 amount, uint256 elapsedTime) public {
+        // 1000000000377783247012652819 ~= 10% APY
+        uint256 maxYearsThatCanBeElapsed = 1_354;
+        amount = bound(amount, 1, 1_000_000_000_000 ether);
+        elapsedTime = bound(elapsedTime, 0, 365 days * maxYearsThatCanBeElapsed);
+
+        uint256 blockTimestamp = block.timestamp;
+
+        address owner = address(this);
+        uint256 initialBasePerSecondRate = 1000000000377783247012652819;
+        ExtendedBasedBoostedVault vault = new ExtendedBasedBoostedVault(owner, initialBasePerSecondRate);
+
+        TestErc20 asset = new TestErc20();
+
+        address account1 = makeAddr("account1");
+        vm.prank(account1);
+        asset.mint(account1, amount);
+        vm.prank(account1);
+        asset.approve(address(vault), amount);
+        vm.prank(account1);
+        vault.deposit(account1, address(asset), amount);
+
+        uint256 assetBalance = vault.getAccountBalance(account1);
+        assertEq(assetBalance, amount, "Asset balance does not match initial deposited amount");
+
+        // Withdraw after advancing block some time
+        vm.warp(blockTimestamp + elapsedTime);
+
+        assetBalance = vault.getAccountBalance(account1);
+
+        uint256 assetsEarned = assetBalance - amount;
+        asset.mint(address(vault), assetsEarned);
+
+        vm.prank(account1);
+        uint256 assetsWithdrawn = vault.withdraw(account1, address(asset), assetBalance);
+
+        uint256 assetBalanceAfterWithdraw = vault.getAccountBalance(account1);
+
+        assertEq(assetBalance, assetsWithdrawn, "Asset balance does not match withdrawn amount");
+        assertEq(assetBalanceAfterWithdraw, 0, "Asset balance after withdrawal is not 0");
+    }
+
+    function testMultiBlockDepositAndWithdrawMax_multiAccount(uint256 amount, uint256 elapsedTime) public {
+        // 1000000000377783247012652819 ~= 10% APY
+        uint256 maxYearsThatCanBeElapsed = 100;
+        amount = bound(amount, 1, 1_000_000_000_000 ether);
+        elapsedTime = bound(elapsedTime, 0, 365 days * maxYearsThatCanBeElapsed);
+
+        address owner = address(this);
+        uint256 initialBasePerSecondRate = 1000000000377783247012652819;
+        ExtendedBasedBoostedVault vault = new ExtendedBasedBoostedVault(owner, initialBasePerSecondRate);
+
+        TestErc20 asset = new TestErc20();
+
+        address account2 = makeAddr("account2");
+        vm.prank(account2);
+        asset.mint(account2, amount);
+        vm.prank(account2);
+        asset.approve(address(vault), amount);
+        vm.prank(account2);
+        vault.deposit(account2, address(asset), amount);
+        uint256 assetBalanceAcct2 = vault.getAccountBalance(account2);
+        assertEq(assetBalanceAcct2, amount, "Asset balance does not match initial deposited amount");
+
+        vm.warp(block.timestamp + 1 days);
+
+        address account1 = makeAddr("account1");
+        vm.prank(account1);
+        asset.mint(account1, amount);
+        vm.prank(account1);
+        asset.approve(address(vault), amount);
+        vm.prank(account1);
+        vault.deposit(account1, address(asset), amount);
+
+        uint256 assetBalanceAcct1 = vault.getAccountBalance(account1);
+
+        // TODO: balance seems to round up due to bankers' rounding
+        // 41308273130206492578766748364 != 41308273130206492578766748363
+        assertEq(assetBalanceAcct1, amount, "Asset balance does not match initial deposited amount");
+
+        // Withdraw after advancing block some time
+        vm.warp(block.timestamp + elapsedTime);
+        assetBalanceAcct1 = vault.getAccountBalance(account1);
+
+        uint256 assetsEarned = assetBalanceAcct1 - amount;
+        asset.mint(address(vault), assetsEarned);
+
+        vm.prank(account1);
+        uint256 assetsWithdrawn = vault.withdraw(account1, address(asset), assetBalanceAcct1);
+
+        uint256 assetBalanceAfterWithdraw = vault.getAccountBalance(account1);
+
+        assertEq(assetBalanceAcct1, assetsWithdrawn, "Asset balance does not match withdrawn amount");
+        assertEq(assetBalanceAfterWithdraw, 0, "Asset balance after withdrawal is not 0");
+    }
+
+    function testMultiBlockDepositAndWithdrawMax_sameAccount(uint256 amount, uint256 elapsedTime) public {
+        // 1000000000377783247012652819 ~= 10% APY
+        uint256 maxYearsThatCanBeElapsed = 100;
+        amount = bound(amount, 1, 1_000_000_000_000 ether);
+        elapsedTime = bound(elapsedTime, 0, 365 days * maxYearsThatCanBeElapsed);
+
+        address owner = address(this);
+        uint256 initialBasePerSecondRate = 1000000000377783247012652819;
+        ExtendedBasedBoostedVault vault = new ExtendedBasedBoostedVault(owner, initialBasePerSecondRate);
+
+        TestErc20 asset = new TestErc20();
+
+        address account2 = makeAddr("account2");
+        vm.prank(account2);
+        asset.mint(account2, amount);
+        vm.prank(account2);
+        asset.approve(address(vault), amount);
+        vm.prank(account2);
+        vault.deposit(account2, address(asset), amount);
+        uint256 assetBalanceAcct2 = vault.getAccountBalance(account2);
+        assertEq(assetBalanceAcct2, amount, "Asset balance does not match initial deposited amount");
+
+        vm.warp(block.timestamp + 1 days);
+
+        address account1 = makeAddr("account1");
+        vm.prank(account1);
+        asset.mint(account1, amount);
+        vm.prank(account1);
+        asset.approve(address(vault), amount);
+        vm.prank(account1);
+        vault.deposit(account1, address(asset), amount);
+
+        uint256 assetBalanceAcct1 = vault.getAccountBalance(account1);
+
+        // TODO: balance seems to round up due to bankers' rounding
+        // 41308273130206492578766748364 != 41308273130206492578766748363
+        assertEq(assetBalanceAcct1, amount, "Asset balance does not match initial deposited amount");
+
+        // Withdraw after advancing block some time
+        vm.warp(block.timestamp + elapsedTime);
+        assetBalanceAcct1 = vault.getAccountBalance(account1);
+
+        uint256 assetsEarned = assetBalanceAcct1 - amount;
+        asset.mint(address(vault), assetsEarned);
+
+        vm.prank(account1);
+        uint256 assetsWithdrawn = vault.withdraw(account1, address(asset), assetBalanceAcct1);
+
+        uint256 assetBalanceAfterWithdraw = vault.getAccountBalance(account1);
+
+        assertEq(assetBalanceAcct1, assetsWithdrawn, "Asset balance does not match withdrawn amount");
+        assertEq(assetBalanceAfterWithdraw, 0, "Asset balance after withdrawal is not 0");
+    }
+
+    function testNextBlockDepositAndSetBoost() public {
+        // TODO:
+    }
 }
