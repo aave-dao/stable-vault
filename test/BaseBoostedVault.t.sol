@@ -11,7 +11,7 @@ import {MathLib} from "./../src/libraries/MathLib.sol";
 contract ExtendedBasedBoostedVaultT is Test {
     using MathLib for uint256;
 
-    function testMathLibRayMulDown() public {
+    function testMathLibRayMulDown() public pure {
         uint256 a = 19944;
         uint256 b = 1000035077411893278326216870;
         uint256 result = a.rayMulDown(b);

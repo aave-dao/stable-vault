@@ -8,8 +8,6 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {MathLib} from "../libraries/MathLib.sol";
 import {IBasedBoostedVault} from "./IBasedBoostedVault.sol";
 
-import {console2} from "forge-std/console2.sol";
-
 contract BasedBoostedVault is IBasedBoostedVault, Ownable {
     using MathLib for uint256;
     using SafeERC20 for IERC20;
@@ -201,24 +199,19 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
 
     // For now, for simplicity, we assume we are handling a single asset, the user passes the same asset he deposited.
     // We are also ignoring the amount parameter, and redeeming the full shares, returning the full amount of assets
-    function withdraw(address account, address asset, uint256 amount) external override returns (uint256) {
+    function withdraw(address account, address asset, uint256 /* amount */ ) external override returns (uint256) {
         // TODO: check notes on withdrawal scenarios (profitable | unprofitable, sufficient balance on acct. chain | insufficient balance on acct. chain)
         // TODO: Create withdrawal queue item
-        (account, asset, amount);
         require(msg.sender == account);
-        console2.log("positions[account].shares:", _positions[account].shares);
         require(_positions[account].shares > 0);
 
         uint256 bucketIndex = _bucketIndexByBoostRate[_positions[account].boostRate];
-        console2.log("bucketIndex:", bucketIndex);
 
         _accrueBaseConversionRate();
         _accrueBucketConversionRate(bucketIndex);
 
         uint256 conversionRate = _baseConversionRate.rayMulDown(_activeBuckets[bucketIndex].conversionRate);
-        console2.log("conversionRate:", conversionRate);
         uint256 assetsAmount = _positions[account].shares.rayMulDown(conversionRate);
-        console2.log("assetsAmount:", assetsAmount);
 
         _activeBuckets[bucketIndex].totalShares -= _positions[account].shares;
         delete _positions[account];
