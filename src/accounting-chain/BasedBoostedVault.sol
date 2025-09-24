@@ -128,7 +128,7 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         _accrueBucketConversionRate(currentBucketIndex);
 
         if (_isActiveBucket(newPerSecondRateBoost)) {
-            _accrueBucketConversionRate(newPerSecondRateBoost);
+            _accrueBucketConversionRate(_bucketIndexByBoostRate[newPerSecondRateBoost]);
         } else {
             // Create bucket and store it into the active buckets
             _activeBuckets.push(
