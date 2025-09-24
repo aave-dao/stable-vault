@@ -119,16 +119,21 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
 
     // TODO: add back onlyOwner modifier
     function setBoost(address account, uint256 newPerSecondRateBoost) external override {
-        require(_positions[account].shares > 0);
-        uint256 currentBoostRate = _positions[account].boostRate;
-        require(currentBoostRate != newPerSecondRateBoost);
-        uint256 currentBucketIndex = _bucketIndexByBoostRate[currentBoostRate];
+        uint256 accountOldShares = _positions[account].shares;
+        require(accountOldShares > 0);
+
+        uint256 oldBoostRate = _positions[account].boostRate;
+        require(oldBoostRate != newPerSecondRateBoost);
+
+        uint256 oldBucketIndex = _bucketIndexByBoostRate[oldBoostRate];
 
         _accrueBaseConversionRate();
-        _accrueBucketConversionRate(currentBucketIndex);
+        _accrueBucketConversionRate(oldBucketIndex);
 
+        uint256 newBucketIndex;
         if (_isActiveBucket(newPerSecondRateBoost)) {
-            _accrueBucketConversionRate(_bucketIndexByBoostRate[newPerSecondRateBoost]);
+            newBucketIndex = _bucketIndexByBoostRate[newPerSecondRateBoost];
+            _accrueBucketConversionRate(newBucketIndex);
         } else {
             // Create bucket and store it into the active buckets
             _activeBuckets.push(
@@ -139,31 +144,31 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
                     totalShares: 0
                 })
             );
-            _bucketIndexByBoostRate[newPerSecondRateBoost] = _activeBuckets.length - 1;
+            newBucketIndex = _activeBuckets.length - 1;
+            _bucketIndexByBoostRate[newPerSecondRateBoost] = newBucketIndex;
         }
 
-        // Calculate current account balance including the accrued interest
-        uint256 currentConversionRate =
-            _baseConversionRate.rayMulDown(_activeBuckets[currentBucketIndex].conversionRate);
-        uint256 accountBalance = _positions[account].shares.rayMulDown(currentConversionRate);
+        uint256 oldBoostConversionRate = _activeBuckets[oldBucketIndex].conversionRate;
+        uint256 newBoostConversionRate = _activeBuckets[newBucketIndex].conversionRate;
 
-        // Get account out of his current bucket
-        _activeBuckets[currentBucketIndex].totalShares -= _positions[account].shares;
+        uint256 accountNewShares = MathLib.rayMulDown(accountOldShares, MathLib.rayDivDown(oldBoostConversionRate, newBoostConversionRate));
 
-        if (_activeBuckets[currentBucketIndex].totalShares == 0) {
-            // No liquidity left in the bucket, remove it from the active ones through swapping with the last bucket
-            _activeBuckets[currentBucketIndex] = _activeBuckets[_activeBuckets.length - 1];
+        _activeBuckets[oldBucketIndex].totalShares -= accountOldShares;
+        _activeBuckets[newBucketIndex].totalShares += accountNewShares;
+
+        if (_activeBuckets[oldBucketIndex].totalShares == 0) {
+            uint256 lastBucketIndex = _activeBuckets.length - 1;
+            if (oldBucketIndex != lastBucketIndex) {
+                Bucket memory moved = _activeBuckets[lastBucketIndex];
+                _activeBuckets[oldBucketIndex] = moved;
+                _bucketIndexByBoostRate[moved.perSecondRateBoost] = oldBucketIndex;
+            }
             _activeBuckets.pop();
-            delete _bucketIndexByBoostRate[currentBoostRate];
-            _bucketIndexByBoostRate[_activeBuckets[currentBucketIndex].perSecondRateBoost] = currentBucketIndex;
+            delete _bucketIndexByBoostRate[oldBoostRate];
         }
-
-        // Put account in the new corresponding bucket
-        uint256 newConversionRate = _baseConversionRate.rayMulDown(newPerSecondRateBoost);
-        uint256 newShares = accountBalance.rayDivDown(newConversionRate);
-        _activeBuckets[_bucketIndexByBoostRate[newPerSecondRateBoost]].totalShares += newShares;
+    
         _positions[account].boostRate = newPerSecondRateBoost;
-        _positions[account].shares = newShares;
+        _positions[account].shares    = accountNewShares;
 
         // TODO: event :)
     }
