@@ -151,7 +151,8 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         uint256 oldBoostConversionRate = _activeBuckets[oldBucketIndex].conversionRate;
         uint256 newBoostConversionRate = _activeBuckets[newBucketIndex].conversionRate;
 
-        uint256 accountNewShares = MathLib.rayMulDown(accountOldShares, MathLib.rayDivDown(oldBoostConversionRate, newBoostConversionRate));
+        uint256 accountNewShares =
+            MathLib.rayMulDown(accountOldShares, MathLib.rayDivDown(oldBoostConversionRate, newBoostConversionRate));
 
         _activeBuckets[oldBucketIndex].totalShares -= accountOldShares;
         _activeBuckets[newBucketIndex].totalShares += accountNewShares;
@@ -166,9 +167,9 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
             _activeBuckets.pop();
             delete _bucketIndexByBoostRate[oldBoostRate];
         }
-    
+
         _positions[account].boostRate = newPerSecondRateBoost;
-        _positions[account].shares    = accountNewShares;
+        _positions[account].shares = accountNewShares;
 
         // TODO: event :)
     }
