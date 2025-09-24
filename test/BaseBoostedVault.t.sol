@@ -7,9 +7,18 @@ import {console2} from "forge-std/console2.sol";
 import {ExtendedBasedBoostedVault} from "./mocks/ExtendedBasedBoostedVault.sol";
 import {TestErc20} from "./mocks/TestErc20.sol";
 import {MathLib} from "./../src/libraries/MathLib.sol";
+import {IBasedBoostedVault} from "./../src/accounting-chain/IBasedBoostedVault.sol";
 
 contract ExtendedBasedBoostedVaultT is Test {
     using MathLib for uint256;
+
+    function _deployVault(address owner, uint256 initialBasePerSecondRate)
+        internal
+        virtual
+        returns (IBasedBoostedVault)
+    {
+        return IBasedBoostedVault(new ExtendedBasedBoostedVault(owner, initialBasePerSecondRate));
+    }
 
     function testMathLibRayMulDown() public pure {
         uint256 a = 19944;
@@ -408,5 +417,56 @@ contract ExtendedBasedBoostedVaultT is Test {
 
     function testNextBlockDepositAndSetBoost() public {
         // TODO:
+    }
+
+    function testSetBoostsOver10Years() public {
+        // Context: - find driver of value delta between ending balance of (5% base) APY vs (4% base + 1% boost) APY
+        //          - add intermittent boosts across the time period of the initial deposit made
+        //          - as of the writing of this test we concluded that intermittent deposits/withdrawals were not a driver of divergence in actual vs expected at the end of the 10 years
+        // WolframAlpha: 2,000,000,000 * 1.05^10 = 3,257,789,253.5548828125
+        uint256 originalDeposit = 2_000_000_000 ether;
+
+        address owner = address(this);
+        uint256 initialBasePerSecondRate = 1000000001243680656318820313; // ~4% APY
+        IBasedBoostedVault vault = _deployVault(owner, initialBasePerSecondRate);
+
+        // Asset deposit
+        TestErc20 asset = new TestErc20();
+        asset.mint(address(this), originalDeposit);
+        asset.approve(address(vault), originalDeposit);
+        vault.deposit(address(this), address(asset), originalDeposit);
+
+        asset.approve(address(vault), originalDeposit);
+
+        uint256 BOOST_4_TO_5 = 1000000000303445301167003084;
+
+        // Set initial boost to set effective rate from 4% APY to 5% APY
+        vault.setBoost(address(this), BOOST_4_TO_5);
+
+        uint256 currentBlockTs = block.timestamp;
+        uint256 numberOfYears = 10;
+        uint256 endingBlockTs = currentBlockTs + (365 days * numberOfYears);
+        uint256 numberOfBoostsPerYear = 100;
+        uint256 totalBoosts = numberOfBoostsPerYear * numberOfYears;
+        uint256 interval = (endingBlockTs - currentBlockTs) / totalBoosts;
+
+        bool addOneToBoost = true;
+        for (uint256 i = 0; i < totalBoosts; i++) {
+            uint256 nextTs = currentBlockTs + (i + 1) * interval;
+            vm.warp(nextTs);
+            vault.setBoost(address(this), BOOST_4_TO_5 + (addOneToBoost ? 1 : 0));
+            addOneToBoost = !addOneToBoost;
+        }
+
+        console2.log("block.timestamp: ", block.timestamp);
+        console2.log("endingBlockTs: ", endingBlockTs);
+        assertEq(block.timestamp, endingBlockTs);
+
+        uint256 thisUsdBalanceInVault = vault.getAccountBalance(address(this));
+
+        console2.log("thisUsdBalanceInVault: ", thisUsdBalanceInVault);
+
+        uint256 expectedBalance_After_10Years = 3_257_789_253_554882812500000000;
+        console2.log("delta_account_1: ", expectedBalance_After_10Years - thisUsdBalanceInVault);
     }
 }
