@@ -15,7 +15,7 @@ contract ExtendedBasedBoostedVault is BasedBoostedVault {
         return _basePerSecondRate;
     }
 
-    function getBoostConversionRate() public view returns (uint256) {
+    function getBaseConversionRate() public view returns (uint256) {
         return _baseConversionRate;
     }
 

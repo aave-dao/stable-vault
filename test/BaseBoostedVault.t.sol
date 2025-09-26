@@ -52,7 +52,7 @@ contract ExtendedBasedBoostedVaultT is Test {
         ExtendedBasedBoostedVault vault = new ExtendedBasedBoostedVault(owner, initialBasePerSecondRate);
 
         // Initial conversion rate should be RAY
-        uint256 initialConversionRate = vault.getBoostConversionRate();
+        uint256 initialConversionRate = vault.getBaseConversionRate();
         assertEq(initialConversionRate, 1e27, "Initial conversion rate should be RAY");
         console2.log("Conversion rate year 0:", initialConversionRate);
         assertEq(vault.getBaseAPR(), 46406372848300078191216000);
@@ -63,7 +63,7 @@ contract ExtendedBasedBoostedVaultT is Test {
         vault.forceAccrueBaseConversionRate();
 
         // Assert: conversion rate should have grown by ~5%
-        uint256 newConversionRateYear1 = vault.getBoostConversionRate();
+        uint256 newConversionRateYear1 = vault.getBaseConversionRate();
         console2.log("Conversion rate year 1:", newConversionRateYear1);
         assertGt(newConversionRateYear1, initialConversionRate);
 
@@ -74,7 +74,7 @@ contract ExtendedBasedBoostedVaultT is Test {
         vault.forceAccrueBaseConversionRate();
 
         // Assert: conversion rate should have grown by ~5%
-        uint256 newConversionRateYear2 = vault.getBoostConversionRate();
+        uint256 newConversionRateYear2 = vault.getBaseConversionRate();
         console2.log("Conversion rate year 2:", newConversionRateYear2);
         assertGt(newConversionRateYear2, newConversionRateYear1);
         assertGt(newConversionRateYear2 - 1e27, 2 * (newConversionRateYear1 - 1e27));
