@@ -7,7 +7,7 @@ import {console2} from "forge-std/console2.sol";
 import {ExtendedBasedBoostedVault} from "./mocks/ExtendedBasedBoostedVault.sol";
 import {TestErc20} from "./mocks/TestErc20.sol";
 import {MathLib} from "./../src/libraries/MathLib.sol";
-import {IBasedBoostedVault} from "./../src/accounting-chain/IBasedBoostedVault.sol";
+import {IBasedBoostedVault} from "./../src/accounting-chain/interfaces/IBasedBoostedVault.sol";
 
 contract ExtendedBasedBoostedVaultT is Test {
     using MathLib for uint256;

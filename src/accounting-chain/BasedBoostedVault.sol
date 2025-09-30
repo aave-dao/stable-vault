@@ -6,7 +6,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 import {MathLib} from "../libraries/MathLib.sol";
-import {IBasedBoostedVault} from "./IBasedBoostedVault.sol";
+import {IBasedBoostedVault} from "./interfaces/IBasedBoostedVault.sol";
 
 contract BasedBoostedVault is IBasedBoostedVault, Ownable {
     using MathLib for uint256;
