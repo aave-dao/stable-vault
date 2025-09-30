@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
 interface IBasedBoostedVault {
@@ -14,7 +14,9 @@ interface IBasedBoostedVault {
 
     function deposit(address account, address asset, uint256 amount) external;
 
-    function withdraw(address account, address asset, uint256 amount) external returns (uint256);
+    function requestWithdrawal(address account, address asset, uint256 amount) external returns (uint256);
+
+    // function processWithdrawal(uint256 withdrawalRequestId, bytes calldata data) external returns (bytes memory);
 
     function getVaultObligations() external view returns (uint256);
 

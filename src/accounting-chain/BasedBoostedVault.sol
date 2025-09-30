@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -7,6 +7,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 import {MathLib} from "../libraries/MathLib.sol";
 import {IBasedBoostedVault} from "./interfaces/IBasedBoostedVault.sol";
+import {IVaultFundsHandler} from "./interfaces/IVaultFundsHandler.sol";
 
 contract BasedBoostedVault is IBasedBoostedVault, Ownable {
     using MathLib for uint256;
@@ -43,6 +44,8 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         uint256 boostRate;
         uint256 shares;
     }
+
+    IVaultFundsHandler internal _fundsHandler;
 
     /**
      * @dev The base per second rate, the fixed rate that all accounts earn by default.
@@ -198,14 +201,19 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         _activeBuckets[bucketIndex].totalShares += shares;
         _positions[account].shares += shares;
 
-        IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
+        IERC20(asset).safeTransferFrom(msg.sender, address(_fundsHandler), amount);
+        _fundsHandler.processDeposit(account, asset, amount);
 
         // TODO: event :)
     }
 
     // For now, for simplicity, we assume we are handling a single asset, the user passes the same asset he deposited.
     // We are also ignoring the amount parameter, and redeeming the full shares, returning the full amount of assets
-    function withdraw(address account, address asset, uint256 /* amount */ ) external override returns (uint256) {
+    function requestWithdrawal(address account, address asset, uint256 /* amount */ )
+        external
+        override
+        returns (uint256)
+    {
         // TODO: check notes on withdrawal scenarios (profitable | unprofitable, sufficient balance on acct. chain | insufficient balance on acct. chain)
         // TODO: Create withdrawal queue item
         require(msg.sender == account);
@@ -222,11 +230,23 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         _activeBuckets[bucketIndex].totalShares -= _positions[account].shares;
         delete _positions[account];
 
-        IERC20(asset).safeTransfer(msg.sender, assetsAmount);
+        // IERC20(asset).safeTransfer(msg.sender, assetsAmount);
+        uint256 withdrawalRequestId = _fundsHandler.processWithdrawalRequest({
+            account: account,
+            amount: assetsAmount,
+            originalDeposit: _positions[account].originalDeposit,
+            preferredAsset: asset,
+            data: ""
+        });
 
         // TODO: event :)
 
-        return assetsAmount;
+        return withdrawalRequestId;
+    }
+
+    function processWithdrawal(uint256 withdrawalRequestId, bytes memory data) external {
+        _fundsHandler.processWithdrawal(withdrawalRequestId, data);
+        // TODO: Implement
     }
 
     function getVaultObligations() external view override returns (uint256) {

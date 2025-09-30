@@ -211,7 +211,7 @@ contract ExtendedBasedBoostedVaultT is Test {
 
         // Without advancing the block or timestamp, call full withdrawal
         vm.prank(account1);
-        uint256 assetsWithdrawn = vault.withdraw(account1, address(asset), assetBalance);
+        uint256 assetsWithdrawn = vault.requestWithdrawal(account1, address(asset), assetBalance);
 
         uint256 assetBalanceAfterWithdraw = vault.getAccountBalance(account1);
 
@@ -256,7 +256,7 @@ contract ExtendedBasedBoostedVaultT is Test {
         asset.mint(address(vault), assetsEarned);
 
         vm.prank(account1);
-        uint256 assetsWithdrawn = vault.withdraw(account1, address(asset), assetBalance);
+        uint256 assetsWithdrawn = vault.requestWithdrawal(account1, address(asset), assetBalance);
 
         uint256 assetBalanceAfterWithdraw = vault.getAccountBalance(account1);
 
@@ -296,7 +296,7 @@ contract ExtendedBasedBoostedVaultT is Test {
 
         // Without advancing the block or timestamp, call full withdrawal
         vm.prank(account1);
-        uint256 assetsWithdrawn = vault.withdraw(account1, address(asset), initialAssetBalance + 1);
+        uint256 assetsWithdrawn = vault.requestWithdrawal(account1, address(asset), initialAssetBalance + 1);
 
         uint256 assetBalanceAfterWithdraw = vault.getAccountBalance(account1);
 
@@ -344,7 +344,7 @@ contract ExtendedBasedBoostedVaultT is Test {
         asset.mint(address(vault), assetsEarned);
 
         vm.prank(account1);
-        uint256 assetsWithdrawn = vault.withdraw(account1, address(asset), assetBalance);
+        uint256 assetsWithdrawn = vault.requestWithdrawal(account1, address(asset), assetBalance);
 
         uint256 assetBalanceAfterWithdraw = vault.getAccountBalance(account1);
 
@@ -406,7 +406,7 @@ contract ExtendedBasedBoostedVaultT is Test {
         }
 
         vm.prank(account1);
-        uint256 assetsWithdrawn = vault.withdraw(account1, address(asset), assetBalanceAcct1);
+        uint256 assetsWithdrawn = vault.requestWithdrawal(account1, address(asset), assetBalanceAcct1);
 
         console2.log("block timestamp after withdraw:", block.timestamp);
         uint256 assetBalanceAfterWithdraw = vault.getAccountBalance(account1);
