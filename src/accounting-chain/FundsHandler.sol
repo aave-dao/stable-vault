@@ -6,6 +6,7 @@ import {IWithdrawalPriorityQueue} from "./interfaces/IWithdrawalPriorityQueue.so
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+// Consider making it a library instead
 contract FundsHandler is IVaultFundsHandler {
     using SafeERC20 for IERC20;
 
@@ -22,6 +23,7 @@ contract FundsHandler is IVaultFundsHandler {
     uint256 internal _lastWithdrawalRequestId;
     IWithdrawalPriorityQueue internal _queue;
 
+    // TODO: onlyBBVault
     function processWithdrawalRequest(
         address account,
         uint256 amount,
@@ -29,28 +31,30 @@ contract FundsHandler is IVaultFundsHandler {
         address preferredAsset,
         bytes calldata /* data */
     ) external override returns (uint256) {
-        _lastWithdrawalRequestId++;
-        _withdrawalRequests[_lastWithdrawalRequestId] =
+        uint256 withdrawalRequestId = ++_lastWithdrawalRequestId;
+        _withdrawalRequests[withdrawalRequestId] =
             WithdrawalRequest(account, amount, originalDeposit, preferredAsset, block.timestamp, "");
-        return _lastWithdrawalRequestId;
         // TODO: Implement
+        return withdrawalRequestId;
     }
 
+    // TODO: onlyBBVault
     function processDeposit(address account, address asset, uint256 amount) external override {
         // TODO: Implement
     }
 
-    function processWithdrawal(uint256 withdrawalRequestId, bytes calldata /* data */ )
+    // TODO: onlyBBVault, but permissionless in the BBVault
+    function processWithdrawalExecution(uint256 withdrawalRequestId, bytes calldata /* data */ )
         external
         override
         returns (bytes memory)
     {
         _verifyIfRequestCanBeProcessed(withdrawalRequestId);
-        uint256 amount = _processActualWithdrawal(withdrawalRequestId);
+        uint256 amount = _executeWithdrawal(withdrawalRequestId);
         return abi.encode(amount);
     }
 
-    function _processActualWithdrawal(uint256 withdrawalRequestId) internal returns (uint256) {
+    function _executeWithdrawal(uint256 withdrawalRequestId) internal returns (uint256) {
         address token = _withdrawalRequests[withdrawalRequestId].preferredAsset;
         uint256 amount = _withdrawalRequests[withdrawalRequestId].amountRequested;
         address destination = _withdrawalRequests[withdrawalRequestId].account;
@@ -60,7 +64,7 @@ contract FundsHandler is IVaultFundsHandler {
     }
 
     function _verifyIfRequestCanBeProcessed(uint256 withdrawalRequestId) internal view {
-        require(IWithdrawalPriorityQueue(_queue).canBeExecuted(withdrawalRequestId));
         // TODO: Implement
+        // require(IWithdrawalPriorityQueue(_queue).canBeExecuted(withdrawalRequestId));
     }
 }

@@ -2,18 +2,26 @@
 pragma solidity ^0.8.22;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 import {MathLib} from "../libraries/MathLib.sol";
 import {IBasedBoostedVault} from "./interfaces/IBasedBoostedVault.sol";
 import {IVaultFundsHandler} from "./interfaces/IVaultFundsHandler.sol";
+/// @dev Assets balances are tracked in RAY internally; conversions from and to specific asset denomination is made on deposit and on withdrawal confirmation
 
 contract BasedBoostedVault is IBasedBoostedVault, Ownable {
     using MathLib for uint256;
     using SafeERC20 for IERC20;
 
     uint256 internal constant SECONDS_PER_YEAR = 365 days;
+
+    event WithdrawalRequested(
+        address indexed account, address indexed asset, uint256 requestedAmount, uint256 guaranteedAmount
+    );
+
+    event Deposit(address indexed account, address indexed asset, uint256 amount);
 
     /**
      * @notice A bucket works like a virtual fixed-rate vault. The rate comes from the base rate with a multiplier boost
@@ -181,6 +189,7 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         require(msg.sender == account);
         require(amount > 0);
         require(_isAssetSupported(asset));
+        IERC20(asset).safeTransferFrom(msg.sender, address(_fundsHandler), amount);
 
         _accrueBaseConversionRate();
 
@@ -196,20 +205,26 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         _accrueBucketConversionRate(bucketIndex);
 
         uint256 conversionRate = _baseConversionRate.rayMulDown(_activeBuckets[bucketIndex].conversionRate);
-        uint256 shares = amount.rayDivDown(conversionRate);
+        uint256 amountInRay = _convertFromAssetToRay(asset, amount);
+        uint256 shares = amountInRay.rayDivDown(conversionRate);
 
         _activeBuckets[bucketIndex].totalShares += shares;
         _positions[account].shares += shares;
+        _positions[account].originalDeposit += amountInRay;
 
-        IERC20(asset).safeTransferFrom(msg.sender, address(_fundsHandler), amount);
         _fundsHandler.processDeposit(account, asset, amount);
 
-        // TODO: event :)
+        emit Deposit(account, asset, amount);
     }
 
-    // For now, for simplicity, we assume we are handling a single asset, the user passes the same asset he deposited.
-    // We are also ignoring the amount parameter, and redeeming the full shares, returning the full amount of assets
-    function requestWithdrawal(address account, address asset, uint256 /* amount */ )
+    /**
+     * NOTE: For now, for simplicity, we assume we are handling a single asset, the user passes the same asset he deposited.
+     *
+     * @param account The address of the account requesting the withdrawal
+     * @param preferredAsset The asset the withdrawal is requested in
+     * @param requestedAmountInRay The amount of assets requested to withdraw (normalized to RAY units)
+     */
+    function requestWithdrawal(address account, address preferredAsset, uint256 requestedAmountInRay)
         external
         override
         returns (uint256)
@@ -225,28 +240,71 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         _accrueBucketConversionRate(bucketIndex);
 
         uint256 conversionRate = _baseConversionRate.rayMulDown(_activeBuckets[bucketIndex].conversionRate);
-        uint256 assetsAmount = _positions[account].shares.rayMulDown(conversionRate);
+        uint256 actualAmountInRay;
+        uint256 guaranteedAmount;
+
+        if (requestedAmountInRay == 0) {
+            // Withdraw full balance
+            require(_positions[account].shares > 0, "zero balance");
+
+            actualAmountInRay = _positions[account].shares.rayMulDown(conversionRate);
+
+            guaranteedAmount = _positions[account].originalDeposit;
+            require(actualAmountInRay >= guaranteedAmount, "something went wrong - investigate"); // TODO: Remove this, but first lets test
+            if (actualAmountInRay < guaranteedAmount) {
+                guaranteedAmount = actualAmountInRay;
+            }
+
+            delete _positions[account];
+        } else {
+            ///////
+            uint256 requestedAmountInShares = requestedAmountInRay.rayDivDown(conversionRate);
+            require(requestedAmountInShares <= _positions[account].shares, "insufficient shares balance");
+
+            // Subtract from the bucket & clear position
+            _positions[account].shares -= requestedAmountInShares;
+            _activeBuckets[bucketIndex].totalShares -= requestedAmountInShares;
+
+            // TODO: Don't like the double conversion, but feel safer this way
+            // TODO: This needs a mathematical proof that:
+            //     requestedAmountInRay <= actualAmountInRay;
+            actualAmountInRay = requestedAmountInShares.rayMulDown(conversionRate);
+
+            _positions[account].shares -= requestedAmountInShares;
+
+            // TODO: Probably there is a better way to do this:
+            if (actualAmountInRay >= _positions[account].originalDeposit) {
+                guaranteedAmount = _positions[account].originalDeposit;
+                _positions[account].originalDeposit = 0;
+            } else {
+                guaranteedAmount = actualAmountInRay;
+                _positions[account].originalDeposit -= actualAmountInRay;
+            }
+        }
 
         _activeBuckets[bucketIndex].totalShares -= _positions[account].shares;
-        delete _positions[account];
 
-        // IERC20(asset).safeTransfer(msg.sender, assetsAmount);
         uint256 withdrawalRequestId = _fundsHandler.processWithdrawalRequest({
             account: account,
-            amount: assetsAmount,
-            originalDeposit: _positions[account].originalDeposit,
-            preferredAsset: asset,
+            amount: actualAmountInRay,
+            guaranteedAmount: guaranteedAmount,
+            preferredAsset: preferredAsset,
             data: ""
         });
 
-        // TODO: event :)
+        emit WithdrawalRequested(account, preferredAsset, actualAmountInRay, guaranteedAmount);
 
         return withdrawalRequestId;
     }
 
-    function processWithdrawal(uint256 withdrawalRequestId, bytes memory data) external {
-        _fundsHandler.processWithdrawal(withdrawalRequestId, data);
+    function executeWithdrawal(uint256 withdrawalRequestId, bytes calldata data)
+        external
+        override
+        returns (bytes memory)
+    {
         // TODO: Implement
+        _fundsHandler.processWithdrawalExecution(withdrawalRequestId, data);
+        return "";
     }
 
     function getVaultObligations() external view override returns (uint256) {
@@ -328,5 +386,34 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
     function _isActiveBucket(uint256 perSecondRateBoost) internal view returns (bool) {
         // TODO: We assume the invariant of _activeBuckets[0] == "no-boost" bucket
         return _bucketIndexByBoostRate[perSecondRateBoost] != 0 || perSecondRateBoost == MathLib.RAY;
+    }
+
+    function _convertFromAssetToRay(address asset, uint256 amount) internal view returns (uint256) {
+        return _convertDecimals(asset, amount, _tryGetAssetDecimals(asset), 27);
+    }
+
+    function _convertFromRayToAsset(address asset, uint256 amount) internal view returns (uint256) {
+        return _convertDecimals(asset, amount, 27, _tryGetAssetDecimals(asset));
+    }
+
+    function _convertDecimals(address, /* asset */ uint256 inputAmount, uint256 inputDecimals, uint256 outputDecimals)
+        internal
+        pure
+        returns (uint256)
+    {
+        // TODO: improve this:
+        if (inputDecimals == outputDecimals) return inputAmount;
+        if (inputDecimals < outputDecimals) {
+            uint256 multiplier = 10 ** (outputDecimals - inputDecimals);
+            return inputAmount * multiplier;
+        } else {
+            uint256 divisor = 10 ** (inputDecimals - outputDecimals);
+            return inputAmount / divisor;
+        }
+    }
+
+    function _tryGetAssetDecimals(address asset) private view returns (uint8 assetDecimals) {
+        // TODO: Make it try getting decimals and default to 18 if fails like OZ does
+        return IERC20Metadata(asset).decimals();
     }
 }
