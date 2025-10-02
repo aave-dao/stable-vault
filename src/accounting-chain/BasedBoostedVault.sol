@@ -20,8 +20,17 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
     event WithdrawalRequested(
         address indexed account, address indexed asset, uint256 requestedAmount, uint256 guaranteedAmount
     );
-
+    event WithdrawalExecuted(uint256 indexed withdrawalRequestId, uint256 amount, bytes returnData);
     event Deposit(address indexed account, address indexed asset, uint256 amount);
+    event BaseRateUpdated(uint256 baseRate);
+    event BoostSet(address indexed account, uint256 boostRate);
+
+    error InvalidRate();
+    error InexistentPosition();
+    error RedundantBoost();
+    error InvalidMsgSender();
+    error InvalidAmount();
+    error UnsupportedAsset();
 
     /**
      * @notice A bucket works like a virtual fixed-rate vault. The rate comes from the base rate with a multiplier boost
@@ -95,16 +104,15 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
 
     /**
      * @dev Constructor.
-     * @param owner The admin/manager of the vault.
+     * @param owner The owner of the vault, acting as an admin.
+     * @param basePerSecondRate The base per-second rate, in Ray units (27 decimals).
      */
     constructor(address owner, uint256 basePerSecondRate) Ownable(owner) {
         // Initialize base conversion rate at 1
         _baseConversionRate = MathLib.RAY;
         // Base conversion rate was just accrued
         _lastBaseConversionRateAccrualTimestamp = uint256(block.timestamp);
-
-        require(basePerSecondRate >= MathLib.RAY);
-        _basePerSecondRate = basePerSecondRate;
+        _setBasePerSecondRate(basePerSecondRate);
 
         // TODO: Do we need to accrue() the base conversion rate? I don't think so because it's the same timestamp
 
@@ -124,17 +132,21 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
 
     function setBasePerSecondRate(uint256 newBasePerSecondRate) external override onlyOwner {
         _accrueBaseConversionRate();
-        _basePerSecondRate = newBasePerSecondRate;
-        // TODO: event?
+        _setBasePerSecondRate(newBasePerSecondRate);
     }
 
-    // TODO: add back onlyOwner modifier
-    function setBoost(address account, uint256 newPerSecondRateBoost) external override {
+    function _setBasePerSecondRate(uint256 newBasePerSecondRate) internal {
+        require(newBasePerSecondRate >= MathLib.RAY, InvalidRate());
+        _basePerSecondRate = newBasePerSecondRate;
+        emit BaseRateUpdated(newBasePerSecondRate);
+    }
+
+    function setBoost(address account, uint256 newPerSecondRateBoost) external override onlyOwner {
         uint256 accountOldShares = _positions[account].shares;
-        require(accountOldShares > 0);
+        require(accountOldShares > 0, InexistentPosition());
 
         uint256 oldBoostRate = _positions[account].boostRate;
-        require(oldBoostRate != newPerSecondRateBoost);
+        require(oldBoostRate != newPerSecondRateBoost, RedundantBoost());
 
         uint256 oldBucketIndex = _bucketIndexByBoostRate[oldBoostRate];
 
@@ -182,13 +194,13 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         _positions[account].boostRate = newPerSecondRateBoost;
         _positions[account].shares = accountNewShares;
 
-        // TODO: event :)
+        emit BoostSet(account, newPerSecondRateBoost);
     }
 
     function deposit(address account, address asset, uint256 amount) external override {
-        require(msg.sender == account);
-        require(amount > 0);
-        require(_isAssetSupported(asset));
+        require(msg.sender == account, InvalidMsgSender());
+        require(amount > 0, InvalidAmount());
+        require(_isAssetSupported(asset), UnsupportedAsset());
         IERC20(asset).safeTransferFrom(msg.sender, address(_fundsHandler), amount);
 
         _accrueBaseConversionRate();
@@ -218,8 +230,7 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
     }
 
     /**
-     * NOTE: For now, for simplicity, we assume we are handling a single asset, the user passes the same asset he deposited.
-     *
+     * @notice Requests a withdrawal of assets from the vault.
      * @param account The address of the account requesting the withdrawal
      * @param preferredAsset The asset the withdrawal is requested in
      * @param requestedAmountInRay The amount of assets requested to withdraw (normalized to RAY units)
@@ -229,10 +240,8 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         override
         returns (uint256)
     {
-        // TODO: check notes on withdrawal scenarios (profitable | unprofitable, sufficient balance on acct. chain | insufficient balance on acct. chain)
-        // TODO: Create withdrawal queue item
-        require(msg.sender == account);
-        require(_positions[account].shares > 0);
+        require(msg.sender == account, InvalidMsgSender());
+        require(_positions[account].shares > 0, InexistentPosition());
 
         uint256 bucketIndex = _bucketIndexByBoostRate[_positions[account].boostRate];
 
@@ -244,35 +253,27 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         uint256 guaranteedAmount;
 
         if (requestedAmountInRay == 0) {
-            // Withdraw full balance
-            require(_positions[account].shares > 0, "zero balance");
-
+            // Withdraw full balance. Account's shares > 0 check already performed at the beginning
             actualAmountInRay = _positions[account].shares.rayMulDown(conversionRate);
-
             guaranteedAmount = _positions[account].originalDeposit;
             // TODO: Remove this, but first try to find more test cases first
             require(actualAmountInRay + 1 >= guaranteedAmount, "something went wrong - investigate");
             if (actualAmountInRay < guaranteedAmount) {
                 guaranteedAmount = actualAmountInRay;
             }
-
             delete _positions[account];
         } else {
             ///////
             uint256 requestedAmountInShares = requestedAmountInRay.rayDivDown(conversionRate);
-            require(requestedAmountInShares <= _positions[account].shares, "insufficient shares balance");
-
+            require(requestedAmountInShares <= _positions[account].shares, InvalidAmount());
             // Subtract from the bucket & clear position
             _positions[account].shares -= requestedAmountInShares;
             _activeBuckets[bucketIndex].totalShares -= requestedAmountInShares;
-
             // TODO: Don't like the double conversion, but feel safer this way
             // TODO: This needs a mathematical proof that:
             //     requestedAmountInRay <= actualAmountInRay;
             actualAmountInRay = requestedAmountInShares.rayMulDown(conversionRate);
-
             _positions[account].shares -= requestedAmountInShares;
-
             // TODO: Probably there is a better way to do this:
             if (actualAmountInRay >= _positions[account].originalDeposit) {
                 guaranteedAmount = _positions[account].originalDeposit;
@@ -282,9 +283,8 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
                 _positions[account].originalDeposit -= actualAmountInRay;
             }
         }
-
         _activeBuckets[bucketIndex].totalShares -= _positions[account].shares;
-
+        // TODO: Handle preferred asset properly
         uint256 withdrawalRequestId = _fundsHandler.processWithdrawalRequest({
             account: account,
             amount: actualAmountInRay,
@@ -292,9 +292,7 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
             preferredAsset: preferredAsset,
             data: ""
         });
-
         emit WithdrawalRequested(account, preferredAsset, actualAmountInRay, guaranteedAmount);
-
         return withdrawalRequestId;
     }
 
@@ -303,11 +301,15 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         override
         returns (uint256, bytes memory)
     {
-        return _fundsHandler.processWithdrawalExecution(withdrawalRequestId, data);
+        (uint256 amount, bytes memory returnData) = _fundsHandler.processWithdrawalExecution(withdrawalRequestId, data);
+        emit WithdrawalExecuted(withdrawalRequestId, amount, returnData);
+        return (amount, returnData);
     }
 
     function getVaultObligations() external view override returns (uint256) {
-        for (uint256 i = 0; i < _activeBuckets.length; i++) {}
+        for (uint256 i = 0; i < _activeBuckets.length; i++) {
+            // TODO: Implement
+        }
         return 0;
     }
 
@@ -366,7 +368,6 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
             uint256 growthFactor = _basePerSecondRate.rpow(secondsSinceLastAccrual);
             _baseConversionRate = _baseConversionRate.rayMulDown(growthFactor);
             _lastBaseConversionRateAccrualTimestamp = block.timestamp;
-            // TODO: add accrual event
         }
     }
 
@@ -378,7 +379,6 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
             _activeBuckets[bucketIndex].conversionRate =
                 _activeBuckets[bucketIndex].conversionRate.rayMulDown(growthFactor);
             _activeBuckets[bucketIndex].lastAccrualTimestamp = block.timestamp;
-            // TODO: add accrual event
         }
     }
 
