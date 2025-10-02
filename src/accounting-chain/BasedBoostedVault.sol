@@ -381,7 +381,7 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
     }
 
     function _isActiveBucket(uint256 perSecondRateBoost) internal view returns (bool) {
-        // TODO: We assume the invariant of _activeBuckets[0] == "no-boost" bucket
-        return _bucketIndexByBoostRate[perSecondRateBoost] != 0 || perSecondRateBoost == MathLib.RAY;
+        return _bucketIndexByBoostRate[perSecondRateBoost] != 0
+            || (_activeBuckets.length > 0 && _activeBuckets[0].perSecondRateBoost == perSecondRateBoost);
     }
 }
