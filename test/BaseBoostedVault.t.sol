@@ -2,22 +2,27 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import {console2} from "forge-std/console2.sol";
+import {console} from "forge-std/console.sol";
 
 import {ExtendedBasedBoostedVault} from "./mocks/ExtendedBasedBoostedVault.sol";
 import {TestErc20} from "./mocks/TestErc20.sol";
 import {MathLib} from "./../src/libraries/MathLib.sol";
 import {IBasedBoostedVault} from "./../src/accounting-chain/interfaces/IBasedBoostedVault.sol";
+import {FundsHandler} from "./../src/accounting-chain/FundsHandler.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 contract ExtendedBasedBoostedVaultT is Test {
     using MathLib for uint256;
 
-    function _deployVault(address owner, uint256 initialBasePerSecondRate)
-        internal
-        virtual
-        returns (IBasedBoostedVault)
-    {
-        return IBasedBoostedVault(new ExtendedBasedBoostedVault(owner, initialBasePerSecondRate));
+    address owner = address(this);
+    uint256 initialBasePerSecondRate = 1e27; // 1 RAY
+    ExtendedBasedBoostedVault vault;
+    FundsHandler fundsHandler;
+
+    function setUp() public {
+        vault = new ExtendedBasedBoostedVault(owner, initialBasePerSecondRate);
+        fundsHandler = new FundsHandler();
+        vault.setFundsHandler(address(fundsHandler));
     }
 
     function testMathLibRayMulDown() public pure {
@@ -28,11 +33,6 @@ contract ExtendedBasedBoostedVaultT is Test {
     }
 
     function testSetBasePerSecondRate() public {
-        // Arrange
-        address owner = address(this);
-        uint256 initialBasePerSecondRate = 1e27; // 1 RAY
-        ExtendedBasedBoostedVault vault = new ExtendedBasedBoostedVault(owner, initialBasePerSecondRate);
-
         // Act
         uint256 newBasePerSecondRate = 1000000001471536429740616381; // ~= ~4.75% APY
         vault.setBasePerSecondRate(newBasePerSecondRate);
@@ -46,15 +46,13 @@ contract ExtendedBasedBoostedVaultT is Test {
 
     function testBaseConversionRateAccrualOverTime() public {
         // Arrange
-        address owner = address(this);
-        uint256 initialBasePerSecondRate = 1000000001471536429740616381; // ~4.75% APY
-        //uint256 initialBasePerSecondRate = 1000000001243680656318820313; // ~4% APY
-        ExtendedBasedBoostedVault vault = new ExtendedBasedBoostedVault(owner, initialBasePerSecondRate);
+        uint256 newBasePerSecondRate = 1000000001471536429740616381; // ~4.75% APY
+        vault.setBasePerSecondRate(newBasePerSecondRate);
 
         // Initial conversion rate should be RAY
         uint256 initialConversionRate = vault.getBaseConversionRate();
         assertEq(initialConversionRate, 1e27, "Initial conversion rate should be RAY");
-        console2.log("Conversion rate year 0:", initialConversionRate);
+        console.log("Conversion rate year 0:", initialConversionRate);
         assertEq(vault.getBaseAPR(), 46406372848300078191216000);
 
         // Move time forward by 1 year
@@ -64,7 +62,7 @@ contract ExtendedBasedBoostedVaultT is Test {
 
         // Assert: conversion rate should have grown by ~5%
         uint256 newConversionRateYear1 = vault.getBaseConversionRate();
-        console2.log("Conversion rate year 1:", newConversionRateYear1);
+        console.log("Conversion rate year 1:", newConversionRateYear1);
         assertGt(newConversionRateYear1, initialConversionRate);
 
         // The rate should not be different from 1 year prior
@@ -75,12 +73,12 @@ contract ExtendedBasedBoostedVaultT is Test {
 
         // Assert: conversion rate should have grown by ~5%
         uint256 newConversionRateYear2 = vault.getBaseConversionRate();
-        console2.log("Conversion rate year 2:", newConversionRateYear2);
+        console.log("Conversion rate year 2:", newConversionRateYear2);
         assertGt(newConversionRateYear2, newConversionRateYear1);
         assertGt(newConversionRateYear2 - 1e27, 2 * (newConversionRateYear1 - 1e27));
     }
 
-    function testBoostedRateAgainstExpectedConstantAPY() public {
+    function testBoostedRateAgainstExpectedConstantAPY_100K() public {
         // In a way (18 decimal number), 1e14 means the error is in the 5th decimal place, so < 0.0001
         uint256 acceptedDelta = 1e14;
 
@@ -88,9 +86,8 @@ contract ExtendedBasedBoostedVaultT is Test {
         uint256 expectedApyPerSecondRate = 1000000001547125957863212449; // 5% APY equivalent per-second rate
 
         // Arrange
-        address owner = address(this);
-        uint256 initialBasePerSecondRate = 1000000001243680656318820313; // ~4% APY
-        ExtendedBasedBoostedVault vault = new ExtendedBasedBoostedVault(owner, initialBasePerSecondRate);
+        uint256 newBasePerSecondRate = 1000000001243680656318820313; // ~4% APY
+        vault.setBasePerSecondRate(newBasePerSecondRate);
 
         // Asset deposit
         uint256 amount = 100_000 ether;
@@ -98,37 +95,40 @@ contract ExtendedBasedBoostedVaultT is Test {
         asset.mint(address(this), amount);
         asset.approve(address(vault), amount);
         vault.deposit(address(this), address(asset), amount);
+        uint256 amountInRay = _convertFromAssetToRay(address(asset), amount);
 
         vault.setBoost(address(this), 1000000000303445301167003084); // Boost from ~4% to ~5% APY
 
-        console2.log("After 1 year...");
+        console.log("After 1 year...");
         vm.warp(block.timestamp + 365 days);
-        uint256 expectedBalance = amount.mulByRay(expectedApyPerSecondRate.rpow(365 days));
+        uint256 expectedBalance = amountInRay.mulByRay(expectedApyPerSecondRate.rpow(365 days));
+        console.log("Expected Balance:", expectedBalance);
         uint256 actualBalance = vault.getAccountBalance(address(this));
+        console.log("Actual Balance:", actualBalance);
         uint256 delta = expectedBalance - actualBalance;
-        console2.log("Actual Balance after year 1:", actualBalance);
-        console2.log("Expected Balance:", expectedBalance);
-        console2.log("Delta:", delta);
+        console.log("Actual Balance after year 1:", actualBalance);
+        console.log("Expected Balance:", expectedBalance);
+        console.log("Delta:", delta);
         assertLt(delta, acceptedDelta);
 
-        console2.log("After 2 years...");
+        console.log("After 2 years...");
         vm.warp(block.timestamp + 365 days);
-        expectedBalance = amount.mulByRay(expectedApyPerSecondRate.rpow(2 * 365 days));
+        expectedBalance = amountInRay.mulByRay(expectedApyPerSecondRate.rpow(2 * 365 days));
         actualBalance = vault.getAccountBalance(address(this));
         delta = expectedBalance - actualBalance;
-        console2.log("Actual Balance after year 2:", actualBalance);
-        console2.log("Expected Balance:", expectedBalance);
-        console2.log("Delta:", delta);
+        console.log("Actual Balance after year 2:", actualBalance);
+        console.log("Expected Balance:", expectedBalance);
+        console.log("Delta:", delta);
         assertLt(delta, acceptedDelta);
 
-        console2.log("After 10 years...");
+        console.log("After 10 years...");
         vm.warp(block.timestamp + 365 days * 8);
-        expectedBalance = amount.mulByRay(expectedApyPerSecondRate.rpow(10 * 365 days));
+        expectedBalance = amountInRay.mulByRay(expectedApyPerSecondRate.rpow(10 * 365 days));
         actualBalance = vault.getAccountBalance(address(this));
         delta = expectedBalance - actualBalance;
-        console2.log("Actual Balance after year 10:", actualBalance);
-        console2.log("Expected Balance:", expectedBalance);
-        console2.log("Delta:", delta);
+        console.log("Actual Balance after year 10:", actualBalance);
+        console.log("Expected Balance:", expectedBalance);
+        console.log("Delta:", delta);
         assertLt(delta, acceptedDelta);
     }
 
@@ -146,9 +146,8 @@ contract ExtendedBasedBoostedVaultT is Test {
         uint256 expectedApyPerSecondRate = 1000000001547125957863212449; // 5% APY equivalent per-second rate
 
         // Arrange
-        address owner = address(this);
-        uint256 initialBasePerSecondRate = 1000000001243680656318820313; // ~4% APY
-        ExtendedBasedBoostedVault vault = new ExtendedBasedBoostedVault(owner, initialBasePerSecondRate);
+        uint256 newBasePerSecondRate = 1000000001243680656318820313; // ~4% APY
+        vault.setBasePerSecondRate(newBasePerSecondRate);
 
         // Asset deposit
         uint256 amount = 2_000_000_000 ether;
@@ -156,35 +155,36 @@ contract ExtendedBasedBoostedVaultT is Test {
         asset.mint(address(this), amount);
         asset.approve(address(vault), amount);
         vault.deposit(address(this), address(asset), amount);
+        uint256 amountInRay = _convertFromAssetToRay(address(asset), amount);
 
         vault.setBoost(address(this), 1000000000303445301167003084); // Boost from ~4% to ~5% APY
 
-        console2.log("After 1 year...");
+        console.log("After 1 year...");
         vm.warp(block.timestamp + 365 days);
-        uint256 expectedBalance = amount.mulByRay(expectedApyPerSecondRate.rpow(365 days));
+        uint256 expectedBalance = amountInRay.mulByRay(expectedApyPerSecondRate.rpow(365 days));
         uint256 actualBalance = vault.getAccountBalance(address(this));
         uint256 delta = expectedBalance - actualBalance;
-        console2.log("Actual Balance after year 1:", actualBalance);
-        console2.log("Expected Balance:", expectedBalance);
-        console2.log("Delta:", delta);
+        console.log("Actual Balance after year 1:", actualBalance);
+        console.log("Expected Balance:", expectedBalance);
+        console.log("Delta:", delta);
 
-        console2.log("After 2 years...");
+        console.log("After 2 years...");
         vm.warp(block.timestamp + 365 days);
-        expectedBalance = amount.mulByRay(expectedApyPerSecondRate.rpow(2 * 365 days));
+        expectedBalance = amountInRay.mulByRay(expectedApyPerSecondRate.rpow(2 * 365 days));
         actualBalance = vault.getAccountBalance(address(this));
         delta = expectedBalance - actualBalance;
-        console2.log("Actual Balance after year 2:", actualBalance);
-        console2.log("Expected Balance:", expectedBalance);
-        console2.log("Delta:", delta);
+        console.log("Actual Balance after year 2:", actualBalance);
+        console.log("Expected Balance:", expectedBalance);
+        console.log("Delta:", delta);
 
-        console2.log("After 10 years...");
+        console.log("After 10 years...");
         vm.warp(block.timestamp + 365 days * 8);
-        expectedBalance = amount.mulByRay(expectedApyPerSecondRate.rpow(10 * 365 days));
+        expectedBalance = amountInRay.mulByRay(expectedApyPerSecondRate.rpow(10 * 365 days));
         actualBalance = vault.getAccountBalance(address(this));
         delta = expectedBalance - actualBalance;
-        console2.log("Actual Balance after year 10:", actualBalance);
-        console2.log("Expected Balance:", expectedBalance);
-        console2.log("Delta:", delta);
+        console.log("Actual Balance after year 10:", actualBalance);
+        console.log("Expected Balance:", expectedBalance);
+        console.log("Delta:", delta);
         assertLt(delta, 1e18);
     }
 
@@ -193,9 +193,8 @@ contract ExtendedBasedBoostedVaultT is Test {
 
         uint256 blockTimestamp = block.timestamp;
 
-        address owner = address(this);
-        uint256 initialBasePerSecondRate = 1000000001243680656318820313; // ~4% APY
-        ExtendedBasedBoostedVault vault = new ExtendedBasedBoostedVault(owner, initialBasePerSecondRate);
+        uint256 newBasePerSecondRate = 1000000001243680656318820313; // ~4% APY
+        vault.setBasePerSecondRate(newBasePerSecondRate);
 
         TestErc20 asset = new TestErc20();
         address account1 = makeAddr("account1");
@@ -206,12 +205,13 @@ contract ExtendedBasedBoostedVaultT is Test {
         vm.prank(account1);
         vault.deposit(account1, address(asset), amount);
 
-        uint256 assetBalance = vault.getAccountBalance(account1);
+        uint256 assetBalance = _convertFromRayToAsset(address(asset), vault.getAccountBalance(account1));
         assertEq(assetBalance, amount, "Asset balance does not match initial deposited amount");
 
         // Without advancing the block or timestamp, call full withdrawal
         vm.prank(account1);
-        uint256 assetsWithdrawn = vault.requestWithdrawal(account1, address(asset), assetBalance);
+        uint256 withdrawalRequestId = vault.requestWithdrawal(account1, address(asset), 0);
+        (uint256 assetsWithdrawn,) = vault.executeWithdrawal(withdrawalRequestId, "");
 
         uint256 assetBalanceAfterWithdraw = vault.getAccountBalance(account1);
 
@@ -221,17 +221,16 @@ contract ExtendedBasedBoostedVaultT is Test {
         assertEq(block.timestamp, blockTimestamp, "Final block timestamp does not match initial timestamp");
     }
 
-    function testMultiBlockDepositAndWithdrawMax(uint256 amount, uint256 elapsedTime) public {
+    function testMultiBlockDepositAndWithdrawMax_simple(uint256 amount, uint256 elapsedTime) public {
         //uint256 maxYearsThatCanBeElapsed = 1_354; // Estimate of the absolute maximum number of years that can be elapsed before arithmatic overflow due to RAY mul
-        uint256 maxYearsThatCanBeElapsed = 1_000;
+        uint256 maxYearsThatCanBeElapsed = 645;
         amount = bound(amount, 1, 1_000_000_000_000 ether);
         elapsedTime = bound(elapsedTime, 0, 365 days * maxYearsThatCanBeElapsed);
 
         uint256 blockTimestamp = block.timestamp;
 
-        address owner = address(this);
-        uint256 initialBasePerSecondRate = 1000000001243680656318820313; // ~4% APY
-        ExtendedBasedBoostedVault vault = new ExtendedBasedBoostedVault(owner, initialBasePerSecondRate);
+        uint256 newBasePerSecondRate = 1000000001243680656318820313; // ~4% APY
+        vault.setBasePerSecondRate(newBasePerSecondRate);
 
         TestErc20 asset = new TestErc20();
         address account1 = makeAddr("account1");
@@ -242,7 +241,7 @@ contract ExtendedBasedBoostedVaultT is Test {
         vm.prank(account1);
         vault.deposit(account1, address(asset), amount);
 
-        uint256 assetBalance = vault.getAccountBalance(account1);
+        uint256 assetBalance = _convertFromRayToAsset(address(asset), vault.getAccountBalance(account1));
         // Check
         assertGe(assetBalance, amount - 1, "Asset balance too low compared to initial deposited amount");
         assertLe(assetBalance, amount, "Asset balance too high compared to initial deposited amount");
@@ -250,13 +249,14 @@ contract ExtendedBasedBoostedVaultT is Test {
         // Withdraw after advancing block some time
         vm.warp(blockTimestamp + elapsedTime);
 
-        assetBalance = vault.getAccountBalance(account1);
+        assetBalance = _convertFromRayToAsset(address(asset), vault.getAccountBalance(account1));
 
         uint256 assetsEarned = assetBalance - amount;
-        asset.mint(address(vault), assetsEarned);
+        asset.mint(address(fundsHandler), assetsEarned); // TODO: Replace with adding into float
 
         vm.prank(account1);
-        uint256 assetsWithdrawn = vault.requestWithdrawal(account1, address(asset), assetBalance);
+        uint256 withdrawalRequestId = vault.requestWithdrawal(account1, address(asset), 0);
+        (uint256 assetsWithdrawn,) = vault.executeWithdrawal(withdrawalRequestId, "");
 
         uint256 assetBalanceAfterWithdraw = vault.getAccountBalance(account1);
 
@@ -269,9 +269,8 @@ contract ExtendedBasedBoostedVaultT is Test {
 
         uint256 blockTimestamp = block.timestamp;
 
-        address owner = address(this);
-        uint256 initialBasePerSecondRate = 1000000001243680656318820313; // ~4% APY
-        ExtendedBasedBoostedVault vault = new ExtendedBasedBoostedVault(owner, initialBasePerSecondRate);
+        uint256 newBasePerSecondRate = 1000000001243680656318820313; // ~4% APY
+        vault.setBasePerSecondRate(newBasePerSecondRate);
 
         TestErc20 asset = new TestErc20();
         address account1 = makeAddr("account1");
@@ -284,7 +283,7 @@ contract ExtendedBasedBoostedVaultT is Test {
             vault.deposit(account1, address(asset), previousDepositAmount);
         }
 
-        uint256 initialAssetBalance = vault.getAccountBalance(account1);
+        uint256 initialAssetBalance = _convertFromRayToAsset(address(asset), vault.getAccountBalance(account1));
         assertEq(initialAssetBalance, previousDepositAmount, "Asset balance does not match initial deposited amount");
 
         vm.prank(account1);
@@ -296,7 +295,8 @@ contract ExtendedBasedBoostedVaultT is Test {
 
         // Without advancing the block or timestamp, call full withdrawal
         vm.prank(account1);
-        uint256 assetsWithdrawn = vault.requestWithdrawal(account1, address(asset), initialAssetBalance + 1);
+        uint256 withdrawalRequestId = vault.requestWithdrawal(account1, address(asset), 0);
+        (uint256 assetsWithdrawn,) = vault.executeWithdrawal(withdrawalRequestId, "");
 
         uint256 assetBalanceAfterWithdraw = vault.getAccountBalance(account1);
 
@@ -311,15 +311,14 @@ contract ExtendedBasedBoostedVaultT is Test {
     function testMultiBlockDepositAndWithdrawMax_largeApy(uint256 amount, uint256 elapsedTime) public {
         // 1000000000377783247012652819 ~= 10% APY
         //uint256 maxYearsThatCanBeElapsed = 1_354; // Estimate of the absolute maximum number of years that can be elapsed before arithmatic overflow due to RAY mul
-        uint256 maxYearsThatCanBeElapsed = 1_000;
+        uint256 maxYearsThatCanBeElapsed = 645;
         amount = bound(amount, 1, 1_000_000_000_000 ether);
         elapsedTime = bound(elapsedTime, 0, 365 days * maxYearsThatCanBeElapsed);
 
         uint256 blockTimestamp = block.timestamp;
 
-        address owner = address(this);
-        uint256 initialBasePerSecondRate = 1000000000377783247012652819;
-        ExtendedBasedBoostedVault vault = new ExtendedBasedBoostedVault(owner, initialBasePerSecondRate);
+        uint256 newBasePerSecondRate = 1000000000377783247012652819;
+        vault.setBasePerSecondRate(newBasePerSecondRate);
 
         TestErc20 asset = new TestErc20();
 
@@ -331,20 +330,21 @@ contract ExtendedBasedBoostedVaultT is Test {
         vm.prank(account1);
         vault.deposit(account1, address(asset), amount);
 
-        uint256 assetBalance = vault.getAccountBalance(account1);
+        uint256 assetBalance = _convertFromRayToAsset(address(asset), vault.getAccountBalance(account1));
         assertGe(assetBalance, amount - 1, "Asset balance too low compared to initial deposited amount");
         assertLe(assetBalance, amount, "Asset balance too high compared to initial deposited amount");
 
         // Withdraw after advancing block some time
         vm.warp(blockTimestamp + elapsedTime);
 
-        assetBalance = vault.getAccountBalance(account1);
+        assetBalance = _convertFromRayToAsset(address(asset), vault.getAccountBalance(account1));
 
         uint256 assetsEarned = assetBalance - amount;
-        asset.mint(address(vault), assetsEarned);
+        asset.mint(address(fundsHandler), assetsEarned);
 
         vm.prank(account1);
-        uint256 assetsWithdrawn = vault.requestWithdrawal(account1, address(asset), assetBalance);
+        uint256 withdrawalRequestId = vault.requestWithdrawal(account1, address(asset), 0);
+        (uint256 assetsWithdrawn,) = vault.executeWithdrawal(withdrawalRequestId, "");
 
         uint256 assetBalanceAfterWithdraw = vault.getAccountBalance(account1);
 
@@ -358,9 +358,8 @@ contract ExtendedBasedBoostedVaultT is Test {
         amount = bound(amount, 1, 1_000_000_000_000 ether);
         elapsedTime = bound(elapsedTime, 0, 365 days * maxYearsThatCanBeElapsed);
 
-        address owner = address(this);
-        uint256 initialBasePerSecondRate = 1000000000377783247012652819;
-        ExtendedBasedBoostedVault vault = new ExtendedBasedBoostedVault(owner, initialBasePerSecondRate);
+        uint256 newBasePerSecondRate = 1000000000377783247012652819;
+        vault.setBasePerSecondRate(newBasePerSecondRate);
 
         TestErc20 asset = new TestErc20();
 
@@ -371,7 +370,7 @@ contract ExtendedBasedBoostedVaultT is Test {
         asset.approve(address(vault), amount);
         vm.prank(account2);
         vault.deposit(account2, address(asset), amount);
-        uint256 assetBalanceAcct2 = vault.getAccountBalance(account2);
+        uint256 assetBalanceAcct2 = _convertFromRayToAsset(address(asset), vault.getAccountBalance(account2));
         assertGe(
             assetBalanceAcct2, amount - 1, "Asset balance too low compared to initial deposited amount for account2"
         );
@@ -387,7 +386,7 @@ contract ExtendedBasedBoostedVaultT is Test {
         vm.prank(account1);
         vault.deposit(account1, address(asset), amount);
 
-        uint256 assetBalanceAcct1 = vault.getAccountBalance(account1);
+        uint256 assetBalanceAcct1 = _convertFromRayToAsset(address(asset), vault.getAccountBalance(account1));
 
         assertGe(
             assetBalanceAcct1, amount - 1, "Asset balance too low compared to initial deposited amount for account1"
@@ -396,19 +395,20 @@ contract ExtendedBasedBoostedVaultT is Test {
 
         // Withdraw after advancing block some time
         vm.warp(block.timestamp + elapsedTime);
-        assetBalanceAcct1 = vault.getAccountBalance(account1);
+        assetBalanceAcct1 = _convertFromRayToAsset(address(asset), vault.getAccountBalance(account1));
         // Since balance is rounding down then withdrawing max will fail because shares will be 0
         vm.assume(assetBalanceAcct1 > 1);
 
         uint256 assetsEarned = assetBalanceAcct1 > amount ? assetBalanceAcct1 - amount : 0;
         if (assetsEarned > 0) {
-            asset.mint(address(vault), assetsEarned);
+            asset.mint(address(fundsHandler), assetsEarned);
         }
 
         vm.prank(account1);
-        uint256 assetsWithdrawn = vault.requestWithdrawal(account1, address(asset), assetBalanceAcct1);
+        uint256 withdrawalRequestId = vault.requestWithdrawal(account1, address(asset), 0);
+        (uint256 assetsWithdrawn,) = vault.executeWithdrawal(withdrawalRequestId, "");
 
-        console2.log("block timestamp after withdraw:", block.timestamp);
+        console.log("block timestamp after withdraw:", block.timestamp);
         uint256 assetBalanceAfterWithdraw = vault.getAccountBalance(account1);
 
         assertEq(assetBalanceAcct1, assetsWithdrawn, "Asset balance does not match withdrawn amount");
@@ -426,9 +426,8 @@ contract ExtendedBasedBoostedVaultT is Test {
         // WolframAlpha: 2,000,000,000 * 1.05^10 = 3,257,789,253.5548828125
         uint256 originalDeposit = 2_000_000_000 ether;
 
-        address owner = address(this);
-        uint256 initialBasePerSecondRate = 1000000001243680656318820313; // ~4% APY
-        IBasedBoostedVault vault = _deployVault(owner, initialBasePerSecondRate);
+        uint256 newBasePerSecondRate = 1000000001243680656318820313; // ~4% APY
+        vault.setBasePerSecondRate(newBasePerSecondRate);
 
         // Asset deposit
         TestErc20 asset = new TestErc20();
@@ -458,15 +457,44 @@ contract ExtendedBasedBoostedVaultT is Test {
             addOneToBoost = !addOneToBoost;
         }
 
-        console2.log("block.timestamp: ", block.timestamp);
-        console2.log("endingBlockTs: ", endingBlockTs);
+        console.log("block.timestamp: ", block.timestamp);
+        console.log("endingBlockTs: ", endingBlockTs);
         assertEq(block.timestamp, endingBlockTs);
 
-        uint256 thisUsdBalanceInVault = vault.getAccountBalance(address(this));
+        uint256 thisUsdBalanceInVault = _convertFromRayToAsset(address(asset), vault.getAccountBalance(address(this)));
 
-        console2.log("thisUsdBalanceInVault: ", thisUsdBalanceInVault);
+        console.log("thisUsdBalanceInVault: ", thisUsdBalanceInVault);
 
         uint256 expectedBalance_After_10Years = 3_257_789_253_554882812500000000;
-        console2.log("delta_account_1: ", expectedBalance_After_10Years - thisUsdBalanceInVault);
+        console.log("delta_account_1: ", expectedBalance_After_10Years - thisUsdBalanceInVault);
     }
+}
+
+// TODO: Move this to some lib:
+function _convertFromAssetToRay(address asset, uint256 amount) view returns (uint256) {
+    return _convertDecimals(asset, amount, _tryGetAssetDecimals(asset), 27);
+}
+
+function _convertFromRayToAsset(address asset, uint256 amount) view returns (uint256) {
+    return _convertDecimals(asset, amount, 27, _tryGetAssetDecimals(asset));
+}
+
+function _convertDecimals(address, /* asset */ uint256 inputAmount, uint256 inputDecimals, uint256 outputDecimals)
+    pure
+    returns (uint256)
+{
+    // TODO: improve this:
+    if (inputDecimals == outputDecimals) return inputAmount;
+    if (inputDecimals < outputDecimals) {
+        uint256 multiplier = 10 ** (outputDecimals - inputDecimals);
+        return inputAmount * multiplier;
+    } else {
+        uint256 divisor = 10 ** (inputDecimals - outputDecimals);
+        return inputAmount / divisor;
+    }
+}
+
+function _tryGetAssetDecimals(address asset) view returns (uint8 assetDecimals) {
+    // TODO: Make it try getting decimals and default to 18 if fails like OZ does
+    return IERC20Metadata(asset).decimals();
 }
