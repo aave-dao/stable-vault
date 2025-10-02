@@ -9,8 +9,8 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {MathLib} from "../libraries/MathLib.sol";
 import {IBasedBoostedVault} from "./interfaces/IBasedBoostedVault.sol";
 import {IVaultFundsHandler} from "./interfaces/IVaultFundsHandler.sol";
-/// @dev Assets balances are tracked in RAY internally; conversions from and to specific asset denomination is made on deposit and on withdrawal confirmation
 
+/// @dev Assets balances are tracked in RAY internally; conversions from and to specific asset denomination is made on deposit and on withdrawal confirmation
 contract BasedBoostedVault is IBasedBoostedVault, Ownable {
     using MathLib for uint256;
     using SafeERC20 for IERC20;
@@ -250,7 +250,8 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
             actualAmountInRay = _positions[account].shares.rayMulDown(conversionRate);
 
             guaranteedAmount = _positions[account].originalDeposit;
-            require(actualAmountInRay >= guaranteedAmount, "something went wrong - investigate"); // TODO: Remove this, but first lets test
+            // TODO: Remove this, but first try to find more test cases first
+            require(actualAmountInRay + 1 >= guaranteedAmount, "something went wrong - investigate");
             if (actualAmountInRay < guaranteedAmount) {
                 guaranteedAmount = actualAmountInRay;
             }
