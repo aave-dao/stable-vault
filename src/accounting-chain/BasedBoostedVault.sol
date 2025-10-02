@@ -300,11 +300,9 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
     function executeWithdrawal(uint256 withdrawalRequestId, bytes calldata data)
         external
         override
-        returns (bytes memory)
+        returns (uint256, bytes memory)
     {
-        // TODO: Implement
-        _fundsHandler.processWithdrawalExecution(withdrawalRequestId, data);
-        return "";
+        return _fundsHandler.processWithdrawalExecution(withdrawalRequestId, data);
     }
 
     function getVaultObligations() external view override returns (uint256) {

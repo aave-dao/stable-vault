@@ -14,5 +14,5 @@ interface IVaultFundsHandler {
 
     function processWithdrawalExecution(uint256 withdrawalRequestId, bytes calldata data)
         external
-        returns (bytes memory);
+        returns (uint256, bytes memory);
 }
