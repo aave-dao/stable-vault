@@ -2,17 +2,18 @@
 pragma solidity ^0.8.22;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 import {MathLib} from "../libraries/MathLib.sol";
+import {AssetLib} from "../libraries/AssetLib.sol";
 import {IBasedBoostedVault} from "./interfaces/IBasedBoostedVault.sol";
 import {IVaultFundsHandler} from "./interfaces/IVaultFundsHandler.sol";
 
 /// @dev Assets balances are tracked in RAY internally; conversions from and to specific asset denomination is made on deposit and on withdrawal confirmation
 contract BasedBoostedVault is IBasedBoostedVault, Ownable {
     using MathLib for uint256;
+    using AssetLib for uint256;
     using SafeERC20 for IERC20;
 
     uint256 internal constant SECONDS_PER_YEAR = 365 days;
@@ -217,7 +218,7 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         _accrueBucketConversionRate(bucketIndex);
 
         uint256 conversionRate = _baseConversionRate.rayMulDown(_activeBuckets[bucketIndex].conversionRate);
-        uint256 amountInRay = _convertFromAssetToRay(asset, amount);
+        uint256 amountInRay = amount.assetDecimalsToRay(asset);
         uint256 shares = amountInRay.rayDivDown(conversionRate);
 
         _activeBuckets[bucketIndex].totalShares += shares;
@@ -256,22 +257,19 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
             // Withdraw full balance. Account's shares > 0 check already performed at the beginning
             actualAmountInRay = _positions[account].shares.rayMulDown(conversionRate);
             guaranteedAmount = _positions[account].originalDeposit;
-            // TODO: Remove this, but first try to find more test cases first
-            require(actualAmountInRay + 1 >= guaranteedAmount, "something went wrong - investigate");
+            require(actualAmountInRay + 1 >= guaranteedAmount, "something went wrong - investigate"); // TODO: Remove this, but first try to find more test cases first
             if (actualAmountInRay < guaranteedAmount) {
                 guaranteedAmount = actualAmountInRay;
             }
             delete _positions[account];
         } else {
-            ///////
             uint256 requestedAmountInShares = requestedAmountInRay.rayDivDown(conversionRate);
             require(requestedAmountInShares <= _positions[account].shares, InvalidAmount());
             // Subtract from the bucket & clear position
             _positions[account].shares -= requestedAmountInShares;
             _activeBuckets[bucketIndex].totalShares -= requestedAmountInShares;
             // TODO: Don't like the double conversion, but feel safer this way
-            // TODO: This needs a mathematical proof that:
-            //     requestedAmountInRay <= actualAmountInRay;
+            // TODO: This needs a mathematical proof that: requestedAmountInRay <= actualAmountInRay;
             actualAmountInRay = requestedAmountInShares.rayMulDown(conversionRate);
             _positions[account].shares -= requestedAmountInShares;
             // TODO: Probably there is a better way to do this:
@@ -385,34 +383,5 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
     function _isActiveBucket(uint256 perSecondRateBoost) internal view returns (bool) {
         // TODO: We assume the invariant of _activeBuckets[0] == "no-boost" bucket
         return _bucketIndexByBoostRate[perSecondRateBoost] != 0 || perSecondRateBoost == MathLib.RAY;
-    }
-
-    function _convertFromAssetToRay(address asset, uint256 amount) internal view returns (uint256) {
-        return _convertDecimals(asset, amount, _tryGetAssetDecimals(asset), 27);
-    }
-
-    function _convertFromRayToAsset(address asset, uint256 amount) internal view returns (uint256) {
-        return _convertDecimals(asset, amount, 27, _tryGetAssetDecimals(asset));
-    }
-
-    function _convertDecimals(address, /* asset */ uint256 inputAmount, uint256 inputDecimals, uint256 outputDecimals)
-        internal
-        pure
-        returns (uint256)
-    {
-        // TODO: improve this:
-        if (inputDecimals == outputDecimals) return inputAmount;
-        if (inputDecimals < outputDecimals) {
-            uint256 multiplier = 10 ** (outputDecimals - inputDecimals);
-            return inputAmount * multiplier;
-        } else {
-            uint256 divisor = 10 ** (inputDecimals - outputDecimals);
-            return inputAmount / divisor;
-        }
-    }
-
-    function _tryGetAssetDecimals(address asset) private view returns (uint8 assetDecimals) {
-        // TODO: Make it try getting decimals and default to 18 if fails like OZ does
-        return IERC20Metadata(asset).decimals();
     }
 }

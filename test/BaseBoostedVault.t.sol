@@ -7,12 +7,12 @@ import {console} from "forge-std/console.sol";
 import {ExtendedBasedBoostedVault} from "./mocks/ExtendedBasedBoostedVault.sol";
 import {TestErc20} from "./mocks/TestErc20.sol";
 import {MathLib} from "./../src/libraries/MathLib.sol";
-import {IBasedBoostedVault} from "./../src/accounting-chain/interfaces/IBasedBoostedVault.sol";
+import {AssetLib} from "./../src/libraries/AssetLib.sol";
 import {FundsHandler} from "./../src/accounting-chain/FundsHandler.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 contract ExtendedBasedBoostedVaultT is Test {
     using MathLib for uint256;
+    using AssetLib for uint256;
 
     address owner = address(this);
     uint256 initialBasePerSecondRate = 1e27; // 1 RAY
@@ -95,7 +95,7 @@ contract ExtendedBasedBoostedVaultT is Test {
         asset.mint(address(this), amount);
         asset.approve(address(vault), amount);
         vault.deposit(address(this), address(asset), amount);
-        uint256 amountInRay = _convertFromAssetToRay(address(asset), amount);
+        uint256 amountInRay = amount.assetDecimalsToRay(address(asset));
 
         vault.setBoost(address(this), 1000000000303445301167003084); // Boost from ~4% to ~5% APY
 
@@ -155,7 +155,7 @@ contract ExtendedBasedBoostedVaultT is Test {
         asset.mint(address(this), amount);
         asset.approve(address(vault), amount);
         vault.deposit(address(this), address(asset), amount);
-        uint256 amountInRay = _convertFromAssetToRay(address(asset), amount);
+        uint256 amountInRay = amount.assetDecimalsToRay(address(asset));
 
         vault.setBoost(address(this), 1000000000303445301167003084); // Boost from ~4% to ~5% APY
 
@@ -205,7 +205,7 @@ contract ExtendedBasedBoostedVaultT is Test {
         vm.prank(account1);
         vault.deposit(account1, address(asset), amount);
 
-        uint256 assetBalance = _convertFromRayToAsset(address(asset), vault.getAccountBalance(account1));
+        uint256 assetBalance = vault.getAccountBalance(account1).rayToAssetDecimals(address(asset));
         assertEq(assetBalance, amount, "Asset balance does not match initial deposited amount");
 
         // Without advancing the block or timestamp, call full withdrawal
@@ -241,7 +241,7 @@ contract ExtendedBasedBoostedVaultT is Test {
         vm.prank(account1);
         vault.deposit(account1, address(asset), amount);
 
-        uint256 assetBalance = _convertFromRayToAsset(address(asset), vault.getAccountBalance(account1));
+        uint256 assetBalance = vault.getAccountBalance(account1).rayToAssetDecimals(address(asset));
         // Check
         assertGe(assetBalance, amount - 1, "Asset balance too low compared to initial deposited amount");
         assertLe(assetBalance, amount, "Asset balance too high compared to initial deposited amount");
@@ -249,7 +249,7 @@ contract ExtendedBasedBoostedVaultT is Test {
         // Withdraw after advancing block some time
         vm.warp(blockTimestamp + elapsedTime);
 
-        assetBalance = _convertFromRayToAsset(address(asset), vault.getAccountBalance(account1));
+        assetBalance = vault.getAccountBalance(account1).rayToAssetDecimals(address(asset));
 
         uint256 assetsEarned = assetBalance - amount;
         asset.mint(address(fundsHandler), assetsEarned); // TODO: Replace with adding into float
@@ -283,7 +283,7 @@ contract ExtendedBasedBoostedVaultT is Test {
             vault.deposit(account1, address(asset), previousDepositAmount);
         }
 
-        uint256 initialAssetBalance = _convertFromRayToAsset(address(asset), vault.getAccountBalance(account1));
+        uint256 initialAssetBalance = vault.getAccountBalance(account1).rayToAssetDecimals(address(asset));
         assertEq(initialAssetBalance, previousDepositAmount, "Asset balance does not match initial deposited amount");
 
         vm.prank(account1);
@@ -330,14 +330,14 @@ contract ExtendedBasedBoostedVaultT is Test {
         vm.prank(account1);
         vault.deposit(account1, address(asset), amount);
 
-        uint256 assetBalance = _convertFromRayToAsset(address(asset), vault.getAccountBalance(account1));
+        uint256 assetBalance = vault.getAccountBalance(account1).rayToAssetDecimals(address(asset));
         assertGe(assetBalance, amount - 1, "Asset balance too low compared to initial deposited amount");
         assertLe(assetBalance, amount, "Asset balance too high compared to initial deposited amount");
 
         // Withdraw after advancing block some time
         vm.warp(blockTimestamp + elapsedTime);
 
-        assetBalance = _convertFromRayToAsset(address(asset), vault.getAccountBalance(account1));
+        assetBalance = vault.getAccountBalance(account1).rayToAssetDecimals(address(asset));
 
         uint256 assetsEarned = assetBalance - amount;
         asset.mint(address(fundsHandler), assetsEarned);
@@ -370,7 +370,7 @@ contract ExtendedBasedBoostedVaultT is Test {
         asset.approve(address(vault), amount);
         vm.prank(account2);
         vault.deposit(account2, address(asset), amount);
-        uint256 assetBalanceAcct2 = _convertFromRayToAsset(address(asset), vault.getAccountBalance(account2));
+        uint256 assetBalanceAcct2 = vault.getAccountBalance(account2).rayToAssetDecimals(address(asset));
         assertGe(
             assetBalanceAcct2, amount - 1, "Asset balance too low compared to initial deposited amount for account2"
         );
@@ -386,7 +386,7 @@ contract ExtendedBasedBoostedVaultT is Test {
         vm.prank(account1);
         vault.deposit(account1, address(asset), amount);
 
-        uint256 assetBalanceAcct1 = _convertFromRayToAsset(address(asset), vault.getAccountBalance(account1));
+        uint256 assetBalanceAcct1 = vault.getAccountBalance(account1).rayToAssetDecimals(address(asset));
 
         assertGe(
             assetBalanceAcct1, amount - 1, "Asset balance too low compared to initial deposited amount for account1"
@@ -395,7 +395,7 @@ contract ExtendedBasedBoostedVaultT is Test {
 
         // Withdraw after advancing block some time
         vm.warp(block.timestamp + elapsedTime);
-        assetBalanceAcct1 = _convertFromRayToAsset(address(asset), vault.getAccountBalance(account1));
+        assetBalanceAcct1 = vault.getAccountBalance(account1).rayToAssetDecimals(address(asset));
         // Since balance is rounding down then withdrawing max will fail because shares will be 0
         vm.assume(assetBalanceAcct1 > 1);
 
@@ -461,40 +461,11 @@ contract ExtendedBasedBoostedVaultT is Test {
         console.log("endingBlockTs: ", endingBlockTs);
         assertEq(block.timestamp, endingBlockTs);
 
-        uint256 thisUsdBalanceInVault = _convertFromRayToAsset(address(asset), vault.getAccountBalance(address(this)));
+        uint256 thisUsdBalanceInVault = vault.getAccountBalance(address(this)).rayToAssetDecimals(address(asset));
 
         console.log("thisUsdBalanceInVault: ", thisUsdBalanceInVault);
 
         uint256 expectedBalance_After_10Years = 3_257_789_253_554882812500000000;
         console.log("delta_account_1: ", expectedBalance_After_10Years - thisUsdBalanceInVault);
     }
-}
-
-// TODO: Move this to some lib:
-function _convertFromAssetToRay(address asset, uint256 amount) view returns (uint256) {
-    return _convertDecimals(asset, amount, _tryGetAssetDecimals(asset), 27);
-}
-
-function _convertFromRayToAsset(address asset, uint256 amount) view returns (uint256) {
-    return _convertDecimals(asset, amount, 27, _tryGetAssetDecimals(asset));
-}
-
-function _convertDecimals(address, /* asset */ uint256 inputAmount, uint256 inputDecimals, uint256 outputDecimals)
-    pure
-    returns (uint256)
-{
-    // TODO: improve this:
-    if (inputDecimals == outputDecimals) return inputAmount;
-    if (inputDecimals < outputDecimals) {
-        uint256 multiplier = 10 ** (outputDecimals - inputDecimals);
-        return inputAmount * multiplier;
-    } else {
-        uint256 divisor = 10 ** (inputDecimals - outputDecimals);
-        return inputAmount / divisor;
-    }
-}
-
-function _tryGetAssetDecimals(address asset) view returns (uint8 assetDecimals) {
-    // TODO: Make it try getting decimals and default to 18 if fails like OZ does
-    return IERC20Metadata(asset).decimals();
 }
