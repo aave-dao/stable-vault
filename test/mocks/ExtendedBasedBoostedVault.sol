@@ -6,7 +6,11 @@ import {BasedBoostedVault} from "../../src/accounting-chain/BasedBoostedVault.so
 import {IVaultFundsHandler} from "../../src/accounting-chain/interfaces/IVaultFundsHandler.sol";
 
 contract ExtendedBasedBoostedVault is BasedBoostedVault {
-    constructor(address owner, uint256 initialBasePerSecondRate) BasedBoostedVault(owner, initialBasePerSecondRate) {}
+    using MathLib for uint256;
+
+    constructor(address owner, uint256 initialBasePerSecondRate, address[] memory initialSupportedAssets)
+        BasedBoostedVault(owner, initialBasePerSecondRate, initialSupportedAssets)
+    {}
 
     function getLastBaseConversionRateAccrualTimestamp() public view returns (uint256) {
         return _lastBaseConversionRateAccrualTimestamp;
@@ -21,7 +25,7 @@ contract ExtendedBasedBoostedVault is BasedBoostedVault {
     }
 
     /// @notice APR can be converted to APY/AEY given 365 compounding periods (similar to Spark)
-    function getBaseAPR() public view returns (uint256) {
+    function getBaseApr() public view returns (uint256) {
         return (getBasePerSecondRate() - MathLib.RAY) * SECONDS_PER_YEAR;
     }
 
@@ -31,5 +35,10 @@ contract ExtendedBasedBoostedVault is BasedBoostedVault {
 
     function setFundsHandler(address fundsHandler) public {
         _fundsHandler = IVaultFundsHandler(fundsHandler);
+    }
+
+    function getBoostTotalApy(uint256 perSecondBoostMiltiplier) public view returns (uint256) {
+        uint256 a = getBasePerSecondRate().rayMulDown(perSecondBoostMiltiplier);
+        return a.rpow(SECONDS_PER_YEAR) - MathLib.RAY;
     }
 }
