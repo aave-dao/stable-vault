@@ -16,293 +16,343 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
     using AssetLib for uint256;
     using SafeERC20 for IERC20;
 
-    uint256 internal constant SECONDS_PER_YEAR = 365 days;
+    uint256 internal constant SECONDS_PER_YEAR = 31_536_000;
 
     /**
-     * @notice A bucket works like a virtual fixed-rate vault. The rate comes from the base rate with a multiplier boost
+     * @notice A subVault works like a virtual fixed-rate vault. The rate comes from the base rate with a multiplier boost
      * being applied to it.
      *
-     * @param perSecondRateBoost The per second rate boost applied to the base rate.
-     * @param conversionRate The cumulative growth at perSecondRateBoost which works as conversion rate between
+     * @param perSecondRate The per second rate boost applied to the base rate.
+     * @param conversionRate The cumulative growth at perSecondRate which works as conversion rate between
      *  shares and assets.
      * @param lastAccrualTimestamp The timestamp of the last accrual i.e. when the `conversionRate` was updated.
-     * @param totalShares The total shares of the bucket, scaled, normalized by `_baseConversionRate * bucket.conversionRate`.
+     * @param totalShares The total shares of the subVault, scaled, normalized by `_baseConversionRate * subVault.conversionRate`.
      */
-    struct Bucket {
-        uint256 perSecondRateBoost;
+    struct SubVault {
+        uint256 perSecondRate;
         uint256 conversionRate;
         uint256 lastAccrualTimestamp;
         uint256 totalShares;
     }
 
     /**
-     * @notice The representation of an account's position. A single account will have at most 1 position.
+     * @notice The representation of an user's position. A single user will have at most 1 position.
      *
-     * @param originalDeposit The amount deposited by the account before accruing any interest.
-     * @param boostRate The `perSecondRateBoost` of the bucket where the account's assets are.
-     * @param shares The shares of the account, scaled, normalized by `_baseConversionRate * bucket.conversionRate`.
+     * @param originalDeposit The amount deposited by the user before accruing any interest.
+     * @param subVaultId The ID of the subVault where the user's assets are.
+     * @param shares The shares of the user, scaled, normalized by `_baseConversionRate * subVault.conversionRate`.
      */
-    struct AccountPosition {
+    struct UserPosition {
         uint256 originalDeposit;
-        uint256 boostRate;
+        uint256 subVaultId;
         uint256 shares;
     }
 
     IVaultFundsHandler internal _fundsHandler;
 
     /**
-     * @dev The base per second rate, the fixed rate that all accounts earn by default.
+     * @dev SubVaults that have liquidity i.e. some user's assets on it.
      */
-    uint256 internal _basePerSecondRate;
+    SubVault[] internal _activeSubVaults;
 
     /**
-     * @dev The cumulative growth at `_basePerSecondRate` which works as conversion rate between
-     *  shares and assets.
+     * @dev The ID of the last subVault created.
      */
-    uint256 internal _baseConversionRate;
+    uint256 internal _lastSubVaultId;
 
     /**
-     * @dev The timestamp of the last accrual of `_baseConversionRate`.
+     * @dev SubVault index in the `_activeSubVaults` array by subVault boost per-second rate.
      */
-    uint256 internal _lastBaseConversionRateAccrualTimestamp;
+    mapping(uint256 subVaultId => uint256 subVaultIndex) _subVaultIndexById;
 
     /**
-     * @dev Buckets that have liquidity i.e. some account's assets on it.
+     * @dev SubVault ID by subVault per-second rate.
      */
-    Bucket[] internal _activeBuckets;
+    mapping(uint256 subVaultRate => uint256 subVaultId) _subVaultIdByRate;
 
     /**
-     * @dev Bucket index in the `_activeBuckets` array by bucket boost per-second rate.
+     * @dev User position by user address.
      */
-    mapping(uint256 boostRate => uint256 bucketIndex) _bucketIndexByBoostRate;
-
-    /**
-     * @dev Account position by account address.
-     */
-    mapping(address account => AccountPosition position) _positions;
+    mapping(address user => UserPosition position) _positions;
 
     /**
      * @dev Mapping to track supported assets.
      */
     mapping(address asset => bool supported) _supportedAssets;
 
-    /// TODO: Decide what to do and how to handle the invariant of _activeBuckets[0] == "no-boost" bucket. Some ideas:
-    /// - Do it an edge case and do not remove from active buckets when shares get down to 0
-    /// - Lock some initial deposit in the constructor so it can never reach 0 liquidity, then its fixed at 0 index
-    /// - Do all generic code, do not assume the invariant, treat it as all the rest of the buckets
-    ///      + In this case we need to check how to handle some edge cases, like the isActiveBucket function to be like:
-    ///      + _activeBuckets[_bucketIndexByBoostRate[perSecondRateBoost]].perSecondRateBoost == perSecondRateBoost
-
     /**
      * @dev Constructor.
      * @param owner The owner of the vault, acting as an admin.
-     * @param basePerSecondRate The base per-second rate, in Ray units (27 decimals).
-     * @param initialSupportedAssets Array of initially supported asset addresses.
+     * @param defaultSubVaultPerSecondRate The base per-second rate, in Ray units (27 decimals).
      */
-    constructor(address owner, uint256 basePerSecondRate, address[] memory initialSupportedAssets) Ownable(owner) {
-        // Initialize base conversion rate at 1
-        _baseConversionRate = MathLib.RAY;
-        // Base conversion rate was just accrued
-        _lastBaseConversionRateAccrualTimestamp = uint256(block.timestamp);
-        _setBasePerSecondRate(basePerSecondRate);
+    constructor(address owner, uint256 defaultSubVaultPerSecondRate) Ownable(owner) {
+        // Creates a subVault that gets ID #1 and that will be used as default subVault for new deposits
+        _createSubVault(defaultSubVaultPerSecondRate);
+    }
 
-        // TODO: Do we need to accrue() the base conversion rate? I don't think so because it's the same timestamp
-
-        // TODO: Do we need an initial "lock" deposit for the base rate bucket? research inflation attack
-
-        // Create the default bucket which has no boost and just grows at the base rate
-        _activeBuckets.push(
-            Bucket({
-                perSecondRateBoost: MathLib.RAY,
+    function _createSubVault(uint256 newPerSecondRate) internal returns (uint256) {
+        require(!_isActiveSubVaultByRate(newPerSecondRate), VaultAlreadyExists());
+        _activeSubVaults.push(
+            SubVault({
+                perSecondRate: newPerSecondRate,
                 conversionRate: MathLib.RAY,
                 lastAccrualTimestamp: uint256(block.timestamp),
                 totalShares: 0
             })
         );
-        _bucketIndexByBoostRate[MathLib.RAY] = 0;
+        uint256 newSubVaultId = ++_lastSubVaultId;
+        _subVaultIdByRate[newPerSecondRate] = newSubVaultId;
+        _subVaultIndexById[newSubVaultId] = _activeSubVaults.length - 1;
+        return newSubVaultId;
+    }
 
-        for (uint256 i = 0; i < initialSupportedAssets.length; i++) {
-            _addSupportedAsset(initialSupportedAssets[i]);
+    function _changeSubVaultRate(uint256 subVaultId, uint256 newPerSecondRate) internal {
+        require(_isActiveSubVaultById(subVaultId), VaultInactive());
+        require(_isActiveSubVaultByRate(newPerSecondRate) == false, VaultAlreadyExists());
+        _accrueSubVaultConversionRate(subVaultId);
+        _activeSubVaults[_subVaultIndexById[subVaultId]].perSecondRate = newPerSecondRate;
+        _subVaultIdByRate[newPerSecondRate] = subVaultId;
+        emit SubVaultRateUpdated(subVaultId, newPerSecondRate);
+    }
+
+    function _deleteSubVault(uint256 subVaultId) internal {
+        require(_isActiveSubVaultById(subVaultId), VaultInactive());
+        uint256 subVaultIndex = _subVaultIndexById[subVaultId];
+        uint256 subVaultPerSecondRate = _activeSubVaults[subVaultIndex].perSecondRate;
+
+        if (subVaultIndex == _activeSubVaults.length - 1) {
+            _activeSubVaults.pop();
+            delete _subVaultIndexById[subVaultId];
+            delete _subVaultIdByRate[subVaultPerSecondRate];
+        } else {
+            SubVault storage moved = _activeSubVaults[_activeSubVaults.length - 1];
+            uint256 movedSubVaultId = _subVaultIdByRate[moved.perSecondRate];
+            _activeSubVaults[subVaultIndex] = moved;
+            _subVaultIndexById[movedSubVaultId] = subVaultIndex;
+
+            _activeSubVaults.pop();
+            delete _subVaultIndexById[subVaultId];
+            delete _subVaultIdByRate[subVaultPerSecondRate];
         }
     }
 
-    function setBasePerSecondRate(uint256 newBasePerSecondRate) external override onlyOwner {
-        _accrueBaseConversionRate();
-        _setBasePerSecondRate(newBasePerSecondRate);
-    }
-
-    function _setBasePerSecondRate(uint256 newBasePerSecondRate) internal {
-        require(newBasePerSecondRate >= MathLib.RAY, InvalidRate());
-        _basePerSecondRate = newBasePerSecondRate;
-        emit BaseRateUpdated(newBasePerSecondRate);
-    }
-
-    function addSupportedAsset(address asset) external override onlyOwner {
-        _addSupportedAsset(asset);
-    }
-
-    function removeSupportedAsset(address asset) external override onlyOwner {
+    function updateAssetSupport(address asset, bool isSupported) external override onlyOwner {
         require(asset != address(0), InvalidAsset(asset));
-        require(_supportedAssets[asset], AssetNotSupported(asset));
-
-        delete _supportedAssets[asset];
-        emit AssetSupported(asset, false);
+        if (isSupported) {
+            require(!_supportedAssets[asset], AssetAlreadySupported(asset));
+            _supportedAssets[asset] = true;
+        } else {
+            require(_supportedAssets[asset], AssetNotSupported(asset));
+            delete _supportedAssets[asset];
+        }
+        emit AssetSupported(asset, isSupported);
     }
 
     function isAssetSupported(address asset) public view returns (bool) {
         return _supportedAssets[asset];
     }
 
-    function setBoost(address account, uint256 newPerSecondRateBoost) external override onlyOwner {
-        uint256 accountOldShares = _positions[account].shares;
-        require(accountOldShares > 0, InexistentPosition());
+    // This is for a new user position - to be assigned to some vault
+    function _addNewUserToSubVault(address user, uint256 newSubVaultId, uint256 amountInRay) internal {
+        require(_positions[user].shares == 0, "AlreadyInPosition()");
+        require(_isActiveSubVaultById(newSubVaultId), VaultInactive());
+        uint256 newSubVaultIndex = _subVaultIndexById[newSubVaultId];
+        _accrueSubVaultConversionRate(newSubVaultIndex);
+        _positions[user].subVaultId = newSubVaultIndex;
 
-        uint256 oldBoostRate = _positions[account].boostRate;
-        require(oldBoostRate != newPerSecondRateBoost, RedundantBoost());
+        uint256 conversionRate = _activeSubVaults[newSubVaultIndex].conversionRate;
+        uint256 shares = amountInRay.rayDivDown(conversionRate);
 
-        uint256 oldBucketIndex = _bucketIndexByBoostRate[oldBoostRate];
+        _activeSubVaults[newSubVaultIndex].totalShares += shares;
+        _positions[user].shares += shares;
+        _positions[user].originalDeposit += amountInRay;
+    }
 
-        _accrueBaseConversionRate();
-        _accrueBucketConversionRate(oldBucketIndex);
+    function _setUserRate(address user, uint256 newPerSecondRate) internal {
+        uint256 userOldShares = _positions[user].shares;
+        require(userOldShares > 0, NonExistentPosition());
 
-        uint256 newBucketIndex;
-        if (_isActiveBucket(newPerSecondRateBoost)) {
-            newBucketIndex = _bucketIndexByBoostRate[newPerSecondRateBoost];
-            _accrueBucketConversionRate(newBucketIndex);
+        uint256 oldSubVaultId = _positions[user].subVaultId;
+        uint256 oldSubVaultIndex = _subVaultIndexById[oldSubVaultId];
+
+        uint256 newSubVaultId;
+        if (!_isActiveSubVaultByRate(newPerSecondRate)) {
+            _createSubVault(newPerSecondRate);
         } else {
-            // Create bucket and store it into the active buckets
-            _activeBuckets.push(
-                Bucket({
-                    perSecondRateBoost: newPerSecondRateBoost,
+            newSubVaultId = _subVaultIdByRate[newPerSecondRate];
+        }
+
+        _moveUserToAnotherSubVault(user, newSubVaultId);
+    }
+
+    function _moveUserToAnotherSubVault(address user, uint256 newSubVaultId) internal {
+        // TODO: We assume this only is called from _setUserRate.
+        // require(_isActiveSubVaultById(newSubVaultId), VaultInactive());
+        uint256 newSubVaultIndex = _subVaultIndexById[newSubVaultId];
+        uint256 userOldShares = _positions[user].shares;
+        require(userOldShares > 0, NonExistentPosition());
+        uint256 oldSubVaultId = _positions[user].subVaultId;
+        uint256 oldSubVaultIndex = _subVaultIndexById[oldSubVaultId];
+        _positions[user].subVaultId = newSubVaultIndex;
+
+        _accrueSubVaultConversionRate(oldSubVaultIndex);
+        _accrueSubVaultConversionRate(newSubVaultIndex);
+
+        uint256 oldConversionRate = _activeSubVaults[oldSubVaultIndex].conversionRate;
+        uint256 newConversionRate = _activeSubVaults[newSubVaultIndex].conversionRate;
+
+        uint256 userNewShares =
+            MathLib.rayDivDown(MathLib.rayMulDown(userOldShares, oldConversionRate), newConversionRate);
+
+        _activeSubVaults[oldSubVaultIndex].totalShares -= userOldShares;
+        _activeSubVaults[newSubVaultIndex].totalShares += userNewShares;
+    }
+
+    function setUserRate(address user, uint256 newPerSecondRate) external override onlyOwner {
+        uint256 userOldShares = _positions[user].shares;
+        require(userOldShares > 0, NonExistentPosition());
+
+        // // TODO: Decide if it's subVaultId or subVaultIndex
+        // uint256 oldSubVaultIndex = _positions[user].subVaultId;
+        // uint256 oldRate = _activeSubVaults[oldSubVaultIndex].perSecondRate;
+        // require(oldRate != newPerSecondRate, RedundantBoost());
+
+        _accrueSubVaultConversionRate(oldSubVaultIndex);
+
+        uint256 newSubVaultIndex;
+        if (_isActiveSubVaultByRate(newPerSecondRate)) {
+            newSubVaultIndex = _subVaultIndexById[_subVaultIdByRate[newPerSecondRate]];
+            _accrueSubVaultConversionRate(newSubVaultIndex);
+        } else {
+            // Create sub-vault and store it into the active subVaults
+            _activeSubVaults.push(
+                SubVault({
+                    perSecondRate: newPerSecondRate,
                     conversionRate: MathLib.RAY,
                     lastAccrualTimestamp: uint256(block.timestamp),
                     totalShares: 0
                 })
             );
-            newBucketIndex = _activeBuckets.length - 1;
-            _bucketIndexByBoostRate[newPerSecondRateBoost] = newBucketIndex;
+            newSubVaultIndex = _activeSubVaults.length - 1;
+            newSubVaultIndex = _subVaultIndexById[_subVaultIdByRate[newPerSecondRate]];
         }
 
-        uint256 oldBoostConversionRate = _activeBuckets[oldBucketIndex].conversionRate;
-        uint256 newBoostConversionRate = _activeBuckets[newBucketIndex].conversionRate;
+        uint256 oldConversionRate = _activeSubVaults[oldSubVaultIndex].conversionRate;
+        uint256 newConversionRate = _activeSubVaults[newSubVaultIndex].conversionRate;
 
-        uint256 accountNewShares =
-            MathLib.rayMulDown(accountOldShares, MathLib.rayDivDown(oldBoostConversionRate, newBoostConversionRate));
+        uint256 userNewShares =
+            MathLib.rayMulDown(userOldShares, MathLib.rayDivDown(oldConversionRate, newConversionRate));
 
-        _activeBuckets[oldBucketIndex].totalShares -= accountOldShares;
-        _activeBuckets[newBucketIndex].totalShares += accountNewShares;
+        _activeSubVaults[oldSubVaultIndex].totalShares -= userOldShares;
+        _activeSubVaults[newSubVaultIndex].totalShares += userNewShares;
 
-        if (_activeBuckets[oldBucketIndex].totalShares == 0) {
-            uint256 lastBucketIndex = _activeBuckets.length - 1;
-            if (oldBucketIndex != lastBucketIndex) {
-                Bucket memory moved = _activeBuckets[lastBucketIndex];
-                _activeBuckets[oldBucketIndex] = moved;
-                _bucketIndexByBoostRate[moved.perSecondRateBoost] = oldBucketIndex;
+        if (_activeSubVaults[oldSubVaultIndex].totalShares == 0) {
+            uint256 lastSubVaultIndex = _activeSubVaults.length - 1;
+            if (oldSubVaultIndex != lastSubVaultIndex) {
+                SubVault memory swappedSubVault = _activeSubVaults[lastSubVaultIndex];
+                _activeSubVaults[oldSubVaultIndex] = swappedSubVault;
+                _subVaultIndexByRate[swappedSubVault.perSecondRate] = oldSubVaultIndex;
             }
-            _activeBuckets.pop();
-            delete _bucketIndexByBoostRate[oldBoostRate];
+            _activeSubVaults.pop();
+            delete _subVaultIndexByRate[oldRate];
         }
 
-        _positions[account].boostRate = newPerSecondRateBoost;
-        _positions[account].shares = accountNewShares;
+        _positions[user].subVaultId = newSubVaultIndex;
+        _positions[user].shares = userNewShares;
 
-        emit BoostSet(account, newPerSecondRateBoost);
+        emit UserRateUpdated(user, newPerSecondRate);
     }
 
-    function deposit(address account, address asset, uint256 amount) external override {
-        require(msg.sender == account, InvalidMsgSender());
+    function deposit(address user, address asset, uint256 amount) external override {
+        require(msg.sender == user, InvalidMsgSender());
         require(isAssetSupported(asset), UnsupportedAsset(asset));
         IERC20(asset).safeTransferFrom(msg.sender, address(_fundsHandler), amount);
-
-        _accrueBaseConversionRate();
-
-        // TODO: We assume the invariant of _activeBuckets[0] being the "no-boost" bucket
-        // If account does not have any deposited assets yet, assign it to the "no-boost" base rate bucket
-        uint256 bucketIndex;
-        if (_positions[account].shares > 0) {
-            bucketIndex = _bucketIndexByBoostRate[_positions[account].boostRate];
+        // TODO: We assume the invariant of _activeSubVaults[0] being the "no-boost" subVault
+        // If user does not have any deposited assets yet, assign it to the "no-boost" base rate subVault
+        uint256 subVaultIndex = 0;
+        if (_positions[user].shares > 0) {
+            subVaultIndex = _positions[user].subVaultId;
         } else {
-            _positions[account].boostRate = MathLib.RAY;
+            _positions[user].subVaultId = subVaultIndex;
         }
 
-        _accrueBucketConversionRate(bucketIndex);
+        _accrueSubVaultConversionRate(subVaultIndex);
 
-        uint256 conversionRate = _baseConversionRate.rayMulDown(_activeBuckets[bucketIndex].conversionRate);
+        uint256 conversionRate = _activeSubVaults[subVaultIndex].conversionRate;
         uint256 amountInRay = amount.assetDecimalsToRay(asset);
         uint256 shares = amountInRay.rayDivDown(conversionRate);
 
-        _activeBuckets[bucketIndex].totalShares += shares;
-        _positions[account].shares += shares;
-        _positions[account].originalDeposit += amountInRay;
+        _activeSubVaults[subVaultIndex].totalShares += shares;
+        _positions[user].shares += shares;
+        _positions[user].originalDeposit += amountInRay;
 
-        _fundsHandler.processDeposit(account, asset, amount);
+        _fundsHandler.processDeposit(user, asset, amount);
 
-        emit Deposit(account, asset, amount);
+        emit Deposit(user, asset, amount);
     }
 
     /**
      * @notice Requests a withdrawal of assets from the vault.
-     * @param account The address of the account requesting the withdrawal
+     * @param user The address of the user requesting the withdrawal
      * @param preferredAsset The asset the withdrawal is requested in
      * @param requestedAmountInRay The amount of assets requested to withdraw (normalized to RAY units)
      */
-    function requestWithdrawal(address account, address preferredAsset, uint256 requestedAmountInRay)
+    function requestWithdrawal(address user, address preferredAsset, uint256 requestedAmountInRay)
         external
         override
         returns (uint256)
     {
-        require(msg.sender == account, InvalidMsgSender());
-        require(_positions[account].shares > 0, InexistentPosition());
+        require(msg.sender == user, InvalidMsgSender());
+        require(_positions[user].shares > 0, NonExistentPosition());
 
-        uint256 bucketIndex = _bucketIndexByBoostRate[_positions[account].boostRate];
+        uint256 subVaultIndex = _positions[user].subVaultId;
 
-        _accrueBaseConversionRate();
-        _accrueBucketConversionRate(bucketIndex);
+        _accrueSubVaultConversionRate(subVaultIndex);
 
-        uint256 conversionRate = _baseConversionRate.rayMulDown(_activeBuckets[bucketIndex].conversionRate);
+        uint256 conversionRate = _activeSubVaults[subVaultIndex].conversionRate;
         uint256 actualAmountInRay;
         uint256 guaranteedAmount;
 
         if (requestedAmountInRay == 0) {
-            // Withdraw full balance. Account's shares > 0 check already performed at the beginning
-            actualAmountInRay = _positions[account].shares.rayMulDown(conversionRate);
+            // Withdraw full balance. user's shares > 0 check already performed at the beginning
+            actualAmountInRay = _positions[user].shares.rayMulDown(conversionRate);
 
             // TODO: should we check actualAmountInRay > 0?
-            guaranteedAmount = _positions[account].originalDeposit;
+            guaranteedAmount = _positions[user].originalDeposit;
             require(actualAmountInRay + 1 >= guaranteedAmount, "something went wrong - investigate"); // TODO: Remove this, but first try to find more test cases first
             if (actualAmountInRay < guaranteedAmount) {
                 guaranteedAmount = actualAmountInRay;
             }
-            delete _positions[account];
+            delete _positions[user];
         } else {
             uint256 requestedAmountInShares = requestedAmountInRay.rayDivDown(conversionRate);
-            require(requestedAmountInShares <= _positions[account].shares, InvalidAmount());
-            // Subtract from the bucket & clear position
-            _positions[account].shares -= requestedAmountInShares;
-            _activeBuckets[bucketIndex].totalShares -= requestedAmountInShares;
+            require(requestedAmountInShares <= _positions[user].shares, InvalidAmount());
+            // Subtract from the subVault & clear position
+            _positions[user].shares -= requestedAmountInShares;
+            _activeSubVaults[subVaultIndex].totalShares -= requestedAmountInShares;
             // TODO: Don't like the double conversion, but feel safer this way
             // TODO: This needs a mathematical proof that: requestedAmountInRay <= actualAmountInRay;
             actualAmountInRay = requestedAmountInShares.rayMulDown(conversionRate);
-            _positions[account].shares -= requestedAmountInShares;
+            _positions[user].shares -= requestedAmountInShares;
             // TODO: Probably there is a better way to do this:
-            if (actualAmountInRay >= _positions[account].originalDeposit) {
-                guaranteedAmount = _positions[account].originalDeposit;
-                _positions[account].originalDeposit = 0;
+            if (actualAmountInRay >= _positions[user].originalDeposit) {
+                guaranteedAmount = _positions[user].originalDeposit;
+                _positions[user].originalDeposit = 0;
             } else {
                 guaranteedAmount = actualAmountInRay;
-                _positions[account].originalDeposit -= actualAmountInRay;
+                _positions[user].originalDeposit -= actualAmountInRay;
             }
         }
-        _activeBuckets[bucketIndex].totalShares -= _positions[account].shares;
+        _activeSubVaults[subVaultIndex].totalShares -= _positions[user].shares;
         // TODO: Handle preferred asset properly
         uint256 withdrawalRequestId = _fundsHandler.processWithdrawalRequest({
-            account: account,
+            user: user,
             amount: actualAmountInRay,
             guaranteedAmount: guaranteedAmount,
             preferredAsset: preferredAsset,
             data: ""
         });
-        emit WithdrawalRequested(account, preferredAsset, actualAmountInRay, guaranteedAmount);
+        emit WithdrawalRequested(user, preferredAsset, actualAmountInRay, guaranteedAmount);
         return withdrawalRequestId;
     }
 
@@ -317,7 +367,7 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
     }
 
     function getVaultObligations() external view override returns (uint256) {
-        for (uint256 i = 0; i < _activeBuckets.length; i++) {
+        for (uint256 i = 0; i < _activeSubVaults.length; i++) {
             // TODO: Implement
         }
         return 0;
@@ -329,74 +379,35 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
     }
 
     /// @dev returns underlying assets denomination in RAY decimal places
-    function getAccountBalance(address account) external view override returns (uint256) {
-        if (_positions[account].shares == 0) {
+    function getUserBalance(address user) external view override returns (uint256) {
+        if (_positions[user].shares == 0) {
             return 0;
         }
-        uint256 bucketIndex = _bucketIndexByBoostRate[_positions[account].boostRate];
-        uint256 conversionRate = _previewBaseConversionRate().rayMulDown(_previewBucketConversionRate(bucketIndex));
-        return _positions[account].shares.rayMulDown(conversionRate);
+        uint256 subVaultIndex = _subVaultIndexById[_positions[user].subVaultId];
+        return _positions[user].shares.rayMulDown(_previewSubVaultConversionRate(subVaultIndex));
     }
 
-    function getRateData(address account) external view returns (RateData memory) {
-        Bucket memory bucket = _activeBuckets[_bucketIndexByBoostRate[_positions[account].boostRate]];
-        return RateData({
-            // TODO: need to return composite of base rate and boost rate
-            perSecondRate: bucket.perSecondRateBoost,
-            conversionRate: bucket.conversionRate,
-            lastAccrualTimestamp: bucket.lastAccrualTimestamp
-        });
-    }
-
-    function _addSupportedAsset(address asset) internal {
-        require(asset != address(0), InvalidAsset(asset));
-        require(!_supportedAssets[asset], AssetAlreadySupported(asset));
-        _supportedAssets[asset] = true;
-        emit AssetSupported(asset, true);
-    }
-
-    function _previewBaseConversionRate() internal view returns (uint256) {
-        uint256 secondsSinceLastAccrual = block.timestamp - _lastBaseConversionRateAccrualTimestamp;
-        uint256 newBaseConversionRate = _baseConversionRate;
+    function _previewSubVaultConversionRate(uint256 subVaultIndex) internal view returns (uint256) {
+        uint256 secondsSinceLastAccrual = block.timestamp - _activeSubVaults[subVaultIndex].lastAccrualTimestamp;
+        uint256 newConversionRate = _activeSubVaults[subVaultIndex].conversionRate;
         if (secondsSinceLastAccrual != 0) {
-            uint256 growthFactor = _basePerSecondRate.rpow(secondsSinceLastAccrual);
-            newBaseConversionRate = _baseConversionRate.rayMulDown(growthFactor);
-        }
-        return newBaseConversionRate;
-    }
-
-    function _previewBucketConversionRate(uint256 bucketIndex) internal view returns (uint256) {
-        uint256 secondsSinceLastAccrual = block.timestamp - _activeBuckets[bucketIndex].lastAccrualTimestamp;
-        uint256 newConversionRate = _activeBuckets[bucketIndex].conversionRate;
-        if (secondsSinceLastAccrual != 0) {
-            uint256 growthFactor = _activeBuckets[bucketIndex].perSecondRateBoost.rpow(secondsSinceLastAccrual);
-            newConversionRate = _activeBuckets[bucketIndex].conversionRate.rayMulDown(growthFactor);
+            uint256 growthFactor = _activeSubVaults[subVaultIndex].perSecondRate.rpow(secondsSinceLastAccrual);
+            newConversionRate = _activeSubVaults[subVaultIndex].conversionRate.rayMulDown(growthFactor);
         }
         return newConversionRate;
     }
 
-    function _accrueBaseConversionRate() internal {
-        uint256 secondsSinceLastAccrual = block.timestamp - _lastBaseConversionRateAccrualTimestamp;
-        if (secondsSinceLastAccrual != 0) {
-            uint256 growthFactor = _basePerSecondRate.rpow(secondsSinceLastAccrual);
-            _baseConversionRate = _baseConversionRate.rayMulDown(growthFactor);
-            _lastBaseConversionRateAccrualTimestamp = block.timestamp;
-        }
+    function _accrueSubVaultConversionRate(uint256 subVaultIndex) internal {
+        _activeSubVaults[subVaultIndex].conversionRate = _previewSubVaultConversionRate(subVaultIndex);
+        _activeSubVaults[subVaultIndex].lastAccrualTimestamp = block.timestamp;
     }
 
-    function _accrueBucketConversionRate(uint256 bucketIndex) internal {
-        // TODO: Maybe if _activeBuckets[bucketIndex].perSecondRateBoost == 1 we skip the accrual?
-        uint256 secondsSinceLastAccrual = block.timestamp - _activeBuckets[bucketIndex].lastAccrualTimestamp;
-        if (secondsSinceLastAccrual != 0) {
-            uint256 growthFactor = _activeBuckets[bucketIndex].perSecondRateBoost.rpow(secondsSinceLastAccrual);
-            _activeBuckets[bucketIndex].conversionRate =
-                _activeBuckets[bucketIndex].conversionRate.rayMulDown(growthFactor);
-            _activeBuckets[bucketIndex].lastAccrualTimestamp = block.timestamp;
-        }
+    function _isActiveSubVaultById(uint256 subVaultId) internal view returns (bool) {
+        return
+            _subVaultIndexById[subVaultId] != 0 || (_activeSubVaults.length > 0 && _activeSubVaults[0].totalShares > 0);
     }
 
-    function _isActiveBucket(uint256 perSecondRateBoost) internal view returns (bool) {
-        return _bucketIndexByBoostRate[perSecondRateBoost] != 0
-            || (_activeBuckets.length > 0 && _activeBuckets[0].perSecondRateBoost == perSecondRateBoost);
+    function _isActiveSubVaultByRate(uint256 perSecondRate) internal view returns (bool) {
+        return _subVaultIdByRate[perSecondRate] != 0;
     }
 }

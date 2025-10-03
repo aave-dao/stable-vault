@@ -674,9 +674,9 @@ contract ExtendedBasedBoostedVaultT is Test {
     // Error Path Tests
     // -------------------------------------------------------------
 
-    function test_revert_setBoost_inexistentPosition() public {
+    function test_revert_setBoost_NonexistentPosition() public {
         address account1 = makeAddr("account1");
-        vm.expectRevert(IBasedBoostedVault.InexistentPosition.selector);
+        vm.expectRevert(IBasedBoostedVault.NonexistentPosition.selector);
         vault.setBoost(account1, 1000000000303445301167003084);
     }
 

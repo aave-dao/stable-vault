@@ -3,16 +3,16 @@ pragma solidity ^0.8.22;
 
 interface IBasedBoostedVault {
     event WithdrawalRequested(
-        address indexed account, address indexed asset, uint256 requestedAmount, uint256 guaranteedAmount
+        address indexed user, address indexed asset, uint256 requestedAmount, uint256 guaranteedAmount
     );
     event WithdrawalExecuted(uint256 indexed withdrawalRequestId, uint256 amount, bytes returnData);
-    event Deposit(address indexed account, address indexed asset, uint256 amount);
-    event BaseRateUpdated(uint256 baseRate);
-    event BoostSet(address indexed account, uint256 boostRate);
+    event Deposit(address indexed user, address indexed asset, uint256 amount);
+    event UserRateUpdated(address indexed user, uint256 newRate);
+    event SubVaultRateUpdated(uint256 indexed subVaultId, uint256 newRate);
     event AssetSupported(address indexed asset, bool supported);
 
     error InvalidRate();
-    error InexistentPosition();
+    error NonExistentPosition();
     error RedundantBoost();
     error InvalidMsgSender();
     error InvalidAmount();
@@ -20,6 +20,8 @@ interface IBasedBoostedVault {
     error InvalidAsset(address asset);
     error AssetAlreadySupported(address asset);
     error AssetNotSupported(address asset);
+    error VaultAlreadyExists();
+    error VaultInactive();
 
     struct RateData {
         uint256 perSecondRate;
@@ -29,25 +31,23 @@ interface IBasedBoostedVault {
 
     function setBasePerSecondRate(uint256 newBasePerSecondRate) external;
 
-    function setBoost(address account, uint256 perSecondRateBoost) external;
+    function setUserRate(address user, uint256 perSecondRate) external;
 
-    function deposit(address account, address asset, uint256 amount) external;
+    function deposit(address user, address asset, uint256 amount) external;
 
-    function requestWithdrawal(address account, address asset, uint256 amount) external returns (uint256);
+    function requestWithdrawal(address user, address asset, uint256 amount) external returns (uint256);
 
     function executeWithdrawal(uint256 withdrawalRequestId, bytes calldata data)
         external
         returns (uint256, bytes memory);
 
-    // function emergencyWithdraw(address account, uint256 amount) external;
+    // function emergencyWithdraw(address user, uint256 amount) external;
 
     function getVaultObligations() external view returns (uint256);
 
     function getVaultAssets() external view returns (uint256);
 
-    function getAccountBalance(address account) external view returns (uint256);
-
-    function getRateData(address account) external view returns (RateData memory);
+    function getUserBalance(address user) external view returns (uint256);
 
     function addSupportedAsset(address asset) external;
 
