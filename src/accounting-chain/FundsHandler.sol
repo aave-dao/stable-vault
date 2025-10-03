@@ -14,7 +14,7 @@ contract FundsHandler is IVaultFundsHandler {
     using AssetLib for uint256;
 
     struct WithdrawalRequest {
-        address account;
+        address user;
         uint256 amountRequested;
         uint256 amountGuaranteed;
         address preferredAsset;
@@ -28,7 +28,7 @@ contract FundsHandler is IVaultFundsHandler {
 
     // TODO: onlyBBVault
     function processWithdrawalRequest(
-        address account,
+        address user,
         uint256 amount,
         uint256 guaranteedAmount,
         address preferredAsset,
@@ -36,13 +36,13 @@ contract FundsHandler is IVaultFundsHandler {
     ) external override returns (uint256) {
         uint256 withdrawalRequestId = ++_lastWithdrawalRequestId;
         _withdrawalRequests[withdrawalRequestId] =
-            WithdrawalRequest(account, amount, guaranteedAmount, preferredAsset, block.timestamp, "");
+            WithdrawalRequest(user, amount, guaranteedAmount, preferredAsset, block.timestamp, "");
         // TODO: Implement anything else if needed
         return withdrawalRequestId;
     }
 
     // TODO: onlyBBVault
-    function processDeposit(address account, address asset, uint256 amount) external override {
+    function processDeposit(address user, address asset, uint256 amount) external override {
         // TODO: Implement
     }
 
@@ -60,7 +60,7 @@ contract FundsHandler is IVaultFundsHandler {
     function _executeWithdrawal(uint256 withdrawalRequestId) internal returns (uint256) {
         address asset = _withdrawalRequests[withdrawalRequestId].preferredAsset;
         uint256 amount = _withdrawalRequests[withdrawalRequestId].amountRequested.rayToAssetDecimals(asset);
-        address destination = _withdrawalRequests[withdrawalRequestId].account;
+        address destination = _withdrawalRequests[withdrawalRequestId].user;
         delete _withdrawalRequests[withdrawalRequestId];
         IERC20(asset).safeTransfer(destination, amount);
         return amount;

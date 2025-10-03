@@ -2,6 +2,11 @@
 pragma solidity ^0.8.22;
 
 interface IBasedBoostedVault {
+    struct SubVaultData {
+        uint256 perSecondRate;
+        uint256 id;
+    }
+
     event WithdrawalRequested(
         address indexed user, address indexed asset, uint256 requestedAmount, uint256 guaranteedAmount
     );
@@ -21,15 +26,11 @@ interface IBasedBoostedVault {
     error AssetAlreadySupported(address asset);
     error AssetNotSupported(address asset);
     error VaultAlreadyExists();
-    error VaultInactive();
+    error InactiveVault();
 
-    struct RateData {
-        uint256 perSecondRate;
-        uint256 conversionRate;
-        uint256 lastAccrualTimestamp;
-    }
+    function changeSubVaultRate(uint256 subVaultId, uint256 newPerSecondRate) external;
 
-    function setBasePerSecondRate(uint256 newBasePerSecondRate) external;
+    function getActiveSubVaults() external view returns (SubVaultData[] memory);
 
     function setUserRate(address user, uint256 perSecondRate) external;
 
@@ -41,17 +42,13 @@ interface IBasedBoostedVault {
         external
         returns (uint256, bytes memory);
 
-    // function emergencyWithdraw(address user, uint256 amount) external;
-
     function getVaultObligations() external view returns (uint256);
 
     function getVaultAssets() external view returns (uint256);
 
     function getUserBalance(address user) external view returns (uint256);
 
-    function addSupportedAsset(address asset) external;
-
-    function removeSupportedAsset(address asset) external;
+    function updateAssetSupport(address asset, bool supported) external;
 
     function isAssetSupported(address asset) external view returns (bool);
 }

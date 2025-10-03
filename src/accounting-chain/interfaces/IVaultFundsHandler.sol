@@ -3,14 +3,14 @@ pragma solidity ^0.8.22;
 
 interface IVaultFundsHandler {
     function processWithdrawalRequest(
-        address account,
+        address user,
         uint256 amount,
         uint256 guaranteedAmount,
         address preferredAsset,
         bytes calldata data
     ) external returns (uint256);
 
-    function processDeposit(address account, address asset, uint256 amount) external;
+    function processDeposit(address user, address asset, uint256 amount) external;
 
     function processWithdrawalExecution(uint256 withdrawalRequestId, bytes calldata data)
         external
