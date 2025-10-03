@@ -18,7 +18,7 @@ interface IBasedBoostedVault {
 
     error InvalidRate();
     error NonExistentPosition();
-    error RedundantBoost();
+    error RedundantRate();
     error InvalidMsgSender();
     error InvalidAmount();
     error UnsupportedAsset(address asset);
@@ -31,6 +31,8 @@ interface IBasedBoostedVault {
     function changeSubVaultRate(uint256 subVaultId, uint256 newPerSecondRate) external;
 
     function getActiveSubVaults() external view returns (SubVaultData[] memory);
+
+    function getUserSubVault(address user) external view returns (SubVaultData memory);
 
     function setUserRate(address user, uint256 perSecondRate) external;
 

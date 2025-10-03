@@ -111,9 +111,10 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
 
     function changeSubVaultRate(uint256 subVaultId, uint256 newPerSecondRate) external onlyOwner {
         // TODO: do we have to check if subVaultId 1 and recreate the base vault if its inactive
+        require(newPerSecondRate >= MathLib.RAY, InvalidRate());
         require(_isActiveSubVaultById(subVaultId), InactiveVault());
         require(_isActiveSubVaultByRate(newPerSecondRate) == false, VaultAlreadyExists());
-        _accrueSubVaultConversionRate(subVaultId);
+        _accrueSubVaultConversionRate(_subVaultIndexById[subVaultId]);
         _activeSubVaults[_subVaultIndexById[subVaultId]].perSecondRate = newPerSecondRate;
         _subVaultIdByRate[newPerSecondRate] = subVaultId;
         emit SubVaultRateUpdated(subVaultId, newPerSecondRate);
@@ -166,8 +167,11 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
     }
 
     function setUserRate(address user, uint256 newPerSecondRate) external override onlyOwner {
+        require(newPerSecondRate >= MathLib.RAY, InvalidRate());
         uint256 userOldShares = _positions[user].shares;
         require(userOldShares > 0, NonExistentPosition());
+        uint256 oldSubVaultIndex = _subVaultIndexById[_positions[user].subVaultId];
+        require(_activeSubVaults[oldSubVaultIndex].perSecondRate != newPerSecondRate, RedundantRate());
 
         uint256 newSubVaultId;
         if (_isActiveSubVaultByRate(newPerSecondRate)) {
@@ -179,7 +183,8 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         _migrateUserToSubVault({
             user: user,
             userOldShares: userOldShares,
-            oldSubVaultIndex: _subVaultIndexById[_positions[user].subVaultId],
+            newSubVaultId: newSubVaultId,
+            oldSubVaultIndex: oldSubVaultIndex,
             newSubVaultIndex: _subVaultIndexById[newSubVaultId]
         });
 
@@ -189,6 +194,7 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
     function _migrateUserToSubVault(
         address user,
         uint256 userOldShares,
+        uint256 newSubVaultId,
         uint256 oldSubVaultIndex,
         uint256 newSubVaultIndex
     ) internal {
@@ -202,7 +208,8 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         _activeSubVaults[oldSubVaultIndex].totalShares -= userOldShares;
         _activeSubVaults[newSubVaultIndex].totalShares += userNewShares;
 
-        _positions[user].subVaultId = newSubVaultIndex;
+        _positions[user].shares = userNewShares;
+        _positions[user].subVaultId = newSubVaultId;
     }
 
     function deposit(address user, address asset, uint256 amount) external override {
@@ -264,7 +271,8 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
 
             // TODO: should we check actualAmountInRay > 0?
             guaranteedAmount = _positions[user].originalDeposit;
-            require(actualAmountInRay + 1 >= guaranteedAmount, "something went wrong - investigate"); // TODO: Remove this, but first try to find more test cases first
+            // FIXME: keeping + 2 here during development; we lose 2 units of assets when going from assets -> shares (the loss is baked into the shares quantity which when multiplied with the same conversion rate leads to 2 unit of asset loss).
+            require(actualAmountInRay + 2 >= guaranteedAmount, "more than 2 unit of loss - investigate");
             if (actualAmountInRay < guaranteedAmount) {
                 guaranteedAmount = actualAmountInRay;
             }
@@ -330,6 +338,12 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         }
         uint256 subVaultIndex = _subVaultIndexById[_positions[user].subVaultId];
         return _positions[user].shares.rayMulDown(_previewSubVaultConversionRate(subVaultIndex));
+    }
+
+    function getUserSubVault(address user) external view override returns (SubVaultData memory) {
+        uint256 subVaultId = _positions[user].subVaultId;
+        uint256 subVaultRate = _activeSubVaults[_subVaultIndexById[subVaultId]].perSecondRate;
+        return SubVaultData(subVaultRate, subVaultId);
     }
 
     function _previewSubVaultConversionRate(uint256 subVaultIndex) internal view returns (uint256) {

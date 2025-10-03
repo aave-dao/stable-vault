@@ -4,8 +4,6 @@ pragma solidity ^0.8.20;
 import "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-
 import {ExtendedBasedBoostedVault} from "./mocks/ExtendedBasedBoostedVault.sol";
 import {TestErc20} from "./mocks/TestErc20.sol";
 import {MathLib} from "./../src/libraries/MathLib.sol";
@@ -113,7 +111,7 @@ contract ExtendedBasedBoostedVaultT is Test {
         vault.deposit(address(this), address(asset), amount);
         uint256 amountInRay = amount.assetDecimalsToRay(address(asset));
 
-        vault.setUserRate(address(this), 1000000000303445301167003084); // Boost from ~4% to ~5% APY
+        vault.setUserRate(address(this), expectedApyPerSecondRate); // Boost from ~4% to ~5% APY
 
         console.log("After 1 year...");
         vm.warp(block.timestamp + 365 days);
@@ -423,10 +421,6 @@ contract ExtendedBasedBoostedVaultT is Test {
         assertEq(assetBalanceAfterWithdraw, 0, "Asset balance after withdrawal is not 0");
     }
 
-    function testNextBlockDepositAndSetUserRate() public {
-        // TODO:
-    }
-
     function testSetUserRatesOver10Years() public {
         // Context: - find driver of value delta between ending balance of (5% base) APY vs (4% base + 1% boost) APY
         //          - add intermittent boosts across the time period of the initial deposit made
@@ -529,8 +523,6 @@ contract ExtendedBasedBoostedVaultT is Test {
         uint256 newBasePerSecondRate = 1000000001243680656318820313; // ~4% APY
         _setDefaultPerSecondRate(newBasePerSecondRate);
 
-        uint256 boost4To5 = 1000000000303445301167003084;
-
         uint256 expectedTotalPerSecondRate = 1000000001547125957863212449; // 5% APY
 
         address account1 = makeAddr("account1");
@@ -546,7 +538,7 @@ contract ExtendedBasedBoostedVaultT is Test {
         vm.prank(account1);
         vault.deposit(account1, address(testAsset), initialDeposit);
 
-        vault.setUserRate(account1, boost4To5);
+        vault.setUserRate(account1, expectedTotalPerSecondRate);
 
         // Check base rate change after 6 months
         uint256 sixMonths = 15768000;
@@ -561,10 +553,9 @@ contract ExtendedBasedBoostedVaultT is Test {
 
         uint256 expectedTotalPerSecondRateAfterChange = 1000000002145441671308778766; // 7% APY
 
-        //uint256 boostTotalApy = vault.getBoostTotalApy(boost4To5);
-        //console.log("boostTotalApy: ", boostTotalApy);
-        //uint256 baseTotalApy = vault.getBoostTotalApy(MathLib.RAY);
-        //console.log("baseTotalApy: ", baseTotalApy);
+        // Set user's sub-vault rate to 7%
+        IBasedBoostedVault.SubVaultData memory userSubVault = vault.getUserSubVault(account1);
+        vault.changeSubVaultRate(userSubVault.id, expectedTotalPerSecondRateAfterChange);
 
         vm.warp(block.timestamp + sixMonths);
 
@@ -591,7 +582,7 @@ contract ExtendedBasedBoostedVaultT is Test {
         console.log("delta: ", delta);
         // FIXME: can we improve the delta here? The issue is the boost multiplier for extra 1% on base rate at t_0 does not translate to an extra 1% on base rate at t_1 (assuming the base rate is different)
         // Balances are queried in RAY, so expect at least the first 9 decimal places to be the same
-        //assertEq(delta / 1e18, 0, "Expected lower delta");
+        assertEq(delta / 1e18, 0, "Expected lower delta");
     }
 
     function test_success_variousDecimalPlaceTokenDeposits_simple() public {
@@ -662,8 +653,7 @@ contract ExtendedBasedBoostedVaultT is Test {
         vault.deposit(account1, address(asset6dp), oneMillionUsd6dp);
 
         // Set boost within same block after depositing
-        uint256 boost4To5 = 1000000000303445301167003084;
-        vault.setUserRate(account1, boost4To5);
+        vault.setUserRate(account1, expectedApyPerSecondRate);
 
         // Move forward in time to check balance accrual
         vm.warp(block.timestamp + 365 days);
@@ -689,7 +679,7 @@ contract ExtendedBasedBoostedVaultT is Test {
         vault.setUserRate(account1, 1000000000303445301167003084);
     }
 
-    function test_revert_setUserRate_redundantBoost() public {
+    function test_revert_setUserRate_redundantRate() public {
         address account1 = makeAddr("account1");
         uint256 depositAmount = 1;
         uint256 boost4To5 = 1000000000303445301167003084;
@@ -702,7 +692,7 @@ contract ExtendedBasedBoostedVaultT is Test {
         vault.deposit(account1, address(asset), depositAmount);
 
         vault.setUserRate(account1, boost4To5);
-        vm.expectRevert(IBasedBoostedVault.RedundantBoost.selector);
+        vm.expectRevert(IBasedBoostedVault.RedundantRate.selector);
         vault.setUserRate(account1, boost4To5);
     }
 
@@ -762,33 +752,4 @@ contract ExtendedBasedBoostedVaultT is Test {
         // The "default" subvault that has the effective base rate will always have id 1
         vault.changeSubVaultRate(1, basePerSecondRate);
     }
-}
-
-// TODO: Move this to some lib:
-function _convertFromAssetToRay(address asset, uint256 amount) view returns (uint256) {
-    return _convertDecimals(asset, amount, _tryGetAssetDecimals(asset), 27);
-}
-
-function _convertFromRayToAsset(address asset, uint256 amount) view returns (uint256) {
-    return _convertDecimals(asset, amount, 27, _tryGetAssetDecimals(asset));
-}
-
-function _convertDecimals(address, /* asset */ uint256 inputAmount, uint256 inputDecimals, uint256 outputDecimals)
-    pure
-    returns (uint256)
-{
-    // TODO: improve this:
-    if (inputDecimals == outputDecimals) return inputAmount;
-    if (inputDecimals < outputDecimals) {
-        uint256 multiplier = 10 ** (outputDecimals - inputDecimals);
-        return inputAmount * multiplier;
-    } else {
-        uint256 divisor = 10 ** (inputDecimals - outputDecimals);
-        return inputAmount / divisor;
-    }
-}
-
-function _tryGetAssetDecimals(address asset) view returns (uint8 assetDecimals) {
-    // TODO: Make it try getting decimals and default to 18 if fails like OZ does
-    return IERC20Metadata(asset).decimals();
 }
