@@ -4,15 +4,20 @@ pragma solidity ^0.8.20;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-// Minimal ERC20 for tests (18 decimals)
+// Minimal ERC20 for tests
 contract TestErc20 is IERC20, IERC20Metadata {
     string public constant NAME = "Test USD";
     string public constant SYMBOL = "TUSD";
-    uint8 public constant DECIMALS = 18;
 
     uint256 public totalSupply;
     mapping(address => uint256) public balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
+
+    uint8 internal _decimals;
+
+    constructor(uint8 decimals_) {
+        _decimals = decimals_;
+    }
 
     function approve(address spender, uint256 amount) external returns (bool) {
         allowance[msg.sender][spender] = amount;
@@ -46,8 +51,8 @@ contract TestErc20 is IERC20, IERC20Metadata {
         emit Transfer(from, to, amount);
     }
 
-    function decimals() external pure returns (uint8) {
-        return DECIMALS;
+    function decimals() external view returns (uint8) {
+        return _decimals;
     }
 
     function name() external pure returns (string memory) {

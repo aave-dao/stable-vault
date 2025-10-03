@@ -18,21 +18,6 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
 
     uint256 internal constant SECONDS_PER_YEAR = 365 days;
 
-    event WithdrawalRequested(
-        address indexed account, address indexed asset, uint256 requestedAmount, uint256 guaranteedAmount
-    );
-    event WithdrawalExecuted(uint256 indexed withdrawalRequestId, uint256 amount, bytes returnData);
-    event Deposit(address indexed account, address indexed asset, uint256 amount);
-    event BaseRateUpdated(uint256 baseRate);
-    event BoostSet(address indexed account, uint256 boostRate);
-
-    error InvalidRate();
-    error InexistentPosition();
-    error RedundantBoost();
-    error InvalidMsgSender();
-    error InvalidAmount();
-    error UnsupportedAsset();
-
     /**
      * @notice A bucket works like a virtual fixed-rate vault. The rate comes from the base rate with a multiplier boost
      * being applied to it.
@@ -96,6 +81,11 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
      */
     mapping(address account => AccountPosition position) _positions;
 
+    /**
+     * @dev Mapping to track supported assets.
+     */
+    mapping(address asset => bool supported) _supportedAssets;
+
     /// TODO: Decide what to do and how to handle the invariant of _activeBuckets[0] == "no-boost" bucket. Some ideas:
     /// - Do it an edge case and do not remove from active buckets when shares get down to 0
     /// - Lock some initial deposit in the constructor so it can never reach 0 liquidity, then its fixed at 0 index
@@ -107,8 +97,9 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
      * @dev Constructor.
      * @param owner The owner of the vault, acting as an admin.
      * @param basePerSecondRate The base per-second rate, in Ray units (27 decimals).
+     * @param initialSupportedAssets Array of initially supported asset addresses.
      */
-    constructor(address owner, uint256 basePerSecondRate) Ownable(owner) {
+    constructor(address owner, uint256 basePerSecondRate, address[] memory initialSupportedAssets) Ownable(owner) {
         // Initialize base conversion rate at 1
         _baseConversionRate = MathLib.RAY;
         // Base conversion rate was just accrued
@@ -129,6 +120,10 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
             })
         );
         _bucketIndexByBoostRate[MathLib.RAY] = 0;
+
+        for (uint256 i = 0; i < initialSupportedAssets.length; i++) {
+            _addSupportedAsset(initialSupportedAssets[i]);
+        }
     }
 
     function setBasePerSecondRate(uint256 newBasePerSecondRate) external override onlyOwner {
@@ -140,6 +135,22 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         require(newBasePerSecondRate >= MathLib.RAY, InvalidRate());
         _basePerSecondRate = newBasePerSecondRate;
         emit BaseRateUpdated(newBasePerSecondRate);
+    }
+
+    function addSupportedAsset(address asset) external override onlyOwner {
+        _addSupportedAsset(asset);
+    }
+
+    function removeSupportedAsset(address asset) external override onlyOwner {
+        require(asset != address(0), InvalidAsset(asset));
+        require(_supportedAssets[asset], AssetNotSupported(asset));
+
+        delete _supportedAssets[asset];
+        emit AssetSupported(asset, false);
+    }
+
+    function isAssetSupported(address asset) public view returns (bool) {
+        return _supportedAssets[asset];
     }
 
     function setBoost(address account, uint256 newPerSecondRateBoost) external override onlyOwner {
@@ -200,8 +211,7 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
 
     function deposit(address account, address asset, uint256 amount) external override {
         require(msg.sender == account, InvalidMsgSender());
-        require(amount > 0, InvalidAmount());
-        require(_isAssetSupported(asset), UnsupportedAsset());
+        require(isAssetSupported(asset), UnsupportedAsset(asset));
         IERC20(asset).safeTransferFrom(msg.sender, address(_fundsHandler), amount);
 
         _accrueBaseConversionRate();
@@ -256,6 +266,8 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         if (requestedAmountInRay == 0) {
             // Withdraw full balance. Account's shares > 0 check already performed at the beginning
             actualAmountInRay = _positions[account].shares.rayMulDown(conversionRate);
+
+            // TODO: should we check actualAmountInRay > 0?
             guaranteedAmount = _positions[account].originalDeposit;
             require(actualAmountInRay + 1 >= guaranteedAmount, "something went wrong - investigate"); // TODO: Remove this, but first try to find more test cases first
             if (actualAmountInRay < guaranteedAmount) {
@@ -316,6 +328,7 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         return 0;
     }
 
+    /// @dev returns underlying assets denomination in RAY decimal places
     function getAccountBalance(address account) external view override returns (uint256) {
         if (_positions[account].shares == 0) {
             return 0;
@@ -335,9 +348,11 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         });
     }
 
-    function _isAssetSupported(address /* asset */ ) internal pure returns (bool) {
-        // TODO: Implement whitelist for assets
-        return true;
+    function _addSupportedAsset(address asset) internal {
+        require(asset != address(0), InvalidAsset(asset));
+        require(!_supportedAssets[asset], AssetAlreadySupported(asset));
+        _supportedAssets[asset] = true;
+        emit AssetSupported(asset, true);
     }
 
     function _previewBaseConversionRate() internal view returns (uint256) {
