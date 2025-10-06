@@ -320,10 +320,15 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
     }
 
     function getVaultObligations() external view override returns (uint256) {
+        return _getVaultObligations();
+    }
+
+    function _getVaultObligations() internal view returns (uint256) {
+        uint256 vaultObligations;
         for (uint256 i = 0; i < _activeSubVaults.length; i++) {
-            // TODO: Implement
+            vaultObligations += _activeSubVaults[i].totalShares.rayMulDown(_previewSubVaultConversionRate(i));
         }
-        return 0;
+        return vaultObligations;
     }
 
     function getVaultAssets() external pure override returns (uint256) {
