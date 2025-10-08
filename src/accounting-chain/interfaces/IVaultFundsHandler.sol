@@ -15,4 +15,15 @@ interface IVaultFundsHandler {
     function processWithdrawalExecution(uint256 withdrawalRequestId, bytes calldata data)
         external
         returns (uint256, bytes memory);
+
+    function pushFundsToChain(address asset, uint256 amount, uint256 chainId) external;
+
+    function pullFundsFromChain(uint256 amount, uint256 chainId) external;
+
+    /// @param chainId The chain id of the chain that sent the balance update
+    /// @param balanceSnapshot The balance snapshot on the source chain in RAY of supported asset denomination
+    /// @param snapshotTimestamp The timestamp of the balance snapshot from the source chain
+    function updateChainBalanceCallback(uint256 chainId, uint256 balanceSnapshot, uint256 snapshotTimestamp) external;
+
+    function fundsArrivedFromChainCallback(uint256 chainId, address asset, uint256 amount) external;
 }
