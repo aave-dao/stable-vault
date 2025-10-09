@@ -7,7 +7,6 @@ interface ICommunicationHandler {
     error NotFundsHandler();
     error NotAdmin();
 
-
     enum MessageType {
         BALANCE_UPDATE,
         TRANSFER,

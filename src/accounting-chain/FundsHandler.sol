@@ -71,6 +71,7 @@ contract FundsHandler is IVaultFundsHandler {
     }
 
     function processDeposit(address user, address asset, uint256 amount) external override onlyBaseBoostedVault {
+        (user);
         // TODO: Implement
         _pushFundsToImmediateLiquidity(asset, amount);
     }
@@ -117,10 +118,7 @@ contract FundsHandler is IVaultFundsHandler {
 
     // Manager Functions
 
-    function pushFundsToChain(address asset, uint256 amount, uint256 chainId)
-        external
-        onlyManager
-    {
+    function pushFundsToChain(address asset, uint256 amount, uint256 chainId) external onlyManager {
         _pullFundsFromImmediateLiquidity(asset, amount);
         ICommunicationHandler(_communicationHandler).sendPushFundsToChainMessage(asset, amount, chainId);
     }
@@ -140,6 +138,7 @@ contract FundsHandler is IVaultFundsHandler {
         external
         onlyCommunicationHandler
     {
+        (chainId);
         _pushFundsToImmediateLiquidity(asset, amount);
     }
 

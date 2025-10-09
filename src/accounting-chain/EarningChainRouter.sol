@@ -5,7 +5,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {ICommunicationHandler} from "./interfaces/ICommunicationHandler.sol";
-import {IVaultFundsHandler} from "./interfaces/IVaultFundsHandler.sol";
 import {IAdapter} from "./interfaces/IAdapter.sol";
 import {IAllocator} from "./interfaces/IAllocator.sol";
 
@@ -31,10 +30,10 @@ contract EarningChainRouter {
     address _manager;
     uint256 immutable ACCOUNTING_CHAIN_ID;
 
-    constructor (uint256 accountingChainId) {
+    constructor(uint256 accountingChainId) {
         ACCOUNTING_CHAIN_ID = accountingChainId;
     }
-    
+
     function pushToStrategy(uint256 fromChainId, address asset, uint256 amount) external onlyAdapter(fromChainId) {
         IERC20(asset).safeTransferFrom(msg.sender, _allocator, amount);
         // TODO: Add a try-catch
@@ -44,7 +43,9 @@ contract EarningChainRouter {
 
     function _sendBalanceUpdateBack() internal {
         uint256 totalAssets = IAllocator(_allocator).getTotalAssets();
-        IAdapter(_adapter).sendMessage(ACCOUNTING_CHAIN_ID, abi.encode(ICommunicationHandler.MessageType.BALANCE_UPDATE, totalAssets));
+        IAdapter(_adapter).sendMessage(
+            ACCOUNTING_CHAIN_ID, abi.encode(ICommunicationHandler.MessageType.BALANCE_UPDATE, totalAssets)
+        );
     }
 
     // TODO: This needs to have a better name?
@@ -53,7 +54,8 @@ contract EarningChainRouter {
         IERC20(asset).safeTransferFrom(_allocator, msg.sender, amount);
         uint256 totalAssets = IAllocator(_allocator).getTotalAssets();
         bytes[] memory messages = new bytes[](2);
-        messages[0] = abi.encode(ICommunicationHandler.MessageType.BALANCE_UPDATE, abi.encode(totalAssets, block.timestamp)); // Balance Update
+        messages[0] =
+            abi.encode(ICommunicationHandler.MessageType.BALANCE_UPDATE, abi.encode(totalAssets, block.timestamp)); // Balance Update
         messages[1] = abi.encode(ICommunicationHandler.MessageType.TRANSFER, abi.encode(block.chainid, asset, amount));
         IAdapter(_adapter).sendFunds(ACCOUNTING_CHAIN_ID, asset, amount, abi.encode(messages));
     }

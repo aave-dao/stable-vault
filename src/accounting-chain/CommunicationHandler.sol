@@ -11,7 +11,7 @@ import {IAllocator} from "./interfaces/IAllocator.sol";
 
 contract CommunicationHandler is ICommunicationHandler {
     using SafeERC20 for IERC20;
-    
+
     modifier onlyAdapter(uint256 fromChainId) {
         require(msg.sender == _adapters[fromChainId], UnsupportedAdapter());
         _;
@@ -30,7 +30,7 @@ contract CommunicationHandler is ICommunicationHandler {
     address _fundsHandler;
     address _admin;
 
-    mapping (uint256 chainId => address adapter) _adapters;
+    mapping(uint256 chainId => address adapter) _adapters;
 
     constructor(address admin, address fundsHandler) {
         _admin = admin;
@@ -48,18 +48,22 @@ contract CommunicationHandler is ICommunicationHandler {
             return;
         }
         IERC20(asset).safeTransfer(_adapters[targetChainId], amount);
-        IAdapter(_adapters[targetChainId]).sendFunds(targetChainId, asset, amount, abi.encode(ICommunicationHandler.MessageType.TRANSFER, asset, amount));
+        IAdapter(_adapters[targetChainId]).sendFunds(
+            targetChainId, asset, amount, abi.encode(ICommunicationHandler.MessageType.TRANSFER, asset, amount)
+        );
     }
 
     /// @dev Assume for Emergency withdrawal only - Earning chain will send whatever asset it prefers
-    function sendPullFundsFromChainMessage(uint256 amount, uint256 targetChainId)
-        external
-        onlyFundsHandler
-    {
-        IAdapter(_adapters[targetChainId]).sendMessage(targetChainId, abi.encode(ICommunicationHandler.MessageType.PULL_FUNDS, amount));
+    function sendPullFundsFromChainMessage(uint256 amount, uint256 targetChainId) external onlyFundsHandler {
+        IAdapter(_adapters[targetChainId]).sendMessage(
+            targetChainId, abi.encode(ICommunicationHandler.MessageType.PULL_FUNDS, amount)
+        );
     }
 
-    function receiveMessage(uint256 fromChainId, bytes calldata typeAndMessageEncoded) external onlyAdapter(fromChainId) {
+    function receiveMessage(uint256 fromChainId, bytes calldata typeAndMessageEncoded)
+        external
+        onlyAdapter(fromChainId)
+    {
         (uint8 messageType, bytes memory message) = abi.decode(typeAndMessageEncoded, (uint8, bytes));
 
         if (messageType == uint8(ICommunicationHandler.MessageType.BALANCE_UPDATE)) {

@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-
 interface IAdapter {
-    function pushFundsToChain(uint256 chainId, address asset, uint256 amount) external;   
+    function pushFundsToChain(uint256 chainId, address asset, uint256 amount) external;
     function pullFundsFromChain(uint256 amount) external;
 
     function sendMessage(uint256 targetChainId, bytes memory message) external;
