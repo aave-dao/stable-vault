@@ -35,8 +35,8 @@ contract ExtendedBasedBoostedVaultT is Test {
         console.log("Creating vault");
         vault = new ExtendedBasedBoostedVault(owner, initialBasePerSecondRate);
 
-        swapper = new Swapper(address(this));
-        allocator = new Allocator(address(this), address(this), address(swapper));
+        swapper = new Swapper();
+        allocator = new Allocator(address(this), address(this));
 
         vault.updateAssetSupport(address(asset), true);
         // TODO: set communicationHandler

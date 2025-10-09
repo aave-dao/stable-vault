@@ -24,8 +24,6 @@ contract Allocator is IAllocator {
     address public manager;
     address public admin;
 
-    ISwapper public swapper;
-
     // uint256 public timelock;
 
     // TODO: do we need a supported assets mapping/list? Can the allocator receive assets that it must swap from?
@@ -54,10 +52,9 @@ contract Allocator is IAllocator {
         _;
     }
 
-    constructor(address _manager, address _admin, address _swapper) {
+    constructor(address _manager, address _admin) {
         manager = _manager;
         admin = _admin;
-        swapper = ISwapper(_swapper);
     }
 
     function getAssets() external view returns (IAllocator.AllocatedAssets[] memory) {
@@ -91,7 +88,8 @@ contract Allocator is IAllocator {
         IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
         // Deposit assets into strategy vault
         IERC20(asset).forceApprove(vault, amount); // TODO: Review if forceApprove or safeIncreaseAllowance
-        uint256 shares = IERC4626(vault).deposit(amount, address(this));
+        /*  uint256 shares = */
+        IERC4626(vault).deposit(amount, address(this));
         // TODO: Think what we do with the shares amount - do we save it? return it?
         // return shares;
     }
@@ -105,7 +103,7 @@ contract Allocator is IAllocator {
     }
 
     /// Request any asset from the allocator for a given amount; assumes allocator assets have common denomination.
-    function withdrawEmergency(uint256 amount) external onlyWhitelistedWithdrawer returns (address asset) {
+    function withdrawEmergency(uint256 amount) external view onlyWhitelistedWithdrawer returns (address asset) {
         (amount);
         // TODO: Implement pull asset from vault based on priority? Based on default? Iterate through and try which ever has funds?
         return address(0);
@@ -124,20 +122,24 @@ contract Allocator is IAllocator {
             uint256 amount = params.swaps[i].fromAmount;
             // Withdraw assets from vault to this contract
             IERC4626(_vaultByAsset[fromAsset]).withdraw(amount, address(this), address(this));
-            // Approve the swapper to spend the fromAsset
-            IERC20(params.swaps[i].fromAsset).forceApprove(address(swapper), amount);
+            address swapper = params.swaps[i].swapContract;
+            // Transfer fromAssets to the swapper
+            IERC20(params.swaps[i].fromAsset).safeTransfer(swapper, amount);
             // Execute the swap; rely on the swapper to enforce slippage constraints and send the toAsset back to the Allocator
-            uint256 toAssetAmount = swapper.execute(
+            uint256 toAssetAmount = ISwapper(swapper).executeSwap(
                 params.swaps[i].fromAsset,
                 amount,
                 params.swaps[i].toAsset,
                 params.swaps[i].slippageToleranceBps,
-                params.swaps[i].router,
-                params.swaps[i].routerData
+                params.swaps[i].swapData
             );
 
+            // Slippage check
             totalSlippageAmountRay += params.swaps[i].fromAmount.assetDecimalsToRay(params.swaps[i].fromAsset)
                 - toAssetAmount.assetDecimalsToRay(params.swaps[i].toAsset);
+
+            // Pull the `toAsset` from the Swapper to the Allocator
+            IERC20(params.swaps[i].toAsset).safeTransferFrom(swapper, address(this), toAssetAmount);
 
             // Deposit the toAsset into the vault
             IERC20(params.swaps[i].toAsset).forceApprove(address(_vaultByAsset[toAsset]), toAssetAmount);
@@ -160,12 +162,6 @@ contract Allocator is IAllocator {
                 totalSlippageAmountRay.rayToAssetDecimals(params.coverageToken), address(this)
             );
         }
-    }
-
-    function setSwapper(address newSwapper) external onlyAdmin {
-        // TODO: set behind timelock
-        require(newSwapper != address(0), ErrorsLib.ZeroAddress());
-        swapper = ISwapper(newSwapper);
     }
 
     function setManager(address newManager) external onlyAdmin {

@@ -18,10 +18,10 @@ interface IAllocator {
         address toAsset;
         // Slippage tolerance in basis points (100 = 1%)
         uint16 slippageToleranceBps;
-        // Router to use to swap fromAsset to toAsset
-        address router;
-        // Selector + Data to pass to the router
-        bytes routerData;
+        // Swap contract address
+        address swapContract;
+        // Custom data required by the swapper to execute the swap
+        bytes swapData;
     }
 
     struct CrossAssetRebalanceParams {
@@ -50,8 +50,6 @@ interface IAllocator {
 
     /// @notice Rebalance the mix of underlying tokens by pulling from strategies, executing swaps and resupplying to strategies.
     function rebalance(CrossAssetRebalanceParams memory params) external;
-
-    function setSwapper(address newSwapper) external;
 
     function setManager(address newManager) external;
 
