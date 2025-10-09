@@ -35,14 +35,14 @@ interface ISwapper {
     /// @param fromAsset the asset transferred to the swapper that must be approved to be spent by the router
     /// @param fromAmount the amount of fromAsset to approve the router to spend
     /// @param toAsset the asset to swap to
-    /// @param minSlippageBps the minimum slippage in basis points (100 = 1%)
+    /// @param slippageToleranceBps the minimum slippage in basis points (100 = 1%)
     /// @param router the router to use to swap fromAsset to toAsset
     /// @param routerData the selector + data to pass to the router
     function execute(
         address fromAsset,
         uint256 fromAmount,
         address toAsset,
-        uint16 minSlippageBps,
+        uint16 slippageToleranceBps,
         address router,
         bytes memory routerData
     ) external returns (uint256 toAmount);

@@ -9,19 +9,27 @@ interface IAllocator {
         uint256 amount;
     }
 
-    struct CrossAssetRebalanceParams {
+    struct SwapParams {
         // Asset to approve the router to spend
         address fromAsset;
         // Amount of fromAsset to approve the router to spend
         uint256 fromAmount;
         // Asset to swap to that will be resupplied within the allocator
         address toAsset;
-        // Minimum slippage in basis points (100 = 1%)
-        uint16 minSlippageBps;
+        // Slippage tolerance in basis points (100 = 1%)
+        uint16 slippageToleranceBps;
         // Router to use to swap fromAsset to toAsset
         address router;
         // Selector + Data to pass to the router
         bytes routerData;
+    }
+
+    struct CrossAssetRebalanceParams {
+        SwapParams[] swaps;
+        // Token used to cover slippage and/or fees; Allocator must be approved to spend tokens on behalf of coverageTokenOwner.
+        address coverageToken;
+        // Owner of the coverage token; Allocator must be approved to spend coverageToken tokens on behalf of coverageTokenOwner.
+        address coverageTokenOwner;
     }
 
     function manager() external view returns (address);
@@ -40,7 +48,8 @@ interface IAllocator {
     /// Request any asset from the allocator for a given amount; assumes allocator assets have common denomination.
     function withdrawEmergency(uint256 amount) external returns (address asset);
 
-    function rebalance(CrossAssetRebalanceParams[] memory params) external;
+    /// @notice Rebalance the mix of underlying tokens by pulling from strategies, executing swaps and resupplying to strategies.
+    function rebalance(CrossAssetRebalanceParams memory params) external;
 
     function setSwapper(address newSwapper) external;
 

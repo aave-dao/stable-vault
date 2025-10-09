@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-interface IVaultFundsHandler {
+interface IFundsHandler {
+    error OnlyBaseBoostedVault();
+
     function processWithdrawalRequest(
         address user,
         uint256 amount,

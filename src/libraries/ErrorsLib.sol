@@ -5,6 +5,9 @@ library ErrorsLib {
     /// @notice Address checked is the zero address.
     error ZeroAddress();
 
+    /// @notice Token amount checked is zero.
+    error ZeroAmount();
+
     /// @notice Unsupported asset.
     error UnsupportedAsset(address asset);
 

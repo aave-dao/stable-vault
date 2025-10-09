@@ -54,6 +54,12 @@ contract Allocator is IAllocator {
         _;
     }
 
+    constructor(address _manager, address _admin, address _swapper) {
+        manager = _manager;
+        admin = _admin;
+        swapper = ISwapper(_swapper);
+    }
+
     function getAssets() external view returns (IAllocator.AllocatedAssets[] memory) {
         IAllocator.AllocatedAssets[] memory allocatedAssets = new IAllocator.AllocatedAssets[](_vaults.length);
         for (uint256 i = 0; i < _vaults.length; i++) {
@@ -79,6 +85,11 @@ contract Allocator is IAllocator {
 
     function deposit(address asset, uint256 amount) external onlyWhitelistedDepositor {
         address vault = _vaultByAsset[asset];
+        require(vault != address(0), ErrorsLib.UnsupportedAsset(asset));
+        require(amount > 0, ErrorsLib.ZeroAmount());
+        // Pull assets from the depositor
+        IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
+        // Deposit assets into strategy vault
         IERC20(asset).forceApprove(vault, amount); // TODO: Review if forceApprove or safeIncreaseAllowance
         uint256 shares = IERC4626(vault).deposit(amount, address(this));
         // TODO: Think what we do with the shares amount - do we save it? return it?
@@ -86,7 +97,11 @@ contract Allocator is IAllocator {
     }
 
     function withdraw(address asset, uint256 amount) external onlyWhitelistedWithdrawer {
-        IERC4626(_vaultByAsset[asset]).withdraw(amount, msg.sender, address(this));
+        address vault = _vaultByAsset[asset];
+        require(vault != address(0), ErrorsLib.UnsupportedAsset(asset));
+        require(amount > 0, ErrorsLib.ZeroAmount());
+        // Withdraw assets from strategy vault
+        IERC4626(vault).withdraw(amount, msg.sender, address(this));
     }
 
     /// Request any asset from the allocator for a given amount; assumes allocator assets have common denomination.
@@ -96,29 +111,54 @@ contract Allocator is IAllocator {
         return address(0);
     }
 
-    function rebalance(CrossAssetRebalanceParams[] memory params) external onlyManager {
-        for (uint256 i = 0; i < params.length; i++) {
-            address fromAsset = params[i].fromAsset;
+    /// @inheritdoc IAllocator
+    function rebalance(CrossAssetRebalanceParams memory params) external onlyManager {
+        require(_vaultByAsset[params.coverageToken] != address(0), ErrorsLib.UnsupportedAsset(params.coverageToken));
+        uint256 totalSlippageAmountRay;
+
+        for (uint256 i = 0; i < params.swaps.length; i++) {
+            address fromAsset = params.swaps[i].fromAsset;
             require(_vaultByAsset[fromAsset] != address(0), ErrorsLib.UnsupportedAsset(fromAsset));
-            address toAsset = params[i].toAsset;
+            address toAsset = params.swaps[i].toAsset;
             require(_vaultByAsset[toAsset] != address(0), ErrorsLib.UnsupportedAsset(toAsset));
-            uint256 amount = params[i].fromAmount;
+            uint256 amount = params.swaps[i].fromAmount;
             // Withdraw assets from vault to this contract
             IERC4626(_vaultByAsset[fromAsset]).withdraw(amount, address(this), address(this));
             // Approve the swapper to spend the fromAsset
-            IERC20(params[i].fromAsset).forceApprove(address(swapper), amount);
+            IERC20(params.swaps[i].fromAsset).forceApprove(address(swapper), amount);
             // Execute the swap; rely on the swapper to enforce slippage constraints and send the toAsset back to the Allocator
             uint256 toAssetAmount = swapper.execute(
-                params[i].fromAsset,
+                params.swaps[i].fromAsset,
                 amount,
-                params[i].toAsset,
-                params[i].minSlippageBps,
-                params[i].router,
-                params[i].routerData
+                params.swaps[i].toAsset,
+                params.swaps[i].slippageToleranceBps,
+                params.swaps[i].router,
+                params.swaps[i].routerData
             );
+
+            totalSlippageAmountRay += params.swaps[i].fromAmount.assetDecimalsToRay(params.swaps[i].fromAsset)
+                - toAssetAmount.assetDecimalsToRay(params.swaps[i].toAsset);
+
             // Deposit the toAsset into the vault
-            IERC20(params[i].toAsset).forceApprove(address(_vaultByAsset[toAsset]), toAssetAmount);
+            IERC20(params.swaps[i].toAsset).forceApprove(address(_vaultByAsset[toAsset]), toAssetAmount);
             IERC4626(_vaultByAsset[toAsset]).deposit(toAssetAmount, address(this));
+        }
+
+        if (totalSlippageAmountRay > 0) {
+            // Pull tokens from the coverage token owner to cover slippage and/or fees
+            IERC20(params.coverageToken).safeTransferFrom(
+                params.coverageTokenOwner,
+                address(this),
+                totalSlippageAmountRay.rayToAssetDecimals(params.coverageToken)
+            );
+            // Supply the coverage token to the vault
+            IERC20(params.coverageToken).forceApprove(
+                address(_vaultByAsset[params.coverageToken]),
+                totalSlippageAmountRay.rayToAssetDecimals(params.coverageToken)
+            );
+            IERC4626(_vaultByAsset[params.coverageToken]).deposit(
+                totalSlippageAmountRay.rayToAssetDecimals(params.coverageToken), address(this)
+            );
         }
     }
 

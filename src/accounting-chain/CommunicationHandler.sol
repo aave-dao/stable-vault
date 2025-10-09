@@ -5,7 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {ICommunicationHandler} from "./interfaces/ICommunicationHandler.sol";
-import {IVaultFundsHandler} from "./interfaces/IVaultFundsHandler.sol";
+import {IFundsHandler} from "./interfaces/IFundsHandler.sol";
 import {IAdapter} from "./interfaces/IAdapter.sol";
 import {IAllocator} from "./interfaces/IAllocator.sol";
 
@@ -68,13 +68,11 @@ contract CommunicationHandler is ICommunicationHandler {
 
         if (messageType == uint8(ICommunicationHandler.MessageType.BALANCE_UPDATE)) {
             (uint256 balanceSnapshot, uint256 snapshotTimestamp) = abi.decode(message, (uint256, uint256));
-            IVaultFundsHandler(_fundsHandler).updateChainBalanceCallback(
-                fromChainId, balanceSnapshot, snapshotTimestamp
-            );
+            IFundsHandler(_fundsHandler).updateChainBalanceCallback(fromChainId, balanceSnapshot, snapshotTimestamp);
         } else if (messageType == uint8(ICommunicationHandler.MessageType.TRANSFER)) {
             (uint256 chainId, address asset, uint256 amount) = abi.decode(message, (uint256, address, uint256));
             IERC20(asset).safeTransfer(_fundsHandler, amount);
-            IVaultFundsHandler(_fundsHandler).fundsArrivedFromChainCallback(chainId, asset, amount);
+            IFundsHandler(_fundsHandler).fundsArrivedFromChainCallback(chainId, asset, amount);
         } else {
             revert UnsupportedMessageType();
         }

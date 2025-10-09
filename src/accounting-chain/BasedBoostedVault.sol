@@ -8,7 +8,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {MathLib} from "../libraries/MathLib.sol";
 import {AssetLib} from "../libraries/AssetLib.sol";
 import {IBasedBoostedVault} from "./interfaces/IBasedBoostedVault.sol";
-import {IVaultFundsHandler} from "./interfaces/IVaultFundsHandler.sol";
+import {IFundsHandler} from "./interfaces/IFundsHandler.sol";
 
 /// @dev Assets balances are tracked in RAY internally; conversions from and to specific asset denomination is made on deposit and on withdrawal confirmation
 contract BasedBoostedVault is IBasedBoostedVault, Ownable {
@@ -48,7 +48,7 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         uint256 shares;
     }
 
-    IVaultFundsHandler internal _fundsHandler;
+    IFundsHandler internal _fundsHandler;
 
     // TODO: Idea, having the default subVault as an isolated special case, that cannot become active/inactive
     // SubVault internal _defaultSubVault;

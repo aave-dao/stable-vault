@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import {MathLib} from "../../src/libraries/MathLib.sol";
 import {BasedBoostedVault} from "../../src/accounting-chain/BasedBoostedVault.sol";
-import {IVaultFundsHandler} from "../../src/accounting-chain/interfaces/IVaultFundsHandler.sol";
+import {IFundsHandler} from "../../src/accounting-chain/interfaces/IFundsHandler.sol";
 
 contract ExtendedBasedBoostedVault is BasedBoostedVault {
     using MathLib for uint256;
@@ -11,7 +11,7 @@ contract ExtendedBasedBoostedVault is BasedBoostedVault {
     constructor(address owner, uint256 initialBasePerSecondRate) BasedBoostedVault(owner, initialBasePerSecondRate) {}
 
     function setFundsHandler(address fundsHandler) public {
-        _fundsHandler = IVaultFundsHandler(fundsHandler);
+        _fundsHandler = IFundsHandler(fundsHandler);
     }
 
     function getDefaultConversionRate() public view returns (uint256) {

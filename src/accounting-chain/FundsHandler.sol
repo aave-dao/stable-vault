@@ -1,43 +1,26 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {IVaultFundsHandler} from "./interfaces/IVaultFundsHandler.sol";
-import {IWithdrawalPriorityQueue} from "./interfaces/IWithdrawalPriorityQueue.sol";
-import {ICommunicationHandler} from "./interfaces/ICommunicationHandler.sol";
-
+import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+import {IFundsHandler} from "./interfaces/IFundsHandler.sol";
+import {IWithdrawalPriorityQueue} from "./interfaces/IWithdrawalPriorityQueue.sol";
+import {ICommunicationHandler} from "./interfaces/ICommunicationHandler.sol";
+import {ErrorsLib} from "../libraries/ErrorsLib.sol";
+import {IAllocator} from "./interfaces/IAllocator.sol";
 
 import {AssetLib} from "../libraries/AssetLib.sol";
 
 // Consider making it a library instead
-contract FundsHandler is IVaultFundsHandler {
+contract FundsHandler is IFundsHandler {
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
 
     struct ChainBalanceSnapshot {
         uint256 balanceSnapshot;
         uint256 snapshotTimestamp;
-    }
-
-    mapping(uint256 chainId => ChainBalanceSnapshot chainBalance) chainBalances;
-
-    error OnlyManager();
-    error OnlyBaseBoostedVault();
-
-    modifier onlyManager() {
-        require(msg.sender == _manager, OnlyManager());
-        _;
-    }
-
-    modifier onlyBaseBoostedVault() {
-        require(msg.sender == _bbVault, OnlyBaseBoostedVault());
-        _;
-    }
-
-    modifier onlyCommunicationHandler() {
-        // TODO: Implement it
-        _;
     }
 
     struct WithdrawalRequest {
@@ -49,12 +32,38 @@ contract FundsHandler is IVaultFundsHandler {
         bytes data;
     }
 
+    mapping(uint256 chainId => ChainBalanceSnapshot chainBalance) chainBalances;
+
     mapping(uint256 withdrawalRequestId => WithdrawalRequest) internal _withdrawalRequests;
     uint256 internal _lastWithdrawalRequestId;
     IWithdrawalPriorityQueue internal _queue;
-    address _manager;
-    address _bbVault;
-    address _communicationHandler;
+    address manager;
+    address basedBoostedVault;
+    address communicationHandler;
+    address allocator;
+
+    modifier onlyManager() {
+        require(msg.sender == address(manager), ErrorsLib.NotManager());
+        _;
+    }
+
+    modifier onlyBaseBoostedVault() {
+        require(msg.sender == basedBoostedVault, OnlyBaseBoostedVault());
+        _;
+    }
+
+    modifier onlyCommunicationHandler() {
+        // TODO: Implement it
+        _;
+    }
+
+    constructor(address _manager, address _basedBoostedVault, address _communicationHandler, address _allocator) {
+        require(_manager != address(0), ErrorsLib.ZeroAddress());
+        manager = _manager;
+        basedBoostedVault = _basedBoostedVault;
+        communicationHandler = _communicationHandler;
+        allocator = _allocator;
+    }
 
     function processWithdrawalRequest(
         address user,
@@ -104,27 +113,26 @@ contract FundsHandler is IVaultFundsHandler {
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    // this takes ERC20 on balance and puts it into AAVE V3
+    /// @notice Pushes funds to Allocator.
     function _pushFundsToImmediateLiquidity(address asset, uint256 amount) internal {
-        // TODO: Implement
-        // Put the funds into earning vault and see if we need to do something else like mark them or accounting or smth
+        IERC20(asset).forceApprove(allocator, amount);
+        IAllocator(allocator).deposit(asset, amount);
     }
 
-    // this takes from AAVE V3 and gets ERC20 here for further action
+    /// @notice Takes from Allocator and gets ERC20 for further action.
     function _pullFundsFromImmediateLiquidity(address asset, uint256 amount) internal {
-        // TODO: Implement
-        // Pull the funds from the earning vault (see if we need to do any accounting etc)
+        IAllocator(allocator).withdraw(asset, amount);
     }
 
     // Manager Functions
 
     function pushFundsToChain(address asset, uint256 amount, uint256 chainId) external onlyManager {
         _pullFundsFromImmediateLiquidity(asset, amount);
-        ICommunicationHandler(_communicationHandler).sendPushFundsToChainMessage(asset, amount, chainId);
+        ICommunicationHandler(communicationHandler).sendPushFundsToChainMessage(asset, amount, chainId);
     }
 
     function pullFundsFromChain(uint256 amount, uint256 chainId) external onlyManager {
-        ICommunicationHandler(_communicationHandler).sendPullFundsFromChainMessage(amount, chainId);
+        ICommunicationHandler(communicationHandler).sendPullFundsFromChainMessage(amount, chainId);
     }
 
     function updateChainBalanceCallback(uint256 chainId, uint256 balanceSnapshot, uint256 snapshotTimestamp)

@@ -42,7 +42,7 @@ contract Swapper is ISwapper, ReentrancyGuard {
         address fromAsset,
         uint256 fromAmount,
         address toAsset,
-        uint16 minSlippageBps,
+        uint16 slippageToleranceBps,
         address router,
         bytes memory routerData
     ) external nonReentrant returns (uint256 toAmount) {
@@ -63,7 +63,7 @@ contract Swapper is ISwapper, ReentrancyGuard {
         toAmount = _executeSwap(toAsset, router, routerData);
 
         // Slippage check
-        uint256 expectedMinOut = (fromAmount * (10_000 - minSlippageBps)) / 10_000;
+        uint256 expectedMinOut = (fromAmount * (10_000 - slippageToleranceBps)) / 10_000;
         require(toAmount >= expectedMinOut, SlippageTooHigh(expectedMinOut, toAmount));
 
         // Cleanup approvals
