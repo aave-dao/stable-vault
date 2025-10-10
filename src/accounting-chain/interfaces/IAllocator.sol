@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-/// @dev Assume 1 strategy per asset; multiple assets per Allocator
+/// @dev Assumes single strategy per asset; multiple assets per Allocator
 /// @dev Deals with assets in their native decimals
 interface IAllocator {
     struct AllocatedAssets {
@@ -10,31 +10,25 @@ interface IAllocator {
     }
 
     struct SwapParams {
-        // Asset to approve the router to spend
-        address fromAsset;
-        // Amount of fromAsset to approve the router to spend
-        uint256 fromAmount;
+        // Swap input asset transferred to swapper
+        address assetIn;
         // Asset to swap to that will be resupplied within the allocator
-        address toAsset;
-        // Slippage tolerance in basis points (100 = 1%)
-        uint16 slippageToleranceBps;
-        // Swap contract address
-        address swapContract;
+        address assetOut;
+        // Amount of assetIn
+        uint256 amountIn;
+        // Address of the swapper to use to execute the swap
+        address swapper;
         // Custom data required by the swapper to execute the swap
         bytes swapData;
     }
 
     struct CrossAssetRebalanceParams {
         SwapParams[] swaps;
-        // Token used to cover slippage and/or fees; Allocator must be approved to spend tokens on behalf of coverageTokenOwner.
-        address coverageToken;
-        // Owner of the coverage token; Allocator must be approved to spend coverageToken tokens on behalf of coverageTokenOwner.
-        address coverageTokenOwner;
     }
 
-    function manager() external view returns (address);
+    function getManager() external view returns (address);
 
-    function admin() external view returns (address);
+    function getAdmin() external view returns (address);
 
     function getAssets() external view returns (AllocatedAssets[] memory);
 
