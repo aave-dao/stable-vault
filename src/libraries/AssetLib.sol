@@ -14,11 +14,7 @@ library AssetLib {
         return convertDecimals(amount, RAY_DECIMALS, getDecimals(asset));
     }
 
-    function convertAssetDecimals(
-        uint256 amount,
-        address fromAsset,
-        address toAsset
-    ) internal view returns (uint256) {
+    function convertAssetDecimals(uint256 amount, address fromAsset, address toAsset) internal view returns (uint256) {
         return convertDecimals(amount, getDecimals(fromAsset), getDecimals(toAsset));
     }
 

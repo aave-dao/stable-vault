@@ -10,7 +10,7 @@ import {AssetLib} from "../libraries/AssetLib.sol";
 import {IBasedBoostedVault} from "./interfaces/IBasedBoostedVault.sol";
 import {IFundsHandler} from "./interfaces/IFundsHandler.sol";
 
-/// @dev Assets balances are tracked in RAY internally; conversions from and to specific asset denomination is made on deposit and on withdrawal confirmation
+/// @dev Assets balances are tracked in RAY internally; conversions from and to specific asset denomination is made on deposit and on withdrawal execution.
 contract BasedBoostedVault is IBasedBoostedVault, Ownable {
     using MathLib for uint256;
     using AssetLib for uint256;
@@ -19,14 +19,12 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
     uint256 internal constant SECONDS_PER_YEAR = 31_536_000;
 
     /**
-     * @notice A subVault works like a virtual fixed-rate vault. The rate comes from the base rate with a multiplier boost
-     * being applied to it.
+     * @notice A subVault works like a virtual fixed-rate vault.
      *
-     * @param perSecondRate The per second rate boost applied to the base rate.
-     * @param conversionRate The cumulative growth at perSecondRate which works as conversion rate between
-     *  shares and assets.
+     * @param perSecondRate The total per second rate of growth associated with the subVault.
+     * @param conversionRate The cumulative growth factor at a point in time; acts as conversion rate between shares and assets.
      * @param lastAccrualTimestamp The timestamp of the last accrual i.e. when the `conversionRate` was updated.
-     * @param totalShares The total shares of the subVault, scaled, normalized by `_baseConversionRate * subVault.conversionRate`.
+     * @param totalShares The total shares of the subVault outstanding.
      */
     struct SubVault {
         uint256 perSecondRate;
@@ -59,12 +57,12 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
     SubVault[] internal _activeSubVaults;
 
     /**
-     * @dev The ID of the last subVault created.
+     * @dev The ID of the last subVault created; monotonically increasing.
      */
     uint256 internal _lastSubVaultId;
 
     /**
-     * @dev SubVault index in the `_activeSubVaults` array by subVault boost per-second rate.
+     * @dev SubVault index in the `_activeSubVaults` array.
      */
     mapping(uint256 subVaultId => uint256 subVaultIndex) _subVaultIndexById;
 
@@ -90,6 +88,7 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
      */
     constructor(address owner, uint256 defaultSubVaultPerSecondRate) Ownable(owner) {
         // Creates a subVault that gets ID #1 and that will be used as default subVault for new deposits
+        // TODO(base-sub-vault): initialize with virtual shares so that the "liquidity" never goes to 0?
         _createSubVault(defaultSubVaultPerSecondRate);
     }
 
@@ -106,11 +105,12 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         uint256 newSubVaultId = ++_lastSubVaultId;
         _subVaultIdByRate[newPerSecondRate] = newSubVaultId;
         _subVaultIndexById[newSubVaultId] = _activeSubVaults.length - 1;
+        emit SubVaultCreated(newSubVaultId, newPerSecondRate);
         return newSubVaultId;
     }
 
     function changeSubVaultRate(uint256 subVaultId, uint256 newPerSecondRate) external onlyOwner {
-        // TODO: do we have to check if subVaultId 1 and recreate the base vault if its inactive
+        // TODO(base-sub-vault): do we have to check if subVaultId 1 and recreate the base vault if its inactive
         require(newPerSecondRate >= MathLib.RAY, InvalidRate());
         require(_isActiveSubVaultById(subVaultId), InactiveVault());
         require(_isActiveSubVaultByRate(newPerSecondRate) == false, VaultAlreadyExists());
@@ -222,7 +222,7 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
             subVaultIndex = _subVaultIndexById[_positions[user].subVaultId];
         } else {
             if (!_isActiveSubVaultById(1)) {
-                // TODO: The default subVault could become inactive, we need to bring it back to active
+                // TODO(base-sub-vault): The default subVault could become inactive, we need to bring it back to active
             }
             subVaultIndex = _subVaultIndexById[1];
             _positions[user].subVaultId = subVaultIndex;
@@ -286,7 +286,6 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
             // TODO: Don't like the double conversion, but feel safer this way
             // TODO: This needs a mathematical proof that: requestedAmountInRay <= actualAmountInRay;
             actualAmountInRay = requestedAmountInShares.rayMulDown(conversionRate);
-            _positions[user].shares -= requestedAmountInShares;
             // TODO: Probably there is a better way to do this:
             if (actualAmountInRay >= _positions[user].originalDeposit) {
                 guaranteedAmount = _positions[user].originalDeposit;

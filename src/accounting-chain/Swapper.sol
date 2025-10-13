@@ -18,7 +18,7 @@ contract Swapper is ISwapper, Ownable, ReentrancyGuard {
 
     uint256 constant MAX_BPS = 10_000;
 
-    constructor(address owner) Ownable(owner) { }
+    constructor(address owner) Ownable(owner) {}
 
     struct SlippageParams {
         uint16 slippageToleranceBps;
@@ -26,18 +26,17 @@ contract Swapper is ISwapper, Ownable, ReentrancyGuard {
     }
 
     /// @inheritdoc ISwapper
-    function executeSwap(
-        address assetIn,
-        address assetOut,
-        uint256 amountIn,
-        bytes memory data
-    ) external onlyOwner nonReentrant returns (uint256) {
+    function executeSwap(address assetIn, address assetOut, uint256 amountIn, bytes memory data)
+        external
+        onlyOwner
+        nonReentrant
+        returns (uint256)
+    {
         // Assumes `amountIn` tokens of `assetIn` were sent from the msg.sender
 
         // TODO: Consider using Multicall's Call struct, allowing calls to fail and adding a msgValue param too
-        (address[] memory targets, bytes[] memory callDatas, SlippageParams memory slippageParams) = abi.decode(
-            data, (address[], bytes[], SlippageParams
-        ));
+        (address[] memory targets, bytes[] memory callDatas, SlippageParams memory slippageParams) =
+            abi.decode(data, (address[], bytes[], SlippageParams));
 
         for (uint256 i = 0; i < targets.length; i++) {
             (bool callSucceeded,) = targets[i].call(callDatas[i]);

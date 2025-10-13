@@ -132,13 +132,12 @@ contract Allocator is IAllocator {
             IERC20(params.swaps[i].assetIn).safeTransfer(swapper, amountIn);
             // Execute the swap; rely on the swapper to enforce slippage constraints and send the toAsset back to the Allocator
             uint256 assetOutAmount = ISwapper(swapper).executeSwap(
-                params.swaps[i].assetIn,
-                params.swaps[i].assetOut,
-                amountIn,
-                params.swaps[i].swapData
+                params.swaps[i].assetIn, params.swaps[i].assetOut, amountIn, params.swaps[i].swapData
             );
 
-            require(assetOutAmount >= amountIn.convertAssetDecimals(assetOut, assetIn), ErrorsLib.InsufficientAmountOut());
+            require(
+                assetOutAmount >= amountIn.convertAssetDecimals(assetOut, assetIn), ErrorsLib.InsufficientAmountOut()
+            );
 
             // Pull the `assetOut` from the Swapper to the Allocator
             IERC20(params.swaps[i].assetOut).safeTransferFrom(swapper, address(this), assetOutAmount);

@@ -18,8 +18,7 @@ contract FloatBasedSwapper is ISwapper, Ownable, ReentrancyGuard {
 
     mapping(address asset => uint256 balanceSnapshot) _balances;
 
-    constructor(address owner) Ownable(owner) { }
-
+    constructor(address owner) Ownable(owner) {}
 
     function topUpFloat(address asset, address from, uint256 topUpAmount) external {
         IERC20(asset).safeTransferFrom(from, address(this), topUpAmount);
@@ -27,12 +26,12 @@ contract FloatBasedSwapper is ISwapper, Ownable, ReentrancyGuard {
     }
 
     /// @inheritdoc ISwapper
-    function executeSwap(
-        address assetIn,
-        address assetOut,
-        uint256 amountIn,
-        bytes memory /* data */
-    ) external onlyOwner nonReentrant returns (uint256) {
+    function executeSwap(address assetIn, address assetOut, uint256 amountIn, bytes memory /* data */ )
+        external
+        onlyOwner
+        nonReentrant
+        returns (uint256)
+    {
         // Assumes `amountIn` tokens of `assetIn` were sent from the msg.sender
         uint256 currentBalanceAssetIn = IERC20(assetIn).balanceOf(address(this));
 

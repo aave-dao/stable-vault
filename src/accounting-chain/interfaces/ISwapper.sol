@@ -9,10 +9,7 @@ interface ISwapper {
     /// @param amountIn the amount of `assetIn` transferred to the swapper
     /// @param data custom data required by the swapper to execute the swap
     /// @return amountOut of `assetOut` that must be approved to be pulled by the msg.sender after returning control of the execution
-    function executeSwap(
-        address assetIn,
-        address assetOut,
-        uint256 amountIn,
-        bytes memory data
-    ) external returns (uint256 amountOut);
+    function executeSwap(address assetIn, address assetOut, uint256 amountIn, bytes memory data)
+        external
+        returns (uint256 amountOut);
 }
