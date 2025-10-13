@@ -3,6 +3,14 @@ pragma solidity ^0.8.22;
 
 interface IFundsHandler {
     error OnlyBaseBoostedVault();
+    error OnlyCommunicationHandler();
+
+    struct AssetBalance {
+        address asset;
+        uint256 amountRAY;
+        uint256 chainId;
+        uint256 timestamp;
+    }
 
     function processWithdrawalRequest(
         address user,
@@ -28,4 +36,6 @@ interface IFundsHandler {
     function updateChainBalanceCallback(uint256 chainId, uint256 balanceSnapshot, uint256 snapshotTimestamp) external;
 
     function fundsArrivedFromChainCallback(uint256 chainId, address asset, uint256 amount) external;
+
+    function getAssetBalances() external returns (AssetBalance[] memory);
 }

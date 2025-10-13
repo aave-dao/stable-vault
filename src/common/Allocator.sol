@@ -18,6 +18,7 @@ import {ISwapper} from "../interfaces/ISwapper.sol";
 ///      - 100% of assets deposited into Allocator belong to the same entity
 /// @dev Deals with assets in their native decimals
 contract Allocator is IAllocator {
+    // TODO: consider scenarios where tokens are left idle here because pushing to strategies fails (reverts should be caught)
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
 
@@ -88,6 +89,7 @@ contract Allocator is IAllocator {
         return totalAssetsInRay;
     }
 
+    // TODO: This function shouldn't fail
     function deposit(address asset, uint256 amount) external onlyWhitelistedDepositor {
         address vault = _vaultByAsset[asset];
         require(vault != address(0), ErrorsLib.UnsupportedAsset(asset));

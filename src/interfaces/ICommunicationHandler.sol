@@ -7,15 +7,11 @@ interface ICommunicationHandler {
     error NotFundsHandler();
     error NotAdmin();
 
-    enum MessageType {
-        BALANCE_UPDATE,
-        TRANSFER,
-        PULL_FUNDS
-    }
-
     function sendPushFundsToChainMessage(address asset, uint256 amount, uint256 targetChainId) external;
 
     function sendPullFundsFromChainMessage(uint256 amount, uint256 targetChainId) external;
 
-    function receiveMessage(uint256 fromChainId, bytes calldata typeAndMessageEncoded) external;
+    function receiveBalanceSnapshotMessage(uint256 fromChainId, uint256 balance, uint256 timestamp) external;
+
+    function receiveFunds(uint256 fromChainId, address asset, uint256 amount) external;
 }

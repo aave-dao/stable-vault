@@ -18,8 +18,10 @@ contract FundsHandler is IFundsHandler {
     using AssetLib for uint256;
 
     struct ChainBalanceSnapshot {
-        uint256 balanceSnapshot;
-        uint256 snapshotTimestamp;
+        uint256 chainId;
+        // Assumes all balances have common denomination.
+        uint256 amountRAY;
+        uint256 timestamp;
     }
 
     struct WithdrawalRequest {
@@ -31,37 +33,61 @@ contract FundsHandler is IFundsHandler {
         bytes data;
     }
 
-    mapping(uint256 chainId => ChainBalanceSnapshot chainBalance) chainBalances;
-
+    ChainBalanceSnapshot[] internal _chainBalances;
     mapping(uint256 withdrawalRequestId => WithdrawalRequest) internal _withdrawalRequests;
     uint256 internal _lastWithdrawalRequestId;
     IWithdrawalPriorityQueue internal _queue;
-    address manager;
-    address basedBoostedVault;
-    address communicationHandler;
-    address allocator;
+    address _manager;
+    address _basedBoostedVault;
+    address _communicationHandler;
+    address _allocator;
 
     modifier onlyManager() {
-        require(msg.sender == address(manager), ErrorsLib.NotManager());
+        require(msg.sender == address(_manager), ErrorsLib.NotManager());
         _;
     }
 
     modifier onlyBaseBoostedVault() {
-        require(msg.sender == basedBoostedVault, OnlyBaseBoostedVault());
+        require(msg.sender == _basedBoostedVault, OnlyBaseBoostedVault());
         _;
     }
 
     modifier onlyCommunicationHandler() {
-        // TODO: Implement it
+        require(msg.sender == _communicationHandler, OnlyCommunicationHandler());
         _;
     }
 
-    constructor(address _manager, address _basedBoostedVault, address _communicationHandler, address _allocator) {
+    constructor(address manager, address basedBoostedVault, address communicationHandler, address allocator) {
         require(_manager != address(0), ErrorsLib.ZeroAddress());
-        manager = _manager;
-        basedBoostedVault = _basedBoostedVault;
-        communicationHandler = _communicationHandler;
-        allocator = _allocator;
+        _manager = manager;
+        _basedBoostedVault = basedBoostedVault;
+        _communicationHandler = communicationHandler;
+        _allocator = allocator;
+    }
+
+    function getAssetBalances() external view returns (AssetBalance[] memory) {
+        IAllocator.AllocatedAssets[] memory allocatorAssets = IAllocator(_allocator).getAssets();
+        AssetBalance[] memory balances = new AssetBalance[](allocatorAssets.length + _chainBalances.length);
+
+        uint16 i = 0;
+        for (uint16 j = 0; j < allocatorAssets.length; j++) {
+            balances[i] = AssetBalance({
+                chainId: block.chainid,
+                asset: allocatorAssets[j].asset,
+                amountRAY: allocatorAssets[j].amount.assetDecimalsToRay(allocatorAssets[j].asset),
+                timestamp: block.timestamp
+            });
+            i++;
+        }
+        for (uint16 j = 0; j < _chainBalances.length; j++) {
+            balances[i] = AssetBalance({
+                chainId: _chainBalances[i].chainId,
+                asset: address(0),
+                amountRAY: _chainBalances[i].amountRAY,
+                timestamp: _chainBalances[i].timestamp
+            });
+            i++;
+        }
     }
 
     function processWithdrawalRequest(
@@ -114,31 +140,31 @@ contract FundsHandler is IFundsHandler {
 
     /// @notice Pushes funds to Allocator.
     function _pushFundsToImmediateLiquidity(address asset, uint256 amount) internal {
-        IERC20(asset).forceApprove(allocator, amount);
-        IAllocator(allocator).deposit(asset, amount);
+        IERC20(asset).forceApprove(_allocator, amount);
+        IAllocator(_allocator).deposit(asset, amount);
     }
 
     /// @notice Takes from Allocator and gets ERC20 for further action.
     function _pullFundsFromImmediateLiquidity(address asset, uint256 amount) internal {
-        IAllocator(allocator).withdraw(asset, amount);
+        IAllocator(_allocator).withdraw(asset, amount);
     }
 
     // Manager Functions
 
     function pushFundsToChain(address asset, uint256 amount, uint256 chainId) external onlyManager {
         _pullFundsFromImmediateLiquidity(asset, amount);
-        ICommunicationHandler(communicationHandler).sendPushFundsToChainMessage(asset, amount, chainId);
+        ICommunicationHandler(_communicationHandler).sendPushFundsToChainMessage(asset, amount, chainId);
     }
 
     function pullFundsFromChain(uint256 amount, uint256 chainId) external onlyManager {
-        ICommunicationHandler(communicationHandler).sendPullFundsFromChainMessage(amount, chainId);
+        ICommunicationHandler(_communicationHandler).sendPullFundsFromChainMessage(amount, chainId);
     }
 
-    function updateChainBalanceCallback(uint256 chainId, uint256 balanceSnapshot, uint256 snapshotTimestamp)
+    function updateChainBalanceCallback(uint256 chainId, uint256 snapshotBalance, uint256 snapshotTimestamp)
         external
         onlyCommunicationHandler
     {
-        _updateChainBalance(chainId, balanceSnapshot, snapshotTimestamp);
+        _updateChainBalance(chainId, snapshotBalance, snapshotTimestamp);
     }
 
     function fundsArrivedFromChainCallback(uint256 chainId, address asset, uint256 amount)
@@ -151,10 +177,21 @@ contract FundsHandler is IFundsHandler {
 
     //////
 
-    function _updateChainBalance(uint256 chainId, uint256 balanceSnapshot, uint256 snapshotTimestamp) internal {
-        if (chainBalances[chainId].snapshotTimestamp < snapshotTimestamp) {
-            chainBalances[chainId] =
-                ChainBalanceSnapshot({balanceSnapshot: balanceSnapshot, snapshotTimestamp: snapshotTimestamp});
+    function _updateChainBalance(uint256 chainId, uint256 snapshotBalance, uint256 snapshotTimestamp) internal {
+        bool chainExists;
+        for (uint16 i = 0; i < _chainBalances.length; i++) {
+            if (_chainBalances[i].chainId == chainId) {
+                chainExists = true;
+                if (_chainBalances[i].timestamp < snapshotTimestamp) {
+                    _chainBalances[i].timestamp = snapshotTimestamp;
+                    _chainBalances[i].amountRAY = snapshotBalance;
+                }
+            }
+        }
+        if (!chainExists) {
+            _chainBalances.push(
+                ChainBalanceSnapshot({chainId: chainId, amountRAY: snapshotBalance, timestamp: snapshotTimestamp})
+            );
         }
     }
 }
