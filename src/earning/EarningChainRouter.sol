@@ -4,9 +4,9 @@ pragma solidity ^0.8.22;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {ICommunicationHandler} from "./interfaces/ICommunicationHandler.sol";
-import {IAdapter} from "./interfaces/IAdapter.sol";
-import {IAllocator} from "./interfaces/IAllocator.sol";
+import {ICommunicationHandler} from "../interfaces/ICommunicationHandler.sol";
+import {IAdapter} from "../interfaces/IAdapter.sol";
+import {IAllocator} from "../interfaces/IAllocator.sol";
 
 // Earning Chain version of CommunicationHandler
 contract EarningChainRouter {

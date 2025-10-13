@@ -4,11 +4,11 @@ pragma solidity ^0.8.22;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {IFundsHandler} from "./interfaces/IFundsHandler.sol";
-import {IWithdrawalPriorityQueue} from "./interfaces/IWithdrawalPriorityQueue.sol";
-import {ICommunicationHandler} from "./interfaces/ICommunicationHandler.sol";
+import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
+import {IWithdrawalPriorityQueue} from "../interfaces/IWithdrawalPriorityQueue.sol";
+import {ICommunicationHandler} from "../interfaces/ICommunicationHandler.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
-import {IAllocator} from "./interfaces/IAllocator.sol";
+import {IAllocator} from "../interfaces/IAllocator.sol";
 
 import {AssetLib} from "../libraries/AssetLib.sol";
 

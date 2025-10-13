@@ -9,10 +9,10 @@ import {TestErc4626} from "./mocks/TestErc4626.sol";
 import {TestErc20} from "./mocks/TestErc20.sol";
 import {MathLib} from "./../src/libraries/MathLib.sol";
 import {AssetLib} from "./../src/libraries/AssetLib.sol";
-import {FundsHandler} from "./../src/accounting-chain/FundsHandler.sol";
-import {Allocator} from "./../src/accounting-chain/Allocator.sol";
-import {Swapper} from "./../src/accounting-chain/Swapper.sol";
-import {IBasedBoostedVault} from "./../src/accounting-chain/interfaces/IBasedBoostedVault.sol";
+import {FundsHandler} from "./../src/accounting/FundsHandler.sol";
+import {Allocator} from "./../src/common/Allocator.sol";
+import {Swapper} from "./../src/common/Swapper.sol";
+import {IBasedBoostedVault} from "./../src/interfaces/IBasedBoostedVault.sol";
 
 contract ExtendedBasedBoostedVaultT is Test {
     using MathLib for uint256;

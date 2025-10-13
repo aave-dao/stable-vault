@@ -2,8 +2,8 @@
 pragma solidity ^0.8.20;
 
 import {MathLib} from "../../src/libraries/MathLib.sol";
-import {BasedBoostedVault} from "../../src/accounting-chain/BasedBoostedVault.sol";
-import {IFundsHandler} from "../../src/accounting-chain/interfaces/IFundsHandler.sol";
+import {BasedBoostedVault} from "../../src/accounting/BasedBoostedVault.sol";
+import {IFundsHandler} from "../../src/interfaces/IFundsHandler.sol";
 
 contract ExtendedBasedBoostedVault is BasedBoostedVault {
     using MathLib for uint256;

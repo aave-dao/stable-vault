@@ -7,8 +7,8 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 import {MathLib} from "../libraries/MathLib.sol";
 import {AssetLib} from "../libraries/AssetLib.sol";
-import {IBasedBoostedVault} from "./interfaces/IBasedBoostedVault.sol";
-import {IFundsHandler} from "./interfaces/IFundsHandler.sol";
+import {IBasedBoostedVault} from "../interfaces/IBasedBoostedVault.sol";
+import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
 
 /// @dev Assets balances are tracked in RAY internally; conversions from and to specific asset denomination is made on deposit and on withdrawal execution.
 contract BasedBoostedVault is IBasedBoostedVault, Ownable {

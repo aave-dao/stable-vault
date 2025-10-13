@@ -7,9 +7,9 @@ import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
 import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
-import {IAllocator} from "./interfaces/IAllocator.sol";
+import {IAllocator} from "../interfaces/IAllocator.sol";
 
-import {ISwapper} from "./interfaces/ISwapper.sol";
+import {ISwapper} from "../interfaces/ISwapper.sol";
 
 /// @dev Assumptions:
 ///      - 1 strategy per asset
