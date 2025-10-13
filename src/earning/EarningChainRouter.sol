@@ -5,7 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {ICommunicationHandler} from "../interfaces/ICommunicationHandler.sol";
-import {IAdapter} from "../interfaces/IAdapter.sol";
+import {ICommunicationAdapter} from "../interfaces/ICommunicationAdapter.sol";
 import {IAllocator} from "../interfaces/IAllocator.sol";
 
 // Earning Chain version of CommunicationHandler
@@ -43,7 +43,7 @@ contract EarningChainRouter {
 
     function _sendBalanceUpdateBack() internal {
         uint256 totalAssets = IAllocator(_allocator).getTotalAssets();
-        IAdapter(_adapter).sendMessage(
+        ICommunicationAdapter(_adapter).sendMessage(
             ACCOUNTING_CHAIN_ID, abi.encode(ICommunicationHandler.MessageType.BALANCE_UPDATE, totalAssets)
         );
     }
@@ -57,7 +57,7 @@ contract EarningChainRouter {
         messages[0] =
             abi.encode(ICommunicationHandler.MessageType.BALANCE_UPDATE, abi.encode(totalAssets, block.timestamp)); // Balance Update
         messages[1] = abi.encode(ICommunicationHandler.MessageType.TRANSFER, abi.encode(block.chainid, asset, amount));
-        IAdapter(_adapter).sendFunds(ACCOUNTING_CHAIN_ID, asset, amount, abi.encode(messages));
+        ICommunicationAdapter(_adapter).sendFunds(ACCOUNTING_CHAIN_ID, asset, amount, abi.encode(messages));
     }
 
     function emergencyExit(address asset, uint256 amount) external onlyAdapter(ACCOUNTING_CHAIN_ID) {

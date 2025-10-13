@@ -6,7 +6,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {ICommunicationHandler} from "../interfaces/ICommunicationHandler.sol";
 import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
-import {IAdapter} from "../interfaces/IAdapter.sol";
+import {ICommunicationAdapter} from "../interfaces/ICommunicationAdapter.sol";
 import {IAllocator} from "../interfaces/IAllocator.sol";
 
 contract CommunicationHandler is ICommunicationHandler {
@@ -48,14 +48,14 @@ contract CommunicationHandler is ICommunicationHandler {
             return;
         }
         IERC20(asset).safeTransfer(_adapters[targetChainId], amount);
-        IAdapter(_adapters[targetChainId]).sendFunds(
+        ICommunicationAdapter(_adapters[targetChainId]).sendFunds(
             targetChainId, asset, amount, abi.encode(ICommunicationHandler.MessageType.TRANSFER, asset, amount)
         );
     }
 
     /// @dev Assume for Emergency withdrawal only - Earning chain will send whatever asset it prefers
     function sendPullFundsFromChainMessage(uint256 amount, uint256 targetChainId) external onlyFundsHandler {
-        IAdapter(_adapters[targetChainId]).sendMessage(
+        ICommunicationAdapter(_adapters[targetChainId]).sendMessage(
             targetChainId, abi.encode(ICommunicationHandler.MessageType.PULL_FUNDS, amount)
         );
     }

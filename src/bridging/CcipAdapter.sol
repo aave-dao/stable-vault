@@ -3,9 +3,9 @@ pragma solidity ^0.8.22;
 
 import {IRouterClient} from "@chainlink-ccip/contracts/interfaces/IRouterClient.sol";
 import {Client} from "@chainlink-ccip/contracts/libraries/Client.sol";
-import {IAdapter} from "../interfaces/IAdapter.sol";
+import {ICommunicationAdapter} from "../interfaces/ICommunicationAdapter.sol";
 
-contract CcipAdapter is IAdapter {
+contract CcipAdapter is ICommunicationAdapter {
     // TODO: Immutable? and we release a new version if the router changes
     address _router;
 
