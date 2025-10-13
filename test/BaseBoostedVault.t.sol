@@ -5,11 +5,14 @@ import "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 
 import {ExtendedBasedBoostedVault} from "./mocks/ExtendedBasedBoostedVault.sol";
+import {TestErc4626} from "./mocks/TestErc4626.sol";
 import {TestErc20} from "./mocks/TestErc20.sol";
 import {MathLib} from "./../src/libraries/MathLib.sol";
 import {AssetLib} from "./../src/libraries/AssetLib.sol";
-import {FundsHandler} from "./../src/accounting-chain/FundsHandler.sol";
-import {IBasedBoostedVault} from "./../src/accounting-chain/interfaces/IBasedBoostedVault.sol";
+import {FundsHandler} from "./../src/accounting/FundsHandler.sol";
+import {Allocator} from "./../src/common/Allocator.sol";
+import {Swapper} from "./../src/common/Swapper.sol";
+import {IBasedBoostedVault} from "./../src/interfaces/IBasedBoostedVault.sol";
 
 contract ExtendedBasedBoostedVaultT is Test {
     using MathLib for uint256;
@@ -19,14 +22,25 @@ contract ExtendedBasedBoostedVaultT is Test {
     uint256 initialBasePerSecondRate = 1e27; // 1 RAY
     ExtendedBasedBoostedVault vault;
     FundsHandler fundsHandler;
+    Allocator allocator;
 
     TestErc20 asset;
+    TestErc4626 asset4626;
+    Swapper swapper;
 
     function setUp() public {
+        console.log("Creating asset");
         asset = new TestErc20(18);
+        asset4626 = new TestErc4626(asset);
+        console.log("Creating vault");
         vault = new ExtendedBasedBoostedVault(owner, initialBasePerSecondRate);
+
+        allocator = new Allocator({manager: address(this), admin: address(this)});
+        swapper = new Swapper(address(allocator));
+
         vault.updateAssetSupport(address(asset), true);
-        fundsHandler = new FundsHandler();
+        // TODO: set communicationHandler
+        fundsHandler = new FundsHandler(address(this), address(vault), address(0), address(allocator));
         vault.setFundsHandler(address(fundsHandler));
 
         address lockDepositor = makeAddr("lockDepositor");

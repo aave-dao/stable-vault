@@ -14,6 +14,10 @@ library AssetLib {
         return convertDecimals(amount, RAY_DECIMALS, getDecimals(asset));
     }
 
+    function convertAssetDecimals(uint256 amount, address fromAsset, address toAsset) internal view returns (uint256) {
+        return convertDecimals(amount, getDecimals(fromAsset), getDecimals(toAsset));
+    }
+
     function convertDecimals(uint256 inputAmount, uint256 inputDecimals, uint256 outputDecimals)
         internal
         pure
@@ -31,7 +35,7 @@ library AssetLib {
         }
     }
 
-    function getDecimals(address asset) private view returns (uint8) {
+    function getDecimals(address asset) internal view returns (uint8) {
         uint8 assetDecimals = 18;
         (bool callSucceeded, bytes memory encodedDecimals) =
             address(asset).staticcall(abi.encodeWithSelector(IERC20Metadata.decimals.selector));
