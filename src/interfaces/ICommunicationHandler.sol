@@ -5,7 +5,6 @@ interface ICommunicationHandler {
     error UnsupportedMessageType();
     error UnsupportedAdapter();
     error NotFundsHandler();
-    error NotAdmin();
 
     function sendPushFundsToChainMessage(address asset, uint256 amount, uint256 targetChainId) external;
 

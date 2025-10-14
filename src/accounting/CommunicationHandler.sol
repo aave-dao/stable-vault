@@ -8,6 +8,7 @@ import {ICommunicationHandler} from "../interfaces/ICommunicationHandler.sol";
 import {ICommunicationAdapter} from "../interfaces/ICommunicationAdapter.sol";
 import {IAllocator} from "../interfaces/IAllocator.sol";
 import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
+import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 contract CommunicationHandler is ICommunicationHandler {
     using SafeERC20 for IERC20;
@@ -25,7 +26,7 @@ contract CommunicationHandler is ICommunicationHandler {
     }
 
     modifier onlyAdmin() {
-        require(msg.sender == _admin, NotAdmin());
+        require(msg.sender == _admin, ErrorsLib.NotAdmin());
         _;
     }
 
@@ -36,8 +37,6 @@ contract CommunicationHandler is ICommunicationHandler {
     /// @dev asset == address(0) for message-only bridging.
     /// @dev Assumes token bridges also support Arbitrary Message Bridging.
     mapping(address asset => mapping(uint256 chainId => address adapter)) _bridgeAdapter;
-
-    mapping(address adapter => bool supported) _supportedAdapter;
 
     constructor(address admin, address fundsHandler) {
         _admin = admin;
@@ -95,21 +94,14 @@ contract CommunicationHandler is ICommunicationHandler {
     /// @param asset asset to bridge using adapter
     /// @param chainId destination chainId
     /// @param adapter address of adapter implementing ICommunicationAdapter
-    function setBridgeAdapter(address asset, uint256 chainId, address adapter, bool supported) external onlyAdmin {
+    function setBridgeAdapter(address asset, uint256 chainId, address adapter) external onlyAdmin {
         address currentAdapter = _bridgeAdapter[asset][chainId];
         if (currentAdapter != adapter) {
-            _supportedAdapter[currentAdapter] = false;
             _bridgeAdapter[asset][chainId] = adapter;
-        }
-        if (supported) {
-            _supportedAdapter[adapter] = true;
-        } else {
-            _supportedAdapter[adapter] = false;
         }
     }
 
-    function getTokenBridgeAdapter(address asset, uint256 chainId) external view returns (address, bool) {
-        address adapter = _bridgeAdapter[asset][chainId];
-        return (adapter, _supportedAdapter[adapter]);
+    function getTokenBridgeAdapter(address asset, uint256 chainId) external view returns (address) {
+        return _bridgeAdapter[asset][chainId];
     }
 }
