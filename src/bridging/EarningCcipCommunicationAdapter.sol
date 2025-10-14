@@ -6,6 +6,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {Client} from "@chainlink-ccip/contracts/libraries/Client.sol";
 
+import {IBridgeCommunicationHandler} from "../interfaces/IBridgeCommunicationHandler.sol";
 import {IEarningChainCommuniationAdapter} from "../interfaces/IEarningChainCommuniationAdapter.sol";
 import {IEarningChainRouter} from "../interfaces/IEarningChainRouter.sol";
 import {BaseCcipCommunicationAdapter} from "./BaseCcipCommunicationAdapter.sol";
@@ -60,23 +61,26 @@ contract EarningCcipCommunicationAdapter is BaseCcipCommunicationAdapter, IEarni
         _sendMessage(chainId, message);
     }
 
-    function _processPullFunds(uint64 fromChainSelector, uint256 amount) internal {
+    function _processPullFunds(uint64 sourceChainSelector, uint256 amount) internal {
+        (sourceChainSelector, amount);
         revert("UNSUPPORTED");
         // TODO: re Emergency Withdrawal how to decide which token to pull from Allocator?
         // TODO: do we need to ccipSend multiple times to bridge multiple tokens?
         // TODO: Keep in mind not every asset in Earning chain will be bridgeable to Accounting chain
         // TODO: if someone emergencyWithdraws then have them wait a cooldown period since pull flow can fail if insufficient bridgeable assets are on Earning chain (assume no swap can be performed)
-        // IEarningChainRouter(_earningChainRouter).pullFunds(fromChainSelector, amount);
+        // IEarningChainRouter(_earningChainRouter).pullFunds(sourceChainSelector, amount);
     }
 
-    function _processFundsReceiving(uint64 fromChainSelector, Client.EVMTokenAmount[] memory assetsToReceive)
+    function _processFundsReceiving(uint64 sourceChainSelector, Client.EVMTokenAmount[] memory assetsToReceive)
         internal
     {
         for (uint256 i = 0; i < assetsToReceive.length; i++) {
             address asset = assetsToReceive[i].token;
             uint256 amount = assetsToReceive[i].amount;
             IERC20(asset).forceApprove(_earningChainRouter, amount);
-            IEarningChainRouter(_earningChainRouter).pushToStrategy(_chainIdOf[fromChainSelector], asset, amount);
+            IBridgeCommunicationHandler(_earningChainRouter).receiveFunds(
+                _chainIdOf[sourceChainSelector], asset, amount
+            );
         }
     }
 }

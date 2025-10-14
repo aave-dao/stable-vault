@@ -6,40 +6,22 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {ICommunicationHandler} from "../interfaces/ICommunicationHandler.sol";
 import {ICommunicationAdapter} from "../interfaces/ICommunicationAdapter.sol";
-import {IAllocator} from "../interfaces/IAllocator.sol";
+import {IBridgeCommunicationHandler} from "../interfaces/IBridgeCommunicationHandler.sol";
 import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
+import {BridgeCommunicationHandler} from "../common/BridgeCommunicationHandler.sol";
 
-contract CommunicationHandler is ICommunicationHandler {
+contract CommunicationHandler is ICommunicationHandler, BridgeCommunicationHandler {
     using SafeERC20 for IERC20;
-
-    address constant ASSET_FOR_MESSAGE_ONLY_BRIDGE = address(0);
-
-    modifier onlyAdapter(address asset, uint256 fromChainId) {
-        require(_bridgeAdapter[asset][fromChainId] == msg.sender, UnsupportedAdapter());
-        _;
-    }
 
     modifier onlyFundsHandler() {
         require(msg.sender == _fundsHandler, NotFundsHandler());
         _;
     }
 
-    modifier onlyAdmin() {
-        require(msg.sender == _admin, ErrorsLib.NotAdmin());
-        _;
-    }
-
     address _fundsHandler;
-    address _admin;
 
-    /// @dev Assumes a single asset is bridged per bridge action through an adapter.
-    /// @dev asset == address(0) for message-only bridging.
-    /// @dev Assumes token bridges also support Arbitrary Message Bridging.
-    mapping(address asset => mapping(uint256 chainId => address adapter)) _bridgeAdapter;
-
-    constructor(address admin, address fundsHandler) {
-        _admin = admin;
+    constructor(address admin, address fundsHandler) BridgeCommunicationHandler(admin) {
         _fundsHandler = fundsHandler;
     }
 
@@ -62,40 +44,24 @@ contract CommunicationHandler is ICommunicationHandler {
         );
     }
 
-    /// @param fromChainId the ID of the chain where  th
+    /// @param sourceChainId the ID of the chain where the balance snapshot was taken
     /// @param balance cumulative balance in RAY
     /// @param timestamp on source chain
-    function receiveBalanceSnapshotMessage(uint256 fromChainId, uint256 balance, uint256 timestamp)
+    function receiveBalanceSnapshotMessage(uint256 sourceChainId, uint256 balance, uint256 timestamp)
         external
         override
-        onlyAdapter(ASSET_FOR_MESSAGE_ONLY_BRIDGE, fromChainId)
+        onlyAdapter(ASSET_FOR_MESSAGE_ONLY_BRIDGE, sourceChainId)
     {
-        IFundsHandler(_fundsHandler).updateChainBalanceCallback(fromChainId, balance, timestamp);
+        IFundsHandler(_fundsHandler).updateChainBalanceCallback(sourceChainId, balance, timestamp);
     }
 
-    /// @param fromChainId the ID of the chain where  th
-    /// @param asset token address
-    /// @param amount amount in asset decimal places
-    function receiveFunds(uint256 fromChainId, address asset, uint256 amount)
+    /// @inheritdoc IBridgeCommunicationHandler
+    function receiveFunds(uint256 sourceChainId, address asset, uint256 amount)
         external
         override
-        onlyAdapter(asset, fromChainId)
+        onlyAdapter(asset, sourceChainId)
     {
-        IERC20(asset).safeTransferFrom(_bridgeAdapter[asset][fromChainId], _fundsHandler, amount);
-        IFundsHandler(_fundsHandler).fundsArrivedFromChainCallback(fromChainId, asset, amount);
-    }
-
-    /// @param asset asset to bridge using adapter
-    /// @param chainId destination chainId
-    /// @param adapter address of adapter implementing ICommunicationAdapter
-    function setBridgeAdapter(address asset, uint256 chainId, address adapter) external onlyAdmin {
-        address currentAdapter = _bridgeAdapter[asset][chainId];
-        if (currentAdapter != adapter) {
-            _bridgeAdapter[asset][chainId] = adapter;
-        }
-    }
-
-    function getBridgeAdapter(address asset, uint256 chainId) external view returns (address) {
-        return _bridgeAdapter[asset][chainId];
+        IERC20(asset).safeTransferFrom(_bridgeAdapter[asset][sourceChainId], _fundsHandler, amount);
+        IFundsHandler(_fundsHandler).fundsArrivedFromChainCallback(sourceChainId, asset, amount);
     }
 }

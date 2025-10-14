@@ -6,6 +6,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {Client} from "@chainlink-ccip/contracts/libraries/Client.sol";
 import {ICommunicationHandler} from "../interfaces/ICommunicationHandler.sol";
+import {IBridgeCommunicationHandler} from "../interfaces/IBridgeCommunicationHandler.sol";
 import {BaseCcipCommunicationAdapter} from "./BaseCcipCommunicationAdapter.sol";
 
 contract AccountingCcipCommunicationAdapter is BaseCcipCommunicationAdapter {
@@ -79,7 +80,7 @@ contract AccountingCcipCommunicationAdapter is BaseCcipCommunicationAdapter {
             address asset = assetsToReceive[i].token;
             uint256 amount = assetsToReceive[i].amount;
             IERC20(asset).forceApprove(_commHandler, amount);
-            ICommunicationHandler(_commHandler).receiveFunds(_chainIdOf[fromChainSelector], asset, amount);
+            IBridgeCommunicationHandler(_commHandler).receiveFunds(_chainIdOf[fromChainSelector], asset, amount);
         }
     }
 }
