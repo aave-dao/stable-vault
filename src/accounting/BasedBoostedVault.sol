@@ -238,7 +238,7 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         _positions[user].shares += shares;
         _positions[user].originalDeposit += amountInRay;
 
-        _fundsHandler.processDeposit(user, asset, amount);
+        _fundsHandler.processDeposit(asset, amount);
 
         emit Deposit(user, asset, amount);
     }
@@ -264,6 +264,8 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         uint256 conversionRate = _activeSubVaults[subVaultIndex].conversionRate;
         uint256 actualAmountInRay;
         uint256 guaranteedAmount;
+        uint256 subVaultShares;
+        uint256 subVaultId = _positions[user].subVaultId;
 
         if (requestedAmountInRay == 0) {
             // Withdraw full balance. user's shares > 0 check already performed at the beginning
@@ -276,6 +278,8 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
             if (actualAmountInRay < guaranteedAmount) {
                 guaranteedAmount = actualAmountInRay;
             }
+            subVaultShares = _positions[user].shares;
+            _activeSubVaults[subVaultIndex].totalShares -= subVaultShares;
             delete _positions[user];
         } else {
             uint256 requestedAmountInShares = requestedAmountInRay.rayDivDown(conversionRate);
@@ -295,16 +299,15 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
                 _positions[user].originalDeposit -= actualAmountInRay;
             }
         }
-        _activeSubVaults[subVaultIndex].totalShares -= _positions[user].shares;
         // TODO: Handle preferred asset properly
         uint256 withdrawalRequestId = _fundsHandler.processWithdrawalRequest({
-            user: user,
+            recipient: user,
             amount: actualAmountInRay,
             guaranteedAmount: guaranteedAmount,
             preferredAsset: preferredAsset,
             data: ""
         });
-        emit WithdrawalRequested(user, preferredAsset, actualAmountInRay, guaranteedAmount);
+        emit WithdrawalRequestedWithShares(user, preferredAsset, withdrawalRequestId, subVaultId, subVaultShares, actualAmountInRay, guaranteedAmount);
         return withdrawalRequestId;
     }
 
@@ -313,8 +316,8 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         override
         returns (uint256, bytes memory)
     {
-        (uint256 amount, bytes memory returnData) = _fundsHandler.processWithdrawalExecution(withdrawalRequestId, data);
-        emit WithdrawalExecuted(withdrawalRequestId, amount, returnData);
+        (uint256 amount, address recipient, bytes memory returnData) = _fundsHandler.processWithdrawalExecution(withdrawalRequestId, data);
+        emit WithdrawalExecuted(recipient, withdrawalRequestId, amount, returnData);
         return (amount, returnData);
     }
 

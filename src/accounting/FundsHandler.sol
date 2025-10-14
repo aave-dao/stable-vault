@@ -25,7 +25,7 @@ contract FundsHandler is IFundsHandler {
     }
 
     struct WithdrawalRequest {
-        address user;
+        address recipient;
         uint256 amountRequested;
         uint256 amountGuaranteed;
         address preferredAsset;
@@ -92,7 +92,7 @@ contract FundsHandler is IFundsHandler {
     }
 
     function processWithdrawalRequest(
-        address user,
+        address recipient,
         uint256 amount,
         uint256 guaranteedAmount,
         address preferredAsset,
@@ -100,14 +100,12 @@ contract FundsHandler is IFundsHandler {
     ) external override onlyBaseBoostedVault returns (uint256) {
         uint256 withdrawalRequestId = ++_lastWithdrawalRequestId;
         _withdrawalRequests[withdrawalRequestId] =
-            WithdrawalRequest(user, amount, guaranteedAmount, preferredAsset, block.timestamp, "");
+            WithdrawalRequest(recipient, amount, guaranteedAmount, preferredAsset, block.timestamp, "");
         // TODO: Implement anything else if needed
         return withdrawalRequestId;
     }
 
-    function processDeposit(address user, address asset, uint256 amount) external override onlyBaseBoostedVault {
-        (user);
-        // TODO: Implement
+    function processDeposit(address asset, uint256 amount) external onlyBaseBoostedVault {
         _pushFundsToImmediateLiquidity(asset, amount);
     }
 
@@ -115,21 +113,21 @@ contract FundsHandler is IFundsHandler {
         external
         override
         onlyBaseBoostedVault
-        returns (uint256, bytes memory)
+        returns (uint256, address, bytes memory)
     {
         _verifyIfRequestCanBeProcessed(withdrawalRequestId);
-        uint256 amount = _executeWithdrawal(withdrawalRequestId);
-        return (amount, "");
+        (uint256 amount, address recipient) = _executeWithdrawal(withdrawalRequestId);
+        return (amount, recipient, "");
     }
 
-    function _executeWithdrawal(uint256 withdrawalRequestId) internal returns (uint256) {
+    function _executeWithdrawal(uint256 withdrawalRequestId) internal returns (uint256, address) {
         address asset = _withdrawalRequests[withdrawalRequestId].preferredAsset;
         uint256 amount = _withdrawalRequests[withdrawalRequestId].amountRequested.rayToAssetDecimals(asset);
-        address destination = _withdrawalRequests[withdrawalRequestId].user;
+        address recipient = _withdrawalRequests[withdrawalRequestId].recipient;
         delete _withdrawalRequests[withdrawalRequestId];
         _pullFundsFromImmediateLiquidity(asset, amount);
-        IERC20(asset).safeTransfer(destination, amount);
-        return amount;
+        IERC20(asset).safeTransfer(recipient, amount);
+        return (amount, recipient);
     }
 
     function _verifyIfRequestCanBeProcessed(uint256 withdrawalRequestId) internal view {

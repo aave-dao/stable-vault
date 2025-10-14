@@ -13,18 +13,18 @@ interface IFundsHandler {
     }
 
     function processWithdrawalRequest(
-        address user,
+        address recipient,
         uint256 amount,
         uint256 guaranteedAmount,
         address preferredAsset,
         bytes calldata data
     ) external returns (uint256);
 
-    function processDeposit(address user, address asset, uint256 amount) external;
+    function processDeposit(address asset, uint256 amount) external;
 
     function processWithdrawalExecution(uint256 withdrawalRequestId, bytes calldata data)
         external
-        returns (uint256, bytes memory);
+        returns (uint256, address, bytes memory);
 
     function pushFundsToChain(address asset, uint256 amount, uint256 chainId) external;
 
