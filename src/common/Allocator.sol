@@ -66,30 +66,21 @@ contract Allocator is IAllocator {
         return _admin;
     }
 
-    function getAssets() external view returns (IAllocator.AllocatedAssets[] memory) {
-        IAllocator.AllocatedAssets[] memory allocatedAssets = new IAllocator.AllocatedAssets[](_vaults.length);
-        for (uint256 i = 0; i < _vaults.length; i++) {
-            address asset = IERC4626(_vaults[i]).asset();
-            uint256 amount = IERC4626(_vaults[i]).maxWithdraw(address(this));
-            // TODO: Sum by asset if multiple vaults per asset?
-            allocatedAssets[i] = IAllocator.AllocatedAssets(asset, amount);
-        }
-        return allocatedAssets;
+    function getAssets() external view returns (IAllocator.AllocatorBalance[] memory) {
+        return _getAssets();
     }
 
     /// @return amount of total assets in all the vaults in RAY
     function getTotalAssets() external view returns (uint256) {
+        IAllocator.AllocatorBalance[] memory allocatedAssets = _getAssets();
         uint256 totalAssetsInRay;
-        for (uint256 i = 0; i < _vaults.length; i++) {
-            uint256 assetAmount = IERC4626(_vaults[i]).maxWithdraw(address(this));
-            address asset = IERC4626(_vaults[i]).asset();
-            uint256 amountInRay = assetAmount.assetDecimalsToRay(asset);
-            totalAssetsInRay += amountInRay;
+        for (uint256 i = 0; i < allocatedAssets.length; i++) {
+            totalAssetsInRay += allocatedAssets[i].amount.assetDecimalsToRay(allocatedAssets[i].asset);
         }
         return totalAssetsInRay;
     }
 
-    // TODO: This function shouldn't fail
+    // TODO: This function shouldn't fail (allow funds to be left idle in Allocator)
     function deposit(address asset, uint256 amount) external onlyWhitelistedDepositor {
         address vault = _vaultByAsset[asset];
         require(vault != address(0), ErrorsLib.UnsupportedAsset(asset));
@@ -177,5 +168,18 @@ contract Allocator is IAllocator {
         require(_vaultByAsset[asset] == vault, ErrorsLib.AddressAlreadyWhitelisted());
         // TODO: check vault supports IERC4626 with EIP-165?
         _vaultByAsset[asset] = vault;
+    }
+
+    function _getAssets() internal view returns (IAllocator.AllocatorBalance[] memory) {
+        IAllocator.AllocatorBalance[] memory allocatedAssets = new IAllocator.AllocatorBalance[](_vaults.length);
+        for (uint256 i = 0; i < _vaults.length; i++) {
+            IERC4626 vault = IERC4626(_vaults[i]);
+            address asset = vault.asset();
+            uint256 amount = vault.previewRedeem(vault.balanceOf(address(this)));
+            // Include idle funds in balance (assumes 1 vault per asset)
+            amount += IERC20(asset).balanceOf(address(this));
+            allocatedAssets[i] = IAllocator.AllocatorBalance(asset, amount);
+        }
+        return allocatedAssets;
     }
 }

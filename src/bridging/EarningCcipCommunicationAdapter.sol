@@ -6,9 +6,11 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {Client} from "@chainlink-ccip/contracts/libraries/Client.sol";
 
+import {IEarningChainCommuniationAdapter} from "../interfaces/IEarningChainCommuniationAdapter.sol";
+import {IEarningChainRouter} from "../interfaces/IEarningChainRouter.sol";
 import {BaseCcipCommunicationAdapter} from "./BaseCcipCommunicationAdapter.sol";
 
-contract EarningCcipCommunicationAdapter is BaseCcipCommunicationAdapter {
+contract EarningCcipCommunicationAdapter is BaseCcipCommunicationAdapter, IEarningChainCommuniationAdapter {
     using SafeERC20 for IERC20;
 
     address _earningChainRouter;
@@ -33,16 +35,22 @@ contract EarningCcipCommunicationAdapter is BaseCcipCommunicationAdapter {
         uint256 chainId,
         address asset,
         uint256 amount,
-        uint256 balance,
-        uint256 timestamp
+        uint256 snapshotBalance,
+        uint256 snapshotTimestamp
     ) external {
-        IERC20(asset).forceApprove(_ccipRouter, amount);
-        Client.EVMTokenAmount[] memory allAssetsToPush = new Client.EVMTokenAmount[](1);
-        allAssetsToPush[0] = Client.EVMTokenAmount({token: asset, amount: amount});
+        Client.EVMTokenAmount[] memory allAssetsToPush;
+        if (asset != address(0)) {
+            IERC20(asset).forceApprove(_ccipRouter, amount);
+            allAssetsToPush = new Client.EVMTokenAmount[](1);
+            allAssetsToPush[0] = Client.EVMTokenAmount({token: asset, amount: amount});
+        } else {
+            // Bridging data only
+            allAssetsToPush = new Client.EVMTokenAmount[](0);
+        }
 
         Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
             receiver: abi.encode(_receiverOf[chainId]),
-            data: abi.encode(BalanceSnapshot(balance, timestamp)),
+            data: abi.encode(BalanceSnapshot(snapshotBalance, snapshotTimestamp)),
             tokenAmounts: allAssetsToPush,
             feeToken: _feeToken,
             // TODO: extra args contains dest chain gas limit which defaults to 200k
@@ -68,7 +76,7 @@ contract EarningCcipCommunicationAdapter is BaseCcipCommunicationAdapter {
             address asset = assetsToReceive[i].token;
             uint256 amount = assetsToReceive[i].amount;
             IERC20(asset).forceApprove(_earningChainRouter, amount);
-            // IEarningChainRouter(_earningChainRouter).receiveFunds(_chainIdOf[fromChainSelector], asset, amount);
+            IEarningChainRouter(_earningChainRouter).pushToStrategy(_chainIdOf[fromChainSelector], asset, amount);
         }
     }
 }

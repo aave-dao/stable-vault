@@ -7,7 +7,7 @@ interface IFundsHandler {
 
     struct AssetBalance {
         address asset;
-        uint256 amountRAY;
+        uint256 amountRay;
         uint256 chainId;
         uint256 timestamp;
     }

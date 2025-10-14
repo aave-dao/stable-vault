@@ -88,7 +88,7 @@ contract CommunicationHandler is ICommunicationHandler {
         override
         onlyAdapter(asset, fromChainId)
     {
-        IERC20(asset).transferFrom(_bridgeAdapter[asset][fromChainId], _fundsHandler, amount);
+        IERC20(asset).safeTransferFrom(_bridgeAdapter[asset][fromChainId], _fundsHandler, amount);
         IFundsHandler(_fundsHandler).fundsArrivedFromChainCallback(fromChainId, asset, amount);
     }
 

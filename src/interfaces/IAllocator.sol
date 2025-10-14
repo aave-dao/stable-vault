@@ -4,7 +4,7 @@ pragma solidity ^0.8.22;
 /// @dev Assumes single strategy per asset; multiple assets per Allocator
 /// @dev Deals with assets in their native decimals
 interface IAllocator {
-    struct AllocatedAssets {
+    struct AllocatorBalance {
         address asset;
         uint256 amount;
     }
@@ -30,7 +30,7 @@ interface IAllocator {
 
     function getAdmin() external view returns (address);
 
-    function getAssets() external view returns (AllocatedAssets[] memory);
+    function getAssets() external view returns (AllocatorBalance[] memory);
 
     /// @dev returns latest total assets in strategies denominated in RAY
     function getTotalAssets() external view returns (uint256);

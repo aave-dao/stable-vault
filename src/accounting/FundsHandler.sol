@@ -20,7 +20,7 @@ contract FundsHandler is IFundsHandler {
     struct ChainBalanceSnapshot {
         uint256 chainId;
         // Assumes all balances have common denomination.
-        uint256 amountRAY;
+        uint256 amountRay;
         uint256 timestamp;
     }
 
@@ -66,7 +66,7 @@ contract FundsHandler is IFundsHandler {
     }
 
     function getAssetBalances() external view returns (AssetBalance[] memory) {
-        IAllocator.AllocatedAssets[] memory allocatorAssets = IAllocator(_allocator).getAssets();
+        IAllocator.AllocatorBalance[] memory allocatorAssets = IAllocator(_allocator).getAssets();
         AssetBalance[] memory balances = new AssetBalance[](allocatorAssets.length + _chainBalances.length);
 
         uint16 i = 0;
@@ -74,7 +74,7 @@ contract FundsHandler is IFundsHandler {
             balances[i] = AssetBalance({
                 chainId: block.chainid,
                 asset: allocatorAssets[j].asset,
-                amountRAY: allocatorAssets[j].amount.assetDecimalsToRay(allocatorAssets[j].asset),
+                amountRay: allocatorAssets[j].amount.assetDecimalsToRay(allocatorAssets[j].asset),
                 timestamp: block.timestamp
             });
             i++;
@@ -83,11 +83,12 @@ contract FundsHandler is IFundsHandler {
             balances[i] = AssetBalance({
                 chainId: _chainBalances[i].chainId,
                 asset: address(0),
-                amountRAY: _chainBalances[i].amountRAY,
+                amountRay: _chainBalances[i].amountRay,
                 timestamp: _chainBalances[i].timestamp
             });
             i++;
         }
+        return balances;
     }
 
     function processWithdrawalRequest(
@@ -184,13 +185,13 @@ contract FundsHandler is IFundsHandler {
                 chainExists = true;
                 if (_chainBalances[i].timestamp < snapshotTimestamp) {
                     _chainBalances[i].timestamp = snapshotTimestamp;
-                    _chainBalances[i].amountRAY = snapshotBalance;
+                    _chainBalances[i].amountRay = snapshotBalance;
                 }
             }
         }
         if (!chainExists) {
             _chainBalances.push(
-                ChainBalanceSnapshot({chainId: chainId, amountRAY: snapshotBalance, timestamp: snapshotTimestamp})
+                ChainBalanceSnapshot({chainId: chainId, amountRay: snapshotBalance, timestamp: snapshotTimestamp})
             );
         }
     }
