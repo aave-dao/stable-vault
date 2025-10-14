@@ -10,9 +10,9 @@ import {TestErc20} from "./mocks/TestErc20.sol";
 import {MathLib} from "./../src/libraries/MathLib.sol";
 import {AssetLib} from "./../src/libraries/AssetLib.sol";
 import {FundsHandler} from "./../src/accounting/FundsHandler.sol";
+import {AccountingChainGateway} from "./../src/accounting/AccountingChainGateway.sol";
 import {Allocator} from "./../src/common/Allocator.sol";
 import {Swapper} from "./../src/common/Swapper.sol";
-import {CommunicationHandler} from "./../src/accounting/CommunicationHandler.sol";
 import {AccountingCcipCommunicationAdapter} from "./../src/bridging/AccountingCcipCommunicationAdapter.sol";
 import {IBasedBoostedVault} from "./../src/interfaces/IBasedBoostedVault.sol";
 import {MockCCIPRouter} from "./mocks/MockRouter.sol";
@@ -41,7 +41,7 @@ contract BaseTest is Test {
     FundsHandler fundsHandler;
     Allocator allocator_accountingChain;
     Swapper swapper_accountingChain;
-    CommunicationHandler communicationHandler;
+    AccountingChainGateway accountingChainGateway;
     AccountingCcipCommunicationAdapter ccipAdapter_accountingChain;
     TestErc4626 ghoStrategyVault_accountingChain;
     TestErc4626 usdcStrategyVault_accountingChain;
@@ -95,8 +95,8 @@ contract BaseTest is Test {
         fundsHandler =
             new FundsHandler(manager, address(vault), communicationHandlerAddress, address(allocator_accountingChain));
         console.log("\tFunds Handler: %s", address(fundsHandler));
-        communicationHandler = new CommunicationHandler(admin, address(fundsHandler));
-        console.log("\tCommunication Handler: %s", address(communicationHandler));
+        accountingChainGateway = new AccountingChainGateway(admin, address(fundsHandler));
+        console.log("\tAccounting Chain Gateway: %s", address(accountingChainGateway));
         swapper_accountingChain = new Swapper(address(allocator_accountingChain));
         console.log("\tSwapper: %s", address(swapper_accountingChain));
         ccipAdapter_accountingChain = new AccountingCcipCommunicationAdapter();
@@ -150,28 +150,28 @@ contract BaseTest is Test {
         // Set up Allocators on Accounting chain
         allocator_accountingChain.setDepositor(address(fundsHandler), true);
         allocator_accountingChain.setWithdrawer(address(fundsHandler), true);
-        allocator_accountingChain.setDepositor(address(communicationHandler), true);
-        allocator_accountingChain.setWithdrawer(address(communicationHandler), true);
+        allocator_accountingChain.setDepositor(address(accountingChainGateway), true);
+        allocator_accountingChain.setWithdrawer(address(accountingChainGateway), true);
 
         // Set up Allocators on Earning chain
         allocator_earningChain.setDepositor(address(earningChainRouter), true);
         allocator_earningChain.setWithdrawer(address(earningChainRouter), true);
 
         // Set up Communication Handler (Accounting chain) // These should be done cross-wise cause it's destination chainId
-        communicationHandler.setBridgeAdapter(address(GHO), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain));
+        accountingChainGateway.setBridgeAdapter(address(GHO), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain));
         console.log(
-            "\tCommunicationHandler GHO adapter (Accounting Chain): %s",
-            communicationHandler.getBridgeAdapter(address(GHO), EARNING_CHAIN_ID)
+            "\tAccountingChainGateway GHO adapter (Accounting Chain): %s",
+            accountingChainGateway.getBridgeAdapter(address(GHO), EARNING_CHAIN_ID)
         );
-        communicationHandler.setBridgeAdapter(address(USDC), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain));
+        accountingChainGateway.setBridgeAdapter(address(USDC), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain));
         console.log(
-            "\tCommunicationHandler USDC adapter (Accounting Chain): %s",
-            communicationHandler.getBridgeAdapter(address(USDC), EARNING_CHAIN_ID)
+            "\tAccountingChainGateway USDC adapter (Accounting Chain): %s",
+            accountingChainGateway.getBridgeAdapter(address(USDC), EARNING_CHAIN_ID)
         );
-        communicationHandler.setBridgeAdapter(address(0), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain));
+        accountingChainGateway.setBridgeAdapter(address(0), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain));
         console.log(
-            "\tCommunicationHandler Message adapter (Accounting Chain): %s",
-            communicationHandler.getBridgeAdapter(address(0), EARNING_CHAIN_ID)
+            "\tAccountingChainGateway Message adapter (Accounting Chain): %s",
+            accountingChainGateway.getBridgeAdapter(address(0), EARNING_CHAIN_ID)
         );
 
         // Set up Earning Chain Router (Earning chain)
@@ -193,7 +193,7 @@ contract BaseTest is Test {
             earningChainRouter.getBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID)
         );
 
-        ccipAdapter_accountingChain.setCommunicationHandler(address(communicationHandler));
+        ccipAdapter_accountingChain.setGateway(address(accountingChainGateway));
         ccipAdapter_earningChain.setEarningChainRouter(address(earningChainRouter));
         ccipAdapter_accountingChain.setCcipRouter(address(mockCcipRouter));
         ccipAdapter_earningChain.setCcipRouter(address(mockCcipRouter));

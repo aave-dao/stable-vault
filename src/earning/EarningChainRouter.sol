@@ -9,6 +9,7 @@ import {IEarningChainCommuniationAdapter} from "../interfaces/IEarningChainCommu
 import {IBridgeCommunicationHandler} from "../interfaces/IBridgeCommunicationHandler.sol";
 import {IEarningChainRouter} from "../interfaces/IEarningChainRouter.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
+import {EventLib} from "../libraries/EventLib.sol";
 import {BridgeCommunicationHandler} from "../common/BridgeCommunicationHandler.sol";
 
 /// @title EarningChainRouter
@@ -32,14 +33,14 @@ contract EarningChainRouter is IEarningChainRouter, BridgeCommunicationHandler {
     function setManager(address manager) external onlyAdmin {
         require(manager != address(0), ErrorsLib.ZeroAddress());
         _manager = manager;
-        emit ManagerSet(manager);
+        emit EventLib.ManagerSet(manager);
     }
 
     // TODO: Think if this should be put in constructor, or this can bee
     function setAllocator(address allocator) external onlyAdmin {
         require(allocator != address(0), ErrorsLib.ZeroAddress());
         _allocator = allocator;
-        // TODO: emit
+        emit EventLib.AllocatorSet(allocator);
     }
 
     /// @inheritdoc IBridgeCommunicationHandler

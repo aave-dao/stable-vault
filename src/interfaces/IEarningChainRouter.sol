@@ -2,8 +2,6 @@
 pragma solidity ^0.8.22;
 
 interface IEarningChainRouter {
-    event ManagerSet(address manager);
-
     /// @notice Sends a balance update to the Accounting Chain.
     function sendBalanceUpdate() external;
 
