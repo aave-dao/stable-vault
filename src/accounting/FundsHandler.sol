@@ -6,7 +6,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
 import {IWithdrawalPriorityQueue} from "../interfaces/IWithdrawalPriorityQueue.sol";
-import {ICommunicationHandler} from "../interfaces/ICommunicationHandler.sol";
+import {IAccountingChainGateway} from "../interfaces/IAccountingChainGateway.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {IAllocator} from "../interfaces/IAllocator.sol";
 
@@ -154,11 +154,11 @@ contract FundsHandler is IFundsHandler {
         _pullFundsFromImmediateLiquidity(asset, amount);
         // TODO: Why do we use transfer but not approve here?
         IERC20(asset).safeTransfer(_communicationHandler, amount);
-        ICommunicationHandler(_communicationHandler).sendPushFundsToChainMessage(asset, amount, chainId);
+        IAccountingChainGateway(_communicationHandler).sendPushFundsToChainMessage(asset, amount, chainId);
     }
 
     function pullFundsFromChain(uint256 amount, uint256 chainId) external onlyManager {
-        ICommunicationHandler(_communicationHandler).sendPullFundsFromChainMessage(amount, chainId);
+        IAccountingChainGateway(_communicationHandler).sendPullFundsFromChainMessage(amount, chainId);
     }
 
     function updateChainBalanceCallback(uint256 chainId, uint256 snapshotBalance, uint256 snapshotTimestamp)

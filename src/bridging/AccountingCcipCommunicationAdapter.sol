@@ -5,17 +5,17 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {Client} from "@chainlink-ccip/contracts/libraries/Client.sol";
-import {ICommunicationHandler} from "../interfaces/ICommunicationHandler.sol";
+import {IAccountingChainGateway} from "../interfaces/IAccountingChainGateway.sol";
 import {IBridgeCommunicationHandler} from "../interfaces/IBridgeCommunicationHandler.sol";
 import {BaseCcipCommunicationAdapter} from "./BaseCcipCommunicationAdapter.sol";
 
 contract AccountingCcipCommunicationAdapter is BaseCcipCommunicationAdapter {
     using SafeERC20 for IERC20;
 
-    address _commHandler;
+    address _gateway;
 
-    function setCommunicationHandler(address communicationHandler) external {
-        _commHandler = communicationHandler;
+    function setGateway(address gateway) external {
+        _gateway = gateway;
     }
 
     function pushFundsToChain(uint256 chainId, address asset, uint256 amount) external /* TODO: override */ {
@@ -68,7 +68,7 @@ contract AccountingCcipCommunicationAdapter is BaseCcipCommunicationAdapter {
         internal
     {
         // TODO: This call must not fail, we should catch if reverts
-        ICommunicationHandler(_commHandler).receiveBalanceSnapshotMessage(
+        IAccountingChainGateway(_gateway).receiveBalanceSnapshotMessage(
             _chainIdOf[fromChainSelector], balanceSnapshot.balance, balanceSnapshot.timestamp
         );
     }
@@ -79,8 +79,8 @@ contract AccountingCcipCommunicationAdapter is BaseCcipCommunicationAdapter {
         for (uint256 i = 0; i < assetsToReceive.length; i++) {
             address asset = assetsToReceive[i].token;
             uint256 amount = assetsToReceive[i].amount;
-            IERC20(asset).forceApprove(_commHandler, amount);
-            IBridgeCommunicationHandler(_commHandler).receiveFunds(_chainIdOf[fromChainSelector], asset, amount);
+            IERC20(asset).forceApprove(_gateway, amount);
+            IBridgeCommunicationHandler(_gateway).receiveFunds(_chainIdOf[fromChainSelector], asset, amount);
         }
     }
 }

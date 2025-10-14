@@ -4,14 +4,14 @@ pragma solidity ^0.8.22;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {ICommunicationHandler} from "../interfaces/ICommunicationHandler.sol";
+import {IAccountingChainGateway} from "../interfaces/IAccountingChainGateway.sol";
 import {ICommunicationAdapter} from "../interfaces/ICommunicationAdapter.sol";
 import {IBridgeCommunicationHandler} from "../interfaces/IBridgeCommunicationHandler.sol";
 import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {BridgeCommunicationHandler} from "../common/BridgeCommunicationHandler.sol";
 
-contract CommunicationHandler is ICommunicationHandler, BridgeCommunicationHandler {
+contract AccountingChainGateway is IAccountingChainGateway, BridgeCommunicationHandler {
     using SafeERC20 for IERC20;
 
     modifier onlyFundsHandler() {
