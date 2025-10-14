@@ -9,13 +9,24 @@ interface IBasedBoostedVault {
 
     // TODO: after initial testing we can fallbabck to using WithdrawalRequested
     //event WithdrawalRequested(address indexed user, address indexed asset, uint256 indexed withdrawalRequestId, uint256 requestedAmount, uint256 guaranteedAmount);
-    event WithdrawalRequestedWithShares(address indexed user, address indexed asset, uint256 indexed withdrawalRequestId, uint256 subVaultId, uint256 subVaultShares, uint256 requestedAmount, uint256 guaranteedAmount);
-    event WithdrawalExecuted(address indexed recipient, uint256 indexed withdrawalRequestId, uint256 amount, bytes returnData);
+    event WithdrawalRequestedWithShares(
+        address indexed user,
+        address indexed asset,
+        uint256 indexed withdrawalRequestId,
+        uint256 subVaultId,
+        uint256 subVaultShares,
+        uint256 requestedAmount,
+        uint256 guaranteedAmount
+    );
+    event WithdrawalExecuted(
+        address indexed recipient, uint256 indexed withdrawalRequestId, uint256 amount, bytes returnData
+    );
     event Deposit(address indexed user, address indexed asset, uint256 amount);
     event UserRateUpdated(address indexed user, uint256 newRate);
     event SubVaultRateUpdated(uint256 indexed subVaultId, uint256 newRate);
     event SubVaultCreated(uint256 indexed subVaultId, uint256 perSecondRate);
     event AssetSupported(address indexed asset, bool supported);
+    event ManagerSet(address manager);
 
     error InvalidRate();
     error NonExistentPosition();

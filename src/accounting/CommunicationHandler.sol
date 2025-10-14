@@ -49,12 +49,6 @@ contract CommunicationHandler is ICommunicationHandler {
     {
         address adapter = _bridgeAdapter[asset][targetChainId];
         require(adapter != address(0), UnsupportedAdapter());
-        if (targetChainId == block.chainid) {
-            // TODO: Is Adapter an Allocator directly or it's just a direct pass-thru?
-            IERC20(asset).safeTransfer(adapter, amount);
-            IAllocator(adapter).deposit(asset, amount);
-            return;
-        }
         IERC20(asset).safeTransfer(adapter, amount);
         ICommunicationAdapter(adapter).pushFundsToChain(targetChainId, asset, amount);
     }
@@ -101,7 +95,7 @@ contract CommunicationHandler is ICommunicationHandler {
         }
     }
 
-    function getTokenBridgeAdapter(address asset, uint256 chainId) external view returns (address) {
+    function getBridgeAdapter(address asset, uint256 chainId) external view returns (address) {
         return _bridgeAdapter[asset][chainId];
     }
 }

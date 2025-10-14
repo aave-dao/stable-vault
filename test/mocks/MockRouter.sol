@@ -30,6 +30,7 @@ contract MockCCIPRouter is IRouter, IRouterClient {
     uint32 public constant DEFAULT_GAS_LIMIT = 200_000;
 
     uint256 internal s_mockFeeTokenAmount; //use setFee() to change to non-zero to test fees
+    mapping(uint64 sourceChainSelector => uint64 destChainSelector) internal s_sourceChainSelector; //use setSourceChainSelector() to change
 
     function routeMessage(
         Client.Any2EVMMessage calldata message,
@@ -120,7 +121,7 @@ contract MockCCIPRouter is IRouter, IRouterClient {
 
         Client.Any2EVMMessage memory executableMsg = Client.Any2EVMMessage({
             messageId: mockMsgId,
-            sourceChainSelector: 16015286601757825753, // Sepolia
+            sourceChainSelector: s_sourceChainSelector[destinationChainSelector],
             sender: abi.encode(msg.sender),
             data: message.data,
             destTokenAmounts: message.tokenAmounts
@@ -186,5 +187,9 @@ contract MockCCIPRouter is IRouter, IRouterClient {
     /// @notice Always returns true
     function isOffRamp(uint64, /* sourceChainSelector */ address /* offRamp */ ) external pure returns (bool) {
         return true;
+    }
+
+    function setSourceChainSelector(uint64 destinationChainSelector, uint64 sourceChainSelector) external {
+        s_sourceChainSelector[destinationChainSelector] = sourceChainSelector;
     }
 }

@@ -107,7 +107,7 @@ contract Allocator is IAllocator {
     function withdrawEmergency(uint256 amount) external view onlyWhitelistedWithdrawer returns (address asset) {
         (amount);
         // TODO: Implement pull asset from vault based on priority? Based on default? Iterate through and try which ever has funds?
-        return address(0);
+        revert("Allocator.withdrawEmergency:NOT_IMPLEMENTED");
     }
 
     /// @inheritdoc IAllocator
@@ -165,9 +165,24 @@ contract Allocator is IAllocator {
         // TODO: set behind timelock?
         require(asset != address(0), ErrorsLib.ZeroAddress());
         require(vault != address(0), ErrorsLib.ZeroAddress());
-        require(_vaultByAsset[asset] == vault, ErrorsLib.AddressAlreadyWhitelisted());
-        // TODO: check vault supports IERC4626 with EIP-165?
+        require(_vaultByAsset[asset] != vault, ErrorsLib.AddressAlreadyWhitelisted());
+        address currentVault = _vaultByAsset[asset];
+        if (currentVault != address(0)) {
+            for (uint16 i = 0; i < _vaults.length; i++) {
+                if (_vaults[i] == currentVault) {
+                    _vaults[i] = vault;
+                    break;
+                }
+            }
+        } else {
+            _vaults.push(vault);
+        }
         _vaultByAsset[asset] = vault;
+    }
+
+    // TODO: Add to the interface
+    function getVault(address asset) external view returns (address) {
+        return _vaultByAsset[asset];
     }
 
     function _getAssets() internal view returns (IAllocator.AllocatorBalance[] memory) {

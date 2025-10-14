@@ -58,7 +58,7 @@ contract FundsHandler is IFundsHandler {
     }
 
     constructor(address manager, address basedBoostedVault, address communicationHandler, address allocator) {
-        require(_manager != address(0), ErrorsLib.ZeroAddress());
+        require(manager != address(0), ErrorsLib.ZeroAddress());
         _manager = manager;
         _basedBoostedVault = basedBoostedVault;
         _communicationHandler = communicationHandler;
@@ -152,6 +152,8 @@ contract FundsHandler is IFundsHandler {
 
     function pushFundsToChain(address asset, uint256 amount, uint256 chainId) external onlyManager {
         _pullFundsFromImmediateLiquidity(asset, amount);
+        // TODO: Why do we use transfer but not approve here?
+        IERC20(asset).safeTransfer(_communicationHandler, amount);
         ICommunicationHandler(_communicationHandler).sendPushFundsToChainMessage(asset, amount, chainId);
     }
 

@@ -42,6 +42,7 @@ abstract contract BaseCcipCommunicationAdapter is IAny2EVMMessageReceiver, IERC1
         _feeToken = feeToken;
     }
 
+    // TODO: add admin modifiers everywhere
     function setCcipRouter(address router) external {
         _ccipRouter = router;
     }

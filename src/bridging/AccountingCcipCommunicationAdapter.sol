@@ -27,8 +27,10 @@ contract AccountingCcipCommunicationAdapter is BaseCcipCommunicationAdapter {
             data: "",
             tokenAmounts: allAssetsToPush,
             feeToken: _feeToken,
-            // TODO: extra args contains dest chain gas limit which defaults to 200k
-            extraArgs: ""
+            // TODO: Think how we pass this gasLimit down here
+            extraArgs: Client._argsToBytes(
+                Client.GenericExtraArgsV2({gasLimit: 2_000_000, allowOutOfOrderExecution: false})
+            )
         });
 
         _sendMessage(chainId, message);
@@ -40,7 +42,10 @@ contract AccountingCcipCommunicationAdapter is BaseCcipCommunicationAdapter {
             data: abi.encode(amount),
             tokenAmounts: new Client.EVMTokenAmount[](0),
             feeToken: _feeToken,
-            extraArgs: ""
+            // TODO: Think how we pass this gasLimit down here
+            extraArgs: Client._argsToBytes(
+                Client.GenericExtraArgsV2({gasLimit: 2_000_000, allowOutOfOrderExecution: false})
+            )
         });
 
         _sendMessage(chainId, message);
