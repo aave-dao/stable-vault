@@ -7,6 +7,7 @@ import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
 import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
+import {IManagedAllocator} from "../interfaces/IManagedAllocator.sol";
 import {IAllocator} from "../interfaces/IAllocator.sol";
 
 import {ISwapper} from "../interfaces/ISwapper.sol";
@@ -17,7 +18,7 @@ import {ISwapper} from "../interfaces/ISwapper.sol";
 ///      - assets are in their native decimals
 ///      - 100% of assets deposited into Allocator belong to the same entity
 /// @dev Deals with assets in their native decimals
-contract Allocator is IAllocator {
+contract Allocator is IManagedAllocator {
     // TODO: consider scenarios where tokens are left idle here because pushing to strategies fails (reverts should be caught)
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
@@ -66,13 +67,16 @@ contract Allocator is IAllocator {
         return _admin;
     }
 
-    function getAssets() external view returns (IAllocator.AllocatorBalance[] memory) {
-        return _getAssets();
+    function getAssetBalance(address asset) external view override returns (uint256) {
+        return _getAssetBalance(asset);
     }
 
-    /// @return amount of total assets in all the vaults in RAY
-    function getTotalAssets() external view returns (uint256) {
-        IAllocator.AllocatorBalance[] memory allocatedAssets = _getAssets();
+    function getAssetBalances() external view override returns (IManagedAllocator.AllocatorBalance[] memory) {
+        return _getAssetBalances();
+    }
+
+    function getAggregatedBalance() external view override returns (uint256) {
+        IManagedAllocator.AllocatorBalance[] memory allocatedAssets = _getAssetBalances();
         uint256 totalAssetsInRay;
         for (uint256 i = 0; i < allocatedAssets.length; i++) {
             totalAssetsInRay += allocatedAssets[i].amount.assetDecimalsToRay(allocatedAssets[i].asset);
@@ -80,37 +84,46 @@ contract Allocator is IAllocator {
         return totalAssetsInRay;
     }
 
-    // TODO: This function shouldn't fail (allow funds to be left idle in Allocator)
-    function deposit(address asset, uint256 amount) external onlyWhitelistedDepositor {
-        address vault = _vaultByAsset[asset];
-        require(vault != address(0), ErrorsLib.UnsupportedAsset(asset));
-        require(amount > 0, ErrorsLib.ZeroAmount());
-        // Pull assets from the depositor
+    function deposit(address asset, uint256 amount) external override onlyWhitelistedDepositor {
         IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
-        // Deposit assets into strategy vault
-        IERC20(asset).forceApprove(vault, amount); // TODO: Review if forceApprove or safeIncreaseAllowance
-        /*  uint256 shares = */
-        IERC4626(vault).deposit(amount, address(this));
-        // TODO: Think what we do with the shares amount - do we save it? return it?
-        // return shares;
+        bool callSucceeded = _deposit({asset: asset, amount: amount});
+        if (!callSucceeded) {
+            emit VaultDepositFailed(_vaultByAsset[asset], amount);
+        }
     }
 
-    function withdraw(address asset, uint256 amount) external onlyWhitelistedWithdrawer {
+    function withdraw(address asset, uint256 amount) external override onlyWhitelistedWithdrawer {
         address vault = _vaultByAsset[asset];
         require(vault != address(0), ErrorsLib.UnsupportedAsset(asset));
         require(amount > 0, ErrorsLib.ZeroAmount());
-        // Withdraw assets from strategy vault
-        IERC4626(vault).withdraw(amount, msg.sender, address(this));
+        uint256 idleBalance = IERC20(asset).balanceOf(address(this));
+        if (idleBalance > 0 && amount > idleBalance) {
+            IERC4626(vault).withdraw({assets: amount - idleBalance, receiver: address(this), owner: address(this)});
+            IERC20(asset).safeTransfer(msg.sender, amount);
+        } else {
+            IERC4626(vault).withdraw({assets: amount, receiver: msg.sender, owner: address(this)});
+        }
     }
 
     /// Request any asset from the allocator for a given amount; assumes allocator assets have common denomination.
-    function withdrawEmergency(uint256 /* amount */ ) external view onlyWhitelistedWithdrawer returns (address) {
+    function withdrawEmergency(uint256 /* amount */ )
+        external
+        view
+        override
+        onlyWhitelistedWithdrawer
+        returns (address)
+    {
         // TODO: Implement pull asset from vault based on priority? Based on default? Iterate through and try which ever has funds?
         revert("Allocator.withdrawEmergency:NOT_IMPLEMENTED");
     }
 
-    /// @inheritdoc IAllocator
-    function rebalance(CrossAssetRebalanceParams memory params) external onlyManager {
+    function depositIdleFunds(address asset) external onlyManager {
+        uint256 amount = IERC20(asset).balanceOf(address(this));
+        bool callSucceeded = _deposit({asset: asset, amount: amount});
+        require(callSucceeded, ErrorsLib.VaultDepositFailed());
+    }
+
+    function rebalance(CrossAssetRebalanceParams memory params) external override onlyManager {
         for (uint256 i = 0; i < params.swaps.length; i++) {
             address assetIn = params.swaps[i].assetIn;
             require(_vaultByAsset[assetIn] != address(0), ErrorsLib.UnsupportedAsset(assetIn));
@@ -128,15 +141,15 @@ contract Allocator is IAllocator {
             );
 
             require(
-                assetOutAmount >= amountIn.convertAssetDecimals(assetOut, assetIn), ErrorsLib.InsufficientAmountOut()
+                assetOutAmount >= amountIn.convertAssetDecimals(assetIn, assetOut), ErrorsLib.InsufficientAmountOut()
             );
 
             // Pull the `assetOut` from the Swapper to the Allocator
             IERC20(params.swaps[i].assetOut).safeTransferFrom(swapper, address(this), assetOutAmount);
 
             // Deposit the assetOut into the vault
-            IERC20(params.swaps[i].assetOut).forceApprove(address(_vaultByAsset[assetIn]), assetOutAmount);
-            IERC4626(_vaultByAsset[assetIn]).deposit(assetOutAmount, address(this));
+            IERC20(params.swaps[i].assetOut).forceApprove(address(_vaultByAsset[assetOut]), assetOutAmount);
+            IERC4626(_vaultByAsset[assetOut]).deposit(assetOutAmount, address(this));
         }
     }
 
@@ -179,21 +192,40 @@ contract Allocator is IAllocator {
         _vaultByAsset[asset] = vault;
     }
 
+    function _deposit(address asset, uint256 amount) internal returns (bool) {
+        address vault = _vaultByAsset[asset];
+        require(vault != address(0), ErrorsLib.UnsupportedAsset(asset));
+        require(amount > 0, ErrorsLib.ZeroAmount());
+        IERC20(asset).forceApprove(vault, amount);
+        (bool callSucceeded,) = vault.call(abi.encodeCall(IERC4626.deposit, (amount, address(this))));
+        return callSucceeded;
+    }
+
     // TODO: Add to the interface
     function getVault(address asset) external view returns (address) {
         return _vaultByAsset[asset];
     }
 
-    function _getAssets() internal view returns (IAllocator.AllocatorBalance[] memory) {
-        IAllocator.AllocatorBalance[] memory allocatedAssets = new IAllocator.AllocatorBalance[](_vaults.length);
+    function _getAssetBalances() internal view returns (IManagedAllocator.AllocatorBalance[] memory) {
+        IManagedAllocator.AllocatorBalance[] memory allocatedAssets =
+            new IManagedAllocator.AllocatorBalance[](_vaults.length);
         for (uint256 i = 0; i < _vaults.length; i++) {
             IERC4626 vault = IERC4626(_vaults[i]);
             address asset = vault.asset();
-            uint256 amount = vault.previewRedeem(vault.balanceOf(address(this)));
-            // Include idle funds in balance (assumes 1 vault per asset)
-            amount += IERC20(asset).balanceOf(address(this));
-            allocatedAssets[i] = IAllocator.AllocatorBalance(asset, amount);
+            allocatedAssets[i] = IAllocator.AllocatorBalance(asset, _getTotalAssetBalance(asset, vault));
         }
         return allocatedAssets;
+    }
+
+    // Assumes single vault per asset
+    function _getAssetBalance(address asset) internal view returns (uint256) {
+        return _getTotalAssetBalance(asset, IERC4626(_vaultByAsset[asset]));
+    }
+
+    function _getTotalAssetBalance(address asset, IERC4626 vault) internal view returns (uint256) {
+        uint256 amount = vault.previewRedeem(vault.balanceOf(address(this)));
+        // Include idle funds in balance (assumes 1 vault per asset)
+        amount += IERC20(asset).balanceOf(address(this));
+        return amount;
     }
 }

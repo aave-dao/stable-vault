@@ -31,4 +31,10 @@ library ErrorsLib {
 
     /// @notice Thrown when unexpected number of assets are received from a source chain.
     error InvalidBridgeAssetsLength();
+
+    /// @notice Not enough liquidity to cover the withdrawal.
+    error InsufficientLiquidity();
+
+    /// @notice Failed to deposit assets into the vault.
+    error VaultDepositFailed();
 }

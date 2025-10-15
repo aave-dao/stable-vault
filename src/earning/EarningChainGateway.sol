@@ -43,12 +43,10 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
         emit EventLib.AllocatorSet(allocator);
     }
 
-    function _receiveFunds(uint256 sourceChainId, IBridgeAdapter.BridgeAsset[] memory assets) internal override {
+    function _receiveFunds(uint256, /* sourceChainId */ IBridgeAdapter.BridgeAsset[] memory assets) internal override {
         require(assets.length == 1, ErrorsLib.InvalidBridgeAssetsLength());
         address asset = assets[0].asset;
         uint256 amount = assets[0].amount;
-        // TODO: If we get funds (which benefit the system), do we still want to validate the source? why failing?
-        _onlyAdapter(asset, sourceChainId);
         IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
         IERC20(asset).forceApprove(_allocator, amount);
         IAllocator(_allocator).deposit(asset, amount);
@@ -99,7 +97,7 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
         IBridgeAdapter(_bridgeAdapter[address(0)][ACCOUNTING_CHAIN_ID]).publishMessageToChain(
             ACCOUNTING_CHAIN_ID,
             new IBridgeAdapter.BridgeAsset[](0),
-            abi.encode(IChainGateway.BalanceSnapshot(IAllocator(_allocator).getTotalAssets(), block.timestamp))
+            abi.encode(IChainGateway.BalanceSnapshot(IAllocator(_allocator).getAggregatedBalance(), block.timestamp))
         );
     }
 }

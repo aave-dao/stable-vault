@@ -4,36 +4,26 @@ pragma solidity ^0.8.22;
 /// @dev Assumes single strategy per asset; multiple assets per Allocator
 /// @dev Deals with assets in their native decimals
 interface IAllocator {
+    /// @notice emitted when funds fails to deposit to strategy vault and left idle in Allocator
+    event VaultDepositFailed(address indexed vault, uint256 amount);
+
     struct AllocatorBalance {
         address asset;
         uint256 amount;
-    }
-
-    struct SwapParams {
-        // Swap input asset transferred to swapper
-        address assetIn;
-        // Asset to swap to that will be resupplied within the allocator
-        address assetOut;
-        // Amount of assetIn
-        uint256 amountIn;
-        // Address of the swapper to use to execute the swap
-        address swapper;
-        // Custom data required by the swapper to execute the swap
-        bytes swapData;
-    }
-
-    struct CrossAssetRebalanceParams {
-        SwapParams[] swaps;
     }
 
     function getManager() external view returns (address);
 
     function getAdmin() external view returns (address);
 
-    function getAssets() external view returns (AllocatorBalance[] memory);
+    /// @dev Returns an array of balances where each amount is denominated in the corresponding asset's decimals.
+    function getAssetBalances() external view returns (AllocatorBalance[] memory);
 
-    /// @dev returns latest total assets in strategies denominated in RAY
-    function getTotalAssets() external view returns (uint256);
+    /// @dev Returns the available liquidity denominated in given asset's decimals.
+    function getAssetBalance(address asset) external view returns (uint256);
+
+    /// @dev Returns latest total assets in strategies denominated in RAY.
+    function getAggregatedBalance() external view returns (uint256);
 
     function deposit(address asset, uint256 amount) external;
 
@@ -41,9 +31,6 @@ interface IAllocator {
 
     /// Request any asset from the allocator for a given amount; assumes allocator assets have common denomination.
     function withdrawEmergency(uint256 amount) external returns (address asset);
-
-    /// @notice Rebalance the mix of underlying tokens by pulling from strategies, executing swaps and resupplying to strategies.
-    function rebalance(CrossAssetRebalanceParams memory params) external;
 
     function setManager(address newManager) external;
 

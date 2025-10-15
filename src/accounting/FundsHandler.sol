@@ -39,7 +39,7 @@ contract FundsHandler is IFundsHandler {
     IWithdrawalPriorityQueue internal _queue;
     address _manager;
     address _basedBoostedVault;
-    address _communicationHandler;
+    address _gateway;
     address _allocator;
 
     modifier onlyManager() {
@@ -48,25 +48,25 @@ contract FundsHandler is IFundsHandler {
     }
 
     modifier onlyBaseBoostedVault() {
-        require(msg.sender == _basedBoostedVault, OnlyBaseBoostedVault());
+        require(msg.sender == _basedBoostedVault, NotBaseBoostedVault());
         _;
     }
 
-    modifier onlyCommunicationHandler() {
-        require(msg.sender == _communicationHandler, OnlyCommunicationHandler());
+    modifier onlyGateway() {
+        require(msg.sender == _gateway, NotGateway());
         _;
     }
 
-    constructor(address manager, address basedBoostedVault, address communicationHandler, address allocator) {
+    constructor(address manager, address basedBoostedVault, address gateway, address allocator) {
         require(manager != address(0), ErrorsLib.ZeroAddress());
         _manager = manager;
         _basedBoostedVault = basedBoostedVault;
-        _communicationHandler = communicationHandler;
+        _gateway = gateway;
         _allocator = allocator;
     }
 
     function getAssetBalances() external view returns (AssetBalance[] memory) {
-        IAllocator.AllocatorBalance[] memory allocatorAssets = IAllocator(_allocator).getAssets();
+        IAllocator.AllocatorBalance[] memory allocatorAssets = IAllocator(_allocator).getAssetBalances();
         AssetBalance[] memory balances = new AssetBalance[](allocatorAssets.length + _chainBalances.length);
 
         uint16 i = 0;
@@ -89,6 +89,11 @@ contract FundsHandler is IFundsHandler {
             i++;
         }
         return balances;
+    }
+
+    // TODO: Add to the interface
+    function getWithdrawalRequest(uint256 withdrawalRequestId) external view returns (WithdrawalRequest memory) {
+        return _withdrawalRequests[withdrawalRequestId];
     }
 
     function processWithdrawalRequest(
@@ -115,24 +120,29 @@ contract FundsHandler is IFundsHandler {
         onlyBaseBoostedVault
         returns (uint256, address, bytes memory)
     {
-        _verifyIfRequestCanBeProcessed(withdrawalRequestId);
-        (uint256 amount, address recipient) = _executeWithdrawal(withdrawalRequestId);
+        WithdrawalRequest storage request = _withdrawalRequests[withdrawalRequestId];
+        _verifyAvailableLiquidity(
+            request.preferredAsset, request.amountRequested.rayToAssetDecimals(request.preferredAsset)
+        );
+        (uint256 amount, address recipient) = _executeWithdrawal(withdrawalRequestId, request);
         return (amount, recipient, "");
     }
 
-    function _executeWithdrawal(uint256 withdrawalRequestId) internal returns (uint256, address) {
-        address asset = _withdrawalRequests[withdrawalRequestId].preferredAsset;
-        uint256 amount = _withdrawalRequests[withdrawalRequestId].amountRequested.rayToAssetDecimals(asset);
-        address recipient = _withdrawalRequests[withdrawalRequestId].recipient;
+    function _executeWithdrawal(uint256 withdrawalRequestId, WithdrawalRequest storage request)
+        internal
+        returns (uint256, address)
+    {
+        address asset = request.preferredAsset;
+        uint256 amount = request.amountRequested.rayToAssetDecimals(asset);
+        address recipient = request.recipient;
         delete _withdrawalRequests[withdrawalRequestId];
         _pullFundsFromImmediateLiquidity(asset, amount);
         IERC20(asset).safeTransfer(recipient, amount);
         return (amount, recipient);
     }
 
-    function _verifyIfRequestCanBeProcessed(uint256 withdrawalRequestId) internal view {
-        // TODO: Implement
-        // require(IWithdrawalPriorityQueue(_queue).canBeExecuted(withdrawalRequestId));
+    function _verifyAvailableLiquidity(address asset, uint256 amount) internal view {
+        require(IAllocator(_allocator).getAssetBalance(asset) >= amount, ErrorsLib.InsufficientLiquidity());
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -153,26 +163,25 @@ contract FundsHandler is IFundsHandler {
     function pushFundsToChain(address asset, uint256 amount, uint256 chainId) external onlyManager {
         _pullFundsFromImmediateLiquidity(asset, amount);
         // TODO: Why do we use transfer but not approve here?
-        IERC20(asset).safeTransfer(_communicationHandler, amount);
-        IAccountingChainGateway(_communicationHandler).sendPushFundsToChainMessage(asset, amount, chainId);
+        IERC20(asset).safeTransfer(_gateway, amount);
+        IAccountingChainGateway(_gateway).sendPushFundsToChainMessage(asset, amount, chainId);
     }
 
     function pullFundsFromChain(uint256 amount, uint256 chainId) external onlyManager {
-        IAccountingChainGateway(_communicationHandler).sendPullFundsFromChainMessage(amount, chainId);
+        IAccountingChainGateway(_gateway).sendPullFundsFromChainMessage(amount, chainId);
     }
+
+    // Gateway Functions
 
     function updateChainBalanceCallback(uint256 chainId, uint256 snapshotBalance, uint256 snapshotTimestamp)
         external
-        onlyCommunicationHandler
+        onlyGateway
     {
         _updateChainBalance(chainId, snapshotBalance, snapshotTimestamp);
     }
 
-    function fundsArrivedFromChainCallback(uint256 chainId, address asset, uint256 amount)
-        external
-        onlyCommunicationHandler
-    {
-        (chainId);
+    /// @dev Caller must have have transferred funds to this contract
+    function fundsArrivedFromChainCallback(address asset, uint256 amount) external onlyGateway {
         _pushFundsToImmediateLiquidity(asset, amount);
     }
 

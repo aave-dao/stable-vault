@@ -2,8 +2,8 @@
 pragma solidity ^0.8.22;
 
 interface IFundsHandler {
-    error OnlyBaseBoostedVault();
-    error OnlyCommunicationHandler();
+    error NotBaseBoostedVault();
+    error NotGateway();
 
     struct AssetBalance {
         address asset;
@@ -35,7 +35,7 @@ interface IFundsHandler {
     /// @param snapshotTimestamp The timestamp of the balance snapshot from the source chain
     function updateChainBalanceCallback(uint256 chainId, uint256 balanceSnapshot, uint256 snapshotTimestamp) external;
 
-    function fundsArrivedFromChainCallback(uint256 chainId, address asset, uint256 amount) external;
+    function fundsArrivedFromChainCallback(address asset, uint256 amount) external;
 
     function getAssetBalances() external returns (AssetBalance[] memory);
 }
