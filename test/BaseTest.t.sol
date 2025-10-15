@@ -13,10 +13,8 @@ import {FundsHandler} from "./../src/accounting/FundsHandler.sol";
 import {AccountingChainGateway} from "./../src/accounting/AccountingChainGateway.sol";
 import {Allocator} from "./../src/common/Allocator.sol";
 import {Swapper} from "./../src/common/Swapper.sol";
-import {AccountingCcipCommunicationAdapter} from "./../src/bridging/AccountingCcipCommunicationAdapter.sol";
-import {IBasedBoostedVault} from "./../src/interfaces/IBasedBoostedVault.sol";
+import {CcipAdapter} from "./../src/bridging/CcipAdapter.sol";
 import {MockCCIPRouter} from "./mocks/MockRouter.sol";
-import {EarningCcipCommunicationAdapter} from "./../src/bridging/EarningCcipCommunicationAdapter.sol";
 import {EarningChainGateway} from "./../src/earning/EarningChainGateway.sol";
 
 contract BaseTest is Test {
@@ -42,12 +40,12 @@ contract BaseTest is Test {
     Allocator allocator_accountingChain;
     Swapper swapper_accountingChain;
     AccountingChainGateway accountingChainGateway;
-    AccountingCcipCommunicationAdapter ccipAdapter_accountingChain;
+    CcipAdapter ccipAdapter_accountingChain;
     TestErc4626 ghoStrategyVault_accountingChain;
     TestErc4626 usdcStrategyVault_accountingChain;
 
     // Earning Chain: Earning Chain Gateway, CCIP Adapter, CCIP Router, Swapper, Allocator, Strategy Vault/4626
-    EarningCcipCommunicationAdapter ccipAdapter_earningChain;
+    CcipAdapter ccipAdapter_earningChain;
     EarningChainGateway earningChainGateway;
     Allocator allocator_earningChain;
     Swapper swapper_earningChain;
@@ -99,7 +97,7 @@ contract BaseTest is Test {
         console.log("\tAccounting Chain Gateway: %s", address(accountingChainGateway));
         swapper_accountingChain = new Swapper(address(allocator_accountingChain));
         console.log("\tSwapper: %s", address(swapper_accountingChain));
-        ccipAdapter_accountingChain = new AccountingCcipCommunicationAdapter();
+        ccipAdapter_accountingChain = new CcipAdapter();
         console.log("\tCCIP Adapter: %s", address(ccipAdapter_accountingChain));
 
         ghoStrategyVault_accountingChain = new TestErc4626(GHO);
@@ -110,7 +108,7 @@ contract BaseTest is Test {
         ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
         // Earning Chain: Earning Chain Gateway, CCIP Adapter, CCIP Router, Swapper, Allocator, Strategy Vault/4626
         console.log("\nEarning Chain:");
-        ccipAdapter_earningChain = new EarningCcipCommunicationAdapter();
+        ccipAdapter_earningChain = new CcipAdapter();
         console.log("\tCCIP Adapter: %s", address(ccipAdapter_earningChain));
         earningChainGateway = new EarningChainGateway(admin, ACCOUNTING_CHAIN_ID);
         console.log("\tEarning Chain Gateway: %s", address(earningChainGateway));

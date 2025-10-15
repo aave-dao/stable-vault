@@ -7,6 +7,4 @@ interface IAccountingChainGateway {
     function sendPushFundsToChainMessage(address asset, uint256 amount, uint256 targetChainId) external;
 
     function sendPullFundsFromChainMessage(uint256 amount, uint256 targetChainId) external;
-
-    function receiveBalanceSnapshotMessage(uint256 fromChainId, uint256 balance, uint256 timestamp) external;
 }

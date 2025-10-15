@@ -5,6 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IBridgeCommunicationHandler} from "../interfaces/IBridgeCommunicationHandler.sol";
+import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 abstract contract BridgeCommunicationHandler is IBridgeCommunicationHandler {
@@ -12,12 +13,7 @@ abstract contract BridgeCommunicationHandler is IBridgeCommunicationHandler {
 
     error UnsupportedAdapter();
 
-    address constant ASSET_FOR_MESSAGE_ONLY_BRIDGE = address(0);
-
-    modifier onlyAdapter(address asset, uint256 fromChainId) {
-        require(_bridgeAdapter[asset][fromChainId] == msg.sender, UnsupportedAdapter());
-        _;
-    }
+    address internal constant ASSET_FOR_MESSAGE_ONLY_BRIDGE = address(0);
 
     modifier onlyAdmin() {
         require(msg.sender == _admin, ErrorsLib.NotAdmin());
@@ -36,7 +32,13 @@ abstract contract BridgeCommunicationHandler is IBridgeCommunicationHandler {
     }
 
     /// @inheritdoc IBridgeCommunicationHandler
-    function receiveFunds(uint256 sourceChainId, address asset, uint256 amount) external virtual override;
+    function receiveFunds(uint256 sourceChainId, IBridgeAdapter.BridgeAsset[] memory assets)
+        external
+        virtual
+        override;
+
+    /// @inheritdoc IBridgeCommunicationHandler
+    function receiveMessage(uint256 sourceChainId, bytes memory message) external virtual override;
 
     function getBridgeAdapter(address asset, uint256 chainId) external view returns (address) {
         return _bridgeAdapter[asset][chainId];
@@ -44,5 +46,9 @@ abstract contract BridgeCommunicationHandler is IBridgeCommunicationHandler {
 
     function setBridgeAdapter(address asset, uint256 chainId, address adapter) external onlyAdmin {
         _bridgeAdapter[asset][chainId] = adapter;
+    }
+
+    function _onlyAdapter(address asset, uint256 sourceChainId) internal view {
+        require(_bridgeAdapter[asset][sourceChainId] == msg.sender, UnsupportedAdapter());
     }
 }
