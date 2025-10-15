@@ -8,16 +8,16 @@ import {Client} from "@chainlink-ccip/contracts/libraries/Client.sol";
 
 import {IBridgeCommunicationHandler} from "../interfaces/IBridgeCommunicationHandler.sol";
 import {IEarningChainCommuniationAdapter} from "../interfaces/IEarningChainCommuniationAdapter.sol";
-import {IEarningChainRouter} from "../interfaces/IEarningChainRouter.sol";
+import {IEarningChainGateway} from "../interfaces/IEarningChainGateway.sol";
 import {BaseCcipCommunicationAdapter} from "./BaseCcipCommunicationAdapter.sol";
 
-contract EarningCcipCommunicationAdapter is BaseCcipCommunicationAdapter, IEarningChainCommuniationAdapter {
+contract EarningCcipCommunicationAdapter is IEarningChainCommuniationAdapter, BaseCcipCommunicationAdapter {
     using SafeERC20 for IERC20;
 
-    address _earningChainRouter;
+    address _gateway;
 
-    function setEarningChainRouter(address earningChainRouter) external {
-        _earningChainRouter = earningChainRouter;
+    function setGateway(address gateway) external {
+        _gateway = gateway;
     }
 
     // TODO: expose admin function for destination chain replays of bridge data
@@ -68,7 +68,7 @@ contract EarningCcipCommunicationAdapter is BaseCcipCommunicationAdapter, IEarni
         // TODO: do we need to ccipSend multiple times to bridge multiple tokens?
         // TODO: Keep in mind not every asset in Earning chain will be bridgeable to Accounting chain
         // TODO: if someone emergencyWithdraws then have them wait a cooldown period since pull flow can fail if insufficient bridgeable assets are on Earning chain (assume no swap can be performed)
-        // IEarningChainRouter(_earningChainRouter).pullFunds(sourceChainSelector, amount);
+        // IEarningChainGateway(_gateway).pullFunds(sourceChainSelector, amount);
     }
 
     function _processFundsReceiving(uint64 sourceChainSelector, Client.EVMTokenAmount[] memory assetsToReceive)
@@ -77,10 +77,8 @@ contract EarningCcipCommunicationAdapter is BaseCcipCommunicationAdapter, IEarni
         for (uint256 i = 0; i < assetsToReceive.length; i++) {
             address asset = assetsToReceive[i].token;
             uint256 amount = assetsToReceive[i].amount;
-            IERC20(asset).forceApprove(_earningChainRouter, amount);
-            IBridgeCommunicationHandler(_earningChainRouter).receiveFunds(
-                _chainIdOf[sourceChainSelector], asset, amount
-            );
+            IERC20(asset).forceApprove(_gateway, amount);
+            IBridgeCommunicationHandler(_gateway).receiveFunds(_chainIdOf[sourceChainSelector], asset, amount);
         }
     }
 }

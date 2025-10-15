@@ -7,14 +7,14 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IAllocator} from "../interfaces/IAllocator.sol";
 import {IEarningChainCommuniationAdapter} from "../interfaces/IEarningChainCommuniationAdapter.sol";
 import {IBridgeCommunicationHandler} from "../interfaces/IBridgeCommunicationHandler.sol";
-import {IEarningChainRouter} from "../interfaces/IEarningChainRouter.sol";
+import {IEarningChainGateway} from "../interfaces/IEarningChainGateway.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {EventLib} from "../libraries/EventLib.sol";
 import {BridgeCommunicationHandler} from "../common/BridgeCommunicationHandler.sol";
 
-/// @title EarningChainRouter
+/// @title EarningChainGateway
 /// @notice Facilitates cross chain messaging with exactly one Accounting Chain.
-contract EarningChainRouter is IEarningChainRouter, BridgeCommunicationHandler {
+contract EarningChainGateway is IEarningChainGateway, BridgeCommunicationHandler {
     using SafeERC20 for IERC20;
 
     modifier onlyManager() {
@@ -59,7 +59,7 @@ contract EarningChainRouter is IEarningChainRouter, BridgeCommunicationHandler {
         (amount);
         // TODO: Implement; decide which asset(s) to withdraw
         // TODO: check that the assets to withdraw from Allocator are actually bridgedable
-        revert("EarningChainRouter.emergencyRouter:NOT_IMPLEMENTED");
+        revert("EarningChainGateway.emergencyRouter:NOT_IMPLEMENTED");
     }
 
     function sendBalanceUpdate() external onlyManager {

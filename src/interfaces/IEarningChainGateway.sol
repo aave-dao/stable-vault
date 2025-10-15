@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-interface IEarningChainRouter {
+interface IEarningChainGateway {
     /// @notice Sends a balance update to the Accounting Chain.
     function sendBalanceUpdate() external;
 

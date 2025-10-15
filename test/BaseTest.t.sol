@@ -17,7 +17,7 @@ import {AccountingCcipCommunicationAdapter} from "./../src/bridging/AccountingCc
 import {IBasedBoostedVault} from "./../src/interfaces/IBasedBoostedVault.sol";
 import {MockCCIPRouter} from "./mocks/MockRouter.sol";
 import {EarningCcipCommunicationAdapter} from "./../src/bridging/EarningCcipCommunicationAdapter.sol";
-import {EarningChainRouter} from "./../src/earning/EarningChainRouter.sol";
+import {EarningChainGateway} from "./../src/earning/EarningChainGateway.sol";
 
 contract BaseTest is Test {
     using MathLib for uint256;
@@ -36,7 +36,7 @@ contract BaseTest is Test {
     TestErc20 GHO = new TestErc20(18);
     TestErc20 USDC = new TestErc20(6);
 
-    // Accounting Chain: BBV, FH, Swapper, Allocator, Comm Handler, CCIP Adapter, CCIP Router, Strategy Vault/4626
+    // Accounting Chain: BBV, FH, Swapper, Allocator, Accounting Chain Gateway, CCIP Adapter, CCIP Router, Strategy Vault/4626
     ExtendedBasedBoostedVault vault;
     FundsHandler fundsHandler;
     Allocator allocator_accountingChain;
@@ -46,9 +46,9 @@ contract BaseTest is Test {
     TestErc4626 ghoStrategyVault_accountingChain;
     TestErc4626 usdcStrategyVault_accountingChain;
 
-    // Earning Chain: Earning Chain Router, CCIP Adapter, CCIP Router, Swapper, Allocator, Strategy Vault/4626
+    // Earning Chain: Earning Chain Gateway, CCIP Adapter, CCIP Router, Swapper, Allocator, Strategy Vault/4626
     EarningCcipCommunicationAdapter ccipAdapter_earningChain;
-    EarningChainRouter earningChainRouter;
+    EarningChainGateway earningChainGateway;
     Allocator allocator_earningChain;
     Swapper swapper_earningChain;
     TestErc4626 ghoStrategyVault_earningChain;
@@ -82,18 +82,18 @@ contract BaseTest is Test {
         console.log("\tEarning Chain ID: %s", EARNING_CHAIN_ID);
 
         console.log("\nAccounting Chain:");
-        // Accounting Chain: BBV, FH, Swapper, Allocator, Comm Handler, CCIP Adapter, CCIP Router, Strategy Vault/4626
+        // Accounting Chain: BBV, FH, Swapper, Allocator, Accounting Chain Gateway, CCIP Adapter, CCIP Router, Strategy Vault/4626
         vault = new ExtendedBasedBoostedVault(admin, initialBasePerSecondRate);
         console.log("\tVault: %s", address(vault));
         allocator_accountingChain = new Allocator(manager, admin);
         console.log("\tAllocator: %s", address(allocator_accountingChain));
 
         uint256 deployerNonce = vm.getNonce(address(this));
-        address communicationHandlerAddress = vm.computeCreateAddress(address(this), deployerNonce + 1);
-        console.log("\tCommunication Handler Predicted Address: %s", communicationHandlerAddress);
+        address accountingChainGatewayAddress = vm.computeCreateAddress(address(this), deployerNonce + 1);
+        console.log("\tAccounting Chain Gateway Predicted Address: %s", accountingChainGatewayAddress);
 
         fundsHandler =
-            new FundsHandler(manager, address(vault), communicationHandlerAddress, address(allocator_accountingChain));
+            new FundsHandler(manager, address(vault), accountingChainGatewayAddress, address(allocator_accountingChain));
         console.log("\tFunds Handler: %s", address(fundsHandler));
         accountingChainGateway = new AccountingChainGateway(admin, address(fundsHandler));
         console.log("\tAccounting Chain Gateway: %s", address(accountingChainGateway));
@@ -108,12 +108,12 @@ contract BaseTest is Test {
         console.log("\tUSDC Strategy Vault (Accounting Chain): %s", address(usdcStrategyVault_accountingChain));
 
         ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        // Earning Chain: Earning Chain Router, CCIP Adapter, CCIP Router, Swapper, Allocator, Strategy Vault/4626
+        // Earning Chain: Earning Chain Gateway, CCIP Adapter, CCIP Router, Swapper, Allocator, Strategy Vault/4626
         console.log("\nEarning Chain:");
         ccipAdapter_earningChain = new EarningCcipCommunicationAdapter();
         console.log("\tCCIP Adapter: %s", address(ccipAdapter_earningChain));
-        earningChainRouter = new EarningChainRouter(admin, ACCOUNTING_CHAIN_ID);
-        console.log("\tEarning Chain Router: %s", address(earningChainRouter));
+        earningChainGateway = new EarningChainGateway(admin, ACCOUNTING_CHAIN_ID);
+        console.log("\tEarning Chain Gateway: %s", address(earningChainGateway));
         allocator_earningChain = new Allocator(manager, admin);
         console.log("\tAllocator: %s", address(allocator_earningChain));
         swapper_earningChain = new Swapper(address(allocator_earningChain));
@@ -154,10 +154,10 @@ contract BaseTest is Test {
         allocator_accountingChain.setWithdrawer(address(accountingChainGateway), true);
 
         // Set up Allocators on Earning chain
-        allocator_earningChain.setDepositor(address(earningChainRouter), true);
-        allocator_earningChain.setWithdrawer(address(earningChainRouter), true);
+        allocator_earningChain.setDepositor(address(earningChainGateway), true);
+        allocator_earningChain.setWithdrawer(address(earningChainGateway), true);
 
-        // Set up Communication Handler (Accounting chain) // These should be done cross-wise cause it's destination chainId
+        // Set up Accounting Chain Gateway (Accounting chain) // These should be done cross-wise cause it's destination chainId
         accountingChainGateway.setBridgeAdapter(address(GHO), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain));
         console.log(
             "\tAccountingChainGateway GHO adapter (Accounting Chain): %s",
@@ -174,27 +174,27 @@ contract BaseTest is Test {
             accountingChainGateway.getBridgeAdapter(address(0), EARNING_CHAIN_ID)
         );
 
-        // Set up Earning Chain Router (Earning chain)
-        earningChainRouter.setManager(manager);
-        earningChainRouter.setAllocator(address(allocator_earningChain));
-        earningChainRouter.setBridgeAdapter(address(GHO), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
+        // Set up Earning Chain Gateway (Earning chain)
+        earningChainGateway.setManager(manager);
+        earningChainGateway.setAllocator(address(allocator_earningChain));
+        earningChainGateway.setBridgeAdapter(address(GHO), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
         console.log(
-            "\tEarningChainRouter GHO adapter (Earning Chain): %s",
-            earningChainRouter.getBridgeAdapter(address(GHO), ACCOUNTING_CHAIN_ID)
+            "\tEarningChainGatway GHO adapter (Earning Chain): %s",
+            earningChainGateway.getBridgeAdapter(address(GHO), ACCOUNTING_CHAIN_ID)
         );
-        earningChainRouter.setBridgeAdapter(address(USDC), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
+        earningChainGateway.setBridgeAdapter(address(USDC), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
         console.log(
-            "\tEarningChainRouter USDC adapter (Earning Chain): %s",
-            earningChainRouter.getBridgeAdapter(address(USDC), ACCOUNTING_CHAIN_ID)
+            "\tEarningChainGatway USDC adapter (Earning Chain): %s",
+            earningChainGateway.getBridgeAdapter(address(USDC), ACCOUNTING_CHAIN_ID)
         );
-        earningChainRouter.setBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
+        earningChainGateway.setBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
         console.log(
-            "\tEarningChainRouter Messages adapter (Earning Chain): %s",
-            earningChainRouter.getBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID)
+            "\tEarningChainGatway Messages adapter (Earning Chain): %s",
+            earningChainGateway.getBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID)
         );
 
         ccipAdapter_accountingChain.setGateway(address(accountingChainGateway));
-        ccipAdapter_earningChain.setEarningChainRouter(address(earningChainRouter));
+        ccipAdapter_earningChain.setGateway(address(earningChainGateway));
         ccipAdapter_accountingChain.setCcipRouter(address(mockCcipRouter));
         ccipAdapter_earningChain.setCcipRouter(address(mockCcipRouter));
         // ccipAdapter_accountingChain.setFeeToken(address(USDC));
