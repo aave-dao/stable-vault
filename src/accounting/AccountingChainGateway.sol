@@ -6,12 +6,12 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {IAccountingChainGateway} from "../interfaces/IAccountingChainGateway.sol";
 import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
-import {IBridgeCommunicationHandler} from "../interfaces/IBridgeCommunicationHandler.sol";
+import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
-import {BridgeCommunicationHandler} from "../common/BridgeCommunicationHandler.sol";
+import {BaseChainGateway} from "../common/BaseChainGateway.sol";
 
-contract AccountingChainGateway is IAccountingChainGateway, BridgeCommunicationHandler {
+contract AccountingChainGateway is IAccountingChainGateway, BaseChainGateway {
     using SafeERC20 for IERC20;
 
     modifier onlyFundsHandler() {
@@ -21,7 +21,7 @@ contract AccountingChainGateway is IAccountingChainGateway, BridgeCommunicationH
 
     address internal _fundsHandler;
 
-    constructor(address admin, address fundsHandler) BridgeCommunicationHandler(admin) {
+    constructor(address admin, address fundsHandler) BaseChainGateway(admin) {
         _fundsHandler = fundsHandler;
     }
 
@@ -41,13 +41,12 @@ contract AccountingChainGateway is IAccountingChainGateway, BridgeCommunicationH
     /// @param amountRay The `amount` must be in RAY to be token agnostic.
     /// @param targetChainId The destination chainId.
     function sendPullFundsFromChainMessage(uint256 amountRay, uint256 targetChainId) external onlyFundsHandler {
-        IBridgeAdapter(_bridgeAdapter[ASSET_FOR_MESSAGE_ONLY_BRIDGE][targetChainId]).publishMessageToChain(
+        IBridgeAdapter(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][targetChainId]).publishMessageToChain(
             targetChainId, abi.encode(amountRay)
         );
     }
 
-    /// @inheritdoc IBridgeCommunicationHandler
-    function receiveFunds(uint256 sourceChainId, IBridgeAdapter.BridgeAsset[] memory assets) external override {
+    function _receiveFunds(uint256 sourceChainId, IBridgeAdapter.BridgeAsset[] memory assets) internal override {
         require(assets.length == 1, ErrorsLib.InvalidBridgeAssetsLength());
         address asset = assets[0].asset;
         uint256 amount = assets[0].amount;
@@ -56,12 +55,10 @@ contract AccountingChainGateway is IAccountingChainGateway, BridgeCommunicationH
         IFundsHandler(_fundsHandler).fundsArrivedFromChainCallback(sourceChainId, asset, amount);
     }
 
-    /// @inheritdoc IBridgeCommunicationHandler
-    function receiveMessage(uint256 sourceChainId, bytes memory message) external override {
-        _onlyAdapter(ASSET_FOR_MESSAGE_ONLY_BRIDGE, sourceChainId);
-        // TODO: this assumes that the message is a balance snapshot and can be nothing else
-        IBridgeCommunicationHandler.BalanceSnapshot memory balanceSnapshot =
-            abi.decode(message, (IBridgeCommunicationHandler.BalanceSnapshot));
+    function _receiveData(uint256 sourceChainId, bytes memory data) internal override {
+        _onlyAdapter(ASSET_FOR_DATA_ONLY_BRIDGE, sourceChainId);
+        // TODO: this assumes that the data is a balance snapshot and can be nothing else
+        IChainGateway.BalanceSnapshot memory balanceSnapshot = abi.decode(data, (IChainGateway.BalanceSnapshot));
         IFundsHandler(_fundsHandler).updateChainBalanceCallback(
             sourceChainId, balanceSnapshot.balance, balanceSnapshot.timestamp
         );
