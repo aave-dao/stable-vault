@@ -10,7 +10,7 @@ import {Client} from "@chainlink-ccip/contracts/libraries/Client.sol";
 import {IAny2EVMMessageReceiver} from "@chainlink-ccip/contracts/interfaces/IAny2EVMMessageReceiver.sol";
 
 import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
-import {IBridgeCommunicationHandler} from "../interfaces/IBridgeCommunicationHandler.sol";
+import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 contract CcipAdapter is IBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
@@ -64,47 +64,32 @@ contract CcipAdapter is IBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
             _processFundsReceiving(message.sourceChainSelector, message.destTokenAmounts);
         }
         if (message.data.length > 0) {
-            IBridgeCommunicationHandler(_gateway).receiveMessage(_chainIdOf[message.sourceChainSelector], message.data);
+            IChainGateway(_gateway).receiveMessage(
+                _chainIdOf[message.sourceChainSelector], new IBridgeAdapter.BridgeAsset[](0), message.data
+            );
         }
     }
 
     /// @inheritdoc IBridgeAdapter
-    function pushFundsToChain(uint256 chainId, IBridgeAdapter.BridgeAsset[] memory assets) external onlyGateway {
-        // TODO: support sending multiple assets with a single message? with multiple ccipSend invocations?
-        require(assets.length == 1, ErrorsLib.InvalidBridgeAssetsLength());
-        address asset = assets[0].asset;
-        uint256 amount = assets[0].amount;
-        IERC20(asset).forceApprove(_ccipRouter, amount);
-        Client.EVMTokenAmount[] memory allAssetsToPush = new Client.EVMTokenAmount[](1);
-        allAssetsToPush[0] = Client.EVMTokenAmount({token: asset, amount: amount});
-
-        Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-            receiver: abi.encode(_receiverOf[chainId]),
-            data: "",
-            tokenAmounts: allAssetsToPush,
-            feeToken: _feeToken,
-            // TODO: Think how we pass this gasLimit down here
-            extraArgs: Client._argsToBytes(
-                Client.GenericExtraArgsV2({gasLimit: 3_000_000, allowOutOfOrderExecution: false})
-            )
-        });
-
-        _sendMessage(chainId, message);
-    }
-
-    /// @inheritdoc IBridgeAdapter
-    function publishMessageToChain(uint256 chainId, bytes memory message) external onlyGateway {
+    function publishMessageToChain(uint256 chainId, BridgeAsset[] memory assets, bytes memory data) external override {
+        uint256 gasLimit = 2_000_000;
+        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](assets.length);
+        if (assets.length > 0) {
+            require(assets.length == 1, ErrorsLib.InvalidBridgeAssetsLength());
+            address asset = assets[0].asset;
+            uint256 amount = assets[0].amount;
+            IERC20(asset).forceApprove(_ccipRouter, amount);
+            tokenAmounts[0] = Client.EVMTokenAmount({token: asset, amount: amount});
+            gasLimit = 3_000_000;
+        }
         Client.EVM2AnyMessage memory ccipMessage = Client.EVM2AnyMessage({
             receiver: abi.encode(_receiverOf[chainId]),
-            data: message,
-            tokenAmounts: new Client.EVMTokenAmount[](0),
+            data: data,
+            tokenAmounts: tokenAmounts,
             feeToken: _feeToken,
             // TODO: Think how we pass this gasLimit down here
-            extraArgs: Client._argsToBytes(
-                Client.GenericExtraArgsV2({gasLimit: 2_000_000, allowOutOfOrderExecution: false})
-            )
+            extraArgs: Client._argsToBytes(Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: false}))
         });
-
         _sendMessage(chainId, ccipMessage);
     }
 
@@ -133,7 +118,7 @@ contract CcipAdapter is IBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
             IERC20(asset).forceApprove(_gateway, amount);
             IBridgeAdapter.BridgeAsset[] memory assets = new IBridgeAdapter.BridgeAsset[](1);
             assets[0] = IBridgeAdapter.BridgeAsset({asset: asset, amount: amount});
-            IBridgeCommunicationHandler(_gateway).receiveFunds(_chainIdOf[sourceChainSelector], assets);
+            IChainGateway(_gateway).receiveMessage(_chainIdOf[sourceChainSelector], assets, "");
         }
     }
 }

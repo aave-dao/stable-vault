@@ -6,7 +6,6 @@ import {console} from "forge-std/console.sol";
 import {BaseTest} from "./BaseTest.t.sol";
 import {IERC20} from "forge-std/interfaces/IERC20.sol";
 import {IERC4626} from "forge-std/interfaces/IERC4626.sol";
-import {MathLib} from "./../src/libraries/MathLib.sol";
 
 contract EndToEndTest is BaseTest {
     function setUp() public override {

@@ -104,8 +104,7 @@ contract Allocator is IAllocator {
     }
 
     /// Request any asset from the allocator for a given amount; assumes allocator assets have common denomination.
-    function withdrawEmergency(uint256 amount) external view onlyWhitelistedWithdrawer returns (address asset) {
-        (amount);
+    function withdrawEmergency(uint256 /* amount */ ) external view onlyWhitelistedWithdrawer returns (address) {
         // TODO: Implement pull asset from vault based on priority? Based on default? Iterate through and try which ever has funds?
         revert("Allocator.withdrawEmergency:NOT_IMPLEMENTED");
     }

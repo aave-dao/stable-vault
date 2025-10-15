@@ -5,16 +5,16 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IAllocator} from "../interfaces/IAllocator.sol";
-import {IBridgeCommunicationHandler} from "../interfaces/IBridgeCommunicationHandler.sol";
+import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {IEarningChainGateway} from "../interfaces/IEarningChainGateway.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {EventLib} from "../libraries/EventLib.sol";
-import {BridgeCommunicationHandler} from "../common/BridgeCommunicationHandler.sol";
+import {BaseChainGateway} from "../common/BaseChainGateway.sol";
 
 /// @title EarningChainGateway
 /// @notice Facilitates cross chain messaging with exactly one Accounting Chain.
-contract EarningChainGateway is IEarningChainGateway, BridgeCommunicationHandler {
+contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
     using SafeERC20 for IERC20;
 
     modifier onlyManager() {
@@ -26,7 +26,7 @@ contract EarningChainGateway is IEarningChainGateway, BridgeCommunicationHandler
     address internal _allocator;
     address internal _manager;
 
-    constructor(address admin, uint256 accountingChainId) BridgeCommunicationHandler(admin) {
+    constructor(address admin, uint256 accountingChainId) BaseChainGateway(admin) {
         ACCOUNTING_CHAIN_ID = accountingChainId;
     }
 
@@ -43,11 +43,11 @@ contract EarningChainGateway is IEarningChainGateway, BridgeCommunicationHandler
         emit EventLib.AllocatorSet(allocator);
     }
 
-    /// @inheritdoc IBridgeCommunicationHandler
-    function receiveFunds(uint256 sourceChainId, IBridgeAdapter.BridgeAsset[] memory assets) external override {
+    function _receiveFunds(uint256 sourceChainId, IBridgeAdapter.BridgeAsset[] memory assets) internal override {
         require(assets.length == 1, ErrorsLib.InvalidBridgeAssetsLength());
         address asset = assets[0].asset;
         uint256 amount = assets[0].amount;
+        // TODO: If we get funds (which benefit the system), do we still want to validate the source? why failing?
         _onlyAdapter(asset, sourceChainId);
         IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
         IERC20(asset).forceApprove(_allocator, amount);
@@ -56,11 +56,10 @@ contract EarningChainGateway is IEarningChainGateway, BridgeCommunicationHandler
         _sendBalanceUpdate();
     }
 
-    /// @inheritdoc IBridgeCommunicationHandler
-    function receiveMessage(uint256 sourceChainId, bytes memory message) external override {
-        _onlyAdapter(ASSET_FOR_MESSAGE_ONLY_BRIDGE, sourceChainId);
-        // TODO: this assumes that the message is token amount in RAY (token agnostic)
-        uint256 amountRay = abi.decode(message, (uint256));
+    function _receiveData(uint256 sourceChainId, bytes memory data) internal view override {
+        _onlyAdapter(ASSET_FOR_DATA_ONLY_BRIDGE, sourceChainId);
+        // TODO: this assumes that the data is token amount in RAY (token agnostic)
+        uint256 amountRay = abi.decode(data, (uint256));
         _emergencyExit(amountRay);
     }
 
@@ -76,7 +75,7 @@ contract EarningChainGateway is IEarningChainGateway, BridgeCommunicationHandler
         _sendBalanceUpdate();
     }
 
-    function _emergencyExit(uint256 amountRay) internal {
+    function _emergencyExit(uint256 amountRay) internal pure {
         (amountRay);
         revert("EarningChainGateway.emergencyExit:NOT_IMPLEMENTED");
         // TODO: re Emergency Withdrawal how to decide which token to pull from Allocator?
@@ -93,15 +92,14 @@ contract EarningChainGateway is IEarningChainGateway, BridgeCommunicationHandler
         IERC20(asset).safeTransfer(adapter, amount);
         IBridgeAdapter.BridgeAsset[] memory assets = new IBridgeAdapter.BridgeAsset[](1);
         assets[0] = IBridgeAdapter.BridgeAsset({asset: asset, amount: amount});
-        IBridgeAdapter(adapter).pushFundsToChain(ACCOUNTING_CHAIN_ID, assets);
+        IBridgeAdapter(adapter).publishMessageToChain(ACCOUNTING_CHAIN_ID, assets, "");
     }
 
     function _sendBalanceUpdate() internal {
         IBridgeAdapter(_bridgeAdapter[address(0)][ACCOUNTING_CHAIN_ID]).publishMessageToChain(
             ACCOUNTING_CHAIN_ID,
-            abi.encode(
-                IBridgeCommunicationHandler.BalanceSnapshot(IAllocator(_allocator).getTotalAssets(), block.timestamp)
-            )
+            new IBridgeAdapter.BridgeAsset[](0),
+            abi.encode(IChainGateway.BalanceSnapshot(IAllocator(_allocator).getTotalAssets(), block.timestamp))
         );
     }
 }

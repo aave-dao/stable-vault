@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-interface IEarningChainGateway {
+import {IChainGateway} from "./IChainGateway.sol";
+
+interface IEarningChainGateway is IChainGateway {
     /// @notice Sends a balance update to the Accounting Chain.
     function sendBalanceUpdate() external;
 
