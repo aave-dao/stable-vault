@@ -1,4 +1,7 @@
 {
+  "lib/chainlink-ccip": {
+    "rev": "76e3647a648bd4b8cc483515ed13bc111e5fb16b"
+  },
   "lib/forge-std": {
     "rev": "8bbcf6e3f8f62f419e5429a0bd89331c85c37824"
   },

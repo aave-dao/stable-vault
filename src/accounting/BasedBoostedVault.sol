@@ -7,6 +7,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 import {MathLib} from "../libraries/MathLib.sol";
 import {AssetLib} from "../libraries/AssetLib.sol";
+import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {IBasedBoostedVault} from "../interfaces/IBasedBoostedVault.sol";
 import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
 
@@ -15,6 +16,13 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
     using MathLib for uint256;
     using AssetLib for uint256;
     using SafeERC20 for IERC20;
+
+    address internal _manager;
+
+    modifier onlyManager() {
+        require(msg.sender == _manager, ErrorsLib.NotManager());
+        _;
+    }
 
     uint256 internal constant SECONDS_PER_YEAR = 31_536_000;
 
@@ -92,6 +100,12 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         _createSubVault(defaultSubVaultPerSecondRate);
     }
 
+    function setManager(address manager) external onlyOwner {
+        require(manager != address(0), ErrorsLib.ZeroAddress());
+        _manager = manager;
+        emit ManagerSet(manager);
+    }
+
     function _createSubVault(uint256 newPerSecondRate) internal returns (uint256) {
         require(!_isActiveSubVaultByRate(newPerSecondRate), VaultAlreadyExists());
         _activeSubVaults.push(
@@ -109,7 +123,7 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         return newSubVaultId;
     }
 
-    function changeSubVaultRate(uint256 subVaultId, uint256 newPerSecondRate) external onlyOwner {
+    function changeSubVaultRate(uint256 subVaultId, uint256 newPerSecondRate) external onlyManager {
         // TODO(base-sub-vault): do we have to check if subVaultId 1 and recreate the base vault if its inactive
         require(newPerSecondRate >= MathLib.RAY, InvalidRate());
         require(_isActiveSubVaultById(subVaultId), InactiveVault());
@@ -166,7 +180,7 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         return _supportedAssets[asset];
     }
 
-    function setUserRate(address user, uint256 newPerSecondRate) external override onlyOwner {
+    function setUserRate(address user, uint256 newPerSecondRate) external override onlyManager {
         require(newPerSecondRate >= MathLib.RAY, InvalidRate());
         uint256 userOldShares = _positions[user].shares;
         require(userOldShares > 0, NonExistentPosition());
@@ -238,7 +252,7 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         _positions[user].shares += shares;
         _positions[user].originalDeposit += amountInRay;
 
-        _fundsHandler.processDeposit(user, asset, amount);
+        _fundsHandler.processDeposit(asset, amount);
 
         emit Deposit(user, asset, amount);
     }
@@ -264,6 +278,8 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         uint256 conversionRate = _activeSubVaults[subVaultIndex].conversionRate;
         uint256 actualAmountInRay;
         uint256 guaranteedAmount;
+        uint256 subVaultShares;
+        uint256 subVaultId = _positions[user].subVaultId;
 
         if (requestedAmountInRay == 0) {
             // Withdraw full balance. user's shares > 0 check already performed at the beginning
@@ -276,6 +292,8 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
             if (actualAmountInRay < guaranteedAmount) {
                 guaranteedAmount = actualAmountInRay;
             }
+            subVaultShares = _positions[user].shares;
+            _activeSubVaults[subVaultIndex].totalShares -= subVaultShares;
             delete _positions[user];
         } else {
             uint256 requestedAmountInShares = requestedAmountInRay.rayDivDown(conversionRate);
@@ -295,16 +313,17 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
                 _positions[user].originalDeposit -= actualAmountInRay;
             }
         }
-        _activeSubVaults[subVaultIndex].totalShares -= _positions[user].shares;
         // TODO: Handle preferred asset properly
         uint256 withdrawalRequestId = _fundsHandler.processWithdrawalRequest({
-            user: user,
+            recipient: user,
             amount: actualAmountInRay,
             guaranteedAmount: guaranteedAmount,
             preferredAsset: preferredAsset,
             data: ""
         });
-        emit WithdrawalRequested(user, preferredAsset, actualAmountInRay, guaranteedAmount);
+        emit WithdrawalRequestedWithShares(
+            user, preferredAsset, withdrawalRequestId, subVaultId, subVaultShares, actualAmountInRay, guaranteedAmount
+        );
         return withdrawalRequestId;
     }
 
@@ -313,8 +332,9 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         override
         returns (uint256, bytes memory)
     {
-        (uint256 amount, bytes memory returnData) = _fundsHandler.processWithdrawalExecution(withdrawalRequestId, data);
-        emit WithdrawalExecuted(withdrawalRequestId, amount, returnData);
+        (uint256 amount, address recipient, bytes memory returnData) =
+            _fundsHandler.processWithdrawalExecution(withdrawalRequestId, data);
+        emit WithdrawalExecuted(recipient, withdrawalRequestId, amount, returnData);
         return (amount, returnData);
     }
 

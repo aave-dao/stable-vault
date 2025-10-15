@@ -1,0 +1,14 @@
+{
+  "devDependencies": {
+    "husky": "^9.1.7"
+  },
+  "lint-staged": {
+    "**/*.sol": "forge fmt"
+  },
+  "dependencies": {
+    "lint-staged": "^16.2.4"
+  },
+  "scripts": {
+    "prepare": "husky || true"
+  }
+}

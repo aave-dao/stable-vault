@@ -5,7 +5,6 @@ import "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 
 import {ExtendedBasedBoostedVault} from "./mocks/ExtendedBasedBoostedVault.sol";
-import {TestErc4626} from "./mocks/TestErc4626.sol";
 import {TestErc20} from "./mocks/TestErc20.sol";
 import {MathLib} from "./../src/libraries/MathLib.sol";
 import {AssetLib} from "./../src/libraries/AssetLib.sol";
@@ -13,43 +12,21 @@ import {FundsHandler} from "./../src/accounting/FundsHandler.sol";
 import {Allocator} from "./../src/common/Allocator.sol";
 import {Swapper} from "./../src/common/Swapper.sol";
 import {IBasedBoostedVault} from "./../src/interfaces/IBasedBoostedVault.sol";
+import {BaseTest} from "./BaseTest.t.sol";
 
-contract ExtendedBasedBoostedVaultT is Test {
+contract ExtendedBasedBoostedVaultTest is BaseTest {
     using MathLib for uint256;
     using AssetLib for uint256;
 
-    address owner = address(this);
-    uint256 initialBasePerSecondRate = 1e27; // 1 RAY
-    ExtendedBasedBoostedVault vault;
-    FundsHandler fundsHandler;
-    Allocator allocator;
-
     TestErc20 asset;
-    TestErc4626 asset4626;
-    Swapper swapper;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         console.log("Creating asset");
         asset = new TestErc20(18);
-        asset4626 = new TestErc4626(asset);
-        console.log("Creating vault");
-        vault = new ExtendedBasedBoostedVault(owner, initialBasePerSecondRate);
 
-        allocator = new Allocator({manager: address(this), admin: address(this)});
-        swapper = new Swapper(address(allocator));
-
+        vm.prank(admin);
         vault.updateAssetSupport(address(asset), true);
-        // TODO: set communicationHandler
-        fundsHandler = new FundsHandler(address(this), address(vault), address(0), address(allocator));
-        vault.setFundsHandler(address(fundsHandler));
-
-        address lockDepositor = makeAddr("lockDepositor");
-        uint256 amount = 1;
-        vm.startPrank(lockDepositor);
-        asset.mint(lockDepositor, amount);
-        asset.approve(address(vault), amount);
-        vault.deposit(lockDepositor, address(asset), amount);
-        vm.stopPrank();
     }
 
     function testMathLibRayMulDown() public pure {
@@ -764,6 +741,7 @@ contract ExtendedBasedBoostedVaultT is Test {
 
     function _setDefaultPerSecondRate(uint256 basePerSecondRate) public {
         // The "default" subvault that has the effective base rate will always have id 1
+        vm.prank(admin);
         vault.changeSubVaultRate(1, basePerSecondRate);
     }
 }

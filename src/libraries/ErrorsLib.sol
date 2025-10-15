@@ -23,6 +23,12 @@ library ErrorsLib {
     /// @notice Address checked is not the manager.
     error NotManager();
 
+    /// @notice Address checked is not the Cross-chain gateway.
+    error NotGateway();
+
     /// @notice Insufficient amount due to slippage tolerance being exceeded.
     error InsufficientAmountOut();
+
+    /// @notice Thrown when unexpected number of assets are received from a source chain.
+    error InvalidBridgeAssetsLength();
 }

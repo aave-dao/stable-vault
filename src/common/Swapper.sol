@@ -18,6 +18,7 @@ contract Swapper is ISwapper, Ownable, ReentrancyGuard {
 
     uint256 constant MAX_BPS = 10_000;
 
+    // TODO: Make a note about Owner being the Allocator
     constructor(address owner) Ownable(owner) {}
 
     struct SlippageParams {

@@ -18,6 +18,7 @@ import {ISwapper} from "../interfaces/ISwapper.sol";
 ///      - 100% of assets deposited into Allocator belong to the same entity
 /// @dev Deals with assets in their native decimals
 contract Allocator is IAllocator {
+    // TODO: consider scenarios where tokens are left idle here because pushing to strategies fails (reverts should be caught)
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
 
@@ -65,29 +66,21 @@ contract Allocator is IAllocator {
         return _admin;
     }
 
-    function getAssets() external view returns (IAllocator.AllocatedAssets[] memory) {
-        IAllocator.AllocatedAssets[] memory allocatedAssets = new IAllocator.AllocatedAssets[](_vaults.length);
-        for (uint256 i = 0; i < _vaults.length; i++) {
-            address asset = IERC4626(_vaults[i]).asset();
-            uint256 amount = IERC4626(_vaults[i]).maxWithdraw(address(this));
-            // TODO: Sum by asset if multiple vaults per asset?
-            allocatedAssets[i] = IAllocator.AllocatedAssets(asset, amount);
-        }
-        return allocatedAssets;
+    function getAssets() external view returns (IAllocator.AllocatorBalance[] memory) {
+        return _getAssets();
     }
 
     /// @return amount of total assets in all the vaults in RAY
     function getTotalAssets() external view returns (uint256) {
+        IAllocator.AllocatorBalance[] memory allocatedAssets = _getAssets();
         uint256 totalAssetsInRay;
-        for (uint256 i = 0; i < _vaults.length; i++) {
-            uint256 assetAmount = IERC4626(_vaults[i]).maxWithdraw(address(this));
-            address asset = IERC4626(_vaults[i]).asset();
-            uint256 amountInRay = assetAmount.assetDecimalsToRay(asset);
-            totalAssetsInRay += amountInRay;
+        for (uint256 i = 0; i < allocatedAssets.length; i++) {
+            totalAssetsInRay += allocatedAssets[i].amount.assetDecimalsToRay(allocatedAssets[i].asset);
         }
         return totalAssetsInRay;
     }
 
+    // TODO: This function shouldn't fail (allow funds to be left idle in Allocator)
     function deposit(address asset, uint256 amount) external onlyWhitelistedDepositor {
         address vault = _vaultByAsset[asset];
         require(vault != address(0), ErrorsLib.UnsupportedAsset(asset));
@@ -111,10 +104,9 @@ contract Allocator is IAllocator {
     }
 
     /// Request any asset from the allocator for a given amount; assumes allocator assets have common denomination.
-    function withdrawEmergency(uint256 amount) external view onlyWhitelistedWithdrawer returns (address asset) {
-        (amount);
+    function withdrawEmergency(uint256 /* amount */ ) external view onlyWhitelistedWithdrawer returns (address) {
         // TODO: Implement pull asset from vault based on priority? Based on default? Iterate through and try which ever has funds?
-        return address(0);
+        revert("Allocator.withdrawEmergency:NOT_IMPLEMENTED");
     }
 
     /// @inheritdoc IAllocator
@@ -172,8 +164,36 @@ contract Allocator is IAllocator {
         // TODO: set behind timelock?
         require(asset != address(0), ErrorsLib.ZeroAddress());
         require(vault != address(0), ErrorsLib.ZeroAddress());
-        require(_vaultByAsset[asset] == vault, ErrorsLib.AddressAlreadyWhitelisted());
-        // TODO: check vault supports IERC4626 with EIP-165?
+        require(_vaultByAsset[asset] != vault, ErrorsLib.AddressAlreadyWhitelisted());
+        address currentVault = _vaultByAsset[asset];
+        if (currentVault != address(0)) {
+            for (uint16 i = 0; i < _vaults.length; i++) {
+                if (_vaults[i] == currentVault) {
+                    _vaults[i] = vault;
+                    break;
+                }
+            }
+        } else {
+            _vaults.push(vault);
+        }
         _vaultByAsset[asset] = vault;
+    }
+
+    // TODO: Add to the interface
+    function getVault(address asset) external view returns (address) {
+        return _vaultByAsset[asset];
+    }
+
+    function _getAssets() internal view returns (IAllocator.AllocatorBalance[] memory) {
+        IAllocator.AllocatorBalance[] memory allocatedAssets = new IAllocator.AllocatorBalance[](_vaults.length);
+        for (uint256 i = 0; i < _vaults.length; i++) {
+            IERC4626 vault = IERC4626(_vaults[i]);
+            address asset = vault.asset();
+            uint256 amount = vault.previewRedeem(vault.balanceOf(address(this)));
+            // Include idle funds in balance (assumes 1 vault per asset)
+            amount += IERC20(asset).balanceOf(address(this));
+            allocatedAssets[i] = IAllocator.AllocatorBalance(asset, amount);
+        }
+        return allocatedAssets;
     }
 }
