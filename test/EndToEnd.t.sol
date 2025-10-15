@@ -6,8 +6,17 @@ import {console} from "forge-std/console.sol";
 import {BaseTest} from "./BaseTest.t.sol";
 import {IERC20} from "forge-std/interfaces/IERC20.sol";
 import {IERC4626} from "forge-std/interfaces/IERC4626.sol";
+import {IManagedAllocator} from "../src/interfaces/IManagedAllocator.sol";
+import {AssetLib} from "../src/libraries/AssetLib.sol";
+import {Swapper} from "../src/common/Swapper.sol";
+import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
+import {FundsHandler} from "../src/accounting/FundsHandler.sol";
 
 contract EndToEndTest is BaseTest {
+    using AssetLib for uint256;
+
+    address user = makeAddr("USER");
+
     function setUp() public override {
         super.setUp();
     }
@@ -15,7 +24,6 @@ contract EndToEndTest is BaseTest {
     function test_endToEnd() public {
         console.log("\nEndToEndTest");
 
-        address user = makeAddr("USER");
         uint256 userInitialDeposit = 500 * (10 ** 6);
         USDC.mint(user, userInitialDeposit);
 
@@ -65,41 +73,194 @@ contract EndToEndTest is BaseTest {
         fundsHandler.pushFundsToChain(address(USDC), userInitialDeposit, EARNING_CHAIN_ID);
 
         //        - check that the funds land on Earning Chain and are dropped into default liquidity vault there
-        address defaultUsdcVault_EarningChain = allocator_earningChain.getVault(address(USDC));
-        console.log("Earning Chain default vault for USDC is: %s", defaultUsdcVault_EarningChain);
-        console.log("It's balance of USDC is: %s", IERC20(address(USDC)).balanceOf(defaultUsdcVault_EarningChain));
+        address defaultUsdcVault_earningChain = allocator_earningChain.getVault(address(USDC));
+        console.log("Earning Chain default vault for USDC is: %s", defaultUsdcVault_earningChain);
+        console.log("It's balance of USDC is: %s", IERC20(address(USDC)).balanceOf(defaultUsdcVault_earningChain));
         assertEq(
-            IERC20(address(USDC)).balanceOf(defaultUsdcVault_EarningChain),
+            IERC20(address(USDC)).balanceOf(defaultUsdcVault_earningChain),
             userInitialDeposit,
             "Vault should have the deposited amount of USDC"
         );
         console.log(
             "Allocator has %s shares of it",
-            IERC4626(defaultUsdcVault_EarningChain).balanceOf(address(allocator_earningChain))
+            IERC4626(defaultUsdcVault_earningChain).balanceOf(address(allocator_earningChain))
         );
         assertTrue(
-            IERC4626(defaultUsdcVault_EarningChain).balanceOf(address(allocator_earningChain)) > 0,
+            IERC4626(defaultUsdcVault_earningChain).balanceOf(address(allocator_earningChain)) > 0,
             "Allocator should have shares of the vault"
         );
 
         //    4. Manager rebalances & swaps the funds on the Earning Chain from USDC to GHO (via Swapper)
+        uint256 userInitialDepositInGho = userInitialDeposit.convertAssetDecimals(address(USDC), address(GHO));
+        GHO.mint(address(swapper_earningChain), userInitialDepositInGho);
+
+        address[] memory targets = new address[](1);
+        targets[0] = address(USDC);
+        bytes[] memory callDatas = new bytes[](1);
+        callDatas[0] = abi.encodeCall(IERC20.transfer, (address(this), userInitialDeposit));
+        Swapper.SlippageParams memory slippageParams = Swapper.SlippageParams(0, address(0));
+
+        IManagedAllocator.SwapParams[] memory swaps = new IManagedAllocator.SwapParams[](1);
+        swaps[0] = IManagedAllocator.SwapParams(
+            address(USDC),
+            address(GHO),
+            userInitialDeposit,
+            address(swapper_earningChain),
+            abi.encode(targets, callDatas, slippageParams)
+        );
+
+        console.log("Rebalancing by swap from USDC to GHO on the Earning chain...");
+        vm.prank(manager);
+        allocator_earningChain.rebalance(IManagedAllocator.CrossAssetRebalanceParams(swaps));
+
         //        - check that the funds are swapped to GHO
+        address defaultGhoVault_earningChain = allocator_earningChain.getVault(address(GHO));
+        console.log(
+            "\tBalance of GHO in The GHO Vault is: %s", IERC20(address(GHO)).balanceOf(defaultGhoVault_earningChain)
+        );
+        assertEq(
+            IERC20(address(GHO)).balanceOf(defaultGhoVault_earningChain),
+            userInitialDepositInGho,
+            "Vault should have the swapped amount of GHO"
+        );
         //        - check that the funds land on the GHO vault
+        console.log(
+            "Allocator has %s shares of it",
+            IERC4626(defaultGhoVault_earningChain).balanceOf(address(allocator_earningChain))
+        );
+        assertTrue(
+            IERC4626(defaultGhoVault_earningChain).balanceOf(address(allocator_earningChain)) > 0,
+            "Allocator should have shares of the vault"
+        );
+
         //    5. We wait for half a year
+        vm.warp(183 days);
+        console.log("\nHalf a year has gone by so fast...");
+
         //        - check how much funds we owe to the user
+        uint256 userEarningsInRay = vault.getUserBalance(user);
+        console.log("User balance in RAY: %s", vault.getUserBalance(user));
+        uint256 userEarningsInUsdc = userEarningsInRay.rayToAssetDecimals(address(USDC));
+        uint256 userEarningsInGho = userEarningsInRay.rayToAssetDecimals(address(GHO));
+        console.log("User balance in USDC: %s", userEarningsInUsdc);
+        console.log("User balance in GHO: %s", userEarningsInUsdc);
+        assertTrue(vault.getUserBalance(user) > userInitialDeposit, "User balance didn't grow in half a year");
+
         //        - mock the 8% APY earnings on the GHO vault for half a year
+        GHO.mint(defaultGhoVault_earningChain, 19_615242270663188059);
+
         //    6. User asks for withdrawal of the whole amount of his earnings (which are $500+ - in USDC)
+        console.log("User creates a WithdrawalRequest...");
+        vm.prank(user);
+        uint256 withdrawalId = vault.requestWithdrawal(user, address(USDC), 0);
         //        - check that the withdrawalId is created and passed to FundsHandler and execute() fails for now
+
+        console.log("...with withdrawalId: %s", withdrawalId);
+
+        // vm.expectRevert(
+        //     abi.encodeWithSelector(ERC4626ExceededMaxWithdraw.selector, allocator_accountingChain, userBalanceInUsdc, 0)
+        // );
+        vm.expectRevert(ErrorsLib.InsufficientLiquidity.selector);
+        vault.executeWithdrawal(withdrawalId, "");
+
         //        - check that we don't owe the user any funds
+        console.log("User balance in RAY after withdrawal request: %s", vault.getUserBalance(user));
+        assertEq(vault.getUserBalance(user), 0, "User balance should be down to 0 after full withdrawal request");
+
         //    7. Manager brings back the money from the Earning Chain to the Accounting Chain via CCIP in GHO
+        vm.prank(manager);
+        earningChainGateway.exit(address(GHO), userEarningsInGho);
+
         //        - check that the funds land on the Accounting Chain and are dropped into default liquidity vault there
+        address defaultGhoVault_accountingChain = allocator_accountingChain.getVault(address(GHO));
+        console.log("Accounting Chain default vault for GHO is: %s", defaultGhoVault_accountingChain);
+        console.log("It's balance of GHO is: %s", IERC20(address(GHO)).balanceOf(defaultGhoVault_accountingChain));
+        assertEq(
+            IERC20(address(GHO)).balanceOf(defaultGhoVault_accountingChain),
+            userEarningsInGho,
+            "Vault should have the exited amount of GHO"
+        );
+        console.log(
+            "Allocator has %s shares of it",
+            IERC4626(defaultGhoVault_accountingChain).balanceOf(address(allocator_accountingChain))
+        );
+        assertTrue(
+            IERC4626(defaultGhoVault_accountingChain).balanceOf(address(allocator_accountingChain)) > 0,
+            "Allocator should have shares of the vault"
+        );
+
         //    8. Manager rebalances & swaps the funds on the Accounting Chain from GHO to USDC (via Swapper)
+        USDC.mint(address(swapper_accountingChain), userEarningsInUsdc);
+
+        targets[0] = address(GHO);
+        callDatas[0] = abi.encodeCall(IERC20.transfer, (address(this), userEarningsInGho));
+
+        swaps = new IManagedAllocator.SwapParams[](1);
+        swaps[0] = IManagedAllocator.SwapParams(
+            address(GHO),
+            address(USDC),
+            userEarningsInGho,
+            address(swapper_accountingChain),
+            abi.encode(targets, callDatas, slippageParams)
+        );
+
+        console.log("Rebalancing by swap from GHO to USDC on the Accounting chain...");
+        vm.prank(manager);
+        allocator_accountingChain.rebalance(IManagedAllocator.CrossAssetRebalanceParams(swaps));
+
         //        - check that the funds are swapped to USDC
+        address defaultUsdcVault_accountingChain = allocator_accountingChain.getVault(address(USDC));
+        console.log(
+            "\tBalance of USDC in The USDC Vault is: %s",
+            IERC20(address(USDC)).balanceOf(defaultUsdcVault_accountingChain)
+        );
+        assertEq(
+            IERC20(address(USDC)).balanceOf(defaultUsdcVault_accountingChain),
+            userEarningsInUsdc,
+            "Vault should have the swapped amount of USDC"
+        );
         //        - check that the funds land on the USDC vault
-        //    9. Manager triggers the execute() withdrawal to send the funds back to the user
+        console.log(
+            "Allocator has %s shares of it",
+            IERC4626(defaultUsdcVault_accountingChain).balanceOf(address(allocator_accountingChain))
+        );
+        assertTrue(
+            IERC4626(defaultUsdcVault_accountingChain).balanceOf(address(allocator_accountingChain)) > 0,
+            "Allocator should have shares of the vault"
+        );
+
+        //    9. Somebody triggers the execute() withdrawal to send the funds back to the user
+        (uint256 amountOut, bytes memory data) = vault.executeWithdrawal(withdrawalId, "");
+        console.log("Amount out withdrawn: %s USDC", amountOut);
+        console.logBytes(data);
+
         //        - check that the funds are received by the user correctly
+        console.log("User balance in USDC after withdrawal: %s USDC", IERC20(address(USDC)).balanceOf(user));
+        assertEq(
+            IERC20(address(USDC)).balanceOf(user), userEarningsInUsdc, "User should have the withdrawn amount of USDC"
+        );
+
         //        - check that the withdrawal request is deleted and gone
+        FundsHandler.WithdrawalRequest memory withdrawalRequest = fundsHandler.getWithdrawalRequest(withdrawalId);
+        console.log("\trecipient:", withdrawalRequest.recipient);
+        console.log("\tamountRequested:", withdrawalRequest.amountRequested);
+        console.log("\tamountGuaranteed:", withdrawalRequest.amountGuaranteed);
+        console.log("\tpreferredAsset:", withdrawalRequest.preferredAsset);
+        console.log("\trequestTimestamp:", withdrawalRequest.requestTimestamp);
+        console.logBytes(data);
+
+        assertEq(withdrawalRequest.recipient, address(0), "Withdrawal Request recipient is not cleared out");
+        assertEq(withdrawalRequest.amountRequested, 0, "Withdrawal Request amountRequested is not cleared out");
+        assertEq(withdrawalRequest.amountGuaranteed, 0, "Withdrawal Request amountGuaranteed is not cleared out");
+        assertEq(withdrawalRequest.preferredAsset, address(0), "Withdrawal Request preferredAsset is not cleared out");
+        assertEq(withdrawalRequest.requestTimestamp, 0, "Withdrawal Request requestTimestamp is not cleared out");
+        assertEq(withdrawalRequest.data, "", "Withdrawal Request data is not cleared out");
+
         //        - check that we don't owe the user any funds
+        console.log("User balance in RAY after withdrawal request: %s", vault.getUserBalance(user));
+        assertEq(vault.getUserBalance(user), 0, "User balance should be down to 0 after full withdrawal request");
         //
     }
+
+    error ERC4626ExceededMaxWithdraw(address owner, uint256 assets, uint256 max);
 }
