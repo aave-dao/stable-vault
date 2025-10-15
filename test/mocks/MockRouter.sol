@@ -77,7 +77,7 @@ contract MockCCIPRouter is IRouter, IRouterClient {
 
         bytes memory data = abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, message);
 
-        console.log("gonna call the guy...");
+        console.log("gonna call the guy... receiver: %s", receiver);
         (success, retData, gasUsed) = CallWithExactGas._callWithExactGasSafeReturnData(
             data, receiver, gasLimit, gasForCallExactCheck, Internal.MAX_RET_BYTES
         );

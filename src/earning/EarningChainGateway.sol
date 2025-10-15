@@ -92,12 +92,13 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
         IERC20(asset).safeTransfer(adapter, amount);
         IBridgeAdapter.BridgeAsset[] memory assets = new IBridgeAdapter.BridgeAsset[](1);
         assets[0] = IBridgeAdapter.BridgeAsset({asset: asset, amount: amount});
-        IBridgeAdapter(adapter).pushFundsToChain(ACCOUNTING_CHAIN_ID, assets);
+        IBridgeAdapter(adapter).publishMessageToChain(ACCOUNTING_CHAIN_ID, assets, "");
     }
 
     function _sendBalanceUpdate() internal {
         IBridgeAdapter(_bridgeAdapter[address(0)][ACCOUNTING_CHAIN_ID]).publishMessageToChain(
             ACCOUNTING_CHAIN_ID,
+            new IBridgeAdapter.BridgeAsset[](0),
             abi.encode(IChainGateway.BalanceSnapshot(IAllocator(_allocator).getTotalAssets(), block.timestamp))
         );
     }

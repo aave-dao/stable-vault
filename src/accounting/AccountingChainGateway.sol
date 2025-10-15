@@ -34,7 +34,7 @@ contract AccountingChainGateway is IAccountingChainGateway, BaseChainGateway {
         IERC20(asset).safeTransfer(adapter, amount);
         IBridgeAdapter.BridgeAsset[] memory assets = new IBridgeAdapter.BridgeAsset[](1);
         assets[0] = IBridgeAdapter.BridgeAsset({asset: asset, amount: amount});
-        IBridgeAdapter(adapter).pushFundsToChain(targetChainId, assets);
+        IBridgeAdapter(adapter).publishMessageToChain(targetChainId, assets, "");
     }
 
     /// @dev Assume for Emergency withdrawal only - Earning chain will send whatever asset it prefers.
@@ -42,7 +42,7 @@ contract AccountingChainGateway is IAccountingChainGateway, BaseChainGateway {
     /// @param targetChainId The destination chainId.
     function sendPullFundsFromChainMessage(uint256 amountRay, uint256 targetChainId) external onlyFundsHandler {
         IBridgeAdapter(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][targetChainId]).publishMessageToChain(
-            targetChainId, abi.encode(amountRay)
+            targetChainId, new IBridgeAdapter.BridgeAsset[](0), abi.encode(amountRay)
         );
     }
 
