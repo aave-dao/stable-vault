@@ -8,3 +8,101 @@ solc_version = "0.8.28"
 runs = 10_000
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+
+[fmt]
+# Maximum line length. Code will be wrapped to stay within this limit.
+# Default: 120
+line_length = 120
+
+# The style of indentation.
+# Options: "space", "tab"
+# Default: "space"
+style = "space"
+
+# Number of spaces per indentation level. This is ignored if `style` is "tab".
+# Default: 4
+tab_width = 4
+
+# Print spaces between brackets in expressions.
+# false -> {a: 1}, true -> { a: 1 }
+# Default: false
+bracket_spacing = false
+
+# Add a new line at the start and end of contract definitions.
+# Default: false
+contract_new_lines = false
+
+# The style of multiline function headers.
+# Options:
+# "attributes_first": Parameters on the same line, attributes wrapped.
+# "params_always": Each parameter on its own line.
+# "params_first_multi": Parameters on separate lines if there is more than one.
+# "all": Entire signature is multiline if it exceeds the line length.
+# "all_params": All parameters are put on separate lines if there are any.
+# Default: "attributes_first"
+multiline_func_header = "attributes_first"
+
+# The style of single-line blocks in `if`/`else`/`while`/`for` statements.
+# Options:
+# "preserve": Keep the original style.
+# "single": Force single-line blocks if possible.
+# "multi": Force multi-line blocks.
+# Default: "preserve"
+single_line_statement_blocks = "multi"
+
+# Print a space in the `override` attribute.
+# false -> override(A), true -> override (A)
+# Default: false
+override_spacing = false
+
+# Sort import statements alphabetically within groups.
+# A group is a set of imports separated by a newline.
+# Default: false
+sort_imports = true
+
+# Style for `uint256`/`int256` types.
+# Options: "long", "short", "preserve"
+# Default: "long"
+int_types = "long"
+
+# Style of quotation marks for strings and imports.
+# Options: "double", "single", "preserve"
+# Default: "double"
+quote_style = "double"
+
+# Style of underscores in number literals.
+# Options:
+# "preserve": Keep original underscores.
+# "remove": Remove all underscores.
+# "thousands": Add an underscore every three digits (e.g., 10_000).
+# Default: "preserve"
+number_underscore = "preserve"
+
+# Style of underscores in hex literals.
+# Options:
+# "preserve": Keep original underscores.
+# "remove": Remove all underscores.
+# "bytes": Add an underscore every two characters (e.g., hex"de_ad_be_ef").
+# Default: "remove"
+hex_underscore = "remove"
+
+# Suppress spaces around the power operator (`**`).
+# false -> a ** b, true -> a**b
+# Default: false
+pow_no_space = false
+
+# Wrap comments when `line_length` is reached.
+# Default: false
+wrap_comments = true
+
+# Enforces a consistent style for Natspec (documentation) comments.
+# Options:
+# "preserve": Keep the original comment style.
+# "line": Convert block doc comments (`/** ... */`) to line doc comments (`///`).
+# "block": Convert line doc comments (`///`) to block doc comments (`/** ... */`).
+# Default: "preserve"
+docs_style = "block"
+
+# A list of glob patterns for files and directories to ignore.
+# Default: []
+ignore = []

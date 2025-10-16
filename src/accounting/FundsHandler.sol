@@ -7,8 +7,8 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
 
 import {IAccountingChainGateway} from "../interfaces/IAccountingChainGateway.sol";
-import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {IAllocator} from "../interfaces/IAllocator.sol";
+import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 import {AssetLib} from "../libraries/AssetLib.sol";
 

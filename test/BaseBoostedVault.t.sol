@@ -4,12 +4,12 @@ pragma solidity ^0.8.20;
 import "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 
-import {TestErc20} from "./mocks/TestErc20.sol";
-import {MathLib} from "./../src/libraries/MathLib.sol";
-import {AssetLib} from "./../src/libraries/AssetLib.sol";
 import {FundsHandler} from "./../src/accounting/FundsHandler.sol";
 import {IBasedBoostedVault} from "./../src/interfaces/IBasedBoostedVault.sol";
+import {AssetLib} from "./../src/libraries/AssetLib.sol";
+import {MathLib} from "./../src/libraries/MathLib.sol";
 import {BaseTest} from "./BaseTest.t.sol";
+import {TestErc20} from "./mocks/TestErc20.sol";
 
 contract ExtendedBasedBoostedVaultTest is BaseTest {
     using MathLib for uint256;
@@ -225,7 +225,8 @@ contract ExtendedBasedBoostedVaultTest is BaseTest {
     }
 
     function testMultiBlockDepositAndWithdrawMax_simple(uint256 amount, uint256 elapsedTime) public {
-        //uint256 maxYearsThatCanBeElapsed = 1_354; // Estimate of the absolute maximum number of years that can be elapsed before arithmatic overflow due to RAY mul
+        //uint256 maxYearsThatCanBeElapsed = 1_354; // Estimate of the absolute maximum number of years that can be
+        // elapsed before arithmatic overflow due to RAY mul
         uint256 maxYearsThatCanBeElapsed = 645;
         amount = bound(amount, 1, 1_000_000_000_000 ether);
         elapsedTime = bound(elapsedTime, 0, 365 days * maxYearsThatCanBeElapsed);
@@ -311,7 +312,8 @@ contract ExtendedBasedBoostedVaultTest is BaseTest {
 
     function testMultiBlockDepositAndWithdrawMax_largeApy(uint256 amount, uint256 elapsedTime) public {
         // 1000000000377783247012652819 ~= 10% APY
-        //uint256 maxYearsThatCanBeElapsed = 1_354; // Estimate of the absolute maximum number of years that can be elapsed before arithmatic overflow due to RAY mul
+        //uint256 maxYearsThatCanBeElapsed = 1_354; // Estimate of the absolute maximum number of years that can be
+        // elapsed before arithmatic overflow due to RAY mul
         uint256 maxYearsThatCanBeElapsed = 645;
         amount = bound(amount, 1, 1_000_000_000_000 ether);
         elapsedTime = bound(elapsedTime, 0, 365 days * maxYearsThatCanBeElapsed);
@@ -415,8 +417,9 @@ contract ExtendedBasedBoostedVaultTest is BaseTest {
     function testSetUserRatesOver10Years() public {
         // Context: - find driver of value delta between ending balance of (5% base) APY vs (4% base + 1% boost) APY
         //          - add intermittent boosts across the time period of the initial deposit made
-        //          - as of the writing of this test we concluded that intermittent deposits/withdrawals were not a driver of divergence in actual vs expected at the end of the 10 years
-        // WolframAlpha: 2,000,000,000 * 1.05^10 = 3,257,789,253.5548828125
+        //          - as of the writing of this test we concluded that intermittent deposits/withdrawals were not a
+        // driver of divergence in actual vs expected at the end of the 10 years WolframAlpha: 2,000,000,000 * 1.05^10 =
+        // 3,257,789,253.5548828125
         uint256 originalDeposit = 2_000_000_000 ether;
 
         uint256 newBasePerSecondRate = 1000000001243680656318820313; // ~4% APY
@@ -571,8 +574,9 @@ contract ExtendedBasedBoostedVaultTest is BaseTest {
             ? expectedBalanceWithRateChangeAfter6Month - balanceAfter12Months
             : balanceAfter12Months - expectedBalanceWithRateChangeAfter6Month;
         console.log("delta: ", delta);
-        // FIXME: can we improve the delta here? The issue is the boost multiplier for extra 1% on base rate at t_0 does not translate to an extra 1% on base rate at t_1 (assuming the base rate is different)
-        // Balances are queried in RAY, so expect at least the first 9 decimal places to be the same
+        // FIXME: can we improve the delta here? The issue is the boost multiplier for extra 1% on base rate at t_0 does
+        // not translate to an extra 1% on base rate at t_1 (assuming the base rate is different) Balances are queried
+        // in RAY, so expect at least the first 9 decimal places to be the same
         assertEq(delta / 1e18, 0, "Expected lower delta");
     }
 

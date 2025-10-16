@@ -4,13 +4,13 @@ pragma solidity ^0.8.22;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+import {BaseChainGateway} from "../common/BaseChainGateway.sol";
 import {IAllocator} from "../interfaces/IAllocator.sol";
-import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
+import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {IEarningChainGateway} from "../interfaces/IEarningChainGateway.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {EventLib} from "../libraries/EventLib.sol";
-import {BaseChainGateway} from "../common/BaseChainGateway.sol";
 
 /// @title EarningChainGateway
 /// @notice Facilitates cross chain messaging with exactly one Accounting Chain.
@@ -84,8 +84,9 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
         // TODO: re Emergency Withdrawal how to decide which token to pull from Allocator?
         // TODO: do we need to ccipSend multiple times to bridge multiple tokens?
         // TODO: Keep in mind not every asset in Earning chain will be bridgeable to Accounting chain
-        // TODO: if someone emergencyWithdraws then have them wait a cooldown period since pull flow can fail if insufficient bridgeable assets are on Earning chain (assume no swap can be performed)
-        // TODO: Implement; decide which asset(s) to withdraw
+        // TODO: if someone emergencyWithdraws then have them wait a cooldown period since pull flow can fail if
+        // insufficient bridgeable assets are on Earning chain (assume no swap can be performed) TODO: Implement; decide
+        // which asset(s) to withdraw
         // TODO: check that the assets to withdraw from Allocator are actually bridgedable
     }
 

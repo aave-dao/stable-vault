@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {MathLib} from "../../src/libraries/MathLib.sol";
 import {BasedBoostedVault} from "../../src/accounting/BasedBoostedVault.sol";
 import {IFundsHandler} from "../../src/interfaces/IFundsHandler.sol";
+import {MathLib} from "../../src/libraries/MathLib.sol";
 
 contract ExtendedBasedBoostedVault is BasedBoostedVault {
     using MathLib for uint256;

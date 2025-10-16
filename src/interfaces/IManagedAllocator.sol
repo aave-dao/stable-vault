@@ -23,6 +23,7 @@ interface IManagedAllocator is IAllocator {
 
     function depositIdleFunds(address asset) external;
 
-    /// @notice Rebalance the mix of underlying tokens by pulling from strategies, executing swaps and resupplying to strategies.
+    /// @notice Rebalance the mix of underlying tokens by pulling from strategies, executing swaps and resupplying to
+    /// strategies.
     function rebalance(CrossAssetRebalanceParams memory params) external;
 }

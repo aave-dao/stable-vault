@@ -5,9 +5,9 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
+import {IAny2EVMMessageReceiver} from "@chainlink-ccip/contracts/interfaces/IAny2EVMMessageReceiver.sol";
 import {IRouterClient} from "@chainlink-ccip/contracts/interfaces/IRouterClient.sol";
 import {Client} from "@chainlink-ccip/contracts/libraries/Client.sol";
-import {IAny2EVMMessageReceiver} from "@chainlink-ccip/contracts/interfaces/IAny2EVMMessageReceiver.sol";
 
 import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";

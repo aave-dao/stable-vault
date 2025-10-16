@@ -4,18 +4,18 @@ pragma solidity ^0.8.20;
 import "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 
-import {ExtendedBasedBoostedVault} from "./mocks/ExtendedBasedBoostedVault.sol";
-import {TestErc4626} from "./mocks/TestErc4626.sol";
-import {TestErc20} from "./mocks/TestErc20.sol";
-import {MathLib} from "./../src/libraries/MathLib.sol";
-import {AssetLib} from "./../src/libraries/AssetLib.sol";
-import {FundsHandler} from "./../src/accounting/FundsHandler.sol";
 import {AccountingChainGateway} from "./../src/accounting/AccountingChainGateway.sol";
+import {FundsHandler} from "./../src/accounting/FundsHandler.sol";
+import {CcipAdapter} from "./../src/bridging/CcipAdapter.sol";
 import {Allocator} from "./../src/common/Allocator.sol";
 import {Swapper} from "./../src/common/Swapper.sol";
-import {CcipAdapter} from "./../src/bridging/CcipAdapter.sol";
-import {MockCCIPRouter} from "./mocks/MockRouter.sol";
 import {EarningChainGateway} from "./../src/earning/EarningChainGateway.sol";
+import {AssetLib} from "./../src/libraries/AssetLib.sol";
+import {MathLib} from "./../src/libraries/MathLib.sol";
+import {ExtendedBasedBoostedVault} from "./mocks/ExtendedBasedBoostedVault.sol";
+import {MockCCIPRouter} from "./mocks/MockRouter.sol";
+import {TestErc20} from "./mocks/TestErc20.sol";
+import {TestErc4626} from "./mocks/TestErc4626.sol";
 
 contract BaseTest is Test {
     using MathLib for uint256;
@@ -34,7 +34,8 @@ contract BaseTest is Test {
     TestErc20 GHO = new TestErc20(18);
     TestErc20 USDC = new TestErc20(6);
 
-    // Accounting Chain: BBV, FH, Swapper, Allocator, Accounting Chain Gateway, CCIP Adapter, CCIP Router, Strategy Vault/4626
+    // Accounting Chain: BBV, FH, Swapper, Allocator, Accounting Chain Gateway, CCIP Adapter, CCIP Router, Strategy
+    // Vault/4626
     ExtendedBasedBoostedVault vault;
     FundsHandler fundsHandler;
     Allocator allocator_accountingChain;
@@ -80,7 +81,8 @@ contract BaseTest is Test {
         console.log("\tEarning Chain ID: %s", EARNING_CHAIN_ID);
 
         console.log("\nAccounting Chain:");
-        // Accounting Chain: BBV, FH, Swapper, Allocator, Accounting Chain Gateway, CCIP Adapter, CCIP Router, Strategy Vault/4626
+        // Accounting Chain: BBV, FH, Swapper, Allocator, Accounting Chain Gateway, CCIP Adapter, CCIP Router, Strategy
+        // Vault/4626
         vault = new ExtendedBasedBoostedVault(admin, initialBasePerSecondRate);
         console.log("\tVault: %s", address(vault));
         allocator_accountingChain = new Allocator(manager, admin);
@@ -157,7 +159,8 @@ contract BaseTest is Test {
         allocator_earningChain.setDepositor(address(earningChainGateway), true);
         allocator_earningChain.setWithdrawer(address(earningChainGateway), true);
 
-        // Set up Accounting Chain Gateway (Accounting chain) // These should be done cross-wise cause it's destination chainId
+        // Set up Accounting Chain Gateway (Accounting chain) // These should be done cross-wise cause it's destination
+        // chainId
         accountingChainGateway.setBridgeAdapter(address(GHO), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain));
         console.log(
             "\tAccountingChainGateway GHO adapter (Accounting Chain): %s",

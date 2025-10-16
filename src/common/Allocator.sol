@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
+import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
+import {IAllocator} from "../interfaces/IAllocator.sol";
+import {IManagedAllocator} from "../interfaces/IManagedAllocator.sol";
 import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
-import {IManagedAllocator} from "../interfaces/IManagedAllocator.sol";
-import {IAllocator} from "../interfaces/IAllocator.sol";
 
 import {ISwapper} from "../interfaces/ISwapper.sol";
 
@@ -19,7 +19,8 @@ import {ISwapper} from "../interfaces/ISwapper.sol";
 ///      - 100% of assets deposited into Allocator belong to the same entity
 /// @dev Deals with assets in their native decimals
 contract Allocator is IManagedAllocator {
-    // TODO: consider scenarios where tokens are left idle here because pushing to strategies fails (reverts should be caught)
+    // TODO: consider scenarios where tokens are left idle here because pushing to strategies fails (reverts should be
+    // caught)
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
 
@@ -115,7 +116,8 @@ contract Allocator is IManagedAllocator {
         onlyWhitelistedWithdrawer
         returns (address)
     {
-        // TODO: Implement pull asset from vault based on priority? Based on default? Iterate through and try which ever has funds?
+        // TODO: Implement pull asset from vault based on priority? Based on default? Iterate through and try which ever
+        // has funds?
         revert("Allocator.withdrawEmergency:NOT_IMPLEMENTED");
     }
 
@@ -137,7 +139,8 @@ contract Allocator is IManagedAllocator {
             address swapper = params.swaps[i].swapper;
             // Transfer assetIn to the swapper
             IERC20(params.swaps[i].assetIn).safeTransfer(swapper, amountIn);
-            // Execute the swap; rely on the swapper to enforce slippage constraints and send the toAsset back to the Allocator
+            // Execute the swap; rely on the swapper to enforce slippage constraints and send the toAsset back to the
+            // Allocator
             uint256 assetOutAmount = ISwapper(swapper)
                 .executeSwap(params.swaps[i].assetIn, params.swaps[i].assetOut, amountIn, params.swaps[i].swapData);
 

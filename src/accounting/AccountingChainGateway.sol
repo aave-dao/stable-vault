@@ -4,12 +4,12 @@ pragma solidity ^0.8.22;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+import {BaseChainGateway} from "../common/BaseChainGateway.sol";
 import {IAccountingChainGateway} from "../interfaces/IAccountingChainGateway.sol";
 import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
-import {BaseChainGateway} from "../common/BaseChainGateway.sol";
 
 /// @title AccountingChainGateway
 /// @notice Facilitates cross chain messaging one or more Earning Chains.

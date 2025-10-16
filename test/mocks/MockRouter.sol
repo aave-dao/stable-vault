@@ -5,9 +5,9 @@ import {IAny2EVMMessageReceiver} from "@chainlink-ccip/contracts/interfaces/IAny
 import {IRouter} from "@chainlink-ccip/contracts/interfaces/IRouter.sol";
 import {IRouterClient} from "@chainlink-ccip/contracts/interfaces/IRouterClient.sol";
 
+import {CallWithExactGas} from "./libraries/CallWithExactGas.sol";
 import {Client} from "@chainlink-ccip/contracts/libraries/Client.sol";
 import {Internal} from "@chainlink-ccip/contracts/libraries/Internal.sol";
-import {CallWithExactGas} from "./libraries/CallWithExactGas.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -30,7 +30,8 @@ contract MockCCIPRouter is IRouter, IRouterClient {
     uint32 public constant DEFAULT_GAS_LIMIT = 200_000;
 
     uint256 internal s_mockFeeTokenAmount; //use setFee() to change to non-zero to test fees
-    mapping(uint64 sourceChainSelector => uint64 destChainSelector) internal s_sourceChainSelector; //use setSourceChainSelector() to change
+    mapping(uint64 sourceChainSelector => uint64 destChainSelector) internal s_sourceChainSelector; //use
+        // setSourceChainSelector() to change
 
     function routeMessage(
         Client.Any2EVMMessage calldata message,
@@ -102,16 +103,24 @@ contract MockCCIPRouter is IRouter, IRouterClient {
         returns (bytes32)
     {
         console.log("in ccipSend");
-        if (message.receiver.length != 32) revert InvalidAddress(message.receiver);
+        if (message.receiver.length != 32) {
+            revert InvalidAddress(message.receiver);
+        }
         uint256 decodedReceiver = abi.decode(message.receiver, (uint256));
         // We want to disallow sending to address(0) and to precompiles, which exist on address(1) through address(9).
-        if (decodedReceiver > type(uint160).max || decodedReceiver < 10) revert InvalidAddress(message.receiver);
+        if (decodedReceiver > type(uint160).max || decodedReceiver < 10) {
+            revert InvalidAddress(message.receiver);
+        }
 
         uint256 feeTokenAmount = getFee(destinationChainSelector, message);
         if (message.feeToken == address(0)) {
-            if (msg.value < feeTokenAmount) revert InsufficientFeeTokenAmount();
+            if (msg.value < feeTokenAmount) {
+                revert InsufficientFeeTokenAmount();
+            }
         } else {
-            if (msg.value > 0) revert InvalidMsgValue();
+            if (msg.value > 0) {
+                revert InvalidMsgValue();
+            }
             IERC20(message.feeToken).safeTransferFrom(msg.sender, address(this), feeTokenAmount);
         }
 
@@ -136,7 +145,9 @@ contract MockCCIPRouter is IRouter, IRouterClient {
             _routeMessage(executableMsg, GAS_FOR_CALL_EXACT_CHECK, gasLimit, receiver);
         console.log("success: %s", success);
 
-        if (!success) revert ReceiverError(retData);
+        if (!success) {
+            revert ReceiverError(retData);
+        }
 
         return mockMsgId;
     }

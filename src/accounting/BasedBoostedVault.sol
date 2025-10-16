@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-import {MathLib} from "../libraries/MathLib.sol";
-import {AssetLib} from "../libraries/AssetLib.sol";
-import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {IBasedBoostedVault} from "../interfaces/IBasedBoostedVault.sol";
 import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
+import {AssetLib} from "../libraries/AssetLib.sol";
+import {ErrorsLib} from "../libraries/ErrorsLib.sol";
+import {MathLib} from "../libraries/MathLib.sol";
 
-/// @dev Assets balances are tracked in RAY internally; conversions from and to specific asset denomination is made on deposit and on withdrawal execution.
+/// @dev Assets balances are tracked in RAY internally; conversions from and to specific asset denomination is made on
+/// deposit and on withdrawal execution.
 contract BasedBoostedVault is IBasedBoostedVault, Ownable {
     using MathLib for uint256;
     using AssetLib for uint256;
@@ -30,7 +31,8 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
      * @notice A subVault works like a virtual fixed-rate vault.
      *
      * @param perSecondRate The total per second rate of growth associated with the subVault.
-     * @param conversionRate The cumulative growth factor at a point in time; acts as conversion rate between shares and assets.
+     * @param conversionRate The cumulative growth factor at a point in time; acts as conversion rate between shares and
+     * assets.
      * @param lastAccrualTimestamp The timestamp of the last accrual i.e. when the `conversionRate` was updated.
      * @param totalShares The total shares of the subVault outstanding.
      */
@@ -185,7 +187,9 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
 
             // TODO: should we check actualAmountInRay > 0?
             guaranteedAmount = _positions[user].originalDeposit;
-            // FIXME: keeping + 2 here during development; we lose 2 units of assets when going from assets -> shares (the loss is baked into the shares quantity which when multiplied with the same conversion rate leads to 2 unit of asset loss).
+            // FIXME: keeping + 2 here during development; we lose 2 units of assets when going from assets -> shares
+            // (the loss is baked into the shares quantity which when multiplied with the same conversion rate leads to
+            // 2 unit of asset loss).
             require(actualAmountInRay + 2 >= guaranteedAmount, "more than 2 unit of loss - investigate");
             if (actualAmountInRay < guaranteedAmount) {
                 guaranteedAmount = actualAmountInRay;
