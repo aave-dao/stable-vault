@@ -9,6 +9,11 @@ import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
+/// @title BaseBridgeAdapter
+/// @notice Base contract for bridge adapters.
+/// @dev Tokens inbound to this contract should be pulled into this contract with spend permission.
+/// @dev Tokens outbound from this contract will be approved to be spent by predetermined spender. Outbound funds are
+/// pulled from this contract.
 abstract contract BaseBridgeAdapter is Ownable, IBridgeAdapter {
     using SafeERC20 for IERC20;
 

@@ -86,9 +86,7 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
 
     function _returnFunds(address asset, uint256 amount) internal {
         address adapter = _bridgeAdapter[asset][ACCOUNTING_CHAIN_ID];
-        // Transfer funds to the bridge adapter and initiate the bridging of assets
-        // TODO: should we approve Adapter to pull funds?
-        IERC20(asset).safeTransfer(adapter, amount);
+        IERC20(asset).forceApprove(adapter, amount);
         IBridgeAdapter.BridgeAsset[] memory assets = new IBridgeAdapter.BridgeAsset[](1);
         assets[0] = IBridgeAdapter.BridgeAsset({asset: asset, amount: amount});
         IBridgeAdapter(adapter).publishMessageToChain(ACCOUNTING_CHAIN_ID, assets, _getBalanceSnapshotData());

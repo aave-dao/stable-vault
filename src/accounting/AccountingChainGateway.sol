@@ -9,7 +9,6 @@ import {IAccountingChainGateway} from "../interfaces/IAccountingChainGateway.sol
 import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
-import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 /// @title AccountingChainGateway
 /// @notice Facilitates cross chain messaging one or more Earning Chains.
@@ -33,8 +32,10 @@ contract AccountingChainGateway is IAccountingChainGateway, BaseChainGateway {
     {
         address adapter = _bridgeAdapter[asset][targetChainId];
         require(adapter != address(0), UnsupportedAdapter());
-        // TODO: should we approve Adapter to pull funds?
-        IERC20(asset).safeTransferFrom(msg.sender, adapter, amount);
+        // Pull funds from caller into this contract
+        IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
+        // Approve the bridge adapter to spend the funds
+        IERC20(asset).forceApprove(adapter, amount);
         IBridgeAdapter.BridgeAsset[] memory assets = new IBridgeAdapter.BridgeAsset[](1);
         assets[0] = IBridgeAdapter.BridgeAsset({asset: asset, amount: amount});
         IBridgeAdapter(adapter).publishMessageToChain(targetChainId, assets, "");

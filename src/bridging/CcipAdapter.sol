@@ -16,9 +16,6 @@ import {BaseBridgeAdapter} from "./BaseBridgeAdapter.sol";
 
 /// @title CcipAdapter
 /// @notice Adapter for sending and receiving messages via Chainlink CCIP.
-/// @dev Tokens inbound to this contract should be pulled into this contract with spend permission.
-/// @dev Tokens outbound from this contract will be approved to be spent by predetermined spender. Outbound funds are
-/// pulled from this contract.
 contract CcipAdapter is BaseBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
     using SafeERC20 for IERC20;
 
@@ -74,7 +71,9 @@ contract CcipAdapter is BaseBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
             for (uint256 i = 0; i < assets.length; i++) {
                 address asset = assets[i].asset;
                 uint256 amount = assets[i].amount;
-                // TODO: should the Bridge Adapter pull funds from caller as opposed to trusting funds were sent?
+                // Pull funds from caller into this contract
+                IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
+                // Approve the CCIP Router to spend the funds
                 IERC20(asset).forceApprove(_ccipRouter, amount);
                 tokenAmounts[i] = Client.EVMTokenAmount({token: asset, amount: amount});
             }
