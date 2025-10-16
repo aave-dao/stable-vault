@@ -11,6 +11,8 @@ import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {BaseChainGateway} from "../common/BaseChainGateway.sol";
 
+/// @title AccountingChainGateway
+/// @notice Facilitates cross chain messaging one or more Earning Chains.
 contract AccountingChainGateway is IAccountingChainGateway, BaseChainGateway {
     using SafeERC20 for IERC20;
 
@@ -31,6 +33,7 @@ contract AccountingChainGateway is IAccountingChainGateway, BaseChainGateway {
     {
         address adapter = _bridgeAdapter[asset][targetChainId];
         require(adapter != address(0), UnsupportedAdapter());
+        // TODO: should we pull funds from caller i.e. FH and then approve Adapter to pull funds?
         IERC20(asset).safeTransfer(adapter, amount);
         IBridgeAdapter.BridgeAsset[] memory assets = new IBridgeAdapter.BridgeAsset[](1);
         assets[0] = IBridgeAdapter.BridgeAsset({asset: asset, amount: amount});

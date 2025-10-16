@@ -5,7 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
-import {IWithdrawalPriorityQueue} from "../interfaces/IWithdrawalPriorityQueue.sol";
+
 import {IAccountingChainGateway} from "../interfaces/IAccountingChainGateway.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {IAllocator} from "../interfaces/IAllocator.sol";
@@ -36,7 +36,6 @@ contract FundsHandler is IFundsHandler {
     ChainBalanceSnapshot[] internal _chainBalances;
     mapping(uint256 withdrawalRequestId => WithdrawalRequest) internal _withdrawalRequests;
     uint256 internal _lastWithdrawalRequestId;
-    IWithdrawalPriorityQueue internal _queue;
     address _manager;
     address _basedBoostedVault;
     address _gateway;
@@ -163,6 +162,7 @@ contract FundsHandler is IFundsHandler {
     function pushFundsToChain(address asset, uint256 amount, uint256 chainId) external onlyManager {
         _pullFundsFromImmediateLiquidity(asset, amount);
         // TODO: Why do we use transfer but not approve here?
+        // TODO: +1 on the above, we should approve the GW to pull funds
         IERC20(asset).safeTransfer(_gateway, amount);
         IAccountingChainGateway(_gateway).sendPushFundsToChainMessage(asset, amount, chainId);
     }

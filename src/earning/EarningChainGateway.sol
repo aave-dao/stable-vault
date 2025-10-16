@@ -69,8 +69,6 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
     function exit(address asset, uint256 amount) external onlyManager {
         IAllocator(_allocator).withdraw(asset, amount);
         _returnFunds(asset, amount);
-        // TODO: should we send balance update here? Or just rely on the external sendBalanceUpdate call?
-        _sendBalanceUpdate();
     }
 
     function _emergencyExit(uint256 amountRay) internal pure {
@@ -87,17 +85,20 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
     function _returnFunds(address asset, uint256 amount) internal {
         address adapter = _bridgeAdapter[asset][ACCOUNTING_CHAIN_ID];
         // Transfer funds to the bridge adapter and initiate the bridging of assets
+        // TODO: should we approve Adapter to pull funds?
         IERC20(asset).safeTransfer(adapter, amount);
         IBridgeAdapter.BridgeAsset[] memory assets = new IBridgeAdapter.BridgeAsset[](1);
         assets[0] = IBridgeAdapter.BridgeAsset({asset: asset, amount: amount});
-        IBridgeAdapter(adapter).publishMessageToChain(ACCOUNTING_CHAIN_ID, assets, "");
+        IBridgeAdapter(adapter).publishMessageToChain(ACCOUNTING_CHAIN_ID, assets, _getBalanceSnapshotData());
     }
 
     function _sendBalanceUpdate() internal {
         IBridgeAdapter(_bridgeAdapter[address(0)][ACCOUNTING_CHAIN_ID]).publishMessageToChain(
-            ACCOUNTING_CHAIN_ID,
-            new IBridgeAdapter.BridgeAsset[](0),
-            abi.encode(IChainGateway.BalanceSnapshot(IAllocator(_allocator).getAggregatedBalance(), block.timestamp))
+            ACCOUNTING_CHAIN_ID, new IBridgeAdapter.BridgeAsset[](0), _getBalanceSnapshotData()
         );
+    }
+
+    function _getBalanceSnapshotData() internal view returns (bytes memory) {
+        return abi.encode(IChainGateway.BalanceSnapshot(IAllocator(_allocator).getAggregatedBalance(), block.timestamp));
     }
 }

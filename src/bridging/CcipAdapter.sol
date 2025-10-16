@@ -71,13 +71,18 @@ contract CcipAdapter is IBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
     }
 
     /// @inheritdoc IBridgeAdapter
-    function publishMessageToChain(uint256 chainId, BridgeAsset[] memory assets, bytes memory data) external override {
+    function publishMessageToChain(uint256 chainId, BridgeAsset[] memory assets, bytes memory data)
+        external
+        override
+        onlyGateway
+    {
         uint256 gasLimit = 2_000_000;
         Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](assets.length);
         if (assets.length > 0) {
             require(assets.length == 1, ErrorsLib.InvalidBridgeAssetsLength());
             address asset = assets[0].asset;
             uint256 amount = assets[0].amount;
+            // TODO: should the Bridge Adapter pull funds from caller as opposed to trusting funds were sent?
             IERC20(asset).forceApprove(_ccipRouter, amount);
             tokenAmounts[0] = Client.EVMTokenAmount({token: asset, amount: amount});
             gasLimit = 3_000_000;
