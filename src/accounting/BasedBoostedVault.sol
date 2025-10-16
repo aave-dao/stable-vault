@@ -57,14 +57,14 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
     IFundsHandler internal _fundsHandler;
 
     /**
+     * @dev The ID of the last subVault created; monotonically increasing.
+     */
+    uint256 internal _lastSubVaultId;
+
+    /**
      * @dev The ID of the subVault where users without existing positions' deposits are allocated to.
      */
     uint256 _defaultSubVaultId;
-
-    /**
-     * @dev The IDs of the SubVaults that have liquidity i.e. some user's assets on it.
-     */
-    uint256[] internal _activeSubVaultsIds;
 
     /**
      * @dev Stores a SubVault by its ID.
@@ -72,9 +72,9 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
     mapping(uint256 subVaultId => SubVault subVault) _subVaultById;
 
     /**
-     * @dev The ID of the last subVault created; monotonically increasing.
+     * @dev The IDs of the SubVaults that have liquidity i.e. some user's assets on it.
      */
-    uint256 internal _lastSubVaultId;
+    uint256[] internal _activeSubVaultsIds;
 
     /**
      * @dev SubVault index in the `_activeSubVaultsIds` array.
