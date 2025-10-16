@@ -113,6 +113,7 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         uint256 subVaultId = _positions[user].subVaultId;
         if (subVaultId == 0) {
             subVaultId = _defaultSubVaultId;
+            _positions[user].subVaultId = subVaultId;
         }
 
         _accrueSubVaultConversionRate(subVaultId);
