@@ -57,7 +57,7 @@ contract CCIPTest is Test {
 }
 
 contract CCIPReceiver is IAny2EVMMessageReceiver, IERC165 {
-    function ccipReceive(Client.Any2EVMMessage calldata message) external override {
+    function ccipReceive(Client.Any2EVMMessage calldata message) external view override {
         console.log("Message received:");
         console.log("\t%s", abi.decode(message.data, (string)));
         console.log("\tsender:");

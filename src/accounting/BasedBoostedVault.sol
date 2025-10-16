@@ -56,23 +56,30 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
 
     IFundsHandler internal _fundsHandler;
 
-    // TODO: Idea, having the default subVault as an isolated special case, that cannot become active/inactive
-    // SubVault internal _defaultSubVault;
-
-    /**
-     * @dev SubVaults that have liquidity i.e. some user's assets on it.
-     */
-    SubVault[] internal _activeSubVaults;
-
     /**
      * @dev The ID of the last subVault created; monotonically increasing.
      */
     uint256 internal _lastSubVaultId;
 
     /**
-     * @dev SubVault index in the `_activeSubVaults` array.
+     * @dev The ID of the subVault where users without existing positions' deposits are allocated to.
      */
-    mapping(uint256 subVaultId => uint256 subVaultIndex) _subVaultIndexById;
+    uint256 _defaultSubVaultId;
+
+    /**
+     * @dev Stores a SubVault by its ID.
+     */
+    mapping(uint256 subVaultId => SubVault subVault) _subVaultById;
+
+    /**
+     * @dev The IDs of the SubVaults that have liquidity i.e. some user's assets on it.
+     */
+    uint256[] internal _activeSubVaultsIds;
+
+    /**
+     * @dev SubVault index in the `_activeSubVaultsIds` array.
+     */
+    mapping(uint256 subVaultId => uint256 subVaultIndex) _activeSubVaultIndexById;
 
     /**
      * @dev SubVault ID by subVault per-second rate.
@@ -95,135 +102,7 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
      * @param defaultSubVaultPerSecondRate The base per-second rate, in Ray units (27 decimals).
      */
     constructor(address owner, uint256 defaultSubVaultPerSecondRate) Ownable(owner) {
-        // Creates a subVault that gets ID #1 and that will be used as default subVault for new deposits
-        // TODO(base-sub-vault): initialize with virtual shares so that the "liquidity" never goes to 0?
-        _createSubVault(defaultSubVaultPerSecondRate);
-    }
-
-    function setManager(address manager) external onlyOwner {
-        require(manager != address(0), ErrorsLib.ZeroAddress());
-        _manager = manager;
-        emit ManagerSet(manager);
-    }
-
-    function _createSubVault(uint256 newPerSecondRate) internal returns (uint256) {
-        require(!_isActiveSubVaultByRate(newPerSecondRate), VaultAlreadyExists());
-        _activeSubVaults.push(
-            SubVault({
-                perSecondRate: newPerSecondRate,
-                conversionRate: MathLib.RAY,
-                lastAccrualTimestamp: uint256(block.timestamp),
-                totalShares: 0
-            })
-        );
-        uint256 newSubVaultId = ++_lastSubVaultId;
-        _subVaultIdByRate[newPerSecondRate] = newSubVaultId;
-        _subVaultIndexById[newSubVaultId] = _activeSubVaults.length - 1;
-        emit SubVaultCreated(newSubVaultId, newPerSecondRate);
-        return newSubVaultId;
-    }
-
-    function changeSubVaultRate(uint256 subVaultId, uint256 newPerSecondRate) external onlyManager {
-        // TODO(base-sub-vault): do we have to check if subVaultId 1 and recreate the base vault if its inactive
-        require(newPerSecondRate >= MathLib.RAY, InvalidRate());
-        require(_isActiveSubVaultById(subVaultId), InactiveVault());
-        require(_isActiveSubVaultByRate(newPerSecondRate) == false, VaultAlreadyExists());
-        _accrueSubVaultConversionRate(_subVaultIndexById[subVaultId]);
-        _activeSubVaults[_subVaultIndexById[subVaultId]].perSecondRate = newPerSecondRate;
-        _subVaultIdByRate[newPerSecondRate] = subVaultId;
-        emit SubVaultRateUpdated(subVaultId, newPerSecondRate);
-    }
-
-    function getActiveSubVaults() external view override returns (SubVaultData[] memory) {
-        SubVaultData[] memory activeSubVaults = new SubVaultData[](_activeSubVaults.length);
-        for (uint256 i = 0; i < _activeSubVaults.length; i++) {
-            uint256 perSecondRate = _activeSubVaults[i].perSecondRate;
-            activeSubVaults[i] = SubVaultData(perSecondRate, _subVaultIdByRate[perSecondRate]);
-        }
-        return activeSubVaults;
-    }
-
-    function _deleteSubVault(uint256 subVaultId) internal {
-        require(_isActiveSubVaultById(subVaultId), InactiveVault());
-        uint256 subVaultIndex = _subVaultIndexById[subVaultId];
-        uint256 subVaultPerSecondRate = _activeSubVaults[subVaultIndex].perSecondRate;
-
-        if (subVaultIndex == _activeSubVaults.length - 1) {
-            _activeSubVaults.pop();
-            delete _subVaultIndexById[subVaultId];
-            delete _subVaultIdByRate[subVaultPerSecondRate];
-        } else {
-            SubVault storage moved = _activeSubVaults[_activeSubVaults.length - 1];
-            uint256 movedSubVaultId = _subVaultIdByRate[moved.perSecondRate];
-            _activeSubVaults[subVaultIndex] = moved;
-            _subVaultIndexById[movedSubVaultId] = subVaultIndex;
-
-            _activeSubVaults.pop();
-            delete _subVaultIndexById[subVaultId];
-            delete _subVaultIdByRate[subVaultPerSecondRate];
-        }
-    }
-
-    function updateAssetSupport(address asset, bool supported) external onlyOwner {
-        require(asset != address(0), InvalidAsset(asset));
-        if (supported) {
-            require(!_supportedAssets[asset], AssetAlreadySupported(asset));
-            _supportedAssets[asset] = true;
-        } else {
-            require(_supportedAssets[asset], AssetNotSupported(asset));
-            delete _supportedAssets[asset];
-        }
-        emit AssetSupported(asset, supported);
-    }
-
-    function isAssetSupported(address asset) public view returns (bool) {
-        return _supportedAssets[asset];
-    }
-
-    function setUserRate(address user, uint256 newPerSecondRate) external override onlyManager {
-        require(newPerSecondRate >= MathLib.RAY, InvalidRate());
-        uint256 userOldShares = _positions[user].shares;
-        require(userOldShares > 0, NonExistentPosition());
-        uint256 oldSubVaultIndex = _subVaultIndexById[_positions[user].subVaultId];
-        require(_activeSubVaults[oldSubVaultIndex].perSecondRate != newPerSecondRate, RedundantRate());
-
-        uint256 newSubVaultId;
-        if (_isActiveSubVaultByRate(newPerSecondRate)) {
-            newSubVaultId = _subVaultIdByRate[newPerSecondRate];
-        } else {
-            newSubVaultId = _createSubVault(newPerSecondRate);
-        }
-
-        _migrateUserToSubVault({
-            user: user,
-            userOldShares: userOldShares,
-            newSubVaultId: newSubVaultId,
-            oldSubVaultIndex: oldSubVaultIndex,
-            newSubVaultIndex: _subVaultIndexById[newSubVaultId]
-        });
-
-        emit UserRateUpdated(user, newPerSecondRate);
-    }
-
-    function _migrateUserToSubVault(
-        address user,
-        uint256 userOldShares,
-        uint256 newSubVaultId,
-        uint256 oldSubVaultIndex,
-        uint256 newSubVaultIndex
-    ) internal {
-        _accrueSubVaultConversionRate(oldSubVaultIndex);
-        _accrueSubVaultConversionRate(newSubVaultIndex);
-        uint256 oldConversionRate = _activeSubVaults[oldSubVaultIndex].conversionRate;
-        uint256 newConversionRate = _activeSubVaults[newSubVaultIndex].conversionRate;
-
-        uint256 userNewShares = userOldShares.rayMulDown(oldConversionRate).rayDivDown(newConversionRate);
-
-        _activeSubVaults[oldSubVaultIndex].totalShares -= userOldShares;
-        _activeSubVaults[newSubVaultIndex].totalShares += userNewShares;
-
-        _positions[user].shares = userNewShares;
-        _positions[user].subVaultId = newSubVaultId;
+        _setDefaultSubVault(_createSubVault(defaultSubVaultPerSecondRate));
     }
 
     function deposit(address user, address asset, uint256 amount) external override {
@@ -231,30 +110,50 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         require(isAssetSupported(asset), UnsupportedAsset(asset));
         IERC20(asset).safeTransferFrom(msg.sender, address(_fundsHandler), amount);
 
-        uint256 subVaultIndex;
-        if (_positions[user].shares > 0) {
-            subVaultIndex = _subVaultIndexById[_positions[user].subVaultId];
-        } else {
-            if (!_isActiveSubVaultById(1)) {
-                // TODO(base-sub-vault): The default subVault could become inactive, we need to bring it back to active
-            }
-            subVaultIndex = _subVaultIndexById[1];
-            _positions[user].subVaultId = subVaultIndex;
+        uint256 subVaultId = _positions[user].subVaultId;
+        if (subVaultId == 0) {
+            subVaultId = _defaultSubVaultId;
+            _positions[user].subVaultId = subVaultId;
         }
 
-        _accrueSubVaultConversionRate(subVaultIndex);
+        _accrueSubVaultConversionRate(subVaultId);
 
-        uint256 conversionRate = _activeSubVaults[subVaultIndex].conversionRate;
+        uint256 conversionRate = _subVaultById[subVaultId].conversionRate;
         uint256 amountInRay = amount.assetDecimalsToRay(asset);
         uint256 shares = amountInRay.rayDivDown(conversionRate);
 
-        _activeSubVaults[subVaultIndex].totalShares += shares;
+        if (!_isActiveSubVaultById(subVaultId)) {
+            _addSubVaultToActive(subVaultId);
+        }
+
+        _subVaultById[subVaultId].totalShares += shares;
         _positions[user].shares += shares;
         _positions[user].originalDeposit += amountInRay;
 
         _fundsHandler.processDeposit(asset, amount);
 
         emit Deposit(user, asset, amount);
+    }
+
+    function setUserRate(address user, uint256 newPerSecondRate) external override onlyManager {
+        uint256 oldSubVaultId = _positions[user].subVaultId;
+        require(oldSubVaultId > 0, NonExistentPosition());
+        require(_subVaultById[oldSubVaultId].perSecondRate != newPerSecondRate, RedundantRate());
+
+        uint256 newSubVaultId = _getOrCreateSubVaultWithRate(newPerSecondRate);
+
+        _migrateUserToSubVault(user, oldSubVaultId, newSubVaultId);
+
+        emit UserRateUpdated(user, newPerSecondRate);
+    }
+
+    function changeSubVaultRate(uint256 subVaultId, uint256 newPerSecondRate) external onlyManager {
+        require(newPerSecondRate >= MathLib.RAY, InvalidRate());
+        require(!_existsSubVaultWithRate(newPerSecondRate), VaultAlreadyExists());
+        _accrueSubVaultConversionRate(subVaultId);
+        _subVaultById[subVaultId].perSecondRate = newPerSecondRate;
+        _subVaultIdByRate[newPerSecondRate] = subVaultId;
+        emit SubVaultRateUpdated(subVaultId, newPerSecondRate);
     }
 
     /**
@@ -269,17 +168,16 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         returns (uint256)
     {
         require(msg.sender == user, InvalidMsgSender());
-        require(_positions[user].shares > 0, NonExistentPosition());
 
-        uint256 subVaultIndex = _subVaultIndexById[_positions[user].subVaultId];
+        uint256 subVaultId = _positions[user].subVaultId;
+        require(subVaultId > 0, NonExistentPosition());
 
-        _accrueSubVaultConversionRate(subVaultIndex);
+        _accrueSubVaultConversionRate(subVaultId);
 
-        uint256 conversionRate = _activeSubVaults[subVaultIndex].conversionRate;
+        uint256 conversionRate = _subVaultById[subVaultId].conversionRate;
         uint256 actualAmountInRay;
         uint256 guaranteedAmount;
         uint256 subVaultShares;
-        uint256 subVaultId = _positions[user].subVaultId;
 
         if (requestedAmountInRay == 0) {
             // Withdraw full balance. user's shares > 0 check already performed at the beginning
@@ -293,14 +191,14 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
                 guaranteedAmount = actualAmountInRay;
             }
             subVaultShares = _positions[user].shares;
-            _activeSubVaults[subVaultIndex].totalShares -= subVaultShares;
+            _subVaultById[subVaultId].totalShares -= subVaultShares;
             delete _positions[user];
         } else {
             uint256 requestedAmountInShares = requestedAmountInRay.rayDivDown(conversionRate);
             require(requestedAmountInShares <= _positions[user].shares, InvalidAmount());
             // Subtract from the subVault & clear position
             _positions[user].shares -= requestedAmountInShares;
-            _activeSubVaults[subVaultIndex].totalShares -= requestedAmountInShares;
+            _subVaultById[subVaultId].totalShares -= requestedAmountInShares;
             // TODO: Don't like the double conversion, but feel safer this way
             // TODO: This needs a mathematical proof that: requestedAmountInRay <= actualAmountInRay;
             actualAmountInRay = requestedAmountInShares.rayMulDown(conversionRate);
@@ -312,6 +210,9 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
                 guaranteedAmount = actualAmountInRay;
                 _positions[user].originalDeposit -= actualAmountInRay;
             }
+        }
+        if (!_isActiveSubVaultById(subVaultId)) {
+            _removeSubVaultFromActive(subVaultId);
         }
         // TODO: Handle preferred asset properly
         uint256 withdrawalRequestId = _fundsHandler.processWithdrawalRequest({
@@ -338,16 +239,42 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         return (amount, returnData);
     }
 
-    function getVaultObligations() external view override returns (uint256) {
-        return _getVaultObligations();
+    function setDefaultSubVault(uint256 perSecondRate) external onlyManager {
+        _setDefaultSubVault(_getOrCreateSubVaultWithRate(perSecondRate));
     }
 
-    function _getVaultObligations() internal view returns (uint256) {
-        uint256 vaultObligations;
-        for (uint256 i = 0; i < _activeSubVaults.length; i++) {
-            vaultObligations += _activeSubVaults[i].totalShares.rayMulDown(_previewSubVaultConversionRate(i));
+    function setManager(address manager) external onlyOwner {
+        require(manager != address(0), ErrorsLib.ZeroAddress());
+        _manager = manager;
+        emit ManagerSet(manager);
+    }
+
+    function updateAssetSupport(address asset, bool supported) external onlyOwner {
+        require(asset != address(0), InvalidAsset(asset));
+        if (supported) {
+            require(!_supportedAssets[asset], AssetAlreadySupported(asset));
+            _supportedAssets[asset] = true;
+        } else {
+            require(_supportedAssets[asset], AssetNotSupported(asset));
+            delete _supportedAssets[asset];
         }
-        return vaultObligations;
+        emit AssetSupported(asset, supported);
+    }
+
+    ///////////////////////////////////////////////// GETTERS /////////////////////////////////////////////////////
+
+    function getActiveSubVaults() external view override returns (SubVaultData[] memory) {
+        SubVaultData[] memory activeSubVaults = new SubVaultData[](_activeSubVaultsIds.length);
+        for (uint256 i = 0; i < _activeSubVaultsIds.length; i++) {
+            uint256 subVaultId = _activeSubVaultsIds[i];
+            uint256 perSecondRate = _subVaultById[subVaultId].perSecondRate;
+            activeSubVaults[i] = SubVaultData(perSecondRate, subVaultId);
+        }
+        return activeSubVaults;
+    }
+
+    function getVaultObligations() external view override returns (uint256) {
+        return _getVaultObligations();
     }
 
     function getVaultAssets() external pure override returns (uint256) {
@@ -360,37 +287,119 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         if (_positions[user].shares == 0) {
             return 0;
         }
-        uint256 subVaultIndex = _subVaultIndexById[_positions[user].subVaultId];
-        return _positions[user].shares.rayMulDown(_previewSubVaultConversionRate(subVaultIndex));
+        return _positions[user].shares.rayMulDown(_previewSubVaultConversionRate(_positions[user].subVaultId));
     }
 
     function getUserSubVault(address user) external view override returns (SubVaultData memory) {
         uint256 subVaultId = _positions[user].subVaultId;
-        uint256 subVaultRate = _activeSubVaults[_subVaultIndexById[subVaultId]].perSecondRate;
+        uint256 subVaultRate = _subVaultById[subVaultId].perSecondRate;
         return SubVaultData(subVaultRate, subVaultId);
     }
 
-    function _previewSubVaultConversionRate(uint256 subVaultIndex) internal view returns (uint256) {
-        uint256 secondsSinceLastAccrual = block.timestamp - _activeSubVaults[subVaultIndex].lastAccrualTimestamp;
-        uint256 newConversionRate = _activeSubVaults[subVaultIndex].conversionRate;
+    function isAssetSupported(address asset) public view returns (bool) {
+        return _supportedAssets[asset];
+    }
+
+    ///////////////////////////////////////////////// INTERNAL /////////////////////////////////////////////////////
+
+    function _getOrCreateSubVaultWithRate(uint256 perSecondRate) internal returns (uint256) {
+        if (_existsSubVaultWithRate(perSecondRate)) {
+            return _subVaultIdByRate[perSecondRate];
+        } else {
+            return _createSubVault(perSecondRate);
+        }
+    }
+
+    function _setDefaultSubVault(uint256 subVaultId) internal {
+        _defaultSubVaultId = subVaultId;
+        emit DefaultSubVaultSet(subVaultId);
+    }
+
+    function _createSubVault(uint256 newPerSecondRate) internal returns (uint256) {
+        require(!_existsSubVaultWithRate(newPerSecondRate), VaultAlreadyExists());
+        require(newPerSecondRate >= MathLib.RAY, InvalidRate());
+        uint256 newSubVaultId = ++_lastSubVaultId;
+        _subVaultById[newSubVaultId] = SubVault({
+            perSecondRate: newPerSecondRate,
+            conversionRate: MathLib.RAY,
+            lastAccrualTimestamp: uint256(block.timestamp),
+            totalShares: 0
+        });
+        _subVaultIdByRate[newPerSecondRate] = newSubVaultId;
+        emit SubVaultCreated(newSubVaultId, newPerSecondRate);
+        return newSubVaultId;
+    }
+
+    function _migrateUserToSubVault(address user, uint256 oldSubVaultId, uint256 newSubVaultId) internal {
+        _accrueSubVaultConversionRate(oldSubVaultId);
+        _accrueSubVaultConversionRate(newSubVaultId);
+        uint256 oldConversionRate = _subVaultById[oldSubVaultId].conversionRate;
+        uint256 newConversionRate = _subVaultById[newSubVaultId].conversionRate;
+        uint256 userOldShares = _positions[user].shares;
+        uint256 userNewShares = userOldShares.rayMulDown(oldConversionRate).rayDivDown(newConversionRate);
+
+        if (!_isActiveSubVaultById(newSubVaultId)) {
+            _addSubVaultToActive(newSubVaultId);
+        }
+
+        _subVaultById[oldSubVaultId].totalShares -= userOldShares;
+        _subVaultById[newSubVaultId].totalShares += userNewShares;
+
+        _positions[user].shares = userNewShares;
+        _positions[user].subVaultId = newSubVaultId;
+
+        if (!_isActiveSubVaultById(oldSubVaultId)) {
+            _removeSubVaultFromActive(oldSubVaultId);
+        }
+    }
+
+    function _addSubVaultToActive(uint256 subVaultId) internal {
+        _activeSubVaultsIds.push(subVaultId);
+        _activeSubVaultIndexById[subVaultId] = _activeSubVaultsIds.length - 1;
+    }
+
+    // Assumes that if it is called then `subVaultId` is indeed active, thus `_activeSubVaultsIds.length > 0`
+    function _removeSubVaultFromActive(uint256 subVaultId) internal {
+        uint256 subVaultIndex = _activeSubVaultIndexById[subVaultId];
+        uint256 lastSubVaultIndex = _activeSubVaultsIds.length - 1;
+        if (subVaultIndex != lastSubVaultIndex) {
+            uint256 lastSubVaultId = _activeSubVaultsIds[lastSubVaultIndex];
+            _activeSubVaultsIds[subVaultIndex] = lastSubVaultId;
+            _activeSubVaultIndexById[lastSubVaultId] = subVaultIndex;
+        }
+        _activeSubVaultsIds.pop();
+        delete _activeSubVaultIndexById[subVaultId];
+    }
+
+    function _previewSubVaultConversionRate(uint256 subVaultId) internal view returns (uint256) {
+        uint256 secondsSinceLastAccrual = block.timestamp - _subVaultById[subVaultId].lastAccrualTimestamp;
+        uint256 newConversionRate = _subVaultById[subVaultId].conversionRate;
         if (secondsSinceLastAccrual != 0) {
-            uint256 growthFactor = _activeSubVaults[subVaultIndex].perSecondRate.rpow(secondsSinceLastAccrual);
-            newConversionRate = _activeSubVaults[subVaultIndex].conversionRate.rayMulDown(growthFactor);
+            uint256 growthFactor = _subVaultById[subVaultId].perSecondRate.rpow(secondsSinceLastAccrual);
+            newConversionRate = _subVaultById[subVaultId].conversionRate.rayMulDown(growthFactor);
         }
         return newConversionRate;
     }
 
-    function _accrueSubVaultConversionRate(uint256 subVaultIndex) internal {
-        _activeSubVaults[subVaultIndex].conversionRate = _previewSubVaultConversionRate(subVaultIndex);
-        _activeSubVaults[subVaultIndex].lastAccrualTimestamp = block.timestamp;
+    function _accrueSubVaultConversionRate(uint256 subVaultId) internal {
+        _subVaultById[subVaultId].conversionRate = _previewSubVaultConversionRate(subVaultId);
+        _subVaultById[subVaultId].lastAccrualTimestamp = block.timestamp;
+    }
+
+    function _getVaultObligations() internal view returns (uint256) {
+        uint256 vaultObligations;
+        for (uint256 i = 0; i < _activeSubVaultsIds.length; i++) {
+            vaultObligations += _subVaultById[_activeSubVaultsIds[i]].totalShares
+                .rayMulDown(_previewSubVaultConversionRate(_activeSubVaultsIds[i]));
+        }
+        return vaultObligations;
     }
 
     function _isActiveSubVaultById(uint256 subVaultId) internal view returns (bool) {
-        return
-            _subVaultIndexById[subVaultId] != 0 || (_activeSubVaults.length > 0 && _activeSubVaults[0].totalShares > 0);
+        return _subVaultById[subVaultId].totalShares > 0;
     }
 
-    function _isActiveSubVaultByRate(uint256 perSecondRate) internal view returns (bool) {
+    function _existsSubVaultWithRate(uint256 perSecondRate) internal view returns (bool) {
         return _subVaultIdByRate[perSecondRate] != 0;
     }
 }
