@@ -178,7 +178,7 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
 
         uint256 conversionRate = _subVaultById[subVaultId].conversionRate;
         uint256 actualAmountInRay;
-        uint256 guaranteedAmount;
+        uint256 guaranteedAmountRay;
         uint256 subVaultShares;
 
         if (requestedAmountInRay == 0) {
@@ -186,13 +186,13 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
             actualAmountInRay = _positions[user].shares.rayMulDown(conversionRate);
 
             // TODO: should we check actualAmountInRay > 0?
-            guaranteedAmount = _positions[user].originalDeposit;
+            guaranteedAmountRay = _positions[user].originalDeposit;
             // FIXME: keeping + 2 here during development; we lose 2 units of assets when going from assets -> shares
             // (the loss is baked into the shares quantity which when multiplied with the same conversion rate leads to
             // 2 unit of asset loss).
-            require(actualAmountInRay + 2 >= guaranteedAmount, "more than 2 unit of loss - investigate");
-            if (actualAmountInRay < guaranteedAmount) {
-                guaranteedAmount = actualAmountInRay;
+            require(actualAmountInRay + 2 >= guaranteedAmountRay, "more than 2 unit of loss - investigate");
+            if (actualAmountInRay < guaranteedAmountRay) {
+                guaranteedAmountRay = actualAmountInRay;
             }
             subVaultShares = _positions[user].shares;
             _subVaultById[subVaultId].totalShares -= subVaultShares;
@@ -208,36 +208,42 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
             actualAmountInRay = requestedAmountInShares.rayMulDown(conversionRate);
             // TODO: Probably there is a better way to do this:
             if (actualAmountInRay >= _positions[user].originalDeposit) {
-                guaranteedAmount = _positions[user].originalDeposit;
+                guaranteedAmountRay = _positions[user].originalDeposit;
                 _positions[user].originalDeposit = 0;
             } else {
-                guaranteedAmount = actualAmountInRay;
+                guaranteedAmountRay = actualAmountInRay;
                 _positions[user].originalDeposit -= actualAmountInRay;
             }
         }
         if (!_isActiveSubVaultById(subVaultId)) {
             _removeSubVaultFromActive(subVaultId);
         }
-        // TODO: Handle preferred asset properly
         uint256 withdrawalRequestId = _fundsHandler.processWithdrawalRequest({
             recipient: user,
-            amount: actualAmountInRay,
-            guaranteedAmount: guaranteedAmount,
+            amountRay: actualAmountInRay,
+            guaranteedAmountRay: guaranteedAmountRay,
             preferredAsset: preferredAsset,
+            // TODO: do we need data here?
             data: ""
         });
         emit WithdrawalRequestedWithShares(
-            user, preferredAsset, withdrawalRequestId, subVaultId, subVaultShares, actualAmountInRay, guaranteedAmount
+            user,
+            preferredAsset,
+            withdrawalRequestId,
+            subVaultId,
+            subVaultShares,
+            actualAmountInRay,
+            guaranteedAmountRay
         );
         return withdrawalRequestId;
     }
 
+    // TODO: do we need data here?
     function executeWithdrawal(uint256 withdrawalRequestId, bytes calldata data)
         external
         override
         returns (address, uint256, bytes memory)
     {
-        // TODO: FH will approve the the BBV to spend, the BBV should do a transferFrom
         (address asset, uint256 amount, address user, bytes memory returnData) =
             _fundsHandler.processWithdrawalExecution(withdrawalRequestId, data);
         IERC20(asset).safeTransferFrom(address(_fundsHandler), user, amount);

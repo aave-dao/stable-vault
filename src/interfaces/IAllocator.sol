@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-/// @dev Assumes single strategy per asset; multiple assets per Allocator
-/// @dev Deals with assets in their native decimals
+/// @dev Assumes single strategy per asset; multiple assets per Allocator.
+/// @dev Deals with assets in their native decimals.
 interface IAllocator {
-    /// @notice emitted when funds fails to deposit to strategy vault and left idle in Allocator
+    event Deallocation(address indexed asset, address indexed vault, uint256 amount, uint256 burnedShares);
+    /// @notice emitted when funds fails to deposit to strategy vault and left idle in Allocator.
     event VaultDepositFailed(address indexed vault, uint256 amount);
 
     struct AllocatorBalance {
@@ -22,14 +23,11 @@ interface IAllocator {
     /// @dev Returns the available liquidity denominated in given asset's decimals.
     function getAssetBalance(address asset) external view returns (uint256);
 
-    /// @dev Returns latest total assets in strategies denominated in RAY.
-    function getAggregatedBalance() external view returns (uint256);
-
     function deposit(address asset, uint256 amount) external;
 
     function withdraw(address asset, uint256 amount) external;
 
-    /// Request any asset from the allocator for a given amount; assumes allocator assets have common denomination.
+    /// @dev Request any asset from the allocator for a given amount; assumes allocator assets have common denomination.
     function withdrawEmergency(uint256 amount) external returns (address asset);
 
     function setManager(address newManager) external;

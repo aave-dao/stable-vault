@@ -247,15 +247,15 @@ contract EndToEndTest is BaseTest {
         //        - check that the withdrawal request is deleted and gone
         FundsHandler.WithdrawalRequest memory withdrawalRequest = fundsHandler.getWithdrawalRequest(withdrawalId);
         console.log("\trecipient:", withdrawalRequest.recipient);
-        console.log("\tamountRequested:", withdrawalRequest.amountRequested);
-        console.log("\tamountGuaranteed:", withdrawalRequest.amountGuaranteed);
+        console.log("\tamountRequestedRay:", withdrawalRequest.amountRequestedRay);
+        console.log("\tamountGuaranteedRay:", withdrawalRequest.amountGuaranteedRay);
         console.log("\tpreferredAsset:", withdrawalRequest.preferredAsset);
         console.log("\trequestTimestamp:", withdrawalRequest.requestTimestamp);
         console.logBytes(data);
 
         assertEq(withdrawalRequest.recipient, address(0), "Withdrawal Request recipient is not cleared out");
-        assertEq(withdrawalRequest.amountRequested, 0, "Withdrawal Request amountRequested is not cleared out");
-        assertEq(withdrawalRequest.amountGuaranteed, 0, "Withdrawal Request amountGuaranteed is not cleared out");
+        assertEq(withdrawalRequest.amountRequestedRay, 0, "Withdrawal Request amountRequestedRay is not cleared out");
+        assertEq(withdrawalRequest.amountGuaranteedRay, 0, "Withdrawal Request amountGuaranteedRay is not cleared out");
         assertEq(withdrawalRequest.preferredAsset, address(0), "Withdrawal Request preferredAsset is not cleared out");
         assertEq(withdrawalRequest.requestTimestamp, 0, "Withdrawal Request requestTimestamp is not cleared out");
         assertEq(withdrawalRequest.data, "", "Withdrawal Request data is not cleared out");

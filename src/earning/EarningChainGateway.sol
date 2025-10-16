@@ -9,6 +9,8 @@ import {IAllocator} from "../interfaces/IAllocator.sol";
 import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {IEarningChainGateway} from "../interfaces/IEarningChainGateway.sol";
+import {IManagedAllocator} from "../interfaces/IManagedAllocator.sol";
+import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {EventLib} from "../libraries/EventLib.sol";
 
@@ -16,6 +18,7 @@ import {EventLib} from "../libraries/EventLib.sol";
 /// @notice Facilitates cross chain messaging with exactly one Accounting Chain.
 contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
     using SafeERC20 for IERC20;
+    using AssetLib for uint256;
 
     modifier onlyManager() {
         require(msg.sender == _manager, ErrorsLib.NotManager());
@@ -36,7 +39,6 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
         emit EventLib.ManagerSet(manager);
     }
 
-    // TODO: Think if this should be put in constructor, or this can bee
     function setAllocator(address allocator) external onlyAdmin {
         require(allocator != address(0), ErrorsLib.ZeroAddress());
         _allocator = allocator;
@@ -57,7 +59,6 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
 
     function _receiveData(uint256 sourceChainId, bytes memory data) internal view override {
         _onlyAdapter(ASSET_FOR_DATA_ONLY_BRIDGE, sourceChainId);
-        // TODO: this assumes that the data is token amount in RAY (token agnostic)
         uint256 amountRay = abi.decode(data, (uint256));
         _emergencyExit(amountRay);
     }
@@ -98,6 +99,11 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
     }
 
     function _getBalanceSnapshotData() internal view returns (bytes memory) {
-        return abi.encode(IChainGateway.BalanceSnapshot(IAllocator(_allocator).getAggregatedBalance(), block.timestamp));
+        IManagedAllocator.AllocatorBalance[] memory allocatorBalances = IAllocator(_allocator).getAssetBalances();
+        uint256 totalAssetsInRay;
+        for (uint256 i = 0; i < allocatorBalances.length; i++) {
+            totalAssetsInRay += allocatorBalances[i].amount.assetDecimalsToRay(allocatorBalances[i].asset);
+        }
+        return abi.encode(IChainGateway.BalanceSnapshot(totalAssetsInRay, block.timestamp));
     }
 }

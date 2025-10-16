@@ -14,8 +14,8 @@ interface IFundsHandler {
 
     struct WithdrawalRequest {
         address recipient;
-        uint256 amountRequested;
-        uint256 amountGuaranteed;
+        uint256 amountRequestedRay;
+        uint256 amountGuaranteedRay;
         address preferredAsset;
         uint256 requestTimestamp;
         bytes data;
@@ -37,16 +37,24 @@ interface IFundsHandler {
     function processDeposit(address asset, uint256 amount) external;
 
     /// @dev Initializes a withdrawal request by creating a withdrawal request id and updating storage.
+    /// @param recipient The recipient of the withdrawal.
+    /// @param amountRay The amount of the asset in RAY (token agnostic) to withdraw.
+    /// @param guaranteedAmountRay Portion of the original deposit made by the recipient that is guaranteed to be
+    /// withdrawable.
+    /// @param preferredAsset Preferred asset to be transferred to the recipient.
+    /// @param data Arbitrary data to pass to the withdrawal execution.
     function processWithdrawalRequest(
         address recipient,
-        uint256 amount,
-        uint256 guaranteedAmount,
+        uint256 amountRay,
+        uint256 guaranteedAmountRay,
         address preferredAsset,
         bytes calldata data
     ) external returns (uint256);
 
     /// @dev Executes a withdrawal request by pulling funds from the liquidity source and allowing them to be returned
     /// to the recipient.
+    /// @param withdrawalRequestId The id of the withdrawal request as is stored.
+    /// @param data Arbitrary data to pass to the withdrawal execution.
     function processWithdrawalExecution(uint256 withdrawalRequestId, bytes calldata data)
         external
         returns (address, uint256, address, bytes memory);
@@ -56,15 +64,15 @@ interface IFundsHandler {
     function pushFundsToChain(address asset, uint256 amount, uint256 chainId) external;
 
     /// @dev Uses the Gateway contract to request funds from another chain.
-    /// @param amount The amount of the asset in RAY (token agnostic) to pull from the chain.
+    /// @param amountRay The amount of the asset in RAY (token agnostic) to pull from the chain.
     /// @param chainId The chain id of the chain to request funds from.
-    function pullFundsFromChain(uint256 amount, uint256 chainId) external;
+    function pullFundsFromChain(uint256 amountRay, uint256 chainId) external;
 
     /// @dev Updates the chain balance snapshot for a given chain.
     /// @param chainId The chain id of the chain that sent the balance update
-    /// @param balanceSnapshot The balance snapshot on the source chain in RAY of supported asset denomination
+    /// @param snapshotBalanceRay The balance snapshot on the source chain in RAY of supported asset denomination
     /// @param snapshotTimestamp The timestamp of the balance snapshot from the source chain
-    function updateChainBalanceCallback(uint256 chainId, uint256 balanceSnapshot, uint256 snapshotTimestamp) external;
+    function updateChainBalanceCallback(uint256 chainId, uint256 snapshotBalanceRay, uint256 snapshotTimestamp) external;
 
     function fundsArrivedFromChainCallback(address asset, uint256 amount) external;
 

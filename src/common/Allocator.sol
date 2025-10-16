@@ -7,17 +7,16 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {IAllocator} from "../interfaces/IAllocator.sol";
 import {IManagedAllocator} from "../interfaces/IManagedAllocator.sol";
+import {ISwapper} from "../interfaces/ISwapper.sol";
 import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
-
-import {ISwapper} from "../interfaces/ISwapper.sol";
 
 /// @dev Assumptions:
 ///      - 1 strategy per asset
 ///      - multiple assets per allocator with a common denomination
 ///      - assets are in their native decimals
 ///      - 100% of assets deposited into Allocator belong to the same entity
-/// @dev Deals with assets in their native decimals
+/// @dev Deals with assets in their native decimals.
 contract Allocator is IManagedAllocator {
     // TODO: consider scenarios where tokens are left idle here because pushing to strategies fails (reverts should be
     // caught)
@@ -60,31 +59,27 @@ contract Allocator is IManagedAllocator {
         _admin = admin;
     }
 
+    /// @inheritdoc IAllocator
     function getManager() external view returns (address) {
         return _manager;
     }
 
+    /// @inheritdoc IAllocator
     function getAdmin() external view returns (address) {
         return _admin;
     }
 
+    /// @inheritdoc IAllocator
     function getAssetBalance(address asset) external view override returns (uint256) {
         return _getAssetBalance(asset);
     }
 
+    /// @inheritdoc IAllocator
     function getAssetBalances() external view override returns (IManagedAllocator.AllocatorBalance[] memory) {
         return _getAssetBalances();
     }
 
-    function getAggregatedBalance() external view override returns (uint256) {
-        IManagedAllocator.AllocatorBalance[] memory allocatedAssets = _getAssetBalances();
-        uint256 totalAssetsInRay;
-        for (uint256 i = 0; i < allocatedAssets.length; i++) {
-            totalAssetsInRay += allocatedAssets[i].amount.assetDecimalsToRay(allocatedAssets[i].asset);
-        }
-        return totalAssetsInRay;
-    }
-
+    /// @inheritdoc IAllocator
     function deposit(address asset, uint256 amount) external override onlyWhitelistedDepositor {
         IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
         bool callSucceeded = _deposit({asset: asset, amount: amount});
@@ -93,20 +88,28 @@ contract Allocator is IManagedAllocator {
         }
     }
 
+    /// @inheritdoc IAllocator
     function withdraw(address asset, uint256 amount) external override onlyWhitelistedWithdrawer {
         address vault = _vaultByAsset[asset];
         require(vault != address(0), ErrorsLib.UnsupportedAsset(asset));
         require(amount > 0, ErrorsLib.ZeroAmount());
         uint256 idleBalance = IERC20(asset).balanceOf(address(this));
+
+        uint256 burnedShares;
+        uint256 amountToDeallocate = amount;
         if (idleBalance > 0 && amount > idleBalance) {
-            IERC4626(vault).withdraw({assets: amount - idleBalance, receiver: address(this), owner: address(this)});
+            amountToDeallocate = amount - idleBalance;
+            burnedShares =
+                IERC4626(vault).withdraw({assets: amountToDeallocate, receiver: address(this), owner: address(this)});
             IERC20(asset).safeTransfer(msg.sender, amount);
         } else {
-            IERC4626(vault).withdraw({assets: amount, receiver: msg.sender, owner: address(this)});
+            burnedShares =
+                IERC4626(vault).withdraw({assets: amountToDeallocate, receiver: msg.sender, owner: address(this)});
         }
+        emit Deallocation(asset, vault, amountToDeallocate, burnedShares);
     }
 
-    /// Request any asset from the allocator for a given amount; assumes allocator assets have common denomination.
+    /// @inheritdoc IAllocator
     function withdrawEmergency(
         uint256 /* amount */
     )
@@ -118,15 +121,27 @@ contract Allocator is IManagedAllocator {
     {
         // TODO: Implement pull asset from vault based on priority? Based on default? Iterate through and try which ever
         // has funds?
+        // TODO: try to avoid dealing with assets in RAY as this contract deals with assets in their native decimals.
         revert("Allocator.withdrawEmergency:NOT_IMPLEMENTED");
     }
 
+    /// @inheritdoc IManagedAllocator
+    function deallocate(address asset, uint256 amount) external onlyManager {
+        address vault = _vaultByAsset[asset];
+        require(vault != address(0), ErrorsLib.UnsupportedAsset(asset));
+        require(amount > 0, ErrorsLib.ZeroAmount());
+        uint256 burnedShares = IERC4626(vault).withdraw({assets: amount, receiver: address(this), owner: address(this)});
+        emit Deallocation(asset, vault, amount, burnedShares);
+    }
+
+    /// @inheritdoc IManagedAllocator
     function depositIdleFunds(address asset) external onlyManager {
         uint256 amount = IERC20(asset).balanceOf(address(this));
         bool callSucceeded = _deposit({asset: asset, amount: amount});
         require(callSucceeded, ErrorsLib.VaultDepositFailed());
     }
 
+    /// @inheritdoc IManagedAllocator
     function rebalance(CrossAssetRebalanceParams memory params) external override onlyManager {
         for (uint256 i = 0; i < params.swaps.length; i++) {
             address assetIn = params.swaps[i].assetIn;

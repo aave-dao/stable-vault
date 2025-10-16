@@ -21,7 +21,11 @@ interface IManagedAllocator is IAllocator {
         SwapParams[] swaps;
     }
 
+    /// @notice Moves all idle funds of a given asset on the contract to a strategy.
     function depositIdleFunds(address asset) external;
+
+    /// @dev Deallocates a given amount of an asset from the allocator; funds stay idle on the contract.
+    function deallocate(address asset, uint256 amount) external;
 
     /// @notice Rebalance the mix of underlying tokens by pulling from strategies, executing swaps and resupplying to
     /// strategies.
