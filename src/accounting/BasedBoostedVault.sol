@@ -136,19 +136,13 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
     }
 
     function setUserRate(address user, uint256 newPerSecondRate) external override onlyManager {
-        uint256 userOldShares = _positions[user].shares;
-        require(userOldShares > 0, NonExistentPosition());
         uint256 oldSubVaultId = _positions[user].subVaultId;
+        require(oldSubVaultId > 0, NonExistentPosition());
         require(_subVaultById[oldSubVaultId].perSecondRate != newPerSecondRate, RedundantRate());
 
         uint256 newSubVaultId = _getOrCreateSubVaultWithRate(newPerSecondRate);
 
-        _migrateUserToSubVault({
-            user: user,
-            userOldShares: userOldShares,
-            oldSubVaultId: oldSubVaultId,
-            newSubVaultId: newSubVaultId
-        });
+        _migrateUserToSubVault(user, oldSubVaultId, newSubVaultId);
 
         emit UserRateUpdated(user, newPerSecondRate);
     }
@@ -336,14 +330,12 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         return newSubVaultId;
     }
 
-    function _migrateUserToSubVault(address user, uint256 userOldShares, uint256 oldSubVaultId, uint256 newSubVaultId)
-        internal
-    {
+    function _migrateUserToSubVault(address user, uint256 oldSubVaultId, uint256 newSubVaultId) internal {
         _accrueSubVaultConversionRate(oldSubVaultId);
         _accrueSubVaultConversionRate(newSubVaultId);
         uint256 oldConversionRate = _subVaultById[oldSubVaultId].conversionRate;
         uint256 newConversionRate = _subVaultById[newSubVaultId].conversionRate;
-
+        uint256 userOldShares = _positions[user].shares;
         uint256 userNewShares = userOldShares.rayMulDown(oldConversionRate).rayDivDown(newConversionRate);
 
         if (!_isActiveSubVaultById(newSubVaultId)) {
