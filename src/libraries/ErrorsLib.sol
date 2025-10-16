@@ -29,9 +29,6 @@ library ErrorsLib {
     /// @notice Insufficient amount due to slippage tolerance being exceeded.
     error InsufficientAmountOut();
 
-    /// @notice Thrown when unexpected number of assets are received from a source chain.
-    error InvalidBridgeAssetsLength();
-
     /// @notice Not enough liquidity to cover the withdrawal.
     error InsufficientLiquidity();
 
@@ -40,4 +37,7 @@ library ErrorsLib {
 
     /// @notice Thrown when input parameter contains unacceptable amount.
     error InvalidAmount();
+
+    /// @notice Address checked is not the self.
+    error NotSelf();
 }

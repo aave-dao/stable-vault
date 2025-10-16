@@ -48,19 +48,13 @@ contract AccountingChainGateway is IAccountingChainGateway, BaseChainGateway {
             .publishMessageToChain(targetChainId, new IBridgeAdapter.BridgeAsset[](0), abi.encode(amountRay));
     }
 
-    function _receiveFunds(
-        uint256,
-        /* sourceChainId */
-        IBridgeAdapter.BridgeAsset[] memory assets
-    )
-        internal
-        override
-    {
-        require(assets.length == 1, ErrorsLib.InvalidBridgeAssetsLength());
-        address asset = assets[0].asset;
-        uint256 amount = assets[0].amount;
-        IERC20(asset).safeTransferFrom(msg.sender, _fundsHandler, amount);
-        IFundsHandler(_fundsHandler).fundsArrivedFromChainCallback(asset, amount);
+    function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal override {
+        for (uint256 i = 0; i < assets.length; i++) {
+            address asset = assets[i].asset;
+            uint256 amount = assets[i].amount;
+            IERC20(asset).safeTransferFrom(msg.sender, _fundsHandler, amount);
+            IFundsHandler(_fundsHandler).fundsArrivedFromChainCallback(asset, amount);
+        }
     }
 
     function _receiveData(uint256 sourceChainId, bytes memory data) internal override {

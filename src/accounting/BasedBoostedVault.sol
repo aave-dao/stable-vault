@@ -13,7 +13,7 @@ import {MathLib} from "../libraries/MathLib.sol";
 
 /// @dev Assets balances are tracked in RAY internally; conversions from and to specific asset denomination is made on
 /// deposit and on withdrawal execution.
-contract BasedBoostedVault is IBasedBoostedVault, Ownable {
+contract BasedBoostedVault is Ownable, IBasedBoostedVault {
     using MathLib for uint256;
     using AssetLib for uint256;
     using SafeERC20 for IERC20;

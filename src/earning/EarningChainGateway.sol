@@ -43,20 +43,14 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
         emit EventLib.AllocatorSet(allocator);
     }
 
-    function _receiveFunds(
-        uint256,
-        /* sourceChainId */
-        IBridgeAdapter.BridgeAsset[] memory assets
-    )
-        internal
-        override
-    {
-        require(assets.length == 1, ErrorsLib.InvalidBridgeAssetsLength());
-        address asset = assets[0].asset;
-        uint256 amount = assets[0].amount;
-        IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
-        IERC20(asset).forceApprove(_allocator, amount);
-        IAllocator(_allocator).deposit(asset, amount);
+    function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal override {
+        for (uint256 i = 0; i < assets.length; i++) {
+            address asset = assets[i].asset;
+            uint256 amount = assets[i].amount;
+            IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
+            IERC20(asset).forceApprove(_allocator, amount);
+            IAllocator(_allocator).deposit(asset, amount);
+        }
         // TODO: should this callback be gated behind a flag sent from the Accounting Chain?
         _sendBalanceUpdate();
     }
