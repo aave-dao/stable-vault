@@ -123,8 +123,7 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         uint256 shares = amountInRay.rayDivDown(conversionRate);
 
         if (!_isActiveSubVaultById(subVaultId)) {
-            _activeSubVaultsIds.push(subVaultId);
-            _activeSubVaultIndexById[subVaultId] = _activeSubVaultsIds.length - 1;
+            _addSubVaultToActive(subVaultId);
         }
 
         _subVaultById[subVaultId].totalShares += shares;
@@ -340,8 +339,7 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         uint256 userNewShares = userOldShares.rayMulDown(oldConversionRate).rayDivDown(newConversionRate);
 
         if (!_isActiveSubVaultById(newSubVaultId)) {
-            _activeSubVaultsIds.push(newSubVaultId);
-            _activeSubVaultIndexById[newSubVaultId] = _activeSubVaultsIds.length - 1;
+            _addSubVaultToActive(newSubVaultId);
         }
 
         _subVaultById[oldSubVaultId].totalShares -= userOldShares;
@@ -353,6 +351,11 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         if (!_isActiveSubVaultById(oldSubVaultId)) {
             _removeSubVaultFromActive(oldSubVaultId);
         }
+    }
+
+    function _addSubVaultToActive(uint256 subVaultId) internal {
+        _activeSubVaultsIds.push(subVaultId);
+        _activeSubVaultIndexById[subVaultId] = _activeSubVaultsIds.length - 1;
     }
 
     // Assumes that if it is called then `subVaultId` is indeed active, thus `_activeSubVaultsIds.length > 0`
@@ -386,9 +389,8 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
     function _getVaultObligations() internal view returns (uint256) {
         uint256 vaultObligations;
         for (uint256 i = 0; i < _activeSubVaultsIds.length; i++) {
-            vaultObligations += _subVaultById[_activeSubVaultsIds[i]].totalShares.rayMulDown(
-                _previewSubVaultConversionRate(_activeSubVaultsIds[i])
-            );
+            vaultObligations += _subVaultById[_activeSubVaultsIds[i]].totalShares
+                .rayMulDown(_previewSubVaultConversionRate(_activeSubVaultsIds[i]));
         }
         return vaultObligations;
     }
