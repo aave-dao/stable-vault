@@ -90,8 +90,9 @@ contract BaseTest is Test {
         address accountingChainGatewayAddress = vm.computeCreateAddress(address(this), deployerNonce + 1);
         console.log("\tAccounting Chain Gateway Predicted Address: %s", accountingChainGatewayAddress);
 
-        fundsHandler =
-            new FundsHandler(manager, address(vault), accountingChainGatewayAddress, address(allocator_accountingChain));
+        fundsHandler = new FundsHandler(
+            manager, address(vault), accountingChainGatewayAddress, address(allocator_accountingChain)
+        );
         console.log("\tFunds Handler: %s", address(fundsHandler));
         accountingChainGateway = new AccountingChainGateway(admin, address(fundsHandler));
         console.log("\tAccounting Chain Gateway: %s", address(accountingChainGateway));

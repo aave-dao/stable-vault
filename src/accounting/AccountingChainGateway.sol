@@ -44,12 +44,18 @@ contract AccountingChainGateway is IAccountingChainGateway, BaseChainGateway {
     /// @param amountRay The `amount` must be in RAY to be token agnostic.
     /// @param targetChainId The destination chainId.
     function sendPullFundsFromChainMessage(uint256 amountRay, uint256 targetChainId) external onlyFundsHandler {
-        IBridgeAdapter(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][targetChainId]).publishMessageToChain(
-            targetChainId, new IBridgeAdapter.BridgeAsset[](0), abi.encode(amountRay)
-        );
+        IBridgeAdapter(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][targetChainId])
+            .publishMessageToChain(targetChainId, new IBridgeAdapter.BridgeAsset[](0), abi.encode(amountRay));
     }
 
-    function _receiveFunds(uint256, /* sourceChainId */ IBridgeAdapter.BridgeAsset[] memory assets) internal override {
+    function _receiveFunds(
+        uint256,
+        /* sourceChainId */
+        IBridgeAdapter.BridgeAsset[] memory assets
+    )
+        internal
+        override
+    {
         require(assets.length == 1, ErrorsLib.InvalidBridgeAssetsLength());
         address asset = assets[0].asset;
         uint256 amount = assets[0].amount;
@@ -61,8 +67,7 @@ contract AccountingChainGateway is IAccountingChainGateway, BaseChainGateway {
         _onlyAdapter(ASSET_FOR_DATA_ONLY_BRIDGE, sourceChainId);
         // TODO: this assumes that the data is a balance snapshot and can be nothing else
         IChainGateway.BalanceSnapshot memory balanceSnapshot = abi.decode(data, (IChainGateway.BalanceSnapshot));
-        IFundsHandler(_fundsHandler).updateChainBalanceCallback(
-            sourceChainId, balanceSnapshot.balance, balanceSnapshot.timestamp
-        );
+        IFundsHandler(_fundsHandler)
+            .updateChainBalanceCallback(sourceChainId, balanceSnapshot.balance, balanceSnapshot.timestamp);
     }
 }

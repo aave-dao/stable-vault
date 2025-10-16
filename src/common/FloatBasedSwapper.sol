@@ -26,7 +26,12 @@ contract FloatBasedSwapper is ISwapper, Ownable, ReentrancyGuard {
     }
 
     /// @inheritdoc ISwapper
-    function executeSwap(address assetIn, address assetOut, uint256 amountIn, bytes memory /* data */ )
+    function executeSwap(
+        address assetIn,
+        address assetOut,
+        uint256 amountIn,
+        bytes memory /* data */
+    )
         external
         onlyOwner
         nonReentrant

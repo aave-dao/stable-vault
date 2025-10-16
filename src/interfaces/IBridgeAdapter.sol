@@ -11,6 +11,5 @@ interface IBridgeAdapter {
     /// @param destinationChainId The chain id of the chain to publish the message to.
     /// @param assets The assets to push to the destination chain.
     /// @param data The arbitrary data that would be decoded and handled by the destination chain.
-    function publishMessageToChain(uint256 destinationChainId, BridgeAsset[] memory assets, bytes memory data)
-        external;
+    function publishMessageToChain(uint256 destinationChainId, BridgeAsset[] memory assets, bytes memory data) external;
 }

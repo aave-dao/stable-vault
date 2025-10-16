@@ -43,7 +43,14 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
         emit EventLib.AllocatorSet(allocator);
     }
 
-    function _receiveFunds(uint256, /* sourceChainId */ IBridgeAdapter.BridgeAsset[] memory assets) internal override {
+    function _receiveFunds(
+        uint256,
+        /* sourceChainId */
+        IBridgeAdapter.BridgeAsset[] memory assets
+    )
+        internal
+        override
+    {
         require(assets.length == 1, ErrorsLib.InvalidBridgeAssetsLength());
         address asset = assets[0].asset;
         uint256 amount = assets[0].amount;
@@ -93,9 +100,8 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
     }
 
     function _sendBalanceUpdate() internal {
-        IBridgeAdapter(_bridgeAdapter[address(0)][ACCOUNTING_CHAIN_ID]).publishMessageToChain(
-            ACCOUNTING_CHAIN_ID, new IBridgeAdapter.BridgeAsset[](0), _getBalanceSnapshotData()
-        );
+        IBridgeAdapter(_bridgeAdapter[address(0)][ACCOUNTING_CHAIN_ID])
+            .publishMessageToChain(ACCOUNTING_CHAIN_ID, new IBridgeAdapter.BridgeAsset[](0), _getBalanceSnapshotData());
     }
 
     function _getBalanceSnapshotData() internal view returns (bytes memory) {

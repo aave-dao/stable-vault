@@ -151,8 +151,7 @@ contract MockCCIPRouter is IRouter, IRouterClient {
             return abi.decode(extraArgs[4:], (Client.GenericExtraArgsV2));
         } else if (extraArgsTag == Client.EVM_EXTRA_ARGS_V1_TAG) {
             return Client.GenericExtraArgsV2({
-                gasLimit: abi.decode(extraArgs[4:], (uint256)),
-                allowOutOfOrderExecution: false
+                gasLimit: abi.decode(extraArgs[4:], (uint256)), allowOutOfOrderExecution: false
             });
         }
 
@@ -180,12 +179,26 @@ contract MockCCIPRouter is IRouter, IRouterClient {
     }
 
     /// @notice Always returns address(1234567890)
-    function getOnRamp(uint64 /* destChainSelector */ ) external pure returns (address onRampAddress) {
+    function getOnRamp(
+        uint64 /* destChainSelector */
+    )
+        external
+        pure
+        returns (address onRampAddress)
+    {
         return address(1234567890);
     }
 
     /// @notice Always returns true
-    function isOffRamp(uint64, /* sourceChainSelector */ address /* offRamp */ ) external pure returns (bool) {
+    function isOffRamp(
+        uint64,
+        /* sourceChainSelector */
+        address /* offRamp */
+    )
+        external
+        pure
+        returns (bool)
+    {
         return true;
     }
 

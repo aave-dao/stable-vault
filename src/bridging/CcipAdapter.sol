@@ -64,9 +64,10 @@ contract CcipAdapter is IBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
             _processFundsReceiving(message.sourceChainSelector, message.destTokenAmounts);
         }
         if (message.data.length > 0) {
-            IChainGateway(_gateway).receiveMessage(
-                _chainIdOf[message.sourceChainSelector], new IBridgeAdapter.BridgeAsset[](0), message.data
-            );
+            IChainGateway(_gateway)
+                .receiveMessage(
+                    _chainIdOf[message.sourceChainSelector], new IBridgeAdapter.BridgeAsset[](0), message.data
+                );
         }
     }
 
@@ -93,7 +94,9 @@ contract CcipAdapter is IBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
             tokenAmounts: tokenAmounts,
             feeToken: _feeToken,
             // TODO: Think how we pass this gasLimit down here
-            extraArgs: Client._argsToBytes(Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: false}))
+            extraArgs: Client._argsToBytes(
+                Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: false})
+            )
         });
         _sendMessage(chainId, ccipMessage);
     }

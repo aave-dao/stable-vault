@@ -106,7 +106,9 @@ contract Allocator is IManagedAllocator {
     }
 
     /// Request any asset from the allocator for a given amount; assumes allocator assets have common denomination.
-    function withdrawEmergency(uint256 /* amount */ )
+    function withdrawEmergency(
+        uint256 /* amount */
+    )
         external
         view
         override
@@ -136,9 +138,8 @@ contract Allocator is IManagedAllocator {
             // Transfer assetIn to the swapper
             IERC20(params.swaps[i].assetIn).safeTransfer(swapper, amountIn);
             // Execute the swap; rely on the swapper to enforce slippage constraints and send the toAsset back to the Allocator
-            uint256 assetOutAmount = ISwapper(swapper).executeSwap(
-                params.swaps[i].assetIn, params.swaps[i].assetOut, amountIn, params.swaps[i].swapData
-            );
+            uint256 assetOutAmount = ISwapper(swapper)
+                .executeSwap(params.swaps[i].assetIn, params.swaps[i].assetOut, amountIn, params.swaps[i].swapData);
 
             require(
                 assetOutAmount >= amountIn.convertAssetDecimals(assetIn, assetOut), ErrorsLib.InsufficientAmountOut()

@@ -113,7 +113,10 @@ contract FundsHandler is IFundsHandler {
         _pushFundsToImmediateLiquidity(asset, amount);
     }
 
-    function processWithdrawalExecution(uint256 withdrawalRequestId, bytes calldata /* data */ )
+    function processWithdrawalExecution(
+        uint256 withdrawalRequestId,
+        bytes calldata /* data */
+    )
         external
         override
         onlyBaseBoostedVault

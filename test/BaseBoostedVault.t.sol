@@ -503,8 +503,8 @@ contract ExtendedBasedBoostedVaultTest is BaseTest {
         );
 
         uint256 expectedBalanceWithRateChangeAfter6Month = initialDepositInRay.mulByRay(
-            newBasePerSecondRate.rpow(sixMonths)
-        ).mulByRay(higherBasePerSecondRate.rpow(sixMonths));
+                newBasePerSecondRate.rpow(sixMonths)
+            ).mulByRay(higherBasePerSecondRate.rpow(sixMonths));
         uint256 delta = expectedBalanceWithRateChangeAfter6Month - balanceAfter12Months;
         // Balances are queried in RAY, so expect at least the first 9 decimal places to be the same
         assertEq(delta / 1e18, 0, "Expected lower delta");
