@@ -214,7 +214,7 @@ contract ExtendedBasedBoostedVaultTest is BaseTest {
         // Without advancing the block or timestamp, call full withdrawal
         vm.prank(account1);
         uint256 withdrawalRequestId = vault.requestWithdrawal(account1, address(asset), 0);
-        (uint256 assetsWithdrawn,) = vault.executeWithdrawal(withdrawalRequestId, "");
+        (, uint256 assetsWithdrawn,) = vault.executeWithdrawal(withdrawalRequestId, "");
 
         uint256 assetBalanceAfterWithdraw = vault.getUserBalance(account1);
 
@@ -259,7 +259,7 @@ contract ExtendedBasedBoostedVaultTest is BaseTest {
 
         vm.prank(account1);
         uint256 withdrawalRequestId = vault.requestWithdrawal(account1, address(asset), 0);
-        (uint256 assetsWithdrawn,) = vault.executeWithdrawal(withdrawalRequestId, "");
+        (, uint256 assetsWithdrawn,) = vault.executeWithdrawal(withdrawalRequestId, "");
 
         uint256 assetBalanceAfterWithdraw = vault.getUserBalance(account1);
 
@@ -298,7 +298,7 @@ contract ExtendedBasedBoostedVaultTest is BaseTest {
         // Without advancing the block or timestamp, call full withdrawal
         vm.prank(account1);
         uint256 withdrawalRequestId = vault.requestWithdrawal(account1, address(asset), 0);
-        (uint256 assetsWithdrawn,) = vault.executeWithdrawal(withdrawalRequestId, "");
+        (, uint256 assetsWithdrawn,) = vault.executeWithdrawal(withdrawalRequestId, "");
 
         uint256 assetBalanceAfterWithdraw = vault.getUserBalance(account1);
 
@@ -345,7 +345,7 @@ contract ExtendedBasedBoostedVaultTest is BaseTest {
 
         vm.prank(account1);
         uint256 withdrawalRequestId = vault.requestWithdrawal(account1, address(asset), 0);
-        (uint256 assetsWithdrawn,) = vault.executeWithdrawal(withdrawalRequestId, "");
+        (, uint256 assetsWithdrawn,) = vault.executeWithdrawal(withdrawalRequestId, "");
 
         uint256 assetBalanceAfterWithdraw = vault.getUserBalance(account1);
 
@@ -405,7 +405,7 @@ contract ExtendedBasedBoostedVaultTest is BaseTest {
 
         vm.prank(account1);
         uint256 withdrawalRequestId = vault.requestWithdrawal(account1, address(asset), 0);
-        (uint256 assetsWithdrawn,) = vault.executeWithdrawal(withdrawalRequestId, "");
+        (, uint256 assetsWithdrawn,) = vault.executeWithdrawal(withdrawalRequestId, "");
 
         console.log("block timestamp after withdraw:", block.timestamp);
         uint256 assetBalanceAfterWithdraw = vault.getUserBalance(account1);

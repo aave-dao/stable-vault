@@ -235,12 +235,14 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
     function executeWithdrawal(uint256 withdrawalRequestId, bytes calldata data)
         external
         override
-        returns (uint256, bytes memory)
+        returns (address, uint256, bytes memory)
     {
-        (uint256 amount, address recipient, bytes memory returnData) =
+        // TODO: FH will approve the the BBV to spend, the BBV should do a transferFrom
+        (address asset, uint256 amount, address user, bytes memory returnData) =
             _fundsHandler.processWithdrawalExecution(withdrawalRequestId, data);
-        emit WithdrawalExecuted(recipient, withdrawalRequestId, amount, returnData);
-        return (amount, returnData);
+        IERC20(asset).safeTransferFrom(address(_fundsHandler), user, amount);
+        emit WithdrawalExecuted(user, withdrawalRequestId, asset, amount, returnData);
+        return (asset, amount, returnData);
     }
 
     function setDefaultSubVault(uint256 perSecondRate) external onlyManager {
@@ -251,6 +253,25 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         require(manager != address(0), ErrorsLib.ZeroAddress());
         _manager = manager;
         emit ManagerSet(manager);
+    }
+
+    // TODO: Should we allow the admin to claim fees as well?
+    // TODO(registry-config): Should we have a "fee recipient" storage field or function param?
+    function claimFees(address[] calldata assets, uint256[] calldata amounts) external onlyManager {
+        uint256 vaultObligationsRay = _getVaultObligations();
+        uint256 vaultAssetsRay = _getVaultAggregatedBalance();
+        require(vaultObligationsRay <= vaultAssetsRay, InsufficientAssets());
+        uint256 fee = vaultAssetsRay - vaultObligationsRay;
+        uint256 accumulatedAmountRay;
+        for (uint256 i = 0; i < assets.length; i++) {
+            _fundsHandler.pullFromLiquidity(assets[i], amounts[i]);
+            accumulatedAmountRay += amounts[i].assetDecimalsToRay(assets[i]);
+            if (amounts[i] > 0) {
+                IERC20(assets[i]).safeTransferFrom(address(_fundsHandler), msg.sender, amounts[i]);
+            }
+        }
+        require(accumulatedAmountRay <= fee, ErrorsLib.InvalidAmount());
+        emit FeesClaimed(assets, amounts);
     }
 
     function updateAssetSupport(address asset, bool supported) external onlyOwner {
@@ -277,13 +298,13 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         return activeSubVaults;
     }
 
+    /// @dev returns aggregated obligations to depositors in RAY of denomination asset
     function getVaultObligations() external view override returns (uint256) {
         return _getVaultObligations();
     }
 
-    function getVaultAssets() external pure override returns (uint256) {
-        // TODO: Implement by checking latest earning strategy balances
-        return 0;
+    function getVaultAssets() external view override returns (uint256) {
+        return _getVaultAggregatedBalance();
     }
 
     /// @dev returns underlying assets denomination in RAY decimal places
@@ -397,6 +418,10 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
                 .rayMulDown(_previewSubVaultConversionRate(_activeSubVaultsIds[i]));
         }
         return vaultObligations;
+    }
+
+    function _getVaultAggregatedBalance() internal view returns (uint256) {
+        return _fundsHandler.getAggregatedBalance();
     }
 
     function _isActiveSubVaultById(uint256 subVaultId) internal view returns (bool) {

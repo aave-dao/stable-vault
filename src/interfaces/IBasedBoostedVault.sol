@@ -20,7 +20,7 @@ interface IBasedBoostedVault {
         uint256 guaranteedAmount
     );
     event WithdrawalExecuted(
-        address indexed recipient, uint256 indexed withdrawalRequestId, uint256 amount, bytes returnData
+        address indexed user, uint256 indexed withdrawalRequestId, address asset, uint256 amount, bytes returnData
     );
     event Deposit(address indexed user, address indexed asset, uint256 amount);
     event UserRateUpdated(address indexed user, uint256 newRate);
@@ -29,6 +29,7 @@ interface IBasedBoostedVault {
     event DefaultSubVaultSet(uint256 indexed subVaultId);
     event AssetSupported(address indexed asset, bool supported);
     event ManagerSet(address manager);
+    event FeesClaimed(address[] assets, uint256[] amounts);
 
     error InvalidRate();
     error NonExistentPosition();
@@ -41,6 +42,7 @@ interface IBasedBoostedVault {
     error AssetNotSupported(address asset);
     error VaultAlreadyExists();
     error InactiveVault();
+    error InsufficientAssets();
 
     function setDefaultSubVault(uint256 perSecondRate) external;
 
@@ -58,7 +60,7 @@ interface IBasedBoostedVault {
 
     function executeWithdrawal(uint256 withdrawalRequestId, bytes calldata data)
         external
-        returns (uint256, bytes memory);
+        returns (address, uint256, bytes memory);
 
     function getVaultObligations() external view returns (uint256);
 

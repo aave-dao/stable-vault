@@ -64,28 +64,39 @@ contract FundsHandler is IFundsHandler {
         _allocator = allocator;
     }
 
+    function getAggregatedBalance() external view returns (uint256) {
+        IAllocator.AllocatorBalance[] memory allocatorAssets = IAllocator(_allocator).getAssetBalances();
+
+        uint256 totalBalanceRay;
+
+        for (uint16 i = 0; i < allocatorAssets.length; i++) {
+            totalBalanceRay += allocatorAssets[i].amount.assetDecimalsToRay(allocatorAssets[i].asset);
+        }
+        for (uint16 i = 0; i < _chainBalances.length; i++) {
+            totalBalanceRay += _chainBalances[i].amountRay;
+        }
+        return totalBalanceRay;
+    }
+
     function getAssetBalances() external view returns (AssetBalance[] memory) {
         IAllocator.AllocatorBalance[] memory allocatorAssets = IAllocator(_allocator).getAssetBalances();
         AssetBalance[] memory balances = new AssetBalance[](allocatorAssets.length + _chainBalances.length);
 
-        uint16 i = 0;
-        for (uint16 j = 0; j < allocatorAssets.length; j++) {
+        for (uint16 i = 0; i < allocatorAssets.length; i++) {
             balances[i] = AssetBalance({
                 chainId: block.chainid,
-                asset: allocatorAssets[j].asset,
-                amountRay: allocatorAssets[j].amount.assetDecimalsToRay(allocatorAssets[j].asset),
+                asset: allocatorAssets[i].asset,
+                amountRay: allocatorAssets[i].amount.assetDecimalsToRay(allocatorAssets[i].asset),
                 timestamp: block.timestamp
             });
-            i++;
         }
-        for (uint16 j = 0; j < _chainBalances.length; j++) {
-            balances[i] = AssetBalance({
+        for (uint16 i = 0; i < _chainBalances.length; i++) {
+            balances[allocatorAssets.length + i] = AssetBalance({
                 chainId: _chainBalances[i].chainId,
                 asset: address(0),
                 amountRay: _chainBalances[i].amountRay,
                 timestamp: _chainBalances[i].timestamp
             });
-            i++;
         }
         return balances;
     }
@@ -120,27 +131,40 @@ contract FundsHandler is IFundsHandler {
         external
         override
         onlyBaseBoostedVault
-        returns (uint256, address, bytes memory)
+        returns (address, uint256, address, bytes memory)
     {
         WithdrawalRequest storage request = _withdrawalRequests[withdrawalRequestId];
         _verifyAvailableLiquidity(
             request.preferredAsset, request.amountRequested.rayToAssetDecimals(request.preferredAsset)
         );
-        (uint256 amount, address recipient) = _executeWithdrawal(withdrawalRequestId, request);
-        return (amount, recipient, "");
+        (address asset, uint256 amount, address recipient) = _executeWithdrawal(withdrawalRequestId, request);
+        return (asset, amount, recipient, "");
+    }
+
+    /// @inheritdoc IFundsHandler
+    function pullFromLiquidity(address asset, uint256 amount) external onlyBaseBoostedVault {
+        _pullFundsFromImmediateLiquidity(asset, amount);
+        // TODO: Check if we don't need to do increaseApproval here (re-entrancy, multi-withdrawal, etc)
+        IERC20(asset).forceApprove(_basedBoostedVault, amount);
+    }
+
+    function rescueTokens(address asset, uint256 amount) external onlyManager {
+        _pullFundsFromImmediateLiquidity(asset, amount);
+        // TODO: send to treasury?
+        IERC20(asset).transfer(msg.sender, amount);
     }
 
     function _executeWithdrawal(uint256 withdrawalRequestId, WithdrawalRequest storage request)
         internal
-        returns (uint256, address)
+        returns (address, uint256, address)
     {
         address asset = request.preferredAsset;
         uint256 amount = request.amountRequested.rayToAssetDecimals(asset);
         address recipient = request.recipient;
         delete _withdrawalRequests[withdrawalRequestId];
         _pullFundsFromImmediateLiquidity(asset, amount);
-        IERC20(asset).safeTransfer(recipient, amount);
-        return (amount, recipient);
+        IERC20(asset).forceApprove(_basedBoostedVault, amount);
+        return (asset, amount, recipient);
     }
 
     function _verifyAvailableLiquidity(address asset, uint256 amount) internal view {
@@ -164,9 +188,7 @@ contract FundsHandler is IFundsHandler {
 
     function pushFundsToChain(address asset, uint256 amount, uint256 chainId) external onlyManager {
         _pullFundsFromImmediateLiquidity(asset, amount);
-        // TODO: Why do we use transfer but not approve here?
-        // TODO: +1 on the above, we should approve the GW to pull funds
-        IERC20(asset).safeTransfer(_gateway, amount);
+        IERC20(asset).forceApprove(_gateway, amount);
         IAccountingChainGateway(_gateway).sendPushFundsToChainMessage(asset, amount, chainId);
     }
 

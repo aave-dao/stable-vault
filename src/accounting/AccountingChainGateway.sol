@@ -33,8 +33,8 @@ contract AccountingChainGateway is IAccountingChainGateway, BaseChainGateway {
     {
         address adapter = _bridgeAdapter[asset][targetChainId];
         require(adapter != address(0), UnsupportedAdapter());
-        // TODO: should we pull funds from caller i.e. FH and then approve Adapter to pull funds?
-        IERC20(asset).safeTransfer(adapter, amount);
+        // TODO: should we approve Adapter to pull funds?
+        IERC20(asset).safeTransferFrom(msg.sender, adapter, amount);
         IBridgeAdapter.BridgeAsset[] memory assets = new IBridgeAdapter.BridgeAsset[](1);
         assets[0] = IBridgeAdapter.BridgeAsset({asset: asset, amount: amount});
         IBridgeAdapter(adapter).publishMessageToChain(targetChainId, assets, "");

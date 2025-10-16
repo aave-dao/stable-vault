@@ -148,6 +148,10 @@ contract EndToEndTest is BaseTest {
 
         //        - mock the 8% APY earnings on the GHO vault for half a year
         GHO.mint(defaultGhoVault_earningChain, 19_615242270663188059);
+        console.log(
+            "GHO vault earned something in this time and it's balance now is: %s GHO",
+            IERC4626(defaultGhoVault_earningChain).balanceOf(address(allocator_earningChain))
+        );
 
         //    6. User asks for withdrawal of the whole amount of his earnings (which are $500+ - in USDC)
         console.log("User creates a WithdrawalRequest...");
@@ -230,7 +234,7 @@ contract EndToEndTest is BaseTest {
         );
 
         //    9. Somebody triggers the execute() withdrawal to send the funds back to the user
-        (uint256 amountOut, bytes memory data) = vault.executeWithdrawal(withdrawalId, "");
+        (, uint256 amountOut, bytes memory data) = vault.executeWithdrawal(withdrawalId, "");
         console.log("Amount out withdrawn: %s USDC", amountOut);
         console.logBytes(data);
 
@@ -260,7 +264,30 @@ contract EndToEndTest is BaseTest {
         console.log("User balance in RAY after withdrawal request: %s", vault.getUserBalance(user));
         assertEq(vault.getUserBalance(user), 0, "User balance should be down to 0 after full withdrawal request");
         //
-    }
 
-    error ERC4626ExceededMaxWithdraw(address owner, uint256 assets, uint256 max);
+        // Manager claims fees (withdraws profits)
+        uint256 ghoBalanceOnVaultLeft =
+            IERC4626(defaultGhoVault_earningChain).balanceOf(address(allocator_earningChain));
+        console.log("Earning chain GHO vault balance after withdrawal is now: %s GHO", ghoBalanceOnVaultLeft);
+        vm.prank(manager);
+        earningChainGateway.exit(address(GHO), ghoBalanceOnVaultLeft);
+
+        address[] memory assets = new address[](1);
+        uint256[] memory amounts = new uint256[](1);
+        assets[0] = address(GHO);
+        amounts[0] = ghoBalanceOnVaultLeft;
+
+        console.log("Manager's GHO balance before claiming fees profits: %s GHO", GHO.balanceOf(manager));
+
+        vm.prank(manager);
+        vault.claimFees(assets, amounts);
+
+        uint256 newManagerGhoBalance = GHO.balanceOf(manager);
+        console.log("Manager's GHO balance after claiming fees profits: %s GHO", newManagerGhoBalance);
+        assertEq(
+            newManagerGhoBalance,
+            ghoBalanceOnVaultLeft,
+            "Manager should have the same amount of GHO after claiming fees profits"
+        );
+    }
 }
