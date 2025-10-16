@@ -320,7 +320,9 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
                 _positions[user].originalDeposit -= actualAmountInRay;
             }
         }
-        // TODO: Remove SubVault from active if total shares got down to 0
+        if (!_isActiveSubVaultById(subVaultId)) {
+            _removeSubVaultFromActive(subVaultId);
+        }
         // TODO: Handle preferred asset properly
         uint256 withdrawalRequestId = _fundsHandler.processWithdrawalRequest({
             recipient: user,
