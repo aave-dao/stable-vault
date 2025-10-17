@@ -137,14 +137,10 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
         emit Deposit(user, asset, amount);
     }
 
-    function setUserRateBatch(UserRateData[] calldata userRateData) external override onlyManager {
+    function setUserRate(UserRateData[] calldata userRateData) external override onlyManager {
         for (uint256 i = 0; i < userRateData.length; i++) {
             _setUserRate(userRateData[i].user, userRateData[i].newPerSecondRate);
         }
-    }
-
-    function setUserRate(address user, uint256 newPerSecondRate) external override onlyManager {
-        _setUserRate(user, newPerSecondRate);
     }
 
     function changeSubVaultRate(uint256 subVaultId, uint256 newPerSecondRate) external onlyManager {

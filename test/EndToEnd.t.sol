@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import {FundsHandler} from "../src/accounting/FundsHandler.sol";
 import {Swapper} from "../src/common/Swapper.sol";
+import {IBasedBoostedVault} from "../src/interfaces/IBasedBoostedVault.sol";
 import {IManagedAllocator} from "../src/interfaces/IManagedAllocator.sol";
 import {AssetLib} from "../src/libraries/AssetLib.sol";
 import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
@@ -62,7 +63,9 @@ contract EndToEndTest is BaseTest {
         //    2. Manager sets the % rate to user to 5% APY
         uint256 userPerSecondRate = 1_000000001547125957863212449; // 5% APY
         vm.prank(manager);
-        vault.setUserRate(user, userPerSecondRate);
+        IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](1);
+        userRateData[0] = IBasedBoostedVault.UserRateData(user, userPerSecondRate);
+        vault.setUserRate(userRateData);
 
         //        - check that the % rate is set correctly
         console.log("User's per second rate is: %s", vault.getUserSubVault(user).perSecondRate);
