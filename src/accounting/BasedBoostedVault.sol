@@ -110,6 +110,7 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
     function deposit(address user, address asset, uint256 amount) external override {
         require(msg.sender == user, InvalidMsgSender());
         require(isAssetSupported(asset), UnsupportedAsset(asset));
+        require(amount > 0, InvalidAmount());
         IERC20(asset).safeTransferFrom(msg.sender, address(_fundsHandler), amount);
 
         uint256 subVaultId = _positions[user].subVaultId;
@@ -245,7 +246,7 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         return (asset, amount, returnData);
     }
 
-    function setDefaultSubVault(uint256 perSecondRate) external onlyManager {
+    function setDefaultSubVault(uint256 perSecondRate) external override onlyManager {
         _setDefaultSubVault(_getOrCreateSubVaultWithRate(perSecondRate));
     }
 
@@ -274,7 +275,7 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         emit FeesClaimed(assets, amounts);
     }
 
-    function updateAssetSupport(address asset, bool supported) external onlyOwner {
+    function updateAssetSupport(address asset, bool supported) external override onlyOwner {
         require(asset != address(0), InvalidAsset(asset));
         if (supported) {
             require(!_supportedAssets[asset], AssetAlreadySupported(asset));
@@ -284,6 +285,10 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
             delete _supportedAssets[asset];
         }
         emit AssetSupported(asset, supported);
+    }
+
+    function setFundsHandler(address fundsHandler) external onlyOwner {
+        _fundsHandler = IFundsHandler(fundsHandler);
     }
 
     ///////////////////////////////////////////////// GETTERS /////////////////////////////////////////////////////
@@ -319,6 +324,20 @@ contract BasedBoostedVault is IBasedBoostedVault, Ownable {
         uint256 subVaultId = _positions[user].subVaultId;
         uint256 subVaultRate = _subVaultById[subVaultId].perSecondRate;
         return SubVaultData(subVaultRate, subVaultId);
+    }
+
+    function getDefaultSubVault() external view override returns (SubVaultData memory) {
+        uint256 subVaultId = _defaultSubVaultId;
+        uint256 subVaultRate = _subVaultById[subVaultId].perSecondRate;
+        return SubVaultData(subVaultRate, subVaultId);
+    }
+
+    function getSubVaultRateById(uint256 subVaultId) external view override returns (uint256) {
+        return _subVaultById[subVaultId].perSecondRate;
+    }
+
+    function getSubVaultIdByRate(uint256 perSecondRate) external view override returns (uint256) {
+        return _subVaultIdByRate[perSecondRate];
     }
 
     function isAssetSupported(address asset) public view returns (bool) {

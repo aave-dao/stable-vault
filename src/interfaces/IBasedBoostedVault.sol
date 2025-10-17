@@ -52,6 +52,12 @@ interface IBasedBoostedVault {
 
     function getUserSubVault(address user) external view returns (SubVaultData memory);
 
+    function getDefaultSubVault() external view returns (SubVaultData memory);
+
+    function getSubVaultRateById(uint256 subVaultId) external view returns (uint256);
+
+    function getSubVaultIdByRate(uint256 perSecondRate) external view returns (uint256);
+
     function setUserRate(address user, uint256 perSecondRate) external;
 
     function deposit(address user, address asset, uint256 amount) external;
