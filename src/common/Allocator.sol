@@ -6,7 +6,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IAllocator} from "../interfaces/IAllocator.sol";
-import {IManagedAllocator} from "../interfaces/IManagedAllocator.sol";
+import {IAllocator} from "../interfaces/IAllocator.sol";
 import {ISwapper} from "../interfaces/ISwapper.sol";
 import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
@@ -17,7 +17,7 @@ import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 ///      - assets are in their native decimals
 ///      - 100% of assets deposited into Allocator belong to the same entity
 /// @dev Deals with assets in their native decimals.
-contract Allocator is IManagedAllocator {
+contract Allocator is IAllocator {
     // TODO: consider scenarios where tokens are left idle here because pushing to strategies fails (reverts should be
     // caught)
     using SafeERC20 for IERC20;
@@ -60,12 +60,12 @@ contract Allocator is IManagedAllocator {
     }
 
     /// @inheritdoc IAllocator
-    function getManager() external view returns (address) {
+    function getManager() external view override returns (address) {
         return _manager;
     }
 
     /// @inheritdoc IAllocator
-    function getAdmin() external view returns (address) {
+    function getAdmin() external view override returns (address) {
         return _admin;
     }
 
@@ -75,12 +75,12 @@ contract Allocator is IManagedAllocator {
     }
 
     /// @inheritdoc IAllocator
-    function getAssetBalances() external view override returns (IManagedAllocator.AllocatorBalance[] memory) {
+    function getAssetBalances() external view override returns (IAllocator.AllocatorBalance[] memory) {
         return _getAssetBalances();
     }
 
     /// @inheritdoc IAllocator
-    function getImmediateLiquidityVault(address asset) external view override returns (address) {
+    function getVault(address asset) external view override returns (address) {
         return _vaultByAsset[asset];
     }
 
@@ -128,22 +128,22 @@ contract Allocator is IManagedAllocator {
 
     // Manager Functions
 
-    /// @inheritdoc IManagedAllocator
-    function deallocate(address asset, uint256 amount) external onlyManager returns (uint256) {
+    /// @inheritdoc IAllocator
+    function deallocate(address asset, uint256 amount) external override onlyManager returns (uint256) {
         address vault = _vaultByAsset[asset];
         require(vault != address(0), ErrorsLib.UnsupportedAsset(asset));
         require(amount > 0, ErrorsLib.ZeroAmount());
         return _deallocate(vault, asset, amount, address(this));
     }
 
-    /// @inheritdoc IManagedAllocator
-    function depositIdleFunds(address asset) external onlyManager {
+    /// @inheritdoc IAllocator
+    function depositIdleFunds(address asset) external override onlyManager {
         uint256 amount = IERC20(asset).balanceOf(address(this));
         bool callSucceeded = _deposit({asset: asset, amount: amount});
         require(callSucceeded, ErrorsLib.VaultDepositFailed());
     }
 
-    /// @inheritdoc IManagedAllocator
+    /// @inheritdoc IAllocator
     function rebalance(CrossAssetRebalanceParams memory params) external override onlyManager {
         for (uint256 i = 0; i < params.swaps.length; i++) {
             address assetIn = params.swaps[i].assetIn;
@@ -196,20 +196,23 @@ contract Allocator is IManagedAllocator {
 
     // Admin Functions
 
-    function setManager(address newManager) external onlyAdmin {
+    /// @inheritdoc IAllocator
+    function setManager(address newManager) external override onlyAdmin {
         // TODO: set behind timelock
         require(newManager != address(0), ErrorsLib.ZeroAddress());
         _manager = newManager;
     }
 
-    function setDepositor(address depositor, bool whitelisted) external onlyAdmin {
+    /// @inheritdoc IAllocator
+    function setDepositor(address depositor, bool whitelisted) external override onlyAdmin {
         // TODO: set behind timelock?
         require(depositor != address(0), ErrorsLib.ZeroAddress());
         require(_whitelistedDepositor[depositor] != whitelisted, ErrorsLib.AddressAlreadyWhitelisted());
         _whitelistedDepositor[depositor] = whitelisted;
     }
 
-    function setWithdrawer(address withdrawer, bool whitelisted) external onlyAdmin {
+    /// @inheritdoc IAllocator
+    function setWithdrawer(address withdrawer, bool whitelisted) external override onlyAdmin {
         // TODO: set behind timelock?
         require(withdrawer != address(0), ErrorsLib.ZeroAddress());
         require(_whitelistedWithdrawer[withdrawer] != whitelisted, ErrorsLib.AddressAlreadyWhitelisted());
@@ -233,9 +236,8 @@ contract Allocator is IManagedAllocator {
         return callSucceeded;
     }
 
-    function _getAssetBalances() internal view returns (IManagedAllocator.AllocatorBalance[] memory) {
-        IManagedAllocator.AllocatorBalance[] memory allocatedAssets =
-            new IManagedAllocator.AllocatorBalance[](_vaults.length);
+    function _getAssetBalances() internal view returns (IAllocator.AllocatorBalance[] memory) {
+        IAllocator.AllocatorBalance[] memory allocatedAssets = new IAllocator.AllocatorBalance[](_vaults.length);
         for (uint256 i = 0; i < _vaults.length; i++) {
             IERC4626 vault = IERC4626(_vaults[i]);
             address asset = vault.asset();

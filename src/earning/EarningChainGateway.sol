@@ -6,10 +6,10 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {BaseChainGateway} from "../common/BaseChainGateway.sol";
 import {IAllocator} from "../interfaces/IAllocator.sol";
+import {IAllocator} from "../interfaces/IAllocator.sol";
 import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {IEarningChainGateway} from "../interfaces/IEarningChainGateway.sol";
-import {IManagedAllocator} from "../interfaces/IManagedAllocator.sol";
 import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {EventLib} from "../libraries/EventLib.sol";
@@ -99,7 +99,7 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
     }
 
     function _getBalanceSnapshotData() internal view returns (bytes memory) {
-        IManagedAllocator.AllocatorBalance[] memory allocatorBalances = IAllocator(_allocator).getAssetBalances();
+        IAllocator.AllocatorBalance[] memory allocatorBalances = IAllocator(_allocator).getAssetBalances();
         uint256 totalAssetsInRay;
         for (uint256 i = 0; i < allocatorBalances.length; i++) {
             totalAssetsInRay += allocatorBalances[i].amount.assetDecimalsToRay(allocatorBalances[i].asset);

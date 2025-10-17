@@ -21,7 +21,7 @@ contract CcipAdapter is BaseBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
 
     address internal constant FEE_ON_NATIVE_CURRENCY = address(0);
 
-    address internal immutable _ccipRouter;
+    address internal immutable CCIP_ROUTER;
     address internal _feeToken;
 
     mapping(uint256 chainId => uint64 ccipChainSelector) internal _chainSelectorOf;
@@ -29,7 +29,7 @@ contract CcipAdapter is BaseBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
     mapping(uint256 chainId => address receiver) internal _receiverOf;
 
     modifier onlyRouter() {
-        require(msg.sender == _ccipRouter, NotBridgeRouter());
+        require(msg.sender == CCIP_ROUTER, NotBridgeRouter());
         _;
     }
 
@@ -42,7 +42,7 @@ contract CcipAdapter is BaseBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
 
     constructor(address owner, address ccipRouter) BaseBridgeAdapter(owner) {
         require(ccipRouter != address(0), ErrorsLib.ZeroAddress());
-        _ccipRouter = ccipRouter;
+        CCIP_ROUTER = ccipRouter;
     }
 
     function setChainSelector(uint256 chainId, uint64 ccipChainSelector) external onlyOwner {
@@ -74,7 +74,7 @@ contract CcipAdapter is BaseBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
                 // Pull funds from caller into this contract
                 IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
                 // Approve the CCIP Router to spend the funds
-                IERC20(asset).forceApprove(_ccipRouter, amount);
+                IERC20(asset).forceApprove(CCIP_ROUTER, amount);
                 tokenAmounts[i] = Client.EVMTokenAmount({token: asset, amount: amount});
             }
         }
@@ -126,13 +126,13 @@ contract CcipAdapter is BaseBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
 
     function _sendMessage(uint256 chainId, Client.EVM2AnyMessage memory message) internal {
         uint64 chainSelector = _chainSelectorOf[chainId];
-        uint256 fee = IRouterClient(_ccipRouter).getFee(chainSelector, message);
+        uint256 fee = IRouterClient(CCIP_ROUTER).getFee(chainSelector, message);
         uint256 msgValue;
         if (message.feeToken == FEE_ON_NATIVE_CURRENCY) {
             msgValue = fee;
         } else {
-            IERC20(_feeToken).safeIncreaseAllowance(_ccipRouter, fee);
+            IERC20(_feeToken).safeIncreaseAllowance(CCIP_ROUTER, fee);
         }
-        IRouterClient(_ccipRouter).ccipSend{value: msgValue}(chainSelector, message);
+        IRouterClient(CCIP_ROUTER).ccipSend{value: msgValue}(chainSelector, message);
     }
 }

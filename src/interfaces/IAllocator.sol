@@ -13,6 +13,23 @@ interface IAllocator {
         uint256 amount;
     }
 
+    struct SwapParams {
+        // Swap input asset transferred to swapper
+        address assetIn;
+        // Asset to swap to that will be resupplied within the allocator
+        address assetOut;
+        // Amount of assetIn
+        uint256 amountIn;
+        // Address of the swapper to use to execute the swap
+        address swapper;
+        // Custom data required by the swapper to execute the swap
+        bytes swapData;
+    }
+
+    struct CrossAssetRebalanceParams {
+        SwapParams[] swaps;
+    }
+
     function getManager() external view returns (address);
 
     function getAdmin() external view returns (address);
@@ -23,10 +40,23 @@ interface IAllocator {
     /// @dev Returns the available liquidity denominated in given asset's decimals.
     function getAssetBalance(address asset) external view returns (uint256);
 
-    /// @dev Returns the default liquidity vault for a given asset.
-    function getImmediateLiquidityVault(address asset) external view returns (address);
+    /// @dev Returns strategy vault for a given asset.
+    function getVault(address asset) external view returns (address);
+
+    /// @dev Deallocates a given amount of an asset from the immediate liquidity vault; funds stay idle on the contract.
+    /// @param asset Asset to deallocate.
+    /// @param amount Amount of the asset to deallocate.
+    /// @dev Returns the amount of shares burned liquidty source vault shares burned.
+    function deallocate(address asset, uint256 amount) external returns (uint256);
+
+    /// @notice Moves all idle funds of a given asset on the contract to a strategy.
+    function depositIdleFunds(address asset) external;
 
     function deposit(address asset, uint256 amount) external;
+
+    /// @notice Rebalance the mix of underlying tokens by pulling from strategies, executing swaps and resupplying to
+    /// strategies.
+    function rebalance(CrossAssetRebalanceParams memory params) external;
 
     function withdraw(address asset, uint256 amount) external;
 
@@ -35,5 +65,9 @@ interface IAllocator {
 
     function setManager(address newManager) external;
 
+    /// @dev Toggles if `depositor` can call deposit functions on the contract.
     function setDepositor(address depositor, bool whitelisted) external;
+
+    /// @dev Toggles if `withdrawer` can call withdraw functions on the contract.
+    function setWithdrawer(address withdrawer, bool whitelisted) external;
 }

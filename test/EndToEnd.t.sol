@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {FundsHandler} from "../src/accounting/FundsHandler.sol";
-import {Swapper} from "../src/common/Swapper.sol";
-import {IBasedBoostedVault} from "../src/interfaces/IBasedBoostedVault.sol";
-import {IManagedAllocator} from "../src/interfaces/IManagedAllocator.sol";
-import {AssetLib} from "../src/libraries/AssetLib.sol";
-import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
-import {BaseTest} from "./BaseTest.t.sol";
 import "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 import {IERC20} from "forge-std/interfaces/IERC20.sol";
 import {IERC4626} from "forge-std/interfaces/IERC4626.sol";
+
+import {FundsHandler} from "../src/accounting/FundsHandler.sol";
+import {Swapper} from "../src/common/Swapper.sol";
+import {IAllocator} from "../src/interfaces/IAllocator.sol";
+import {IBasedBoostedVault} from "../src/interfaces/IBasedBoostedVault.sol";
+import {AssetLib} from "../src/libraries/AssetLib.sol";
+import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
+import {BaseTest} from "./BaseTest.t.sol";
 
 contract EndToEndTest is BaseTest {
     using AssetLib for uint256;
@@ -42,7 +43,7 @@ contract EndToEndTest is BaseTest {
 
         //        - check that funds are dropped into default liquidity vault
         console.log("User deposited %s USDC into Vault", userInitialDeposit);
-        address defaultUsdcVault_AccountingChain = allocator_accountingChain.getImmediateLiquidityVault(address(USDC));
+        address defaultUsdcVault_AccountingChain = allocator_accountingChain.getVault(address(USDC));
         console.log("Default vault for USDC is: %s", defaultUsdcVault_AccountingChain);
         console.log("It's balance of USDC is: %s", IERC20(address(USDC)).balanceOf(defaultUsdcVault_AccountingChain));
         // TODO: Replace with Before/After balance
@@ -76,7 +77,7 @@ contract EndToEndTest is BaseTest {
         fundsHandler.pushFundsToChain(address(USDC), userInitialDeposit, EARNING_CHAIN_ID);
 
         //        - check that the funds land on Earning Chain and are dropped into default liquidity vault there
-        address defaultUsdcVault_earningChain = allocator_earningChain.getImmediateLiquidityVault(address(USDC));
+        address defaultUsdcVault_earningChain = allocator_earningChain.getVault(address(USDC));
         console.log("Earning Chain default vault for USDC is: %s", defaultUsdcVault_earningChain);
         console.log("It's balance of USDC is: %s", IERC20(address(USDC)).balanceOf(defaultUsdcVault_earningChain));
         assertEq(
@@ -103,8 +104,8 @@ contract EndToEndTest is BaseTest {
         callDatas[0] = abi.encodeCall(IERC20.transfer, (address(this), userInitialDeposit));
         Swapper.SlippageParams memory slippageParams = Swapper.SlippageParams(0, address(0));
 
-        IManagedAllocator.SwapParams[] memory swaps = new IManagedAllocator.SwapParams[](1);
-        swaps[0] = IManagedAllocator.SwapParams(
+        IAllocator.SwapParams[] memory swaps = new IAllocator.SwapParams[](1);
+        swaps[0] = IAllocator.SwapParams(
             address(USDC),
             address(GHO),
             userInitialDeposit,
@@ -114,10 +115,10 @@ contract EndToEndTest is BaseTest {
 
         console.log("Rebalancing by swap from USDC to GHO on the Earning chain...");
         vm.prank(manager);
-        allocator_earningChain.rebalance(IManagedAllocator.CrossAssetRebalanceParams(swaps));
+        allocator_earningChain.rebalance(IAllocator.CrossAssetRebalanceParams(swaps));
 
         //        - check that the funds are swapped to GHO
-        address defaultGhoVault_earningChain = allocator_earningChain.getImmediateLiquidityVault(address(GHO));
+        address defaultGhoVault_earningChain = allocator_earningChain.getVault(address(GHO));
         console.log(
             "\tBalance of GHO in The GHO Vault is: %s", IERC20(address(GHO)).balanceOf(defaultGhoVault_earningChain)
         );
@@ -179,7 +180,7 @@ contract EndToEndTest is BaseTest {
         earningChainGateway.exit(address(GHO), userEarningsInGho);
 
         //        - check that the funds land on the Accounting Chain and are dropped into default liquidity vault there
-        address defaultGhoVault_accountingChain = allocator_accountingChain.getImmediateLiquidityVault(address(GHO));
+        address defaultGhoVault_accountingChain = allocator_accountingChain.getVault(address(GHO));
         console.log("Accounting Chain default vault for GHO is: %s", defaultGhoVault_accountingChain);
         console.log("It's balance of GHO is: %s", IERC20(address(GHO)).balanceOf(defaultGhoVault_accountingChain));
         assertEq(
@@ -202,8 +203,8 @@ contract EndToEndTest is BaseTest {
         targets[0] = address(GHO);
         callDatas[0] = abi.encodeCall(IERC20.transfer, (address(this), userEarningsInGho));
 
-        swaps = new IManagedAllocator.SwapParams[](1);
-        swaps[0] = IManagedAllocator.SwapParams(
+        swaps = new IAllocator.SwapParams[](1);
+        swaps[0] = IAllocator.SwapParams(
             address(GHO),
             address(USDC),
             userEarningsInGho,
@@ -213,10 +214,10 @@ contract EndToEndTest is BaseTest {
 
         console.log("Rebalancing by swap from GHO to USDC on the Accounting chain...");
         vm.prank(manager);
-        allocator_accountingChain.rebalance(IManagedAllocator.CrossAssetRebalanceParams(swaps));
+        allocator_accountingChain.rebalance(IAllocator.CrossAssetRebalanceParams(swaps));
 
         //        - check that the funds are swapped to USDC
-        address defaultUsdcVault_accountingChain = allocator_accountingChain.getImmediateLiquidityVault(address(USDC));
+        address defaultUsdcVault_accountingChain = allocator_accountingChain.getVault(address(USDC));
         console.log(
             "\tBalance of USDC in The USDC Vault is: %s",
             IERC20(address(USDC)).balanceOf(defaultUsdcVault_accountingChain)
