@@ -149,16 +149,17 @@ contract Allocator is IManagedAllocator {
             address assetOut = params.swaps[i].assetOut;
             require(_vaultByAsset[assetOut] != address(0), ErrorsLib.UnsupportedAsset(assetOut));
             uint256 amountIn = params.swaps[i].amountIn;
-            // Withdraw assets from vault to this contract
-            IERC4626(_vaultByAsset[assetIn]).withdraw(amountIn, address(this), address(this));
+            uint256 idleBalance = IERC20(assetIn).balanceOf(address(this));
+            if (idleBalance < amountIn) {
+                // Withdraw assets from vault to this contract
+                IERC4626(_vaultByAsset[assetIn]).withdraw(amountIn - idleBalance, address(this), address(this));
+            }
             address swapper = params.swaps[i].swapper;
             // Transfer assetIn to the swapper
             IERC20(params.swaps[i].assetIn).safeTransfer(swapper, amountIn);
-            // Execute the swap; rely on the swapper to enforce slippage constraints and send the toAsset back to the
-            // Allocator
+            // Execute the swap and require 1:1 conversion
             uint256 assetOutAmount = ISwapper(swapper)
                 .executeSwap(params.swaps[i].assetIn, params.swaps[i].assetOut, amountIn, params.swaps[i].swapData);
-
             require(
                 assetOutAmount >= amountIn.convertAssetDecimals(assetIn, assetOut), ErrorsLib.InsufficientAmountOut()
             );
