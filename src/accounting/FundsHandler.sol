@@ -4,15 +4,13 @@ pragma solidity ^0.8.22;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
-
 import {IAccountingChainGateway} from "../interfaces/IAccountingChainGateway.sol";
 import {IAllocator} from "../interfaces/IAllocator.sol";
+import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
+import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
-import {AssetLib} from "../libraries/AssetLib.sol";
-
-// Consider making it a library instead
+// TODO: consider making it a library instead
 contract FundsHandler is IFundsHandler {
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
@@ -22,15 +20,6 @@ contract FundsHandler is IFundsHandler {
         // Assumes all balances have common denomination.
         uint256 amountRay;
         uint256 timestamp;
-    }
-
-    struct WithdrawalRequest {
-        address recipient;
-        uint256 amountRequested;
-        uint256 amountGuaranteed;
-        address preferredAsset;
-        uint256 requestTimestamp;
-        bytes data;
     }
 
     ChainBalanceSnapshot[] internal _chainBalances;
@@ -64,6 +53,7 @@ contract FundsHandler is IFundsHandler {
         _allocator = allocator;
     }
 
+    /// @inheritdoc IFundsHandler
     function getAggregatedBalance() external view returns (uint256) {
         IAllocator.AllocatorBalance[] memory allocatorAssets = IAllocator(_allocator).getAssetBalances();
 
@@ -78,6 +68,7 @@ contract FundsHandler is IFundsHandler {
         return totalBalanceRay;
     }
 
+    /// @inheritdoc IFundsHandler
     function getAssetBalances() external view returns (AssetBalance[] memory) {
         IAllocator.AllocatorBalance[] memory allocatorAssets = IAllocator(_allocator).getAssetBalances();
         AssetBalance[] memory balances = new AssetBalance[](allocatorAssets.length + _chainBalances.length);
@@ -101,44 +92,48 @@ contract FundsHandler is IFundsHandler {
         return balances;
     }
 
-    // TODO: Add to the interface
+    /// @inheritdoc IFundsHandler
     function getWithdrawalRequest(uint256 withdrawalRequestId) external view returns (WithdrawalRequest memory) {
         return _withdrawalRequests[withdrawalRequestId];
     }
 
+    /// @inheritdoc IFundsHandler
+    function processDeposit(address asset, uint256 amount) external onlyBaseBoostedVault {
+        _pushFundsToImmediateLiquidity(asset, amount);
+    }
+
+    /// @inheritdoc IFundsHandler
     function processWithdrawalRequest(
         address recipient,
-        uint256 amount,
-        uint256 guaranteedAmount,
+        uint256 amountRay,
+        uint256 guaranteedAmountRay,
         address preferredAsset,
         bytes calldata /* data */
     ) external override onlyBaseBoostedVault returns (uint256) {
         uint256 withdrawalRequestId = ++_lastWithdrawalRequestId;
         _withdrawalRequests[withdrawalRequestId] =
-            WithdrawalRequest(recipient, amount, guaranteedAmount, preferredAsset, block.timestamp, "");
-        // TODO: Implement anything else if needed
+            WithdrawalRequest(recipient, amountRay, guaranteedAmountRay, preferredAsset, block.timestamp, "");
         return withdrawalRequestId;
     }
 
-    function processDeposit(address asset, uint256 amount) external onlyBaseBoostedVault {
-        _pushFundsToImmediateLiquidity(asset, amount);
-    }
-
-    function processWithdrawalExecution(
-        uint256 withdrawalRequestId,
-        bytes calldata /* data */
-    )
+    /// @inheritdoc IFundsHandler
+    function processWithdrawalExecution(uint256 withdrawalRequestId)
         external
         override
         onlyBaseBoostedVault
         returns (address, uint256, address, bytes memory)
     {
-        WithdrawalRequest storage request = _withdrawalRequests[withdrawalRequestId];
+        WithdrawalRequest memory request = _withdrawalRequests[withdrawalRequestId];
         _verifyAvailableLiquidity(
-            request.preferredAsset, request.amountRequested.rayToAssetDecimals(request.preferredAsset)
+            request.preferredAsset, request.amountRequestedRay.rayToAssetDecimals(request.preferredAsset)
         );
-        (address asset, uint256 amount, address recipient) = _executeWithdrawal(withdrawalRequestId, request);
-        return (asset, amount, recipient, "");
+        (address asset, uint256 amount, address recipient) = _executeWithdrawal(
+            withdrawalRequestId,
+            request.preferredAsset,
+            request.amountRequestedRay.rayToAssetDecimals(request.preferredAsset),
+            request.recipient
+        );
+        return (asset, amount, recipient, request.data);
     }
 
     /// @inheritdoc IFundsHandler
@@ -148,30 +143,61 @@ contract FundsHandler is IFundsHandler {
         IERC20(asset).forceApprove(_basedBoostedVault, amount);
     }
 
+    // Manager Functions
+
+    /// @inheritdoc IFundsHandler
+    function pushFundsToChain(address asset, uint256 amount, uint256 chainId) external onlyManager {
+        _pullFundsFromImmediateLiquidity(asset, amount);
+        IERC20(asset).forceApprove(_gateway, amount);
+        IAccountingChainGateway(_gateway).sendPushFundsToChainMessage(asset, amount, chainId);
+    }
+
+    /// @inheritdoc IFundsHandler
+    function pullFundsFromChain(uint256 amountRay, uint256 chainId) external onlyManager {
+        IAccountingChainGateway(_gateway).sendPullFundsFromChainMessage(amountRay, chainId);
+    }
+
+    /// @inheritdoc IFundsHandler
     function rescueTokens(address asset, uint256 amount) external onlyManager {
-        _pullFundsFromImmediateLiquidity(asset, amount);
-        // TODO: send to treasury?
-        IERC20(asset).transfer(msg.sender, amount);
+        // TODO: send to treasury? If so can make this public.
+        IERC20(asset).safeTransfer(msg.sender, amount);
     }
 
-    function _executeWithdrawal(uint256 withdrawalRequestId, WithdrawalRequest storage request)
-        internal
-        returns (address, uint256, address)
+    // Gateway Functions
+
+    /// @inheritdoc IFundsHandler
+    function updateChainBalanceCallback(uint256 chainId, uint256 snapshotBalanceRay, uint256 snapshotTimestamp)
+        external
+        onlyGateway
     {
-        address asset = request.preferredAsset;
-        uint256 amount = request.amountRequested.rayToAssetDecimals(asset);
-        address recipient = request.recipient;
-        delete _withdrawalRequests[withdrawalRequestId];
-        _pullFundsFromImmediateLiquidity(asset, amount);
-        IERC20(asset).forceApprove(_basedBoostedVault, amount);
-        return (asset, amount, recipient);
+        _updateChainBalance(chainId, snapshotBalanceRay, snapshotTimestamp);
     }
 
-    function _verifyAvailableLiquidity(address asset, uint256 amount) internal view {
-        require(IAllocator(_allocator).getAssetBalance(asset) >= amount, ErrorsLib.InsufficientLiquidity());
+    /// @inheritdoc IFundsHandler
+    /// @dev Caller must have have transferred funds to this contract
+    function fundsArrivedFromChainCallback(address asset, uint256 amount) external onlyGateway {
+        _pushFundsToImmediateLiquidity(asset, amount);
     }
 
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //////
+
+    function _updateChainBalance(uint256 chainId, uint256 snapshotBalanceRay, uint256 snapshotTimestamp) internal {
+        bool chainExists;
+        for (uint16 i = 0; i < _chainBalances.length; i++) {
+            if (_chainBalances[i].chainId == chainId) {
+                chainExists = true;
+                if (_chainBalances[i].timestamp < snapshotTimestamp) {
+                    _chainBalances[i].timestamp = snapshotTimestamp;
+                    _chainBalances[i].amountRay = snapshotBalanceRay;
+                }
+            }
+        }
+        if (!chainExists) {
+            _chainBalances.push(
+                ChainBalanceSnapshot({chainId: chainId, amountRay: snapshotBalanceRay, timestamp: snapshotTimestamp})
+            );
+        }
+    }
 
     /// @notice Pushes funds to Allocator.
     function _pushFundsToImmediateLiquidity(address asset, uint256 amount) internal {
@@ -184,49 +210,17 @@ contract FundsHandler is IFundsHandler {
         IAllocator(_allocator).withdraw(asset, amount);
     }
 
-    // Manager Functions
-
-    function pushFundsToChain(address asset, uint256 amount, uint256 chainId) external onlyManager {
-        _pullFundsFromImmediateLiquidity(asset, amount);
-        IERC20(asset).forceApprove(_gateway, amount);
-        IAccountingChainGateway(_gateway).sendPushFundsToChainMessage(asset, amount, chainId);
-    }
-
-    function pullFundsFromChain(uint256 amount, uint256 chainId) external onlyManager {
-        IAccountingChainGateway(_gateway).sendPullFundsFromChainMessage(amount, chainId);
-    }
-
-    // Gateway Functions
-
-    function updateChainBalanceCallback(uint256 chainId, uint256 snapshotBalance, uint256 snapshotTimestamp)
-        external
-        onlyGateway
+    function _executeWithdrawal(uint256 withdrawalRequestId, address asset, uint256 amount, address recipient)
+        internal
+        returns (address, uint256, address)
     {
-        _updateChainBalance(chainId, snapshotBalance, snapshotTimestamp);
+        delete _withdrawalRequests[withdrawalRequestId];
+        _pullFundsFromImmediateLiquidity(asset, amount);
+        IERC20(asset).forceApprove(_basedBoostedVault, amount);
+        return (asset, amount, recipient);
     }
 
-    /// @dev Caller must have have transferred funds to this contract
-    function fundsArrivedFromChainCallback(address asset, uint256 amount) external onlyGateway {
-        _pushFundsToImmediateLiquidity(asset, amount);
-    }
-
-    //////
-
-    function _updateChainBalance(uint256 chainId, uint256 snapshotBalance, uint256 snapshotTimestamp) internal {
-        bool chainExists;
-        for (uint16 i = 0; i < _chainBalances.length; i++) {
-            if (_chainBalances[i].chainId == chainId) {
-                chainExists = true;
-                if (_chainBalances[i].timestamp < snapshotTimestamp) {
-                    _chainBalances[i].timestamp = snapshotTimestamp;
-                    _chainBalances[i].amountRay = snapshotBalance;
-                }
-            }
-        }
-        if (!chainExists) {
-            _chainBalances.push(
-                ChainBalanceSnapshot({chainId: chainId, amountRay: snapshotBalance, timestamp: snapshotTimestamp})
-            );
-        }
+    function _verifyAvailableLiquidity(address asset, uint256 amount) internal view {
+        require(IAllocator(_allocator).getAssetBalance(asset) >= amount, ErrorsLib.InsufficientLiquidity());
     }
 }

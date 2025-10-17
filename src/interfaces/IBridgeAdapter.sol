@@ -2,6 +2,11 @@
 pragma solidity ^0.8.22;
 
 interface IBridgeAdapter {
+    /// @notice Emitted when the processing of bridged funds fails.
+    event BridgedFundsProcessingFailed(uint256 sourceChainId, bytes message, bytes error);
+
+    error NotBridgeRouter();
+
     struct BridgeAsset {
         address asset;
         uint256 amount;

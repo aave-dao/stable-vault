@@ -12,66 +12,53 @@ import {Client} from "@chainlink-ccip/contracts/libraries/Client.sol";
 import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
+import {BaseBridgeAdapter} from "./BaseBridgeAdapter.sol";
 
-contract CcipAdapter is IBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
+/// @title CcipAdapter
+/// @notice Adapter for sending and receiving messages via Chainlink CCIP.
+contract CcipAdapter is BaseBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
     using SafeERC20 for IERC20;
 
     address internal constant FEE_ON_NATIVE_CURRENCY = address(0);
 
-    address internal _ccipRouter;
+    address internal immutable CCIP_ROUTER;
     address internal _feeToken;
-    address internal _gateway;
 
     mapping(uint256 chainId => uint64 ccipChainSelector) internal _chainSelectorOf;
     mapping(uint64 ccipChainSelector => uint256 chainId) internal _chainIdOf;
     mapping(uint256 chainId => address receiver) internal _receiverOf;
 
-    modifier onlyGateway() {
-        require(msg.sender == _gateway, ErrorsLib.NotGateway());
+    modifier onlyRouter() {
+        require(msg.sender == CCIP_ROUTER, NotBridgeRouter());
         _;
     }
 
-    // TODO: add admin modifier
-    function setGateway(address gateway) external {
-        _gateway = gateway;
+    modifier onlySelf() {
+        if (msg.sender != address(this)) {
+            revert ErrorsLib.NotSelf();
+        }
+        _;
     }
 
-    // TODO: add admin modifier
-    function setChainSelector(uint256 chainId, uint64 ccipChainSelector) external {
+    constructor(address owner, address ccipRouter) BaseBridgeAdapter(owner) {
+        require(ccipRouter != address(0), ErrorsLib.ZeroAddress());
+        CCIP_ROUTER = ccipRouter;
+    }
+
+    function setChainSelector(uint256 chainId, uint64 ccipChainSelector) external onlyOwner {
         _chainSelectorOf[chainId] = ccipChainSelector;
         _chainIdOf[ccipChainSelector] = chainId;
     }
 
-    // TODO: add admin modifier
-    function setChainReceiver(uint256 chainId, address receiver) external {
+    function setChainReceiver(uint256 chainId, address receiver) external onlyOwner {
         _receiverOf[chainId] = receiver;
     }
 
-    // TODO: add admin modifier
-    function setFeeToken(address feeToken) external {
+    function setFeeToken(address feeToken) external onlyOwner {
         _feeToken = feeToken;
     }
 
-    // TODO: add admin modifier
-    function setCcipRouter(address router) external {
-        _ccipRouter = router;
-    }
-
-    // TODO: expose admin function for destination chain replays of bridge data
-    function ccipReceive(Client.Any2EVMMessage calldata message) external override {
-        // TODO: Verify it's coming from a proper sender on the other chain
-        if (message.destTokenAmounts.length > 0) {
-            _processFundsReceiving(message.sourceChainSelector, message.destTokenAmounts);
-        }
-        if (message.data.length > 0) {
-            IChainGateway(_gateway)
-                .receiveMessage(
-                    _chainIdOf[message.sourceChainSelector], new IBridgeAdapter.BridgeAsset[](0), message.data
-                );
-        }
-    }
-
-    /// @inheritdoc IBridgeAdapter
+    /// @inheritdoc BaseBridgeAdapter
     function publishMessageToChain(uint256 chainId, BridgeAsset[] memory assets, bytes memory data)
         external
         override
@@ -80,13 +67,16 @@ contract CcipAdapter is IBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
         uint256 gasLimit = 2_000_000;
         Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](assets.length);
         if (assets.length > 0) {
-            require(assets.length == 1, ErrorsLib.InvalidBridgeAssetsLength());
-            address asset = assets[0].asset;
-            uint256 amount = assets[0].amount;
-            // TODO: should the Bridge Adapter pull funds from caller as opposed to trusting funds were sent?
-            IERC20(asset).forceApprove(_ccipRouter, amount);
-            tokenAmounts[0] = Client.EVMTokenAmount({token: asset, amount: amount});
             gasLimit = 3_000_000;
+            for (uint256 i = 0; i < assets.length; i++) {
+                address asset = assets[i].asset;
+                uint256 amount = assets[i].amount;
+                // Pull funds from caller into this contract
+                IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
+                // Approve the CCIP Router to spend the funds
+                IERC20(asset).forceApprove(CCIP_ROUTER, amount);
+                tokenAmounts[i] = Client.EVMTokenAmount({token: asset, amount: amount});
+            }
         }
         Client.EVM2AnyMessage memory ccipMessage = Client.EVM2AnyMessage({
             receiver: abi.encode(_receiverOf[chainId]),
@@ -101,32 +91,48 @@ contract CcipAdapter is IBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
         _sendMessage(chainId, ccipMessage);
     }
 
+    /// @inheritdoc IAny2EVMMessageReceiver
+    function ccipReceive(Client.Any2EVMMessage calldata message) external override onlyRouter {
+        if (message.data.length > 0) {
+            IChainGateway(_gateway)
+                .receiveMessage(
+                    _chainIdOf[message.sourceChainSelector], new IBridgeAdapter.BridgeAsset[](0), message.data
+                );
+        }
+        if (message.destTokenAmounts.length > 0) {
+            try this.processReceivedFunds(_chainIdOf[message.sourceChainSelector], message.destTokenAmounts) {}
+            catch (bytes memory err) {
+                emit BridgedFundsProcessingFailed(_chainIdOf[message.sourceChainSelector], abi.encode(message), err);
+            }
+        }
+    }
+
+    function processReceivedFunds(uint256 sourceChainId, Client.EVMTokenAmount[] memory assetsToProcess)
+        external
+        onlySelf
+    {
+        IBridgeAdapter.BridgeAsset[] memory assets = new IBridgeAdapter.BridgeAsset[](assetsToProcess.length);
+        for (uint256 i = 0; i < assetsToProcess.length; i++) {
+            address asset = assetsToProcess[i].token;
+            uint256 amount = assetsToProcess[i].amount;
+            assets[i] = IBridgeAdapter.BridgeAsset({asset: asset, amount: amount});
+        }
+        _processReceivedFunds(sourceChainId, assets);
+    }
+
     function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
         return interfaceId == type(IAny2EVMMessageReceiver).interfaceId || interfaceId == type(IERC165).interfaceId;
     }
 
     function _sendMessage(uint256 chainId, Client.EVM2AnyMessage memory message) internal {
         uint64 chainSelector = _chainSelectorOf[chainId];
-        uint256 fee = IRouterClient(_ccipRouter).getFee(chainSelector, message);
+        uint256 fee = IRouterClient(CCIP_ROUTER).getFee(chainSelector, message);
         uint256 msgValue;
         if (message.feeToken == FEE_ON_NATIVE_CURRENCY) {
             msgValue = fee;
         } else {
-            IERC20(_feeToken).safeIncreaseAllowance(_ccipRouter, fee);
+            IERC20(_feeToken).safeIncreaseAllowance(CCIP_ROUTER, fee);
         }
-        IRouterClient(_ccipRouter).ccipSend{value: msgValue}(chainSelector, message);
-    }
-
-    function _processFundsReceiving(uint64 sourceChainSelector, Client.EVMTokenAmount[] memory assetsToReceive)
-        internal
-    {
-        for (uint256 i = 0; i < assetsToReceive.length; i++) {
-            address asset = assetsToReceive[i].token;
-            uint256 amount = assetsToReceive[i].amount;
-            IERC20(asset).forceApprove(_gateway, amount);
-            IBridgeAdapter.BridgeAsset[] memory assets = new IBridgeAdapter.BridgeAsset[](1);
-            assets[0] = IBridgeAdapter.BridgeAsset({asset: asset, amount: amount});
-            IChainGateway(_gateway).receiveMessage(_chainIdOf[sourceChainSelector], assets, "");
-        }
+        IRouterClient(CCIP_ROUTER).ccipSend{value: msgValue}(chainSelector, message);
     }
 }
