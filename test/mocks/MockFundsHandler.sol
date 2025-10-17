@@ -1,0 +1,51 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.4;
+
+import {IFundsHandler} from "../../src/interfaces/IFundsHandler.sol";
+
+contract MockFundsHandler is IFundsHandler {
+    mapping(address asset => uint256 balanceRay) _mockedAssetBalancesRay;
+
+    function mockAssetBalances(AssetBalance[] memory assetBalances) external {
+        for (uint256 i = 0; i < assetBalances.length; i++) {
+            _mockedAssetBalancesRay[assetBalances[i].asset] = assetBalances[i].amountRay;
+        }
+    }
+
+    ////
+
+    function processWithdrawalRequest(
+        address recipient,
+        uint256 amount,
+        uint256 guaranteedAmount,
+        address preferredAsset,
+        bytes calldata data
+    ) external override returns (uint256) {}
+
+    function processDeposit(address asset, uint256 amount) external override {}
+
+    function processWithdrawalExecution(uint256 withdrawalRequestId, bytes calldata data)
+        external
+        override
+        returns (address, uint256, address, bytes memory)
+    {}
+
+    function pushFundsToChain(address asset, uint256 amount, uint256 chainId) external override {}
+
+    function pullFundsFromChain(uint256 amount, uint256 chainId) external override {}
+
+    function updateChainBalanceCallback(uint256 chainId, uint256 balanceSnapshot, uint256 snapshotTimestamp)
+        external
+        override
+    {}
+
+    function fundsArrivedFromChainCallback(address asset, uint256 amount) external override {}
+
+    function getAssetBalances() external override returns (AssetBalance[] memory) {}
+
+    function getAggregatedBalance() external view override returns (uint256) {}
+
+    function pullFromLiquidity(address asset, uint256 amount) external override {}
+
+    function rescueTokens(address asset, uint256 amount) external override {}
+}
