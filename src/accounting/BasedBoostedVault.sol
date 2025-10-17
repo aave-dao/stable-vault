@@ -43,70 +43,50 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
         uint256 totalShares;
     }
 
-    /**
-     * @notice The representation of an user's position. A single user will have at most 1 position.
-     *
-     * @param originalDeposit The amount deposited by the user before accruing any interest.
-     * @param subVaultId The ID of the subVault where the user's assets are.
-     * @param shares The shares of the user, scaled, normalized by `_baseConversionRate * subVault.conversionRate`.
-     */
+    /// @notice The representation of an user's position. A single user will have at most 1 position.
+    /// @param originalDepositRay The amount deposited by the user before accruing any interest.
+    /// @param subVaultId The ID of the subVault where the user's assets are.
+    /// @param shares The shares of the user, scaled, normalized by `_baseConversionRate * subVault.conversionRate`.
     struct UserPosition {
-        uint256 originalDeposit;
+        uint256 originalDepositRay;
         uint256 subVaultId;
         uint256 shares;
     }
 
     IFundsHandler internal _fundsHandler;
 
-    /**
-     * @dev The ID of the last subVault created; monotonically increasing.
-     */
+    /// @dev The ID of the last subVault created; monotonically increasing.
     uint256 internal _lastSubVaultId;
 
-    /**
-     * @dev The ID of the subVault where users without existing positions' deposits are allocated to.
-     */
-    uint256 _defaultSubVaultId;
+    /// @dev The ID of the subVault where users without existing positions' deposits are allocated to.
+    uint256 internal _defaultSubVaultId;
 
-    /**
-     * @dev Stores a SubVault by its ID.
-     */
-    mapping(uint256 subVaultId => SubVault subVault) _subVaultById;
+    /// @dev Stores a SubVault by its ID.
+    mapping(uint256 subVaultId => SubVault subVault) internal _subVaultById;
 
-    /**
-     * @dev The IDs of the SubVaults that have liquidity i.e. some user's assets on it.
-     */
+    /// @dev The IDs of the SubVaults that have liquidity i.e. some user's assets on it.
     uint256[] internal _activeSubVaultsIds;
 
-    /**
-     * @dev SubVault index in the `_activeSubVaultsIds` array.
-     */
-    mapping(uint256 subVaultId => uint256 subVaultIndex) _activeSubVaultIndexById;
+    /// @dev SubVault index in the `_activeSubVaultsIds` array.
+    mapping(uint256 subVaultId => uint256 subVaultIndex) internal _activeSubVaultIndexById;
 
-    /**
-     * @dev SubVault ID by subVault per-second rate.
-     */
-    mapping(uint256 subVaultRate => uint256 subVaultId) _subVaultIdByRate;
+    /// @dev SubVault ID by subVault per-second rate.
+    mapping(uint256 subVaultRate => uint256 subVaultId) internal _subVaultIdByRate;
 
-    /**
-     * @dev User position by user address.
-     */
-    mapping(address user => UserPosition position) _positions;
+    /// @dev User position by user address.
+    mapping(address user => UserPosition position) internal _positions;
 
-    /**
-     * @dev Mapping to track supported assets.
-     */
-    mapping(address asset => bool supported) _supportedAssets;
+    /// @dev Mapping to track supported assets.
+    mapping(address asset => bool supported) internal _supportedAssets;
 
-    /**
-     * @dev Constructor.
-     * @param owner The owner of the vault, acting as an admin.
-     * @param defaultSubVaultPerSecondRate The base per-second rate, in Ray units (27 decimals).
-     */
+    /// @dev Constructor.
+    /// @param owner The owner of the vault, acting as an admin.
+    /// @param defaultSubVaultPerSecondRate The base per-second rate, in Ray units (27 decimals).
     constructor(address owner, uint256 defaultSubVaultPerSecondRate) Ownable(owner) {
         _setDefaultSubVault(_createSubVault(defaultSubVaultPerSecondRate));
     }
 
+    /// @inheritdoc IBasedBoostedVault
     function deposit(address user, address asset, uint256 amount) external override {
         require(msg.sender == user, InvalidMsgSender());
         require(isAssetSupported(asset), ErrorsLib.UnsupportedAsset(asset));
@@ -130,19 +110,21 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
 
         _subVaultById[subVaultId].totalShares += shares;
         _positions[user].shares += shares;
-        _positions[user].originalDeposit += amountInRay;
+        _positions[user].originalDepositRay += amountInRay;
 
         _fundsHandler.processDeposit(asset, amount);
 
         emit Deposit(user, asset, amount);
     }
 
+    /// @inheritdoc IBasedBoostedVault
     function setUserRate(UserRateData[] calldata userRateData) external override onlyManager {
         for (uint256 i = 0; i < userRateData.length; i++) {
             _setUserRate(userRateData[i].user, userRateData[i].newPerSecondRate);
         }
     }
 
+    /// @inheritdoc IBasedBoostedVault
     function changeSubVaultRate(uint256 subVaultId, uint256 newPerSecondRate) external onlyManager {
         require(newPerSecondRate >= MathLib.RAY, InvalidRate());
         require(!_existsSubVaultWithRate(newPerSecondRate), VaultAlreadyExists());
@@ -152,13 +134,8 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
         emit SubVaultRateUpdated(subVaultId, newPerSecondRate);
     }
 
-    /**
-     * @notice Requests a withdrawal of assets from the vault.
-     * @param user The address of the user requesting the withdrawal
-     * @param preferredAsset The asset the withdrawal is requested in
-     * @param requestedAmountInRay The amount of assets requested to withdraw (normalized to RAY units)
-     */
-    function requestWithdrawal(address user, address preferredAsset, uint256 requestedAmountInRay)
+    /// @inheritdoc IBasedBoostedVault
+    function requestWithdrawal(address user, address preferredAsset, uint256 requestedAmountInRay, bytes calldata data)
         external
         override
         returns (uint256)
@@ -180,7 +157,7 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
             actualAmountInRay = _positions[user].shares.rayMulDown(conversionRate);
 
             // TODO: should we check actualAmountInRay > 0?
-            guaranteedAmountRay = _positions[user].originalDeposit;
+            guaranteedAmountRay = _positions[user].originalDepositRay;
             // FIXME: keeping + 2 here during development; we lose 2 units of assets when going from assets -> shares
             // (the loss is baked into the shares quantity which when multiplied with the same conversion rate leads to
             // 2 unit of asset loss).
@@ -201,12 +178,12 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
             // TODO: This needs a mathematical proof that: requestedAmountInRay <= actualAmountInRay;
             actualAmountInRay = requestedAmountInShares.rayMulDown(conversionRate);
             // TODO: Probably there is a better way to do this:
-            if (actualAmountInRay >= _positions[user].originalDeposit) {
-                guaranteedAmountRay = _positions[user].originalDeposit;
-                _positions[user].originalDeposit = 0;
+            if (actualAmountInRay >= _positions[user].originalDepositRay) {
+                guaranteedAmountRay = _positions[user].originalDepositRay;
+                _positions[user].originalDepositRay = 0;
             } else {
                 guaranteedAmountRay = actualAmountInRay;
-                _positions[user].originalDeposit -= actualAmountInRay;
+                _positions[user].originalDepositRay -= actualAmountInRay;
             }
         }
         if (!_isActiveSubVaultById(subVaultId)) {
@@ -217,8 +194,7 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
             amountRay: actualAmountInRay,
             guaranteedAmountRay: guaranteedAmountRay,
             preferredAsset: preferredAsset,
-            // TODO: do we need data here?
-            data: ""
+            data: data
         });
         emit WithdrawalRequestedWithShares(
             user,
@@ -232,23 +208,21 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
         return withdrawalRequestId;
     }
 
-    // TODO: do we need data here?
-    function executeWithdrawal(uint256 withdrawalRequestId, bytes calldata data)
-        external
-        override
-        returns (address, uint256, bytes memory)
-    {
+    /// @inheritdoc IBasedBoostedVault
+    function executeWithdrawal(uint256 withdrawalRequestId) external override returns (address, uint256, bytes memory) {
         (address asset, uint256 amount, address user, bytes memory returnData) =
-            _fundsHandler.processWithdrawalExecution(withdrawalRequestId, data);
+            _fundsHandler.processWithdrawalExecution(withdrawalRequestId);
         IERC20(asset).safeTransferFrom(address(_fundsHandler), user, amount);
         emit WithdrawalExecuted(user, withdrawalRequestId, asset, amount, returnData);
         return (asset, amount, returnData);
     }
 
+    /// @inheritdoc IBasedBoostedVault
     function setDefaultSubVault(uint256 perSecondRate) external onlyManager {
         _setDefaultSubVault(_getOrCreateSubVaultWithRate(perSecondRate));
     }
 
+    /// @inheritdoc IBasedBoostedVault
     function setManager(address manager) external onlyOwner {
         require(manager != address(0), ErrorsLib.ZeroAddress());
         _manager = manager;
@@ -257,6 +231,7 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
 
     // TODO: Should we allow the admin to claim fees as well?
     // TODO(registry-config): Should we have a "fee recipient" storage field or function param?
+    /// @inheritdoc IBasedBoostedVault
     function claimFees(address[] calldata assets, uint256[] calldata amounts) external onlyManager {
         uint256 vaultObligationsRay = _getVaultObligations();
         uint256 vaultAssetsRay = _getVaultAggregatedBalance();
@@ -274,6 +249,7 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
         emit FeesClaimed(assets, amounts);
     }
 
+    /// @inheritdoc IBasedBoostedVault
     function updateAssetSupport(address asset, bool supported) external onlyOwner {
         require(asset != address(0), ErrorsLib.UnsupportedAsset(asset));
         if (supported) {
@@ -288,6 +264,7 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
 
     ///////////////////////////////////////////////// GETTERS /////////////////////////////////////////////////////
 
+    /// @inheritdoc IBasedBoostedVault
     function getActiveSubVaults() external view override returns (SubVaultData[] memory) {
         SubVaultData[] memory activeSubVaults = new SubVaultData[](_activeSubVaultsIds.length);
         for (uint256 i = 0; i < _activeSubVaultsIds.length; i++) {
@@ -298,16 +275,17 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
         return activeSubVaults;
     }
 
-    /// @dev returns aggregated obligations to depositors in RAY of denomination asset
+    /// @inheritdoc IBasedBoostedVault
     function getVaultObligations() external view override returns (uint256) {
         return _getVaultObligations();
     }
 
+    /// @inheritdoc IBasedBoostedVault
     function getVaultAssets() external view override returns (uint256) {
         return _getVaultAggregatedBalance();
     }
 
-    /// @dev returns underlying assets denomination in RAY decimal places
+    /// @inheritdoc IBasedBoostedVault
     function getUserBalance(address user) external view override returns (uint256) {
         if (_positions[user].shares == 0) {
             return 0;
@@ -315,12 +293,14 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
         return _positions[user].shares.rayMulDown(_previewSubVaultConversionRate(_positions[user].subVaultId));
     }
 
+    /// @inheritdoc IBasedBoostedVault
     function getUserSubVault(address user) external view override returns (SubVaultData memory) {
         uint256 subVaultId = _positions[user].subVaultId;
         uint256 subVaultRate = _subVaultById[subVaultId].perSecondRate;
         return SubVaultData(subVaultRate, subVaultId);
     }
 
+    /// @inheritdoc IBasedBoostedVault
     function isAssetSupported(address asset) public view returns (bool) {
         return _supportedAssets[asset];
     }

@@ -52,10 +52,9 @@ interface IFundsHandler {
     ) external returns (uint256);
 
     /// @dev Executes a withdrawal request by pulling funds from the liquidity source and allowing them to be returned
-    /// to the recipient.
+    /// to the recipient with the data passed to the request.
     /// @param withdrawalRequestId The id of the withdrawal request as is stored.
-    /// @param data Arbitrary data to pass to the withdrawal execution.
-    function processWithdrawalExecution(uint256 withdrawalRequestId, bytes calldata data)
+    function processWithdrawalExecution(uint256 withdrawalRequestId)
         external
         returns (address, uint256, address, bytes memory);
 

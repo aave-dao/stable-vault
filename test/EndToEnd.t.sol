@@ -42,7 +42,7 @@ contract EndToEndTest is BaseTest {
 
         //        - check that funds are dropped into default liquidity vault
         console.log("User deposited %s USDC into Vault", userInitialDeposit);
-        address defaultUsdcVault_AccountingChain = allocator_accountingChain.getVault(address(USDC));
+        address defaultUsdcVault_AccountingChain = allocator_accountingChain.getImmediateLiquidityVault(address(USDC));
         console.log("Default vault for USDC is: %s", defaultUsdcVault_AccountingChain);
         console.log("It's balance of USDC is: %s", IERC20(address(USDC)).balanceOf(defaultUsdcVault_AccountingChain));
         // TODO: Replace with Before/After balance
@@ -76,7 +76,7 @@ contract EndToEndTest is BaseTest {
         fundsHandler.pushFundsToChain(address(USDC), userInitialDeposit, EARNING_CHAIN_ID);
 
         //        - check that the funds land on Earning Chain and are dropped into default liquidity vault there
-        address defaultUsdcVault_earningChain = allocator_earningChain.getVault(address(USDC));
+        address defaultUsdcVault_earningChain = allocator_earningChain.getImmediateLiquidityVault(address(USDC));
         console.log("Earning Chain default vault for USDC is: %s", defaultUsdcVault_earningChain);
         console.log("It's balance of USDC is: %s", IERC20(address(USDC)).balanceOf(defaultUsdcVault_earningChain));
         assertEq(
@@ -117,7 +117,7 @@ contract EndToEndTest is BaseTest {
         allocator_earningChain.rebalance(IManagedAllocator.CrossAssetRebalanceParams(swaps));
 
         //        - check that the funds are swapped to GHO
-        address defaultGhoVault_earningChain = allocator_earningChain.getVault(address(GHO));
+        address defaultGhoVault_earningChain = allocator_earningChain.getImmediateLiquidityVault(address(GHO));
         console.log(
             "\tBalance of GHO in The GHO Vault is: %s", IERC20(address(GHO)).balanceOf(defaultGhoVault_earningChain)
         );
@@ -159,7 +159,7 @@ contract EndToEndTest is BaseTest {
         //    6. User asks for withdrawal of the whole amount of his earnings (which are $500+ - in USDC)
         console.log("User creates a WithdrawalRequest...");
         vm.prank(user);
-        uint256 withdrawalId = vault.requestWithdrawal(user, address(USDC), 0);
+        uint256 withdrawalId = vault.requestWithdrawal(user, address(USDC), 0, "");
         //        - check that the withdrawalId is created and passed to FundsHandler and execute() fails for now
 
         console.log("...with withdrawalId: %s", withdrawalId);
@@ -168,7 +168,7 @@ contract EndToEndTest is BaseTest {
         //     abi.encodeWithSelector(ERC4626ExceededMaxWithdraw.selector, allocator_accountingChain, userBalanceInUsdc,
         // 0) );
         vm.expectRevert(ErrorsLib.InsufficientLiquidity.selector);
-        vault.executeWithdrawal(withdrawalId, "");
+        vault.executeWithdrawal(withdrawalId);
 
         //        - check that we don't owe the user any funds
         console.log("User balance in RAY after withdrawal request: %s", vault.getUserBalance(user));
@@ -179,7 +179,7 @@ contract EndToEndTest is BaseTest {
         earningChainGateway.exit(address(GHO), userEarningsInGho);
 
         //        - check that the funds land on the Accounting Chain and are dropped into default liquidity vault there
-        address defaultGhoVault_accountingChain = allocator_accountingChain.getVault(address(GHO));
+        address defaultGhoVault_accountingChain = allocator_accountingChain.getImmediateLiquidityVault(address(GHO));
         console.log("Accounting Chain default vault for GHO is: %s", defaultGhoVault_accountingChain);
         console.log("It's balance of GHO is: %s", IERC20(address(GHO)).balanceOf(defaultGhoVault_accountingChain));
         assertEq(
@@ -216,7 +216,7 @@ contract EndToEndTest is BaseTest {
         allocator_accountingChain.rebalance(IManagedAllocator.CrossAssetRebalanceParams(swaps));
 
         //        - check that the funds are swapped to USDC
-        address defaultUsdcVault_accountingChain = allocator_accountingChain.getVault(address(USDC));
+        address defaultUsdcVault_accountingChain = allocator_accountingChain.getImmediateLiquidityVault(address(USDC));
         console.log(
             "\tBalance of USDC in The USDC Vault is: %s",
             IERC20(address(USDC)).balanceOf(defaultUsdcVault_accountingChain)
@@ -237,7 +237,7 @@ contract EndToEndTest is BaseTest {
         );
 
         //    9. Somebody triggers the execute() withdrawal to send the funds back to the user
-        (, uint256 amountOut, bytes memory data) = vault.executeWithdrawal(withdrawalId, "");
+        (, uint256 amountOut, bytes memory data) = vault.executeWithdrawal(withdrawalId);
         console.log("Amount out withdrawn: %s USDC", amountOut);
         console.logBytes(data);
 

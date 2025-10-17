@@ -4,7 +4,7 @@ pragma solidity ^0.8.22;
 /// @dev Assumes single strategy per asset; multiple assets per Allocator.
 /// @dev Deals with assets in their native decimals.
 interface IAllocator {
-    event Deallocation(address indexed asset, address indexed vault, uint256 amount, uint256 burnedShares);
+    event AssetDeallocated(address indexed asset, address indexed vault, uint256 amount, uint256 burnedShares);
     /// @notice emitted when funds fails to deposit to strategy vault and left idle in Allocator.
     event VaultDepositFailed(address indexed vault, uint256 amount);
 
@@ -22,6 +22,9 @@ interface IAllocator {
 
     /// @dev Returns the available liquidity denominated in given asset's decimals.
     function getAssetBalance(address asset) external view returns (uint256);
+
+    /// @dev Returns the default liquidity vault for a given asset.
+    function getImmediateLiquidityVault(address asset) external view returns (address);
 
     function deposit(address asset, uint256 amount) external;
 

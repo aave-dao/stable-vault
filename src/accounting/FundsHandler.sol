@@ -117,10 +117,7 @@ contract FundsHandler is IFundsHandler {
     }
 
     /// @inheritdoc IFundsHandler
-    function processWithdrawalExecution(
-        uint256 withdrawalRequestId,
-        bytes calldata /* data */
-    )
+    function processWithdrawalExecution(uint256 withdrawalRequestId)
         external
         override
         onlyBaseBoostedVault
@@ -136,7 +133,7 @@ contract FundsHandler is IFundsHandler {
             request.amountRequestedRay.rayToAssetDecimals(request.preferredAsset),
             request.recipient
         );
-        return (asset, amount, recipient, "");
+        return (asset, amount, recipient, request.data);
     }
 
     /// @inheritdoc IFundsHandler
