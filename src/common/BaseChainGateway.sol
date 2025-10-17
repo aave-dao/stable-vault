@@ -37,14 +37,14 @@ abstract contract BaseChainGateway is IChainGateway {
         override
     {
         if (assets.length > 0) {
-            _receiveFunds(sourceChainId, assets);
+            _receiveFunds(assets);
         }
         if (data.length > 0) {
             _receiveData(sourceChainId, data);
         }
     }
 
-    function _receiveFunds(uint256 sourceChainId, IBridgeAdapter.BridgeAsset[] memory assets) internal virtual;
+    function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal virtual;
 
     function _receiveData(uint256 sourceChainId, bytes memory data) internal virtual;
 

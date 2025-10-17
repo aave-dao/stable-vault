@@ -133,7 +133,7 @@ contract BasedBoostedVaultTest is Test {
         assertEq(bbv.getUserSubVault(user).id, bbv.getDefaultSubVault().id);
 
         vm.prank(manager);
-        bbv.setUserRate(user, userRate);
+        _setUserRate(user, userRate);
 
         IBasedBoostedVault.SubVaultData memory userVaultBeforeSecondDeposit = bbv.getUserSubVault(user);
         assertNotEq(userVaultBeforeSecondDeposit.id, bbv.getDefaultSubVault().id);
@@ -183,7 +183,7 @@ contract BasedBoostedVaultTest is Test {
 
         vm.prank(manager);
         vm.expectRevert(IBasedBoostedVault.NonExistentPosition.selector);
-        bbv.setUserRate(user, DEFAULT_PER_SECOND_RATE);
+        _setUserRate(user, DEFAULT_PER_SECOND_RATE);
     }
 
     function test_setUserRate_reverts_ifSettingTheSameRateHeAlreadyHas(address user, uint256 amount) public {
@@ -202,7 +202,7 @@ contract BasedBoostedVaultTest is Test {
 
         vm.prank(manager);
         vm.expectRevert(IBasedBoostedVault.RedundantRate.selector);
-        bbv.setUserRate(user, currentRate);
+        _setUserRate(user, currentRate);
     }
 
     function test_setUserRate_twoUsersWithSameRateLandsInTheSameSubVault(
@@ -229,7 +229,7 @@ contract BasedBoostedVaultTest is Test {
         bbv.deposit(user1, address(mockAsset), amount1);
 
         vm.prank(manager);
-        bbv.setUserRate(user1, newRate);
+        _setUserRate(user1, newRate);
 
         IBasedBoostedVault.SubVaultData memory user1SubVault = bbv.getUserSubVault(user1);
 
@@ -245,7 +245,7 @@ contract BasedBoostedVaultTest is Test {
         assertNotEq(user2SubVault.perSecondRate, newRate);
 
         vm.prank(manager);
-        bbv.setUserRate(user2, newRate);
+        _setUserRate(user2, newRate);
 
         // SubVaults must match after setting the same new rate as user1 for user2
         user2SubVault = bbv.getUserSubVault(user2);
@@ -270,5 +270,11 @@ contract BasedBoostedVaultTest is Test {
 
     function _boundAmount(uint256 amount, uint256 scaleFactor) internal pure returns (uint256) {
         return bound(amount, 1, 100_000_000_000_000 * scaleFactor); // 100 trillion
+    }
+
+    function _setUserRate(address user, uint256 newPerSecondRate) public {
+        IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](1);
+        userRateData[0] = IBasedBoostedVault.UserRateData(user, newPerSecondRate);
+        bbv.setUserRate(userRateData);
     }
 }

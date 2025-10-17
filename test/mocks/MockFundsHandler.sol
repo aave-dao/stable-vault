@@ -14,17 +14,28 @@ contract MockFundsHandler is IFundsHandler {
 
     ////
 
+    function getAggregatedBalance() external view override returns (uint256) {}
+
+    function getAssetBalances() external view override returns (AssetBalance[] memory) {}
+
+    function getWithdrawalRequest(uint256 withdrawalRequestId)
+        external
+        view
+        override
+        returns (WithdrawalRequest memory)
+    {}
+
+    function processDeposit(address asset, uint256 amount) external override {}
+
     function processWithdrawalRequest(
         address recipient,
-        uint256 amount,
-        uint256 guaranteedAmount,
+        uint256 amountRay,
+        uint256 guaranteedAmountRay,
         address preferredAsset,
         bytes calldata data
     ) external override returns (uint256) {}
 
-    function processDeposit(address asset, uint256 amount) external override {}
-
-    function processWithdrawalExecution(uint256 withdrawalRequestId, bytes calldata data)
+    function processWithdrawalExecution(uint256 withdrawalRequestId)
         external
         override
         returns (address, uint256, address, bytes memory)
@@ -32,18 +43,14 @@ contract MockFundsHandler is IFundsHandler {
 
     function pushFundsToChain(address asset, uint256 amount, uint256 chainId) external override {}
 
-    function pullFundsFromChain(uint256 amount, uint256 chainId) external override {}
+    function pullFundsFromChain(uint256 amountRay, uint256 chainId) external override {}
 
-    function updateChainBalanceCallback(uint256 chainId, uint256 balanceSnapshot, uint256 snapshotTimestamp)
+    function updateChainBalanceCallback(uint256 chainId, uint256 snapshotBalanceRay, uint256 snapshotTimestamp)
         external
         override
     {}
 
     function fundsArrivedFromChainCallback(address asset, uint256 amount) external override {}
-
-    function getAssetBalances() external override returns (AssetBalance[] memory) {}
-
-    function getAggregatedBalance() external view override returns (uint256) {}
 
     function pullFromLiquidity(address asset, uint256 amount) external override {}
 

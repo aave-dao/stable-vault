@@ -6,9 +6,11 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {BaseChainGateway} from "../common/BaseChainGateway.sol";
 import {IAllocator} from "../interfaces/IAllocator.sol";
+import {IAllocator} from "../interfaces/IAllocator.sol";
 import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {IEarningChainGateway} from "../interfaces/IEarningChainGateway.sol";
+import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {EventLib} from "../libraries/EventLib.sol";
 
@@ -16,6 +18,7 @@ import {EventLib} from "../libraries/EventLib.sol";
 /// @notice Facilitates cross chain messaging with exactly one Accounting Chain.
 contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
     using SafeERC20 for IERC20;
+    using AssetLib for uint256;
 
     modifier onlyManager() {
         require(msg.sender == _manager, ErrorsLib.NotManager());
@@ -36,34 +39,26 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
         emit EventLib.ManagerSet(manager);
     }
 
-    // TODO: Think if this should be put in constructor, or this can bee
     function setAllocator(address allocator) external onlyAdmin {
         require(allocator != address(0), ErrorsLib.ZeroAddress());
         _allocator = allocator;
         emit EventLib.AllocatorSet(allocator);
     }
 
-    function _receiveFunds(
-        uint256,
-        /* sourceChainId */
-        IBridgeAdapter.BridgeAsset[] memory assets
-    )
-        internal
-        override
-    {
-        require(assets.length == 1, ErrorsLib.InvalidBridgeAssetsLength());
-        address asset = assets[0].asset;
-        uint256 amount = assets[0].amount;
-        IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
-        IERC20(asset).forceApprove(_allocator, amount);
-        IAllocator(_allocator).deposit(asset, amount);
+    function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal override {
+        for (uint256 i = 0; i < assets.length; i++) {
+            address asset = assets[i].asset;
+            uint256 amount = assets[i].amount;
+            IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
+            IERC20(asset).forceApprove(_allocator, amount);
+            IAllocator(_allocator).deposit(asset, amount);
+        }
         // TODO: should this callback be gated behind a flag sent from the Accounting Chain?
         _sendBalanceUpdate();
     }
 
     function _receiveData(uint256 sourceChainId, bytes memory data) internal view override {
         _onlyAdapter(ASSET_FOR_DATA_ONLY_BRIDGE, sourceChainId);
-        // TODO: this assumes that the data is token amount in RAY (token agnostic)
         uint256 amountRay = abi.decode(data, (uint256));
         _emergencyExit(amountRay);
     }
@@ -92,9 +87,7 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
 
     function _returnFunds(address asset, uint256 amount) internal {
         address adapter = _bridgeAdapter[asset][ACCOUNTING_CHAIN_ID];
-        // Transfer funds to the bridge adapter and initiate the bridging of assets
-        // TODO: should we approve Adapter to pull funds?
-        IERC20(asset).safeTransfer(adapter, amount);
+        IERC20(asset).forceApprove(adapter, amount);
         IBridgeAdapter.BridgeAsset[] memory assets = new IBridgeAdapter.BridgeAsset[](1);
         assets[0] = IBridgeAdapter.BridgeAsset({asset: asset, amount: amount});
         IBridgeAdapter(adapter).publishMessageToChain(ACCOUNTING_CHAIN_ID, assets, _getBalanceSnapshotData());
@@ -106,6 +99,11 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
     }
 
     function _getBalanceSnapshotData() internal view returns (bytes memory) {
-        return abi.encode(IChainGateway.BalanceSnapshot(IAllocator(_allocator).getAggregatedBalance(), block.timestamp));
+        IAllocator.AllocatorBalance[] memory allocatorBalances = IAllocator(_allocator).getAssetBalances();
+        uint256 totalAssetsInRay;
+        for (uint256 i = 0; i < allocatorBalances.length; i++) {
+            totalAssetsInRay += allocatorBalances[i].amount.assetDecimalsToRay(allocatorBalances[i].asset);
+        }
+        return abi.encode(IChainGateway.BalanceSnapshot(totalAssetsInRay, block.timestamp));
     }
 }

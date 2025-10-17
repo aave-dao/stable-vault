@@ -80,6 +80,13 @@ contract BaseTest is Test {
         console.log("\tAccounting Chain ID: %s", ACCOUNTING_CHAIN_ID);
         console.log("\tEarning Chain ID: %s", EARNING_CHAIN_ID);
 
+        // ccip mock
+        mockCcipRouter = new MockCCIPRouter();
+        console.log("\tMock CCIP Router: %s", address(mockCcipRouter));
+
+        mockCcipRouter.setSourceChainSelector(EARNING_CHAIN_CCIP_SELECTOR, ACCOUNTING_CHAIN_CCIP_SELECTOR);
+        mockCcipRouter.setSourceChainSelector(ACCOUNTING_CHAIN_CCIP_SELECTOR, EARNING_CHAIN_CCIP_SELECTOR);
+
         console.log("\nAccounting Chain:");
         // Accounting Chain: BBV, FH, Swapper, Allocator, Accounting Chain Gateway, CCIP Adapter, CCIP Router, Strategy
         // Vault/4626
@@ -100,7 +107,7 @@ contract BaseTest is Test {
         console.log("\tAccounting Chain Gateway: %s", address(accountingChainGateway));
         swapper_accountingChain = new Swapper(address(allocator_accountingChain));
         console.log("\tSwapper: %s", address(swapper_accountingChain));
-        ccipAdapter_accountingChain = new CcipAdapter();
+        ccipAdapter_accountingChain = new CcipAdapter(admin, address(mockCcipRouter));
         console.log("\tCCIP Adapter: %s", address(ccipAdapter_accountingChain));
 
         ghoStrategyVault_accountingChain = new TestErc4626(GHO);
@@ -111,7 +118,7 @@ contract BaseTest is Test {
         ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
         // Earning Chain: Earning Chain Gateway, CCIP Adapter, CCIP Router, Swapper, Allocator, Strategy Vault/4626
         console.log("\nEarning Chain:");
-        ccipAdapter_earningChain = new CcipAdapter();
+        ccipAdapter_earningChain = new CcipAdapter(admin, address(mockCcipRouter));
         console.log("\tCCIP Adapter: %s", address(ccipAdapter_earningChain));
         earningChainGateway = new EarningChainGateway(admin, ACCOUNTING_CHAIN_ID);
         console.log("\tEarning Chain Gateway: %s", address(earningChainGateway));
@@ -124,13 +131,6 @@ contract BaseTest is Test {
         console.log("\tGHO Strategy Vault (Earning Chain): %s", address(ghoStrategyVault_earningChain));
         usdcStrategyVault_earningChain = new TestErc4626(USDC);
         console.log("\tUSDC Strategy Vault (Earning Chain): %s", address(usdcStrategyVault_earningChain));
-
-        // ccip mock
-        mockCcipRouter = new MockCCIPRouter();
-        console.log("\tMock CCIP Router: %s", address(mockCcipRouter));
-
-        mockCcipRouter.setSourceChainSelector(EARNING_CHAIN_CCIP_SELECTOR, ACCOUNTING_CHAIN_CCIP_SELECTOR);
-        mockCcipRouter.setSourceChainSelector(ACCOUNTING_CHAIN_CCIP_SELECTOR, EARNING_CHAIN_CCIP_SELECTOR);
     }
 
     function setUp() public virtual {
@@ -198,8 +198,6 @@ contract BaseTest is Test {
 
         ccipAdapter_accountingChain.setGateway(address(accountingChainGateway));
         ccipAdapter_earningChain.setGateway(address(earningChainGateway));
-        ccipAdapter_accountingChain.setCcipRouter(address(mockCcipRouter));
-        ccipAdapter_earningChain.setCcipRouter(address(mockCcipRouter));
         // ccipAdapter_accountingChain.setFeeToken(address(USDC));
         // ccipAdapter_earningChain.setFeeToken(address(USDC));
         ccipAdapter_accountingChain.setChainSelector(EARNING_CHAIN_ID, EARNING_CHAIN_CCIP_SELECTOR);

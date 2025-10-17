@@ -9,7 +9,6 @@ import {IAccountingChainGateway} from "../interfaces/IAccountingChainGateway.sol
 import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
-import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 /// @title AccountingChainGateway
 /// @notice Facilitates cross chain messaging one or more Earning Chains.
@@ -33,8 +32,10 @@ contract AccountingChainGateway is IAccountingChainGateway, BaseChainGateway {
     {
         address adapter = _bridgeAdapter[asset][targetChainId];
         require(adapter != address(0), UnsupportedAdapter());
-        // TODO: should we approve Adapter to pull funds?
-        IERC20(asset).safeTransferFrom(msg.sender, adapter, amount);
+        // Pull funds from caller into this contract
+        IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
+        // Approve the bridge adapter to spend the funds
+        IERC20(asset).forceApprove(adapter, amount);
         IBridgeAdapter.BridgeAsset[] memory assets = new IBridgeAdapter.BridgeAsset[](1);
         assets[0] = IBridgeAdapter.BridgeAsset({asset: asset, amount: amount});
         IBridgeAdapter(adapter).publishMessageToChain(targetChainId, assets, "");
@@ -48,19 +49,13 @@ contract AccountingChainGateway is IAccountingChainGateway, BaseChainGateway {
             .publishMessageToChain(targetChainId, new IBridgeAdapter.BridgeAsset[](0), abi.encode(amountRay));
     }
 
-    function _receiveFunds(
-        uint256,
-        /* sourceChainId */
-        IBridgeAdapter.BridgeAsset[] memory assets
-    )
-        internal
-        override
-    {
-        require(assets.length == 1, ErrorsLib.InvalidBridgeAssetsLength());
-        address asset = assets[0].asset;
-        uint256 amount = assets[0].amount;
-        IERC20(asset).safeTransferFrom(msg.sender, _fundsHandler, amount);
-        IFundsHandler(_fundsHandler).fundsArrivedFromChainCallback(asset, amount);
+    function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal override {
+        for (uint256 i = 0; i < assets.length; i++) {
+            address asset = assets[i].asset;
+            uint256 amount = assets[i].amount;
+            IERC20(asset).safeTransferFrom(msg.sender, _fundsHandler, amount);
+            IFundsHandler(_fundsHandler).fundsArrivedFromChainCallback(asset, amount);
+        }
     }
 
     function _receiveData(uint256 sourceChainId, bytes memory data) internal override {

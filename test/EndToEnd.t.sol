@@ -1,16 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {FundsHandler} from "../src/accounting/FundsHandler.sol";
-import {Swapper} from "../src/common/Swapper.sol";
-import {IManagedAllocator} from "../src/interfaces/IManagedAllocator.sol";
-import {AssetLib} from "../src/libraries/AssetLib.sol";
-import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
-import {BaseTest} from "./BaseTest.t.sol";
 import "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 import {IERC20} from "forge-std/interfaces/IERC20.sol";
 import {IERC4626} from "forge-std/interfaces/IERC4626.sol";
+
+import {FundsHandler} from "../src/accounting/FundsHandler.sol";
+import {Swapper} from "../src/common/Swapper.sol";
+import {IAllocator} from "../src/interfaces/IAllocator.sol";
+import {IBasedBoostedVault} from "../src/interfaces/IBasedBoostedVault.sol";
+import {AssetLib} from "../src/libraries/AssetLib.sol";
+import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
+import {BaseTest} from "./BaseTest.t.sol";
 
 contract EndToEndTest is BaseTest {
     using AssetLib for uint256;
@@ -62,7 +64,9 @@ contract EndToEndTest is BaseTest {
         //    2. Manager sets the % rate to user to 5% APY
         uint256 userPerSecondRate = 1_000000001547125957863212449; // 5% APY
         vm.prank(manager);
-        vault.setUserRate(user, userPerSecondRate);
+        IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](1);
+        userRateData[0] = IBasedBoostedVault.UserRateData(user, userPerSecondRate);
+        vault.setUserRate(userRateData);
 
         //        - check that the % rate is set correctly
         console.log("User's per second rate is: %s", vault.getUserSubVault(user).perSecondRate);
@@ -100,8 +104,8 @@ contract EndToEndTest is BaseTest {
         callDatas[0] = abi.encodeCall(IERC20.transfer, (address(this), userInitialDeposit));
         Swapper.SlippageParams memory slippageParams = Swapper.SlippageParams(0, address(0));
 
-        IManagedAllocator.SwapParams[] memory swaps = new IManagedAllocator.SwapParams[](1);
-        swaps[0] = IManagedAllocator.SwapParams(
+        IAllocator.SwapParams[] memory swaps = new IAllocator.SwapParams[](1);
+        swaps[0] = IAllocator.SwapParams(
             address(USDC),
             address(GHO),
             userInitialDeposit,
@@ -111,7 +115,7 @@ contract EndToEndTest is BaseTest {
 
         console.log("Rebalancing by swap from USDC to GHO on the Earning chain...");
         vm.prank(manager);
-        allocator_earningChain.rebalance(IManagedAllocator.CrossAssetRebalanceParams(swaps));
+        allocator_earningChain.rebalance(IAllocator.CrossAssetRebalanceParams(swaps));
 
         //        - check that the funds are swapped to GHO
         address defaultGhoVault_earningChain = allocator_earningChain.getVault(address(GHO));
@@ -156,7 +160,7 @@ contract EndToEndTest is BaseTest {
         //    6. User asks for withdrawal of the whole amount of his earnings (which are $500+ - in USDC)
         console.log("User creates a WithdrawalRequest...");
         vm.prank(user);
-        uint256 withdrawalId = vault.requestWithdrawal(user, address(USDC), 0);
+        uint256 withdrawalId = vault.requestWithdrawal(user, address(USDC), 0, "");
         //        - check that the withdrawalId is created and passed to FundsHandler and execute() fails for now
 
         console.log("...with withdrawalId: %s", withdrawalId);
@@ -165,7 +169,7 @@ contract EndToEndTest is BaseTest {
         //     abi.encodeWithSelector(ERC4626ExceededMaxWithdraw.selector, allocator_accountingChain, userBalanceInUsdc,
         // 0) );
         vm.expectRevert(ErrorsLib.InsufficientLiquidity.selector);
-        vault.executeWithdrawal(withdrawalId, "");
+        vault.executeWithdrawal(withdrawalId);
 
         //        - check that we don't owe the user any funds
         console.log("User balance in RAY after withdrawal request: %s", vault.getUserBalance(user));
@@ -199,8 +203,8 @@ contract EndToEndTest is BaseTest {
         targets[0] = address(GHO);
         callDatas[0] = abi.encodeCall(IERC20.transfer, (address(this), userEarningsInGho));
 
-        swaps = new IManagedAllocator.SwapParams[](1);
-        swaps[0] = IManagedAllocator.SwapParams(
+        swaps = new IAllocator.SwapParams[](1);
+        swaps[0] = IAllocator.SwapParams(
             address(GHO),
             address(USDC),
             userEarningsInGho,
@@ -210,7 +214,7 @@ contract EndToEndTest is BaseTest {
 
         console.log("Rebalancing by swap from GHO to USDC on the Accounting chain...");
         vm.prank(manager);
-        allocator_accountingChain.rebalance(IManagedAllocator.CrossAssetRebalanceParams(swaps));
+        allocator_accountingChain.rebalance(IAllocator.CrossAssetRebalanceParams(swaps));
 
         //        - check that the funds are swapped to USDC
         address defaultUsdcVault_accountingChain = allocator_accountingChain.getVault(address(USDC));
@@ -234,7 +238,7 @@ contract EndToEndTest is BaseTest {
         );
 
         //    9. Somebody triggers the execute() withdrawal to send the funds back to the user
-        (, uint256 amountOut, bytes memory data) = vault.executeWithdrawal(withdrawalId, "");
+        (, uint256 amountOut, bytes memory data) = vault.executeWithdrawal(withdrawalId);
         console.log("Amount out withdrawn: %s USDC", amountOut);
         console.logBytes(data);
 
@@ -247,15 +251,15 @@ contract EndToEndTest is BaseTest {
         //        - check that the withdrawal request is deleted and gone
         FundsHandler.WithdrawalRequest memory withdrawalRequest = fundsHandler.getWithdrawalRequest(withdrawalId);
         console.log("\trecipient:", withdrawalRequest.recipient);
-        console.log("\tamountRequested:", withdrawalRequest.amountRequested);
-        console.log("\tamountGuaranteed:", withdrawalRequest.amountGuaranteed);
+        console.log("\tamountRequestedRay:", withdrawalRequest.amountRequestedRay);
+        console.log("\tamountGuaranteedRay:", withdrawalRequest.amountGuaranteedRay);
         console.log("\tpreferredAsset:", withdrawalRequest.preferredAsset);
         console.log("\trequestTimestamp:", withdrawalRequest.requestTimestamp);
         console.logBytes(data);
 
         assertEq(withdrawalRequest.recipient, address(0), "Withdrawal Request recipient is not cleared out");
-        assertEq(withdrawalRequest.amountRequested, 0, "Withdrawal Request amountRequested is not cleared out");
-        assertEq(withdrawalRequest.amountGuaranteed, 0, "Withdrawal Request amountGuaranteed is not cleared out");
+        assertEq(withdrawalRequest.amountRequestedRay, 0, "Withdrawal Request amountRequestedRay is not cleared out");
+        assertEq(withdrawalRequest.amountGuaranteedRay, 0, "Withdrawal Request amountGuaranteedRay is not cleared out");
         assertEq(withdrawalRequest.preferredAsset, address(0), "Withdrawal Request preferredAsset is not cleared out");
         assertEq(withdrawalRequest.requestTimestamp, 0, "Withdrawal Request requestTimestamp is not cleared out");
         assertEq(withdrawalRequest.data, "", "Withdrawal Request data is not cleared out");
