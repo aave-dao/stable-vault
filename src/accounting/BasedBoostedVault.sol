@@ -109,7 +109,7 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
 
     function deposit(address user, address asset, uint256 amount) external override {
         require(msg.sender == user, InvalidMsgSender());
-        require(isAssetSupported(asset), UnsupportedAsset(asset));
+        require(isAssetSupported(asset), ErrorsLib.UnsupportedAsset(asset));
         IERC20(asset).safeTransferFrom(msg.sender, address(_fundsHandler), amount);
 
         uint256 subVaultId = _positions[user].subVaultId;
@@ -137,16 +137,14 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
         emit Deposit(user, asset, amount);
     }
 
+    function setUserRateBatch(UserRateData[] calldata userRateData) external override onlyManager {
+        for (uint256 i = 0; i < userRateData.length; i++) {
+            _setUserRate(userRateData[i].user, userRateData[i].newPerSecondRate);
+        }
+    }
+
     function setUserRate(address user, uint256 newPerSecondRate) external override onlyManager {
-        uint256 oldSubVaultId = _positions[user].subVaultId;
-        require(oldSubVaultId > 0, NonExistentPosition());
-        require(_subVaultById[oldSubVaultId].perSecondRate != newPerSecondRate, RedundantRate());
-
-        uint256 newSubVaultId = _getOrCreateSubVaultWithRate(newPerSecondRate);
-
-        _migrateUserToSubVault(user, oldSubVaultId, newSubVaultId);
-
-        emit UserRateUpdated(user, newPerSecondRate);
+        _setUserRate(user, newPerSecondRate);
     }
 
     function changeSubVaultRate(uint256 subVaultId, uint256 newPerSecondRate) external onlyManager {
@@ -199,7 +197,7 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
             delete _positions[user];
         } else {
             uint256 requestedAmountInShares = requestedAmountInRay.rayDivDown(conversionRate);
-            require(requestedAmountInShares <= _positions[user].shares, InvalidAmount());
+            require(requestedAmountInShares <= _positions[user].shares, ErrorsLib.InvalidAmount());
             // Subtract from the subVault & clear position
             _positions[user].shares -= requestedAmountInShares;
             _subVaultById[subVaultId].totalShares -= requestedAmountInShares;
@@ -281,12 +279,12 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
     }
 
     function updateAssetSupport(address asset, bool supported) external onlyOwner {
-        require(asset != address(0), InvalidAsset(asset));
+        require(asset != address(0), ErrorsLib.UnsupportedAsset(asset));
         if (supported) {
-            require(!_supportedAssets[asset], AssetAlreadySupported(asset));
+            require(!_supportedAssets[asset], ErrorsLib.AssetAlreadySupported(asset));
             _supportedAssets[asset] = true;
         } else {
-            require(_supportedAssets[asset], AssetNotSupported(asset));
+            require(_supportedAssets[asset], ErrorsLib.UnsupportedAsset(asset));
             delete _supportedAssets[asset];
         }
         emit AssetSupported(asset, supported);
@@ -436,5 +434,17 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
 
     function _existsSubVaultWithRate(uint256 perSecondRate) internal view returns (bool) {
         return _subVaultIdByRate[perSecondRate] != 0;
+    }
+
+    function _setUserRate(address user, uint256 newPerSecondRate) internal {
+        uint256 oldSubVaultId = _positions[user].subVaultId;
+        require(oldSubVaultId > 0, NonExistentPosition());
+        require(_subVaultById[oldSubVaultId].perSecondRate != newPerSecondRate, RedundantRate());
+
+        uint256 newSubVaultId = _getOrCreateSubVaultWithRate(newPerSecondRate);
+
+        _migrateUserToSubVault(user, oldSubVaultId, newSubVaultId);
+
+        emit UserRateUpdated(user, newPerSecondRate);
     }
 }

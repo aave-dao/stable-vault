@@ -7,6 +7,7 @@ import {console} from "forge-std/console.sol";
 import {FundsHandler} from "./../src/accounting/FundsHandler.sol";
 import {IBasedBoostedVault} from "./../src/interfaces/IBasedBoostedVault.sol";
 import {AssetLib} from "./../src/libraries/AssetLib.sol";
+import {ErrorsLib} from "./../src/libraries/ErrorsLib.sol";
 import {MathLib} from "./../src/libraries/MathLib.sol";
 import {BaseTest} from "./BaseTest.t.sol";
 import {TestErc20} from "./mocks/TestErc20.sol";
@@ -708,25 +709,25 @@ contract ExtendedBasedBoostedVaultTest is BaseTest {
     }
 
     function test_revert_addSupportedAsset_invalidAsset() public {
-        vm.expectRevert(abi.encodeWithSelector(IBasedBoostedVault.InvalidAsset.selector, address(0)));
+        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(0)));
         vault.updateAssetSupport(address(0), true);
     }
 
     function test_revert_addSupportedAsset_alreadySupported() public {
         TestErc20 testAsset = new TestErc20(18);
         vault.updateAssetSupport(address(testAsset), true);
-        vm.expectRevert(abi.encodeWithSelector(IBasedBoostedVault.AssetAlreadySupported.selector, address(testAsset)));
+        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.AssetAlreadySupported.selector, address(testAsset)));
         vault.updateAssetSupport(address(testAsset), true);
     }
 
     function test_revert_removeSupportedAsset_invalidAsset() public {
-        vm.expectRevert(abi.encodeWithSelector(IBasedBoostedVault.InvalidAsset.selector, address(0)));
+        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(0)));
         vault.updateAssetSupport(address(0), false);
     }
 
     function test_revert_removeSupportedAsset_notSupported() public {
         TestErc20 testAsset = new TestErc20(18);
-        vm.expectRevert(abi.encodeWithSelector(IBasedBoostedVault.AssetNotSupported.selector, address(testAsset)));
+        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(testAsset)));
         vault.updateAssetSupport(address(testAsset), false);
     }
 
@@ -738,7 +739,7 @@ contract ExtendedBasedBoostedVaultTest is BaseTest {
         vm.prank(account1);
         testAsset.approve(address(vault), 1);
 
-        vm.expectRevert(abi.encodeWithSelector(IBasedBoostedVault.UnsupportedAsset.selector, address(testAsset)));
+        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(testAsset)));
         vm.prank(account1);
         vault.deposit(account1, address(testAsset), 1);
     }

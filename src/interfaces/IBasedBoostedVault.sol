@@ -7,6 +7,11 @@ interface IBasedBoostedVault {
         uint256 id;
     }
 
+    struct UserRateData {
+        address user;
+        uint256 newPerSecondRate;
+    }
+
     // TODO: after initial testing we can fallbabck to using WithdrawalRequested
     //event WithdrawalRequested(address indexed user, address indexed asset, uint256 indexed withdrawalRequestId,
     // uint256 requestedAmount, uint256 guaranteedAmount);
@@ -35,11 +40,6 @@ interface IBasedBoostedVault {
     error NonExistentPosition();
     error RedundantRate();
     error InvalidMsgSender();
-    error InvalidAmount();
-    error UnsupportedAsset(address asset);
-    error InvalidAsset(address asset);
-    error AssetAlreadySupported(address asset);
-    error AssetNotSupported(address asset);
     error VaultAlreadyExists();
     error InactiveVault();
     error InsufficientAssets();
@@ -53,6 +53,8 @@ interface IBasedBoostedVault {
     function getUserSubVault(address user) external view returns (SubVaultData memory);
 
     function setUserRate(address user, uint256 perSecondRate) external;
+
+    function setUserRateBatch(UserRateData[] calldata userRateData) external;
 
     function deposit(address user, address asset, uint256 amount) external;
 

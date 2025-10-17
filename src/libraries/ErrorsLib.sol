@@ -11,6 +11,9 @@ library ErrorsLib {
     /// @notice Unsupported asset.
     error UnsupportedAsset(address asset);
 
+    /// @notice Asset already supported.
+    error AssetAlreadySupported(address asset);
+
     /// @notice Address checked is already whitelisted.
     error AddressAlreadyWhitelisted();
 
@@ -40,4 +43,7 @@ library ErrorsLib {
 
     /// @notice Address checked is not the self.
     error NotSelf();
+
+    /// @notice Thrown when input parameter contains unacceptable length.
+    error InvalidLength();
 }
