@@ -108,11 +108,11 @@ contract FundsHandler is IFundsHandler {
         uint256 amountRay,
         uint256 guaranteedAmountRay,
         address preferredAsset,
-        bytes calldata /* data */
+        bytes calldata data
     ) external override onlyBaseBoostedVault returns (uint256) {
         uint256 withdrawalRequestId = ++_lastWithdrawalRequestId;
         _withdrawalRequests[withdrawalRequestId] =
-            WithdrawalRequest(recipient, amountRay, guaranteedAmountRay, preferredAsset, block.timestamp, "");
+            WithdrawalRequest(recipient, amountRay, guaranteedAmountRay, preferredAsset, block.timestamp, data);
         return withdrawalRequestId;
     }
 
