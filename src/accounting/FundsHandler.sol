@@ -23,8 +23,6 @@ contract FundsHandler is IFundsHandler {
     }
 
     ChainBalanceSnapshot[] internal _chainBalances;
-    mapping(uint256 withdrawalRequestId => WithdrawalRequest) internal _withdrawalRequests;
-    uint256 internal _lastWithdrawalRequestId;
     address _manager;
     address _basedBoostedVault;
     address _gateway;
@@ -72,7 +70,6 @@ contract FundsHandler is IFundsHandler {
     function getAssetBalances() external view returns (AssetBalance[] memory) {
         IAllocator.AllocatorBalance[] memory allocatorAssets = IAllocator(_allocator).getAssetBalances();
         AssetBalance[] memory balances = new AssetBalance[](allocatorAssets.length + _chainBalances.length);
-
         for (uint16 i = 0; i < allocatorAssets.length; i++) {
             balances[i] = AssetBalance({
                 chainId: block.chainid,
@@ -93,47 +90,15 @@ contract FundsHandler is IFundsHandler {
     }
 
     /// @inheritdoc IFundsHandler
-    function getWithdrawalRequest(uint256 withdrawalRequestId) external view returns (WithdrawalRequest memory) {
-        return _withdrawalRequests[withdrawalRequestId];
-    }
-
-    /// @inheritdoc IFundsHandler
     function processDeposit(address asset, uint256 amount) external onlyBaseBoostedVault {
         _pushFundsToImmediateLiquidity(asset, amount);
     }
 
     /// @inheritdoc IFundsHandler
-    function processWithdrawalRequest(
-        address recipient,
-        uint256 amountRay,
-        uint256 guaranteedAmountRay,
-        address preferredAsset,
-        bytes calldata data
-    ) external override onlyBaseBoostedVault returns (uint256) {
-        uint256 withdrawalRequestId = ++_lastWithdrawalRequestId;
-        _withdrawalRequests[withdrawalRequestId] =
-            WithdrawalRequest(recipient, amountRay, guaranteedAmountRay, preferredAsset, block.timestamp, data);
-        return withdrawalRequestId;
-    }
-
-    /// @inheritdoc IFundsHandler
-    function processWithdrawalExecution(uint256 withdrawalRequestId)
-        external
-        override
-        onlyBaseBoostedVault
-        returns (address, uint256, address, bytes memory)
-    {
-        WithdrawalRequest memory request = _withdrawalRequests[withdrawalRequestId];
-        _verifyAvailableLiquidity(
-            request.preferredAsset, request.amountRequestedRay.rayToAssetDecimals(request.preferredAsset)
-        );
-        (address asset, uint256 amount, address recipient) = _executeWithdrawal(
-            withdrawalRequestId,
-            request.preferredAsset,
-            request.amountRequestedRay.rayToAssetDecimals(request.preferredAsset),
-            request.recipient
-        );
-        return (asset, amount, recipient, request.data);
+    function processWithdrawal(address asset, uint256 amount) external override onlyBaseBoostedVault {
+        _verifyAvailableLiquidity(asset, amount);
+        _pullFundsFromImmediateLiquidity(asset, amount);
+        IERC20(asset).forceApprove(_basedBoostedVault, amount);
     }
 
     /// @inheritdoc IFundsHandler
@@ -208,16 +173,6 @@ contract FundsHandler is IFundsHandler {
     /// @notice Takes from Allocator and gets ERC20 for further action.
     function _pullFundsFromImmediateLiquidity(address asset, uint256 amount) internal {
         IAllocator(_allocator).withdraw(asset, amount);
-    }
-
-    function _executeWithdrawal(uint256 withdrawalRequestId, address asset, uint256 amount, address recipient)
-        internal
-        returns (address, uint256, address)
-    {
-        delete _withdrawalRequests[withdrawalRequestId];
-        _pullFundsFromImmediateLiquidity(asset, amount);
-        IERC20(asset).forceApprove(_basedBoostedVault, amount);
-        return (asset, amount, recipient);
     }
 
     function _verifyAvailableLiquidity(address asset, uint256 amount) internal view {

@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 // TODO: This is a draft, but the final code might not differ much from this
-contract AssetRegistry {
+// TODO: add events
+// TODO: use timelocks on updates?
+contract AssetRegistry is Ownable {
     event AssetConfigSet(address asset, uint256 config);
 
     uint8 constant BBV_DEPOSIT_BIT = 0;
@@ -23,7 +26,9 @@ contract AssetRegistry {
         // ...up to 32 permissions (alternative storage approach for _configByAsset)
     }
 
-    function setAssetConfigBitmap(address asset, uint256 config) external /* onlyAdmin timeLocked? */  {
+    constructor(address owner) Ownable(owner) {}
+
+    function setAssetConfigBitmap(address asset, uint256 config) external onlyOwner {
         // check asset has balanceOf function as interface verification method - maybe not needed as the admin calls it
         IERC20(asset).balanceOf(address(this));
         _configByAsset[asset] = config;
@@ -55,7 +60,8 @@ contract AssetRegistry {
     //////////////////////////// INTERNAL HELPERS ////////////////////////////
 
     function _getMaskFor(uint8 bit) internal pure returns (uint256) {
-        return 1 << bit;
+        uint256 zeroBitMask = 1; // Avoid "incorrect-shift" warning
+        return zeroBitMask << bit;
     }
 
     function _isAllowedTo(address asset, uint8 bit) internal view returns (bool) {

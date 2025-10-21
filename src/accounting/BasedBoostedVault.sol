@@ -5,8 +5,11 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+import {IouToken} from "../common/IouToken.sol";
+import {IAssetRegistry} from "../interfaces/IAssetRegistry.sol";
 import {IBasedBoostedVault} from "../interfaces/IBasedBoostedVault.sol";
 import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
+import {IMintableBurnableIERC20} from "../interfaces/IMintableBurnableIERC20.sol";
 import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {MathLib} from "../libraries/MathLib.sol";
@@ -26,6 +29,8 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
     }
 
     uint256 internal constant SECONDS_PER_YEAR = 31_536_000;
+
+    address internal immutable IOU_TOKEN;
 
     /**
      * @notice A subVault works like a virtual fixed-rate vault.
@@ -53,7 +58,11 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
         uint256 shares;
     }
 
-    IFundsHandler internal _fundsHandler;
+    address internal _fundsHandler;
+
+    address internal _assetRegistry;
+
+    uint256 internal _globalOriginalDepositsRay;
 
     /// @dev The ID of the last subVault created; monotonically increasing.
     uint256 internal _lastSubVaultId;
@@ -76,22 +85,23 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
     /// @dev User position by user address.
     mapping(address user => UserPosition position) internal _positions;
 
-    /// @dev Mapping to track supported assets.
-    mapping(address asset => bool supported) internal _supportedAssets;
-
     /// @dev Constructor.
     /// @param owner The owner of the vault, acting as an admin.
     /// @param defaultSubVaultPerSecondRate The base per-second rate, in Ray units (27 decimals).
-    constructor(address owner, uint256 defaultSubVaultPerSecondRate) Ownable(owner) {
+    constructor(address owner, uint256 defaultSubVaultPerSecondRate, address iouToken, address assetRegistry)
+        Ownable(owner)
+    {
+        IOU_TOKEN = iouToken;
+        _assetRegistry = assetRegistry;
         _setDefaultSubVault(_createSubVault(defaultSubVaultPerSecondRate));
     }
 
     /// @inheritdoc IBasedBoostedVault
     function deposit(address user, address asset, uint256 amount) external override {
         require(msg.sender == user, InvalidMsgSender());
-        require(isAssetSupported(asset), ErrorsLib.UnsupportedAsset(asset));
+        require(IAssetRegistry(_assetRegistry).isAllowedToDepositIntoBBV(asset), ErrorsLib.UnsupportedAsset(asset));
         require(amount > 0, ErrorsLib.InvalidAmount());
-        IERC20(asset).safeTransferFrom(msg.sender, address(_fundsHandler), amount);
+        IERC20(asset).safeTransferFrom(msg.sender, _fundsHandler, amount);
 
         uint256 subVaultId = _positions[user].subVaultId;
         if (subVaultId == 0) {
@@ -112,8 +122,9 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
         _subVaultById[subVaultId].totalShares += shares;
         _positions[user].shares += shares;
         _positions[user].originalDepositRay += amountInRay;
+        _globalOriginalDepositsRay += amountInRay;
 
-        _fundsHandler.processDeposit(asset, amount);
+        IFundsHandler(_fundsHandler).processDeposit(asset, amount);
 
         emit Deposit(user, asset, amount);
     }
@@ -136,7 +147,7 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
     }
 
     /// @inheritdoc IBasedBoostedVault
-    function requestWithdrawal(address user, address preferredAsset, uint256 requestedAmountInRay, bytes calldata data)
+    function requestWithdrawal(address user, uint256 requestedAmountInRay, bytes calldata data)
         external
         override
         returns (uint256)
@@ -159,27 +170,26 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
                 _partialWithdrawalRequest(user, requestedAmountInRay);
         }
 
+        // Assets in Allocator + last snapshot updates from Earning chains
+        uint256 totalAssetsRay = _getVaultAggregatedBalance();
+        // Total outstanding claims on system Assets
+        uint256 iousInCirculationRay = _getIousInCirculation();
+        uint256 guaranteedObligationsRay = iousInCirculationRay + _globalOriginalDepositsRay;
+        uint256 globalWithdrawableInterestRay = totalAssetsRay - guaranteedObligationsRay;
+        uint256 withdrawalRequestInterestRay = actualAmountInRay - guaranteedAmountRay;
+        require(
+            withdrawalRequestInterestRay <= globalWithdrawableInterestRay,
+            DepositsNotCovered(user, actualAmountInRay, guaranteedAmountRay + globalWithdrawableInterestRay)
+        );
+
         if (!_isActiveSubVaultById(subVaultId)) {
             _removeSubVaultFromActive(subVaultId);
         }
 
-        uint256 withdrawalRequestId = _fundsHandler.processWithdrawalRequest({
-            recipient: user,
-            amountRay: actualAmountInRay,
-            guaranteedAmountRay: guaranteedAmountRay,
-            preferredAsset: preferredAsset,
-            data: data
-        });
-        emit WithdrawalRequestedWithShares(
-            user,
-            preferredAsset,
-            withdrawalRequestId,
-            subVaultId,
-            redeemedShares,
-            actualAmountInRay,
-            guaranteedAmountRay
-        );
-        return withdrawalRequestId;
+        _mintIous(user, actualAmountInRay);
+
+        emit WithdrawalRequestedWithShares(user, subVaultId, redeemedShares, actualAmountInRay, guaranteedAmountRay);
+        return actualAmountInRay;
     }
 
     function _fullWithdrawalRequest(address user) internal returns (uint256, uint256, uint256) {
@@ -236,12 +246,16 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
     }
 
     /// @inheritdoc IBasedBoostedVault
-    function executeWithdrawal(uint256 withdrawalRequestId) external override returns (address, uint256, bytes memory) {
-        (address asset, uint256 amount, address user, bytes memory returnData) =
-            _fundsHandler.processWithdrawalExecution(withdrawalRequestId);
-        IERC20(asset).safeTransferFrom(address(_fundsHandler), user, amount);
-        emit WithdrawalExecuted(user, withdrawalRequestId, asset, amount, returnData);
-        return (asset, amount, returnData);
+    function executeWithdrawal(address user, address assetOut, uint256 iouAmountRay) external override {
+        require(msg.sender == user, InvalidMsgSender());
+        require(
+            IAssetRegistry(_assetRegistry).isAllowedToWithdrawFromBBV(assetOut), ErrorsLib.UnsupportedAsset(assetOut)
+        );
+        IMintableBurnableIERC20(IOU_TOKEN).burn(user, iouAmountRay);
+        uint256 assetAmount = iouAmountRay.assetDecimalsToRay(assetOut);
+        IFundsHandler(_fundsHandler).processWithdrawal(assetOut, assetAmount);
+        IERC20(assetOut).safeTransferFrom(_fundsHandler, user, assetAmount);
+        emit WithdrawalExecuted(user, assetOut, assetAmount);
     }
 
     /// @inheritdoc IBasedBoostedVault
@@ -266,34 +280,26 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
         uint256 fee = vaultAssetsRay - vaultObligationsRay;
         uint256 accumulatedAmountRay;
         for (uint256 i = 0; i < assets.length; i++) {
-            _fundsHandler.pullFromLiquidity(assets[i], amounts[i]);
+            IFundsHandler(_fundsHandler).pullFromLiquidity(assets[i], amounts[i]);
             accumulatedAmountRay += amounts[i].assetDecimalsToRay(assets[i]);
             if (amounts[i] > 0) {
-                IERC20(assets[i]).safeTransferFrom(address(_fundsHandler), msg.sender, amounts[i]);
+                IERC20(assets[i]).safeTransferFrom(_fundsHandler, msg.sender, amounts[i]);
             }
         }
         require(accumulatedAmountRay <= fee, ErrorsLib.InvalidAmount());
         emit FeesClaimed(assets, amounts);
     }
 
-    /// @inheritdoc IBasedBoostedVault
-    function updateAssetSupport(address asset, bool supported) external override onlyOwner {
-        require(asset != address(0), ErrorsLib.UnsupportedAsset(asset));
-        if (supported) {
-            require(!_supportedAssets[asset], ErrorsLib.AssetAlreadySupported(asset));
-            _supportedAssets[asset] = true;
-        } else {
-            require(_supportedAssets[asset], ErrorsLib.UnsupportedAsset(asset));
-            delete _supportedAssets[asset];
-        }
-        emit AssetSupported(asset, supported);
-    }
-
     function setFundsHandler(address fundsHandler) external onlyOwner {
-        _fundsHandler = IFundsHandler(fundsHandler);
+        _fundsHandler = fundsHandler;
     }
 
     ///////////////////////////////////////////////// GETTERS /////////////////////////////////////////////////////
+
+    /// @inheritdoc IBasedBoostedVault
+    function getGlobalOriginalDepositAmount() external view override returns (uint256) {
+        return _globalOriginalDepositsRay;
+    }
 
     /// @inheritdoc IBasedBoostedVault
     function getActiveSubVaults() external view override returns (SubVaultData[] memory) {
@@ -346,11 +352,6 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
     /// @inheritdoc IBasedBoostedVault
     function getSubVaultIdByRate(uint256 perSecondRate) external view override returns (uint256) {
         return _subVaultIdByRate[perSecondRate];
-    }
-
-    /// @inheritdoc IBasedBoostedVault
-    function isAssetSupported(address asset) public view returns (bool) {
-        return _supportedAssets[asset];
     }
 
     ///////////////////////////////////////////////// INTERNAL /////////////////////////////////////////////////////
@@ -449,7 +450,21 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
     }
 
     function _getVaultAggregatedBalance() internal view returns (uint256) {
-        return _fundsHandler.getAggregatedBalance();
+        return IFundsHandler(_fundsHandler).getAggregatedBalance();
+    }
+
+    /// @return supply of all IOU tokens across all networks
+    function _getIousInCirculation() internal view returns (uint256) {
+        // TODO: Read internal storage of tokens bridged to other chains?
+        //      NO => because we will lock tokens when bridging
+        //      When the Earning chain exchanges IOUs for assets, it will send a message back to Accounting chain
+        //      Once Accounting chain receives this message the locked IOUs can be burned.
+        //      Total supply will decrease.
+        return IERC20(IOU_TOKEN).totalSupply();
+    }
+
+    function _mintIous(address user, uint256 amount) internal {
+        IMintableBurnableIERC20(IOU_TOKEN).mint(user, amount);
     }
 
     function _isActiveSubVaultById(uint256 subVaultId) internal view returns (bool) {

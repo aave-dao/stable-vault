@@ -17,22 +17,17 @@ interface IBasedBoostedVault {
     // uint256 requestedAmount, uint256 guaranteedAmount);
     event WithdrawalRequestedWithShares(
         address indexed user,
-        address indexed asset,
-        uint256 indexed withdrawalRequestId,
         uint256 subVaultId,
         uint256 subVaultShares,
         uint256 requestedAmount,
         uint256 guaranteedAmount
     );
-    event WithdrawalExecuted(
-        address indexed user, uint256 indexed withdrawalRequestId, address asset, uint256 amount, bytes returnData
-    );
+    event WithdrawalExecuted(address indexed user, address asset, uint256 amount);
     event Deposit(address indexed user, address indexed asset, uint256 amount);
     event UserRateUpdated(address indexed user, uint256 newRate);
     event SubVaultRateUpdated(uint256 indexed subVaultId, uint256 newRate);
     event SubVaultCreated(uint256 indexed subVaultId, uint256 perSecondRate);
     event DefaultSubVaultSet(uint256 indexed subVaultId);
-    event AssetSupported(address indexed asset, bool supported);
     event ManagerSet(address manager);
     event FeesClaimed(address[] assets, uint256[] amounts);
 
@@ -43,6 +38,7 @@ interface IBasedBoostedVault {
     error VaultAlreadyExists();
     error InactiveVault();
     error InsufficientAssets();
+    error DepositsNotCovered(address withdrawalRequester, uint256 amountRequestedRay, uint256 amountAvailableRay);
 
     function setDefaultSubVault(uint256 perSecondRate) external;
 
@@ -62,11 +58,6 @@ interface IBasedBoostedVault {
     /// @param manager Address of the manager.
     function setManager(address manager) external;
 
-    /// @dev Updates the support status of an asset.
-    /// @param asset Address of the asset.
-    /// @param supported New support status of the asset.
-    function updateAssetSupport(address asset, bool supported) external;
-
     /// @dev Deposits assets into the vault.
     /// @param user Address of the user depositing the assets.
     /// @param asset Address of the asset being deposited.
@@ -75,19 +66,20 @@ interface IBasedBoostedVault {
 
     /// @notice Requests a withdrawal of assets from the vault.
     /// @dev User shares are burned; the amount requested to withdraw stops accruing yield.
+    /// @dev User is minted units of IOUs which can be used to claim assets.
     /// @param user The address of the user requesting the withdrawal
-    /// @param preferredAsset The asset the withdrawal is requested in
     /// @param requestedAmountInRay The amount of assets requested to withdraw (normalized to RAY units)
     /// @param data Arbitrary data can be used to inform withdrawal execution behavior.
-    function requestWithdrawal(address user, address preferredAsset, uint256 requestedAmountInRay, bytes calldata data)
+    /// @return amount of IOU tokens minted to the user
+    function requestWithdrawal(address user, uint256 requestedAmountInRay, bytes calldata data)
         external
         returns (uint256);
 
-    /// @notice Executes a previously requested withdrawal by pulling funds from the liquidity source and transferring
-    /// them to the recipient.
-    /// @dev The withdrawal request is deleted from storage after execution.
-    /// @param withdrawalRequestId The id of the withdrawal request as is stored.
-    function executeWithdrawal(uint256 withdrawalRequestId) external returns (address, uint256, bytes memory);
+    /// @notice Exchanges IOUs for a supported asset.
+    /// @param user Address of the user executing the withdrawal.
+    /// @param tokenOut Address of the token to withdraw.
+    /// @param iouAmountRay Amount of the IOU tokens to exchange as part of the withdrawal execution.
+    function executeWithdrawal(address user, address tokenOut, uint256 iouAmountRay) external;
 
     /// @return Aggregated obligations to depositors in RAY of denomination asset.
     function getVaultObligations() external view returns (uint256);
@@ -105,7 +97,6 @@ interface IBasedBoostedVault {
     /// @return SubVaultData struct of vault.
     function getUserSubVault(address user) external view returns (SubVaultData memory);
 
-    /// @param asset Address of the asset.
-    /// @return Support status of the asset.
-    function isAssetSupported(address asset) external view returns (bool);
+    /// @return Value of global original deposit amount in RAY of denomination asset.
+    function getGlobalOriginalDepositAmount() external view returns (uint256);
 }

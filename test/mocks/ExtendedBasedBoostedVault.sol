@@ -2,13 +2,14 @@
 pragma solidity ^0.8.20;
 
 import {BasedBoostedVault} from "../../src/accounting/BasedBoostedVault.sol";
-import {IFundsHandler} from "../../src/interfaces/IFundsHandler.sol";
 import {MathLib} from "../../src/libraries/MathLib.sol";
 
 contract ExtendedBasedBoostedVault is BasedBoostedVault {
     using MathLib for uint256;
 
-    constructor(address owner, uint256 initialBasePerSecondRate) BasedBoostedVault(owner, initialBasePerSecondRate) {}
+    constructor(address owner, uint256 initialBasePerSecondRate, address iouToken, address assetRegistry)
+        BasedBoostedVault(owner, initialBasePerSecondRate, iouToken, assetRegistry)
+    {}
 
     function getDefaultConversionRate() public view returns (uint256) {
         SubVault storage defaultVault = _subVaultById[_defaultSubVaultId];

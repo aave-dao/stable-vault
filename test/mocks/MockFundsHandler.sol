@@ -13,33 +13,13 @@ contract MockFundsHandler is IFundsHandler {
     }
 
     ////
-
     function getAggregatedBalance() external view override returns (uint256) {}
 
     function getAssetBalances() external view override returns (AssetBalance[] memory) {}
 
-    function getWithdrawalRequest(uint256 withdrawalRequestId)
-        external
-        view
-        override
-        returns (WithdrawalRequest memory)
-    {}
-
     function processDeposit(address asset, uint256 amount) external override {}
 
-    function processWithdrawalRequest(
-        address recipient,
-        uint256 amountRay,
-        uint256 guaranteedAmountRay,
-        address preferredAsset,
-        bytes calldata data
-    ) external override returns (uint256) {}
-
-    function processWithdrawalExecution(uint256 withdrawalRequestId)
-        external
-        override
-        returns (address, uint256, address, bytes memory)
-    {}
+    function processWithdrawal(address asset, uint256 amount) external override {}
 
     function pushFundsToChain(address asset, uint256 amount, uint256 chainId) external override {}
 

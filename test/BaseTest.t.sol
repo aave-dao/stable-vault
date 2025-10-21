@@ -4,6 +4,8 @@ pragma solidity ^0.8.20;
 import "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 
+import {AssetRegistry} from "../src/common/AssetRegistry.sol";
+import {IouToken} from "../src/common/IouToken.sol";
 import {AccountingChainGateway} from "./../src/accounting/AccountingChainGateway.sol";
 import {FundsHandler} from "./../src/accounting/FundsHandler.sol";
 import {CcipAdapter} from "./../src/bridging/CcipAdapter.sol";
@@ -37,6 +39,9 @@ contract BaseTest is Test {
     // Accounting Chain: BBV, FH, Swapper, Allocator, Accounting Chain Gateway, CCIP Adapter, CCIP Router, Strategy
     // Vault/4626
     ExtendedBasedBoostedVault vault;
+    IouToken iouToken;
+
+    AssetRegistry assetRegistry_accountingChain;
     FundsHandler fundsHandler;
     Allocator allocator_accountingChain;
     Swapper swapper_accountingChain;
@@ -90,7 +95,18 @@ contract BaseTest is Test {
         console.log("\nAccounting Chain:");
         // Accounting Chain: BBV, FH, Swapper, Allocator, Accounting Chain Gateway, CCIP Adapter, CCIP Router, Strategy
         // Vault/4626
-        vault = new ExtendedBasedBoostedVault(admin, initialBasePerSecondRate);
+        assetRegistry_accountingChain = new AssetRegistry(address(this));
+
+        assetRegistry_accountingChain.setAssetConfigBitmap(address(GHO), type(uint256).max);
+        assetRegistry_accountingChain.setAssetConfigBitmap(address(USDC), type(uint256).max);
+
+        // TODO: set tokens here on AssetRegistry
+        iouToken = new IouToken(address(this));
+        vault = new ExtendedBasedBoostedVault(
+            admin, initialBasePerSecondRate, address(iouToken), address(assetRegistry_accountingChain)
+        );
+        iouToken.transferOwnership(address(vault));
+
         console.log("\tVault: %s", address(vault));
         allocator_accountingChain = new Allocator(manager, admin);
         console.log("\tAllocator: %s", address(allocator_accountingChain));
