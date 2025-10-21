@@ -159,15 +159,22 @@ contract EndToEndTest is BaseTest {
         //    6. User asks for withdrawal of the whole amount of his earnings (which are $500+ - in USDC)
         console.log("User creates a WithdrawalRequest...");
         vm.prank(user);
-        vm.expectRevert(abi.encodeWithSelector(IBasedBoostedVault.DepositsNotCovered.selector, user, 512381781828396559943369876000, 500000000000000000000000000000));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IBasedBoostedVault.DepositsNotCovered.selector,
+                user,
+                512381781828396559943369876000,
+                500000000000000000000000000000
+            )
+        );
         uint256 iouAmountRequestedRay = vault.requestWithdrawal(user, 0);
-        
+
         // Send balance snap shot update so that Accounting chain has latest assets balances
         vm.prank(manager);
         earningChainGateway.sendBalanceUpdate();
 
         console.log("Total system balance: %s", fundsHandler.getAggregatedBalance());
-        
+
         // Try the request again
         vm.prank(user);
         iouAmountRequestedRay = vault.requestWithdrawal(user, iouAmountRequestedRay);

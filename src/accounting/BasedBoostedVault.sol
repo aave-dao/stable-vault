@@ -147,11 +147,7 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
     }
 
     /// @inheritdoc IBasedBoostedVault
-    function requestWithdrawal(address user, uint256 requestedAmountInRay)
-        external
-        override
-        returns (uint256)
-    {
+    function requestWithdrawal(address user, uint256 requestedAmountInRay) external override returns (uint256) {
         require(msg.sender == user, InvalidMsgSender());
 
         uint256 subVaultId = _positions[user].subVaultId;

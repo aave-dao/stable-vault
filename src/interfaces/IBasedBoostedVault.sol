@@ -70,9 +70,7 @@ interface IBasedBoostedVault {
     /// @param user The address of the user requesting the withdrawal
     /// @param requestedAmountInRay The amount of assets requested to withdraw (normalized to RAY units)
     /// @return amount of IOU tokens minted to the user
-    function requestWithdrawal(address user, uint256 requestedAmountInRay)
-        external
-        returns (uint256);
+    function requestWithdrawal(address user, uint256 requestedAmountInRay) external returns (uint256);
 
     /// @notice Exchanges IOUs for a supported asset.
     /// @param user Address of the user executing the withdrawal.
