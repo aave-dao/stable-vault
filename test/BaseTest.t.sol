@@ -39,8 +39,7 @@ contract BaseTest is Test {
     // Accounting Chain: BBV, FH, Swapper, Allocator, Accounting Chain Gateway, CCIP Adapter, CCIP Router, Strategy
     // Vault/4626
     ExtendedBasedBoostedVault vault;
-    IouToken iouToken;
-
+    IouToken iouToken_accountingChain;
     AssetRegistry assetRegistry_accountingChain;
     FundsHandler fundsHandler;
     Allocator allocator_accountingChain;
@@ -96,16 +95,14 @@ contract BaseTest is Test {
         // Accounting Chain: BBV, FH, Swapper, Allocator, Accounting Chain Gateway, CCIP Adapter, CCIP Router, Strategy
         // Vault/4626
         assetRegistry_accountingChain = new AssetRegistry(address(this));
-
+        // Enable everything for assets
         assetRegistry_accountingChain.setAssetConfigBitmap(address(GHO), type(uint256).max);
         assetRegistry_accountingChain.setAssetConfigBitmap(address(USDC), type(uint256).max);
-
-        // TODO: set tokens here on AssetRegistry
-        iouToken = new IouToken(address(this));
+        iouToken_accountingChain = new IouToken(address(this));
         vault = new ExtendedBasedBoostedVault(
-            admin, initialBasePerSecondRate, address(iouToken), address(assetRegistry_accountingChain)
+            admin, initialBasePerSecondRate, address(iouToken_accountingChain), address(assetRegistry_accountingChain)
         );
-        iouToken.transferOwnership(address(vault));
+        iouToken_accountingChain.transferOwnership(address(vault));
 
         console.log("\tVault: %s", address(vault));
         allocator_accountingChain = new Allocator(manager, admin);
@@ -160,8 +157,6 @@ contract BaseTest is Test {
         vm.startPrank(admin);
 
         // Set up BBV
-        vault.updateAssetSupport(address(GHO), true);
-        vault.updateAssetSupport(address(USDC), true);
         vault.setFundsHandler(address(fundsHandler));
         vault.setManager(manager);
 

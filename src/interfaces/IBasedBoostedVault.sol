@@ -69,9 +69,8 @@ interface IBasedBoostedVault {
     /// @dev User is minted units of IOUs which can be used to claim assets.
     /// @param user The address of the user requesting the withdrawal
     /// @param requestedAmountInRay The amount of assets requested to withdraw (normalized to RAY units)
-    /// @param data Arbitrary data can be used to inform withdrawal execution behavior.
     /// @return amount of IOU tokens minted to the user
-    function requestWithdrawal(address user, uint256 requestedAmountInRay, bytes calldata data)
+    function requestWithdrawal(address user, uint256 requestedAmountInRay)
         external
         returns (uint256);
 

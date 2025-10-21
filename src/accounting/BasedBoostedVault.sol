@@ -147,7 +147,7 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
     }
 
     /// @inheritdoc IBasedBoostedVault
-    function requestWithdrawal(address user, uint256 requestedAmountInRay, bytes calldata data)
+    function requestWithdrawal(address user, uint256 requestedAmountInRay)
         external
         override
         returns (uint256)
@@ -252,7 +252,7 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
             IAssetRegistry(_assetRegistry).isAllowedToWithdrawFromBBV(assetOut), ErrorsLib.UnsupportedAsset(assetOut)
         );
         IMintableBurnableIERC20(IOU_TOKEN).burn(user, iouAmountRay);
-        uint256 assetAmount = iouAmountRay.assetDecimalsToRay(assetOut);
+        uint256 assetAmount = iouAmountRay.rayToAssetDecimals(assetOut);
         IFundsHandler(_fundsHandler).processWithdrawal(assetOut, assetAmount);
         IERC20(assetOut).safeTransferFrom(_fundsHandler, user, assetAmount);
         emit WithdrawalExecuted(user, assetOut, assetAmount);
