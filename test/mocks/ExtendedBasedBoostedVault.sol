@@ -10,10 +10,6 @@ contract ExtendedBasedBoostedVault is BasedBoostedVault {
 
     constructor(address owner, uint256 initialBasePerSecondRate) BasedBoostedVault(owner, initialBasePerSecondRate) {}
 
-    function setFundsHandler(address fundsHandler) public {
-        _fundsHandler = IFundsHandler(fundsHandler);
-    }
-
     function getDefaultConversionRate() public view returns (uint256) {
         SubVault storage defaultVault = _subVaultById[_defaultSubVaultId];
         return defaultVault.conversionRate;

@@ -69,6 +69,21 @@ library MathLib {
         }
     }
 
+    /// @notice Divides two Ray numbers, rounding up.
+    /// @dev Reverts if division by zero or intermediate multiplication overflows.
+    /// @return c = ceil(a * RAY / b) in Ray units.
+    function rayDivUp(uint256 a, uint256 b) internal pure returns (uint256 c) {
+        // to avoid overflow, a <= type(uint256).max / RAY
+        assembly ("memory-safe") {
+            if or(iszero(b), iszero(iszero(gt(a, div(not(0), RAY))))) {
+                revert(0, 0)
+            }
+            c := mul(a, RAY)
+            // Add 1 if (a * RAY) % b > 0 to round up the division of (a * RAY) by b
+            c := add(div(c, b), gt(mod(c, b), 0))
+        }
+    }
+
     function rpow(uint256 x, uint256 n) internal pure returns (uint256 z) {
         assembly {
             switch x

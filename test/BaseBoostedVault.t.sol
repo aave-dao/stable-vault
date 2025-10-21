@@ -2,758 +2,279 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import {console} from "forge-std/console.sol";
 
+import {BasedBoostedVault} from "./../src/accounting/BasedBoostedVault.sol";
 import {FundsHandler} from "./../src/accounting/FundsHandler.sol";
 import {IBasedBoostedVault} from "./../src/interfaces/IBasedBoostedVault.sol";
+import {IFundsHandler} from "./../src/interfaces/IFundsHandler.sol";
 import {AssetLib} from "./../src/libraries/AssetLib.sol";
 import {ErrorsLib} from "./../src/libraries/ErrorsLib.sol";
 import {MathLib} from "./../src/libraries/MathLib.sol";
-import {BaseTest} from "./BaseTest.t.sol";
-import {TestErc20} from "./mocks/TestErc20.sol";
+import {IMockErc20, MockErc20} from "./mocks/MockErc20.sol";
+import {MockFundsHandler} from "./mocks/MockFundsHandler.sol";
+import {MockNonStandardErc20} from "./mocks/MockNonStandardErc20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-contract ExtendedBasedBoostedVaultTest is BaseTest {
+contract BasedBoostedVaultTest is Test {
     using MathLib for uint256;
     using AssetLib for uint256;
+    using SafeERC20 for IMockErc20;
 
-    TestErc20 asset;
+    address admin = makeAddr("admin");
+    address manager = makeAddr("manager");
 
-    function setUp() public override {
-        super.setUp();
-        console.log("Creating asset");
-        asset = new TestErc20(18);
+    uint256 constant DEFAULT_PER_SECOND_RATE = 1000000001243680656318820313; // ~4% APY
+    IMockErc20 mockAsset;
+    MockFundsHandler mockFundsHandler;
+    IBasedBoostedVault bbv;
+
+    function _deployDefaultAsset() internal returns (IMockErc20) {
+        return IMockErc20(address(new MockNonStandardErc20("Test USDT", "tUSDT", 6)));
+    }
+
+    function _deployBasedBoostedVault(address adminParam, uint256 defaultSubVaultPerSecondRate)
+        internal
+        returns (IBasedBoostedVault)
+    {
+        return new BasedBoostedVault(adminParam, defaultSubVaultPerSecondRate);
+    }
+
+    function setUp() public {
+        mockAsset = _deployDefaultAsset();
+        bbv = _deployBasedBoostedVault(admin, DEFAULT_PER_SECOND_RATE);
+
+        mockFundsHandler = new MockFundsHandler();
 
         vm.prank(admin);
-        vault.updateAssetSupport(address(asset), true);
+        BasedBoostedVault(address(bbv)).setFundsHandler(address(mockFundsHandler));
 
-        // FIXME: Skipping these tests for now
-        vm.skip(true);
+        vm.prank(admin);
+        bbv.updateAssetSupport(address(mockAsset), true);
+
+        vm.prank(admin);
+        BasedBoostedVault(address(bbv)).setManager(manager);
     }
 
-    function testMathLibRayMulDown() public pure {
-        uint256 a = 19944;
-        uint256 b = 1000035077411893278326216870;
-        uint256 result = a.rayMulDown(b);
-        assertEq(result, 19944);
+    function test_constructor_setsTheExpectedValues(address expectedOwner, uint256 expectedDefaultSubVaultRate) public {
+        vm.assume(expectedOwner != address(0));
+        expectedDefaultSubVaultRate = _boundRate(expectedDefaultSubVaultRate);
+
+        BasedBoostedVault newBbv = new BasedBoostedVault(expectedOwner, expectedDefaultSubVaultRate);
+
+        assertEq(newBbv.owner(), expectedOwner);
+
+        IBasedBoostedVault.SubVaultData memory defaultSubVault = newBbv.getDefaultSubVault();
+        assertEq(defaultSubVault.perSecondRate, expectedDefaultSubVaultRate);
+        assertEq(defaultSubVault.id, newBbv.getSubVaultIdByRate(expectedDefaultSubVaultRate));
     }
 
-    function test_success_changeSubVaultRate() public {
-        IBasedBoostedVault.SubVaultData[] memory activeSubVaults = vault.getActiveSubVaults();
-        assertEq(activeSubVaults.length, 1);
-
-        uint256 newPerSecondRate = 1000000001471536429740616381;
-        vault.changeSubVaultRate(activeSubVaults[0].id, newPerSecondRate);
-
-        // Assert
-        IBasedBoostedVault.SubVaultData[] memory activeSubVaultsAfterUpdate = vault.getActiveSubVaults();
-        assertEq(activeSubVaultsAfterUpdate.length, 1);
-        assertEq(activeSubVaults[0].id, activeSubVaultsAfterUpdate[0].id);
-        assertEq(activeSubVaultsAfterUpdate[0].perSecondRate, newPerSecondRate);
+    function test_constructor_reverts_ifZeroAddressAsOwner() public {
+        vm.expectRevert();
+        new BasedBoostedVault(address(0), DEFAULT_PER_SECOND_RATE);
     }
 
-    function testBaseConversionRateAccrualOverTime() public {
-        // Arrange
-        uint256 newBasePerSecondRate = 1000000001471536429740616381; // ~4.75% APY
-        _setDefaultPerSecondRate(newBasePerSecondRate);
+    function test_constructor_reverts_ifInvalidDefaultSubVaultRate(uint256 invalidDefaultSubVaultRate) public {
+        vm.assume(invalidDefaultSubVaultRate < MathLib.RAY);
 
-        // Initial conversion rate should be RAY
-        uint256 initialConversionRate = vault.getDefaultConversionRate();
-        assertEq(initialConversionRate, 1e27, "Initial conversion rate should be RAY");
-        console.log("Conversion rate year 0:", initialConversionRate);
-        assertEq(vault.getBaseApr(), 46406372848300078191216000);
-
-        // Move time forward by 1 year
-        uint256 secondsInYear = 365 days;
-        vm.warp(block.timestamp + secondsInYear);
-        vault.forceAccrueSubVaultConversionRate();
-
-        // Assert: conversion rate should have grown by ~5%
-        uint256 newConversionRateYear1 = vault.getDefaultConversionRate();
-        console.log("Conversion rate year 1:", newConversionRateYear1);
-        assertGt(newConversionRateYear1, initialConversionRate);
-
-        // The rate should not be different from 1 year prior
-        assertEq(vault.getBaseApr(), 46406372848300078191216000);
-
-        vm.warp(block.timestamp + secondsInYear);
-        vault.forceAccrueSubVaultConversionRate();
-
-        // Assert: conversion rate should have grown by ~5%
-        uint256 newConversionRateYear2 = vault.getDefaultConversionRate();
-        console.log("Conversion rate year 2:", newConversionRateYear2);
-        assertGt(newConversionRateYear2, newConversionRateYear1);
-        assertGt(newConversionRateYear2 - 1e27, 2 * (newConversionRateYear1 - 1e27));
+        vm.expectRevert();
+        new BasedBoostedVault(admin, MathLib.RAY - 1);
     }
 
-    function testBoostedRateAgainstExpectedConstantAPY_100K() public {
-        // In a way (18 decimal number), 1e14 means the error is in the 5th decimal place, so < 0.0001
-        uint256 acceptedDelta = 1e14;
+    function test_deposit_firstUserDepositGoesToDefaultSubVault(address user, uint256 amount) public {
+        vm.assume(user != address(0));
+        amount = _boundAssetAmount(address(mockAsset), amount);
 
-        // Compare contract 4% base APY + boost to 5% APY against plain direct pure math with 5% APY
-        uint256 expectedApyPerSecondRate = 1000000001547125957863212449; // 5% APY equivalent per-second rate
+        IBasedBoostedVault.SubVaultData memory userSubVault = bbv.getUserSubVault(user);
+        vm.assume(userSubVault.id == 0); // no prior deposits
 
-        // Arrange
-        uint256 newBasePerSecondRate = 1000000001243680656318820313; // ~4% APY
-        _setDefaultPerSecondRate(newBasePerSecondRate);
+        mockAsset.mint(user, amount);
 
-        // Asset deposit
-        uint256 amount = 100_000 ether;
-        asset.mint(address(this), amount);
-        asset.approve(address(vault), amount);
-        vault.deposit(address(this), address(asset), amount);
-        uint256 amountInRay = amount.assetDecimalsToRay(address(asset));
+        vm.prank(user);
+        mockAsset.forceApprove(address(bbv), amount);
 
-        _setUserRate(address(this), expectedApyPerSecondRate); // Boost from ~4% to ~5% APY
+        vm.prank(user);
+        bbv.deposit(user, address(mockAsset), amount);
 
-        console.log("After 1 year...");
-        vm.warp(block.timestamp + 365 days);
-        uint256 expectedBalance = amountInRay.mulByRay(expectedApyPerSecondRate.rpow(365 days));
-        console.log("Expected Balance:", expectedBalance);
-        uint256 actualBalance = vault.getUserBalance(address(this));
-        console.log("Actual Balance:", actualBalance);
-        uint256 delta = expectedBalance - actualBalance;
-        console.log("Actual Balance after year 1:", actualBalance);
-        console.log("Expected Balance:", expectedBalance);
-        console.log("Delta:", delta);
-        assertLt(delta, acceptedDelta);
+        userSubVault = bbv.getUserSubVault(user);
+        assertNotEq(userSubVault.id, 0); // subVault assigned after deposit
 
-        console.log("After 2 years...");
-        vm.warp(block.timestamp + 365 days);
-        expectedBalance = amountInRay.mulByRay(expectedApyPerSecondRate.rpow(2 * 365 days));
-        actualBalance = vault.getUserBalance(address(this));
-        delta = expectedBalance - actualBalance;
-        console.log("Actual Balance after year 2:", actualBalance);
-        console.log("Expected Balance:", expectedBalance);
-        console.log("Delta:", delta);
-        assertLt(delta, acceptedDelta);
-
-        console.log("After 10 years...");
-        vm.warp(block.timestamp + 365 days * 8);
-        expectedBalance = amountInRay.mulByRay(expectedApyPerSecondRate.rpow(10 * 365 days));
-        actualBalance = vault.getUserBalance(address(this));
-        delta = expectedBalance - actualBalance;
-        console.log("Actual Balance after year 10:", actualBalance);
-        console.log("Expected Balance:", expectedBalance);
-        console.log("Delta:", delta);
-        assertLt(delta, acceptedDelta);
+        IBasedBoostedVault.SubVaultData memory defaultSubVault = bbv.getDefaultSubVault();
+        assertEq(userSubVault.id, defaultSubVault.id);
+        assertEq(userSubVault.perSecondRate, defaultSubVault.perSecondRate);
     }
 
-    function testBoostedRateAgainstExpectedConstantAPY_2Billion() public {
-        /* Context: check that the delta b/w expected and actual is ~$1 if $2b deposited for 10 years;
-         *          expected assumes 5% APY base rate, actual assumes 4% APY base rate & 1% APY boost
-         * Deposit at t0:                 100,000.000000000000000000
-         * t0 + 10yr @ 4% + 1% boost APY: 162,889.462628316098542802
-         * t0 + 10yr @ 5% APY:            162,889.462677744140615978
-         * Delta after year 10:                 0.000049428042073176
-         * 2,000,000,000 after 10 years = ~$1 delta
-         */
+    function test_deposit_goesToCurrentUserSubVaultIfUserAlreadyHasAPosition(
+        address user,
+        uint256 firstDepositAmount,
+        uint256 secondDepositAmount,
+        uint256 userRate
+    ) public {
+        vm.assume(user != address(0));
+        firstDepositAmount = _boundAssetAmount(address(mockAsset), firstDepositAmount);
+        secondDepositAmount = _boundAssetAmount(address(mockAsset), secondDepositAmount);
+        // Assumes the sum of the two deposits does not exceed the max expected deposit amount
+        vm.assume(
+            _boundAssetAmount(address(mockAsset), firstDepositAmount + secondDepositAmount)
+                == firstDepositAmount + secondDepositAmount
+        );
+        userRate = _boundRate(userRate);
 
-        // Compare contract 4% base APY + boost to 5% APY against plain direct pure math with 5% APY
-        uint256 expectedApyPerSecondRate = 1000000001547125957863212449; // 5% APY equivalent per-second rate
+        mockAsset.mint(user, firstDepositAmount + secondDepositAmount);
 
-        // Arrange
-        uint256 newBasePerSecondRate = 1000000001243680656318820313; // ~4% APY
-        _setDefaultPerSecondRate(newBasePerSecondRate);
+        vm.assume(userRate != bbv.getDefaultSubVault().perSecondRate);
+        vm.assume(bbv.getUserSubVault(user).id == 0); // no prior deposits
 
-        // Asset deposit
-        uint256 amount = 2_000_000_000 ether;
-        asset.mint(address(this), amount);
-        asset.approve(address(vault), amount);
-        vault.deposit(address(this), address(asset), amount);
-        uint256 amountInRay = amount.assetDecimalsToRay(address(asset));
+        vm.prank(user);
+        mockAsset.forceApprove(address(bbv), firstDepositAmount);
 
-        _setUserRate(address(this), expectedApyPerSecondRate);
+        vm.prank(user);
+        bbv.deposit(user, address(mockAsset), firstDepositAmount);
 
-        console.log("After 1 year...");
-        vm.warp(block.timestamp + 365 days);
-        uint256 expectedBalance = amountInRay.mulByRay(expectedApyPerSecondRate.rpow(365 days));
-        uint256 actualBalance = vault.getUserBalance(address(this));
-        uint256 delta = expectedBalance - actualBalance;
-        console.log("Actual Balance after year 1:", actualBalance);
-        console.log("Expected Balance:", expectedBalance);
-        console.log("Delta:", delta);
+        assertEq(bbv.getUserSubVault(user).id, bbv.getDefaultSubVault().id);
 
-        console.log("After 2 years...");
-        vm.warp(block.timestamp + 365 days);
-        expectedBalance = amountInRay.mulByRay(expectedApyPerSecondRate.rpow(2 * 365 days));
-        actualBalance = vault.getUserBalance(address(this));
-        delta = expectedBalance - actualBalance;
-        console.log("Actual Balance after year 2:", actualBalance);
-        console.log("Expected Balance:", expectedBalance);
-        console.log("Delta:", delta);
+        vm.prank(manager);
+        _setUserRate(user, userRate);
 
-        console.log("After 10 years...");
-        vm.warp(block.timestamp + 365 days * 8);
-        expectedBalance = amountInRay.mulByRay(expectedApyPerSecondRate.rpow(10 * 365 days));
-        actualBalance = vault.getUserBalance(address(this));
-        delta = expectedBalance - actualBalance;
-        console.log("Actual Balance after year 10:", actualBalance);
-        console.log("Expected Balance:", expectedBalance);
-        console.log("Delta:", delta);
-        assertLt(delta, 1e18);
+        IBasedBoostedVault.SubVaultData memory userVaultBeforeSecondDeposit = bbv.getUserSubVault(user);
+        assertNotEq(userVaultBeforeSecondDeposit.id, bbv.getDefaultSubVault().id);
+
+        vm.prank(user);
+        mockAsset.forceApprove(address(bbv), secondDepositAmount);
+
+        vm.prank(user);
+        bbv.deposit(user, address(mockAsset), secondDepositAmount);
+
+        IBasedBoostedVault.SubVaultData memory userVaultAfterSecondDeposit = bbv.getUserSubVault(user);
+        assertEq(userVaultBeforeSecondDeposit.id, userVaultAfterSecondDeposit.id);
+        assertEq(userVaultBeforeSecondDeposit.perSecondRate, userVaultAfterSecondDeposit.perSecondRate);
     }
 
-    function testSameBlockDepositAndWithdrawMax(uint256 amount) public {
-        amount = bound(amount, 1, 1_000_000_000_000 ether);
+    function test_deposit_reverts_ifAmountIsZero(address user) public {
+        vm.assume(user != address(0));
 
-        uint256 blockTimestamp = block.timestamp;
-
-        uint256 newBasePerSecondRate = 1000000001243680656318820313; // ~4% APY
-        _setDefaultPerSecondRate(newBasePerSecondRate);
-
-        address account1 = makeAddr("account1");
-        vm.prank(account1);
-        asset.mint(account1, amount);
-        vm.prank(account1);
-        asset.approve(address(vault), amount);
-        vm.prank(account1);
-        vault.deposit(account1, address(asset), amount);
-
-        uint256 assetBalance = vault.getUserBalance(account1).rayToAssetDecimals(address(asset));
-        assertEq(assetBalance, amount, "Asset balance does not match initial deposited amount");
-
-        // Without advancing the block or timestamp, call full withdrawal
-        vm.prank(account1);
-        uint256 withdrawalRequestId = vault.requestWithdrawal(account1, address(asset), 0, "");
-        (, uint256 assetsWithdrawn,) = vault.executeWithdrawal(withdrawalRequestId);
-
-        uint256 assetBalanceAfterWithdraw = vault.getUserBalance(account1);
-
-        assertEq(assetBalance, assetsWithdrawn, "Asset balance does not match withdrawn amount");
-        assertEq(assetBalanceAfterWithdraw, 0, "Asset balance after withdrawal is not 0");
-
-        assertEq(block.timestamp, blockTimestamp, "Final block timestamp does not match initial timestamp");
+        vm.prank(user);
+        vm.expectRevert(ErrorsLib.InvalidAmount.selector);
+        bbv.deposit(user, address(mockAsset), 0);
     }
 
-    function testMultiBlockDepositAndWithdrawMax_simple(uint256 amount, uint256 elapsedTime) public {
-        //uint256 maxYearsThatCanBeElapsed = 1_354; // Estimate of the absolute maximum number of years that can be
-        // elapsed before arithmatic overflow due to RAY mul
-        uint256 maxYearsThatCanBeElapsed = 645;
-        amount = bound(amount, 1, 1_000_000_000_000 ether);
-        elapsedTime = bound(elapsedTime, 0, 365 days * maxYearsThatCanBeElapsed);
+    function test_deposit_callsFundsHandlerToProcessDepositWithExpectedParams(address user, uint256 amount) public {
+        vm.assume(user != address(0));
+        amount = _boundAssetAmount(address(mockAsset), amount);
 
-        uint256 blockTimestamp = block.timestamp;
+        mockAsset.mint(user, amount);
 
-        uint256 newBasePerSecondRate = 1000000001243680656318820313; // ~4% APY
-        _setDefaultPerSecondRate(newBasePerSecondRate);
+        vm.prank(user);
+        mockAsset.forceApprove(address(bbv), amount);
 
-        address account1 = makeAddr("account1");
-        vm.prank(account1);
-        asset.mint(account1, amount);
-        vm.prank(account1);
-        asset.approve(address(vault), amount);
-        vm.prank(account1);
-        vault.deposit(account1, address(asset), amount);
-
-        uint256 assetBalance = vault.getUserBalance(account1).rayToAssetDecimals(address(asset));
-        // Check
-        assertGe(assetBalance, amount - 1, "Asset balance too low compared to initial deposited amount");
-        assertLe(assetBalance, amount, "Asset balance too high compared to initial deposited amount");
-
-        // Withdraw after advancing block some time
-        vm.warp(blockTimestamp + elapsedTime);
-
-        assetBalance = vault.getUserBalance(account1).rayToAssetDecimals(address(asset));
-
-        uint256 assetsEarned = assetBalance - amount;
-        asset.mint(address(fundsHandler), assetsEarned); // TODO: Replace with adding into float
-
-        vm.prank(account1);
-        uint256 withdrawalRequestId = vault.requestWithdrawal(account1, address(asset), 0, "");
-        (, uint256 assetsWithdrawn,) = vault.executeWithdrawal(withdrawalRequestId);
-
-        uint256 assetBalanceAfterWithdraw = vault.getUserBalance(account1);
-
-        assertEq(assetBalance, assetsWithdrawn, "Asset balance does not match withdrawn amount");
-        assertEq(assetBalanceAfterWithdraw, 0, "Asset balance after withdrawal is not 0");
-    }
-
-    function testOneUnitDepositSameBlock(uint256 previousDepositAmount) public {
-        previousDepositAmount = bound(previousDepositAmount, 0, 1_000_000_000_000 ether);
-
-        uint256 blockTimestamp = block.timestamp;
-
-        uint256 newBasePerSecondRate = 1000000001243680656318820313; // ~4% APY
-        _setDefaultPerSecondRate(newBasePerSecondRate);
-
-        address account1 = makeAddr("account1");
-        if (previousDepositAmount > 0) {
-            vm.prank(account1);
-            asset.mint(account1, previousDepositAmount);
-            vm.prank(account1);
-            asset.approve(address(vault), previousDepositAmount);
-            vm.prank(account1);
-            vault.deposit(account1, address(asset), previousDepositAmount);
-        }
-
-        uint256 initialAssetBalance = vault.getUserBalance(account1).rayToAssetDecimals(address(asset));
-        assertEq(initialAssetBalance, previousDepositAmount, "Asset balance does not match initial deposited amount");
-
-        vm.prank(account1);
-        asset.mint(account1, 1);
-        vm.prank(account1);
-        asset.approve(address(vault), 1);
-        vm.prank(account1);
-        vault.deposit(account1, address(asset), 1);
-
-        // Without advancing the block or timestamp, call full withdrawal
-        vm.prank(account1);
-        uint256 withdrawalRequestId = vault.requestWithdrawal(account1, address(asset), 0, "");
-        (, uint256 assetsWithdrawn,) = vault.executeWithdrawal(withdrawalRequestId);
-
-        uint256 assetBalanceAfterWithdraw = vault.getUserBalance(account1);
-
-        assertEq(assetBalanceAfterWithdraw, 0, "Asset balance after withdrawal is not 0");
-        assertEq(
-            assetsWithdrawn, initialAssetBalance + 1, "Assets withdrawn does not take into account the 1 unit deposit"
+        vm.expectCall(
+            address(mockFundsHandler),
+            abi.encodeWithSelector(IFundsHandler.processDeposit.selector, address(mockAsset), amount)
         );
 
-        assertEq(block.timestamp, blockTimestamp, "Final block timestamp does not match initial timestamp");
+        vm.prank(user);
+        bbv.deposit(user, address(mockAsset), amount);
     }
 
-    function testMultiBlockDepositAndWithdrawMax_largeApy(uint256 amount, uint256 elapsedTime) public {
-        // 1000000000377783247012652819 ~= 10% APY
-        //uint256 maxYearsThatCanBeElapsed = 1_354; // Estimate of the absolute maximum number of years that can be
-        // elapsed before arithmatic overflow due to RAY mul
-        uint256 maxYearsThatCanBeElapsed = 645;
-        amount = bound(amount, 1, 1_000_000_000_000 ether);
-        elapsedTime = bound(elapsedTime, 0, 365 days * maxYearsThatCanBeElapsed);
-
-        uint256 blockTimestamp = block.timestamp;
-
-        uint256 newBasePerSecondRate = 1000000000377783247012652819;
-        _setDefaultPerSecondRate(newBasePerSecondRate);
-
-        address account1 = makeAddr("account1");
-        vm.prank(account1);
-        asset.mint(account1, amount);
-        vm.prank(account1);
-        asset.approve(address(vault), amount);
-        vm.prank(account1);
-        vault.deposit(account1, address(asset), amount);
-
-        uint256 assetBalance = vault.getUserBalance(account1).rayToAssetDecimals(address(asset));
-        assertGe(assetBalance, amount - 1, "Asset balance too low compared to initial deposited amount");
-        assertLe(assetBalance, amount, "Asset balance too high compared to initial deposited amount");
-
-        // Withdraw after advancing block some time
-        vm.warp(blockTimestamp + elapsedTime);
-
-        assetBalance = vault.getUserBalance(account1).rayToAssetDecimals(address(asset));
-
-        uint256 assetsEarned = assetBalance - amount;
-        asset.mint(address(fundsHandler), assetsEarned);
-
-        vm.prank(account1);
-        uint256 withdrawalRequestId = vault.requestWithdrawal(account1, address(asset), 0, "");
-        (, uint256 assetsWithdrawn,) = vault.executeWithdrawal(withdrawalRequestId);
-
-        uint256 assetBalanceAfterWithdraw = vault.getUserBalance(account1);
-
-        assertEq(assetBalance, assetsWithdrawn, "Asset balance does not match withdrawn amount");
-        assertEq(assetBalanceAfterWithdraw, 0, "Asset balance after withdrawal is not 0");
-    }
-
-    function testMultiBlockDepositAndWithdrawMax_multiAccount(uint256 amount, uint256 elapsedTime) public {
-        // 1000000000377783247012652819 ~= 10% APY
-        uint256 maxYearsThatCanBeElapsed = 100;
-        amount = bound(amount, 1, 1_000_000_000_000 ether);
-        elapsedTime = bound(elapsedTime, 0, 365 days * maxYearsThatCanBeElapsed);
-
-        uint256 newBasePerSecondRate = 1000000000377783247012652819;
-        _setDefaultPerSecondRate(newBasePerSecondRate);
-
-        address account2 = makeAddr("account2");
-        vm.prank(account2);
-        asset.mint(account2, amount);
-        vm.prank(account2);
-        asset.approve(address(vault), amount);
-        vm.prank(account2);
-        vault.deposit(account2, address(asset), amount);
-        uint256 assetBalanceAcct2 = vault.getUserBalance(account2).rayToAssetDecimals(address(asset));
-        assertGe(
-            assetBalanceAcct2, amount - 1, "Asset balance too low compared to initial deposited amount for account2"
-        );
-        assertLe(assetBalanceAcct2, amount, "Asset balance too high compared to initial deposited amount for account2");
-
-        vm.warp(block.timestamp + 1 days);
-
-        address account1 = makeAddr("account1");
-        vm.prank(account1);
-        asset.mint(account1, amount);
-        vm.prank(account1);
-        asset.approve(address(vault), amount);
-        vm.prank(account1);
-        vault.deposit(account1, address(asset), amount);
-
-        uint256 assetBalanceAcct1 = vault.getUserBalance(account1).rayToAssetDecimals(address(asset));
-
-        assertGe(
-            assetBalanceAcct1, amount - 1, "Asset balance too low compared to initial deposited amount for account1"
-        );
-        assertLe(assetBalanceAcct1, amount, "Asset balance too high compared to initial deposited amount for account1");
-
-        // Withdraw after advancing block some time
-        vm.warp(block.timestamp + elapsedTime);
-        assetBalanceAcct1 = vault.getUserBalance(account1).rayToAssetDecimals(address(asset));
-        // Since balance is rounding down then withdrawing max will fail because shares will be 0
-        vm.assume(assetBalanceAcct1 > 1);
-
-        uint256 assetsEarned = assetBalanceAcct1 > amount ? assetBalanceAcct1 - amount : 0;
-        if (assetsEarned > 0) {
-            asset.mint(address(fundsHandler), assetsEarned);
-        }
-
-        vm.prank(account1);
-        uint256 withdrawalRequestId = vault.requestWithdrawal(account1, address(asset), 0, "");
-        (, uint256 assetsWithdrawn,) = vault.executeWithdrawal(withdrawalRequestId);
-
-        console.log("block timestamp after withdraw:", block.timestamp);
-        uint256 assetBalanceAfterWithdraw = vault.getUserBalance(account1);
-
-        assertEq(assetBalanceAcct1, assetsWithdrawn, "Asset balance does not match withdrawn amount");
-        assertEq(assetBalanceAfterWithdraw, 0, "Asset balance after withdrawal is not 0");
-    }
-
-    function testSetUserRatesOver10Years() public {
-        // Context: - find driver of value delta between ending balance of (5% base) APY vs (4% base + 1% boost) APY
-        //          - add intermittent boosts across the time period of the initial deposit made
-        //          - as of the writing of this test we concluded that intermittent deposits/withdrawals were not a
-        // driver of divergence in actual vs expected at the end of the 10 years WolframAlpha: 2,000,000,000 * 1.05^10 =
-        // 3,257,789,253.5548828125
-        uint256 originalDeposit = 2_000_000_000 ether;
-
-        uint256 newBasePerSecondRate = 1000000001243680656318820313; // ~4% APY
-        _setDefaultPerSecondRate(newBasePerSecondRate);
-
-        // Asset deposit
-        TestErc20 testAsset = new TestErc20(18);
-        vault.updateAssetSupport(address(testAsset), true);
-        testAsset.mint(address(this), originalDeposit);
-        testAsset.approve(address(vault), originalDeposit);
-        vault.deposit(address(this), address(testAsset), originalDeposit);
-
-        testAsset.approve(address(vault), originalDeposit);
-
-        uint256 boost4To5 = 1000000000303445301167003084;
-
-        // Set initial boost to set effective rate from 4% APY to 5% APY
-        _setUserRate(address(this), boost4To5);
-
-        uint256 currentBlockTs = block.timestamp;
-        uint256 numberOfYears = 10;
-        uint256 endingBlockTs = currentBlockTs + (365 days * numberOfYears);
-        uint256 numberOfBoostsPerYear = 100;
-        uint256 totalBoosts = numberOfBoostsPerYear * numberOfYears;
-        uint256 interval = (endingBlockTs - currentBlockTs) / totalBoosts;
-
-        bool addOneToBoost = true;
-        for (uint256 i = 0; i < totalBoosts; i++) {
-            uint256 nextTs = currentBlockTs + (i + 1) * interval;
-            vm.warp(nextTs);
-
-            _setUserRate(address(this), boost4To5 + (addOneToBoost ? 1 : 0));
-            addOneToBoost = !addOneToBoost;
-        }
-
-        console.log("block.timestamp: ", block.timestamp);
-        console.log("endingBlockTs: ", endingBlockTs);
-        assertEq(block.timestamp, endingBlockTs);
-
-        uint256 thisUsdBalanceInVault = vault.getUserBalance(address(this)).rayToAssetDecimals(address(testAsset));
-        console.log("thisUsdBalanceInVault: ", thisUsdBalanceInVault);
-
-        uint256 expectedBalanceAfter10Years = 3_257_789_253_554882812500000000;
-        console.log("delta_account_1: ", expectedBalanceAfter10Years - thisUsdBalanceInVault);
-    }
-
-    function test_success_baseRateChange() public {
-        uint256 newBasePerSecondRate = 1000000003022265980097387650; // 10% APY
-        _setDefaultPerSecondRate(newBasePerSecondRate);
-
-        address account1 = makeAddr("account1");
-
-        TestErc20 testAsset = new TestErc20(18);
-        vault.updateAssetSupport(address(testAsset), true);
-
-        uint256 initialDeposit = 1_000_000 * 10 ** 18;
-        uint256 initialDepositInRay = initialDeposit * 10 ** 9;
-        testAsset.mint(account1, initialDeposit);
-        vm.prank(account1);
-        testAsset.approve(address(vault), initialDeposit);
-        vm.prank(account1);
-        vault.deposit(account1, address(testAsset), initialDeposit);
-
-        // Check base rate change after 6 months
-        uint256 sixMonths = 15768000;
-        vm.warp(block.timestamp + sixMonths);
-
-        uint256 balanceAfter6Months = vault.getUserBalance(account1);
-        console.log("balanceAfter6Months: ", balanceAfter6Months);
-
-        // Change the base rate to 15%
-        uint256 higherBasePerSecondRate = 1000000004431822129783699001;
-        _setDefaultPerSecondRate(higherBasePerSecondRate);
-
-        vm.warp(block.timestamp + sixMonths);
-
-        uint256 balanceAfter12Months = vault.getUserBalance(account1);
-
-        uint256 expectedBalanceIfOriginalRateFor12Months =
-            balanceAfter6Months.mulByRay(newBasePerSecondRate.rpow(sixMonths));
-        assertGt(
-            balanceAfter12Months,
-            expectedBalanceIfOriginalRateFor12Months,
-            "Expected higher balance after 12 with rate change"
-        );
-
-        uint256 expectedBalanceWithRateChangeAfter6Month = initialDepositInRay.mulByRay(
-                newBasePerSecondRate.rpow(sixMonths)
-            ).mulByRay(higherBasePerSecondRate.rpow(sixMonths));
-        uint256 delta = expectedBalanceWithRateChangeAfter6Month - balanceAfter12Months;
-        // Balances are queried in RAY, so expect at least the first 9 decimal places to be the same
-        assertEq(delta / 1e18, 0, "Expected lower delta");
-    }
-
-    function test_success_baseRateChange_withBoost() public {
-        uint256 newBasePerSecondRate = 1000000001243680656318820313; // ~4% APY
-        _setDefaultPerSecondRate(newBasePerSecondRate);
-
-        uint256 expectedTotalPerSecondRate = 1000000001547125957863212449; // 5% APY
-
-        address account1 = makeAddr("account1");
-
-        TestErc20 testAsset = new TestErc20(18);
-        vault.updateAssetSupport(address(testAsset), true);
-
-        uint256 initialDeposit = 1_000_000 * 10 ** 18;
-        uint256 initialDepositInRay = initialDeposit * 10 ** 9;
-        testAsset.mint(account1, initialDeposit);
-        vm.prank(account1);
-        testAsset.approve(address(vault), initialDeposit);
-        vm.prank(account1);
-        vault.deposit(account1, address(testAsset), initialDeposit);
-
-        _setUserRate(account1, expectedTotalPerSecondRate);
-
-        // Check base rate change after 6 months
-        uint256 sixMonths = 15768000;
-        vm.warp(block.timestamp + sixMonths);
-
-        uint256 balanceAfter6Months = vault.getUserBalance(account1);
-        console.log("balanceAfter6Months: ", balanceAfter6Months);
-
-        // Change the base rate to 6%
-        uint256 higherBasePerSecondRate = 1000000001847694957439350563;
-        _setDefaultPerSecondRate(higherBasePerSecondRate);
-
-        uint256 expectedTotalPerSecondRateAfterChange = 1000000002145441671308778766; // 7% APY
-
-        // Set user's sub-vault rate to 7%
-        IBasedBoostedVault.SubVaultData memory userSubVault = vault.getUserSubVault(account1);
-        vault.changeSubVaultRate(userSubVault.id, expectedTotalPerSecondRateAfterChange);
-
-        vm.warp(block.timestamp + sixMonths);
-
-        uint256 balanceAfter12Months = vault.getUserBalance(account1);
-        console.log("balanceAfter12Months: ", balanceAfter12Months);
-
-        uint256 expectedBalanceIfOriginalRateFor12Months =
-            balanceAfter6Months.mulByRay(expectedTotalPerSecondRate.rpow(sixMonths));
-        assertGt(
-            balanceAfter12Months,
-            expectedBalanceIfOriginalRateFor12Months,
-            "Expected higher balance after 12 with rate change"
-        );
-
-        // Avoid stack too deep error
-        uint256 expectedBalanceWithRateChangeAfter6Month0 =
-            initialDepositInRay.mulByRay(expectedTotalPerSecondRate.rpow(sixMonths));
-        uint256 expectedBalanceWithRateChangeAfter6Month =
-            expectedBalanceWithRateChangeAfter6Month0.mulByRay(expectedTotalPerSecondRateAfterChange.rpow(sixMonths));
-
-        uint256 delta = expectedBalanceWithRateChangeAfter6Month > balanceAfter12Months
-            ? expectedBalanceWithRateChangeAfter6Month - balanceAfter12Months
-            : balanceAfter12Months - expectedBalanceWithRateChangeAfter6Month;
-        console.log("delta: ", delta);
-        // FIXME: can we improve the delta here? The issue is the boost multiplier for extra 1% on base rate at t_0 does
-        // not translate to an extra 1% on base rate at t_1 (assuming the base rate is different) Balances are queried
-        // in RAY, so expect at least the first 9 decimal places to be the same
-        assertEq(delta / 1e18, 0, "Expected lower delta");
-    }
-
-    function test_success_variousDecimalPlaceTokenDeposits_simple() public {
-        address account1 = makeAddr("account1");
-        TestErc20 asset18dp = new TestErc20(18);
-        vault.updateAssetSupport(address(asset18dp), true);
-        TestErc20 asset6dp = new TestErc20(6);
-        vault.updateAssetSupport(address(asset6dp), true);
-
-        uint256 oneMillionUsd18dp = 1000000000000000000000000;
-        uint256 oneMillionUsd6dp = 1000000000000;
-
-        uint256 newBasePerSecondRate = 1000000000377783247012652819;
-        _setDefaultPerSecondRate(newBasePerSecondRate);
-
-        asset18dp.mint(account1, oneMillionUsd18dp);
-        asset6dp.mint(account1, oneMillionUsd6dp);
-        vm.prank(account1);
-        asset6dp.approve(address(vault), oneMillionUsd6dp);
-        vm.prank(account1);
-        asset18dp.approve(address(vault), oneMillionUsd18dp);
-
-        vm.prank(account1);
-        vault.deposit(account1, address(asset18dp), oneMillionUsd18dp);
-
-        // Move forward in time to check balance accrual
-        vm.warp(block.timestamp + 365 days);
-
-        uint256 accountBalance1 = vault.getUserBalance(account1);
-        console.log("accountBalance1: ", accountBalance1);
-        vm.prank(account1);
-        vault.deposit(account1, address(asset6dp), oneMillionUsd6dp);
-        // Check balance after depositing 6dp token
-        uint256 accountBalance2 = vault.getUserBalance(account1);
-        console.log("accountBalance2: ", accountBalance2);
-
-        // Conversion from shares to obtain accountBalance2 rounds down.
-        // Since this check is in the same block as the deposit, we lose 1 unit of RAY.
-        assertEq(accountBalance2 + 1, accountBalance1 + oneMillionUsd6dp * 10 ** (27 - 6));
-    }
-
-    function test_success_variousDecimalPlaceTokenDeposits_withBoost() public {
-        address account1 = makeAddr("account1");
-        TestErc20 asset18dp = new TestErc20(18);
-        vault.updateAssetSupport(address(asset18dp), true);
-        TestErc20 asset6dp = new TestErc20(6);
-        vault.updateAssetSupport(address(asset6dp), true);
-
-        uint256 oneMillionUsd18dp = 1000000000000000000000000;
-        uint256 oneMillionUsd6dp = 1000000000000;
-
-        uint256 expectedApyPerSecondRate = 1000000001547125957863212449; // 5% APY equivalent per-second rate
-
-        uint256 newBasePerSecondRate = 1000000001243680656318820313; // ~4% APY
-        _setDefaultPerSecondRate(newBasePerSecondRate);
-
-        asset18dp.mint(account1, oneMillionUsd18dp);
-        asset6dp.mint(account1, oneMillionUsd6dp);
-        vm.prank(account1);
-        asset6dp.approve(address(vault), oneMillionUsd6dp);
-        vm.prank(account1);
-        asset18dp.approve(address(vault), oneMillionUsd18dp);
-
-        // Deposit $2m in different tokens
-        vm.prank(account1);
-        vault.deposit(account1, address(asset18dp), oneMillionUsd18dp);
-        vm.prank(account1);
-        vault.deposit(account1, address(asset6dp), oneMillionUsd6dp);
-
-        // Set boost within same block after depositing
-        _setUserRate(account1, expectedApyPerSecondRate);
-
-        // Move forward in time to check balance accrual
-        vm.warp(block.timestamp + 365 days);
-        uint256 twoMillionRay = 2_000_000 * 10 ** 27;
-        uint256 expectedBalance = twoMillionRay.mulByRay(expectedApyPerSecondRate.rpow(365 days));
-
-        // Check that account balance is within some threshold of expected balance
-        // Balances are in RAY, so to convert to USD, we need to divide by 10 ** 27
-        uint256 accountBalance1 = vault.getUserBalance(account1);
-        uint256 delta =
-            expectedBalance > accountBalance1 ? expectedBalance - accountBalance1 : accountBalance1 - expectedBalance;
-        // First 9 decimal places are the same
-        assertEq(delta / 10 ** 18, 0);
-    }
-
-    // -------------------------------------------------------------
-    // Error Path Tests
-    // -------------------------------------------------------------
-
-    function test_revert_setUserRate_NonExistentPosition() public {
-        address account1 = makeAddr("account1");
+    function test_setUserRate_reverts_ifUserDoesNotHaveAPosition(address user, uint256 newPerSecondRate) public {
+        vm.assume(user != address(0));
+        vm.assume(bbv.getUserSubVault(user).id == 0); // no prior deposits
+        newPerSecondRate = _boundRate(newPerSecondRate);
+        vm.assume(newPerSecondRate != bbv.getDefaultSubVault().perSecondRate);
+
+        vm.prank(manager);
         vm.expectRevert(IBasedBoostedVault.NonExistentPosition.selector);
-        _setUserRate(account1, 1000000000303445301167003084);
+        _setUserRate(user, DEFAULT_PER_SECOND_RATE);
     }
 
-    function test_revert_setUserRate_redundantRate() public {
-        address account1 = makeAddr("account1");
-        uint256 depositAmount = 1;
-        uint256 boost4To5 = 1000000000303445301167003084;
+    function test_setUserRate_reverts_ifSettingTheSameRateHeAlreadyHas(address user, uint256 amount) public {
+        vm.assume(user != address(0));
+        amount = _boundAssetAmount(address(mockAsset), amount);
 
-        asset.mint(account1, depositAmount);
+        mockAsset.mint(user, amount);
 
-        vm.prank(account1);
-        asset.approve(address(vault), depositAmount);
-        vm.prank(account1);
-        vault.deposit(account1, address(asset), depositAmount);
+        vm.prank(user);
+        mockAsset.forceApprove(address(bbv), amount);
 
-        _setUserRate(account1, boost4To5);
+        vm.prank(user);
+        bbv.deposit(user, address(mockAsset), amount);
+
+        uint256 currentRate = bbv.getUserSubVault(user).perSecondRate;
+
+        vm.prank(manager);
         vm.expectRevert(IBasedBoostedVault.RedundantRate.selector);
-        _setUserRate(account1, boost4To5);
+        _setUserRate(user, currentRate);
     }
 
-    function test_revert_setBaseRate_invalidRate() public {
-        vm.expectRevert(IBasedBoostedVault.InvalidRate.selector);
-        _setDefaultPerSecondRate(12345);
+    function test_setUserRate_twoUsersWithSameRateLandsInTheSameSubVault(
+        address user1,
+        address user2,
+        uint256 amount1,
+        uint256 amount2,
+        uint256 newRate
+    ) public {
+        vm.assume(user1 != address(0));
+        vm.assume(user2 != address(0));
+        vm.assume(user1 != user2);
+        amount1 = _boundAssetAmount(address(mockAsset), amount1);
+        amount2 = _boundAssetAmount(address(mockAsset), amount2);
+        newRate = _boundRate(newRate);
+        vm.assume(newRate != bbv.getDefaultSubVault().perSecondRate);
+
+        mockAsset.mint(user1, amount1);
+        mockAsset.mint(user2, amount2);
+
+        vm.prank(user1);
+        mockAsset.forceApprove(address(bbv), amount1);
+        vm.prank(user1);
+        bbv.deposit(user1, address(mockAsset), amount1);
+
+        vm.prank(manager);
+        _setUserRate(user1, newRate);
+
+        IBasedBoostedVault.SubVaultData memory user1SubVault = bbv.getUserSubVault(user1);
+
+        vm.prank(user2);
+        mockAsset.forceApprove(address(bbv), amount2);
+        vm.prank(user2);
+        bbv.deposit(user2, address(mockAsset), amount2);
+
+        IBasedBoostedVault.SubVaultData memory user2SubVault = bbv.getUserSubVault(user2);
+
+        // SubVaults are not the same because user2 is still at the default subVault
+        assertNotEq(user2SubVault.id, user1SubVault.id);
+        assertNotEq(user2SubVault.perSecondRate, newRate);
+
+        vm.prank(manager);
+        _setUserRate(user2, newRate);
+
+        // SubVaults must match after setting the same new rate as user1 for user2
+        user2SubVault = bbv.getUserSubVault(user2);
+        assertEq(user2SubVault.id, user1SubVault.id);
+        assertEq(user2SubVault.perSecondRate, newRate);
     }
 
-    function test_revert_deposit_invalidMsgSender() public {
-        address account1 = makeAddr("account1");
-        asset.mint(account1, 1);
-        asset.approve(address(vault), 1);
+    //////////////////////// HELPERS ////////////////////////
+    // TODO: Move to BaseTest or Helpers contract
 
-        // Call deposit from different address
-        vm.prank(makeAddr("account2"));
-        vm.expectRevert(IBasedBoostedVault.InvalidMsgSender.selector);
-        vault.deposit(account1, address(asset), 1);
+    function _boundRate(uint256 rate) internal pure returns (uint256) {
+        return bound(rate, MathLib.RAY, type(uint256).max);
     }
 
-    function test_revert_addSupportedAsset_invalidAsset() public {
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(0)));
-        vault.updateAssetSupport(address(0), true);
+    function _boundAssetAmount(address asset, uint256 amount) internal view returns (uint256) {
+        return bound(amount, 1, 10 ** IMockErc20(asset).decimals());
     }
 
-    function test_revert_addSupportedAsset_alreadySupported() public {
-        TestErc20 testAsset = new TestErc20(18);
-        vault.updateAssetSupport(address(testAsset), true);
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.AssetAlreadySupported.selector, address(testAsset)));
-        vault.updateAssetSupport(address(testAsset), true);
+    function _boundRayAmount(uint256 amount) internal pure returns (uint256) {
+        return bound(amount, 1, MathLib.RAY);
     }
 
-    function test_revert_removeSupportedAsset_invalidAsset() public {
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(0)));
-        vault.updateAssetSupport(address(0), false);
-    }
-
-    function test_revert_removeSupportedAsset_notSupported() public {
-        TestErc20 testAsset = new TestErc20(18);
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(testAsset)));
-        vault.updateAssetSupport(address(testAsset), false);
-    }
-
-    function test_revert_deposit_unsupportedAsset() public {
-        address account1 = makeAddr("account1");
-        TestErc20 testAsset = new TestErc20(18);
-
-        testAsset.mint(account1, 1);
-        vm.prank(account1);
-        testAsset.approve(address(vault), 1);
-
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(testAsset)));
-        vm.prank(account1);
-        vault.deposit(account1, address(testAsset), 1);
-    }
-
-    function _setDefaultPerSecondRate(uint256 basePerSecondRate) public {
-        // The "default" subvault that has the effective base rate will always have id 1
-        vm.prank(admin);
-        vault.changeSubVaultRate(1, basePerSecondRate);
+    function _boundAmount(uint256 amount, uint256 scaleFactor) internal pure returns (uint256) {
+        return bound(amount, 1, 100_000_000_000_000 * scaleFactor); // 100 trillion
     }
 
     function _setUserRate(address user, uint256 newPerSecondRate) public {
         IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](1);
         userRateData[0] = IBasedBoostedVault.UserRateData(user, newPerSecondRate);
-        vault.setUserRate(userRateData);
+        bbv.setUserRate(userRateData);
     }
 }

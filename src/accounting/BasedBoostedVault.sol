@@ -90,6 +90,7 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
     function deposit(address user, address asset, uint256 amount) external override {
         require(msg.sender == user, InvalidMsgSender());
         require(isAssetSupported(asset), ErrorsLib.UnsupportedAsset(asset));
+        require(amount > 0, ErrorsLib.InvalidAmount());
         IERC20(asset).safeTransferFrom(msg.sender, address(_fundsHandler), amount);
 
         uint256 subVaultId = _positions[user].subVaultId;
@@ -147,48 +148,21 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
 
         _accrueSubVaultConversionRate(subVaultId);
 
-        uint256 conversionRate = _subVaultById[subVaultId].conversionRate;
         uint256 actualAmountInRay;
         uint256 guaranteedAmountRay;
-        uint256 subVaultShares;
+        uint256 redeemedShares;
 
         if (requestedAmountInRay == 0) {
-            // Withdraw full balance. user's shares > 0 check already performed at the beginning
-            actualAmountInRay = _positions[user].shares.rayMulDown(conversionRate);
-
-            // TODO: should we check actualAmountInRay > 0?
-            guaranteedAmountRay = _positions[user].originalDepositRay;
-            // FIXME: keeping + 2 here during development; we lose 2 units of assets when going from assets -> shares
-            // (the loss is baked into the shares quantity which when multiplied with the same conversion rate leads to
-            // 2 unit of asset loss).
-            require(actualAmountInRay + 2 >= guaranteedAmountRay, "more than 2 unit of loss - investigate");
-            if (actualAmountInRay < guaranteedAmountRay) {
-                guaranteedAmountRay = actualAmountInRay;
-            }
-            subVaultShares = _positions[user].shares;
-            _subVaultById[subVaultId].totalShares -= subVaultShares;
-            delete _positions[user];
+            (actualAmountInRay, guaranteedAmountRay, redeemedShares) = _fullWithdrawalRequest(user);
         } else {
-            uint256 requestedAmountInShares = requestedAmountInRay.rayDivDown(conversionRate);
-            require(requestedAmountInShares <= _positions[user].shares, ErrorsLib.InvalidAmount());
-            // Subtract from the subVault & clear position
-            _positions[user].shares -= requestedAmountInShares;
-            _subVaultById[subVaultId].totalShares -= requestedAmountInShares;
-            // TODO: Don't like the double conversion, but feel safer this way
-            // TODO: This needs a mathematical proof that: requestedAmountInRay <= actualAmountInRay;
-            actualAmountInRay = requestedAmountInShares.rayMulDown(conversionRate);
-            // TODO: Probably there is a better way to do this:
-            if (actualAmountInRay >= _positions[user].originalDepositRay) {
-                guaranteedAmountRay = _positions[user].originalDepositRay;
-                _positions[user].originalDepositRay = 0;
-            } else {
-                guaranteedAmountRay = actualAmountInRay;
-                _positions[user].originalDepositRay -= actualAmountInRay;
-            }
+            (actualAmountInRay, guaranteedAmountRay, redeemedShares) =
+                _partialWithdrawalRequest(user, requestedAmountInRay);
         }
+
         if (!_isActiveSubVaultById(subVaultId)) {
             _removeSubVaultFromActive(subVaultId);
         }
+
         uint256 withdrawalRequestId = _fundsHandler.processWithdrawalRequest({
             recipient: user,
             amountRay: actualAmountInRay,
@@ -201,11 +175,64 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
             preferredAsset,
             withdrawalRequestId,
             subVaultId,
-            subVaultShares,
+            redeemedShares,
             actualAmountInRay,
             guaranteedAmountRay
         );
         return withdrawalRequestId;
+    }
+
+    function _fullWithdrawalRequest(address user) internal returns (uint256, uint256, uint256) {
+        uint256 subVaultId = _positions[user].subVaultId;
+        uint256 conversionRate = _subVaultById[subVaultId].conversionRate;
+
+        uint256 sharesToRedeem = _positions[user].shares;
+        uint256 actualAmountOfWithdrawalRay = sharesToRedeem.rayMulDown(conversionRate);
+        require(actualAmountOfWithdrawalRay > 0, ErrorsLib.InsufficientAmountOut());
+        // We don't check for sharesToRedeem > 0 here because we check for actualAmountInRay > 0 below.
+        _burnShares(user, sharesToRedeem);
+        uint256 originalDeposit = _positions[user].originalDepositRay;
+        delete _positions[user];
+        if (actualAmountOfWithdrawalRay < originalDeposit) {
+            // We round it up because we guarantee originalDeposit
+            // TODO: Write some tests to prove that, but this should be OK
+            actualAmountOfWithdrawalRay = originalDeposit;
+        }
+
+        return (actualAmountOfWithdrawalRay, originalDeposit, sharesToRedeem);
+    }
+
+    function _partialWithdrawalRequest(address user, uint256 requestedAmountInRay)
+        internal
+        returns (uint256, uint256, uint256)
+    {
+        uint256 subVaultId = _positions[user].subVaultId;
+        uint256 conversionRate = _subVaultById[subVaultId].conversionRate;
+
+        uint256 sharesToRedeem = requestedAmountInRay.rayDivUp(conversionRate);
+        require(sharesToRedeem <= _positions[user].shares, ErrorsLib.InvalidAmount());
+        _burnShares(user, sharesToRedeem);
+        uint256 amountTakenFromOriginalDepositRay = _decrementOriginalDeposit(user, requestedAmountInRay);
+
+        return (requestedAmountInRay, amountTakenFromOriginalDepositRay, sharesToRedeem);
+    }
+
+    function _decrementOriginalDeposit(address user, uint256 actualAmountOfWithdrawal) internal returns (uint256) {
+        uint256 amountTakenFromOriginalDepositRay;
+        if (actualAmountOfWithdrawal >= _positions[user].originalDepositRay) {
+            // The remaining portion of user's withdrawable balance is not guaranteed unless user deposits more funds.
+            amountTakenFromOriginalDepositRay = _positions[user].originalDepositRay;
+        } else {
+            amountTakenFromOriginalDepositRay = actualAmountOfWithdrawal;
+        }
+        _positions[user].originalDepositRay -= amountTakenFromOriginalDepositRay;
+        return amountTakenFromOriginalDepositRay;
+    }
+
+    function _burnShares(address user, uint256 shares) internal {
+        uint256 subVaultId = _positions[user].subVaultId;
+        _positions[user].shares -= shares;
+        _subVaultById[subVaultId].totalShares -= shares;
     }
 
     /// @inheritdoc IBasedBoostedVault
@@ -218,7 +245,7 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
     }
 
     /// @inheritdoc IBasedBoostedVault
-    function setDefaultSubVault(uint256 perSecondRate) external onlyManager {
+    function setDefaultSubVault(uint256 perSecondRate) external override onlyManager {
         _setDefaultSubVault(_getOrCreateSubVaultWithRate(perSecondRate));
     }
 
@@ -250,7 +277,7 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
     }
 
     /// @inheritdoc IBasedBoostedVault
-    function updateAssetSupport(address asset, bool supported) external onlyOwner {
+    function updateAssetSupport(address asset, bool supported) external override onlyOwner {
         require(asset != address(0), ErrorsLib.UnsupportedAsset(asset));
         if (supported) {
             require(!_supportedAssets[asset], ErrorsLib.AssetAlreadySupported(asset));
@@ -260,6 +287,10 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
             delete _supportedAssets[asset];
         }
         emit AssetSupported(asset, supported);
+    }
+
+    function setFundsHandler(address fundsHandler) external onlyOwner {
+        _fundsHandler = IFundsHandler(fundsHandler);
     }
 
     ///////////////////////////////////////////////// GETTERS /////////////////////////////////////////////////////
@@ -298,6 +329,23 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
         uint256 subVaultId = _positions[user].subVaultId;
         uint256 subVaultRate = _subVaultById[subVaultId].perSecondRate;
         return SubVaultData(subVaultRate, subVaultId);
+    }
+
+    /// @inheritdoc IBasedBoostedVault
+    function getDefaultSubVault() external view override returns (SubVaultData memory) {
+        uint256 subVaultId = _defaultSubVaultId;
+        uint256 subVaultRate = _subVaultById[subVaultId].perSecondRate;
+        return SubVaultData(subVaultRate, subVaultId);
+    }
+
+    /// @inheritdoc IBasedBoostedVault
+    function getSubVaultRateById(uint256 subVaultId) external view override returns (uint256) {
+        return _subVaultById[subVaultId].perSecondRate;
+    }
+
+    /// @inheritdoc IBasedBoostedVault
+    function getSubVaultIdByRate(uint256 perSecondRate) external view override returns (uint256) {
+        return _subVaultIdByRate[perSecondRate];
     }
 
     /// @inheritdoc IBasedBoostedVault

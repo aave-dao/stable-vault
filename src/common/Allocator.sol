@@ -86,6 +86,7 @@ contract Allocator is IAllocator {
 
     /// @inheritdoc IAllocator
     function deposit(address asset, uint256 amount) external override onlyWhitelistedDepositor {
+        // TODO: check if Allocator supports deposit for asset
         IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
         bool callSucceeded = _deposit({asset: asset, amount: amount});
         if (!callSucceeded) {
@@ -229,6 +230,10 @@ contract Allocator is IAllocator {
 
     function _deposit(address asset, uint256 amount) internal returns (bool) {
         address vault = _vaultByAsset[asset];
+        if (vault == address(0)) {
+            // There is not strategy for this asset
+            return true;
+        }
         require(vault != address(0), ErrorsLib.UnsupportedAsset(asset));
         require(amount > 0, ErrorsLib.ZeroAmount());
         IERC20(asset).forceApprove(vault, amount);

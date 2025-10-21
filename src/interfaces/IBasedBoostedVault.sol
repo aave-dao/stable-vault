@@ -52,6 +52,14 @@ interface IBasedBoostedVault {
 
     function setUserRate(UserRateData[] calldata userRateData) external;
 
+    function getDefaultSubVault() external view returns (SubVaultData memory);
+
+    function getSubVaultRateById(uint256 subVaultId) external view returns (uint256);
+
+    function getSubVaultIdByRate(uint256 perSecondRate) external view returns (uint256);
+
+    /// @dev Sets the manager of the vault.
+    /// @param manager Address of the manager.
     function setManager(address manager) external;
 
     /// @dev Updates the support status of an asset.
@@ -59,6 +67,10 @@ interface IBasedBoostedVault {
     /// @param supported New support status of the asset.
     function updateAssetSupport(address asset, bool supported) external;
 
+    /// @dev Deposits assets into the vault.
+    /// @param user Address of the user depositing the assets.
+    /// @param asset Address of the asset being deposited.
+    /// @param amount Amount of assets being deposited.
     function deposit(address user, address asset, uint256 amount) external;
 
     /// @notice Requests a withdrawal of assets from the vault.
