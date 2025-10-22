@@ -262,7 +262,7 @@ contract BasedBoostedVaultTest is Test {
         assertEq(user2SubVault.perSecondRate, newRate);
     }
 
-    //////////////////////// HELPERS ////////////////////////
+    // ////////////////////// HELPERS ////////////////////////
     // TODO: Move to BaseTest or Helpers contract
 
     function _boundRate(uint256 rate) internal pure returns (uint256) {

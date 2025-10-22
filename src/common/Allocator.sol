@@ -13,14 +13,13 @@ import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 /// @dev Assumptions:
-///      - 1 strategy per asset
+///      - 1 default strategy per asset
+///      - multiple allowed strategy per asset which require manual reallocation
 ///      - multiple assets per allocator with a common denomination
 ///      - assets are in their native decimals
-///      - 100% of assets deposited into Allocator belong to the same entity
+///      - 100% of assets deposited into Allocator belong to the same entity (the Allocator does not track depositors)
 /// @dev Deals with assets in their native decimals.
 contract Allocator is IAllocator {
-    // TODO: consider scenarios where tokens are left idle here because pushing to strategies fails (reverts should be
-    // caught)
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
 
@@ -29,11 +28,23 @@ contract Allocator is IAllocator {
     address internal _assetRegistry;
     // uint256 public timelock;
 
-    // TODO: do we need a supported assets mapping/list? Can the allocator receive assets that it must swap from?
+    struct VaultData {
+        address asset;
+        uint32 indexInAssetVaults;
+        uint32 indexInAllVaults;
+    }
+
     mapping(address depositor => bool whitelisted) internal _whitelistedDepositor;
     mapping(address withdrawer => bool whitelisted) internal _whitelistedWithdrawer;
-    mapping(address asset => address vault) internal _vaultByAsset;
-    address[] internal _vaults; // TODO: Think how we handle/populate this (when whitelisting probably? constructor?)
+    // Strategy Vaults
+    // - defaultVaultByAsset: The default vault for an asset which funds are deposited into and withdrawn from.
+    // - allowedVaultsByAsset: Entire set of allowed vaults for an asset which funds can be reallocated to/from
+    mapping(address asset => address vault) internal _defaultVaultByAsset;
+    mapping(address vault => VaultData vaultData) internal _vaultData;
+    // To iterate through all vaults for an asset
+    mapping(address asset => address[]) internal _assetVaults;
+    // To iterate through all vaults
+    address[] internal _allVaults;
 
     modifier onlyWhitelistedDepositor() {
         require(_whitelistedDepositor[msg.sender], ErrorsLib.AddressNotWhitelisted());
@@ -73,7 +84,7 @@ contract Allocator is IAllocator {
 
     /// @inheritdoc IAllocator
     function getAssetBalance(address asset) external view override returns (uint256) {
-        return _getAssetBalance(asset);
+        return _getTotalAssetBalance(asset);
     }
 
     /// @inheritdoc IAllocator
@@ -82,8 +93,18 @@ contract Allocator is IAllocator {
     }
 
     /// @inheritdoc IAllocator
-    function getVault(address asset) external view override returns (address) {
-        return _vaultByAsset[asset];
+    function getDefaultVault(address asset) external view override returns (address) {
+        return _defaultVaultByAsset[asset];
+    }
+
+    /// @inheritdoc IAllocator
+    function isVaultSupportedForAsset(address asset, address vault) external view override returns (bool) {
+        return _isVaultSupportedForAsset({vault: vault, asset: asset});
+    }
+
+    /// @inheritdoc IAllocator
+    function isVaultSupported(address vault) external view override returns (bool) {
+        return _isVaultSupported(vault);
     }
 
     /// @inheritdoc IAllocator
@@ -92,7 +113,7 @@ contract Allocator is IAllocator {
         IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
         bool callSucceeded = _deposit({asset: asset, amount: amount});
         if (!callSucceeded) {
-            emit VaultDepositFailed(_vaultByAsset[asset], amount);
+            emit VaultDepositFailed(_defaultVaultByAsset[asset], amount);
         }
     }
 
@@ -102,7 +123,7 @@ contract Allocator is IAllocator {
         require(
             IAssetRegistry(_assetRegistry).isAllowedToWithdrawFromAllocator(asset), ErrorsLib.UnsupportedAsset(asset)
         );
-        address vault = _vaultByAsset[asset];
+        address vault = _defaultVaultByAsset[asset];
         uint256 idleBalance = IERC20(asset).balanceOf(address(this));
 
         if (idleBalance > 0 && amount > idleBalance) {
@@ -115,28 +136,11 @@ contract Allocator is IAllocator {
         }
     }
 
-    /// @inheritdoc IAllocator
-    function withdrawEmergency(
-        uint256 /* amount */
-    )
-        external
-        view
-        override
-        onlyWhitelistedWithdrawer
-        returns (address)
-    {
-        // TODO: Implement pull asset from vault based on priority? Based on default? Iterate through and try which ever
-        // has funds?
-        // TODO: try to avoid dealing with assets in RAY as this contract deals with assets in their native decimals.
-        revert("Allocator.withdrawEmergency:NOT_IMPLEMENTED");
-    }
-
     // Manager Functions
 
     /// @inheritdoc IAllocator
-    function deallocate(address asset, uint256 amount) external override onlyManager returns (uint256) {
-        address vault = _vaultByAsset[asset];
-        require(vault != address(0), ErrorsLib.UnsupportedAsset(asset));
+    function deallocate(address asset, uint256 amount, address vault) external override onlyManager returns (uint256) {
+        require(_isVaultSupportedForAsset({vault: vault, asset: asset}), ErrorsLib.AddressAlreadyWhitelisted());
         require(amount > 0, ErrorsLib.ZeroAmount());
         return _deallocate(vault, asset, amount, address(this));
     }
@@ -165,7 +169,7 @@ contract Allocator is IAllocator {
             uint256 idleBalance = IERC20(assetIn).balanceOf(address(this));
             if (idleBalance < amountIn) {
                 // Withdraw assets from vault to this contract
-                IERC4626(_vaultByAsset[assetIn]).withdraw(amountIn - idleBalance, address(this), address(this));
+                IERC4626(_defaultVaultByAsset[assetIn]).withdraw(amountIn - idleBalance, address(this), address(this));
             }
             address swapper = params.swaps[i].swapper;
             // Transfer assetIn to the swapper
@@ -181,28 +185,44 @@ contract Allocator is IAllocator {
             IERC20(params.swaps[i].assetOut).safeTransferFrom(swapper, address(this), assetOutAmount);
 
             // Deposit the assetOut into the vault
-            IERC20(params.swaps[i].assetOut).forceApprove(address(_vaultByAsset[assetOut]), assetOutAmount);
-            IERC4626(_vaultByAsset[assetOut]).deposit(assetOutAmount, address(this));
+            IERC20(params.swaps[i].assetOut).forceApprove(address(_defaultVaultByAsset[assetOut]), assetOutAmount);
+            IERC4626(_defaultVaultByAsset[assetOut]).deposit(assetOutAmount, address(this));
         }
     }
 
-    function setVault(address asset, address vault) external onlyManager {
-        // TODO: set behind timelock?
-        require(asset != address(0), ErrorsLib.ZeroAddress());
-        require(vault != address(0), ErrorsLib.ZeroAddress());
-        require(_vaultByAsset[asset] != vault, ErrorsLib.AddressAlreadyWhitelisted());
-        address currentVault = _vaultByAsset[asset];
-        if (currentVault != address(0)) {
-            for (uint16 i = 0; i < _vaults.length; i++) {
-                if (_vaults[i] == currentVault) {
-                    _vaults[i] = vault;
-                    break;
-                }
-            }
+    // TODO: Consider consolidating `rebalance` and `reallocate` functions into a single function.
+
+    /// @inheritdoc IAllocator
+    function reallocate(address asset, uint256 amount, address fromVault, address toVault)
+        external
+        override
+        onlyManager
+    {
+        require(_isVaultSupportedForAsset({vault: fromVault, asset: asset}), ErrorsLib.AddressNotWhitelisted());
+        require(_isVaultSupportedForAsset({vault: toVault, asset: asset}), ErrorsLib.AddressNotWhitelisted());
+        // Pull the asset from the fromVault to the Allocator
+        _deallocate(fromVault, asset, amount, address(this));
+        // Push the asset to the toVault
+        _deposit(asset, amount);
+    }
+
+    /// @inheritdoc IAllocator
+    function setVault(address asset, address vault, bool isAllowed) external onlyManager {
+        if (isAllowed) {
+            _addVault(asset, vault);
         } else {
-            _vaults.push(vault);
+            _removeVault(vault);
         }
-        _vaultByAsset[asset] = vault;
+    }
+
+    /// @inheritdoc IAllocator
+    function setDefaultVault(address asset, address vault) external onlyManager {
+        // TODO: set behind timelock?
+        // Vault must be allowed to be set as the default vault for the asset
+        require(_defaultVaultByAsset[asset] != vault, ErrorsLib.AddressAlreadyWhitelisted());
+        require(_isVaultSupportedForAsset({vault: vault, asset: asset}), ErrorsLib.AddressNotWhitelisted());
+        _defaultVaultByAsset[asset] = vault;
+        emit DefaultVaultSet(asset, vault);
     }
 
     // Admin Functions
@@ -242,36 +262,87 @@ contract Allocator is IAllocator {
         require(
             IAssetRegistry(_assetRegistry).isAllowedToDepositIntoAllocator(asset), ErrorsLib.UnsupportedAsset(asset)
         );
-        address vault = _vaultByAsset[asset];
+        address vault = _defaultVaultByAsset[asset];
         if (vault == address(0)) {
             // There is not strategy for this asset
             return true;
         }
         require(amount > 0, ErrorsLib.ZeroAmount());
         IERC20(asset).forceApprove(vault, amount);
-        (bool callSucceeded,) = vault.call(abi.encodeCall(IERC4626.deposit, (amount, address(this))));
-        return callSucceeded;
+        return _callVaultWithData(vault, abi.encodeCall(IERC4626.deposit, (amount, address(this))));
     }
 
     function _getAssetBalances() internal view returns (IAllocator.AllocatorBalance[] memory) {
-        IAllocator.AllocatorBalance[] memory allocatedAssets = new IAllocator.AllocatorBalance[](_vaults.length);
-        for (uint256 i = 0; i < _vaults.length; i++) {
-            IERC4626 vault = IERC4626(_vaults[i]);
-            address asset = vault.asset();
-            allocatedAssets[i] = IAllocator.AllocatorBalance(asset, _getTotalAssetBalance(asset, vault));
+        IAllocator.AllocatorBalance[] memory allocatedAssets = new IAllocator.AllocatorBalance[](_allVaults.length);
+        for (uint256 i = 0; i < _allVaults.length; i++) {
+            address asset = IERC4626(_allVaults[i]).asset();
+            allocatedAssets[i] = IAllocator.AllocatorBalance(asset, _getTotalAssetBalance(asset));
         }
         return allocatedAssets;
     }
 
-    // Assumes single vault per asset
-    function _getAssetBalance(address asset) internal view returns (uint256) {
-        return _getTotalAssetBalance(asset, IERC4626(_vaultByAsset[asset]));
+    function _getTotalAssetBalance(address asset) internal view returns (uint256) {
+        uint256 balance = 0;
+        for (uint256 i = 0; i < _assetVaults[asset].length; i++) {
+            balance += _getAssetBalanceInVault(IERC4626(_assetVaults[asset][i]));
+        }
+        balance += IERC20(asset).balanceOf(address(this));
+        return balance;
     }
 
-    function _getTotalAssetBalance(address asset, IERC4626 vault) internal view returns (uint256) {
+    function _getAssetBalanceInVault(IERC4626 vault) internal view returns (uint256) {
         uint256 amount = vault.previewRedeem(vault.balanceOf(address(this)));
-        // Include idle funds in balance (assumes 1 vault per asset)
-        amount += IERC20(asset).balanceOf(address(this));
         return amount;
+    }
+
+    function _isVaultSupportedForAsset(address vault, address asset) internal view returns (bool) {
+        return _vaultData[vault].asset == asset;
+    }
+
+    function _isVaultSupported(address vault) internal view returns (bool) {
+        return _vaultData[vault].asset != address(0);
+    }
+
+    function _callVaultWithData(address vault, bytes memory data) internal returns (bool) {
+        (bool callSucceeded,) = vault.call(data);
+        return callSucceeded;
+    }
+
+    function _addVault(address asset, address vault) internal {
+        require(!_isVaultSupported(vault), ErrorsLib.AddressAlreadyWhitelisted());
+        _assetVaults[asset].push(vault);
+        _allVaults.push(vault);
+        _vaultData[vault] = VaultData({
+            asset: asset,
+            indexInAssetVaults: uint32(_assetVaults[asset].length - 1),
+            indexInAllVaults: uint32(_allVaults.length - 1)
+        });
+        emit VaultAdded(asset, vault);
+    }
+
+    function _removeVault(address vault) internal {
+        VaultData memory vaultData = _vaultData[vault];
+        require(_getAssetBalanceInVault(IERC4626(vault)) == 0, NonZeroVaultBalance());
+        require(_isVaultSupported(vault), ErrorsLib.AddressAlreadyWhitelisted());
+
+        // Remove vault from _assetVaults
+        if (_assetVaults[vaultData.asset].length > 1) {
+            uint32 index = vaultData.indexInAssetVaults;
+            _assetVaults[vaultData.asset][index] =
+                _assetVaults[vaultData.asset][_assetVaults[vaultData.asset].length - 1];
+            _vaultData[vault].indexInAssetVaults = index;
+        }
+        _assetVaults[vaultData.asset].pop();
+
+        // Remove vault from _allVaults
+        if (_allVaults.length > 1) {
+            uint32 indexInAllVaults = vaultData.indexInAllVaults;
+            _allVaults[indexInAllVaults] = _allVaults[_allVaults.length - 1];
+            _vaultData[vault].indexInAllVaults = indexInAllVaults;
+        }
+        _allVaults.pop();
+
+        delete _vaultData[vault];
+        emit VaultRemoved(vaultData.asset, vault);
     }
 }

@@ -51,7 +51,7 @@ contract AssetRegistry is Ownable, IAssetRegistry {
         return _configByAsset[asset];
     }
 
-    ///////////////////////// PERMISSION SPECIFIC GETTERS ////////////////////////////
+    // /////////////////////// PERMISSION SPECIFIC GETTERS ////////////////////////////
 
     function isAllowedToDepositIntoBBV(address asset) external view override returns (bool) {
         return _isAllowedTo(asset, BBV_DEPOSIT_BIT);
@@ -77,7 +77,7 @@ contract AssetRegistry is Ownable, IAssetRegistry {
         return _isAllowedTo(asset, ALLOCATOR_SWAP_OUT_BIT);
     }
 
-    //////////////////////////// INTERNAL HELPERS ////////////////////////////
+    // ////////////////////////// INTERNAL HELPERS ////////////////////////////
 
     function _getMaskFor(uint8 bit) internal pure returns (uint256) {
         uint256 zeroBitMask = 1; // Avoid "incorrect-shift" warning
