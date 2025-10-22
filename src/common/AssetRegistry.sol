@@ -4,29 +4,28 @@ pragma solidity ^0.8.22;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-// TODO: This is a draft, but the final code might not differ much from this
-// TODO: add events
-// TODO: use timelocks on updates?
-contract AssetRegistry is Ownable {
-    event AssetConfigSet(address asset, uint256 config);
+import {IAssetRegistry} from "../interfaces/IAssetRegistry.sol";
 
-    uint8 constant BBV_DEPOSIT_BIT = 0;
-    uint8 constant BBV_WITHDRAW_BIT = 1;
-    uint8 constant ALLOCATOR_DEPOSIT_BIT = 2;
-    uint8 constant ALLOCATOR_WITHDRAW_BIT = 3;
+// TODO: This is a draft, but the final code might not differ much from this
+// TODO: use timelocks on updates?
+contract AssetRegistry is Ownable, IAssetRegistry {
+    uint8 public constant BBV_DEPOSIT_BIT = 0;
+    uint8 public constant BBV_WITHDRAW_BIT = 1;
+    uint8 public constant ALLOCATOR_DEPOSIT_BIT = 2;
+    uint8 public constant ALLOCATOR_WITHDRAW_BIT = 3;
 
     // If we do not have more than 32 permissions, it might make sense to do a struct with booleans
     mapping(address asset => uint256 assetConfig) internal _configByAsset;
 
-    struct AssetConfig {
-        bool isAllowedToDepositIntoBBV; // uint8
-        bool isAllowedToWithdrawFromBBV;
-        bool isAllowedToDepositIntoAllocator;
-        bool isAllowedToWithdrawFromAllocator;
-        // ...up to 32 permissions (alternative storage approach for _configByAsset)
-    }
-
     constructor(address owner) Ownable(owner) {}
+
+    function registerAssetPermissions(address asset, uint8[] memory permissions) external onlyOwner {
+        uint256 config = 0;
+        for (uint256 i = 0; i < permissions.length; i++) {
+            config |= _getMaskFor(permissions[i]);
+        }
+        this.setAssetConfigBitmap(asset, config);
+    }
 
     function setAssetConfigBitmap(address asset, uint256 config) external onlyOwner {
         // check asset has balanceOf function as interface verification method - maybe not needed as the admin calls it
@@ -35,25 +34,30 @@ contract AssetRegistry is Ownable {
         emit AssetConfigSet(asset, config);
     }
 
+    function unregisterAsset(address asset) external onlyOwner {
+        delete _configByAsset[asset];
+        emit AssetConfigSet(asset, 0);
+    }
+
     function getAssetConfigBitmap(address asset) external view returns (uint256) {
         return _configByAsset[asset];
     }
 
     ///////////////////////// PERMISSION SPECIFIC GETTERS ////////////////////////////
 
-    function isAllowedToDepositIntoBBV(address asset) external view returns (bool) {
+    function isAllowedToDepositIntoBBV(address asset) external view override returns (bool) {
         return _isAllowedTo(asset, BBV_DEPOSIT_BIT);
     }
 
-    function isAllowedToWithdrawFromBBV(address asset) external view returns (bool) {
+    function isAllowedToWithdrawFromBBV(address asset) external view override returns (bool) {
         return _isAllowedTo(asset, BBV_WITHDRAW_BIT);
     }
 
-    function isAllowedToDepositIntoAllocator(address asset) external view returns (bool) {
+    function isAllowedToDepositIntoAllocator(address asset) external view override returns (bool) {
         return _isAllowedTo(asset, ALLOCATOR_DEPOSIT_BIT);
     }
 
-    function isAllowedToWithdrawFromAllocator(address asset) external view returns (bool) {
+    function isAllowedToWithdrawFromAllocator(address asset) external view override returns (bool) {
         return _isAllowedTo(asset, ALLOCATOR_WITHDRAW_BIT);
     }
 

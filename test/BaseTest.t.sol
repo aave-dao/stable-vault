@@ -50,6 +50,7 @@ contract BaseTest is Test {
     TestErc4626 usdcStrategyVault_accountingChain;
 
     // Earning Chain: Earning Chain Gateway, CCIP Adapter, CCIP Router, Swapper, Allocator, Strategy Vault/4626
+    AssetRegistry assetRegistry_earningChain;
     CcipAdapter ccipAdapter_earningChain;
     EarningChainGateway earningChainGateway;
     Allocator allocator_earningChain;
@@ -92,8 +93,8 @@ contract BaseTest is Test {
         mockCcipRouter.setSourceChainSelector(ACCOUNTING_CHAIN_CCIP_SELECTOR, EARNING_CHAIN_CCIP_SELECTOR);
 
         console.log("\nAccounting Chain:");
-        // Accounting Chain: BBV, FH, Swapper, Allocator, Accounting Chain Gateway, CCIP Adapter, CCIP Router, Strategy
-        // Vault/4626
+        // Accounting Chain: BBV, FH, Swapper, Allocator, Accounting Chain Gateway, CCIP Adapter, CCIP Router, Strategy,
+        // Asset Registry Vault/4626
         assetRegistry_accountingChain = new AssetRegistry(address(this));
         // Enable everything for assets
         assetRegistry_accountingChain.setAssetConfigBitmap(address(GHO), type(uint256).max);
@@ -105,7 +106,7 @@ contract BaseTest is Test {
         iouToken_accountingChain.transferOwnership(address(vault));
 
         console.log("\tVault: %s", address(vault));
-        allocator_accountingChain = new Allocator(manager, admin);
+        allocator_accountingChain = new Allocator(manager, admin, address(assetRegistry_accountingChain));
         console.log("\tAllocator: %s", address(allocator_accountingChain));
 
         uint256 deployerNonce = vm.getNonce(address(this));
@@ -129,13 +130,18 @@ contract BaseTest is Test {
         console.log("\tUSDC Strategy Vault (Accounting Chain): %s", address(usdcStrategyVault_accountingChain));
 
         ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        // Earning Chain: Earning Chain Gateway, CCIP Adapter, CCIP Router, Swapper, Allocator, Strategy Vault/4626
+        // Earning Chain: Earning Chain Gateway, CCIP Adapter, CCIP Router, Swapper, Allocator, Strategy Vault/4626,
+        // Asset Registry
         console.log("\nEarning Chain:");
+        assetRegistry_earningChain = new AssetRegistry(address(this));
+        // Enable everything for assets
+        assetRegistry_earningChain.setAssetConfigBitmap(address(GHO), type(uint256).max);
+        assetRegistry_earningChain.setAssetConfigBitmap(address(USDC), type(uint256).max);
         ccipAdapter_earningChain = new CcipAdapter(admin, address(mockCcipRouter));
         console.log("\tCCIP Adapter: %s", address(ccipAdapter_earningChain));
         earningChainGateway = new EarningChainGateway(admin, ACCOUNTING_CHAIN_ID);
         console.log("\tEarning Chain Gateway: %s", address(earningChainGateway));
-        allocator_earningChain = new Allocator(manager, admin);
+        allocator_earningChain = new Allocator(manager, admin, address(assetRegistry_earningChain));
         console.log("\tAllocator: %s", address(allocator_earningChain));
         swapper_earningChain = new Swapper(address(allocator_earningChain));
         console.log("\tSwapper: %s", address(swapper_earningChain));

@@ -6,8 +6,9 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IAllocator} from "../interfaces/IAllocator.sol";
-import {IAllocator} from "../interfaces/IAllocator.sol";
+import {IAssetRegistry} from "../interfaces/IAssetRegistry.sol";
 import {ISwapper} from "../interfaces/ISwapper.sol";
+
 import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
@@ -25,7 +26,7 @@ contract Allocator is IAllocator {
 
     address internal _manager;
     address internal _admin;
-
+    address internal _assetRegistry;
     // uint256 public timelock;
 
     // TODO: do we need a supported assets mapping/list? Can the allocator receive assets that it must swap from?
@@ -54,9 +55,10 @@ contract Allocator is IAllocator {
         _;
     }
 
-    constructor(address manager, address admin) {
+    constructor(address manager, address admin, address assetRegistry) {
         _manager = manager;
         _admin = admin;
+        _assetRegistry = assetRegistry;
     }
 
     /// @inheritdoc IAllocator
@@ -96,9 +98,11 @@ contract Allocator is IAllocator {
 
     /// @inheritdoc IAllocator
     function withdraw(address asset, uint256 amount) external override onlyWhitelistedWithdrawer {
-        address vault = _vaultByAsset[asset];
-        require(vault != address(0), ErrorsLib.UnsupportedAsset(asset));
         require(amount > 0, ErrorsLib.ZeroAmount());
+        require(
+            IAssetRegistry(_assetRegistry).isAllowedToWithdrawFromAllocator(asset), ErrorsLib.UnsupportedAsset(asset)
+        );
+        address vault = _vaultByAsset[asset];
         uint256 idleBalance = IERC20(asset).balanceOf(address(this));
 
         if (idleBalance > 0 && amount > idleBalance) {
@@ -229,12 +233,14 @@ contract Allocator is IAllocator {
     }
 
     function _deposit(address asset, uint256 amount) internal returns (bool) {
+        require(
+            IAssetRegistry(_assetRegistry).isAllowedToDepositIntoAllocator(asset), ErrorsLib.UnsupportedAsset(asset)
+        );
         address vault = _vaultByAsset[asset];
         if (vault == address(0)) {
             // There is not strategy for this asset
             return true;
         }
-        require(vault != address(0), ErrorsLib.UnsupportedAsset(asset));
         require(amount > 0, ErrorsLib.ZeroAmount());
         IERC20(asset).forceApprove(vault, amount);
         (bool callSucceeded,) = vault.call(abi.encodeCall(IERC4626.deposit, (amount, address(this))));

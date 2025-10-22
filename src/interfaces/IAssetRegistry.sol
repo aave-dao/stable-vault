@@ -2,6 +2,10 @@
 pragma solidity ^0.8.22;
 
 interface IAssetRegistry {
+    event AssetConfigSet(address asset, uint256 config);
+
     function isAllowedToDepositIntoBBV(address asset) external returns (bool);
     function isAllowedToWithdrawFromBBV(address asset) external returns (bool);
+    function isAllowedToDepositIntoAllocator(address asset) external returns (bool);
+    function isAllowedToWithdrawFromAllocator(address asset) external returns (bool);
 }

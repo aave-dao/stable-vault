@@ -9,6 +9,8 @@ import {IAssetRegistry} from "../../src/interfaces/IAssetRegistry.sol";
 contract MockAssetRegistry is IAssetRegistry {
     mapping(address asset => bool isAllowedToDepositIntoBBV) _isNotAllowedToDepositIntoBBV;
     mapping(address asset => bool isAllowedToWithdrawFromBBV) _isNotAllowedToWithdrawFromBBV;
+    mapping(address asset => bool isAllowedToDepositIntoAllocator) _isNotAllowedToDepositIntoAllocator;
+    mapping(address asset => bool isAllowedToWithdrawFromAllocator) _isNotAllowedToWithdrawFromAllocator;
 
     function mockToAllowAssetDepositsIntoBBV(address asset) external {
         _isNotAllowedToDepositIntoBBV[asset] = false;
@@ -32,5 +34,13 @@ contract MockAssetRegistry is IAssetRegistry {
 
     function isAllowedToWithdrawFromBBV(address asset) external view override returns (bool) {
         return !_isNotAllowedToWithdrawFromBBV[asset];
+    }
+
+    function isAllowedToDepositIntoAllocator(address asset) external view override returns (bool) {
+        return !_isNotAllowedToDepositIntoAllocator[asset];
+    }
+
+    function isAllowedToWithdrawFromAllocator(address asset) external view override returns (bool) {
+        return !_isNotAllowedToWithdrawFromAllocator[asset];
     }
 }
