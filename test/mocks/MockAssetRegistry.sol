@@ -11,6 +11,8 @@ contract MockAssetRegistry is IAssetRegistry {
     mapping(address asset => bool isAllowedToWithdrawFromBBV) _isNotAllowedToWithdrawFromBBV;
     mapping(address asset => bool isAllowedToDepositIntoAllocator) _isNotAllowedToDepositIntoAllocator;
     mapping(address asset => bool isAllowedToWithdrawFromAllocator) _isNotAllowedToWithdrawFromAllocator;
+    mapping(address asset => bool isAllowedToSwapInputTokenInAllocator) _isNotAllowedToSwapInputTokenInAllocator;
+    mapping(address asset => bool isAllowedToSwapOutputTokenInAllocator) _isNotAllowedToSwapOutputTokenInAllocator;
 
     function mockToAllowAssetDepositsIntoBBV(address asset) external {
         _isNotAllowedToDepositIntoBBV[asset] = false;
@@ -42,5 +44,13 @@ contract MockAssetRegistry is IAssetRegistry {
 
     function isAllowedToWithdrawFromAllocator(address asset) external view override returns (bool) {
         return !_isNotAllowedToWithdrawFromAllocator[asset];
+    }
+
+    function isAllowedSwapInputToken(address asset) external view override returns (bool) {
+        return !_isNotAllowedToSwapInputTokenInAllocator[asset];
+    }
+
+    function isAllowedSwapOutputToken(address asset) external view override returns (bool) {
+        return !_isNotAllowedToSwapOutputTokenInAllocator[asset];
     }
 }

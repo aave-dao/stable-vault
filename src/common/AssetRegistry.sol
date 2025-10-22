@@ -9,10 +9,18 @@ import {IAssetRegistry} from "../interfaces/IAssetRegistry.sol";
 // TODO: This is a draft, but the final code might not differ much from this
 // TODO: use timelocks on updates?
 contract AssetRegistry is Ownable, IAssetRegistry {
+    // Token is able to be deposited into BBV
     uint8 public constant BBV_DEPOSIT_BIT = 0;
+    // Token is able to be withdrawn from BBV
     uint8 public constant BBV_WITHDRAW_BIT = 1;
+    // Token is able to sit idle in an Allocator or in a strategy vault
     uint8 public constant ALLOCATOR_DEPOSIT_BIT = 2;
+    // Token is able to be withdrawn from an Allocator or a strategy vault
     uint8 public constant ALLOCATOR_WITHDRAW_BIT = 3;
+    // Token is able to be used as swap input token in the Allocator
+    uint8 public constant ALLOCATOR_SWAP_IN_BIT = 4;
+    // Token is able to be used as swap output token in the Allocator
+    uint8 public constant ALLOCATOR_SWAP_OUT_BIT = 5;
 
     // If we do not have more than 32 permissions, it might make sense to do a struct with booleans
     mapping(address asset => uint256 assetConfig) internal _configByAsset;
@@ -59,6 +67,14 @@ contract AssetRegistry is Ownable, IAssetRegistry {
 
     function isAllowedToWithdrawFromAllocator(address asset) external view override returns (bool) {
         return _isAllowedTo(asset, ALLOCATOR_WITHDRAW_BIT);
+    }
+
+    function isAllowedSwapInputToken(address asset) external view override returns (bool) {
+        return _isAllowedTo(asset, ALLOCATOR_SWAP_IN_BIT);
+    }
+
+    function isAllowedSwapOutputToken(address asset) external view override returns (bool) {
+        return _isAllowedTo(asset, ALLOCATOR_SWAP_OUT_BIT);
     }
 
     //////////////////////////// INTERNAL HELPERS ////////////////////////////

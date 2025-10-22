@@ -8,4 +8,6 @@ interface IAssetRegistry {
     function isAllowedToWithdrawFromBBV(address asset) external returns (bool);
     function isAllowedToDepositIntoAllocator(address asset) external returns (bool);
     function isAllowedToWithdrawFromAllocator(address asset) external returns (bool);
+    function isAllowedSwapInputToken(address asset) external returns (bool);
+    function isAllowedSwapOutputToken(address asset) external returns (bool);
 }

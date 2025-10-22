@@ -152,9 +152,15 @@ contract Allocator is IAllocator {
     function rebalance(CrossAssetRebalanceParams memory params) external override onlyManager {
         for (uint256 i = 0; i < params.swaps.length; i++) {
             address assetIn = params.swaps[i].assetIn;
-            require(_vaultByAsset[assetIn] != address(0), ErrorsLib.UnsupportedAsset(assetIn));
+            require(
+                IAssetRegistry(_assetRegistry).isAllowedSwapInputToken(assetIn), ErrorsLib.UnsupportedAsset(assetIn)
+            );
             address assetOut = params.swaps[i].assetOut;
-            require(_vaultByAsset[assetOut] != address(0), ErrorsLib.UnsupportedAsset(assetOut));
+            require(
+                IAssetRegistry(_assetRegistry).isAllowedSwapOutputToken(assetOut)
+                    && IAssetRegistry(_assetRegistry).isAllowedToDepositIntoAllocator(assetOut),
+                ErrorsLib.UnsupportedAsset(assetOut)
+            );
             uint256 amountIn = params.swaps[i].amountIn;
             uint256 idleBalance = IERC20(assetIn).balanceOf(address(this));
             if (idleBalance < amountIn) {
