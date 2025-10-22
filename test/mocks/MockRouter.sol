@@ -29,8 +29,8 @@ contract MockCCIPRouter is IRouter, IRouterClient {
     uint16 public constant GAS_FOR_CALL_EXACT_CHECK = 5_000;
     uint32 public constant DEFAULT_GAS_LIMIT = 200_000;
 
-    uint256 internal s_mockFeeTokenAmount; //use setFee() to change to non-zero to test fees
-    mapping(uint64 sourceChainSelector => uint64 destChainSelector) internal s_sourceChainSelector; //use
+    uint256 internal s_mockFeeTokenAmount; // use setFee() to change to non-zero to test fees
+    mapping(uint64 sourceChainSelector => uint64 destChainSelector) internal s_sourceChainSelector; // use
         // setSourceChainSelector() to change
 
     function routeMessage(
@@ -54,9 +54,9 @@ contract MockCCIPRouter is IRouter, IRouterClient {
         console.log("\treceiver.code.length: %s", receiver.code.length);
         // There are three cases in which we skip calling the receiver:
         // 1. If the message data is empty AND the gas limit is 0.
-        //          This indicates a message that only transfers tokens. It is valid to only send tokens to a contract
-        //          that supports the IAny2EVMMessageReceiver interface, but without this first check we would call the
-        //          receiver without any gas, which would revert the transaction.
+        // This indicates a message that only transfers tokens. It is valid to only send tokens to a contract
+        // that supports the IAny2EVMMessageReceiver interface, but without this first check we would call the
+        // receiver without any gas, which would revert the transaction.
         // 2. If the receiver is not a contract.
         // 3. If the receiver is a contract but it does not support the IAny2EVMMessageReceiver interface.
         //

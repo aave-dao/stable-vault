@@ -268,7 +268,7 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
 
     // TODO: Should we allow the admin to claim fees as well?
     // TODO(registry-config): Should we have a "fee recipient" storage field or function param?
-    /// @inheritdoc IBasedBoostedVault
+    // / @inheritdoc IBasedBoostedVault
     function claimFees(address[] calldata assets, uint256[] calldata amounts) external onlyManager {
         uint256 vaultObligationsRay = _getVaultObligations();
         uint256 vaultAssetsRay = _getVaultAggregatedBalance();
@@ -290,7 +290,7 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
         _fundsHandler = fundsHandler;
     }
 
-    ///////////////////////////////////////////////// GETTERS /////////////////////////////////////////////////////
+    // /////////////////////////////////////////////// GETTERS /////////////////////////////////////////////////////
 
     /// @inheritdoc IBasedBoostedVault
     function getGlobalOriginalDepositAmount() external view override returns (uint256) {
@@ -350,7 +350,7 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
         return _subVaultIdByRate[perSecondRate];
     }
 
-    ///////////////////////////////////////////////// INTERNAL /////////////////////////////////////////////////////
+    // /////////////////////////////////////////////// INTERNAL /////////////////////////////////////////////////////
 
     function _getOrCreateSubVaultWithRate(uint256 perSecondRate) internal returns (uint256) {
         if (_existsSubVaultWithRate(perSecondRate)) {
@@ -452,10 +452,10 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
     /// @return supply of all IOU tokens across all networks
     function _getIousInCirculation() internal view returns (uint256) {
         // TODO: Read internal storage of tokens bridged to other chains?
-        //      NO => because we will lock tokens when bridging
-        //      When the Earning chain exchanges IOUs for assets, it will send a message back to Accounting chain
-        //      Once Accounting chain receives this message the locked IOUs can be burned.
-        //      Total supply will decrease.
+        // NO => because we will lock tokens when bridging
+        // When the Earning chain exchanges IOUs for assets, it will send a message back to Accounting chain
+        // Once Accounting chain receives this message the locked IOUs can be burned.
+        // Total supply will decrease.
         return IERC20(IOU_TOKEN).totalSupply();
     }
 
