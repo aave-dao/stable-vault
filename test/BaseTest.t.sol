@@ -229,12 +229,16 @@ contract BaseTest is Test {
 
         vm.startPrank(manager);
         // Set up strategies on Accounting chain
-        allocator_accountingChain.setVault(address(GHO), address(ghoStrategyVault_accountingChain));
-        allocator_accountingChain.setVault(address(USDC), address(usdcStrategyVault_accountingChain));
+        allocator_accountingChain.setVault(address(GHO), address(ghoStrategyVault_accountingChain), true);
+        allocator_accountingChain.setDefaultVault(address(GHO), address(ghoStrategyVault_accountingChain));
+        allocator_accountingChain.setVault(address(USDC), address(usdcStrategyVault_accountingChain), true);
+        allocator_accountingChain.setDefaultVault(address(USDC), address(usdcStrategyVault_accountingChain));
 
         // Set up strategies on Earning chain
-        allocator_earningChain.setVault(address(GHO), address(ghoStrategyVault_earningChain));
-        allocator_earningChain.setVault(address(USDC), address(usdcStrategyVault_earningChain));
+        allocator_earningChain.setVault(address(GHO), address(ghoStrategyVault_earningChain), true);
+        allocator_earningChain.setDefaultVault(address(GHO), address(ghoStrategyVault_earningChain));
+        allocator_earningChain.setVault(address(USDC), address(usdcStrategyVault_earningChain), true);
+        allocator_earningChain.setDefaultVault(address(USDC), address(usdcStrategyVault_earningChain));
 
         vm.stopPrank();
 

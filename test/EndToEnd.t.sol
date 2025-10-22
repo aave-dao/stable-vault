@@ -42,7 +42,7 @@ contract EndToEndTest is BaseTest {
 
         //        - check that funds are dropped into default liquidity vault
         console.log("User deposited %s USDC into Vault", userInitialDeposit);
-        address defaultUsdcVault_AccountingChain = allocator_accountingChain.getVault(address(USDC));
+        address defaultUsdcVault_AccountingChain = allocator_accountingChain.getDefaultVault(address(USDC));
         console.log("Default vault for USDC is: %s", defaultUsdcVault_AccountingChain);
         console.log("It's balance of USDC is: %s", IERC20(address(USDC)).balanceOf(defaultUsdcVault_AccountingChain));
         // TODO: Replace with Before/After balance
@@ -76,7 +76,7 @@ contract EndToEndTest is BaseTest {
         fundsHandler.pushFundsToChain(address(USDC), userInitialDeposit, EARNING_CHAIN_ID);
 
         //        - check that the funds land on Earning Chain and are dropped into default liquidity vault there
-        address defaultUsdcVault_earningChain = allocator_earningChain.getVault(address(USDC));
+        address defaultUsdcVault_earningChain = allocator_earningChain.getDefaultVault(address(USDC));
         console.log("Earning Chain default vault for USDC is: %s", defaultUsdcVault_earningChain);
         console.log("It's balance of USDC is: %s", IERC20(address(USDC)).balanceOf(defaultUsdcVault_earningChain));
         assertEq(
@@ -117,7 +117,7 @@ contract EndToEndTest is BaseTest {
         allocator_earningChain.rebalance(IAllocator.CrossAssetRebalanceParams(swaps));
 
         //        - check that the funds are swapped to GHO
-        address defaultGhoVault_earningChain = allocator_earningChain.getVault(address(GHO));
+        address defaultGhoVault_earningChain = allocator_earningChain.getDefaultVault(address(GHO));
         console.log(
             "\tBalance of GHO in The GHO Vault is: %s", IERC20(address(GHO)).balanceOf(defaultGhoVault_earningChain)
         );
@@ -199,7 +199,7 @@ contract EndToEndTest is BaseTest {
         earningChainGateway.exit(address(GHO), userEarningsInGho);
 
         //        - check that the funds land on the Accounting Chain and are dropped into default liquidity vault there
-        address defaultGhoVault_accountingChain = allocator_accountingChain.getVault(address(GHO));
+        address defaultGhoVault_accountingChain = allocator_accountingChain.getDefaultVault(address(GHO));
         console.log("Accounting Chain default vault for GHO is: %s", defaultGhoVault_accountingChain);
         console.log("It's balance of GHO is: %s", IERC20(address(GHO)).balanceOf(defaultGhoVault_accountingChain));
         assertEq(
@@ -236,7 +236,7 @@ contract EndToEndTest is BaseTest {
         allocator_accountingChain.rebalance(IAllocator.CrossAssetRebalanceParams(swaps));
 
         //        - check that the funds are swapped to USDC
-        address defaultUsdcVault_accountingChain = allocator_accountingChain.getVault(address(USDC));
+        address defaultUsdcVault_accountingChain = allocator_accountingChain.getDefaultVault(address(USDC));
         console.log(
             "\tBalance of USDC in The USDC Vault is: %s",
             IERC20(address(USDC)).balanceOf(defaultUsdcVault_accountingChain)
