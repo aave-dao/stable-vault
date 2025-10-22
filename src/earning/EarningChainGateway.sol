@@ -10,6 +10,7 @@ import {IAllocator} from "../interfaces/IAllocator.sol";
 import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {IEarningChainGateway} from "../interfaces/IEarningChainGateway.sol";
+import {IMintableBurnableIERC20} from "../interfaces/IMintableBurnableIERC20.sol";
 import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {EventLib} from "../libraries/EventLib.sol";
@@ -59,12 +60,56 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
 
     function _receiveData(uint256 sourceChainId, bytes memory data) internal view override {
         _onlyAdapter(ASSET_FOR_DATA_ONLY_BRIDGE, sourceChainId);
-        uint256 amountRay = abi.decode(data, (uint256));
-        _emergencyExit(amountRay);
+        IChainGateway.CrossChainMessage memory crossChainMessage = abi.decode(data, (IChainGateway.CrossChainMessage));
+        if (crossChainMessage.messageType == IChainGateway.MessageType.BRIDGE_IOUTOKEN) {
+            _bridgeIouTokenFromAccountingChain(sourceChainId, crossChainMessage.data);
+        } else {
+            revert IChainGateway.InvalidMessageType();
+        }
     }
 
+    // TODO: We should open this function to public (in case manager goes awol)
     function sendBalanceUpdate() external onlyManager {
         _sendBalanceUpdate();
+    }
+
+    function sendBridgeIouTokenMessage(
+        address user,
+        address recipient,
+        address bridgeFeePayer,
+        address bridgeFeeToken,
+        uint256 targetChainId,
+        uint256 amount
+    ) external {
+        require(user == msg.sender, "IouTokenBridge: not authorized");
+        // TODO: Add this check everywhere where there is a targetChainId
+        require(targetChainId == block.chainid, "IouTokenBridge: invalid target chain");
+        // Lock tokens in this contract
+        IERC20(IOU_TOKEN).transferFrom(user, address(this), amount);
+        IBridgeAdapter(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][targetChainId]).publishMessageToChainWithFeePayer(
+            bridgeFeePayer,
+            bridgeFeeToken,
+            targetChainId,
+            abi.encode(
+                IChainGateway.CrossChainMessage({
+                    messageType: MessageType.BRIDGE_IOUTOKEN,
+                    data: abi.encode(IouTokenBridgeMessage({recipient: recipient, amount: amount}))
+                })
+            )
+        );
+    }
+
+    // TODO: Add bridgeFeePayer, etc
+    function exitViaIouTokens(address user, address recipient, address token, uint256 amountIouRay)
+        external
+        returns (uint256)
+    {
+        require(user == msg.sender, "User != msg.sender");
+        IMintableBurnableIERC20(IOU_TOKEN).burn(user, amountIouRay);
+        IAllocator(_allocator).withdraw(token, amountIouRay);
+        IERC20(token).safeTransfer(recipient, amountIouRay);
+        _sendIouBurnMessage(amountIouRay);
+        return amountIouRay;
     }
 
     // TODO: This needs to have a better name?
@@ -73,16 +118,10 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
         _returnFunds(asset, amount);
     }
 
-    function _emergencyExit(uint256 amountRay) internal pure {
-        (amountRay);
-        revert("EarningChainGateway.emergencyExit:NOT_IMPLEMENTED");
-        // TODO: re Emergency Withdrawal how to decide which token to pull from Allocator?
-        // TODO: do we need to ccipSend multiple times to bridge multiple tokens?
-        // TODO: Keep in mind not every asset in Earning chain will be bridgeable to Accounting chain
-        // TODO: if someone emergencyWithdraws then have them wait a cooldown period since pull flow can fail if
-        // insufficient bridgeable assets are on Earning chain (assume no swap can be performed) TODO: Implement; decide
-        // which asset(s) to withdraw
-        // TODO: check that the assets to withdraw from Allocator are actually bridgedable
+    function _bridgeIouTokenFromAccountingChain(uint256 sourceChainId, bytes memory data) internal {
+        IChainGateway.IouTokenBridgeMessage memory iouTokenBridgeMessage =
+            abi.decode(data, (IChainGateway.IouTokenBridgeMessage));
+        IMintableBurnableIERC20(IOU_TOKEN).mint(iouTokenBridgeMessage.recipient, iouTokenBridgeMessage.amount);
     }
 
     function _returnFunds(address asset, uint256 amount) internal {
@@ -94,8 +133,17 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
     }
 
     function _sendBalanceUpdate() internal {
-        IBridgeAdapter(_bridgeAdapter[address(0)][ACCOUNTING_CHAIN_ID])
-            .publishMessageToChain(ACCOUNTING_CHAIN_ID, new IBridgeAdapter.BridgeAsset[](0), _getBalanceSnapshotData());
+        IBridgeAdapter(_bridgeAdapter[address(0)][ACCOUNTING_CHAIN_ID]).publishMessageToChain(
+            ACCOUNTING_CHAIN_ID, new IBridgeAdapter.BridgeAsset[](0), _getBalanceSnapshotData()
+        );
+    }
+
+    function _sendIouBurnMessage(uint256 amountIouRay) internal {
+        IBridgeAdapter(_bridgeAdapter[address(0)][ACCOUNTING_CHAIN_ID]).publishMessageToChain(
+            ACCOUNTING_CHAIN_ID,
+            new IBridgeAdapter.BridgeAsset[](0),
+            abi.encode(IChainGateway.BurnIouTokenMessage({amount: amountIouRay}))
+        );
     }
 
     function _getBalanceSnapshotData() internal view returns (bytes memory) {

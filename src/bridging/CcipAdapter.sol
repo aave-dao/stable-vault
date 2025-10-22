@@ -84,20 +84,33 @@ contract CcipAdapter is BaseBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
             tokenAmounts: tokenAmounts,
             feeToken: _feeToken,
             // TODO: Think how we pass this gasLimit down here
-            extraArgs: Client._argsToBytes(
-                Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: false})
-            )
+            extraArgs: Client._argsToBytes(Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: false}))
         });
         _sendMessage(chainId, ccipMessage);
+    }
+
+    function publishMessageToChainWithFeePayer(address feePayer, address feeToken, uint256 chainId, bytes memory data)
+        external
+        override
+        onlyGateway
+    {
+        uint256 gasLimit = 2_000_000;
+        Client.EVM2AnyMessage memory ccipMessage = Client.EVM2AnyMessage({
+            receiver: abi.encode(_receiverOf[chainId]),
+            data: data,
+            tokenAmounts: new Client.EVMTokenAmount[](0),
+            feeToken: feeToken,
+            extraArgs: Client._argsToBytes(Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: false}))
+        });
+        _sendMessageWithFeePayer(feePayer, feeToken, chainId, ccipMessage);
     }
 
     /// @inheritdoc IAny2EVMMessageReceiver
     function ccipReceive(Client.Any2EVMMessage calldata message) external override onlyRouter {
         if (message.data.length > 0) {
-            IChainGateway(_gateway)
-                .receiveMessage(
-                    _chainIdOf[message.sourceChainSelector], new IBridgeAdapter.BridgeAsset[](0), message.data
-                );
+            IChainGateway(_gateway).receiveMessage(
+                _chainIdOf[message.sourceChainSelector], new IBridgeAdapter.BridgeAsset[](0), message.data
+            );
         }
         if (message.destTokenAmounts.length > 0) {
             try this.processReceivedFunds(_chainIdOf[message.sourceChainSelector], message.destTokenAmounts) {}
@@ -134,5 +147,18 @@ contract CcipAdapter is BaseBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
             IERC20(_feeToken).safeIncreaseAllowance(CCIP_ROUTER, fee);
         }
         IRouterClient(CCIP_ROUTER).ccipSend{value: msgValue}(chainSelector, message);
+    }
+
+    function _sendMessageWithFeePayer(
+        address feePayer,
+        address feeToken,
+        uint256 chainId,
+        Client.EVM2AnyMessage memory message
+    ) internal {
+        uint64 chainSelector = _chainSelectorOf[chainId];
+        uint256 fee = IRouterClient(CCIP_ROUTER).getFee(chainSelector, message);
+        IERC20(feeToken).safeTransferFrom(feePayer, address(this), fee);
+        IERC20(feeToken).safeIncreaseAllowance(CCIP_ROUTER, fee);
+        IRouterClient(CCIP_ROUTER).ccipSend(chainSelector, message);
     }
 }

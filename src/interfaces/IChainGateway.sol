@@ -6,11 +6,34 @@ import {IBridgeAdapter} from "./IBridgeAdapter.sol";
 /// @notice Interface for handling the communication between chains for bridging assets and data.
 /// @dev Assumes bridged assets and bridged data can be handled independently of each other.
 interface IChainGateway {
+    error InvalidMessageType();
+
+    enum MessageType {
+        BALANCE_SNAPSHOT,
+        EMERGENCY_WITHDRAWAL,
+        BRIDGE_IOUTOKEN,
+        BURN_IOUTOKEN
+    }
+
+    struct CrossChainMessage {
+        MessageType messageType;
+        bytes data;
+    }
     /// @notice Struct for arbitrary data containing a balance snapshot from a source chain.
+
     struct BalanceSnapshot {
         // Cumulative balance of all tokens with common denomination in RAY.
         uint256 balance;
         uint256 timestamp;
+    }
+
+    struct IouTokenBridgeMessage {
+        address recipient;
+        uint256 amount;
+    }
+
+    struct BurnIouTokenMessage {
+        uint256 amount;
     }
 
     /// @notice Handle receiving of a data and funds from a source chain.

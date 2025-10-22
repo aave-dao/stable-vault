@@ -32,6 +32,13 @@ abstract contract BaseBridgeAdapter is Ownable, IBridgeAdapter {
         bytes memory data
     ) external virtual;
 
+    function publishMessageToChainWithFeePayer(
+        address feePayer,
+        address feeToken,
+        uint256 destinationChainId,
+        bytes memory data
+    ) external virtual;
+
     function setGateway(address gateway) external onlyOwner {
         _gateway = gateway;
     }
