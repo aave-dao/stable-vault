@@ -28,22 +28,23 @@ contract Allocator is IAllocator {
     address internal _assetRegistry;
     // uint256 public timelock;
 
+    struct VaultData {
+        address asset;
+        uint32 indexInAssetVaults;
+        uint32 indexInAllVaults;
+    }
+
     mapping(address depositor => bool whitelisted) internal _whitelistedDepositor;
     mapping(address withdrawer => bool whitelisted) internal _whitelistedWithdrawer;
     // Strategy Vaults
     // - defaultVaultByAsset: The default vault for an asset which funds are deposited into and withdrawn from.
     // - allowedVaultsByAsset: Entire set of allowed vaults for an asset which funds can be reallocated to/from
     mapping(address asset => address vault) internal _defaultVaultByAsset;
-    // For O(1) lookup of allowed vaults for an asset
-    mapping(address asset => mapping(address vault => bool)) internal _allowedVaultsByAsset;
+    mapping(address vault => VaultData vaultData) internal _vaultData;
     // To iterate through all vaults for an asset
     mapping(address asset => address[]) internal _assetVaults;
-    // For O(1) lookup of the index of a vault in the _assetVaults array
-    mapping(address vault => uint8 indexInAssetVaults) internal _indexInAssetVaults;
     // To iterate through all vaults
     address[] internal _allVaults;
-    // For O(1) lookup of the index of a vault in the _allVaults array
-    mapping(address vault => uint8 indexInAllVaults) internal _indexInAllVaults;
 
     modifier onlyWhitelistedDepositor() {
         require(_whitelistedDepositor[msg.sender], ErrorsLib.AddressNotWhitelisted());
@@ -97,8 +98,13 @@ contract Allocator is IAllocator {
     }
 
     /// @inheritdoc IAllocator
-    function isAllowedVault(address asset, address vault) external view override returns (bool) {
-        return _isAllowedVault(asset, vault);
+    function isVaultSupportedForAsset(address asset, address vault) external view override returns (bool) {
+        return _isVaultSupportedForAsset({vault: vault, asset: asset});
+    }
+
+    /// @inheritdoc IAllocator
+    function isVaultSupported(address vault) external view override returns (bool) {
+        return _isVaultSupported(vault);
     }
 
     /// @inheritdoc IAllocator
@@ -134,7 +140,7 @@ contract Allocator is IAllocator {
 
     /// @inheritdoc IAllocator
     function deallocate(address asset, uint256 amount, address vault) external override onlyManager returns (uint256) {
-        require(_isAllowedVault(asset, vault), UnsupportedVault(asset, vault));
+        require(_isVaultSupportedForAsset({vault: vault, asset: asset}), ErrorsLib.AddressAlreadyWhitelisted());
         require(amount > 0, ErrorsLib.ZeroAmount());
         return _deallocate(vault, asset, amount, address(this));
     }
@@ -184,14 +190,16 @@ contract Allocator is IAllocator {
         }
     }
 
+    // TODO: Consider consolidating `rebalance` and `reallocate` functions into a single function.
+
     /// @inheritdoc IAllocator
     function reallocate(address asset, uint256 amount, address fromVault, address toVault)
         external
         override
         onlyManager
     {
-        require(_isAllowedVault(asset, fromVault), UnsupportedVault(asset, fromVault));
-        require(_isAllowedVault(asset, toVault), UnsupportedVault(asset, toVault));
+        require(_isVaultSupportedForAsset({vault: fromVault, asset: asset}), ErrorsLib.AddressNotWhitelisted());
+        require(_isVaultSupportedForAsset({vault: toVault, asset: asset}), ErrorsLib.AddressNotWhitelisted());
         // Pull the asset from the fromVault to the Allocator
         _deallocate(fromVault, asset, amount, address(this));
         // Push the asset to the toVault
@@ -203,7 +211,7 @@ contract Allocator is IAllocator {
         if (isAllowed) {
             _addVault(asset, vault);
         } else {
-            _removeVault(asset, vault);
+            _removeVault(vault);
         }
     }
 
@@ -212,7 +220,7 @@ contract Allocator is IAllocator {
         // TODO: set behind timelock?
         // Vault must be allowed to be set as the default vault for the asset
         require(_defaultVaultByAsset[asset] != vault, ErrorsLib.AddressAlreadyWhitelisted());
-        require(_isAllowedVault(asset, vault), UnsupportedVault(asset, vault));
+        require(_isVaultSupportedForAsset({vault: vault, asset: asset}), ErrorsLib.AddressNotWhitelisted());
         _defaultVaultByAsset[asset] = vault;
         emit DefaultVaultSet(asset, vault);
     }
@@ -287,8 +295,12 @@ contract Allocator is IAllocator {
         return amount;
     }
 
-    function _isAllowedVault(address asset, address vault) internal view returns (bool) {
-        return _allowedVaultsByAsset[asset][vault];
+    function _isVaultSupportedForAsset(address vault, address asset) internal view returns (bool) {
+        return _vaultData[vault].asset == asset;
+    }
+
+    function _isVaultSupported(address vault) internal view returns (bool) {
+        return _vaultData[vault].asset != address(0);
     }
 
     function _callVaultWithData(address vault, bytes memory data) internal returns (bool) {
@@ -297,31 +309,40 @@ contract Allocator is IAllocator {
     }
 
     function _addVault(address asset, address vault) internal {
-        require(!_isAllowedVault(asset, vault), ErrorsLib.AddressAlreadyWhitelisted());
+        require(!_isVaultSupported(vault), ErrorsLib.AddressAlreadyWhitelisted());
         _assetVaults[asset].push(vault);
-        _indexInAssetVaults[vault] = uint8(_assetVaults[asset].length - 1);
-        _allowedVaultsByAsset[asset][vault] = true;
         _allVaults.push(vault);
-        _indexInAllVaults[vault] = uint8(_allVaults.length - 1);
+        _vaultData[vault] = VaultData({
+            asset: asset,
+            indexInAssetVaults: uint32(_assetVaults[asset].length - 1),
+            indexInAllVaults: uint32(_allVaults.length - 1)
+        });
         emit VaultAdded(asset, vault);
     }
 
-    function _removeVault(address asset, address vault) internal {
-        require(_defaultVaultByAsset[asset] != vault, VaultIsDefault());
+    function _removeVault(address vault) internal {
+        VaultData memory vaultData = _vaultData[vault];
         require(_getAssetBalanceInVault(IERC4626(vault)) == 0, NonZeroVaultBalance());
-        require(_isAllowedVault(asset, vault), UnsupportedVault(asset, vault));
-        require(_assetVaults[asset].length > 1, ErrorsLib.InvalidLength());
+        require(_isVaultSupported(vault), ErrorsLib.AddressAlreadyWhitelisted());
 
-        uint8 index = _indexInAssetVaults[vault];
-        _assetVaults[asset][index] = _assetVaults[asset][_assetVaults[asset].length - 1];
-        _indexInAssetVaults[_assetVaults[asset][index]] = index;
-        _assetVaults[asset].pop();
-        _allowedVaultsByAsset[asset][vault] = false;
+        // Remove vault from _assetVaults
+        if (_assetVaults[vaultData.asset].length > 1) {
+            uint32 index = vaultData.indexInAssetVaults;
+            _assetVaults[vaultData.asset][index] =
+                _assetVaults[vaultData.asset][_assetVaults[vaultData.asset].length - 1];
+            _vaultData[vault].indexInAssetVaults = index;
+        }
+        _assetVaults[vaultData.asset].pop();
 
-        uint8 indexInAllVaults = _indexInAllVaults[vault];
-        _allVaults[indexInAllVaults] = _allVaults[_allVaults.length - 1];
-        _indexInAllVaults[_allVaults[indexInAllVaults]] = indexInAllVaults;
+        // Remove vault from _allVaults
+        if (_allVaults.length > 1) {
+            uint32 indexInAllVaults = vaultData.indexInAllVaults;
+            _allVaults[indexInAllVaults] = _allVaults[_allVaults.length - 1];
+            _vaultData[vault].indexInAllVaults = indexInAllVaults;
+        }
         _allVaults.pop();
-        emit VaultRemoved(asset, vault);
+
+        delete _vaultData[vault];
+        emit VaultRemoved(vaultData.asset, vault);
     }
 }

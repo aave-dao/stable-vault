@@ -11,9 +11,7 @@ interface IAllocator {
     event VaultRemoved(address indexed asset, address indexed vault);
     event DefaultVaultSet(address indexed asset, address indexed vault);
 
-    error VaultIsDefault();
     error NonZeroVaultBalance();
-    error UnsupportedVault(address asset, address vault);
 
     struct AllocatorBalance {
         address asset;
@@ -50,14 +48,17 @@ interface IAllocator {
     /// @dev Returns strategy vault for a given asset.
     function getDefaultVault(address asset) external view returns (address);
 
-    /// @dev Returns if a given vault is allowed to be allocated to or deallocated from for a given asset.
-    function isAllowedVault(address asset, address vault) external view returns (bool);
+    /// @dev Returns if a given vault is supported for allocating to or deallocating from a given asset.
+    function isVaultSupportedForAsset(address asset, address vault) external view returns (bool);
+
+    /// @dev Returns if a given vault is supported for allocating or deallocating, regardless of the asset.
+    function isVaultSupported(address vault) external view returns (bool);
 
     /// @dev Deallocates a given amount of an asset from the immediate liquidity vault; funds stay idle on the contract.
     /// @param asset Asset to deallocate.
     /// @param amount Amount of the asset to deallocate.
     /// @param vault Vault to deallocate from.
-    /// @dev Returns the amount of shares burned liquidty source vault shares burned.
+    /// @dev Returns the amount of shares burned liquidity source vault shares burned.
     function deallocate(address asset, uint256 amount, address vault) external returns (uint256);
 
     /// @notice Moves all idle funds of a given asset on the contract to a strategy.

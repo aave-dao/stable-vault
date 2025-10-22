@@ -129,7 +129,7 @@ contract BaseTest is Test {
         usdcStrategyVault_accountingChain = new TestErc4626(USDC);
         console.log("\tUSDC Strategy Vault (Accounting Chain): %s", address(usdcStrategyVault_accountingChain));
 
-        ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        // /////////////////////////////////////////////////////////////////////////////////////////////////////////////
         // Earning Chain: Earning Chain Gateway, CCIP Adapter, CCIP Router, Swapper, Allocator, Strategy Vault/4626,
         // Asset Registry
         console.log("\nEarning Chain:");
@@ -157,7 +157,7 @@ contract BaseTest is Test {
         // _prepareTokens();
 
         // ------------------------------------------------
-        //                  ADMIN ACTIONS
+        // ADMIN ACTIONS
         // ------------------------------------------------
 
         vm.startPrank(admin);
@@ -224,7 +224,7 @@ contract BaseTest is Test {
         vm.stopPrank();
 
         // ------------------------------------------------
-        //                  MANAGER ACTIONS
+        // MANAGER ACTIONS
         // ------------------------------------------------
 
         vm.startPrank(manager);

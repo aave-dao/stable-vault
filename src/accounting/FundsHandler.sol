@@ -144,7 +144,7 @@ contract FundsHandler is IFundsHandler {
         _pushFundsToImmediateLiquidity(asset, amount);
     }
 
-    //////
+    // ////
 
     function _updateChainBalance(uint256 chainId, uint256 snapshotBalanceRay, uint256 snapshotTimestamp) internal {
         bool chainExists;

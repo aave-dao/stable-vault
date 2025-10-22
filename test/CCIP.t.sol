@@ -29,7 +29,7 @@ contract CCIPTest is Test {
         _receiver = address(new CCIPReceiver());
         console.log("_receiver: %s", _receiver);
 
-        //Configure the Fee to 0.1 ether for native token fees
+        // Configure the Fee to 0.1 ether for native token fees
         mockRouter.setFee(0.1 ether);
         deal(address(this), 100 ether);
 

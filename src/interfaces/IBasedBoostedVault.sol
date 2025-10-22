@@ -13,7 +13,7 @@ interface IBasedBoostedVault {
     }
 
     // TODO: after initial testing we can fallbabck to using WithdrawalRequested
-    //event WithdrawalRequested(address indexed user, address indexed asset, uint256 indexed withdrawalRequestId,
+    // event WithdrawalRequested(address indexed user, address indexed asset, uint256 indexed withdrawalRequestId,
     // uint256 requestedAmount, uint256 guaranteedAmount);
     event WithdrawalRequestedWithShares(
         address indexed user,

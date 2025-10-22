@@ -33,14 +33,14 @@ contract EndToEndTest is BaseTest {
             1. Setup default liquidity vaults/strategies on both chains for every currency
         */
 
-        //// Steps: ////
-        //    1. User1 deposits 500 USDC to Vault on Accounting Chain
+        // // Steps: ////
+        // 1. User1 deposits 500 USDC to Vault on Accounting Chain
         vm.startPrank(user);
         USDC.approve(address(vault), userInitialDeposit);
         vault.deposit(user, address(USDC), userInitialDeposit);
         vm.stopPrank();
 
-        //        - check that funds are dropped into default liquidity vault
+        // - check that funds are dropped into default liquidity vault
         console.log("User deposited %s USDC into Vault", userInitialDeposit);
         address defaultUsdcVault_AccountingChain = allocator_accountingChain.getDefaultVault(address(USDC));
         console.log("Default vault for USDC is: %s", defaultUsdcVault_AccountingChain);
@@ -60,22 +60,22 @@ contract EndToEndTest is BaseTest {
             "Allocator should have shares of the vault"
         );
 
-        //    2. Manager sets the % rate to user to 5% APY
+        // 2. Manager sets the % rate to user to 5% APY
         uint256 userPerSecondRate = 1_000000001547125957863212449; // 5% APY
         vm.prank(manager);
         IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](1);
         userRateData[0] = IBasedBoostedVault.UserRateData(user, userPerSecondRate);
         vault.setUserRate(userRateData);
 
-        //        - check that the % rate is set correctly
+        // - check that the % rate is set correctly
         console.log("User's per second rate is: %s", vault.getUserSubVault(user).perSecondRate);
         assertEq(vault.getUserSubVault(user).perSecondRate, userPerSecondRate);
 
-        //    3. Manager sends the money to the Earning Chain via CCIP
+        // 3. Manager sends the money to the Earning Chain via CCIP
         vm.prank(manager);
         fundsHandler.pushFundsToChain(address(USDC), userInitialDeposit, EARNING_CHAIN_ID);
 
-        //        - check that the funds land on Earning Chain and are dropped into default liquidity vault there
+        // - check that the funds land on Earning Chain and are dropped into default liquidity vault there
         address defaultUsdcVault_earningChain = allocator_earningChain.getDefaultVault(address(USDC));
         console.log("Earning Chain default vault for USDC is: %s", defaultUsdcVault_earningChain);
         console.log("It's balance of USDC is: %s", IERC20(address(USDC)).balanceOf(defaultUsdcVault_earningChain));
@@ -93,7 +93,7 @@ contract EndToEndTest is BaseTest {
             "Allocator should have shares of the vault"
         );
 
-        //    4. Manager rebalances & swaps the funds on the Earning Chain from USDC to GHO (via Swapper)
+        // 4. Manager rebalances & swaps the funds on the Earning Chain from USDC to GHO (via Swapper)
         uint256 userInitialDepositInGho = userInitialDeposit.convertAssetDecimals(address(USDC), address(GHO));
         GHO.mint(address(swapper_earningChain), userInitialDepositInGho);
 
@@ -116,7 +116,7 @@ contract EndToEndTest is BaseTest {
         vm.prank(manager);
         allocator_earningChain.rebalance(IAllocator.CrossAssetRebalanceParams(swaps));
 
-        //        - check that the funds are swapped to GHO
+        // - check that the funds are swapped to GHO
         address defaultGhoVault_earningChain = allocator_earningChain.getDefaultVault(address(GHO));
         console.log(
             "\tBalance of GHO in The GHO Vault is: %s", IERC20(address(GHO)).balanceOf(defaultGhoVault_earningChain)
@@ -126,7 +126,7 @@ contract EndToEndTest is BaseTest {
             userInitialDepositInGho,
             "Vault should have the swapped amount of GHO"
         );
-        //        - check that the funds land on the GHO vault
+        // - check that the funds land on the GHO vault
         console.log(
             "Allocator has %s shares of it",
             IERC4626(defaultGhoVault_earningChain).balanceOf(address(allocator_earningChain))
@@ -136,11 +136,11 @@ contract EndToEndTest is BaseTest {
             "Allocator should have shares of the vault"
         );
 
-        //    5. We wait for half a year
+        // 5. We wait for half a year
         vm.warp(183 days);
         console.log("\nHalf a year has gone by so fast...");
 
-        //        - check how much funds we owe to the user
+        // - check how much funds we owe to the user
         uint256 userEarningsInRay = vault.getUserBalance(user);
         console.log("User balance in RAY: %s", vault.getUserBalance(user));
         uint256 userEarningsInUsdc = userEarningsInRay.rayToAssetDecimals(address(USDC));
@@ -149,14 +149,14 @@ contract EndToEndTest is BaseTest {
         console.log("User balance in GHO: %s", userEarningsInUsdc);
         assertTrue(vault.getUserBalance(user) > userInitialDeposit, "User balance didn't grow in half a year");
 
-        //        - mock the 8% APY earnings on the GHO vault for half a year
+        // - mock the 8% APY earnings on the GHO vault for half a year
         GHO.mint(defaultGhoVault_earningChain, 19_615242270663188059);
         console.log(
             "GHO vault earned something in this time and it's balance now is: %s GHO",
             IERC4626(defaultGhoVault_earningChain).balanceOf(address(allocator_earningChain))
         );
 
-        //    6. User asks for withdrawal of the whole amount of his earnings (which are $500+ - in USDC)
+        // 6. User asks for withdrawal of the whole amount of his earnings (which are $500+ - in USDC)
         console.log("User creates a WithdrawalRequest...");
         vm.prank(user);
         vm.expectRevert(
@@ -184,21 +184,21 @@ contract EndToEndTest is BaseTest {
         assertGt(iouToken_accountingChain.balanceOf(user), 0, "User should have minted IOU tokens");
 
         // vm.expectRevert(
-        //     abi.encodeWithSelector(ERC4626ExceededMaxWithdraw.selector, allocator_accountingChain, userBalanceInUsdc,
+        // abi.encodeWithSelector(ERC4626ExceededMaxWithdraw.selector, allocator_accountingChain, userBalanceInUsdc,
         // 0) );
         vm.prank(user);
         vm.expectRevert(ErrorsLib.InsufficientLiquidity.selector);
         vault.executeWithdrawal(user, address(USDC), iouAmountRequestedRay);
 
-        //        - check that we don't owe the user any funds
+        // - check that we don't owe the user any funds
         console.log("User balance in RAY after withdrawal request: %s", vault.getUserBalance(user));
         assertEq(vault.getUserBalance(user), 0, "User balance should be down to 0 after full withdrawal request");
 
-        //    7. Manager brings back the money from the Earning Chain to the Accounting Chain via CCIP in GHO
+        // 7. Manager brings back the money from the Earning Chain to the Accounting Chain via CCIP in GHO
         vm.prank(manager);
         earningChainGateway.exit(address(GHO), userEarningsInGho);
 
-        //        - check that the funds land on the Accounting Chain and are dropped into default liquidity vault there
+        // - check that the funds land on the Accounting Chain and are dropped into default liquidity vault there
         address defaultGhoVault_accountingChain = allocator_accountingChain.getDefaultVault(address(GHO));
         console.log("Accounting Chain default vault for GHO is: %s", defaultGhoVault_accountingChain);
         console.log("It's balance of GHO is: %s", IERC20(address(GHO)).balanceOf(defaultGhoVault_accountingChain));
@@ -216,7 +216,7 @@ contract EndToEndTest is BaseTest {
             "Allocator should have shares of the vault"
         );
 
-        //    8. Manager rebalances & swaps the funds on the Accounting Chain from GHO to USDC (via Swapper)
+        // 8. Manager rebalances & swaps the funds on the Accounting Chain from GHO to USDC (via Swapper)
         USDC.mint(address(swapper_accountingChain), userEarningsInUsdc);
 
         targets[0] = address(GHO);
@@ -235,7 +235,7 @@ contract EndToEndTest is BaseTest {
         vm.prank(manager);
         allocator_accountingChain.rebalance(IAllocator.CrossAssetRebalanceParams(swaps));
 
-        //        - check that the funds are swapped to USDC
+        // - check that the funds are swapped to USDC
         address defaultUsdcVault_accountingChain = allocator_accountingChain.getDefaultVault(address(USDC));
         console.log(
             "\tBalance of USDC in The USDC Vault is: %s",
@@ -246,7 +246,7 @@ contract EndToEndTest is BaseTest {
             userEarningsInUsdc,
             "Vault should have the swapped amount of USDC"
         );
-        //        - check that the funds land on the USDC vault
+        // - check that the funds land on the USDC vault
         console.log(
             "Allocator has %s shares of it",
             IERC4626(defaultUsdcVault_accountingChain).balanceOf(address(allocator_accountingChain))
@@ -256,19 +256,19 @@ contract EndToEndTest is BaseTest {
             "Allocator should have shares of the vault"
         );
 
-        //    9. User triggers the execute() withdrawal to send the funds back to the user
+        // 9. User triggers the execute() withdrawal to send the funds back to the user
         vm.prank(user);
         vault.executeWithdrawal(user, address(USDC), iouAmountRequestedRay);
         // Check IOU token balance went down
         assertEq(iouToken_accountingChain.balanceOf(user), 0, "User should have minted IOU tokens");
 
-        //        - check that the funds are received by the user correctly
+        // - check that the funds are received by the user correctly
         console.log("User balance in USDC after withdrawal: %s USDC", IERC20(address(USDC)).balanceOf(user));
         assertEq(
             IERC20(address(USDC)).balanceOf(user), userEarningsInUsdc, "User should have the withdrawn amount of USDC"
         );
 
-        //        - check that we don't owe the user any funds
+        // - check that we don't owe the user any funds
         console.log("User balance in RAY after withdrawal request: %s", vault.getUserBalance(user));
         assertEq(vault.getUserBalance(user), 0, "User balance should be down to 0 after full withdrawal request");
         //

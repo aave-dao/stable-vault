@@ -23,7 +23,7 @@ contract MockNonStandardErc20 {
     mapping(address => mapping(address => uint256)) private _allowances;
     uint256 private _totalSupply;
 
-    //////////////////////// USDT-BASED NON-STANDARD FUNCTIONS ////////////////////////
+    // ////////////////////// USDT-BASED NON-STANDARD FUNCTIONS ////////////////////////
 
     /**
      * @dev Does not return boolean in purpose. As it does not follow the ERC-20 standard properly.
@@ -52,7 +52,7 @@ contract MockNonStandardErc20 {
         _transfer(from, to, amount);
     }
 
-    //////////////////////////// MOCK FUNCTIONS ////////////////////////////
+    // ////////////////////////// MOCK FUNCTIONS ////////////////////////////
 
     function mint(address to, uint256 value) public {
         _mint(to, value);
@@ -70,7 +70,7 @@ contract MockNonStandardErc20 {
         _burn(msg.sender, value);
     }
 
-    ////////////////////// ERC-20 STANDARD FUNCTIONS //////////////////////
+    // //////////////////// ERC-20 STANDARD FUNCTIONS //////////////////////
 
     function name() public view virtual returns (string memory) {
         return _name;
