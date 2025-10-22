@@ -86,17 +86,19 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
         require(targetChainId == block.chainid, "IouTokenBridge: invalid target chain");
         // Lock tokens in this contract
         IERC20(IOU_TOKEN).transferFrom(user, address(this), amount);
-        IBridgeAdapter(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][targetChainId]).publishMessageToChainWithFeePayer(
-            bridgeFeePayer,
-            bridgeFeeToken,
-            targetChainId,
-            abi.encode(
-                IChainGateway.CrossChainMessage({
-                    messageType: MessageType.BRIDGE_IOUTOKEN,
-                    data: abi.encode(IouTokenBridgeMessage({recipient: recipient, amount: amount}))
-                })
-            )
-        );
+        IBridgeAdapter(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][targetChainId])
+            .publishMessageToChainWithFeePayer(
+                bridgeFeePayer,
+                bridgeFeeToken,
+                targetChainId,
+                new IBridgeAdapter.BridgeAsset[](0),
+                abi.encode(
+                    IChainGateway.CrossChainMessage({
+                        messageType: MessageType.BRIDGE_IOUTOKEN,
+                        data: abi.encode(IouTokenBridgeMessage({recipient: recipient, amount: amount}))
+                    })
+                )
+            );
     }
 
     // TODO: Add bridgeFeePayer, etc
@@ -133,17 +135,17 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
     }
 
     function _sendBalanceUpdate() internal {
-        IBridgeAdapter(_bridgeAdapter[address(0)][ACCOUNTING_CHAIN_ID]).publishMessageToChain(
-            ACCOUNTING_CHAIN_ID, new IBridgeAdapter.BridgeAsset[](0), _getBalanceSnapshotData()
-        );
+        IBridgeAdapter(_bridgeAdapter[address(0)][ACCOUNTING_CHAIN_ID])
+            .publishMessageToChain(ACCOUNTING_CHAIN_ID, new IBridgeAdapter.BridgeAsset[](0), _getBalanceSnapshotData());
     }
 
     function _sendIouBurnMessage(uint256 amountIouRay) internal {
-        IBridgeAdapter(_bridgeAdapter[address(0)][ACCOUNTING_CHAIN_ID]).publishMessageToChain(
-            ACCOUNTING_CHAIN_ID,
-            new IBridgeAdapter.BridgeAsset[](0),
-            abi.encode(IChainGateway.BurnIouTokenMessage({amount: amountIouRay}))
-        );
+        IBridgeAdapter(_bridgeAdapter[address(0)][ACCOUNTING_CHAIN_ID])
+            .publishMessageToChain(
+                ACCOUNTING_CHAIN_ID,
+                new IBridgeAdapter.BridgeAsset[](0),
+                abi.encode(IChainGateway.BurnIouTokenMessage({amount: amountIouRay}))
+            );
     }
 
     function _getBalanceSnapshotData() internal view returns (bytes memory) {

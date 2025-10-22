@@ -26,7 +26,7 @@ contract CcipAdapter is BaseBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
 
     mapping(uint256 chainId => uint64 ccipChainSelector) internal _chainSelectorOf;
     mapping(uint64 ccipChainSelector => uint256 chainId) internal _chainIdOf;
-    mapping(uint256 chainId => address receiver) internal _receiverOf;
+    mapping(uint256 chainId => address destinationChainAdapter) internal _destinationChainAdapterOf;
 
     modifier onlyRouter() {
         require(msg.sender == CCIP_ROUTER, NotBridgeRouter());
@@ -50,8 +50,8 @@ contract CcipAdapter is BaseBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
         _chainIdOf[ccipChainSelector] = chainId;
     }
 
-    function setChainReceiver(uint256 chainId, address receiver) external onlyOwner {
-        _receiverOf[chainId] = receiver;
+    function setDestinationChainAdapter(uint256 chainId, address destinationChainAdapter) external onlyOwner {
+        _destinationChainAdapterOf[chainId] = receiver;
     }
 
     function setFeeToken(address feeToken) external onlyOwner {
@@ -79,28 +79,43 @@ contract CcipAdapter is BaseBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
             }
         }
         Client.EVM2AnyMessage memory ccipMessage = Client.EVM2AnyMessage({
-            receiver: abi.encode(_receiverOf[chainId]),
+            receiver: abi.encode(_destinationChainAdapterOf[chainId]),
             data: data,
             tokenAmounts: tokenAmounts,
             feeToken: _feeToken,
             // TODO: Think how we pass this gasLimit down here
-            extraArgs: Client._argsToBytes(Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: false}))
+            extraArgs: Client._argsToBytes(
+                Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: false})
+            )
         });
         _sendMessage(chainId, ccipMessage);
     }
 
-    function publishMessageToChainWithFeePayer(address feePayer, address feeToken, uint256 chainId, bytes memory data)
-        external
-        override
-        onlyGateway
-    {
+    function publishMessageToChainWithFeePayer(
+        address feePayer,
+        address feeToken,
+        uint256 chainId,
+        BridgeAsset[] memory assets,
+        bytes memory data
+    ) external override onlyGateway {
         uint256 gasLimit = 2_000_000;
+        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](assets.length);
+        if (assets.length > 0) {
+            gasLimit = 3_000_000;
+            for (uint256 i = 0; i < assets.length; i++) {
+                address asset = assets[i].asset;
+                uint256 amount = assets[i].amount;
+                tokenAmounts[i] = Client.EVMTokenAmount({token: asset, amount: amount});
+            }
+        }
         Client.EVM2AnyMessage memory ccipMessage = Client.EVM2AnyMessage({
-            receiver: abi.encode(_receiverOf[chainId]),
+            receiver: abi.encode(_destinationChainAdapterOf[chainId]),
             data: data,
-            tokenAmounts: new Client.EVMTokenAmount[](0),
+            tokenAmounts: tokenAmounts,
             feeToken: feeToken,
-            extraArgs: Client._argsToBytes(Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: false}))
+            extraArgs: Client._argsToBytes(
+                Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: false})
+            )
         });
         _sendMessageWithFeePayer(feePayer, feeToken, chainId, ccipMessage);
     }
@@ -108,9 +123,14 @@ contract CcipAdapter is BaseBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
     /// @inheritdoc IAny2EVMMessageReceiver
     function ccipReceive(Client.Any2EVMMessage calldata message) external override onlyRouter {
         if (message.data.length > 0) {
-            IChainGateway(_gateway).receiveMessage(
-                _chainIdOf[message.sourceChainSelector], new IBridgeAdapter.BridgeAsset[](0), message.data
+            require(
+                message.sender == _destinationChainAdapterOf[_chainIdOf[message.sourceChainSelector]],
+                ErrorsLib.NotDestinationChainAdapter()
             );
+            IChainGateway(_gateway)
+                .receiveMessage(
+                    _chainIdOf[message.sourceChainSelector], new IBridgeAdapter.BridgeAsset[](0), message.data
+                );
         }
         if (message.destTokenAmounts.length > 0) {
             try this.processReceivedFunds(_chainIdOf[message.sourceChainSelector], message.destTokenAmounts) {}

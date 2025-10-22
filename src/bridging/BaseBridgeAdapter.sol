@@ -36,6 +36,7 @@ abstract contract BaseBridgeAdapter is Ownable, IBridgeAdapter {
         address feePayer,
         address feeToken,
         uint256 destinationChainId,
+        IBridgeAdapter.BridgeAsset[] memory assets,
         bytes memory data
     ) external virtual;
 
