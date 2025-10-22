@@ -3,17 +3,20 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
 import {BasedBoostedVault} from "./../src/accounting/BasedBoostedVault.sol";
-import {FundsHandler} from "./../src/accounting/FundsHandler.sol";
+import {AssetRegistry} from "./../src/common/AssetRegistry.sol";
 import {IBasedBoostedVault} from "./../src/interfaces/IBasedBoostedVault.sol";
 import {IFundsHandler} from "./../src/interfaces/IFundsHandler.sol";
 import {AssetLib} from "./../src/libraries/AssetLib.sol";
 import {ErrorsLib} from "./../src/libraries/ErrorsLib.sol";
 import {MathLib} from "./../src/libraries/MathLib.sol";
+import {MockAssetRegistry} from "./mocks/MockAssetRegistry.sol";
 import {IMockErc20, MockErc20} from "./mocks/MockErc20.sol";
 import {MockFundsHandler} from "./mocks/MockFundsHandler.sol";
+import {MockIouToken} from "./mocks/MockIouToken.sol";
 import {MockNonStandardErc20} from "./mocks/MockNonStandardErc20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract BasedBoostedVaultTest is Test {
     using MathLib for uint256;
@@ -26,30 +29,34 @@ contract BasedBoostedVaultTest is Test {
     uint256 constant DEFAULT_PER_SECOND_RATE = 1000000001243680656318820313; // ~4% APY
     IMockErc20 mockAsset;
     MockFundsHandler mockFundsHandler;
+    MockIouToken mockIouToken;
+    MockAssetRegistry mockAssetRegistry;
     IBasedBoostedVault bbv;
 
     function _deployDefaultAsset() internal returns (IMockErc20) {
         return IMockErc20(address(new MockNonStandardErc20("Test USDT", "tUSDT", 6)));
     }
 
-    function _deployBasedBoostedVault(address adminParam, uint256 defaultSubVaultPerSecondRate)
-        internal
-        returns (IBasedBoostedVault)
-    {
-        return new BasedBoostedVault(adminParam, defaultSubVaultPerSecondRate);
+    function _deployBasedBoostedVault(
+        address adminParam,
+        uint256 defaultSubVaultPerSecondRate,
+        address iouToken,
+        address assetRegistry
+    ) internal returns (IBasedBoostedVault) {
+        return new BasedBoostedVault(adminParam, defaultSubVaultPerSecondRate, iouToken, assetRegistry);
     }
 
     function setUp() public {
+        mockIouToken = new MockIouToken(address(this));
+        mockAssetRegistry = new MockAssetRegistry();
         mockAsset = _deployDefaultAsset();
-        bbv = _deployBasedBoostedVault(admin, DEFAULT_PER_SECOND_RATE);
+        bbv =
+            _deployBasedBoostedVault(admin, DEFAULT_PER_SECOND_RATE, address(mockIouToken), address(mockAssetRegistry));
 
         mockFundsHandler = new MockFundsHandler();
 
         vm.prank(admin);
         BasedBoostedVault(address(bbv)).setFundsHandler(address(mockFundsHandler));
-
-        vm.prank(admin);
-        bbv.updateAssetSupport(address(mockAsset), true);
 
         vm.prank(admin);
         BasedBoostedVault(address(bbv)).setManager(manager);
@@ -59,7 +66,9 @@ contract BasedBoostedVaultTest is Test {
         vm.assume(expectedOwner != address(0));
         expectedDefaultSubVaultRate = _boundRate(expectedDefaultSubVaultRate);
 
-        BasedBoostedVault newBbv = new BasedBoostedVault(expectedOwner, expectedDefaultSubVaultRate);
+        BasedBoostedVault newBbv = new BasedBoostedVault(
+            expectedOwner, expectedDefaultSubVaultRate, address(mockIouToken), address(mockAssetRegistry)
+        );
 
         assertEq(newBbv.owner(), expectedOwner);
 
@@ -70,14 +79,14 @@ contract BasedBoostedVaultTest is Test {
 
     function test_constructor_reverts_ifZeroAddressAsOwner() public {
         vm.expectRevert();
-        new BasedBoostedVault(address(0), DEFAULT_PER_SECOND_RATE);
+        new BasedBoostedVault(address(0), DEFAULT_PER_SECOND_RATE, address(mockIouToken), address(mockAssetRegistry));
     }
 
     function test_constructor_reverts_ifInvalidDefaultSubVaultRate(uint256 invalidDefaultSubVaultRate) public {
         vm.assume(invalidDefaultSubVaultRate < MathLib.RAY);
 
         vm.expectRevert();
-        new BasedBoostedVault(admin, MathLib.RAY - 1);
+        new BasedBoostedVault(admin, MathLib.RAY - 1, address(mockIouToken), address(mockAssetRegistry));
     }
 
     function test_deposit_firstUserDepositGoesToDefaultSubVault(address user, uint256 amount) public {
