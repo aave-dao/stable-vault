@@ -14,6 +14,7 @@ abstract contract BaseChainGateway is IChainGateway {
 
     error UnsupportedAdapter();
 
+    address internal constant FEE_ON_NATIVE_CURRENCY = address(0);
     address internal constant ASSET_FOR_DATA_ONLY_BRIDGE = address(0);
     address internal immutable IOU_TOKEN_MANAGER;
 
@@ -55,11 +56,15 @@ abstract contract BaseChainGateway is IChainGateway {
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay
-    ) external {
+    ) external payable override {
         require(msg.sender == IOU_TOKEN_MANAGER, ErrorsLib.InvalidMessageSender());
         require(destinationChainId != block.chainid, ErrorsLib.InvalidDestinationChainId());
-        IERC20(feeToken).safeTransferFrom(msg.sender, address(this), feeAmount);
-        IERC20(feeToken).forceApprove(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId], feeAmount);
+
+        if (feeToken != FEE_ON_NATIVE_CURRENCY) {
+            IERC20(feeToken).safeTransferFrom(msg.sender, address(this), feeAmount);
+            IERC20(feeToken).forceApprove(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId], feeAmount);
+        }
+
         IBridgeAdapter(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId])
             .publishMessageToChainWithFeePayer(
                 feeRefundRecipient,

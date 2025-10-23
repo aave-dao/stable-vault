@@ -172,7 +172,10 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
         // Total outstanding claims on system Assets
         uint256 iousInCirculationRay = _getIousInCirculation();
         uint256 guaranteedObligationsRay = iousInCirculationRay + _globalOriginalDepositsRay;
-        uint256 globalWithdrawableInterestRay = totalAssetsRay - guaranteedObligationsRay;
+        // This can underflow if Earning chain(s) have not sent back the balance update and user positions have been
+        // removed (they've claimed IOUs).
+        uint256 globalWithdrawableInterestRay =
+            totalAssetsRay > guaranteedObligationsRay ? totalAssetsRay - guaranteedObligationsRay : 0;
         uint256 withdrawalRequestInterestRay = actualAmountInRay - guaranteedAmountRay;
         require(
             withdrawalRequestInterestRay <= globalWithdrawableInterestRay,
@@ -220,6 +223,10 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
         require(sharesToRedeem <= _positions[user].shares, ErrorsLib.InvalidAmount());
         _burnShares(user, sharesToRedeem);
         uint256 amountTakenFromOriginalDepositRay = _decrementOriginalDeposit(user, requestedAmountInRay);
+
+        if (_positions[user].shares == 0) {
+            delete _positions[user];
+        }
 
         return (requestedAmountInRay, amountTakenFromOriginalDepositRay, sharesToRedeem);
     }

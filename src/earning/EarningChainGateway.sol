@@ -36,6 +36,10 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
         ACCOUNTING_CHAIN_ID = accountingChainId;
     }
 
+    function getAggregatedBalance() external view returns (uint256) {
+        return _getTotalAssetsInRay();
+    }
+
     function setManager(address manager) external onlyAdmin {
         require(manager != address(0), ErrorsLib.ZeroAddress());
         _manager = manager;
@@ -139,10 +143,15 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
                 ACCOUNTING_CHAIN_ID,
                 new IBridgeAdapter.BridgeAsset[](0),
                 abi.encode(
-                    IChainGateway.BurnIouTokenMessage({
-                        iouTokenAmountBurnedRay: amountBurnedIouRay,
-                        balanceSnapshotTimestamp: block.timestamp,
-                        balanceSnapshotTotalAssetsInRay: _getTotalAssetsInRay()
+                    IChainGateway.CrossChainMessage({
+                        messageType: IChainGateway.MessageType.BURN_IOUTOKEN,
+                        data: abi.encode(
+                            IChainGateway.BurnIouTokenMessage({
+                                iouTokenAmountBurnedRay: amountBurnedIouRay,
+                                balanceSnapshotTimestamp: block.timestamp,
+                                balanceSnapshotTotalAssetsInRay: _getTotalAssetsInRay()
+                            })
+                        )
                     })
                 )
             );

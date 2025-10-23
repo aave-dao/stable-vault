@@ -16,20 +16,30 @@ import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 contract IouTokenManager is IIouTokenManager {
     using SafeERC20 for IERC20;
 
+    address internal constant FEE_ON_NATIVE_CURRENCY = address(0);
+
     address internal immutable IOU_TOKEN;
     bool internal immutable IS_CONANICAL_CHAIN;
 
     address internal _chainGateway;
     uint256 internal _lockedBalance;
 
-    constructor(address iouToken, address chainGateway, bool isCanonicalChain) {
+    constructor(address iouToken, bool isCanonicalChain) {
         IOU_TOKEN = iouToken;
-        _chainGateway = chainGateway;
         IS_CONANICAL_CHAIN = isCanonicalChain;
+    }
+
+    // TODO: put behind a role
+    function setChainGateway(address chainGateway) external {
+        _chainGateway = chainGateway;
     }
 
     function getAsset() external view override returns (address) {
         return IOU_TOKEN;
+    }
+
+    function getLockedBalance() external view returns (uint256) {
+        return _lockedBalance;
     }
 
     /// @inheritdoc IIouTokenManager
@@ -40,26 +50,22 @@ contract IouTokenManager is IIouTokenManager {
         address bridgeFeePayer,
         address bridgeFeeToken,
         uint256 bridgeFeeAmount
-    ) external {
+    ) external payable override {
         require(destinationChainId != block.chainid, ErrorsLib.InvalidDestinationChainId());
         // Pull the fee token from the caller and approve the chain gateway to spend it.
-        IERC20(bridgeFeeToken).safeTransferFrom(msg.sender, address(this), bridgeFeeAmount);
-        IERC20(bridgeFeeToken).forceApprove(_chainGateway, bridgeFeeAmount);
+        if (bridgeFeeToken != FEE_ON_NATIVE_CURRENCY) {
+            IERC20(bridgeFeeToken).safeTransferFrom(msg.sender, address(this), bridgeFeeAmount);
+            IERC20(bridgeFeeToken).forceApprove(_chainGateway, bridgeFeeAmount);
+        }
         // Pull the IOU tokens from the caller and lock them.
         if (IS_CONANICAL_CHAIN) {
             _lockTokens(msg.sender, iouTokenAmountRay);
         } else {
             _burnTokens(msg.sender, iouTokenAmountRay);
         }
-        IChainGateway(_chainGateway)
-            .sendBridgeIouTokenMessageWithFeePayer(
-                bridgeFeePayer,
-                bridgeFeeToken,
-                bridgeFeeAmount,
-                destinationChainId,
-                iouTokenRecipient,
-                iouTokenAmountRay
-            );
+        IChainGateway(_chainGateway).sendBridgeIouTokenMessageWithFeePayer{value: msg.value}(
+            bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount, destinationChainId, iouTokenRecipient, iouTokenAmountRay
+        );
     }
 
     // TODO: put behind a role
