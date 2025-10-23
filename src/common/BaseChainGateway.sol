@@ -5,6 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
+import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
@@ -14,6 +15,7 @@ abstract contract BaseChainGateway is IChainGateway {
     error UnsupportedAdapter();
 
     address internal constant ASSET_FOR_DATA_ONLY_BRIDGE = address(0);
+    address internal immutable IOU_TOKEN_MANAGER;
 
     modifier onlyAdmin() {
         require(msg.sender == _admin, ErrorsLib.NotAdmin());
@@ -27,7 +29,8 @@ abstract contract BaseChainGateway is IChainGateway {
     /// @dev Assumes token bridges also support Arbitrary Message Bridging.
     mapping(address asset => mapping(uint256 chainId => address adapter)) internal _bridgeAdapter;
 
-    constructor(address admin) {
+    constructor(address admin, address iouTokenManager) {
+        IOU_TOKEN_MANAGER = iouTokenManager;
         _admin = admin;
     }
 
@@ -42,6 +45,39 @@ abstract contract BaseChainGateway is IChainGateway {
         if (data.length > 0) {
             _receiveData(sourceChainId, data);
         }
+    }
+
+    /// @inheritdoc IChainGateway
+    function sendBridgeIouTokenMessageWithFeePayer(
+        address feeRefundRecipient,
+        address feeToken,
+        uint256 feeAmount,
+        uint256 destinationChainId,
+        address iouTokenRecipient,
+        uint256 iouTokenAmountRay
+    ) external {
+        require(msg.sender == IOU_TOKEN_MANAGER, ErrorsLib.InvalidMessageSender());
+        require(destinationChainId != block.chainid, ErrorsLib.InvalidDestinationChainId());
+        IERC20(feeToken).safeTransferFrom(msg.sender, address(this), feeAmount);
+        IERC20(feeToken).forceApprove(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId], feeAmount);
+        IBridgeAdapter(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId])
+            .publishMessageToChainWithFeePayer(
+                feeRefundRecipient,
+                feeToken,
+                feeAmount,
+                destinationChainId,
+                new IBridgeAdapter.BridgeAsset[](0),
+                abi.encode(
+                    IChainGateway.CrossChainMessage({
+                        messageType: IChainGateway.MessageType.BRIDGE_IOUTOKEN,
+                        data: abi.encode(
+                            IChainGateway.IouTokenBridgeMessage({
+                                recipient: iouTokenRecipient, amount: iouTokenAmountRay
+                            })
+                        )
+                    })
+                )
+            );
     }
 
     function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal virtual;

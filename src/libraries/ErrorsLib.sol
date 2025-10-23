@@ -8,6 +8,9 @@ library ErrorsLib {
     /// @notice Token amount checked is zero.
     error ZeroAmount();
 
+    /// @notice Thrown when destination chain id checked is the same as the current chain id.
+    error InvalidDestinationChainId();
+
     /// @notice Unsupported asset.
     error UnsupportedAsset(address asset);
 
@@ -28,6 +31,12 @@ library ErrorsLib {
 
     /// @notice Address checked is not the Cross-chain gateway.
     error NotGateway();
+
+    /// @notice Address checked is not message sender.
+    error InvalidMessageSender();
+
+    /// @notice Address checked is not the destination chain adapter.
+    error NotDestinationChainAdapter();
 
     /// @notice Insufficient amount due to slippage tolerance being exceeded.
     error InsufficientAmountOut();

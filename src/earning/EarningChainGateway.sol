@@ -10,6 +10,8 @@ import {IAllocator} from "../interfaces/IAllocator.sol";
 import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {IEarningChainGateway} from "../interfaces/IEarningChainGateway.sol";
+import {IIouTokenManager} from "../interfaces/IIouTokenManager.sol";
+import {IMintableBurnableIERC20} from "../interfaces/IMintableBurnableIERC20.sol";
 import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {EventLib} from "../libraries/EventLib.sol";
@@ -29,7 +31,9 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
     address internal _allocator;
     address internal _manager;
 
-    constructor(address admin, uint256 accountingChainId) BaseChainGateway(admin) {
+    constructor(address admin, uint256 accountingChainId, address iouTokenManager)
+        BaseChainGateway(admin, iouTokenManager)
+    {
         ACCOUNTING_CHAIN_ID = accountingChainId;
     }
 
@@ -53,18 +57,41 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
             IERC20(asset).forceApprove(_allocator, amount);
             IAllocator(_allocator).deposit(asset, amount);
         }
-        // TODO: should this callback be gated behind a flag sent from the Accounting Chain?
+        // TODO: should this callback be gated behind a flag sent from the Accounting Chain? or should we check gas
+        // left?
         _sendBalanceUpdate();
     }
 
-    function _receiveData(uint256 sourceChainId, bytes memory data) internal view override {
+    function _receiveData(uint256 sourceChainId, bytes memory data) internal override {
         _onlyAdapter(ASSET_FOR_DATA_ONLY_BRIDGE, sourceChainId);
-        uint256 amountRay = abi.decode(data, (uint256));
-        _emergencyExit(amountRay);
+        IChainGateway.CrossChainMessage memory crossChainMessage = abi.decode(data, (IChainGateway.CrossChainMessage));
+        if (crossChainMessage.messageType == IChainGateway.MessageType.BRIDGE_IOUTOKEN) {
+            _bridgeIouTokenFromAccountingChain(sourceChainId, crossChainMessage.data);
+        } else {
+            revert IChainGateway.InvalidMessageType();
+        }
     }
 
+    // TODO: We should open this function to public (in case manager goes awol)
     function sendBalanceUpdate() external onlyManager {
         _sendBalanceUpdate();
+    }
+
+    function exchangeIouTokens(
+        uint256 iouTokenAmountRay,
+        address tokenOut,
+        address tokenOutReceiver,
+        address bridgeFeePayer,
+        address bridgeFeeToken,
+        uint256 bridgeFeeAmount
+    ) external returns (uint256) {
+        // TODO: apply a withdrawal fee here?
+        IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(msg.sender, iouTokenAmountRay);
+        uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(tokenOut);
+        IAllocator(_allocator).withdraw(tokenOut, amountOut);
+        IERC20(tokenOut).safeTransfer(tokenOutReceiver, amountOut);
+        _sendIouBurnMessage(bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount, iouTokenAmountRay);
+        return amountOut;
     }
 
     // TODO: This needs to have a better name?
@@ -73,16 +100,11 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
         _returnFunds(asset, amount);
     }
 
-    function _emergencyExit(uint256 amountRay) internal pure {
-        (amountRay);
-        revert("EarningChainGateway.emergencyExit:NOT_IMPLEMENTED");
-        // TODO: re Emergency Withdrawal how to decide which token to pull from Allocator?
-        // TODO: do we need to ccipSend multiple times to bridge multiple tokens?
-        // TODO: Keep in mind not every asset in Earning chain will be bridgeable to Accounting chain
-        // TODO: if someone emergencyWithdraws then have them wait a cooldown period since pull flow can fail if
-        // insufficient bridgeable assets are on Earning chain (assume no swap can be performed) TODO: Implement; decide
-        // which asset(s) to withdraw
-        // TODO: check that the assets to withdraw from Allocator are actually bridgedable
+    function _bridgeIouTokenFromAccountingChain(uint256 sourceChainId, bytes memory data) internal {
+        IChainGateway.IouTokenBridgeMessage memory iouTokenBridgeMessage =
+            abi.decode(data, (IChainGateway.IouTokenBridgeMessage));
+        IIouTokenManager(IOU_TOKEN_MANAGER).mintTokens(iouTokenBridgeMessage.recipient, iouTokenBridgeMessage.amount);
+        // TODO: emit event?
     }
 
     function _returnFunds(address asset, uint256 amount) internal {
@@ -98,12 +120,49 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
             .publishMessageToChain(ACCOUNTING_CHAIN_ID, new IBridgeAdapter.BridgeAsset[](0), _getBalanceSnapshotData());
     }
 
-    function _getBalanceSnapshotData() internal view returns (bytes memory) {
+    function _sendIouBurnMessage(
+        address bridgeFeePayer,
+        address bridgeFeeToken,
+        uint256 bridgeFeeAmount,
+        uint256 amountBurnedIouRay
+    ) internal {
+        IBridgeAdapter(_bridgeAdapter[address(0)][ACCOUNTING_CHAIN_ID])
+            .publishMessageToChainWithFeePayer(
+                bridgeFeePayer,
+                bridgeFeeToken,
+                bridgeFeeAmount,
+                ACCOUNTING_CHAIN_ID,
+                new IBridgeAdapter.BridgeAsset[](0),
+                abi.encode(
+                    IChainGateway.BurnIouTokenMessage({
+                        iouTokenAmountBurnedRay: amountBurnedIouRay,
+                        balanceSnapshotTimestamp: block.timestamp,
+                        balanceSnapshotTotalAssetsInRay: _getTotalAssetsInRay()
+                    })
+                )
+            );
+        // TODO: emit event?
+    }
+
+    function _getTotalAssetsInRay() internal view returns (uint256) {
         IAllocator.AllocatorBalance[] memory allocatorBalances = IAllocator(_allocator).getAssetBalances();
         uint256 totalAssetsInRay;
         for (uint256 i = 0; i < allocatorBalances.length; i++) {
             totalAssetsInRay += allocatorBalances[i].amount.assetDecimalsToRay(allocatorBalances[i].asset);
         }
-        return abi.encode(IChainGateway.BalanceSnapshot(totalAssetsInRay, block.timestamp));
+        return totalAssetsInRay;
+    }
+
+    function _getBalanceSnapshotData() internal view returns (bytes memory) {
+        return abi.encode(
+            IChainGateway.CrossChainMessage({
+                messageType: IChainGateway.MessageType.BALANCE_SNAPSHOT,
+                data: abi.encode(
+                    IChainGateway.BalanceSnapshot({
+                        totalAssetsInRay: _getTotalAssetsInRay(), timestamp: block.timestamp
+                    })
+                )
+            })
+        );
     }
 }

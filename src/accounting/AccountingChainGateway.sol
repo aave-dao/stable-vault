@@ -9,6 +9,7 @@ import {IAccountingChainGateway} from "../interfaces/IAccountingChainGateway.sol
 import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
+import {IIouTokenManager} from "../interfaces/IIouTokenManager.sol";
 
 /// @title AccountingChainGateway
 /// @notice Facilitates cross chain messaging one or more Earning Chains.
@@ -22,7 +23,7 @@ contract AccountingChainGateway is IAccountingChainGateway, BaseChainGateway {
 
     address internal _fundsHandler;
 
-    constructor(address admin, address fundsHandler) BaseChainGateway(admin) {
+    constructor(address admin, address fundsHandler, address iouTokenManager) BaseChainGateway(admin, iouTokenManager) {
         _fundsHandler = fundsHandler;
     }
 
@@ -60,9 +61,41 @@ contract AccountingChainGateway is IAccountingChainGateway, BaseChainGateway {
 
     function _receiveData(uint256 sourceChainId, bytes memory data) internal override {
         _onlyAdapter(ASSET_FOR_DATA_ONLY_BRIDGE, sourceChainId);
-        // TODO: this assumes that the data is a balance snapshot and can be nothing else
+        IChainGateway.CrossChainMessage memory crossChainMessage = abi.decode(data, (IChainGateway.CrossChainMessage));
+        if (crossChainMessage.messageType == IChainGateway.MessageType.BALANCE_SNAPSHOT) {
+            _updateChainBalanceSnapshot(sourceChainId, crossChainMessage.data);
+        } else if (crossChainMessage.messageType == IChainGateway.MessageType.BRIDGE_IOUTOKEN) {
+            _bridgeIouTokenFromEarningChain(sourceChainId, crossChainMessage.data);
+        } else if (crossChainMessage.messageType == IChainGateway.MessageType.BURN_IOUTOKEN) {
+            _burnIouToken(sourceChainId, crossChainMessage.data);
+        } else {
+            revert IChainGateway.InvalidMessageType();
+        }
+    }
+
+    // TODO: I think we need to verify who is sending the messages on the source chain.
+    // Not only this, but all of the messages we need to restrict.
+    function _bridgeIouTokenFromEarningChain(uint256 sourceChainId, bytes memory data) internal {
+        IChainGateway.IouTokenBridgeMessage memory iouTokenBridgeMessage =
+            abi.decode(data, (IChainGateway.IouTokenBridgeMessage));
+        IIouTokenManager(IOU_TOKEN_MANAGER).releaseTokens(iouTokenBridgeMessage.recipient, iouTokenBridgeMessage.amount);
+    }
+
+    function _burnIouToken(uint256 sourceChainId, bytes memory data) internal {
+        IChainGateway.BurnIouTokenMessage memory burnIouTokenMessage =
+            abi.decode(data, (IChainGateway.BurnIouTokenMessage));
+        IIouTokenManager(IOU_TOKEN_MANAGER).burnLockedTokens(burnIouTokenMessage.iouTokenAmountBurnedRay);
+        IFundsHandler(_fundsHandler)
+            .updateChainBalanceCallback(
+                sourceChainId,
+                burnIouTokenMessage.balanceSnapshotTotalAssetsInRay,
+                burnIouTokenMessage.balanceSnapshotTimestamp
+            );
+    }
+
+    function _updateChainBalanceSnapshot(uint256 sourceChainId, bytes memory data) internal {
         IChainGateway.BalanceSnapshot memory balanceSnapshot = abi.decode(data, (IChainGateway.BalanceSnapshot));
         IFundsHandler(_fundsHandler)
-            .updateChainBalanceCallback(sourceChainId, balanceSnapshot.balance, balanceSnapshot.timestamp);
+            .updateChainBalanceCallback(sourceChainId, balanceSnapshot.totalAssetsInRay, balanceSnapshot.timestamp);
     }
 }
