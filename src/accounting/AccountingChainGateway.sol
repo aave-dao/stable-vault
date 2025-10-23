@@ -42,14 +42,6 @@ contract AccountingChainGateway is IAccountingChainGateway, BaseChainGateway {
         IBridgeAdapter(adapter).publishMessageToChain(targetChainId, assets, "");
     }
 
-    /// @dev Assume for Emergency withdrawal only - Earning chain will send whatever asset it prefers.
-    /// @param amountRay The `amount` must be in RAY to be token agnostic.
-    /// @param targetChainId The destination chainId.
-    function sendPullFundsFromChainMessage(uint256 amountRay, uint256 targetChainId) external onlyFundsHandler {
-        IBridgeAdapter(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][targetChainId])
-            .publishMessageToChain(targetChainId, new IBridgeAdapter.BridgeAsset[](0), abi.encode(amountRay));
-    }
-
     function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal override {
         for (uint256 i = 0; i < assets.length; i++) {
             address asset = assets[i].asset;

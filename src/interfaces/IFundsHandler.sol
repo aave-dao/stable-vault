@@ -33,11 +33,6 @@ interface IFundsHandler {
     /// Gateway contract.
     function pushFundsToChain(address asset, uint256 amount, uint256 chainId) external;
 
-    /// @dev Uses the Gateway contract to request funds from another chain.
-    /// @param amountRay The amount of the asset in RAY (token agnostic) to pull from the chain.
-    /// @param chainId The chain id of the chain to request funds from.
-    function pullFundsFromChain(uint256 amountRay, uint256 chainId) external;
-
     /// @dev Updates the chain balance snapshot for a given chain.
     /// @param chainId The chain id of the chain that sent the balance update
     /// @param snapshotBalanceRay The balance snapshot on the source chain in RAY of supported asset denomination

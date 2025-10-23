@@ -114,12 +114,9 @@ contract FundsHandler is IFundsHandler {
     function pushFundsToChain(address asset, uint256 amount, uint256 chainId) external onlyManager {
         _pullFundsFromImmediateLiquidity(asset, amount);
         IERC20(asset).forceApprove(_gateway, amount);
+        // Increment the chain balance snapshot for the target chain.
+        _updateChainBalance(chainId, amount.assetDecimalsToRay(asset), block.timestamp);
         IAccountingChainGateway(_gateway).sendPushFundsToChainMessage(asset, amount, chainId);
-    }
-
-    /// @inheritdoc IFundsHandler
-    function pullFundsFromChain(uint256 amountRay, uint256 chainId) external onlyManager {
-        IAccountingChainGateway(_gateway).sendPullFundsFromChainMessage(amountRay, chainId);
     }
 
     /// @inheritdoc IFundsHandler
