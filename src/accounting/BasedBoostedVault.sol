@@ -13,8 +13,6 @@ import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {MathLib} from "../libraries/MathLib.sol";
 
-import {console} from "forge-std/console.sol";
-
 /// @dev Assets balances are tracked in RAY internally; conversions from and to specific asset denomination is made on
 /// deposit and on withdrawal execution.
 contract BasedBoostedVault is Ownable, IBasedBoostedVault {
@@ -154,7 +152,6 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
         require(msg.sender == user, InvalidMsgSender());
 
         uint256 subVaultId = _positions[user].subVaultId;
-        console.log("subVaultId", subVaultId);
         require(subVaultId > 0, NonExistentPosition());
 
         _accrueSubVaultConversionRate(subVaultId);

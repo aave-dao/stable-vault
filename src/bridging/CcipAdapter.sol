@@ -14,8 +14,6 @@ import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {BaseBridgeAdapter} from "./BaseBridgeAdapter.sol";
 
-import {console} from "forge-std/console.sol";
-
 /// @title CcipAdapter
 /// @notice Adapter for sending and receiving messages via Chainlink CCIP.
 contract CcipAdapter is BaseBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {

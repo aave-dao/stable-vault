@@ -9,8 +9,6 @@ import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
-import {console} from "forge-std/console.sol";
-
 abstract contract BaseChainGateway is IChainGateway {
     using SafeERC20 for IERC20;
 
@@ -61,9 +59,6 @@ abstract contract BaseChainGateway is IChainGateway {
     ) external payable override {
         require(msg.sender == IOU_TOKEN_MANAGER, ErrorsLib.InvalidMessageSender());
         require(destinationChainId != block.chainid, ErrorsLib.InvalidDestinationChainId());
-        console.log("feeToken", feeToken);
-        console.log("feeAmount", feeAmount);
-        console.log("msg.value", msg.value);
 
         if (feeToken != FEE_ON_NATIVE_CURRENCY) {
             IERC20(feeToken).safeTransferFrom(msg.sender, address(this), feeAmount);

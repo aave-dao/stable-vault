@@ -9,8 +9,6 @@ import {IIouTokenManager} from "../interfaces/IIouTokenManager.sol";
 import {IMintableBurnableIERC20} from "../interfaces/IMintableBurnableIERC20.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
-import {console} from "forge-std/console.sol";
-
 // TODO: add events
 
 /// @title IouTokenManager
@@ -53,22 +51,18 @@ contract IouTokenManager is IIouTokenManager {
         address bridgeFeeToken,
         uint256 bridgeFeeAmount
     ) external payable override {
-        console.log("bridgeTokens called with iouTokenAmountRay", iouTokenAmountRay);
         require(destinationChainId != block.chainid, ErrorsLib.InvalidDestinationChainId());
         // Pull the fee token from the caller and approve the chain gateway to spend it.
         if (bridgeFeeToken != FEE_ON_NATIVE_CURRENCY) {
             IERC20(bridgeFeeToken).safeTransferFrom(msg.sender, address(this), bridgeFeeAmount);
             IERC20(bridgeFeeToken).forceApprove(_chainGateway, bridgeFeeAmount);
         }
-        console.log("iouTokenAmountRay", iouTokenAmountRay);
         // Pull the IOU tokens from the caller and lock them.
         if (IS_CONANICAL_CHAIN) {
             _lockTokens(msg.sender, iouTokenAmountRay);
         } else {
             _burnTokens(msg.sender, iouTokenAmountRay);
         }
-        console.log("Calling sendBridgeIouTokenMessageWithFeePayer with msg.value", msg.value);
-        console.log("chainGateway", _chainGateway);
         IChainGateway(_chainGateway).sendBridgeIouTokenMessageWithFeePayer{value: msg.value}(
             bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount, destinationChainId, iouTokenRecipient, iouTokenAmountRay
         );

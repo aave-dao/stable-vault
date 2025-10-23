@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 import {IERC20} from "forge-std/interfaces/IERC20.sol";
 
@@ -210,8 +209,6 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         // 9. User1 echanges IOUs for assets on Earning chain and checks their balance is expected
 
         uint256 assetsOnEarningBeforeUser1ExchangeIous = earningChainGateway.getAggregatedBalance();
-        // The Earning chain should send snap shot back
-        uint256 balanceOnAccountingChainBeforeIouExchange = fundsHandler.getAggregatedBalance();
         // Tokens should be burned from iouTokenManager_accountingChain
         uint256 iouSupplyOnAccountingChainBeforeIouExchange = iouToken_accountingChain.totalSupply();
         uint256 iouLockedBalanceOnAccountingChainBeforeIouExchange = iouTokenManager_accountingChain.getLockedBalance();
