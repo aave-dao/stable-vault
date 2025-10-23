@@ -11,7 +11,6 @@ import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {IEarningChainGateway} from "../interfaces/IEarningChainGateway.sol";
 import {IIouTokenManager} from "../interfaces/IIouTokenManager.sol";
-import {IMintableBurnableIERC20} from "../interfaces/IMintableBurnableIERC20.sol";
 import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {EventLib} from "../libraries/EventLib.sol";
@@ -100,7 +99,13 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
         _returnFunds(asset, amount);
     }
 
-    function _bridgeIouTokenFromAccountingChain(uint256 sourceChainId, bytes memory data) internal {
+    function _bridgeIouTokenFromAccountingChain(
+        uint256,
+        /* sourceChainId */
+        bytes memory data
+    )
+        internal
+    {
         IChainGateway.IouTokenBridgeMessage memory iouTokenBridgeMessage =
             abi.decode(data, (IChainGateway.IouTokenBridgeMessage));
         IIouTokenManager(IOU_TOKEN_MANAGER).mintTokens(iouTokenBridgeMessage.recipient, iouTokenBridgeMessage.amount);

@@ -1,19 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {BasedBoostedVault} from "./../src/accounting/BasedBoostedVault.sol";
-import {AssetRegistry} from "./../src/common/AssetRegistry.sol";
 import {IBasedBoostedVault} from "./../src/interfaces/IBasedBoostedVault.sol";
 import {IFundsHandler} from "./../src/interfaces/IFundsHandler.sol";
 import {AssetLib} from "./../src/libraries/AssetLib.sol";
 import {ErrorsLib} from "./../src/libraries/ErrorsLib.sol";
 import {MathLib} from "./../src/libraries/MathLib.sol";
 import {MockAssetRegistry} from "./mocks/MockAssetRegistry.sol";
-import {IMockErc20, MockErc20} from "./mocks/MockErc20.sol";
+import {IMockErc20} from "./mocks/MockErc20.sol";
 import {MockFundsHandler} from "./mocks/MockFundsHandler.sol";
 import {MockIouToken} from "./mocks/MockIouToken.sol";
 import {MockNonStandardErc20} from "./mocks/MockNonStandardErc20.sol";

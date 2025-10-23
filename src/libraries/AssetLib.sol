@@ -42,6 +42,8 @@ library AssetLib {
         if (callSucceeded && encodedDecimals.length >= 32) {
             uint256 returnedDecimals = abi.decode(encodedDecimals, (uint256));
             if (returnedDecimals <= type(uint8).max) {
+                // Casting to uint8 is safe because we are checking the value is not greater than type(uint8).max
+                // forge-lint: disable-next-line(unsafe-typecast)
                 assetDecimals = uint8(returnedDecimals);
             }
         }

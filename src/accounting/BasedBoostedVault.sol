@@ -5,12 +5,10 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {IouToken} from "../common/IouToken.sol";
 import {IAssetRegistry} from "../interfaces/IAssetRegistry.sol";
 import {IBasedBoostedVault} from "../interfaces/IBasedBoostedVault.sol";
 import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
 import {IIouTokenManager} from "../interfaces/IIouTokenManager.sol";
-import {IMintableBurnableIERC20} from "../interfaces/IMintableBurnableIERC20.sol";
 import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {MathLib} from "../libraries/MathLib.sol";
@@ -306,7 +304,7 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
         for (uint256 i = 0; i < _activeSubVaultsIds.length; i++) {
             uint256 subVaultId = _activeSubVaultsIds[i];
             uint256 perSecondRate = _subVaultById[subVaultId].perSecondRate;
-            activeSubVaults[i] = SubVaultData(perSecondRate, subVaultId);
+            activeSubVaults[i] = SubVaultData({perSecondRate: perSecondRate, id: subVaultId});
         }
         return activeSubVaults;
     }
@@ -333,14 +331,14 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
     function getUserSubVault(address user) external view override returns (SubVaultData memory) {
         uint256 subVaultId = _positions[user].subVaultId;
         uint256 subVaultRate = _subVaultById[subVaultId].perSecondRate;
-        return SubVaultData(subVaultRate, subVaultId);
+        return SubVaultData({perSecondRate: subVaultRate, id: subVaultId});
     }
 
     /// @inheritdoc IBasedBoostedVault
     function getDefaultSubVault() external view override returns (SubVaultData memory) {
         uint256 subVaultId = _defaultSubVaultId;
         uint256 subVaultRate = _subVaultById[subVaultId].perSecondRate;
-        return SubVaultData(subVaultRate, subVaultId);
+        return SubVaultData({perSecondRate: subVaultRate, id: subVaultId});
     }
 
     /// @inheritdoc IBasedBoostedVault

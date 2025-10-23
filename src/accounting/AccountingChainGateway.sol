@@ -75,7 +75,13 @@ contract AccountingChainGateway is IAccountingChainGateway, BaseChainGateway {
 
     // TODO: I think we need to verify who is sending the messages on the source chain.
     // Not only this, but all of the messages we need to restrict.
-    function _bridgeIouTokenFromEarningChain(uint256 sourceChainId, bytes memory data) internal {
+    function _bridgeIouTokenFromEarningChain(
+        uint256,
+        /* sourceChainId */
+        bytes memory data
+    )
+        internal
+    {
         IChainGateway.IouTokenBridgeMessage memory iouTokenBridgeMessage =
             abi.decode(data, (IChainGateway.IouTokenBridgeMessage));
         IIouTokenManager(IOU_TOKEN_MANAGER).releaseTokens(iouTokenBridgeMessage.recipient, iouTokenBridgeMessage.amount);

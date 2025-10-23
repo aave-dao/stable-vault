@@ -124,6 +124,8 @@ contract MockCCIPRouter is IRouter, IRouterClient {
             IERC20(message.feeToken).safeTransferFrom(msg.sender, address(this), feeTokenAmount);
         }
 
+        // Casting to uint160/address is safe, we already checked that the value is not greater than type(uint160).max
+        // forge-lint: disable-next-line(unsafe-typecast)
         address receiver = address(uint160(decodedReceiver));
         uint256 gasLimit = _fromBytes(message.extraArgs).gasLimit;
         bytes32 mockMsgId = keccak256(abi.encode(message));
@@ -157,7 +159,7 @@ contract MockCCIPRouter is IRouter, IRouterClient {
             return Client.GenericExtraArgsV2({gasLimit: DEFAULT_GAS_LIMIT, allowOutOfOrderExecution: false});
         }
 
-        bytes4 extraArgsTag = bytes4(extraArgs);
+        bytes4 extraArgsTag = bytes4(extraArgs[0:4]);
         if (extraArgsTag == Client.GENERIC_EXTRA_ARGS_V2_TAG) {
             return abi.decode(extraArgs[4:], (Client.GenericExtraArgsV2));
         } else if (extraArgsTag == Client.EVM_EXTRA_ARGS_V1_TAG) {

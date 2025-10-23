@@ -9,7 +9,11 @@ runs = 10_000
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
 
+[lint]
+exclude_lints = ["mixed-case-variable", "mixed-case-function", "unwrapped-modifier-logic"]
+
 [fmt]
+
 # Maximum line length. Code will be wrapped to stay within this limit.
 # Default: 120
 line_length = 120
