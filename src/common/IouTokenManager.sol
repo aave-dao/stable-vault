@@ -36,8 +36,8 @@ contract IouTokenManager is IIouTokenManager {
     /// @inheritdoc IIouTokenManager
     function bridgeTokens(
         uint256 destinationChainId,
-        address recipient,
-        uint256 iouTokenAmount,
+        address iouTokenRecipient,
+        uint256 iouTokenAmountRay,
         address bridgeFeePayer,
         address bridgeFeeToken,
         uint256 bridgeFeeAmount
@@ -48,24 +48,18 @@ contract IouTokenManager is IIouTokenManager {
         IERC20(bridgeFeeToken).forceApprove(_chainGateway, bridgeFeeAmount);
         // Pull the IOU tokens from the caller and lock them.
         if (IS_CONANICAL_CHAIN) {
-            _lockTokens(msg.sender, iouTokenAmount);
+            _lockTokens(msg.sender, iouTokenAmountRay);
         } else {
-            _burnTokens(msg.sender, iouTokenAmount);
+            _burnTokens(msg.sender, iouTokenAmountRay);
         }
         IChainGateway(_chainGateway)
-            .sendBridgeMessageWithFeePayer(
+            .sendBridgeIouTokenMessageWithFeePayer(
                 bridgeFeePayer,
                 bridgeFeeToken,
                 bridgeFeeAmount,
                 destinationChainId,
-                abi.encode(
-                    IChainGateway.CrossChainMessage({
-                        messageType: IChainGateway.MessageType.BRIDGE_IOUTOKEN,
-                        data: abi.encode(
-                            IChainGateway.IouTokenBridgeMessage({recipient: recipient, amount: iouTokenAmount})
-                        )
-                    })
-                )
+                iouTokenRecipient,
+                iouTokenAmountRay
             );
     }
 

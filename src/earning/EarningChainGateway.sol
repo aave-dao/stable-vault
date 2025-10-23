@@ -28,13 +28,13 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
     }
 
     uint256 internal immutable ACCOUNTING_CHAIN_ID;
-    address internal immutable IOU_TOKEN_MANAGER;
     address internal _allocator;
     address internal _manager;
 
-    constructor(address admin, uint256 accountingChainId, address iouTokenManager) BaseChainGateway(admin) {
+    constructor(address admin, uint256 accountingChainId, address iouTokenManager)
+        BaseChainGateway(admin, iouTokenManager)
+    {
         ACCOUNTING_CHAIN_ID = accountingChainId;
-        IOU_TOKEN_MANAGER = iouTokenManager;
     }
 
     function setManager(address manager) external onlyAdmin {

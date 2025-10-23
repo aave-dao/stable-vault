@@ -10,16 +10,16 @@ interface IIouTokenManager {
     /// @notice Entry point for IOU token owners to bridge tokens to a destination chain.
     /// @dev Pulls tokens from caller and holds them in the contract until unlock is called.
     /// @param destinationChainId The chain id of the chain to publish the message to.
-    /// @param recipient The address to send the IOU tokens to on the destination chain.
-    /// @param amount The amount of IOU tokens to bridge.
+    /// @param iouTokenRecipient The address to send the IOU tokens to on the destination chain.
+    /// @param iouTokenAmountRay The amount of IOU tokens to bridge.
     /// @param bridgeFeePayer The address that will pay the bridge fee.
     /// @param bridgeFeeToken The token to pay the bridge fee in.
     /// @param bridgeFeeAmount The amount of fee to pay in the fee token (a refund is provided to the fee payer if
     /// necessary).
     function bridgeTokens(
         uint256 destinationChainId,
-        address recipient,
-        uint256 amount,
+        address iouTokenRecipient,
+        uint256 iouTokenAmountRay,
         address bridgeFeePayer,
         address bridgeFeeToken,
         uint256 bridgeFeeAmount

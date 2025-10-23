@@ -33,7 +33,7 @@ library ErrorsLib {
     error NotGateway();
 
     /// @notice Address checked is not message sender.
-    error NotMsgSender();
+    error InvalidMessageSender();
 
     /// @notice Address checked is not the destination chain adapter.
     error NotDestinationChainAdapter();

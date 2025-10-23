@@ -21,11 +21,9 @@ contract AccountingChainGateway is IAccountingChainGateway, BaseChainGateway {
         _;
     }
 
-    address internal immutable IOU_TOKEN_MANAGER;
     address internal _fundsHandler;
 
-    constructor(address admin, address fundsHandler, address iouTokenManager) BaseChainGateway(admin) {
-        IOU_TOKEN_MANAGER = iouTokenManager;
+    constructor(address admin, address fundsHandler, address iouTokenManager) BaseChainGateway(admin, iouTokenManager) {
         _fundsHandler = fundsHandler;
     }
 
