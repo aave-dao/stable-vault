@@ -13,6 +13,8 @@ import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {MathLib} from "../libraries/MathLib.sol";
 
+import {console} from "forge-std/console.sol";
+
 /// @dev Assets balances are tracked in RAY internally; conversions from and to specific asset denomination is made on
 /// deposit and on withdrawal execution.
 contract BasedBoostedVault is Ownable, IBasedBoostedVault {
@@ -152,6 +154,7 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
         require(msg.sender == user, InvalidMsgSender());
 
         uint256 subVaultId = _positions[user].subVaultId;
+        console.log("subVaultId", subVaultId);
         require(subVaultId > 0, NonExistentPosition());
 
         _accrueSubVaultConversionRate(subVaultId);
@@ -172,7 +175,10 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
         // Total outstanding claims on system Assets
         uint256 iousInCirculationRay = _getIousInCirculation();
         uint256 guaranteedObligationsRay = iousInCirculationRay + _globalOriginalDepositsRay;
-        uint256 globalWithdrawableInterestRay = totalAssetsRay - guaranteedObligationsRay;
+        // This can underflow if Earning chain(s) have not sent back the balance update and user positions have been
+        // removed (they've claimed IOUs).
+        uint256 globalWithdrawableInterestRay =
+            totalAssetsRay > guaranteedObligationsRay ? totalAssetsRay - guaranteedObligationsRay : 0;
         uint256 withdrawalRequestInterestRay = actualAmountInRay - guaranteedAmountRay;
         require(
             withdrawalRequestInterestRay <= globalWithdrawableInterestRay,
@@ -220,6 +226,10 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
         require(sharesToRedeem <= _positions[user].shares, ErrorsLib.InvalidAmount());
         _burnShares(user, sharesToRedeem);
         uint256 amountTakenFromOriginalDepositRay = _decrementOriginalDeposit(user, requestedAmountInRay);
+
+        if (_positions[user].shares == 0) {
+            delete _positions[user];
+        }
 
         return (requestedAmountInRay, amountTakenFromOriginalDepositRay, sharesToRedeem);
     }

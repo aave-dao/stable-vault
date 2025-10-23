@@ -23,7 +23,7 @@ interface IIouTokenManager {
         address bridgeFeePayer,
         address bridgeFeeToken,
         uint256 bridgeFeeAmount
-    ) external;
+    ) external payable;
 
     /// @notice Mints tokens and transfers them to the caller (assumes this contract has mint privileges on the IOU
     /// token).

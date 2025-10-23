@@ -105,8 +105,7 @@ contract BaseTest is Test {
         assetRegistry_accountingChain.setAssetConfigBitmap(address(USDC), type(uint256).max);
         iouToken_accountingChain = new IouToken(address(this));
         console.log("\tIOU Token (Accounting Chain): %s", address(iouToken_accountingChain));
-        iouTokenManager_accountingChain =
-            new IouTokenManager(address(iouToken_accountingChain), address(accountingChainGateway), true);
+        iouTokenManager_accountingChain = new IouTokenManager(address(iouToken_accountingChain), true);
         console.log("\tIOU Token Manager (Accounting Chain): %s", address(iouTokenManager_accountingChain));
         iouToken_accountingChain.transferOwnership(address(iouTokenManager_accountingChain));
         vault = new ExtendedBasedBoostedVault(
@@ -123,6 +122,8 @@ contract BaseTest is Test {
         uint256 deployerNonce = vm.getNonce(address(this));
         address accountingChainGatewayAddress = vm.computeCreateAddress(address(this), deployerNonce + 1);
         console.log("\tAccounting Chain Gateway Predicted Address: %s", accountingChainGatewayAddress);
+        vm.prank(admin);
+        iouTokenManager_accountingChain.setChainGateway(accountingChainGatewayAddress);
 
         fundsHandler = new FundsHandler(
             manager, address(vault), accountingChainGatewayAddress, address(allocator_accountingChain)
@@ -152,12 +153,13 @@ contract BaseTest is Test {
         ccipAdapter_earningChain = new CcipAdapter(admin, address(mockCcipRouter));
         iouToken_earningChain = new IouToken(address(this));
         console.log("\tIOU Token (Earning Chain): %s", address(iouToken_earningChain));
-        iouTokenManager_earningChain =
-            new IouTokenManager(address(iouToken_earningChain), address(earningChainGateway), false);
+        iouTokenManager_earningChain = new IouTokenManager(address(iouToken_earningChain), false);
         console.log("\tIOU Token Manager (Earning Chain): %s", address(iouTokenManager_earningChain));
         iouToken_earningChain.transferOwnership(address(iouTokenManager_earningChain));
         earningChainGateway = new EarningChainGateway(admin, ACCOUNTING_CHAIN_ID, address(iouTokenManager_earningChain));
         console.log("\tEarning Chain Gateway: %s", address(earningChainGateway));
+        vm.prank(admin);
+        iouTokenManager_earningChain.setChainGateway(address(earningChainGateway));
         allocator_earningChain = new Allocator(manager, admin, address(assetRegistry_earningChain));
         console.log("\tAllocator: %s", address(allocator_earningChain));
         swapper_earningChain = new Swapper(address(allocator_earningChain));

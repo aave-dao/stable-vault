@@ -14,6 +14,8 @@ import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {BaseBridgeAdapter} from "./BaseBridgeAdapter.sol";
 
+import {console} from "forge-std/console.sol";
+
 /// @title CcipAdapter
 /// @notice Adapter for sending and receiving messages via Chainlink CCIP.
 contract CcipAdapter is BaseBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
@@ -99,7 +101,7 @@ contract CcipAdapter is BaseBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
         uint256 chainId,
         BridgeAsset[] memory assets,
         bytes memory data
-    ) external override onlyGateway {
+    ) external payable override onlyGateway {
         uint256 gasLimit = 2_000_000;
         Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](assets.length);
         if (assets.length > 0) {
@@ -181,14 +183,23 @@ contract CcipAdapter is BaseBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
     ) internal {
         uint64 chainSelector = _chainSelectorOf[chainId];
         uint256 estimatedFeeAmount = IRouterClient(CCIP_ROUTER).getFee(chainSelector, message);
-        // Pull the fee amount from the caller into this contract.
-        IERC20(feeToken).safeTransferFrom(msg.sender, address(this), estimatedFeeAmount);
-        // Approve the Router to pull the estimated fee.
-        IERC20(feeToken).safeIncreaseAllowance(CCIP_ROUTER, estimatedFeeAmount);
+        uint256 msgValue;
+        if (feeToken == FEE_ON_NATIVE_CURRENCY) {
+            msgValue = estimatedFeeAmount;
+        } else {
+            // Pull the fee amount from the caller into this contract.
+            IERC20(feeToken).safeTransferFrom(msg.sender, address(this), estimatedFeeAmount);
+            // Approve the Router to pull the estimated fee.
+            IERC20(feeToken).safeIncreaseAllowance(CCIP_ROUTER, estimatedFeeAmount);
+        }
         // Return any excess fee to the fee refund recipient.
         if (allocatedFeeAmount > estimatedFeeAmount) {
-            IERC20(feeToken).safeTransfer(feeRefundRecipient, allocatedFeeAmount - estimatedFeeAmount);
+            if (feeToken == FEE_ON_NATIVE_CURRENCY) {
+                payable(feeRefundRecipient).transfer(allocatedFeeAmount - estimatedFeeAmount);
+            } else {
+                IERC20(feeToken).safeTransfer(feeRefundRecipient, allocatedFeeAmount - estimatedFeeAmount);
+            }
         }
-        IRouterClient(CCIP_ROUTER).ccipSend(chainSelector, message);
+        IRouterClient(CCIP_ROUTER).ccipSend{value: msgValue}(chainSelector, message);
     }
 }

@@ -33,5 +33,5 @@ interface IBridgeAdapter {
         uint256 destinationChainId,
         BridgeAsset[] memory assets,
         bytes memory data
-    ) external;
+    ) external payable;
 }

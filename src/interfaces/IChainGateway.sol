@@ -59,5 +59,5 @@ interface IChainGateway {
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay
-    ) external;
+    ) external payable;
 }

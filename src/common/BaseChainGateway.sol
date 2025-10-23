@@ -9,11 +9,14 @@ import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
+import {console} from "forge-std/console.sol";
+
 abstract contract BaseChainGateway is IChainGateway {
     using SafeERC20 for IERC20;
 
     error UnsupportedAdapter();
 
+    address internal constant FEE_ON_NATIVE_CURRENCY = address(0);
     address internal constant ASSET_FOR_DATA_ONLY_BRIDGE = address(0);
     address internal immutable IOU_TOKEN_MANAGER;
 
@@ -55,11 +58,18 @@ abstract contract BaseChainGateway is IChainGateway {
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay
-    ) external {
+    ) external payable override {
         require(msg.sender == IOU_TOKEN_MANAGER, ErrorsLib.InvalidMessageSender());
         require(destinationChainId != block.chainid, ErrorsLib.InvalidDestinationChainId());
-        IERC20(feeToken).safeTransferFrom(msg.sender, address(this), feeAmount);
-        IERC20(feeToken).forceApprove(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId], feeAmount);
+        console.log("feeToken", feeToken);
+        console.log("feeAmount", feeAmount);
+        console.log("msg.value", msg.value);
+
+        if (feeToken != FEE_ON_NATIVE_CURRENCY) {
+            IERC20(feeToken).safeTransferFrom(msg.sender, address(this), feeAmount);
+            IERC20(feeToken).forceApprove(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId], feeAmount);
+        }
+
         IBridgeAdapter(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId])
             .publishMessageToChainWithFeePayer(
                 feeRefundRecipient,
