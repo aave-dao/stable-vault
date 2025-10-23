@@ -33,8 +33,9 @@ abstract contract BaseBridgeAdapter is Ownable, IBridgeAdapter {
     ) external virtual;
 
     function publishMessageToChainWithFeePayer(
-        address feePayer,
+        address feeRefundRecipient,
         address feeToken,
+        uint256 allocatedFeeAmount,
         uint256 destinationChainId,
         IBridgeAdapter.BridgeAsset[] memory assets,
         bytes memory data

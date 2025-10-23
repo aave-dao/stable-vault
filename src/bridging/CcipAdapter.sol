@@ -51,7 +51,8 @@ contract CcipAdapter is BaseBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
     }
 
     function setDestinationChainAdapter(uint256 chainId, address destinationChainAdapter) external onlyOwner {
-        _destinationChainAdapterOf[chainId] = receiver;
+        require(destinationChainAdapter != address(0), ErrorsLib.ZeroAddress());
+        _destinationChainAdapterOf[chainId] = destinationChainAdapter;
     }
 
     function setFeeToken(address feeToken) external onlyOwner {
@@ -92,8 +93,9 @@ contract CcipAdapter is BaseBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
     }
 
     function publishMessageToChainWithFeePayer(
-        address feePayer,
+        address feeRefundRecipient,
         address feeToken,
+        uint256 allocatedFeeAmount,
         uint256 chainId,
         BridgeAsset[] memory assets,
         bytes memory data
@@ -117,14 +119,14 @@ contract CcipAdapter is BaseBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
                 Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: false})
             )
         });
-        _sendMessageWithFeePayer(feePayer, feeToken, chainId, ccipMessage);
+        _sendMessageWithFeePayer(feeRefundRecipient, feeToken, allocatedFeeAmount, chainId, ccipMessage);
     }
 
     /// @inheritdoc IAny2EVMMessageReceiver
     function ccipReceive(Client.Any2EVMMessage calldata message) external override onlyRouter {
         if (message.data.length > 0) {
             require(
-                message.sender == _destinationChainAdapterOf[_chainIdOf[message.sourceChainSelector]],
+                address(bytes20(message.sender)) == _destinationChainAdapterOf[_chainIdOf[message.sourceChainSelector]],
                 ErrorsLib.NotDestinationChainAdapter()
             );
             IChainGateway(_gateway)
@@ -170,15 +172,22 @@ contract CcipAdapter is BaseBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
     }
 
     function _sendMessageWithFeePayer(
-        address feePayer,
+        address feeRefundRecipient,
         address feeToken,
+        uint256 allocatedFeeAmount,
         uint256 chainId,
         Client.EVM2AnyMessage memory message
     ) internal {
         uint64 chainSelector = _chainSelectorOf[chainId];
-        uint256 fee = IRouterClient(CCIP_ROUTER).getFee(chainSelector, message);
-        IERC20(feeToken).safeTransferFrom(feePayer, address(this), fee);
-        IERC20(feeToken).safeIncreaseAllowance(CCIP_ROUTER, fee);
+        uint256 estimatedFeeAmount = IRouterClient(CCIP_ROUTER).getFee(chainSelector, message);
+        // Pull the fee amount from the caller into this contract.
+        IERC20(feeToken).safeTransferFrom(msg.sender, address(this), estimatedFeeAmount);
+        // Approve the Router to pull the estimated fee.
+        IERC20(feeToken).safeIncreaseAllowance(CCIP_ROUTER, estimatedFeeAmount);
+        // Return any excess fee to the fee refund recipient.
+        if (allocatedFeeAmount > estimatedFeeAmount) {
+            IERC20(feeToken).safeTransfer(feeRefundRecipient, allocatedFeeAmount - estimatedFeeAmount);
+        }
         IRouterClient(CCIP_ROUTER).ccipSend(chainSelector, message);
     }
 }

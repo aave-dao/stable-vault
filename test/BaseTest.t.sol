@@ -6,6 +6,7 @@ import {console} from "forge-std/console.sol";
 
 import {AssetRegistry} from "../src/common/AssetRegistry.sol";
 import {IouToken} from "../src/common/IouToken.sol";
+import {IouTokenManager} from "../src/common/IouTokenManager.sol";
 import {AccountingChainGateway} from "./../src/accounting/AccountingChainGateway.sol";
 import {FundsHandler} from "./../src/accounting/FundsHandler.sol";
 import {CcipAdapter} from "./../src/bridging/CcipAdapter.sol";
@@ -40,6 +41,7 @@ contract BaseTest is Test {
     // Vault/4626
     ExtendedBasedBoostedVault vault;
     IouToken iouToken_accountingChain;
+    IouTokenManager iouTokenManager_accountingChain;
     AssetRegistry assetRegistry_accountingChain;
     FundsHandler fundsHandler;
     Allocator allocator_accountingChain;
@@ -51,6 +53,8 @@ contract BaseTest is Test {
 
     // Earning Chain: Earning Chain Gateway, CCIP Adapter, CCIP Router, Swapper, Allocator, Strategy Vault/4626
     AssetRegistry assetRegistry_earningChain;
+    IouToken iouToken_earningChain;
+    IouTokenManager iouTokenManager_earningChain;
     CcipAdapter ccipAdapter_earningChain;
     EarningChainGateway earningChainGateway;
     Allocator allocator_earningChain;
@@ -100,10 +104,17 @@ contract BaseTest is Test {
         assetRegistry_accountingChain.setAssetConfigBitmap(address(GHO), type(uint256).max);
         assetRegistry_accountingChain.setAssetConfigBitmap(address(USDC), type(uint256).max);
         iouToken_accountingChain = new IouToken(address(this));
+        console.log("\tIOU Token (Accounting Chain): %s", address(iouToken_accountingChain));
+        iouTokenManager_accountingChain =
+            new IouTokenManager(address(iouToken_accountingChain), address(accountingChainGateway), true);
+        console.log("\tIOU Token Manager (Accounting Chain): %s", address(iouTokenManager_accountingChain));
+        iouToken_accountingChain.transferOwnership(address(iouTokenManager_accountingChain));
         vault = new ExtendedBasedBoostedVault(
-            admin, initialBasePerSecondRate, address(iouToken_accountingChain), address(assetRegistry_accountingChain)
+            admin,
+            initialBasePerSecondRate,
+            address(iouTokenManager_accountingChain),
+            address(assetRegistry_accountingChain)
         );
-        iouToken_accountingChain.transferOwnership(address(vault));
 
         console.log("\tVault: %s", address(vault));
         allocator_accountingChain = new Allocator(manager, admin, address(assetRegistry_accountingChain));
@@ -117,7 +128,8 @@ contract BaseTest is Test {
             manager, address(vault), accountingChainGatewayAddress, address(allocator_accountingChain)
         );
         console.log("\tFunds Handler: %s", address(fundsHandler));
-        accountingChainGateway = new AccountingChainGateway(admin, address(fundsHandler));
+        accountingChainGateway =
+            new AccountingChainGateway(admin, address(fundsHandler), address(iouTokenManager_accountingChain));
         console.log("\tAccounting Chain Gateway: %s", address(accountingChainGateway));
         swapper_accountingChain = new Swapper(address(allocator_accountingChain));
         console.log("\tSwapper: %s", address(swapper_accountingChain));
@@ -138,8 +150,13 @@ contract BaseTest is Test {
         assetRegistry_earningChain.setAssetConfigBitmap(address(GHO), type(uint256).max);
         assetRegistry_earningChain.setAssetConfigBitmap(address(USDC), type(uint256).max);
         ccipAdapter_earningChain = new CcipAdapter(admin, address(mockCcipRouter));
-        console.log("\tCCIP Adapter: %s", address(ccipAdapter_earningChain));
-        earningChainGateway = new EarningChainGateway(admin, ACCOUNTING_CHAIN_ID);
+        iouToken_earningChain = new IouToken(address(this));
+        console.log("\tIOU Token (Earning Chain): %s", address(iouToken_earningChain));
+        iouTokenManager_earningChain =
+            new IouTokenManager(address(iouToken_earningChain), address(earningChainGateway), false);
+        console.log("\tIOU Token Manager (Earning Chain): %s", address(iouTokenManager_earningChain));
+        iouToken_earningChain.transferOwnership(address(iouTokenManager_earningChain));
+        earningChainGateway = new EarningChainGateway(admin, ACCOUNTING_CHAIN_ID, address(iouTokenManager_earningChain));
         console.log("\tEarning Chain Gateway: %s", address(earningChainGateway));
         allocator_earningChain = new Allocator(manager, admin, address(assetRegistry_earningChain));
         console.log("\tAllocator: %s", address(allocator_earningChain));
@@ -219,8 +236,8 @@ contract BaseTest is Test {
         // ccipAdapter_earningChain.setFeeToken(address(USDC));
         ccipAdapter_accountingChain.setChainSelector(EARNING_CHAIN_ID, EARNING_CHAIN_CCIP_SELECTOR);
         ccipAdapter_earningChain.setChainSelector(ACCOUNTING_CHAIN_ID, ACCOUNTING_CHAIN_CCIP_SELECTOR);
-        ccipAdapter_accountingChain.setChainReceiver(EARNING_CHAIN_ID, address(ccipAdapter_earningChain));
-        ccipAdapter_earningChain.setChainReceiver(ACCOUNTING_CHAIN_ID, address(ccipAdapter_accountingChain));
+        ccipAdapter_accountingChain.setDestinationChainAdapter(EARNING_CHAIN_ID, address(ccipAdapter_earningChain));
+        ccipAdapter_earningChain.setDestinationChainAdapter(ACCOUNTING_CHAIN_ID, address(ccipAdapter_accountingChain));
         vm.stopPrank();
 
         // ------------------------------------------------

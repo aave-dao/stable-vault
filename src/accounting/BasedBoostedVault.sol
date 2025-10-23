@@ -9,6 +9,7 @@ import {IouToken} from "../common/IouToken.sol";
 import {IAssetRegistry} from "../interfaces/IAssetRegistry.sol";
 import {IBasedBoostedVault} from "../interfaces/IBasedBoostedVault.sol";
 import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
+import {IIouTokenManager} from "../interfaces/IIouTokenManager.sol";
 import {IMintableBurnableIERC20} from "../interfaces/IMintableBurnableIERC20.sol";
 import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
@@ -30,7 +31,7 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
 
     uint256 internal constant SECONDS_PER_YEAR = 31_536_000;
 
-    address internal immutable IOU_TOKEN;
+    address internal immutable IOU_TOKEN_MANAGER;
 
     /**
      * @notice A subVault works like a virtual fixed-rate vault.
@@ -88,10 +89,12 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
     /// @dev Constructor.
     /// @param owner The owner of the vault, acting as an admin.
     /// @param defaultSubVaultPerSecondRate The base per-second rate, in Ray units (27 decimals).
-    constructor(address owner, uint256 defaultSubVaultPerSecondRate, address iouToken, address assetRegistry)
+    /// @param iouTokenManager The address of the IOU token manager.
+    /// @param assetRegistry The address of the contract that manages the permissions for handling assets.
+    constructor(address owner, uint256 defaultSubVaultPerSecondRate, address iouTokenManager, address assetRegistry)
         Ownable(owner)
     {
-        IOU_TOKEN = iouToken;
+        IOU_TOKEN_MANAGER = iouTokenManager;
         _assetRegistry = assetRegistry;
         _setDefaultSubVault(_createSubVault(defaultSubVaultPerSecondRate));
     }
@@ -247,7 +250,7 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
         require(
             IAssetRegistry(_assetRegistry).isAllowedToWithdrawFromBBV(assetOut), ErrorsLib.UnsupportedAsset(assetOut)
         );
-        IMintableBurnableIERC20(IOU_TOKEN).burn(user, iouAmountRay);
+        IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(user, iouAmountRay);
         uint256 assetAmount = iouAmountRay.rayToAssetDecimals(assetOut);
         IFundsHandler(_fundsHandler).processWithdrawal(assetOut, assetAmount);
         IERC20(assetOut).safeTransferFrom(_fundsHandler, user, assetAmount);
@@ -456,11 +459,11 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
         // When the Earning chain exchanges IOUs for assets, it will send a message back to Accounting chain
         // Once Accounting chain receives this message the locked IOUs can be burned.
         // Total supply will decrease.
-        return IERC20(IOU_TOKEN).totalSupply();
+        return IERC20(IIouTokenManager(IOU_TOKEN_MANAGER).getAsset()).totalSupply();
     }
 
     function _mintIous(address user, uint256 amount) internal {
-        IMintableBurnableIERC20(IOU_TOKEN).mint(user, amount);
+        IIouTokenManager(IOU_TOKEN_MANAGER).mintTokens(user, amount);
     }
 
     function _isActiveSubVaultById(uint256 subVaultId) internal view returns (bool) {

@@ -5,6 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
+import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
@@ -42,6 +43,22 @@ abstract contract BaseChainGateway is IChainGateway {
         if (data.length > 0) {
             _receiveData(sourceChainId, data);
         }
+    }
+
+    /// @inheritdoc IChainGateway
+    function sendBridgeMessageWithFeePayer(
+        address feeRefundRecipient,
+        address feeToken,
+        uint256 feeAmount,
+        uint256 destinationChainId,
+        bytes memory data
+    ) external {
+        IERC20(feeToken).safeTransferFrom(msg.sender, address(this), feeAmount);
+        IERC20(feeToken).forceApprove(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId], feeAmount);
+        IBridgeAdapter(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId])
+            .publishMessageToChainWithFeePayer(
+                feeRefundRecipient, feeToken, feeAmount, destinationChainId, new IBridgeAdapter.BridgeAsset[](0), data
+            );
     }
 
     function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal virtual;

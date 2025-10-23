@@ -10,7 +10,6 @@ interface IChainGateway {
 
     enum MessageType {
         BALANCE_SNAPSHOT,
-        EMERGENCY_WITHDRAWAL,
         BRIDGE_IOUTOKEN,
         BURN_IOUTOKEN
     }
@@ -23,7 +22,7 @@ interface IChainGateway {
 
     struct BalanceSnapshot {
         // Cumulative balance of all tokens with common denomination in RAY.
-        uint256 balance;
+        uint256 totalAssetsInRay;
         uint256 timestamp;
     }
 
@@ -33,7 +32,9 @@ interface IChainGateway {
     }
 
     struct BurnIouTokenMessage {
-        uint256 amount;
+        uint256 iouTokenAmountBurnedRay;
+        uint256 balanceSnapshotTimestamp;
+        uint256 balanceSnapshotTotalAssetsInRay;
     }
 
     /// @notice Handle receiving of a data and funds from a source chain.
@@ -42,4 +43,18 @@ interface IChainGateway {
     /// @param assets The assets bridged over from a source chain.
     function receiveMessage(uint256 sourceChainId, IBridgeAdapter.BridgeAsset[] memory assets, bytes memory data)
         external;
+
+    /// @notice Sends an arbitrary message containing instructions or data updates to a destination chain.
+    /// @param feeRefundRecipient The address to send the remaining bridge fee to if any. The actual fee is taken from
+    /// the msg.sender. @param feeToken Token to pay the bridge fee in (must be accepted by the Bridge provider).
+    /// @param feeAmount The amount of fee to pay in the fee token (a refund is provided to the fee payer if necessary).
+    /// @param destinationChainId The chain id of the chain to publish the message to.
+    /// @param data The arbitrary data that would be decoded and handled by the destination chain.
+    function sendBridgeMessageWithFeePayer(
+        address feeRefundRecipient,
+        address feeToken,
+        uint256 feeAmount,
+        uint256 destinationChainId,
+        bytes memory data
+    ) external;
 }

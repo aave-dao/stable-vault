@@ -9,6 +9,7 @@ import {IAccountingChainGateway} from "../interfaces/IAccountingChainGateway.sol
 import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
+import {IIouTokenManager} from "../interfaces/IIouTokenManager.sol";
 
 /// @title AccountingChainGateway
 /// @notice Facilitates cross chain messaging one or more Earning Chains.
@@ -20,9 +21,11 @@ contract AccountingChainGateway is IAccountingChainGateway, BaseChainGateway {
         _;
     }
 
+    address internal immutable IOU_TOKEN_MANAGER;
     address internal _fundsHandler;
 
-    constructor(address admin, address fundsHandler) BaseChainGateway(admin) {
+    constructor(address admin, address fundsHandler, address iouTokenManager) BaseChainGateway(admin) {
+        IOU_TOKEN_MANAGER = iouTokenManager;
         _fundsHandler = fundsHandler;
     }
 
@@ -47,33 +50,6 @@ contract AccountingChainGateway is IAccountingChainGateway, BaseChainGateway {
     function sendPullFundsFromChainMessage(uint256 amountRay, uint256 targetChainId) external onlyFundsHandler {
         IBridgeAdapter(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][targetChainId])
             .publishMessageToChain(targetChainId, new IBridgeAdapter.BridgeAsset[](0), abi.encode(amountRay));
-    }
-
-    // TODO: Either move this to BBV/FundsHandler, or rename to BridgeIouTokens()
-    function sendBridgeIouTokenMessage(
-        address user,
-        address recipient,
-        address bridgeFeePayer,
-        address bridgeFeeToken,
-        uint256 targetChainId,
-        uint256 amount
-    ) external {
-        require(user == msg.sender, "IouTokenBridge: not authorized");
-        require(targetChainId == block.chainid, "IouTokenBridge: invalid target chain");
-        // Lock tokens in this contract
-        IERC20(IOU_TOKEN).transferFrom(user, address(this), amount);
-        IBridgeAdapter(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][targetChainId])
-            .publishMessageToChainWithFeePayer(
-                bridgeFeePayer,
-                bridgeFeeToken,
-                targetChainId,
-                abi.encode(
-                    IChainGateway.CrossChainMessage({
-                        messageType: MessageType.BRIDGE_IOUTOKEN,
-                        data: abi.encode(IouTokenBridgeMessage({recipient: recipient, amount: amount}))
-                    })
-                )
-            );
     }
 
     function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal override {
@@ -104,19 +80,25 @@ contract AccountingChainGateway is IAccountingChainGateway, BaseChainGateway {
     function _bridgeIouTokenFromEarningChain(uint256 sourceChainId, bytes memory data) internal {
         IChainGateway.IouTokenBridgeMessage memory iouTokenBridgeMessage =
             abi.decode(data, (IChainGateway.IouTokenBridgeMessage));
-        IERC20(IOU_TOKEN).transfer(iouTokenBridgeMessage.recipient, iouTokenBridgeMessage.amount);
+        IIouTokenManager(IOU_TOKEN_MANAGER).releaseTokens(iouTokenBridgeMessage.recipient, iouTokenBridgeMessage.amount);
     }
 
     function _burnIouToken(uint256 sourceChainId, bytes memory data) internal {
-        IChainGateway.IouTokenBridgeMessage memory iouTokenBridgeMessage =
+        IChainGateway.BurnIouTokenMessage memory burnIouTokenMessage =
             abi.decode(data, (IChainGateway.BurnIouTokenMessage));
-        IERC20(IOU_TOKEN).burn(iouTokenBridgeMessage.amount);
+        IIouTokenManager(IOU_TOKEN_MANAGER).burnLockedTokens(burnIouTokenMessage.iouTokenAmountBurnedRay);
+        IFundsHandler(_fundsHandler)
+            .updateChainBalanceCallback(
+                sourceChainId,
+                burnIouTokenMessage.balanceSnapshotTotalAssetsInRay,
+                burnIouTokenMessage.balanceSnapshotTimestamp
+            );
     }
 
     function _updateChainBalanceSnapshot(uint256 sourceChainId, bytes memory data) internal {
         // TODO: this assumes that the data is a balance snapshot and can be nothing else
         IChainGateway.BalanceSnapshot memory balanceSnapshot = abi.decode(data, (IChainGateway.BalanceSnapshot));
         IFundsHandler(_fundsHandler)
-            .updateChainBalanceCallback(sourceChainId, balanceSnapshot.balance, balanceSnapshot.timestamp);
+            .updateChainBalanceCallback(sourceChainId, balanceSnapshot.totalAssetsInRay, balanceSnapshot.timestamp);
     }
 }
