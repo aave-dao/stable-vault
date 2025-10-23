@@ -72,7 +72,7 @@ contract AccountingChainGateway is IAccountingChainGateway, BaseChainGateway {
             revert IChainGateway.InvalidMessageType();
         }
     }
-    
+
     function _bridgeIouTokenFromEarningChain(
         uint256,
         /* sourceChainId */
