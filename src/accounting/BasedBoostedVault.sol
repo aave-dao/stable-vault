@@ -171,6 +171,8 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
         uint256 totalAssetsRay = _getVaultAggregatedBalance();
         // Total outstanding claims on system Assets
         uint256 iousInCirculationRay = _getIousInCirculation();
+        // There is no overlap between original deposits and circulating IOUs because original deposits are decremented
+        // when new issue IOUs are minted.
         uint256 guaranteedObligationsRay = iousInCirculationRay + _globalOriginalDepositsRay;
         // This can underflow if Earning chain(s) have not sent back the balance update and user positions have been
         // removed (they've claimed IOUs).
