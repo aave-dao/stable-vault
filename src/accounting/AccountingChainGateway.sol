@@ -72,9 +72,7 @@ contract AccountingChainGateway is IAccountingChainGateway, BaseChainGateway {
             revert IChainGateway.InvalidMessageType();
         }
     }
-
-    // TODO: I think we need to verify who is sending the messages on the source chain.
-    // Not only this, but all of the messages we need to restrict.
+    
     function _bridgeIouTokenFromEarningChain(
         uint256,
         /* sourceChainId */
