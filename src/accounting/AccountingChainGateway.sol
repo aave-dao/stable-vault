@@ -96,7 +96,6 @@ contract AccountingChainGateway is IAccountingChainGateway, BaseChainGateway {
     }
 
     function _updateChainBalanceSnapshot(uint256 sourceChainId, bytes memory data) internal {
-        // TODO: this assumes that the data is a balance snapshot and can be nothing else
         IChainGateway.BalanceSnapshot memory balanceSnapshot = abi.decode(data, (IChainGateway.BalanceSnapshot));
         IFundsHandler(_fundsHandler)
             .updateChainBalanceCallback(sourceChainId, balanceSnapshot.totalAssetsInRay, balanceSnapshot.timestamp);

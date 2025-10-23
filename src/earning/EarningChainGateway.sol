@@ -155,7 +155,14 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
 
     function _getBalanceSnapshotData() internal view returns (bytes memory) {
         return abi.encode(
-            IChainGateway.BalanceSnapshot({totalAssetsInRay: _getTotalAssetsInRay(), timestamp: block.timestamp})
+            IChainGateway.CrossChainMessage({
+                messageType: IChainGateway.MessageType.BALANCE_SNAPSHOT,
+                data: abi.encode(
+                    IChainGateway.BalanceSnapshot({
+                        totalAssetsInRay: _getTotalAssetsInRay(), timestamp: block.timestamp
+                    })
+                )
+            })
         );
     }
 }

@@ -126,7 +126,8 @@ contract CcipAdapter is BaseBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
     function ccipReceive(Client.Any2EVMMessage calldata message) external override onlyRouter {
         if (message.data.length > 0) {
             require(
-                address(bytes20(message.sender)) == _destinationChainAdapterOf[_chainIdOf[message.sourceChainSelector]],
+                abi.decode(message.sender, (address))
+                    == _destinationChainAdapterOf[_chainIdOf[message.sourceChainSelector]],
                 ErrorsLib.NotDestinationChainAdapter()
             );
             IChainGateway(_gateway)
