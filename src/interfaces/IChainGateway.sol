@@ -23,7 +23,7 @@ interface IChainGateway {
     struct BalanceSnapshot {
         // Cumulative balance of all tokens with common denomination in RAY.
         uint256 totalAssetsInRay;
-        uint256 timestamp;
+        uint256 nonce;
     }
 
     struct IouTokenBridgeMessage {
@@ -33,7 +33,7 @@ interface IChainGateway {
 
     struct BurnIouTokenMessage {
         uint256 iouTokenAmountBurnedRay;
-        uint256 balanceSnapshotTimestamp;
+        uint256 chainBalanceSnapshotNonce;
         uint256 balanceSnapshotTotalAssetsInRay;
     }
 

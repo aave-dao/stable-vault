@@ -29,6 +29,7 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
     uint256 internal immutable ACCOUNTING_CHAIN_ID;
     address internal _allocator;
     address internal _manager;
+    uint256 internal _balanceSnapshotNonce;
 
     constructor(address admin, uint256 accountingChainId, address iouTokenManager)
         BaseChainGateway(admin, iouTokenManager)
@@ -118,7 +119,7 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
                 data: abi.encode(
                     IChainGateway.BurnIouTokenMessage({
                         iouTokenAmountBurnedRay: iouTokenAmountRay,
-                        balanceSnapshotTimestamp: block.timestamp,
+                        chainBalanceSnapshotNonce: _balanceSnapshotNonce++,
                         balanceSnapshotTotalAssetsInRay: _getTotalAssetsInRay()
                     })
                 )
@@ -180,13 +181,13 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
         return totalAssetsInRay;
     }
 
-    function _getBalanceSnapshotData() internal view returns (bytes memory) {
+    function _getBalanceSnapshotData() internal returns (bytes memory) {
         return abi.encode(
             IChainGateway.CrossChainMessage({
                 messageType: IChainGateway.MessageType.BALANCE_SNAPSHOT,
                 data: abi.encode(
                     IChainGateway.BalanceSnapshot({
-                        totalAssetsInRay: _getTotalAssetsInRay(), timestamp: block.timestamp
+                        totalAssetsInRay: _getTotalAssetsInRay(), nonce: _balanceSnapshotNonce++
                     })
                 )
             })

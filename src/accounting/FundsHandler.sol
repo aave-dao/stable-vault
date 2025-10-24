@@ -19,7 +19,7 @@ contract FundsHandler is IFundsHandler {
         uint256 chainId;
         // Assumes all balances have common denomination.
         uint256 amountRay;
-        uint256 timestamp;
+        uint256 nonce;
     }
 
     ChainBalanceSnapshot[] internal _chainBalances;
@@ -74,16 +74,12 @@ contract FundsHandler is IFundsHandler {
             balances[i] = AssetBalance({
                 chainId: block.chainid,
                 asset: allocatorAssets[i].asset,
-                amountRay: allocatorAssets[i].amount.assetDecimalsToRay(allocatorAssets[i].asset),
-                timestamp: block.timestamp
+                amountRay: allocatorAssets[i].amount.assetDecimalsToRay(allocatorAssets[i].asset)
             });
         }
         for (uint16 i = 0; i < _chainBalances.length; i++) {
             balances[allocatorAssets.length + i] = AssetBalance({
-                chainId: _chainBalances[i].chainId,
-                asset: address(0),
-                amountRay: _chainBalances[i].amountRay,
-                timestamp: _chainBalances[i].timestamp
+                chainId: _chainBalances[i].chainId, asset: address(0), amountRay: _chainBalances[i].amountRay
             });
         }
         return balances;
@@ -115,7 +111,7 @@ contract FundsHandler is IFundsHandler {
         _pullFundsFromImmediateLiquidity(asset, amount);
         IERC20(asset).forceApprove(_gateway, amount);
         // Increment the chain balance snapshot for the target chain.
-        _updateChainBalance(chainId, amount.assetDecimalsToRay(asset), block.timestamp);
+        _updateChainBalancePreBridge(chainId, amount.assetDecimalsToRay(asset));
         IAccountingChainGateway(_gateway).sendPushFundsToChainMessage(asset, amount, chainId);
     }
 
@@ -128,11 +124,11 @@ contract FundsHandler is IFundsHandler {
     // Gateway Functions
 
     /// @inheritdoc IFundsHandler
-    function updateChainBalanceCallback(uint256 chainId, uint256 snapshotBalanceRay, uint256 snapshotTimestamp)
+    function updateChainBalanceCallback(uint256 chainId, uint256 snapshotBalanceRay, uint256 chainBalanceSnapshotNonce)
         external
         onlyGateway
     {
-        _updateChainBalance(chainId, snapshotBalanceRay, snapshotTimestamp);
+        _updateChainBalance(chainId, snapshotBalanceRay, chainBalanceSnapshotNonce);
     }
 
     /// @inheritdoc IFundsHandler
@@ -143,21 +139,40 @@ contract FundsHandler is IFundsHandler {
 
     // ////
 
-    function _updateChainBalance(uint256 chainId, uint256 snapshotBalanceRay, uint256 snapshotTimestamp) internal {
+    function _updateChainBalance(uint256 chainId, uint256 snapshotBalanceRay, uint256 chainBalanceSnapshotNonce)
+        internal
+    {
         bool chainExists;
         for (uint16 i = 0; i < _chainBalances.length; i++) {
             if (_chainBalances[i].chainId == chainId) {
                 chainExists = true;
-                if (_chainBalances[i].timestamp < snapshotTimestamp) {
-                    _chainBalances[i].timestamp = snapshotTimestamp;
+                if (_chainBalances[i].nonce < chainBalanceSnapshotNonce) {
+                    _chainBalances[i].nonce = chainBalanceSnapshotNonce;
                     _chainBalances[i].amountRay = snapshotBalanceRay;
                 }
             }
         }
         if (!chainExists) {
             _chainBalances.push(
-                ChainBalanceSnapshot({chainId: chainId, amountRay: snapshotBalanceRay, timestamp: snapshotTimestamp})
+                ChainBalanceSnapshot({
+                    chainId: chainId, amountRay: snapshotBalanceRay, nonce: chainBalanceSnapshotNonce
+                })
             );
+        }
+    }
+
+    /// @dev This does not update the chain balance snapshot nonce because any potential incoming snapshot data would be
+    /// ignored.
+    function _updateChainBalancePreBridge(uint256 chainId, uint256 amountToIncrementRay) internal {
+        bool chainExists;
+        for (uint16 i = 0; i < _chainBalances.length; i++) {
+            if (_chainBalances[i].chainId == chainId) {
+                chainExists = true;
+                _chainBalances[i].amountRay += amountToIncrementRay;
+            }
+        }
+        if (!chainExists) {
+            _chainBalances.push(ChainBalanceSnapshot({chainId: chainId, amountRay: amountToIncrementRay, nonce: 0}));
         }
     }
 
