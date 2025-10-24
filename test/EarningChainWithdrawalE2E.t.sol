@@ -128,7 +128,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         _mintAndDepositUsdcToBBV(user2, userInitialDeposit);
         // Set the rate to be 99%
         vm.prank(manager);
-        vault.changeSubVaultRate(2, 1_000000021820606489223699321);
+        vault.setSubVaultRate(2, 1_000000021820606489223699321);
         // Mimic time passing so that user2's balances increase.
         vm.warp(block.timestamp + 365 days);
         console.log("User2 balance after 1 years", vault.getUserBalance(user2));
