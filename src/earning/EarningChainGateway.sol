@@ -75,11 +75,29 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
         }
     }
 
-    // TODO: We should open this function to public (in case manager goes awol)
+    /// @inheritdoc IEarningChainGateway
     function sendBalanceUpdate() external onlyManager {
         _sendBalanceUpdate();
     }
 
+    /// @inheritdoc IEarningChainGateway
+    function sendBalanceUpdateWithFeePayer(address bridgeFeePayer, address bridgeFeeToken, uint256 bridgeFeeAmount)
+        external
+        payable
+    {
+        IBridgeAdapter(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID]).publishMessageToChainWithFeePayer{
+            value: msg.value
+        }(
+            bridgeFeePayer,
+            bridgeFeeToken,
+            bridgeFeeAmount,
+            ACCOUNTING_CHAIN_ID,
+            new IBridgeAdapter.BridgeAsset[](0),
+            _getBalanceSnapshotData()
+        );
+    }
+
+    /// @inheritdoc IEarningChainGateway
     function exchangeIouTokens(
         uint256 iouTokenAmountRay,
         address tokenOut,
@@ -87,13 +105,35 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
         address bridgeFeePayer,
         address bridgeFeeToken,
         uint256 bridgeFeeAmount
-    ) external returns (uint256) {
+    ) external payable returns (uint256) {
         // TODO: apply a withdrawal fee here?
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(msg.sender, iouTokenAmountRay);
         uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(tokenOut);
         IAllocator(_allocator).withdraw(tokenOut, amountOut);
         IERC20(tokenOut).safeTransfer(tokenOutReceiver, amountOut);
-        _sendIouBurnMessage(bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount, iouTokenAmountRay);
+        bytes memory data = abi.encode(
+            IChainGateway.CrossChainMessage({
+                messageType: IChainGateway.MessageType.BURN_IOUTOKEN,
+                data: abi.encode(
+                    IChainGateway.BurnIouTokenMessage({
+                        iouTokenAmountBurnedRay: iouTokenAmountRay,
+                        balanceSnapshotTimestamp: block.timestamp,
+                        balanceSnapshotTotalAssetsInRay: _getTotalAssetsInRay()
+                    })
+                )
+            })
+        );
+        IBridgeAdapter(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID]).publishMessageToChainWithFeePayer{
+            value: msg.value
+        }(
+            bridgeFeePayer,
+            bridgeFeeToken,
+            bridgeFeeAmount,
+            ACCOUNTING_CHAIN_ID,
+            new IBridgeAdapter.BridgeAsset[](0),
+            data
+        );
+        // TODO: emit event?
         return amountOut;
     }
 
@@ -127,35 +167,6 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
     function _sendBalanceUpdate() internal {
         IBridgeAdapter(_bridgeAdapter[address(0)][ACCOUNTING_CHAIN_ID])
             .publishMessageToChain(ACCOUNTING_CHAIN_ID, new IBridgeAdapter.BridgeAsset[](0), _getBalanceSnapshotData());
-    }
-
-    function _sendIouBurnMessage(
-        address bridgeFeePayer,
-        address bridgeFeeToken,
-        uint256 bridgeFeeAmount,
-        uint256 amountBurnedIouRay
-    ) internal {
-        IBridgeAdapter(_bridgeAdapter[address(0)][ACCOUNTING_CHAIN_ID])
-            .publishMessageToChainWithFeePayer(
-                bridgeFeePayer,
-                bridgeFeeToken,
-                bridgeFeeAmount,
-                ACCOUNTING_CHAIN_ID,
-                new IBridgeAdapter.BridgeAsset[](0),
-                abi.encode(
-                    IChainGateway.CrossChainMessage({
-                        messageType: IChainGateway.MessageType.BURN_IOUTOKEN,
-                        data: abi.encode(
-                            IChainGateway.BurnIouTokenMessage({
-                                iouTokenAmountBurnedRay: amountBurnedIouRay,
-                                balanceSnapshotTimestamp: block.timestamp,
-                                balanceSnapshotTotalAssetsInRay: _getTotalAssetsInRay()
-                            })
-                        )
-                    })
-                )
-            );
-        // TODO: emit event?
     }
 
     function _getTotalAssetsInRay() internal view returns (uint256) {

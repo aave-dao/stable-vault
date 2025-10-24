@@ -7,6 +7,4 @@ interface IAccountingChainGateway is IChainGateway {
     error NotFundsHandler();
 
     function sendPushFundsToChainMessage(address asset, uint256 amount, uint256 targetChainId) external;
-
-    function sendPullFundsFromChainMessage(uint256 amount, uint256 targetChainId) external;
 }
