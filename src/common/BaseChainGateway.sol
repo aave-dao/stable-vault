@@ -96,6 +96,8 @@ abstract contract BaseChainGateway is IChainGateway {
     }
 
     function setBridgeAdapter(address asset, uint256 chainId, address adapter) external onlyAdmin {
+        require(chainId != 0, ErrorsLib.ZeroChainId());
+        require(adapter != address(0), ErrorsLib.ZeroAddress());
         _bridgeAdapter[asset][chainId] = adapter;
     }
 

@@ -15,6 +15,8 @@ import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {EventLib} from "../libraries/EventLib.sol";
 
+import {console} from "forge-std/console.sol";
+
 /// @title EarningChainGateway
 /// @notice Facilitates cross chain messaging with exactly one Accounting Chain.
 contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
@@ -72,7 +74,7 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
     }
 
     /// @inheritdoc IEarningChainGateway
-    function sendBalanceUpdate() external onlyManager {
+    function sendBalanceUpdate() external override onlyManager {
         _sendBalanceUpdate();
     }
 
@@ -80,6 +82,7 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
     function sendBalanceUpdateWithFeePayer(address bridgeFeePayer, address bridgeFeeToken, uint256 bridgeFeeAmount)
         external
         payable
+        override
     {
         IBridgeAdapter(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID])
         .publishMessageToChainWithFeePayer{
@@ -186,7 +189,7 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
     }
 
     function _sendBalanceUpdate() internal {
-        IBridgeAdapter(_bridgeAdapter[address(0)][ACCOUNTING_CHAIN_ID])
+        IBridgeAdapter(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID])
             .publishMessageToChain(ACCOUNTING_CHAIN_ID, new IBridgeAdapter.BridgeAsset[](0), _getBalanceSnapshotData());
     }
 

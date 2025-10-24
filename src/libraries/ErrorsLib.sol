@@ -5,6 +5,9 @@ library ErrorsLib {
     /// @notice Address checked is the zero address.
     error ZeroAddress();
 
+    /// @notice Chain id checked is zero.
+    error ZeroChainId();
+
     /// @notice Token amount checked is zero.
     error ZeroAmount();
 

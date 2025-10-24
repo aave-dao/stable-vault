@@ -146,7 +146,9 @@ contract FundsHandler is IFundsHandler {
         for (uint16 i = 0; i < _chainBalances.length; i++) {
             if (_chainBalances[i].chainId == chainId) {
                 chainExists = true;
-                if (_chainBalances[i].nonce < chainBalanceSnapshotNonce) {
+                // Nonces should always be strictly increasing.
+                // Use <= for initial snapshot update safety.
+                if (_chainBalances[i].nonce <= chainBalanceSnapshotNonce) {
                     _chainBalances[i].nonce = chainBalanceSnapshotNonce;
                     _chainBalances[i].amountRay = snapshotBalanceRay;
                 }
