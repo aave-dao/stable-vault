@@ -85,7 +85,8 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
         external
         payable
     {
-        IBridgeAdapter(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID]).publishMessageToChainWithFeePayer{
+        IBridgeAdapter(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID])
+        .publishMessageToChainWithFeePayer{
             value: msg.value
         }(
             bridgeFeePayer,
@@ -123,7 +124,8 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
                 )
             })
         );
-        IBridgeAdapter(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID]).publishMessageToChainWithFeePayer{
+        IBridgeAdapter(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID])
+        .publishMessageToChainWithFeePayer{
             value: msg.value
         }(
             bridgeFeePayer,
