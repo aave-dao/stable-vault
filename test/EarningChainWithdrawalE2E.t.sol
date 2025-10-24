@@ -96,7 +96,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             "User should have minted IOU tokens"
         );
 
-        // 6. Bridge user1 IOUs back to Accounting chain and check supplies are expected
+        // 6. Bridge user1 IOUs to Earning chain and check supplies are expected
         // The user will use native asset to pay for bridge fees
         // User must approve the IOU token manager to spend the IOU tokens
         vm.prank(user1);
@@ -107,7 +107,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             EARNING_CHAIN_ID, user1, iouAmountRequestedRay, user1, address(0), 0
         );
         // Check the IOU token balance on Accounting Chain went down
-        assertEq(iouToken_accountingChain.balanceOf(user1), 0, "User should have burned IOU tokens");
+        assertEq(iouToken_accountingChain.balanceOf(user1), 0, "User should have bridged IOU tokens");
         // Check that supply on Accounting Chain stayed the same
         assertEq(
             iouToken_accountingChain.totalSupply(),
@@ -115,7 +115,9 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             "Supply on Accounting Chain should stay the same"
         );
         // Check the IOU token balance on Earning Chain went up
-        assertEq(iouToken_earningChain.balanceOf(user1), iouAmountRequestedRay, "User should have minted IOU tokens");
+        assertEq(
+            iouToken_earningChain.balanceOf(user1), iouAmountRequestedRay, "Should have minted IOU tokens for user1"
+        );
         // Check that supply on Earning Chain went up
         assertEq(iouToken_earningChain.totalSupply(), iouAmountRequestedRay, "Supply on Earning Chain should go up");
 
@@ -149,7 +151,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         // User2 should be able to withdraw their original deposit
         vm.prank(user2);
         vault.requestWithdrawal(user2, iouAmountRequestedRay);
-        // Check the IOU token balance on Accounting Chain went down
+        // Check the IOU token balance on Accounting Chain went up
         assertEq(
             iouToken_accountingChain.balanceOf(user2),
             userInitialDeposit.assetDecimalsToRay(address(USDC)),
@@ -166,11 +168,13 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         // 8. Check that a user bridging IOUs to/from Earning chain updates the supply on both chains properly.
         uint256 iousOnAccountBeforeUser2BridgeToEarningChain = iouToken_accountingChain.totalSupply();
         console.log(
-            "IOUS ON ACCOUNT BEFORE USER2 BRIDGE TO EARNING CHAIN", iousOnAccountBeforeUser2BridgeToEarningChain
+            "IOUS ON ACCOUNTING CHAIN (BEFORE USER2 BRIDGE TO EARNING CHAIN) =",
+            iousOnAccountBeforeUser2BridgeToEarningChain
         );
         uint256 iousOnEarningBeforeUser2BridgeToAccountingChain = iouToken_earningChain.totalSupply();
         console.log(
-            "IOUS ON EARNING BEFORE USER2 BRIDGE TO ACCOUNTING CHAIN", iousOnEarningBeforeUser2BridgeToAccountingChain
+            "IOUS ON EARNING CHAIN (BEFORE USER2 BRIDGE TO ACCOUNTING CHAIN) =",
+            iousOnEarningBeforeUser2BridgeToAccountingChain
         );
         vm.deal(user2, 1000);
         vm.prank(user2);
@@ -203,7 +207,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         );
         require(
             iouToken_earningChain.totalSupply() == iousOnEarningBeforeUser2BridgeToAccountingChain,
-            "Supply on Earning Chain should NOT have decreased by the amount of IOUs bridged"
+            "Supply on Earning Chain should decrease by the amount of IOUs bridged"
         );
 
         // 9. User1 echanges IOUs for assets on Earning chain and checks their balance is expected
