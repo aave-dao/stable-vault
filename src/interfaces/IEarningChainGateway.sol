@@ -7,6 +7,15 @@ interface IEarningChainGateway is IChainGateway {
     /// @notice Sends a balance update to the Accounting Chain.
     function sendBalanceUpdate() external;
 
+    /// @notice Sends a balance update to the Accounting Chain with bridging fees taken by specified payer.
+    /// @param bridgeFeePayer The address that will pay the bridge fee (this receives a refund if funds from
+    /// bridgeFeeAmount are not used).
+    /// @param bridgeFeeToken The token to pay the bridge fee in.
+    /// @param bridgeFeeAmount The estimated amount of fee to pay in the fee token.
+    function sendBalanceUpdateWithFeePayer(address bridgeFeePayer, address bridgeFeeToken, uint256 bridgeFeeAmount)
+        external
+        payable;
+
     /// @notice Withdraws a specific asset from the Allocator and bridges it to the Accounting Chain.
     /// @param asset The asset to withdraw.
     /// @param amount The `amount` must be in RAY to be token agnostic.
@@ -28,5 +37,5 @@ interface IEarningChainGateway is IChainGateway {
         address bridgeFeePayer,
         address bridgeFeeToken,
         uint256 bridgeFeeAmount
-    ) external returns (uint256);
+    ) external payable returns (uint256);
 }
