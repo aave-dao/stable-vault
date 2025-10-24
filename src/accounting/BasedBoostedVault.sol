@@ -138,13 +138,13 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
     }
 
     /// @inheritdoc IBasedBoostedVault
-    function changeSubVaultRate(uint256 subVaultId, uint256 newPerSecondRate) external onlyManager {
+    function setSubVaultRate(uint256 subVaultId, uint256 newPerSecondRate) external onlyManager {
         require(newPerSecondRate >= MathLib.RAY, InvalidRate());
         require(!_existsSubVaultWithRate(newPerSecondRate), VaultAlreadyExists());
         _accrueSubVaultConversionRate(subVaultId);
         _subVaultById[subVaultId].perSecondRate = newPerSecondRate;
         _subVaultIdByRate[newPerSecondRate] = subVaultId;
-        emit SubVaultRateUpdated(subVaultId, newPerSecondRate);
+        emit SubVaultRateSet(subVaultId, newPerSecondRate);
     }
 
     /// @inheritdoc IBasedBoostedVault
@@ -490,6 +490,6 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
 
         _migrateUserToSubVault(user, oldSubVaultId, newSubVaultId);
 
-        emit UserRateUpdated(user, newSubVaultId, newPerSecondRate);
+        emit UserRateSet(user, newSubVaultId, newPerSecondRate);
     }
 }

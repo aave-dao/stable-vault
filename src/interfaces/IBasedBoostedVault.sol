@@ -24,8 +24,8 @@ interface IBasedBoostedVault {
     );
     event WithdrawalExecuted(address indexed user, address asset, uint256 amount);
     event Deposit(address indexed user, address indexed asset, uint256 amount);
-    event UserRateUpdated(address indexed user, uint256 indexed subVaultId, uint256 newRate);
-    event SubVaultRateUpdated(uint256 indexed subVaultId, uint256 newRate);
+    event UserRateSet(address indexed user, uint256 indexed subVaultId, uint256 newPerSecondRate);
+    event SubVaultRateSet(uint256 indexed subVaultId, uint256 newPerSecondRate);
     event SubVaultCreated(uint256 indexed subVaultId, uint256 perSecondRate);
     event DefaultSubVaultSet(uint256 indexed subVaultId, uint256 perSecondRate);
     event ManagerSet(address manager);
@@ -42,7 +42,7 @@ interface IBasedBoostedVault {
 
     function setDefaultSubVault(uint256 perSecondRate) external;
 
-    function changeSubVaultRate(uint256 subVaultId, uint256 newPerSecondRate) external;
+    function setSubVaultRate(uint256 subVaultId, uint256 newPerSecondRate) external;
 
     function claimFees(address[] calldata assets, uint256[] calldata amounts) external;
 
