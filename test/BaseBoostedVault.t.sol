@@ -165,6 +165,37 @@ contract BasedBoostedVaultTest is Test {
         bbv.deposit(user, address(mockAsset), 0);
     }
 
+    function test_deposit_reverts_ifAssetIsNotAllowedToDepositIntoBBV(address msgSender, address user, uint256 amount)
+        public
+    {
+        vm.assume(msgSender != address(0));
+        vm.assume(user != address(0));
+        vm.assume(msgSender != user);
+
+        amount = _boundAssetAmount(address(mockAsset), amount);
+        mockAsset.mint(user, amount);
+
+        vm.prank(user);
+        mockAsset.forceApprove(address(bbv), amount);
+
+        mockAssetRegistry.mockToDisallowAssetDepositsIntoBBV(address(mockAsset));
+
+        vm.prank(user);
+        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(mockAsset)));
+        bbv.deposit(user, address(mockAsset), amount);
+    }
+
+    function test_deposit_reverts_ifMsgSenderIsNotTheUserDepositing(address user, uint256 amount) public {
+        vm.assume(user != address(0));
+        amount = _boundAssetAmount(address(mockAsset), amount);
+
+        mockAsset.mint(user, amount);
+
+        vm.prank(user);
+        vm.expectRevert((IBasedBoostedVault.InvalidMsgSender.selector));
+        bbv.deposit(makeAddr("otherUser"), address(mockAsset), amount);
+    }
+
     function test_deposit_callsFundsHandlerToProcessDepositWithExpectedParams(address user, uint256 amount) public {
         vm.assume(user != address(0));
         amount = _boundAssetAmount(address(mockAsset), amount);
@@ -259,6 +290,108 @@ contract BasedBoostedVaultTest is Test {
         user2SubVault = bbv.getUserSubVault(user2);
         assertEq(user2SubVault.id, user1SubVault.id);
         assertEq(user2SubVault.perSecondRate, newRate);
+    }
+
+    function test_setDefaultSubVault_setsExistingVaultIfAlreadyExistsWithGivenRate(
+        address user,
+        uint256 amount,
+        uint256 newPerSecondRate
+    ) public {
+        newPerSecondRate = _boundRate(newPerSecondRate);
+        vm.assume(bbv.getDefaultSubVault().perSecondRate != newPerSecondRate);
+
+        vm.assume(user != address(0));
+        amount = _boundAssetAmount(address(mockAsset), amount);
+        mockAsset.mint(user, amount);
+        vm.prank(user);
+        mockAsset.forceApprove(address(bbv), amount);
+        vm.prank(user);
+        bbv.deposit(user, address(mockAsset), amount);
+
+        vm.prank(manager);
+        _setUserRate(user, newPerSecondRate);
+        uint256 expectedSubVaultId = bbv.getSubVaultIdByRate(newPerSecondRate);
+
+        vm.prank(manager);
+        bbv.setDefaultSubVault(newPerSecondRate);
+
+        assertEq(bbv.getDefaultSubVault().perSecondRate, newPerSecondRate);
+        assertEq(bbv.getSubVaultIdByRate(newPerSecondRate), expectedSubVaultId);
+        assertEq(bbv.getSubVaultRateById(expectedSubVaultId), newPerSecondRate);
+    }
+
+    function test_setDefaultSubVault_settingToSameRateAsCurrentDefaultSubVaultIsAllowedAndDoesNothing(uint256 newPerSecondRate)
+        public
+    {
+        newPerSecondRate = _boundRate(newPerSecondRate);
+
+        vm.prank(manager);
+        bbv.setDefaultSubVault(newPerSecondRate);
+
+        assertEq(bbv.getDefaultSubVault().perSecondRate, newPerSecondRate);
+        assertEq(bbv.getSubVaultIdByRate(newPerSecondRate), bbv.getDefaultSubVault().id);
+        assertEq(bbv.getSubVaultRateById(bbv.getDefaultSubVault().id), newPerSecondRate);
+
+        uint256 sameDefaultSubVaultId = bbv.getDefaultSubVault().id;
+
+        vm.prank(manager);
+        bbv.setDefaultSubVault(newPerSecondRate);
+
+        assertEq(bbv.getDefaultSubVault().perSecondRate, newPerSecondRate);
+        assertEq(bbv.getSubVaultIdByRate(newPerSecondRate), sameDefaultSubVaultId);
+        assertEq(bbv.getSubVaultRateById(sameDefaultSubVaultId), newPerSecondRate);
+    }
+
+    function test_setDefaultSubVault_createsANewSubVaultIfNoSubVaultHasTheGivenRate(
+        uint256 newPerSecondRate,
+        uint256 anotherNewPerSecondRate
+    ) public {
+        vm.assume(newPerSecondRate != anotherNewPerSecondRate);
+        newPerSecondRate = _boundRate(newPerSecondRate);
+        anotherNewPerSecondRate = _boundRate(anotherNewPerSecondRate);
+        vm.assume(bbv.getSubVaultIdByRate(newPerSecondRate) == 0);
+        vm.assume(bbv.getSubVaultIdByRate(anotherNewPerSecondRate) == 0);
+
+        vm.prank(manager);
+        bbv.setDefaultSubVault(newPerSecondRate);
+
+        uint256 lastId = bbv.getDefaultSubVault().id;
+
+        assertEq(bbv.getDefaultSubVault().perSecondRate, newPerSecondRate);
+        assertEq(bbv.getSubVaultIdByRate(newPerSecondRate), lastId);
+        assertEq(bbv.getSubVaultRateById(lastId), newPerSecondRate);
+
+        uint256 expectedId = lastId + 1;
+
+        assertEq(bbv.getSubVaultIdByRate(anotherNewPerSecondRate), 0);
+        assertEq(bbv.getSubVaultRateById(expectedId), 0);
+
+        vm.prank(manager);
+        bbv.setDefaultSubVault(anotherNewPerSecondRate);
+
+        assertEq(bbv.getDefaultSubVault().perSecondRate, anotherNewPerSecondRate);
+        assertEq(bbv.getSubVaultIdByRate(anotherNewPerSecondRate), expectedId);
+        assertEq(bbv.getSubVaultRateById(expectedId), anotherNewPerSecondRate);
+    }
+
+    function test_setDefaultSubVault_reverts_ifMsgSenderIsNotTheManager(address msgSender, uint256 newPerSecondRate)
+        public
+    {
+        vm.assume(msgSender != address(0));
+        vm.assume(msgSender != manager);
+        newPerSecondRate = _boundRate(newPerSecondRate);
+
+        vm.prank(msgSender);
+        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.NotManager.selector));
+        bbv.setDefaultSubVault(newPerSecondRate);
+    }
+
+    function test_setDefaultSubVault_reverts_ifNewRateIsInvalid(uint256 invalidPerSecondRate) public {
+        vm.assume(invalidPerSecondRate < MathLib.RAY);
+
+        vm.prank(manager);
+        vm.expectRevert(abi.encodeWithSelector(IBasedBoostedVault.InvalidRate.selector));
+        bbv.setDefaultSubVault(invalidPerSecondRate);
     }
 
     // ////////////////////// HELPERS ////////////////////////
