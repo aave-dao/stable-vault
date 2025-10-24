@@ -37,7 +37,25 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
         ACCOUNTING_CHAIN_ID = accountingChainId;
     }
 
-    function getAggregatedBalance() external view returns (uint256) {
+    function getAdmin() external view returns (address) {
+        return _admin;
+    }
+
+    function getManager() external view returns (address) {
+        return _manager;
+    }
+
+    function getIouTokenManager() external view returns (address) {
+        return IOU_TOKEN_MANAGER;
+    }
+
+    /// @inheritdoc IEarningChainGateway
+    function getAccountingChainId() external view override returns (uint256) {
+        return ACCOUNTING_CHAIN_ID;
+    }
+
+    /// @inheritdoc IEarningChainGateway
+    function getAggregatedBalance() external view override returns (uint256) {
         return _getTotalAssetsInRay();
     }
 
@@ -51,29 +69,6 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
         require(allocator != address(0), ErrorsLib.ZeroAddress());
         _allocator = allocator;
         emit EventLib.AllocatorSet(allocator);
-    }
-
-    function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal override {
-        for (uint256 i = 0; i < assets.length; i++) {
-            address asset = assets[i].asset;
-            uint256 amount = assets[i].amount;
-            IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
-            IERC20(asset).forceApprove(_allocator, amount);
-            IAllocator(_allocator).deposit(asset, amount);
-        }
-        // TODO: should this callback be gated behind a flag sent from the Accounting Chain? or should we check gas
-        // left?
-        _sendBalanceUpdate();
-    }
-
-    function _receiveData(uint256 sourceChainId, bytes memory data) internal override {
-        _onlyAdapter(ASSET_FOR_DATA_ONLY_BRIDGE, sourceChainId);
-        IChainGateway.CrossChainMessage memory crossChainMessage = abi.decode(data, (IChainGateway.CrossChainMessage));
-        if (crossChainMessage.messageType == IChainGateway.MessageType.BRIDGE_IOUTOKEN) {
-            _bridgeIouTokenFromAccountingChain(sourceChainId, crossChainMessage.data);
-        } else {
-            revert IChainGateway.InvalidMessageType();
-        }
     }
 
     /// @inheritdoc IEarningChainGateway
@@ -140,10 +135,33 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
         return amountOut;
     }
 
-    // TODO: This needs to have a better name?
+    /// @inheritdoc IEarningChainGateway
     function exit(address asset, uint256 amount) external onlyManager {
         IAllocator(_allocator).withdraw(asset, amount);
         _returnFunds(asset, amount);
+    }
+
+    function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal override {
+        for (uint256 i = 0; i < assets.length; i++) {
+            address asset = assets[i].asset;
+            uint256 amount = assets[i].amount;
+            IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
+            IERC20(asset).forceApprove(_allocator, amount);
+            IAllocator(_allocator).deposit(asset, amount);
+        }
+        // TODO: should this callback be gated behind a flag sent from the Accounting Chain? or should we check gas
+        // left?
+        _sendBalanceUpdate();
+    }
+
+    function _receiveData(uint256 sourceChainId, bytes memory data) internal override {
+        _onlyAdapter(ASSET_FOR_DATA_ONLY_BRIDGE, sourceChainId);
+        IChainGateway.CrossChainMessage memory crossChainMessage = abi.decode(data, (IChainGateway.CrossChainMessage));
+        if (crossChainMessage.messageType == IChainGateway.MessageType.BRIDGE_IOUTOKEN) {
+            _bridgeIouTokenFromAccountingChain(sourceChainId, crossChainMessage.data);
+        } else {
+            revert IChainGateway.InvalidMessageType();
+        }
     }
 
     function _bridgeIouTokenFromAccountingChain(

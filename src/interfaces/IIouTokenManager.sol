@@ -7,6 +7,9 @@ interface IIouTokenManager {
     /// @return address of the IOU token.
     function getAsset() external view returns (address);
 
+    /// @return the locked balance of the IOU token.
+    function getLockedBalance() external view returns (uint256);
+
     /// @notice Entry point for IOU token owners to bridge tokens to a destination chain.
     /// @dev Pulls tokens from caller and holds them in the contract until unlock is called.
     /// @param destinationChainId The chain id of the chain to publish the message to.

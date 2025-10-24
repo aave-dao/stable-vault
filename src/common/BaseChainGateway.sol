@@ -31,6 +31,8 @@ abstract contract BaseChainGateway is IChainGateway {
     mapping(address asset => mapping(uint256 chainId => address adapter)) internal _bridgeAdapter;
 
     constructor(address admin, address iouTokenManager) {
+        require(admin != address(0), ErrorsLib.ZeroAddress());
+        require(iouTokenManager != address(0), ErrorsLib.ZeroAddress());
         IOU_TOKEN_MANAGER = iouTokenManager;
         _admin = admin;
     }
