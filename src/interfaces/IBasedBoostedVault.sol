@@ -24,10 +24,10 @@ interface IBasedBoostedVault {
     );
     event WithdrawalExecuted(address indexed user, address asset, uint256 amount);
     event Deposit(address indexed user, address indexed asset, uint256 amount);
-    event UserRateUpdated(address indexed user, uint256 newRate);
+    event UserRateUpdated(address indexed user, uint256 indexed subVaultId, uint256 newRate);
     event SubVaultRateUpdated(uint256 indexed subVaultId, uint256 newRate);
     event SubVaultCreated(uint256 indexed subVaultId, uint256 perSecondRate);
-    event DefaultSubVaultSet(uint256 indexed subVaultId);
+    event DefaultSubVaultSet(uint256 indexed subVaultId, uint256 perSecondRate);
     event ManagerSet(address manager);
     event FeesClaimed(address[] assets, uint256[] amounts);
 

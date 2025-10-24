@@ -94,7 +94,7 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
     {
         IOU_TOKEN_MANAGER = iouTokenManager;
         _assetRegistry = assetRegistry;
-        _setDefaultSubVault(_createSubVault(defaultSubVaultPerSecondRate));
+        _setDefaultSubVault(_createSubVault(defaultSubVaultPerSecondRate), defaultSubVaultPerSecondRate);
     }
 
     /// @inheritdoc IBasedBoostedVault
@@ -266,7 +266,7 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
 
     /// @inheritdoc IBasedBoostedVault
     function setDefaultSubVault(uint256 perSecondRate) external override onlyManager {
-        _setDefaultSubVault(_getOrCreateSubVaultWithRate(perSecondRate));
+        _setDefaultSubVault(_getOrCreateSubVaultWithRate(perSecondRate), perSecondRate);
     }
 
     /// @inheritdoc IBasedBoostedVault
@@ -370,9 +370,9 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
         }
     }
 
-    function _setDefaultSubVault(uint256 subVaultId) internal {
+    function _setDefaultSubVault(uint256 subVaultId, uint256 perSecondRate) internal {
         _defaultSubVaultId = subVaultId;
-        emit DefaultSubVaultSet(subVaultId);
+        emit DefaultSubVaultSet(subVaultId, perSecondRate);
     }
 
     function _createSubVault(uint256 newPerSecondRate) internal returns (uint256) {
@@ -490,6 +490,6 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
 
         _migrateUserToSubVault(user, oldSubVaultId, newSubVaultId);
 
-        emit UserRateUpdated(user, newPerSecondRate);
+        emit UserRateUpdated(user, newSubVaultId, newPerSecondRate);
     }
 }
