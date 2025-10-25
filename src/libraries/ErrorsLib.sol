@@ -44,6 +44,9 @@ library ErrorsLib {
     /// @notice Insufficient amount due to slippage tolerance being exceeded.
     error InsufficientAmountOut();
 
+    /// @notice Insufficient funds.
+    error InsufficientFunds();
+
     /// @notice Not enough liquidity to cover the withdrawal.
     error InsufficientLiquidity();
 

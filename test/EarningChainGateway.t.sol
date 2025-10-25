@@ -3,11 +3,12 @@ pragma solidity ^0.8.22;
 
 import {Test} from "forge-std/Test.sol";
 
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 import {EarningChainGateway} from "../src/earning/EarningChainGateway.sol";
 import {IAllocator} from "../src/interfaces/IAllocator.sol";
 import {IBridgeAdapter} from "../src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../src/interfaces/IChainGateway.sol";
-import {IEarningChainGateway} from "../src/interfaces/IEarningChainGateway.sol";
 import {AssetLib} from "../src/libraries/AssetLib.sol";
 import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
 import {MathLib} from "../src/libraries/MathLib.sol";
@@ -171,9 +172,7 @@ contract EarningChainGatewayTest is Test {
         vm.assume(amountUsdt < 100_000_000_000_000 * 10 ** 6);
         vm.assume(amountGho < 100_000_000_000_000 * 10 ** 18);
 
-        IAllocator.AllocatorBalance[] memory allocatorBalances = new IAllocator.AllocatorBalance[](2);
-        allocatorBalances[0] = IAllocator.AllocatorBalance({asset: address(_mockUsdt), amount: amountUsdt});
-        allocatorBalances[1] = IAllocator.AllocatorBalance({asset: address(_mockGho), amount: amountGho});
+        IAllocator.AllocatorBalance[] memory allocatorBalances = _buildAllocatorBalances(amountUsdt, amountGho);
 
         uint256 expectedTotalAssetsInRay =
             amountUsdt.assetDecimalsToRay(address(_mockUsdt)) + amountGho.assetDecimalsToRay(address(_mockGho));
@@ -239,9 +238,7 @@ contract EarningChainGatewayTest is Test {
         // ERC20 token fee payments only
         vm.assume(bridgeFeeToken != address(0));
 
-        IAllocator.AllocatorBalance[] memory allocatorBalances = new IAllocator.AllocatorBalance[](2);
-        allocatorBalances[0] = IAllocator.AllocatorBalance({asset: address(_mockUsdt), amount: amountUsdt});
-        allocatorBalances[1] = IAllocator.AllocatorBalance({asset: address(_mockGho), amount: amountGho});
+        IAllocator.AllocatorBalance[] memory allocatorBalances = _buildAllocatorBalances(amountUsdt, amountGho);
 
         uint256 expectedTotalAssetsInRay =
             amountUsdt.assetDecimalsToRay(address(_mockUsdt)) + amountGho.assetDecimalsToRay(address(_mockGho));
@@ -314,9 +311,7 @@ contract EarningChainGatewayTest is Test {
 
         address bridgeFeeToken = address(0);
 
-        IAllocator.AllocatorBalance[] memory allocatorBalances = new IAllocator.AllocatorBalance[](2);
-        allocatorBalances[0] = IAllocator.AllocatorBalance({asset: address(_mockUsdt), amount: amountUsdt});
-        allocatorBalances[1] = IAllocator.AllocatorBalance({asset: address(_mockGho), amount: amountGho});
+        IAllocator.AllocatorBalance[] memory allocatorBalances = _buildAllocatorBalances(amountUsdt, amountGho);
 
         uint256 expectedTotalAssetsInRay =
             amountUsdt.assetDecimalsToRay(address(_mockUsdt)) + amountGho.assetDecimalsToRay(address(_mockGho));
@@ -384,5 +379,217 @@ contract EarningChainGatewayTest is Test {
         _earningChainGateway.sendBalanceUpdateWithFeePayer{value: bridgeFeeAmount}(
             bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount
         );
+    }
+
+    function test_exchangeIouTokens_exchangesIouTokensWithToken(
+        uint256 iouTokenAmountRay,
+        address tokenOutReceiver,
+        address bridgeFeePayer,
+        address bridgeFeeToken,
+        uint256 bridgeFeeAmount
+    ) public {
+        vm.assume(iouTokenAmountRay < 100_000_000_000_000 * 10 ** 27);
+        vm.assume(iouTokenAmountRay > 0);
+        vm.assume(bridgeFeeAmount < 100_000_000_000_000 * 10 ** 18);
+        vm.assume(bridgeFeeAmount > 0);
+        vm.assume(tokenOutReceiver != address(0));
+        vm.assume(bridgeFeePayer != address(0));
+        vm.assume(bridgeFeeToken != address(0));
+
+        address tokenOut = address(_mockUsdt);
+
+        // Expect call to IOU token manager to burn tokens
+        console.log("MOCK IOU TOKEN MANAGER: ", address(_mockIouTokenManager));
+        vm.expectCall(
+            address(_mockIouTokenManager),
+            abi.encodeCall(MockIouTokenManager.burnTokens, (tokenOutReceiver, iouTokenAmountRay))
+        );
+
+        _mockUsdt.mint(address(_earningChainGateway), iouTokenAmountRay.rayToAssetDecimals(tokenOut));
+
+        uint256 amountUsdt = 123000000000000000000;
+        uint256 amountGho = 4560000000000000;
+        IAllocator.AllocatorBalance[] memory allocatorBalances = _buildAllocatorBalances(amountUsdt, amountGho);
+
+        uint256 expectedTotalAssetsInRay =
+            amountUsdt.assetDecimalsToRay(address(_mockUsdt)) + amountGho.assetDecimalsToRay(address(_mockGho));
+        vm.mockCall(
+            address(_mockAllocator),
+            abi.encodeWithSelector(MockAllocator.getAssetBalances.selector),
+            abi.encode(allocatorBalances)
+        );
+
+        // Check the bridge adapter is called with expected parameters
+        bytes memory data = abi.encode(
+            IChainGateway.CrossChainMessage({
+                messageType: IChainGateway.MessageType.BURN_IOUTOKEN,
+                data: abi.encode(
+                    IChainGateway.BurnIouTokenMessage({
+                        iouTokenAmountBurnedRay: iouTokenAmountRay,
+                        chainBalanceSnapshotNonce: 0,
+                        balanceSnapshotTotalAssetsInRay: expectedTotalAssetsInRay
+                    })
+                )
+            })
+        );
+        uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(tokenOut);
+        vm.expectCall(address(_mockUsdt), abi.encodeCall(IERC20.transfer, (tokenOutReceiver, amountOut)));
+        vm.expectCall(
+            address(_mockBridgeAdapterData),
+            abi.encodeCall(
+                IBridgeAdapter.publishMessageToChainWithFeePayer,
+                (
+                    bridgeFeePayer,
+                    bridgeFeeToken,
+                    bridgeFeeAmount,
+                    ACCOUNTING_CHAIN_ID,
+                    new IBridgeAdapter.BridgeAsset[](0),
+                    data
+                )
+            )
+        );
+
+        vm.prank(tokenOutReceiver);
+        _earningChainGateway.exchangeIouTokens(
+            iouTokenAmountRay, tokenOut, tokenOutReceiver, bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount
+        );
+
+        // Check that another exchange uses incremented nonce
+        bytes memory dataInner = abi.encode(
+            IChainGateway.BurnIouTokenMessage({
+                iouTokenAmountBurnedRay: iouTokenAmountRay,
+                chainBalanceSnapshotNonce: 1,
+                balanceSnapshotTotalAssetsInRay: expectedTotalAssetsInRay
+            })
+        );
+        _mockUsdt.mint(address(_earningChainGateway), amountOut);
+        data = abi.encode(
+            IChainGateway.CrossChainMessage({messageType: IChainGateway.MessageType.BURN_IOUTOKEN, data: dataInner})
+        );
+        vm.expectCall(
+            address(_mockBridgeAdapterData),
+            abi.encodeCall(
+                IBridgeAdapter.publishMessageToChainWithFeePayer,
+                (
+                    bridgeFeePayer,
+                    bridgeFeeToken,
+                    bridgeFeeAmount,
+                    ACCOUNTING_CHAIN_ID,
+                    new IBridgeAdapter.BridgeAsset[](0),
+                    data
+                )
+            )
+        );
+        vm.expectCall(address(_mockUsdt), abi.encodeCall(IERC20.transfer, (tokenOutReceiver, amountOut)));
+        vm.prank(tokenOutReceiver);
+        _earningChainGateway.exchangeIouTokens(
+            iouTokenAmountRay, tokenOut, tokenOutReceiver, bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount
+        );
+    }
+
+    function test_exchangeIouTokens_exchangesIouTokensWithNative(
+        uint256 iouTokenAmountRay,
+        address tokenOutReceiver,
+        address bridgeFeePayer,
+        uint256 bridgeFeeAmount
+    ) public {
+        vm.assume(iouTokenAmountRay < 100_000_000_000_000 * 10 ** 27);
+        vm.assume(iouTokenAmountRay > 0);
+        vm.assume(bridgeFeeAmount < 100_000_000_000_000 * 10 ** 18);
+        vm.assume(bridgeFeeAmount > 0);
+        vm.assume(tokenOutReceiver != address(0));
+        vm.assume(bridgeFeePayer != address(0));
+
+        address tokenOut = address(_mockUsdt);
+
+        // Setup mocks and expectations
+        {
+            vm.expectCall(
+                address(_mockIouTokenManager),
+                abi.encodeCall(MockIouTokenManager.burnTokens, (tokenOutReceiver, iouTokenAmountRay))
+            );
+
+            _mockUsdt.mint(address(_earningChainGateway), iouTokenAmountRay.rayToAssetDecimals(tokenOut));
+
+            uint256 amountUsdt = 123000000000000000000;
+            uint256 amountGho = 4560000000000000;
+            IAllocator.AllocatorBalance[] memory allocatorBalances = _buildAllocatorBalances(amountUsdt, amountGho);
+
+            vm.mockCall(
+                address(_mockAllocator),
+                abi.encodeWithSelector(MockAllocator.getAssetBalances.selector),
+                abi.encode(allocatorBalances)
+            );
+
+            uint256 expectedTotalAssetsInRay =
+                amountUsdt.assetDecimalsToRay(address(_mockUsdt)) + amountGho.assetDecimalsToRay(address(_mockGho));
+
+            bytes memory data = abi.encode(
+                IChainGateway.CrossChainMessage({
+                    messageType: IChainGateway.MessageType.BURN_IOUTOKEN,
+                    data: abi.encode(
+                        IChainGateway.BurnIouTokenMessage({
+                            iouTokenAmountBurnedRay: iouTokenAmountRay,
+                            chainBalanceSnapshotNonce: 0,
+                            balanceSnapshotTotalAssetsInRay: expectedTotalAssetsInRay
+                        })
+                    )
+                })
+            );
+
+            uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(tokenOut);
+            vm.expectCall(address(_mockUsdt), abi.encodeCall(IERC20.transfer, (tokenOutReceiver, amountOut)));
+            vm.expectCall(
+                address(_mockBridgeAdapterData),
+                abi.encodeCall(
+                    IBridgeAdapter.publishMessageToChainWithFeePayer,
+                    (
+                        bridgeFeePayer,
+                        // bridgeFeeToken
+                        address(0),
+                        bridgeFeeAmount,
+                        ACCOUNTING_CHAIN_ID,
+                        new IBridgeAdapter.BridgeAsset[](0),
+                        data
+                    )
+                )
+            );
+        }
+
+        vm.deal(tokenOutReceiver, bridgeFeeAmount);
+        vm.prank(tokenOutReceiver);
+        _earningChainGateway.exchangeIouTokens{value: bridgeFeeAmount}(
+            iouTokenAmountRay, tokenOut, tokenOutReceiver, bridgeFeePayer, address(0), bridgeFeeAmount
+        );
+    }
+
+    function test_exchangeIouTokens_reverts_ifZeroAmountAsIouTokenAmountRay() public {
+        vm.expectRevert(ErrorsLib.ZeroAmount.selector);
+        _earningChainGateway.exchangeIouTokens(
+            0, address(_mockUsdt), makeAddr("tokenOutReceiver"), makeAddr("bridgeFeePayer"), address(0), 0
+        );
+    }
+
+    function test_exchangeIouTokens_reverts_ifZeroAmountAsBridgeFeeAmount() public {
+        vm.expectRevert(ErrorsLib.ZeroAmount.selector);
+        _earningChainGateway.exchangeIouTokens(
+            100_000_000_000_000 * 10 ** 27,
+            address(_mockUsdt),
+            makeAddr("tokenOutReceiver"),
+            makeAddr("bridgeFeePayer"),
+            address(0),
+            0
+        );
+    }
+
+    function _buildAllocatorBalances(uint256 amountUsdt, uint256 amountGho)
+        internal
+        view
+        returns (IAllocator.AllocatorBalance[] memory)
+    {
+        IAllocator.AllocatorBalance[] memory allocatorBalances = new IAllocator.AllocatorBalance[](2);
+        allocatorBalances[0] = IAllocator.AllocatorBalance({asset: address(_mockUsdt), amount: amountUsdt});
+        allocatorBalances[1] = IAllocator.AllocatorBalance({asset: address(_mockGho), amount: amountGho});
+        return allocatorBalances;
     }
 }

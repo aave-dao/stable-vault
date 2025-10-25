@@ -105,12 +105,20 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
         address bridgeFeePayer,
         address bridgeFeeToken,
         uint256 bridgeFeeAmount
-    ) external payable returns (uint256) {
+    ) external payable override returns (uint256) {
+        require(iouTokenAmountRay > 0, ErrorsLib.ZeroAmount());
+        require(bridgeFeeAmount > 0, ErrorsLib.ZeroAmount());
+        if (bridgeFeeToken == address(0)) {
+            require(msg.value >= bridgeFeeAmount, ErrorsLib.InsufficientFunds());
+        }
         // TODO: apply a withdrawal fee here?
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(msg.sender, iouTokenAmountRay);
         uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(tokenOut);
         IAllocator(_allocator).withdraw(tokenOut, amountOut);
         IERC20(tokenOut).safeTransfer(tokenOutReceiver, amountOut);
+        console.log("iou token amount burned ray: ", iouTokenAmountRay);
+        console.log("chain balance snapshot nonce: ", _balanceSnapshotNonce);
+        console.log("balance snapshot total assets in ray: ", _getTotalAssetsInRay());
         bytes memory data = abi.encode(
             IChainGateway.CrossChainMessage({
                 messageType: IChainGateway.MessageType.BURN_IOUTOKEN,
@@ -139,7 +147,7 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
     }
 
     /// @inheritdoc IEarningChainGateway
-    function exit(address asset, uint256 amount) external onlyManager {
+    function exit(address asset, uint256 amount) external override onlyManager {
         IAllocator(_allocator).withdraw(asset, amount);
         _returnFunds(asset, amount);
     }

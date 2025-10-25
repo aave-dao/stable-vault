@@ -224,8 +224,9 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         assertGt(
             iouToken_earningChain.balanceOf(user1), amountIouToExchange, "User should have enough IOUs to exchange"
         );
+        vm.deal(user1, 1000);
         vm.prank(user1);
-        earningChainGateway.exchangeIouTokens(amountIouToExchange, address(USDC), user1, user1, address(0), 0);
+        earningChainGateway.exchangeIouTokens{value: 1}(amountIouToExchange, address(USDC), user1, user1, address(0), 1);
 
         // Check user1 IOU balance on Earning chain went down
         assertEq(
