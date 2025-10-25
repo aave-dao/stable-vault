@@ -148,6 +148,7 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
 
     /// @inheritdoc IEarningChainGateway
     function exit(address asset, uint256 amount) external override onlyManager {
+        require(amount > 0, ErrorsLib.ZeroAmount());
         IAllocator(_allocator).withdraw(asset, amount);
         _returnFunds(asset, amount);
     }

@@ -9,6 +9,7 @@ interface IChainGateway {
     error InvalidMessageType();
 
     enum MessageType {
+        INVALID,
         BALANCE_SNAPSHOT,
         BRIDGE_IOUTOKEN,
         BURN_IOUTOKEN

@@ -1,9 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
 import {IAllocator} from "../../src/interfaces/IAllocator.sol";
 
 contract MockAllocator is IAllocator {
+    using SafeERC20 for IERC20;
+
     function getManager() external view override returns (address) {}
     function getAdmin() external view override returns (address) {}
     function getAssetBalances() external view override returns (AllocatorBalance[] memory) {}
@@ -16,7 +21,11 @@ contract MockAllocator is IAllocator {
     function deposit(address asset, uint256 amount) external override {}
     function rebalance(CrossAssetRebalanceParams memory params) external override {}
     function reallocate(address asset, uint256 amount, address fromVault, address toVault) external override {}
-    function withdraw(address asset, uint256 amount) external override {}
+
+    function withdraw(address asset, uint256 amount) external override {
+        IERC20(asset).safeTransfer(msg.sender, amount);
+    }
+
     function setManager(address newManager) external override {}
     function setDepositor(address depositor, bool whitelisted) external override {}
     function setWithdrawer(address withdrawer, bool whitelisted) external override {}
