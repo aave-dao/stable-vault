@@ -15,8 +15,6 @@ import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {EventLib} from "../libraries/EventLib.sol";
 
-import {console} from "forge-std/console.sol";
-
 /// @title EarningChainGateway
 /// @notice Facilitates cross chain messaging with exactly one Accounting Chain.
 contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
@@ -116,9 +114,6 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
         uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(tokenOut);
         IAllocator(_allocator).withdraw(tokenOut, amountOut);
         IERC20(tokenOut).safeTransfer(tokenOutReceiver, amountOut);
-        console.log("iou token amount burned ray: ", iouTokenAmountRay);
-        console.log("chain balance snapshot nonce: ", _balanceSnapshotNonce);
-        console.log("balance snapshot total assets in ray: ", _getTotalAssetsInRay());
         bytes memory data = abi.encode(
             IChainGateway.CrossChainMessage({
                 messageType: IChainGateway.MessageType.BURN_IOUTOKEN,

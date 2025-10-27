@@ -48,15 +48,16 @@ interface IChainGateway {
     /// @notice Sends an arbitrary message containing instructions or data updates to a destination chain.
     /// @param feeRefundRecipient The address to send the remaining bridge fee to if any. The actual fee is taken from
     /// the msg.sender.
-    /// @param feeToken Token to pay the bridge fee in (must be accepted by the Bridge provider).
-    /// @param feeAmount The amount of fee to pay in the fee token (a refund is provided to the fee payer if necessary).
+    /// @param bridgeFeeToken Token to pay the bridge fee in (must be accepted by the Bridge provider).
+    /// @param bridgeFeeAmount The amount of fee to pay in the fee token (a refund is provided to the fee payer if
+    /// necessary).
     /// @param destinationChainId The chain id of the chain to publish the message to.
     /// @param iouTokenRecipient The address to send the IOU tokens to on the destination chain.
     /// @param iouTokenAmountRay The amount of IOU tokens to bridge.
     function sendBridgeIouTokenMessageWithFeePayer(
         address feeRefundRecipient,
-        address feeToken,
-        uint256 feeAmount,
+        address bridgeFeeToken,
+        uint256 bridgeFeeAmount,
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay

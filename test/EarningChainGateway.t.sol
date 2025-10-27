@@ -4,6 +4,7 @@ pragma solidity ^0.8.22;
 import {Test} from "forge-std/Test.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {EarningChainGateway} from "../src/earning/EarningChainGateway.sol";
 import {IAllocator} from "../src/interfaces/IAllocator.sol";
@@ -24,6 +25,7 @@ import {console} from "forge-std/console.sol";
 contract EarningChainGatewayTest is Test {
     using MathLib for uint256;
     using AssetLib for uint256;
+    using SafeERC20 for IERC20;
 
     uint256 internal ACCOUNTING_CHAIN_ID = 1;
     uint256 internal EARNING_CHAIN_ID = 2;
@@ -226,7 +228,7 @@ contract EarningChainGatewayTest is Test {
         _earningChainGateway.sendBalanceUpdate();
     }
 
-    function test_sendBalanceUpdateWithFeePayer_sendsBalanceUpdateWithFeePayerWithToken(
+    function test_sendBalanceUpdateWithFeePayer_sendsBalanceUpdateWithFeePayerWithTokenBridgeFee(
         uint256 amountUsdt,
         uint256 amountGho,
         address bridgeFeeToken,
@@ -300,7 +302,7 @@ contract EarningChainGatewayTest is Test {
         _earningChainGateway.sendBalanceUpdateWithFeePayer(bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount);
     }
 
-    function test_sendBalanceUpdateWithFeePayer_sendsBalanceUpdateWithFeePayerWithNative(
+    function test_sendBalanceUpdateWithFeePayer_sendsBalanceUpdateWithFeePayerWithNativeBridgeFee(
         uint256 amountUsdt,
         uint256 amountGho,
         uint256 bridgeFeeAmount
@@ -381,7 +383,7 @@ contract EarningChainGatewayTest is Test {
         );
     }
 
-    function test_exchangeIouTokens_exchangesIouTokensWithToken(
+    function test_exchangeIouTokens_exchangesIouTokensWithTokenBridgeFee(
         uint256 iouTokenAmountRay,
         address tokenOutReceiver,
         address bridgeFeePayer,
@@ -399,7 +401,6 @@ contract EarningChainGatewayTest is Test {
         address tokenOut = address(_mockUsdt);
 
         // Expect call to IOU token manager to burn tokens
-        console.log("MOCK IOU TOKEN MANAGER: ", address(_mockIouTokenManager));
         vm.expectCall(
             address(_mockIouTokenManager),
             abi.encodeCall(MockIouTokenManager.burnTokens, (tokenOutReceiver, iouTokenAmountRay))
@@ -487,7 +488,7 @@ contract EarningChainGatewayTest is Test {
         );
     }
 
-    function test_exchangeIouTokens_exchangesIouTokensWithNative(
+    function test_exchangeIouTokens_exchangesIouTokensWithNativeBridgeFee(
         uint256 iouTokenAmountRay,
         address tokenOutReceiver,
         address bridgeFeePayer,
@@ -618,10 +619,6 @@ contract EarningChainGatewayTest is Test {
         uint256 expectedTotalAssetsInRay =
             amountUsdt.assetDecimalsToRay(address(_mockUsdt)) + amountGho.assetDecimalsToRay(address(_mockGho));
 
-        console.log("_mockBridgeAdapterAssets: ", address(_mockBridgeAdapterAssets));
-        console.log("token: ", address(_mockUsdt));
-        console.log("amount: ", amountToken);
-
         bytes memory data = abi.encode(
             IChainGateway.CrossChainMessage({
                 messageType: IChainGateway.MessageType.BALANCE_SNAPSHOT,
@@ -674,7 +671,143 @@ contract EarningChainGatewayTest is Test {
         _earningChainGateway.exit(address(_mockUsdt), 100_000_000_000_000 * 10 ** 6);
     }
 
-    // TODO: sendBridgeIouTokenMessageWithFeePayer
+    function test_sendBridgeIouTokenMessageWithFeePayer_withTokenBridgeFee(
+        address feeRefundRecipient,
+        uint256 feeAmount,
+        address iouTokenRecipient,
+        uint256 iouTokenAmountRay
+    ) public {
+        vm.assume(feeAmount < 100_000_000_000_000 * 10 ** 18);
+        vm.assume(feeAmount > 0);
+        vm.assume(iouTokenAmountRay > 0);
+
+        // Use GHO as the bridge fee token
+        address feeToken = address(_mockGho);
+        // Mimic the IOU token mgr approval of Gateway to pull funds
+        IMockErc20(feeToken).mint(address(_mockIouTokenManager), feeAmount);
+        vm.prank(address(_mockIouTokenManager));
+        MockNonStandardErc20(feeToken).approve(address(_earningChainGateway), feeAmount);
+
+        vm.expectCall(
+            feeToken,
+            abi.encodeCall(
+                IERC20.transferFrom, (address(_mockIouTokenManager), address(_earningChainGateway), feeAmount)
+            )
+        );
+        vm.expectCall(feeToken, abi.encodeCall(IERC20.approve, (address(_mockBridgeAdapterData), feeAmount)));
+
+        // Expect call to Bridge Adapter to publish message with fee payer
+        vm.expectCall(
+            address(_mockBridgeAdapterData),
+            abi.encodeCall(
+                IBridgeAdapter.publishMessageToChainWithFeePayer,
+                (
+                    feeRefundRecipient,
+                    feeToken,
+                    feeAmount,
+                    ACCOUNTING_CHAIN_ID,
+                    new IBridgeAdapter.BridgeAsset[](0),
+                    abi.encode(
+                        IChainGateway.CrossChainMessage({
+                            messageType: IChainGateway.MessageType.BRIDGE_IOUTOKEN,
+                            data: abi.encode(
+                                IChainGateway.IouTokenBridgeMessage({
+                                    recipient: iouTokenRecipient, amount: iouTokenAmountRay
+                                })
+                            )
+                        })
+                    )
+                )
+            )
+        );
+
+        vm.prank(address(_mockIouTokenManager));
+        _earningChainGateway.sendBridgeIouTokenMessageWithFeePayer(
+            feeRefundRecipient, address(_mockGho), feeAmount, ACCOUNTING_CHAIN_ID, iouTokenRecipient, iouTokenAmountRay
+        );
+    }
+
+    function test_sendBridgeIouTokenMessageWithFeePayer_withNativeBridgeFee(
+        address feeRefundRecipient,
+        uint256 bridgeFeeAmount,
+        address iouTokenRecipient,
+        uint256 iouTokenAmountRay
+    ) public {
+        vm.assume(bridgeFeeAmount < 100_000_000_000_000 * 10 ** 18);
+        vm.assume(bridgeFeeAmount > 0);
+        vm.assume(iouTokenAmountRay > 0);
+
+        vm.deal(address(_mockIouTokenManager), bridgeFeeAmount);
+
+        vm.expectCall(
+            address(_mockBridgeAdapterData),
+            abi.encodeCall(
+                IBridgeAdapter.publishMessageToChainWithFeePayer,
+                (
+                    feeRefundRecipient,
+                    address(0),
+                    bridgeFeeAmount,
+                    ACCOUNTING_CHAIN_ID,
+                    new IBridgeAdapter.BridgeAsset[](0),
+                    abi.encode(
+                        IChainGateway.CrossChainMessage({
+                            messageType: IChainGateway.MessageType.BRIDGE_IOUTOKEN,
+                            data: abi.encode(
+                                IChainGateway.IouTokenBridgeMessage({
+                                    recipient: iouTokenRecipient, amount: iouTokenAmountRay
+                                })
+                            )
+                        })
+                    )
+                )
+            )
+        );
+
+        vm.prank(address(_mockIouTokenManager));
+        _earningChainGateway.sendBridgeIouTokenMessageWithFeePayer{value: bridgeFeeAmount}(
+            feeRefundRecipient, address(0), bridgeFeeAmount, ACCOUNTING_CHAIN_ID, iouTokenRecipient, iouTokenAmountRay
+        );
+    }
+
+    function test_revert_ifInvalidMessageSender() public {
+        // Context: only callable by IOU Token Manager
+        vm.expectRevert(ErrorsLib.InvalidMessageSender.selector);
+        _earningChainGateway.sendBridgeIouTokenMessageWithFeePayer(
+            makeAddr("feeRefundRecipient"),
+            address(_mockUsdt),
+            100_000,
+            EARNING_CHAIN_ID,
+            makeAddr("iouTokenRecipient"),
+            100_000
+        );
+    }
+
+    function test_revert_ifInvalidDestinationChainId() public {
+        vm.prank(address(_mockIouTokenManager));
+        vm.expectRevert(ErrorsLib.InvalidDestinationChainId.selector);
+        _earningChainGateway.sendBridgeIouTokenMessageWithFeePayer(
+            makeAddr("feeRefundRecipient"),
+            address(_mockUsdt),
+            100_000,
+            // Can not be the same chain that the Gateway contract is on
+            block.chainid,
+            makeAddr("iouTokenRecipient"),
+            100_000
+        );
+    }
+
+    function test_sendBridgeIouTokenMessageWithFeePayer_reverts_ifInsufficientFunds() public {
+        vm.expectRevert(ErrorsLib.InsufficientFunds.selector);
+        vm.prank(address(_mockIouTokenManager));
+        _earningChainGateway.sendBridgeIouTokenMessageWithFeePayer(
+            makeAddr("feeRefundRecipient"),
+            address(0),
+            100_000,
+            ACCOUNTING_CHAIN_ID,
+            makeAddr("iouTokenRecipient"),
+            100_000
+        );
+    }
 
     // TODO: test receive message (data)
 

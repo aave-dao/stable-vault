@@ -53,8 +53,8 @@ abstract contract BaseChainGateway is IChainGateway {
     /// @inheritdoc IChainGateway
     function sendBridgeIouTokenMessageWithFeePayer(
         address feeRefundRecipient,
-        address feeToken,
-        uint256 feeAmount,
+        address bridgeFeeToken,
+        uint256 bridgeFeeAmount,
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay
@@ -62,16 +62,21 @@ abstract contract BaseChainGateway is IChainGateway {
         require(msg.sender == IOU_TOKEN_MANAGER, ErrorsLib.InvalidMessageSender());
         require(destinationChainId != block.chainid, ErrorsLib.InvalidDestinationChainId());
 
-        if (feeToken != FEE_ON_NATIVE_CURRENCY) {
-            IERC20(feeToken).safeTransferFrom(msg.sender, address(this), feeAmount);
-            IERC20(feeToken).forceApprove(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId], feeAmount);
+        if (bridgeFeeToken == address(0)) {
+            require(msg.value >= bridgeFeeAmount, ErrorsLib.InsufficientFunds());
+        }
+
+        if (bridgeFeeToken != FEE_ON_NATIVE_CURRENCY) {
+            IERC20(bridgeFeeToken).safeTransferFrom(msg.sender, address(this), bridgeFeeAmount);
+            IERC20(bridgeFeeToken)
+                .forceApprove(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId], bridgeFeeAmount);
         }
 
         IBridgeAdapter(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId])
             .publishMessageToChainWithFeePayer(
                 feeRefundRecipient,
-                feeToken,
-                feeAmount,
+                bridgeFeeToken,
+                bridgeFeeAmount,
                 destinationChainId,
                 new IBridgeAdapter.BridgeAsset[](0),
                 abi.encode(
