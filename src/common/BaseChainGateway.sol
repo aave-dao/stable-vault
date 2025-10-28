@@ -12,8 +12,6 @@ import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 abstract contract BaseChainGateway is IChainGateway {
     using SafeERC20 for IERC20;
 
-    error UnsupportedAdapter();
-
     address internal constant FEE_ON_NATIVE_CURRENCY = address(0);
     address internal constant ASSET_FOR_DATA_ONLY_BRIDGE = address(0);
     address internal immutable IOU_TOKEN_MANAGER;

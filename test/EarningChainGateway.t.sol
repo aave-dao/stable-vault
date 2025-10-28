@@ -10,6 +10,7 @@ import {EarningChainGateway} from "../src/earning/EarningChainGateway.sol";
 import {IAllocator} from "../src/interfaces/IAllocator.sol";
 import {IBridgeAdapter} from "../src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../src/interfaces/IChainGateway.sol";
+import {IIouTokenManager} from "../src/interfaces/IIouTokenManager.sol";
 import {AssetLib} from "../src/libraries/AssetLib.sol";
 import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
 import {MathLib} from "../src/libraries/MathLib.sol";
@@ -19,8 +20,6 @@ import {MockBridgeAdapter} from "./mocks/MockBridgeAdapter.sol";
 import {IMockErc20} from "./mocks/MockErc20.sol";
 import {MockIouTokenManager} from "./mocks/MockIouTokenManager.sol";
 import {MockNonStandardErc20} from "./mocks/MockNonStandardErc20.sol";
-
-import {console} from "forge-std/console.sol";
 
 contract EarningChainGatewayTest is Test {
     using MathLib for uint256;
@@ -157,6 +156,22 @@ contract EarningChainGatewayTest is Test {
         vm.expectRevert(ErrorsLib.ZeroChainId.selector);
         vm.prank(admin);
         newEarningChainGateway.setBridgeAdapter(address(0), 0, address(0));
+    }
+
+    function test_getAggregatedBalance_returnsExpectedBalance(uint256 amountUsdt, uint256 amountGho) public {
+        vm.assume(amountUsdt < 100_000_000_000_000 * 10 ** 6);
+        vm.assume(amountGho < 100_000_000_000_000 * 10 ** 18);
+
+        IAllocator.AllocatorBalance[] memory allocatorBalances = _buildAllocatorBalances(amountUsdt, amountGho);
+
+        uint256 expectedTotalAssetsInRay =
+            amountUsdt.assetDecimalsToRay(address(_mockUsdt)) + amountGho.assetDecimalsToRay(address(_mockGho));
+        vm.mockCall(
+            address(_mockAllocator),
+            abi.encodeWithSelector(MockAllocator.getAssetBalances.selector),
+            abi.encode(allocatorBalances)
+        );
+        assertEq(_earningChainGateway.getAggregatedBalance(), expectedTotalAssetsInRay);
     }
 
     function test_sendBalanceUpdate_reverts_ifNotManager() public {
@@ -809,7 +824,47 @@ contract EarningChainGatewayTest is Test {
         );
     }
 
-    // TODO: test receive message (data)
+    function test_receiveMessage_whenBridgeIouTokenMessageIsReceived(
+        address iouTokenRecipient,
+        uint256 iouTokenAmountRay
+    ) public {
+        vm.assume(iouTokenAmountRay > 0);
+        // Expect call to IouTokenManager to mint tokens
+        vm.expectCall(
+            address(_mockIouTokenManager),
+            abi.encodeCall(IIouTokenManager.mintTokens, (iouTokenRecipient, iouTokenAmountRay))
+        );
+
+        bytes memory data = abi.encode(
+            IChainGateway.CrossChainMessage({
+                messageType: IChainGateway.MessageType.BRIDGE_IOUTOKEN,
+                data: abi.encode(
+                    IChainGateway.IouTokenBridgeMessage({recipient: iouTokenRecipient, amount: iouTokenAmountRay})
+                )
+            })
+        );
+        vm.prank(address(_mockBridgeAdapterData));
+        _earningChainGateway.receiveMessage(ACCOUNTING_CHAIN_ID, new IBridgeAdapter.BridgeAsset[](0), data);
+    }
+
+    function test_receiveMessage_whenBridgeFundsIsReceived(uint256 amountUsdt, uint256 amountGho) public {
+        // mint this contract with the assets to mimic the Bridge Adapter
+        _mockUsdt.mint(address(_mockBridgeAdapterAssets), amountUsdt);
+        vm.prank(address(_mockBridgeAdapterAssets));
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(_earningChainGateway), amountUsdt);
+        _mockGho.mint(address(_mockBridgeAdapterAssets), amountGho);
+        vm.prank(address(_mockBridgeAdapterAssets));
+        MockNonStandardErc20(address(_mockGho)).approve(address(_earningChainGateway), amountGho);
+
+        vm.expectCall(address(_mockAllocator), abi.encodeCall(IAllocator.deposit, (address(_mockUsdt), amountUsdt)));
+        vm.expectCall(address(_mockAllocator), abi.encodeCall(IAllocator.deposit, (address(_mockGho), amountGho)));
+
+        IBridgeAdapter.BridgeAsset[] memory bridgeAssets = new IBridgeAdapter.BridgeAsset[](2);
+        bridgeAssets[0] = IBridgeAdapter.BridgeAsset({asset: address(_mockUsdt), amount: amountUsdt});
+        bridgeAssets[1] = IBridgeAdapter.BridgeAsset({asset: address(_mockGho), amount: amountGho});
+        vm.prank(address(_mockBridgeAdapterAssets));
+        _earningChainGateway.receiveMessage(ACCOUNTING_CHAIN_ID, bridgeAssets, "");
+    }
 
     function test_receiveMessage_reverts_ifInvalidMessageType() public {
         vm.prank(address(_mockBridgeAdapterData));
@@ -828,7 +883,22 @@ contract EarningChainGatewayTest is Test {
         );
     }
 
-    // TODO: test receive message (tokens)
+    function test_reverts_receiveMessage_ifNotAdapter() public {
+        vm.expectRevert(IChainGateway.UnsupportedAdapter.selector);
+        vm.prank(makeAddr("notAdapter"));
+        _earningChainGateway.receiveMessage(
+            ACCOUNTING_CHAIN_ID,
+            new IBridgeAdapter.BridgeAsset[](0),
+            abi.encode(
+                IChainGateway.CrossChainMessage({
+                    messageType: IChainGateway.MessageType.BRIDGE_IOUTOKEN,
+                    data: abi.encode(
+                        IChainGateway.IouTokenBridgeMessage({recipient: makeAddr("iouTokenRecipient"), amount: 100_000})
+                    )
+                })
+            )
+        );
+    }
 
     function _buildAllocatorBalances(uint256 amountUsdt, uint256 amountGho)
         internal

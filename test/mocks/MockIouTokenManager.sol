@@ -17,5 +17,6 @@ contract MockIouTokenManager is IIouTokenManager {
     function mintTokens(address to, uint256 amount) external override {}
     function burnTokens(address from, uint256 amount) external override {}
     function burnLockedTokens(uint256 amount) external override {}
+
     function releaseTokens(address to, uint256 amount) external override {}
 }

@@ -156,9 +156,6 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
             IERC20(asset).forceApprove(_allocator, amount);
             IAllocator(_allocator).deposit(asset, amount);
         }
-        // TODO: should this callback be gated behind a flag sent from the Accounting Chain? or should we check gas
-        // left?
-        _sendBalanceUpdate();
     }
 
     function _receiveData(uint256 sourceChainId, bytes memory data) internal override {

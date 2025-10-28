@@ -7,6 +7,7 @@ import {IBridgeAdapter} from "./IBridgeAdapter.sol";
 /// @dev Assumes bridged assets and bridged data can be handled independently of each other.
 interface IChainGateway {
     error InvalidMessageType();
+    error UnsupportedAdapter();
 
     enum MessageType {
         INVALID,
