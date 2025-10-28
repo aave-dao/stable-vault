@@ -148,7 +148,7 @@ contract FundsHandler is IFundsHandler {
                 chainExists = true;
                 // Nonces should always be strictly increasing.
                 // Use <= for initial snapshot update safety.
-                if (_chainBalances[i].nonce <= chainBalanceSnapshotNonce) {
+                if (_chainBalances[i].nonce < chainBalanceSnapshotNonce) {
                     _chainBalances[i].nonce = chainBalanceSnapshotNonce;
                     _chainBalances[i].amountRay = snapshotBalanceRay;
                 }

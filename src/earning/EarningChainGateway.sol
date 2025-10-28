@@ -203,8 +203,11 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
         return totalAssetsInRay;
     }
 
+    /// @dev Increments the balance snapshot nonce and returns the new nonce
+    /// @dev Assumes the Accounting Chain does not allow non-replayable nonces, so the new nonce sent is always higher
+    /// than the previous nonce stored on Accounting Chain.
     function _getAndUpdateBalanceSnapshotNonce() internal returns (uint256) {
-        return _balanceSnapshotNonce++;
+        return ++_balanceSnapshotNonce;
     }
 
     function _getBalanceSnapshotData() internal returns (bytes memory) {

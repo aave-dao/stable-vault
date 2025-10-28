@@ -211,7 +211,7 @@ contract EarningChainGatewayTest is Test {
                         IChainGateway.CrossChainMessage({
                             messageType: IChainGateway.MessageType.BALANCE_SNAPSHOT,
                             data: abi.encode(
-                                IChainGateway.BalanceSnapshot({totalAssetsInRay: expectedTotalAssetsInRay, nonce: 0})
+                                IChainGateway.BalanceSnapshot({totalAssetsInRay: expectedTotalAssetsInRay, nonce: 1})
                             )
                         })
                     )
@@ -233,7 +233,7 @@ contract EarningChainGatewayTest is Test {
                         IChainGateway.CrossChainMessage({
                             messageType: IChainGateway.MessageType.BALANCE_SNAPSHOT,
                             data: abi.encode(
-                                IChainGateway.BalanceSnapshot({totalAssetsInRay: expectedTotalAssetsInRay, nonce: 1})
+                                IChainGateway.BalanceSnapshot({totalAssetsInRay: expectedTotalAssetsInRay, nonce: 2})
                             )
                         })
                     )
@@ -282,7 +282,7 @@ contract EarningChainGatewayTest is Test {
                         IChainGateway.CrossChainMessage({
                             messageType: IChainGateway.MessageType.BALANCE_SNAPSHOT,
                             data: abi.encode(
-                                IChainGateway.BalanceSnapshot({totalAssetsInRay: expectedTotalAssetsInRay, nonce: 0})
+                                IChainGateway.BalanceSnapshot({totalAssetsInRay: expectedTotalAssetsInRay, nonce: 1})
                             )
                         })
                     )
@@ -307,7 +307,7 @@ contract EarningChainGatewayTest is Test {
                         IChainGateway.CrossChainMessage({
                             messageType: IChainGateway.MessageType.BALANCE_SNAPSHOT,
                             data: abi.encode(
-                                IChainGateway.BalanceSnapshot({totalAssetsInRay: expectedTotalAssetsInRay, nonce: 1})
+                                IChainGateway.BalanceSnapshot({totalAssetsInRay: expectedTotalAssetsInRay, nonce: 2})
                             )
                         })
                     )
@@ -357,7 +357,7 @@ contract EarningChainGatewayTest is Test {
                         IChainGateway.CrossChainMessage({
                             messageType: IChainGateway.MessageType.BALANCE_SNAPSHOT,
                             data: abi.encode(
-                                IChainGateway.BalanceSnapshot({totalAssetsInRay: expectedTotalAssetsInRay, nonce: 0})
+                                IChainGateway.BalanceSnapshot({totalAssetsInRay: expectedTotalAssetsInRay, nonce: 1})
                             )
                         })
                     )
@@ -386,7 +386,7 @@ contract EarningChainGatewayTest is Test {
                         IChainGateway.CrossChainMessage({
                             messageType: IChainGateway.MessageType.BALANCE_SNAPSHOT,
                             data: abi.encode(
-                                IChainGateway.BalanceSnapshot({totalAssetsInRay: expectedTotalAssetsInRay, nonce: 1})
+                                IChainGateway.BalanceSnapshot({totalAssetsInRay: expectedTotalAssetsInRay, nonce: 2})
                             )
                         })
                     )
@@ -442,7 +442,7 @@ contract EarningChainGatewayTest is Test {
                 data: abi.encode(
                     IChainGateway.BurnIouTokenMessage({
                         iouTokenAmountBurnedRay: iouTokenAmountRay,
-                        chainBalanceSnapshotNonce: 0,
+                        chainBalanceSnapshotNonce: 1,
                         balanceSnapshotTotalAssetsInRay: expectedTotalAssetsInRay
                     })
                 )
@@ -474,7 +474,7 @@ contract EarningChainGatewayTest is Test {
         bytes memory dataInner = abi.encode(
             IChainGateway.BurnIouTokenMessage({
                 iouTokenAmountBurnedRay: iouTokenAmountRay,
-                chainBalanceSnapshotNonce: 1,
+                chainBalanceSnapshotNonce: 2,
                 balanceSnapshotTotalAssetsInRay: expectedTotalAssetsInRay
             })
         );
@@ -546,7 +546,7 @@ contract EarningChainGatewayTest is Test {
                     data: abi.encode(
                         IChainGateway.BurnIouTokenMessage({
                             iouTokenAmountBurnedRay: iouTokenAmountRay,
-                            chainBalanceSnapshotNonce: 0,
+                            chainBalanceSnapshotNonce: 1,
                             balanceSnapshotTotalAssetsInRay: expectedTotalAssetsInRay
                         })
                     )
@@ -637,7 +637,7 @@ contract EarningChainGatewayTest is Test {
         bytes memory data = abi.encode(
             IChainGateway.CrossChainMessage({
                 messageType: IChainGateway.MessageType.BALANCE_SNAPSHOT,
-                data: abi.encode(IChainGateway.BalanceSnapshot({totalAssetsInRay: expectedTotalAssetsInRay, nonce: 0}))
+                data: abi.encode(IChainGateway.BalanceSnapshot({totalAssetsInRay: expectedTotalAssetsInRay, nonce: 1}))
             })
         );
         vm.expectCall(
@@ -661,7 +661,7 @@ contract EarningChainGatewayTest is Test {
         data = abi.encode(
             IChainGateway.CrossChainMessage({
                 messageType: IChainGateway.MessageType.BALANCE_SNAPSHOT,
-                data: abi.encode(IChainGateway.BalanceSnapshot({totalAssetsInRay: expectedTotalAssetsInRay, nonce: 1}))
+                data: abi.encode(IChainGateway.BalanceSnapshot({totalAssetsInRay: expectedTotalAssetsInRay, nonce: 2}))
             })
         );
         vm.expectCall(
@@ -876,7 +876,7 @@ contract EarningChainGatewayTest is Test {
                 IChainGateway.CrossChainMessage({
                     messageType: IChainGateway.MessageType.INVALID,
                     data: abi.encode(
-                        IChainGateway.BalanceSnapshot({totalAssetsInRay: 100_000_000_000_000 * 10 ** 27, nonce: 0})
+                        IChainGateway.BalanceSnapshot({totalAssetsInRay: 100_000_000_000_000 * 10 ** 27, nonce: 1})
                     )
                 })
             )
