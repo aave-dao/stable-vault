@@ -14,6 +14,7 @@ import {IIouTokenManager} from "../src/interfaces/IIouTokenManager.sol";
 import {AssetLib} from "../src/libraries/AssetLib.sol";
 import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
 import {MathLib} from "../src/libraries/MathLib.sol";
+import {TestWithHelpers} from "./helpers/TestWithHelpers.sol";
 import {MockAllocator} from "./mocks/MockAllocator.sol";
 import {MockAssetRegistry} from "./mocks/MockAssetRegistry.sol";
 import {MockBridgeAdapter} from "./mocks/MockBridgeAdapter.sol";
@@ -21,7 +22,7 @@ import {IMockErc20} from "./mocks/MockErc20.sol";
 import {MockIouTokenManager} from "./mocks/MockIouTokenManager.sol";
 import {MockNonStandardErc20} from "./mocks/MockNonStandardErc20.sol";
 
-contract EarningChainGatewayTest is Test {
+contract EarningChainGatewayTest is TestWithHelpers {
     using MathLib for uint256;
     using AssetLib for uint256;
     using SafeERC20 for IERC20;
@@ -159,8 +160,8 @@ contract EarningChainGatewayTest is Test {
     }
 
     function test_getAggregatedBalance_returnsExpectedBalance(uint256 amountUsdt, uint256 amountGho) public {
-        vm.assume(amountUsdt < 100_000_000_000_000 * 10 ** 6);
-        vm.assume(amountGho < 100_000_000_000_000 * 10 ** 18);
+        amountUsdt = _boundAssetAmountAllowingZero(address(_mockUsdt), amountUsdt);
+        amountGho = _boundAssetAmountAllowingZero(address(_mockGho), amountGho);
 
         IAllocator.AllocatorBalance[] memory allocatorBalances = _buildAllocatorBalances(amountUsdt, amountGho);
 
@@ -186,8 +187,8 @@ contract EarningChainGatewayTest is Test {
     }
 
     function test_sendBalanceUpdate_sendsBalanceUpdate(uint256 amountUsdt, uint256 amountGho) public {
-        vm.assume(amountUsdt < 100_000_000_000_000 * 10 ** 6);
-        vm.assume(amountGho < 100_000_000_000_000 * 10 ** 18);
+        amountUsdt = _boundAssetAmountAllowingZero(address(_mockUsdt), amountUsdt);
+        amountGho = _boundAssetAmountAllowingZero(address(_mockGho), amountGho);
 
         IAllocator.AllocatorBalance[] memory allocatorBalances = _buildAllocatorBalances(amountUsdt, amountGho);
 
@@ -249,8 +250,8 @@ contract EarningChainGatewayTest is Test {
         address bridgeFeeToken,
         uint256 bridgeFeeAmount
     ) public {
-        vm.assume(amountUsdt < 100_000_000_000_000 * 10 ** 6);
-        vm.assume(amountGho < 100_000_000_000_000 * 10 ** 18);
+        amountUsdt = _boundAssetAmountAllowingZero(address(_mockUsdt), amountUsdt);
+        amountGho = _boundAssetAmountAllowingZero(address(_mockGho), amountGho);
 
         // ERC20 token fee payments only
         vm.assume(bridgeFeeToken != address(0));
@@ -322,9 +323,9 @@ contract EarningChainGatewayTest is Test {
         uint256 amountGho,
         uint256 bridgeFeeAmount
     ) public {
-        vm.assume(amountUsdt < 100_000_000_000_000 * 10 ** 6);
-        vm.assume(amountGho < 100_000_000_000_000 * 10 ** 18);
-        vm.assume(bridgeFeeAmount < 100_000_000_000_000 * 10 ** 18);
+        amountUsdt = _boundAssetAmountAllowingZero(address(_mockUsdt), amountUsdt);
+        amountGho = _boundAssetAmountAllowingZero(address(_mockGho), amountGho);
+        bridgeFeeAmount = _boundNativeAmountAllowingZero(bridgeFeeAmount);
 
         address bridgeFeeToken = address(0);
 
@@ -405,10 +406,8 @@ contract EarningChainGatewayTest is Test {
         address bridgeFeeToken,
         uint256 bridgeFeeAmount
     ) public {
-        vm.assume(iouTokenAmountRay < 100_000_000_000_000 * 10 ** 27);
-        vm.assume(iouTokenAmountRay > 0);
-        vm.assume(bridgeFeeAmount < 100_000_000_000_000 * 10 ** 18);
-        vm.assume(bridgeFeeAmount > 0);
+        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        bridgeFeeAmount = _boundNativeAmount(bridgeFeeAmount);
         vm.assume(tokenOutReceiver != address(0));
         vm.assume(bridgeFeePayer != address(0));
         vm.assume(bridgeFeeToken != address(0));
@@ -509,10 +508,8 @@ contract EarningChainGatewayTest is Test {
         address bridgeFeePayer,
         uint256 bridgeFeeAmount
     ) public {
-        vm.assume(iouTokenAmountRay < 100_000_000_000_000 * 10 ** 27);
-        vm.assume(iouTokenAmountRay > 0);
-        vm.assume(bridgeFeeAmount < 100_000_000_000_000 * 10 ** 18);
-        vm.assume(bridgeFeeAmount > 0);
+        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        bridgeFeeAmount = _boundNativeAmount(bridgeFeeAmount);
         vm.assume(tokenOutReceiver != address(0));
         vm.assume(bridgeFeePayer != address(0));
 
@@ -611,9 +608,7 @@ contract EarningChainGatewayTest is Test {
     }
 
     function test_exit_bridgesAssetAndSnapshot(uint256 amountTokenUnits) public {
-        vm.assume(amountTokenUnits < 100_000_000_000_000);
-        vm.assume(amountTokenUnits > 0);
-        uint256 amountToken = amountTokenUnits * 10 ** 6;
+        uint256 amountToken = _boundAssetAmount(address(_mockUsdt), amountTokenUnits);
 
         // Mock tokens to the Allocator so they can be withdrawn to EarningChainGateway
         _mockUsdt.mint(address(_mockAllocator), amountToken);
@@ -692,9 +687,8 @@ contract EarningChainGatewayTest is Test {
         address iouTokenRecipient,
         uint256 iouTokenAmountRay
     ) public {
-        vm.assume(feeAmount < 100_000_000_000_000 * 10 ** 18);
-        vm.assume(feeAmount > 0);
-        vm.assume(iouTokenAmountRay > 0);
+        feeAmount = _boundNativeAmount(feeAmount);
+        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
 
         // Use GHO as the bridge fee token
         address feeToken = address(_mockGho);
@@ -748,9 +742,8 @@ contract EarningChainGatewayTest is Test {
         address iouTokenRecipient,
         uint256 iouTokenAmountRay
     ) public {
-        vm.assume(bridgeFeeAmount < 100_000_000_000_000 * 10 ** 18);
-        vm.assume(bridgeFeeAmount > 0);
-        vm.assume(iouTokenAmountRay > 0);
+        bridgeFeeAmount = _boundNativeAmount(bridgeFeeAmount);
+        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
 
         vm.deal(address(_mockIouTokenManager), bridgeFeeAmount);
 
@@ -828,7 +821,7 @@ contract EarningChainGatewayTest is Test {
         address iouTokenRecipient,
         uint256 iouTokenAmountRay
     ) public {
-        vm.assume(iouTokenAmountRay > 0);
+        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
         // Expect call to IouTokenManager to mint tokens
         vm.expectCall(
             address(_mockIouTokenManager),
