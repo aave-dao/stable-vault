@@ -22,11 +22,11 @@ contract TestWithHelpers is Test {
         return _boundAmountAllowingZero(amount, 10 ** IMockErc20(asset).decimals());
     }
 
-    function _boundNativeAmount(uint256 amount) internal view returns (uint256) {
+    function _boundNativeAmount(uint256 amount) internal pure returns (uint256) {
         return _boundNonZeroAmount(amount, 10 ** 18);
     }
 
-    function _boundNativeAmountAllowingZero(uint256 amount) internal view returns (uint256) {
+    function _boundNativeAmountAllowingZero(uint256 amount) internal pure returns (uint256) {
         return _boundAmountAllowingZero(amount, 10 ** 18);
     }
 
