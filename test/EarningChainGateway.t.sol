@@ -117,7 +117,7 @@ contract EarningChainGatewayTest is Test {
         newEarningChainGateway.setManager(address(0));
     }
 
-    function test_setter_reverts_ifZeroAddressAsManager() public {
+    function test_setManager_reverts_ifZeroAddressAsManager() public {
         EarningChainGateway newEarningChainGateway =
             new EarningChainGateway(admin, EARNING_CHAIN_ID, address(_mockIouTokenManager));
         vm.expectRevert(ErrorsLib.ZeroAddress.selector);
@@ -125,7 +125,7 @@ contract EarningChainGatewayTest is Test {
         newEarningChainGateway.setManager(address(0));
     }
 
-    function test_setter_reverts_ifZeroAddressAsAllocator() public {
+    function test_setManager_reverts_ifZeroAddressAsAllocator() public {
         EarningChainGateway newEarningChainGateway =
             new EarningChainGateway(admin, EARNING_CHAIN_ID, address(_mockIouTokenManager));
         vm.expectRevert(ErrorsLib.ZeroAddress.selector);
@@ -133,7 +133,7 @@ contract EarningChainGatewayTest is Test {
         newEarningChainGateway.setManager(address(0));
     }
 
-    function test_setter_setsExpectedBridgeAdapter(address asset, uint256 chainId, address adapter) public {
+    function test_setBridgeAdapter_setsExpectedBridgeAdapter(address asset, uint256 chainId, address adapter) public {
         vm.assume(asset != address(0));
         vm.assume(chainId != 0);
         vm.assume(adapter != address(0));
@@ -142,7 +142,7 @@ contract EarningChainGatewayTest is Test {
         assertEq(_earningChainGateway.getBridgeAdapter(asset, chainId), adapter);
     }
 
-    function test_setter_reverts_ifZeroAddressAsAdapter() public {
+    function test_setBridgeAdapter_reverts_ifZeroAddressAsAdapter() public {
         EarningChainGateway newEarningChainGateway =
             new EarningChainGateway(admin, EARNING_CHAIN_ID, address(_mockIouTokenManager));
         vm.expectRevert(ErrorsLib.ZeroAddress.selector);
@@ -150,7 +150,7 @@ contract EarningChainGatewayTest is Test {
         newEarningChainGateway.setBridgeAdapter(address(0), EARNING_CHAIN_ID, address(0));
     }
 
-    function test_setter_reverts_ifZeroChainIdAsAdapter() public {
+    function test_setBridgeAdapter_reverts_ifZeroChainIdAsAdapter() public {
         EarningChainGateway newEarningChainGateway =
             new EarningChainGateway(admin, EARNING_CHAIN_ID, address(_mockIouTokenManager));
         vm.expectRevert(ErrorsLib.ZeroChainId.selector);

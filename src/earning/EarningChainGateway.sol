@@ -120,7 +120,7 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
                 data: abi.encode(
                     IChainGateway.BurnIouTokenMessage({
                         iouTokenAmountBurnedRay: iouTokenAmountRay,
-                        chainBalanceSnapshotNonce: _balanceSnapshotNonce++,
+                        chainBalanceSnapshotNonce: _getAndUpdateBalanceSnapshotNonce(),
                         balanceSnapshotTotalAssetsInRay: _getTotalAssetsInRay()
                     })
                 )
@@ -203,13 +203,17 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
         return totalAssetsInRay;
     }
 
+    function _getAndUpdateBalanceSnapshotNonce() internal returns (uint256) {
+        return _balanceSnapshotNonce++;
+    }
+
     function _getBalanceSnapshotData() internal returns (bytes memory) {
         return abi.encode(
             IChainGateway.CrossChainMessage({
                 messageType: IChainGateway.MessageType.BALANCE_SNAPSHOT,
                 data: abi.encode(
                     IChainGateway.BalanceSnapshot({
-                        totalAssetsInRay: _getTotalAssetsInRay(), nonce: _balanceSnapshotNonce++
+                        totalAssetsInRay: _getTotalAssetsInRay(), nonce: _getAndUpdateBalanceSnapshotNonce()
                     })
                 )
             })

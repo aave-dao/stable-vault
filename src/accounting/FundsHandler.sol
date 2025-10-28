@@ -111,7 +111,7 @@ contract FundsHandler is IFundsHandler {
         _pullFundsFromImmediateLiquidity(asset, amount);
         IERC20(asset).forceApprove(_gateway, amount);
         // Increment the chain balance snapshot for the target chain.
-        _updateChainBalancePreBridge(chainId, amount.assetDecimalsToRay(asset));
+        _updateChainBalanceBeforeBridging(chainId, amount.assetDecimalsToRay(asset));
         IAccountingChainGateway(_gateway).sendPushFundsToChainMessage(asset, amount, chainId);
     }
 
@@ -165,7 +165,7 @@ contract FundsHandler is IFundsHandler {
 
     /// @dev This does not update the chain balance snapshot nonce because any potential incoming snapshot data would be
     /// ignored.
-    function _updateChainBalancePreBridge(uint256 chainId, uint256 amountToIncrementRay) internal {
+    function _updateChainBalanceBeforeBridging(uint256 chainId, uint256 amountToIncrementRay) internal {
         bool chainExists;
         for (uint16 i = 0; i < _chainBalances.length; i++) {
             if (_chainBalances[i].chainId == chainId) {
