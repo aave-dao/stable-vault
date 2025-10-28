@@ -5,6 +5,11 @@ import {IFundsHandler} from "../../src/interfaces/IFundsHandler.sol";
 
 contract MockFundsHandler is IFundsHandler {
     mapping(address asset => uint256 balanceRay) _mockedAssetBalancesRay;
+    uint256 _mockedAggregatedBalance;
+
+    function mockAggregatedBalance(uint256 aggregatedBalance) external {
+        _mockedAggregatedBalance = aggregatedBalance;
+    }
 
     function mockAssetBalances(AssetBalance[] memory assetBalances) external {
         for (uint256 i = 0; i < assetBalances.length; i++) {
@@ -13,7 +18,9 @@ contract MockFundsHandler is IFundsHandler {
     }
 
     ////
-    function getAggregatedBalance() external view override returns (uint256) {}
+    function getAggregatedBalance() external view override returns (uint256) {
+        return _mockedAggregatedBalance;
+    }
 
     function getAssetBalances() external view override returns (AssetBalance[] memory) {}
 

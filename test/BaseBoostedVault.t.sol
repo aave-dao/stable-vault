@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {Test} from "forge-std/Test.sol";
-
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {BasedBoostedVault} from "./../src/accounting/BasedBoostedVault.sol";
@@ -11,13 +9,14 @@ import {IFundsHandler} from "./../src/interfaces/IFundsHandler.sol";
 import {AssetLib} from "./../src/libraries/AssetLib.sol";
 import {ErrorsLib} from "./../src/libraries/ErrorsLib.sol";
 import {MathLib} from "./../src/libraries/MathLib.sol";
+import {TestWithHelpers} from "./helpers/TestWithHelpers.sol";
 import {MockAssetRegistry} from "./mocks/MockAssetRegistry.sol";
 import {IMockErc20} from "./mocks/MockErc20.sol";
 import {MockFundsHandler} from "./mocks/MockFundsHandler.sol";
 import {MockIouToken} from "./mocks/MockIouToken.sol";
 import {MockNonStandardErc20} from "./mocks/MockNonStandardErc20.sol";
 
-contract BasedBoostedVaultTest is Test {
+contract BasedBoostedVaultTest is TestWithHelpers {
     using MathLib for uint256;
     using AssetLib for uint256;
     using SafeERC20 for IMockErc20;
@@ -109,6 +108,8 @@ contract BasedBoostedVaultTest is Test {
         IBasedBoostedVault.SubVaultData memory defaultSubVault = bbv.getDefaultSubVault();
         assertEq(userSubVault.id, defaultSubVault.id);
         assertEq(userSubVault.perSecondRate, defaultSubVault.perSecondRate);
+
+        assertEq(bbv.getGlobalOriginalDepositAmount(), AssetLib.assetDecimalsToRay(amount, address(mockAsset)));
     }
 
     function test_deposit_goesToCurrentUserSubVaultIfUserAlreadyHasAPosition(
@@ -155,6 +156,11 @@ contract BasedBoostedVaultTest is Test {
         IBasedBoostedVault.SubVaultData memory userVaultAfterSecondDeposit = bbv.getUserSubVault(user);
         assertEq(userVaultBeforeSecondDeposit.id, userVaultAfterSecondDeposit.id);
         assertEq(userVaultBeforeSecondDeposit.perSecondRate, userVaultAfterSecondDeposit.perSecondRate);
+
+        assertEq(
+            bbv.getGlobalOriginalDepositAmount(),
+            AssetLib.assetDecimalsToRay(firstDepositAmount + secondDepositAmount, address(mockAsset))
+        );
     }
 
     function test_deposit_reverts_ifAmountIsZero(address user) public {
@@ -394,24 +400,18 @@ contract BasedBoostedVaultTest is Test {
         bbv.setDefaultSubVault(invalidPerSecondRate);
     }
 
-    // ////////////////////// HELPERS ////////////////////////
-    // TODO: Move to BaseTest or Helpers contract
+    function test_getVaultAssets_returnsExpectedValue(uint256 expectedAssets) public {
+        expectedAssets = _boundRayAmount(expectedAssets);
 
-    function _boundRate(uint256 rate) internal pure returns (uint256) {
-        return bound(rate, MathLib.RAY, type(uint256).max);
+        mockFundsHandler.mockAggregatedBalance(expectedAssets);
+        vm.expectCall(address(mockFundsHandler), abi.encodeWithSelector(IFundsHandler.getAggregatedBalance.selector));
+
+        uint256 actualAssets = bbv.getVaultAssets();
+
+        assertEq(actualAssets, expectedAssets);
     }
 
-    function _boundAssetAmount(address asset, uint256 amount) internal view returns (uint256) {
-        return bound(amount, 1, 10 ** IMockErc20(asset).decimals());
-    }
-
-    function _boundRayAmount(uint256 amount) internal pure returns (uint256) {
-        return bound(amount, 1, MathLib.RAY);
-    }
-
-    function _boundAmount(uint256 amount, uint256 scaleFactor) internal pure returns (uint256) {
-        return bound(amount, 1, 100_000_000_000_000 * scaleFactor); // 100 trillion
-    }
+    ////////////////////////////// HELPERS ///////////////////////////////
 
     function _setUserRate(address user, uint256 newPerSecondRate) public {
         IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](1);
