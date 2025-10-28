@@ -85,13 +85,13 @@ contract AccountingChainGateway is IAccountingChainGateway, BaseChainGateway {
             .updateChainBalanceCallback(
                 sourceChainId,
                 burnIouTokenMessage.balanceSnapshotTotalAssetsInRay,
-                burnIouTokenMessage.balanceSnapshotTimestamp
+                burnIouTokenMessage.chainBalanceSnapshotNonce
             );
     }
 
     function _updateChainBalanceSnapshot(uint256 sourceChainId, bytes memory data) internal {
         IChainGateway.BalanceSnapshot memory balanceSnapshot = abi.decode(data, (IChainGateway.BalanceSnapshot));
         IFundsHandler(_fundsHandler)
-            .updateChainBalanceCallback(sourceChainId, balanceSnapshot.totalAssetsInRay, balanceSnapshot.timestamp);
+            .updateChainBalanceCallback(sourceChainId, balanceSnapshot.totalAssetsInRay, balanceSnapshot.nonce);
     }
 }

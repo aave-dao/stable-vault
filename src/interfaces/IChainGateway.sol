@@ -7,8 +7,10 @@ import {IBridgeAdapter} from "./IBridgeAdapter.sol";
 /// @dev Assumes bridged assets and bridged data can be handled independently of each other.
 interface IChainGateway {
     error InvalidMessageType();
+    error UnsupportedAdapter();
 
     enum MessageType {
+        INVALID,
         BALANCE_SNAPSHOT,
         BRIDGE_IOUTOKEN,
         BURN_IOUTOKEN
@@ -23,7 +25,7 @@ interface IChainGateway {
     struct BalanceSnapshot {
         // Cumulative balance of all tokens with common denomination in RAY.
         uint256 totalAssetsInRay;
-        uint256 timestamp;
+        uint256 nonce;
     }
 
     struct IouTokenBridgeMessage {
@@ -33,7 +35,7 @@ interface IChainGateway {
 
     struct BurnIouTokenMessage {
         uint256 iouTokenAmountBurnedRay;
-        uint256 balanceSnapshotTimestamp;
+        uint256 chainBalanceSnapshotNonce;
         uint256 balanceSnapshotTotalAssetsInRay;
     }
 
@@ -47,15 +49,16 @@ interface IChainGateway {
     /// @notice Sends an arbitrary message containing instructions or data updates to a destination chain.
     /// @param feeRefundRecipient The address to send the remaining bridge fee to if any. The actual fee is taken from
     /// the msg.sender.
-    /// @param feeToken Token to pay the bridge fee in (must be accepted by the Bridge provider).
-    /// @param feeAmount The amount of fee to pay in the fee token (a refund is provided to the fee payer if necessary).
+    /// @param bridgeFeeToken Token to pay the bridge fee in (must be accepted by the Bridge provider).
+    /// @param bridgeFeeAmount The amount of fee to pay in the fee token (a refund is provided to the fee payer if
+    /// necessary).
     /// @param destinationChainId The chain id of the chain to publish the message to.
     /// @param iouTokenRecipient The address to send the IOU tokens to on the destination chain.
     /// @param iouTokenAmountRay The amount of IOU tokens to bridge.
     function sendBridgeIouTokenMessageWithFeePayer(
         address feeRefundRecipient,
-        address feeToken,
-        uint256 feeAmount,
+        address bridgeFeeToken,
+        uint256 bridgeFeeAmount,
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay

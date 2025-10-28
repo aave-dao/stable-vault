@@ -9,7 +9,6 @@ interface IFundsHandler {
         address asset;
         uint256 amountRay;
         uint256 chainId;
-        uint256 timestamp;
     }
 
     /// @dev Returns the total liquidity across all supported chains in RAY of supported asset denomination.
@@ -36,8 +35,9 @@ interface IFundsHandler {
     /// @dev Updates the chain balance snapshot for a given chain.
     /// @param chainId The chain id of the chain that sent the balance update
     /// @param snapshotBalanceRay The balance snapshot on the source chain in RAY of supported asset denomination
-    /// @param snapshotTimestamp The timestamp of the balance snapshot from the source chain
-    function updateChainBalanceCallback(uint256 chainId, uint256 snapshotBalanceRay, uint256 snapshotTimestamp) external;
+    /// @param chainBalanceSnapshotNonce The nonce of the balance snapshot from the source chain.
+    function updateChainBalanceCallback(uint256 chainId, uint256 snapshotBalanceRay, uint256 chainBalanceSnapshotNonce)
+        external;
 
     function fundsArrivedFromChainCallback(address asset, uint256 amount) external;
 

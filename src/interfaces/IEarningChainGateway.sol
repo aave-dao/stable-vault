@@ -4,6 +4,12 @@ pragma solidity ^0.8.22;
 import {IChainGateway} from "./IChainGateway.sol";
 
 interface IEarningChainGateway is IChainGateway {
+    /// @notice The ID of the Accounting Chain.
+    function getAccountingChainId() external view returns (uint256);
+
+    /// @notice The aggregated balance of the Earning Chain.
+    function getAggregatedBalance() external view returns (uint256);
+
     /// @notice Sends a balance update to the Accounting Chain.
     function sendBalanceUpdate() external;
 

@@ -29,6 +29,7 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
     uint256 internal immutable ACCOUNTING_CHAIN_ID;
     address internal _allocator;
     address internal _manager;
+    uint256 internal _balanceSnapshotNonce;
 
     constructor(address admin, uint256 accountingChainId, address iouTokenManager)
         BaseChainGateway(admin, iouTokenManager)
@@ -36,7 +37,25 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
         ACCOUNTING_CHAIN_ID = accountingChainId;
     }
 
-    function getAggregatedBalance() external view returns (uint256) {
+    function getAdmin() external view returns (address) {
+        return _admin;
+    }
+
+    function getManager() external view returns (address) {
+        return _manager;
+    }
+
+    function getIouTokenManager() external view returns (address) {
+        return IOU_TOKEN_MANAGER;
+    }
+
+    /// @inheritdoc IEarningChainGateway
+    function getAccountingChainId() external view override returns (uint256) {
+        return ACCOUNTING_CHAIN_ID;
+    }
+
+    /// @inheritdoc IEarningChainGateway
+    function getAggregatedBalance() external view override returns (uint256) {
         return _getTotalAssetsInRay();
     }
 
@@ -52,31 +71,8 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
         emit EventLib.AllocatorSet(allocator);
     }
 
-    function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal override {
-        for (uint256 i = 0; i < assets.length; i++) {
-            address asset = assets[i].asset;
-            uint256 amount = assets[i].amount;
-            IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
-            IERC20(asset).forceApprove(_allocator, amount);
-            IAllocator(_allocator).deposit(asset, amount);
-        }
-        // TODO: should this callback be gated behind a flag sent from the Accounting Chain? or should we check gas
-        // left?
-        _sendBalanceUpdate();
-    }
-
-    function _receiveData(uint256 sourceChainId, bytes memory data) internal override {
-        _onlyAdapter(ASSET_FOR_DATA_ONLY_BRIDGE, sourceChainId);
-        IChainGateway.CrossChainMessage memory crossChainMessage = abi.decode(data, (IChainGateway.CrossChainMessage));
-        if (crossChainMessage.messageType == IChainGateway.MessageType.BRIDGE_IOUTOKEN) {
-            _bridgeIouTokenFromAccountingChain(sourceChainId, crossChainMessage.data);
-        } else {
-            revert IChainGateway.InvalidMessageType();
-        }
-    }
-
     /// @inheritdoc IEarningChainGateway
-    function sendBalanceUpdate() external onlyManager {
+    function sendBalanceUpdate() external override onlyManager {
         _sendBalanceUpdate();
     }
 
@@ -84,6 +80,7 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
     function sendBalanceUpdateWithFeePayer(address bridgeFeePayer, address bridgeFeeToken, uint256 bridgeFeeAmount)
         external
         payable
+        override
     {
         IBridgeAdapter(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID])
         .publishMessageToChainWithFeePayer{
@@ -106,7 +103,12 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
         address bridgeFeePayer,
         address bridgeFeeToken,
         uint256 bridgeFeeAmount
-    ) external payable returns (uint256) {
+    ) external payable override returns (uint256) {
+        require(iouTokenAmountRay > 0, ErrorsLib.ZeroAmount());
+        require(bridgeFeeAmount > 0, ErrorsLib.ZeroAmount());
+        if (bridgeFeeToken == address(0)) {
+            require(msg.value >= bridgeFeeAmount, ErrorsLib.InsufficientFunds());
+        }
         // TODO: apply a withdrawal fee here?
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(msg.sender, iouTokenAmountRay);
         uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(tokenOut);
@@ -118,7 +120,7 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
                 data: abi.encode(
                     IChainGateway.BurnIouTokenMessage({
                         iouTokenAmountBurnedRay: iouTokenAmountRay,
-                        balanceSnapshotTimestamp: block.timestamp,
+                        chainBalanceSnapshotNonce: _getAndUpdateBalanceSnapshotNonce(),
                         balanceSnapshotTotalAssetsInRay: _getTotalAssetsInRay()
                     })
                 )
@@ -139,10 +141,31 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
         return amountOut;
     }
 
-    // TODO: This needs to have a better name?
-    function exit(address asset, uint256 amount) external onlyManager {
+    /// @inheritdoc IEarningChainGateway
+    function exit(address asset, uint256 amount) external override onlyManager {
+        require(amount > 0, ErrorsLib.ZeroAmount());
         IAllocator(_allocator).withdraw(asset, amount);
         _returnFunds(asset, amount);
+    }
+
+    function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal override {
+        for (uint256 i = 0; i < assets.length; i++) {
+            address asset = assets[i].asset;
+            uint256 amount = assets[i].amount;
+            IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
+            IERC20(asset).forceApprove(_allocator, amount);
+            IAllocator(_allocator).deposit(asset, amount);
+        }
+    }
+
+    function _receiveData(uint256 sourceChainId, bytes memory data) internal override {
+        _onlyAdapter(ASSET_FOR_DATA_ONLY_BRIDGE, sourceChainId);
+        IChainGateway.CrossChainMessage memory crossChainMessage = abi.decode(data, (IChainGateway.CrossChainMessage));
+        if (crossChainMessage.messageType == IChainGateway.MessageType.BRIDGE_IOUTOKEN) {
+            _bridgeIouTokenFromAccountingChain(sourceChainId, crossChainMessage.data);
+        } else {
+            revert IChainGateway.InvalidMessageType();
+        }
     }
 
     function _bridgeIouTokenFromAccountingChain(
@@ -167,7 +190,7 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
     }
 
     function _sendBalanceUpdate() internal {
-        IBridgeAdapter(_bridgeAdapter[address(0)][ACCOUNTING_CHAIN_ID])
+        IBridgeAdapter(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID])
             .publishMessageToChain(ACCOUNTING_CHAIN_ID, new IBridgeAdapter.BridgeAsset[](0), _getBalanceSnapshotData());
     }
 
@@ -180,13 +203,20 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
         return totalAssetsInRay;
     }
 
-    function _getBalanceSnapshotData() internal view returns (bytes memory) {
+    /// @dev Increments the balance snapshot nonce and returns the new nonce
+    /// @dev Assumes the Accounting Chain does not allow non-replayable nonces, so the new nonce sent is always higher
+    /// than the previous nonce stored on Accounting Chain.
+    function _getAndUpdateBalanceSnapshotNonce() internal returns (uint256) {
+        return ++_balanceSnapshotNonce;
+    }
+
+    function _getBalanceSnapshotData() internal returns (bytes memory) {
         return abi.encode(
             IChainGateway.CrossChainMessage({
                 messageType: IChainGateway.MessageType.BALANCE_SNAPSHOT,
                 data: abi.encode(
                     IChainGateway.BalanceSnapshot({
-                        totalAssetsInRay: _getTotalAssetsInRay(), timestamp: block.timestamp
+                        totalAssetsInRay: _getTotalAssetsInRay(), nonce: _getAndUpdateBalanceSnapshotNonce()
                     })
                 )
             })

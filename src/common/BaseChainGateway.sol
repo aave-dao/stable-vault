@@ -12,8 +12,6 @@ import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 abstract contract BaseChainGateway is IChainGateway {
     using SafeERC20 for IERC20;
 
-    error UnsupportedAdapter();
-
     address internal constant FEE_ON_NATIVE_CURRENCY = address(0);
     address internal constant ASSET_FOR_DATA_ONLY_BRIDGE = address(0);
     address internal immutable IOU_TOKEN_MANAGER;
@@ -31,6 +29,8 @@ abstract contract BaseChainGateway is IChainGateway {
     mapping(address asset => mapping(uint256 chainId => address adapter)) internal _bridgeAdapter;
 
     constructor(address admin, address iouTokenManager) {
+        require(admin != address(0), ErrorsLib.ZeroAddress());
+        require(iouTokenManager != address(0), ErrorsLib.ZeroAddress());
         IOU_TOKEN_MANAGER = iouTokenManager;
         _admin = admin;
     }
@@ -51,8 +51,8 @@ abstract contract BaseChainGateway is IChainGateway {
     /// @inheritdoc IChainGateway
     function sendBridgeIouTokenMessageWithFeePayer(
         address feeRefundRecipient,
-        address feeToken,
-        uint256 feeAmount,
+        address bridgeFeeToken,
+        uint256 bridgeFeeAmount,
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay
@@ -60,16 +60,21 @@ abstract contract BaseChainGateway is IChainGateway {
         require(msg.sender == IOU_TOKEN_MANAGER, ErrorsLib.InvalidMessageSender());
         require(destinationChainId != block.chainid, ErrorsLib.InvalidDestinationChainId());
 
-        if (feeToken != FEE_ON_NATIVE_CURRENCY) {
-            IERC20(feeToken).safeTransferFrom(msg.sender, address(this), feeAmount);
-            IERC20(feeToken).forceApprove(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId], feeAmount);
+        if (bridgeFeeToken == address(0)) {
+            require(msg.value >= bridgeFeeAmount, ErrorsLib.InsufficientFunds());
+        }
+
+        if (bridgeFeeToken != FEE_ON_NATIVE_CURRENCY) {
+            IERC20(bridgeFeeToken).safeTransferFrom(msg.sender, address(this), bridgeFeeAmount);
+            IERC20(bridgeFeeToken)
+                .forceApprove(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId], bridgeFeeAmount);
         }
 
         IBridgeAdapter(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId])
             .publishMessageToChainWithFeePayer(
                 feeRefundRecipient,
-                feeToken,
-                feeAmount,
+                bridgeFeeToken,
+                bridgeFeeAmount,
                 destinationChainId,
                 new IBridgeAdapter.BridgeAsset[](0),
                 abi.encode(
@@ -94,6 +99,8 @@ abstract contract BaseChainGateway is IChainGateway {
     }
 
     function setBridgeAdapter(address asset, uint256 chainId, address adapter) external onlyAdmin {
+        require(chainId != 0, ErrorsLib.ZeroChainId());
+        require(adapter != address(0), ErrorsLib.ZeroAddress());
         _bridgeAdapter[asset][chainId] = adapter;
     }
 

@@ -5,6 +5,9 @@ library ErrorsLib {
     /// @notice Address checked is the zero address.
     error ZeroAddress();
 
+    /// @notice Chain id checked is zero.
+    error ZeroChainId();
+
     /// @notice Token amount checked is zero.
     error ZeroAmount();
 
@@ -40,6 +43,9 @@ library ErrorsLib {
 
     /// @notice Insufficient amount due to slippage tolerance being exceeded.
     error InsufficientAmountOut();
+
+    /// @notice Insufficient funds.
+    error InsufficientFunds();
 
     /// @notice Not enough liquidity to cover the withdrawal.
     error InsufficientLiquidity();
