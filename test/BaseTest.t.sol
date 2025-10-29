@@ -7,6 +7,7 @@ import {console} from "forge-std/console.sol";
 import {AssetRegistry} from "../src/common/AssetRegistry.sol";
 import {IouToken} from "../src/common/IouToken.sol";
 import {IouTokenManager} from "../src/common/IouTokenManager.sol";
+import {IAssetRegistry} from "../src/interfaces/IAssetRegistry.sol";
 import {AccountingChainGateway} from "./../src/accounting/AccountingChainGateway.sol";
 import {FundsHandler} from "./../src/accounting/FundsHandler.sol";
 import {CcipAdapter} from "./../src/bridging/CcipAdapter.sol";
@@ -101,8 +102,16 @@ contract BaseTest is Test {
         // Asset Registry Vault/4626
         assetRegistry_accountingChain = new AssetRegistry(address(this));
         // Enable everything for assets
-        assetRegistry_accountingChain.setAssetConfigBitmap(address(GHO), type(uint256).max);
-        assetRegistry_accountingChain.setAssetConfigBitmap(address(USDC), type(uint256).max);
+        IAssetRegistry.AssetConfig memory unrestrictedAssetConfig = IAssetRegistry.AssetConfig({
+            depositIntoBBVAllowed: true,
+            withdrawFromBBVAllowed: true,
+            depositIntoAllocatorAllowed: true,
+            withdrawFromAllocatorAllowed: true,
+            swapInputTokenAllowed: true,
+            swapOutputTokenAllowed: true
+        });
+        assetRegistry_accountingChain.setAssetConfig(address(GHO), unrestrictedAssetConfig);
+        assetRegistry_accountingChain.setAssetConfig(address(USDC), unrestrictedAssetConfig);
         iouToken_accountingChain = new IouToken(address(this));
         console.log("\tIOU Token (Accounting Chain): %s", address(iouToken_accountingChain));
         iouTokenManager_accountingChain = new IouTokenManager(address(iouToken_accountingChain), true);
@@ -148,8 +157,8 @@ contract BaseTest is Test {
         console.log("\nEarning Chain:");
         assetRegistry_earningChain = new AssetRegistry(address(this));
         // Enable everything for assets
-        assetRegistry_earningChain.setAssetConfigBitmap(address(GHO), type(uint256).max);
-        assetRegistry_earningChain.setAssetConfigBitmap(address(USDC), type(uint256).max);
+        assetRegistry_earningChain.setAssetConfig(address(GHO), unrestrictedAssetConfig);
+        assetRegistry_earningChain.setAssetConfig(address(USDC), unrestrictedAssetConfig);
         ccipAdapter_earningChain = new CcipAdapter(admin, address(mockCcipRouter));
         iouToken_earningChain = new IouToken(address(this));
         console.log("\tIOU Token (Earning Chain): %s", address(iouToken_earningChain));

@@ -21,6 +21,7 @@ contract IouTokenManager is IIouTokenManager {
     address internal immutable IOU_TOKEN;
     bool internal immutable IS_CONANICAL_CHAIN;
 
+    // TODO: make this immutable in the Address Book
     address internal _chainGateway;
     uint256 internal _lockedBalance;
 
