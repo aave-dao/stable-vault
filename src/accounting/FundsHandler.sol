@@ -54,7 +54,7 @@ contract FundsHandler is RescuableAssets, IFundsHandler {
     }
 
     /// @inheritdoc IFundsHandler
-    function getAggregatedBalance() external view returns (uint256) {
+    function getAggregatedBalance() external view override returns (uint256) {
         IAllocator.AllocatorBalance[] memory allocatorAssets = IAllocator(_allocator).getAssetBalances();
 
         uint256 totalBalanceRay;
@@ -69,7 +69,7 @@ contract FundsHandler is RescuableAssets, IFundsHandler {
     }
 
     /// @inheritdoc IFundsHandler
-    function getAssetBalances() external view returns (AssetBalance[] memory) {
+    function getAssetBalances() external view override returns (AssetBalance[] memory) {
         IAllocator.AllocatorBalance[] memory allocatorAssets = IAllocator(_allocator).getAssetBalances();
         AssetBalance[] memory balances = new AssetBalance[](allocatorAssets.length + _chainBalances.length);
         for (uint16 i = 0; i < allocatorAssets.length; i++) {
@@ -88,7 +88,7 @@ contract FundsHandler is RescuableAssets, IFundsHandler {
     }
 
     /// @inheritdoc IFundsHandler
-    function processDeposit(address asset, uint256 amount) external onlyBaseBoostedVault {
+    function processDeposit(address asset, uint256 amount) external override onlyBaseBoostedVault {
         _pushFundsToImmediateLiquidity(asset, amount);
     }
 
@@ -100,7 +100,7 @@ contract FundsHandler is RescuableAssets, IFundsHandler {
     }
 
     /// @inheritdoc IFundsHandler
-    function pullFromLiquidity(address asset, uint256 amount) external onlyBaseBoostedVault {
+    function pullFromLiquidity(address asset, uint256 amount) external override onlyBaseBoostedVault {
         _pullFundsFromImmediateLiquidity(asset, amount);
         // TODO: Check if we don't need to do increaseApproval here (re-entrancy, multi-withdrawal, etc)
         IERC20(asset).forceApprove(_basedBoostedVault, amount);
@@ -109,7 +109,7 @@ contract FundsHandler is RescuableAssets, IFundsHandler {
     // Manager Functions
 
     /// @inheritdoc IFundsHandler
-    function pushFundsToChain(address asset, uint256 amount, uint256 chainId) external onlyManager {
+    function pushFundsToChain(address asset, uint256 amount, uint256 chainId) external override onlyManager {
         _pullFundsFromImmediateLiquidity(asset, amount);
         IERC20(asset).forceApprove(_gateway, amount);
         // Increment the chain balance snapshot for the target chain.
@@ -126,7 +126,7 @@ contract FundsHandler is RescuableAssets, IFundsHandler {
 
     /// @inheritdoc IFundsHandler
     function updateChainBalanceCallback(uint256 chainId, uint256 snapshotBalanceRay, uint256 chainBalanceSnapshotNonce)
-        external
+        external override
         onlyGateway
     {
         _updateChainBalance(chainId, snapshotBalanceRay, chainBalanceSnapshotNonce);
@@ -134,7 +134,7 @@ contract FundsHandler is RescuableAssets, IFundsHandler {
 
     /// @inheritdoc IFundsHandler
     /// @dev Caller must have have transferred funds to this contract
-    function fundsArrivedFromChainCallback(address asset, uint256 amount) external onlyGateway {
+    function fundsArrivedFromChainCallback(address asset, uint256 amount) external override onlyGateway {
         _pushFundsToImmediateLiquidity(asset, amount);
     }
 

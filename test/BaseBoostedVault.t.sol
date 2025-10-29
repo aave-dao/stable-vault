@@ -400,13 +400,13 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         bbv.setDefaultSubVault(invalidPerSecondRate);
     }
 
-    function test_getVaultAssets_returnsExpectedValue(uint256 expectedAssets) public {
+    function test_getAggregatedBalance_returnsExpectedValue(uint256 expectedAssets) public {
         expectedAssets = _boundRayAmount(expectedAssets);
 
         mockFundsHandler.mockAggregatedBalance(expectedAssets);
         vm.expectCall(address(mockFundsHandler), abi.encodeWithSelector(IFundsHandler.getAggregatedBalance.selector));
 
-        uint256 actualAssets = bbv.getVaultAssets();
+        uint256 actualAssets = bbv.getAggregatedBalance();
 
         assertEq(actualAssets, expectedAssets);
     }

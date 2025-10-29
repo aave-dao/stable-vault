@@ -82,7 +82,7 @@ interface IBasedBoostedVault {
     function getVaultObligations() external view returns (uint256);
 
     /// @return Aggregated amount of assets either idle or allocated to strategies in RAY of denomination asset.
-    function getVaultAssets() external view returns (uint256);
+    function getAggregatedBalance() external view returns (uint256);
 
     /// @return Balance of a user in RAY of denomination asset.
     function getUserBalance(address user) external view returns (uint256);

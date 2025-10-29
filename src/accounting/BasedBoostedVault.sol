@@ -332,7 +332,7 @@ contract BasedBoostedVault is Ownable, RescuableAssets, IBasedBoostedVault {
     }
 
     /// @inheritdoc IBasedBoostedVault
-    function getVaultAssets() external view override returns (uint256) {
+    function getAggregatedBalance() external view override returns (uint256) {
         return _getVaultAggregatedBalance();
     }
 
