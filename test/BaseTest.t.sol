@@ -249,6 +249,15 @@ contract BaseTest is Test {
         ccipAdapter_earningChain.setChainSelector(ACCOUNTING_CHAIN_ID, ACCOUNTING_CHAIN_CCIP_SELECTOR);
         ccipAdapter_accountingChain.setDestinationChainAdapter(EARNING_CHAIN_ID, address(ccipAdapter_earningChain));
         ccipAdapter_earningChain.setDestinationChainAdapter(ACCOUNTING_CHAIN_ID, address(ccipAdapter_accountingChain));
+
+        // Set up Allocator on Accounting chain
+        allocator_accountingChain.addVault(address(GHO), address(ghoStrategyVault_accountingChain));
+        allocator_accountingChain.addVault(address(USDC), address(usdcStrategyVault_accountingChain));
+
+        // Set up Allocator on Earning chain
+        allocator_earningChain.addVault(address(GHO), address(ghoStrategyVault_earningChain));
+        allocator_earningChain.addVault(address(USDC), address(usdcStrategyVault_earningChain));
+
         vm.stopPrank();
 
         // ------------------------------------------------
@@ -256,16 +265,10 @@ contract BaseTest is Test {
         // ------------------------------------------------
 
         vm.startPrank(manager);
-        // Set up strategies on Accounting chain
-        allocator_accountingChain.setVault(address(GHO), address(ghoStrategyVault_accountingChain), true);
+        // Set default vaults for assets
         allocator_accountingChain.setDefaultVault(address(GHO), address(ghoStrategyVault_accountingChain));
-        allocator_accountingChain.setVault(address(USDC), address(usdcStrategyVault_accountingChain), true);
         allocator_accountingChain.setDefaultVault(address(USDC), address(usdcStrategyVault_accountingChain));
-
-        // Set up strategies on Earning chain
-        allocator_earningChain.setVault(address(GHO), address(ghoStrategyVault_earningChain), true);
         allocator_earningChain.setDefaultVault(address(GHO), address(ghoStrategyVault_earningChain));
-        allocator_earningChain.setVault(address(USDC), address(usdcStrategyVault_earningChain), true);
         allocator_earningChain.setDefaultVault(address(USDC), address(usdcStrategyVault_earningChain));
 
         vm.stopPrank();

@@ -4,10 +4,10 @@ pragma solidity ^0.8.22;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {RescuableAssets} from "./RescuableAssets.sol";
 import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
+import {RescuableAssets} from "./RescuableAssets.sol";
 
 abstract contract BaseChainGateway is RescuableAssets, IChainGateway {
     using SafeERC20 for IERC20;
@@ -108,6 +108,16 @@ abstract contract BaseChainGateway is RescuableAssets, IChainGateway {
         require(adapter != address(0), ErrorsLib.ZeroAddress());
         _bridgeAdapter[asset][chainId] = adapter;
     }
+
+    function addBridgeAdapter(address asset, uint256 chainId, address adapter) external onlyAdmin {
+        require(chainId != 0, ErrorsLib.ZeroChainId());
+        require(adapter != address(0), ErrorsLib.ZeroAddress());
+        _bridgeAdapter[asset][chainId] = adapter;
+    }
+
+    function removeBridgeAdapter(address asset, uint256 chainId, address adapter) external onlyAdmin {}
+
+    function setDefaultAdapter(address asset, uint256 chainId, address adapter) external onlyAdmin {}
 
     function _onlyAdapter(address asset, uint256 sourceChainId) internal view {
         require(_bridgeAdapter[asset][sourceChainId] == msg.sender, UnsupportedAdapter());

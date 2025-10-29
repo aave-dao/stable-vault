@@ -198,7 +198,7 @@ contract BasedBoostedVault is Ownable, RescuableAssets, IBasedBoostedVault {
     }
 
     /// @inheritdoc RescuableAssets
-    function rescueTokens(address asset, uint256 amount) public override onlyManager() {
+    function rescueTokens(address asset, uint256 amount) public override onlyManager {
         super.rescueTokens(asset, amount);
     }
 

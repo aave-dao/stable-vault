@@ -207,12 +207,13 @@ contract Allocator is IAllocator {
     }
 
     /// @inheritdoc IAllocator
-    function setVault(address asset, address vault, bool isAllowed) external onlyManager {
-        if (isAllowed) {
-            _addVault(asset, vault);
-        } else {
-            _removeVault(vault);
-        }
+    function addVault(address asset, address vault) external override onlyAdmin {
+        _addVault(asset, vault);
+    }
+
+    /// @inheritdoc IAllocator
+    function removeVault(address vault) external override onlyAdmin {
+        _removeVault(vault);
     }
 
     /// @inheritdoc IAllocator

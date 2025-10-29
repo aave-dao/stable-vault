@@ -29,6 +29,7 @@ contract MockAllocator is IAllocator {
     function setManager(address newManager) external override {}
     function setDepositor(address depositor, bool whitelisted) external override {}
     function setWithdrawer(address withdrawer, bool whitelisted) external override {}
-    function setVault(address asset, address vault, bool isAllowed) external override {}
+    function addVault(address asset, address vault) external override {}
+    function removeVault(address vault) external override {}
     function setDefaultVault(address asset, address vault) external override {}
 }
