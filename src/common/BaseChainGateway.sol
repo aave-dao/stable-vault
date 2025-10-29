@@ -4,12 +4,12 @@ pragma solidity ^0.8.22;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
+import {RescuableAssets} from "./RescuableAssets.sol";
 import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
-abstract contract BaseChainGateway is IChainGateway {
+abstract contract BaseChainGateway is RescuableAssets, IChainGateway {
     using SafeERC20 for IERC20;
 
     address internal constant FEE_ON_NATIVE_CURRENCY = address(0);
@@ -88,6 +88,11 @@ abstract contract BaseChainGateway is IChainGateway {
                     })
                 )
             );
+    }
+
+    /// @inheritdoc RescuableAssets
+    function rescueTokens(address asset, uint256 amount) public override onlyAdmin {
+        super.rescueTokens(asset, amount);
     }
 
     function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal virtual;

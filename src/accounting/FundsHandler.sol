@@ -4,14 +4,16 @@ pragma solidity ^0.8.22;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+import {RescuableAssets} from "../common/RescuableAssets.sol";
 import {IAccountingChainGateway} from "../interfaces/IAccountingChainGateway.sol";
 import {IAllocator} from "../interfaces/IAllocator.sol";
 import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
 import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
-// TODO: consider making it a library instead
-contract FundsHandler is IFundsHandler {
+/// @title FundsHandler
+/// @notice Handles push/pull of funds across the system.
+contract FundsHandler is RescuableAssets, IFundsHandler {
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
 
@@ -115,10 +117,9 @@ contract FundsHandler is IFundsHandler {
         IAccountingChainGateway(_gateway).sendPushFundsToChainMessage(asset, amount, chainId);
     }
 
-    /// @inheritdoc IFundsHandler
-    function rescueTokens(address asset, uint256 amount) external onlyManager {
-        // TODO: send to treasury? If so can make this public.
-        IERC20(asset).safeTransfer(msg.sender, amount);
+    /// @inheritdoc RescuableAssets
+    function rescueTokens(address asset, uint256 amount) public override onlyManager {
+        super.rescueTokens(asset, amount);
     }
 
     // Gateway Functions
