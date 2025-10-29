@@ -206,39 +206,55 @@ contract BaseTest is Test {
 
         // Set up Accounting Chain Gateway (Accounting chain) // These should be done cross-wise cause it's destination
         // chainId
-        accountingChainGateway.setBridgeAdapter(address(GHO), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain));
+        accountingChainGateway.addBridgeAdapter(address(GHO), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain));
+        accountingChainGateway.setDefaultBridgeAdapter(
+            address(GHO), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain)
+        );
         console.log(
             "\tAccountingChainGateway GHO adapter (Accounting Chain): %s",
-            accountingChainGateway.getBridgeAdapter(address(GHO), EARNING_CHAIN_ID)
+            accountingChainGateway.getDefaultBridgeAdapter(address(GHO), EARNING_CHAIN_ID)
         );
-        accountingChainGateway.setBridgeAdapter(address(USDC), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain));
+        accountingChainGateway.addBridgeAdapter(address(USDC), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain));
+        accountingChainGateway.setDefaultBridgeAdapter(
+            address(USDC), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain)
+        );
         console.log(
             "\tAccountingChainGateway USDC adapter (Accounting Chain): %s",
-            accountingChainGateway.getBridgeAdapter(address(USDC), EARNING_CHAIN_ID)
+            accountingChainGateway.getDefaultBridgeAdapter(address(USDC), EARNING_CHAIN_ID)
         );
-        accountingChainGateway.setBridgeAdapter(address(0), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain));
+        accountingChainGateway.addBridgeAdapter(address(0), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain));
+        accountingChainGateway.setDefaultBridgeAdapter(
+            address(0), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain)
+        );
         console.log(
             "\tAccountingChainGateway Message adapter (Accounting Chain): %s",
-            accountingChainGateway.getBridgeAdapter(address(0), EARNING_CHAIN_ID)
+            accountingChainGateway.getDefaultBridgeAdapter(address(0), EARNING_CHAIN_ID)
         );
 
         // Set up Earning Chain Gateway (Earning chain)
         earningChainGateway.setManager(manager);
         earningChainGateway.setAllocator(address(allocator_earningChain));
-        earningChainGateway.setBridgeAdapter(address(GHO), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
+        earningChainGateway.addBridgeAdapter(address(GHO), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
+        earningChainGateway.setDefaultBridgeAdapter(
+            address(GHO), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain)
+        );
         console.log(
             "\tEarningChainGatway GHO adapter (Earning Chain): %s",
-            earningChainGateway.getBridgeAdapter(address(GHO), ACCOUNTING_CHAIN_ID)
+            earningChainGateway.getDefaultBridgeAdapter(address(GHO), ACCOUNTING_CHAIN_ID)
         );
-        earningChainGateway.setBridgeAdapter(address(USDC), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
+        earningChainGateway.addBridgeAdapter(address(USDC), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
+        earningChainGateway.setDefaultBridgeAdapter(
+            address(USDC), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain)
+        );
         console.log(
             "\tEarningChainGatway USDC adapter (Earning Chain): %s",
-            earningChainGateway.getBridgeAdapter(address(USDC), ACCOUNTING_CHAIN_ID)
+            earningChainGateway.getDefaultBridgeAdapter(address(USDC), ACCOUNTING_CHAIN_ID)
         );
-        earningChainGateway.setBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
+        earningChainGateway.addBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
+        earningChainGateway.setDefaultBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
         console.log(
             "\tEarningChainGatway Messages adapter (Earning Chain): %s",
-            earningChainGateway.getBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID)
+            earningChainGateway.getDefaultBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID)
         );
 
         ccipAdapter_accountingChain.setGateway(address(accountingChainGateway));

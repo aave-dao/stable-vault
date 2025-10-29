@@ -9,6 +9,10 @@ interface IChainGateway {
     error InvalidMessageType();
     error UnsupportedAdapter();
 
+    event BridgeAdapterAdded(address asset, uint256 chainId, address adapter);
+    event BridgeAdapterRemoved(address asset, uint256 chainId, address adapter);
+    event DefaultBridgeAdapterSet(address asset, uint256 chainId, address adapter);
+
     enum MessageType {
         INVALID,
         BALANCE_SNAPSHOT,
