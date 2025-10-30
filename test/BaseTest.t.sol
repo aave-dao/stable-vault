@@ -7,6 +7,7 @@ import {console} from "forge-std/console.sol";
 import {AssetRegistry} from "../src/common/AssetRegistry.sol";
 import {IouToken} from "../src/common/IouToken.sol";
 import {IouTokenManager} from "../src/common/IouTokenManager.sol";
+import {IAssetRegistry} from "../src/interfaces/IAssetRegistry.sol";
 import {AccountingChainGateway} from "./../src/accounting/AccountingChainGateway.sol";
 import {FundsHandler} from "./../src/accounting/FundsHandler.sol";
 import {CcipAdapter} from "./../src/bridging/CcipAdapter.sol";
@@ -101,8 +102,16 @@ contract BaseTest is Test {
         // Asset Registry Vault/4626
         assetRegistry_accountingChain = new AssetRegistry(address(this));
         // Enable everything for assets
-        assetRegistry_accountingChain.setAssetConfigBitmap(address(GHO), type(uint256).max);
-        assetRegistry_accountingChain.setAssetConfigBitmap(address(USDC), type(uint256).max);
+        IAssetRegistry.AssetConfig memory unrestrictedAssetConfig = IAssetRegistry.AssetConfig({
+            depositIntoBBVAllowed: true,
+            withdrawFromBBVAllowed: true,
+            depositIntoAllocatorAllowed: true,
+            withdrawFromAllocatorAllowed: true,
+            swapInputTokenAllowed: true,
+            swapOutputTokenAllowed: true
+        });
+        assetRegistry_accountingChain.setAssetConfig(address(GHO), unrestrictedAssetConfig);
+        assetRegistry_accountingChain.setAssetConfig(address(USDC), unrestrictedAssetConfig);
         iouToken_accountingChain = new IouToken(address(this));
         console.log("\tIOU Token (Accounting Chain): %s", address(iouToken_accountingChain));
         iouTokenManager_accountingChain = new IouTokenManager(address(iouToken_accountingChain), true);
@@ -148,8 +157,8 @@ contract BaseTest is Test {
         console.log("\nEarning Chain:");
         assetRegistry_earningChain = new AssetRegistry(address(this));
         // Enable everything for assets
-        assetRegistry_earningChain.setAssetConfigBitmap(address(GHO), type(uint256).max);
-        assetRegistry_earningChain.setAssetConfigBitmap(address(USDC), type(uint256).max);
+        assetRegistry_earningChain.setAssetConfig(address(GHO), unrestrictedAssetConfig);
+        assetRegistry_earningChain.setAssetConfig(address(USDC), unrestrictedAssetConfig);
         ccipAdapter_earningChain = new CcipAdapter(admin, address(mockCcipRouter));
         iouToken_earningChain = new IouToken(address(this));
         console.log("\tIOU Token (Earning Chain): %s", address(iouToken_earningChain));
@@ -197,39 +206,55 @@ contract BaseTest is Test {
 
         // Set up Accounting Chain Gateway (Accounting chain) // These should be done cross-wise cause it's destination
         // chainId
-        accountingChainGateway.setBridgeAdapter(address(GHO), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain));
+        accountingChainGateway.addBridgeAdapter(address(GHO), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain));
+        accountingChainGateway.setDefaultBridgeAdapter(
+            address(GHO), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain)
+        );
         console.log(
             "\tAccountingChainGateway GHO adapter (Accounting Chain): %s",
-            accountingChainGateway.getBridgeAdapter(address(GHO), EARNING_CHAIN_ID)
+            accountingChainGateway.getDefaultBridgeAdapter(address(GHO), EARNING_CHAIN_ID)
         );
-        accountingChainGateway.setBridgeAdapter(address(USDC), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain));
+        accountingChainGateway.addBridgeAdapter(address(USDC), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain));
+        accountingChainGateway.setDefaultBridgeAdapter(
+            address(USDC), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain)
+        );
         console.log(
             "\tAccountingChainGateway USDC adapter (Accounting Chain): %s",
-            accountingChainGateway.getBridgeAdapter(address(USDC), EARNING_CHAIN_ID)
+            accountingChainGateway.getDefaultBridgeAdapter(address(USDC), EARNING_CHAIN_ID)
         );
-        accountingChainGateway.setBridgeAdapter(address(0), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain));
+        accountingChainGateway.addBridgeAdapter(address(0), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain));
+        accountingChainGateway.setDefaultBridgeAdapter(
+            address(0), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain)
+        );
         console.log(
             "\tAccountingChainGateway Message adapter (Accounting Chain): %s",
-            accountingChainGateway.getBridgeAdapter(address(0), EARNING_CHAIN_ID)
+            accountingChainGateway.getDefaultBridgeAdapter(address(0), EARNING_CHAIN_ID)
         );
 
         // Set up Earning Chain Gateway (Earning chain)
         earningChainGateway.setManager(manager);
         earningChainGateway.setAllocator(address(allocator_earningChain));
-        earningChainGateway.setBridgeAdapter(address(GHO), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
+        earningChainGateway.addBridgeAdapter(address(GHO), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
+        earningChainGateway.setDefaultBridgeAdapter(
+            address(GHO), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain)
+        );
         console.log(
             "\tEarningChainGatway GHO adapter (Earning Chain): %s",
-            earningChainGateway.getBridgeAdapter(address(GHO), ACCOUNTING_CHAIN_ID)
+            earningChainGateway.getDefaultBridgeAdapter(address(GHO), ACCOUNTING_CHAIN_ID)
         );
-        earningChainGateway.setBridgeAdapter(address(USDC), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
+        earningChainGateway.addBridgeAdapter(address(USDC), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
+        earningChainGateway.setDefaultBridgeAdapter(
+            address(USDC), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain)
+        );
         console.log(
             "\tEarningChainGatway USDC adapter (Earning Chain): %s",
-            earningChainGateway.getBridgeAdapter(address(USDC), ACCOUNTING_CHAIN_ID)
+            earningChainGateway.getDefaultBridgeAdapter(address(USDC), ACCOUNTING_CHAIN_ID)
         );
-        earningChainGateway.setBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
+        earningChainGateway.addBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
+        earningChainGateway.setDefaultBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
         console.log(
             "\tEarningChainGatway Messages adapter (Earning Chain): %s",
-            earningChainGateway.getBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID)
+            earningChainGateway.getDefaultBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID)
         );
 
         ccipAdapter_accountingChain.setGateway(address(accountingChainGateway));
@@ -240,6 +265,15 @@ contract BaseTest is Test {
         ccipAdapter_earningChain.setChainSelector(ACCOUNTING_CHAIN_ID, ACCOUNTING_CHAIN_CCIP_SELECTOR);
         ccipAdapter_accountingChain.setDestinationChainAdapter(EARNING_CHAIN_ID, address(ccipAdapter_earningChain));
         ccipAdapter_earningChain.setDestinationChainAdapter(ACCOUNTING_CHAIN_ID, address(ccipAdapter_accountingChain));
+
+        // Set up Allocator on Accounting chain
+        allocator_accountingChain.addVault(address(GHO), address(ghoStrategyVault_accountingChain));
+        allocator_accountingChain.addVault(address(USDC), address(usdcStrategyVault_accountingChain));
+
+        // Set up Allocator on Earning chain
+        allocator_earningChain.addVault(address(GHO), address(ghoStrategyVault_earningChain));
+        allocator_earningChain.addVault(address(USDC), address(usdcStrategyVault_earningChain));
+
         vm.stopPrank();
 
         // ------------------------------------------------
@@ -247,16 +281,10 @@ contract BaseTest is Test {
         // ------------------------------------------------
 
         vm.startPrank(manager);
-        // Set up strategies on Accounting chain
-        allocator_accountingChain.setVault(address(GHO), address(ghoStrategyVault_accountingChain), true);
+        // Set default vaults for assets
         allocator_accountingChain.setDefaultVault(address(GHO), address(ghoStrategyVault_accountingChain));
-        allocator_accountingChain.setVault(address(USDC), address(usdcStrategyVault_accountingChain), true);
         allocator_accountingChain.setDefaultVault(address(USDC), address(usdcStrategyVault_accountingChain));
-
-        // Set up strategies on Earning chain
-        allocator_earningChain.setVault(address(GHO), address(ghoStrategyVault_earningChain), true);
         allocator_earningChain.setDefaultVault(address(GHO), address(ghoStrategyVault_earningChain));
-        allocator_earningChain.setVault(address(USDC), address(usdcStrategyVault_earningChain), true);
         allocator_earningChain.setDefaultVault(address(USDC), address(usdcStrategyVault_earningChain));
 
         vm.stopPrank();

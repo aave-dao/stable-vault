@@ -5,6 +5,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+import {RescuableAssets} from "../common/RescuableAssets.sol";
 import {IAssetRegistry} from "../interfaces/IAssetRegistry.sol";
 import {IBasedBoostedVault} from "../interfaces/IBasedBoostedVault.sol";
 import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
@@ -13,9 +14,11 @@ import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {MathLib} from "../libraries/MathLib.sol";
 
+/// @title BasedBoostedVault.
+/// @notice Semi-fixed rate vault.
 /// @dev Assets balances are tracked in RAY internally; conversions from and to specific asset denomination is made on
 /// deposit and on withdrawal execution.
-contract BasedBoostedVault is Ownable, IBasedBoostedVault {
+contract BasedBoostedVault is Ownable, RescuableAssets, IBasedBoostedVault {
     using MathLib for uint256;
     using AssetLib for uint256;
     using SafeERC20 for IERC20;
@@ -194,6 +197,11 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
         return actualAmountInRay;
     }
 
+    /// @inheritdoc RescuableAssets
+    function rescueTokens(address asset, uint256 amount) public override onlyManager {
+        super.rescueTokens(asset, amount);
+    }
+
     function _fullWithdrawalRequest(address user) internal returns (uint256, uint256, uint256) {
         uint256 subVaultId = _positions[user].subVaultId;
         uint256 conversionRate = _subVaultById[subVaultId].conversionRate;
@@ -324,7 +332,7 @@ contract BasedBoostedVault is Ownable, IBasedBoostedVault {
     }
 
     /// @inheritdoc IBasedBoostedVault
-    function getVaultAssets() external view override returns (uint256) {
+    function getAggregatedBalance() external view override returns (uint256) {
         return _getVaultAggregatedBalance();
     }
 

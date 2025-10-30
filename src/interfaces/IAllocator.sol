@@ -88,7 +88,17 @@ interface IAllocator {
     /// @dev Toggles if `withdrawer` can call withdraw functions on the contract.
     function setWithdrawer(address withdrawer, bool whitelisted) external;
 
-    function setVault(address asset, address vault, bool isAllowed) external;
+    /// @dev Adds a new strategy vault to the allocator.
+    /// @param asset The asset to add the vault for.
+    /// @param vault The ERC-4626 vault address.
+    function addVault(address asset, address vault) external;
 
+    /// @dev Removes a strategy vault from the allocator.
+    /// @param vault The ERC-4626 vault address to remove.
+    function removeVault(address vault) external;
+
+    /// @dev Sets the default strategy vault for an asset.
+    /// @param asset The asset to set the default vault for.
+    /// @param vault The ERC-4626 vault address to set as the default.
     function setDefaultVault(address asset, address vault) external;
 }

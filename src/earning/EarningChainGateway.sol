@@ -82,7 +82,7 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
         payable
         override
     {
-        IBridgeAdapter(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID])
+        IBridgeAdapter(_defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID])
         .publishMessageToChainWithFeePayer{
             value: msg.value
         }(
@@ -126,7 +126,7 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
                 )
             })
         );
-        IBridgeAdapter(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID])
+        IBridgeAdapter(_defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID])
         .publishMessageToChainWithFeePayer{
             value: msg.value
         }(
@@ -182,7 +182,7 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
     }
 
     function _returnFunds(address asset, uint256 amount) internal {
-        address adapter = _bridgeAdapter[asset][ACCOUNTING_CHAIN_ID];
+        address adapter = _defaultBridgeAdapter[asset][ACCOUNTING_CHAIN_ID];
         IERC20(asset).forceApprove(adapter, amount);
         IBridgeAdapter.BridgeAsset[] memory assets = new IBridgeAdapter.BridgeAsset[](1);
         assets[0] = IBridgeAdapter.BridgeAsset({asset: asset, amount: amount});
@@ -190,7 +190,7 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
     }
 
     function _sendBalanceUpdate() internal {
-        IBridgeAdapter(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID])
+        IBridgeAdapter(_defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID])
             .publishMessageToChain(ACCOUNTING_CHAIN_ID, new IBridgeAdapter.BridgeAsset[](0), _getBalanceSnapshotData());
     }
 

@@ -5,11 +5,12 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
-import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
+import {RescuableAssets} from "./RescuableAssets.sol";
 
-abstract contract BaseChainGateway is IChainGateway {
+// TODO: this contract should be pausable.... if bridge is compromised we should not ingest messages from it.
+abstract contract BaseChainGateway is RescuableAssets, IChainGateway {
     using SafeERC20 for IERC20;
 
     address internal constant FEE_ON_NATIVE_CURRENCY = address(0);
@@ -21,12 +22,14 @@ abstract contract BaseChainGateway is IChainGateway {
         _;
     }
 
-    /// @notice Account used to make low frequency, high impact changes.
     address internal _admin;
-    /// @dev Assumes a single asset is bridged per bridge action through an adapter.
+    /// @dev Set of adapters whitelisted for usage.
     /// @dev asset == address(0) for data-only bridging.
     /// @dev Assumes token bridges also support Arbitrary Message Bridging.
-    mapping(address asset => mapping(uint256 chainId => address adapter)) internal _bridgeAdapter;
+    mapping(address asset => mapping(uint256 chainId => mapping(address adapter => bool))) internal
+        _supportedBridgeAdapters;
+    /// @dev The adapter used to send assets/messages to a destination chain.
+    mapping(address asset => mapping(uint256 chainId => address defaultAdapter)) internal _defaultBridgeAdapter;
 
     constructor(address admin, address iouTokenManager) {
         require(admin != address(0), ErrorsLib.ZeroAddress());
@@ -67,10 +70,10 @@ abstract contract BaseChainGateway is IChainGateway {
         if (bridgeFeeToken != FEE_ON_NATIVE_CURRENCY) {
             IERC20(bridgeFeeToken).safeTransferFrom(msg.sender, address(this), bridgeFeeAmount);
             IERC20(bridgeFeeToken)
-                .forceApprove(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId], bridgeFeeAmount);
+                .forceApprove(_defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId], bridgeFeeAmount);
         }
 
-        IBridgeAdapter(_bridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId])
+        IBridgeAdapter(_defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId])
             .publishMessageToChainWithFeePayer(
                 feeRefundRecipient,
                 bridgeFeeToken,
@@ -90,21 +93,40 @@ abstract contract BaseChainGateway is IChainGateway {
             );
     }
 
+    /// @inheritdoc RescuableAssets
+    function rescueTokens(address asset, uint256 amount) public override onlyAdmin {
+        super.rescueTokens(asset, amount);
+    }
+
+    function getDefaultBridgeAdapter(address asset, uint256 chainId) external view returns (address) {
+        return _defaultBridgeAdapter[asset][chainId];
+    }
+
+    function addBridgeAdapter(address asset, uint256 chainId, address adapter) external onlyAdmin {
+        require(!_supportedBridgeAdapters[asset][chainId][adapter], ErrorsLib.AddressAlreadyWhitelisted());
+        _supportedBridgeAdapters[asset][chainId][adapter] = true;
+        emit BridgeAdapterAdded(asset, chainId, adapter);
+    }
+
+    function removeBridgeAdapter(address asset, uint256 chainId, address adapter) external onlyAdmin {
+        require(_supportedBridgeAdapters[asset][chainId][adapter], ErrorsLib.AddressNotWhitelisted());
+        delete _supportedBridgeAdapters[asset][chainId][adapter];
+        emit BridgeAdapterRemoved(asset, chainId, adapter);
+    }
+
+    function setDefaultBridgeAdapter(address asset, uint256 chainId, address adapter) external onlyAdmin {
+        require(_supportedBridgeAdapters[asset][chainId][adapter], ErrorsLib.AddressNotWhitelisted());
+        _defaultBridgeAdapter[asset][chainId] = adapter;
+        emit DefaultBridgeAdapterSet(asset, chainId, adapter);
+    }
+
+    /// @dev Checks full set of adapters as opposed to the default adapter in case an adapter is swapped out but a
+    /// pending message needs to be ingested.
+    function _onlyAdapter(address asset, uint256 sourceChainId) internal view {
+        require(_supportedBridgeAdapters[asset][sourceChainId][msg.sender], UnsupportedAdapter());
+    }
+
     function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal virtual;
 
     function _receiveData(uint256 sourceChainId, bytes memory data) internal virtual;
-
-    function getBridgeAdapter(address asset, uint256 chainId) external view returns (address) {
-        return _bridgeAdapter[asset][chainId];
-    }
-
-    function setBridgeAdapter(address asset, uint256 chainId, address adapter) external onlyAdmin {
-        require(chainId != 0, ErrorsLib.ZeroChainId());
-        require(adapter != address(0), ErrorsLib.ZeroAddress());
-        _bridgeAdapter[asset][chainId] = adapter;
-    }
-
-    function _onlyAdapter(address asset, uint256 sourceChainId) internal view {
-        require(_bridgeAdapter[asset][sourceChainId] == msg.sender, UnsupportedAdapter());
-    }
 }

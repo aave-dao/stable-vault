@@ -48,11 +48,21 @@ contract EarningChainGatewayTest is TestWithHelpers {
         vm.prank(admin);
         earningChainGateway.setAllocator(address(_mockAllocator));
         vm.prank(admin);
-        earningChainGateway.setBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, address(_mockBridgeAdapterData));
+        earningChainGateway.addBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, address(_mockBridgeAdapterData));
         vm.prank(admin);
-        earningChainGateway.setBridgeAdapter(address(_mockUsdt), ACCOUNTING_CHAIN_ID, address(_mockBridgeAdapterAssets));
+        earningChainGateway.setDefaultBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, address(_mockBridgeAdapterData));
         vm.prank(admin);
-        earningChainGateway.setBridgeAdapter(address(_mockGho), ACCOUNTING_CHAIN_ID, address(_mockBridgeAdapterAssets));
+        earningChainGateway.addBridgeAdapter(address(_mockUsdt), ACCOUNTING_CHAIN_ID, address(_mockBridgeAdapterAssets));
+        vm.prank(admin);
+        earningChainGateway.setDefaultBridgeAdapter(
+            address(_mockUsdt), ACCOUNTING_CHAIN_ID, address(_mockBridgeAdapterAssets)
+        );
+        vm.prank(admin);
+        earningChainGateway.addBridgeAdapter(address(_mockGho), ACCOUNTING_CHAIN_ID, address(_mockBridgeAdapterAssets));
+        vm.prank(admin);
+        earningChainGateway.setDefaultBridgeAdapter(
+            address(_mockGho), ACCOUNTING_CHAIN_ID, address(_mockBridgeAdapterAssets)
+        );
         return earningChainGateway;
     }
 
@@ -132,29 +142,35 @@ contract EarningChainGatewayTest is TestWithHelpers {
         newEarningChainGateway.setManager(address(0));
     }
 
-    function test_setBridgeAdapter_setsExpectedBridgeAdapter(address asset, uint256 chainId, address adapter) public {
+    function test_addBridgeAdapter_setsExpectedBridgeAdapter(address asset, uint256 chainId, address adapter) public {
         vm.assume(asset != address(0));
         vm.assume(chainId != 0);
         vm.assume(adapter != address(0));
         vm.prank(admin);
-        _earningChainGateway.setBridgeAdapter(asset, chainId, adapter);
-        assertEq(_earningChainGateway.getBridgeAdapter(asset, chainId), adapter);
+        _earningChainGateway.addBridgeAdapter(asset, chainId, adapter);
+        vm.prank(admin);
+        _earningChainGateway.setDefaultBridgeAdapter(asset, chainId, adapter);
+        assertEq(_earningChainGateway.getDefaultBridgeAdapter(asset, chainId), adapter);
     }
 
-    function test_setBridgeAdapter_reverts_ifZeroAddressAsAdapter() public {
-        EarningChainGateway newEarningChainGateway =
-            new EarningChainGateway(admin, EARNING_CHAIN_ID, address(_mockIouTokenManager));
-        vm.expectRevert(ErrorsLib.ZeroAddress.selector);
+    function test_addBridgeAdapter_reverts_ifAlreadyAdded() public {
+        address adapter = makeAddr("adapter");
+        address asset = address(_mockUsdt);
+
         vm.prank(admin);
-        newEarningChainGateway.setBridgeAdapter(address(0), EARNING_CHAIN_ID, address(0));
+        _earningChainGateway.addBridgeAdapter(asset, ACCOUNTING_CHAIN_ID, adapter);
+        vm.expectRevert(ErrorsLib.AddressAlreadyWhitelisted.selector);
+        vm.prank(admin);
+        _earningChainGateway.addBridgeAdapter(asset, ACCOUNTING_CHAIN_ID, adapter);
     }
 
-    function test_setBridgeAdapter_reverts_ifZeroChainIdAsAdapter() public {
-        EarningChainGateway newEarningChainGateway =
-            new EarningChainGateway(admin, EARNING_CHAIN_ID, address(_mockIouTokenManager));
-        vm.expectRevert(ErrorsLib.ZeroChainId.selector);
+    function test_setDefaultBridgeAdatper_revert_ifNotWhitelisted() public {
+        address adapter = makeAddr("adapter");
+        address asset = address(_mockUsdt);
+
+        vm.expectRevert(ErrorsLib.AddressNotWhitelisted.selector);
         vm.prank(admin);
-        newEarningChainGateway.setBridgeAdapter(address(0), 0, address(0));
+        _earningChainGateway.setDefaultBridgeAdapter(asset, ACCOUNTING_CHAIN_ID, adapter);
     }
 
     function test_getAggregatedBalance_returnsExpectedBalance(uint256 amountUsdt, uint256 amountGho) public {

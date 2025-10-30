@@ -31,7 +31,7 @@ contract AccountingChainGateway is IAccountingChainGateway, BaseChainGateway {
         external
         onlyFundsHandler
     {
-        address adapter = _bridgeAdapter[asset][targetChainId];
+        address adapter = _defaultBridgeAdapter[asset][targetChainId];
         require(adapter != address(0), UnsupportedAdapter());
         // Pull funds from caller into this contract
         IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);

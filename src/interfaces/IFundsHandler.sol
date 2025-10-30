@@ -43,9 +43,4 @@ interface IFundsHandler {
 
     /// @dev Retrieve funds from liquidity source to make available to spend.
     function pullFromLiquidity(address asset, uint256 amount) external;
-
-    /// @dev Rescue tokens stuck on the contract.
-    /// @param asset The asset to rescue.
-    /// @param amount The amount of the asset to rescue.
-    function rescueTokens(address asset, uint256 amount) external;
 }
