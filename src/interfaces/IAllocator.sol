@@ -56,7 +56,7 @@ interface IAllocator {
 
     /// @dev Deallocates a given amount of an asset from the immediate liquidity vault; funds stay idle on the contract.
     /// @param asset Asset to deallocate.
-    /// @param amount Amount of the asset to deallocate.
+    /// @param amount Amount of the asset to deallocate. Zero to deallocate the maximum possible amount.
     /// @param vault Vault to deallocate from.
     /// @dev Returns the amount of shares burned liquidity source vault shares burned.
     function deallocate(address asset, uint256 amount, address vault) external returns (uint256);

@@ -147,8 +147,7 @@ contract Allocator is IAllocator {
     {
         require(IERC4626(vault).asset() == asset, ErrorsLib.InvalidAsset(asset));
         if (assetsAmount == 0) {
-            // TODO: Add to documentation
-            // Withdraw MAX special case
+            // If zero is passed, we withdraw the max amount using shares.
             uint256 maxShares = IERC4626(vault).maxRedeem(address(this));
             uint256 balanceBefore = IERC20(asset).balanceOf(address(this));
             uint256 assetsWithdrawn = _deallocateShares(vault, asset, maxShares, address(this));
