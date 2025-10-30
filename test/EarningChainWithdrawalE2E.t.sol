@@ -8,6 +8,7 @@ import {IBasedBoostedVault} from "../src/interfaces/IBasedBoostedVault.sol";
 import {AssetLib} from "../src/libraries/AssetLib.sol";
 import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
 import {BaseTest} from "./BaseTest.t.sol";
+import {ExtendedBasedBoostedVault} from "./mocks/ExtendedBasedBoostedVault.sol";
 
 /// @title EarningChainWithdrawalE2ETest
 /// @notice Test the withdrawal of funds from the Earning Chain to the Accounting Chain.
@@ -20,6 +21,20 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
 
     function setUp() public override {
         super.setUp();
+    }
+
+    function _deployBasedBoostedVault(
+        address adminParam,
+        uint256,
+        /* maxPerSecondRate */
+        uint256 defaultSubVaultPerSecondRate,
+        address iouToken,
+        address assetRegistry
+    ) internal virtual override returns (ExtendedBasedBoostedVault) {
+        // Deploy a vault without restriction in the valid per-second rate
+        return new ExtendedBasedBoostedVault(
+            adminParam, type(uint256).max, defaultSubVaultPerSecondRate, iouToken, assetRegistry
+        );
     }
 
     function test_earningChainWithdrawalE2E() public {
