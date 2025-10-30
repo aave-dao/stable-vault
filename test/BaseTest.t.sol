@@ -29,6 +29,7 @@ contract BaseTest is Test {
     address manager = makeAddr("MANAGER");
     uint256 initialBasePerSecondRate = MathLib.RAY; // 1 RAY
 
+    uint256 constant DEFAULT_MAX_PER_SECOND_RATE = 1000000005781378656804591713; // ~20% APY
     uint64 public constant ACCOUNTING_CHAIN_ID = 1;
     uint64 public constant ACCOUNTING_CHAIN_CCIP_SELECTOR = 10;
     uint64 public constant EARNING_CHAIN_ID = 2;
@@ -81,6 +82,18 @@ contract BaseTest is Test {
         usdcStrategyVault_earningChain.deposit(1000 * (10 ** 6), address(this));
     }
 
+    function _deployBasedBoostedVault(
+        address adminParam,
+        uint256 maxPerSecondRate,
+        uint256 defaultSubVaultPerSecondRate,
+        address iouToken,
+        address assetRegistry
+    ) internal virtual returns (ExtendedBasedBoostedVault) {
+        return new ExtendedBasedBoostedVault(
+            adminParam, maxPerSecondRate, defaultSubVaultPerSecondRate, iouToken, assetRegistry
+        );
+    }
+
     function _deployContracts() internal {
         console.log("\n-------------------");
         console.log("\nDeploying contracts");
@@ -117,13 +130,13 @@ contract BaseTest is Test {
         iouTokenManager_accountingChain = new IouTokenManager(address(iouToken_accountingChain), true);
         console.log("\tIOU Token Manager (Accounting Chain): %s", address(iouTokenManager_accountingChain));
         iouToken_accountingChain.transferOwnership(address(iouTokenManager_accountingChain));
-        vault = new ExtendedBasedBoostedVault(
+        vault = _deployBasedBoostedVault(
             admin,
+            DEFAULT_MAX_PER_SECOND_RATE,
             initialBasePerSecondRate,
             address(iouTokenManager_accountingChain),
             address(assetRegistry_accountingChain)
         );
-
         console.log("\tVault: %s", address(vault));
         allocator_accountingChain = new Allocator(manager, admin, address(assetRegistry_accountingChain));
         console.log("\tAllocator: %s", address(allocator_accountingChain));
