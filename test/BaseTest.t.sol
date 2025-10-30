@@ -4,6 +4,8 @@ pragma solidity ^0.8.20;
 import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 
+import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+
 import {ExtendedAccessManager} from "../src/common/ExtendedAccessManager.sol";
 
 import {AssetRegistry} from "../src/common/AssetRegistry.sol";
@@ -12,7 +14,9 @@ import {IouTokenManager} from "../src/common/IouTokenManager.sol";
 import {IAllocator} from "../src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "../src/interfaces/IAssetRegistry.sol";
 import {IBasedBoostedVault} from "../src/interfaces/IBasedBoostedVault.sol";
+import {IEarningChainGateway} from "../src/interfaces/IEarningChainGateway.sol";
 import {IChainGateway} from "../src/interfaces/IChainGateway.sol";
+import {IFundsHandler} from "../src/interfaces/IFundsHandler.sol";
 import {IRescuableAssets} from "../src/interfaces/IRescuableAssets.sol";
 import {AccountingChainGateway} from "./../src/accounting/AccountingChainGateway.sol";
 import {FundsHandler} from "./../src/accounting/FundsHandler.sol";
@@ -23,10 +27,12 @@ import {EarningChainGateway} from "./../src/earning/EarningChainGateway.sol";
 import {AssetLib} from "./../src/libraries/AssetLib.sol";
 import {MathLib} from "./../src/libraries/MathLib.sol";
 import {ExtendedBasedBoostedVault} from "./mocks/ExtendedBasedBoostedVault.sol";
-import {MockAccessManager} from "./mocks/MockAccessManager.sol";
 import {MockCCIPRouter} from "./mocks/MockRouter.sol";
 import {TestErc20} from "./mocks/TestErc20.sol";
 import {TestErc4626} from "./mocks/TestErc4626.sol";
+
+// forge-lint: disable-next-line(unaliased-plain-import)
+import "test/helpers/TypeHelpers.sol";
 
 contract BaseTest is Test {
     using MathLib for uint256;
@@ -43,13 +49,14 @@ contract BaseTest is Test {
     address operator = makeAddr("OPERATOR");
 
     // ADMIN_ROLE = 0
-    uint64 internal constant GUARDIAN_ROLE = 1;
-    uint64 internal constant UPGRADE_PROXY_ADMIN_ROLE = 2;
-    uint64 internal constant APPENDER_ROLE = 3;
-    uint64 internal constant REMOVER_ROLE = 4;
-    uint64 internal constant RESCUER_ROLE = 5;
-    uint64 internal constant PROFIT_TAKER_ROLE = 6;
-    uint64 internal constant OPERATOR_ROLE = 7;
+    uint64 internal constant ROLE_MANAGEMENT_ROLE = 1;
+    uint64 internal constant GUARDIAN_ROLE = 2;
+    uint64 internal constant UPGRADE_PROXY_ADMIN_ROLE = 3;
+    uint64 internal constant APPENDER_ROLE = 4;
+    uint64 internal constant REMOVER_ROLE = 5;
+    uint64 internal constant RESCUER_ROLE = 6;
+    uint64 internal constant PROFIT_TAKER_ROLE = 7;
+    uint64 internal constant OPERATOR_ROLE = 8;
 
     uint256 initialBasePerSecondRate = MathLib.RAY; // 1 RAY
 
@@ -281,7 +288,7 @@ contract BaseTest is Test {
         );
 
         // Set up Access Manager roles on Accounting chain
-        _setUpAccountingChainAccessManager();
+        _setUpAccountingChainAccessManager(accessManager_accountingChain);
 
         // Set up Earning Chain Gateway (Earning chain)
         vm.prank(appender);
@@ -358,7 +365,7 @@ contract BaseTest is Test {
         // TODO: MasterAdmin needs to set grantDelay on all roles
         // TODO: creater Pauser role
 
-        uint256 executionDelay;
+        uint32 executionDelay;
 
         // ----- Set up Guardian -----
         accessManager.grantRole(GUARDIAN_ROLE, guardian, 0);
@@ -367,10 +374,7 @@ contract BaseTest is Test {
         executionDelay = 1 days * 15;
         accessManager.grantRole(UPGRADE_PROXY_ADMIN_ROLE, upgradeProxyAdmin, executionDelay);
         accessManager.setRoleGuardian(UPGRADE_PROXY_ADMIN_ROLE, GUARDIAN_ROLE);
-        // TODO(upgrade): set upgrade selector for all relavent contracts
-        bytes4 selector = 0x00000000;
-        bytes4[] memory upgradeSelectors = new bytes4[](1);
-        upgradeSelectors[0] = selector;
+        bytes4[] memory upgradeSelectors = _toSelectorArray(ITransparentUpgradeableProxy.upgradeToAndCall.selector);
         // TODO(upgrade): add all upgradabale targets here
         address[] memory upgradeTargets = new address[](0);
         for (uint256 i = 0; i < upgradeTargets.length; i++) {
@@ -381,50 +385,45 @@ contract BaseTest is Test {
         executionDelay = 1 days * 7;
         accessManager.grantRole(APPENDER_ROLE, appender, executionDelay);
         accessManager.setRoleGuardian(APPENDER_ROLE, GUARDIAN_ROLE);
-        bytes4[] memory addSelectorsAllocator = new bytes4[](1);
-        addSelectorsAllocator[0] = IAllocator.addVault.selector;
-        accessManager.setTargetFunctionRole(address(allocator_accountingChain), addSelectorsAllocator, APPENDER_ROLE);
-        bytes4[] memory addSelectorsAssetRegistry = new bytes4[](1);
-        addSelectorsAssetRegistry[0] = IAssetRegistry.setAssetConfig.selector;
         accessManager.setTargetFunctionRole(
-            address(assetRegistry_accountingChain), addSelectorsAssetRegistry, APPENDER_ROLE
+            address(allocator_accountingChain), _toSelectorArray(IAllocator.addVault.selector), APPENDER_ROLE
         );
-        bytes4[] memory addSelectorsGateway = new bytes4[](1);
-        addSelectorsGateway[0] = IChainGateway.addBridgeAdapter.selector;
-        accessManager.setTargetFunctionRole(address(accountingChainGateway), addSelectorsGateway, APPENDER_ROLE);
+        accessManager.setTargetFunctionRole(
+            address(assetRegistry_accountingChain),
+            _toSelectorArray(IAssetRegistry.setAssetConfig.selector),
+            APPENDER_ROLE
+        );
+        accessManager.setTargetFunctionRole(
+            address(accountingChainGateway), _toSelectorArray(IChainGateway.addBridgeAdapter.selector), APPENDER_ROLE
+        );
 
         // ----- Set up Remover -----
         executionDelay = 0;
         accessManager.grantRole(REMOVER_ROLE, remover, executionDelay);
         accessManager.setRoleGuardian(REMOVER_ROLE, GUARDIAN_ROLE);
-        bytes4[] memory removeSelectorsAllocator = new bytes4[](1);
-        removeSelectorsAllocator[0] = IAllocator.removeVault.selector;
-        accessManager.setTargetFunctionRole(address(allocator_accountingChain), removeSelectorsAllocator, REMOVER_ROLE);
-        bytes4[] memory removeSelectorsGateway = new bytes4[](1);
-        removeSelectorsGateway[0] = IChainGateway.removeBridgeAdapter.selector;
-        accessManager.setTargetFunctionRole(address(accountingChainGateway), removeSelectorsGateway, REMOVER_ROLE);
+        accessManager.setTargetFunctionRole(
+            address(allocator_accountingChain), _toSelectorArray(IAllocator.removeVault.selector), REMOVER_ROLE
+        );
+        accessManager.setTargetFunctionRole(
+            address(accountingChainGateway), _toSelectorArray(IChainGateway.removeBridgeAdapter.selector), REMOVER_ROLE
+        );
 
         // ----- Set up Rescuer -----
         executionDelay = 0;
         accessManager.grantRole(RESCUER_ROLE, rescuer, executionDelay);
         accessManager.setRoleGuardian(RESCUER_ROLE, GUARDIAN_ROLE);
-        bytes4[] memory rescueSelectors = new bytes4[](1);
-        rescueSelectors[0] = IRescuableAssets.rescueTokens.selector;
-        address[] memory rescueTargets = new address[](3);
-        rescueTargets[0] = address(vault);
-        rescueTargets[1] = address(fundsHandler);
-        rescueTargets[2] = address(accountingChainGateway);
-        for (uint256 i = 0; i < rescueTargets.length; i++) {
-            accessManager.setTargetFunctionRole(rescueTargets[i], rescueSelectors, RESCUER_ROLE);
-        }
+        bytes4[] memory rescueSelectorAsArray = _toSelectorArray(IRescuableAssets.rescueTokens.selector);
+        accessManager.setTargetFunctionRole(address(vault), rescueSelectorAsArray, RESCUER_ROLE);
+        accessManager.setTargetFunctionRole(address(fundsHandler), rescueSelectorAsArray, RESCUER_ROLE);
+        accessManager.setTargetFunctionRole(address(accountingChainGateway), rescueSelectorAsArray, RESCUER_ROLE);
 
         // ----- Set up Profit Taker -----
         executionDelay = 0;
         accessManager.grantRole(PROFIT_TAKER_ROLE, profitTaker, executionDelay);
         accessManager.setRoleGuardian(PROFIT_TAKER_ROLE, GUARDIAN_ROLE);
-        bytes4[] memory claimFeesSelectors = new bytes4[](1);
-        claimFeesSelectors[0] = IBasedBoostedVault.claimFees.selector;
-        accessManager.setTargetFunctionRole(address(vault), claimFeesSelectors, PROFIT_TAKER_ROLE);
+        accessManager.setTargetFunctionRole(
+            address(vault), _toSelectorArray(IBasedBoostedVault.claimFees.selector), PROFIT_TAKER_ROLE
+        );
 
         // ----- Set up Operator -----
         executionDelay = 0;
@@ -432,31 +431,39 @@ contract BaseTest is Test {
         accessManager.setRoleGuardian(OPERATOR_ROLE, GUARDIAN_ROLE);
 
         // For Allocator on Accounting chain
-        bytes4[] memory operatorSelectorsAllocator = new bytes4[](4);
-        operatorSelectorsAllocator[0] = IAllocator.deallocate.selector;
-        operatorSelectorsAllocator[1] = IAllocator.depositIdleFunds.selector;
-        operatorSelectorsAllocator[2] = IAllocator.rebalance.selector;
-        operatorSelectorsAllocator[3] = IAllocator.reallocate.selector;
         accessManager.setTargetFunctionRole(
-            address(allocator_accountingChain), operatorSelectorsAllocator, OPERATOR_ROLE
+            address(allocator_accountingChain),
+            _toSelectorArray(
+                IAllocator.deallocate.selector,
+                IAllocator.depositIdleFunds.selector,
+                IAllocator.rebalance.selector,
+                IAllocator.reallocate.selector
+            ),
+            OPERATOR_ROLE
         );
 
         // For Accounting Chain Gateway
-        bytes4[] memory operatorSelectorsGateway = new bytes4[](1);
-        operatorSelectorsGateway[0] = IChainGateway.setDefaultBridgeAdapter.selector;
-        accessManager.setTargetFunctionRole(address(accountingChainGateway), operatorSelectorsGateway, OPERATOR_ROLE);
+        accessManager.setTargetFunctionRole(
+            address(accountingChainGateway),
+            _toSelectorArray(IChainGateway.setDefaultBridgeAdapter.selector),
+            OPERATOR_ROLE
+        );
 
         // For BasedBoostedVault
-        bytes4[] memory operatorSelectorsBbv = new bytes4[](3);
-        operatorSelectorsBbv[0] = IBasedBoostedVault.setUserRate.selector;
-        operatorSelectorsBbv[1] = IBasedBoostedVault.setSubVaultRate.selector;
-        operatorSelectorsBbv[2] = IBasedBoostedVault.setDefaultSubVault.selector;
-        accessManager.setTargetFunctionRole(address(vault), operatorSelectorsBbv, OPERATOR_ROLE);
+        accessManager.setTargetFunctionRole(
+            address(vault),
+            _toSelectorArray(
+                IBasedBoostedVault.setUserRate.selector,
+                IBasedBoostedVault.setSubVaultRate.selector,
+                IBasedBoostedVault.setDefaultSubVault.selector
+            ),
+            OPERATOR_ROLE
+        );
 
         // For FundsHandler
-        bytes4[] memory operatorSelectorsFundsHandler = new bytes4[](1);
-        operatorSelectorsFundsHandler[0] = IFundsHandler.pushFundsToChain.selector;
-        accessManager.setTargetFunctionRole(address(fundsHandler), operatorSelectorsFundsHandler, OPERATOR_ROLE);
+        accessManager.setTargetFunctionRole(
+            address(fundsHandler), _toSelectorArray(IFundsHandler.pushFundsToChain.selector), OPERATOR_ROLE
+        );
 
         vm.stopPrank();
     }
@@ -468,7 +475,7 @@ contract BaseTest is Test {
         // TODO: MasterAdmin needs to set grantDelay on all roles
         // TODO: creater Pauser role
 
-        uint256 executionDelay;
+        uint32 executionDelay;
 
         // ----- Set up Guardian -----
         accessManager.grantRole(GUARDIAN_ROLE, guardian, 0);
@@ -477,10 +484,7 @@ contract BaseTest is Test {
         executionDelay = 1 days * 15;
         accessManager.grantRole(UPGRADE_PROXY_ADMIN_ROLE, upgradeProxyAdmin, executionDelay);
         accessManager.setRoleGuardian(UPGRADE_PROXY_ADMIN_ROLE, GUARDIAN_ROLE);
-        // TODO(upgrade): set upgrade selector for all relavent contracts
-        bytes4 selector = 0x00000000;
-        bytes4[] memory upgradeSelectors = new bytes4[](1);
-        upgradeSelectors[0] = selector;
+        bytes4[] memory upgradeSelectors = _toSelectorArray(ITransparentUpgradeableProxy.upgradeToAndCall.selector);
         // TODO(upgrade): add all upgradabale targets here
         address[] memory upgradeTargets = new address[](0);
         for (uint256 i = 0; i < upgradeTargets.length; i++) {
@@ -491,82 +495,62 @@ contract BaseTest is Test {
         executionDelay = 1 days * 7;
         accessManager.grantRole(APPENDER_ROLE, appender, executionDelay);
         accessManager.setRoleGuardian(APPENDER_ROLE, GUARDIAN_ROLE);
-        bytes4[] memory addSelectorsAllocator = new bytes4[](1);
-        addSelectorsAllocator[0] = IAllocator.addVault.selector;
-        accessManager.setTargetFunctionRole(address(allocator_accountingChain), addSelectorsAllocator, APPENDER_ROLE);
-        bytes4[] memory addSelectorsAssetRegistry = new bytes4[](1);
-        addSelectorsAssetRegistry[0] = IAssetRegistry.setAssetConfig.selector;
         accessManager.setTargetFunctionRole(
-            address(assetRegistry_accountingChain), addSelectorsAssetRegistry, APPENDER_ROLE
+            address(allocator_earningChain), _toSelectorArray(IAllocator.addVault.selector), APPENDER_ROLE
         );
-        bytes4[] memory addSelectorsGateway = new bytes4[](1);
-        addSelectorsGateway[0] = IChainGateway.addBridgeAdapter.selector;
-        accessManager.setTargetFunctionRole(address(accountingChainGateway), addSelectorsGateway, APPENDER_ROLE);
+        accessManager.setTargetFunctionRole(
+            address(assetRegistry_earningChain), _toSelectorArray(IAssetRegistry.setAssetConfig.selector), APPENDER_ROLE
+        );
+        accessManager.setTargetFunctionRole(
+            address(earningChainGateway), _toSelectorArray(IChainGateway.addBridgeAdapter.selector), APPENDER_ROLE
+        );
 
         // ----- Set up Remover -----
         executionDelay = 0;
         accessManager.grantRole(REMOVER_ROLE, remover, executionDelay);
         accessManager.setRoleGuardian(REMOVER_ROLE, GUARDIAN_ROLE);
-        bytes4[] memory removeSelectorsAllocator = new bytes4[](1);
-        removeSelectorsAllocator[0] = IAllocator.removeVault.selector;
-        accessManager.setTargetFunctionRole(address(allocator_accountingChain), removeSelectorsAllocator, REMOVER_ROLE);
-        bytes4[] memory removeSelectorsGateway = new bytes4[](1);
-        removeSelectorsGateway[0] = IChainGateway.removeBridgeAdapter.selector;
-        accessManager.setTargetFunctionRole(address(accountingChainGateway), removeSelectorsGateway, REMOVER_ROLE);
+        accessManager.setTargetFunctionRole(
+            address(allocator_earningChain), _toSelectorArray(IAllocator.removeVault.selector), REMOVER_ROLE
+        );
+        accessManager.setTargetFunctionRole(
+            address(earningChainGateway), _toSelectorArray(IChainGateway.removeBridgeAdapter.selector), REMOVER_ROLE
+        );
 
         // ----- Set up Rescuer -----
         executionDelay = 0;
         accessManager.grantRole(RESCUER_ROLE, rescuer, executionDelay);
         accessManager.setRoleGuardian(RESCUER_ROLE, GUARDIAN_ROLE);
-        bytes4[] memory rescueSelectors = new bytes4[](1);
-        rescueSelectors[0] = IRescuableAssets.rescueTokens.selector;
-        address[] memory rescueTargets = new address[](3);
-        rescueTargets[0] = address(vault);
-        rescueTargets[1] = address(fundsHandler);
-        rescueTargets[2] = address(accountingChainGateway);
-        for (uint256 i = 0; i < rescueTargets.length; i++) {
-            accessManager.setTargetFunctionRole(rescueTargets[i], rescueSelectors, RESCUER_ROLE);
-        }
-
-        // ----- Set up Profit Taker -----
-        executionDelay = 0;
-        accessManager.grantRole(PROFIT_TAKER_ROLE, profitTaker, executionDelay);
-        accessManager.setRoleGuardian(PROFIT_TAKER_ROLE, GUARDIAN_ROLE);
-        bytes4[] memory claimFeesSelectors = new bytes4[](1);
-        claimFeesSelectors[0] = IBasedBoostedVault.claimFees.selector;
-        accessManager.setTargetFunctionRole(address(vault), claimFeesSelectors, PROFIT_TAKER_ROLE);
+        accessManager.setTargetFunctionRole(
+            address(earningChainGateway), _toSelectorArray(IRescuableAssets.rescueTokens.selector), RESCUER_ROLE
+        );
 
         // ----- Set up Operator -----
         executionDelay = 0;
         accessManager.grantRole(OPERATOR_ROLE, operator, executionDelay);
         accessManager.setRoleGuardian(OPERATOR_ROLE, GUARDIAN_ROLE);
 
-        // For Allocator on Accounting chain
-        bytes4[] memory operatorSelectorsAllocator = new bytes4[](4);
-        operatorSelectorsAllocator[0] = IAllocator.deallocate.selector;
-        operatorSelectorsAllocator[1] = IAllocator.depositIdleFunds.selector;
-        operatorSelectorsAllocator[2] = IAllocator.rebalance.selector;
-        operatorSelectorsAllocator[3] = IAllocator.reallocate.selector;
+        // For Allocator on Earning chain
         accessManager.setTargetFunctionRole(
-            address(allocator_accountingChain), operatorSelectorsAllocator, OPERATOR_ROLE
+            address(allocator_earningChain),
+            _toSelectorArray(
+                IAllocator.deallocate.selector,
+                IAllocator.depositIdleFunds.selector,
+                IAllocator.rebalance.selector,
+                IAllocator.reallocate.selector
+            ),
+            OPERATOR_ROLE
         );
 
-        // For Accounting Chain Gateway
-        bytes4[] memory operatorSelectorsGateway = new bytes4[](1);
-        operatorSelectorsGateway[0] = IChainGateway.setDefaultBridgeAdapter.selector;
-        accessManager.setTargetFunctionRole(address(accountingChainGateway), operatorSelectorsGateway, OPERATOR_ROLE);
-
-        // For BasedBoostedVault
-        bytes4[] memory operatorSelectorsBbv = new bytes4[](3);
-        operatorSelectorsBbv[0] = IBasedBoostedVault.setUserRate.selector;
-        operatorSelectorsBbv[1] = IBasedBoostedVault.setSubVaultRate.selector;
-        operatorSelectorsBbv[2] = IBasedBoostedVault.setDefaultSubVault.selector;
-        accessManager.setTargetFunctionRole(address(vault), operatorSelectorsBbv, OPERATOR_ROLE);
-
-        // For FundsHandler
-        bytes4[] memory operatorSelectorsFundsHandler = new bytes4[](1);
-        operatorSelectorsFundsHandler[0] = IFundsHandler.pushFundsToChain.selector;
-        accessManager.setTargetFunctionRole(address(fundsHandler), operatorSelectorsFundsHandler, OPERATOR_ROLE);
+        // For Earning Chain Gateway
+        accessManager.setTargetFunctionRole(
+            address(earningChainGateway),
+            _toSelectorArray(
+                IChainGateway.setDefaultBridgeAdapter.selector,
+                IEarningChainGateway.sendBalanceUpdate.selector,
+                IEarningChainGateway.exit.selector
+            ),
+            OPERATOR_ROLE
+        );
 
         vm.stopPrank();
     }
