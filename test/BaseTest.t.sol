@@ -14,8 +14,8 @@ import {IouTokenManager} from "../src/common/IouTokenManager.sol";
 import {IAllocator} from "../src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "../src/interfaces/IAssetRegistry.sol";
 import {IBasedBoostedVault} from "../src/interfaces/IBasedBoostedVault.sol";
-import {IEarningChainGateway} from "../src/interfaces/IEarningChainGateway.sol";
 import {IChainGateway} from "../src/interfaces/IChainGateway.sol";
+import {IEarningChainGateway} from "../src/interfaces/IEarningChainGateway.sol";
 import {IFundsHandler} from "../src/interfaces/IFundsHandler.sol";
 import {IRescuableAssets} from "../src/interfaces/IRescuableAssets.sol";
 import {AccountingChainGateway} from "./../src/accounting/AccountingChainGateway.sol";
@@ -365,15 +365,11 @@ contract BaseTest is Test {
         // TODO: MasterAdmin needs to set grantDelay on all roles
         // TODO: creater Pauser role
 
-        uint32 executionDelay;
-
         // ----- Set up Guardian -----
         accessManager.grantRole(GUARDIAN_ROLE, guardian, 0);
 
         // ----- Set up Upgrade Proxy Admin -----
-        executionDelay = 1 days * 15;
-        accessManager.grantRole(UPGRADE_PROXY_ADMIN_ROLE, upgradeProxyAdmin, executionDelay);
-        accessManager.setRoleGuardian(UPGRADE_PROXY_ADMIN_ROLE, GUARDIAN_ROLE);
+        _setUpRole(accessManager, UPGRADE_PROXY_ADMIN_ROLE, upgradeProxyAdmin, 1 days * 15);
         bytes4[] memory upgradeSelectors = _toSelectorArray(ITransparentUpgradeableProxy.upgradeToAndCall.selector);
         // TODO(upgrade): add all upgradabale targets here
         address[] memory upgradeTargets = new address[](0);
@@ -382,9 +378,7 @@ contract BaseTest is Test {
         }
 
         // ----- Set up Appender -----
-        executionDelay = 1 days * 7;
-        accessManager.grantRole(APPENDER_ROLE, appender, executionDelay);
-        accessManager.setRoleGuardian(APPENDER_ROLE, GUARDIAN_ROLE);
+        _setUpRole(accessManager, APPENDER_ROLE, appender, 1 days * 7);
         accessManager.setTargetFunctionRole(
             address(allocator_accountingChain), _toSelectorArray(IAllocator.addVault.selector), APPENDER_ROLE
         );
@@ -398,9 +392,7 @@ contract BaseTest is Test {
         );
 
         // ----- Set up Remover -----
-        executionDelay = 0;
-        accessManager.grantRole(REMOVER_ROLE, remover, executionDelay);
-        accessManager.setRoleGuardian(REMOVER_ROLE, GUARDIAN_ROLE);
+        _setUpRole(accessManager, REMOVER_ROLE, remover, 0);
         accessManager.setTargetFunctionRole(
             address(allocator_accountingChain), _toSelectorArray(IAllocator.removeVault.selector), REMOVER_ROLE
         );
@@ -409,26 +401,20 @@ contract BaseTest is Test {
         );
 
         // ----- Set up Rescuer -----
-        executionDelay = 0;
-        accessManager.grantRole(RESCUER_ROLE, rescuer, executionDelay);
-        accessManager.setRoleGuardian(RESCUER_ROLE, GUARDIAN_ROLE);
+        _setUpRole(accessManager, RESCUER_ROLE, rescuer, 0);
         bytes4[] memory rescueSelectorAsArray = _toSelectorArray(IRescuableAssets.rescueTokens.selector);
         accessManager.setTargetFunctionRole(address(vault), rescueSelectorAsArray, RESCUER_ROLE);
         accessManager.setTargetFunctionRole(address(fundsHandler), rescueSelectorAsArray, RESCUER_ROLE);
         accessManager.setTargetFunctionRole(address(accountingChainGateway), rescueSelectorAsArray, RESCUER_ROLE);
 
         // ----- Set up Profit Taker -----
-        executionDelay = 0;
-        accessManager.grantRole(PROFIT_TAKER_ROLE, profitTaker, executionDelay);
-        accessManager.setRoleGuardian(PROFIT_TAKER_ROLE, GUARDIAN_ROLE);
+        _setUpRole(accessManager, PROFIT_TAKER_ROLE, profitTaker, 0);
         accessManager.setTargetFunctionRole(
             address(vault), _toSelectorArray(IBasedBoostedVault.claimFees.selector), PROFIT_TAKER_ROLE
         );
 
         // ----- Set up Operator -----
-        executionDelay = 0;
-        accessManager.grantRole(OPERATOR_ROLE, operator, executionDelay);
-        accessManager.setRoleGuardian(OPERATOR_ROLE, GUARDIAN_ROLE);
+        _setUpRole(accessManager, OPERATOR_ROLE, operator, 0);
 
         // For Allocator on Accounting chain
         accessManager.setTargetFunctionRole(
@@ -475,15 +461,11 @@ contract BaseTest is Test {
         // TODO: MasterAdmin needs to set grantDelay on all roles
         // TODO: creater Pauser role
 
-        uint32 executionDelay;
-
         // ----- Set up Guardian -----
         accessManager.grantRole(GUARDIAN_ROLE, guardian, 0);
 
         // ----- Set up Upgrade Proxy Admin -----
-        executionDelay = 1 days * 15;
-        accessManager.grantRole(UPGRADE_PROXY_ADMIN_ROLE, upgradeProxyAdmin, executionDelay);
-        accessManager.setRoleGuardian(UPGRADE_PROXY_ADMIN_ROLE, GUARDIAN_ROLE);
+        _setUpRole(accessManager, UPGRADE_PROXY_ADMIN_ROLE, upgradeProxyAdmin, 1 days * 15);
         bytes4[] memory upgradeSelectors = _toSelectorArray(ITransparentUpgradeableProxy.upgradeToAndCall.selector);
         // TODO(upgrade): add all upgradabale targets here
         address[] memory upgradeTargets = new address[](0);
@@ -492,9 +474,7 @@ contract BaseTest is Test {
         }
 
         // ----- Set up Appender -----
-        executionDelay = 1 days * 7;
-        accessManager.grantRole(APPENDER_ROLE, appender, executionDelay);
-        accessManager.setRoleGuardian(APPENDER_ROLE, GUARDIAN_ROLE);
+        _setUpRole(accessManager, APPENDER_ROLE, appender, 1 days * 7);
         accessManager.setTargetFunctionRole(
             address(allocator_earningChain), _toSelectorArray(IAllocator.addVault.selector), APPENDER_ROLE
         );
@@ -506,9 +486,7 @@ contract BaseTest is Test {
         );
 
         // ----- Set up Remover -----
-        executionDelay = 0;
-        accessManager.grantRole(REMOVER_ROLE, remover, executionDelay);
-        accessManager.setRoleGuardian(REMOVER_ROLE, GUARDIAN_ROLE);
+        _setUpRole(accessManager, REMOVER_ROLE, remover, 0);
         accessManager.setTargetFunctionRole(
             address(allocator_earningChain), _toSelectorArray(IAllocator.removeVault.selector), REMOVER_ROLE
         );
@@ -517,17 +495,13 @@ contract BaseTest is Test {
         );
 
         // ----- Set up Rescuer -----
-        executionDelay = 0;
-        accessManager.grantRole(RESCUER_ROLE, rescuer, executionDelay);
-        accessManager.setRoleGuardian(RESCUER_ROLE, GUARDIAN_ROLE);
+        _setUpRole(accessManager, RESCUER_ROLE, rescuer, 0);
         accessManager.setTargetFunctionRole(
             address(earningChainGateway), _toSelectorArray(IRescuableAssets.rescueTokens.selector), RESCUER_ROLE
         );
 
         // ----- Set up Operator -----
-        executionDelay = 0;
-        accessManager.grantRole(OPERATOR_ROLE, operator, executionDelay);
-        accessManager.setRoleGuardian(OPERATOR_ROLE, GUARDIAN_ROLE);
+        _setUpRole(accessManager, OPERATOR_ROLE, operator, 0);
 
         // For Allocator on Earning chain
         accessManager.setTargetFunctionRole(
@@ -553,5 +527,10 @@ contract BaseTest is Test {
         );
 
         vm.stopPrank();
+    }
+
+    function _setUpRole(ExtendedAccessManager accessManager, uint64 roleId, address account, uint32 executionDelay) internal {
+        accessManager.grantRole(roleId, account, executionDelay);
+        accessManager.setRoleGuardian(roleId, GUARDIAN_ROLE);
     }
 }
