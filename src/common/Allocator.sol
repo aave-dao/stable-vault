@@ -145,7 +145,6 @@ contract Allocator is IAllocator {
         onlyManager
         returns (uint256)
     {
-        require(_isVaultSupportedForAsset({vault: vault, asset: asset}), ErrorsLib.AddressAlreadyWhitelisted());
         require(IERC4626(vault).asset() == asset, ErrorsLib.InvalidAsset(asset));
         if (assetsAmount == 0) {
             // TODO: Add to documentation
