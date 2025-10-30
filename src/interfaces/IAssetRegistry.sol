@@ -19,6 +19,7 @@ interface IAssetRegistry {
 
     event AssetConfigSet(address asset, AssetConfig config);
 
+    function setAssetConfig(address asset, AssetConfig memory config) external;
     function isAllowedToDepositIntoBBV(address asset) external returns (bool);
     function isAllowedToWithdrawFromBBV(address asset) external returns (bool);
     function isAllowedToDepositIntoAllocator(address asset) external returns (bool);

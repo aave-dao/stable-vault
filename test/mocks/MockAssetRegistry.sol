@@ -14,6 +14,8 @@ contract MockAssetRegistry is IAssetRegistry {
     mapping(address asset => bool isAllowedToSwapInputTokenInAllocator) _isNotAllowedToSwapInputTokenInAllocator;
     mapping(address asset => bool isAllowedToSwapOutputTokenInAllocator) _isNotAllowedToSwapOutputTokenInAllocator;
 
+    function setAssetConfig(address asset, AssetConfig memory config) external override {}
+
     function mockToAllowAssetDepositsIntoBBV(address asset) external {
         _isNotAllowedToDepositIntoBBV[asset] = false;
     }
