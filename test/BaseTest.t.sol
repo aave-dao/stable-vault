@@ -29,6 +29,7 @@ contract BaseTest is Test {
     address manager = makeAddr("MANAGER");
     uint256 initialBasePerSecondRate = MathLib.RAY; // 1 RAY
 
+    uint256 constant DEFAULT_MAX_PER_SECOND_RATE = 1000000005781378656804591713; // ~20% APY
     uint64 public constant ACCOUNTING_CHAIN_ID = 1;
     uint64 public constant ACCOUNTING_CHAIN_CCIP_SELECTOR = 10;
     uint64 public constant EARNING_CHAIN_ID = 2;
@@ -119,6 +120,7 @@ contract BaseTest is Test {
         iouToken_accountingChain.transferOwnership(address(iouTokenManager_accountingChain));
         vault = new ExtendedBasedBoostedVault(
             admin,
+            DEFAULT_MAX_PER_SECOND_RATE,
             initialBasePerSecondRate,
             address(iouTokenManager_accountingChain),
             address(assetRegistry_accountingChain)

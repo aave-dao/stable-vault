@@ -34,6 +34,8 @@ contract BasedBoostedVault is Ownable, RescuableAssets, IBasedBoostedVault {
 
     address internal immutable IOU_TOKEN_MANAGER;
 
+    uint256 internal immutable MAX_VALID_PER_SECOND_RATE;
+
     /**
      * @notice A subVault works like a virtual fixed-rate vault.
      *
@@ -89,12 +91,18 @@ contract BasedBoostedVault is Ownable, RescuableAssets, IBasedBoostedVault {
 
     /// @dev Constructor.
     /// @param owner The owner of the vault, acting as an admin.
+    /// @param maxValidPerSecondRate The maximum valid per-second rate, in Ray units (27 decimals).
     /// @param defaultSubVaultPerSecondRate The base per-second rate, in Ray units (27 decimals).
     /// @param iouTokenManager The address of the IOU token manager.
     /// @param assetRegistry The address of the contract that manages the permissions for handling assets.
-    constructor(address owner, uint256 defaultSubVaultPerSecondRate, address iouTokenManager, address assetRegistry)
-        Ownable(owner)
-    {
+    constructor(
+        address owner,
+        uint256 maxValidPerSecondRate,
+        uint256 defaultSubVaultPerSecondRate,
+        address iouTokenManager,
+        address assetRegistry
+    ) Ownable(owner) {
+        MAX_VALID_PER_SECOND_RATE = maxValidPerSecondRate;
         IOU_TOKEN_MANAGER = iouTokenManager;
         _assetRegistry = assetRegistry;
         _setDefaultSubVault(_createSubVault(defaultSubVaultPerSecondRate), defaultSubVaultPerSecondRate);
@@ -368,6 +376,10 @@ contract BasedBoostedVault is Ownable, RescuableAssets, IBasedBoostedVault {
         return _subVaultIdByRate[perSecondRate];
     }
 
+    function getMaxValidPerSecondRate() external view returns (uint256) {
+        return MAX_VALID_PER_SECOND_RATE;
+    }
+
     // /////////////////////////////////////////////// INTERNAL /////////////////////////////////////////////////////
 
     function _getOrCreateSubVaultWithRate(uint256 perSecondRate) internal returns (uint256) {
@@ -385,7 +397,7 @@ contract BasedBoostedVault is Ownable, RescuableAssets, IBasedBoostedVault {
 
     function _createSubVault(uint256 newPerSecondRate) internal returns (uint256) {
         require(!_existsSubVaultWithRate(newPerSecondRate), VaultAlreadyExists());
-        require(newPerSecondRate >= MathLib.RAY, InvalidRate());
+        require(newPerSecondRate >= MathLib.RAY && newPerSecondRate <= MAX_VALID_PER_SECOND_RATE, InvalidRate());
         uint256 newSubVaultId = ++_lastSubVaultId;
         _subVaultById[newSubVaultId] = SubVault({
             perSecondRate: newPerSecondRate,

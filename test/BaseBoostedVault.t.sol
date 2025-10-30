@@ -37,19 +37,27 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
     function _deployBasedBoostedVault(
         address adminParam,
+        uint256 maxPerSecondRate,
         uint256 defaultSubVaultPerSecondRate,
         address iouToken,
         address assetRegistry
     ) internal returns (IBasedBoostedVault) {
-        return new BasedBoostedVault(adminParam, defaultSubVaultPerSecondRate, iouToken, assetRegistry);
+        return new BasedBoostedVault(
+            adminParam, maxPerSecondRate, defaultSubVaultPerSecondRate, iouToken, assetRegistry
+        );
     }
 
     function setUp() public {
         mockIouToken = new MockIouToken(address(this));
         mockAssetRegistry = new MockAssetRegistry();
         mockAsset = _deployDefaultAsset();
-        bbv =
-            _deployBasedBoostedVault(admin, DEFAULT_PER_SECOND_RATE, address(mockIouToken), address(mockAssetRegistry));
+        bbv = _deployBasedBoostedVault(
+            admin,
+            DEFAULT_MAX_PER_SECOND_RATE,
+            DEFAULT_PER_SECOND_RATE,
+            address(mockIouToken),
+            address(mockAssetRegistry)
+        );
 
         mockFundsHandler = new MockFundsHandler();
 
@@ -65,7 +73,11 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         expectedDefaultSubVaultRate = _boundRate(expectedDefaultSubVaultRate);
 
         BasedBoostedVault newBbv = new BasedBoostedVault(
-            expectedOwner, expectedDefaultSubVaultRate, address(mockIouToken), address(mockAssetRegistry)
+            expectedOwner,
+            DEFAULT_MAX_PER_SECOND_RATE,
+            expectedDefaultSubVaultRate,
+            address(mockIouToken),
+            address(mockAssetRegistry)
         );
 
         assertEq(newBbv.owner(), expectedOwner);
@@ -77,14 +89,22 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
     function test_constructor_reverts_ifZeroAddressAsOwner() public {
         vm.expectRevert();
-        new BasedBoostedVault(address(0), DEFAULT_PER_SECOND_RATE, address(mockIouToken), address(mockAssetRegistry));
+        new BasedBoostedVault(
+            address(0),
+            DEFAULT_MAX_PER_SECOND_RATE,
+            DEFAULT_PER_SECOND_RATE,
+            address(mockIouToken),
+            address(mockAssetRegistry)
+        );
     }
 
     function test_constructor_reverts_ifInvalidDefaultSubVaultRate(uint256 invalidDefaultSubVaultRate) public {
         vm.assume(invalidDefaultSubVaultRate < MathLib.RAY);
 
         vm.expectRevert();
-        new BasedBoostedVault(admin, MathLib.RAY - 1, address(mockIouToken), address(mockAssetRegistry));
+        new BasedBoostedVault(
+            admin, DEFAULT_MAX_PER_SECOND_RATE, MathLib.RAY - 1, address(mockIouToken), address(mockAssetRegistry)
+        );
     }
 
     function test_deposit_firstUserDepositGoesToDefaultSubVault(address user, uint256 amount) public {
