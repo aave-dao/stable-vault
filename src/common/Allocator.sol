@@ -139,10 +139,30 @@ contract Allocator is IAllocator {
     // Manager Functions
 
     /// @inheritdoc IAllocator
-    function deallocate(address asset, uint256 amount, address vault) external override onlyManager returns (uint256) {
+    function deallocate(address asset, uint256 assetsAmount, address vault)
+        external
+        override
+        onlyManager
+        returns (uint256)
+    {
         require(_isVaultSupportedForAsset({vault: vault, asset: asset}), ErrorsLib.AddressAlreadyWhitelisted());
-        require(amount > 0, ErrorsLib.ZeroAmount());
-        return _deallocate(vault, asset, amount, address(this));
+        require(IERC4626(vault).asset() == asset, ErrorsLib.InvalidAsset(asset));
+        if (assetsAmount == 0) {
+            // TODO: Add to documentation
+            // Withdraw MAX special case
+            uint256 maxShares = IERC4626(vault).maxRedeem(address(this));
+            uint256 balanceBefore = IERC20(asset).balanceOf(address(this));
+            uint256 assetsWithdrawn = _deallocateShares(vault, asset, maxShares, address(this));
+            uint256 balanceAfter = IERC20(asset).balanceOf(address(this));
+            require(balanceAfter - balanceBefore == assetsWithdrawn, ErrorsLib.InsufficientAmountOut());
+            return maxShares;
+        } else {
+            uint256 balanceBefore = IERC20(asset).balanceOf(address(this));
+            uint256 sharesBurned = _deallocate(vault, asset, assetsAmount, address(this));
+            uint256 balanceAfter = IERC20(asset).balanceOf(address(this));
+            require(balanceAfter - balanceBefore == assetsAmount, ErrorsLib.InsufficientAmountOut());
+            return sharesBurned;
+        }
     }
 
     /// @inheritdoc IAllocator
@@ -259,6 +279,16 @@ contract Allocator is IAllocator {
         return burnedShares;
     }
 
+    function _deallocateShares(address vault, address asset, uint256 sharesAmount, address receiver)
+        internal
+        returns (uint256)
+    {
+        uint256 assetsWithdrawn =
+            IERC4626(vault).redeem({shares: sharesAmount, receiver: receiver, owner: address(this)});
+        emit AssetDeallocated(asset, vault, assetsWithdrawn, sharesAmount);
+        return assetsWithdrawn;
+    }
+
     function _deposit(address asset, uint256 amount) internal returns (bool) {
         require(
             IAssetRegistry(_assetRegistry).isAllowedToDepositIntoAllocator(asset), ErrorsLib.UnsupportedAsset(asset)
@@ -311,6 +341,7 @@ contract Allocator is IAllocator {
 
     function _addVault(address asset, address vault) internal {
         require(!_isVaultSupported(vault), ErrorsLib.AddressAlreadyWhitelisted());
+        require(IERC4626(vault).asset() == asset, ErrorsLib.InvalidAsset(asset));
         _assetVaults[asset].push(vault);
         _allVaults.push(vault);
         _vaultData[vault] = VaultData({
