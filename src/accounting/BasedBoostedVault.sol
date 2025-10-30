@@ -150,7 +150,7 @@ contract BasedBoostedVault is Ownable, RescuableAssets, IBasedBoostedVault {
 
     /// @inheritdoc IBasedBoostedVault
     function setSubVaultRate(uint256 subVaultId, uint256 newPerSecondRate) external onlyManager {
-        require(newPerSecondRate >= MathLib.RAY, InvalidRate());
+        _validateRate(newPerSecondRate);
         require(!_existsSubVaultWithRate(newPerSecondRate), VaultAlreadyExists());
         _accrueSubVaultConversionRate(subVaultId);
         _subVaultById[subVaultId].perSecondRate = newPerSecondRate;
@@ -382,6 +382,10 @@ contract BasedBoostedVault is Ownable, RescuableAssets, IBasedBoostedVault {
 
     // /////////////////////////////////////////////// INTERNAL /////////////////////////////////////////////////////
 
+    function _validateRate(uint256 perSecondRate) internal view {
+        require(perSecondRate >= MathLib.RAY && perSecondRate <= MAX_VALID_PER_SECOND_RATE, InvalidRate());
+    }
+
     function _getOrCreateSubVaultWithRate(uint256 perSecondRate) internal returns (uint256) {
         if (_existsSubVaultWithRate(perSecondRate)) {
             return _subVaultIdByRate[perSecondRate];
@@ -397,7 +401,7 @@ contract BasedBoostedVault is Ownable, RescuableAssets, IBasedBoostedVault {
 
     function _createSubVault(uint256 newPerSecondRate) internal returns (uint256) {
         require(!_existsSubVaultWithRate(newPerSecondRate), VaultAlreadyExists());
-        require(newPerSecondRate >= MathLib.RAY && newPerSecondRate <= MAX_VALID_PER_SECOND_RATE, InvalidRate());
+        _validateRate(newPerSecondRate);
         uint256 newSubVaultId = ++_lastSubVaultId;
         _subVaultById[newSubVaultId] = SubVault({
             perSecondRate: newPerSecondRate,
