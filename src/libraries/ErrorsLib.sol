@@ -56,6 +56,9 @@ library ErrorsLib {
     /// @notice Thrown when input parameter contains unacceptable amount.
     error InvalidAmount();
 
+    /// @notice Thrown when input parameter contains unacceptable asset.
+    error InvalidAsset(address asset);
+
     /// @notice Address checked is not the self.
     error NotSelf();
 
