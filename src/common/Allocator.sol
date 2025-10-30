@@ -357,7 +357,8 @@ contract Allocator is IAllocator {
         if (vault == _defaultVaultByAsset[vaultData.asset]) {
             // Unset the default vault for the asset - deposits will not flow to this vault.
             // If the default vault is removed, another one should be set as the default for withdrawals.
-            _unsetDefaultVault(vaultData.asset);
+            delete _defaultVaultByAsset[vaultData.asset];
+            emit DefaultVaultSet(vaultData.asset, address(0));
         }
 
         // Remove vault from _assetVaults
@@ -379,11 +380,5 @@ contract Allocator is IAllocator {
 
         delete _vaultData[vault];
         emit VaultRemoved(vaultData.asset, vault);
-    }
-
-    function _unsetDefaultVault(address asset) internal {
-        require(_defaultVaultByAsset[asset] != address(0), ErrorsLib.AddressNotWhitelisted());
-        _defaultVaultByAsset[asset] = address(0);
-        emit DefaultVaultSet(asset, address(0));
     }
 }
