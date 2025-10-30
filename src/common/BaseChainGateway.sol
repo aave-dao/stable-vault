@@ -36,6 +36,10 @@ abstract contract BaseChainGateway is RescuableAssets, AccessManaged, IChainGate
         override
     {
         if (assets.length > 0) {
+            // Receiving of funds should not check for whitelisted adapter because we may want to recover tokens from
+            // adapter even after removing the adapter. We may have to remove an adapter if we do not trust it for
+            // receiving arbitrary messages.
+            // If someone wants to send funds to the Gateway then it will take it.
             _receiveFunds(assets);
         }
         if (data.length > 0) {

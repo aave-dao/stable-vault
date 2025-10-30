@@ -4,10 +4,16 @@ pragma solidity ^0.8.20;
 import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 
+import {ExtendedAccessManager} from "../src/common/ExtendedAccessManager.sol";
+
 import {AssetRegistry} from "../src/common/AssetRegistry.sol";
 import {IouToken} from "../src/common/IouToken.sol";
 import {IouTokenManager} from "../src/common/IouTokenManager.sol";
+import {IAllocator} from "../src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "../src/interfaces/IAssetRegistry.sol";
+import {IBasedBoostedVault} from "../src/interfaces/IBasedBoostedVault.sol";
+import {IChainGateway} from "../src/interfaces/IChainGateway.sol";
+import {IRescuableAssets} from "../src/interfaces/IRescuableAssets.sol";
 import {AccountingChainGateway} from "./../src/accounting/AccountingChainGateway.sol";
 import {FundsHandler} from "./../src/accounting/FundsHandler.sol";
 import {CcipAdapter} from "./../src/bridging/CcipAdapter.sol";
@@ -36,6 +42,15 @@ contract BaseTest is Test {
     address profitTaker = makeAddr("PROFIT_TAKER");
     address operator = makeAddr("OPERATOR");
 
+    // ADMIN_ROLE = 0
+    uint64 internal constant GUARDIAN_ROLE = 1;
+    uint64 internal constant UPGRADE_PROXY_ADMIN_ROLE = 2;
+    uint64 internal constant APPENDER_ROLE = 3;
+    uint64 internal constant REMOVER_ROLE = 4;
+    uint64 internal constant RESCUER_ROLE = 5;
+    uint64 internal constant PROFIT_TAKER_ROLE = 6;
+    uint64 internal constant OPERATOR_ROLE = 7;
+
     uint256 initialBasePerSecondRate = MathLib.RAY; // 1 RAY
 
     uint256 constant DEFAULT_MAX_PER_SECOND_RATE = 1000000005781378656804591713; // ~20% APY
@@ -50,7 +65,7 @@ contract BaseTest is Test {
 
     // Accounting Chain: BBV, FH, Swapper, Allocator, Accounting Chain Gateway, CCIP Adapter, CCIP Router, Strategy
     // Vault/4626
-    MockAccessManager accessManager_accountingChain;
+    ExtendedAccessManager accessManager_accountingChain;
     ExtendedBasedBoostedVault vault;
     IouToken iouToken_accountingChain;
     IouTokenManager iouTokenManager_accountingChain;
@@ -64,7 +79,7 @@ contract BaseTest is Test {
     TestErc4626 usdcStrategyVault_accountingChain;
 
     // Earning Chain: Earning Chain Gateway, CCIP Adapter, CCIP Router, Swapper, Allocator, Strategy Vault/4626
-    MockAccessManager accessManager_earningChain;
+    ExtendedAccessManager accessManager_earningChain;
     AssetRegistry assetRegistry_earningChain;
     IouToken iouToken_earningChain;
     IouTokenManager iouTokenManager_earningChain;
@@ -124,7 +139,7 @@ contract BaseTest is Test {
         console.log("\nAccounting Chain:");
         // Accounting Chain: BBV, FH, Swapper, Allocator, Accounting Chain Gateway, CCIP Adapter, CCIP Router, Strategy,
         // Asset Registry Vault/4626
-        accessManager_accountingChain = new MockAccessManager(admin);
+        accessManager_accountingChain = new ExtendedAccessManager(admin);
         console.log("\tAccess Manager: %s", address(accessManager_accountingChain));
         assetRegistry_accountingChain = new AssetRegistry(address(this));
         // Enable everything for assets
@@ -182,7 +197,7 @@ contract BaseTest is Test {
         // Earning Chain: Access Manager, Earning Chain Gateway, CCIP Adapter, CCIP Router, Swapper, Allocator, Strategy
         // Vault/4626, Asset Registry
         console.log("\nEarning Chain:");
-        accessManager_earningChain = new MockAccessManager(admin);
+        accessManager_earningChain = new ExtendedAccessManager(admin);
         console.log("\tAccess Manager: %s", address(accessManager_earningChain));
         assetRegistry_earningChain = new AssetRegistry(address(this));
         // Enable everything for assets
@@ -266,30 +281,7 @@ contract BaseTest is Test {
         );
 
         // Set up Access Manager roles on Accounting chain
-        accessManager_accountingChain.setUpGuardian(guardian);
-
-        address[] memory upgradeProxyTargets_accountingChain = new address[](0);
-        accessManager_accountingChain.setUpUpgradeProxyRole(upgradeProxyAdmin, upgradeProxyTargets_accountingChain);
-        accessManager_accountingChain.setUpAppenderRole(
-            appender,
-            address(allocator_accountingChain),
-            address(assetRegistry_accountingChain),
-            address(accountingChainGateway)
-        );
-        accessManager_accountingChain.setUpRemoverRole(
-            remover, address(allocator_accountingChain), address(accountingChainGateway)
-        );
-        accessManager_accountingChain.setUpRescuerRole(
-            rescuer, address(vault), address(fundsHandler), address(accountingChainGateway)
-        );
-        accessManager_accountingChain.setUpProfitTakerRole(profitTaker, address(vault));
-        accessManager_accountingChain.setUpAccountingChainOperatorRole(
-            operator,
-            address(vault),
-            address(fundsHandler),
-            address(accountingChainGateway),
-            address(allocator_accountingChain)
-        );
+        _setUpAccountingChainAccessManager();
 
         // Set up Earning Chain Gateway (Earning chain)
         vm.prank(appender);
@@ -373,5 +365,134 @@ contract BaseTest is Test {
         vm.stopPrank();
 
         console.log("\n-------------------");
+    }
+
+    function _setUpAccountingChainAccessManager() internal {
+        vm.startPrank(admin);
+        // TODO: add targets of upgradable contracts for upgrade proxy
+
+        // Set Up Guardian
+        address[] memory upgradeProxyTargets_accountingChain = new address[](0);
+        accessManager_accountingChain.setUpGuardian(guardian);
+        accessManager_accountingChain.setUpUpgradeProxyRole(upgradeProxyAdmin, upgradeProxyTargets_accountingChain);
+        accessManager_accountingChain.setUpAppenderRole(
+            appender,
+            address(allocator_accountingChain),
+            address(assetRegistry_accountingChain),
+            address(accountingChainGateway)
+        );
+        accessManager_accountingChain.setUpRemoverRole(
+            remover, address(allocator_accountingChain), address(accountingChainGateway)
+        );
+        accessManager_accountingChain.setUpRescuerRole(
+            rescuer, address(vault), address(fundsHandler), address(accountingChainGateway)
+        );
+        accessManager_accountingChain.setUpProfitTakerRole(profitTaker, address(vault));
+        accessManager_accountingChain.setUpAccountingChainOperatorRole(
+            operator,
+            address(vault),
+            address(fundsHandler),
+            address(accountingChainGateway),
+            address(allocator_accountingChain)
+        );
+        vm.stopPrank();
+    }
+
+    function _setUpAccessManager(ExtendedAccessManager accessManager) internal {
+        vm.startPrank(admin);
+
+        // TODO: set up RoleAdmin role which can grant and revoke roles
+        // TODO: MasterAdmin needs to set grantDelay on all roles
+        // TODO: creater Pauser role
+
+        uint256 executionDelay;
+
+        // ----- Set up Guardian -----
+        accessManager.grantRole(GUARDIAN_ROLE, guardian, 0);
+
+        // ----- Set up Upgrade Proxy Admin -----
+        executionDelay = 1 days * 15;
+        accessManager.grantRole(UPGRADE_PROXY_ADMIN_ROLE, upgradeProxyAdmin, executionDelay);
+        accessManager.setRoleGuardian(UPGRADE_PROXY_ADMIN_ROLE, GUARDIAN_ROLE);
+        // TODO(upgrade): set upgrade selector for all relavent contracts
+        bytes4 selector = 0x00000000;
+        bytes4[] memory upgradeSelectors = new bytes4[](1);
+        upgradeSelectors[0] = selector;
+        // TODO(upgrade): add all upgradabale targets here
+        address[] memory upgradeTargets = new address[](0);
+        for (uint256 i = 0; i < upgradeTargets.length; i++) {
+            accessManager.setTargetFunctionRole(upgradeTargets[i], upgradeSelectors, UPGRADE_PROXY_ADMIN_ROLE);
+        }
+
+        // ----- Set up Appender -----
+        executionDelay = 1 days * 7;
+        accessManager.grantRole(APPENDER_ROLE, appender, executionDelay);
+        accessManager.setRoleGuardian(APPENDER_ROLE, GUARDIAN_ROLE);
+        bytes4[] memory addSelectorsAllocator = new bytes4[](1);
+        addSelectorsAllocator[0] = IAllocator.addVault.selector;
+        accessManager.setTargetFunctionRole(address(allocator_accountingChain), addSelectorsAllocator, APPENDER_ROLE);
+        bytes4[] memory addSelectorsAssetRegistry = new bytes4[](1);
+        addSelectorsAssetRegistry[0] = IAssetRegistry.setAssetConfig.selector;
+        accessManager.setTargetFunctionRole(
+            address(assetRegistry_accountingChain), addSelectorsAssetRegistry, APPENDER_ROLE
+        );
+        bytes4[] memory addSelectorsGateway = new bytes4[](1);
+        addSelectorsGateway[0] = IChainGateway.addBridgeAdapter.selector;
+        accessManager.setTargetFunctionRole(address(accountingChainGateway), addSelectorsGateway, APPENDER_ROLE);
+
+        // ----- Set up Remover -----
+        executionDelay = 0;
+        accessManager.grantRole(REMOVER_ROLE, remover, executionDelay);
+        accessManager.setRoleGuardian(REMOVER_ROLE, GUARDIAN_ROLE);
+        bytes4[] memory removeSelectorsAllocator = new bytes4[](1);
+        removeSelectorsAllocator[0] = IAllocator.removeVault.selector;
+        accessManager.setTargetFunctionRole(address(allocator_accountingChain), removeSelectorsAllocator, REMOVER_ROLE);
+        bytes4[] memory removeSelectorsGateway = new bytes4[](1);
+        removeSelectorsGateway[0] = IChainGateway.removeBridgeAdapter.selector;
+        accessManager.setTargetFunctionRole(address(accountingChainGateway), removeSelectorsGateway, REMOVER_ROLE);
+
+        // ----- Set up Rescuer -----
+        executionDelay = 0;
+        accessManager.grantRole(RESCUER_ROLE, rescuer, executionDelay);
+        accessManager.setRoleGuardian(RESCUER_ROLE, GUARDIAN_ROLE);
+        bytes4[] memory rescueSelectors = new bytes4[](1);
+        rescueSelectors[0] = IRescuableAssets.rescueTokens.selector;
+        address[] memory rescueTargets = new address[](3);
+        rescueTargets[0] = address(vault);
+        rescueTargets[1] = address(fundsHandler);
+        rescueTargets[2] = address(accountingChainGateway);
+        for (uint256 i = 0; i < rescueTargets.length; i++) {
+            accessManager.setTargetFunctionRole(rescueTargets[i], rescueSelectors, RESCUER_ROLE);
+        }
+
+        // ----- Set up Profit Taker -----
+        executionDelay = 0;
+        accessManager.grantRole(PROFIT_TAKER_ROLE, profitTaker, executionDelay);
+        accessManager.setRoleGuardian(PROFIT_TAKER_ROLE, GUARDIAN_ROLE);
+        bytes4[] memory claimFeesSelectors = new bytes4[](1);
+        claimFeesSelectors[0] = IBasedBoostedVault.claimFees.selector;
+        accessManager.setTargetFunctionRole(address(vault), claimFeesSelectors, PROFIT_TAKER_ROLE);
+
+        // ----- Set up Operator -----
+        executionDelay = 0;
+        accessManager.grantRole(OPERATOR_ROLE, operator, executionDelay);
+        accessManager.setRoleGuardian(OPERATOR_ROLE, GUARDIAN_ROLE);
+
+        // For Allocator on Accounting chain
+        bytes4[] memory operatorSelectorsAllocator = new bytes4[](4);
+        operatorSelectorsAllocator[0] = IAllocator.deallocate.selector;
+        operatorSelectorsAllocator[1] = IAllocator.depositIdleFunds.selector;
+        operatorSelectorsAllocator[2] = IAllocator.rebalance.selector;
+        operatorSelectorsAllocator[3] = IAllocator.reallocate.selector;
+        accessManager.setTargetFunctionRole(
+            address(allocator_accountingChain), operatorSelectorsAllocator, OPERATOR_ROLE
+        );
+
+        // For Accounting Chain Gateway TODO: finish from here
+        bytes4[] memory operatorSelectorsGateway = new bytes4[](1);
+        operatorSelectorsGateway[0] = IChainGateway.setDefaultBridgeAdapter.selector;
+        accessManager.setTargetFunctionRole(address(accountingChainGateway), operatorSelectorsGateway, OPERATOR_ROLE);
+
+        vm.stopPrank();
     }
 }
