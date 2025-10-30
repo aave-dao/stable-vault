@@ -126,7 +126,8 @@ contract FundsHandler is RescuableAssets, IFundsHandler {
 
     /// @inheritdoc IFundsHandler
     function updateChainBalanceCallback(uint256 chainId, uint256 snapshotBalanceRay, uint256 chainBalanceSnapshotNonce)
-        external override
+        external
+        override
         onlyGateway
     {
         _updateChainBalance(chainId, snapshotBalanceRay, chainBalanceSnapshotNonce);
