@@ -13,12 +13,15 @@ import {AssetLib} from "../src/libraries/AssetLib.sol";
 import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
 import {MathLib} from "../src/libraries/MathLib.sol";
 import {TestWithHelpers} from "./helpers/TestWithHelpers.sol";
+import {MockAccessManager} from "./mocks/MockAccessManager.sol";
 import {MockAllocator} from "./mocks/MockAllocator.sol";
 import {MockAssetRegistry} from "./mocks/MockAssetRegistry.sol";
 import {MockBridgeAdapter} from "./mocks/MockBridgeAdapter.sol";
 import {IMockErc20} from "./mocks/MockErc20.sol";
 import {MockIouTokenManager} from "./mocks/MockIouTokenManager.sol";
 import {MockNonStandardErc20} from "./mocks/MockNonStandardErc20.sol";
+
+import {console} from "forge-std/console.sol";
 
 contract EarningChainGatewayTest is TestWithHelpers {
     using MathLib for uint256;
@@ -30,7 +33,16 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
     address internal admin = makeAddr("admin");
     address internal manager = makeAddr("manager");
+    address internal guardian = makeAddr("guardian");
+    address internal upgradeProxyAdmin = makeAddr("upgradeProxyAdmin");
+    address internal appender = makeAddr("appender");
+    address internal remover = makeAddr("remover");
+    address internal rescuer = makeAddr("rescuer");
+    address internal operator = makeAddr("operator");
+    address internal dummyFundsHandler = makeAddr("dummyFundsHandler");
+    address internal dummyVault = makeAddr("dummyVault");
 
+    MockAccessManager internal _mockAccessManager;
     IMockErc20 internal _mockUsdt;
     IMockErc20 internal _mockGho;
     MockAllocator internal _mockAllocator;
@@ -41,12 +53,14 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
     EarningChainGateway internal _earningChainGateway;
 
-    function _deployEarningChainGateway(address iouTokenManager) internal returns (EarningChainGateway) {
-        EarningChainGateway earningChainGateway = new EarningChainGateway(admin, ACCOUNTING_CHAIN_ID, iouTokenManager);
-        vm.prank(admin);
-        earningChainGateway.setManager(manager);
-        vm.prank(admin);
-        earningChainGateway.setAllocator(address(_mockAllocator));
+    function _deployEarningChainGateway(
+        MockAccessManager mockAccessManager,
+        address iouTokenManager,
+        address allocator
+    ) internal returns (EarningChainGateway) {
+        EarningChainGateway earningChainGateway = new EarningChainGateway(
+            address(mockAccessManager), ACCOUNTING_CHAIN_ID, iouTokenManager, allocator
+        );
         vm.prank(admin);
         earningChainGateway.addBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, address(_mockBridgeAdapterData));
         vm.prank(admin);
@@ -81,7 +95,34 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         _mockBridgeAdapterData = new MockBridgeAdapter();
 
-        _earningChainGateway = _deployEarningChainGateway(address(_mockIouTokenManager));
+        _mockAccessManager = new MockAccessManager(admin);
+
+        _earningChainGateway =
+            _deployEarningChainGateway(_mockAccessManager, address(_mockIouTokenManager), address(_mockAllocator));
+
+        vm.startPrank(admin);
+        console.log("\tSetting up Access Manager roles for Earning Chain Gateway");
+        console.log("admin: ", admin);
+        _mockAccessManager.setUpGuardian(guardian);
+        address[] memory upgradeProxyTargets = new address[](1);
+        upgradeProxyTargets[0] = address(_earningChainGateway);
+        console.log("\tSetting up Upgrade Proxy Role for Earning Chain Gateway");
+        _mockAccessManager.setUpUpgradeProxyRole(upgradeProxyAdmin, upgradeProxyTargets);
+        console.log("\tSetting up Appender Role for Earning Chain Gateway");
+        _mockAccessManager.setUpAppenderRole(
+            appender, address(_mockAllocator), address(_mockAssetRegistry), address(_earningChainGateway)
+        );
+        console.log("\tSetting up Remover Role for Earning Chain Gateway");
+        _mockAccessManager.setUpRemoverRole(remover, address(_mockAllocator), address(_earningChainGateway));
+        console.log("\tSetting up Rescuer Role for Earning Chain Gateway");
+        _mockAccessManager.setUpRescuerRole(
+            rescuer, address(dummyVault), address(dummyFundsHandler), address(_earningChainGateway)
+        );
+        console.log("\tSetting up Earning Chain Operator Role for Earning Chain Gateway");
+        _mockAccessManager.setUpEarningChainOperatorRole(
+            operator, address(_earningChainGateway), address(_mockAllocator)
+        );
+        vm.stopPrank();
     }
 
     function test_constructor_setsTheExpectedValues(
@@ -95,51 +136,12 @@ contract EarningChainGatewayTest is TestWithHelpers {
         vm.assume(expectedAccountingChainId != 0);
         vm.assume(expectedManager != address(0));
 
-        EarningChainGateway newEarningChainGateway =
-            new EarningChainGateway(expectedAdmin, expectedAccountingChainId, expectedIouTokenManager);
-        assertEq(newEarningChainGateway.getAdmin(), expectedAdmin);
-        assertEq(newEarningChainGateway.getManager(), address(0));
+        EarningChainGateway newEarningChainGateway = new EarningChainGateway(
+            address(_mockAccessManager), expectedAccountingChainId, expectedIouTokenManager, address(_mockAllocator)
+        );
+        assertEq(newEarningChainGateway.authority(), address(_mockAccessManager));
         assertEq(newEarningChainGateway.getAccountingChainId(), expectedAccountingChainId);
         assertEq(newEarningChainGateway.getIouTokenManager(), expectedIouTokenManager);
-
-        vm.prank(expectedAdmin);
-        newEarningChainGateway.setManager(expectedManager);
-
-        assertEq(newEarningChainGateway.getManager(), expectedManager);
-    }
-
-    function test_constructor_reverts_ifZeroAddressAsAdmin() public {
-        vm.expectRevert(ErrorsLib.ZeroAddress.selector);
-        new EarningChainGateway(address(0), EARNING_CHAIN_ID, address(_mockIouTokenManager));
-    }
-
-    function test_constructor_reverts_ifZeroAddressAsIouTokenManager() public {
-        vm.expectRevert(ErrorsLib.ZeroAddress.selector);
-        new EarningChainGateway(admin, EARNING_CHAIN_ID, address(0));
-    }
-
-    function test_constructor_reverts_ifZeroAddressAsManager() public {
-        EarningChainGateway newEarningChainGateway =
-            new EarningChainGateway(admin, EARNING_CHAIN_ID, address(_mockIouTokenManager));
-        vm.prank(admin);
-        vm.expectRevert(ErrorsLib.ZeroAddress.selector);
-        newEarningChainGateway.setManager(address(0));
-    }
-
-    function test_setManager_reverts_ifZeroAddressAsManager() public {
-        EarningChainGateway newEarningChainGateway =
-            new EarningChainGateway(admin, EARNING_CHAIN_ID, address(_mockIouTokenManager));
-        vm.expectRevert(ErrorsLib.ZeroAddress.selector);
-        vm.prank(admin);
-        newEarningChainGateway.setManager(address(0));
-    }
-
-    function test_setManager_reverts_ifZeroAddressAsAllocator() public {
-        EarningChainGateway newEarningChainGateway =
-            new EarningChainGateway(admin, EARNING_CHAIN_ID, address(_mockIouTokenManager));
-        vm.expectRevert(ErrorsLib.ZeroAddress.selector);
-        vm.prank(admin);
-        newEarningChainGateway.setManager(address(0));
     }
 
     function test_addBridgeAdapter_setsExpectedBridgeAdapter(address asset, uint256 chainId, address adapter) public {
@@ -148,7 +150,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         vm.assume(adapter != address(0));
         vm.prank(admin);
         _earningChainGateway.addBridgeAdapter(asset, chainId, adapter);
-        vm.prank(admin);
+        vm.prank(operator);
         _earningChainGateway.setDefaultBridgeAdapter(asset, chainId, adapter);
         assertEq(_earningChainGateway.getDefaultBridgeAdapter(asset, chainId), adapter);
     }
@@ -157,10 +159,10 @@ contract EarningChainGatewayTest is TestWithHelpers {
         address adapter = makeAddr("adapter");
         address asset = address(_mockUsdt);
 
-        vm.prank(admin);
+        vm.prank(appender);
         _earningChainGateway.addBridgeAdapter(asset, ACCOUNTING_CHAIN_ID, adapter);
         vm.expectRevert(ErrorsLib.AddressAlreadyWhitelisted.selector);
-        vm.prank(admin);
+        vm.prank(appender);
         _earningChainGateway.addBridgeAdapter(asset, ACCOUNTING_CHAIN_ID, adapter);
     }
 
@@ -169,7 +171,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         address asset = address(_mockUsdt);
 
         vm.expectRevert(ErrorsLib.AddressNotWhitelisted.selector);
-        vm.prank(admin);
+        vm.prank(operator);
         _earningChainGateway.setDefaultBridgeAdapter(asset, ACCOUNTING_CHAIN_ID, adapter);
     }
 

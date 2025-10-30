@@ -17,6 +17,7 @@ import {EarningChainGateway} from "./../src/earning/EarningChainGateway.sol";
 import {AssetLib} from "./../src/libraries/AssetLib.sol";
 import {MathLib} from "./../src/libraries/MathLib.sol";
 import {ExtendedBasedBoostedVault} from "./mocks/ExtendedBasedBoostedVault.sol";
+import {MockAccessManager} from "./mocks/MockAccessManager.sol";
 import {MockCCIPRouter} from "./mocks/MockRouter.sol";
 import {TestErc20} from "./mocks/TestErc20.sol";
 import {TestErc4626} from "./mocks/TestErc4626.sol";
@@ -27,6 +28,14 @@ contract BaseTest is Test {
 
     address admin = makeAddr("ADMIN");
     address manager = makeAddr("MANAGER");
+    address guardian = makeAddr("GUARDIAN");
+    address upgradeProxyAdmin = makeAddr("UPGRADE_PROXY_ADMIN");
+    address appender = makeAddr("APPENDER");
+    address remover = makeAddr("REMOVER");
+    address rescuer = makeAddr("RESCUER");
+    address profitTaker = makeAddr("PROFIT_TAKER");
+    address operator = makeAddr("OPERATOR");
+
     uint256 initialBasePerSecondRate = MathLib.RAY; // 1 RAY
 
     uint256 constant DEFAULT_MAX_PER_SECOND_RATE = 1000000005781378656804591713; // ~20% APY
@@ -41,6 +50,7 @@ contract BaseTest is Test {
 
     // Accounting Chain: BBV, FH, Swapper, Allocator, Accounting Chain Gateway, CCIP Adapter, CCIP Router, Strategy
     // Vault/4626
+    MockAccessManager accessManager_accountingChain;
     ExtendedBasedBoostedVault vault;
     IouToken iouToken_accountingChain;
     IouTokenManager iouTokenManager_accountingChain;
@@ -54,6 +64,7 @@ contract BaseTest is Test {
     TestErc4626 usdcStrategyVault_accountingChain;
 
     // Earning Chain: Earning Chain Gateway, CCIP Adapter, CCIP Router, Swapper, Allocator, Strategy Vault/4626
+    MockAccessManager accessManager_earningChain;
     AssetRegistry assetRegistry_earningChain;
     IouToken iouToken_earningChain;
     IouTokenManager iouTokenManager_earningChain;
@@ -113,6 +124,8 @@ contract BaseTest is Test {
         console.log("\nAccounting Chain:");
         // Accounting Chain: BBV, FH, Swapper, Allocator, Accounting Chain Gateway, CCIP Adapter, CCIP Router, Strategy,
         // Asset Registry Vault/4626
+        accessManager_accountingChain = new MockAccessManager(admin);
+        console.log("\tAccess Manager: %s", address(accessManager_accountingChain));
         assetRegistry_accountingChain = new AssetRegistry(address(this));
         // Enable everything for assets
         IAssetRegistry.AssetConfig memory unrestrictedAssetConfig = IAssetRegistry.AssetConfig({
@@ -151,8 +164,9 @@ contract BaseTest is Test {
             manager, address(vault), accountingChainGatewayAddress, address(allocator_accountingChain)
         );
         console.log("\tFunds Handler: %s", address(fundsHandler));
-        accountingChainGateway =
-            new AccountingChainGateway(admin, address(fundsHandler), address(iouTokenManager_accountingChain));
+        accountingChainGateway = new AccountingChainGateway(
+            address(accessManager_accountingChain), address(fundsHandler), address(iouTokenManager_accountingChain)
+        );
         console.log("\tAccounting Chain Gateway: %s", address(accountingChainGateway));
         swapper_accountingChain = new Swapper(address(allocator_accountingChain));
         console.log("\tSwapper: %s", address(swapper_accountingChain));
@@ -165,9 +179,11 @@ contract BaseTest is Test {
         console.log("\tUSDC Strategy Vault (Accounting Chain): %s", address(usdcStrategyVault_accountingChain));
 
         // /////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        // Earning Chain: Earning Chain Gateway, CCIP Adapter, CCIP Router, Swapper, Allocator, Strategy Vault/4626,
-        // Asset Registry
+        // Earning Chain: Access Manager, Earning Chain Gateway, CCIP Adapter, CCIP Router, Swapper, Allocator, Strategy
+        // Vault/4626, Asset Registry
         console.log("\nEarning Chain:");
+        accessManager_earningChain = new MockAccessManager(admin);
+        console.log("\tAccess Manager: %s", address(accessManager_earningChain));
         assetRegistry_earningChain = new AssetRegistry(address(this));
         // Enable everything for assets
         assetRegistry_earningChain.setAssetConfig(address(GHO), unrestrictedAssetConfig);
@@ -178,14 +194,19 @@ contract BaseTest is Test {
         iouTokenManager_earningChain = new IouTokenManager(address(iouToken_earningChain), false);
         console.log("\tIOU Token Manager (Earning Chain): %s", address(iouTokenManager_earningChain));
         iouToken_earningChain.transferOwnership(address(iouTokenManager_earningChain));
-        earningChainGateway = new EarningChainGateway(admin, ACCOUNTING_CHAIN_ID, address(iouTokenManager_earningChain));
-        console.log("\tEarning Chain Gateway: %s", address(earningChainGateway));
-        vm.prank(admin);
-        iouTokenManager_earningChain.setChainGateway(address(earningChainGateway));
         allocator_earningChain = new Allocator(manager, admin, address(assetRegistry_earningChain));
         console.log("\tAllocator: %s", address(allocator_earningChain));
         swapper_earningChain = new Swapper(address(allocator_earningChain));
         console.log("\tSwapper: %s", address(swapper_earningChain));
+        earningChainGateway = new EarningChainGateway(
+            address(accessManager_earningChain),
+            ACCOUNTING_CHAIN_ID,
+            address(iouTokenManager_earningChain),
+            address(allocator_earningChain)
+        );
+        console.log("\tEarning Chain Gateway: %s", address(earningChainGateway));
+        vm.prank(admin);
+        iouTokenManager_earningChain.setChainGateway(address(earningChainGateway));
 
         ghoStrategyVault_earningChain = new TestErc4626(GHO);
         console.log("\tGHO Strategy Vault (Earning Chain): %s", address(ghoStrategyVault_earningChain));
@@ -244,10 +265,36 @@ contract BaseTest is Test {
             accountingChainGateway.getDefaultBridgeAdapter(address(0), EARNING_CHAIN_ID)
         );
 
+        // Set up Access Manager roles on Accounting chain
+        accessManager_accountingChain.setUpGuardian(guardian);
+
+        address[] memory upgradeProxyTargets_accountingChain = new address[](0);
+        accessManager_accountingChain.setUpUpgradeProxyRole(upgradeProxyAdmin, upgradeProxyTargets_accountingChain);
+        accessManager_accountingChain.setUpAppenderRole(
+            appender,
+            address(allocator_accountingChain),
+            address(assetRegistry_accountingChain),
+            address(accountingChainGateway)
+        );
+        accessManager_accountingChain.setUpRemoverRole(
+            remover, address(allocator_accountingChain), address(accountingChainGateway)
+        );
+        accessManager_accountingChain.setUpRescuerRole(
+            rescuer, address(vault), address(fundsHandler), address(accountingChainGateway)
+        );
+        accessManager_accountingChain.setUpProfitTakerRole(profitTaker, address(vault));
+        accessManager_accountingChain.setUpAccountingChainOperatorRole(
+            operator,
+            address(vault),
+            address(fundsHandler),
+            address(accountingChainGateway),
+            address(allocator_accountingChain)
+        );
+
         // Set up Earning Chain Gateway (Earning chain)
-        earningChainGateway.setManager(manager);
-        earningChainGateway.setAllocator(address(allocator_earningChain));
+        vm.prank(appender);
         earningChainGateway.addBridgeAdapter(address(GHO), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
+        vm.prank(operator);
         earningChainGateway.setDefaultBridgeAdapter(
             address(GHO), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain)
         );
@@ -255,7 +302,9 @@ contract BaseTest is Test {
             "\tEarningChainGatway GHO adapter (Earning Chain): %s",
             earningChainGateway.getDefaultBridgeAdapter(address(GHO), ACCOUNTING_CHAIN_ID)
         );
+        vm.prank(appender);
         earningChainGateway.addBridgeAdapter(address(USDC), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
+        vm.prank(operator);
         earningChainGateway.setDefaultBridgeAdapter(
             address(USDC), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain)
         );
@@ -263,7 +312,9 @@ contract BaseTest is Test {
             "\tEarningChainGatway USDC adapter (Earning Chain): %s",
             earningChainGateway.getDefaultBridgeAdapter(address(USDC), ACCOUNTING_CHAIN_ID)
         );
+        vm.prank(appender);
         earningChainGateway.addBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
+        vm.prank(operator);
         earningChainGateway.setDefaultBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
         console.log(
             "\tEarningChainGatway Messages adapter (Earning Chain): %s",
@@ -286,6 +337,25 @@ contract BaseTest is Test {
         // Set up Allocator on Earning chain
         allocator_earningChain.addVault(address(GHO), address(ghoStrategyVault_earningChain));
         allocator_earningChain.addVault(address(USDC), address(usdcStrategyVault_earningChain));
+
+        // Set up Access Manager roles on Earning chain
+        accessManager_earningChain.setUpGuardian(guardian);
+
+        address[] memory upgradeProxyTargets_earningChain = new address[](0);
+        accessManager_earningChain.setUpUpgradeProxyRole(upgradeProxyAdmin, upgradeProxyTargets_earningChain);
+        accessManager_earningChain.setUpAppenderRole(
+            appender, address(allocator_earningChain), address(assetRegistry_earningChain), address(earningChainGateway)
+        );
+        accessManager_earningChain.setUpRemoverRole(
+            remover, address(allocator_earningChain), address(earningChainGateway)
+        );
+        accessManager_earningChain.setUpRescuerRole(
+            rescuer, address(vault), address(fundsHandler), address(earningChainGateway)
+        );
+        accessManager_earningChain.setUpProfitTakerRole(profitTaker, address(vault));
+        accessManager_earningChain.setUpEarningChainOperatorRole(
+            operator, address(earningChainGateway), address(allocator_earningChain)
+        );
 
         vm.stopPrank();
 

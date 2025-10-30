@@ -17,14 +17,16 @@ contract AccountingChainGateway is IAccountingChainGateway, BaseChainGateway {
     using SafeERC20 for IERC20;
 
     modifier onlyFundsHandler() {
-        require(msg.sender == _fundsHandler, NotFundsHandler());
+        require(msg.sender == FUNDS_HANDLER, NotFundsHandler());
         _;
     }
 
-    address internal _fundsHandler;
+    address internal immutable FUNDS_HANDLER;
 
-    constructor(address admin, address fundsHandler, address iouTokenManager) BaseChainGateway(admin, iouTokenManager) {
-        _fundsHandler = fundsHandler;
+    constructor(address accessManager, address fundsHandler, address iouTokenManager)
+        BaseChainGateway(accessManager, iouTokenManager)
+    {
+        FUNDS_HANDLER = fundsHandler;
     }
 
     function sendPushFundsToChainMessage(address asset, uint256 amount, uint256 targetChainId)
@@ -46,8 +48,8 @@ contract AccountingChainGateway is IAccountingChainGateway, BaseChainGateway {
         for (uint256 i = 0; i < assets.length; i++) {
             address asset = assets[i].asset;
             uint256 amount = assets[i].amount;
-            IERC20(asset).safeTransferFrom(msg.sender, _fundsHandler, amount);
-            IFundsHandler(_fundsHandler).fundsArrivedFromChainCallback(asset, amount);
+            IERC20(asset).safeTransferFrom(msg.sender, FUNDS_HANDLER, amount);
+            IFundsHandler(FUNDS_HANDLER).fundsArrivedFromChainCallback(asset, amount);
         }
     }
 
@@ -81,7 +83,7 @@ contract AccountingChainGateway is IAccountingChainGateway, BaseChainGateway {
         IChainGateway.BurnIouTokenMessage memory burnIouTokenMessage =
             abi.decode(data, (IChainGateway.BurnIouTokenMessage));
         IIouTokenManager(IOU_TOKEN_MANAGER).burnLockedTokens(burnIouTokenMessage.iouTokenAmountBurnedRay);
-        IFundsHandler(_fundsHandler)
+        IFundsHandler(FUNDS_HANDLER)
             .updateChainBalanceCallback(
                 sourceChainId,
                 burnIouTokenMessage.balanceSnapshotTotalAssetsInRay,
@@ -91,7 +93,7 @@ contract AccountingChainGateway is IAccountingChainGateway, BaseChainGateway {
 
     function _updateChainBalanceSnapshot(uint256 sourceChainId, bytes memory data) internal {
         IChainGateway.BalanceSnapshot memory balanceSnapshot = abi.decode(data, (IChainGateway.BalanceSnapshot));
-        IFundsHandler(_fundsHandler)
+        IFundsHandler(FUNDS_HANDLER)
             .updateChainBalanceCallback(sourceChainId, balanceSnapshot.totalAssetsInRay, balanceSnapshot.nonce);
     }
 }
