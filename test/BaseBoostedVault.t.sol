@@ -24,9 +24,9 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     using AssetLib for uint256;
     using SafeERC20 for IMockErc20;
 
-    address immutable proxyAdmin = makeAddr("PROXY_ADMIN");
-    address immutable admin = makeAddr("admin");
-    address immutable manager = makeAddr("manager");
+    address proxyAdmin = makeAddr("PROXY_ADMIN");
+    address admin = makeAddr("admin");
+    address manager = makeAddr("manager");
 
     uint256 constant DEFAULT_PER_SECOND_RATE = 1000000001243680656318820313; // ~4% APY
     MockAccessManager mockAccessManager;
