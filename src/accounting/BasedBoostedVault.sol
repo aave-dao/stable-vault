@@ -20,7 +20,7 @@ import {MathLib} from "../libraries/MathLib.sol";
 /// @notice Semi-fixed rate vault.
 /// @dev Assets balances are tracked in RAY internally; conversions from and to specific asset denomination is made on
 /// deposit and on withdrawal execution.
-contract BasedBoostedVault is RescuableAssets, AccessManagedUpgradeable, IBasedBoostedVault {
+contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedBoostedVault {
     using MathLib for uint256;
     using AssetLib for uint256;
     using SafeERC20 for IERC20;
@@ -96,7 +96,7 @@ contract BasedBoostedVault is RescuableAssets, AccessManagedUpgradeable, IBasedB
     }
 
     /// @dev Initializer.
-    /// @param accessManager The address of the OZ AccessManager contract.
+    /// @param accessManager The address of the IAccessManager contract used for handling access control.
     /// @param defaultSubVaultPerSecondRate The base per-second rate, in Ray units (27 decimals).
     /// @param assetRegistry The address of the contract that manages the permissions for handling assets.
     function initialize(address accessManager, uint256 defaultSubVaultPerSecondRate, address assetRegistry)
