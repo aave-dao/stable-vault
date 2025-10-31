@@ -4,19 +4,18 @@ pragma solidity ^0.8.22;
 import {ISwapper} from "../interfaces/ISwapper.sol";
 import {AssetLib} from "../libraries/AssetLib.sol";
 
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 /// @title Swapper
 /// @notice Executes swaps through approved routers and selectors with slippage & access control.
-
 contract Swapper is ISwapper, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
 
-    uint256 constant MAX_BPS = 10_000;
+    uint256 internal constant MAX_BPS = 10_000;
 
     // TODO: Make a note about Owner being the Allocator
     constructor(address owner) Ownable(owner) {}

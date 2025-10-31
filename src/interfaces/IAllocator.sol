@@ -35,10 +35,6 @@ interface IAllocator {
         SwapParams[] swaps;
     }
 
-    function getManager() external view returns (address);
-
-    function getAdmin() external view returns (address);
-
     /// @dev Returns an array of balances where each amount is denominated in the corresponding asset's decimals.
     function getAssetBalances() external view returns (AllocatorBalance[] memory);
 
@@ -79,14 +75,6 @@ interface IAllocator {
     function reallocate(address asset, uint256 amount, address fromVault, address toVault) external;
 
     function withdraw(address asset, uint256 amount) external;
-
-    function setManager(address newManager) external;
-
-    /// @dev Toggles if `depositor` can call deposit functions on the contract.
-    function setDepositor(address depositor, bool whitelisted) external;
-
-    /// @dev Toggles if `withdrawer` can call withdraw functions on the contract.
-    function setWithdrawer(address withdrawer, bool whitelisted) external;
 
     /// @dev Adds a new strategy vault to the allocator.
     /// @param asset The asset to add the vault for.

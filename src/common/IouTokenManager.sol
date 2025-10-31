@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
+import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -13,26 +14,41 @@ import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 /// @title IouTokenManager
 /// @notice Manages the IOU token locking, releasing, minting, burning.
-contract IouTokenManager is IIouTokenManager {
+contract IouTokenManager is AccessManaged, IIouTokenManager {
     using SafeERC20 for IERC20;
 
     address internal constant FEE_ON_NATIVE_CURRENCY = address(0);
 
     address internal immutable IOU_TOKEN;
+    address internal immutable CHAIN_GATEWAY;
     bool internal immutable IS_CONANICAL_CHAIN;
 
-    // TODO: make this immutable in the Address Book
-    address internal _chainGateway;
     uint256 internal _lockedBalance;
+    mapping(address minter => bool allowed) internal _allowedMinters;
+    mapping(address burner => bool allowed) internal _allowedBurners;
+    mapping(address releaser => bool allowed) internal _allowedReleasers;
 
-    constructor(address iouToken, bool isCanonicalChain) {
-        IOU_TOKEN = iouToken;
-        IS_CONANICAL_CHAIN = isCanonicalChain;
+    modifier onlyAllowedReleaser() {
+        require(_allowedReleasers[msg.sender], ErrorsLib.AddressNotWhitelisted());
+        _;
     }
 
-    // TODO: put behind a role
-    function setChainGateway(address chainGateway) external {
-        _chainGateway = chainGateway;
+    modifier onlyAllowedMinter() {
+        require(_allowedMinters[msg.sender], ErrorsLib.AddressNotWhitelisted());
+        _;
+    }
+
+    modifier onlyAllowedBurner() {
+        require(_allowedBurners[msg.sender], ErrorsLib.AddressNotWhitelisted());
+        _;
+    }
+
+    constructor(address accessManager, address iouToken, address chainGateway, bool isCanonicalChain)
+        AccessManaged(accessManager)
+    {
+        IOU_TOKEN = iouToken;
+        CHAIN_GATEWAY = chainGateway;
+        IS_CONANICAL_CHAIN = isCanonicalChain;
     }
 
     function getAsset() external view override returns (address) {
@@ -56,7 +72,7 @@ contract IouTokenManager is IIouTokenManager {
         // Pull the fee token from the caller and approve the chain gateway to spend it.
         if (bridgeFeeToken != FEE_ON_NATIVE_CURRENCY) {
             IERC20(bridgeFeeToken).safeTransferFrom(msg.sender, address(this), bridgeFeeAmount);
-            IERC20(bridgeFeeToken).forceApprove(_chainGateway, bridgeFeeAmount);
+            IERC20(bridgeFeeToken).forceApprove(CHAIN_GATEWAY, bridgeFeeAmount);
         }
         // Pull the IOU tokens from the caller and lock them.
         if (IS_CONANICAL_CHAIN) {
@@ -64,39 +80,47 @@ contract IouTokenManager is IIouTokenManager {
         } else {
             _burnTokens(msg.sender, iouTokenAmountRay);
         }
-        IChainGateway(_chainGateway).sendBridgeIouTokenMessageWithFeePayer{value: msg.value}(
+        IChainGateway(CHAIN_GATEWAY).sendBridgeIouTokenMessageWithFeePayer{value: msg.value}(
             bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount, destinationChainId, iouTokenRecipient, iouTokenAmountRay
         );
     }
 
-    // TODO: put behind a role
-    //   - called by EarningChainGateway
-    //   - called by BBV, AccountingChainGateway?
     /// @inheritdoc IIouTokenManager
-    function mintTokens(address to, uint256 amount) external override {
+    function mintTokens(address to, uint256 amount) external override onlyAllowedMinter {
         IMintableBurnableIERC20(IOU_TOKEN).mint(to, amount);
     }
 
-    // TODO: put behind a role (should only be used on Earning Chain)
     /// @inheritdoc IIouTokenManager
-    function burnTokens(address from, uint256 amount) external override {
+    function burnTokens(address from, uint256 amount) external override onlyAllowedBurner {
         _burnTokens(from, amount);
     }
 
-    // TODO: put behind a role (should only be used on canonical chain)
     /// @inheritdoc IIouTokenManager
-    function burnLockedTokens(uint256 amount) external override {
+    /// @dev Should only be used on canonical chain.
+    function burnLockedTokens(uint256 amount) external override onlyAllowedBurner {
         require(_lockedBalance >= amount, InsufficientLockedBalance());
         _lockedBalance -= amount;
         _burnTokens(address(this), amount);
     }
 
-    // TODO: put behind a role (should only be used on canonical chain)
     /// @inheritdoc IIouTokenManager
-    function releaseTokens(address to, uint256 amount) external override {
+    /// @dev Should only be used on canonical chain.
+    function releaseTokens(address to, uint256 amount) external override onlyAllowedReleaser {
         require(_lockedBalance >= amount, InsufficientLockedBalance());
         _lockedBalance -= amount;
         IERC20(IOU_TOKEN).safeTransfer(to, amount);
+    }
+
+    function setAllowedMinter(address minter, bool allowed) external restricted {
+        _allowedMinters[minter] = allowed;
+    }
+
+    function setAllowedBurner(address burner, bool allowed) external restricted {
+        _allowedBurners[burner] = allowed;
+    }
+
+    function setAllowedReleaser(address releaser, bool allowed) external restricted {
+        _allowedReleasers[releaser] = allowed;
     }
 
     /// @dev should only be used on canonical chain.

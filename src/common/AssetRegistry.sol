@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
 
 import {IAssetRegistry} from "../interfaces/IAssetRegistry.sol";
 
-contract AssetRegistry is Ownable, IAssetRegistry {
+contract AssetRegistry is AccessManaged, IAssetRegistry {
     mapping(address asset => AssetConfig config) internal _configByAsset;
 
-    constructor(address owner) Ownable(owner) {}
+    constructor(address accessManager) AccessManaged(accessManager) {}
 
-    function setAssetConfig(address asset, AssetConfig memory config) external onlyOwner {
+    function setAssetConfig(address asset, AssetConfig memory config) external restricted {
         _configByAsset[asset] = config;
         emit AssetConfigSet(asset, config);
     }

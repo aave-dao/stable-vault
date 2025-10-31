@@ -1,165 +1,51 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {AccessManager} from "@openzeppelin/contracts/access/manager/AccessManager.sol";
+contract MockAccessManager {
+    address internal immutable ADMIN;
 
-import {IAllocator} from "../../src/interfaces/IAllocator.sol";
-import {IAssetRegistry} from "../../src/interfaces/IAssetRegistry.sol";
-import {IBasedBoostedVault} from "../../src/interfaces/IBasedBoostedVault.sol";
-import {IChainGateway} from "../../src/interfaces/IChainGateway.sol";
-import {IEarningChainGateway} from "../../src/interfaces/IEarningChainGateway.sol";
-import {IFundsHandler} from "../../src/interfaces/IFundsHandler.sol";
-import {IRescuableAssets} from "../../src/interfaces/IRescuableAssets.sol";
-
-contract MockAccessManager is AccessManager {
-    /// @param admin The MasterAdmin which has the ADMIN_ROLE
-    constructor(address admin) AccessManager(admin) {}
-
-    // ADMIN_ROLE = 0
-    uint64 public constant GUARDIAN_ROLE = 1;
-    uint64 public constant UPGRADE_PROXY_ADMIN_ROLE = 2;
-    uint64 public constant APPENDER_ROLE = 3;
-    uint64 public constant REMOVER_ROLE = 4;
-    uint64 public constant RESCUER_ROLE = 5;
-    uint64 public constant PROFIT_TAKER_ROLE = 6;
-    uint64 public constant OPERATOR_ROLE = 7;
-
-    modifier onlyMasterAdmin() {
-        (bool isMember, uint32 executionDelay) = hasRole(ADMIN_ROLE, _msgSender());
-        require(isMember && executionDelay == 0, "MockAccessManager: caller is not the master admin");
-        _;
+    constructor(address initialAdminParam) {
+        ADMIN = initialAdminParam;
     }
 
-    /// @inheritdoc AccessManager
-    function expiration() public pure override returns (uint32) {
-        return 1 days * 21;
+    // Allow by default, require to reject explicitly.
+    mapping(address caller => mapping(address target => mapping(bytes4 selector => bool callRejected))) internal
+        _callRejected;
+    // A delay + timestamp approach can be used if we want to make it compatible with vm.warp.
+    mapping(address caller => mapping(address target => mapping(bytes4 selector => uint32 delay))) internal _mockDelay;
+
+    function mockCanCall(address caller, address target, bytes4 selector, bool allowCall, uint32 delay) external {
+        _callRejected[caller][target][selector] = !allowCall;
+        _mockDelay[caller][target][selector] = delay;
     }
 
-    function setUpGuardian(address guardian) public onlyMasterAdmin {
-        _grantRole(GUARDIAN_ROLE, guardian, 0, 0);
+    function mockAllowCall(address caller, address target, bytes4 selector, uint32 delay) external {
+        _callRejected[caller][target][selector] = false;
+        _mockDelay[caller][target][selector] = delay;
     }
 
-    function setUpUpgradeProxyRole(address upgradeProxyAdmin, address[] calldata targets) public onlyMasterAdmin {
-        // Keep the role's admin as the master admin (set by default to ADMIN_ROLE id 0 unless set otherwise)
-        uint32 executionDelay = 1 days * 15;
-        _grantRole(UPGRADE_PROXY_ADMIN_ROLE, upgradeProxyAdmin, 0, executionDelay);
-        _setRoleGuardian(UPGRADE_PROXY_ADMIN_ROLE, GUARDIAN_ROLE);
-
-        // TODO: set upgrade selector for all relavent contracts
-        bytes4 selector = 0x00000000;
-        for (uint256 i = 0; i < targets.length; i++) {
-            _setTargetFunctionRole(targets[i], selector, UPGRADE_PROXY_ADMIN_ROLE);
-        }
+    function mockRejectCall(address caller, address target, bytes4 selector, uint32 delay) external {
+        _callRejected[caller][target][selector] = true;
+        _mockDelay[caller][target][selector] = delay;
     }
 
-    function setUpAppenderRole(address appender, address allocator, address assetRegistry, address gateway)
-        public
-        onlyMasterAdmin
+    function mockCanCall(address caller, address target, bytes4 selector, bool allowCall) external {
+        _callRejected[caller][target][selector] = !allowCall;
+    }
+
+    function mockAllowCall(address caller, address target, bytes4 selector) external {
+        _callRejected[caller][target][selector] = false;
+    }
+
+    function mockRejectCall(address caller, address target, bytes4 selector) external {
+        _callRejected[caller][target][selector] = true;
+    }
+
+    function canCall(address caller, address target, bytes4 selector)
+        external
+        view
+        returns (bool allowed, uint32 delay)
     {
-        uint32 executionDelay = 1 days * 7;
-        _grantRole(APPENDER_ROLE, appender, 0, executionDelay);
-        _setRoleGuardian(APPENDER_ROLE, GUARDIAN_ROLE);
-
-        bytes4 selector = IAllocator.addVault.selector;
-        _setTargetFunctionRole(address(allocator), selector, APPENDER_ROLE);
-
-        selector = IAssetRegistry.setAssetConfig.selector;
-        _setTargetFunctionRole(address(assetRegistry), selector, APPENDER_ROLE);
-
-        selector = IChainGateway.addBridgeAdapter.selector;
-        _setTargetFunctionRole(address(gateway), selector, APPENDER_ROLE);
-    }
-
-    function setUpRemoverRole(address remover, address allocator, address gateway) public onlyMasterAdmin {
-        _grantRole(REMOVER_ROLE, remover, 0, 0);
-        _setRoleGuardian(REMOVER_ROLE, GUARDIAN_ROLE);
-
-        bytes4 selector = IAllocator.removeVault.selector;
-        _setTargetFunctionRole(address(allocator), selector, REMOVER_ROLE);
-
-        selector = IChainGateway.removeBridgeAdapter.selector;
-        _setTargetFunctionRole(address(gateway), selector, REMOVER_ROLE);
-    }
-
-    function setUpRescuerRole(address rescuer, address bbv, address fundsHandler, address gateway)
-        public
-        onlyMasterAdmin
-    {
-        _grantRole(RESCUER_ROLE, rescuer, 0, 0);
-        _setRoleGuardian(RESCUER_ROLE, GUARDIAN_ROLE);
-
-        bytes4 selector = IRescuableAssets.rescueTokens.selector;
-        _setTargetFunctionRole(address(bbv), selector, RESCUER_ROLE);
-        _setTargetFunctionRole(address(fundsHandler), selector, RESCUER_ROLE);
-        _setTargetFunctionRole(address(gateway), selector, RESCUER_ROLE);
-    }
-
-    function setUpProfitTakerRole(address profitTaker, address bbv) public onlyMasterAdmin {
-        _grantRole(PROFIT_TAKER_ROLE, profitTaker, 0, 0);
-        _setRoleGuardian(PROFIT_TAKER_ROLE, GUARDIAN_ROLE);
-
-        bytes4 selector = IBasedBoostedVault.claimFees.selector;
-        _setTargetFunctionRole(address(bbv), selector, PROFIT_TAKER_ROLE);
-    }
-
-    function setUpAccountingChainOperatorRole(
-        address operator,
-        address bbv,
-        address fundsHandler,
-        address gateway,
-        address allocator
-    ) public onlyMasterAdmin {
-        _grantRole(OPERATOR_ROLE, operator, 0, 0);
-        _setRoleGuardian(OPERATOR_ROLE, GUARDIAN_ROLE);
-
-        _setUpOperatorRoleFunctions(allocator, gateway);
-
-        bytes4 selector = IBasedBoostedVault.setUserRate.selector;
-        _setTargetFunctionRole(address(bbv), selector, OPERATOR_ROLE);
-
-        selector = IBasedBoostedVault.setSubVaultRate.selector;
-        _setTargetFunctionRole(address(bbv), selector, OPERATOR_ROLE);
-
-        selector = IBasedBoostedVault.setDefaultSubVault.selector;
-        _setTargetFunctionRole(address(bbv), selector, OPERATOR_ROLE);
-
-        selector = IFundsHandler.pushFundsToChain.selector;
-        _setTargetFunctionRole(address(fundsHandler), selector, OPERATOR_ROLE);
-    }
-
-    function setUpEarningChainOperatorRole(address operator, address gateway, address allocator)
-        public
-        onlyMasterAdmin
-    {
-        _grantRole(OPERATOR_ROLE, operator, 0, 0);
-        _setRoleGuardian(OPERATOR_ROLE, GUARDIAN_ROLE);
-
-        _setUpOperatorRoleFunctions(allocator, gateway);
-
-        bytes4 selector = IEarningChainGateway.sendBalanceUpdate.selector;
-        _setTargetFunctionRole(address(gateway), selector, OPERATOR_ROLE);
-
-        selector = IEarningChainGateway.exit.selector;
-        _setTargetFunctionRole(address(gateway), selector, OPERATOR_ROLE);
-    }
-
-    function _setUpOperatorRoleFunctions(address allocator, address gateway) internal {
-        bytes4 selector = IAllocator.deallocate.selector;
-        _setTargetFunctionRole(address(allocator), selector, OPERATOR_ROLE);
-
-        selector = IAllocator.depositIdleFunds.selector;
-        _setTargetFunctionRole(address(allocator), selector, OPERATOR_ROLE);
-
-        selector = IAllocator.rebalance.selector;
-        _setTargetFunctionRole(address(allocator), selector, OPERATOR_ROLE);
-
-        selector = IAllocator.reallocate.selector;
-        _setTargetFunctionRole(address(allocator), selector, OPERATOR_ROLE);
-
-        selector = IAllocator.setDefaultVault.selector;
-        _setTargetFunctionRole(address(allocator), selector, OPERATOR_ROLE);
-
-        selector = IChainGateway.setDefaultBridgeAdapter.selector;
-        _setTargetFunctionRole(address(gateway), selector, OPERATOR_ROLE);
+        return (!_callRejected[caller][target][selector], _mockDelay[caller][target][selector]);
     }
 }

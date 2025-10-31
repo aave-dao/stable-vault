@@ -26,7 +26,6 @@ contract CcipAdapter is BaseBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
 
     mapping(uint256 chainId => uint64 ccipChainSelector) internal _chainSelectorOf;
     mapping(uint64 ccipChainSelector => uint256 chainId) internal _chainIdOf;
-    mapping(uint256 chainId => address destinationChainAdapter) internal _destinationChainAdapterOf;
 
     modifier onlyRouter() {
         require(msg.sender == CCIP_ROUTER, NotBridgeRouter());
@@ -40,22 +39,16 @@ contract CcipAdapter is BaseBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
         _;
     }
 
-    constructor(address owner, address ccipRouter) BaseBridgeAdapter(owner) {
-        require(ccipRouter != address(0), ErrorsLib.ZeroAddress());
+    constructor(address accessManager, address gateway, address ccipRouter) BaseBridgeAdapter(accessManager, gateway) {
         CCIP_ROUTER = ccipRouter;
     }
 
-    function setChainSelector(uint256 chainId, uint64 ccipChainSelector) external onlyOwner {
+    function setChainSelector(uint256 chainId, uint64 ccipChainSelector) external restricted {
         _chainSelectorOf[chainId] = ccipChainSelector;
         _chainIdOf[ccipChainSelector] = chainId;
     }
 
-    function setDestinationChainAdapter(uint256 chainId, address destinationChainAdapter) external onlyOwner {
-        require(destinationChainAdapter != address(0), ErrorsLib.ZeroAddress());
-        _destinationChainAdapterOf[chainId] = destinationChainAdapter;
-    }
-
-    function setFeeToken(address feeToken) external onlyOwner {
+    function setFeeToken(address feeToken) external restricted {
         _feeToken = feeToken;
     }
 
@@ -130,7 +123,7 @@ contract CcipAdapter is BaseBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
                     == _destinationChainAdapterOf[_chainIdOf[message.sourceChainSelector]],
                 ErrorsLib.NotDestinationChainAdapter()
             );
-            IChainGateway(_gateway)
+            IChainGateway(GATEWAY)
                 .receiveMessage(
                     _chainIdOf[message.sourceChainSelector], new IBridgeAdapter.BridgeAsset[](0), message.data
                 );

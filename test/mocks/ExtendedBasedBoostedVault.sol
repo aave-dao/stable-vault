@@ -8,12 +8,17 @@ contract ExtendedBasedBoostedVault is BasedBoostedVault {
     using MathLib for uint256;
 
     constructor(
-        address owner,
+        address accessManager,
         uint256 maxPerSecondRate,
         uint256 initialBasePerSecondRate,
         address iouTokenManager,
+        address fundsHandler,
         address assetRegistry
-    ) BasedBoostedVault(owner, maxPerSecondRate, initialBasePerSecondRate, iouTokenManager, assetRegistry) {}
+    )
+        BasedBoostedVault(
+            accessManager, maxPerSecondRate, initialBasePerSecondRate, iouTokenManager, fundsHandler, assetRegistry
+        )
+    {}
 
     function getDefaultConversionRate() public view returns (uint256) {
         SubVault storage defaultVault = _subVaultById[_defaultSubVaultId];

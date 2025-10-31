@@ -61,7 +61,7 @@ contract EndToEndTest is BaseTest {
 
         // 2. Manager sets the % rate to user to 5% APY
         uint256 userPerSecondRate = 1_000000001547125957863212449; // 5% APY
-        vm.prank(manager);
+        vm.prank(everyRoleAccount);
         IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](1);
         userRateData[0] = IBasedBoostedVault.UserRateData(user, userPerSecondRate);
         vault.setUserRate(userRateData);
@@ -71,7 +71,7 @@ contract EndToEndTest is BaseTest {
         assertEq(vault.getUserSubVault(user).perSecondRate, userPerSecondRate);
 
         // 3. Manager sends the money to the Earning Chain via CCIP
-        vm.prank(manager);
+        vm.prank(everyRoleAccount);
         fundsHandler.pushFundsToChain(address(USDC), userInitialDeposit, EARNING_CHAIN_ID);
 
         // - check that the funds land on Earning Chain and are dropped into default liquidity vault there
@@ -112,7 +112,7 @@ contract EndToEndTest is BaseTest {
         );
 
         console.log("Rebalancing by swap from USDC to GHO on the Earning chain...");
-        vm.prank(manager);
+        vm.prank(everyRoleAccount);
         allocator_earningChain.rebalance(IAllocator.CrossAssetRebalanceParams(swaps));
 
         // - check that the funds are swapped to GHO
@@ -169,7 +169,7 @@ contract EndToEndTest is BaseTest {
         uint256 iouAmountRequestedRay = vault.requestWithdrawal(user, 0);
 
         // Send balance snap shot update so that Accounting chain has latest assets balances
-        vm.prank(manager);
+        vm.prank(everyRoleAccount);
         earningChainGateway.sendBalanceUpdate();
 
         console.log("Total system balance: %s", fundsHandler.getAggregatedBalance());
@@ -194,7 +194,7 @@ contract EndToEndTest is BaseTest {
         assertEq(vault.getUserBalance(user), 0, "User balance should be down to 0 after full withdrawal request");
 
         // 7. Manager brings back the money from the Earning Chain to the Accounting Chain via CCIP in GHO
-        vm.prank(manager);
+        vm.prank(everyRoleAccount);
         earningChainGateway.exit(address(GHO), userEarningsInGho);
 
         // - check that the funds land on the Accounting Chain and are dropped into default liquidity vault there
@@ -231,7 +231,7 @@ contract EndToEndTest is BaseTest {
         );
 
         console.log("Rebalancing by swap from GHO to USDC on the Accounting chain...");
-        vm.prank(manager);
+        vm.prank(everyRoleAccount);
         allocator_accountingChain.rebalance(IAllocator.CrossAssetRebalanceParams(swaps));
 
         // - check that the funds are swapped to USDC
@@ -276,7 +276,7 @@ contract EndToEndTest is BaseTest {
         uint256 ghoBalanceOnVaultLeft =
             IERC4626(defaultGhoVault_earningChain).balanceOf(address(allocator_earningChain));
         console.log("Earning chain GHO vault balance after withdrawal is now: %s GHO", ghoBalanceOnVaultLeft);
-        vm.prank(manager);
+        vm.prank(everyRoleAccount);
         earningChainGateway.exit(address(GHO), ghoBalanceOnVaultLeft);
 
         address[] memory assets = new address[](1);
@@ -284,12 +284,12 @@ contract EndToEndTest is BaseTest {
         assets[0] = address(GHO);
         amounts[0] = ghoBalanceOnVaultLeft;
 
-        console.log("Manager's GHO balance before claiming fees profits: %s GHO", GHO.balanceOf(manager));
+        console.log("Manager's GHO balance before claiming fees profits: %s GHO", GHO.balanceOf(everyRoleAccount));
 
-        vm.prank(manager);
+        vm.prank(everyRoleAccount);
         vault.claimFees(assets, amounts);
 
-        uint256 newManagerGhoBalance = GHO.balanceOf(manager);
+        uint256 newManagerGhoBalance = GHO.balanceOf(everyRoleAccount);
         console.log("Manager's GHO balance after claiming fees profits: %s GHO", newManagerGhoBalance);
         assertEq(
             newManagerGhoBalance,

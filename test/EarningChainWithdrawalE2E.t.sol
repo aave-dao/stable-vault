@@ -29,11 +29,12 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         /* maxPerSecondRate */
         uint256 defaultSubVaultPerSecondRate,
         address iouToken,
+        address fundsHandler,
         address assetRegistry
     ) internal virtual override returns (ExtendedBasedBoostedVault) {
         // Deploy a vault without restriction in the valid per-second rate
         return new ExtendedBasedBoostedVault(
-            adminParam, type(uint256).max, defaultSubVaultPerSecondRate, iouToken, assetRegistry
+            adminParam, type(uint256).max, defaultSubVaultPerSecondRate, iouToken, fundsHandler, assetRegistry
         );
     }
 
@@ -43,7 +44,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         uint256 userInitialDeposit = 500 * (10 ** 6);
 
         // 0. Set the default rate on BBV to 5% APY
-        vm.prank(manager);
+        vm.prank(everyRoleAccount);
         vault.setDefaultSubVault(1_000000001547125957863212449);
 
         // 1. User1 deposits 500 USDC to Vault on Accounting Chain
@@ -63,7 +64,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         );
 
         // 2. Bridge the assets to the Earning Chain
-        vm.prank(manager);
+        vm.prank(everyRoleAccount);
         fundsHandler.pushFundsToChain(address(USDC), userInitialDeposit, EARNING_CHAIN_ID);
 
         // Check the funds were bridged to the Earning Chain
@@ -144,7 +145,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         // 7. A second depositor deposits and tries to withdraw (check the iousInCirculationRay math)
         _mintAndDepositUsdcToBBV(user2, userInitialDeposit);
         // Set the rate to be 99%
-        vm.prank(manager);
+        vm.prank(everyRoleAccount);
         vault.setSubVaultRate(2, 1_000000021820606489223699321);
         // Mimic time passing so that user2's balances increase.
         vm.warp(block.timestamp + 365 days);

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
+import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -19,14 +20,13 @@ import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 ///      - assets are in their native decimals
 ///      - 100% of assets deposited into Allocator belong to the same entity (the Allocator does not track depositors)
 /// @dev Deals with assets in their native decimals.
-contract Allocator is IAllocator {
+contract Allocator is AccessManaged, IAllocator {
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
 
-    address internal _manager;
-    address internal _admin;
-    address internal _assetRegistry;
-    // uint256 public timelock;
+    address internal immutable DEPOSITOR;
+    address internal immutable WITHDRAWER;
+    address internal immutable ASSET_REGISTRY;
 
     struct VaultData {
         address asset;
@@ -34,8 +34,6 @@ contract Allocator is IAllocator {
         uint32 indexInAllVaults;
     }
 
-    mapping(address depositor => bool whitelisted) internal _whitelistedDepositor;
-    mapping(address withdrawer => bool whitelisted) internal _whitelistedWithdrawer;
     // Strategy Vaults
     // - defaultVaultByAsset: The default vault for an asset which funds are deposited into and withdrawn from.
     // - allowedVaultsByAsset: Entire set of allowed vaults for an asset which funds can be reallocated to/from
@@ -46,40 +44,22 @@ contract Allocator is IAllocator {
     // To iterate through all vaults
     address[] internal _allVaults;
 
-    modifier onlyWhitelistedDepositor() {
-        require(_whitelistedDepositor[msg.sender], ErrorsLib.AddressNotWhitelisted());
+    modifier onlyDepositor() {
+        require(msg.sender == DEPOSITOR, ErrorsLib.AddressNotWhitelisted());
         _;
     }
 
-    modifier onlyWhitelistedWithdrawer() {
-        require(_whitelistedWithdrawer[msg.sender], ErrorsLib.AddressNotWhitelisted());
+    modifier onlyWithdrawer() {
+        require(msg.sender == WITHDRAWER, ErrorsLib.AddressNotWhitelisted());
         _;
     }
 
-    modifier onlyManager() {
-        require(msg.sender == _manager, ErrorsLib.NotManager());
-        _;
-    }
-
-    modifier onlyAdmin() {
-        require(msg.sender == _admin, ErrorsLib.NotAdmin());
-        _;
-    }
-
-    constructor(address manager, address admin, address assetRegistry) {
-        _manager = manager;
-        _admin = admin;
-        _assetRegistry = assetRegistry;
-    }
-
-    /// @inheritdoc IAllocator
-    function getManager() external view override returns (address) {
-        return _manager;
-    }
-
-    /// @inheritdoc IAllocator
-    function getAdmin() external view override returns (address) {
-        return _admin;
+    constructor(address accessManager, address assetRegistry, address depositor, address withdrawer)
+        AccessManaged(accessManager)
+    {
+        DEPOSITOR = depositor;
+        WITHDRAWER = withdrawer;
+        ASSET_REGISTRY = assetRegistry;
     }
 
     /// @inheritdoc IAllocator
@@ -108,7 +88,7 @@ contract Allocator is IAllocator {
     }
 
     /// @inheritdoc IAllocator
-    function deposit(address asset, uint256 amount) external override onlyWhitelistedDepositor {
+    function deposit(address asset, uint256 amount) external override onlyDepositor {
         // TODO: check if Allocator supports deposit for asset
         IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
         bool callSucceeded = _deposit({asset: asset, amount: amount});
@@ -118,10 +98,10 @@ contract Allocator is IAllocator {
     }
 
     /// @inheritdoc IAllocator
-    function withdraw(address asset, uint256 amount) external override onlyWhitelistedWithdrawer {
+    function withdraw(address asset, uint256 amount) external override onlyWithdrawer {
         require(amount > 0, ErrorsLib.ZeroAmount());
         require(
-            IAssetRegistry(_assetRegistry).isAllowedToWithdrawFromAllocator(asset), ErrorsLib.UnsupportedAsset(asset)
+            IAssetRegistry(ASSET_REGISTRY).isAllowedToWithdrawFromAllocator(asset), ErrorsLib.UnsupportedAsset(asset)
         );
         address vault = _defaultVaultByAsset[asset];
         uint256 idleBalance = IERC20(asset).balanceOf(address(this));
@@ -142,7 +122,7 @@ contract Allocator is IAllocator {
     function deallocate(address asset, uint256 assetsAmount, address vault)
         external
         override
-        onlyManager
+        restricted
         returns (uint256)
     {
         require(IERC4626(vault).asset() == asset, ErrorsLib.InvalidAsset(asset));
@@ -164,23 +144,23 @@ contract Allocator is IAllocator {
     }
 
     /// @inheritdoc IAllocator
-    function depositIdleFunds(address asset) external override onlyManager {
+    function depositIdleFunds(address asset) external override restricted {
         uint256 amount = IERC20(asset).balanceOf(address(this));
         bool callSucceeded = _deposit({asset: asset, amount: amount});
         require(callSucceeded, ErrorsLib.VaultDepositFailed());
     }
 
     /// @inheritdoc IAllocator
-    function rebalance(CrossAssetRebalanceParams memory params) external override onlyManager {
+    function rebalance(CrossAssetRebalanceParams memory params) external override restricted {
         for (uint256 i = 0; i < params.swaps.length; i++) {
             address assetIn = params.swaps[i].assetIn;
             require(
-                IAssetRegistry(_assetRegistry).isAllowedSwapInputToken(assetIn), ErrorsLib.UnsupportedAsset(assetIn)
+                IAssetRegistry(ASSET_REGISTRY).isAllowedSwapInputToken(assetIn), ErrorsLib.UnsupportedAsset(assetIn)
             );
             address assetOut = params.swaps[i].assetOut;
             require(
-                IAssetRegistry(_assetRegistry).isAllowedSwapOutputToken(assetOut)
-                    && IAssetRegistry(_assetRegistry).isAllowedToDepositIntoAllocator(assetOut),
+                IAssetRegistry(ASSET_REGISTRY).isAllowedSwapOutputToken(assetOut)
+                    && IAssetRegistry(ASSET_REGISTRY).isAllowedToDepositIntoAllocator(assetOut),
                 ErrorsLib.UnsupportedAsset(assetOut)
             );
             uint256 amountIn = params.swaps[i].amountIn;
@@ -214,7 +194,7 @@ contract Allocator is IAllocator {
     function reallocate(address asset, uint256 amount, address fromVault, address toVault)
         external
         override
-        onlyManager
+        restricted
     {
         require(_isVaultSupportedForAsset({vault: fromVault, asset: asset}), ErrorsLib.AddressNotWhitelisted());
         require(_isVaultSupportedForAsset({vault: toVault, asset: asset}), ErrorsLib.AddressNotWhitelisted());
@@ -225,48 +205,23 @@ contract Allocator is IAllocator {
     }
 
     /// @inheritdoc IAllocator
-    function addVault(address asset, address vault) external override onlyAdmin {
+    function addVault(address asset, address vault) external override restricted {
         _addVault(asset, vault);
     }
 
     /// @inheritdoc IAllocator
-    function removeVault(address vault) external override onlyAdmin {
+    function removeVault(address vault) external override restricted {
         _removeVault(vault);
     }
 
     /// @inheritdoc IAllocator
-    function setDefaultVault(address asset, address vault) external onlyManager {
+    function setDefaultVault(address asset, address vault) external restricted {
         // TODO: set behind timelock?
         // Vault must be allowed to be set as the default vault for the asset
         require(_defaultVaultByAsset[asset] != vault, ErrorsLib.AddressAlreadyWhitelisted());
         require(_isVaultSupportedForAsset({vault: vault, asset: asset}), ErrorsLib.AddressNotWhitelisted());
         _defaultVaultByAsset[asset] = vault;
         emit DefaultVaultSet(asset, vault);
-    }
-
-    // Admin Functions
-
-    /// @inheritdoc IAllocator
-    function setManager(address newManager) external override onlyAdmin {
-        // TODO: set behind timelock
-        require(newManager != address(0), ErrorsLib.ZeroAddress());
-        _manager = newManager;
-    }
-
-    /// @inheritdoc IAllocator
-    function setDepositor(address depositor, bool whitelisted) external override onlyAdmin {
-        // TODO: set behind timelock?
-        require(depositor != address(0), ErrorsLib.ZeroAddress());
-        require(_whitelistedDepositor[depositor] != whitelisted, ErrorsLib.AddressAlreadyWhitelisted());
-        _whitelistedDepositor[depositor] = whitelisted;
-    }
-
-    /// @inheritdoc IAllocator
-    function setWithdrawer(address withdrawer, bool whitelisted) external override onlyAdmin {
-        // TODO: set behind timelock?
-        require(withdrawer != address(0), ErrorsLib.ZeroAddress());
-        require(_whitelistedWithdrawer[withdrawer] != whitelisted, ErrorsLib.AddressAlreadyWhitelisted());
-        _whitelistedWithdrawer[withdrawer] = whitelisted;
     }
 
     // Internal Functions
@@ -289,7 +244,7 @@ contract Allocator is IAllocator {
 
     function _deposit(address asset, uint256 amount) internal returns (bool) {
         require(
-            IAssetRegistry(_assetRegistry).isAllowedToDepositIntoAllocator(asset), ErrorsLib.UnsupportedAsset(asset)
+            IAssetRegistry(ASSET_REGISTRY).isAllowedToDepositIntoAllocator(asset), ErrorsLib.UnsupportedAsset(asset)
         );
         address vault = _defaultVaultByAsset[asset];
         if (vault == address(0)) {

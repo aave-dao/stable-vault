@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -18,17 +18,10 @@ import {MathLib} from "../libraries/MathLib.sol";
 /// @notice Semi-fixed rate vault.
 /// @dev Assets balances are tracked in RAY internally; conversions from and to specific asset denomination is made on
 /// deposit and on withdrawal execution.
-contract BasedBoostedVault is Ownable, RescuableAssets, IBasedBoostedVault {
+contract BasedBoostedVault is RescuableAssets, AccessManaged, IBasedBoostedVault {
     using MathLib for uint256;
     using AssetLib for uint256;
     using SafeERC20 for IERC20;
-
-    address internal _manager;
-
-    modifier onlyManager() {
-        require(msg.sender == _manager, ErrorsLib.NotManager());
-        _;
-    }
 
     uint256 internal constant SECONDS_PER_YEAR = 31_536_000;
 
@@ -62,7 +55,7 @@ contract BasedBoostedVault is Ownable, RescuableAssets, IBasedBoostedVault {
         uint256 shares;
     }
 
-    address internal _fundsHandler;
+    address internal immutable FUNDS_HANDLER;
 
     address internal _assetRegistry;
 
@@ -90,20 +83,23 @@ contract BasedBoostedVault is Ownable, RescuableAssets, IBasedBoostedVault {
     mapping(address user => UserPosition position) internal _positions;
 
     /// @dev Constructor.
-    /// @param owner The owner of the vault, acting as an admin.
+    /// @param accessManager The address of the OZ AccessManager contract.
     /// @param maxValidPerSecondRate The maximum valid per-second rate, in Ray units (27 decimals).
     /// @param defaultSubVaultPerSecondRate The base per-second rate, in Ray units (27 decimals).
     /// @param iouTokenManager The address of the IOU token manager.
+    /// @param fundsHandler The address of the FundsHandler contract.
     /// @param assetRegistry The address of the contract that manages the permissions for handling assets.
     constructor(
-        address owner,
+        address accessManager,
         uint256 maxValidPerSecondRate,
         uint256 defaultSubVaultPerSecondRate,
         address iouTokenManager,
+        address fundsHandler,
         address assetRegistry
-    ) Ownable(owner) {
+    ) AccessManaged(accessManager) {
         MAX_VALID_PER_SECOND_RATE = maxValidPerSecondRate;
         IOU_TOKEN_MANAGER = iouTokenManager;
+        FUNDS_HANDLER = fundsHandler;
         _assetRegistry = assetRegistry;
         _setDefaultSubVault(_createSubVault(defaultSubVaultPerSecondRate), defaultSubVaultPerSecondRate);
     }
@@ -113,7 +109,7 @@ contract BasedBoostedVault is Ownable, RescuableAssets, IBasedBoostedVault {
         require(msg.sender == user, InvalidMsgSender());
         require(IAssetRegistry(_assetRegistry).isAllowedToDepositIntoBBV(asset), ErrorsLib.UnsupportedAsset(asset));
         require(amount > 0, ErrorsLib.InvalidAmount());
-        IERC20(asset).safeTransferFrom(msg.sender, _fundsHandler, amount);
+        IERC20(asset).safeTransferFrom(msg.sender, FUNDS_HANDLER, amount);
 
         uint256 subVaultId = _positions[user].subVaultId;
         if (subVaultId == 0) {
@@ -136,20 +132,20 @@ contract BasedBoostedVault is Ownable, RescuableAssets, IBasedBoostedVault {
         _positions[user].originalDepositRay += amountInRay;
         _globalOriginalDepositsRay += amountInRay;
 
-        IFundsHandler(_fundsHandler).processDeposit(asset, amount);
+        IFundsHandler(FUNDS_HANDLER).processDeposit(asset, amount);
 
         emit Deposit(user, asset, amount);
     }
 
     /// @inheritdoc IBasedBoostedVault
-    function setUserRate(UserRateData[] calldata userRateData) external override onlyManager {
+    function setUserRate(UserRateData[] calldata userRateData) external override restricted {
         for (uint256 i = 0; i < userRateData.length; i++) {
             _setUserRate(userRateData[i].user, userRateData[i].newPerSecondRate);
         }
     }
 
     /// @inheritdoc IBasedBoostedVault
-    function setSubVaultRate(uint256 subVaultId, uint256 newPerSecondRate) external onlyManager {
+    function setSubVaultRate(uint256 subVaultId, uint256 newPerSecondRate) external restricted {
         _validateRate(newPerSecondRate);
         require(!_existsSubVaultWithRate(newPerSecondRate), VaultAlreadyExists());
         _accrueSubVaultConversionRate(subVaultId);
@@ -206,7 +202,7 @@ contract BasedBoostedVault is Ownable, RescuableAssets, IBasedBoostedVault {
     }
 
     /// @inheritdoc RescuableAssets
-    function rescueTokens(address asset, uint256 amount) public override onlyManager {
+    function rescueTokens(address asset, uint256 amount) public override restricted {
         super.rescueTokens(asset, amount);
     }
 
@@ -275,45 +271,34 @@ contract BasedBoostedVault is Ownable, RescuableAssets, IBasedBoostedVault {
         );
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(user, iouAmountRay);
         uint256 assetAmount = iouAmountRay.rayToAssetDecimals(assetOut);
-        IFundsHandler(_fundsHandler).processWithdrawal(assetOut, assetAmount);
-        IERC20(assetOut).safeTransferFrom(_fundsHandler, user, assetAmount);
+        IFundsHandler(FUNDS_HANDLER).processWithdrawal(assetOut, assetAmount);
+        IERC20(assetOut).safeTransferFrom(FUNDS_HANDLER, user, assetAmount);
         emit WithdrawalExecuted(user, assetOut, assetAmount);
     }
 
     /// @inheritdoc IBasedBoostedVault
-    function setDefaultSubVault(uint256 perSecondRate) external override onlyManager {
+    function setDefaultSubVault(uint256 perSecondRate) external override restricted {
         _setDefaultSubVault(_getOrCreateSubVaultWithRate(perSecondRate), perSecondRate);
-    }
-
-    /// @inheritdoc IBasedBoostedVault
-    function setManager(address manager) external onlyOwner {
-        require(manager != address(0), ErrorsLib.ZeroAddress());
-        _manager = manager;
-        emit ManagerSet(manager);
     }
 
     // TODO: Should we allow the admin to claim fees as well?
     // TODO(registry-config): Should we have a "fee recipient" storage field or function param?
     // / @inheritdoc IBasedBoostedVault
-    function claimFees(address[] calldata assets, uint256[] calldata amounts) external onlyManager {
+    function claimFees(address[] calldata assets, uint256[] calldata amounts) external restricted {
         uint256 vaultObligationsRay = _getVaultObligations();
         uint256 vaultAssetsRay = _getVaultAggregatedBalance();
         require(vaultObligationsRay <= vaultAssetsRay, InsufficientAssets());
         uint256 fee = vaultAssetsRay - vaultObligationsRay;
         uint256 accumulatedAmountRay;
         for (uint256 i = 0; i < assets.length; i++) {
-            IFundsHandler(_fundsHandler).pullFromLiquidity(assets[i], amounts[i]);
+            IFundsHandler(FUNDS_HANDLER).pullFromLiquidity(assets[i], amounts[i]);
             accumulatedAmountRay += amounts[i].assetDecimalsToRay(assets[i]);
             if (amounts[i] > 0) {
-                IERC20(assets[i]).safeTransferFrom(_fundsHandler, msg.sender, amounts[i]);
+                IERC20(assets[i]).safeTransferFrom(FUNDS_HANDLER, msg.sender, amounts[i]);
             }
         }
         require(accumulatedAmountRay <= fee, ErrorsLib.InvalidAmount());
         emit FeesClaimed(assets, amounts);
-    }
-
-    function setFundsHandler(address fundsHandler) external onlyOwner {
-        _fundsHandler = fundsHandler;
     }
 
     // /////////////////////////////////////////////// GETTERS /////////////////////////////////////////////////////
@@ -480,7 +465,7 @@ contract BasedBoostedVault is Ownable, RescuableAssets, IBasedBoostedVault {
     }
 
     function _getVaultAggregatedBalance() internal view returns (uint256) {
-        return IFundsHandler(_fundsHandler).getAggregatedBalance();
+        return IFundsHandler(FUNDS_HANDLER).getAggregatedBalance();
     }
 
     /// @return supply of all IOU tokens across all networks

@@ -11,7 +11,7 @@ import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {RescuableAssets} from "./RescuableAssets.sol";
 
 // TODO: this contract should be pausable.... if bridge is compromised we should not ingest messages from it.
-abstract contract BaseChainGateway is RescuableAssets, AccessManaged, IChainGateway {
+abstract contract BaseChainGateway is AccessManaged, RescuableAssets, IChainGateway {
     using SafeERC20 for IERC20;
 
     address internal constant FEE_ON_NATIVE_CURRENCY = address(0);

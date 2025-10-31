@@ -10,6 +10,7 @@ import {AssetLib} from "./../src/libraries/AssetLib.sol";
 import {ErrorsLib} from "./../src/libraries/ErrorsLib.sol";
 import {MathLib} from "./../src/libraries/MathLib.sol";
 import {TestWithHelpers} from "./helpers/TestWithHelpers.sol";
+import {MockAccessManager} from "./mocks/MockAccessManager.sol";
 import {MockAssetRegistry} from "./mocks/MockAssetRegistry.sol";
 import {IMockErc20} from "./mocks/MockErc20.sol";
 import {MockFundsHandler} from "./mocks/MockFundsHandler.sol";
@@ -25,6 +26,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     address manager = makeAddr("manager");
 
     uint256 constant DEFAULT_PER_SECOND_RATE = 1000000001243680656318820313; // ~4% APY
+    MockAccessManager mockAccessManager;
     IMockErc20 mockAsset;
     MockFundsHandler mockFundsHandler;
     MockIouToken mockIouToken;
@@ -40,32 +42,28 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 maxPerSecondRate,
         uint256 defaultSubVaultPerSecondRate,
         address iouToken,
+        address fundsHandler,
         address assetRegistry
     ) internal returns (IBasedBoostedVault) {
         return new BasedBoostedVault(
-            adminParam, maxPerSecondRate, defaultSubVaultPerSecondRate, iouToken, assetRegistry
+            adminParam, maxPerSecondRate, defaultSubVaultPerSecondRate, iouToken, fundsHandler, assetRegistry
         );
     }
 
     function setUp() public {
-        mockIouToken = new MockIouToken(address(this));
+        mockAccessManager = new MockAccessManager(admin);
+        mockIouToken = new MockIouToken(address(mockAccessManager));
         mockAssetRegistry = new MockAssetRegistry();
         mockAsset = _deployDefaultAsset();
+        mockFundsHandler = new MockFundsHandler();
         bbv = _deployBasedBoostedVault(
-            admin,
+            address(mockAccessManager),
             DEFAULT_MAX_PER_SECOND_RATE,
             DEFAULT_PER_SECOND_RATE,
             address(mockIouToken),
+            address(mockFundsHandler),
             address(mockAssetRegistry)
         );
-
-        mockFundsHandler = new MockFundsHandler();
-
-        vm.prank(admin);
-        BasedBoostedVault(address(bbv)).setFundsHandler(address(mockFundsHandler));
-
-        vm.prank(admin);
-        BasedBoostedVault(address(bbv)).setManager(manager);
     }
 
     function test_constructor_setsTheExpectedValues(address expectedOwner, uint256 expectedDefaultSubVaultRate) public {
@@ -77,10 +75,11 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             DEFAULT_MAX_PER_SECOND_RATE,
             expectedDefaultSubVaultRate,
             address(mockIouToken),
+            address(mockFundsHandler),
             address(mockAssetRegistry)
         );
 
-        assertEq(newBbv.owner(), expectedOwner);
+        assertEq(newBbv.authority(), expectedOwner);
 
         IBasedBoostedVault.SubVaultData memory defaultSubVault = newBbv.getDefaultSubVault();
         assertEq(defaultSubVault.perSecondRate, expectedDefaultSubVaultRate);
@@ -94,6 +93,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             DEFAULT_MAX_PER_SECOND_RATE,
             DEFAULT_PER_SECOND_RATE,
             address(mockIouToken),
+            address(mockFundsHandler),
             address(mockAssetRegistry)
         );
     }
@@ -103,7 +103,12 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         vm.expectRevert();
         new BasedBoostedVault(
-            admin, DEFAULT_MAX_PER_SECOND_RATE, MathLib.RAY - 1, address(mockIouToken), address(mockAssetRegistry)
+            address(mockAccessManager),
+            DEFAULT_MAX_PER_SECOND_RATE,
+            MathLib.RAY - 1,
+            address(mockIouToken),
+            address(mockFundsHandler),
+            address(mockAssetRegistry)
         );
     }
 

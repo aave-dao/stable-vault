@@ -28,7 +28,6 @@ interface IBasedBoostedVault {
     event SubVaultRateSet(uint256 indexed subVaultId, uint256 newPerSecondRate);
     event SubVaultCreated(uint256 indexed subVaultId, uint256 perSecondRate);
     event DefaultSubVaultSet(uint256 indexed subVaultId, uint256 perSecondRate);
-    event ManagerSet(address manager);
     event FeesClaimed(address[] assets, uint256[] amounts);
 
     error InvalidRate();
@@ -53,10 +52,6 @@ interface IBasedBoostedVault {
     function getSubVaultRateById(uint256 subVaultId) external view returns (uint256);
 
     function getSubVaultIdByRate(uint256 perSecondRate) external view returns (uint256);
-
-    /// @dev Sets the manager of the vault.
-    /// @param manager Address of the manager.
-    function setManager(address manager) external;
 
     /// @dev Deposits assets into the vault.
     /// @param user Address of the user depositing the assets.
