@@ -407,8 +407,8 @@ contract BaseTest is Test {
         allocator_earningChain = new Allocator(
             accessManager_earningChainAddress,
             assetRegistry_earningChainAddress,
-            allocator_earningChainAddress,
-            allocator_earningChainAddress
+            chainGateway_earningChainAddress,
+            chainGateway_earningChainAddress
         );
         console.log("\tAllocator: %s", address(allocator_earningChain));
         require(
@@ -552,6 +552,15 @@ contract BaseTest is Test {
         // Set up Asset Registry on Earning chain
         assetRegistry_earningChain.setAssetConfig(address(GHO), unrestrictedAssetConfig);
         assetRegistry_earningChain.setAssetConfig(address(USDC), unrestrictedAssetConfig);
+
+        // Set up IOU Token Manager on Accounting chain
+        iouTokenManager_accountingChain.setAllowedMinter(address(vault), true);
+        iouTokenManager_accountingChain.setAllowedBurner(address(vault), true);
+        iouTokenManager_accountingChain.setAllowedBurner(address(accountingChainGateway), true);
+        iouTokenManager_accountingChain.setAllowedReleaser(address(accountingChainGateway), true);
+        // Set up IOU Token Manager on Earning chain
+        iouTokenManager_earningChain.setAllowedMinter(address(earningChainGateway), true);
+        iouTokenManager_earningChain.setAllowedBurner(address(earningChainGateway), true);
 
         vm.stopPrank();
     }
