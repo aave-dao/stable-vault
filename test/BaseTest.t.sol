@@ -5,10 +5,10 @@ import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-
-import {ExtendedAccessManager} from "../src/common/ExtendedAccessManager.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {AssetRegistry} from "../src/common/AssetRegistry.sol";
+import {ExtendedAccessManager} from "../src/common/ExtendedAccessManager.sol";
 import {IouToken} from "../src/common/IouToken.sol";
 import {IouTokenManager} from "../src/common/IouTokenManager.sol";
 import {IAllocator} from "../src/interfaces/IAllocator.sol";
@@ -22,6 +22,7 @@ import {IFundsHandler} from "../src/interfaces/IFundsHandler.sol";
 import {IIouTokenManager} from "../src/interfaces/IIouTokenManager.sol";
 import {IRescuableAssets} from "../src/interfaces/IRescuableAssets.sol";
 import {AccountingChainGateway} from "./../src/accounting/AccountingChainGateway.sol";
+import {BasedBoostedVault} from "./../src/accounting/BasedBoostedVault.sol";
 import {FundsHandler} from "./../src/accounting/FundsHandler.sol";
 import {CcipAdapter} from "./../src/bridging/CcipAdapter.sol";
 import {Allocator} from "./../src/common/Allocator.sol";
@@ -41,6 +42,7 @@ contract BaseTest is Test {
     using MathLib for uint256;
     using AssetLib for uint256;
 
+    address proxyAdmin = makeAddr("PROXY_ADMIN");
     address admin = makeAddr("ADMIN");
     address everyRoleAccount = makeAddr("EVERY_ROLE_ACCOUNT");
 
@@ -138,11 +140,20 @@ contract BaseTest is Test {
         uint256 maxPerSecondRate,
         uint256 defaultSubVaultPerSecondRate,
         address iouTokenManager,
-        address fh,
+        address fundsHandlerAddr,
         address assetRegistry
     ) internal virtual returns (ExtendedBasedBoostedVault) {
-        return new ExtendedBasedBoostedVault(
-            accessManager, maxPerSecondRate, defaultSubVaultPerSecondRate, iouTokenManager, fh, assetRegistry
+        address vaultImpl = address(new ExtendedBasedBoostedVault(maxPerSecondRate, iouTokenManager, fundsHandlerAddr));
+        return ExtendedBasedBoostedVault(
+            address(
+                new TransparentUpgradeableProxy(
+                    vaultImpl,
+                    address(this),
+                    abi.encodeCall(
+                        BasedBoostedVault.initialize, (accessManager, defaultSubVaultPerSecondRate, assetRegistry)
+                    )
+                )
+            )
         );
     }
 
@@ -169,42 +180,64 @@ contract BaseTest is Test {
 
         // Deployment order:
         // 1. Access Manager
-        // 2. Asset Registry
-        // 3. IOU Token
-        // 4. IOU Token Manager
-        // 5. Based Boosted Vault
-        // 6. Allocator
-        // 7. Funds Handler
-        // 8. Accounting Chain Gateway
-        // 9. Swapper
-        // 10. CCIP Adapter
-        // 11. Strategy Vault/4626
+        // 2. Asset Registry Impl
+        // 3. Asset Registry Proxy
+        // 4. IOU Token
+        // 5. IOU Token Manager Impl
+        // 6. IOU Token Manager Proxy
+        // 7. Based Boosted Vault Impl
+        // 8. Based Boosted Vault Proxy
+        // 9. Allocator Impl
+        // 10. Allocator Proxy
+        // 11. Funds Handler Impl
+        // 12. Funds Handler Proxy
+        // 13. Accounting Chain Gateway Impl
+        // 14. Accounting Chain Gateway Proxy
+        // 15. Swapper
+        // 16. CCIP Adapter
+        // 17. Strategy Vault/4626
 
         // Pre compute addresses for contracts that are with circular dependencies
         uint256 deployerNonce_accountingChain = vm.getNonce(address(this));
         console.log("\tDeployer Nonce (Accounting Chain): %s", deployerNonce_accountingChain);
+
         accessManager_accountingChainAddress = vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
         console.log("\tAccess Manager (Accounting Chain) Predicted Address: %s", accessManager_accountingChainAddress);
+
+        deployerNonce_accountingChain++; // Incrementing for Asset Registry implementation
         assetRegistry_accountingChainAddress = vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
         console.log("\tAsset Registry (Accounting Chain) Predicted Address: %s", assetRegistry_accountingChainAddress);
+
         iouToken_accountingChainAddress = vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
         console.log("\tIOU Token (Accounting Chain) Predicted Address: %s", iouToken_accountingChainAddress);
+
+        deployerNonce_accountingChain++; // Incrementing for IOU TokenManager implementation
         iouTokenManager_accountingChainAddress = vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
         console.log(
             "\tIOU Token Manager (Accounting Chain) Predicted Address: %s", iouTokenManager_accountingChainAddress
         );
+
+        deployerNonce_accountingChain++; // Incrementing for BBV implementation
         vault_accountingChainAddress = vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
         console.log("\tVault (Accounting Chain) Predicted Address: %s", vault_accountingChainAddress);
+
+        deployerNonce_accountingChain++; // Incrementing for Allocator implementation
         allocator_accountingChainAddress = vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
         console.log("\tAllocator (Accounting Chain) Predicted Address: %s", allocator_accountingChainAddress);
+
+        deployerNonce_accountingChain++; // Incrementing for FH implementation
         fundsHandler_accountingChainAddress = vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
         console.log("\tFunds Handler (Accounting Chain) Predicted Address: %s", fundsHandler_accountingChainAddress);
+
+        deployerNonce_accountingChain++; // Incrementing for Gateway implementation
         chainGateway_accountingChainAddress = vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
         console.log(
             "\tAccounting Chain Gateway (Accounting Chain) Predicted Address: %s", chainGateway_accountingChainAddress
         );
+
         swapper_accountingChainAddress = vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
         console.log("\tSwapper (Accounting Chain) Predicted Address: %s", swapper_accountingChainAddress);
+
         ccipAdapter_accountingChainAddress = vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
         console.log("\tCCIP Adapter (Accounting Chain) Predicted Address: %s", ccipAdapter_accountingChainAddress);
 
@@ -217,7 +250,16 @@ contract BaseTest is Test {
         );
 
         // 2. Asset Registry
-        assetRegistry_accountingChain = new AssetRegistry(address(accessManager_accountingChain));
+        address assetRegistry_accountingChain_impl = address(new AssetRegistry());
+        assetRegistry_accountingChain = AssetRegistry(
+            address(
+                new TransparentUpgradeableProxy(
+                    assetRegistry_accountingChain_impl,
+                    proxyAdmin,
+                    abi.encodeCall(AssetRegistry.initialize, (accessManager_accountingChainAddress))
+                )
+            )
+        );
         console.log("\tAsset Registry: %s", address(assetRegistry_accountingChain));
         require(
             address(assetRegistry_accountingChain) == assetRegistry_accountingChainAddress,
@@ -233,11 +275,16 @@ contract BaseTest is Test {
         );
 
         // 4. IOU Token Manager
-        iouTokenManager_accountingChain = new IouTokenManager(
-            accessManager_accountingChainAddress,
-            iouToken_accountingChainAddress,
-            chainGateway_accountingChainAddress,
-            true
+        address iouTokenManager_accountingChain_impl =
+            address(new IouTokenManager(iouToken_accountingChainAddress, chainGateway_accountingChainAddress, true));
+        iouTokenManager_accountingChain = IouTokenManager(
+            address(
+                new TransparentUpgradeableProxy(
+                    iouTokenManager_accountingChain_impl,
+                    proxyAdmin,
+                    abi.encodeCall(IouTokenManager.initialize, (accessManager_accountingChainAddress))
+                )
+            )
         );
         console.log("\tIOU Token Manager (Accounting Chain): %s", address(iouTokenManager_accountingChain));
         require(
@@ -246,6 +293,7 @@ contract BaseTest is Test {
         );
 
         // 5. Based Boosted Vault
+        // Impl and proxy deployed in the internal `_deployBasedBoostedVault` function
         vault = _deployBasedBoostedVault(
             accessManager_accountingChainAddress,
             DEFAULT_MAX_PER_SECOND_RATE,
@@ -258,11 +306,21 @@ contract BaseTest is Test {
         require(address(vault) == vault_accountingChainAddress, "Vault (Accounting Chain) address mismatch");
 
         // 6. Allocator
-        allocator_accountingChain = new Allocator(
-            accessManager_accountingChainAddress,
-            assetRegistry_accountingChainAddress,
-            fundsHandler_accountingChainAddress,
-            fundsHandler_accountingChainAddress
+        address allocator_accountingChain_impl = address(
+            new Allocator(
+                assetRegistry_accountingChainAddress,
+                fundsHandler_accountingChainAddress,
+                fundsHandler_accountingChainAddress
+            )
+        );
+        allocator_accountingChain = Allocator(
+            address(
+                new TransparentUpgradeableProxy(
+                    allocator_accountingChain_impl,
+                    proxyAdmin,
+                    abi.encodeCall(Allocator.initialize, (accessManager_accountingChainAddress))
+                )
+            )
         );
         console.log("\tAllocator: %s", allocator_accountingChainAddress);
         require(
@@ -271,11 +329,19 @@ contract BaseTest is Test {
         );
 
         // 7. Funds Handler
-        fundsHandler = new FundsHandler(
-            accessManager_accountingChainAddress,
-            vault_accountingChainAddress,
-            chainGateway_accountingChainAddress,
-            allocator_accountingChainAddress
+        address fundsHandler_impl = address(
+            new FundsHandler(
+                vault_accountingChainAddress, chainGateway_accountingChainAddress, allocator_accountingChainAddress
+            )
+        );
+        fundsHandler = FundsHandler(
+            address(
+                new TransparentUpgradeableProxy(
+                    fundsHandler_impl,
+                    proxyAdmin,
+                    abi.encodeCall(FundsHandler.initialize, (accessManager_accountingChainAddress))
+                )
+            )
         );
         console.log("\tFunds Handler: %s", address(fundsHandler));
         require(
@@ -284,10 +350,17 @@ contract BaseTest is Test {
         );
 
         // 8. Accounting Chain Gateway
-        accountingChainGateway = new AccountingChainGateway(
-            accessManager_accountingChainAddress,
-            fundsHandler_accountingChainAddress,
-            iouTokenManager_accountingChainAddress
+        address accountingChainGateway_impl = address(
+            new AccountingChainGateway(fundsHandler_accountingChainAddress, iouTokenManager_accountingChainAddress)
+        );
+        accountingChainGateway = AccountingChainGateway(
+            address(
+                new TransparentUpgradeableProxy(
+                    accountingChainGateway_impl,
+                    proxyAdmin,
+                    abi.encodeCall(AccountingChainGateway.initialize, (accessManager_accountingChainAddress))
+                )
+            )
         );
         console.log("\tAccounting Chain Gateway: %s", address(accountingChainGateway));
         require(
@@ -327,34 +400,51 @@ contract BaseTest is Test {
 
         // Deployment order:
         // 1. Access Manager
-        // 2. Asset Registry
+        // 2. Asset Registry Impl
+        // 2. Asset Registry Proxy
         // 3. CCIP Router
         // 4. IOU Token
-        // 5. IOU Token Manager
-        // 6. Allocator
-        // 7. Swapper
-        // 8. Earning Chain Gateway
-        // 9. Strategy Vault/4626
+        // 5. IOU Token Manager Impl
+        // 6. IOU Token Manager Proxy
+        // 7. Allocator Impl
+        // 8. Allocator Proxy
+        // 9. Swapper
+        // 10. Earning Chain Gateway Impl
+        // 11. Earning Chain Gateway Proxy
+        // 12. Strategy Vault/4626
 
         uint256 deployerNonce_earningChain = vm.getNonce(address(this));
         accessManager_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
         console.log("\tAccess Manager (Earning Chain) Predicted Address: %s", accessManager_earningChainAddress);
+
+        deployerNonce_earningChain++; // Incrementing for Asset Registry implementation
         assetRegistry_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
         console.log("\tAsset Registry (Earning Chain) Predicted Address: %s", assetRegistry_earningChainAddress);
+
         ccipAdapter_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
         console.log("\tCCIP Adapter (Earning Chain) Predicted Address: %s", ccipAdapter_earningChainAddress);
+
         iouToken_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
         console.log("\tIOU Token (Earning Chain) Predicted Address: %s", iouToken_earningChainAddress);
+
+        deployerNonce_earningChain++; // Incrementing for IOU Token Manager implementation
         iouTokenManager_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
         console.log("\tIOU Token Manager (Earning Chain) Predicted Address: %s", iouTokenManager_earningChainAddress);
+
+        deployerNonce_earningChain++; // Incrementing for Allocator implementation
         allocator_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
         console.log("\tAllocator (Earning Chain) Predicted Address: %s", allocator_earningChainAddress);
+
         swapper_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
         console.log("\tSwapper (Earning Chain) Predicted Address: %s", swapper_earningChainAddress);
+
+        deployerNonce_earningChain++; // Incrementing for Gateway implementation
         chainGateway_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
         console.log("\tEarning Chain Gateway (Earning Chain) Predicted Address: %s", chainGateway_earningChainAddress);
+
         ghoStrategyVault_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
         console.log("\tGHO Strategy Vault (Earning Chain) Predicted Address: %s", ghoStrategyVault_earningChainAddress);
+
         usdcStrategyVault_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
         console.log(
             "\tUSDC Strategy Vault (Earning Chain) Predicted Address: %s", usdcStrategyVault_earningChainAddress
@@ -369,7 +459,16 @@ contract BaseTest is Test {
         );
 
         // 2. Asset Registry
-        assetRegistry_earningChain = new AssetRegistry(address(accessManager_earningChain));
+        address assetRegistry_earningChain_impl = address(new AssetRegistry());
+        assetRegistry_earningChain = AssetRegistry(
+            address(
+                new TransparentUpgradeableProxy(
+                    assetRegistry_earningChain_impl,
+                    proxyAdmin,
+                    abi.encodeCall(AssetRegistry.initialize, (accessManager_earningChainAddress))
+                )
+            )
+        );
         console.log("\tAsset Registry: %s", address(assetRegistry_earningChain));
         require(
             address(assetRegistry_earningChain) == assetRegistry_earningChainAddress,
@@ -394,8 +493,16 @@ contract BaseTest is Test {
         );
 
         // 5. IOU Token Manager
-        iouTokenManager_earningChain = new IouTokenManager(
-            accessManager_earningChainAddress, iouToken_earningChainAddress, chainGateway_earningChainAddress, false
+        address iouTokenManager_earningChain_impl =
+            address(new IouTokenManager(iouToken_earningChainAddress, chainGateway_earningChainAddress, false));
+        iouTokenManager_earningChain = IouTokenManager(
+            address(
+                new TransparentUpgradeableProxy(
+                    iouTokenManager_earningChain_impl,
+                    proxyAdmin,
+                    abi.encodeCall(IouTokenManager.initialize, (accessManager_earningChainAddress))
+                )
+            )
         );
         console.log("\tIOU Token Manager (Earning Chain): %s", address(iouTokenManager_earningChain));
         require(
@@ -404,11 +511,19 @@ contract BaseTest is Test {
         );
 
         // 6. Allocator
-        allocator_earningChain = new Allocator(
-            accessManager_earningChainAddress,
-            assetRegistry_earningChainAddress,
-            chainGateway_earningChainAddress,
-            chainGateway_earningChainAddress
+        address allocator_earningChain_impl = address(
+            new Allocator(
+                assetRegistry_earningChainAddress, chainGateway_earningChainAddress, chainGateway_earningChainAddress
+            )
+        );
+        allocator_earningChain = Allocator(
+            address(
+                new TransparentUpgradeableProxy(
+                    allocator_earningChain_impl,
+                    proxyAdmin,
+                    abi.encodeCall(Allocator.initialize, (accessManager_earningChainAddress))
+                )
+            )
         );
         console.log("\tAllocator: %s", address(allocator_earningChain));
         require(
@@ -424,11 +539,19 @@ contract BaseTest is Test {
         );
 
         // 8. Earning Chain Gateway
-        earningChainGateway = new EarningChainGateway(
-            accessManager_earningChainAddress,
-            ACCOUNTING_CHAIN_ID,
-            iouTokenManager_earningChainAddress,
-            allocator_earningChainAddress
+        address earningChainGateway_impl = address(
+            new EarningChainGateway(
+                ACCOUNTING_CHAIN_ID, allocator_earningChainAddress, iouTokenManager_earningChainAddress
+            )
+        );
+        earningChainGateway = EarningChainGateway(
+            address(
+                new TransparentUpgradeableProxy(
+                    earningChainGateway_impl,
+                    proxyAdmin,
+                    abi.encodeCall(EarningChainGateway.initialize, (accessManager_earningChainAddress))
+                )
+            )
         );
         console.log("\tEarning Chain Gateway: %s", address(earningChainGateway));
         require(

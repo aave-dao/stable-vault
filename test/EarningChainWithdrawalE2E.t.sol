@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {console} from "forge-std/console.sol";
 import {IERC20} from "forge-std/interfaces/IERC20.sol";
 
+import {BasedBoostedVault} from "../src/accounting/BasedBoostedVault.sol";
 import {IBasedBoostedVault} from "../src/interfaces/IBasedBoostedVault.sol";
 import {AssetLib} from "../src/libraries/AssetLib.sol";
 import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
@@ -33,8 +35,17 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         address assetRegistry
     ) internal virtual override returns (ExtendedBasedBoostedVault) {
         // Deploy a vault without restriction in the valid per-second rate
-        return new ExtendedBasedBoostedVault(
-            adminParam, type(uint256).max, defaultSubVaultPerSecondRate, iouToken, fundsHandler, assetRegistry
+        address vaultImpl = address(new ExtendedBasedBoostedVault(type(uint256).max, iouToken, fundsHandler));
+        return ExtendedBasedBoostedVault(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(vaultImpl),
+                    proxyAdmin,
+                    abi.encodeCall(
+                        BasedBoostedVault.initialize, (adminParam, defaultSubVaultPerSecondRate, assetRegistry)
+                    )
+                )
+            )
         );
     }
 
