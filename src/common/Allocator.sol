@@ -58,8 +58,8 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
 
     /// @dev Constructor.
     /// @param assetRegistry The address of the AssetRegistry contract.
-    /// @param depositor The address of the initial depositor to whitelist.
-    /// @param withdrawer The address of the initial withdrawer to whitelist.
+    /// @param depositor The address of the depositor to whitelist.
+    /// @param withdrawer The address of the withdrawer to whitelist.
     constructor(address assetRegistry, address depositor, address withdrawer) {
         _disableInitializers();
         DEPOSITOR = depositor;
