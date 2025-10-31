@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
+import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -8,6 +9,7 @@ import {EarningChainGateway} from "../src/earning/EarningChainGateway.sol";
 import {IAllocator} from "../src/interfaces/IAllocator.sol";
 import {IBridgeAdapter} from "../src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../src/interfaces/IChainGateway.sol";
+import {IEarningChainGateway} from "../src/interfaces/IEarningChainGateway.sol";
 import {IIouTokenManager} from "../src/interfaces/IIouTokenManager.sol";
 import {AssetLib} from "../src/libraries/AssetLib.sol";
 import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
@@ -158,13 +160,10 @@ contract EarningChainGatewayTest is TestWithHelpers {
     }
 
     function test_sendBalanceUpdate_reverts_ifNotManager() public {
-        vm.expectRevert(ErrorsLib.NotManager.selector);
-        _earningChainGateway.sendBalanceUpdate();
-    }
-
-    function test_sendBalanceUpdate_sendsBalanceUpdate_reverts_ifNotManager() public {
-        vm.prank(makeAddr("notManager"));
-        vm.expectRevert(ErrorsLib.NotManager.selector);
+        _mockAccessManager.mockRejectCall(
+            address(this), address(_earningChainGateway), IEarningChainGateway.sendBalanceUpdate.selector, 0
+        );
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, address(this)));
         _earningChainGateway.sendBalanceUpdate();
     }
 
@@ -659,7 +658,10 @@ contract EarningChainGatewayTest is TestWithHelpers {
     }
 
     function test_exit_reverts_notManager() public {
-        vm.expectRevert(ErrorsLib.NotManager.selector);
+        _mockAccessManager.mockRejectCall(
+            address(this), address(_earningChainGateway), IEarningChainGateway.exit.selector, 0
+        );
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, address(this)));
         _earningChainGateway.exit(address(_mockUsdt), 100_000_000_000_000 * 10 ** 6);
     }
 
