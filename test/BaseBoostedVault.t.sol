@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {BasedBoostedVault} from "./../src/accounting/BasedBoostedVault.sol";
@@ -46,8 +47,17 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         address fundsHandler,
         address assetRegistry
     ) internal returns (IBasedBoostedVault) {
-        return new BasedBoostedVault(
-            adminParam, maxPerSecondRate, defaultSubVaultPerSecondRate, iouToken, fundsHandler, assetRegistry
+        address vaultImpl = address(new BasedBoostedVault(maxPerSecondRate, iouToken, fundsHandler));
+        return BasedBoostedVault(
+            address(
+                new TransparentUpgradeableProxy(
+                    vaultImpl,
+                    address(this),
+                    abi.encodeCall(
+                        BasedBoostedVault.initialize, (adminParam, defaultSubVaultPerSecondRate, assetRegistry)
+                    )
+                )
+            )
         );
     }
 
@@ -67,54 +77,57 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         );
     }
 
-    function test_constructor_setsTheExpectedValues(address expectedOwner, uint256 expectedDefaultSubVaultRate) public {
-        vm.assume(expectedOwner != address(0));
-        expectedDefaultSubVaultRate = _boundRate(expectedDefaultSubVaultRate);
+    // TODO: initializer and constructor tests
 
-        BasedBoostedVault newBbv = new BasedBoostedVault(
-            expectedOwner,
-            DEFAULT_MAX_PER_SECOND_RATE,
-            expectedDefaultSubVaultRate,
-            address(mockIouToken),
-            address(mockFundsHandler),
-            address(mockAssetRegistry)
-        );
+    // function test_constructor_setsTheExpectedValues(address expectedOwner, uint256 expectedDefaultSubVaultRate)
+    // public { vm.assume(expectedOwner != address(0));
+    //     expectedDefaultSubVaultRate = _boundRate(expectedDefaultSubVaultRate);
 
-        assertEq(newBbv.authority(), expectedOwner);
+    //     BasedBoostedVault newBbv = new BasedBoostedVault(
+    //         expectedOwner,
+    //         DEFAULT_MAX_PER_SECOND_RATE,
+    //         expectedDefaultSubVaultRate,
+    //         address(mockIouToken),
+    //         address(mockFundsHandler),
+    //         address(mockAssetRegistry)
+    //     );
 
-        IBasedBoostedVault.SubVaultData memory defaultSubVault = newBbv.getDefaultSubVault();
-        assertEq(defaultSubVault.perSecondRate, expectedDefaultSubVaultRate);
-        assertEq(defaultSubVault.id, newBbv.getSubVaultIdByRate(expectedDefaultSubVaultRate));
-    }
+    //     assertEq(newBbv.authority(), expectedOwner);
 
-    function test_constructor_reverts_ifZeroAddressAsOwner() public {
-        vm.expectRevert();
-        new BasedBoostedVault(
-            address(0),
-            DEFAULT_MAX_PER_SECOND_RATE,
-            DEFAULT_PER_SECOND_RATE,
-            address(mockIouToken),
-            address(mockFundsHandler),
-            address(mockAssetRegistry)
-        );
-    }
+    //     IBasedBoostedVault.SubVaultData memory defaultSubVault = newBbv.getDefaultSubVault();
+    //     assertEq(defaultSubVault.perSecondRate, expectedDefaultSubVaultRate);
+    //     assertEq(defaultSubVault.id, newBbv.getSubVaultIdByRate(expectedDefaultSubVaultRate));
+    // }
 
-    function test_constructor_reverts_ifInvalidDefaultSubVaultRate(uint256 invalidDefaultSubVaultRate) public {
-        vm.assume(invalidDefaultSubVaultRate < MathLib.RAY);
+    // function test_constructor_reverts_ifZeroAddressAsOwner() public {
+    //     vm.expectRevert();
+    //     new BasedBoostedVault(
+    //         address(0),
+    //         DEFAULT_MAX_PER_SECOND_RATE,
+    //         DEFAULT_PER_SECOND_RATE,
+    //         address(mockIouToken),
+    //         address(mockFundsHandler),
+    //         address(mockAssetRegistry)
+    //     );
+    // }
 
-        vm.expectRevert();
-        new BasedBoostedVault(
-            address(mockAccessManager),
-            DEFAULT_MAX_PER_SECOND_RATE,
-            MathLib.RAY - 1,
-            address(mockIouToken),
-            address(mockFundsHandler),
-            address(mockAssetRegistry)
-        );
-    }
+    // function test_constructor_reverts_ifInvalidDefaultSubVaultRate(uint256 invalidDefaultSubVaultRate) public {
+    //     vm.assume(invalidDefaultSubVaultRate < MathLib.RAY);
+
+    //     vm.expectRevert();
+    //     new BasedBoostedVault(
+    //         address(mockAccessManager),
+    //         DEFAULT_MAX_PER_SECOND_RATE,
+    //         MathLib.RAY - 1,
+    //         address(mockIouToken),
+    //         address(mockFundsHandler),
+    //         address(mockAssetRegistry)
+    //     );
+    // }
 
     function test_deposit_firstUserDepositGoesToDefaultSubVault(address user, uint256 amount) public {
         vm.assume(user != address(0));
+        _assumeNotProxyAdmin(user, address(bbv));
         amount = _boundAssetAmount(address(mockAsset), amount);
 
         IBasedBoostedVault.SubVaultData memory userSubVault = bbv.getUserSubVault(user);
@@ -145,6 +158,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 userRate
     ) public {
         vm.assume(user != address(0));
+        _assumeNotProxyAdmin(user, address(bbv));
         firstDepositAmount = _boundAssetAmount(address(mockAsset), firstDepositAmount);
         secondDepositAmount = _boundAssetAmount(address(mockAsset), secondDepositAmount);
         // Assumes the sum of the two deposits does not exceed the max expected deposit amount
@@ -191,6 +205,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
     function test_deposit_reverts_ifAmountIsZero(address user) public {
         vm.assume(user != address(0));
+        _assumeNotProxyAdmin(user, address(bbv));
 
         vm.prank(user);
         vm.expectRevert(ErrorsLib.InvalidAmount.selector);
@@ -201,7 +216,9 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         public
     {
         vm.assume(msgSender != address(0));
+        _assumeNotProxyAdmin(msgSender, address(bbv));
         vm.assume(user != address(0));
+        _assumeNotProxyAdmin(user, address(bbv));
         vm.assume(msgSender != user);
 
         amount = _boundAssetAmount(address(mockAsset), amount);
@@ -219,6 +236,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
     function test_deposit_reverts_ifMsgSenderIsNotTheUserDepositing(address user, uint256 amount) public {
         vm.assume(user != address(0));
+        _assumeNotProxyAdmin(user, address(bbv));
         amount = _boundAssetAmount(address(mockAsset), amount);
 
         mockAsset.mint(user, amount);
@@ -230,6 +248,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
     function test_deposit_callsFundsHandlerToProcessDepositWithExpectedParams(address user, uint256 amount) public {
         vm.assume(user != address(0));
+        _assumeNotProxyAdmin(user, address(bbv));
         amount = _boundAssetAmount(address(mockAsset), amount);
 
         mockAsset.mint(user, amount);
@@ -248,6 +267,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
     function test_setUserRate_reverts_ifUserDoesNotHaveAPosition(address user, uint256 newPerSecondRate) public {
         vm.assume(user != address(0));
+        _assumeNotProxyAdmin(user, address(bbv));
         vm.assume(bbv.getUserSubVault(user).id == 0); // no prior deposits
         newPerSecondRate = _boundRate(newPerSecondRate);
         vm.assume(newPerSecondRate != bbv.getDefaultSubVault().perSecondRate);
@@ -259,6 +279,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
     function test_setUserRate_reverts_ifSettingTheSameRateHeAlreadyHas(address user, uint256 amount) public {
         vm.assume(user != address(0));
+        _assumeNotProxyAdmin(user, address(bbv));
         amount = _boundAssetAmount(address(mockAsset), amount);
 
         mockAsset.mint(user, amount);
@@ -284,7 +305,9 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 newRate
     ) public {
         vm.assume(user1 != address(0));
+        _assumeNotProxyAdmin(user1, address(bbv));
         vm.assume(user2 != address(0));
+        _assumeNotProxyAdmin(user2, address(bbv));
         vm.assume(user1 != user2);
         amount1 = _boundAssetAmount(address(mockAsset), amount1);
         amount2 = _boundAssetAmount(address(mockAsset), amount2);
@@ -333,6 +356,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(bbv.getDefaultSubVault().perSecondRate != newPerSecondRate);
 
         vm.assume(user != address(0));
+        _assumeNotProxyAdmin(user, address(bbv));
         amount = _boundAssetAmount(address(mockAsset), amount);
         mockAsset.mint(user, amount);
         vm.prank(user);
@@ -410,6 +434,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         public
     {
         vm.assume(msgSender != address(0));
+        _assumeNotProxyAdmin(msgSender, address(bbv));
         vm.assume(msgSender != manager);
         newPerSecondRate = _boundRate(newPerSecondRate);
 

@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
+import {
+    AccessManagedUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -14,7 +16,7 @@ import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 /// @title FundsHandler
 /// @notice Handles push/pull of funds across the system.
-contract FundsHandler is AccessManaged, RescuableAssets, IFundsHandler {
+contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandler {
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
 
@@ -25,13 +27,14 @@ contract FundsHandler is AccessManaged, RescuableAssets, IFundsHandler {
         uint256 nonce;
     }
 
-    ChainBalanceSnapshot[] internal _chainBalances;
     address internal immutable VAULT;
     address internal immutable GATEWAY;
     address internal immutable ALLOCATOR;
 
-    modifier onlyBaseBoostedVault() {
-        require(msg.sender == VAULT, NotBaseBoostedVault());
+    ChainBalanceSnapshot[] internal _chainBalances;
+
+    modifier onlyBasedBoostedVault() {
+        require(msg.sender == VAULT, NotBasedBoostedVault());
         _;
     }
 
@@ -40,12 +43,25 @@ contract FundsHandler is AccessManaged, RescuableAssets, IFundsHandler {
         _;
     }
 
-    constructor(address accessManager, address basedBoostedVault, address gateway, address allocator)
-        AccessManaged(accessManager)
-    {
+    /// @dev Constructor.
+    /// @param basedBoostedVault The address of the BasedBoostedVault contract, which triggers deposits and withdrawals.
+    /// @param gateway The address of the Gateway contract to use for cross-chain communication.
+    /// @param allocator The address of the Allocator contract to use for immediate liquidity management.
+    constructor(address basedBoostedVault, address gateway, address allocator) {
+        _disableInitializers();
         VAULT = basedBoostedVault;
         GATEWAY = gateway;
         ALLOCATOR = allocator;
+    }
+
+    /// @dev Initializer.
+    /// @param accessManager The address of the IAccessManager contract used for handling access control.
+    function initialize(address accessManager) external virtual initializer {
+        __FundsHandler_init(accessManager);
+    }
+
+    function __FundsHandler_init(address accessManager) internal virtual onlyInitializing {
+        __AccessManaged_init(accessManager);
     }
 
     /// @inheritdoc IFundsHandler
@@ -83,19 +99,19 @@ contract FundsHandler is AccessManaged, RescuableAssets, IFundsHandler {
     }
 
     /// @inheritdoc IFundsHandler
-    function processDeposit(address asset, uint256 amount) external override onlyBaseBoostedVault {
+    function processDeposit(address asset, uint256 amount) external override onlyBasedBoostedVault {
         _pushFundsToImmediateLiquidity(asset, amount);
     }
 
     /// @inheritdoc IFundsHandler
-    function processWithdrawal(address asset, uint256 amount) external override onlyBaseBoostedVault {
+    function processWithdrawal(address asset, uint256 amount) external override onlyBasedBoostedVault {
         _verifyAvailableLiquidity(asset, amount);
         _pullFundsFromImmediateLiquidity(asset, amount);
         IERC20(asset).forceApprove(VAULT, amount);
     }
 
     /// @inheritdoc IFundsHandler
-    function pullFromLiquidity(address asset, uint256 amount) external override onlyBaseBoostedVault {
+    function pullFromLiquidity(address asset, uint256 amount) external override onlyBasedBoostedVault {
         _pullFundsFromImmediateLiquidity(asset, amount);
         // TODO: Check if we don't need to do increaseApproval here (re-entrancy, multi-withdrawal, etc)
         IERC20(asset).forceApprove(VAULT, amount);

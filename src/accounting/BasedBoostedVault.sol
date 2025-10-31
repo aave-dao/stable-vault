@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
+import {
+    AccessManagedUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -18,16 +20,10 @@ import {MathLib} from "../libraries/MathLib.sol";
 /// @notice Semi-fixed rate vault.
 /// @dev Assets balances are tracked in RAY internally; conversions from and to specific asset denomination is made on
 /// deposit and on withdrawal execution.
-contract BasedBoostedVault is RescuableAssets, AccessManaged, IBasedBoostedVault {
+contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedBoostedVault {
     using MathLib for uint256;
     using AssetLib for uint256;
     using SafeERC20 for IERC20;
-
-    uint256 internal constant SECONDS_PER_YEAR = 31_536_000;
-
-    address internal immutable IOU_TOKEN_MANAGER;
-
-    uint256 internal immutable MAX_VALID_PER_SECOND_RATE;
 
     /**
      * @notice A subVault works like a virtual fixed-rate vault.
@@ -54,6 +50,12 @@ contract BasedBoostedVault is RescuableAssets, AccessManaged, IBasedBoostedVault
         uint256 subVaultId;
         uint256 shares;
     }
+
+    uint256 internal constant SECONDS_PER_YEAR = 31_536_000;
+
+    address internal immutable IOU_TOKEN_MANAGER;
+
+    uint256 internal immutable MAX_VALID_PER_SECOND_RATE;
 
     address internal immutable FUNDS_HANDLER;
 
@@ -83,24 +85,34 @@ contract BasedBoostedVault is RescuableAssets, AccessManaged, IBasedBoostedVault
     mapping(address user => UserPosition position) internal _positions;
 
     /// @dev Constructor.
-    /// @param accessManager The address of the OZ AccessManager contract.
     /// @param maxValidPerSecondRate The maximum valid per-second rate, in Ray units (27 decimals).
-    /// @param defaultSubVaultPerSecondRate The base per-second rate, in Ray units (27 decimals).
     /// @param iouTokenManager The address of the IOU token manager.
     /// @param fundsHandler The address of the FundsHandler contract.
-    /// @param assetRegistry The address of the contract that manages the permissions for handling assets.
-    constructor(
-        address accessManager,
-        uint256 maxValidPerSecondRate,
-        uint256 defaultSubVaultPerSecondRate,
-        address iouTokenManager,
-        address fundsHandler,
-        address assetRegistry
-    ) AccessManaged(accessManager) {
-        require(accessManager != address(0), ErrorsLib.ZeroAddress());
+    constructor(uint256 maxValidPerSecondRate, address iouTokenManager, address fundsHandler) {
+        _disableInitializers();
         MAX_VALID_PER_SECOND_RATE = maxValidPerSecondRate;
         IOU_TOKEN_MANAGER = iouTokenManager;
         FUNDS_HANDLER = fundsHandler;
+    }
+
+    /// @dev Initializer.
+    /// @param accessManager The address of the IAccessManager contract used for handling access control.
+    /// @param defaultSubVaultPerSecondRate The base per-second rate, in Ray units (27 decimals).
+    /// @param assetRegistry The address of the contract that manages the permissions for handling assets.
+    function initialize(address accessManager, uint256 defaultSubVaultPerSecondRate, address assetRegistry)
+        external
+        virtual
+        initializer
+    {
+        __BasedBoostedVault_init(accessManager, defaultSubVaultPerSecondRate, assetRegistry);
+    }
+
+    function __BasedBoostedVault_init(
+        address accessManager,
+        uint256 defaultSubVaultPerSecondRate,
+        address assetRegistry
+    ) internal virtual onlyInitializing {
+        __AccessManaged_init(accessManager);
         _assetRegistry = assetRegistry;
         _setDefaultSubVault(_createSubVault(defaultSubVaultPerSecondRate), defaultSubVaultPerSecondRate);
     }

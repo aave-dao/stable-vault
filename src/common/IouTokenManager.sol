@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
+import {
+    AccessManagedUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -14,7 +16,7 @@ import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 /// @title IouTokenManager
 /// @notice Manages the IOU token locking, releasing, minting, burning.
-contract IouTokenManager is AccessManaged, IIouTokenManager {
+contract IouTokenManager is AccessManagedUpgradeable, IIouTokenManager {
     using SafeERC20 for IERC20;
 
     address internal constant FEE_ON_NATIVE_CURRENCY = address(0);
@@ -43,12 +45,19 @@ contract IouTokenManager is AccessManaged, IIouTokenManager {
         _;
     }
 
-    constructor(address accessManager, address iouToken, address chainGateway, bool isCanonicalChain)
-        AccessManaged(accessManager)
-    {
+    constructor(address iouToken, address chainGateway, bool isCanonicalChain) {
+        _disableInitializers();
         IOU_TOKEN = iouToken;
         CHAIN_GATEWAY = chainGateway;
         IS_CONANICAL_CHAIN = isCanonicalChain;
+    }
+
+    function initialize(address accessManager) external virtual initializer {
+        __IouTokenManager_init(accessManager);
+    }
+
+    function __IouTokenManager_init(address accessManager) internal virtual onlyInitializing {
+        __AccessManaged_init(accessManager);
     }
 
     function getAsset() external view override returns (address) {

@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import {MathLib} from "../../src/libraries/MathLib.sol";
 import {IMockErc20} from "../mocks/MockErc20.sol";
+import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
 import {Test} from "forge-std/Test.sol";
 
 contract TestWithHelpers is Test {
@@ -11,6 +12,11 @@ contract TestWithHelpers is Test {
     uint256 constant MAX_DEPOSIT_AMOUNT = 100_000_000_000_000; // 100 trillion
 
     uint256 constant NATIVE_CURRENCY_DECIMALS = 18;
+
+    function _assumeNotProxyAdmin(address fuzzedAddress, address targetAddress) internal view {
+        address proxyAdmin = address(uint160(uint256(vm.load(targetAddress, ERC1967Utils.ADMIN_SLOT))));
+        vm.assume(fuzzedAddress != proxyAdmin);
+    }
 
     function _boundRate(uint256 rate) internal pure returns (uint256) {
         return bound(rate, MathLib.RAY, DEFAULT_MAX_PER_SECOND_RATE);

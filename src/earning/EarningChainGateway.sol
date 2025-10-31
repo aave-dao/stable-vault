@@ -13,11 +13,10 @@ import {IEarningChainGateway} from "../interfaces/IEarningChainGateway.sol";
 import {IIouTokenManager} from "../interfaces/IIouTokenManager.sol";
 import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
-import {EventLib} from "../libraries/EventLib.sol";
 
 /// @title EarningChainGateway
 /// @notice Facilitates cross chain messaging with exactly one Accounting Chain.
-contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
+contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
 
@@ -25,12 +24,26 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
     address internal immutable ALLOCATOR;
     uint256 internal _balanceSnapshotNonce;
 
-    constructor(address accessManager, uint256 accountingChainId, address iouTokenManager, address allocator)
-        BaseChainGateway(accessManager, iouTokenManager)
+    /// @dev Constructor.
+    /// @param accountingChainId The Chain ID of the Accounting Chain.
+    /// @param allocator The address of the Allocator contract.
+    /// @param iouTokenManager The address of the IOU token manager contract.
+    constructor(uint256 accountingChainId, address allocator, address iouTokenManager)
+        BaseChainGateway(iouTokenManager)
     {
+        _disableInitializers();
         ACCOUNTING_CHAIN_ID = accountingChainId;
         ALLOCATOR = allocator;
-        emit EventLib.AllocatorSet(allocator);
+    }
+
+    /// @dev Initializer.
+    /// @param accessManager The address of the IAccessManager contract used for handling access control.
+    function initialize(address accessManager) external virtual initializer {
+        __EarningChainGateway_init(accessManager);
+    }
+
+    function __EarningChainGateway_init(address accessManager) internal virtual onlyInitializing {
+        __BaseChainGateway_init(accessManager);
     }
 
     function getIouTokenManager() external view returns (address) {
