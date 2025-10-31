@@ -58,4 +58,7 @@ library ErrorsLib {
 
     /// @notice Thrown when input parameter contains unacceptable length.
     error InvalidLength();
+
+    /// @notice Thrown when caller is not authorized.
+    error NotAuthorized();
 }

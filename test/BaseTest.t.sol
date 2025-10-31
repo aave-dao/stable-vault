@@ -19,7 +19,6 @@ import {ICcipBridgeAdapter} from "../src/interfaces/ICcipBridgeAdapter.sol";
 import {IChainGateway} from "../src/interfaces/IChainGateway.sol";
 import {IEarningChainGateway} from "../src/interfaces/IEarningChainGateway.sol";
 import {IFundsHandler} from "../src/interfaces/IFundsHandler.sol";
-import {IIouTokenManager} from "../src/interfaces/IIouTokenManager.sol";
 import {IRescuableAssets} from "../src/interfaces/IRescuableAssets.sol";
 import {AccountingChainGateway} from "./../src/accounting/AccountingChainGateway.sol";
 import {BasedBoostedVault} from "./../src/accounting/BasedBoostedVault.sol";
@@ -275,16 +274,13 @@ contract BaseTest is Test {
         );
 
         // 4. IOU Token Manager
-        address iouTokenManager_accountingChain_impl =
-            address(new IouTokenManager(iouToken_accountingChainAddress, chainGateway_accountingChainAddress, true));
-        iouTokenManager_accountingChain = IouTokenManager(
-            address(
-                new TransparentUpgradeableProxy(
-                    iouTokenManager_accountingChain_impl,
-                    proxyAdmin,
-                    abi.encodeCall(IouTokenManager.initialize, (accessManager_accountingChainAddress))
-                )
+        address iouTokenManager_accountingChain_impl = address(
+            new IouTokenManager(
+                iouToken_accountingChainAddress, chainGateway_accountingChainAddress, vault_accountingChainAddress, true
             )
+        );
+        iouTokenManager_accountingChain = IouTokenManager(
+            address(new TransparentUpgradeableProxy(iouTokenManager_accountingChain_impl, proxyAdmin, ""))
         );
         console.log("\tIOU Token Manager (Accounting Chain): %s", address(iouTokenManager_accountingChain));
         require(
@@ -493,16 +489,11 @@ contract BaseTest is Test {
         );
 
         // 5. IOU Token Manager
-        address iouTokenManager_earningChain_impl =
-            address(new IouTokenManager(iouToken_earningChainAddress, chainGateway_earningChainAddress, false));
+        address iouTokenManager_earningChain_impl = address(
+            new IouTokenManager(iouToken_earningChainAddress, chainGateway_earningChainAddress, address(0), false)
+        );
         iouTokenManager_earningChain = IouTokenManager(
-            address(
-                new TransparentUpgradeableProxy(
-                    iouTokenManager_earningChain_impl,
-                    proxyAdmin,
-                    abi.encodeCall(IouTokenManager.initialize, (accessManager_earningChainAddress))
-                )
-            )
+            address(new TransparentUpgradeableProxy(iouTokenManager_earningChain_impl, proxyAdmin, ""))
         );
         console.log("\tIOU Token Manager (Earning Chain): %s", address(iouTokenManager_earningChain));
         require(
@@ -676,15 +667,6 @@ contract BaseTest is Test {
         assetRegistry_earningChain.setAssetConfig(address(GHO), unrestrictedAssetConfig);
         assetRegistry_earningChain.setAssetConfig(address(USDC), unrestrictedAssetConfig);
 
-        // Set up IOU Token Manager on Accounting chain
-        iouTokenManager_accountingChain.setAllowedMinter(address(vault), true);
-        iouTokenManager_accountingChain.setAllowedBurner(address(vault), true);
-        iouTokenManager_accountingChain.setAllowedBurner(address(accountingChainGateway), true);
-        iouTokenManager_accountingChain.setAllowedReleaser(address(accountingChainGateway), true);
-        // Set up IOU Token Manager on Earning chain
-        iouTokenManager_earningChain.setAllowedMinter(address(earningChainGateway), true);
-        iouTokenManager_earningChain.setAllowedBurner(address(earningChainGateway), true);
-
         vm.stopPrank();
     }
 
@@ -727,15 +709,6 @@ contract BaseTest is Test {
                 IBridgeAdapter.setDestinationChainAdapter.selector,
                 ICcipBridgeAdapter.setChainSelector.selector,
                 ICcipBridgeAdapter.setFeeToken.selector
-            ),
-            APPENDER_ROLE
-        );
-        accessManager.setTargetFunctionRole(
-            address(iouTokenManager_accountingChain),
-            _toSelectorArray(
-                IIouTokenManager.setAllowedMinter.selector,
-                IIouTokenManager.setAllowedBurner.selector,
-                IIouTokenManager.setAllowedReleaser.selector
             ),
             APPENDER_ROLE
         );
@@ -842,15 +815,6 @@ contract BaseTest is Test {
                 IBridgeAdapter.setDestinationChainAdapter.selector,
                 ICcipBridgeAdapter.setChainSelector.selector,
                 ICcipBridgeAdapter.setFeeToken.selector
-            ),
-            APPENDER_ROLE
-        );
-        accessManager.setTargetFunctionRole(
-            address(iouTokenManager_earningChain),
-            _toSelectorArray(
-                IIouTokenManager.setAllowedMinter.selector,
-                IIouTokenManager.setAllowedBurner.selector,
-                IIouTokenManager.setAllowedReleaser.selector
             ),
             APPENDER_ROLE
         );

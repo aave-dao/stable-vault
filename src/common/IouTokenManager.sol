@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {
-    AccessManagedUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -16,48 +13,39 @@ import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 /// @title IouTokenManager
 /// @notice Manages the IOU token locking, releasing, minting, burning.
-contract IouTokenManager is AccessManagedUpgradeable, IIouTokenManager {
+contract IouTokenManager is IIouTokenManager {
     using SafeERC20 for IERC20;
 
     address internal constant FEE_ON_NATIVE_CURRENCY = address(0);
 
     address internal immutable IOU_TOKEN;
     address internal immutable CHAIN_GATEWAY;
+    address internal immutable VAULT;
     bool internal immutable IS_CONANICAL_CHAIN;
 
     uint256 internal _lockedBalance;
-    mapping(address minter => bool allowed) internal _allowedMinters;
-    mapping(address burner => bool allowed) internal _allowedBurners;
-    mapping(address releaser => bool allowed) internal _allowedReleasers;
 
     modifier onlyAllowedReleaser() {
-        require(_allowedReleasers[msg.sender], ErrorsLib.AddressNotWhitelisted());
+        require(IS_CONANICAL_CHAIN, NotCanonicalChain());
+        require(msg.sender == CHAIN_GATEWAY, ErrorsLib.NotAuthorized());
         _;
     }
 
     modifier onlyAllowedMinter() {
-        require(_allowedMinters[msg.sender], ErrorsLib.AddressNotWhitelisted());
+        require(msg.sender == VAULT || msg.sender == CHAIN_GATEWAY, ErrorsLib.NotAuthorized());
         _;
     }
 
     modifier onlyAllowedBurner() {
-        require(_allowedBurners[msg.sender], ErrorsLib.AddressNotWhitelisted());
+        require(msg.sender == VAULT || msg.sender == CHAIN_GATEWAY, ErrorsLib.NotAuthorized());
         _;
     }
 
-    constructor(address iouToken, address chainGateway, bool isCanonicalChain) {
-        _disableInitializers();
+    constructor(address iouToken, address chainGateway, address vault, bool isCanonicalChain) {
         IOU_TOKEN = iouToken;
         CHAIN_GATEWAY = chainGateway;
+        VAULT = vault;
         IS_CONANICAL_CHAIN = isCanonicalChain;
-    }
-
-    function initialize(address accessManager) external virtual initializer {
-        __IouTokenManager_init(accessManager);
-    }
-
-    function __IouTokenManager_init(address accessManager) internal virtual onlyInitializing {
-        __AccessManaged_init(accessManager);
     }
 
     function getAsset() external view override returns (address) {
@@ -118,21 +106,6 @@ contract IouTokenManager is AccessManagedUpgradeable, IIouTokenManager {
         require(_lockedBalance >= amount, InsufficientLockedBalance());
         _lockedBalance -= amount;
         IERC20(IOU_TOKEN).safeTransfer(to, amount);
-    }
-
-    /// @inheritdoc IIouTokenManager
-    function setAllowedMinter(address minter, bool allowed) external restricted {
-        _allowedMinters[minter] = allowed;
-    }
-
-    /// @inheritdoc IIouTokenManager
-    function setAllowedBurner(address burner, bool allowed) external restricted {
-        _allowedBurners[burner] = allowed;
-    }
-
-    /// @inheritdoc IIouTokenManager
-    function setAllowedReleaser(address releaser, bool allowed) external restricted {
-        _allowedReleasers[releaser] = allowed;
     }
 
     /// @dev should only be used on canonical chain.
