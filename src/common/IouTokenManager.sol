@@ -111,14 +111,17 @@ contract IouTokenManager is AccessManaged, IIouTokenManager {
         IERC20(IOU_TOKEN).safeTransfer(to, amount);
     }
 
+    /// @inheritdoc IIouTokenManager
     function setAllowedMinter(address minter, bool allowed) external restricted {
         _allowedMinters[minter] = allowed;
     }
 
+    /// @inheritdoc IIouTokenManager
     function setAllowedBurner(address burner, bool allowed) external restricted {
         _allowedBurners[burner] = allowed;
     }
 
+    /// @inheritdoc IIouTokenManager
     function setAllowedReleaser(address releaser, bool allowed) external restricted {
         _allowedReleasers[releaser] = allowed;
     }

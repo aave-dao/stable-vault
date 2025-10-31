@@ -44,4 +44,10 @@ interface IIouTokenManager {
     /// @param to The address to send the unlocked IOU tokens to.
     /// @param amount The amount of IOU tokens to release.
     function releaseTokens(address to, uint256 amount) external;
+
+    function setAllowedMinter(address minter, bool allowed) external;
+
+    function setAllowedBurner(address burner, bool allowed) external;
+
+    function setAllowedReleaser(address releaser, bool allowed) external;
 }

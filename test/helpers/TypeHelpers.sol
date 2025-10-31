@@ -39,6 +39,19 @@ function _toSelectorArray(bytes4 selector0, bytes4 selector1, bytes4 selector2, 
     return selectors;
 }
 
+function _toSelectorArray(bytes4 selector0, bytes4 selector1, bytes4 selector2, bytes4 selector3, bytes4 selector4)
+    pure
+    returns (bytes4[] memory)
+{
+    bytes4[] memory selectors = new bytes4[](5);
+    selectors[0] = selector0;
+    selectors[1] = selector1;
+    selectors[2] = selector2;
+    selectors[3] = selector3;
+    selectors[4] = selector4;
+    return selectors;
+}
+
 function _toUint256Array(uint256 n) pure returns (uint256[] memory) {
     uint256[] memory ret = new uint256[](1);
     ret[0] = n;

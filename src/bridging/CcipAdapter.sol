@@ -10,13 +10,14 @@ import {IRouterClient} from "@chainlink-ccip/contracts/interfaces/IRouterClient.
 import {Client} from "@chainlink-ccip/contracts/libraries/Client.sol";
 
 import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
+import {ICcipBridgeAdapter} from "../interfaces/ICcipBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {BaseBridgeAdapter} from "./BaseBridgeAdapter.sol";
 
 /// @title CcipAdapter
 /// @notice Adapter for sending and receiving messages via Chainlink CCIP.
-contract CcipAdapter is BaseBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
+contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
     using SafeERC20 for IERC20;
 
     address internal constant FEE_ON_NATIVE_CURRENCY = address(0);
@@ -43,12 +44,14 @@ contract CcipAdapter is BaseBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
         CCIP_ROUTER = ccipRouter;
     }
 
-    function setChainSelector(uint256 chainId, uint64 ccipChainSelector) external restricted {
+    /// @inheritdoc ICcipBridgeAdapter
+    function setChainSelector(uint256 chainId, uint64 ccipChainSelector) external override restricted {
         _chainSelectorOf[chainId] = ccipChainSelector;
         _chainIdOf[ccipChainSelector] = chainId;
     }
 
-    function setFeeToken(address feeToken) external restricted {
+    /// @inheritdoc ICcipBridgeAdapter
+    function setFeeToken(address feeToken) external override restricted {
         _feeToken = feeToken;
     }
 
