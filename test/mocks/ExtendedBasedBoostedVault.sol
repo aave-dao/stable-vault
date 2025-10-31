@@ -7,17 +7,8 @@ import {MathLib} from "../../src/libraries/MathLib.sol";
 contract ExtendedBasedBoostedVault is BasedBoostedVault {
     using MathLib for uint256;
 
-    constructor(
-        address accessManager,
-        uint256 maxPerSecondRate,
-        uint256 initialBasePerSecondRate,
-        address iouTokenManager,
-        address fundsHandler,
-        address assetRegistry
-    )
-        BasedBoostedVault(
-            accessManager, maxPerSecondRate, initialBasePerSecondRate, iouTokenManager, fundsHandler, assetRegistry
-        )
+    constructor(uint256 maxPerSecondRate, address iouTokenManager, address fundsHandler)
+        BasedBoostedVault(maxPerSecondRate, iouTokenManager, fundsHandler)
     {}
 
     function getDefaultConversionRate() public view returns (uint256) {
