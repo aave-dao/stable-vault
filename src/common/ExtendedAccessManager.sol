@@ -8,6 +8,6 @@ contract ExtendedAccessManager is AccessManager {
 
     // @inheritdoc AccessManager
     function expiration() public pure override returns (uint32) {
-        return 1 days * 21;
+        return 21 days;
     }
 }
