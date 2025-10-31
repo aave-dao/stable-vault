@@ -30,8 +30,8 @@ contract FundsHandler is AccessManaged, RescuableAssets, IFundsHandler {
     address internal immutable GATEWAY;
     address internal immutable ALLOCATOR;
 
-    modifier onlyBaseBoostedVault() {
-        require(msg.sender == VAULT, NotBaseBoostedVault());
+    modifier onlyBasedBoostedVault() {
+        require(msg.sender == VAULT, NotBasedBoostedVault());
         _;
     }
 
@@ -83,19 +83,19 @@ contract FundsHandler is AccessManaged, RescuableAssets, IFundsHandler {
     }
 
     /// @inheritdoc IFundsHandler
-    function processDeposit(address asset, uint256 amount) external override onlyBaseBoostedVault {
+    function processDeposit(address asset, uint256 amount) external override onlyBasedBoostedVault {
         _pushFundsToImmediateLiquidity(asset, amount);
     }
 
     /// @inheritdoc IFundsHandler
-    function processWithdrawal(address asset, uint256 amount) external override onlyBaseBoostedVault {
+    function processWithdrawal(address asset, uint256 amount) external override onlyBasedBoostedVault {
         _verifyAvailableLiquidity(asset, amount);
         _pullFundsFromImmediateLiquidity(asset, amount);
         IERC20(asset).forceApprove(VAULT, amount);
     }
 
     /// @inheritdoc IFundsHandler
-    function pullFromLiquidity(address asset, uint256 amount) external override onlyBaseBoostedVault {
+    function pullFromLiquidity(address asset, uint256 amount) external override onlyBasedBoostedVault {
         _pullFundsFromImmediateLiquidity(asset, amount);
         // TODO: Check if we don't need to do increaseApproval here (re-entrancy, multi-withdrawal, etc)
         IERC20(asset).forceApprove(VAULT, amount);
