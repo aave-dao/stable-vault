@@ -24,7 +24,6 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     using AssetLib for uint256;
     using SafeERC20 for IMockErc20;
 
-    address proxyAdmin = makeAddr("PROXY_ADMIN");
     address admin = makeAddr("admin");
     address manager = makeAddr("manager");
 
@@ -53,7 +52,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(
                 new TransparentUpgradeableProxy(
                     vaultImpl,
-                    proxyAdmin,
+                    address(this),
                     abi.encodeCall(
                         BasedBoostedVault.initialize, (adminParam, defaultSubVaultPerSecondRate, assetRegistry)
                     )
@@ -128,7 +127,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
     function test_deposit_firstUserDepositGoesToDefaultSubVault(address user, uint256 amount) public {
         vm.assume(user != address(0));
-        vm.assume(user != proxyAdmin);
+        _assumeNotProxyAdmin(user, address(bbv));
         amount = _boundAssetAmount(address(mockAsset), amount);
 
         IBasedBoostedVault.SubVaultData memory userSubVault = bbv.getUserSubVault(user);
@@ -158,7 +157,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 secondDepositAmount,
         uint256 userRate
     ) public {
-        vm.assume(user != address(0) && user != proxyAdmin);
+        vm.assume(user != address(0));
+        _assumeNotProxyAdmin(user, address(bbv));
         firstDepositAmount = _boundAssetAmount(address(mockAsset), firstDepositAmount);
         secondDepositAmount = _boundAssetAmount(address(mockAsset), secondDepositAmount);
         // Assumes the sum of the two deposits does not exceed the max expected deposit amount
@@ -204,7 +204,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     }
 
     function test_deposit_reverts_ifAmountIsZero(address user) public {
-        vm.assume(user != address(0) && user != proxyAdmin);
+        vm.assume(user != address(0));
+        _assumeNotProxyAdmin(user, address(bbv));
 
         vm.prank(user);
         vm.expectRevert(ErrorsLib.InvalidAmount.selector);
@@ -214,8 +215,10 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     function test_deposit_reverts_ifAssetIsNotAllowedToDepositIntoBBV(address msgSender, address user, uint256 amount)
         public
     {
-        vm.assume(msgSender != address(0) && msgSender != proxyAdmin);
-        vm.assume(user != address(0) && user != proxyAdmin);
+        vm.assume(msgSender != address(0));
+        _assumeNotProxyAdmin(msgSender, address(bbv));
+        vm.assume(user != address(0));
+        _assumeNotProxyAdmin(user, address(bbv));
         vm.assume(msgSender != user);
 
         amount = _boundAssetAmount(address(mockAsset), amount);
@@ -232,7 +235,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     }
 
     function test_deposit_reverts_ifMsgSenderIsNotTheUserDepositing(address user, uint256 amount) public {
-        vm.assume(user != address(0) && user != proxyAdmin);
+        vm.assume(user != address(0));
+        _assumeNotProxyAdmin(user, address(bbv));
         amount = _boundAssetAmount(address(mockAsset), amount);
 
         mockAsset.mint(user, amount);
@@ -243,7 +247,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     }
 
     function test_deposit_callsFundsHandlerToProcessDepositWithExpectedParams(address user, uint256 amount) public {
-        vm.assume(user != address(0) && user != proxyAdmin);
+        vm.assume(user != address(0));
+        _assumeNotProxyAdmin(user, address(bbv));
         amount = _boundAssetAmount(address(mockAsset), amount);
 
         mockAsset.mint(user, amount);
@@ -261,7 +266,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     }
 
     function test_setUserRate_reverts_ifUserDoesNotHaveAPosition(address user, uint256 newPerSecondRate) public {
-        vm.assume(user != address(0) && user != proxyAdmin);
+        vm.assume(user != address(0));
+        _assumeNotProxyAdmin(user, address(bbv));
         vm.assume(bbv.getUserSubVault(user).id == 0); // no prior deposits
         newPerSecondRate = _boundRate(newPerSecondRate);
         vm.assume(newPerSecondRate != bbv.getDefaultSubVault().perSecondRate);
@@ -272,7 +278,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     }
 
     function test_setUserRate_reverts_ifSettingTheSameRateHeAlreadyHas(address user, uint256 amount) public {
-        vm.assume(user != address(0) && user != proxyAdmin);
+        vm.assume(user != address(0));
+        _assumeNotProxyAdmin(user, address(bbv));
         amount = _boundAssetAmount(address(mockAsset), amount);
 
         mockAsset.mint(user, amount);
@@ -297,8 +304,10 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 amount2,
         uint256 newRate
     ) public {
-        vm.assume(user1 != address(0) && user1 != proxyAdmin);
-        vm.assume(user2 != address(0) && user2 != proxyAdmin);
+        vm.assume(user1 != address(0));
+        _assumeNotProxyAdmin(user1, address(bbv));
+        vm.assume(user2 != address(0));
+        _assumeNotProxyAdmin(user2, address(bbv));
         vm.assume(user1 != user2);
         amount1 = _boundAssetAmount(address(mockAsset), amount1);
         amount2 = _boundAssetAmount(address(mockAsset), amount2);
@@ -346,7 +355,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         newPerSecondRate = _boundRate(newPerSecondRate);
         vm.assume(bbv.getDefaultSubVault().perSecondRate != newPerSecondRate);
 
-        vm.assume(user != address(0) && user != proxyAdmin);
+        vm.assume(user != address(0));
+        _assumeNotProxyAdmin(user, address(bbv));
         amount = _boundAssetAmount(address(mockAsset), amount);
         mockAsset.mint(user, amount);
         vm.prank(user);
@@ -423,7 +433,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     function test_setDefaultSubVault_reverts_ifMsgSenderIsNotTheManager(address msgSender, uint256 newPerSecondRate)
         public
     {
-        vm.assume(msgSender != address(0) && msgSender != proxyAdmin);
+        vm.assume(msgSender != address(0));
+        _assumeNotProxyAdmin(msgSender, address(bbv));
         vm.assume(msgSender != manager);
         newPerSecondRate = _boundRate(newPerSecondRate);
 

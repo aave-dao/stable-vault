@@ -32,7 +32,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
     uint256 internal ACCOUNTING_CHAIN_ID = 1;
     uint256 internal EARNING_CHAIN_ID = 2;
 
-    address proxyAdmin = makeAddr("PROXY_ADMIN");
     address admin = makeAddr("ADMIN");
     address everyRoleAccount = makeAddr("EVERY_ROLE_ACCOUNT");
 
@@ -58,7 +57,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(
                 new TransparentUpgradeableProxy(
                     earningChainGatewayImpl,
-                    proxyAdmin,
+                    address(this),
                     abi.encodeCall(EarningChainGateway.initialize, address(mockAccessManager))
                 )
             )
@@ -401,6 +400,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
         bridgeFeeAmount = _boundNativeAmount(bridgeFeeAmount);
         vm.assume(tokenOutReceiver != address(0));
+        _assumeNotProxyAdmin(tokenOutReceiver, address(_earningChainGateway));
         vm.assume(bridgeFeePayer != address(0));
         vm.assume(bridgeFeeToken != address(0));
 
@@ -503,6 +503,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
         bridgeFeeAmount = _boundNativeAmount(bridgeFeeAmount);
         vm.assume(tokenOutReceiver != address(0));
+        _assumeNotProxyAdmin(tokenOutReceiver, address(_earningChainGateway));
         vm.assume(bridgeFeePayer != address(0));
 
         address tokenOut = address(_mockUsdt);
