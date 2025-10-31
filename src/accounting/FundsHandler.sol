@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
+import {
+    AccessManagedUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -14,7 +16,7 @@ import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 /// @title FundsHandler
 /// @notice Handles push/pull of funds across the system.
-contract FundsHandler is AccessManaged, RescuableAssets, IFundsHandler {
+contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandler {
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
 
@@ -25,10 +27,11 @@ contract FundsHandler is AccessManaged, RescuableAssets, IFundsHandler {
         uint256 nonce;
     }
 
-    ChainBalanceSnapshot[] internal _chainBalances;
     address internal immutable VAULT;
     address internal immutable GATEWAY;
     address internal immutable ALLOCATOR;
+
+    ChainBalanceSnapshot[] internal _chainBalances;
 
     modifier onlyBasedBoostedVault() {
         require(msg.sender == VAULT, NotBasedBoostedVault());
@@ -40,12 +43,25 @@ contract FundsHandler is AccessManaged, RescuableAssets, IFundsHandler {
         _;
     }
 
-    constructor(address accessManager, address basedBoostedVault, address gateway, address allocator)
-        AccessManaged(accessManager)
-    {
+    /// @dev Constructor.
+    /// @param basedBoostedVault The address of the BasedBoostedVault contract, which triggers deposits and withdrawals.
+    /// @param gateway The address of the Gateway contract to use for cross-chain communication.
+    /// @param allocator The address of the Allocator contract to use for immediate liquidity management.
+    constructor(address basedBoostedVault, address gateway, address allocator) {
+        _disableInitializers();
         VAULT = basedBoostedVault;
         GATEWAY = gateway;
         ALLOCATOR = allocator;
+    }
+
+    /// @dev Initializer.
+    /// @param accessManager The address of the IAccessManager contract used for handling access control.
+    function initialize(address accessManager) external virtual initializer {
+        __FundsHandler_init(accessManager);
+    }
+
+    function __FundsHandler_init(address accessManager) internal virtual onlyInitializing {
+        __AccessManaged_init(accessManager);
     }
 
     /// @inheritdoc IFundsHandler
