@@ -26,14 +26,6 @@ library ErrorsLib {
     /// @notice Address checked is not whitelisted.
     error AddressNotWhitelisted();
 
-    // TODO: remove this error
-    /// @notice Address checked is not the admin.
-    error NotAdmin();
-
-    // TODO: remove this error
-    /// @notice Address checked is not the manager.
-    error NotManager();
-
     /// @notice Address checked is not the Cross-chain gateway.
     error NotGateway();
 

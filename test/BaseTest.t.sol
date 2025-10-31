@@ -387,7 +387,7 @@ contract BaseTest is Test {
         );
 
         // 4. IOU Token
-        iouToken_earningChain = new IouToken(iouToken_earningChainAddress);
+        iouToken_earningChain = new IouToken(iouTokenManager_earningChainAddress);
         console.log("\tIOU Token (Earning Chain): %s", address(iouToken_earningChain));
         require(
             address(iouToken_earningChain) == iouToken_earningChainAddress, "IOU Token (Earning Chain) address mismatch"

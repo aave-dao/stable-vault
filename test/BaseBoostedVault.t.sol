@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {BasedBoostedVault} from "./../src/accounting/BasedBoostedVault.sol";
@@ -412,8 +413,9 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(msgSender != manager);
         newPerSecondRate = _boundRate(newPerSecondRate);
 
+        mockAccessManager.mockRejectCall(msgSender, address(bbv), IBasedBoostedVault.setDefaultSubVault.selector, 0);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, msgSender));
         vm.prank(msgSender);
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.NotManager.selector));
         bbv.setDefaultSubVault(newPerSecondRate);
     }
 
