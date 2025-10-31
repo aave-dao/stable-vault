@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
+import {
+    AccessManagedUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -20,19 +22,19 @@ import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 ///      - assets are in their native decimals
 ///      - 100% of assets deposited into Allocator belong to the same entity (the Allocator does not track depositors)
 /// @dev Deals with assets in their native decimals.
-contract Allocator is AccessManaged, IAllocator {
+contract Allocator is AccessManagedUpgradeable, IAllocator {
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
-
-    address internal immutable DEPOSITOR;
-    address internal immutable WITHDRAWER;
-    address internal immutable ASSET_REGISTRY;
 
     struct VaultData {
         address asset;
         uint32 indexInAssetVaults;
         uint32 indexInAllVaults;
     }
+
+    address internal immutable DEPOSITOR;
+    address internal immutable WITHDRAWER;
+    address internal immutable ASSET_REGISTRY;
 
     // Strategy Vaults
     // - defaultVaultByAsset: The default vault for an asset which funds are deposited into and withdrawn from.
@@ -54,12 +56,25 @@ contract Allocator is AccessManaged, IAllocator {
         _;
     }
 
-    constructor(address accessManager, address assetRegistry, address depositor, address withdrawer)
-        AccessManaged(accessManager)
-    {
+    /// @dev Constructor.
+    /// @param assetRegistry The address of the AssetRegistry contract.
+    /// @param depositor The address of the initial depositor to whitelist.
+    /// @param withdrawer The address of the initial withdrawer to whitelist.
+    constructor(address assetRegistry, address depositor, address withdrawer) {
+        _disableInitializers();
         DEPOSITOR = depositor;
         WITHDRAWER = withdrawer;
         ASSET_REGISTRY = assetRegistry;
+    }
+
+    /// @dev Initializer.
+    /// @param accessManager The address of the IAccessManager contract used for handling access control.
+    function initialize(address accessManager) external virtual initializer {
+        __Allocator_init(accessManager);
+    }
+
+    function __Allocator_init(address accessManager) internal virtual onlyInitializing {
+        __AccessManaged_init(accessManager);
     }
 
     /// @inheritdoc IAllocator
