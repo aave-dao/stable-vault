@@ -13,7 +13,7 @@ import {IIouTokenManager} from "../interfaces/IIouTokenManager.sol";
 
 /// @title AccountingChainGateway
 /// @notice Facilitates cross chain messaging one or more Earning Chains.
-contract AccountingChainGateway is IAccountingChainGateway, BaseChainGateway {
+contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
     using SafeERC20 for IERC20;
 
     modifier onlyFundsHandler() {
@@ -23,10 +23,22 @@ contract AccountingChainGateway is IAccountingChainGateway, BaseChainGateway {
 
     address internal immutable FUNDS_HANDLER;
 
-    constructor(address accessManager, address fundsHandler, address iouTokenManager)
-        BaseChainGateway(accessManager, iouTokenManager)
-    {
+    /// @dev Constructor.
+    /// @param fundsHandler The address of the FundsHandler contract.
+    /// @param iouTokenManager The address of the IOU token manager contract.
+    constructor(address fundsHandler, address iouTokenManager) BaseChainGateway(iouTokenManager) {
+        _disableInitializers();
         FUNDS_HANDLER = fundsHandler;
+    }
+
+    /// @dev Initializer.
+    /// @param accessManager The address of the IAccessManager contract used for handling access control.
+    function initialize(address accessManager) external virtual initializer {
+        __AccountingChainGateway_init(accessManager);
+    }
+
+    function __AccountingChainGateway_init(address accessManager) internal virtual onlyInitializing {
+        __BaseChainGateway_init(accessManager);
     }
 
     function sendPushFundsToChainMessage(address asset, uint256 amount, uint256 targetChainId)
