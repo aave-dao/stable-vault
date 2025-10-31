@@ -97,6 +97,7 @@ contract BasedBoostedVault is RescuableAssets, AccessManaged, IBasedBoostedVault
         address fundsHandler,
         address assetRegistry
     ) AccessManaged(accessManager) {
+        require(accessManager != address(0), ErrorsLib.ZeroAddress());
         MAX_VALID_PER_SECOND_RATE = maxValidPerSecondRate;
         IOU_TOKEN_MANAGER = iouTokenManager;
         FUNDS_HANDLER = fundsHandler;
