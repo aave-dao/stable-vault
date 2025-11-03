@@ -30,19 +30,13 @@ abstract contract BaseBridgeAdapter is AccessManaged, IBridgeAdapter {
         GATEWAY = gateway;
     }
 
-    function publishMessageToChain(
+    function publishMessageToChainWithFeePayer(
         uint256 destinationChainId,
         IBridgeAdapter.BridgeAsset[] memory assets,
-        bytes memory data
-    ) external virtual;
-
-    function publishMessageToChainWithFeePayer(
+        bytes memory data,
         address feeRefundRecipient,
         address feeToken,
-        uint256 allocatedFeeAmount,
-        uint256 destinationChainId,
-        IBridgeAdapter.BridgeAsset[] memory assets,
-        bytes memory data
+        uint256 allocatedFeeAmount
     ) external payable virtual;
 
     function setDestinationChainAdapter(uint256 chainId, address destinationChainAdapter) external override restricted {

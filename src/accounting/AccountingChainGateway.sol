@@ -10,6 +10,7 @@ import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
 import {IIouTokenManager} from "../interfaces/IIouTokenManager.sol";
+import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 /// @title AccountingChainGateway
 /// @notice Facilitates cross chain messaging one or more Earning Chains.
@@ -41,19 +42,29 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
         __BaseChainGateway_init(accessManager);
     }
 
-    function sendPushFundsToChainMessage(address asset, uint256 amount, uint256 targetChainId)
-        external
-        onlyFundsHandler
-    {
+    function sendPushFundsToChainMessage(
+        address asset,
+        uint256 amount,
+        uint256 targetChainId,
+        address bridgeFeePayer,
+        address bridgeFeeToken,
+        uint256 bridgeFeeAmount
+    ) external payable override onlyFundsHandler {
         address adapter = _defaultBridgeAdapter[asset][targetChainId];
         require(adapter != address(0), UnsupportedAdapter());
+        require(bridgeFeeAmount > 0, ErrorsLib.ZeroAmount());
+        if (bridgeFeeToken == address(0)) {
+            require(msg.value >= bridgeFeeAmount, ErrorsLib.InsufficientFunds());
+        }
         // Pull funds from caller into this contract
         IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
         // Approve the bridge adapter to spend the funds
         IERC20(asset).forceApprove(adapter, amount);
         IBridgeAdapter.BridgeAsset[] memory assets = new IBridgeAdapter.BridgeAsset[](1);
         assets[0] = IBridgeAdapter.BridgeAsset({asset: asset, amount: amount});
-        IBridgeAdapter(adapter).publishMessageToChain(targetChainId, assets, "");
+        IBridgeAdapter(adapter).publishMessageToChainWithFeePayer{value: msg.value}(
+            targetChainId, assets, "", bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount
+        );
     }
 
     function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal override {

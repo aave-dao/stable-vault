@@ -76,7 +76,11 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
 
         // 2. Bridge the assets to the Earning Chain
         vm.prank(everyRoleAccount);
-        fundsHandler.pushFundsToChain(address(USDC), userInitialDeposit, EARNING_CHAIN_ID);
+        uint256 bridgeFeeAmount = 1000;
+        vm.deal(everyRoleAccount, bridgeFeeAmount);
+        fundsHandler.pushFundsToChain{value: bridgeFeeAmount}(
+            address(USDC), userInitialDeposit, EARNING_CHAIN_ID, everyRoleAccount, address(0), bridgeFeeAmount
+        );
 
         // Check the funds were bridged to the Earning Chain
         address defaultUsdcVault_earningChain = allocator_earningChain.getDefaultVault(address(USDC));
@@ -129,9 +133,9 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         vm.prank(user1);
         iouToken_accountingChain.approve(address(iouTokenManager_accountingChain), iouAmountRequestedRay);
         vm.prank(user1);
-        vm.deal(user1, 1000);
-        iouTokenManager_accountingChain.bridgeTokens{value: 1000}(
-            EARNING_CHAIN_ID, user1, iouAmountRequestedRay, user1, address(0), 0
+        vm.deal(user1, bridgeFeeAmount);
+        iouTokenManager_accountingChain.bridgeTokens{value: bridgeFeeAmount}(
+            EARNING_CHAIN_ID, user1, iouAmountRequestedRay, user1, address(0), bridgeFeeAmount
         );
         // Check the IOU token balance on Accounting Chain went down
         assertEq(iouToken_accountingChain.balanceOf(user1), 0, "User should have bridged IOU tokens");
@@ -203,12 +207,12 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             "IOUS ON EARNING CHAIN (BEFORE USER2 BRIDGE TO ACCOUNTING CHAIN) =",
             iousOnEarningBeforeUser2BridgeToAccountingChain
         );
-        vm.deal(user2, 1000);
         vm.prank(user2);
         iouToken_accountingChain.approve(address(iouTokenManager_accountingChain), iouAmountRequestedRay);
         vm.prank(user2);
-        iouTokenManager_accountingChain.bridgeTokens{value: 1000}(
-            EARNING_CHAIN_ID, user2, iouAmountRequestedRay, user2, address(0), 0
+        vm.deal(user2, bridgeFeeAmount);
+        iouTokenManager_accountingChain.bridgeTokens{value: bridgeFeeAmount}(
+            EARNING_CHAIN_ID, user2, iouAmountRequestedRay, user2, address(0), bridgeFeeAmount
         );
         require(
             iouToken_accountingChain.totalSupply() == iousOnAccountBeforeUser2BridgeToEarningChain,
@@ -223,10 +227,10 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         // Bridge the tokens back to Accounting chain and check the supply on both chains is expected
         vm.prank(user2);
         iouToken_earningChain.approve(address(iouTokenManager_earningChain), iouAmountRequestedRay);
-        vm.deal(user2, 1000);
+        vm.deal(user2, bridgeFeeAmount);
         vm.prank(user2);
-        iouTokenManager_earningChain.bridgeTokens{value: 1000}(
-            ACCOUNTING_CHAIN_ID, user2, iouAmountRequestedRay, user2, address(0), 0
+        iouTokenManager_earningChain.bridgeTokens{value: bridgeFeeAmount}(
+            ACCOUNTING_CHAIN_ID, user2, iouAmountRequestedRay, user2, address(0), bridgeFeeAmount
         );
         require(
             iouToken_accountingChain.totalSupply() == iousOnAccountBeforeUser2BridgeToEarningChain,

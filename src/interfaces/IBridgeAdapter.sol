@@ -16,26 +16,19 @@ interface IBridgeAdapter {
 
     function replayFundsReceiving(uint256 sourceChainId, BridgeAsset[] memory assets) external;
 
-    /// @notice Sends tokens and/or an arbitrary message containing instructions or data updates to a destination chain.
-    /// @param destinationChainId The chain id of the chain to publish the message to.
-    /// @param assets The assets to push to the destination chain.
-    /// @param data The arbitrary data that would be decoded and handled by the destination chain.
-    function publishMessageToChain(uint256 destinationChainId, BridgeAsset[] memory assets, bytes memory data) external;
-
     /// @notice Sends an arbitrary message containing instructions or data updates to a destination chain.
-    /// @param feeRefundRecipient The address to send the remaining bridge fee to if any. The actual fee is taken from
-    /// the msg.sender.
-    /// @param feeToken Token to pay the bridge fee in (must be accepted by the Bridge provider).
-    /// @param feeAmount The amount approved by msg.sender to use for fees (a refund is provided to the refundRecipient
-    /// if necessary).
     /// @param destinationChainId The chain id of the chain to publish the message to.
+    /// @param assets The assets to bridge.
     /// @param data The arbitrary data that would be decoded and handled by the destination chain.
+    /// @param feePayer The address paying the bridge fee and which receives a refund if any.
+    /// @param feeToken Token to pay the bridge fee in (must be accepted by the Bridge provider).
+    /// @param allocatedFeeAmount The amount approved by feePayer to use for fees.
     function publishMessageToChainWithFeePayer(
-        address feeRefundRecipient,
-        address feeToken,
-        uint256 feeAmount,
         uint256 destinationChainId,
         BridgeAsset[] memory assets,
-        bytes memory data
+        bytes memory data,
+        address feePayer,
+        address feeToken,
+        uint256 allocatedFeeAmount
     ) external payable;
 }

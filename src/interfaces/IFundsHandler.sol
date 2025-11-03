@@ -30,7 +30,14 @@ interface IFundsHandler {
 
     /// @dev Retrieves funds from liquidity source on native chain before pushing funds to another chain through the
     /// Gateway contract.
-    function pushFundsToChain(address asset, uint256 amount, uint256 chainId) external;
+    function pushFundsToChain(
+        address asset,
+        uint256 amount,
+        uint256 chainId,
+        address bridgeFeePayer,
+        address bridgeFeeToken,
+        uint256 bridgeFeeAmount
+    ) external payable;
 
     /// @dev Updates the chain balance snapshot for a given chain.
     /// @param chainId The chain id of the chain that sent the balance update

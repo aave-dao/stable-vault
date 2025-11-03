@@ -28,7 +28,14 @@ contract MockFundsHandler is IFundsHandler {
 
     function processWithdrawal(address asset, uint256 amount) external override {}
 
-    function pushFundsToChain(address asset, uint256 amount, uint256 chainId) external override {}
+    function pushFundsToChain(
+        address asset,
+        uint256 amount,
+        uint256 chainId,
+        address bridgeFeePayer,
+        address bridgeFeeToken,
+        uint256 bridgeFeeAmount
+    ) external payable override {}
 
     function updateChainBalanceCallback(uint256 chainId, uint256 snapshotBalanceRay, uint256 snapshotTimestamp)
         external

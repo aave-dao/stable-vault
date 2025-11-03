@@ -40,100 +40,115 @@ contract EndToEndTest is BaseTest {
         vm.stopPrank();
 
         // - check that funds are dropped into default liquidity vault
-        console.log("User deposited %s USDC into Vault", userInitialDeposit);
-        address defaultUsdcVault_AccountingChain = allocator_accountingChain.getDefaultVault(address(USDC));
-        console.log("Default vault for USDC is: %s", defaultUsdcVault_AccountingChain);
-        console.log("It's balance of USDC is: %s", IERC20(address(USDC)).balanceOf(defaultUsdcVault_AccountingChain));
-        // TODO: Replace with Before/After balance
-        assertEq(
-            IERC20(address(USDC)).balanceOf(defaultUsdcVault_AccountingChain),
-            userInitialDeposit,
-            "Vault should have the deposited amount of USDC"
-        );
-        console.log(
-            "Allocator has %s shares of it",
-            IERC4626(defaultUsdcVault_AccountingChain).balanceOf(address(allocator_accountingChain))
-        );
-        assertTrue(
-            IERC4626(defaultUsdcVault_AccountingChain).balanceOf(address(allocator_accountingChain)) > 0,
-            "Allocator should have shares of the vault"
-        );
+        {
+            console.log("User deposited %s USDC into Vault", userInitialDeposit);
+            address defaultUsdcVault_AccountingChain = allocator_accountingChain.getDefaultVault(address(USDC));
+            console.log("Default vault for USDC is: %s", defaultUsdcVault_AccountingChain);
+            console.log(
+                "It's balance of USDC is: %s", IERC20(address(USDC)).balanceOf(defaultUsdcVault_AccountingChain)
+            );
+            // TODO: Replace with Before/After balance
+            assertEq(
+                IERC20(address(USDC)).balanceOf(defaultUsdcVault_AccountingChain),
+                userInitialDeposit,
+                "Vault should have the deposited amount of USDC"
+            );
+            console.log(
+                "Allocator has %s shares of it",
+                IERC4626(defaultUsdcVault_AccountingChain).balanceOf(address(allocator_accountingChain))
+            );
+            assertTrue(
+                IERC4626(defaultUsdcVault_AccountingChain).balanceOf(address(allocator_accountingChain)) > 0,
+                "Allocator should have shares of the vault"
+            );
+        }
 
         // 2. Manager sets the % rate to user to 5% APY
-        uint256 userPerSecondRate = 1_000000001547125957863212449; // 5% APY
-        vm.prank(everyRoleAccount);
-        IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](1);
-        userRateData[0] = IBasedBoostedVault.UserRateData(user, userPerSecondRate);
-        vault.setUserRate(userRateData);
+        {
+            uint256 userPerSecondRate = 1_000000001547125957863212449; // 5% APY
+            vm.prank(everyRoleAccount);
+            IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](1);
+            userRateData[0] = IBasedBoostedVault.UserRateData(user, userPerSecondRate);
+            vault.setUserRate(userRateData);
 
-        // - check that the % rate is set correctly
-        console.log("User's per second rate is: %s", vault.getUserSubVault(user).perSecondRate);
-        assertEq(vault.getUserSubVault(user).perSecondRate, userPerSecondRate);
+            // - check that the % rate is set correctly
+            console.log("User's per second rate is: %s", vault.getUserSubVault(user).perSecondRate);
+            assertEq(vault.getUserSubVault(user).perSecondRate, userPerSecondRate);
+        }
 
         // 3. Manager sends the money to the Earning Chain via CCIP
-        vm.prank(everyRoleAccount);
-        fundsHandler.pushFundsToChain(address(USDC), userInitialDeposit, EARNING_CHAIN_ID);
+        uint256 bridgeFeeAmount = 1000;
+        {
+            vm.prank(everyRoleAccount);
+            vm.deal(everyRoleAccount, bridgeFeeAmount);
+            fundsHandler.pushFundsToChain{value: bridgeFeeAmount}(
+                address(USDC), userInitialDeposit, EARNING_CHAIN_ID, everyRoleAccount, address(0), bridgeFeeAmount
+            );
 
-        // - check that the funds land on Earning Chain and are dropped into default liquidity vault there
-        address defaultUsdcVault_earningChain = allocator_earningChain.getDefaultVault(address(USDC));
-        console.log("Earning Chain default vault for USDC is: %s", defaultUsdcVault_earningChain);
-        console.log("It's balance of USDC is: %s", IERC20(address(USDC)).balanceOf(defaultUsdcVault_earningChain));
-        assertEq(
-            IERC20(address(USDC)).balanceOf(defaultUsdcVault_earningChain),
-            userInitialDeposit,
-            "Vault should have the deposited amount of USDC"
-        );
-        console.log(
-            "Allocator has %s shares of it",
-            IERC4626(defaultUsdcVault_earningChain).balanceOf(address(allocator_earningChain))
-        );
-        assertTrue(
-            IERC4626(defaultUsdcVault_earningChain).balanceOf(address(allocator_earningChain)) > 0,
-            "Allocator should have shares of the vault"
-        );
+            // - check that the funds land on Earning Chain and are dropped into default liquidity vault there
+            address defaultUsdcVault_earningChain = allocator_earningChain.getDefaultVault(address(USDC));
+            console.log("Earning Chain default vault for USDC is: %s", defaultUsdcVault_earningChain);
+            console.log("It's balance of USDC is: %s", IERC20(address(USDC)).balanceOf(defaultUsdcVault_earningChain));
+            assertEq(
+                IERC20(address(USDC)).balanceOf(defaultUsdcVault_earningChain),
+                userInitialDeposit,
+                "Vault should have the deposited amount of USDC"
+            );
+            console.log(
+                "Allocator has %s shares of it",
+                IERC4626(defaultUsdcVault_earningChain).balanceOf(address(allocator_earningChain))
+            );
+            assertTrue(
+                IERC4626(defaultUsdcVault_earningChain).balanceOf(address(allocator_earningChain)) > 0,
+                "Allocator should have shares of the vault"
+            );
+        }
 
         // 4. Manager rebalances & swaps the funds on the Earning Chain from USDC to GHO (via Swapper)
-        uint256 userInitialDepositInGho = userInitialDeposit.convertAssetDecimals(address(USDC), address(GHO));
-        GHO.mint(address(swapper_earningChain), userInitialDepositInGho);
+        address defaultGhoVault_earningChain;
+        {
+            uint256 userInitialDepositInGho = userInitialDeposit.convertAssetDecimals(address(USDC), address(GHO));
+            GHO.mint(address(swapper_earningChain), userInitialDepositInGho);
 
-        address[] memory targets = new address[](1);
-        targets[0] = address(USDC);
-        bytes[] memory callDatas = new bytes[](1);
-        callDatas[0] = abi.encodeCall(IERC20.transfer, (address(this), userInitialDeposit));
-        Swapper.SlippageParams memory slippageParams = Swapper.SlippageParams(0, address(0));
+            address[] memory targets = new address[](1);
+            targets[0] = address(USDC);
+            bytes[] memory callDatas = new bytes[](1);
+            callDatas[0] = abi.encodeCall(IERC20.transfer, (address(this), userInitialDeposit));
+            Swapper.SlippageParams memory slippageParams = Swapper.SlippageParams(0, address(0));
 
-        IAllocator.SwapParams[] memory swaps = new IAllocator.SwapParams[](1);
-        swaps[0] = IAllocator.SwapParams(
-            address(USDC),
-            address(GHO),
-            userInitialDeposit,
-            address(swapper_earningChain),
-            abi.encode(targets, callDatas, slippageParams)
-        );
+            IAllocator.SwapParams[] memory swaps = new IAllocator.SwapParams[](1);
+            swaps[0] = IAllocator.SwapParams(
+                address(USDC),
+                address(GHO),
+                userInitialDeposit,
+                address(swapper_earningChain),
+                abi.encode(targets, callDatas, slippageParams)
+            );
 
-        console.log("Rebalancing by swap from USDC to GHO on the Earning chain...");
-        vm.prank(everyRoleAccount);
-        allocator_earningChain.rebalance(IAllocator.CrossAssetRebalanceParams(swaps));
+            console.log("Rebalancing by swap from USDC to GHO on the Earning chain...");
+            vm.prank(everyRoleAccount);
+            allocator_earningChain.rebalance(IAllocator.CrossAssetRebalanceParams(swaps));
 
-        // - check that the funds are swapped to GHO
-        address defaultGhoVault_earningChain = allocator_earningChain.getDefaultVault(address(GHO));
-        console.log(
-            "\tBalance of GHO in The GHO Vault is: %s", IERC20(address(GHO)).balanceOf(defaultGhoVault_earningChain)
-        );
-        assertEq(
-            IERC20(address(GHO)).balanceOf(defaultGhoVault_earningChain),
-            userInitialDepositInGho,
-            "Vault should have the swapped amount of GHO"
-        );
-        // - check that the funds land on the GHO vault
-        console.log(
-            "Allocator has %s shares of it",
-            IERC4626(defaultGhoVault_earningChain).balanceOf(address(allocator_earningChain))
-        );
-        assertTrue(
-            IERC4626(defaultGhoVault_earningChain).balanceOf(address(allocator_earningChain)) > 0,
-            "Allocator should have shares of the vault"
-        );
+            // - check that the funds are swapped to GHO
+            defaultGhoVault_earningChain = allocator_earningChain.getDefaultVault(address(GHO));
+            console.log(
+                "\tBalance of GHO in The GHO Vault is: %s", IERC20(address(GHO)).balanceOf(defaultGhoVault_earningChain)
+            );
+            assertEq(
+                IERC20(address(GHO)).balanceOf(defaultGhoVault_earningChain),
+                userInitialDepositInGho,
+                "Vault should have the swapped amount of GHO"
+            );
+            // - check that the funds land on the GHO vault
+            console.log(
+                "Allocator has %s shares of it",
+                IERC4626(defaultGhoVault_earningChain).balanceOf(address(allocator_earningChain))
+            );
+            assertTrue(
+                IERC4626(defaultGhoVault_earningChain).balanceOf(address(allocator_earningChain)) > 0,
+                "Allocator should have shares of the vault"
+            );
+        }
 
         // 5. We wait for half a year
         vm.warp(183 days);
@@ -142,10 +157,8 @@ contract EndToEndTest is BaseTest {
         // - check how much funds we owe to the user
         uint256 userEarningsInRay = vault.getUserBalance(user);
         console.log("User balance in RAY: %s", vault.getUserBalance(user));
-        uint256 userEarningsInUsdc = userEarningsInRay.rayToAssetDecimals(address(USDC));
-        uint256 userEarningsInGho = userEarningsInRay.rayToAssetDecimals(address(GHO));
-        console.log("User balance in USDC: %s", userEarningsInUsdc);
-        console.log("User balance in GHO: %s", userEarningsInUsdc);
+        console.log("User balance in USDC: %s", userEarningsInRay.rayToAssetDecimals(address(USDC)));
+        console.log("User balance in GHO: %s", userEarningsInRay.rayToAssetDecimals(address(GHO)));
         assertTrue(vault.getUserBalance(user) > userInitialDeposit, "User balance didn't grow in half a year");
 
         // - mock the 8% APY earnings on the GHO vault for half a year
@@ -156,145 +169,173 @@ contract EndToEndTest is BaseTest {
         );
 
         // 6. User asks for withdrawal of the whole amount of his earnings (which are $500+ - in USDC)
-        console.log("User creates a WithdrawalRequest...");
-        vm.prank(user);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IBasedBoostedVault.DepositsNotCovered.selector,
-                user,
-                512381781828396559943369876000,
-                500000000000000000000000000000
-            )
-        );
-        uint256 iouAmountRequestedRay = vault.requestWithdrawal(user, 0);
+        uint256 iouAmountRequestedRay;
+        {
+            console.log("User creates a WithdrawalRequest...");
+            vm.prank(user);
+            vm.expectRevert(
+                abi.encodeWithSelector(
+                    IBasedBoostedVault.DepositsNotCovered.selector,
+                    user,
+                    512381781828396559943369876000,
+                    500000000000000000000000000000
+                )
+            );
+            iouAmountRequestedRay = vault.requestWithdrawal(user, 0);
 
-        // Send balance snap shot update so that Accounting chain has latest assets balances
-        vm.prank(everyRoleAccount);
-        earningChainGateway.sendBalanceUpdateWithFeePayer(everyRoleAccount, address(0), 0);
+            // Send balance snap shot update so that Accounting chain has latest assets balances
+            vm.prank(everyRoleAccount);
+            vm.deal(everyRoleAccount, bridgeFeeAmount);
+            earningChainGateway.sendBalanceUpdateWithFeePayer{value: bridgeFeeAmount}(
+                everyRoleAccount, address(0), bridgeFeeAmount
+            );
 
-        console.log("Total system balance: %s", fundsHandler.getAggregatedBalance());
+            console.log("Total system balance: %s", fundsHandler.getAggregatedBalance());
 
-        // Try the request again
-        vm.prank(user);
-        iouAmountRequestedRay = vault.requestWithdrawal(user, iouAmountRequestedRay);
+            // Try the request again
+            vm.prank(user);
+            iouAmountRequestedRay = vault.requestWithdrawal(user, iouAmountRequestedRay);
 
-        console.log("... request withdrawal minted IOU tokens: %s", iouAmountRequestedRay);
-        // Check user IOU token balance
-        assertGt(iouToken_accountingChain.balanceOf(user), 0, "User should have minted IOU tokens");
+            console.log("... request withdrawal minted IOU tokens: %s", iouAmountRequestedRay);
+            // Check user IOU token balance
+            assertGt(iouToken_accountingChain.balanceOf(user), 0, "User should have minted IOU tokens");
 
-        // vm.expectRevert(
-        // abi.encodeWithSelector(ERC4626ExceededMaxWithdraw.selector, allocator_accountingChain, userBalanceInUsdc,
-        // 0) );
-        vm.prank(user);
-        vm.expectRevert(ErrorsLib.InsufficientLiquidity.selector);
-        vault.executeWithdrawal(user, address(USDC), iouAmountRequestedRay);
+            // vm.expectRevert(
+            // abi.encodeWithSelector(ERC4626ExceededMaxWithdraw.selector, allocator_accountingChain, userBalanceInUsdc,
+            // 0) );
+            vm.prank(user);
+            vm.expectRevert(ErrorsLib.InsufficientLiquidity.selector);
+            vault.executeWithdrawal(user, address(USDC), iouAmountRequestedRay);
 
-        // - check that we don't owe the user any funds
-        console.log("User balance in RAY after withdrawal request: %s", vault.getUserBalance(user));
-        assertEq(vault.getUserBalance(user), 0, "User balance should be down to 0 after full withdrawal request");
+            // - check that we don't owe the user any funds
+            console.log("User balance in RAY after withdrawal request: %s", vault.getUserBalance(user));
+            assertEq(vault.getUserBalance(user), 0, "User balance should be down to 0 after full withdrawal request");
+        }
 
         // 7. Manager brings back the money from the Earning Chain to the Accounting Chain via CCIP in GHO
-        vm.prank(everyRoleAccount);
-        earningChainGateway.exit(address(GHO), userEarningsInGho);
+        uint256 userEarningsInGho;
+        {
+            userEarningsInGho = userEarningsInRay.rayToAssetDecimals(address(GHO));
+            vm.prank(everyRoleAccount);
+            vm.deal(everyRoleAccount, bridgeFeeAmount);
+            earningChainGateway.exit{value: bridgeFeeAmount}(
+                address(GHO), userEarningsInGho, everyRoleAccount, address(0), bridgeFeeAmount
+            );
 
-        // - check that the funds land on the Accounting Chain and are dropped into default liquidity vault there
-        address defaultGhoVault_accountingChain = allocator_accountingChain.getDefaultVault(address(GHO));
-        console.log("Accounting Chain default vault for GHO is: %s", defaultGhoVault_accountingChain);
-        console.log("It's balance of GHO is: %s", IERC20(address(GHO)).balanceOf(defaultGhoVault_accountingChain));
-        assertEq(
-            IERC20(address(GHO)).balanceOf(defaultGhoVault_accountingChain),
-            userEarningsInGho,
-            "Vault should have the exited amount of GHO"
-        );
-        console.log(
-            "Allocator has %s shares of it",
-            IERC4626(defaultGhoVault_accountingChain).balanceOf(address(allocator_accountingChain))
-        );
-        assertTrue(
-            IERC4626(defaultGhoVault_accountingChain).balanceOf(address(allocator_accountingChain)) > 0,
-            "Allocator should have shares of the vault"
-        );
+            // - check that the funds land on the Accounting Chain and are dropped into default liquidity vault there
+            address defaultGhoVault_accountingChain = allocator_accountingChain.getDefaultVault(address(GHO));
+            console.log("Accounting Chain default vault for GHO is: %s", defaultGhoVault_accountingChain);
+            console.log("It's balance of GHO is: %s", IERC20(address(GHO)).balanceOf(defaultGhoVault_accountingChain));
+            assertEq(
+                IERC20(address(GHO)).balanceOf(defaultGhoVault_accountingChain),
+                userEarningsInGho,
+                "Vault should have the exited amount of GHO"
+            );
+            console.log(
+                "Allocator has %s shares of it",
+                IERC4626(defaultGhoVault_accountingChain).balanceOf(address(allocator_accountingChain))
+            );
+            assertTrue(
+                IERC4626(defaultGhoVault_accountingChain).balanceOf(address(allocator_accountingChain)) > 0,
+                "Allocator should have shares of the vault"
+            );
+        }
 
         // 8. Manager rebalances & swaps the funds on the Accounting Chain from GHO to USDC (via Swapper)
-        USDC.mint(address(swapper_accountingChain), userEarningsInUsdc);
+        uint256 userEarningsInUsdc;
+        {
+            userEarningsInUsdc = userEarningsInRay.rayToAssetDecimals(address(USDC));
+            USDC.mint(address(swapper_accountingChain), userEarningsInUsdc);
 
-        targets[0] = address(GHO);
-        callDatas[0] = abi.encodeCall(IERC20.transfer, (address(this), userEarningsInGho));
+            address[] memory targets = new address[](1);
+            targets[0] = address(GHO);
+            bytes[] memory callDatas = new bytes[](1);
+            callDatas[0] = abi.encodeCall(IERC20.transfer, (address(this), userEarningsInGho));
+            Swapper.SlippageParams memory slippageParams = Swapper.SlippageParams(0, address(0));
 
-        swaps = new IAllocator.SwapParams[](1);
-        swaps[0] = IAllocator.SwapParams(
-            address(GHO),
-            address(USDC),
-            userEarningsInGho,
-            address(swapper_accountingChain),
-            abi.encode(targets, callDatas, slippageParams)
-        );
+            IAllocator.SwapParams[] memory swaps = new IAllocator.SwapParams[](1);
+            swaps[0] = IAllocator.SwapParams(
+                address(GHO),
+                address(USDC),
+                userEarningsInGho,
+                address(swapper_accountingChain),
+                abi.encode(targets, callDatas, slippageParams)
+            );
 
-        console.log("Rebalancing by swap from GHO to USDC on the Accounting chain...");
-        vm.prank(everyRoleAccount);
-        allocator_accountingChain.rebalance(IAllocator.CrossAssetRebalanceParams(swaps));
+            console.log("Rebalancing by swap from GHO to USDC on the Accounting chain...");
+            vm.prank(everyRoleAccount);
+            allocator_accountingChain.rebalance(IAllocator.CrossAssetRebalanceParams(swaps));
 
-        // - check that the funds are swapped to USDC
-        address defaultUsdcVault_accountingChain = allocator_accountingChain.getDefaultVault(address(USDC));
-        console.log(
-            "\tBalance of USDC in The USDC Vault is: %s",
-            IERC20(address(USDC)).balanceOf(defaultUsdcVault_accountingChain)
-        );
-        assertEq(
-            IERC20(address(USDC)).balanceOf(defaultUsdcVault_accountingChain),
-            userEarningsInUsdc,
-            "Vault should have the swapped amount of USDC"
-        );
-        // - check that the funds land on the USDC vault
-        console.log(
-            "Allocator has %s shares of it",
-            IERC4626(defaultUsdcVault_accountingChain).balanceOf(address(allocator_accountingChain))
-        );
-        assertTrue(
-            IERC4626(defaultUsdcVault_accountingChain).balanceOf(address(allocator_accountingChain)) > 0,
-            "Allocator should have shares of the vault"
-        );
+            // - check that the funds are swapped to USDC
+            address defaultUsdcVault_accountingChain = allocator_accountingChain.getDefaultVault(address(USDC));
+            console.log(
+                "\tBalance of USDC in The USDC Vault is: %s",
+                IERC20(address(USDC)).balanceOf(defaultUsdcVault_accountingChain)
+            );
+            assertEq(
+                IERC20(address(USDC)).balanceOf(defaultUsdcVault_accountingChain),
+                userEarningsInUsdc,
+                "Vault should have the swapped amount of USDC"
+            );
+            // - check that the funds land on the USDC vault
+            console.log(
+                "Allocator has %s shares of it",
+                IERC4626(defaultUsdcVault_accountingChain).balanceOf(address(allocator_accountingChain))
+            );
+            assertTrue(
+                IERC4626(defaultUsdcVault_accountingChain).balanceOf(address(allocator_accountingChain)) > 0,
+                "Allocator should have shares of the vault"
+            );
+        }
 
         // 9. User triggers the execute() withdrawal to send the funds back to the user
-        vm.prank(user);
-        vault.executeWithdrawal(user, address(USDC), iouAmountRequestedRay);
-        // Check IOU token balance went down
-        assertEq(iouToken_accountingChain.balanceOf(user), 0, "User should have minted IOU tokens");
+        {
+            vm.prank(user);
+            vault.executeWithdrawal(user, address(USDC), iouAmountRequestedRay);
+            // Check IOU token balance went down
+            assertEq(iouToken_accountingChain.balanceOf(user), 0, "User should have minted IOU tokens");
 
-        // - check that the funds are received by the user correctly
-        console.log("User balance in USDC after withdrawal: %s USDC", IERC20(address(USDC)).balanceOf(user));
-        assertEq(
-            IERC20(address(USDC)).balanceOf(user), userEarningsInUsdc, "User should have the withdrawn amount of USDC"
-        );
+            // - check that the funds are received by the user correctly
+            console.log("User balance in USDC after withdrawal: %s USDC", IERC20(address(USDC)).balanceOf(user));
+            assertEq(
+                IERC20(address(USDC)).balanceOf(user),
+                userEarningsInUsdc,
+                "User should have the withdrawn amount of USDC"
+            );
 
-        // - check that we don't owe the user any funds
-        console.log("User balance in RAY after withdrawal request: %s", vault.getUserBalance(user));
-        assertEq(vault.getUserBalance(user), 0, "User balance should be down to 0 after full withdrawal request");
-        //
+            // - check that we don't owe the user any funds
+            console.log("User balance in RAY after withdrawal request: %s", vault.getUserBalance(user));
+            assertEq(vault.getUserBalance(user), 0, "User balance should be down to 0 after full withdrawal request");
+        }
 
         // Manager claims fees (withdraws profits)
-        uint256 ghoBalanceOnVaultLeft =
-            IERC4626(defaultGhoVault_earningChain).balanceOf(address(allocator_earningChain));
-        console.log("Earning chain GHO vault balance after withdrawal is now: %s GHO", ghoBalanceOnVaultLeft);
-        vm.prank(everyRoleAccount);
-        earningChainGateway.exit(address(GHO), ghoBalanceOnVaultLeft);
+        {
+            uint256 ghoBalanceOnVaultLeft =
+                IERC4626(defaultGhoVault_earningChain).balanceOf(address(allocator_earningChain));
+            console.log("Earning chain GHO vault balance after withdrawal is now: %s GHO", ghoBalanceOnVaultLeft);
+            vm.prank(everyRoleAccount);
+            vm.deal(everyRoleAccount, bridgeFeeAmount);
+            earningChainGateway.exit{value: bridgeFeeAmount}(
+                address(GHO), ghoBalanceOnVaultLeft, everyRoleAccount, address(0), bridgeFeeAmount
+            );
 
-        address[] memory assets = new address[](1);
-        uint256[] memory amounts = new uint256[](1);
-        assets[0] = address(GHO);
-        amounts[0] = ghoBalanceOnVaultLeft;
+            address[] memory assets = new address[](1);
+            uint256[] memory amounts = new uint256[](1);
+            assets[0] = address(GHO);
+            amounts[0] = ghoBalanceOnVaultLeft;
 
-        console.log("Manager's GHO balance before claiming fees profits: %s GHO", GHO.balanceOf(everyRoleAccount));
+            console.log("Manager's GHO balance before claiming fees profits: %s GHO", GHO.balanceOf(everyRoleAccount));
 
-        vm.prank(everyRoleAccount);
-        vault.claimFees(assets, amounts);
+            vm.prank(everyRoleAccount);
+            vault.claimFees(assets, amounts);
 
-        uint256 newManagerGhoBalance = GHO.balanceOf(everyRoleAccount);
-        console.log("Manager's GHO balance after claiming fees profits: %s GHO", newManagerGhoBalance);
-        assertEq(
-            newManagerGhoBalance,
-            ghoBalanceOnVaultLeft,
-            "Manager should have the same amount of GHO after claiming fees profits"
-        );
+            uint256 newManagerGhoBalance = GHO.balanceOf(everyRoleAccount);
+            console.log("Manager's GHO balance after claiming fees profits: %s GHO", newManagerGhoBalance);
+            assertEq(
+                newManagerGhoBalance,
+                ghoBalanceOnVaultLeft,
+                "Manager should have the same amount of GHO after claiming fees profits"
+            );
+        }
     }
 }

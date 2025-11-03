@@ -81,23 +81,23 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
         }
 
         IBridgeAdapter(_defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId])
-            .publishMessageToChainWithFeePayer(
-                feeRefundRecipient,
-                bridgeFeeToken,
-                bridgeFeeAmount,
-                destinationChainId,
-                new IBridgeAdapter.BridgeAsset[](0),
-                abi.encode(
-                    IChainGateway.CrossChainMessage({
-                        messageType: IChainGateway.MessageType.BRIDGE_IOUTOKEN,
-                        data: abi.encode(
-                            IChainGateway.IouTokenBridgeMessage({
-                                recipient: iouTokenRecipient, amount: iouTokenAmountRay
-                            })
-                        )
-                    })
-                )
-            );
+        .publishMessageToChainWithFeePayer{
+            value: msg.value
+        }(
+            destinationChainId,
+            new IBridgeAdapter.BridgeAsset[](0),
+            abi.encode(
+                IChainGateway.CrossChainMessage({
+                    messageType: IChainGateway.MessageType.BRIDGE_IOUTOKEN,
+                    data: abi.encode(
+                        IChainGateway.IouTokenBridgeMessage({recipient: iouTokenRecipient, amount: iouTokenAmountRay})
+                    )
+                })
+            ),
+            feeRefundRecipient,
+            bridgeFeeToken,
+            bridgeFeeAmount
+        );
     }
 
     /// @inheritdoc RescuableAssets

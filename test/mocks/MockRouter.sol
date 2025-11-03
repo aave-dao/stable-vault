@@ -113,6 +113,8 @@ contract MockCCIPRouter is IRouter, IRouterClient {
         }
 
         uint256 feeTokenAmount = getFee(destinationChainSelector, message);
+        console.log("[MockRouter] feeTokenAmount: %s", feeTokenAmount);
+        console.log("[MockRouter] message.feeToken: %s", message.feeToken);
         if (message.feeToken == address(0)) {
             if (msg.value < feeTokenAmount) {
                 revert InsufficientFeeTokenAmount();
@@ -139,6 +141,10 @@ contract MockCCIPRouter is IRouter, IRouterClient {
         });
 
         for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
+            console.log("[MockRouter] transferring token: %s", message.tokenAmounts[i].token);
+            console.log("[MockRouter] amount: %s", message.tokenAmounts[i].amount);
+            console.log("[MockRouter] msg.sender: %s", msg.sender);
+            console.log("[MockRouter] receiver: %s", receiver);
             IERC20(message.tokenAmounts[i].token).safeTransferFrom(msg.sender, receiver, message.tokenAmounts[i].amount);
         }
 

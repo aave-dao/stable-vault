@@ -22,7 +22,17 @@ interface IEarningChainGateway is IChainGateway {
     /// @notice Withdraws a specific asset from the Allocator and bridges it to the Accounting Chain.
     /// @param asset The asset to withdraw.
     /// @param amount The `amount` must be in RAY to be token agnostic.
-    function exit(address asset, uint256 amount) external;
+    /// @param bridgeFeePayer The address that will pay the bridge fee (this receives a refund if funds from
+    /// bridgeFeeAmount are not used).
+    /// @param bridgeFeeToken The token to pay the bridge fee in.
+    /// @param bridgeFeeAmount The estimated amount of fee to pay in the fee token.
+    function exit(
+        address asset,
+        uint256 amount,
+        address bridgeFeePayer,
+        address bridgeFeeToken,
+        uint256 bridgeFeeAmount
+    ) external payable;
 
     /// @notice Exchanges IOU tokens for a specific asset and bridges data back to the Accounting Chain.
     /// @param iouTokenAmountRay The amount of IOU tokens to exchange.

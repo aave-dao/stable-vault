@@ -120,12 +120,21 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
     // Manager Functions
 
     /// @inheritdoc IFundsHandler
-    function pushFundsToChain(address asset, uint256 amount, uint256 chainId) external override restricted {
+    function pushFundsToChain(
+        address asset,
+        uint256 amount,
+        uint256 chainId,
+        address bridgeFeePayer,
+        address bridgeFeeToken,
+        uint256 bridgeFeeAmount
+    ) external payable override restricted {
         _pullFundsFromImmediateLiquidity(asset, amount);
         IERC20(asset).forceApprove(GATEWAY, amount);
         // Increment the chain balance snapshot for the target chain.
         _updateChainBalanceBeforeBridging(chainId, amount.assetDecimalsToRay(asset));
-        IAccountingChainGateway(GATEWAY).sendPushFundsToChainMessage(asset, amount, chainId);
+        IAccountingChainGateway(GATEWAY).sendPushFundsToChainMessage{value: msg.value}(
+            asset, amount, chainId, bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount
+        );
     }
 
     /// @inheritdoc RescuableAssets

@@ -5,7 +5,14 @@ import {IAccountingChainGateway} from "../../src/interfaces/IAccountingChainGate
 import {IBridgeAdapter} from "../../src/interfaces/IBridgeAdapter.sol";
 
 contract MockAccountingChainGateway is IAccountingChainGateway {
-    function sendPushFundsToChainMessage(address asset, uint256 amount, uint256 targetChainId) external {}
+    function sendPushFundsToChainMessage(
+        address asset,
+        uint256 amount,
+        uint256 targetChainId,
+        address bridgeFeePayer,
+        address bridgeFeeToken,
+        uint256 bridgeFeeAmount
+    ) external payable {}
 
     function addBridgeAdapter(address asset, uint256 chainId, address adapter) external {}
 

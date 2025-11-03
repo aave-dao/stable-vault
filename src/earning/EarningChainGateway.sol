@@ -66,16 +66,20 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         payable
         override
     {
+        require(bridgeFeeAmount > 0, ErrorsLib.ZeroAmount());
+        if (bridgeFeeToken == address(0)) {
+            require(msg.value >= bridgeFeeAmount, ErrorsLib.InsufficientFunds());
+        }
         IBridgeAdapter(_defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID])
         .publishMessageToChainWithFeePayer{
             value: msg.value
         }(
-            bridgeFeePayer,
-            bridgeFeeToken,
-            bridgeFeeAmount,
             ACCOUNTING_CHAIN_ID,
             new IBridgeAdapter.BridgeAsset[](0),
-            _getBalanceSnapshotData()
+            _getBalanceSnapshotData(),
+            bridgeFeePayer,
+            bridgeFeeToken,
+            bridgeFeeAmount
         );
     }
 
@@ -114,22 +118,32 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         .publishMessageToChainWithFeePayer{
             value: msg.value
         }(
-            bridgeFeePayer,
-            bridgeFeeToken,
-            bridgeFeeAmount,
             ACCOUNTING_CHAIN_ID,
             new IBridgeAdapter.BridgeAsset[](0),
-            data
+            data,
+            bridgeFeePayer,
+            bridgeFeeToken,
+            bridgeFeeAmount
         );
         // TODO: emit event?
         return amountOut;
     }
 
     /// @inheritdoc IEarningChainGateway
-    function exit(address asset, uint256 amount) external override restricted {
+    function exit(
+        address asset,
+        uint256 amount,
+        address bridgeFeePayer,
+        address bridgeFeeToken,
+        uint256 bridgeFeeAmount
+    ) external payable override restricted {
         require(amount > 0, ErrorsLib.ZeroAmount());
+        require(bridgeFeeAmount > 0, ErrorsLib.ZeroAmount());
+        if (bridgeFeeToken == address(0)) {
+            require(msg.value >= bridgeFeeAmount, ErrorsLib.InsufficientFunds());
+        }
         IAllocator(ALLOCATOR).withdraw(asset, amount);
-        _returnFunds(asset, amount);
+        _returnFunds(asset, amount, bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount);
     }
 
     function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal override {
@@ -165,12 +179,20 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         // TODO: emit event?
     }
 
-    function _returnFunds(address asset, uint256 amount) internal {
+    function _returnFunds(
+        address asset,
+        uint256 amount,
+        address bridgeFeePayer,
+        address bridgeFeeToken,
+        uint256 bridgeFeeAmount
+    ) internal {
         address adapter = _defaultBridgeAdapter[asset][ACCOUNTING_CHAIN_ID];
         IERC20(asset).forceApprove(adapter, amount);
         IBridgeAdapter.BridgeAsset[] memory assets = new IBridgeAdapter.BridgeAsset[](1);
         assets[0] = IBridgeAdapter.BridgeAsset({asset: asset, amount: amount});
-        IBridgeAdapter(adapter).publishMessageToChain(ACCOUNTING_CHAIN_ID, assets, _getBalanceSnapshotData());
+        IBridgeAdapter(adapter).publishMessageToChainWithFeePayer{value: msg.value}(
+            ACCOUNTING_CHAIN_ID, assets, _getBalanceSnapshotData(), bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount
+        );
     }
 
     function _getTotalAssetsInRay() internal view returns (uint256) {

@@ -6,5 +6,12 @@ import {IChainGateway} from "./IChainGateway.sol";
 interface IAccountingChainGateway is IChainGateway {
     error NotFundsHandler();
 
-    function sendPushFundsToChainMessage(address asset, uint256 amount, uint256 targetChainId) external;
+    function sendPushFundsToChainMessage(
+        address asset,
+        uint256 amount,
+        uint256 targetChainId,
+        address bridgeFeePayer,
+        address bridgeFeeToken,
+        uint256 bridgeFeeAmount
+    ) external payable;
 }
