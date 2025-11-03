@@ -13,36 +13,37 @@ import {IEarningChainGateway} from "../interfaces/IEarningChainGateway.sol";
 import {IIouTokenManager} from "../interfaces/IIouTokenManager.sol";
 import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
-import {EventLib} from "../libraries/EventLib.sol";
 
 /// @title EarningChainGateway
 /// @notice Facilitates cross chain messaging with exactly one Accounting Chain.
-contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
+contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
 
-    modifier onlyManager() {
-        require(msg.sender == _manager, ErrorsLib.NotManager());
-        _;
-    }
-
     uint256 internal immutable ACCOUNTING_CHAIN_ID;
-    address internal _allocator;
-    address internal _manager;
+    address internal immutable ALLOCATOR;
     uint256 internal _balanceSnapshotNonce;
 
-    constructor(address admin, uint256 accountingChainId, address iouTokenManager)
-        BaseChainGateway(admin, iouTokenManager)
+    /// @dev Constructor.
+    /// @param accountingChainId The Chain ID of the Accounting Chain.
+    /// @param allocator The address of the Allocator contract.
+    /// @param iouTokenManager The address of the IOU token manager contract.
+    constructor(uint256 accountingChainId, address allocator, address iouTokenManager)
+        BaseChainGateway(iouTokenManager)
     {
+        _disableInitializers();
         ACCOUNTING_CHAIN_ID = accountingChainId;
+        ALLOCATOR = allocator;
     }
 
-    function getAdmin() external view returns (address) {
-        return _admin;
+    /// @dev Initializer.
+    /// @param accessManager The address of the IAccessManager contract used for handling access control.
+    function initialize(address accessManager) external virtual initializer {
+        __EarningChainGateway_init(accessManager);
     }
 
-    function getManager() external view returns (address) {
-        return _manager;
+    function __EarningChainGateway_init(address accessManager) internal virtual onlyInitializing {
+        __BaseChainGateway_init(accessManager);
     }
 
     function getIouTokenManager() external view returns (address) {
@@ -59,20 +60,8 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
         return _getTotalAssetsInRay();
     }
 
-    function setManager(address manager) external onlyAdmin {
-        require(manager != address(0), ErrorsLib.ZeroAddress());
-        _manager = manager;
-        emit EventLib.ManagerSet(manager);
-    }
-
-    function setAllocator(address allocator) external onlyAdmin {
-        require(allocator != address(0), ErrorsLib.ZeroAddress());
-        _allocator = allocator;
-        emit EventLib.AllocatorSet(allocator);
-    }
-
     /// @inheritdoc IEarningChainGateway
-    function sendBalanceUpdate() external override onlyManager {
+    function sendBalanceUpdate() external override restricted {
         _sendBalanceUpdate();
     }
 
@@ -112,7 +101,7 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
         // TODO: apply a withdrawal fee here?
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(msg.sender, iouTokenAmountRay);
         uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(tokenOut);
-        IAllocator(_allocator).withdraw(tokenOut, amountOut);
+        IAllocator(ALLOCATOR).withdraw(tokenOut, amountOut);
         IERC20(tokenOut).safeTransfer(tokenOutReceiver, amountOut);
         bytes memory data = abi.encode(
             IChainGateway.CrossChainMessage({
@@ -142,9 +131,9 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
     }
 
     /// @inheritdoc IEarningChainGateway
-    function exit(address asset, uint256 amount) external override onlyManager {
+    function exit(address asset, uint256 amount) external override restricted {
         require(amount > 0, ErrorsLib.ZeroAmount());
-        IAllocator(_allocator).withdraw(asset, amount);
+        IAllocator(ALLOCATOR).withdraw(asset, amount);
         _returnFunds(asset, amount);
     }
 
@@ -153,8 +142,8 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
             address asset = assets[i].asset;
             uint256 amount = assets[i].amount;
             IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
-            IERC20(asset).forceApprove(_allocator, amount);
-            IAllocator(_allocator).deposit(asset, amount);
+            IERC20(asset).forceApprove(ALLOCATOR, amount);
+            IAllocator(ALLOCATOR).deposit(asset, amount);
         }
     }
 
@@ -195,7 +184,7 @@ contract EarningChainGateway is IEarningChainGateway, BaseChainGateway {
     }
 
     function _getTotalAssetsInRay() internal view returns (uint256) {
-        IAllocator.AllocatorBalance[] memory allocatorBalances = IAllocator(_allocator).getAssetBalances();
+        IAllocator.AllocatorBalance[] memory allocatorBalances = IAllocator(ALLOCATOR).getAssetBalances();
         uint256 totalAssetsInRay;
         for (uint256 i = 0; i < allocatorBalances.length; i++) {
             totalAssetsInRay += allocatorBalances[i].amount.assetDecimalsToRay(allocatorBalances[i].asset);

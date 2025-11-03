@@ -3,6 +3,7 @@ pragma solidity ^0.8.22;
 
 interface IIouTokenManager {
     error InsufficientLockedBalance();
+    error NotCanonicalChain();
 
     /// @return address of the IOU token.
     function getAsset() external view returns (address);

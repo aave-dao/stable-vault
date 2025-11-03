@@ -2,7 +2,7 @@
 pragma solidity ^0.8.22;
 
 interface IFundsHandler {
-    error NotBaseBoostedVault();
+    error NotBasedBoostedVault();
     error NotGateway();
 
     struct AssetBalance {

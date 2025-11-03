@@ -26,12 +26,6 @@ library ErrorsLib {
     /// @notice Address checked is not whitelisted.
     error AddressNotWhitelisted();
 
-    /// @notice Address checked is not the admin.
-    error NotAdmin();
-
-    /// @notice Address checked is not the manager.
-    error NotManager();
-
     /// @notice Address checked is not the Cross-chain gateway.
     error NotGateway();
 
@@ -64,4 +58,7 @@ library ErrorsLib {
 
     /// @notice Thrown when input parameter contains unacceptable length.
     error InvalidLength();
+
+    /// @notice Thrown when caller is not authorized.
+    error NotAuthorized();
 }

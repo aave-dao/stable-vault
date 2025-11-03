@@ -43,6 +43,12 @@ interface IChainGateway {
         uint256 balanceSnapshotTotalAssetsInRay;
     }
 
+    function addBridgeAdapter(address asset, uint256 chainId, address adapter) external;
+
+    function removeBridgeAdapter(address asset, uint256 chainId, address adapter) external;
+
+    function setDefaultBridgeAdapter(address asset, uint256 chainId, address adapter) external;
+
     /// @notice Handle receiving of a data and funds from a source chain.
     /// @param sourceChainId The chain from which the message was sent from.
     /// @param data The data that was sent from a source chain.

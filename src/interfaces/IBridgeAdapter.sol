@@ -12,6 +12,10 @@ interface IBridgeAdapter {
         uint256 amount;
     }
 
+    function setDestinationChainAdapter(uint256 chainId, address destinationChainAdapter) external;
+
+    function replayFundsReceiving(uint256 sourceChainId, BridgeAsset[] memory assets) external;
+
     /// @notice Sends tokens and/or an arbitrary message containing instructions or data updates to a destination chain.
     /// @param destinationChainId The chain id of the chain to publish the message to.
     /// @param assets The assets to push to the destination chain.

@@ -13,18 +13,32 @@ import {IIouTokenManager} from "../interfaces/IIouTokenManager.sol";
 
 /// @title AccountingChainGateway
 /// @notice Facilitates cross chain messaging one or more Earning Chains.
-contract AccountingChainGateway is IAccountingChainGateway, BaseChainGateway {
+contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
     using SafeERC20 for IERC20;
 
     modifier onlyFundsHandler() {
-        require(msg.sender == _fundsHandler, NotFundsHandler());
+        require(msg.sender == FUNDS_HANDLER, NotFundsHandler());
         _;
     }
 
-    address internal _fundsHandler;
+    address internal immutable FUNDS_HANDLER;
 
-    constructor(address admin, address fundsHandler, address iouTokenManager) BaseChainGateway(admin, iouTokenManager) {
-        _fundsHandler = fundsHandler;
+    /// @dev Constructor.
+    /// @param fundsHandler The address of the FundsHandler contract.
+    /// @param iouTokenManager The address of the IOU token manager contract.
+    constructor(address fundsHandler, address iouTokenManager) BaseChainGateway(iouTokenManager) {
+        _disableInitializers();
+        FUNDS_HANDLER = fundsHandler;
+    }
+
+    /// @dev Initializer.
+    /// @param accessManager The address of the IAccessManager contract used for handling access control.
+    function initialize(address accessManager) external virtual initializer {
+        __AccountingChainGateway_init(accessManager);
+    }
+
+    function __AccountingChainGateway_init(address accessManager) internal virtual onlyInitializing {
+        __BaseChainGateway_init(accessManager);
     }
 
     function sendPushFundsToChainMessage(address asset, uint256 amount, uint256 targetChainId)
@@ -46,8 +60,8 @@ contract AccountingChainGateway is IAccountingChainGateway, BaseChainGateway {
         for (uint256 i = 0; i < assets.length; i++) {
             address asset = assets[i].asset;
             uint256 amount = assets[i].amount;
-            IERC20(asset).safeTransferFrom(msg.sender, _fundsHandler, amount);
-            IFundsHandler(_fundsHandler).fundsArrivedFromChainCallback(asset, amount);
+            IERC20(asset).safeTransferFrom(msg.sender, FUNDS_HANDLER, amount);
+            IFundsHandler(FUNDS_HANDLER).fundsArrivedFromChainCallback(asset, amount);
         }
     }
 
@@ -81,7 +95,7 @@ contract AccountingChainGateway is IAccountingChainGateway, BaseChainGateway {
         IChainGateway.BurnIouTokenMessage memory burnIouTokenMessage =
             abi.decode(data, (IChainGateway.BurnIouTokenMessage));
         IIouTokenManager(IOU_TOKEN_MANAGER).burnLockedTokens(burnIouTokenMessage.iouTokenAmountBurnedRay);
-        IFundsHandler(_fundsHandler)
+        IFundsHandler(FUNDS_HANDLER)
             .updateChainBalanceCallback(
                 sourceChainId,
                 burnIouTokenMessage.balanceSnapshotTotalAssetsInRay,
@@ -91,7 +105,7 @@ contract AccountingChainGateway is IAccountingChainGateway, BaseChainGateway {
 
     function _updateChainBalanceSnapshot(uint256 sourceChainId, bytes memory data) internal {
         IChainGateway.BalanceSnapshot memory balanceSnapshot = abi.decode(data, (IChainGateway.BalanceSnapshot));
-        IFundsHandler(_fundsHandler)
+        IFundsHandler(FUNDS_HANDLER)
             .updateChainBalanceCallback(sourceChainId, balanceSnapshot.totalAssetsInRay, balanceSnapshot.nonce);
     }
 }

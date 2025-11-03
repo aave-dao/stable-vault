@@ -9,8 +9,6 @@ import {IAllocator} from "../../src/interfaces/IAllocator.sol";
 contract MockAllocator is IAllocator {
     using SafeERC20 for IERC20;
 
-    function getManager() external view override returns (address) {}
-    function getAdmin() external view override returns (address) {}
     function getAssetBalances() external view override returns (AllocatorBalance[] memory) {}
     function getAssetBalance(address asset) external view override returns (uint256) {}
     function getDefaultVault(address asset) external view override returns (address) {}
@@ -25,10 +23,6 @@ contract MockAllocator is IAllocator {
     function withdraw(address asset, uint256 amount) external override {
         IERC20(asset).safeTransfer(msg.sender, amount);
     }
-
-    function setManager(address newManager) external override {}
-    function setDepositor(address depositor, bool whitelisted) external override {}
-    function setWithdrawer(address withdrawer, bool whitelisted) external override {}
     function addVault(address asset, address vault) external override {}
     function removeVault(address vault) external override {}
     function setDefaultVault(address asset, address vault) external override {}

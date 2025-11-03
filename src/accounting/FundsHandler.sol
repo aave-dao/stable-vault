@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
+import {
+    AccessManagedUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -13,7 +16,7 @@ import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 /// @title FundsHandler
 /// @notice Handles push/pull of funds across the system.
-contract FundsHandler is RescuableAssets, IFundsHandler {
+contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandler {
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
 
@@ -24,38 +27,46 @@ contract FundsHandler is RescuableAssets, IFundsHandler {
         uint256 nonce;
     }
 
+    address internal immutable VAULT;
+    address internal immutable GATEWAY;
+    address internal immutable ALLOCATOR;
+
     ChainBalanceSnapshot[] internal _chainBalances;
-    address _manager;
-    address _basedBoostedVault;
-    address _gateway;
-    address _allocator;
 
-    modifier onlyManager() {
-        require(msg.sender == address(_manager), ErrorsLib.NotManager());
-        _;
-    }
-
-    modifier onlyBaseBoostedVault() {
-        require(msg.sender == _basedBoostedVault, NotBaseBoostedVault());
+    modifier onlyBasedBoostedVault() {
+        require(msg.sender == VAULT, NotBasedBoostedVault());
         _;
     }
 
     modifier onlyGateway() {
-        require(msg.sender == _gateway, NotGateway());
+        require(msg.sender == GATEWAY, NotGateway());
         _;
     }
 
-    constructor(address manager, address basedBoostedVault, address gateway, address allocator) {
-        require(manager != address(0), ErrorsLib.ZeroAddress());
-        _manager = manager;
-        _basedBoostedVault = basedBoostedVault;
-        _gateway = gateway;
-        _allocator = allocator;
+    /// @dev Constructor.
+    /// @param basedBoostedVault The address of the BasedBoostedVault contract, which triggers deposits and withdrawals.
+    /// @param gateway The address of the Gateway contract to use for cross-chain communication.
+    /// @param allocator The address of the Allocator contract to use for immediate liquidity management.
+    constructor(address basedBoostedVault, address gateway, address allocator) {
+        _disableInitializers();
+        VAULT = basedBoostedVault;
+        GATEWAY = gateway;
+        ALLOCATOR = allocator;
+    }
+
+    /// @dev Initializer.
+    /// @param accessManager The address of the IAccessManager contract used for handling access control.
+    function initialize(address accessManager) external virtual initializer {
+        __FundsHandler_init(accessManager);
+    }
+
+    function __FundsHandler_init(address accessManager) internal virtual onlyInitializing {
+        __AccessManaged_init(accessManager);
     }
 
     /// @inheritdoc IFundsHandler
     function getAggregatedBalance() external view override returns (uint256) {
-        IAllocator.AllocatorBalance[] memory allocatorAssets = IAllocator(_allocator).getAssetBalances();
+        IAllocator.AllocatorBalance[] memory allocatorAssets = IAllocator(ALLOCATOR).getAssetBalances();
 
         uint256 totalBalanceRay;
 
@@ -70,7 +81,7 @@ contract FundsHandler is RescuableAssets, IFundsHandler {
 
     /// @inheritdoc IFundsHandler
     function getAssetBalances() external view override returns (AssetBalance[] memory) {
-        IAllocator.AllocatorBalance[] memory allocatorAssets = IAllocator(_allocator).getAssetBalances();
+        IAllocator.AllocatorBalance[] memory allocatorAssets = IAllocator(ALLOCATOR).getAssetBalances();
         AssetBalance[] memory balances = new AssetBalance[](allocatorAssets.length + _chainBalances.length);
         for (uint16 i = 0; i < allocatorAssets.length; i++) {
             balances[i] = AssetBalance({
@@ -88,37 +99,37 @@ contract FundsHandler is RescuableAssets, IFundsHandler {
     }
 
     /// @inheritdoc IFundsHandler
-    function processDeposit(address asset, uint256 amount) external override onlyBaseBoostedVault {
+    function processDeposit(address asset, uint256 amount) external override onlyBasedBoostedVault {
         _pushFundsToImmediateLiquidity(asset, amount);
     }
 
     /// @inheritdoc IFundsHandler
-    function processWithdrawal(address asset, uint256 amount) external override onlyBaseBoostedVault {
+    function processWithdrawal(address asset, uint256 amount) external override onlyBasedBoostedVault {
         _verifyAvailableLiquidity(asset, amount);
         _pullFundsFromImmediateLiquidity(asset, amount);
-        IERC20(asset).forceApprove(_basedBoostedVault, amount);
+        IERC20(asset).forceApprove(VAULT, amount);
     }
 
     /// @inheritdoc IFundsHandler
-    function pullFromLiquidity(address asset, uint256 amount) external override onlyBaseBoostedVault {
+    function pullFromLiquidity(address asset, uint256 amount) external override onlyBasedBoostedVault {
         _pullFundsFromImmediateLiquidity(asset, amount);
         // TODO: Check if we don't need to do increaseApproval here (re-entrancy, multi-withdrawal, etc)
-        IERC20(asset).forceApprove(_basedBoostedVault, amount);
+        IERC20(asset).forceApprove(VAULT, amount);
     }
 
     // Manager Functions
 
     /// @inheritdoc IFundsHandler
-    function pushFundsToChain(address asset, uint256 amount, uint256 chainId) external override onlyManager {
+    function pushFundsToChain(address asset, uint256 amount, uint256 chainId) external override restricted {
         _pullFundsFromImmediateLiquidity(asset, amount);
-        IERC20(asset).forceApprove(_gateway, amount);
+        IERC20(asset).forceApprove(GATEWAY, amount);
         // Increment the chain balance snapshot for the target chain.
         _updateChainBalanceBeforeBridging(chainId, amount.assetDecimalsToRay(asset));
-        IAccountingChainGateway(_gateway).sendPushFundsToChainMessage(asset, amount, chainId);
+        IAccountingChainGateway(GATEWAY).sendPushFundsToChainMessage(asset, amount, chainId);
     }
 
     /// @inheritdoc RescuableAssets
-    function rescueTokens(address asset, uint256 amount) public override onlyManager {
+    function rescueTokens(address asset, uint256 amount) public override restricted {
         super.rescueTokens(asset, amount);
     }
 
@@ -182,16 +193,16 @@ contract FundsHandler is RescuableAssets, IFundsHandler {
 
     /// @notice Pushes funds to Allocator.
     function _pushFundsToImmediateLiquidity(address asset, uint256 amount) internal {
-        IERC20(asset).forceApprove(_allocator, amount);
-        IAllocator(_allocator).deposit(asset, amount);
+        IERC20(asset).forceApprove(ALLOCATOR, amount);
+        IAllocator(ALLOCATOR).deposit(asset, amount);
     }
 
     /// @notice Takes from Allocator and gets ERC20 for further action.
     function _pullFundsFromImmediateLiquidity(address asset, uint256 amount) internal {
-        IAllocator(_allocator).withdraw(asset, amount);
+        IAllocator(ALLOCATOR).withdraw(asset, amount);
     }
 
     function _verifyAvailableLiquidity(address asset, uint256 amount) internal view {
-        require(IAllocator(_allocator).getAssetBalance(asset) >= amount, ErrorsLib.InsufficientLiquidity());
+        require(IAllocator(ALLOCATOR).getAssetBalance(asset) >= amount, ErrorsLib.InsufficientLiquidity());
     }
 }
