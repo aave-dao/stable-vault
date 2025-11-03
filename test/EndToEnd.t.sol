@@ -170,7 +170,7 @@ contract EndToEndTest is BaseTest {
 
         // Send balance snap shot update so that Accounting chain has latest assets balances
         vm.prank(everyRoleAccount);
-        earningChainGateway.sendBalanceUpdate();
+        earningChainGateway.sendBalanceUpdateWithFeePayer(everyRoleAccount, address(0), 0);
 
         console.log("Total system balance: %s", fundsHandler.getAggregatedBalance());
 

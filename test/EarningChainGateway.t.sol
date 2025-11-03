@@ -169,17 +169,15 @@ contract EarningChainGatewayTest is TestWithHelpers {
         assertEq(_earningChainGateway.getAggregatedBalance(), expectedTotalAssetsInRay);
     }
 
-    function test_sendBalanceUpdate_reverts_ifNotManager() public {
-        _mockAccessManager.mockRejectCall(
-            address(this), address(_earningChainGateway), IEarningChainGateway.sendBalanceUpdate.selector, 0
-        );
-        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, address(this)));
-        _earningChainGateway.sendBalanceUpdate();
-    }
-
-    function test_sendBalanceUpdate_sendsBalanceUpdate(uint256 amountUsdt, uint256 amountGho) public {
+    function test_sendBalanceUpdate_sendsBalanceUpdate(
+        uint256 amountUsdt,
+        uint256 amountGho,
+        address bridgeFeeToken,
+        uint256 bridgeFeeAmount
+    ) public {
         amountUsdt = _boundAssetAmountAllowingZero(address(_mockUsdt), amountUsdt);
         amountGho = _boundAssetAmountAllowingZero(address(_mockGho), amountGho);
+        bridgeFeeAmount = _boundNativeAmount(bridgeFeeAmount);
 
         IAllocator.AllocatorBalance[] memory allocatorBalances = _buildAllocatorBalances(amountUsdt, amountGho);
 
@@ -194,9 +192,13 @@ contract EarningChainGatewayTest is TestWithHelpers {
         vm.prank(everyRoleAccount);
         vm.expectCall(
             address(_mockBridgeAdapterData),
+            bridgeFeeToken == address(0) ? bridgeFeeAmount : 0,
             abi.encodeCall(
-                IBridgeAdapter.publishMessageToChain,
+                IBridgeAdapter.publishMessageToChainWithFeePayer,
                 (
+                    everyRoleAccount,
+                    bridgeFeeToken,
+                    bridgeFeeAmount,
                     ACCOUNTING_CHAIN_ID,
                     new IBridgeAdapter.BridgeAsset[](0),
                     abi.encode(
@@ -210,15 +212,26 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 )
             )
         );
-        _earningChainGateway.sendBalanceUpdate();
+
+        uint256 msgValue = bridgeFeeToken == address(0) ? bridgeFeeAmount : 0;
+        if (msgValue > 0) {
+            vm.deal(everyRoleAccount, msgValue);
+        }
+        _earningChainGateway.sendBalanceUpdateWithFeePayer{value: msgValue}(
+            everyRoleAccount, bridgeFeeToken, bridgeFeeAmount
+        );
 
         // Check when multiple snap shots are sent, the nonce is incremented
         vm.prank(everyRoleAccount);
         vm.expectCall(
             address(_mockBridgeAdapterData),
+            bridgeFeeToken == address(0) ? bridgeFeeAmount : 0,
             abi.encodeCall(
-                IBridgeAdapter.publishMessageToChain,
+                IBridgeAdapter.publishMessageToChainWithFeePayer,
                 (
+                    everyRoleAccount,
+                    bridgeFeeToken,
+                    bridgeFeeAmount,
                     ACCOUNTING_CHAIN_ID,
                     new IBridgeAdapter.BridgeAsset[](0),
                     abi.encode(
@@ -232,7 +245,12 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 )
             )
         );
-        _earningChainGateway.sendBalanceUpdate();
+        if (msgValue > 0) {
+            vm.deal(everyRoleAccount, msgValue);
+        }
+        _earningChainGateway.sendBalanceUpdateWithFeePayer{value: msgValue}(
+            everyRoleAccount, bridgeFeeToken, bridgeFeeAmount
+        );
     }
 
     function test_sendBalanceUpdateWithFeePayer_sendsBalanceUpdateWithFeePayerWithTokenBridgeFee(

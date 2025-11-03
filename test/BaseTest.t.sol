@@ -853,11 +853,7 @@ contract BaseTest is Test {
         // For Earning Chain Gateway
         accessManager.setTargetFunctionRole(
             address(earningChainGateway),
-            _toSelectorArray(
-                IChainGateway.setDefaultBridgeAdapter.selector,
-                IEarningChainGateway.sendBalanceUpdate.selector,
-                IEarningChainGateway.exit.selector
-            ),
+            _toSelectorArray(IChainGateway.setDefaultBridgeAdapter.selector, IEarningChainGateway.exit.selector),
             OPERATOR_ROLE
         );
 

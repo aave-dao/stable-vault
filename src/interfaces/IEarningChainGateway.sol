@@ -10,9 +10,6 @@ interface IEarningChainGateway is IChainGateway {
     /// @notice The aggregated balance of the Earning Chain.
     function getAggregatedBalance() external view returns (uint256);
 
-    /// @notice Sends a balance update to the Accounting Chain.
-    function sendBalanceUpdate() external;
-
     /// @notice Sends a balance update to the Accounting Chain with bridging fees taken by specified payer.
     /// @param bridgeFeePayer The address that will pay the bridge fee (this receives a refund if funds from
     /// bridgeFeeAmount are not used).
