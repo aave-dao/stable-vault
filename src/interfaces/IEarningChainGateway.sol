@@ -26,7 +26,7 @@ interface IEarningChainGateway is IChainGateway {
     /// bridgeFeeAmount are not used).
     /// @param bridgeFeeToken The token to pay the bridge fee in.
     /// @param bridgeFeeAmount The estimated amount of fee to pay in the fee token.
-    function exit(
+    function pushFundsToAccountingChain(
         address asset,
         uint256 amount,
         address bridgeFeePayer,

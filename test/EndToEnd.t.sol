@@ -218,7 +218,7 @@ contract EndToEndTest is BaseTest {
             userEarningsInGho = userEarningsInRay.rayToAssetDecimals(address(GHO));
             vm.prank(everyRoleAccount);
             vm.deal(everyRoleAccount, bridgeFeeAmount);
-            earningChainGateway.exit{value: bridgeFeeAmount}(
+            earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
                 address(GHO), userEarningsInGho, everyRoleAccount, address(0), bridgeFeeAmount
             );
 
@@ -315,7 +315,7 @@ contract EndToEndTest is BaseTest {
             console.log("Earning chain GHO vault balance after withdrawal is now: %s GHO", ghoBalanceOnVaultLeft);
             vm.prank(everyRoleAccount);
             vm.deal(everyRoleAccount, bridgeFeeAmount);
-            earningChainGateway.exit{value: bridgeFeeAmount}(
+            earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
                 address(GHO), ghoBalanceOnVaultLeft, everyRoleAccount, address(0), bridgeFeeAmount
             );
 

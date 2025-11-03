@@ -563,7 +563,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
         );
     }
 
-    function test_exit_bridgesAssetAndSnapshot(uint256 amountTokenUnits, uint256 bridgeFeeAmount) public {
+    function test_pushFundsToAccountingChain_bridgesAssetAndSnapshot(uint256 amountTokenUnits, uint256 bridgeFeeAmount)
+        public
+    {
         uint256 amountToken = _boundAssetAmount(address(_mockUsdt), amountTokenUnits);
         address bridgeFeeToken = address(_mockGho);
         bridgeFeeAmount = _boundAssetAmount(address(_mockGho), bridgeFeeAmount);
@@ -610,7 +612,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
         );
 
         vm.prank(everyRoleAccount);
-        _earningChainGateway.exit(address(_mockUsdt), amountToken, everyRoleAccount, bridgeFeeToken, bridgeFeeAmount);
+        _earningChainGateway.pushFundsToAccountingChain(
+            address(_mockUsdt), amountToken, everyRoleAccount, bridgeFeeToken, bridgeFeeAmount
+        );
 
         // Check the balance of Allocator is 0
         assertEq(IERC20(address(_mockUsdt)).balanceOf(address(_mockAllocator)), 0);
@@ -641,33 +645,41 @@ contract EarningChainGatewayTest is TestWithHelpers {
             )
         );
         vm.prank(everyRoleAccount);
-        _earningChainGateway.exit(address(_mockUsdt), amountToken, everyRoleAccount, bridgeFeeToken, bridgeFeeAmount);
+        _earningChainGateway.pushFundsToAccountingChain(
+            address(_mockUsdt), amountToken, everyRoleAccount, bridgeFeeToken, bridgeFeeAmount
+        );
     }
 
-    function test_exit_reverts_ifZeroAmountAsAmount() public {
+    function test_pushFundsToAccountingChain_reverts_ifZeroAmountAsAmount() public {
         vm.expectRevert(ErrorsLib.ZeroAmount.selector);
         vm.prank(everyRoleAccount);
-        _earningChainGateway.exit(address(_mockUsdt), 0, everyRoleAccount, address(0), 0);
+        _earningChainGateway.pushFundsToAccountingChain(address(_mockUsdt), 0, everyRoleAccount, address(0), 0);
     }
 
-    function test_exit_reverts_ifZeroAmountAsBridgeFeeAmount() public {
+    function test_pushFundsToAccountingChain_reverts_ifZeroAmountAsBridgeFeeAmount() public {
         vm.expectRevert(ErrorsLib.ZeroAmount.selector);
         vm.prank(everyRoleAccount);
-        _earningChainGateway.exit(address(_mockUsdt), 100_000_000_000_000 * 10 ** 27, everyRoleAccount, address(0), 0);
+        _earningChainGateway.pushFundsToAccountingChain(
+            address(_mockUsdt), 100_000_000_000_000 * 10 ** 27, everyRoleAccount, address(0), 0
+        );
     }
 
-    function test_exit_reverts_ifZeroValueForNativeBridgeFee() public {
+    function test_pushFundsToAccountingChain_reverts_ifZeroValueForNativeBridgeFee() public {
         vm.expectRevert(ErrorsLib.InsufficientFunds.selector);
         vm.prank(everyRoleAccount);
-        _earningChainGateway.exit(address(_mockUsdt), 100_000_000_000_000 * 10 ** 27, everyRoleAccount, address(0), 123);
+        _earningChainGateway.pushFundsToAccountingChain(
+            address(_mockUsdt), 100_000_000_000_000 * 10 ** 27, everyRoleAccount, address(0), 123
+        );
     }
 
-    function test_exit_reverts_notManager() public {
+    function test_pushFundsToAccountingChain_reverts_notManager() public {
         _mockAccessManager.mockRejectCall(
-            address(this), address(_earningChainGateway), IEarningChainGateway.exit.selector, 0
+            address(this), address(_earningChainGateway), IEarningChainGateway.pushFundsToAccountingChain.selector, 0
         );
         vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, address(this)));
-        _earningChainGateway.exit(address(_mockUsdt), 100_000_000_000_000 * 10 ** 6, everyRoleAccount, address(0), 0);
+        _earningChainGateway.pushFundsToAccountingChain(
+            address(_mockUsdt), 100_000_000_000_000 * 10 ** 6, everyRoleAccount, address(0), 0
+        );
     }
 
     function test_sendBridgeIouTokenMessageWithFeePayer_withTokenBridgeFee(

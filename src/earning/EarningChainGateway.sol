@@ -130,7 +130,7 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
     }
 
     /// @inheritdoc IEarningChainGateway
-    function exit(
+    function pushFundsToAccountingChain(
         address asset,
         uint256 amount,
         address bridgeFeePayer,
