@@ -153,8 +153,8 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
         if (feeToken == FEE_ON_NATIVE_CURRENCY) {
             msgValue = estimatedFeeAmount;
         } else {
-            // Pull the fee amount from the fee payer into this contract.
-            IERC20(feeToken).safeTransferFrom(feePayer, address(this), estimatedFeeAmount);
+            // Pull the fee amount from the sender into this contract.
+            IERC20(feeToken).safeTransferFrom(msg.sender, address(this), estimatedFeeAmount);
             // Approve the Router to pull the estimated fee.
             IERC20(feeToken).safeIncreaseAllowance(CCIP_ROUTER, estimatedFeeAmount);
         }

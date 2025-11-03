@@ -30,6 +30,14 @@ interface IFundsHandler {
 
     /// @dev Retrieves funds from liquidity source on native chain before pushing funds to another chain through the
     /// Gateway contract.
+    /// @param asset The asset to push to the Accounting Chain.
+    /// @param amount The amount of the asset to push to the Accounting Chain.
+    /// @param chainId The chain id of the Accounting Chain.
+    /// @param bridgeFeePayer The address that will pay the bridge fee (this receives a refund if funds from
+    /// bridgeFeeAmount are not used).
+    /// @param bridgeFeeToken The token to pay the bridge fee in. Zero address for native bridge fee. If ERC-20 then
+    /// this contract must be approved to spend the bridgeFeeAmount. @param bridgeFeeAmount The estimated amount of fee
+    /// to pay in the fee token.
     function pushFundsToChain(
         address asset,
         uint256 amount,

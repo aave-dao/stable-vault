@@ -67,13 +67,15 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         override
     {
         require(bridgeFeeAmount > 0, ErrorsLib.ZeroAmount());
+        address adapter = _defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID];
+        require(adapter != address(0), UnsupportedAdapter());
         if (bridgeFeeToken == address(0)) {
             require(msg.value >= bridgeFeeAmount, ErrorsLib.InsufficientFunds());
+        } else {
+            IERC20(bridgeFeeToken).safeTransferFrom(bridgeFeePayer, address(this), bridgeFeeAmount);
+            IERC20(bridgeFeeToken).forceApprove(adapter, bridgeFeeAmount);
         }
-        IBridgeAdapter(_defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID])
-        .publishMessageToChainWithFeePayer{
-            value: msg.value
-        }(
+        IBridgeAdapter(adapter).publishMessageToChainWithFeePayer{value: msg.value}(
             ACCOUNTING_CHAIN_ID,
             new IBridgeAdapter.BridgeAsset[](0),
             _getBalanceSnapshotData(),
@@ -93,12 +95,21 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         uint256 bridgeFeeAmount
     ) external payable override returns (uint256) {
         require(iouTokenAmountRay > 0, ErrorsLib.ZeroAmount());
+        IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(msg.sender, iouTokenAmountRay);
+
         require(bridgeFeeAmount > 0, ErrorsLib.ZeroAmount());
+
+        address adapter = _defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID];
+        require(adapter != address(0), UnsupportedAdapter());
+
         if (bridgeFeeToken == address(0)) {
             require(msg.value >= bridgeFeeAmount, ErrorsLib.InsufficientFunds());
+        } else {
+            IERC20(bridgeFeeToken).safeTransferFrom(bridgeFeePayer, address(this), bridgeFeeAmount);
+            IERC20(bridgeFeeToken).forceApprove(adapter, bridgeFeeAmount);
         }
+
         // TODO: apply a withdrawal fee here?
-        IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(msg.sender, iouTokenAmountRay);
         uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(tokenOut);
         IAllocator(ALLOCATOR).withdraw(tokenOut, amountOut);
         IERC20(tokenOut).safeTransfer(tokenOutReceiver, amountOut);
@@ -114,10 +125,7 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
                 )
             })
         );
-        IBridgeAdapter(_defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID])
-        .publishMessageToChainWithFeePayer{
-            value: msg.value
-        }(
+        IBridgeAdapter(adapter).publishMessageToChainWithFeePayer{value: msg.value}(
             ACCOUNTING_CHAIN_ID,
             new IBridgeAdapter.BridgeAsset[](0),
             data,

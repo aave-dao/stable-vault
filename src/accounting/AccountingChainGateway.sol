@@ -55,11 +55,15 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
         require(bridgeFeeAmount > 0, ErrorsLib.ZeroAmount());
         if (bridgeFeeToken == address(0)) {
             require(msg.value >= bridgeFeeAmount, ErrorsLib.InsufficientFunds());
+        } else {
+            IERC20(bridgeFeeToken).safeTransferFrom(bridgeFeePayer, address(this), bridgeFeeAmount);
+            IERC20(bridgeFeeToken).forceApprove(adapter, bridgeFeeAmount);
         }
-        // Pull funds from caller into this contract
+        // Pull funds from caller into this contract.
         IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
-        // Approve the bridge adapter to spend the funds
-        IERC20(asset).forceApprove(adapter, amount);
+        // Approve the bridge adapter to spend the funds.
+        // Increase allowance for when the fee token is the same token being bridged.
+        IERC20(asset).safeIncreaseAllowance(adapter, amount);
         IBridgeAdapter.BridgeAsset[] memory assets = new IBridgeAdapter.BridgeAsset[](1);
         assets[0] = IBridgeAdapter.BridgeAsset({asset: asset, amount: amount});
         IBridgeAdapter(adapter).publishMessageToChainWithFeePayer{value: msg.value}(

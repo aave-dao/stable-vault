@@ -191,8 +191,17 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         address bridgeFeePayer = makeAddr("bridgeFeePayer");
 
-        _mockGho.mint(everyRoleAccount, bridgeFeeAmount);
-        vm.prank(everyRoleAccount);
+        _mockGho.mint(bridgeFeePayer, bridgeFeeAmount);
+        vm.prank(bridgeFeePayer);
+        MockNonStandardErc20(bridgeFeeToken).approve(address(_earningChainGateway), bridgeFeeAmount);
+
+        vm.expectCall(
+            bridgeFeeToken,
+            abi.encodeCall(IERC20.transferFrom, (bridgeFeePayer, address(_earningChainGateway), bridgeFeeAmount))
+        );
+        vm.expectCall(
+            bridgeFeeToken, abi.encodeCall(IERC20.approve, (address(_mockBridgeAdapterData), bridgeFeeAmount))
+        );
         vm.expectCall(
             address(_mockBridgeAdapterData),
             abi.encodeCall(
@@ -214,11 +223,21 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 )
             )
         );
+        vm.prank(everyRoleAccount);
         _earningChainGateway.sendBalanceUpdateWithFeePayer(bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount);
 
         // Check when multiple snap shots are sent, the nonce is incremented
-        _mockGho.mint(everyRoleAccount, bridgeFeeAmount);
-        vm.prank(everyRoleAccount);
+        _mockGho.mint(bridgeFeePayer, bridgeFeeAmount);
+        vm.prank(bridgeFeePayer);
+        MockNonStandardErc20(bridgeFeeToken).approve(address(_earningChainGateway), bridgeFeeAmount);
+
+        vm.expectCall(
+            bridgeFeeToken,
+            abi.encodeCall(IERC20.transferFrom, (bridgeFeePayer, address(_earningChainGateway), bridgeFeeAmount))
+        );
+        vm.expectCall(
+            bridgeFeeToken, abi.encodeCall(IERC20.approve, (address(_mockBridgeAdapterData), bridgeFeeAmount))
+        );
         vm.expectCall(
             address(_mockBridgeAdapterData),
             abi.encodeCall(
@@ -240,6 +259,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 )
             )
         );
+        vm.prank(everyRoleAccount);
         _earningChainGateway.sendBalanceUpdateWithFeePayer(bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount);
     }
 
@@ -338,7 +358,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
         uint256 iouTokenAmountRay,
         address tokenOutReceiver,
         address bridgeFeePayer,
-        address bridgeFeeToken,
         uint256 bridgeFeeAmount
     ) public {
         iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
@@ -346,7 +365,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         vm.assume(tokenOutReceiver != address(0));
         _assumeNotProxyAdmin(tokenOutReceiver, address(_earningChainGateway));
         vm.assume(bridgeFeePayer != address(0));
-        vm.assume(bridgeFeeToken != address(0));
+        address bridgeFeeToken = address(_mockGho);
 
         address tokenOut = address(_mockUsdt);
         uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(tokenOut);
@@ -361,33 +380,46 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
             _mockUsdt.mint(address(_mockAllocator), amountOut);
 
-            uint256 amountUsdt = 123000000000000000000;
-            uint256 amountGho = 4560000000000000;
-            IAllocator.AllocatorBalance[] memory allocatorBalances = _buildAllocatorBalances(amountUsdt, amountGho);
+            bytes memory data;
+            {
+                uint256 amountUsdt = 123000000000000000000;
+                uint256 amountGho = 4560000000000000;
+                IAllocator.AllocatorBalance[] memory allocatorBalances = _buildAllocatorBalances(amountUsdt, amountGho);
 
-            uint256 expectedTotalAssetsInRay =
-                amountUsdt.assetDecimalsToRay(address(_mockUsdt)) + amountGho.assetDecimalsToRay(address(_mockGho));
-            vm.mockCall(
-                address(_mockAllocator),
-                abi.encodeWithSelector(MockAllocator.getAssetBalances.selector),
-                abi.encode(allocatorBalances)
-            );
+                uint256 expectedTotalAssetsInRay =
+                    amountUsdt.assetDecimalsToRay(address(_mockUsdt)) + amountGho.assetDecimalsToRay(address(_mockGho));
+                vm.mockCall(
+                    address(_mockAllocator),
+                    abi.encodeWithSelector(MockAllocator.getAssetBalances.selector),
+                    abi.encode(allocatorBalances)
+                );
+
+                data = abi.encode(
+                    IChainGateway.CrossChainMessage({
+                        messageType: IChainGateway.MessageType.BURN_IOUTOKEN,
+                        data: abi.encode(
+                            IChainGateway.BurnIouTokenMessage({
+                                iouTokenAmountBurnedRay: iouTokenAmountRay,
+                                chainBalanceSnapshotNonce: 1,
+                                balanceSnapshotTotalAssetsInRay: expectedTotalAssetsInRay
+                            })
+                        )
+                    })
+                );
+            }
 
             // Check the bridge adapter is called with expected parameters
-            bytes memory data = abi.encode(
-                IChainGateway.CrossChainMessage({
-                    messageType: IChainGateway.MessageType.BURN_IOUTOKEN,
-                    data: abi.encode(
-                        IChainGateway.BurnIouTokenMessage({
-                            iouTokenAmountBurnedRay: iouTokenAmountRay,
-                            chainBalanceSnapshotNonce: 1,
-                            balanceSnapshotTotalAssetsInRay: expectedTotalAssetsInRay
-                        })
-                    )
-                })
-            );
+            _mockGho.mint(bridgeFeePayer, bridgeFeeAmount);
+            vm.prank(bridgeFeePayer);
+            MockNonStandardErc20(bridgeFeeToken).approve(address(_earningChainGateway), bridgeFeeAmount);
 
-            vm.expectCall(address(_mockUsdt), abi.encodeCall(IERC20.transfer, (tokenOutReceiver, amountOut)));
+            vm.expectCall(
+                bridgeFeeToken,
+                abi.encodeCall(IERC20.transferFrom, (bridgeFeePayer, address(_earningChainGateway), bridgeFeeAmount))
+            );
+            vm.expectCall(
+                bridgeFeeToken, abi.encodeCall(IERC20.approve, (address(_mockBridgeAdapterData), bridgeFeeAmount))
+            );
             vm.expectCall(
                 address(_mockBridgeAdapterData),
                 abi.encodeCall(
@@ -402,6 +434,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     )
                 )
             );
+            vm.expectCall(address(_mockUsdt), abi.encodeCall(IERC20.transfer, (tokenOutReceiver, amountOut)));
 
             vm.prank(tokenOutReceiver);
             _earningChainGateway.exchangeIouTokens(
@@ -435,6 +468,17 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 );
             }
 
+            _mockGho.mint(bridgeFeePayer, bridgeFeeAmount);
+            vm.prank(bridgeFeePayer);
+            MockNonStandardErc20(bridgeFeeToken).approve(address(_earningChainGateway), bridgeFeeAmount);
+
+            vm.expectCall(
+                bridgeFeeToken,
+                abi.encodeCall(IERC20.transferFrom, (bridgeFeePayer, address(_earningChainGateway), bridgeFeeAmount))
+            );
+            vm.expectCall(
+                bridgeFeeToken, abi.encodeCall(IERC20.approve, (address(_mockBridgeAdapterData), bridgeFeeAmount))
+            );
             vm.expectCall(
                 address(_mockBridgeAdapterData),
                 abi.encodeCall(
