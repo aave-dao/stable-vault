@@ -149,6 +149,9 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         require(bridgeFeeAmount > 0, ErrorsLib.ZeroAmount());
         if (bridgeFeeToken == address(0)) {
             require(msg.value >= bridgeFeeAmount, ErrorsLib.InsufficientFunds());
+        } else {
+            IERC20(bridgeFeeToken).safeTransferFrom(bridgeFeePayer, address(this), bridgeFeeAmount);
+            IERC20(bridgeFeeToken).forceApprove(ALLOCATOR, bridgeFeeAmount);
         }
         IAllocator(ALLOCATOR).withdraw(asset, amount);
         _returnFunds(asset, amount, bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount);

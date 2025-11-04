@@ -105,23 +105,32 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
         super.rescueTokens(asset, amount);
     }
 
-    function getDefaultBridgeAdapter(address asset, uint256 chainId) external view returns (address) {
+    /// @inheritdoc IChainGateway
+    function getDefaultBridgeAdapter(address asset, uint256 chainId) external view override returns (address) {
         return _defaultBridgeAdapter[asset][chainId];
     }
 
-    function addBridgeAdapter(address asset, uint256 chainId, address adapter) external restricted {
+    /// @inheritdoc IChainGateway
+    function addBridgeAdapter(address asset, uint256 chainId, address adapter) external override restricted {
         require(!_supportedBridgeAdapters[asset][chainId][adapter], ErrorsLib.AddressAlreadyWhitelisted());
         _supportedBridgeAdapters[asset][chainId][adapter] = true;
         emit BridgeAdapterAdded(asset, chainId, adapter);
     }
 
-    function removeBridgeAdapter(address asset, uint256 chainId, address adapter) external restricted {
+    /// @inheritdoc IChainGateway
+    function removeBridgeAdapter(address asset, uint256 chainId, address adapter) external override restricted {
         require(_supportedBridgeAdapters[asset][chainId][adapter], ErrorsLib.AddressNotWhitelisted());
         delete _supportedBridgeAdapters[asset][chainId][adapter];
+        // Remove it from the default adapter if it is the default adapter.
+        if (_defaultBridgeAdapter[asset][chainId] == adapter) {
+            delete _defaultBridgeAdapter[asset][chainId];
+            emit DefaultBridgeAdapterSet(asset, chainId, address(0));
+        }
         emit BridgeAdapterRemoved(asset, chainId, adapter);
     }
 
-    function setDefaultBridgeAdapter(address asset, uint256 chainId, address adapter) external restricted {
+    /// @inheritdoc IChainGateway
+    function setDefaultBridgeAdapter(address asset, uint256 chainId, address adapter) external override restricted {
         require(_supportedBridgeAdapters[asset][chainId][adapter], ErrorsLib.AddressNotWhitelisted());
         _defaultBridgeAdapter[asset][chainId] = adapter;
         emit DefaultBridgeAdapterSet(asset, chainId, adapter);
