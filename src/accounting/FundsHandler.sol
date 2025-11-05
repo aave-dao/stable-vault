@@ -129,6 +129,7 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
         uint256 bridgeFeeAmount
     ) external payable override restricted {
         require(amount > 0, ErrorsLib.ZeroAmount());
+
         require(bridgeFeeAmount > 0, ErrorsLib.ZeroAmount());
         if (bridgeFeeToken == address(0)) {
             require(msg.value >= bridgeFeeAmount, ErrorsLib.InsufficientFunds());
@@ -136,6 +137,7 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
             IERC20(bridgeFeeToken).safeTransferFrom(bridgeFeePayer, address(this), bridgeFeeAmount);
             IERC20(bridgeFeeToken).forceApprove(GATEWAY, bridgeFeeAmount);
         }
+
         _pullFundsFromImmediateLiquidity(asset, amount);
         // Increase allowance for when the fee token is the same token being bridged.
         IERC20(asset).safeIncreaseAllowance(GATEWAY, amount);
