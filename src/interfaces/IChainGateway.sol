@@ -105,7 +105,7 @@ interface IChainGateway {
     function receiveMessage(uint256 sourceChainId, IBridgeAdapter.BridgeAsset[] memory assets, bytes memory data)
         external;
 
-    /// @notice Sends an arbitrary message containing instructions or data updates to a destination chain.
+    /// @notice Sends a message to bridge IOU tokens to a destination chain.
     ///
     /// @param destinationChainId The chain id of the chain to publish the message to.
     /// @param iouTokenRecipient The address to send the IOU tokens to on the destination chain.
