@@ -60,7 +60,7 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
         uint256 destinationChainId,
         BridgeAsset[] memory assets,
         bytes memory data,
-        IChainGateway.BridgeAdapterParams memory bridgeAdapterParams
+        IChainGateway.BridgeParams memory bridgeParams
     ) external payable override onlyGateway {
         Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](assets.length);
         if (assets.length > 0) {
@@ -78,17 +78,13 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
             receiver: abi.encode(_destinationChainAdapterOf[destinationChainId]),
             data: data,
             tokenAmounts: tokenAmounts,
-            feeToken: bridgeAdapterParams.feeToken,
+            feeToken: bridgeParams.feeToken,
             extraArgs: Client._argsToBytes(
-                Client.GenericExtraArgsV2({gasLimit: bridgeAdapterParams.gasLimit, allowOutOfOrderExecution: false})
+                Client.GenericExtraArgsV2({gasLimit: bridgeParams.gasLimit, allowOutOfOrderExecution: false})
             )
         });
         _sendMessageWithFeePayer(
-            destinationChainId,
-            ccipMessage,
-            bridgeAdapterParams.feePayer,
-            bridgeAdapterParams.feeToken,
-            bridgeAdapterParams.feeAmount
+            destinationChainId, ccipMessage, bridgeParams.feePayer, bridgeParams.feeToken, bridgeParams.feeAmount
         );
     }
 

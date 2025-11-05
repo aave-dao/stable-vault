@@ -86,7 +86,7 @@ contract EndToEndTest is BaseTest {
                 address(USDC),
                 userInitialDeposit,
                 EARNING_CHAIN_ID,
-                IChainGateway.BridgeAdapterParams({
+                IChainGateway.BridgeParams({
                     feePayer: everyRoleAccount,
                     feeToken: address(0),
                     feeAmount: bridgeFeeAmount,
@@ -197,7 +197,7 @@ contract EndToEndTest is BaseTest {
             vm.prank(everyRoleAccount);
             vm.deal(everyRoleAccount, bridgeFeeAmount);
             earningChainGateway.sendBalanceUpdateWithFeePayer{value: bridgeFeeAmount}(
-                IChainGateway.BridgeAdapterParams({
+                IChainGateway.BridgeParams({
                     feePayer: everyRoleAccount,
                     feeToken: address(0),
                     feeAmount: bridgeFeeAmount,
@@ -237,7 +237,7 @@ contract EndToEndTest is BaseTest {
             earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
                 address(GHO),
                 userEarningsInGho,
-                IChainGateway.BridgeAdapterParams({
+                IChainGateway.BridgeParams({
                     feePayer: everyRoleAccount,
                     feeToken: address(0),
                     feeAmount: bridgeFeeAmount,
@@ -342,7 +342,7 @@ contract EndToEndTest is BaseTest {
             earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
                 address(GHO),
                 ghoBalanceOnVaultLeft,
-                IChainGateway.BridgeAdapterParams({
+                IChainGateway.BridgeParams({
                     feePayer: everyRoleAccount,
                     feeToken: address(0),
                     feeAmount: bridgeFeeAmount,

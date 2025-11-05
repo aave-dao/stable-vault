@@ -61,7 +61,7 @@ contract IouTokenManager is IIouTokenManager {
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
-        IChainGateway.BridgeAdapterParams memory bridgeAdapterParams
+        IChainGateway.BridgeParams memory bridgeParams
     ) external payable override {
         require(destinationChainId != block.chainid, ErrorsLib.InvalidDestinationChainId());
         if (IS_CONANICAL_CHAIN) {
@@ -70,7 +70,7 @@ contract IouTokenManager is IIouTokenManager {
             _burnTokens(msg.sender, iouTokenAmountRay);
         }
         IChainGateway(CHAIN_GATEWAY).sendBridgeIouTokenMessageWithFeePayer{value: msg.value}(
-            destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeAdapterParams
+            destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeParams
         );
     }
 

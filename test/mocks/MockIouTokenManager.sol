@@ -11,7 +11,7 @@ contract MockIouTokenManager is IIouTokenManager {
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
-        IChainGateway.BridgeAdapterParams memory bridgeAdapterParams
+        IChainGateway.BridgeParams memory bridgeParams
     ) external payable override {}
     function mintTokens(address to, uint256 amount) external override {}
     function burnTokens(address from, uint256 amount) external override {}

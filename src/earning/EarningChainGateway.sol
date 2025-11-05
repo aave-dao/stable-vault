@@ -60,22 +60,12 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
     }
 
     /// @inheritdoc IEarningChainGateway
-    function sendBalanceUpdateWithFeePayer(IChainGateway.BridgeAdapterParams memory bridgeAdapterParams)
-        external
-        payable
-        override
-    {
+    function sendBalanceUpdateWithFeePayer(IChainGateway.BridgeParams memory bridgeParams) external payable override {
         address adapter = _defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID];
         require(adapter != address(0), AdapterNotFound());
-        _prepareBridgeFeeForAdapter(
-            adapter, bridgeAdapterParams.feePayer, bridgeAdapterParams.feeToken, bridgeAdapterParams.feeAmount
-        );
+        _prepareBridgeFeeForAdapter(adapter, bridgeParams.feePayer, bridgeParams.feeToken, bridgeParams.feeAmount);
         _sendCrossChainMessage(
-            ACCOUNTING_CHAIN_ID,
-            adapter,
-            new IBridgeAdapter.BridgeAsset[](0),
-            _getBalanceSnapshotData(),
-            bridgeAdapterParams
+            ACCOUNTING_CHAIN_ID, adapter, new IBridgeAdapter.BridgeAsset[](0), _getBalanceSnapshotData(), bridgeParams
         );
     }
 
@@ -84,7 +74,7 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         uint256 iouTokenAmountRay,
         address tokenOut,
         address tokenOutReceiver,
-        IChainGateway.BridgeAdapterParams memory bridgeAdapterParams
+        IChainGateway.BridgeParams memory bridgeParams
     ) external payable override returns (uint256) {
         require(iouTokenAmountRay > 0, ErrorsLib.ZeroAmount());
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(msg.sender, iouTokenAmountRay);
@@ -108,25 +98,22 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
                 )
             })
         );
-        _prepareBridgeFeeForAdapter(
-            adapter, bridgeAdapterParams.feePayer, bridgeAdapterParams.feeToken, bridgeAdapterParams.feeAmount
-        );
-        _sendCrossChainMessage(
-            ACCOUNTING_CHAIN_ID, adapter, new IBridgeAdapter.BridgeAsset[](0), data, bridgeAdapterParams
-        );
+        _prepareBridgeFeeForAdapter(adapter, bridgeParams.feePayer, bridgeParams.feeToken, bridgeParams.feeAmount);
+        _sendCrossChainMessage(ACCOUNTING_CHAIN_ID, adapter, new IBridgeAdapter.BridgeAsset[](0), data, bridgeParams);
         // TODO: emit event?
         return amountOut;
     }
 
     /// @inheritdoc IEarningChainGateway
-    function pushFundsToAccountingChain(
-        address asset,
-        uint256 amount,
-        IChainGateway.BridgeAdapterParams memory bridgeAdapterParams
-    ) external payable override restricted {
+    function pushFundsToAccountingChain(address asset, uint256 amount, IChainGateway.BridgeParams memory bridgeParams)
+        external
+        payable
+        override
+        restricted
+    {
         require(amount > 0, ErrorsLib.ZeroAmount());
         IAllocator(ALLOCATOR).withdraw(asset, amount);
-        _returnFundsWithBalanceSnapshot(asset, amount, bridgeAdapterParams);
+        _returnFundsWithBalanceSnapshot(asset, amount, bridgeParams);
     }
 
     function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal override {
@@ -165,7 +152,7 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
     function _returnFundsWithBalanceSnapshot(
         address asset,
         uint256 amount,
-        IChainGateway.BridgeAdapterParams memory bridgeAdapterParams
+        IChainGateway.BridgeParams memory bridgeParams
     ) internal {
         address bridgeAdapter = _defaultBridgeAdapter[asset][ACCOUNTING_CHAIN_ID];
         require(bridgeAdapter != address(0), AdapterNotFound());
@@ -174,12 +161,8 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         assets[0] = IBridgeAdapter.BridgeAsset({asset: asset, amount: amount});
         // Send a single cross chain message with the asset and the balance snapshot. The bridge must support both
         // assets and arbitrary data.
-        _prepareBridgeFeeForAdapter(
-            bridgeAdapter, bridgeAdapterParams.feePayer, bridgeAdapterParams.feeToken, bridgeAdapterParams.feeAmount
-        );
-        _sendCrossChainMessage(
-            ACCOUNTING_CHAIN_ID, bridgeAdapter, assets, _getBalanceSnapshotData(), bridgeAdapterParams
-        );
+        _prepareBridgeFeeForAdapter(bridgeAdapter, bridgeParams.feePayer, bridgeParams.feeToken, bridgeParams.feeAmount);
+        _sendCrossChainMessage(ACCOUNTING_CHAIN_ID, bridgeAdapter, assets, _getBalanceSnapshotData(), bridgeParams);
     }
 
     function _getTotalAssetsInRay() internal view returns (uint256) {

@@ -127,14 +127,13 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
         address asset,
         uint256 amount,
         uint256 chainId,
-        IChainGateway.BridgeAdapterParams memory bridgeAdapterParams
+        IChainGateway.BridgeParams memory bridgeParams
     ) external payable override restricted {
         require(amount > 0, ErrorsLib.ZeroAmount());
 
-        if (bridgeAdapterParams.feeToken != BRIDGE_FEE_ON_NATIVE_CURRENCY) {
-            IERC20(bridgeAdapterParams.feeToken)
-                .safeTransferFrom(bridgeAdapterParams.feePayer, address(this), bridgeAdapterParams.feeAmount);
-            IERC20(bridgeAdapterParams.feeToken).forceApprove(GATEWAY, bridgeAdapterParams.feeAmount);
+        if (bridgeParams.feeToken != BRIDGE_FEE_ON_NATIVE_CURRENCY) {
+            IERC20(bridgeParams.feeToken).safeTransferFrom(bridgeParams.feePayer, address(this), bridgeParams.feeAmount);
+            IERC20(bridgeParams.feeToken).forceApprove(GATEWAY, bridgeParams.feeAmount);
         }
 
         _pullFundsFromImmediateLiquidity(asset, amount);
@@ -143,7 +142,7 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
         // Increment the chain balance snapshot for the target chain.
         _updateChainBalanceBeforeBridging(chainId, amount.assetDecimalsToRay(asset));
         IAccountingChainGateway(GATEWAY).sendPushFundsToChainMessage{value: msg.value}(
-            asset, amount, chainId, bridgeAdapterParams
+            asset, amount, chainId, bridgeParams
         );
     }
 

@@ -8,14 +8,14 @@ interface IEarningChainGateway is IChainGateway {
     function getAggregatedBalance() external view returns (uint256);
 
     /// @notice Sends a balance update to the Accounting Chain with bridging fees taken by specified payer.
-    /// @param bridgeAdapterParams The parameters for the bridge adapter.
-    function sendBalanceUpdateWithFeePayer(BridgeAdapterParams memory bridgeAdapterParams) external payable;
+    /// @param bridgeParams The parameters for the bridge adapter.
+    function sendBalanceUpdateWithFeePayer(BridgeParams memory bridgeParams) external payable;
 
     /// @notice Withdraws a specific asset from the Allocator and bridges it to the Accounting Chain.
     /// @param asset The asset to withdraw.
     /// @param amount The `amount` must be in RAY to be token agnostic.
-    /// @param bridgeAdapterParams The parameters for the bridge adapter.
-    function pushFundsToAccountingChain(address asset, uint256 amount, BridgeAdapterParams memory bridgeAdapterParams)
+    /// @param bridgeParams The parameters for the bridge adapter.
+    function pushFundsToAccountingChain(address asset, uint256 amount, BridgeParams memory bridgeParams)
         external
         payable;
 
@@ -23,12 +23,12 @@ interface IEarningChainGateway is IChainGateway {
     /// @param iouTokenAmountRay The amount of IOU tokens to exchange.
     /// @param tokenOut The asset to exchange the IOU tokens for.
     /// @param tokenOutReceiver The address to send the exchanged asset to.
-    /// @param bridgeAdapterParams The parameters for the bridge adapter.
+    /// @param bridgeParams The parameters for the bridge adapter.
     /// @return amountOut The amount of the exchanged asset transferred to the tokenOutReceiver.
     function exchangeIouTokens(
         uint256 iouTokenAmountRay,
         address tokenOut,
         address tokenOutReceiver,
-        BridgeAdapterParams memory bridgeAdapterParams
+        BridgeParams memory bridgeParams
     ) external payable returns (uint256);
 }

@@ -20,7 +20,7 @@ interface IChainGateway {
         BURN_IOUTOKEN
     }
 
-    struct BridgeAdapterParams {
+    struct BridgeParams {
         // The address that will pay the bridge fee (also the recipient of any refund).
         address feePayer;
         // The token to pay the bridge fee in.
@@ -98,11 +98,11 @@ interface IChainGateway {
     /// @param destinationChainId The chain id of the chain to publish the message to.
     /// @param iouTokenRecipient The address to send the IOU tokens to on the destination chain.
     /// @param iouTokenAmountRay The amount of IOU tokens to bridge.
-    /// @param bridgeAdapterParams The parameters for the bridge adapter.
+    /// @param bridgeParams The parameters for the bridge adapter.
     function sendBridgeIouTokenMessageWithFeePayer(
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
-        BridgeAdapterParams memory bridgeAdapterParams
+        BridgeParams memory bridgeParams
     ) external payable;
 }

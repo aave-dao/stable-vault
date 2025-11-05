@@ -22,11 +22,11 @@ interface IBridgeAdapter {
     /// @param destinationChainId The chain id of the chain to publish the message to.
     /// @param assets The assets to bridge.
     /// @param data The arbitrary data that would be decoded and handled by the destination chain.
-    /// @param bridgeAdapterParams The parameters for the bridge adapter.
+    /// @param bridgeParams The parameters for the bridge adapter.
     function publishMessageToChainWithFeePayer(
         uint256 destinationChainId,
         BridgeAsset[] memory assets,
         bytes memory data,
-        IChainGateway.BridgeAdapterParams memory bridgeAdapterParams
+        IChainGateway.BridgeParams memory bridgeParams
     ) external payable;
 }

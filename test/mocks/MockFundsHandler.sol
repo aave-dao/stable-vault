@@ -33,7 +33,7 @@ contract MockFundsHandler is IFundsHandler {
         address asset,
         uint256 amount,
         uint256 chainId,
-        IChainGateway.BridgeAdapterParams memory bridgeAdapterParams
+        IChainGateway.BridgeParams memory bridgeParams
     ) external payable override {}
 
     function updateChainBalanceCallback(uint256 chainId, uint256 snapshotBalanceRay, uint256 snapshotTimestamp)

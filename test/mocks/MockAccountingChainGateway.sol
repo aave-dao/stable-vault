@@ -12,7 +12,7 @@ contract MockAccountingChainGateway is IAccountingChainGateway {
         address asset,
         uint256 amount,
         uint256 targetChainId,
-        IChainGateway.BridgeAdapterParams memory bridgeAdapterParams
+        IChainGateway.BridgeParams memory bridgeParams
     ) external payable {}
 
     function addBridgeAdapter(address asset, uint256 chainId, address adapter) external {}
@@ -28,6 +28,6 @@ contract MockAccountingChainGateway is IAccountingChainGateway {
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
-        IChainGateway.BridgeAdapterParams memory bridgeAdapterParams
+        IChainGateway.BridgeParams memory bridgeParams
     ) external payable {}
 }

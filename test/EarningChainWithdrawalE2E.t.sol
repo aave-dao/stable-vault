@@ -83,7 +83,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             address(USDC),
             userInitialDeposit,
             EARNING_CHAIN_ID,
-            IChainGateway.BridgeAdapterParams({
+            IChainGateway.BridgeParams({
                 feePayer: everyRoleAccount, feeToken: address(0), feeAmount: bridgeFeeAmount, gasLimit: 300000, data: ""
             })
         );
@@ -144,7 +144,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             EARNING_CHAIN_ID,
             user1,
             iouAmountRequestedRay,
-            IChainGateway.BridgeAdapterParams({
+            IChainGateway.BridgeParams({
                 feePayer: user1, feeToken: address(0), feeAmount: bridgeFeeAmount, gasLimit: 300000, data: ""
             })
         );
@@ -226,7 +226,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             EARNING_CHAIN_ID,
             user2,
             iouAmountRequestedRay,
-            IChainGateway.BridgeAdapterParams({
+            IChainGateway.BridgeParams({
                 feePayer: user2, feeToken: address(0), feeAmount: bridgeFeeAmount, gasLimit: 100000, data: ""
             })
         );
@@ -249,7 +249,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             ACCOUNTING_CHAIN_ID,
             user2,
             iouAmountRequestedRay,
-            IChainGateway.BridgeAdapterParams({
+            IChainGateway.BridgeParams({
                 feePayer: user2, feeToken: address(0), feeAmount: bridgeFeeAmount, gasLimit: 100000, data: ""
             })
         );
@@ -282,7 +282,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             amountIouToExchange,
             address(USDC),
             user1,
-            IChainGateway.BridgeAdapterParams({
+            IChainGateway.BridgeParams({
                 feePayer: user1, feeToken: address(0), feeAmount: 1, gasLimit: 100000, data: ""
             })
         );

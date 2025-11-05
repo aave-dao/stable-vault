@@ -49,7 +49,7 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
         address asset,
         uint256 amount,
         uint256 targetChainId,
-        BridgeAdapterParams memory bridgeAdapterParams
+        BridgeParams memory bridgeParams
     ) external payable override onlyFundsHandler {
         address adapter = _defaultBridgeAdapter[asset][targetChainId];
         require(adapter != address(0), AdapterNotFound());
@@ -59,10 +59,10 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
 
         // The FundsHandler will have pulled the fee token from the caller to itself.
         // Pull the fee token from the FundsHandler to this contract.
-        _prepareBridgeFeeForAdapter(adapter, msg.sender, bridgeAdapterParams.feeToken, bridgeAdapterParams.feeAmount);
+        _prepareBridgeFeeForAdapter(adapter, msg.sender, bridgeParams.feeToken, bridgeParams.feeAmount);
         IBridgeAdapter.BridgeAsset[] memory assets = new IBridgeAdapter.BridgeAsset[](1);
         assets[0] = IBridgeAdapter.BridgeAsset({asset: asset, amount: amount});
-        _sendCrossChainMessage(targetChainId, adapter, assets, "", bridgeAdapterParams);
+        _sendCrossChainMessage(targetChainId, adapter, assets, "", bridgeParams);
     }
 
     function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal override {

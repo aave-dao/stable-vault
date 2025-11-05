@@ -18,12 +18,12 @@ interface IIouTokenManager {
     /// @param destinationChainId The chain id of the chain to publish the message to.
     /// @param iouTokenRecipient The address to send the IOU tokens to on the destination chain.
     /// @param iouTokenAmountRay The amount of IOU tokens to bridge.
-    /// @param bridgeAdapterParams The parameters for the bridge adapter.
+    /// @param bridgeParams The parameters for the bridge adapter.
     function bridgeTokens(
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
-        IChainGateway.BridgeAdapterParams memory bridgeAdapterParams
+        IChainGateway.BridgeParams memory bridgeParams
     ) external payable;
 
     /// @notice Mints tokens and transfers them to the caller (assumes this contract has mint privileges on the IOU

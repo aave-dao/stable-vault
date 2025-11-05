@@ -63,7 +63,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
-        BridgeAdapterParams memory bridgeAdapterParams
+        BridgeParams memory bridgeParams
     ) external payable override {
         require(msg.sender == IOU_TOKEN_MANAGER, ErrorsLib.InvalidMessageSender());
         require(destinationChainId != block.chainid, ErrorsLib.InvalidDestinationChainId());
@@ -79,12 +79,8 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
                 )
             })
         );
-        _prepareBridgeFeeForAdapter(
-            adapter, bridgeAdapterParams.feePayer, bridgeAdapterParams.feeToken, bridgeAdapterParams.feeAmount
-        );
-        _sendCrossChainMessage(
-            destinationChainId, adapter, new IBridgeAdapter.BridgeAsset[](0), data, bridgeAdapterParams
-        );
+        _prepareBridgeFeeForAdapter(adapter, bridgeParams.feePayer, bridgeParams.feeToken, bridgeParams.feeAmount);
+        _sendCrossChainMessage(destinationChainId, adapter, new IBridgeAdapter.BridgeAsset[](0), data, bridgeParams);
     }
 
     /// @inheritdoc RescuableAssets
@@ -152,14 +148,14 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
         address adapter,
         IBridgeAdapter.BridgeAsset[] memory assets,
         bytes memory data,
-        BridgeAdapterParams memory bridgeAdapterParams
+        BridgeParams memory bridgeParams
     ) internal {
         for (uint256 i = 0; i < assets.length; i++) {
             // Increase allowance for when the fee token is the same token being bridged.
             IERC20(assets[i].asset).safeIncreaseAllowance(adapter, assets[i].amount);
         }
         IBridgeAdapter(adapter).publishMessageToChainWithFeePayer{value: msg.value}(
-            destinationChainId, assets, data, bridgeAdapterParams
+            destinationChainId, assets, data, bridgeParams
         );
     }
 
