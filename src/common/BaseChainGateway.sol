@@ -81,6 +81,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
                 )
             })
         );
+        _prepareBridgeFeeForAdapter(adapter, bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount);
         _sendCrossChainMessage(
             destinationChainId,
             adapter,
@@ -134,6 +135,23 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
         require(_supportedBridgeAdapters[asset][sourceChainId][msg.sender], UnsupportedAdapter());
     }
 
+    /// @dev Assumes the bridge fee has not yet been pulled from the caller into this contract.
+    /// @dev Be mindful of overriding the token approval made by this function.
+    function _prepareBridgeFeeForAdapter(
+        address adapter,
+        address feeSource,
+        address bridgeFeeToken,
+        uint256 bridgeFeeAmount
+    ) internal {
+        require(bridgeFeeAmount > 0, ErrorsLib.ZeroAmount());
+        if (bridgeFeeToken == FEE_ON_NATIVE_CURRENCY) {
+            require(msg.value >= bridgeFeeAmount, ErrorsLib.InsufficientFunds());
+        } else {
+            IERC20(bridgeFeeToken).safeTransferFrom(feeSource, address(this), bridgeFeeAmount);
+            IERC20(bridgeFeeToken).forceApprove(adapter, bridgeFeeAmount);
+        }
+    }
+
     /// @dev The Gateway must have ownership of the assets being bridged as it allows the adapter as a spender.
     function _sendCrossChainMessage(
         uint256 destinationChainId,
@@ -144,13 +162,6 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
         address bridgeFeeToken,
         uint256 bridgeFeeAmount
     ) internal {
-        require(bridgeFeeAmount > 0, ErrorsLib.ZeroAmount());
-        if (bridgeFeeToken == address(0)) {
-            require(msg.value >= bridgeFeeAmount, ErrorsLib.InsufficientFunds());
-        } else {
-            IERC20(bridgeFeeToken).safeTransferFrom(bridgeFeePayer, address(this), bridgeFeeAmount);
-            IERC20(bridgeFeeToken).forceApprove(adapter, bridgeFeeAmount);
-        }
         for (uint256 i = 0; i < assets.length; i++) {
             // Increase allowance for when the fee token is the same token being bridged.
             IERC20(assets[i].asset).safeIncreaseAllowance(adapter, assets[i].amount);
