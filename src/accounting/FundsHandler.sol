@@ -28,6 +28,8 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
         uint256 nonce;
     }
 
+    address internal constant BRIDGE_FEE_ON_NATIVE_CURRENCY = address(0);
+
     address internal immutable VAULT;
     address internal immutable GATEWAY;
     address internal immutable ALLOCATOR;
@@ -129,10 +131,7 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
     ) external payable override restricted {
         require(amount > 0, ErrorsLib.ZeroAmount());
 
-        require(bridgeAdapterParams.bridgeFeeAmount > 0, ErrorsLib.ZeroAmount());
-        if (bridgeAdapterParams.bridgeFeeToken == address(0)) {
-            require(msg.value >= bridgeAdapterParams.bridgeFeeAmount, ErrorsLib.InsufficientFunds());
-        } else {
+        if (bridgeAdapterParams.bridgeFeeToken != address(0)) {
             IERC20(bridgeAdapterParams.bridgeFeeToken)
                 .safeTransferFrom(
                     bridgeAdapterParams.bridgeFeePayer, address(this), bridgeAdapterParams.bridgeFeeAmount
