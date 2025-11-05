@@ -1,23 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-//import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {AccountingChainGateway} from "../src/accounting/AccountingChainGateway.sol";
-//import {IAccountingChainGateway} from "../src/interfaces/IAccountingChainGateway.sol";
-//import {IAllocator} from "../src/interfaces/IAllocator.sol";
-//import {IBridgeAdapter} from "../src/interfaces/IBridgeAdapter.sol";
-//import {IChainGateway} from "../src/interfaces/IChainGateway.sol";
-//import {IIouTokenManager} from "../src/interfaces/IIouTokenManager.sol";
 import {AssetLib} from "../src/libraries/AssetLib.sol";
-//import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
 import {MathLib} from "../src/libraries/MathLib.sol";
 import {TestWithHelpers} from "./helpers/TestWithHelpers.sol";
 import {MockAccessManager} from "./mocks/MockAccessManager.sol";
-//import {MockAllocator} from "./mocks/MockAllocator.sol";
 import {MockAssetRegistry} from "./mocks/MockAssetRegistry.sol";
 import {MockBridgeAdapter} from "./mocks/MockBridgeAdapter.sol";
 import {IMockErc20} from "./mocks/MockErc20.sol";

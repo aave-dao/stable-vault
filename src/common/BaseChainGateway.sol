@@ -60,18 +60,16 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
 
     /// @inheritdoc IChainGateway
     function sendBridgeIouTokenMessageWithFeePayer(
-        address bridgeFeePayer,
-        address bridgeFeeToken,
-        uint256 bridgeFeeAmount,
         uint256 destinationChainId,
         address iouTokenRecipient,
-        uint256 iouTokenAmountRay
+        uint256 iouTokenAmountRay,
+        BridgeParams memory bridgeParams
     ) external payable override {
         require(msg.sender == IOU_TOKEN_MANAGER, ErrorsLib.InvalidMessageSender());
         require(destinationChainId != block.chainid, ErrorsLib.InvalidDestinationChainId());
 
         address adapter = _defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId];
-        require(adapter != address(0), UnsupportedAdapter());
+        require(adapter != address(0), AdapterNotFound());
 
         bytes memory data = abi.encode(
             IChainGateway.CrossChainMessage({
@@ -81,16 +79,8 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
                 )
             })
         );
-        _prepareBridgeFeeForAdapter(adapter, bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount);
-        _sendCrossChainMessage(
-            destinationChainId,
-            adapter,
-            new IBridgeAdapter.BridgeAsset[](0),
-            data,
-            bridgeFeePayer,
-            bridgeFeeToken,
-            bridgeFeeAmount
-        );
+        _prepareBridgeFeeForAdapter(adapter, bridgeParams.feePayer, bridgeParams.feeToken, bridgeParams.feeAmount);
+        _sendCrossChainMessage(destinationChainId, adapter, new IBridgeAdapter.BridgeAsset[](0), data, bridgeParams);
     }
 
     /// @inheritdoc RescuableAssets
@@ -132,7 +122,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
     /// @dev Checks full set of adapters as opposed to the default adapter in case an adapter is swapped out but a
     /// pending message needs to be ingested.
     function _onlyAdapter(address asset, uint256 sourceChainId) internal view {
-        require(_supportedBridgeAdapters[asset][sourceChainId][msg.sender], UnsupportedAdapter());
+        require(_supportedBridgeAdapters[asset][sourceChainId][msg.sender], AdapterNotFound());
     }
 
     /// @dev Assumes the bridge fee has not yet been pulled from the caller into this contract.
@@ -158,16 +148,14 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
         address adapter,
         IBridgeAdapter.BridgeAsset[] memory assets,
         bytes memory data,
-        address bridgeFeePayer,
-        address bridgeFeeToken,
-        uint256 bridgeFeeAmount
+        BridgeParams memory bridgeParams
     ) internal {
         for (uint256 i = 0; i < assets.length; i++) {
             // Increase allowance for when the fee token is the same token being bridged.
             IERC20(assets[i].asset).safeIncreaseAllowance(adapter, assets[i].amount);
         }
         IBridgeAdapter(adapter).publishMessageToChainWithFeePayer{value: msg.value}(
-            destinationChainId, assets, data, bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount
+            destinationChainId, assets, data, bridgeParams
         );
     }
 

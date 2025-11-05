@@ -8,6 +8,7 @@ import {IERC4626} from "forge-std/interfaces/IERC4626.sol";
 import {Swapper} from "../src/common/Swapper.sol";
 import {IAllocator} from "../src/interfaces/IAllocator.sol";
 import {IBasedBoostedVault} from "../src/interfaces/IBasedBoostedVault.sol";
+import {IChainGateway} from "../src/interfaces/IChainGateway.sol";
 import {AssetLib} from "../src/libraries/AssetLib.sol";
 import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
 import {BaseTest} from "./BaseTest.t.sol";
@@ -82,7 +83,16 @@ contract EndToEndTest is BaseTest {
             vm.prank(everyRoleAccount);
             vm.deal(everyRoleAccount, bridgeFeeAmount);
             fundsHandler.pushFundsToChain{value: bridgeFeeAmount}(
-                address(USDC), userInitialDeposit, EARNING_CHAIN_ID, everyRoleAccount, address(0), bridgeFeeAmount
+                address(USDC),
+                userInitialDeposit,
+                EARNING_CHAIN_ID,
+                IChainGateway.BridgeParams({
+                    feePayer: everyRoleAccount,
+                    feeToken: address(0),
+                    feeAmount: bridgeFeeAmount,
+                    gasLimit: 300000,
+                    data: ""
+                })
             );
 
             // - check that the funds land on Earning Chain and are dropped into default liquidity vault there
@@ -187,7 +197,13 @@ contract EndToEndTest is BaseTest {
             vm.prank(everyRoleAccount);
             vm.deal(everyRoleAccount, bridgeFeeAmount);
             earningChainGateway.sendBalanceUpdateWithFeePayer{value: bridgeFeeAmount}(
-                everyRoleAccount, address(0), bridgeFeeAmount
+                IChainGateway.BridgeParams({
+                    feePayer: everyRoleAccount,
+                    feeToken: address(0),
+                    feeAmount: bridgeFeeAmount,
+                    gasLimit: 300000,
+                    data: ""
+                })
             );
 
             console.log("Total system balance: %s", fundsHandler.getAggregatedBalance());
@@ -219,7 +235,15 @@ contract EndToEndTest is BaseTest {
             vm.prank(everyRoleAccount);
             vm.deal(everyRoleAccount, bridgeFeeAmount);
             earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
-                address(GHO), userEarningsInGho, everyRoleAccount, address(0), bridgeFeeAmount
+                address(GHO),
+                userEarningsInGho,
+                IChainGateway.BridgeParams({
+                    feePayer: everyRoleAccount,
+                    feeToken: address(0),
+                    feeAmount: bridgeFeeAmount,
+                    gasLimit: 300000,
+                    data: ""
+                })
             );
 
             // - check that the funds land on the Accounting Chain and are dropped into default liquidity vault there
@@ -316,7 +340,15 @@ contract EndToEndTest is BaseTest {
             vm.prank(everyRoleAccount);
             vm.deal(everyRoleAccount, bridgeFeeAmount);
             earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
-                address(GHO), ghoBalanceOnVaultLeft, everyRoleAccount, address(0), bridgeFeeAmount
+                address(GHO),
+                ghoBalanceOnVaultLeft,
+                IChainGateway.BridgeParams({
+                    feePayer: everyRoleAccount,
+                    feeToken: address(0),
+                    feeAmount: bridgeFeeAmount,
+                    gasLimit: 300000,
+                    data: ""
+                })
             );
 
             address[] memory assets = new address[](1);

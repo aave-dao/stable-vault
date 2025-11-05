@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
+import {IChainGateway} from "../../src/interfaces/IChainGateway.sol";
 import {IFundsHandler} from "../../src/interfaces/IFundsHandler.sol";
 
 contract MockFundsHandler is IFundsHandler {
@@ -32,9 +33,7 @@ contract MockFundsHandler is IFundsHandler {
         address asset,
         uint256 amount,
         uint256 chainId,
-        address bridgeFeePayer,
-        address bridgeFeeToken,
-        uint256 bridgeFeeAmount
+        IChainGateway.BridgeParams memory bridgeParams
     ) external payable override {}
 
     function updateChainBalanceCallback(uint256 chainId, uint256 snapshotBalanceRay, uint256 snapshotTimestamp)

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
+import {IChainGateway} from "../../src/interfaces/IChainGateway.sol";
 import {IIouTokenManager} from "../../src/interfaces/IIouTokenManager.sol";
 
 contract MockIouTokenManager is IIouTokenManager {
@@ -10,9 +11,7 @@ contract MockIouTokenManager is IIouTokenManager {
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
-        address bridgeFeePayer,
-        address bridgeFeeToken,
-        uint256 bridgeFeeAmount
+        IChainGateway.BridgeParams memory bridgeParams
     ) external payable override {}
     function mintTokens(address to, uint256 amount) external override {}
     function burnTokens(address from, uint256 amount) external override {}

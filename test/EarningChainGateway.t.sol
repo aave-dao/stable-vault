@@ -273,14 +273,26 @@ contract EarningChainGatewayTest is TestWithHelpers {
                             )
                         })
                     ),
-                    bridgeFeePayer,
-                    bridgeFeeToken,
-                    bridgeFeeAmount
+                    IChainGateway.BridgeParams({
+                        feePayer: bridgeFeePayer,
+                        feeToken: bridgeFeeToken,
+                        feeAmount: bridgeFeeAmount,
+                        gasLimit: 100000,
+                        data: ""
+                    })
                 )
             )
         );
         vm.prank(everyRoleAccount);
-        _earningChainGateway.sendBalanceUpdateWithFeePayer(bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount);
+        _earningChainGateway.sendBalanceUpdateWithFeePayer(
+            IChainGateway.BridgeParams({
+                feePayer: bridgeFeePayer,
+                feeToken: bridgeFeeToken,
+                feeAmount: bridgeFeeAmount,
+                gasLimit: 100000,
+                data: ""
+            })
+        );
 
         // Check when multiple snap shots are sent, the nonce is incremented
         _mockGho.mint(bridgeFeePayer, bridgeFeeAmount);
@@ -309,14 +321,26 @@ contract EarningChainGatewayTest is TestWithHelpers {
                             )
                         })
                     ),
-                    bridgeFeePayer,
-                    bridgeFeeToken,
-                    bridgeFeeAmount
+                    IChainGateway.BridgeParams({
+                        feePayer: bridgeFeePayer,
+                        feeToken: bridgeFeeToken,
+                        feeAmount: bridgeFeeAmount,
+                        gasLimit: 100000,
+                        data: ""
+                    })
                 )
             )
         );
         vm.prank(everyRoleAccount);
-        _earningChainGateway.sendBalanceUpdateWithFeePayer(bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount);
+        _earningChainGateway.sendBalanceUpdateWithFeePayer(
+            IChainGateway.BridgeParams({
+                feePayer: bridgeFeePayer,
+                feeToken: bridgeFeeToken,
+                feeAmount: bridgeFeeAmount,
+                gasLimit: 100000,
+                data: ""
+            })
+        );
     }
 
     function test_sendBalanceUpdateWithFeePayer_sendsBalanceUpdateWithFeePayerWithNativeBridgeFee(
@@ -360,14 +384,24 @@ contract EarningChainGatewayTest is TestWithHelpers {
                             )
                         })
                     ),
-                    bridgeFeePayer,
-                    bridgeFeeToken,
-                    bridgeFeeAmount
+                    IChainGateway.BridgeParams({
+                        feePayer: bridgeFeePayer,
+                        feeToken: bridgeFeeToken,
+                        feeAmount: bridgeFeeAmount,
+                        gasLimit: 100000,
+                        data: ""
+                    })
                 )
             )
         );
         _earningChainGateway.sendBalanceUpdateWithFeePayer{value: bridgeFeeAmount}(
-            bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount
+            IChainGateway.BridgeParams({
+                feePayer: bridgeFeePayer,
+                feeToken: bridgeFeeToken,
+                feeAmount: bridgeFeeAmount,
+                gasLimit: 100000,
+                data: ""
+            })
         );
 
         // Check when multiple snap shots are sent, the nonce is incremented
@@ -389,20 +423,34 @@ contract EarningChainGatewayTest is TestWithHelpers {
                             )
                         })
                     ),
-                    bridgeFeePayer,
-                    bridgeFeeToken,
-                    bridgeFeeAmount
+                    IChainGateway.BridgeParams({
+                        feePayer: bridgeFeePayer,
+                        feeToken: bridgeFeeToken,
+                        feeAmount: bridgeFeeAmount,
+                        gasLimit: 100000,
+                        data: ""
+                    })
                 )
             )
         );
         _earningChainGateway.sendBalanceUpdateWithFeePayer{value: bridgeFeeAmount}(
-            bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount
+            IChainGateway.BridgeParams({
+                feePayer: bridgeFeePayer,
+                feeToken: bridgeFeeToken,
+                feeAmount: bridgeFeeAmount,
+                gasLimit: 100000,
+                data: ""
+            })
         );
     }
 
     function test_sendBalanceUpdateWithFeePayer_reverts_ifZeroAmountAsBridgeFeeAmount() public {
         vm.expectRevert(ErrorsLib.ZeroAmount.selector);
-        _earningChainGateway.sendBalanceUpdateWithFeePayer(makeAddr("bridgeFeePayer"), address(0), 0);
+        _earningChainGateway.sendBalanceUpdateWithFeePayer(
+            IChainGateway.BridgeParams({
+                feePayer: makeAddr("bridgeFeePayer"), feeToken: address(0), feeAmount: 0, gasLimit: 100000, data: ""
+            })
+        );
     }
 
     function test_sendBalanceUpdateWithFeePayer_reverts_ifNotWhitelistedBridgeAdapter() public {
@@ -410,13 +458,21 @@ contract EarningChainGatewayTest is TestWithHelpers {
         vm.prank(admin);
         _earningChainGateway.removeBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, address(_mockBridgeAdapterData));
 
-        vm.expectRevert(IChainGateway.UnsupportedAdapter.selector);
-        _earningChainGateway.sendBalanceUpdateWithFeePayer(makeAddr("bridgeFeePayer"), address(0), 123);
+        vm.expectRevert(IChainGateway.AdapterNotFound.selector);
+        _earningChainGateway.sendBalanceUpdateWithFeePayer(
+            IChainGateway.BridgeParams({
+                feePayer: makeAddr("bridgeFeePayer"), feeToken: address(0), feeAmount: 123, gasLimit: 100000, data: ""
+            })
+        );
     }
 
     function test_sendBalanceUpdateWithFeePayer_reverts_ifZeroValueForNativeBridgeFee() public {
         vm.expectRevert(ErrorsLib.InsufficientFunds.selector);
-        _earningChainGateway.sendBalanceUpdateWithFeePayer{value: 0}(makeAddr("bridgeFeePayer"), address(0), 123);
+        _earningChainGateway.sendBalanceUpdateWithFeePayer{value: 0}(
+            IChainGateway.BridgeParams({
+                feePayer: makeAddr("bridgeFeePayer"), feeToken: address(0), feeAmount: 123, gasLimit: 100000, data: ""
+            })
+        );
     }
 
     function test_exchangeIouTokens_exchangesIouTokensWithTokenBridgeFee(
@@ -493,9 +549,13 @@ contract EarningChainGatewayTest is TestWithHelpers {
                         ACCOUNTING_CHAIN_ID,
                         new IBridgeAdapter.BridgeAsset[](0),
                         data,
-                        bridgeFeePayer,
-                        bridgeFeeToken,
-                        bridgeFeeAmount
+                        IChainGateway.BridgeParams({
+                            feePayer: bridgeFeePayer,
+                            feeToken: bridgeFeeToken,
+                            feeAmount: bridgeFeeAmount,
+                            gasLimit: 100000,
+                            data: ""
+                        })
                     )
                 )
             );
@@ -503,7 +563,16 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
             vm.prank(tokenOutReceiver);
             _earningChainGateway.exchangeIouTokens(
-                iouTokenAmountRay, tokenOut, tokenOutReceiver, bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount
+                iouTokenAmountRay,
+                tokenOut,
+                tokenOutReceiver,
+                IChainGateway.BridgeParams({
+                    feePayer: bridgeFeePayer,
+                    feeToken: bridgeFeeToken,
+                    feeAmount: bridgeFeeAmount,
+                    gasLimit: 100000,
+                    data: ""
+                })
             );
         }
 
@@ -552,16 +621,29 @@ contract EarningChainGatewayTest is TestWithHelpers {
                         ACCOUNTING_CHAIN_ID,
                         new IBridgeAdapter.BridgeAsset[](0),
                         data,
-                        bridgeFeePayer,
-                        bridgeFeeToken,
-                        bridgeFeeAmount
+                        IChainGateway.BridgeParams({
+                            feePayer: bridgeFeePayer,
+                            feeToken: bridgeFeeToken,
+                            feeAmount: bridgeFeeAmount,
+                            gasLimit: 100000,
+                            data: ""
+                        })
                     )
                 )
             );
             vm.expectCall(address(_mockUsdt), abi.encodeCall(IERC20.transfer, (tokenOutReceiver, amountOut)));
             vm.prank(tokenOutReceiver);
             _earningChainGateway.exchangeIouTokens(
-                iouTokenAmountRay, tokenOut, tokenOutReceiver, bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount
+                iouTokenAmountRay,
+                tokenOut,
+                tokenOutReceiver,
+                IChainGateway.BridgeParams({
+                    feePayer: bridgeFeePayer,
+                    feeToken: bridgeFeeToken,
+                    feeAmount: bridgeFeeAmount,
+                    gasLimit: 100000,
+                    data: ""
+                })
             );
         }
     }
@@ -580,6 +662,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         address tokenOut = address(_mockUsdt);
 
+        IChainGateway.BridgeParams memory bridgeParams;
         // Setup mocks and expectations
         {
             vm.expectCall(
@@ -616,20 +699,15 @@ contract EarningChainGatewayTest is TestWithHelpers {
             );
 
             uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(tokenOut);
+            bridgeParams = IChainGateway.BridgeParams({
+                feePayer: bridgeFeePayer, feeToken: address(0), feeAmount: bridgeFeeAmount, gasLimit: 100000, data: ""
+            });
             vm.expectCall(address(_mockUsdt), abi.encodeCall(IERC20.transfer, (tokenOutReceiver, amountOut)));
             vm.expectCall(
                 address(_mockBridgeAdapterData),
                 abi.encodeCall(
                     IBridgeAdapter.publishMessageToChainWithFeePayer,
-                    (
-                        ACCOUNTING_CHAIN_ID,
-                        new IBridgeAdapter.BridgeAsset[](0),
-                        data,
-                        bridgeFeePayer,
-                        // bridgeFeeToken
-                        address(0),
-                        bridgeFeeAmount
-                    )
+                    (ACCOUNTING_CHAIN_ID, new IBridgeAdapter.BridgeAsset[](0), data, bridgeParams)
                 )
             );
         }
@@ -637,14 +715,19 @@ contract EarningChainGatewayTest is TestWithHelpers {
         vm.deal(tokenOutReceiver, bridgeFeeAmount);
         vm.prank(tokenOutReceiver);
         _earningChainGateway.exchangeIouTokens{value: bridgeFeeAmount}(
-            iouTokenAmountRay, tokenOut, tokenOutReceiver, bridgeFeePayer, address(0), bridgeFeeAmount
+            iouTokenAmountRay, tokenOut, tokenOutReceiver, bridgeParams
         );
     }
 
     function test_exchangeIouTokens_reverts_ifZeroAmountAsIouTokenAmountRay() public {
         vm.expectRevert(ErrorsLib.ZeroAmount.selector);
         _earningChainGateway.exchangeIouTokens(
-            0, address(_mockUsdt), makeAddr("tokenOutReceiver"), makeAddr("bridgeFeePayer"), address(0), 0
+            0,
+            address(_mockUsdt),
+            makeAddr("tokenOutReceiver"),
+            IChainGateway.BridgeParams({
+                feePayer: makeAddr("bridgeFeePayer"), feeToken: address(0), feeAmount: 0, gasLimit: 100000, data: ""
+            })
         );
     }
 
@@ -659,9 +742,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
             iouTokenAmountRay,
             address(_mockUsdt),
             makeAddr("tokenOutReceiver"),
-            makeAddr("bridgeFeePayer"),
-            address(0),
-            0
+            IChainGateway.BridgeParams({
+                feePayer: makeAddr("bridgeFeePayer"), feeToken: address(0), feeAmount: 0, gasLimit: 100000, data: ""
+            })
         );
     }
 
@@ -676,9 +759,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
             iouTokenAmountRay,
             address(_mockUsdt),
             makeAddr("tokenOutReceiver"),
-            makeAddr("bridgeFeePayer"),
-            address(0),
-            123
+            IChainGateway.BridgeParams({
+                feePayer: makeAddr("bridgeFeePayer"), feeToken: address(0), feeAmount: 123, gasLimit: 100000, data: ""
+            })
         );
     }
 
@@ -688,15 +771,15 @@ contract EarningChainGatewayTest is TestWithHelpers {
         _earningChainGateway.removeBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, address(_mockBridgeAdapterData));
 
         address tokenOutReceiver = makeAddr("tokenOutReceiver");
-        vm.expectRevert(IChainGateway.UnsupportedAdapter.selector);
+        vm.expectRevert(IChainGateway.AdapterNotFound.selector);
         vm.prank(tokenOutReceiver);
         _earningChainGateway.exchangeIouTokens(
             100_000_000_000_000 * 10 ** 27,
             address(_mockUsdt),
             tokenOutReceiver,
-            makeAddr("bridgeFeePayer"),
-            address(0),
-            123
+            IChainGateway.BridgeParams({
+                feePayer: makeAddr("bridgeFeePayer"), feeToken: address(0), feeAmount: 123, gasLimit: 100000, data: ""
+            })
         );
     }
 
@@ -753,9 +836,13 @@ contract EarningChainGatewayTest is TestWithHelpers {
                         ACCOUNTING_CHAIN_ID,
                         _buildBridgeAssets(address(_mockUsdt), amountToken),
                         data,
-                        feePayer,
-                        bridgeFeeToken,
-                        bridgeFeeAmount
+                        IChainGateway.BridgeParams({
+                            feePayer: feePayer,
+                            feeToken: bridgeFeeToken,
+                            feeAmount: bridgeFeeAmount,
+                            gasLimit: 100000,
+                            data: ""
+                        })
                     )
                 )
             );
@@ -770,7 +857,11 @@ contract EarningChainGatewayTest is TestWithHelpers {
             // Call from random account to ensure the fee payer is used
             vm.prank(makeAddr("randomAccount"));
             _earningChainGateway.pushFundsToAccountingChain(
-                address(_mockUsdt), amountToken, feePayer, bridgeFeeToken, bridgeFeeAmount
+                address(_mockUsdt),
+                amountToken,
+                IChainGateway.BridgeParams({
+                    feePayer: feePayer, feeToken: bridgeFeeToken, feeAmount: bridgeFeeAmount, gasLimit: 100000, data: ""
+                })
             );
 
             // Check the balance of Allocator is 0
@@ -812,16 +903,24 @@ contract EarningChainGatewayTest is TestWithHelpers {
                         ACCOUNTING_CHAIN_ID,
                         _buildBridgeAssets(address(_mockUsdt), amountToken),
                         data,
-                        feePayer,
-                        bridgeFeeToken,
-                        bridgeFeeAmount
+                        IChainGateway.BridgeParams({
+                            feePayer: feePayer,
+                            feeToken: bridgeFeeToken,
+                            feeAmount: bridgeFeeAmount,
+                            gasLimit: 100000,
+                            data: ""
+                        })
                     )
                 )
             );
             // Call from a different account to ensure the any account can call this function
             vm.prank(everyRoleAccount);
             _earningChainGateway.pushFundsToAccountingChain(
-                address(_mockUsdt), amountToken, feePayer, bridgeFeeToken, bridgeFeeAmount
+                address(_mockUsdt),
+                amountToken,
+                IChainGateway.BridgeParams({
+                    feePayer: feePayer, feeToken: bridgeFeeToken, feeAmount: bridgeFeeAmount, gasLimit: 100000, data: ""
+                })
             );
         }
     }
@@ -879,9 +978,13 @@ contract EarningChainGatewayTest is TestWithHelpers {
                         ACCOUNTING_CHAIN_ID,
                         _buildBridgeAssets(address(_mockGho), amountToken),
                         data,
-                        feePayer,
-                        bridgeFeeToken,
-                        bridgeFeeAmount
+                        IChainGateway.BridgeParams({
+                            feePayer: feePayer,
+                            feeToken: bridgeFeeToken,
+                            feeAmount: bridgeFeeAmount,
+                            gasLimit: 100000,
+                            data: ""
+                        })
                     )
                 )
             );
@@ -901,7 +1004,11 @@ contract EarningChainGatewayTest is TestWithHelpers {
             // Call from random account to ensure the fee payer is used
             vm.prank(makeAddr("randomAccount"));
             _earningChainGateway.pushFundsToAccountingChain(
-                address(_mockGho), amountToken, feePayer, bridgeFeeToken, bridgeFeeAmount
+                address(_mockGho),
+                amountToken,
+                IChainGateway.BridgeParams({
+                    feePayer: feePayer, feeToken: bridgeFeeToken, feeAmount: bridgeFeeAmount, gasLimit: 100000, data: ""
+                })
             );
 
             // Check the balance of Allocator is 0
@@ -943,16 +1050,24 @@ contract EarningChainGatewayTest is TestWithHelpers {
                         ACCOUNTING_CHAIN_ID,
                         _buildBridgeAssets(address(_mockGho), amountToken),
                         data,
-                        feePayer,
-                        bridgeFeeToken,
-                        bridgeFeeAmount
+                        IChainGateway.BridgeParams({
+                            feePayer: feePayer,
+                            feeToken: bridgeFeeToken,
+                            feeAmount: bridgeFeeAmount,
+                            gasLimit: 100000,
+                            data: ""
+                        })
                     )
                 )
             );
             // Call from a different account to ensure the any account can call this function
             vm.prank(everyRoleAccount);
             _earningChainGateway.pushFundsToAccountingChain(
-                address(_mockGho), amountToken, feePayer, bridgeFeeToken, bridgeFeeAmount
+                address(_mockGho),
+                amountToken,
+                IChainGateway.BridgeParams({
+                    feePayer: feePayer, feeToken: bridgeFeeToken, feeAmount: bridgeFeeAmount, gasLimit: 100000, data: ""
+                })
             );
         }
     }
@@ -1009,16 +1124,24 @@ contract EarningChainGatewayTest is TestWithHelpers {
                         ACCOUNTING_CHAIN_ID,
                         _buildBridgeAssets(address(_mockUsdt), amountToken),
                         data,
-                        feePayer,
-                        bridgeFeeToken,
-                        bridgeFeeAmount
+                        IChainGateway.BridgeParams({
+                            feePayer: feePayer,
+                            feeToken: bridgeFeeToken,
+                            feeAmount: bridgeFeeAmount,
+                            gasLimit: 100000,
+                            data: ""
+                        })
                     )
                 )
             );
 
             vm.prank(feePayer);
             _earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
-                address(_mockUsdt), amountToken, feePayer, bridgeFeeToken, bridgeFeeAmount
+                address(_mockUsdt),
+                amountToken,
+                IChainGateway.BridgeParams({
+                    feePayer: feePayer, feeToken: bridgeFeeToken, feeAmount: bridgeFeeAmount, gasLimit: 100000, data: ""
+                })
             );
 
             // Check the balance of Allocator is 0
@@ -1031,7 +1154,13 @@ contract EarningChainGatewayTest is TestWithHelpers {
     function test_pushFundsToAccountingChain_reverts_ifZeroAmountAsAmount() public {
         vm.expectRevert(ErrorsLib.ZeroAmount.selector);
         vm.prank(everyRoleAccount);
-        _earningChainGateway.pushFundsToAccountingChain(address(_mockUsdt), 0, everyRoleAccount, address(0), 0);
+        _earningChainGateway.pushFundsToAccountingChain(
+            address(_mockUsdt),
+            0,
+            IChainGateway.BridgeParams({
+                feePayer: everyRoleAccount, feeToken: address(0), feeAmount: 0, gasLimit: 100000, data: ""
+            })
+        );
     }
 
     function test_pushFundsToAccountingChain_reverts_ifZeroAmountAsBridgeFeeAmount(uint256 amount) public {
@@ -1041,7 +1170,13 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         vm.expectRevert(ErrorsLib.ZeroAmount.selector);
         vm.prank(everyRoleAccount);
-        _earningChainGateway.pushFundsToAccountingChain(address(_mockUsdt), amount, everyRoleAccount, address(0), 0);
+        _earningChainGateway.pushFundsToAccountingChain(
+            address(_mockUsdt),
+            amount,
+            IChainGateway.BridgeParams({
+                feePayer: everyRoleAccount, feeToken: address(0), feeAmount: 0, gasLimit: 100000, data: ""
+            })
+        );
     }
 
     function test_pushFundsToAccountingChain_reverts_ifInsufficientValueForNativeBridgeFee(uint256 amount) public {
@@ -1051,10 +1186,16 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         vm.expectRevert(ErrorsLib.InsufficientFunds.selector);
         vm.prank(everyRoleAccount);
-        _earningChainGateway.pushFundsToAccountingChain(address(_mockUsdt), amount, everyRoleAccount, address(0), 123);
+        _earningChainGateway.pushFundsToAccountingChain(
+            address(_mockUsdt),
+            amount,
+            IChainGateway.BridgeParams({
+                feePayer: everyRoleAccount, feeToken: address(0), feeAmount: 123, gasLimit: 100000, data: ""
+            })
+        );
     }
 
-    function test_pushFundsToAccountingChain_reverts_ifUnsupportedAdapter(
+    function test_pushFundsToAccountingChain_reverts_ifAdapterNotFound(
         uint256 amount,
         address bridgeFeePayer,
         uint256 bridgeFeeAmount
@@ -1072,10 +1213,18 @@ contract EarningChainGatewayTest is TestWithHelpers {
         // Put funds idle in Allocator to allow withdrawal to EarningChainGateway
         _mockUsdt.mint(address(_mockAllocator), amount);
 
-        vm.expectRevert(IChainGateway.UnsupportedAdapter.selector);
+        vm.expectRevert(IChainGateway.AdapterNotFound.selector);
         vm.prank(everyRoleAccount);
         _earningChainGateway.pushFundsToAccountingChain(
-            address(_mockUsdt), amount, bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount
+            address(_mockUsdt),
+            amount,
+            IChainGateway.BridgeParams({
+                feePayer: bridgeFeePayer,
+                feeToken: bridgeFeeToken,
+                feeAmount: bridgeFeeAmount,
+                gasLimit: 100000,
+                data: ""
+            })
         );
     }
 
@@ -1085,7 +1234,11 @@ contract EarningChainGatewayTest is TestWithHelpers {
         );
         vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, address(this)));
         _earningChainGateway.pushFundsToAccountingChain(
-            address(_mockUsdt), 100_000_000_000_000 * 10 ** 6, everyRoleAccount, address(0), 0
+            address(_mockUsdt),
+            100_000_000_000_000 * 10 ** 6,
+            IChainGateway.BridgeParams({
+                feePayer: everyRoleAccount, feeToken: address(0), feeAmount: 0, gasLimit: 100000, data: ""
+            })
         );
     }
 
@@ -1130,16 +1283,21 @@ contract EarningChainGatewayTest is TestWithHelpers {
                             )
                         })
                     ),
-                    bridgeFeePayer,
-                    feeToken,
-                    feeAmount
+                    IChainGateway.BridgeParams({
+                        feePayer: bridgeFeePayer, feeToken: feeToken, feeAmount: feeAmount, gasLimit: 100000, data: ""
+                    })
                 )
             )
         );
 
         vm.prank(address(_mockIouTokenManager));
         _earningChainGateway.sendBridgeIouTokenMessageWithFeePayer(
-            bridgeFeePayer, address(_mockGho), feeAmount, ACCOUNTING_CHAIN_ID, iouTokenRecipient, iouTokenAmountRay
+            ACCOUNTING_CHAIN_ID,
+            iouTokenRecipient,
+            iouTokenAmountRay,
+            IChainGateway.BridgeParams({
+                feePayer: bridgeFeePayer, feeToken: address(_mockGho), feeAmount: feeAmount, gasLimit: 100000, data: ""
+            })
         );
     }
 
@@ -1172,16 +1330,25 @@ contract EarningChainGatewayTest is TestWithHelpers {
                             )
                         })
                     ),
-                    bridgeFeePayer,
-                    address(0),
-                    bridgeFeeAmount
+                    IChainGateway.BridgeParams({
+                        feePayer: bridgeFeePayer,
+                        feeToken: address(0),
+                        feeAmount: bridgeFeeAmount,
+                        gasLimit: 100000,
+                        data: ""
+                    })
                 )
             )
         );
 
         vm.prank(address(_mockIouTokenManager));
         _earningChainGateway.sendBridgeIouTokenMessageWithFeePayer{value: bridgeFeeAmount}(
-            bridgeFeePayer, address(0), bridgeFeeAmount, ACCOUNTING_CHAIN_ID, iouTokenRecipient, iouTokenAmountRay
+            ACCOUNTING_CHAIN_ID,
+            iouTokenRecipient,
+            iouTokenAmountRay,
+            IChainGateway.BridgeParams({
+                feePayer: bridgeFeePayer, feeToken: address(0), feeAmount: bridgeFeeAmount, gasLimit: 100000, data: ""
+            })
         );
     }
 
@@ -1189,12 +1356,16 @@ contract EarningChainGatewayTest is TestWithHelpers {
         // Context: only callable by IOU Token Manager
         vm.expectRevert(ErrorsLib.InvalidMessageSender.selector);
         _earningChainGateway.sendBridgeIouTokenMessageWithFeePayer(
-            makeAddr("feeRefundRecipient"),
-            address(_mockUsdt),
-            100_000,
             EARNING_CHAIN_ID,
             makeAddr("iouTokenRecipient"),
-            100_000
+            100_000,
+            IChainGateway.BridgeParams({
+                feePayer: makeAddr("bridgeFeePayer"),
+                feeToken: address(_mockUsdt),
+                feeAmount: 100_000,
+                gasLimit: 100000,
+                data: ""
+            })
         );
     }
 
@@ -1202,13 +1373,17 @@ contract EarningChainGatewayTest is TestWithHelpers {
         vm.prank(address(_mockIouTokenManager));
         vm.expectRevert(ErrorsLib.InvalidDestinationChainId.selector);
         _earningChainGateway.sendBridgeIouTokenMessageWithFeePayer(
-            makeAddr("feeRefundRecipient"),
-            address(_mockUsdt),
-            100_000,
             // Can not be the same chain that the Gateway contract is on
             block.chainid,
             makeAddr("iouTokenRecipient"),
-            100_000
+            100_000,
+            IChainGateway.BridgeParams({
+                feePayer: makeAddr("bridgeFeePayer"),
+                feeToken: address(_mockUsdt),
+                feeAmount: 100_000,
+                gasLimit: 100000,
+                data: ""
+            })
         );
     }
 
@@ -1216,29 +1391,37 @@ contract EarningChainGatewayTest is TestWithHelpers {
         vm.expectRevert(ErrorsLib.InsufficientFunds.selector);
         vm.prank(address(_mockIouTokenManager));
         _earningChainGateway.sendBridgeIouTokenMessageWithFeePayer(
-            makeAddr("feeRefundRecipient"),
-            address(0),
-            100_000,
             ACCOUNTING_CHAIN_ID,
             makeAddr("iouTokenRecipient"),
-            100_000
+            100_000,
+            IChainGateway.BridgeParams({
+                feePayer: makeAddr("bridgeFeePayer"),
+                feeToken: address(0),
+                feeAmount: 100_000,
+                gasLimit: 100000,
+                data: ""
+            })
         );
     }
 
-    function test_sendBridgeIouTokenMessageWithFeePayer_reverts_ifUnsupportedAdapter() public {
+    function test_sendBridgeIouTokenMessageWithFeePayer_reverts_ifAdapterNotFound() public {
         // Remove the adapter for message bridge
         vm.prank(admin);
         _earningChainGateway.removeBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, address(_mockBridgeAdapterData));
 
-        vm.expectRevert(IChainGateway.UnsupportedAdapter.selector);
+        vm.expectRevert(IChainGateway.AdapterNotFound.selector);
         vm.prank(address(_mockIouTokenManager));
         _earningChainGateway.sendBridgeIouTokenMessageWithFeePayer(
-            makeAddr("feeRefundRecipient"),
-            address(_mockUsdt),
-            100_000,
             ACCOUNTING_CHAIN_ID,
             makeAddr("iouTokenRecipient"),
-            100_000
+            100_000,
+            IChainGateway.BridgeParams({
+                feePayer: makeAddr("bridgeFeePayer"),
+                feeToken: address(_mockUsdt),
+                feeAmount: 100_000,
+                gasLimit: 100000,
+                data: ""
+            })
         );
     }
 
@@ -1323,7 +1506,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     }
 
     function test_reverts_receiveMessage_ifNotAdapter() public {
-        vm.expectRevert(IChainGateway.UnsupportedAdapter.selector);
+        vm.expectRevert(IChainGateway.AdapterNotFound.selector);
         vm.prank(makeAddr("notAdapter"));
         _earningChainGateway.receiveMessage(
             ACCOUNTING_CHAIN_ID,

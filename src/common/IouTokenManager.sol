@@ -61,22 +61,16 @@ contract IouTokenManager is IIouTokenManager {
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
-        address bridgeFeePayer,
-        address bridgeFeeToken,
-        uint256 bridgeFeeAmount
+        IChainGateway.BridgeParams memory bridgeParams
     ) external payable override {
         require(destinationChainId != block.chainid, ErrorsLib.InvalidDestinationChainId());
-        require(bridgeFeeAmount > 0, ErrorsLib.ZeroAmount());
-        if (bridgeFeeToken == address(0)) {
-            require(msg.value >= bridgeFeeAmount, ErrorsLib.InsufficientFunds());
-        }
         if (IS_CONANICAL_CHAIN) {
             _lockTokens(msg.sender, iouTokenAmountRay);
         } else {
             _burnTokens(msg.sender, iouTokenAmountRay);
         }
         IChainGateway(CHAIN_GATEWAY).sendBridgeIouTokenMessageWithFeePayer{value: msg.value}(
-            bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount, destinationChainId, iouTokenRecipient, iouTokenAmountRay
+            destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeParams
         );
     }
 

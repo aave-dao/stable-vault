@@ -10,6 +10,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {RescuableAssets} from "../common/RescuableAssets.sol";
 import {IAccountingChainGateway} from "../interfaces/IAccountingChainGateway.sol";
 import {IAllocator} from "../interfaces/IAllocator.sol";
+import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
 import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
@@ -26,6 +27,8 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
         uint256 amountRay;
         uint256 nonce;
     }
+
+    address internal constant BRIDGE_FEE_ON_NATIVE_CURRENCY = address(0);
 
     address internal immutable VAULT;
     address internal immutable GATEWAY;
@@ -124,27 +127,22 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
         address asset,
         uint256 amount,
         uint256 chainId,
-        address bridgeFeePayer,
-        address bridgeFeeToken,
-        uint256 bridgeFeeAmount
+        IChainGateway.BridgeParams memory bridgeParams
     ) external payable override restricted {
         require(amount > 0, ErrorsLib.ZeroAmount());
 
-        require(bridgeFeeAmount > 0, ErrorsLib.ZeroAmount());
-        if (bridgeFeeToken == address(0)) {
-            require(msg.value >= bridgeFeeAmount, ErrorsLib.InsufficientFunds());
-        } else {
-            IERC20(bridgeFeeToken).safeTransferFrom(bridgeFeePayer, address(this), bridgeFeeAmount);
-            IERC20(bridgeFeeToken).forceApprove(GATEWAY, bridgeFeeAmount);
+        if (bridgeParams.feeToken != BRIDGE_FEE_ON_NATIVE_CURRENCY) {
+            IERC20(bridgeParams.feeToken).safeTransferFrom(bridgeParams.feePayer, address(this), bridgeParams.feeAmount);
+            IERC20(bridgeParams.feeToken).forceApprove(GATEWAY, bridgeParams.feeAmount);
         }
 
         _pullFundsFromImmediateLiquidity(asset, amount);
-        // Increase allowance for when the fee token is the same token being bridged.
+        // Increase allowance in case of the fee token matching the same token being bridged.
         IERC20(asset).safeIncreaseAllowance(GATEWAY, amount);
         // Increment the chain balance snapshot for the target chain.
         _updateChainBalanceBeforeBridging(chainId, amount.assetDecimalsToRay(asset));
         IAccountingChainGateway(GATEWAY).sendPushFundsToChainMessage{value: msg.value}(
-            asset, amount, chainId, bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount
+            asset, amount, chainId, bridgeParams
         );
     }
 
