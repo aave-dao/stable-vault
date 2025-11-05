@@ -16,6 +16,7 @@ import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {BaseBridgeAdapter} from "./BaseBridgeAdapter.sol";
 
 /// @title CcipAdapter
+///
 /// @notice Adapter for sending and receiving messages via Chainlink CCIP.
 contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
     using SafeERC20 for IERC20;
@@ -60,14 +61,10 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
         uint256 destinationChainId,
         BridgeAsset[] memory assets,
         bytes memory data,
-        address feePayer,
-        address feeToken,
-        uint256 allocatedFeeAmount
+        IChainGateway.BridgeAdapterParams memory bridgeAdapterParams
     ) external payable override onlyGateway {
-        uint256 gasLimit = 2_000_000;
         Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](assets.length);
         if (assets.length > 0) {
-            gasLimit = 3_000_000;
             for (uint256 i = 0; i < assets.length; i++) {
                 address asset = assets[i].asset;
                 uint256 amount = assets[i].amount;
@@ -82,12 +79,18 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
             receiver: abi.encode(_destinationChainAdapterOf[destinationChainId]),
             data: data,
             tokenAmounts: tokenAmounts,
-            feeToken: feeToken,
+            feeToken: bridgeAdapterParams.bridgeFeeToken,
             extraArgs: Client._argsToBytes(
-                Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: false})
+                Client.GenericExtraArgsV2({gasLimit: bridgeAdapterParams.tripGasLimit, allowOutOfOrderExecution: false})
             )
         });
-        _sendMessageWithFeePayer(destinationChainId, ccipMessage, feePayer, feeToken, allocatedFeeAmount);
+        _sendMessageWithFeePayer(
+            destinationChainId,
+            ccipMessage,
+            bridgeAdapterParams.bridgeFeePayer,
+            bridgeAdapterParams.bridgeFeeToken,
+            bridgeAdapterParams.bridgeFeeAmount
+        );
     }
 
     /// @inheritdoc IAny2EVMMessageReceiver

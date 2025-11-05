@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
+import {IChainGateway} from "./IChainGateway.sol";
+
 interface IIouTokenManager {
     error InsufficientLockedBalance();
     error NotCanonicalChain();
@@ -16,17 +18,12 @@ interface IIouTokenManager {
     /// @param destinationChainId The chain id of the chain to publish the message to.
     /// @param iouTokenRecipient The address to send the IOU tokens to on the destination chain.
     /// @param iouTokenAmountRay The amount of IOU tokens to bridge.
-    /// @param bridgeFeePayer The address that will pay the bridge fee.
-    /// @param bridgeFeeToken The token to pay the bridge fee in.
-    /// @param bridgeFeeAmount The amount of fee to pay in the fee token (a refund is provided to the fee payer if
-    /// necessary).
+    /// @param bridgeAdapterParams The parameters for the bridge adapter.
     function bridgeTokens(
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
-        address bridgeFeePayer,
-        address bridgeFeeToken,
-        uint256 bridgeFeeAmount
+        IChainGateway.BridgeAdapterParams memory bridgeAdapterParams
     ) external payable;
 
     /// @notice Mints tokens and transfers them to the caller (assumes this contract has mint privileges on the IOU

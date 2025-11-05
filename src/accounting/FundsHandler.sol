@@ -10,6 +10,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {RescuableAssets} from "../common/RescuableAssets.sol";
 import {IAccountingChainGateway} from "../interfaces/IAccountingChainGateway.sol";
 import {IAllocator} from "../interfaces/IAllocator.sol";
+import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
 import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
@@ -124,18 +125,19 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
         address asset,
         uint256 amount,
         uint256 chainId,
-        address bridgeFeePayer,
-        address bridgeFeeToken,
-        uint256 bridgeFeeAmount
+        IChainGateway.BridgeAdapterParams memory bridgeAdapterParams
     ) external payable override restricted {
         require(amount > 0, ErrorsLib.ZeroAmount());
 
-        require(bridgeFeeAmount > 0, ErrorsLib.ZeroAmount());
-        if (bridgeFeeToken == address(0)) {
-            require(msg.value >= bridgeFeeAmount, ErrorsLib.InsufficientFunds());
+        require(bridgeAdapterParams.bridgeFeeAmount > 0, ErrorsLib.ZeroAmount());
+        if (bridgeAdapterParams.bridgeFeeToken == address(0)) {
+            require(msg.value >= bridgeAdapterParams.bridgeFeeAmount, ErrorsLib.InsufficientFunds());
         } else {
-            IERC20(bridgeFeeToken).safeTransferFrom(bridgeFeePayer, address(this), bridgeFeeAmount);
-            IERC20(bridgeFeeToken).forceApprove(GATEWAY, bridgeFeeAmount);
+            IERC20(bridgeAdapterParams.bridgeFeeToken)
+                .safeTransferFrom(
+                    bridgeAdapterParams.bridgeFeePayer, address(this), bridgeAdapterParams.bridgeFeeAmount
+                );
+            IERC20(bridgeAdapterParams.bridgeFeeToken).forceApprove(GATEWAY, bridgeAdapterParams.bridgeFeeAmount);
         }
 
         _pullFundsFromImmediateLiquidity(asset, amount);
@@ -144,7 +146,7 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
         // Increment the chain balance snapshot for the target chain.
         _updateChainBalanceBeforeBridging(chainId, amount.assetDecimalsToRay(asset));
         IAccountingChainGateway(GATEWAY).sendPushFundsToChainMessage{value: msg.value}(
-            asset, amount, chainId, bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount
+            asset, amount, chainId, bridgeAdapterParams
         );
     }
 

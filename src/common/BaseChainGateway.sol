@@ -60,12 +60,10 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
 
     /// @inheritdoc IChainGateway
     function sendBridgeIouTokenMessageWithFeePayer(
-        address bridgeFeePayer,
-        address bridgeFeeToken,
-        uint256 bridgeFeeAmount,
         uint256 destinationChainId,
         address iouTokenRecipient,
-        uint256 iouTokenAmountRay
+        uint256 iouTokenAmountRay,
+        BridgeAdapterParams memory bridgeAdapterParams
     ) external payable override {
         require(msg.sender == IOU_TOKEN_MANAGER, ErrorsLib.InvalidMessageSender());
         require(destinationChainId != block.chainid, ErrorsLib.InvalidDestinationChainId());
@@ -81,15 +79,14 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
                 )
             })
         );
-        _prepareBridgeFeeForAdapter(adapter, bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount);
-        _sendCrossChainMessage(
-            destinationChainId,
+        _prepareBridgeFeeForAdapter(
             adapter,
-            new IBridgeAdapter.BridgeAsset[](0),
-            data,
-            bridgeFeePayer,
-            bridgeFeeToken,
-            bridgeFeeAmount
+            bridgeAdapterParams.bridgeFeePayer,
+            bridgeAdapterParams.bridgeFeeToken,
+            bridgeAdapterParams.bridgeFeeAmount
+        );
+        _sendCrossChainMessage(
+            destinationChainId, adapter, new IBridgeAdapter.BridgeAsset[](0), data, bridgeAdapterParams
         );
     }
 
@@ -158,16 +155,14 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
         address adapter,
         IBridgeAdapter.BridgeAsset[] memory assets,
         bytes memory data,
-        address bridgeFeePayer,
-        address bridgeFeeToken,
-        uint256 bridgeFeeAmount
+        BridgeAdapterParams memory bridgeAdapterParams
     ) internal {
         for (uint256 i = 0; i < assets.length; i++) {
             // Increase allowance for when the fee token is the same token being bridged.
             IERC20(assets[i].asset).safeIncreaseAllowance(adapter, assets[i].amount);
         }
         IBridgeAdapter(adapter).publishMessageToChainWithFeePayer{value: msg.value}(
-            destinationChainId, assets, data, bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount
+            destinationChainId, assets, data, bridgeAdapterParams
         );
     }
 

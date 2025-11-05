@@ -15,6 +15,7 @@ import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 /// @title EarningChainGateway
+///
 /// @notice Facilitates cross chain messaging with exactly one Accounting Chain.
 contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
     using SafeERC20 for IERC20;
@@ -25,6 +26,7 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
     uint256 internal _balanceSnapshotNonce;
 
     /// @dev Constructor.
+    ///
     /// @param accountingChainId The Chain ID of the Accounting Chain.
     /// @param allocator The address of the Allocator contract.
     /// @param iouTokenManager The address of the IOU token manager contract.
@@ -37,6 +39,7 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
     }
 
     /// @dev Initializer.
+    ///
     /// @param accessManager The address of the IAccessManager contract used for handling access control.
     function initialize(address accessManager) external virtual initializer {
         __EarningChainGateway_init(accessManager);
@@ -50,8 +53,7 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         return IOU_TOKEN_MANAGER;
     }
 
-    /// @inheritdoc IEarningChainGateway
-    function getAccountingChainId() external view override returns (uint256) {
+    function getAccountingChainId() external view returns (uint256) {
         return ACCOUNTING_CHAIN_ID;
     }
 
@@ -61,22 +63,25 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
     }
 
     /// @inheritdoc IEarningChainGateway
-    function sendBalanceUpdateWithFeePayer(address bridgeFeePayer, address bridgeFeeToken, uint256 bridgeFeeAmount)
+    function sendBalanceUpdateWithFeePayer(IChainGateway.BridgeAdapterParams memory bridgeAdapterParams)
         external
         payable
         override
     {
         address adapter = _defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID];
         require(adapter != address(0), UnsupportedAdapter());
-        _prepareBridgeFeeForAdapter(adapter, bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount);
+        _prepareBridgeFeeForAdapter(
+            adapter,
+            bridgeAdapterParams.bridgeFeePayer,
+            bridgeAdapterParams.bridgeFeeToken,
+            bridgeAdapterParams.bridgeFeeAmount
+        );
         _sendCrossChainMessage(
             ACCOUNTING_CHAIN_ID,
             adapter,
             new IBridgeAdapter.BridgeAsset[](0),
             _getBalanceSnapshotData(),
-            bridgeFeePayer,
-            bridgeFeeToken,
-            bridgeFeeAmount
+            bridgeAdapterParams
         );
     }
 
@@ -85,9 +90,7 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         uint256 iouTokenAmountRay,
         address tokenOut,
         address tokenOutReceiver,
-        address bridgeFeePayer,
-        address bridgeFeeToken,
-        uint256 bridgeFeeAmount
+        IChainGateway.BridgeAdapterParams memory bridgeAdapterParams
     ) external payable override returns (uint256) {
         require(iouTokenAmountRay > 0, ErrorsLib.ZeroAmount());
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(msg.sender, iouTokenAmountRay);
@@ -111,15 +114,14 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
                 )
             })
         );
-        _prepareBridgeFeeForAdapter(adapter, bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount);
-        _sendCrossChainMessage(
-            ACCOUNTING_CHAIN_ID,
+        _prepareBridgeFeeForAdapter(
             adapter,
-            new IBridgeAdapter.BridgeAsset[](0),
-            data,
-            bridgeFeePayer,
-            bridgeFeeToken,
-            bridgeFeeAmount
+            bridgeAdapterParams.bridgeFeePayer,
+            bridgeAdapterParams.bridgeFeeToken,
+            bridgeAdapterParams.bridgeFeeAmount
+        );
+        _sendCrossChainMessage(
+            ACCOUNTING_CHAIN_ID, adapter, new IBridgeAdapter.BridgeAsset[](0), data, bridgeAdapterParams
         );
         // TODO: emit event?
         return amountOut;
@@ -129,13 +131,11 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
     function pushFundsToAccountingChain(
         address asset,
         uint256 amount,
-        address bridgeFeePayer,
-        address bridgeFeeToken,
-        uint256 bridgeFeeAmount
+        IChainGateway.BridgeAdapterParams memory bridgeAdapterParams
     ) external payable override restricted {
         require(amount > 0, ErrorsLib.ZeroAmount());
         IAllocator(ALLOCATOR).withdraw(asset, amount);
-        _returnFundsWithBalanceSnapshot(asset, amount, bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount);
+        _returnFundsWithBalanceSnapshot(asset, amount, bridgeAdapterParams);
     }
 
     function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal override {
@@ -174,9 +174,7 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
     function _returnFundsWithBalanceSnapshot(
         address asset,
         uint256 amount,
-        address bridgeFeePayer,
-        address bridgeFeeToken,
-        uint256 bridgeFeeAmount
+        IChainGateway.BridgeAdapterParams memory bridgeAdapterParams
     ) internal {
         address bridgeAdapter = _defaultBridgeAdapter[asset][ACCOUNTING_CHAIN_ID];
         require(bridgeAdapter != address(0), UnsupportedAdapter());
@@ -185,15 +183,14 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         assets[0] = IBridgeAdapter.BridgeAsset({asset: asset, amount: amount});
         // Send a single cross chain message with the asset and the balance snapshot. The bridge must support both
         // assets and arbitrary data.
-        _prepareBridgeFeeForAdapter(bridgeAdapter, bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount);
-        _sendCrossChainMessage(
-            ACCOUNTING_CHAIN_ID,
+        _prepareBridgeFeeForAdapter(
             bridgeAdapter,
-            assets,
-            _getBalanceSnapshotData(),
-            bridgeFeePayer,
-            bridgeFeeToken,
-            bridgeFeeAmount
+            bridgeAdapterParams.bridgeFeePayer,
+            bridgeAdapterParams.bridgeFeeToken,
+            bridgeAdapterParams.bridgeFeeAmount
+        );
+        _sendCrossChainMessage(
+            ACCOUNTING_CHAIN_ID, bridgeAdapter, assets, _getBalanceSnapshotData(), bridgeAdapterParams
         );
     }
 
