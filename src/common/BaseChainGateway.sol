@@ -60,7 +60,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
 
     /// @inheritdoc IChainGateway
     function sendBridgeIouTokenMessageWithFeePayer(
-        address feeRefundRecipient,
+        address bridgeFeePayer,
         address bridgeFeeToken,
         uint256 bridgeFeeAmount,
         uint256 destinationChainId,
@@ -70,31 +70,23 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
         require(msg.sender == IOU_TOKEN_MANAGER, ErrorsLib.InvalidMessageSender());
         require(destinationChainId != block.chainid, ErrorsLib.InvalidDestinationChainId());
 
-        if (bridgeFeeToken == address(0)) {
-            require(msg.value >= bridgeFeeAmount, ErrorsLib.InsufficientFunds());
-        }
+        address adapter = _defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId];
+        require(adapter != address(0), UnsupportedAdapter());
 
-        if (bridgeFeeToken != FEE_ON_NATIVE_CURRENCY) {
-            IERC20(bridgeFeeToken).safeTransferFrom(msg.sender, address(this), bridgeFeeAmount);
-            IERC20(bridgeFeeToken)
-                .forceApprove(_defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId], bridgeFeeAmount);
-        }
-
-        IBridgeAdapter(_defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId])
-        .publishMessageToChainWithFeePayer{
-            value: msg.value
-        }(
+        bytes memory data = abi.encode(
+            IChainGateway.CrossChainMessage({
+                messageType: IChainGateway.MessageType.BRIDGE_IOUTOKEN,
+                data: abi.encode(
+                    IChainGateway.IouTokenBridgeMessage({recipient: iouTokenRecipient, amount: iouTokenAmountRay})
+                )
+            })
+        );
+        _sendCrossChainMessage(
             destinationChainId,
+            adapter,
             new IBridgeAdapter.BridgeAsset[](0),
-            abi.encode(
-                IChainGateway.CrossChainMessage({
-                    messageType: IChainGateway.MessageType.BRIDGE_IOUTOKEN,
-                    data: abi.encode(
-                        IChainGateway.IouTokenBridgeMessage({recipient: iouTokenRecipient, amount: iouTokenAmountRay})
-                    )
-                })
-            ),
-            feeRefundRecipient,
+            data,
+            bridgeFeePayer,
             bridgeFeeToken,
             bridgeFeeAmount
         );
@@ -140,6 +132,32 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
     /// pending message needs to be ingested.
     function _onlyAdapter(address asset, uint256 sourceChainId) internal view {
         require(_supportedBridgeAdapters[asset][sourceChainId][msg.sender], UnsupportedAdapter());
+    }
+
+    /// @dev The Gateway must have ownership of the assets being bridged as it allows the adapter as a spender.
+    function _sendCrossChainMessage(
+        uint256 destinationChainId,
+        address adapter,
+        IBridgeAdapter.BridgeAsset[] memory assets,
+        bytes memory data,
+        address bridgeFeePayer,
+        address bridgeFeeToken,
+        uint256 bridgeFeeAmount
+    ) internal {
+        require(bridgeFeeAmount > 0, ErrorsLib.ZeroAmount());
+        if (bridgeFeeToken == address(0)) {
+            require(msg.value >= bridgeFeeAmount, ErrorsLib.InsufficientFunds());
+        } else {
+            IERC20(bridgeFeeToken).safeTransferFrom(bridgeFeePayer, address(this), bridgeFeeAmount);
+            IERC20(bridgeFeeToken).forceApprove(adapter, bridgeFeeAmount);
+        }
+        for (uint256 i = 0; i < assets.length; i++) {
+            // Increase allowance for when the fee token is the same token being bridged.
+            IERC20(assets[i].asset).safeIncreaseAllowance(adapter, assets[i].amount);
+        }
+        IBridgeAdapter(adapter).publishMessageToChainWithFeePayer{value: msg.value}(
+            destinationChainId, assets, data, bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount
+        );
     }
 
     function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal virtual;

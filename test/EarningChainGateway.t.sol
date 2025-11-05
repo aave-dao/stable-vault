@@ -47,11 +47,10 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
     EarningChainGateway internal _earningChainGateway;
 
-    function _deployEarningChainGateway(
-        MockAccessManager mockAccessManager,
-        address iouTokenManager,
-        address allocator
-    ) internal returns (EarningChainGateway) {
+    function _deployEarningChainGateway(MockAccessManager mockAccessManager, address iouTokenManager, address allocator)
+        internal
+        returns (EarningChainGateway)
+    {
         address earningChainGatewayImpl =
             address(new EarningChainGateway(ACCOUNTING_CHAIN_ID, allocator, iouTokenManager));
         EarningChainGateway earningChainGateway = EarningChainGateway(
@@ -643,10 +642,15 @@ contract EarningChainGatewayTest is TestWithHelpers {
         );
     }
 
-    function test_exchangeIouTokens_reverts_ifZeroAmountAsBridgeFeeAmount() public {
+    function test_exchangeIouTokens_reverts_ifZeroAmountAsBridgeFeeAmount(uint256 iouTokenAmountRay) public {
+        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(address(_mockUsdt));
+        // Put funds idle in Allocator to allow withdrawal to EarningChainGateway
+        _mockUsdt.mint(address(_mockAllocator), amountOut);
+
         vm.expectRevert(ErrorsLib.ZeroAmount.selector);
         _earningChainGateway.exchangeIouTokens(
-            100_000_000_000_000 * 10 ** 27,
+            iouTokenAmountRay,
             address(_mockUsdt),
             makeAddr("tokenOutReceiver"),
             makeAddr("bridgeFeePayer"),
@@ -655,10 +659,15 @@ contract EarningChainGatewayTest is TestWithHelpers {
         );
     }
 
-    function test_exchangeIouTokens_reverts_ifZeroValueForNativeBridgeFee() public {
+    function test_exchangeIouTokens_reverts_ifZeroValueForNativeBridgeFee(uint256 iouTokenAmountRay) public {
+        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(address(_mockUsdt));
+        // Put funds idle in Allocator to allow withdrawal to EarningChainGateway
+        _mockUsdt.mint(address(_mockAllocator), amountOut);
+
         vm.expectRevert(ErrorsLib.InsufficientFunds.selector);
         _earningChainGateway.exchangeIouTokens(
-            100_000_000_000_000 * 10 ** 27,
+            iouTokenAmountRay,
             address(_mockUsdt),
             makeAddr("tokenOutReceiver"),
             makeAddr("bridgeFeePayer"),
@@ -748,7 +757,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 bridgeFeeToken,
                 abi.encodeCall(IERC20.transferFrom, (feePayer, address(_earningChainGateway), bridgeFeeAmount))
             );
-            vm.expectCall(bridgeFeeToken, abi.encodeCall(IERC20.approve, (address(_mockAllocator), bridgeFeeAmount)));
+            vm.expectCall(
+                bridgeFeeToken, abi.encodeCall(IERC20.approve, (address(_mockBridgeAdapterAssets), bridgeFeeAmount))
+            );
 
             // Call from random account to ensure the fee payer is used
             vm.prank(makeAddr("randomAccount"));
@@ -886,19 +897,48 @@ contract EarningChainGatewayTest is TestWithHelpers {
         _earningChainGateway.pushFundsToAccountingChain(address(_mockUsdt), 0, everyRoleAccount, address(0), 0);
     }
 
-    function test_pushFundsToAccountingChain_reverts_ifZeroAmountAsBridgeFeeAmount() public {
+    function test_pushFundsToAccountingChain_reverts_ifZeroAmountAsBridgeFeeAmount(uint256 amount) public {
+        amount = _boundAssetAmount(address(_mockUsdt), amount);
+        // Put funds idle in Allocator to allow withdrawal to EarningChainGateway
+        _mockUsdt.mint(address(_mockAllocator), amount);
+
         vm.expectRevert(ErrorsLib.ZeroAmount.selector);
         vm.prank(everyRoleAccount);
-        _earningChainGateway.pushFundsToAccountingChain(
-            address(_mockUsdt), 100_000_000_000_000 * 10 ** 27, everyRoleAccount, address(0), 0
-        );
+        _earningChainGateway.pushFundsToAccountingChain(address(_mockUsdt), amount, everyRoleAccount, address(0), 0);
     }
 
-    function test_pushFundsToAccountingChain_reverts_ifInsufficientValueForNativeBridgeFee() public {
+    function test_pushFundsToAccountingChain_reverts_ifInsufficientValueForNativeBridgeFee(uint256 amount) public {
+        amount = _boundAssetAmount(address(_mockUsdt), amount);
+        // Put funds idle in Allocator to allow withdrawal to EarningChainGateway
+        _mockUsdt.mint(address(_mockAllocator), amount);
+
         vm.expectRevert(ErrorsLib.InsufficientFunds.selector);
         vm.prank(everyRoleAccount);
+        _earningChainGateway.pushFundsToAccountingChain(address(_mockUsdt), amount, everyRoleAccount, address(0), 123);
+    }
+
+    function test_pushFundsToAccountingChain_reverts_ifUnsupportedAdapter(
+        uint256 amount,
+        address bridgeFeePayer,
+        uint256 bridgeFeeAmount
+    ) public {
+        amount = _boundAssetAmount(address(_mockUsdt), amount);
+        address bridgeFeeToken = address(_mockGho);
+        bridgeFeeAmount = _boundAssetAmount(address(_mockGho), bridgeFeeAmount);
+
+        // Remove the adapter for the asset being bridged
+        vm.prank(admin);
+        _earningChainGateway.removeBridgeAdapter(
+            address(_mockUsdt), ACCOUNTING_CHAIN_ID, address(_mockBridgeAdapterAssets)
+        );
+
+        // Put funds idle in Allocator to allow withdrawal to EarningChainGateway
+        _mockUsdt.mint(address(_mockAllocator), amount);
+
+        vm.expectRevert(IChainGateway.UnsupportedAdapter.selector);
+        vm.prank(everyRoleAccount);
         _earningChainGateway.pushFundsToAccountingChain(
-            address(_mockUsdt), 100_000_000_000_000 * 10 ** 27, everyRoleAccount, address(0), 123
+            address(_mockUsdt), amount, bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount
         );
     }
 
@@ -913,26 +953,25 @@ contract EarningChainGatewayTest is TestWithHelpers {
     }
 
     function test_sendBridgeIouTokenMessageWithFeePayer_withTokenBridgeFee(
-        address feeRefundRecipient,
+        address bridgeFeePayer,
         uint256 feeAmount,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay
     ) public {
         feeAmount = _boundNativeAmount(feeAmount);
         iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        vm.assume(bridgeFeePayer != address(0));
 
         // Use GHO as the bridge fee token
         address feeToken = address(_mockGho);
         // Mimic the IOU token mgr approval of Gateway to pull funds
-        IMockErc20(feeToken).mint(address(_mockIouTokenManager), feeAmount);
-        vm.prank(address(_mockIouTokenManager));
+        IMockErc20(feeToken).mint(address(bridgeFeePayer), feeAmount);
+        vm.prank(address(bridgeFeePayer));
         MockNonStandardErc20(feeToken).approve(address(_earningChainGateway), feeAmount);
 
         vm.expectCall(
             feeToken,
-            abi.encodeCall(
-                IERC20.transferFrom, (address(_mockIouTokenManager), address(_earningChainGateway), feeAmount)
-            )
+            abi.encodeCall(IERC20.transferFrom, (address(bridgeFeePayer), address(_earningChainGateway), feeAmount))
         );
         vm.expectCall(feeToken, abi.encodeCall(IERC20.approve, (address(_mockBridgeAdapterData), feeAmount)));
 
@@ -954,7 +993,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                             )
                         })
                     ),
-                    feeRefundRecipient,
+                    bridgeFeePayer,
                     feeToken,
                     feeAmount
                 )
@@ -963,23 +1002,24 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         vm.prank(address(_mockIouTokenManager));
         _earningChainGateway.sendBridgeIouTokenMessageWithFeePayer(
-            feeRefundRecipient, address(_mockGho), feeAmount, ACCOUNTING_CHAIN_ID, iouTokenRecipient, iouTokenAmountRay
+            bridgeFeePayer, address(_mockGho), feeAmount, ACCOUNTING_CHAIN_ID, iouTokenRecipient, iouTokenAmountRay
         );
     }
 
     function test_sendBridgeIouTokenMessageWithFeePayer_withNativeBridgeFee(
-        address feeRefundRecipient,
+        address bridgeFeePayer,
         uint256 bridgeFeeAmount,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay
     ) public {
         bridgeFeeAmount = _boundNativeAmount(bridgeFeeAmount);
         iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
-
+        vm.assume(bridgeFeePayer != address(0));
         vm.deal(address(_mockIouTokenManager), bridgeFeeAmount);
 
         vm.expectCall(
             address(_mockBridgeAdapterData),
+            bridgeFeeAmount,
             abi.encodeCall(
                 IBridgeAdapter.publishMessageToChainWithFeePayer,
                 (
@@ -995,7 +1035,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                             )
                         })
                     ),
-                    feeRefundRecipient,
+                    bridgeFeePayer,
                     address(0),
                     bridgeFeeAmount
                 )
@@ -1004,7 +1044,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         vm.prank(address(_mockIouTokenManager));
         _earningChainGateway.sendBridgeIouTokenMessageWithFeePayer{value: bridgeFeeAmount}(
-            feeRefundRecipient, address(0), bridgeFeeAmount, ACCOUNTING_CHAIN_ID, iouTokenRecipient, iouTokenAmountRay
+            bridgeFeePayer, address(0), bridgeFeeAmount, ACCOUNTING_CHAIN_ID, iouTokenRecipient, iouTokenAmountRay
         );
     }
 

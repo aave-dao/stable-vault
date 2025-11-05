@@ -79,7 +79,7 @@ interface IChainGateway {
         external;
 
     /// @notice Sends an arbitrary message containing instructions or data updates to a destination chain.
-    /// @param feeRefundRecipient The address to send the remaining bridge fee to if any. The actual fee is taken from
+    /// @param bridgeFeePayer The address to send the remaining bridge fee to if any. The actual fee is taken from
     /// the msg.sender.
     /// @param bridgeFeeToken Token to pay the bridge fee in (must be accepted by the Bridge provider).
     /// @param bridgeFeeAmount The amount of fee to pay in the fee token (a refund is provided to the fee payer if
@@ -88,7 +88,7 @@ interface IChainGateway {
     /// @param iouTokenRecipient The address to send the IOU tokens to on the destination chain.
     /// @param iouTokenAmountRay The amount of IOU tokens to bridge.
     function sendBridgeIouTokenMessageWithFeePayer(
-        address feeRefundRecipient,
+        address bridgeFeePayer,
         address bridgeFeeToken,
         uint256 bridgeFeeAmount,
         uint256 destinationChainId,

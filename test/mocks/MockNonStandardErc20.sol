@@ -4,10 +4,8 @@ pragma solidity ^0.8.10;
 
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 
-/**
- * @notice Mimics tokens like USDT that have non-standard behavior (in contrast to ERC-20) for transfer and approval
- * functions
- */
+/// @notice Mimics tokens like USDT that have non-standard behavior (in contrast to ERC-20) for transfer and approval
+/// functions
 contract MockNonStandardErc20 {
     uint8 internal immutable DECIMALS;
     string internal _name;
@@ -25,27 +23,21 @@ contract MockNonStandardErc20 {
 
     // ////////////////////// USDT-BASED NON-STANDARD FUNCTIONS ////////////////////////
 
-    /**
-     * @dev Does not return boolean in purpose. As it does not follow the ERC-20 standard properly.
-     */
+    /// @dev Does not return boolean in purpose. As it does not follow the ERC-20 standard properly.
     function transfer(address to, uint256 amount) public virtual {
         address owner = msg.sender;
         _transfer(owner, to, amount);
     }
 
-    /**
-     * @dev Does not return boolean in purpose. As it does not follow the ERC-20 standard properly.
-     * Also, the additional requirement to not allow approval if was not previously set to 0.
-     */
+    /// @dev Does not return boolean in purpose. As it does not follow the ERC-20 standard properly.
+    /// Also, the additional requirement to not allow approval if was not previously set to 0.
     function approve(address spender, uint256 amount) public virtual {
         address owner = msg.sender;
         require(!((amount != 0) && (_allowances[owner][spender] != 0)));
         _approve(owner, spender, amount);
     }
 
-    /**
-     * @dev Does not return boolean in purpose. As it does not follow the ERC-20 standard properly.
-     */
+    /// @dev Does not return boolean in purpose. As it does not follow the ERC-20 standard properly.
     function transferFrom(address from, address to, uint256 amount) public virtual {
         address spender = msg.sender;
         _spendAllowance(from, spender, amount);
