@@ -7,7 +7,7 @@ import {IBridgeAdapter} from "./IBridgeAdapter.sol";
 /// @dev Assumes bridged assets and bridged data can be handled independently of each other.
 interface IChainGateway {
     error InvalidMessageType();
-    error UnsupportedAdapter();
+    error AdapterNotFound();
 
     event BridgeAdapterAdded(address asset, uint256 chainId, address adapter);
     event BridgeAdapterRemoved(address asset, uint256 chainId, address adapter);
@@ -20,12 +20,26 @@ interface IChainGateway {
         BURN_IOUTOKEN
     }
 
+    struct BridgeParams {
+        // The address that will pay the bridge fee (also the recipient of any refund).
+        address feePayer;
+        // The token to pay the bridge fee in.
+        address feeToken;
+        // The amount of `feeToken` approved by `feePayer` to spend on fees.
+        uint256 feeAmount;
+        // Total gas that should be allocated for executions that take place from the message being processed on the
+        // destination chain (including round trips).
+        uint256 gasLimit;
+        // Arbitrary data that may be required by the bridge adapter to operate.
+        bytes data;
+    }
+
     struct CrossChainMessage {
         MessageType messageType;
         bytes data;
     }
-    /// @notice Struct for arbitrary data containing a balance snapshot from a source chain.
 
+    /// @dev Struct for arbitrary data containing a balance snapshot from a source chain.
     struct BalanceSnapshot {
         // Cumulative balance of all tokens with common denomination in RAY.
         uint256 totalAssetsInRay;
@@ -43,10 +57,34 @@ interface IChainGateway {
         uint256 balanceSnapshotTotalAssetsInRay;
     }
 
+    /// @notice Gets the default bridge adapter for an asset and chain; the default adapter is used for outbound
+    /// messages.
+    /// @dev The adapter must be whitelisted for the asset and chain.
+    /// @param asset The asset to get the default adapter for.
+    /// @param chainId The chain id to get the default adapter for.
+    /// @return The default adapter for the asset and chain.
+    function getDefaultBridgeAdapter(address asset, uint256 chainId) external view returns (address);
+
+    /// @notice Adds a bridge adapter to the gateway's set of whitelisted adapters.
+    /// @dev The adapter must not be already whitelisted for the asset and chain.
+    /// @param asset The asset to add the adapter for.
+    /// @param chainId The chain id to add the adapter for.
+    /// @param adapter The adapter to add.
     function addBridgeAdapter(address asset, uint256 chainId, address adapter) external;
 
+    /// @notice Removes a bridge adapter from the gateway's set of whitelisted adapters.
+    /// @dev If the adapter is the default adapter for the asset and chain, the default adapter is unset.
+    /// @param asset The asset to remove the adapter for.
+    /// @param chainId The chain id to remove the adapter for.
+    /// @param adapter The adapter to remove.
     function removeBridgeAdapter(address asset, uint256 chainId, address adapter) external;
 
+    /// @notice Sets the default bridge adapter for an asset and chain; the default adapter is used for outbound
+    /// messages.
+    /// @dev The adapter must be whitelisted for the asset and chain.
+    /// @param asset The asset to set the default adapter for.
+    /// @param chainId The chain id to set the default adapter for.
+    /// @param adapter The adapter to set as the default.
     function setDefaultBridgeAdapter(address asset, uint256 chainId, address adapter) external;
 
     /// @notice Handle receiving of a data and funds from a source chain.
@@ -56,21 +94,15 @@ interface IChainGateway {
     function receiveMessage(uint256 sourceChainId, IBridgeAdapter.BridgeAsset[] memory assets, bytes memory data)
         external;
 
-    /// @notice Sends an arbitrary message containing instructions or data updates to a destination chain.
-    /// @param feeRefundRecipient The address to send the remaining bridge fee to if any. The actual fee is taken from
-    /// the msg.sender.
-    /// @param bridgeFeeToken Token to pay the bridge fee in (must be accepted by the Bridge provider).
-    /// @param bridgeFeeAmount The amount of fee to pay in the fee token (a refund is provided to the fee payer if
-    /// necessary).
+    /// @notice Sends a message to bridge IOU tokens to a destination chain.
     /// @param destinationChainId The chain id of the chain to publish the message to.
     /// @param iouTokenRecipient The address to send the IOU tokens to on the destination chain.
     /// @param iouTokenAmountRay The amount of IOU tokens to bridge.
+    /// @param bridgeParams The parameters for the bridge adapter.
     function sendBridgeIouTokenMessageWithFeePayer(
-        address feeRefundRecipient,
-        address bridgeFeeToken,
-        uint256 bridgeFeeAmount,
         uint256 destinationChainId,
         address iouTokenRecipient,
-        uint256 iouTokenAmountRay
+        uint256 iouTokenAmountRay,
+        BridgeParams memory bridgeParams
     ) external payable;
 }

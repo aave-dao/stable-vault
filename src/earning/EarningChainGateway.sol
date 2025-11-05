@@ -50,8 +50,7 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         return IOU_TOKEN_MANAGER;
     }
 
-    /// @inheritdoc IEarningChainGateway
-    function getAccountingChainId() external view override returns (uint256) {
+    function getAccountingChainId() external view returns (uint256) {
         return ACCOUNTING_CHAIN_ID;
     }
 
@@ -61,26 +60,12 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
     }
 
     /// @inheritdoc IEarningChainGateway
-    function sendBalanceUpdate() external override restricted {
-        _sendBalanceUpdate();
-    }
-
-    /// @inheritdoc IEarningChainGateway
-    function sendBalanceUpdateWithFeePayer(address bridgeFeePayer, address bridgeFeeToken, uint256 bridgeFeeAmount)
-        external
-        payable
-        override
-    {
-        IBridgeAdapter(_defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID])
-        .publishMessageToChainWithFeePayer{
-            value: msg.value
-        }(
-            bridgeFeePayer,
-            bridgeFeeToken,
-            bridgeFeeAmount,
-            ACCOUNTING_CHAIN_ID,
-            new IBridgeAdapter.BridgeAsset[](0),
-            _getBalanceSnapshotData()
+    function sendBalanceUpdateWithFeePayer(IChainGateway.BridgeParams memory bridgeParams) external payable override {
+        address adapter = _defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID];
+        require(adapter != address(0), AdapterNotFound());
+        _prepareBridgeFeeForAdapter(adapter, bridgeParams.feePayer, bridgeParams.feeToken, bridgeParams.feeAmount);
+        _sendCrossChainMessage(
+            ACCOUNTING_CHAIN_ID, adapter, new IBridgeAdapter.BridgeAsset[](0), _getBalanceSnapshotData(), bridgeParams
         );
     }
 
@@ -89,17 +74,15 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         uint256 iouTokenAmountRay,
         address tokenOut,
         address tokenOutReceiver,
-        address bridgeFeePayer,
-        address bridgeFeeToken,
-        uint256 bridgeFeeAmount
+        IChainGateway.BridgeParams memory bridgeParams
     ) external payable override returns (uint256) {
         require(iouTokenAmountRay > 0, ErrorsLib.ZeroAmount());
-        require(bridgeFeeAmount > 0, ErrorsLib.ZeroAmount());
-        if (bridgeFeeToken == address(0)) {
-            require(msg.value >= bridgeFeeAmount, ErrorsLib.InsufficientFunds());
-        }
-        // TODO: apply a withdrawal fee here?
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(msg.sender, iouTokenAmountRay);
+
+        address adapter = _defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID];
+        require(adapter != address(0), AdapterNotFound());
+
+        // TODO: apply a withdrawal fee here?
         uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(tokenOut);
         IAllocator(ALLOCATOR).withdraw(tokenOut, amountOut);
         IERC20(tokenOut).safeTransfer(tokenOutReceiver, amountOut);
@@ -115,26 +98,22 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
                 )
             })
         );
-        IBridgeAdapter(_defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID])
-        .publishMessageToChainWithFeePayer{
-            value: msg.value
-        }(
-            bridgeFeePayer,
-            bridgeFeeToken,
-            bridgeFeeAmount,
-            ACCOUNTING_CHAIN_ID,
-            new IBridgeAdapter.BridgeAsset[](0),
-            data
-        );
+        _prepareBridgeFeeForAdapter(adapter, bridgeParams.feePayer, bridgeParams.feeToken, bridgeParams.feeAmount);
+        _sendCrossChainMessage(ACCOUNTING_CHAIN_ID, adapter, new IBridgeAdapter.BridgeAsset[](0), data, bridgeParams);
         // TODO: emit event?
         return amountOut;
     }
 
     /// @inheritdoc IEarningChainGateway
-    function exit(address asset, uint256 amount) external override restricted {
+    function pushFundsToAccountingChain(address asset, uint256 amount, IChainGateway.BridgeParams memory bridgeParams)
+        external
+        payable
+        override
+        restricted
+    {
         require(amount > 0, ErrorsLib.ZeroAmount());
         IAllocator(ALLOCATOR).withdraw(asset, amount);
-        _returnFunds(asset, amount);
+        _returnFundsWithBalanceSnapshot(asset, amount, bridgeParams);
     }
 
     function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal override {
@@ -170,17 +149,20 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         // TODO: emit event?
     }
 
-    function _returnFunds(address asset, uint256 amount) internal {
-        address adapter = _defaultBridgeAdapter[asset][ACCOUNTING_CHAIN_ID];
-        IERC20(asset).forceApprove(adapter, amount);
+    function _returnFundsWithBalanceSnapshot(
+        address asset,
+        uint256 amount,
+        IChainGateway.BridgeParams memory bridgeParams
+    ) internal {
+        address bridgeAdapter = _defaultBridgeAdapter[asset][ACCOUNTING_CHAIN_ID];
+        require(bridgeAdapter != address(0), AdapterNotFound());
+
         IBridgeAdapter.BridgeAsset[] memory assets = new IBridgeAdapter.BridgeAsset[](1);
         assets[0] = IBridgeAdapter.BridgeAsset({asset: asset, amount: amount});
-        IBridgeAdapter(adapter).publishMessageToChain(ACCOUNTING_CHAIN_ID, assets, _getBalanceSnapshotData());
-    }
-
-    function _sendBalanceUpdate() internal {
-        IBridgeAdapter(_defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID])
-            .publishMessageToChain(ACCOUNTING_CHAIN_ID, new IBridgeAdapter.BridgeAsset[](0), _getBalanceSnapshotData());
+        // Send a single cross chain message with the asset and the balance snapshot. The bridge must support both
+        // assets and arbitrary data.
+        _prepareBridgeFeeForAdapter(bridgeAdapter, bridgeParams.feePayer, bridgeParams.feeToken, bridgeParams.feeAmount);
+        _sendCrossChainMessage(ACCOUNTING_CHAIN_ID, bridgeAdapter, assets, _getBalanceSnapshotData(), bridgeParams);
     }
 
     function _getTotalAssetsInRay() internal view returns (uint256) {

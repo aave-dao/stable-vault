@@ -55,16 +55,15 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
         _feeToken = feeToken;
     }
 
-    /// @inheritdoc BaseBridgeAdapter
-    function publishMessageToChain(uint256 chainId, BridgeAsset[] memory assets, bytes memory data)
-        external
-        override
-        onlyGateway
-    {
-        uint256 gasLimit = 2_000_000;
+    /// @inheritdoc IBridgeAdapter
+    function publishMessageToChainWithFeePayer(
+        uint256 destinationChainId,
+        BridgeAsset[] memory assets,
+        bytes memory data,
+        IChainGateway.BridgeParams memory bridgeParams
+    ) external payable override onlyGateway {
         Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](assets.length);
         if (assets.length > 0) {
-            gasLimit = 3_000_000;
             for (uint256 i = 0; i < assets.length; i++) {
                 address asset = assets[i].asset;
                 uint256 amount = assets[i].amount;
@@ -76,46 +75,17 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
             }
         }
         Client.EVM2AnyMessage memory ccipMessage = Client.EVM2AnyMessage({
-            receiver: abi.encode(_destinationChainAdapterOf[chainId]),
+            receiver: abi.encode(_destinationChainAdapterOf[destinationChainId]),
             data: data,
             tokenAmounts: tokenAmounts,
-            feeToken: _feeToken,
-            // TODO: Think how we pass this gasLimit down here
+            feeToken: bridgeParams.feeToken,
             extraArgs: Client._argsToBytes(
-                Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: false})
+                Client.GenericExtraArgsV2({gasLimit: bridgeParams.gasLimit, allowOutOfOrderExecution: false})
             )
         });
-        _sendMessage(chainId, ccipMessage);
-    }
-
-    function publishMessageToChainWithFeePayer(
-        address feeRefundRecipient,
-        address feeToken,
-        uint256 allocatedFeeAmount,
-        uint256 chainId,
-        BridgeAsset[] memory assets,
-        bytes memory data
-    ) external payable override onlyGateway {
-        uint256 gasLimit = 2_000_000;
-        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](assets.length);
-        if (assets.length > 0) {
-            gasLimit = 3_000_000;
-            for (uint256 i = 0; i < assets.length; i++) {
-                address asset = assets[i].asset;
-                uint256 amount = assets[i].amount;
-                tokenAmounts[i] = Client.EVMTokenAmount({token: asset, amount: amount});
-            }
-        }
-        Client.EVM2AnyMessage memory ccipMessage = Client.EVM2AnyMessage({
-            receiver: abi.encode(_destinationChainAdapterOf[chainId]),
-            data: data,
-            tokenAmounts: tokenAmounts,
-            feeToken: feeToken,
-            extraArgs: Client._argsToBytes(
-                Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: false})
-            )
-        });
-        _sendMessageWithFeePayer(feeRefundRecipient, feeToken, allocatedFeeAmount, chainId, ccipMessage);
+        _sendMessageWithFeePayer(
+            destinationChainId, ccipMessage, bridgeParams.feePayer, bridgeParams.feeToken, bridgeParams.feeAmount
+        );
     }
 
     /// @inheritdoc IAny2EVMMessageReceiver
@@ -169,11 +139,11 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
     }
 
     function _sendMessageWithFeePayer(
-        address feeRefundRecipient,
-        address feeToken,
-        uint256 allocatedFeeAmount,
         uint256 chainId,
-        Client.EVM2AnyMessage memory message
+        Client.EVM2AnyMessage memory message,
+        address feePayer,
+        address feeToken,
+        uint256 allocatedFeeAmount
     ) internal {
         uint64 chainSelector = _chainSelectorOf[chainId];
         uint256 estimatedFeeAmount = IRouterClient(CCIP_ROUTER).getFee(chainSelector, message);
@@ -181,17 +151,17 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
         if (feeToken == FEE_ON_NATIVE_CURRENCY) {
             msgValue = estimatedFeeAmount;
         } else {
-            // Pull the fee amount from the caller into this contract.
+            // Pull the fee amount from the sender into this contract.
             IERC20(feeToken).safeTransferFrom(msg.sender, address(this), estimatedFeeAmount);
             // Approve the Router to pull the estimated fee.
             IERC20(feeToken).safeIncreaseAllowance(CCIP_ROUTER, estimatedFeeAmount);
         }
-        // Return any excess fee to the fee refund recipient.
+        // Return any excess fee to the fee payer.
         if (allocatedFeeAmount > estimatedFeeAmount) {
             if (feeToken == FEE_ON_NATIVE_CURRENCY) {
-                payable(feeRefundRecipient).transfer(allocatedFeeAmount - estimatedFeeAmount);
+                payable(feePayer).transfer(allocatedFeeAmount - estimatedFeeAmount);
             } else {
-                IERC20(feeToken).safeTransfer(feeRefundRecipient, allocatedFeeAmount - estimatedFeeAmount);
+                IERC20(feeToken).safeTransfer(feePayer, allocatedFeeAmount - estimatedFeeAmount);
             }
         }
         IRouterClient(CCIP_ROUTER).ccipSend{value: msgValue}(chainSelector, message);

@@ -10,14 +10,12 @@ library MathLib {
         }
     }
 
-    /**
-     * @dev Multiplies two ray, rounding down
-     * @dev assembly optimized for improved gas savings, see
-     * https://twitter.com/transmissions11/status/1451131036377571328
-     * @param a Ray
-     * @param b Ray
-     * @return c = floor(a*b), in ray
-     */
+    /// @dev Multiplies two ray, rounding down
+    /// @dev assembly optimized for improved gas savings, see
+    /// https://twitter.com/transmissions11/status/1451131036377571328
+    /// @param a Ray
+    /// @param b Ray
+    /// @return c = floor(a*b), in ray
     function rayMulDown(uint256 a, uint256 b) internal pure returns (uint256 c) {
         // to avoid overflow, a <= type(uint256).max / b
         assembly ("memory-safe") {
@@ -27,14 +25,12 @@ library MathLib {
         }
     }
 
-    /**
-     * @dev Multiplies two ray, rounding up
-     * @dev assembly optimized for improved gas savings, see
-     * https://twitter.com/transmissions11/status/1451131036377571328
-     * @param a Ray
-     * @param b Ray
-     * @return c = ceil(a*b), in ray
-     */
+    /// @dev Multiplies two ray, rounding up
+    /// @dev assembly optimized for improved gas savings, see
+    /// https://twitter.com/transmissions11/status/1451131036377571328
+    /// @param a Ray
+    /// @param b Ray
+    /// @return c = ceil(a*b), in ray
     function rayMulUp(uint256 a, uint256 b) internal pure returns (uint256 c) {
         // to avoid overflow, a <= type(uint256).max / b
         assembly ("memory-safe") {
@@ -52,14 +48,12 @@ library MathLib {
         }
     }
 
-    /**
-     * @dev Divides two ray, rounding down
-     * @dev assembly optimized for improved gas savings, see
-     * https://twitter.com/transmissions11/status/1451131036377571328
-     * @param a Ray
-     * @param b Ray
-     * @return c = floor(a/b), in ray
-     */
+    /// @dev Divides two ray, rounding down
+    /// @dev assembly optimized for improved gas savings, see
+    /// https://twitter.com/transmissions11/status/1451131036377571328
+    /// @param a Ray
+    /// @param b Ray
+    /// @return c = floor(a/b), in ray
     function rayDivDown(uint256 a, uint256 b) internal pure returns (uint256 c) {
         // to avoid overflow, a <= type(uint256).max / RAY
         assembly ("memory-safe") {
