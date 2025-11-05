@@ -4,7 +4,6 @@ pragma solidity ^0.8.22;
 import {IBridgeAdapter} from "./IBridgeAdapter.sol";
 
 /// @notice Interface for handling the communication between chains for bridging assets and data.
-///
 /// @dev Assumes bridged assets and bridged data can be handled independently of each other.
 interface IChainGateway {
     error InvalidMessageType();
@@ -60,27 +59,21 @@ interface IChainGateway {
 
     /// @notice Gets the default bridge adapter for an asset and chain; the default adapter is used for outbound
     /// messages.
-    ///
     /// @dev The adapter must be whitelisted for the asset and chain.
-    ///
     /// @param asset The asset to get the default adapter for.
     /// @param chainId The chain id to get the default adapter for.
     /// @return The default adapter for the asset and chain.
     function getDefaultBridgeAdapter(address asset, uint256 chainId) external view returns (address);
 
     /// @notice Adds a bridge adapter to the gateway's set of whitelisted adapters.
-    ///
     /// @dev The adapter must not be already whitelisted for the asset and chain.
-    ///
     /// @param asset The asset to add the adapter for.
     /// @param chainId The chain id to add the adapter for.
     /// @param adapter The adapter to add.
     function addBridgeAdapter(address asset, uint256 chainId, address adapter) external;
 
     /// @notice Removes a bridge adapter from the gateway's set of whitelisted adapters.
-    ///
     /// @dev If the adapter is the default adapter for the asset and chain, the default adapter is unset.
-    ///
     /// @param asset The asset to remove the adapter for.
     /// @param chainId The chain id to remove the adapter for.
     /// @param adapter The adapter to remove.
@@ -88,16 +81,13 @@ interface IChainGateway {
 
     /// @notice Sets the default bridge adapter for an asset and chain; the default adapter is used for outbound
     /// messages.
-    ///
     /// @dev The adapter must be whitelisted for the asset and chain.
-    ///
     /// @param asset The asset to set the default adapter for.
     /// @param chainId The chain id to set the default adapter for.
     /// @param adapter The adapter to set as the default.
     function setDefaultBridgeAdapter(address asset, uint256 chainId, address adapter) external;
 
     /// @notice Handle receiving of a data and funds from a source chain.
-    ///
     /// @param sourceChainId The chain from which the message was sent from.
     /// @param data The data that was sent from a source chain.
     /// @param assets The assets bridged over from a source chain.
@@ -105,7 +95,6 @@ interface IChainGateway {
         external;
 
     /// @notice Sends a message to bridge IOU tokens to a destination chain.
-    ///
     /// @param destinationChainId The chain id of the chain to publish the message to.
     /// @param iouTokenRecipient The address to send the IOU tokens to on the destination chain.
     /// @param iouTokenAmountRay The amount of IOU tokens to bridge.

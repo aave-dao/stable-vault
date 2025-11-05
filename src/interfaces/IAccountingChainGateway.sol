@@ -7,7 +7,6 @@ interface IAccountingChainGateway is IChainGateway {
     error NotFundsHandler();
 
     /// @notice Sends assets to an Earning Chain.
-    ///
     /// @dev The Accounting Chain does not prescribe to the Earning Chain which strategy to push assets to.
     /// @dev One asset is pushed at a time to avoid depedencies on bridges that support multiple assets bridged
     /// together.

@@ -15,7 +15,6 @@ import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 /// @title EarningChainGateway
-///
 /// @notice Facilitates cross chain messaging with exactly one Accounting Chain.
 contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
     using SafeERC20 for IERC20;
@@ -26,7 +25,6 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
     uint256 internal _balanceSnapshotNonce;
 
     /// @dev Constructor.
-    ///
     /// @param accountingChainId The Chain ID of the Accounting Chain.
     /// @param allocator The address of the Allocator contract.
     /// @param iouTokenManager The address of the IOU token manager contract.
@@ -39,7 +37,6 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
     }
 
     /// @dev Initializer.
-    ///
     /// @param accessManager The address of the IAccessManager contract used for handling access control.
     function initialize(address accessManager) external virtual initializer {
         __EarningChainGateway_init(accessManager);

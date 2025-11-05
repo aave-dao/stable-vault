@@ -16,7 +16,6 @@ import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {BaseBridgeAdapter} from "./BaseBridgeAdapter.sol";
 
 /// @title CcipAdapter
-///
 /// @notice Adapter for sending and receiving messages via Chainlink CCIP.
 contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
     using SafeERC20 for IERC20;
