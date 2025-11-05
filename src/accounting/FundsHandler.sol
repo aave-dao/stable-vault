@@ -131,12 +131,10 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
     ) external payable override restricted {
         require(amount > 0, ErrorsLib.ZeroAmount());
 
-        if (bridgeAdapterParams.bridgeFeeToken != address(0)) {
-            IERC20(bridgeAdapterParams.bridgeFeeToken)
-                .safeTransferFrom(
-                    bridgeAdapterParams.bridgeFeePayer, address(this), bridgeAdapterParams.bridgeFeeAmount
-                );
-            IERC20(bridgeAdapterParams.bridgeFeeToken).forceApprove(GATEWAY, bridgeAdapterParams.bridgeFeeAmount);
+        if (bridgeAdapterParams.feeToken != BRIDGE_FEE_ON_NATIVE_CURRENCY) {
+            IERC20(bridgeAdapterParams.feeToken)
+                .safeTransferFrom(bridgeAdapterParams.feePayer, address(this), bridgeAdapterParams.feeAmount);
+            IERC20(bridgeAdapterParams.feeToken).forceApprove(GATEWAY, bridgeAdapterParams.feeAmount);
         }
 
         _pullFundsFromImmediateLiquidity(asset, amount);

@@ -87,10 +87,10 @@ contract EndToEndTest is BaseTest {
                 userInitialDeposit,
                 EARNING_CHAIN_ID,
                 IChainGateway.BridgeAdapterParams({
-                    bridgeFeePayer: everyRoleAccount,
-                    bridgeFeeToken: address(0),
-                    bridgeFeeAmount: bridgeFeeAmount,
-                    tripGasLimit: 300000,
+                    feePayer: everyRoleAccount,
+                    feeToken: address(0),
+                    feeAmount: bridgeFeeAmount,
+                    gasLimit: 300000,
                     data: ""
                 })
             );
@@ -198,10 +198,10 @@ contract EndToEndTest is BaseTest {
             vm.deal(everyRoleAccount, bridgeFeeAmount);
             earningChainGateway.sendBalanceUpdateWithFeePayer{value: bridgeFeeAmount}(
                 IChainGateway.BridgeAdapterParams({
-                    bridgeFeePayer: everyRoleAccount,
-                    bridgeFeeToken: address(0),
-                    bridgeFeeAmount: bridgeFeeAmount,
-                    tripGasLimit: 300000,
+                    feePayer: everyRoleAccount,
+                    feeToken: address(0),
+                    feeAmount: bridgeFeeAmount,
+                    gasLimit: 300000,
                     data: ""
                 })
             );
@@ -238,10 +238,10 @@ contract EndToEndTest is BaseTest {
                 address(GHO),
                 userEarningsInGho,
                 IChainGateway.BridgeAdapterParams({
-                    bridgeFeePayer: everyRoleAccount,
-                    bridgeFeeToken: address(0),
-                    bridgeFeeAmount: bridgeFeeAmount,
-                    tripGasLimit: 300000,
+                    feePayer: everyRoleAccount,
+                    feeToken: address(0),
+                    feeAmount: bridgeFeeAmount,
+                    gasLimit: 300000,
                     data: ""
                 })
             );
@@ -343,10 +343,10 @@ contract EndToEndTest is BaseTest {
                 address(GHO),
                 ghoBalanceOnVaultLeft,
                 IChainGateway.BridgeAdapterParams({
-                    bridgeFeePayer: everyRoleAccount,
-                    bridgeFeeToken: address(0),
-                    bridgeFeeAmount: bridgeFeeAmount,
-                    tripGasLimit: 300000,
+                    feePayer: everyRoleAccount,
+                    feeToken: address(0),
+                    feeAmount: bridgeFeeAmount,
+                    gasLimit: 300000,
                     data: ""
                 })
             );

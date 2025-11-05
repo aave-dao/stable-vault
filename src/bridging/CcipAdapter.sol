@@ -79,17 +79,17 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
             receiver: abi.encode(_destinationChainAdapterOf[destinationChainId]),
             data: data,
             tokenAmounts: tokenAmounts,
-            feeToken: bridgeAdapterParams.bridgeFeeToken,
+            feeToken: bridgeAdapterParams.feeToken,
             extraArgs: Client._argsToBytes(
-                Client.GenericExtraArgsV2({gasLimit: bridgeAdapterParams.tripGasLimit, allowOutOfOrderExecution: false})
+                Client.GenericExtraArgsV2({gasLimit: bridgeAdapterParams.gasLimit, allowOutOfOrderExecution: false})
             )
         });
         _sendMessageWithFeePayer(
             destinationChainId,
             ccipMessage,
-            bridgeAdapterParams.bridgeFeePayer,
-            bridgeAdapterParams.bridgeFeeToken,
-            bridgeAdapterParams.bridgeFeeAmount
+            bridgeAdapterParams.feePayer,
+            bridgeAdapterParams.feeToken,
+            bridgeAdapterParams.feeAmount
         );
     }
 

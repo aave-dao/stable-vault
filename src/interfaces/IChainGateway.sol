@@ -22,17 +22,16 @@ interface IChainGateway {
     }
 
     struct BridgeAdapterParams {
-        // The address that will pay the bridge fee (this receives a refund if funds from
-        // bridgeFeeAmount are not used).
-        address bridgeFeePayer;
+        // The address that will pay the bridge fee (also the recipient of any refund).
+        address feePayer;
         // The token to pay the bridge fee in.
-        address bridgeFeeToken;
-        // The estimated amount of fee to pay in the fee token.
-        uint256 bridgeFeeAmount;
+        address feeToken;
+        // The amount of `feeToken` approved by `feePayer` to spend on fees.
+        uint256 feeAmount;
         // Total gas that should be allocated for executions that take place from the message being processed on the
         // destination chain (including round trips).
-        uint256 tripGasLimit;
-        // Arbitrary data that will be passed to the bridge adapter.
+        uint256 gasLimit;
+        // Arbitrary data that may be required by the bridge adapter to operate.
         bytes data;
     }
 

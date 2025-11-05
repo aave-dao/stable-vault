@@ -84,11 +84,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             userInitialDeposit,
             EARNING_CHAIN_ID,
             IChainGateway.BridgeAdapterParams({
-                bridgeFeePayer: everyRoleAccount,
-                bridgeFeeToken: address(0),
-                bridgeFeeAmount: bridgeFeeAmount,
-                tripGasLimit: 300000,
-                data: ""
+                feePayer: everyRoleAccount, feeToken: address(0), feeAmount: bridgeFeeAmount, gasLimit: 300000, data: ""
             })
         );
 
@@ -149,11 +145,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             user1,
             iouAmountRequestedRay,
             IChainGateway.BridgeAdapterParams({
-                bridgeFeePayer: user1,
-                bridgeFeeToken: address(0),
-                bridgeFeeAmount: bridgeFeeAmount,
-                tripGasLimit: 300000,
-                data: ""
+                feePayer: user1, feeToken: address(0), feeAmount: bridgeFeeAmount, gasLimit: 300000, data: ""
             })
         );
         // Check the IOU token balance on Accounting Chain went down
@@ -235,11 +227,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             user2,
             iouAmountRequestedRay,
             IChainGateway.BridgeAdapterParams({
-                bridgeFeePayer: user2,
-                bridgeFeeToken: address(0),
-                bridgeFeeAmount: bridgeFeeAmount,
-                tripGasLimit: 100000,
-                data: ""
+                feePayer: user2, feeToken: address(0), feeAmount: bridgeFeeAmount, gasLimit: 100000, data: ""
             })
         );
         require(
@@ -262,11 +250,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             user2,
             iouAmountRequestedRay,
             IChainGateway.BridgeAdapterParams({
-                bridgeFeePayer: user2,
-                bridgeFeeToken: address(0),
-                bridgeFeeAmount: bridgeFeeAmount,
-                tripGasLimit: 100000,
-                data: ""
+                feePayer: user2, feeToken: address(0), feeAmount: bridgeFeeAmount, gasLimit: 100000, data: ""
             })
         );
         require(
@@ -299,7 +283,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             address(USDC),
             user1,
             IChainGateway.BridgeAdapterParams({
-                bridgeFeePayer: user1, bridgeFeeToken: address(0), bridgeFeeAmount: 1, tripGasLimit: 100000, data: ""
+                feePayer: user1, feeToken: address(0), feeAmount: 1, gasLimit: 100000, data: ""
             })
         );
 

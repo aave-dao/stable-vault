@@ -80,10 +80,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
             })
         );
         _prepareBridgeFeeForAdapter(
-            adapter,
-            bridgeAdapterParams.bridgeFeePayer,
-            bridgeAdapterParams.bridgeFeeToken,
-            bridgeAdapterParams.bridgeFeeAmount
+            adapter, bridgeAdapterParams.feePayer, bridgeAdapterParams.feeToken, bridgeAdapterParams.feeAmount
         );
         _sendCrossChainMessage(
             destinationChainId, adapter, new IBridgeAdapter.BridgeAsset[](0), data, bridgeAdapterParams

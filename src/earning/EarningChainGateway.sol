@@ -71,10 +71,7 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         address adapter = _defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID];
         require(adapter != address(0), AdapterNotFound());
         _prepareBridgeFeeForAdapter(
-            adapter,
-            bridgeAdapterParams.bridgeFeePayer,
-            bridgeAdapterParams.bridgeFeeToken,
-            bridgeAdapterParams.bridgeFeeAmount
+            adapter, bridgeAdapterParams.feePayer, bridgeAdapterParams.feeToken, bridgeAdapterParams.feeAmount
         );
         _sendCrossChainMessage(
             ACCOUNTING_CHAIN_ID,
@@ -115,10 +112,7 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
             })
         );
         _prepareBridgeFeeForAdapter(
-            adapter,
-            bridgeAdapterParams.bridgeFeePayer,
-            bridgeAdapterParams.bridgeFeeToken,
-            bridgeAdapterParams.bridgeFeeAmount
+            adapter, bridgeAdapterParams.feePayer, bridgeAdapterParams.feeToken, bridgeAdapterParams.feeAmount
         );
         _sendCrossChainMessage(
             ACCOUNTING_CHAIN_ID, adapter, new IBridgeAdapter.BridgeAsset[](0), data, bridgeAdapterParams
@@ -184,10 +178,7 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         // Send a single cross chain message with the asset and the balance snapshot. The bridge must support both
         // assets and arbitrary data.
         _prepareBridgeFeeForAdapter(
-            bridgeAdapter,
-            bridgeAdapterParams.bridgeFeePayer,
-            bridgeAdapterParams.bridgeFeeToken,
-            bridgeAdapterParams.bridgeFeeAmount
+            bridgeAdapter, bridgeAdapterParams.feePayer, bridgeAdapterParams.feeToken, bridgeAdapterParams.feeAmount
         );
         _sendCrossChainMessage(
             ACCOUNTING_CHAIN_ID, bridgeAdapter, assets, _getBalanceSnapshotData(), bridgeAdapterParams
