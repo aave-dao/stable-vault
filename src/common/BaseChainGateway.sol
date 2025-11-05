@@ -69,7 +69,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
         require(destinationChainId != block.chainid, ErrorsLib.InvalidDestinationChainId());
 
         address adapter = _defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId];
-        require(adapter != address(0), UnsupportedAdapter());
+        require(adapter != address(0), AdapterNotFound());
 
         bytes memory data = abi.encode(
             IChainGateway.CrossChainMessage({
@@ -129,7 +129,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
     /// @dev Checks full set of adapters as opposed to the default adapter in case an adapter is swapped out but a
     /// pending message needs to be ingested.
     function _onlyAdapter(address asset, uint256 sourceChainId) internal view {
-        require(_supportedBridgeAdapters[asset][sourceChainId][msg.sender], UnsupportedAdapter());
+        require(_supportedBridgeAdapters[asset][sourceChainId][msg.sender], AdapterNotFound());
     }
 
     /// @dev Assumes the bridge fee has not yet been pulled from the caller into this contract.

@@ -8,7 +8,7 @@ import {IBridgeAdapter} from "./IBridgeAdapter.sol";
 /// @dev Assumes bridged assets and bridged data can be handled independently of each other.
 interface IChainGateway {
     error InvalidMessageType();
-    error UnsupportedAdapter();
+    error AdapterNotFound();
 
     event BridgeAdapterAdded(address asset, uint256 chainId, address adapter);
     event BridgeAdapterRemoved(address asset, uint256 chainId, address adapter);

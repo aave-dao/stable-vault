@@ -52,7 +52,7 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
         BridgeAdapterParams memory bridgeAdapterParams
     ) external payable override onlyFundsHandler {
         address adapter = _defaultBridgeAdapter[asset][targetChainId];
-        require(adapter != address(0), UnsupportedAdapter());
+        require(adapter != address(0), AdapterNotFound());
 
         // Pull the asset to bridge from the caller into this contract.
         IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);

@@ -69,7 +69,7 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         override
     {
         address adapter = _defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID];
-        require(adapter != address(0), UnsupportedAdapter());
+        require(adapter != address(0), AdapterNotFound());
         _prepareBridgeFeeForAdapter(
             adapter,
             bridgeAdapterParams.bridgeFeePayer,
@@ -96,7 +96,7 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(msg.sender, iouTokenAmountRay);
 
         address adapter = _defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID];
-        require(adapter != address(0), UnsupportedAdapter());
+        require(adapter != address(0), AdapterNotFound());
 
         // TODO: apply a withdrawal fee here?
         uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(tokenOut);
@@ -177,7 +177,7 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         IChainGateway.BridgeAdapterParams memory bridgeAdapterParams
     ) internal {
         address bridgeAdapter = _defaultBridgeAdapter[asset][ACCOUNTING_CHAIN_ID];
-        require(bridgeAdapter != address(0), UnsupportedAdapter());
+        require(bridgeAdapter != address(0), AdapterNotFound());
 
         IBridgeAdapter.BridgeAsset[] memory assets = new IBridgeAdapter.BridgeAsset[](1);
         assets[0] = IBridgeAdapter.BridgeAsset({asset: asset, amount: amount});

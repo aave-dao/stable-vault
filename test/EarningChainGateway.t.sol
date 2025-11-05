@@ -462,7 +462,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         vm.prank(admin);
         _earningChainGateway.removeBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, address(_mockBridgeAdapterData));
 
-        vm.expectRevert(IChainGateway.UnsupportedAdapter.selector);
+        vm.expectRevert(IChainGateway.AdapterNotFound.selector);
         _earningChainGateway.sendBalanceUpdateWithFeePayer(
             IChainGateway.BridgeAdapterParams({
                 bridgeFeePayer: makeAddr("bridgeFeePayer"),
@@ -799,7 +799,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         _earningChainGateway.removeBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, address(_mockBridgeAdapterData));
 
         address tokenOutReceiver = makeAddr("tokenOutReceiver");
-        vm.expectRevert(IChainGateway.UnsupportedAdapter.selector);
+        vm.expectRevert(IChainGateway.AdapterNotFound.selector);
         vm.prank(tokenOutReceiver);
         _earningChainGateway.exchangeIouTokens(
             100_000_000_000_000 * 10 ** 27,
@@ -1259,7 +1259,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         );
     }
 
-    function test_pushFundsToAccountingChain_reverts_ifUnsupportedAdapter(
+    function test_pushFundsToAccountingChain_reverts_ifAdapterNotFound(
         uint256 amount,
         address bridgeFeePayer,
         uint256 bridgeFeeAmount
@@ -1277,7 +1277,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         // Put funds idle in Allocator to allow withdrawal to EarningChainGateway
         _mockUsdt.mint(address(_mockAllocator), amount);
 
-        vm.expectRevert(IChainGateway.UnsupportedAdapter.selector);
+        vm.expectRevert(IChainGateway.AdapterNotFound.selector);
         vm.prank(everyRoleAccount);
         _earningChainGateway.pushFundsToAccountingChain(
             address(_mockUsdt),
@@ -1484,12 +1484,12 @@ contract EarningChainGatewayTest is TestWithHelpers {
         );
     }
 
-    function test_sendBridgeIouTokenMessageWithFeePayer_reverts_ifUnsupportedAdapter() public {
+    function test_sendBridgeIouTokenMessageWithFeePayer_reverts_ifAdapterNotFound() public {
         // Remove the adapter for message bridge
         vm.prank(admin);
         _earningChainGateway.removeBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, address(_mockBridgeAdapterData));
 
-        vm.expectRevert(IChainGateway.UnsupportedAdapter.selector);
+        vm.expectRevert(IChainGateway.AdapterNotFound.selector);
         vm.prank(address(_mockIouTokenManager));
         _earningChainGateway.sendBridgeIouTokenMessageWithFeePayer(
             ACCOUNTING_CHAIN_ID,
@@ -1586,7 +1586,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     }
 
     function test_reverts_receiveMessage_ifNotAdapter() public {
-        vm.expectRevert(IChainGateway.UnsupportedAdapter.selector);
+        vm.expectRevert(IChainGateway.AdapterNotFound.selector);
         vm.prank(makeAddr("notAdapter"));
         _earningChainGateway.receiveMessage(
             ACCOUNTING_CHAIN_ID,

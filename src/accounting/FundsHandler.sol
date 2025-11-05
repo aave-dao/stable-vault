@@ -140,7 +140,7 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
         }
 
         _pullFundsFromImmediateLiquidity(asset, amount);
-        // Increase allowance for when the fee token is the same token being bridged.
+        // Increase allowance in case of the fee token matching the same token being bridged.
         IERC20(asset).safeIncreaseAllowance(GATEWAY, amount);
         // Increment the chain balance snapshot for the target chain.
         _updateChainBalanceBeforeBridging(chainId, amount.assetDecimalsToRay(asset));
