@@ -60,10 +60,7 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
         // The FundsHandler will have pulled the fee token from the caller to itself.
         // Pull the fee token from the FundsHandler to this contract.
         _prepareBridgeFeeForAdapter(
-            adapter,
-            bridgeAdapterParams.bridgeFeePayer,
-            bridgeAdapterParams.bridgeFeeToken,
-            bridgeAdapterParams.bridgeFeeAmount
+            adapter, msg.sender, bridgeAdapterParams.bridgeFeeToken, bridgeAdapterParams.bridgeFeeAmount
         );
         IBridgeAdapter.BridgeAsset[] memory assets = new IBridgeAdapter.BridgeAsset[](1);
         assets[0] = IBridgeAdapter.BridgeAsset({asset: asset, amount: amount});
