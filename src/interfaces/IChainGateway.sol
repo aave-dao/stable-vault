@@ -43,10 +43,32 @@ interface IChainGateway {
         uint256 balanceSnapshotTotalAssetsInRay;
     }
 
+    /// @notice Gets the default bridge adapter for an asset and chain; the default adapter is used for outbound
+    /// messages. @dev The adapter must be whitelisted for the asset and chain.
+    /// @param asset The asset to get the default adapter for.
+    /// @param chainId The chain id to get the default adapter for.
+    /// @return The default adapter for the asset and chain.
+    function getDefaultBridgeAdapter(address asset, uint256 chainId) external view returns (address);
+
+    /// @notice Adds a bridge adapter to the gateway's set of whitelisted adapters.
+    /// @dev The adapter must not be already whitelisted for the asset and chain.
+    /// @param asset The asset to add the adapter for.
+    /// @param chainId The chain id to add the adapter for.
+    /// @param adapter The adapter to add.
     function addBridgeAdapter(address asset, uint256 chainId, address adapter) external;
 
+    /// @notice Removes a bridge adapter from the gateway's set of whitelisted adapters.
+    /// @dev If the adapter is the default adapter for the asset and chain, the default adapter is unset.
+    /// @param asset The asset to remove the adapter for.
+    /// @param chainId The chain id to remove the adapter for.
+    /// @param adapter The adapter to remove.
     function removeBridgeAdapter(address asset, uint256 chainId, address adapter) external;
 
+    /// @notice Sets the default bridge adapter for an asset and chain; the default adapter is used for outbound
+    /// messages. @dev The adapter must be whitelisted for the asset and chain.
+    /// @param asset The asset to set the default adapter for.
+    /// @param chainId The chain id to set the default adapter for.
+    /// @param adapter The adapter to set as the default.
     function setDefaultBridgeAdapter(address asset, uint256 chainId, address adapter) external;
 
     /// @notice Handle receiving of a data and funds from a source chain.
@@ -57,7 +79,7 @@ interface IChainGateway {
         external;
 
     /// @notice Sends an arbitrary message containing instructions or data updates to a destination chain.
-    /// @param feeRefundRecipient The address to send the remaining bridge fee to if any. The actual fee is taken from
+    /// @param bridgeFeePayer The address to send the remaining bridge fee to if any. The actual fee is taken from
     /// the msg.sender.
     /// @param bridgeFeeToken Token to pay the bridge fee in (must be accepted by the Bridge provider).
     /// @param bridgeFeeAmount The amount of fee to pay in the fee token (a refund is provided to the fee payer if
@@ -66,7 +88,7 @@ interface IChainGateway {
     /// @param iouTokenRecipient The address to send the IOU tokens to on the destination chain.
     /// @param iouTokenAmountRay The amount of IOU tokens to bridge.
     function sendBridgeIouTokenMessageWithFeePayer(
-        address feeRefundRecipient,
+        address bridgeFeePayer,
         address bridgeFeeToken,
         uint256 bridgeFeeAmount,
         uint256 destinationChainId,

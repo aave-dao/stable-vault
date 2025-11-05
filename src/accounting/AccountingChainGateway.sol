@@ -10,7 +10,6 @@ import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
 import {IIouTokenManager} from "../interfaces/IIouTokenManager.sol";
-import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 /// @title AccountingChainGateway
 /// @notice Facilitates cross chain messaging one or more Earning Chains.
@@ -42,6 +41,10 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
         __BaseChainGateway_init(accessManager);
     }
 
+    function getFundsHandler() external view returns (address) {
+        return FUNDS_HANDLER;
+    }
+
     function sendPushFundsToChainMessage(
         address asset,
         uint256 amount,
@@ -52,23 +55,16 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
     ) external payable override onlyFundsHandler {
         address adapter = _defaultBridgeAdapter[asset][targetChainId];
         require(adapter != address(0), UnsupportedAdapter());
-        require(bridgeFeeAmount > 0, ErrorsLib.ZeroAmount());
-        if (bridgeFeeToken == address(0)) {
-            require(msg.value >= bridgeFeeAmount, ErrorsLib.InsufficientFunds());
-        } else {
-            IERC20(bridgeFeeToken).safeTransferFrom(bridgeFeePayer, address(this), bridgeFeeAmount);
-            IERC20(bridgeFeeToken).forceApprove(adapter, bridgeFeeAmount);
-        }
-        // Pull funds from caller into this contract.
+
+        // Pull the asset to bridge from the caller into this contract.
         IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
-        // Approve the bridge adapter to spend the funds.
-        // Increase allowance for when the fee token is the same token being bridged.
-        IERC20(asset).safeIncreaseAllowance(adapter, amount);
+
+        // The FundsHandler will have pulled the fee token from the caller to itself.
+        // Pull the fee token from the FundsHandler to this contract.
+        _prepareBridgeFeeForAdapter(adapter, msg.sender, bridgeFeeToken, bridgeFeeAmount);
         IBridgeAdapter.BridgeAsset[] memory assets = new IBridgeAdapter.BridgeAsset[](1);
         assets[0] = IBridgeAdapter.BridgeAsset({asset: asset, amount: amount});
-        IBridgeAdapter(adapter).publishMessageToChainWithFeePayer{value: msg.value}(
-            targetChainId, assets, "", bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount
-        );
+        _sendCrossChainMessage(targetChainId, adapter, assets, "", bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount);
     }
 
     function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal override {

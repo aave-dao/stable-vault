@@ -66,17 +66,12 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         payable
         override
     {
-        require(bridgeFeeAmount > 0, ErrorsLib.ZeroAmount());
         address adapter = _defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID];
         require(adapter != address(0), UnsupportedAdapter());
-        if (bridgeFeeToken == address(0)) {
-            require(msg.value >= bridgeFeeAmount, ErrorsLib.InsufficientFunds());
-        } else {
-            IERC20(bridgeFeeToken).safeTransferFrom(bridgeFeePayer, address(this), bridgeFeeAmount);
-            IERC20(bridgeFeeToken).forceApprove(adapter, bridgeFeeAmount);
-        }
-        IBridgeAdapter(adapter).publishMessageToChainWithFeePayer{value: msg.value}(
+        _prepareBridgeFeeForAdapter(adapter, bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount);
+        _sendCrossChainMessage(
             ACCOUNTING_CHAIN_ID,
+            adapter,
             new IBridgeAdapter.BridgeAsset[](0),
             _getBalanceSnapshotData(),
             bridgeFeePayer,
@@ -97,17 +92,8 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         require(iouTokenAmountRay > 0, ErrorsLib.ZeroAmount());
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(msg.sender, iouTokenAmountRay);
 
-        require(bridgeFeeAmount > 0, ErrorsLib.ZeroAmount());
-
         address adapter = _defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID];
         require(adapter != address(0), UnsupportedAdapter());
-
-        if (bridgeFeeToken == address(0)) {
-            require(msg.value >= bridgeFeeAmount, ErrorsLib.InsufficientFunds());
-        } else {
-            IERC20(bridgeFeeToken).safeTransferFrom(bridgeFeePayer, address(this), bridgeFeeAmount);
-            IERC20(bridgeFeeToken).forceApprove(adapter, bridgeFeeAmount);
-        }
 
         // TODO: apply a withdrawal fee here?
         uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(tokenOut);
@@ -125,8 +111,10 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
                 )
             })
         );
-        IBridgeAdapter(adapter).publishMessageToChainWithFeePayer{value: msg.value}(
+        _prepareBridgeFeeForAdapter(adapter, bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount);
+        _sendCrossChainMessage(
             ACCOUNTING_CHAIN_ID,
+            adapter,
             new IBridgeAdapter.BridgeAsset[](0),
             data,
             bridgeFeePayer,
@@ -146,12 +134,8 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         uint256 bridgeFeeAmount
     ) external payable override restricted {
         require(amount > 0, ErrorsLib.ZeroAmount());
-        require(bridgeFeeAmount > 0, ErrorsLib.ZeroAmount());
-        if (bridgeFeeToken == address(0)) {
-            require(msg.value >= bridgeFeeAmount, ErrorsLib.InsufficientFunds());
-        }
         IAllocator(ALLOCATOR).withdraw(asset, amount);
-        _returnFunds(asset, amount, bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount);
+        _returnFundsWithBalanceSnapshot(asset, amount, bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount);
     }
 
     function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal override {
@@ -187,19 +171,29 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         // TODO: emit event?
     }
 
-    function _returnFunds(
+    function _returnFundsWithBalanceSnapshot(
         address asset,
         uint256 amount,
         address bridgeFeePayer,
         address bridgeFeeToken,
         uint256 bridgeFeeAmount
     ) internal {
-        address adapter = _defaultBridgeAdapter[asset][ACCOUNTING_CHAIN_ID];
-        IERC20(asset).forceApprove(adapter, amount);
+        address bridgeAdapter = _defaultBridgeAdapter[asset][ACCOUNTING_CHAIN_ID];
+        require(bridgeAdapter != address(0), UnsupportedAdapter());
+
         IBridgeAdapter.BridgeAsset[] memory assets = new IBridgeAdapter.BridgeAsset[](1);
         assets[0] = IBridgeAdapter.BridgeAsset({asset: asset, amount: amount});
-        IBridgeAdapter(adapter).publishMessageToChainWithFeePayer{value: msg.value}(
-            ACCOUNTING_CHAIN_ID, assets, _getBalanceSnapshotData(), bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount
+        // Send a single cross chain message with the asset and the balance snapshot. The bridge must support both
+        // assets and arbitrary data.
+        _prepareBridgeFeeForAdapter(bridgeAdapter, bridgeFeePayer, bridgeFeeToken, bridgeFeeAmount);
+        _sendCrossChainMessage(
+            ACCOUNTING_CHAIN_ID,
+            bridgeAdapter,
+            assets,
+            _getBalanceSnapshotData(),
+            bridgeFeePayer,
+            bridgeFeeToken,
+            bridgeFeeAmount
         );
     }
 
