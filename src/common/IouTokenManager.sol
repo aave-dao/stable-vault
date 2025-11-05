@@ -64,10 +64,6 @@ contract IouTokenManager is IIouTokenManager {
         IChainGateway.BridgeAdapterParams memory bridgeAdapterParams
     ) external payable override {
         require(destinationChainId != block.chainid, ErrorsLib.InvalidDestinationChainId());
-        require(bridgeAdapterParams.bridgeFeeAmount > 0, ErrorsLib.ZeroAmount());
-        if (bridgeAdapterParams.bridgeFeeToken == address(0)) {
-            require(msg.value >= bridgeAdapterParams.bridgeFeeAmount, ErrorsLib.InsufficientFunds());
-        }
         if (IS_CONANICAL_CHAIN) {
             _lockTokens(msg.sender, iouTokenAmountRay);
         } else {
