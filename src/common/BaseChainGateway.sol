@@ -42,6 +42,11 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
     }
 
     /// @inheritdoc IChainGateway
+    function getDefaultBridgeAdapter(address asset, uint256 chainId) external view override returns (address) {
+        return _defaultBridgeAdapter[asset][chainId];
+    }
+
+    /// @inheritdoc IChainGateway
     function receiveMessage(uint256 sourceChainId, IBridgeAdapter.BridgeAsset[] memory assets, bytes memory data)
         external
         override
@@ -80,17 +85,12 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
             })
         );
         _prepareBridgeFeeForAdapter(adapter, bridgeParams.feePayer, bridgeParams.feeToken, bridgeParams.feeAmount);
-        _sendCrossChainMessage(destinationChainId, adapter, new IBridgeAdapter.BridgeAsset[](0), data, bridgeParams);
+        _sendCrossChainMessage(destinationChainId, adapter, ASSET_FOR_DATA_ONLY_BRIDGE, 0, data, bridgeParams);
     }
 
     /// @inheritdoc RescuableAssets
     function rescueTokens(address asset, uint256 amount) public override restricted {
         super.rescueTokens(asset, amount);
-    }
-
-    /// @inheritdoc IChainGateway
-    function getDefaultBridgeAdapter(address asset, uint256 chainId) external view override returns (address) {
-        return _defaultBridgeAdapter[asset][chainId];
     }
 
     /// @inheritdoc IChainGateway
@@ -146,16 +146,22 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
     function _sendCrossChainMessage(
         uint256 destinationChainId,
         address adapter,
-        IBridgeAdapter.BridgeAsset[] memory assets,
-        bytes memory data,
+        address assetToBridge,
+        uint256 amountToBridge,
+        bytes memory dataToBridge,
         BridgeParams memory bridgeParams
     ) internal {
-        for (uint256 i = 0; i < assets.length; i++) {
-            // Increase allowance for when the fee token is the same token being bridged.
-            IERC20(assets[i].asset).safeIncreaseAllowance(adapter, assets[i].amount);
+        IBridgeAdapter.BridgeAsset[] memory assets = new IBridgeAdapter.BridgeAsset[](0);
+        if (assetToBridge != FEE_ON_NATIVE_CURRENCY) {
+            assets = new IBridgeAdapter.BridgeAsset[](1);
+            assets[0] = IBridgeAdapter.BridgeAsset({asset: assetToBridge, amount: amountToBridge});
+            for (uint256 i = 0; i < assets.length; i++) {
+                // Increase allowance for when the fee token is the same token being bridged.
+                IERC20(assets[i].asset).safeIncreaseAllowance(adapter, assets[i].amount);
+            }
         }
         IBridgeAdapter(adapter).publishMessageToChainWithFeePayer{value: msg.value}(
-            destinationChainId, assets, data, bridgeParams
+            destinationChainId, assets, dataToBridge, bridgeParams
         );
     }
 

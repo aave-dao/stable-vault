@@ -65,7 +65,7 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         require(adapter != address(0), AdapterNotFound());
         _prepareBridgeFeeForAdapter(adapter, bridgeParams.feePayer, bridgeParams.feeToken, bridgeParams.feeAmount);
         _sendCrossChainMessage(
-            ACCOUNTING_CHAIN_ID, adapter, new IBridgeAdapter.BridgeAsset[](0), _getBalanceSnapshotData(), bridgeParams
+            ACCOUNTING_CHAIN_ID, adapter, ASSET_FOR_DATA_ONLY_BRIDGE, 0, _getBalanceSnapshotData(), bridgeParams
         );
     }
 
@@ -99,7 +99,7 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
             })
         );
         _prepareBridgeFeeForAdapter(adapter, bridgeParams.feePayer, bridgeParams.feeToken, bridgeParams.feeAmount);
-        _sendCrossChainMessage(ACCOUNTING_CHAIN_ID, adapter, new IBridgeAdapter.BridgeAsset[](0), data, bridgeParams);
+        _sendCrossChainMessage(ACCOUNTING_CHAIN_ID, adapter, ASSET_FOR_DATA_ONLY_BRIDGE, 0, data, bridgeParams);
         // TODO: emit event?
         return amountOut;
     }
@@ -157,12 +157,12 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         address bridgeAdapter = _defaultBridgeAdapter[asset][ACCOUNTING_CHAIN_ID];
         require(bridgeAdapter != address(0), AdapterNotFound());
 
-        IBridgeAdapter.BridgeAsset[] memory assets = new IBridgeAdapter.BridgeAsset[](1);
-        assets[0] = IBridgeAdapter.BridgeAsset({asset: asset, amount: amount});
         // Send a single cross chain message with the asset and the balance snapshot. The bridge must support both
         // assets and arbitrary data.
         _prepareBridgeFeeForAdapter(bridgeAdapter, bridgeParams.feePayer, bridgeParams.feeToken, bridgeParams.feeAmount);
-        _sendCrossChainMessage(ACCOUNTING_CHAIN_ID, bridgeAdapter, assets, _getBalanceSnapshotData(), bridgeParams);
+        _sendCrossChainMessage(
+            ACCOUNTING_CHAIN_ID, bridgeAdapter, asset, amount, _getBalanceSnapshotData(), bridgeParams
+        );
     }
 
     function _getTotalAssetsInRay() internal view returns (uint256) {
