@@ -148,6 +148,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
         _earningChainGateway.addBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, adapter);
         vm.prank(admin);
         _earningChainGateway.setDefaultBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, adapter);
+        vm.expectEmit(true, true, true, true);
+        emit IChainGateway.BridgeAdapterRemoved(address(0), ACCOUNTING_CHAIN_ID, address(_mockBridgeAdapterData));
         vm.prank(admin);
         _earningChainGateway.removeBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, address(_mockBridgeAdapterData));
         assertEq(_earningChainGateway.getDefaultBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID), adapter);
@@ -200,7 +202,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         _earningChainGateway.addBridgeAdapter(asset, ACCOUNTING_CHAIN_ID, adapter);
     }
 
-    function test_setDefaultBridgeAdatper_revert_ifNotWhitelisted() public {
+    function test_setDefaultBridgeAdatper_reverts_ifNotWhitelisted() public {
         address adapter = makeAddr("adapter");
         address asset = address(_mockUsdt);
 
@@ -1255,7 +1257,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         // Use GHO as the bridge fee token
         address feeToken = address(_mockGho);
         // Mimic the IOU token mgr approval of Gateway to pull funds
-        IMockErc20(feeToken).mint(address(bridgeFeePayer), feeAmount);
+        IMockErc20(feeToken).mint(bridgeFeePayer, feeAmount);
         vm.prank(address(bridgeFeePayer));
         MockNonStandardErc20(feeToken).approve(address(_earningChainGateway), feeAmount);
 
@@ -1448,7 +1450,35 @@ contract EarningChainGatewayTest is TestWithHelpers {
         _earningChainGateway.receiveMessage(ACCOUNTING_CHAIN_ID, new IBridgeAdapter.BridgeAsset[](0), data);
     }
 
+    function test_receiveMessage_givenWhitelistedNonDefaultBridgeAdapter(
+        address iouTokenRecipient,
+        uint256 iouTokenAmountRay
+    ) public {
+        // Context: this should be the case for any valid message type
+
+        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+
+        // Add a new whitelisted bridge adapter for message bridge
+        address unknownAdapter = makeAddr("unknownAdapter");
+        vm.prank(admin);
+        _earningChainGateway.addBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, unknownAdapter);
+
+        bytes memory data = abi.encode(
+            IChainGateway.CrossChainMessage({
+                messageType: IChainGateway.MessageType.BRIDGE_IOUTOKEN,
+                data: abi.encode(
+                    IChainGateway.IouTokenBridgeMessage({recipient: iouTokenRecipient, amount: iouTokenAmountRay})
+                )
+            })
+        );
+        vm.prank(address(unknownAdapter));
+        _earningChainGateway.receiveMessage(ACCOUNTING_CHAIN_ID, new IBridgeAdapter.BridgeAsset[](0), data);
+    }
+
     function test_receiveMessage_whenBridgeFundsIsReceived(uint256 amountUsdt, uint256 amountGho) public {
+        amountUsdt = _boundAssetAmount(address(_mockUsdt), amountUsdt);
+        amountGho = _boundAssetAmount(address(_mockGho), amountGho);
+
         // mint this contract with the assets to mimic the Bridge Adapter
         _mockUsdt.mint(address(_mockBridgeAdapterAssets), amountUsdt);
         vm.prank(address(_mockBridgeAdapterAssets));
