@@ -90,6 +90,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
     /// @param fundsHandler The address of the FundsHandler contract.
     constructor(uint256 maxValidPerSecondRate, address iouTokenManager, address fundsHandler) {
         _disableInitializers();
+        require(maxValidPerSecondRate > MathLib.RAY, InvalidRate());
         MAX_VALID_PER_SECOND_RATE = maxValidPerSecondRate;
         IOU_TOKEN_MANAGER = iouTokenManager;
         FUNDS_HANDLER = fundsHandler;
@@ -160,7 +161,8 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
     /// @inheritdoc IBasedBoostedVault
     function setSubVaultRate(uint256 subVaultId, uint256 newPerSecondRate) external restricted {
         _validateRate(newPerSecondRate);
-        require(!_existsSubVaultWithRate(newPerSecondRate), VaultAlreadyExists());
+        require(!_existsSubVaultWithRate(newPerSecondRate), SubVaultAlreadyExists());
+        require(_existsSubVaultWithId(subVaultId), SubVaultDoesNotExist());
         _accrueSubVaultConversionRate(subVaultId);
         _subVaultById[subVaultId].perSecondRate = newPerSecondRate;
         _subVaultIdByRate[newPerSecondRate] = subVaultId;
@@ -189,11 +191,9 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
 
         // Assets in Allocator + last snapshot updates from Earning chains
         uint256 totalAssetsRay = _getVaultAggregatedBalance();
-        // Total outstanding claims on system Assets
-        uint256 iousInCirculationRay = _getIousInCirculation();
         // There is no overlap between original deposits and circulating IOUs because original deposits are decremented
         // when new issue IOUs are minted.
-        uint256 guaranteedObligationsRay = iousInCirculationRay + _globalOriginalDepositsRay;
+        uint256 guaranteedObligationsRay = _getIousInCirculation() + _globalOriginalDepositsRay;
         // This can underflow if Earning chain(s) have not sent back the balance update and user positions have been
         // removed (they've claimed IOUs).
         uint256 globalWithdrawableInterestRay =
@@ -214,68 +214,6 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
         return actualAmountInRay;
     }
 
-    /// @inheritdoc RescuableAssets
-    function rescueTokens(address asset, uint256 amount) public override restricted {
-        super.rescueTokens(asset, amount);
-    }
-
-    function _fullWithdrawalRequest(address user) internal returns (uint256, uint256, uint256) {
-        uint256 subVaultId = _positions[user].subVaultId;
-        uint256 conversionRate = _subVaultById[subVaultId].conversionRate;
-
-        uint256 sharesToRedeem = _positions[user].shares;
-        uint256 actualAmountOfWithdrawalRay = sharesToRedeem.rayMulDown(conversionRate);
-        require(actualAmountOfWithdrawalRay > 0, ErrorsLib.InsufficientAmountOut());
-        // We don't check for sharesToRedeem > 0 here because we check for actualAmountInRay > 0 below.
-        _burnShares(user, sharesToRedeem);
-        uint256 originalDeposit = _positions[user].originalDepositRay;
-        delete _positions[user];
-        if (actualAmountOfWithdrawalRay < originalDeposit) {
-            // We round it up because we guarantee originalDeposit
-            // TODO: Write some tests to prove that, but this should be OK
-            actualAmountOfWithdrawalRay = originalDeposit;
-        }
-
-        return (actualAmountOfWithdrawalRay, originalDeposit, sharesToRedeem);
-    }
-
-    function _partialWithdrawalRequest(address user, uint256 requestedAmountInRay)
-        internal
-        returns (uint256, uint256, uint256)
-    {
-        uint256 subVaultId = _positions[user].subVaultId;
-        uint256 conversionRate = _subVaultById[subVaultId].conversionRate;
-
-        uint256 sharesToRedeem = requestedAmountInRay.rayDivUp(conversionRate);
-        require(sharesToRedeem <= _positions[user].shares, ErrorsLib.InvalidAmount());
-        _burnShares(user, sharesToRedeem);
-        uint256 amountTakenFromOriginalDepositRay = _decrementOriginalDeposit(user, requestedAmountInRay);
-
-        if (_positions[user].shares == 0) {
-            delete _positions[user];
-        }
-
-        return (requestedAmountInRay, amountTakenFromOriginalDepositRay, sharesToRedeem);
-    }
-
-    function _decrementOriginalDeposit(address user, uint256 actualAmountOfWithdrawal) internal returns (uint256) {
-        uint256 amountTakenFromOriginalDepositRay;
-        if (actualAmountOfWithdrawal >= _positions[user].originalDepositRay) {
-            // The remaining portion of user's withdrawable balance is not guaranteed unless user deposits more funds.
-            amountTakenFromOriginalDepositRay = _positions[user].originalDepositRay;
-        } else {
-            amountTakenFromOriginalDepositRay = actualAmountOfWithdrawal;
-        }
-        _positions[user].originalDepositRay -= amountTakenFromOriginalDepositRay;
-        return amountTakenFromOriginalDepositRay;
-    }
-
-    function _burnShares(address user, uint256 shares) internal {
-        uint256 subVaultId = _positions[user].subVaultId;
-        _positions[user].shares -= shares;
-        _subVaultById[subVaultId].totalShares -= shares;
-    }
-
     /// @inheritdoc IBasedBoostedVault
     function executeWithdrawal(address user, address assetOut, uint256 iouAmountRay) external override {
         require(msg.sender == user, InvalidMsgSender());
@@ -294,10 +232,9 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
         _setDefaultSubVault(_getOrCreateSubVaultWithRate(perSecondRate), perSecondRate);
     }
 
-    // TODO: Should we allow the admin to claim fees as well?
     // TODO(registry-config): Should we have a "fee recipient" storage field or function param?
-    // / @inheritdoc IBasedBoostedVault
-    function claimFees(address[] calldata assets, uint256[] calldata amounts) external restricted {
+    /// @inheritdoc IBasedBoostedVault
+    function claimFees(address[] calldata assets, uint256[] calldata amounts) external override restricted {
         uint256 vaultObligationsRay = _getVaultObligations();
         uint256 vaultAssetsRay = _getVaultAggregatedBalance();
         require(vaultObligationsRay <= vaultAssetsRay, InsufficientAssets());
@@ -314,7 +251,12 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
         emit FeesClaimed(assets, amounts);
     }
 
-    // /////////////////////////////////////////////// GETTERS /////////////////////////////////////////////////////
+    /// @inheritdoc RescuableAssets
+    function rescueTokens(address asset, uint256 amount) public override restricted {
+        super.rescueTokens(asset, amount);
+    }
+
+    ////////////////////////////////////////////////// GETTERS /////////////////////////////////////////////////////
 
     /// @inheritdoc IBasedBoostedVault
     function getGlobalOriginalDepositAmount() external view override returns (uint256) {
@@ -378,7 +320,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
         return MAX_VALID_PER_SECOND_RATE;
     }
 
-    // /////////////////////////////////////////////// INTERNAL /////////////////////////////////////////////////////
+    ////////////////////////////////////////////////// INTERNAL /////////////////////////////////////////////////////
 
     function _validateRate(uint256 perSecondRate) internal view {
         require(perSecondRate >= MathLib.RAY && perSecondRate <= MAX_VALID_PER_SECOND_RATE, InvalidRate());
@@ -398,7 +340,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
     }
 
     function _createSubVault(uint256 newPerSecondRate) internal returns (uint256) {
-        require(!_existsSubVaultWithRate(newPerSecondRate), VaultAlreadyExists());
+        require(!_existsSubVaultWithRate(newPerSecondRate), SubVaultAlreadyExists());
         _validateRate(newPerSecondRate);
         uint256 newSubVaultId = ++_lastSubVaultId;
         _subVaultById[newSubVaultId] = SubVault({
@@ -468,6 +410,63 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
         _subVaultById[subVaultId].lastAccrualTimestamp = block.timestamp;
     }
 
+    function _fullWithdrawalRequest(address user) internal returns (uint256, uint256, uint256) {
+        uint256 subVaultId = _positions[user].subVaultId;
+        uint256 conversionRate = _subVaultById[subVaultId].conversionRate;
+
+        uint256 sharesToRedeem = _positions[user].shares;
+        uint256 actualAmountOfWithdrawalRay = sharesToRedeem.rayMulDown(conversionRate);
+        require(actualAmountOfWithdrawalRay > 0, ErrorsLib.InsufficientAmountOut());
+        // We don't check for sharesToRedeem > 0 here because we check for actualAmountInRay > 0 below.
+        _burnShares(user, sharesToRedeem);
+        uint256 originalDeposit = _positions[user].originalDepositRay;
+        delete _positions[user];
+        if (actualAmountOfWithdrawalRay < originalDeposit) {
+            // We round it up because we guarantee originalDeposit
+            // TODO: Write some tests to prove that, but this should be OK
+            actualAmountOfWithdrawalRay = originalDeposit;
+        }
+
+        return (actualAmountOfWithdrawalRay, originalDeposit, sharesToRedeem);
+    }
+
+    function _partialWithdrawalRequest(address user, uint256 requestedAmountInRay)
+        internal
+        returns (uint256, uint256, uint256)
+    {
+        uint256 subVaultId = _positions[user].subVaultId;
+        uint256 conversionRate = _subVaultById[subVaultId].conversionRate;
+
+        uint256 sharesToRedeem = requestedAmountInRay.rayDivUp(conversionRate);
+        require(sharesToRedeem <= _positions[user].shares, ErrorsLib.InvalidAmount());
+        _burnShares(user, sharesToRedeem);
+        uint256 amountTakenFromOriginalDepositRay = _decrementOriginalDeposit(user, requestedAmountInRay);
+
+        if (_positions[user].shares == 0) {
+            delete _positions[user];
+        }
+
+        return (requestedAmountInRay, amountTakenFromOriginalDepositRay, sharesToRedeem);
+    }
+
+    function _decrementOriginalDeposit(address user, uint256 actualAmountOfWithdrawal) internal returns (uint256) {
+        uint256 amountTakenFromOriginalDepositRay;
+        if (actualAmountOfWithdrawal >= _positions[user].originalDepositRay) {
+            // The remaining portion of user's withdrawable balance is not guaranteed unless user deposits more funds.
+            amountTakenFromOriginalDepositRay = _positions[user].originalDepositRay;
+        } else {
+            amountTakenFromOriginalDepositRay = actualAmountOfWithdrawal;
+        }
+        _positions[user].originalDepositRay -= amountTakenFromOriginalDepositRay;
+        return amountTakenFromOriginalDepositRay;
+    }
+
+    function _burnShares(address user, uint256 shares) internal {
+        uint256 subVaultId = _positions[user].subVaultId;
+        _positions[user].shares -= shares;
+        _subVaultById[subVaultId].totalShares -= shares;
+    }
+
     function _getVaultObligations() internal view returns (uint256) {
         uint256 vaultObligations;
         for (uint256 i = 0; i < _activeSubVaultsIds.length; i++) {
@@ -501,6 +500,10 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
 
     function _existsSubVaultWithRate(uint256 perSecondRate) internal view returns (bool) {
         return _subVaultIdByRate[perSecondRate] != 0;
+    }
+
+    function _existsSubVaultWithId(uint256 subVaultId) internal view returns (bool) {
+        return subVaultId > 0 && subVaultId <= _lastSubVaultId;
     }
 
     function _setUserRate(address user, uint256 newPerSecondRate) internal {
