@@ -47,11 +47,10 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
     EarningChainGateway internal _earningChainGateway;
 
-    function _deployEarningChainGateway(
-        MockAccessManager mockAccessManager,
-        address iouTokenManager,
-        address allocator
-    ) internal returns (EarningChainGateway) {
+    function _deployEarningChainGateway(MockAccessManager mockAccessManager, address iouTokenManager, address allocator)
+        internal
+        returns (EarningChainGateway)
+    {
         address earningChainGatewayImpl =
             address(new EarningChainGateway(ACCOUNTING_CHAIN_ID, allocator, iouTokenManager));
         EarningChainGateway earningChainGateway = EarningChainGateway(
