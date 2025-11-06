@@ -18,9 +18,9 @@ import {TestWithHelpers} from "./helpers/TestWithHelpers.sol";
 import {MockAccessManager} from "./mocks/MockAccessManager.sol";
 import {MockAssetRegistry} from "./mocks/MockAssetRegistry.sol";
 import {MockBridgeAdapter} from "./mocks/MockBridgeAdapter.sol";
+import {MockDummyIouTokenManager} from "./mocks/MockDummyIouTokenManager.sol";
 import {IMockErc20} from "./mocks/MockErc20.sol";
 import {MockFundsHandler} from "./mocks/MockFundsHandler.sol";
-import {MockIouTokenManager} from "./mocks/MockIouTokenManager.sol";
 import {MockNonStandardErc20} from "./mocks/MockNonStandardErc20.sol";
 
 contract AccountingChainGatewayTest is TestWithHelpers {
@@ -42,7 +42,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
     IMockErc20 internal _mockUnsupportedAsset;
     MockBridgeAdapter internal _mockBridgeAdapterAssets;
     MockBridgeAdapter internal _mockBridgeAdapterData;
-    MockIouTokenManager internal _mockIouTokenManager;
+    MockDummyIouTokenManager internal _mockIouTokenManager;
     MockAssetRegistry internal _mockAssetRegistry;
 
     AccountingChainGateway internal _accountingChainGateway;
@@ -91,7 +91,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         _mockUnsupportedAsset =
             IMockErc20(address(new MockNonStandardErc20("Test Unsupported Asset", "tUNSUPPORTED", 18)));
 
-        _mockIouTokenManager = new MockIouTokenManager();
+        _mockIouTokenManager = new MockDummyIouTokenManager();
 
         _mockAssetRegistry = new MockAssetRegistry();
 
