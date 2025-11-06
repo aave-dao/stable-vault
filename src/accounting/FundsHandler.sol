@@ -150,8 +150,6 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
         _pushFundsToImmediateLiquidity(asset, amount);
     }
 
-    // ////
-
     function _updateChainBalance(uint256 chainId, uint256 snapshotBalanceRay, uint256 chainBalanceSnapshotNonce)
         internal
     {
@@ -175,6 +173,8 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
             );
         }
     }
+
+    ////////////////////////////////////////////////// INTERNAL /////////////////////////////////////////////////////
 
     /// @dev This does not update the chain balance snapshot nonce because any potential incoming snapshot data would be
     /// ignored.
