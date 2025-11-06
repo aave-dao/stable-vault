@@ -41,10 +41,14 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
     // - allowedVaultsByAsset: Entire set of allowed vaults for an asset which funds can be reallocated to/from
     mapping(address asset => address vault) internal _defaultVaultByAsset;
     mapping(address vault => VaultData vaultData) internal _vaultData;
-    // To iterate through all vaults for an asset
+    // To iterate through all vaults for an asset.
     mapping(address asset => address[]) internal _assetVaults;
-    // To iterate through all vaults
+    // To allow O(1) lookup to see if asset should be added/removed from _assetsWithSupportedVaults.
+    mapping(address asset => uint256 vaultsCount) internal _assetVaultsCount;
+    // To iterate through all vaults.
     address[] internal _allVaults;
+    // To iterate through all assets with supported vaults and collect their balances.
+    address[] internal _assetsWithSupportedVaults;
 
     modifier onlyDepositor() {
         require(msg.sender == DEPOSITOR, ErrorsLib.AddressNotWhitelisted());
@@ -107,7 +111,6 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
 
     /// @inheritdoc IAllocator
     function deposit(address asset, uint256 amount) external override onlyDepositor {
-        // TODO: check if Allocator supports deposit for asset
         IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
         bool callSucceeded = _deposit({asset: asset, amount: amount});
         if (!callSucceeded) {
@@ -256,15 +259,15 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
     }
 
     function _deposit(address asset, uint256 amount) internal returns (bool) {
+        require(amount > 0, ErrorsLib.ZeroAmount());
         require(
             IAssetRegistry(ASSET_REGISTRY).isAllowedToDepositIntoAllocator(asset), ErrorsLib.UnsupportedAsset(asset)
         );
         address vault = _defaultVaultByAsset[asset];
         if (vault == address(0)) {
-            // There is not strategy for this asset
+            // A strategy for this asset is not set, so the funds stay idle in the Allocator.
             return true;
         }
-        require(amount > 0, ErrorsLib.ZeroAmount());
         IERC20(asset).forceApprove(vault, amount);
         return _callVaultWithData(vault, abi.encodeCall(IERC4626.deposit, (amount, address(this))));
     }
@@ -291,11 +294,13 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
         }
     }
 
+    /// @dev Returns balances grouped by asset.
     function _getAssetBalances() internal view returns (IAllocator.AllocatorBalance[] memory) {
-        IAllocator.AllocatorBalance[] memory allocatedAssets = new IAllocator.AllocatorBalance[](_allVaults.length);
-        for (uint256 i = 0; i < _allVaults.length; i++) {
-            address asset = IERC4626(_allVaults[i]).asset();
-            allocatedAssets[i] = IAllocator.AllocatorBalance(asset, _getTotalAssetBalance(asset));
+        IAllocator.AllocatorBalance[] memory allocatedAssets =
+            new IAllocator.AllocatorBalance[](_assetsWithSupportedVaults.length);
+        for (uint256 i = 0; i < _assetsWithSupportedVaults.length; i++) {
+            address asset = _assetsWithSupportedVaults[i];
+            allocatedAssets[i] = IAllocator.AllocatorBalance({asset: asset, amount: _getTotalAssetBalance(asset)});
         }
         return allocatedAssets;
     }
@@ -337,6 +342,13 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
             indexInAssetVaults: uint32(_assetVaults[asset].length - 1),
             indexInAllVaults: uint32(_allVaults.length - 1)
         });
+
+        // Add asset to _assetsWithSupportedVaults if it is not already in the list
+        if (_assetVaultsCount[asset] == 0) {
+            _assetsWithSupportedVaults.push(asset);
+        }
+        _assetVaultsCount[asset]++;
+
         emit VaultAdded(asset, vault);
     }
 
@@ -366,6 +378,19 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
             _vaultData[vault].indexInAllVaults = indexInAllVaults;
         }
         _allVaults.pop();
+
+        // Update storage that tracks assets with supported vaults
+        _assetVaultsCount[vaultData.asset]--;
+        if (_assetVaultsCount[vaultData.asset] == 0) {
+            // Remove asset from _assetsWithSupportedVaults
+            for (uint256 i = 0; i < _assetsWithSupportedVaults.length; i++) {
+                if (_assetsWithSupportedVaults[i] == vaultData.asset) {
+                    _assetsWithSupportedVaults[i] = _assetsWithSupportedVaults[_assetsWithSupportedVaults.length - 1];
+                    _assetsWithSupportedVaults.pop();
+                    break;
+                }
+            }
+        }
 
         delete _vaultData[vault];
         emit VaultRemoved(vaultData.asset, vault);
