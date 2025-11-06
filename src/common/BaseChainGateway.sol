@@ -156,7 +156,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
             assets = new IBridgeAdapter.BridgeAsset[](1);
             assets[0] = IBridgeAdapter.BridgeAsset({asset: assetToBridge, amount: amountToBridge});
             for (uint256 i = 0; i < assets.length; i++) {
-                // Increase allowance for when the fee token is the same token being bridged.
+                // Increase allowance in case of the fee token matching the token being bridged.
                 IERC20(assets[i].asset).safeIncreaseAllowance(adapter, assets[i].amount);
             }
         }

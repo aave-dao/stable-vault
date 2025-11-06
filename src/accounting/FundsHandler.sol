@@ -137,7 +137,7 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
         }
 
         _pullFundsFromImmediateLiquidity(asset, amount);
-        // Increase allowance in case of the fee token matching the same token being bridged.
+        // Increase allowance in case of the fee token matching the token being bridged.
         IERC20(asset).safeIncreaseAllowance(GATEWAY, amount);
         // Increment the chain balance snapshot for the target chain.
         _updateChainBalanceBeforeBridging(chainId, amount.assetDecimalsToRay(asset));
@@ -178,7 +178,7 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
             if (_chainBalances[i].chainId == chainId) {
                 chainExists = true;
                 // Nonces should always be strictly increasing.
-                // Use <= for initial snapshot update safety.
+                // Use < to avoid replayable nonces.
                 if (_chainBalances[i].nonce < chainBalanceSnapshotNonce) {
                     _chainBalances[i].nonce = chainBalanceSnapshotNonce;
                     _chainBalances[i].amountRay = snapshotBalanceRay;
