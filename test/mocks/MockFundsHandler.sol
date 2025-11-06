@@ -3,21 +3,26 @@ pragma solidity ^0.8.4;
 
 import {IFundsHandler} from "../../src/interfaces/IFundsHandler.sol";
 
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
 contract MockFundsHandler is IFundsHandler {
+    using SafeERC20 for IERC20;
+
     mapping(address asset => uint256 balanceRay) _mockedAssetBalancesRay;
+    address[] _mockedAssets;
     uint256 _mockedAggregatedBalance;
 
     function mockAggregatedBalance(uint256 aggregatedBalance) external {
         _mockedAggregatedBalance = aggregatedBalance;
     }
 
-    function mockAssetBalances(AssetBalance[] memory assetBalances) external {
-        for (uint256 i = 0; i < assetBalances.length; i++) {
-            _mockedAssetBalancesRay[assetBalances[i].asset] = assetBalances[i].amountRay;
-        }
+    function mockAssetBalance(address asset, uint256 balanceRay) external {
+        _mockedAssetBalancesRay[asset] = balanceRay;
     }
 
     ////
+
     function getAggregatedBalance() external view override returns (uint256) {
         return _mockedAggregatedBalance;
     }
@@ -26,7 +31,9 @@ contract MockFundsHandler is IFundsHandler {
 
     function processDeposit(address asset, uint256 amount) external override {}
 
-    function processWithdrawal(address asset, uint256 amount) external override {}
+    function processWithdrawal(address asset, uint256 amount) external override {
+        IERC20(asset).forceApprove(msg.sender, amount);
+    }
 
     function pushFundsToChain(address asset, uint256 amount, uint256 chainId) external override {}
 
