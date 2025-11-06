@@ -10,6 +10,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {RescuableAssets} from "../common/RescuableAssets.sol";
 import {IAccountingChainGateway} from "../interfaces/IAccountingChainGateway.sol";
 import {IAllocator} from "../interfaces/IAllocator.sol";
+import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
 import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
@@ -26,6 +27,8 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
         uint256 amountRay;
         uint256 nonce;
     }
+
+    address internal constant BRIDGE_FEE_ON_NATIVE_CURRENCY = address(0);
 
     address internal immutable VAULT;
     address internal immutable GATEWAY;
@@ -120,12 +123,27 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
     // Manager Functions
 
     /// @inheritdoc IFundsHandler
-    function pushFundsToChain(address asset, uint256 amount, uint256 chainId) external override restricted {
+    function pushFundsToChain(
+        address asset,
+        uint256 amount,
+        uint256 chainId,
+        IChainGateway.BridgeParams memory bridgeParams
+    ) external payable override restricted {
+        require(amount > 0, ErrorsLib.ZeroAmount());
+
+        if (bridgeParams.feeToken != BRIDGE_FEE_ON_NATIVE_CURRENCY) {
+            IERC20(bridgeParams.feeToken).safeTransferFrom(bridgeParams.feePayer, address(this), bridgeParams.feeAmount);
+            IERC20(bridgeParams.feeToken).forceApprove(GATEWAY, bridgeParams.feeAmount);
+        }
+
         _pullFundsFromImmediateLiquidity(asset, amount);
-        IERC20(asset).forceApprove(GATEWAY, amount);
+        // Increase allowance in case of the fee token matching the token being bridged.
+        IERC20(asset).safeIncreaseAllowance(GATEWAY, amount);
         // Increment the chain balance snapshot for the target chain.
         _updateChainBalanceBeforeBridging(chainId, amount.assetDecimalsToRay(asset));
-        IAccountingChainGateway(GATEWAY).sendPushFundsToChainMessage(asset, amount, chainId);
+        IAccountingChainGateway(GATEWAY).sendPushFundsToChainMessage{value: msg.value}(
+            asset, amount, chainId, bridgeParams
+        );
     }
 
     /// @inheritdoc RescuableAssets
@@ -158,7 +176,7 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
             if (_chainBalances[i].chainId == chainId) {
                 chainExists = true;
                 // Nonces should always be strictly increasing.
-                // Use <= for initial snapshot update safety.
+                // Use < to avoid replayable nonces.
                 if (_chainBalances[i].nonce < chainBalanceSnapshotNonce) {
                     _chainBalances[i].nonce = chainBalanceSnapshotNonce;
                     _chainBalances[i].amountRay = snapshotBalanceRay;

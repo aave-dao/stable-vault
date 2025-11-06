@@ -25,15 +25,13 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
     using AssetLib for uint256;
     using SafeERC20 for IERC20;
 
-    /**
-     * @notice A subVault works like a virtual fixed-rate vault.
-     *
-     * @param perSecondRate The total per second rate of growth associated with the subVault.
-     * @param conversionRate The cumulative growth factor at a point in time; acts as conversion rate between shares and
-     * assets.
-     * @param lastAccrualTimestamp The timestamp of the last accrual i.e. when the `conversionRate` was updated.
-     * @param totalShares The total shares of the subVault outstanding.
-     */
+    /// @notice A subVault works like a virtual fixed-rate vault.
+    ///
+    /// @param perSecondRate The total per second rate of growth associated with the subVault.
+    /// @param conversionRate The cumulative growth factor at a point in time; acts as conversion rate between shares
+    /// and assets.
+    /// @param lastAccrualTimestamp The timestamp of the last accrual i.e. when the `conversionRate` was updated.
+    /// @param totalShares The total shares of the subVault outstanding.
     struct SubVault {
         uint256 perSecondRate;
         uint256 conversionRate;

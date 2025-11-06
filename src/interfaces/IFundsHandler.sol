@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
+import {IChainGateway} from "./IChainGateway.sol";
+
 interface IFundsHandler {
     error NotBasedBoostedVault();
     error NotGateway();
@@ -30,7 +32,16 @@ interface IFundsHandler {
 
     /// @dev Retrieves funds from liquidity source on native chain before pushing funds to another chain through the
     /// Gateway contract.
-    function pushFundsToChain(address asset, uint256 amount, uint256 chainId) external;
+    /// @param asset The asset to push to the Accounting Chain.
+    /// @param amount The amount of the asset to push to the Accounting Chain.
+    /// @param chainId The chain id of the Accounting Chain.
+    /// @param bridgeParams The parameters for the bridge adapter.
+    function pushFundsToChain(
+        address asset,
+        uint256 amount,
+        uint256 chainId,
+        IChainGateway.BridgeParams memory bridgeParams
+    ) external payable;
 
     /// @dev Updates the chain balance snapshot for a given chain.
     /// @param chainId The chain id of the chain that sent the balance update

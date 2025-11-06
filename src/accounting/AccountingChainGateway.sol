@@ -41,19 +41,26 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
         __BaseChainGateway_init(accessManager);
     }
 
-    function sendPushFundsToChainMessage(address asset, uint256 amount, uint256 targetChainId)
-        external
-        onlyFundsHandler
-    {
+    function getFundsHandler() external view returns (address) {
+        return FUNDS_HANDLER;
+    }
+
+    /// @inheritdoc IAccountingChainGateway
+    function sendPushFundsToChainMessage(
+        address asset,
+        uint256 amount,
+        uint256 targetChainId,
+        BridgeParams memory bridgeParams
+    ) external payable override onlyFundsHandler {
         address adapter = _defaultBridgeAdapter[asset][targetChainId];
-        require(adapter != address(0), UnsupportedAdapter());
-        // Pull funds from caller into this contract
+        require(adapter != address(0), AdapterNotFound());
+
         IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
-        // Approve the bridge adapter to spend the funds
-        IERC20(asset).forceApprove(adapter, amount);
-        IBridgeAdapter.BridgeAsset[] memory assets = new IBridgeAdapter.BridgeAsset[](1);
-        assets[0] = IBridgeAdapter.BridgeAsset({asset: asset, amount: amount});
-        IBridgeAdapter(adapter).publishMessageToChain(targetChainId, assets, "");
+
+        // The FundsHandler will have pulled the fee token from the caller to itself.
+        // Pull the fee token from the FundsHandler to this contract.
+        _prepareBridgeFeeForAdapter(adapter, msg.sender, bridgeParams.feeToken, bridgeParams.feeAmount);
+        _sendCrossChainMessage(targetChainId, adapter, asset, amount, "", bridgeParams);
     }
 
     function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal override {

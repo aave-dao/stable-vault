@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
+import {IChainGateway} from "../../src/interfaces/IChainGateway.sol";
 import {IIouTokenManager} from "../../src/interfaces/IIouTokenManager.sol";
 import {IMintableBurnableIERC20} from "../../src/interfaces/IMintableBurnableIERC20.sol";
 
@@ -46,9 +47,7 @@ contract MockIouTokenManager is IIouTokenManager {
         uint256, // destinationChainId
         address, // iouTokenRecipient
         uint256 iouTokenAmountRay,
-        address, // bridgeFeePayer
-        address, // bridgeFeeToken
-        uint256 // bridgeFeeAmount
+        IChainGateway.BridgeParams memory // bridgeParams
     )
         external
         payable

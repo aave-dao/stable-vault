@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
+import {IChainGateway} from "../../src/interfaces/IChainGateway.sol";
 import {IFundsHandler} from "../../src/interfaces/IFundsHandler.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -35,7 +36,12 @@ contract MockFundsHandler is IFundsHandler {
         IERC20(asset).forceApprove(msg.sender, amount);
     }
 
-    function pushFundsToChain(address asset, uint256 amount, uint256 chainId) external override {}
+    function pushFundsToChain(
+        address asset,
+        uint256 amount,
+        uint256 chainId,
+        IChainGateway.BridgeParams memory bridgeParams
+    ) external payable override {}
 
     function updateChainBalanceCallback(uint256 chainId, uint256 snapshotBalanceRay, uint256 snapshotTimestamp)
         external

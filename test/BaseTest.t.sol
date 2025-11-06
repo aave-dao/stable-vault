@@ -854,9 +854,7 @@ contract BaseTest is Test {
         accessManager.setTargetFunctionRole(
             address(earningChainGateway),
             _toSelectorArray(
-                IChainGateway.setDefaultBridgeAdapter.selector,
-                IEarningChainGateway.sendBalanceUpdate.selector,
-                IEarningChainGateway.exit.selector
+                IChainGateway.setDefaultBridgeAdapter.selector, IEarningChainGateway.pushFundsToAccountingChain.selector
             ),
             OPERATOR_ROLE
         );

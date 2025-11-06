@@ -105,7 +105,7 @@ wrap_comments = true
 # "line": Convert block doc comments (`/** ... */`) to line doc comments (`///`).
 # "block": Convert line doc comments (`///`) to block doc comments (`/** ... */`).
 # Default: "preserve"
-docs_style = "block"
+docs_style = "line"
 
 # A list of glob patterns for files and directories to ignore.
 # Default: []

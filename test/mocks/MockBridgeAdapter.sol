@@ -2,20 +2,14 @@
 pragma solidity ^0.8.22;
 
 import {IBridgeAdapter} from "../../src/interfaces/IBridgeAdapter.sol";
+import {IChainGateway} from "../../src/interfaces/IChainGateway.sol";
 
 contract MockBridgeAdapter is IBridgeAdapter {
-    function publishMessageToChain(
-        uint256 destinationChainId,
-        IBridgeAdapter.BridgeAsset[] memory assets,
-        bytes memory data
-    ) external override {}
     function publishMessageToChainWithFeePayer(
-        address feeRefundRecipient,
-        address feeToken,
-        uint256 feeAmount,
         uint256 destinationChainId,
         IBridgeAdapter.BridgeAsset[] memory assets,
-        bytes memory data
+        bytes memory data,
+        IChainGateway.BridgeParams memory bridgeParams
     ) external payable override {}
     function setDestinationChainAdapter(uint256 chainId, address destinationChainAdapter) external override {}
     function replayFundsReceiving(uint256 sourceChainId, IBridgeAdapter.BridgeAsset[] memory assets)
