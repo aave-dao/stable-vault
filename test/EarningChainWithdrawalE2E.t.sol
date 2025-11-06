@@ -281,6 +281,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         earningChainGateway.exchangeIouTokens{value: 1}(
             amountIouToExchange,
             address(USDC),
+            address(0),
             user1,
             IChainGateway.BridgeParams({
                 feePayer: user1, feeToken: address(0), feeAmount: 1, gasLimit: 100000, data: ""

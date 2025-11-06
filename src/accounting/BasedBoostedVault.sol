@@ -275,14 +275,17 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
     }
 
     /// @inheritdoc IBasedBoostedVault
-    function executeWithdrawal(address user, address assetOut, uint256 iouAmountRay) external override {
+    function executeWithdrawal(address user, address assetOut, uint256 iouAmountRay, address strategyVault)
+        external
+        override
+    {
         require(msg.sender == user, InvalidMsgSender());
         require(
             IAssetRegistry(_assetRegistry).isAllowedToWithdrawFromBBV(assetOut), ErrorsLib.UnsupportedAsset(assetOut)
         );
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(user, iouAmountRay);
         uint256 assetAmount = iouAmountRay.rayToAssetDecimals(assetOut);
-        IFundsHandler(FUNDS_HANDLER).processWithdrawal(assetOut, assetAmount);
+        IFundsHandler(FUNDS_HANDLER).processWithdrawal(assetOut, assetAmount, strategyVault);
         IERC20(assetOut).safeTransferFrom(FUNDS_HANDLER, user, assetAmount);
         emit WithdrawalExecuted(user, assetOut, assetAmount);
     }

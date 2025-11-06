@@ -38,9 +38,6 @@ interface IAllocator {
     /// @dev Returns an array of balances where each amount is denominated in the corresponding asset's decimals.
     function getAssetBalances() external view returns (AllocatorBalance[] memory);
 
-    /// @dev Returns the available liquidity denominated in given asset's decimals.
-    function getAssetBalance(address asset) external view returns (uint256);
-
     /// @dev Returns strategy vault for a given asset.
     function getDefaultVault(address asset) external view returns (address);
 
@@ -74,7 +71,16 @@ interface IAllocator {
     /// @param toVault Vault to allocate to.
     function reallocate(address asset, uint256 amount, address fromVault, address toVault) external;
 
+    /// @notice Withdraws a given amount of an asset from the immediate liquidity vault a.k.a the default strategy vault
+    /// for the asset. @param asset Asset to withdraw.
+    /// @param amount Amount of the asset to withdraw.
     function withdraw(address asset, uint256 amount) external;
+
+    /// @notice Withdraws a given amount of an asset from a given strategy vault.
+    /// @param asset Asset to withdraw.
+    /// @param amount Amount of the asset to withdraw.
+    /// @param strategyVault Address of the strategy vault to withdraw from.
+    function withdrawFromStrategy(address asset, uint256 amount, address strategyVault) external;
 
     /// @dev Adds a new strategy vault to the allocator.
     /// @param asset The asset to add the vault for.

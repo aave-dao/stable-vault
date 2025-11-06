@@ -28,7 +28,9 @@ interface IFundsHandler {
     /// to the recipient with the data passed to the request.
     /// @param asset the token to pull from liquidity sources
     /// @param amount the value of asset in decimals of the asset
-    function processWithdrawal(address asset, uint256 amount) external;
+    /// @param strategyVault Address of the strategy vault to withdraw from through the Allocator. Zero-address to use
+    /// the default vault for the asset.
+    function processWithdrawal(address asset, uint256 amount, address strategyVault) external;
 
     /// @dev Retrieves funds from liquidity source on native chain before pushing funds to another chain through the
     /// Gateway contract.

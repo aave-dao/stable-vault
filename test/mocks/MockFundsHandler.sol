@@ -27,7 +27,7 @@ contract MockFundsHandler is IFundsHandler {
 
     function processDeposit(address asset, uint256 amount) external override {}
 
-    function processWithdrawal(address asset, uint256 amount) external override {}
+    function processWithdrawal(address asset, uint256 amount, address strategyVault) external override {}
 
     function pushFundsToChain(
         address asset,

@@ -567,6 +567,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             _earningChainGateway.exchangeIouTokens(
                 iouTokenAmountRay,
                 tokenOut,
+                address(0),
                 tokenOutReceiver,
                 IChainGateway.BridgeParams({
                     feePayer: bridgeFeePayer,
@@ -638,6 +639,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             _earningChainGateway.exchangeIouTokens(
                 iouTokenAmountRay,
                 tokenOut,
+                address(0),
                 tokenOutReceiver,
                 IChainGateway.BridgeParams({
                     feePayer: bridgeFeePayer,
@@ -717,7 +719,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         vm.deal(tokenOutReceiver, bridgeFeeAmount);
         vm.prank(tokenOutReceiver);
         _earningChainGateway.exchangeIouTokens{value: bridgeFeeAmount}(
-            iouTokenAmountRay, tokenOut, tokenOutReceiver, bridgeParams
+            iouTokenAmountRay, tokenOut, address(0), tokenOutReceiver, bridgeParams
         );
     }
 
@@ -726,6 +728,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         _earningChainGateway.exchangeIouTokens(
             0,
             address(_mockUsdt),
+            address(0),
             makeAddr("tokenOutReceiver"),
             IChainGateway.BridgeParams({
                 feePayer: makeAddr("bridgeFeePayer"), feeToken: address(0), feeAmount: 0, gasLimit: 100000, data: ""
@@ -743,6 +746,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         _earningChainGateway.exchangeIouTokens(
             iouTokenAmountRay,
             address(_mockUsdt),
+            address(0),
             makeAddr("tokenOutReceiver"),
             IChainGateway.BridgeParams({
                 feePayer: makeAddr("bridgeFeePayer"), feeToken: address(0), feeAmount: 0, gasLimit: 100000, data: ""
@@ -760,6 +764,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         _earningChainGateway.exchangeIouTokens(
             iouTokenAmountRay,
             address(_mockUsdt),
+            address(0),
             makeAddr("tokenOutReceiver"),
             IChainGateway.BridgeParams({
                 feePayer: makeAddr("bridgeFeePayer"), feeToken: address(0), feeAmount: 123, gasLimit: 100000, data: ""
@@ -778,6 +783,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         _earningChainGateway.exchangeIouTokens(
             100_000_000_000_000 * 10 ** 27,
             address(_mockUsdt),
+            address(0),
             tokenOutReceiver,
             IChainGateway.BridgeParams({
                 feePayer: makeAddr("bridgeFeePayer"), feeToken: address(0), feeAmount: 123, gasLimit: 100000, data: ""

@@ -10,7 +10,6 @@ contract MockAllocator is IAllocator {
     using SafeERC20 for IERC20;
 
     function getAssetBalances() external view override returns (AllocatorBalance[] memory) {}
-    function getAssetBalance(address asset) external view override returns (uint256) {}
     function getDefaultVault(address asset) external view override returns (address) {}
     function isVaultSupportedForAsset(address asset, address vault) external view override returns (bool) {}
     function isVaultSupported(address vault) external view override returns (bool) {}
@@ -21,6 +20,11 @@ contract MockAllocator is IAllocator {
     function reallocate(address asset, uint256 amount, address fromVault, address toVault) external override {}
 
     function withdraw(address asset, uint256 amount) external override {
+        IERC20(asset).safeTransfer(msg.sender, amount);
+    }
+
+    function withdrawFromStrategy(address asset, uint256 amount, address strategyVault) external override {
+        (strategyVault);
         IERC20(asset).safeTransfer(msg.sender, amount);
     }
     function addVault(address asset, address vault) external override {}

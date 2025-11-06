@@ -22,12 +22,14 @@ interface IEarningChainGateway is IChainGateway {
     /// @notice Exchanges IOU tokens for a specific asset and bridges data back to the Accounting Chain.
     /// @param iouTokenAmountRay The amount of IOU tokens to exchange.
     /// @param tokenOut The asset to exchange the IOU tokens for.
+    /// @param strategyVault The strategy vault to withdraw from. Zero-address to use the default vault for the asset.
     /// @param tokenOutReceiver The address to send the exchanged asset to.
     /// @param bridgeParams The parameters for the bridge adapter.
     /// @return amountOut The amount of the exchanged asset transferred to the tokenOutReceiver.
     function exchangeIouTokens(
         uint256 iouTokenAmountRay,
         address tokenOut,
+        address strategyVault,
         address tokenOutReceiver,
         BridgeParams memory bridgeParams
     ) external payable returns (uint256);

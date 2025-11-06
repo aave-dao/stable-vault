@@ -107,9 +107,12 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
     }
 
     /// @inheritdoc IFundsHandler
-    function processWithdrawal(address asset, uint256 amount) external override onlyBasedBoostedVault {
-        _verifyAvailableLiquidity(asset, amount);
-        _pullFundsFromImmediateLiquidity(asset, amount);
+    function processWithdrawal(address asset, uint256 amount, address strategyVault)
+        external
+        override
+        onlyBasedBoostedVault
+    {
+        _pullFundsFromStrategyVault(asset, amount, strategyVault);
         IERC20(asset).forceApprove(VAULT, amount);
     }
 
@@ -209,18 +212,16 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
         }
     }
 
-    /// @notice Pushes funds to Allocator.
     function _pushFundsToImmediateLiquidity(address asset, uint256 amount) internal {
         IERC20(asset).forceApprove(ALLOCATOR, amount);
         IAllocator(ALLOCATOR).deposit(asset, amount);
     }
 
-    /// @notice Takes from Allocator and gets ERC20 for further action.
     function _pullFundsFromImmediateLiquidity(address asset, uint256 amount) internal {
         IAllocator(ALLOCATOR).withdraw(asset, amount);
     }
 
-    function _verifyAvailableLiquidity(address asset, uint256 amount) internal view {
-        require(IAllocator(ALLOCATOR).getAssetBalance(asset) >= amount, ErrorsLib.InsufficientLiquidity());
+    function _pullFundsFromStrategyVault(address asset, uint256 amount, address strategyVault) internal {
+        IAllocator(ALLOCATOR).withdrawFromStrategy(asset, amount, strategyVault);
     }
 }
