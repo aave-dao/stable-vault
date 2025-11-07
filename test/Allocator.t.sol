@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
+import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
+import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -375,6 +377,99 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.deposit(address(_mockUsdt), 0);
     }
 
+    function test_depositIdleFunds_depositsIdleFundsIntoDefaultVault(uint256 amount) public {
+        amount = _boundAssetAmount(address(_mockUsdt), amount);
+        _mockUsdt.mint(address(_allocator), amount);
+        _mockGho.mint(address(_allocator), amount);
+
+        // Check balances (non should be in any strategy vaults)
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount);
+        assertEq(_allocator.getAssetBalance(address(_mockGho)), amount);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoVault)), 0);
+
+        vm.prank(address(everyRoleAccount));
+        _allocator.depositIdleFunds(address(_mockUsdt));
+
+        // Check balances (now all USDT should be in the default vault)
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount);
+        assertEq(_allocator.getAssetBalance(address(_mockGho)), amount);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtVault)), amount);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoVault)), 0);
+
+        vm.prank(address(everyRoleAccount));
+        _allocator.depositIdleFunds(address(_mockGho));
+
+        // Check balances (now all GHO should be in the default vault)
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount);
+        assertEq(_allocator.getAssetBalance(address(_mockGho)), amount);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtVault)), amount);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoVault)), amount);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoVault)), 0);
+    }
+
+    function test_depositIdleFunds_reverts_ifAmountIsZero() public {
+        vm.expectRevert(ErrorsLib.ZeroAmount.selector);
+        vm.prank(address(everyRoleAccount));
+        _allocator.depositIdleFunds(address(_mockUsdt));
+    }
+
+    function test_depositIdleFunds_reverts_ifDepositIsNotSupportedForAsset(uint256 amount) public {
+        amount = _boundAssetAmount(address(_mockUnsupportedAsset), amount);
+
+        _mockAssetRegistry.mockToDisallowAssetDepositsIntoAllocator(address(_mockUnsupportedAsset));
+
+        _mockUnsupportedAsset.mint(address(_allocator), amount);
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(_mockUnsupportedAsset)));
+        _allocator.depositIdleFunds(address(_mockUnsupportedAsset));
+    }
+
+    function test_depositIdleFunds_reverts_iffNonDepositorCalls(address nonDepositor, uint256 amount) public {
+        amount = _boundAssetAmount(address(_mockUsdt), amount);
+        vm.assume(nonDepositor != everyRoleAccount);
+        vm.assume(nonDepositor != address(0));
+        _assumeNotProxyAdmin(nonDepositor, address(_allocator));
+
+        vm.mockCall(
+            address(_mockAccessManager),
+            abi.encodeWithSelector(
+                IAccessManager.canCall.selector,
+                nonDepositor,
+                address(_allocator),
+                bytes4(keccak256("depositIdleFunds(address)"))
+            ),
+            abi.encode(false)
+        );
+
+        _mockUsdt.mint(address(_allocator), amount);
+        vm.prank(nonDepositor);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, nonDepositor));
+        _allocator.depositIdleFunds(address(_mockUsdt));
+    }
+
+    function test_depositIdleFunds_reverts_ifVaultRejectsDeposit(uint256 amount) public {
+        amount = _boundAssetAmount(address(_mockUsdt), amount);
+        _mockUsdt.mint(address(_allocator), amount);
+
+        vm.mockCallRevert(
+            address(_defaultUsdtVault),
+            abi.encodeWithSelector(IERC4626.deposit.selector, amount, address(_allocator)),
+            abi.encodeWithSelector(IERC20Errors.ERC20InvalidSender.selector, address(_allocator))
+        );
+
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(
+            abi.encodeWithSelector(ErrorsLib.VaultDepositFailed.selector, address(_defaultUsdtVault), amount)
+        );
+        _allocator.depositIdleFunds(address(_mockUsdt));
+    }
+
     function test_withdraw_withdrawsFromDefaultVault(uint256 amount) public {
         uint256 amountRemaining = 1000;
         amount = _boundAssetAmount(address(_mockUsdt), amount);
@@ -569,7 +664,7 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoVault)), 0);
     }
 
-    function test_withdraw_revertsIfDefaultVaultHasInsufficientFunds(uint256 amount) public {
+    function test_withdraw_reverts_ifDefaultVaultHasInsufficientFunds(uint256 amount) public {
         amount = _boundAssetAmount(address(_mockUsdt), amount);
         vm.assume(amount > 0);
 
@@ -591,7 +686,7 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.withdraw(address(_mockUsdt), amount * 2 + 1);
     }
 
-    function test_withdrawFromStrategyVault_revertsIfVaultHasInsufficientFunds(uint256 amount) public {
+    function test_withdrawFromStrategyVault_reverts_ifVaultHasInsufficientFunds(uint256 amount) public {
         amount = _boundAssetAmount(address(_mockUsdt), amount);
         vm.assume(amount > 0);
 
@@ -614,19 +709,19 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.withdrawFromStrategy(address(_mockUsdt), amount * 2 + 1, address(_extraUsdtVault));
     }
 
-    function test_withdraw_revertsIfAmountIsZero() public {
+    function test_withdraw_reverts_ifAmountIsZero() public {
         vm.expectRevert(ErrorsLib.ZeroAmount.selector);
         vm.prank(withdrawer);
         _allocator.withdraw(address(_mockUsdt), 0);
     }
 
-    function test_withdrawFromStrategyVault_revertsIfAmountIsZero() public {
+    function test_withdrawFromStrategyVault_reverts_ifAmountIsZero() public {
         vm.expectRevert(ErrorsLib.ZeroAmount.selector);
         vm.prank(withdrawer);
         _allocator.withdrawFromStrategy(address(_mockUsdt), 0, address(_extraUsdtVault));
     }
 
-    function test_withdraw_revertsIfVaultIsNotSupportedForAsset(uint256 amount) public {
+    function test_withdraw_reverts_ifVaultIsNotSupportedForAsset(uint256 amount) public {
         amount = _boundAssetAmount(address(_mockUsdt), amount);
         vm.assume(amount > 0);
 
@@ -642,7 +737,7 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.withdrawFromStrategy(address(_mockGho), amount, address(_defaultUsdtVault));
     }
 
-    function test_withdrawFromStrategyVault_revertsIfVaultIsNotSupportedForAsset(uint256 amount) public {
+    function test_withdrawFromStrategyVault_reverts_ifVaultIsNotSupportedForAsset(uint256 amount) public {
         amount = _boundAssetAmount(address(_mockUnsupportedAsset), amount);
 
         _mockAssetRegistry.mockToDisallowAssetWithdrawalsFromAllocator(address(_mockUnsupportedAsset));
@@ -656,7 +751,7 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.withdrawFromStrategy(address(_mockUnsupportedAsset), amount, address(_extraUsdtVault));
     }
 
-    function test_withdraw_revertsIfNonWithdrawerCalls(address nonWithdrawer, uint256 amount) public {
+    function test_withdraw_reverts_ifNonWithdrawerCalls(address nonWithdrawer, uint256 amount) public {
         amount = _boundAssetAmount(address(_mockUsdt), amount);
         vm.assume(nonWithdrawer != withdrawer);
         _assumeNotProxyAdmin(nonWithdrawer, address(_allocator));
