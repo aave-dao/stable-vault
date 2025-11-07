@@ -41,9 +41,6 @@ library ErrorsLib {
     /// @notice Insufficient funds.
     error InsufficientFunds();
 
-    /// @notice Failed to deposit assets into the vault.
-    error VaultDepositFailed();
-
     /// @notice Thrown when input parameter contains unacceptable amount.
     error InvalidAmount();
 

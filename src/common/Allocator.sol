@@ -26,29 +26,29 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
 
-    struct VaultData {
+    struct StrategyData {
         address asset;
-        uint32 indexInAssetVaults;
-        uint32 indexInAllVaults;
+        uint32 indexInAssetStrategies;
+        uint32 indexInAllStrategies;
     }
 
     address internal immutable DEPOSITOR;
     address internal immutable WITHDRAWER;
     address internal immutable ASSET_REGISTRY;
 
-    // Strategy Vaults
-    // - defaultVaultByAsset: The default vault for an asset which funds are deposited into and withdrawn from.
-    // - allowedVaultsByAsset: Entire set of allowed vaults for an asset which funds can be reallocated to/from
-    mapping(address asset => address vault) internal _defaultVaultByAsset;
-    mapping(address vault => VaultData vaultData) internal _vaultData;
-    // To iterate through all vaults for an asset.
-    mapping(address asset => address[]) internal _assetVaults;
-    // To allow O(1) lookup to see if asset should be added/removed from _assetsWithSupportedVaults.
-    mapping(address asset => uint256 vaultsCount) internal _assetVaultsCount;
-    // To iterate through all vaults.
-    address[] internal _allVaults;
-    // To iterate through all assets with supported vaults and collect their balances.
-    address[] internal _assetsWithSupportedVaults;
+    // Yield strategies
+    // - _defaultStrategyByAsset: The default strategy for an asset which funds are deposited into and withdrawn from.
+    // - _assetStrategies: Entire set of allowed strategies for an asset which funds can be reallocated to/from
+    mapping(address asset => address strategy) internal _defaultStrategyByAsset;
+    mapping(address strategy => StrategyData strategyData) internal _strategyData;
+    // To iterate through all strategies for an asset.
+    mapping(address asset => address[]) internal _assetStrategies;
+    // To allow O(1) lookup to see if asset should be added/removed from _assetsWithSupportedStrategies.
+    mapping(address asset => uint256 strategiesCount) internal _assetStrategyCount;
+    // To iterate through all strategies.
+    address[] internal _allStrategies;
+    // To iterate through all assets with supported strategies and collect their balances.
+    address[] internal _assetsWithSupportedStrategies;
 
     modifier onlyDepositor() {
         require(msg.sender == DEPOSITOR, ErrorsLib.AddressNotWhitelisted());
@@ -85,8 +85,8 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
         return _getTotalAssetBalance(asset);
     }
 
-    function getAssetBalanceInStrategy(address strategyVault) external view returns (uint256) {
-        return _getAssetBalanceInVault(IERC4626(strategyVault));
+    function getAssetBalanceInStrategy(address strategiestrategy) external view returns (uint256) {
+        return _getAssetBalanceInStrategy(IERC4626(strategiestrategy));
     }
 
     /// @inheritdoc IAllocator
@@ -95,18 +95,18 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
     }
 
     /// @inheritdoc IAllocator
-    function getDefaultVault(address asset) external view override returns (address) {
-        return _defaultVaultByAsset[asset];
+    function getDefaultStrategy(address asset) external view override returns (address) {
+        return _defaultStrategyByAsset[asset];
     }
 
     /// @inheritdoc IAllocator
-    function isVaultSupportedForAsset(address asset, address vault) external view override returns (bool) {
-        return _isVaultSupportedForAsset({vault: vault, asset: asset});
+    function isStrategySupportedForAsset(address asset, address strategy) external view override returns (bool) {
+        return _isStrategySupportedForAsset({strategy: strategy, asset: asset});
     }
 
     /// @inheritdoc IAllocator
-    function isVaultSupported(address vault) external view override returns (bool) {
-        return _isVaultSupported(vault);
+    function isStrategySupported(address strategy) external view override returns (bool) {
+        return _isStrategySupported(strategy);
     }
 
     /// @inheritdoc IAllocator
@@ -114,7 +114,7 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
         IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
         bool callSucceeded = _deposit({asset: asset, amount: amount});
         if (!callSucceeded) {
-            emit VaultDepositFailed(_defaultVaultByAsset[asset], amount);
+            emit StrategyDepositFailed(_defaultStrategyByAsset[asset], amount);
         }
     }
 
@@ -131,12 +131,12 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
             uint256 amountRemaining = amount - idleBalance;
 
             // Consume from default strategy
-            amountRemaining -= _withdrawFromStrategy(asset, amountRemaining, _defaultVaultByAsset[asset]);
+            amountRemaining -= _withdrawFromStrategy(asset, amountRemaining, _defaultStrategyByAsset[asset]);
 
             // If necessary, pull from remaining strategies
-            for (uint256 i = 0; amountRemaining > 0 && i < _assetVaults[asset].length; i++) {
-                address strategy = _assetVaults[asset][i];
-                if (strategy != _defaultVaultByAsset[asset]) {
+            for (uint256 i = 0; amountRemaining > 0 && i < _assetStrategies[asset].length; i++) {
+                address strategy = _assetStrategies[asset][i];
+                if (strategy != _defaultStrategyByAsset[asset]) {
                     amountRemaining -= _withdrawFromStrategy(asset, amountRemaining, strategy);
                 }
             }
@@ -147,24 +147,24 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
     //////////////////////////////////////////// MANAGER FUNCTIONS /////////////////////////////////////////////////////
 
     /// @inheritdoc IAllocator
-    function deallocate(address asset, uint256 assetsAmount, address vault)
+    function deallocate(address asset, uint256 assetsAmount, address strategy)
         external
         override
         restricted
         returns (uint256)
     {
-        require(IERC4626(vault).asset() == asset, ErrorsLib.InvalidAsset(asset));
+        require(IERC4626(strategy).asset() == asset, ErrorsLib.InvalidAsset(asset));
         if (assetsAmount == 0) {
             // If zero is passed, we withdraw the max amount using shares.
-            uint256 maxShares = IERC4626(vault).maxRedeem(address(this));
+            uint256 maxShares = IERC4626(strategy).maxRedeem(address(this));
             uint256 balanceBefore = IERC20(asset).balanceOf(address(this));
-            uint256 assetsWithdrawn = _deallocateShares(vault, asset, maxShares, address(this));
+            uint256 assetsWithdrawn = _deallocateShares(strategy, asset, maxShares, address(this));
             uint256 balanceAfter = IERC20(asset).balanceOf(address(this));
             require(balanceAfter - balanceBefore == assetsWithdrawn, ErrorsLib.InsufficientAmountOut());
             return maxShares;
         } else {
             uint256 balanceBefore = IERC20(asset).balanceOf(address(this));
-            uint256 sharesBurned = _deallocate(vault, asset, assetsAmount, address(this));
+            uint256 sharesBurned = _deallocate(strategy, asset, assetsAmount, address(this));
             uint256 balanceAfter = IERC20(asset).balanceOf(address(this));
             require(balanceAfter - balanceBefore == assetsAmount, ErrorsLib.InsufficientAmountOut());
             return sharesBurned;
@@ -175,7 +175,7 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
     function depositIdleFunds(address asset) external override restricted {
         uint256 amount = IERC20(asset).balanceOf(address(this));
         bool callSucceeded = _deposit({asset: asset, amount: amount});
-        require(callSucceeded, ErrorsLib.VaultDepositFailed());
+        require(callSucceeded, IAllocator.FailedToDepositIntoStrategy());
     }
 
     /// @inheritdoc IAllocator
@@ -194,8 +194,9 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
             uint256 amountIn = params.swaps[i].amountIn;
             uint256 idleBalance = IERC20(assetIn).balanceOf(address(this));
             if (idleBalance < amountIn) {
-                // Withdraw assets from vault to this contract
-                IERC4626(_defaultVaultByAsset[assetIn]).withdraw(amountIn - idleBalance, address(this), address(this));
+                // Withdraw assets from strategy to this contract
+                IERC4626(_defaultStrategyByAsset[assetIn])
+                    .withdraw(amountIn - idleBalance, address(this), address(this));
             }
             address swapper = params.swaps[i].swapper;
             // Transfer assetIn to the swapper
@@ -210,62 +211,62 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
             // Pull the `assetOut` from the Swapper to the Allocator
             IERC20(params.swaps[i].assetOut).safeTransferFrom(swapper, address(this), assetOutAmount);
 
-            // Deposit the assetOut into the vault
-            IERC20(params.swaps[i].assetOut).forceApprove(address(_defaultVaultByAsset[assetOut]), assetOutAmount);
-            IERC4626(_defaultVaultByAsset[assetOut]).deposit(assetOutAmount, address(this));
+            // Deposit the assetOut into the strategy
+            IERC20(params.swaps[i].assetOut).forceApprove(address(_defaultStrategyByAsset[assetOut]), assetOutAmount);
+            IERC4626(_defaultStrategyByAsset[assetOut]).deposit(assetOutAmount, address(this));
         }
     }
 
     // TODO: Consider consolidating `rebalance` and `reallocate` functions into a single function.
 
     /// @inheritdoc IAllocator
-    function reallocate(address asset, uint256 amount, address fromVault, address toVault)
+    function reallocate(address asset, uint256 amount, address fromStrategy, address toStrategy)
         external
         override
         restricted
     {
-        require(_isVaultSupportedForAsset({vault: fromVault, asset: asset}), ErrorsLib.AddressNotWhitelisted());
-        require(_isVaultSupportedForAsset({vault: toVault, asset: asset}), ErrorsLib.AddressNotWhitelisted());
-        // Pull the asset from the fromVault to the Allocator
-        _deallocate(fromVault, asset, amount, address(this));
-        // Push the asset to the toVault
+        require(_isStrategySupportedForAsset({strategy: fromStrategy, asset: asset}), ErrorsLib.AddressNotWhitelisted());
+        require(_isStrategySupportedForAsset({strategy: toStrategy, asset: asset}), ErrorsLib.AddressNotWhitelisted());
+        // Pull the asset from the fromStrategy to the Allocator
+        _deallocate(fromStrategy, asset, amount, address(this));
+        // Push the asset to the toStrategy
         _deposit(asset, amount);
     }
 
     /// @inheritdoc IAllocator
-    function addVault(address asset, address vault) external override restricted {
-        _addVault(asset, vault);
+    function addStrategy(address asset, address strategy) external override restricted {
+        _addStrategy(asset, strategy);
     }
 
     /// @inheritdoc IAllocator
-    function removeVault(address vault) external override restricted {
-        _removeVault(vault);
+    function removeStrategy(address strategy) external override restricted {
+        _removeStrategy(strategy);
     }
 
     /// @inheritdoc IAllocator
-    function setDefaultVault(address asset, address vault) external restricted {
-        // Vault must be allowed to be set as the default vault for the asset
-        require(_defaultVaultByAsset[asset] != vault, ErrorsLib.AddressAlreadyWhitelisted());
-        require(_isVaultSupportedForAsset({vault: vault, asset: asset}), ErrorsLib.AddressNotWhitelisted());
-        _defaultVaultByAsset[asset] = vault;
-        emit DefaultVaultSet(asset, vault);
+    function setDefaultStrategy(address asset, address strategy) external restricted {
+        // Strategy must be allowed to be set as the default strategy for the asset
+        require(_defaultStrategyByAsset[asset] != strategy, ErrorsLib.AddressAlreadyWhitelisted());
+        require(_isStrategySupportedForAsset({strategy: strategy, asset: asset}), ErrorsLib.AddressNotWhitelisted());
+        _defaultStrategyByAsset[asset] = strategy;
+        emit DefaultStrategySet(asset, strategy);
     }
 
     ////////////////////////////////////////////////// INTERNAL ////////////////////////////////////////////////////////
 
-    function _deallocate(address vault, address asset, uint256 amount, address receiver) internal returns (uint256) {
-        uint256 burnedShares = IERC4626(vault).withdraw({assets: amount, receiver: receiver, owner: address(this)});
-        emit AssetDeallocated(asset, vault, amount, burnedShares);
+    function _deallocate(address strategy, address asset, uint256 amount, address receiver) internal returns (uint256) {
+        uint256 burnedShares = IERC4626(strategy).withdraw({assets: amount, receiver: receiver, owner: address(this)});
+        emit AssetDeallocated(asset, strategy, amount, burnedShares);
         return burnedShares;
     }
 
-    function _deallocateShares(address vault, address asset, uint256 sharesAmount, address receiver)
+    function _deallocateShares(address strategy, address asset, uint256 sharesAmount, address receiver)
         internal
         returns (uint256)
     {
         uint256 assetsWithdrawn =
-            IERC4626(vault).redeem({shares: sharesAmount, receiver: receiver, owner: address(this)});
-        emit AssetDeallocated(asset, vault, assetsWithdrawn, sharesAmount);
+            IERC4626(strategy).redeem({shares: sharesAmount, receiver: receiver, owner: address(this)});
+        emit AssetDeallocated(asset, strategy, assetsWithdrawn, sharesAmount);
         return assetsWithdrawn;
     }
 
@@ -274,21 +275,21 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
         require(
             IAssetRegistry(ASSET_REGISTRY).isAllowedToDepositIntoAllocator(asset), ErrorsLib.UnsupportedAsset(asset)
         );
-        address vault = _defaultVaultByAsset[asset];
-        if (vault == address(0)) {
+        address strategy = _defaultStrategyByAsset[asset];
+        if (strategy == address(0)) {
             // A strategy for this asset is not set, so the funds stay idle in the Allocator.
             return true;
         }
-        IERC20(asset).forceApprove(vault, amount);
-        (bool callSucceeded,) = vault.call(abi.encodeCall(IERC4626.deposit, (amount, address(this))));
+        IERC20(asset).forceApprove(strategy, amount);
+        (bool callSucceeded,) = strategy.call(abi.encodeCall(IERC4626.deposit, (amount, address(this))));
         return callSucceeded;
     }
 
     function _withdrawFromStrategy(address asset, uint256 amount, address strategy) internal returns (uint256) {
         // TODO: review if the following require is actually needed
-        require(_isVaultSupportedForAsset({vault: strategy, asset: asset}), ErrorsLib.AddressNotWhitelisted());
+        require(_isStrategySupportedForAsset({strategy: strategy, asset: asset}), ErrorsLib.AddressNotWhitelisted());
         uint256 withdrawnAmount;
-        uint256 balanceInStrategy = _getAssetBalanceInVault(IERC4626(strategy));
+        uint256 balanceInStrategy = _getAssetBalanceInStrategy(IERC4626(strategy));
         if (balanceInStrategy > 0) {
             withdrawnAmount = balanceInStrategy > amount ? amount : balanceInStrategy;
             _deallocate(strategy, asset, withdrawnAmount, address(this));
@@ -299,9 +300,9 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
     /// @dev Returns balances grouped by asset.
     function _getAssetBalances() internal view returns (IAllocator.AllocatorBalance[] memory) {
         IAllocator.AllocatorBalance[] memory allocatedAssets =
-            new IAllocator.AllocatorBalance[](_assetsWithSupportedVaults.length);
-        for (uint256 i = 0; i < _assetsWithSupportedVaults.length; i++) {
-            address asset = _assetsWithSupportedVaults[i];
+            new IAllocator.AllocatorBalance[](_assetsWithSupportedStrategies.length);
+        for (uint256 i = 0; i < _assetsWithSupportedStrategies.length; i++) {
+            address asset = _assetsWithSupportedStrategies[i];
             allocatedAssets[i] = IAllocator.AllocatorBalance({asset: asset, amount: _getTotalAssetBalance(asset)});
         }
         return allocatedAssets;
@@ -309,87 +310,88 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
 
     function _getTotalAssetBalance(address asset) internal view returns (uint256) {
         uint256 balance = 0;
-        for (uint256 i = 0; i < _assetVaults[asset].length; i++) {
-            balance += _getAssetBalanceInVault(IERC4626(_assetVaults[asset][i]));
+        for (uint256 i = 0; i < _assetStrategies[asset].length; i++) {
+            balance += _getAssetBalanceInStrategy(IERC4626(_assetStrategies[asset][i]));
         }
         balance += IERC20(asset).balanceOf(address(this));
         return balance;
     }
 
-    function _getAssetBalanceInVault(IERC4626 vault) internal view returns (uint256) {
-        uint256 amount = vault.previewRedeem(vault.balanceOf(address(this)));
+    function _getAssetBalanceInStrategy(IERC4626 strategy) internal view returns (uint256) {
+        uint256 amount = strategy.previewRedeem(strategy.balanceOf(address(this)));
         return amount;
     }
 
-    function _isVaultSupportedForAsset(address vault, address asset) internal view returns (bool) {
-        return _vaultData[vault].asset == asset;
+    function _isStrategySupportedForAsset(address strategy, address asset) internal view returns (bool) {
+        return _strategyData[strategy].asset == asset;
     }
 
-    function _isVaultSupported(address vault) internal view returns (bool) {
-        return _vaultData[vault].asset != address(0);
+    function _isStrategySupported(address strategy) internal view returns (bool) {
+        return _strategyData[strategy].asset != address(0);
     }
 
-    function _addVault(address asset, address vault) internal {
-        require(!_isVaultSupported(vault), ErrorsLib.AddressAlreadyWhitelisted());
-        require(IERC4626(vault).asset() == asset, ErrorsLib.InvalidAsset(asset));
-        _assetVaults[asset].push(vault);
-        _allVaults.push(vault);
-        _vaultData[vault] = VaultData({
+    function _addStrategy(address asset, address strategy) internal {
+        require(!_isStrategySupported(strategy), ErrorsLib.AddressAlreadyWhitelisted());
+        require(IERC4626(strategy).asset() == asset, ErrorsLib.InvalidAsset(asset));
+        _assetStrategies[asset].push(strategy);
+        _allStrategies.push(strategy);
+        _strategyData[strategy] = StrategyData({
             asset: asset,
-            indexInAssetVaults: uint32(_assetVaults[asset].length - 1),
-            indexInAllVaults: uint32(_allVaults.length - 1)
+            indexInAssetStrategies: uint32(_assetStrategies[asset].length - 1),
+            indexInAllStrategies: uint32(_allStrategies.length - 1)
         });
 
-        // Add asset to _assetsWithSupportedVaults if it is not already in the list
-        if (_assetVaultsCount[asset] == 0) {
-            _assetsWithSupportedVaults.push(asset);
+        // Add asset to _assetsWithSupportedStrategies if it is not already in the list
+        if (_assetStrategyCount[asset] == 0) {
+            _assetsWithSupportedStrategies.push(asset);
         }
-        _assetVaultsCount[asset]++;
+        _assetStrategyCount[asset]++;
 
-        emit VaultAdded(asset, vault);
+        emit StrategyAdded(asset, strategy);
     }
 
-    function _removeVault(address vault) internal {
-        VaultData memory vaultData = _vaultData[vault];
-        require(_isVaultSupported(vault), ErrorsLib.AddressNotWhitelisted());
-        if (vault == _defaultVaultByAsset[vaultData.asset]) {
-            // Unset the default vault for the asset - deposits will not flow to this vault.
-            // If the default vault is removed, another one should be set as the default for withdrawals.
-            delete _defaultVaultByAsset[vaultData.asset];
-            emit DefaultVaultSet(vaultData.asset, address(0));
+    function _removeStrategy(address strategy) internal {
+        StrategyData memory strategyData = _strategyData[strategy];
+        require(_isStrategySupported(strategy), ErrorsLib.AddressNotWhitelisted());
+        if (strategy == _defaultStrategyByAsset[strategyData.asset]) {
+            // Unset the default strategy for the asset - deposits will not flow to this strategy.
+            // If the default strategy is removed, another one should be set as the default for withdrawals.
+            delete _defaultStrategyByAsset[strategyData.asset];
+            emit DefaultStrategySet(strategyData.asset, address(0));
         }
 
-        // Remove vault from _assetVaults
-        if (_assetVaults[vaultData.asset].length > 1) {
-            uint32 index = vaultData.indexInAssetVaults;
-            _assetVaults[vaultData.asset][index] =
-                _assetVaults[vaultData.asset][_assetVaults[vaultData.asset].length - 1];
-            _vaultData[vault].indexInAssetVaults = index;
+        // Remove strategy from _assetStrategies
+        if (_assetStrategies[strategyData.asset].length > 1) {
+            uint32 index = strategyData.indexInAssetStrategies;
+            _assetStrategies[strategyData.asset][index] =
+                _assetStrategies[strategyData.asset][_assetStrategies[strategyData.asset].length - 1];
+            _strategyData[strategy].indexInAssetStrategies = index;
         }
-        _assetVaults[vaultData.asset].pop();
+        _assetStrategies[strategyData.asset].pop();
 
-        // Remove vault from _allVaults
-        if (_allVaults.length > 1) {
-            uint32 indexInAllVaults = vaultData.indexInAllVaults;
-            _allVaults[indexInAllVaults] = _allVaults[_allVaults.length - 1];
-            _vaultData[vault].indexInAllVaults = indexInAllVaults;
+        // Remove strategy from _allStrategies
+        if (_allStrategies.length > 1) {
+            uint32 indexInAllStrategies = strategyData.indexInAllStrategies;
+            _allStrategies[indexInAllStrategies] = _allStrategies[_allStrategies.length - 1];
+            _strategyData[strategy].indexInAllStrategies = indexInAllStrategies;
         }
-        _allVaults.pop();
+        _allStrategies.pop();
 
-        // Update storage that tracks assets with supported vaults
-        _assetVaultsCount[vaultData.asset]--;
-        if (_assetVaultsCount[vaultData.asset] == 0) {
-            // Remove asset from _assetsWithSupportedVaults
-            for (uint256 i = 0; i < _assetsWithSupportedVaults.length; i++) {
-                if (_assetsWithSupportedVaults[i] == vaultData.asset) {
-                    _assetsWithSupportedVaults[i] = _assetsWithSupportedVaults[_assetsWithSupportedVaults.length - 1];
-                    _assetsWithSupportedVaults.pop();
+        // Update storage that tracks assets with supported strategies
+        _assetStrategyCount[strategyData.asset]--;
+        if (_assetStrategyCount[strategyData.asset] == 0) {
+            // Remove asset from _assetsWithSupportedStrategies
+            for (uint256 i = 0; i < _assetsWithSupportedStrategies.length; i++) {
+                if (_assetsWithSupportedStrategies[i] == strategyData.asset) {
+                    _assetsWithSupportedStrategies[i] =
+                        _assetsWithSupportedStrategies[_assetsWithSupportedStrategies.length - 1];
+                    _assetsWithSupportedStrategies.pop();
                     break;
                 }
             }
         }
 
-        delete _vaultData[vault];
-        emit VaultRemoved(vaultData.asset, vault);
+        delete _strategyData[strategy];
+        emit StrategyRemoved(strategyData.asset, strategy);
     }
 }
