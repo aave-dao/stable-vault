@@ -22,6 +22,10 @@ contract MockFundsHandler is IFundsHandler {
         _mockedAssetBalancesRay[asset] = balanceRay;
     }
 
+    function mockApprove(address spender, address asset, uint256 amount) external {
+        IERC20(asset).forceApprove(spender, amount);
+    }
+
     ////
 
     function getAggregatedBalance() external view override returns (uint256) {

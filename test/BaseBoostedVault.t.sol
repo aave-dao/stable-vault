@@ -502,6 +502,21 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         assertEq(actualAssets, expectedAssets);
     }
 
+    function test_claimFees_reverts_ifMsgSenderIsNotAuthorized(address unauthorizedMsgSender, uint256 amountToClaim)
+        public
+    {
+        _assumeNotProxyAdmin(unauthorizedMsgSender, address(bbv));
+        amountToClaim = _boundAssetAmount(address(mockAsset), amountToClaim);
+
+        mockAccessManager.mockRejectCall(unauthorizedMsgSender, address(bbv), IBasedBoostedVault.claimFees.selector);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
+        );
+        vm.prank(unauthorizedMsgSender);
+        bbv.claimFees(_toAddressArray(address(mockAsset)), _toUint256Array(amountToClaim));
+    }
+
     function test_claimFees_reverts_ifObligationsExceedAssets(uint256 obligationsRay, uint256 aggregatedBalanceRay)
         public
     {
@@ -527,6 +542,72 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.prank(manager);
         vm.expectRevert(abi.encodeWithSelector(IBasedBoostedVault.InsufficientAssets.selector));
         bbv.claimFees(_toAddressArray(address(mockAsset)), _toUint256Array(obligationsInAssetDecimals));
+    }
+
+    function test_claimFees_reverts_ifPullingMoreFundsThanTheAvailableFeesToClaim(
+        uint256 availableFeesToClaimRay,
+        uint256 requestedAssetsToClaim
+    ) public {
+        requestedAssetsToClaim = _boundAssetAmount(address(mockAsset), requestedAssetsToClaim);
+        availableFeesToClaimRay = _boundRayAmount(availableFeesToClaimRay);
+        vm.assume(requestedAssetsToClaim.assetDecimalsToRay(address(mockAsset)) > availableFeesToClaimRay);
+
+        mockAsset.mint(address(mockFundsHandler), requestedAssetsToClaim);
+        mockFundsHandler.mockApprove(address(bbv), address(mockAsset), requestedAssetsToClaim);
+
+        mockFundsHandler.mockAggregatedBalance(availableFeesToClaimRay);
+
+        vm.prank(manager);
+        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.InvalidAmount.selector));
+        bbv.claimFees(_toAddressArray(address(mockAsset)), _toUint256Array(requestedAssetsToClaim));
+    }
+
+    function test_claimFees_emitExpectedEvent(uint256 availableFeesToClaimRay, uint256 requestedAssetsToClaim) public {
+        requestedAssetsToClaim = _boundAssetAmount(address(mockAsset), requestedAssetsToClaim);
+        availableFeesToClaimRay = _boundRayAmount(availableFeesToClaimRay);
+        vm.assume(requestedAssetsToClaim.assetDecimalsToRay(address(mockAsset)) <= availableFeesToClaimRay);
+
+        mockAsset.mint(address(mockFundsHandler), availableFeesToClaimRay);
+        mockFundsHandler.mockApprove(address(bbv), address(mockAsset), availableFeesToClaimRay);
+
+        mockFundsHandler.mockAggregatedBalance(availableFeesToClaimRay);
+
+        vm.expectEmit(true, true, true, true);
+        emit IBasedBoostedVault.FeesClaimed(
+            _toAddressArray(address(mockAsset)), _toUint256Array(requestedAssetsToClaim)
+        );
+
+        vm.prank(manager);
+        bbv.claimFees(_toAddressArray(address(mockAsset)), _toUint256Array(requestedAssetsToClaim));
+    }
+
+    function test_claimFees_sendsFeesToMsgSender(
+        address msgSender,
+        uint256 availableFeesToClaimRay,
+        uint256 requestedAssetsToClaim
+    ) public {
+        vm.assume(msgSender != address(0));
+        _assumeNotProxyAdmin(msgSender, address(bbv));
+        requestedAssetsToClaim = _boundAssetAmount(address(mockAsset), requestedAssetsToClaim);
+        availableFeesToClaimRay = _boundRayAmount(availableFeesToClaimRay);
+        vm.assume(requestedAssetsToClaim.assetDecimalsToRay(address(mockAsset)) <= availableFeesToClaimRay);
+        vm.assume(mockAsset.balanceOf(msgSender) == 0);
+
+        mockAsset.mint(address(mockFundsHandler), availableFeesToClaimRay);
+        mockFundsHandler.mockApprove(address(bbv), address(mockAsset), availableFeesToClaimRay);
+
+        mockFundsHandler.mockAggregatedBalance(availableFeesToClaimRay);
+
+        vm.expectEmit(true, true, true, true);
+        emit IBasedBoostedVault.FeesClaimed(
+            _toAddressArray(address(mockAsset)), _toUint256Array(requestedAssetsToClaim)
+        );
+
+        // The AccessManager contract we use has all calls allowed by default, only rejections needs to be explicit.
+        vm.prank(msgSender);
+        bbv.claimFees(_toAddressArray(address(mockAsset)), _toUint256Array(requestedAssetsToClaim));
+
+        assertEq(mockAsset.balanceOf(msgSender), requestedAssetsToClaim);
     }
 
     function test_setSubVaultRate_reverts_ifMsgSenderIsNotAuthorized(
@@ -706,6 +787,48 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 actualWithdrawalAmountRay = bbv.requestWithdrawal(user, 0);
 
         assertEq(actualWithdrawalAmountRay, userBalanceRay);
+    }
+
+    // TODO: Couldn't reproduce the case where the withdrawal amount is zero due to conversion rounding loss.
+    // function test_requestWithdrawal_reverts_ifWithdrawalAmountIsZeroDueToConversionRoundingLoss(address user) public
+    // { vm.assume(user != address(0));
+    //     _assumeNotProxyAdmin(user, address(bbv));
+    //     uint256 depositAmount = 1;
+
+    //     IMockErc20 asset = IMockErc20(address(new MockErc20("GHO", "GHO", 18)));
+    //     asset.mint(user, depositAmount);
+    //     vm.prank(user);
+    //     asset.forceApprove(address(bbv), depositAmount);
+    //     vm.prank(user);
+    //     bbv.deposit(user, address(asset), depositAmount);
+
+    //     uint256 withdrawalAmountRay = depositAmount.assetDecimalsToRay(address(asset));
+
+    //     vm.expectRevert(ErrorsLib.InsufficientAmountOut.selector);
+    //     vm.prank(user);
+    //     bbv.requestWithdrawal(user, withdrawalAmountRay);
+    // }
+
+    function test_requestWithdrawal_tinyAmountWorksAsExpected(address user) public {
+        vm.assume(user != address(0));
+        _assumeNotProxyAdmin(user, address(bbv));
+        uint256 depositAmount = 1;
+
+        IMockErc20 asset = IMockErc20(address(new MockErc20("GHO", "GHO", 18)));
+        asset.mint(user, depositAmount);
+        vm.prank(user);
+        asset.forceApprove(address(bbv), depositAmount);
+        vm.prank(user);
+        bbv.deposit(user, address(asset), depositAmount);
+
+        uint256 withdrawalAmountRay = depositAmount.assetDecimalsToRay(address(asset));
+
+        vm.assume(asset.balanceOf(user) == 0);
+
+        vm.prank(user);
+        bbv.requestWithdrawal(user, withdrawalAmountRay);
+
+        assertEq(mockIouToken.balanceOf(user), withdrawalAmountRay);
     }
 
     function test_requestWithdrawal_reverts_ifWithdrawalAmountIsGreaterThanUserBalance(
