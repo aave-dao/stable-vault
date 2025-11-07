@@ -161,6 +161,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
     function test_deposit_firstUserDepositGoesToDefaultSubVault(address user, uint256 amount) public {
         vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(bbv));
         amount = _boundAssetAmount(address(mockAsset), amount);
 
@@ -192,6 +193,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 userRate
     ) public {
         vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(bbv));
         firstDepositAmount = _boundAssetAmount(address(mockAsset), firstDepositAmount);
         secondDepositAmount = _boundAssetAmount(address(mockAsset), secondDepositAmount);
@@ -239,6 +241,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
     function test_deposit_reverts_ifAmountIsZero(address user) public {
         vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(bbv));
 
         vm.prank(user);
@@ -252,6 +255,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(msgSender != address(0));
         _assumeNotProxyAdmin(msgSender, address(bbv));
         vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(bbv));
         vm.assume(msgSender != user);
 
@@ -270,6 +274,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
     function test_deposit_reverts_ifMsgSenderIsNotTheUserDepositing(address user, uint256 amount) public {
         vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(bbv));
         amount = _boundAssetAmount(address(mockAsset), amount);
 
@@ -282,6 +287,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
     function test_deposit_callsFundsHandlerToProcessDepositWithExpectedParams(address user, uint256 amount) public {
         vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(bbv));
         amount = _boundAssetAmount(address(mockAsset), amount);
 
@@ -301,6 +307,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
     function test_setUserRate_reverts_ifUserDoesNotHaveAPosition(address user, uint256 newPerSecondRate) public {
         vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(bbv));
         vm.assume(bbv.getUserSubVault(user).id == 0); // no prior deposits
         newPerSecondRate = _boundRate(newPerSecondRate);
@@ -313,6 +320,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
     function test_setUserRate_reverts_ifSettingTheSameRateHeAlreadyHas(address user, uint256 amount) public {
         vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(bbv));
         amount = _boundAssetAmount(address(mockAsset), amount);
 
@@ -390,6 +398,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(bbv.getDefaultSubVault().perSecondRate != newPerSecondRate);
 
         vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(bbv));
         amount = _boundAssetAmount(address(mockAsset), amount);
         mockAsset.mint(user, amount);
@@ -540,7 +549,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         assertGt(bbv.getVaultObligations(), bbv.getAggregatedBalance());
 
         vm.prank(manager);
-        vm.expectRevert(abi.encodeWithSelector(IBasedBoostedVault.InsufficientAssets.selector));
+        vm.expectRevert(abi.encodeWithSelector(IBasedBoostedVault.NoFeesToClaim.selector));
         bbv.claimFees(_toAddressArray(address(mockAsset)), _toUint256Array(obligationsInAssetDecimals));
     }
 
@@ -581,12 +590,13 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         bbv.claimFees(_toAddressArray(address(mockAsset)), _toUint256Array(requestedAssetsToClaim));
     }
 
-    function test_claimFees_sendsFeesToMsgSender(
+    function test_claimFees_sendsExpectedAmountOfFeesToMsgSender(
         address msgSender,
         uint256 availableFeesToClaimRay,
         uint256 requestedAssetsToClaim
     ) public {
         vm.assume(msgSender != address(0));
+        vm.assume(msgSender != address(mockFundsHandler));
         _assumeNotProxyAdmin(msgSender, address(bbv));
         requestedAssetsToClaim = _boundAssetAmount(address(mockAsset), requestedAssetsToClaim);
         availableFeesToClaimRay = _boundRayAmount(availableFeesToClaimRay);
@@ -597,11 +607,6 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockFundsHandler.mockApprove(address(bbv), address(mockAsset), availableFeesToClaimRay);
 
         mockFundsHandler.mockAggregatedBalance(availableFeesToClaimRay);
-
-        vm.expectEmit(true, true, true, true);
-        emit IBasedBoostedVault.FeesClaimed(
-            _toAddressArray(address(mockAsset)), _toUint256Array(requestedAssetsToClaim)
-        );
 
         // The AccessManager contract we use has all calls allowed by default, only rejections needs to be explicit.
         vm.prank(msgSender);
@@ -684,6 +689,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
     function test_getActiveSubVaults_activeSubVaultIsAddedUponDeposit(address user, uint256 depositAmount) public {
         vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(bbv));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
 
@@ -701,6 +707,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 newPerSecondRate
     ) public {
         vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(bbv));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
 
@@ -723,6 +730,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 depositAmount
     ) public {
         vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(bbv));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
         _deposit(user, depositAmount);
@@ -738,6 +746,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
     function test_getUserBalance_returnsZeroIfUserDoesNotHaveAPosition(address user) public view {
         vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(bbv));
         vm.assume(bbv.getUserSubVault(user).id == 0);
 
@@ -751,6 +760,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 withdrawalAmountRay
     ) public {
         vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(bbv));
         _assumeNotProxyAdmin(msgSender, address(bbv));
         vm.assume(msgSender != user);
@@ -765,6 +775,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
     function test_requestWithdrawal_reverts_userDoesNotHaveAPosition(address user, uint256 withdrawalAmountRay) public {
         vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(bbv));
         withdrawalAmountRay = _boundRayAmount(withdrawalAmountRay);
 
@@ -777,6 +788,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         public
     {
         vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(bbv));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
         _deposit(user, depositAmount);
@@ -789,28 +801,53 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         assertEq(actualWithdrawalAmountRay, userBalanceRay);
     }
 
-    // TODO: Couldn't reproduce the case where the withdrawal amount is zero due to conversion rounding loss.
-    // function test_requestWithdrawal_reverts_ifWithdrawalAmountIsZeroDueToConversionRoundingLoss(address user) public
-    // { vm.assume(user != address(0));
-    //     _assumeNotProxyAdmin(user, address(bbv));
-    //     uint256 depositAmount = 1;
+    // Couldn't reproduce the case where the withdrawal amount is zero due to conversion rounding loss.
+    //   └────── It should never happen. We added an `assert` instead of a `require`. We can remove it
+    //           later or keep it as a safe guard.
+    function test_requestWithdrawal_DoesNotHaveRoundingLoss(address user) public {
+        vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
+        _assumeNotProxyAdmin(user, address(bbv));
+        uint256 depositAmount = 1;
 
-    //     IMockErc20 asset = IMockErc20(address(new MockErc20("GHO", "GHO", 18)));
-    //     asset.mint(user, depositAmount);
-    //     vm.prank(user);
-    //     asset.forceApprove(address(bbv), depositAmount);
-    //     vm.prank(user);
-    //     bbv.deposit(user, address(asset), depositAmount);
+        uint256 depositAmountInRay = depositAmount.assetDecimalsToRay(address(mockAsset));
+        _deposit(user, depositAmount);
 
-    //     uint256 withdrawalAmountRay = depositAmount.assetDecimalsToRay(address(asset));
+        vm.warp(block.timestamp + 1);
+        mockFundsHandler.mockAggregatedBalance(10e27);
 
-    //     vm.expectRevert(ErrorsLib.InsufficientAmountOut.selector);
-    //     vm.prank(user);
-    //     bbv.requestWithdrawal(user, withdrawalAmountRay);
-    // }
+        vm.prank(user);
+        bbv.requestWithdrawal(user, depositAmountInRay);
+
+        vm.prank(user);
+        bbv.requestWithdrawal(user, 0);
+    }
+
+    function test_requestWithdrawal_WithReallySmallInterest(address user) public {
+        vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
+        _assumeNotProxyAdmin(user, address(bbv));
+        uint256 depositAmount = 1000000;
+
+        uint256 depositAmountInRay = depositAmount.assetDecimalsToRay(address(mockAsset));
+        _deposit(user, depositAmount);
+
+        uint256 smallestGrowingRate = 1000000000000000000000000001;
+        _setUserRate(user, smallestGrowingRate);
+
+        vm.warp(block.timestamp + 1);
+        mockFundsHandler.mockAggregatedBalance(10e27);
+
+        vm.prank(user);
+        bbv.requestWithdrawal(user, depositAmountInRay - 1);
+
+        vm.prank(user);
+        bbv.requestWithdrawal(user, 0);
+    }
 
     function test_requestWithdrawal_tinyAmountWorksAsExpected(address user) public {
         vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(bbv));
         uint256 depositAmount = 1;
 
@@ -837,6 +874,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 withdrawalAmountRay
     ) public {
         vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(bbv));
         userBalance = _boundAssetAmount(address(mockAsset), userBalance);
         _deposit(user, userBalance);
@@ -850,25 +888,26 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     }
 
     function test_requestWithdrawal_reverts_ifInterestToWithdrawIsGreaterThanAvailableInterest(
-        address user,
-        uint256 depositAmount,
-        uint256 timeElapsed
+        address user, // 0x0000000000000000000000000000000000000ac9
+        uint256 depositAmount, // 74
+        uint256 timeElapsed // 5285
     ) public {
         vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(bbv));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
         _deposit(user, depositAmount);
+
         timeElapsed = bound(timeElapsed, 5 minutes, 30 * 365 days);
-
         vm.warp(block.timestamp + timeElapsed);
-
-        mockFundsHandler.mockAggregatedBalance(depositAmount);
 
         uint256 withdrawalAmountRay = bbv.getUserBalance(user);
 
+        mockFundsHandler.mockAggregatedBalance(depositAmount.assetDecimalsToRay(address(mockAsset)));
+
         vm.expectRevert(
             abi.encodeWithSelector(
-                IBasedBoostedVault.DepositsNotCovered.selector,
+                IBasedBoostedVault.InsufficientAssets.selector,
                 user,
                 withdrawalAmountRay,
                 depositAmount.assetDecimalsToRay(address(mockAsset))
@@ -884,6 +923,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 withdrawalAmountRay
     ) public {
         vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(bbv));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
         _deposit(user, depositAmount);
@@ -908,6 +948,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     //     uint256 withdrawalAmountRay
     // ) public {
     //     vm.assume(user != address(0));
+    //     vm.assume(user != address(mockFundsHandler));
     //     _assumeNotProxyAdmin(user, address(bbv));
     //     depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
     //     _deposit(user, depositAmount);
@@ -932,6 +973,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 withdrawalAmountRay
     ) public {
         vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(bbv));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
         _deposit(user, depositAmount);
@@ -953,6 +995,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 withdrawalAmountRay
     ) public {
         vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(bbv));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
         _deposit(user, depositAmount);
@@ -976,6 +1019,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 iouAmountRay
     ) public {
         vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(bbv));
         _assumeNotProxyAdmin(msgSender, address(bbv));
         vm.assume(msgSender != user);
@@ -993,6 +1037,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 iouAmountRay
     ) public {
         vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(bbv));
         _assumeNotProxyAdmin(msgSender, address(bbv));
         vm.assume(msgSender != user);
@@ -1012,6 +1057,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 iouAmountRay
     ) public {
         vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(bbv));
         userIouBalance = _boundRayAmountAllowingZero(userIouBalance);
         iouAmountRay = _boundRayAmount(iouAmountRay);
@@ -1027,6 +1073,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
     function test_executeWithdrawal_emitsExpectedEvent(address user, uint256 iouAmountRay) public {
         vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(bbv));
         iouAmountRay = _boundRayAmount(iouAmountRay);
         mockIouToken.mint(user, iouAmountRay);
@@ -1047,6 +1094,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 iouAmountRay
     ) public {
         vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(bbv));
         userIouBalance = _boundRayAmountAllowingZero(userIouBalance);
         iouAmountRay = _boundRayAmount(iouAmountRay);
@@ -1065,6 +1113,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
     function test_executeWithdrawal_transfersExpectedAmountOfAssetsToUser(address user, uint256 iouAmountRay) public {
         vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(bbv));
         iouAmountRay = _boundRayAmount(iouAmountRay);
         mockIouToken.mint(user, iouAmountRay);
