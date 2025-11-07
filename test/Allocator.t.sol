@@ -22,8 +22,6 @@ import {IMockErc20} from "./mocks/MockErc20.sol";
 import {MockNonStandardErc20} from "./mocks/MockNonStandardErc20.sol";
 import {TestErc4626} from "./mocks/TestErc4626.sol";
 
-import {console} from "forge-std/console.sol";
-
 contract AllocatorTest is TestWithHelpers {
     using MathLib for uint256;
     using AssetLib for uint256;
