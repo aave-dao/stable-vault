@@ -73,7 +73,6 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
     function exchangeIouTokens(
         uint256 iouTokenAmountRay,
         address tokenOut,
-        address strategyVault,
         address tokenOutReceiver,
         IChainGateway.BridgeParams memory bridgeParams
     ) external payable override returns (uint256) {
@@ -85,7 +84,7 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
 
         // TODO: apply a withdrawal fee here?
         uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(tokenOut);
-        IAllocator(ALLOCATOR).withdrawFromStrategy(tokenOut, amountOut, strategyVault);
+        IAllocator(ALLOCATOR).withdraw(tokenOut, amountOut);
         IERC20(tokenOut).safeTransfer(tokenOutReceiver, amountOut);
         bytes memory data = abi.encode(
             IChainGateway.CrossChainMessage({

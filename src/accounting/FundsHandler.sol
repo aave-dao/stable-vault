@@ -107,23 +107,12 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
     }
 
     /// @inheritdoc IFundsHandler
-    function processWithdrawal(address asset, uint256 amount, address strategyVault)
-        external
-        override
-        onlyBasedBoostedVault
-    {
-        _pullFundsFromStrategyVault(asset, amount, strategyVault);
-        IERC20(asset).forceApprove(VAULT, amount);
-    }
-
-    /// @inheritdoc IFundsHandler
-    function pullFromLiquidity(address asset, uint256 amount) external override onlyBasedBoostedVault {
+    function processWithdrawal(address asset, uint256 amount) external override onlyBasedBoostedVault {
         _pullFundsFromImmediateLiquidity(asset, amount);
-        // TODO: Check if we don't need to do increaseApproval here (re-entrancy, multi-withdrawal, etc)
         IERC20(asset).forceApprove(VAULT, amount);
     }
 
-    // Manager Functions
+    //////////////////////////////////////////// MANAGER FUNCTIONS /////////////////////////////////////////////////////
 
     /// @inheritdoc IFundsHandler
     function pushFundsToChain(
@@ -171,7 +160,7 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
         _pushFundsToImmediateLiquidity(asset, amount);
     }
 
-    // ////
+    ////////////////////////////////////////////////// INTERNAL ////////////////////////////////////////////////////////
 
     function _updateChainBalance(uint256 chainId, uint256 snapshotBalanceRay, uint256 chainBalanceSnapshotNonce)
         internal
@@ -219,9 +208,5 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
 
     function _pullFundsFromImmediateLiquidity(address asset, uint256 amount) internal {
         IAllocator(ALLOCATOR).withdraw(asset, amount);
-    }
-
-    function _pullFundsFromStrategyVault(address asset, uint256 amount, address strategyVault) internal {
-        IAllocator(ALLOCATOR).withdrawFromStrategy(asset, amount, strategyVault);
     }
 }

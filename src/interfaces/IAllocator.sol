@@ -72,15 +72,11 @@ interface IAllocator {
     function reallocate(address asset, uint256 amount, address fromVault, address toVault) external;
 
     /// @notice Withdraws a given amount of an asset from the immediate liquidity vault a.k.a the default strategy vault
-    /// for the asset. @param asset Asset to withdraw.
-    /// @param amount Amount of the asset to withdraw.
-    function withdraw(address asset, uint256 amount) external;
-
-    /// @notice Withdraws a given amount of an asset from a given strategy vault.
+    /// for the asset.
+    /// @dev Prioritizes idle funds, default strategy, then non-default vault(s).
     /// @param asset Asset to withdraw.
     /// @param amount Amount of the asset to withdraw.
-    /// @param strategyVault Address of the strategy vault to withdraw from.
-    function withdrawFromStrategy(address asset, uint256 amount, address strategyVault) external;
+    function withdraw(address asset, uint256 amount) external;
 
     /// @dev Adds a new strategy vault to the allocator.
     /// @param asset The asset to add the vault for.

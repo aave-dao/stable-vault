@@ -120,19 +120,31 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
 
     /// @inheritdoc IAllocator
     function withdraw(address asset, uint256 amount) external override onlyWithdrawer {
-        _withdrawFromVault(asset, amount, _defaultVaultByAsset[asset]);
+        require(amount > 0, ErrorsLib.ZeroAmount());
+        require(
+            IAssetRegistry(ASSET_REGISTRY).isAllowedToWithdrawFromAllocator(asset), ErrorsLib.UnsupportedAsset(asset)
+        );
+
+        uint256 idleBalance = IERC20(asset).balanceOf(address(this));
+        if (idleBalance < amount) {
+            // Consume from idle balance first
+            uint256 amountRemaining = amount - idleBalance;
+
+            // Consume from default strategy
+            amountRemaining -= _withdrawFromStrategy(asset, amountRemaining, _defaultVaultByAsset[asset]);
+
+            // If necessary, pull from remaining strategies
+            for (uint256 i = 0; amountRemaining > 0 && i < _assetVaults[asset].length; i++) {
+                address strategy = _assetVaults[asset][i];
+                if (strategy != _defaultVaultByAsset[asset]) {
+                    amountRemaining -= _withdrawFromStrategy(asset, amountRemaining, strategy);
+                }
+            }
+        }
+        IERC20(asset).safeTransfer(msg.sender, amount);
     }
 
-    /// @inheritdoc IAllocator
-    function withdrawFromStrategy(address asset, uint256 amount, address strategyVault)
-        external
-        override
-        onlyWithdrawer
-    {
-        _withdrawFromVault(asset, amount, strategyVault == address(0) ? _defaultVaultByAsset[asset] : strategyVault);
-    }
-
-    // Manager Functions
+    //////////////////////////////////////////// MANAGER FUNCTIONS /////////////////////////////////////////////////////
 
     /// @inheritdoc IAllocator
     function deallocate(address asset, uint256 assetsAmount, address vault)
@@ -232,7 +244,6 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
 
     /// @inheritdoc IAllocator
     function setDefaultVault(address asset, address vault) external restricted {
-        // TODO: set behind timelock?
         // Vault must be allowed to be set as the default vault for the asset
         require(_defaultVaultByAsset[asset] != vault, ErrorsLib.AddressAlreadyWhitelisted());
         require(_isVaultSupportedForAsset({vault: vault, asset: asset}), ErrorsLib.AddressNotWhitelisted());
@@ -240,7 +251,7 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
         emit DefaultVaultSet(asset, vault);
     }
 
-    // Internal Functions
+    ////////////////////////////////////////////////// INTERNAL ////////////////////////////////////////////////////////
 
     function _deallocate(address vault, address asset, uint256 amount, address receiver) internal returns (uint256) {
         uint256 burnedShares = IERC4626(vault).withdraw({assets: amount, receiver: receiver, owner: address(this)});
@@ -269,29 +280,20 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
             return true;
         }
         IERC20(asset).forceApprove(vault, amount);
-        return _callVaultWithData(vault, abi.encodeCall(IERC4626.deposit, (amount, address(this))));
+        (bool callSucceeded,) = vault.call(abi.encodeCall(IERC4626.deposit, (amount, address(this))));
+        return callSucceeded;
     }
 
-    function _withdrawFromVault(address asset, uint256 amount, address strategyVault) internal {
-        require(amount > 0, ErrorsLib.ZeroAmount());
-        require(
-            IAssetRegistry(ASSET_REGISTRY).isAllowedToWithdrawFromAllocator(asset), ErrorsLib.UnsupportedAsset(asset)
-        );
-        uint256 idleBalance = IERC20(asset).balanceOf(address(this));
-
-        if (idleBalance >= amount) {
-            // Withdraw from idle funds directly to the msg.sender
-            IERC20(asset).safeTransfer(msg.sender, amount);
-            return;
+    function _withdrawFromStrategy(address asset, uint256 amount, address strategy) internal returns (uint256) {
+        // TODO: review if the following require is actually needed
+        require(_isVaultSupportedForAsset({vault: strategy, asset: asset}), ErrorsLib.AddressNotWhitelisted());
+        uint256 withdrawnAmount;
+        uint256 balanceInStrategy = _getAssetBalanceInVault(IERC4626(strategy));
+        if (balanceInStrategy > 0) {
+            withdrawnAmount = balanceInStrategy > amount ? amount : balanceInStrategy;
+            _deallocate(strategy, asset, withdrawnAmount, address(this));
         }
-
-        require(_isVaultSupportedForAsset({vault: strategyVault, asset: asset}), ErrorsLib.AddressNotWhitelisted());
-        require(
-            idleBalance + _getAssetBalanceInVault(IERC4626(strategyVault)) >= amount, ErrorsLib.InsufficientLiquidity()
-        );
-        // Deallocate as necessary then transfer `amount` to the msg.sender
-        _deallocate(strategyVault, asset, amount - idleBalance, address(this));
-        IERC20(asset).safeTransfer(msg.sender, amount);
+        return withdrawnAmount;
     }
 
     /// @dev Returns balances grouped by asset.
@@ -325,11 +327,6 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
 
     function _isVaultSupported(address vault) internal view returns (bool) {
         return _vaultData[vault].asset != address(0);
-    }
-
-    function _callVaultWithData(address vault, bytes memory data) internal returns (bool) {
-        (bool callSucceeded,) = vault.call(data);
-        return callSucceeded;
     }
 
     function _addVault(address asset, address vault) internal {

@@ -275,17 +275,14 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
     }
 
     /// @inheritdoc IBasedBoostedVault
-    function executeWithdrawal(address user, address assetOut, uint256 iouAmountRay, address strategyVault)
-        external
-        override
-    {
+    function executeWithdrawal(address user, address assetOut, uint256 iouAmountRay) external override {
         require(msg.sender == user, InvalidMsgSender());
         require(
             IAssetRegistry(_assetRegistry).isAllowedToWithdrawFromBBV(assetOut), ErrorsLib.UnsupportedAsset(assetOut)
         );
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(user, iouAmountRay);
         uint256 assetAmount = iouAmountRay.rayToAssetDecimals(assetOut);
-        IFundsHandler(FUNDS_HANDLER).processWithdrawal(assetOut, assetAmount, strategyVault);
+        IFundsHandler(FUNDS_HANDLER).processWithdrawal(assetOut, assetAmount);
         IERC20(assetOut).safeTransferFrom(FUNDS_HANDLER, user, assetAmount);
         emit WithdrawalExecuted(user, assetOut, assetAmount);
     }
@@ -305,7 +302,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
         uint256 fee = vaultAssetsRay - vaultObligationsRay;
         uint256 accumulatedAmountRay;
         for (uint256 i = 0; i < assets.length; i++) {
-            IFundsHandler(FUNDS_HANDLER).pullFromLiquidity(assets[i], amounts[i]);
+            IFundsHandler(FUNDS_HANDLER).processWithdrawal(assets[i], amounts[i]);
             accumulatedAmountRay += amounts[i].assetDecimalsToRay(assets[i]);
             if (amounts[i] > 0) {
                 IERC20(assets[i]).safeTransferFrom(FUNDS_HANDLER, msg.sender, amounts[i]);

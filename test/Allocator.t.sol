@@ -539,7 +539,7 @@ contract AllocatorTest is TestWithHelpers {
         // Perform partial withdrawal
         uint256 amountToWithdraw = amount - amountRemaining;
         vm.prank(withdrawer);
-        _allocator.withdrawFromStrategy(address(_mockUsdt), amountToWithdraw, address(_extraUsdtVault));
+        _allocator.withdraw(address(_mockUsdt), amountToWithdraw);
 
         // Check balances after partial withdrawal
         assertEq(_mockUsdt.balanceOf(withdrawer), amountToWithdraw);
@@ -552,7 +552,7 @@ contract AllocatorTest is TestWithHelpers {
 
         // Perform full withdrawal
         vm.prank(withdrawer);
-        _allocator.withdrawFromStrategy(address(_mockUsdt), amountRemaining, address(_extraUsdtVault));
+        _allocator.withdraw(address(_mockUsdt), amountRemaining);
 
         // Check balances after full withdrawal
         assertEq(_mockUsdt.balanceOf(withdrawer), amount);
@@ -674,13 +674,13 @@ contract AllocatorTest is TestWithHelpers {
 
         // Perform withdrawal
         vm.prank(withdrawer);
-        vm.expectRevert(ErrorsLib.InsufficientLiquidity.selector);
+        vm.expectRevert("ERC20: transfer amount exceeds balance");
         _allocator.withdraw(address(_mockUsdt), amount + 1);
 
         // Try again after airdropping funds to the Allocator
         _mockUsdt.mint(address(_allocator), amount);
         vm.prank(withdrawer);
-        vm.expectRevert(ErrorsLib.InsufficientLiquidity.selector);
+        vm.expectRevert("ERC20: transfer amount exceeds balance");
         _allocator.withdraw(address(_mockUsdt), amount * 2 + 1);
     }
 
@@ -697,14 +697,14 @@ contract AllocatorTest is TestWithHelpers {
 
         // Perform withdrawal
         vm.prank(withdrawer);
-        vm.expectRevert(ErrorsLib.InsufficientLiquidity.selector);
-        _allocator.withdrawFromStrategy(address(_mockUsdt), amount + 1, address(_extraUsdtVault));
+        vm.expectRevert("ERC20: transfer amount exceeds balance");
+        _allocator.withdraw(address(_mockUsdt), amount + 1);
 
         // Try again after airdropping funds to the Allocator
         _mockUsdt.mint(address(_allocator), amount);
         vm.prank(withdrawer);
-        vm.expectRevert(ErrorsLib.InsufficientLiquidity.selector);
-        _allocator.withdrawFromStrategy(address(_mockUsdt), amount * 2 + 1, address(_extraUsdtVault));
+        vm.expectRevert("ERC20: transfer amount exceeds balance");
+        _allocator.withdraw(address(_mockUsdt), amount * 2 + 1);
     }
 
     function test_withdraw_reverts_ifAmountIsZero() public {
@@ -716,23 +716,7 @@ contract AllocatorTest is TestWithHelpers {
     function test_withdrawFromStrategyVault_reverts_ifAmountIsZero() public {
         vm.expectRevert(ErrorsLib.ZeroAmount.selector);
         vm.prank(withdrawer);
-        _allocator.withdrawFromStrategy(address(_mockUsdt), 0, address(_extraUsdtVault));
-    }
-
-    function test_withdraw_reverts_ifVaultIsNotSupportedForAsset(uint256 amount) public {
-        amount = _boundAssetAmount(address(_mockUsdt), amount);
-        vm.assume(amount > 0);
-
-        _mockUsdt.mint(depositor, amount);
-        vm.prank(depositor);
-        MockNonStandardErc20(address(_mockUsdt)).approve(address(_allocator), amount);
-        vm.prank(depositor);
-        _allocator.deposit(address(_mockUsdt), amount);
-
-        vm.prank(withdrawer);
-        vm.expectRevert(ErrorsLib.AddressNotWhitelisted.selector);
-        // Specify the wrong vault for the asset
-        _allocator.withdrawFromStrategy(address(_mockGho), amount, address(_defaultUsdtVault));
+        _allocator.withdraw(address(_mockUsdt), 0);
     }
 
     function test_withdrawFromStrategyVault_reverts_ifVaultIsNotSupportedForAsset(uint256 amount) public {
@@ -746,7 +730,7 @@ contract AllocatorTest is TestWithHelpers {
 
         vm.prank(withdrawer);
         vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(_mockUnsupportedAsset)));
-        _allocator.withdrawFromStrategy(address(_mockUnsupportedAsset), amount, address(_extraUsdtVault));
+        _allocator.withdraw(address(_mockUnsupportedAsset), amount);
     }
 
     function test_withdraw_reverts_ifNonWithdrawerCalls(address nonWithdrawer, uint256 amount) public {
@@ -760,6 +744,6 @@ contract AllocatorTest is TestWithHelpers {
 
         vm.prank(nonWithdrawer);
         vm.expectRevert(ErrorsLib.AddressNotWhitelisted.selector);
-        _allocator.withdrawFromStrategy(address(_mockUsdt), amount, address(_extraUsdtVault));
+        _allocator.withdraw(address(_mockUsdt), amount);
     }
 }
