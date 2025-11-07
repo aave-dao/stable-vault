@@ -41,8 +41,8 @@ contract AllocatorTest is TestWithHelpers {
     IMockErc20 internal _mockUsdt;
     IMockErc20 internal _mockGho;
     IMockErc20 internal _mockUnsupportedAsset;
-    TestErc4626 internal _defaultUsdcVault;
-    TestErc4626 internal _extraUsdcVault;
+    TestErc4626 internal _defaultUsdtVault;
+    TestErc4626 internal _extraUsdtVault;
     TestErc4626 internal _defaultGhoVault;
     TestErc4626 internal _extraGhoVault;
 
@@ -60,16 +60,16 @@ contract AllocatorTest is TestWithHelpers {
 
         // Set up strategy vaults
         vm.prank(admin);
-        allocator.addVault(address(_mockUsdt), address(_defaultUsdcVault));
+        allocator.addVault(address(_mockUsdt), address(_defaultUsdtVault));
         vm.prank(admin);
-        allocator.addVault(address(_mockUsdt), address(_extraUsdcVault));
+        allocator.addVault(address(_mockUsdt), address(_extraUsdtVault));
         vm.prank(admin);
         allocator.addVault(address(_mockGho), address(_defaultGhoVault));
         vm.prank(admin);
         allocator.addVault(address(_mockGho), address(_extraGhoVault));
 
         vm.prank(everyRoleAccount);
-        allocator.setDefaultVault(address(_mockUsdt), address(_defaultUsdcVault));
+        allocator.setDefaultVault(address(_mockUsdt), address(_defaultUsdtVault));
         vm.prank(everyRoleAccount);
         allocator.setDefaultVault(address(_mockGho), address(_defaultGhoVault));
 
@@ -82,8 +82,8 @@ contract AllocatorTest is TestWithHelpers {
         _mockUnsupportedAsset =
             IMockErc20(address(new MockNonStandardErc20("Test Unsupported Asset", "tUNSUPPORTED", 18)));
 
-        _defaultUsdcVault = new TestErc4626(_mockUsdt);
-        _extraUsdcVault = new TestErc4626(_mockUsdt);
+        _defaultUsdtVault = new TestErc4626(_mockUsdt);
+        _extraUsdtVault = new TestErc4626(_mockUsdt);
         _defaultGhoVault = new TestErc4626(_mockGho);
         _extraGhoVault = new TestErc4626(_mockGho);
 
@@ -141,8 +141,8 @@ contract AllocatorTest is TestWithHelpers {
         assertTrue(foundGho);
         assertEq(_allocator.getAssetBalance(address(_mockUsdt)), 0);
         assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
-        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdcVault)), 0);
-        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdcVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtVault)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoVault)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoVault)), 0);
 
@@ -179,8 +179,8 @@ contract AllocatorTest is TestWithHelpers {
         assertTrue(foundGho);
         assertEq(_allocator.getAssetBalance(address(_mockUsdt)), depositAmountUsdt);
         assertEq(_allocator.getAssetBalance(address(_mockGho)), depositAmountGho);
-        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdcVault)), depositAmountUsdt);
-        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdcVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtVault)), depositAmountUsdt);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtVault)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoVault)), depositAmountGho);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoVault)), 0);
 
@@ -208,17 +208,17 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalance(address(_mockUsdt)), depositAmountUsdt + idleFundsUsdt);
         assertEq(_allocator.getAssetBalance(address(_mockGho)), depositAmountGho + idleFundsGho);
         // Balance in vault should not change with idle funds
-        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdcVault)), depositAmountUsdt);
-        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdcVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtVault)), depositAmountUsdt);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtVault)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoVault)), depositAmountGho);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoVault)), 0);
 
         // Deposit funds into the extra vaults on half of the allocator
         _mockUsdt.mint(address(depositor), depositAmountUsdt);
         vm.prank(depositor);
-        MockNonStandardErc20(address(_mockUsdt)).approve(address(_extraUsdcVault), depositAmountUsdt);
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(_extraUsdtVault), depositAmountUsdt);
         vm.prank(depositor);
-        _extraUsdcVault.deposit(depositAmountUsdt, address(_allocator));
+        _extraUsdtVault.deposit(depositAmountUsdt, address(_allocator));
 
         _mockGho.mint(address(depositor), depositAmountGho);
         vm.prank(depositor);
@@ -245,35 +245,35 @@ contract AllocatorTest is TestWithHelpers {
         assertTrue(foundGho);
         assertEq(_allocator.getAssetBalance(address(_mockUsdt)), depositAmountUsdt * 2 + idleFundsUsdt);
         assertEq(_allocator.getAssetBalance(address(_mockGho)), depositAmountGho * 2 + idleFundsGho);
-        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdcVault)), depositAmountUsdt);
-        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdcVault)), depositAmountUsdt);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtVault)), depositAmountUsdt);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtVault)), depositAmountUsdt);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoVault)), depositAmountGho);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoVault)), depositAmountGho);
     }
 
     function test_getDefaultVault_returnsExpectedDefaultVault() public view {
-        assertEq(_allocator.getDefaultVault(address(_mockUsdt)), address(_defaultUsdcVault));
+        assertEq(_allocator.getDefaultVault(address(_mockUsdt)), address(_defaultUsdtVault));
         assertEq(_allocator.getDefaultVault(address(_mockGho)), address(_defaultGhoVault));
     }
 
     function test_isVaultSupportedForAsset_returnsExpectedResult() public view {
-        assertTrue(_allocator.isVaultSupportedForAsset(address(_mockUsdt), address(_defaultUsdcVault)));
-        assertTrue(_allocator.isVaultSupportedForAsset(address(_mockUsdt), address(_extraUsdcVault)));
+        assertTrue(_allocator.isVaultSupportedForAsset(address(_mockUsdt), address(_defaultUsdtVault)));
+        assertTrue(_allocator.isVaultSupportedForAsset(address(_mockUsdt), address(_extraUsdtVault)));
         assertTrue(_allocator.isVaultSupportedForAsset(address(_mockGho), address(_defaultGhoVault)));
         assertTrue(_allocator.isVaultSupportedForAsset(address(_mockGho), address(_extraGhoVault)));
         assertFalse(_allocator.isVaultSupportedForAsset(address(_mockUsdt), address(_defaultGhoVault)));
-        assertFalse(_allocator.isVaultSupportedForAsset(address(_mockGho), address(_defaultUsdcVault)));
+        assertFalse(_allocator.isVaultSupportedForAsset(address(_mockGho), address(_defaultUsdtVault)));
         assertFalse(_allocator.isVaultSupportedForAsset(address(_mockUsdt), address(_extraGhoVault)));
-        assertFalse(_allocator.isVaultSupportedForAsset(address(_mockGho), address(_extraUsdcVault)));
-        assertFalse(_allocator.isVaultSupportedForAsset(address(_mockUnsupportedAsset), address(_defaultUsdcVault)));
-        assertFalse(_allocator.isVaultSupportedForAsset(address(_mockUnsupportedAsset), address(_extraUsdcVault)));
+        assertFalse(_allocator.isVaultSupportedForAsset(address(_mockGho), address(_extraUsdtVault)));
+        assertFalse(_allocator.isVaultSupportedForAsset(address(_mockUnsupportedAsset), address(_defaultUsdtVault)));
+        assertFalse(_allocator.isVaultSupportedForAsset(address(_mockUnsupportedAsset), address(_extraUsdtVault)));
         assertFalse(_allocator.isVaultSupportedForAsset(address(_mockUnsupportedAsset), address(_defaultGhoVault)));
         assertFalse(_allocator.isVaultSupportedForAsset(address(_mockUnsupportedAsset), address(_extraGhoVault)));
     }
 
     function test_isVaultSupported_returnsExpectedResult() public {
-        assertTrue(_allocator.isVaultSupported(address(_defaultUsdcVault)));
-        assertTrue(_allocator.isVaultSupported(address(_extraUsdcVault)));
+        assertTrue(_allocator.isVaultSupported(address(_defaultUsdtVault)));
+        assertTrue(_allocator.isVaultSupported(address(_extraUsdtVault)));
         assertTrue(_allocator.isVaultSupported(address(_defaultGhoVault)));
         assertTrue(_allocator.isVaultSupported(address(_extraGhoVault)));
         assertFalse(_allocator.isVaultSupported(makeAddr("NON_EXISTING_VAULT")));
@@ -289,8 +289,8 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.deposit(address(_mockUsdt), depositAmountUsdt);
 
         assertEq(_allocator.getAssetBalance(address(_mockUsdt)), depositAmountUsdt);
-        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdcVault)), depositAmountUsdt);
-        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdcVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtVault)), depositAmountUsdt);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtVault)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoVault)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoVault)), 0);
     }
@@ -304,21 +304,21 @@ contract AllocatorTest is TestWithHelpers {
 
         // Mock the vault to reject the deposit
         vm.mockCallRevert(
-            address(_defaultUsdcVault),
+            address(_defaultUsdtVault),
             abi.encodeWithSelector(IERC4626.deposit.selector, depositAmountUsdt, address(_allocator)),
             abi.encodeWithSelector(IERC20Errors.ERC20InvalidSender.selector, address(_allocator))
         );
 
         vm.expectEmit(true, true, true, true);
-        emit IAllocator.VaultDepositFailed(address(_defaultUsdcVault), depositAmountUsdt);
+        emit IAllocator.VaultDepositFailed(address(_defaultUsdtVault), depositAmountUsdt);
         vm.prank(depositor);
         _allocator.deposit(address(_mockUsdt), depositAmountUsdt);
 
         // Check the funds are idle in the Allocator
         assertEq(_allocator.getAssetBalance(address(_mockUsdt)), depositAmountUsdt);
         assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
-        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdcVault)), 0);
-        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdcVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtVault)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoVault)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoVault)), 0);
     }
@@ -339,8 +339,8 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalance(address(_mockUnsupportedAsset)), amount);
         assertEq(_allocator.getAssetBalance(address(_mockUsdt)), 0);
         assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
-        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdcVault)), 0);
-        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdcVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtVault)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoVault)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoVault)), 0);
     }
@@ -375,5 +375,298 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.deposit(address(_mockUsdt), 0);
     }
 
-    // TODO: test add vault for asset where vault does not support the asset
+    function test_withdraw_withdrawsFromDefaultVault(uint256 amount) public {
+        uint256 amountRemaining = 1000;
+        amount = _boundAssetAmount(address(_mockUsdt), amount);
+        vm.assume(amount > amountRemaining);
+
+        _mockUsdt.mint(depositor, amount);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(_allocator), amount);
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), amount);
+
+        // Check balances
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount);
+        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtVault)), amount);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoVault)), 0);
+
+        // Perform partial withdrawal
+        uint256 amountToWithdraw = amount - amountRemaining;
+        vm.prank(withdrawer);
+        _allocator.withdraw(address(_mockUsdt), amountToWithdraw);
+
+        // Check balances after partial withdrawal
+        assertEq(_mockUsdt.balanceOf(withdrawer), amountToWithdraw);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amountRemaining);
+        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtVault)), amountRemaining);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoVault)), 0);
+
+        // Perform full withdrawal
+        vm.prank(withdrawer);
+        _allocator.withdraw(address(_mockUsdt), amountRemaining);
+
+        // Check balances after full withdrawal
+        assertEq(_mockUsdt.balanceOf(withdrawer), amount);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoVault)), 0);
+    }
+
+    // TODO: withdraw from strategy vault
+    function test_withdrawFromStrategyVault_withdrawsFromStrategyVault(uint256 amount) public {
+        uint256 amountRemaining = 1000;
+        amount = _boundAssetAmount(address(_mockUsdt), amount);
+        vm.assume(amount > amountRemaining);
+
+        _mockUsdt.mint(depositor, amount);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(_extraUsdtVault), amount);
+        vm.prank(depositor);
+        // Deposit on behalf of the Allocator
+        _extraUsdtVault.deposit(amount, address(_allocator));
+
+        // Check balances
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount);
+        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtVault)), amount);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoVault)), 0);
+
+        // Perform partial withdrawal
+        uint256 amountToWithdraw = amount - amountRemaining;
+        vm.prank(withdrawer);
+        _allocator.withdrawFromStrategy(address(_mockUsdt), amountToWithdraw, address(_extraUsdtVault));
+
+        // Check balances after partial withdrawal
+        assertEq(_mockUsdt.balanceOf(withdrawer), amountToWithdraw);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amountRemaining);
+        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtVault)), amountRemaining);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoVault)), 0);
+
+        // Perform full withdrawal
+        vm.prank(withdrawer);
+        _allocator.withdrawFromStrategy(address(_mockUsdt), amountRemaining, address(_extraUsdtVault));
+
+        // Check balances after full withdrawal
+        assertEq(_mockUsdt.balanceOf(withdrawer), amount);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoVault)), 0);
+    }
+
+    function test_withdraw_usesIdleFundsOnly(uint256 amount) public {
+        uint256 amountRemaining = 1000;
+        amount = _boundAssetAmount(address(_mockUsdt), amount);
+        vm.assume(amount > amountRemaining);
+
+        // Airdrop funds to the Allocator so that it has idle funds
+        _mockUsdt.mint(address(_allocator), amount);
+
+        // Check balances
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount);
+        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoVault)), 0);
+
+        // Perform partial withdrawal
+        uint256 amountToWithdraw = amount - amountRemaining;
+
+        vm.prank(withdrawer);
+        _allocator.withdraw(address(_mockUsdt), amountToWithdraw);
+
+        // Check balances after partial withdrawal
+        assertEq(_mockUsdt.balanceOf(withdrawer), amountToWithdraw);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amountRemaining);
+        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoVault)), 0);
+
+        // Perform full withdrawal
+        vm.prank(withdrawer);
+        _allocator.withdraw(address(_mockUsdt), amountRemaining);
+
+        // Check balances after full withdrawal
+        assertEq(_mockUsdt.balanceOf(withdrawer), amount);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoVault)), 0);
+    }
+
+    function test_withdraw_usesIdleFundsFirst(uint256 amount) public {
+        uint256 amountRemaining = 1000;
+        amount = _boundAssetAmount(address(_mockUsdt), amount);
+        vm.assume(amount > amountRemaining);
+
+        uint256 totalDeposited = amount * 2;
+
+        // Deposit funds into the strategy vault
+        _mockUsdt.mint(depositor, amount);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(_allocator), amount);
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), amount);
+
+        // Airdrop funds to the Allocator so that it has idle funds
+        _mockUsdt.mint(address(_allocator), amount);
+
+        // Check balances
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), totalDeposited);
+        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtVault)), amount);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoVault)), 0);
+
+        // Perform partial withdrawal
+        uint256 amountToWithdraw = totalDeposited - amountRemaining;
+        vm.prank(withdrawer);
+        _allocator.withdraw(address(_mockUsdt), amountToWithdraw);
+
+        // Check balances after partial withdrawal (uses idle funds first)
+        assertEq(_mockUsdt.balanceOf(withdrawer), amountToWithdraw);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amountRemaining);
+        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtVault)), amountRemaining);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoVault)), 0);
+
+        // Perform full withdrawal
+        vm.prank(withdrawer);
+        _allocator.withdraw(address(_mockUsdt), amountRemaining);
+
+        // Check balances after full withdrawal
+        assertEq(_mockUsdt.balanceOf(withdrawer), totalDeposited);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoVault)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoVault)), 0);
+    }
+
+    function test_withdraw_revertsIfDefaultVaultHasInsufficientFunds(uint256 amount) public {
+        amount = _boundAssetAmount(address(_mockUsdt), amount);
+        vm.assume(amount > 0);
+
+        _mockUsdt.mint(depositor, amount);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(_allocator), amount);
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), amount);
+
+        // Perform withdrawal
+        vm.prank(withdrawer);
+        vm.expectRevert(ErrorsLib.InsufficientLiquidity.selector);
+        _allocator.withdraw(address(_mockUsdt), amount + 1);
+
+        // Try again after airdropping funds to the Allocator
+        _mockUsdt.mint(address(_allocator), amount);
+        vm.prank(withdrawer);
+        vm.expectRevert(ErrorsLib.InsufficientLiquidity.selector);
+        _allocator.withdraw(address(_mockUsdt), amount * 2 + 1);
+    }
+
+    function test_withdrawFromStrategyVault_revertsIfVaultHasInsufficientFunds(uint256 amount) public {
+        amount = _boundAssetAmount(address(_mockUsdt), amount);
+        vm.assume(amount > 0);
+
+        // Deposit funds into the strategy vault on behalf of the Allocator
+        _mockUsdt.mint(depositor, amount);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(_extraUsdtVault), amount);
+        vm.prank(depositor);
+        _extraUsdtVault.deposit(amount, address(_allocator));
+
+        // Perform withdrawal
+        vm.prank(withdrawer);
+        vm.expectRevert(ErrorsLib.InsufficientLiquidity.selector);
+        _allocator.withdrawFromStrategy(address(_mockUsdt), amount + 1, address(_extraUsdtVault));
+
+        // Try again after airdropping funds to the Allocator
+        _mockUsdt.mint(address(_allocator), amount);
+        vm.prank(withdrawer);
+        vm.expectRevert(ErrorsLib.InsufficientLiquidity.selector);
+        _allocator.withdrawFromStrategy(address(_mockUsdt), amount * 2 + 1, address(_extraUsdtVault));
+    }
+
+    function test_withdraw_revertsIfAmountIsZero() public {
+        vm.expectRevert(ErrorsLib.ZeroAmount.selector);
+        vm.prank(withdrawer);
+        _allocator.withdraw(address(_mockUsdt), 0);
+    }
+
+    function test_withdrawFromStrategyVault_revertsIfAmountIsZero() public {
+        vm.expectRevert(ErrorsLib.ZeroAmount.selector);
+        vm.prank(withdrawer);
+        _allocator.withdrawFromStrategy(address(_mockUsdt), 0, address(_extraUsdtVault));
+    }
+
+    function test_withdraw_revertsIfVaultIsNotSupportedForAsset(uint256 amount) public {
+        amount = _boundAssetAmount(address(_mockUsdt), amount);
+        vm.assume(amount > 0);
+
+        _mockUsdt.mint(depositor, amount);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(_allocator), amount);
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), amount);
+
+        vm.prank(withdrawer);
+        vm.expectRevert(ErrorsLib.AddressNotWhitelisted.selector);
+        // Specify the wrong vault for the asset
+        _allocator.withdrawFromStrategy(address(_mockGho), amount, address(_defaultUsdtVault));
+    }
+
+    function test_withdrawFromStrategyVault_revertsIfVaultIsNotSupportedForAsset(uint256 amount) public {
+        amount = _boundAssetAmount(address(_mockUnsupportedAsset), amount);
+
+        _mockAssetRegistry.mockToDisallowAssetWithdrawalsFromAllocator(address(_mockUnsupportedAsset));
+
+        vm.prank(withdrawer);
+        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(_mockUnsupportedAsset)));
+        _allocator.withdraw(address(_mockUnsupportedAsset), amount);
+
+        vm.prank(withdrawer);
+        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(_mockUnsupportedAsset)));
+        _allocator.withdrawFromStrategy(address(_mockUnsupportedAsset), amount, address(_extraUsdtVault));
+    }
+
+    function test_withdraw_revertsIfNonWithdrawerCalls(address nonWithdrawer, uint256 amount) public {
+        amount = _boundAssetAmount(address(_mockUsdt), amount);
+        vm.assume(nonWithdrawer != withdrawer);
+        _assumeNotProxyAdmin(nonWithdrawer, address(_allocator));
+
+        vm.prank(nonWithdrawer);
+        vm.expectRevert(ErrorsLib.AddressNotWhitelisted.selector);
+        _allocator.withdraw(address(_mockUsdt), amount);
+
+        vm.prank(nonWithdrawer);
+        vm.expectRevert(ErrorsLib.AddressNotWhitelisted.selector);
+        _allocator.withdrawFromStrategy(address(_mockUsdt), amount, address(_extraUsdtVault));
+    }
 }

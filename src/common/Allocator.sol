@@ -274,24 +274,24 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
 
     function _withdrawFromVault(address asset, uint256 amount, address strategyVault) internal {
         require(amount > 0, ErrorsLib.ZeroAmount());
-        require(_isVaultSupportedForAsset({vault: strategyVault, asset: asset}), ErrorsLib.AddressNotWhitelisted());
         require(
             IAssetRegistry(ASSET_REGISTRY).isAllowedToWithdrawFromAllocator(asset), ErrorsLib.UnsupportedAsset(asset)
         );
         uint256 idleBalance = IERC20(asset).balanceOf(address(this));
 
+        if (idleBalance >= amount) {
+            // Withdraw from idle funds directly to the msg.sender
+            IERC20(asset).safeTransfer(msg.sender, amount);
+            return;
+        }
+
+        require(_isVaultSupportedForAsset({vault: strategyVault, asset: asset}), ErrorsLib.AddressNotWhitelisted());
         require(
             idleBalance + _getAssetBalanceInVault(IERC4626(strategyVault)) >= amount, ErrorsLib.InsufficientLiquidity()
         );
-
-        if (idleBalance > 0 && amount > idleBalance) {
-            // Deallocate as necessary then transfer `amount` to the msg.sender
-            _deallocate(strategyVault, asset, amount - idleBalance, address(this));
-            IERC20(asset).safeTransfer(msg.sender, amount);
-        } else {
-            // Withdraw from strategy vault directly to the msg.sender
-            _deallocate(strategyVault, asset, amount, msg.sender);
-        }
+        // Deallocate as necessary then transfer `amount` to the msg.sender
+        _deallocate(strategyVault, asset, amount - idleBalance, address(this));
+        IERC20(asset).safeTransfer(msg.sender, amount);
     }
 
     /// @dev Returns balances grouped by asset.
