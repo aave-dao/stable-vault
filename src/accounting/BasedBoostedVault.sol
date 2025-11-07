@@ -199,7 +199,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
         uint256 withdrawalRequestInterestRay = actualAmountInRay - guaranteedAmountRay;
         require(
             withdrawalRequestInterestRay <= globalWithdrawableInterestRay,
-            DepositsNotCovered(user, actualAmountInRay, guaranteedAmountRay + globalWithdrawableInterestRay)
+            InsufficientAssets(user, actualAmountInRay, guaranteedAmountRay + globalWithdrawableInterestRay)
         );
 
         if (!_isActiveSubVaultById(subVaultId)) {
@@ -235,7 +235,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
     function claimFees(address[] calldata assets, uint256[] calldata amounts) external override restricted {
         uint256 vaultObligationsRay = _getVaultObligations();
         uint256 vaultAssetsRay = _getVaultAggregatedBalance();
-        require(vaultObligationsRay <= vaultAssetsRay, InsufficientAssets());
+        require(vaultObligationsRay <= vaultAssetsRay, NoFeesToClaim());
         uint256 fee = vaultAssetsRay - vaultObligationsRay;
         uint256 accumulatedAmountRay;
         for (uint256 i = 0; i < assets.length; i++) {

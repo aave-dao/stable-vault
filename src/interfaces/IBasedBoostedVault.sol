@@ -36,8 +36,8 @@ interface IBasedBoostedVault {
     error InvalidMsgSender();
     error SubVaultAlreadyExists();
     error SubVaultDoesNotExist();
-    error InsufficientAssets();
-    error DepositsNotCovered(address withdrawalRequester, uint256 amountRequestedRay, uint256 amountAvailableRay);
+    error NoFeesToClaim();
+    error InsufficientAssets(address user, uint256 amountRequestedRay, uint256 amountAvailableRay);
 
     function setDefaultSubVault(uint256 perSecondRate) external;
 
