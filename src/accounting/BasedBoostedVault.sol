@@ -338,7 +338,6 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
     }
 
     function _createSubVault(uint256 newPerSecondRate) internal returns (uint256) {
-        require(!_existsSubVaultWithRate(newPerSecondRate), SubVaultAlreadyExists());
         _validateRate(newPerSecondRate);
         uint256 newSubVaultId = ++_lastSubVaultId;
         _subVaultById[newSubVaultId] = SubVault({
