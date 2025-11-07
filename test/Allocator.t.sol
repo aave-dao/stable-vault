@@ -515,8 +515,7 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoVault)), 0);
     }
 
-    // TODO: withdraw from strategy vault
-    function test_withdrawFromStrategyVault_withdrawsFromStrategyVault(uint256 amount) public {
+    function test_withdraw_withdrawsFromMultipleStrategies(uint256 amount) public {
         uint256 amountRemaining = 1000;
         amount = _boundAssetAmount(address(_mockUsdt), amount);
         vm.assume(amount > amountRemaining);
@@ -684,7 +683,7 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.withdraw(address(_mockUsdt), amount * 2 + 1);
     }
 
-    function test_withdrawFromStrategyVault_reverts_ifVaultHasInsufficientFunds(uint256 amount) public {
+    function test_withdraw_reverts_ifStrategiesHaveInsufficientFunds(uint256 amount) public {
         amount = _boundAssetAmount(address(_mockUsdt), amount);
         vm.assume(amount > 0);
 
@@ -713,13 +712,7 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.withdraw(address(_mockUsdt), 0);
     }
 
-    function test_withdrawFromStrategyVault_reverts_ifAmountIsZero() public {
-        vm.expectRevert(ErrorsLib.ZeroAmount.selector);
-        vm.prank(withdrawer);
-        _allocator.withdraw(address(_mockUsdt), 0);
-    }
-
-    function test_withdrawFromStrategyVault_reverts_ifVaultIsNotSupportedForAsset(uint256 amount) public {
+    function test_withdraw_reverts_ifVaultIsNotSupportedForAsset(uint256 amount) public {
         amount = _boundAssetAmount(address(_mockUnsupportedAsset), amount);
 
         _mockAssetRegistry.mockToDisallowAssetWithdrawalsFromAllocator(address(_mockUnsupportedAsset));
