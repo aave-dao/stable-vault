@@ -183,17 +183,24 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
     function rebalance(RebalanceParams[] memory params) external override restricted {
         for (uint256 i = 0; i < params.length; i++) {
             RebalanceParams memory param = params[i];
-            
+
             require(
-                IAssetRegistry(ASSET_REGISTRY).isAllowedSwapInputToken(param.assetIn), ErrorsLib.UnsupportedAsset(param.assetIn)
+                IAssetRegistry(ASSET_REGISTRY).isAllowedSwapInputToken(param.assetIn),
+                ErrorsLib.UnsupportedAsset(param.assetIn)
             );
             require(
                 IAssetRegistry(ASSET_REGISTRY).isAllowedSwapOutputToken(param.assetOut),
                 ErrorsLib.UnsupportedAsset(param.assetOut)
             );
-            require(_isStrategySupportedForAsset({strategy: param.fromStrategy, asset: param.assetIn}), ErrorsLib.AddressNotWhitelisted());
-            require(_isStrategySupportedForAsset({strategy: param.toStrategy, asset: param.assetOut}), ErrorsLib.AddressNotWhitelisted());
-            
+            require(
+                _isStrategySupportedForAsset({strategy: param.fromStrategy, asset: param.assetIn}),
+                ErrorsLib.AddressNotWhitelisted()
+            );
+            require(
+                _isStrategySupportedForAsset({strategy: param.toStrategy, asset: param.assetOut}),
+                ErrorsLib.AddressNotWhitelisted()
+            );
+
             uint256 amountIn = param.amountIn;
             uint256 idleBalanceAssetIn = IERC20(param.assetIn).balanceOf(address(this));
             if (idleBalanceAssetIn < amountIn) {
@@ -210,10 +217,11 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
                 IERC20(param.assetIn).safeTransfer(param.swapper, amountIn);
 
                 // Execute the swap and require 1:1 conversion
-                assetOutAmount = ISwapper(param.swapper)
-                    .executeSwap(param.assetIn, param.assetOut, amountIn, param.swapData);
+                assetOutAmount =
+                    ISwapper(param.swapper).executeSwap(param.assetIn, param.assetOut, amountIn, param.swapData);
                 require(
-                    assetOutAmount >= amountIn.convertAssetDecimals(param.assetIn, param.assetOut), ErrorsLib.InsufficientAmountOut()
+                    assetOutAmount >= amountIn.convertAssetDecimals(param.assetIn, param.assetOut),
+                    ErrorsLib.InsufficientAmountOut()
                 );
 
                 // Pull the `assetOut` from the Swapper to the Allocator
