@@ -85,8 +85,8 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
         return _getTotalAssetBalance(asset);
     }
 
-    function getAssetBalanceInStrategy(address strategiestrategy) external view returns (uint256) {
-        return _getAssetBalanceInStrategy(IERC4626(strategiestrategy));
+    function getAssetBalanceInStrategy(address strategy) external view returns (uint256) {
+        return _getAssetBalanceInStrategy(IERC4626(strategy));
     }
 
     /// @inheritdoc IAllocator
