@@ -481,11 +481,6 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
 
     /// @return supply of all IOU tokens across all networks
     function _getIousInCirculation() internal view returns (uint256) {
-        // TODO: Read internal storage of tokens bridged to other chains?
-        // NO => because we will lock tokens when bridging
-        // When the Earning chain exchanges IOUs for assets, it will send a message back to Accounting chain
-        // Once Accounting chain receives this message the locked IOUs can be burned.
-        // Total supply will decrease.
         return IERC20(IIouTokenManager(IOU_TOKEN_MANAGER).getAsset()).totalSupply();
     }
 
