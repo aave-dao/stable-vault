@@ -184,7 +184,7 @@ contract EndToEndTest is BaseTest {
             vm.prank(user);
             vm.expectRevert(
                 abi.encodeWithSelector(
-                    IBasedBoostedVault.DepositsNotCovered.selector,
+                    IBasedBoostedVault.InsufficientAssets.selector,
                     user,
                     512381781828396559943369876000,
                     500000000000000000000000000000

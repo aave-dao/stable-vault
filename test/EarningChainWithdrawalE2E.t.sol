@@ -112,7 +112,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         // request.
         vm.expectRevert(
             abi.encodeWithSelector(
-                IBasedBoostedVault.DepositsNotCovered.selector,
+                IBasedBoostedVault.InsufficientAssets.selector,
                 user1,
                 userBalanceAfterHalfYearInRay,
                 userInitialDeposit.assetDecimalsToRay(address(USDC))
@@ -181,7 +181,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         uint256 user2BalanceAfterOneYearInRay = vault.getUserBalance(user2);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IBasedBoostedVault.DepositsNotCovered.selector,
+                IBasedBoostedVault.InsufficientAssets.selector,
                 user2,
                 user2BalanceAfterOneYearInRay,
                 userInitialDeposit.assetDecimalsToRay(address(USDC))

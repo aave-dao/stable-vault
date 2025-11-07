@@ -12,7 +12,7 @@ interface IBasedBoostedVault {
         uint256 newPerSecondRate;
     }
 
-    // TODO: after initial testing we can fallbabck to using WithdrawalRequested
+    // TODO: after initial testing we can fallback to using WithdrawalRequested
     // event WithdrawalRequested(address indexed user, address indexed asset, uint256 indexed withdrawalRequestId,
     // uint256 requestedAmount, uint256 guaranteedAmount);
     event WithdrawalRequestedWithShares(
@@ -34,10 +34,10 @@ interface IBasedBoostedVault {
     error NonExistentPosition();
     error RedundantRate();
     error InvalidMsgSender();
-    error VaultAlreadyExists();
-    error InactiveVault();
-    error InsufficientAssets();
-    error DepositsNotCovered(address withdrawalRequester, uint256 amountRequestedRay, uint256 amountAvailableRay);
+    error SubVaultAlreadyExists();
+    error SubVaultDoesNotExist();
+    error NoFeesToClaim();
+    error InsufficientAssets(address user, uint256 amountRequestedRay, uint256 amountAvailableRay);
 
     function setDefaultSubVault(uint256 perSecondRate) external;
 

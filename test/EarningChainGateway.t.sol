@@ -20,8 +20,8 @@ import {MockAccessManager} from "./mocks/MockAccessManager.sol";
 import {MockAllocator} from "./mocks/MockAllocator.sol";
 import {MockAssetRegistry} from "./mocks/MockAssetRegistry.sol";
 import {MockBridgeAdapter} from "./mocks/MockBridgeAdapter.sol";
+import {MockDummyIouTokenManager} from "./mocks/MockDummyIouTokenManager.sol";
 import {IMockErc20} from "./mocks/MockErc20.sol";
-import {MockIouTokenManager} from "./mocks/MockIouTokenManager.sol";
 import {MockNonStandardErc20} from "./mocks/MockNonStandardErc20.sol";
 
 contract EarningChainGatewayTest is TestWithHelpers {
@@ -42,7 +42,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     MockAllocator internal _mockAllocator;
     MockBridgeAdapter internal _mockBridgeAdapterAssets;
     MockBridgeAdapter internal _mockBridgeAdapterData;
-    MockIouTokenManager internal _mockIouTokenManager;
+    MockDummyIouTokenManager internal _mockIouTokenManager;
     MockAssetRegistry internal _mockAssetRegistry;
 
     EarningChainGateway internal _earningChainGateway;
@@ -89,7 +89,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         _mockUnsupportedAsset =
             IMockErc20(address(new MockNonStandardErc20("Test Unsupported Asset", "tUNSUPPORTED", 18)));
 
-        _mockIouTokenManager = new MockIouTokenManager();
+        _mockIouTokenManager = new MockDummyIouTokenManager();
 
         _mockAssetRegistry = new MockAssetRegistry();
 
@@ -498,7 +498,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             // Expect call to IOU token manager to burn tokens
             vm.expectCall(
                 address(_mockIouTokenManager),
-                abi.encodeCall(MockIouTokenManager.burnTokens, (tokenOutReceiver, iouTokenAmountRay))
+                abi.encodeCall(MockDummyIouTokenManager.burnTokens, (tokenOutReceiver, iouTokenAmountRay))
             );
 
             _mockUsdt.mint(address(_mockAllocator), amountOut);
@@ -669,7 +669,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         {
             vm.expectCall(
                 address(_mockIouTokenManager),
-                abi.encodeCall(MockIouTokenManager.burnTokens, (tokenOutReceiver, iouTokenAmountRay))
+                abi.encodeCall(MockDummyIouTokenManager.burnTokens, (tokenOutReceiver, iouTokenAmountRay))
             );
 
             _mockUsdt.mint(address(_mockAllocator), iouTokenAmountRay.rayToAssetDecimals(tokenOut));
