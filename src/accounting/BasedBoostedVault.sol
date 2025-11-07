@@ -202,6 +202,8 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
             InsufficientAssets(user, actualAmountInRay, guaranteedAmountRay + globalWithdrawableInterestRay)
         );
 
+        _globalOriginalDepositsRay -= guaranteedAmountRay;
+
         if (!_isActiveSubVaultById(subVaultId)) {
             _removeSubVaultFromActive(subVaultId);
         }
@@ -416,8 +418,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
         require(actualAmountOfWithdrawalRay > 0, ErrorsLib.InsufficientAmountOut());
         // We don't check for sharesToRedeem > 0 here because we check for actualAmountInRay > 0 below.
         _burnShares(user, sharesToRedeem);
-        uint256 originalDeposit = _positions[user].originalDepositRay;
-        _globalOriginalDepositsRay -= originalDeposit;
+        uint256 originalDepositRay = _positions[user].originalDepositRay;
         delete _positions[user];
         if (actualAmountOfWithdrawalRay < originalDeposit) {
             // We round it up because we guarantee originalDeposit
@@ -456,7 +457,6 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
             amountTakenFromOriginalDepositRay = actualAmountOfWithdrawal;
         }
         _positions[user].originalDepositRay -= amountTakenFromOriginalDepositRay;
-        _globalOriginalDepositsRay -= amountTakenFromOriginalDepositRay;
         return amountTakenFromOriginalDepositRay;
     }
 
