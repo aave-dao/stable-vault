@@ -47,7 +47,7 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
     mapping(address asset => uint256 strategiesCount) internal _assetStrategyCount;
     // To iterate through all strategies.
     address[] internal _allStrategies;
-    // To iterate through all assets with supported strategies and collect their balances.
+    // List of all supported assets that have at least one strategy.
     address[] internal _assetsWithSupportedStrategies;
 
     modifier onlyDepositor() {
@@ -131,13 +131,13 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
             uint256 amountRemaining = amount - idleBalance;
 
             // Consume from default strategy
-            amountRemaining -= _withdrawFromStrategy(asset, amountRemaining, _defaultStrategyByAsset[asset]);
+            amountRemaining -= _tryWithdrawFromStrategy(asset, amountRemaining, _defaultStrategyByAsset[asset]);
 
             // If necessary, pull from remaining strategies
             for (uint256 i = 0; amountRemaining > 0 && i < _assetStrategies[asset].length; i++) {
                 address strategy = _assetStrategies[asset][i];
                 if (strategy != _defaultStrategyByAsset[asset]) {
-                    amountRemaining -= _withdrawFromStrategy(asset, amountRemaining, strategy);
+                    amountRemaining -= _tryWithdrawFromStrategy(asset, amountRemaining, strategy);
                 }
             }
         }
@@ -282,10 +282,13 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
         }
         IERC20(asset).forceApprove(strategy, amount);
         (bool callSucceeded,) = strategy.call(abi.encodeCall(IERC4626.deposit, (amount, address(this))));
+        if (!callSucceeded) {
+            IERC20(asset).forceApprove(strategy, 0);
+        }
         return callSucceeded;
     }
 
-    function _withdrawFromStrategy(address asset, uint256 amount, address strategy) internal returns (uint256) {
+    function _tryWithdrawFromStrategy(address asset, uint256 amount, address strategy) internal returns (uint256) {
         // TODO: review if the following require is actually needed
         require(_isStrategySupportedForAsset({strategy: strategy, asset: asset}), ErrorsLib.AddressNotWhitelisted());
         uint256 withdrawnAmount;
