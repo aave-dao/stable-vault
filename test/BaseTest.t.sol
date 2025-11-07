@@ -741,12 +741,7 @@ contract BaseTest is Test {
         // For Allocator on Accounting chain
         accessManager.setTargetFunctionRole(
             address(allocator_accountingChain),
-            _toSelectorArray(
-                IAllocator.deallocate.selector,
-                IAllocator.depositIdleFunds.selector,
-                IAllocator.rebalance.selector,
-                IAllocator.setDefaultStrategy.selector
-            ),
+            _toSelectorArray(IAllocator.rebalance.selector, IAllocator.setDefaultStrategy.selector),
             OPERATOR_ROLE
         );
 
@@ -839,12 +834,7 @@ contract BaseTest is Test {
         // For Allocator on Earning chain
         accessManager.setTargetFunctionRole(
             address(allocator_earningChain),
-            _toSelectorArray(
-                IAllocator.deallocate.selector,
-                IAllocator.depositIdleFunds.selector,
-                IAllocator.rebalance.selector,
-                IAllocator.setDefaultStrategy.selector
-            ),
+            _toSelectorArray(IAllocator.rebalance.selector, IAllocator.setDefaultStrategy.selector),
             OPERATOR_ROLE
         );
 

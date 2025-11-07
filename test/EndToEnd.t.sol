@@ -126,20 +126,37 @@ contract EndToEndTest is BaseTest {
             Swapper.SlippageParams memory slippageParams = Swapper.SlippageParams(0, address(0));
 
             defaultGhoVault_earningChain = allocator_earningChain.getDefaultStrategy(address(GHO));
-            IAllocator.RebalanceParams[] memory rebalanceParams = new IAllocator.RebalanceParams[](1);
-            rebalanceParams[0] = IAllocator.RebalanceParams(
-                address(USDC),
-                defaultUsdcVault_earningChain,
-                address(GHO),
-                defaultGhoVault_earningChain,
-                userInitialDeposit,
-                address(swapper_earningChain),
-                abi.encode(targets, callDatas, slippageParams)
-            );
+            // Deallocation params
+            IAllocator.DeallocationParams[] memory deallocationParams = new IAllocator.DeallocationParams[](1);
+            deallocationParams[0] =
+                IAllocator.DeallocationParams(address(USDC), defaultUsdcVault_earningChain, userInitialDeposit);
+
+            // Swap params
+            IAllocator.SwapParams[] memory swapParams = new IAllocator.SwapParams[](1);
+            swapParams[0] = IAllocator.SwapParams({
+                assetIn: address(USDC),
+                amountIn: userInitialDeposit,
+                assetOut: address(GHO),
+                swapper: address(swapper_earningChain),
+                data: abi.encode(targets, callDatas, slippageParams)
+            });
+
+            // Allocation params
+            IAllocator.AllocationParams[] memory allocationParams = new IAllocator.AllocationParams[](1);
+            allocationParams[0] = IAllocator.AllocationParams({
+                asset: address(GHO), strategy: defaultGhoVault_earningChain, amount: userInitialDepositInGho
+            });
+
+            IAllocator.RebalanceParams memory rebalanceParams = IAllocator.RebalanceParams({
+                deallocations: deallocationParams, swaps: swapParams, allocations: allocationParams
+            });
+
+            IAllocator.RebalanceParams[] memory rebalances = new IAllocator.RebalanceParams[](1);
+            rebalances[0] = rebalanceParams;
 
             console.log("Rebalancing by swap from USDC to GHO on the Earning chain...");
             vm.prank(everyRoleAccount);
-            allocator_earningChain.rebalance(rebalanceParams);
+            allocator_earningChain.rebalance(rebalances);
 
             // - check that the funds are swapped to GHO
             console.log(
@@ -279,20 +296,34 @@ contract EndToEndTest is BaseTest {
             Swapper.SlippageParams memory slippageParams = Swapper.SlippageParams(0, address(0));
 
             address defaultUsdcVault_accountingChain = allocator_accountingChain.getDefaultStrategy(address(USDC));
-            IAllocator.RebalanceParams[] memory rebalanceParams = new IAllocator.RebalanceParams[](1);
-            rebalanceParams[0] = IAllocator.RebalanceParams(
-                address(GHO),
-                defaultGhoVault_accountingChain,
-                address(USDC),
-                defaultUsdcVault_accountingChain,
-                userEarningsInGho,
-                address(swapper_accountingChain),
-                abi.encode(targets, callDatas, slippageParams)
-            );
+            IAllocator.DeallocationParams[] memory deallocationParams = new IAllocator.DeallocationParams[](1);
+            deallocationParams[0] =
+                IAllocator.DeallocationParams(address(GHO), defaultGhoVault_accountingChain, userEarningsInGho);
+
+            IAllocator.SwapParams[] memory swapParams = new IAllocator.SwapParams[](1);
+            swapParams[0] = IAllocator.SwapParams({
+                assetIn: address(GHO),
+                amountIn: userEarningsInGho,
+                assetOut: address(USDC),
+                swapper: address(swapper_accountingChain),
+                data: abi.encode(targets, callDatas, slippageParams)
+            });
+
+            IAllocator.AllocationParams[] memory allocationParams = new IAllocator.AllocationParams[](1);
+            allocationParams[0] = IAllocator.AllocationParams({
+                asset: address(USDC), strategy: defaultUsdcVault_accountingChain, amount: userEarningsInUsdc
+            });
+
+            IAllocator.RebalanceParams memory rebalanceParams = IAllocator.RebalanceParams({
+                deallocations: deallocationParams, swaps: swapParams, allocations: allocationParams
+            });
+
+            IAllocator.RebalanceParams[] memory rebalances = new IAllocator.RebalanceParams[](1);
+            rebalances[0] = rebalanceParams;
 
             console.log("Rebalancing by swap from GHO to USDC on the Accounting chain...");
             vm.prank(everyRoleAccount);
-            allocator_accountingChain.rebalance(rebalanceParams);
+            allocator_accountingChain.rebalance(rebalances);
 
             // - check that the funds are swapped to USDC
             console.log(

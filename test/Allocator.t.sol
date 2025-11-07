@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
-import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -393,7 +391,7 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
 
         vm.prank(address(everyRoleAccount));
-        _allocator.depositIdleFunds(address(_mockUsdt));
+        _allocator.rebalance(_getDepositIdleFundsRebalanceParams(address(_mockUsdt)));
 
         // Check balances (now all USDT should be in the default vault)
         assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount);
@@ -404,7 +402,7 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
 
         vm.prank(address(everyRoleAccount));
-        _allocator.depositIdleFunds(address(_mockGho));
+        _allocator.rebalance(_getDepositIdleFundsRebalanceParams(address(_mockGho)));
 
         // Check balances (now all GHO should be in the default vault)
         assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount);
@@ -415,44 +413,17 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
     }
 
-    function test_depositIdleFunds_reverts_ifAmountIsZero() public {
-        vm.expectRevert(ErrorsLib.ZeroAmount.selector);
-        vm.prank(address(everyRoleAccount));
-        _allocator.depositIdleFunds(address(_mockUsdt));
-    }
-
-    function test_depositIdleFunds_reverts_ifDepositIsNotSupportedForAsset(uint256 amount) public {
+    function test_depositIdleFunds_reverts_ifStrategyIsNotSupportedForAsset(uint256 amount) public {
         amount = _boundAssetAmount(address(_mockUnsupportedAsset), amount);
 
         _mockAssetRegistry.mockToDisallowAssetDepositsIntoAllocator(address(_mockUnsupportedAsset));
 
         _mockUnsupportedAsset.mint(address(_allocator), amount);
+        IAllocator.RebalanceParams[] memory rebalanceParams =
+            _getDepositIdleFundsRebalanceParams(address(_mockUnsupportedAsset));
         vm.prank(address(everyRoleAccount));
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(_mockUnsupportedAsset)));
-        _allocator.depositIdleFunds(address(_mockUnsupportedAsset));
-    }
-
-    function test_depositIdleFunds_reverts_iffNonDepositorCalls(address nonDepositor, uint256 amount) public {
-        amount = _boundAssetAmount(address(_mockUsdt), amount);
-        vm.assume(nonDepositor != everyRoleAccount);
-        vm.assume(nonDepositor != address(0));
-        _assumeNotProxyAdmin(nonDepositor, address(_allocator));
-
-        vm.mockCall(
-            address(_mockAccessManager),
-            abi.encodeWithSelector(
-                IAccessManager.canCall.selector,
-                nonDepositor,
-                address(_allocator),
-                bytes4(IAllocator.depositIdleFunds.selector)
-            ),
-            abi.encode(false)
-        );
-
-        _mockUsdt.mint(address(_allocator), amount);
-        vm.prank(nonDepositor);
-        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, nonDepositor));
-        _allocator.depositIdleFunds(address(_mockUsdt));
+        vm.expectRevert(ErrorsLib.AddressNotWhitelisted.selector);
+        _allocator.rebalance(rebalanceParams);
     }
 
     function test_depositIdleFunds_reverts_ifVaultRejectsDeposit(uint256 amount) public {
@@ -465,13 +436,14 @@ contract AllocatorTest is TestWithHelpers {
             abi.encodeWithSelector(IERC20Errors.ERC20InvalidSender.selector, address(_allocator))
         );
 
+        IAllocator.RebalanceParams[] memory rebalanceParams = _getDepositIdleFundsRebalanceParams(address(_mockUsdt));
         vm.prank(address(everyRoleAccount));
         vm.expectRevert(
             abi.encodeWithSelector(
                 IAllocator.FailedToDepositIntoStrategy.selector, address(_defaultUsdtStrategy), amount
             )
         );
-        _allocator.depositIdleFunds(address(_mockUsdt));
+        _allocator.rebalance(rebalanceParams);
     }
 
     function test_withdraw_withdrawsFromDefaultVault(uint256 amount) public {
@@ -744,5 +716,24 @@ contract AllocatorTest is TestWithHelpers {
         vm.prank(nonWithdrawer);
         vm.expectRevert(ErrorsLib.AddressNotWhitelisted.selector);
         _allocator.withdraw(address(_mockUsdt), amount);
+    }
+
+    function _getDepositIdleFundsRebalanceParams(address asset)
+        internal
+        view
+        returns (IAllocator.RebalanceParams[] memory)
+    {
+        IAllocator.AllocationParams memory allocation =
+            IAllocator.AllocationParams({asset: asset, strategy: _allocator.getDefaultStrategy(asset), amount: 0});
+        IAllocator.AllocationParams[] memory allocations = new IAllocator.AllocationParams[](1);
+        allocations[0] = allocation;
+        IAllocator.RebalanceParams memory rebalanceParams = IAllocator.RebalanceParams({
+            deallocations: new IAllocator.DeallocationParams[](0),
+            swaps: new IAllocator.SwapParams[](0),
+            allocations: allocations
+        });
+        IAllocator.RebalanceParams[] memory rebalances = new IAllocator.RebalanceParams[](1);
+        rebalances[0] = rebalanceParams;
+        return rebalances;
     }
 }

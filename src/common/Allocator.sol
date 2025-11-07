@@ -112,7 +112,8 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
     /// @inheritdoc IAllocator
     function deposit(address asset, uint256 amount) external override onlyDepositor {
         IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
-        bool callSucceeded = _deposit({asset: asset, amount: amount, strategy: _defaultStrategyByAsset[asset]});
+        bool callSucceeded =
+            _depositToStrategy({asset: asset, amount: amount, strategy: _defaultStrategyByAsset[asset]});
         if (!callSucceeded) {
             emit StrategyDepositFailed(_defaultStrategyByAsset[asset], amount);
         }
@@ -147,39 +148,6 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
     //////////////////////////////////////////// MANAGER FUNCTIONS /////////////////////////////////////////////////////
 
     /// @inheritdoc IAllocator
-    function deallocate(address asset, uint256 amount, address strategy)
-        external
-        override
-        restricted
-        returns (uint256)
-    {
-        require(_isStrategySupportedForAsset({strategy: strategy, asset: asset}), ErrorsLib.AddressNotWhitelisted());
-        uint256 balanceBefore = IERC20(asset).balanceOf(address(this));
-        uint256 sharesBurned = _deallocate(asset, amount, address(this), strategy);
-        uint256 balanceAfter = IERC20(asset).balanceOf(address(this));
-        require(balanceAfter - balanceBefore == amount, ErrorsLib.InsufficientAmountOut());
-        return sharesBurned;
-    }
-
-    /// @inheritdoc IAllocator
-    function maxDeallocate(address asset, address strategy) external override restricted returns (uint256) {
-        require(_isStrategySupportedForAsset({strategy: strategy, asset: asset}), ErrorsLib.AddressNotWhitelisted());
-        uint256 maxShares = IERC4626(strategy).maxRedeem(address(this));
-        uint256 balanceBefore = IERC20(asset).balanceOf(address(this));
-        uint256 assetsWithdrawn = _deallocateShares(asset, maxShares, address(this), strategy);
-        uint256 balanceAfter = IERC20(asset).balanceOf(address(this));
-        require(balanceAfter - balanceBefore == assetsWithdrawn, ErrorsLib.InsufficientAmountOut());
-        return maxShares;
-    }
-
-    /// @inheritdoc IAllocator
-    function depositIdleFunds(address asset) external override restricted {
-        uint256 amount = IERC20(asset).balanceOf(address(this));
-        bool callSucceeded = _deposit({asset: asset, amount: amount, strategy: _defaultStrategyByAsset[asset]});
-        require(callSucceeded, IAllocator.FailedToDepositIntoStrategy());
-    }
-
-    /// @inheritdoc IAllocator
     function rebalance(RebalanceParams[] memory params) external override restricted {
         for (uint256 i = 0; i < params.length; i++) {
             _rebalance(params[i]);
@@ -207,23 +175,120 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
 
     ////////////////////////////////////////////////// INTERNAL ////////////////////////////////////////////////////////
 
-    function _deallocate(address asset, uint256 amount, address receiver, address strategy) internal returns (uint256) {
+    function _rebalance(RebalanceParams memory rebalanceParams) internal {
+        uint256 i;
+
+        // Execute all deallocations in the order specified by the deallocations array.
+        for (i = 0; i < rebalanceParams.deallocations.length; i++) {
+            _deallocate(rebalanceParams.deallocations[i]);
+        }
+
+        // Execute all swaps in the order specified by the swaps array.
+        for (i = 0; i < rebalanceParams.swaps.length; i++) {
+            _swap(rebalanceParams.swaps[i]);
+        }
+
+        // Execute all allocations in the order specified by the allocations array.
+        for (i = 0; i < rebalanceParams.allocations.length; i++) {
+            _allocate(rebalanceParams.allocations[i]);
+        }
+    }
+
+    function _deallocate(DeallocationParams memory deallocation) internal returns (uint256) {
+        require(
+            _isStrategySupportedForAsset({strategy: deallocation.strategy, asset: deallocation.asset}),
+            ErrorsLib.AddressNotWhitelisted()
+        );
+        if (deallocation.amount == 0) {
+            return _withdrawAllFromStrategy(deallocation);
+        }
+        uint256 balanceBefore = IERC20(deallocation.asset).balanceOf(address(this));
+        uint256 sharesBurned =
+            _withdrawFromStrategy(deallocation.asset, deallocation.amount, address(this), deallocation.strategy);
+        uint256 balanceAfter = IERC20(deallocation.asset).balanceOf(address(this));
+        require(balanceAfter - balanceBefore == deallocation.amount, ErrorsLib.InsufficientAmountOut());
+        return sharesBurned;
+    }
+
+    function _swap(SwapParams memory swap) internal returns (uint256) {
+        require(
+            IAssetRegistry(ASSET_REGISTRY).isAllowedSwapInputToken(swap.assetIn),
+            ErrorsLib.UnsupportedAsset(swap.assetIn)
+        );
+        require(
+            IAssetRegistry(ASSET_REGISTRY).isAllowedSwapOutputToken(swap.assetOut),
+            ErrorsLib.UnsupportedAsset(swap.assetOut)
+        );
+
+        // Transfer assetIn to the swapper
+        IERC20(swap.assetIn).safeTransfer(swap.swapper, swap.amountIn);
+
+        // Execute the swap and require 1:1 conversion
+        uint256 amountOut = ISwapper(swap.swapper).executeSwap(swap.assetIn, swap.assetOut, swap.amountIn, swap.data);
+        require(
+            amountOut >= swap.amountIn.convertAssetDecimals(swap.assetIn, swap.assetOut),
+            ErrorsLib.InsufficientAmountOut()
+        );
+
+        // Pull the `assetOut` from the Swapper to the Allocator
+        IERC20(swap.assetOut).safeTransferFrom(swap.swapper, address(this), amountOut);
+
+        return amountOut;
+    }
+
+    function _allocate(AllocationParams memory allocation) internal returns (uint256) {
+        require(
+            _isStrategySupportedForAsset({strategy: allocation.strategy, asset: allocation.asset}),
+            ErrorsLib.AddressNotWhitelisted()
+        );
+        uint256 amountToAllocate;
+        if (allocation.amount == 0) {
+            amountToAllocate = IERC20(allocation.asset).balanceOf(address(this));
+        } else {
+            amountToAllocate = allocation.amount;
+        }
+        bool callSucceeded =
+            _depositToStrategy({asset: allocation.asset, amount: amountToAllocate, strategy: allocation.strategy});
+        require(callSucceeded, IAllocator.FailedToDepositIntoStrategy());
+        return 0;
+    }
+
+    function _withdrawAllFromStrategy(DeallocationParams memory deallocation) internal returns (uint256) {
+        uint256 maxShares = IERC4626(deallocation.strategy).maxRedeem(address(this));
+        uint256 balanceBefore = IERC20(deallocation.asset).balanceOf(address(this));
+        uint256 assetsWithdrawn =
+            IERC4626(deallocation.strategy).redeem({shares: maxShares, receiver: address(this), owner: address(this)});
+        emit AssetDeallocated(deallocation.asset, deallocation.strategy, assetsWithdrawn, maxShares);
+
+        // Validate amount assets received after burning shares
+        uint256 balanceAfter = IERC20(deallocation.asset).balanceOf(address(this));
+        require(balanceAfter - balanceBefore == assetsWithdrawn, ErrorsLib.InsufficientAmountOut());
+
+        return maxShares;
+    }
+
+    function _withdrawFromStrategy(address asset, uint256 amount, address receiver, address strategy)
+        internal
+        returns (uint256)
+    {
         uint256 burnedShares = IERC4626(strategy).withdraw({assets: amount, receiver: receiver, owner: address(this)});
         emit AssetDeallocated(asset, strategy, amount, burnedShares);
         return burnedShares;
     }
 
-    function _deallocateShares(address asset, uint256 sharesAmount, address receiver, address strategy)
-        internal
-        returns (uint256)
-    {
-        uint256 assetsWithdrawn =
-            IERC4626(strategy).redeem({shares: sharesAmount, receiver: receiver, owner: address(this)});
-        emit AssetDeallocated(asset, strategy, assetsWithdrawn, sharesAmount);
-        return assetsWithdrawn;
+    function _tryWithdrawFromStrategy(address asset, uint256 amount, address strategy) internal returns (uint256) {
+        // TODO: review if the following require is actually needed
+        require(_isStrategySupportedForAsset({strategy: strategy, asset: asset}), ErrorsLib.AddressNotWhitelisted());
+        uint256 withdrawnAmount;
+        uint256 balanceInStrategy = _getAssetBalanceInStrategy(IERC4626(strategy));
+        if (balanceInStrategy > 0) {
+            withdrawnAmount = balanceInStrategy > amount ? amount : balanceInStrategy;
+            _withdrawFromStrategy(asset, withdrawnAmount, address(this), strategy);
+        }
+        return withdrawnAmount;
     }
 
-    function _deposit(address asset, uint256 amount, address strategy) internal returns (bool) {
+    function _depositToStrategy(address asset, uint256 amount, address strategy) internal returns (bool) {
         require(amount > 0, ErrorsLib.ZeroAmount());
         require(
             IAssetRegistry(ASSET_REGISTRY).isAllowedToDepositIntoAllocator(asset), ErrorsLib.UnsupportedAsset(asset)
@@ -238,77 +303,6 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
             IERC20(asset).forceApprove(strategy, 0);
         }
         return callSucceeded;
-    }
-
-    function _rebalance(RebalanceParams memory rebalanceParams) internal {
-        require(
-            IAssetRegistry(ASSET_REGISTRY).isAllowedSwapInputToken(rebalanceParams.assetIn),
-            ErrorsLib.UnsupportedAsset(rebalanceParams.assetIn)
-        );
-        require(
-            IAssetRegistry(ASSET_REGISTRY).isAllowedSwapOutputToken(rebalanceParams.assetOut),
-            ErrorsLib.UnsupportedAsset(rebalanceParams.assetOut)
-        );
-        require(
-            _isStrategySupportedForAsset({strategy: rebalanceParams.fromStrategy, asset: rebalanceParams.assetIn}),
-            ErrorsLib.AddressNotWhitelisted()
-        );
-        require(
-            _isStrategySupportedForAsset({strategy: rebalanceParams.toStrategy, asset: rebalanceParams.assetOut}),
-            ErrorsLib.AddressNotWhitelisted()
-        );
-
-        uint256 amountIn = rebalanceParams.amountIn;
-        uint256 idleBalanceAssetIn = IERC20(rebalanceParams.assetIn).balanceOf(address(this));
-        if (idleBalanceAssetIn < amountIn) {
-            _deallocate(
-                rebalanceParams.assetIn, amountIn - idleBalanceAssetIn, address(this), rebalanceParams.fromStrategy
-            );
-        }
-
-        uint256 assetOutAmount;
-        if (rebalanceParams.assetIn == rebalanceParams.assetOut) {
-            // A swap is not needed if same asset, so supply directly to the toStrategy.
-            assetOutAmount = amountIn;
-        } else {
-            // A swap is needed in case of different assets.
-            assetOutAmount = _swap(rebalanceParams);
-        }
-
-        _deposit(rebalanceParams.assetOut, assetOutAmount, rebalanceParams.toStrategy);
-    }
-
-    function _swap(RebalanceParams memory rebalanceParams) internal returns (uint256) {
-        // Transfer assetIn to the swapper
-        IERC20(rebalanceParams.assetIn).safeTransfer(rebalanceParams.swapper, rebalanceParams.amountIn);
-
-        // Execute the swap and require 1:1 conversion
-        uint256 assetOutAmount = ISwapper(rebalanceParams.swapper)
-            .executeSwap(
-                rebalanceParams.assetIn, rebalanceParams.assetOut, rebalanceParams.amountIn, rebalanceParams.swapData
-            );
-        require(
-            assetOutAmount
-                >= rebalanceParams.amountIn.convertAssetDecimals(rebalanceParams.assetIn, rebalanceParams.assetOut),
-            ErrorsLib.InsufficientAmountOut()
-        );
-
-        // Pull the `assetOut` from the Swapper to the Allocator
-        IERC20(rebalanceParams.assetOut).safeTransferFrom(rebalanceParams.swapper, address(this), assetOutAmount);
-
-        return assetOutAmount;
-    }
-
-    function _tryWithdrawFromStrategy(address asset, uint256 amount, address strategy) internal returns (uint256) {
-        // TODO: review if the following require is actually needed
-        require(_isStrategySupportedForAsset({strategy: strategy, asset: asset}), ErrorsLib.AddressNotWhitelisted());
-        uint256 withdrawnAmount;
-        uint256 balanceInStrategy = _getAssetBalanceInStrategy(IERC4626(strategy));
-        if (balanceInStrategy > 0) {
-            withdrawnAmount = balanceInStrategy > amount ? amount : balanceInStrategy;
-            _deallocate(asset, withdrawnAmount, address(this), strategy);
-        }
-        return withdrawnAmount;
     }
 
     /// @dev Returns balances grouped by asset.
