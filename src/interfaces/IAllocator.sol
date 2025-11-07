@@ -19,21 +19,35 @@ interface IAllocator {
         uint256 amount;
     }
 
-    struct SwapParams {
-        // Swap input asset transferred to swapper
-        address assetIn;
-        // Asset to swap to that will be resupplied within the allocator
-        address assetOut;
-        // Amount of assetIn
-        uint256 amountIn;
-        // Address of the swapper to use to execute the swap
-        address swapper;
-        // Custom data required by the swapper to execute the swap
-        bytes swapData;
+    struct DeallocationParams {
+        address asset;
+        address strategy;
+        uint256 amount; // Zero amount indicates max deallocation of `asset` from `strategy`
     }
 
-    struct CrossAssetRebalanceParams {
+    struct SwapParams {
+        address assetIn;
+        uint256 amountIn; // TODO: Consider passing zero as wildcard for `amountIn = assetIn.balanceOf(allocator)`
+        address assetOut;
+        address swapper;
+        bytes data; // Custom data that may be required by the swapper to execute the swap
+    }
+
+    struct AllocationParams {
+        address asset;
+        address strategy;
+        uint256 amount; // Zero amount indicates max allocation of `asset` balance to `strategy`
+    }
+
+    /// @dev A rebalance is a combination of deallocations, swaps, and allocations.
+    /// @dev The rebalance will follow a strict order of:
+    ///         Step 1. Execute all deallocations in the order specified by the deallocations array.
+    ///         Step 2. Execute all swaps in the order specified by the swaps array.
+    ///         Step 3. Execute all allocations in the order specified by the allocations array.
+    struct RebalanceParams {
+        DeallocationParams[] deallocations;
         SwapParams[] swaps;
+        AllocationParams[] allocations;
     }
 
     /// @dev Returns an array of balances where each amount is denominated in the corresponding asset's decimals.
@@ -48,29 +62,12 @@ interface IAllocator {
     /// @dev Returns if a given strategy is supported for allocating or deallocating, regardless of the asset.
     function isStrategySupported(address strategy) external view returns (bool);
 
-    /// @dev Deallocates a given amount of an asset from the immediate liquidity strategy; funds stay idle on the
-    /// contract. @param asset Asset to deallocate.
-    /// @param amount Amount of the asset to deallocate. Zero to deallocate the maximum possible amount.
-    /// @param strategy strategy to deallocate from.
-    /// @dev Returns the amount of shares burned liquidity source strategy shares burned.
-    function deallocate(address asset, uint256 amount, address strategy) external returns (uint256);
-
-    /// @notice Moves all idle funds of a given asset on the contract to a strategy.
-    function depositIdleFunds(address asset) external;
-
     function deposit(address asset, uint256 amount) external;
 
-    /// @notice Rebalance the mix of underlying tokens by pulling from strategies, executing swaps and resupplying to
-    /// strategies.
-    /// @dev Swapping is only performed on idle balances or assets in the default yield strategy.
-    function rebalance(CrossAssetRebalanceParams memory params) external;
-
-    /// @notice Reallocates a given amount of an asset from one strategy to another.
-    /// @param asset Asset to reallocate.
-    /// @param amount Amount of the asset expected to be reallocated.
-    /// @param fromStrategy strategy to deallocate from.
-    /// @param toStrategy strategy to allocate to.
-    function reallocate(address asset, uint256 amount, address fromStrategy, address toStrategy) external;
+    /// @notice Rebalances underlying assets.
+    /// @dev A rebalance is an ordered combination of the following operations: deallocation of assets from strategies,
+    /// swaps between assets, and allocation of assets to strategies.
+    function rebalance(RebalanceParams[] memory params) external;
 
     /// @notice Withdraws a given amount of an asset from the immediate liquidity strategy a.k.a the default strategy
     /// strategy for the asset.
