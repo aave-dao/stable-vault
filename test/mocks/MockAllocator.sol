@@ -10,20 +10,20 @@ contract MockAllocator is IAllocator {
     using SafeERC20 for IERC20;
 
     function getAssetBalances() external view override returns (AllocatorBalance[] memory) {}
-    function getAssetBalance(address asset) external view override returns (uint256) {}
-    function getDefaultVault(address asset) external view override returns (address) {}
-    function isVaultSupportedForAsset(address asset, address vault) external view override returns (bool) {}
-    function isVaultSupported(address vault) external view override returns (bool) {}
-    function deallocate(address asset, uint256 amount, address vault) external override returns (uint256) {}
+    function getDefaultStrategy(address asset) external view override returns (address) {}
+    function isStrategySupportedForAsset(address asset, address strategy) external view override returns (bool) {}
+    function isStrategySupported(address strategy) external view override returns (bool) {}
+    function deallocate(address asset, uint256 amount, address strategy) external override returns (uint256) {}
     function depositIdleFunds(address asset) external override {}
     function deposit(address asset, uint256 amount) external override {}
     function rebalance(CrossAssetRebalanceParams memory params) external override {}
-    function reallocate(address asset, uint256 amount, address fromVault, address toVault) external override {}
+    function reallocate(address asset, uint256 amount, address fromStrategy, address toStrategy) external override {}
 
     function withdraw(address asset, uint256 amount) external override {
         IERC20(asset).safeTransfer(msg.sender, amount);
     }
-    function addVault(address asset, address vault) external override {}
-    function removeVault(address vault) external override {}
-    function setDefaultVault(address asset, address vault) external override {}
+
+    function addStrategy(address asset, address strategy) external override {}
+    function removeStrategy(address strategy) external override {}
+    function setDefaultStrategy(address asset, address strategy) external override {}
 }

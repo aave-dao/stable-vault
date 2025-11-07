@@ -53,6 +53,4 @@ contract MockFundsHandler is IFundsHandler {
     {}
 
     function fundsArrivedFromChainCallback(address asset, uint256 amount) external override {}
-
-    function pullFromLiquidity(address asset, uint256 amount) external override {}
 }

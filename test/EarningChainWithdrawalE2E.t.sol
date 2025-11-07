@@ -63,7 +63,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         _mintAndDepositUsdcToBBV(user1, userInitialDeposit);
 
         // Check the deposit was made into the default earning strategy for USDC
-        address defaultUsdcVault_AccountingChain = allocator_accountingChain.getDefaultVault(address(USDC));
+        address defaultUsdcVault_AccountingChain = allocator_accountingChain.getDefaultStrategy(address(USDC));
         assertEq(
             IERC20(address(USDC)).balanceOf(defaultUsdcVault_AccountingChain),
             userInitialDeposit,
@@ -89,7 +89,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         );
 
         // Check the funds were bridged to the Earning Chain
-        address defaultUsdcVault_earningChain = allocator_earningChain.getDefaultVault(address(USDC));
+        address defaultUsdcVault_earningChain = allocator_earningChain.getDefaultStrategy(address(USDC));
         assertEq(
             IERC20(address(USDC)).balanceOf(defaultUsdcVault_earningChain),
             userInitialDeposit,
