@@ -41,9 +41,6 @@ library ErrorsLib {
     /// @notice Insufficient funds.
     error InsufficientFunds();
 
-    /// @notice Not enough liquidity to cover the withdrawal.
-    error InsufficientLiquidity();
-
     /// @notice Failed to deposit assets into the vault.
     error VaultDepositFailed();
 

@@ -10,7 +10,6 @@ import {IAllocator} from "../src/interfaces/IAllocator.sol";
 import {IBasedBoostedVault} from "../src/interfaces/IBasedBoostedVault.sol";
 import {IChainGateway} from "../src/interfaces/IChainGateway.sol";
 import {AssetLib} from "../src/libraries/AssetLib.sol";
-import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
 import {BaseTest} from "./BaseTest.t.sol";
 
 contract EndToEndTest is BaseTest {
