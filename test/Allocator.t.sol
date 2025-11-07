@@ -444,7 +444,7 @@ contract AllocatorTest is TestWithHelpers {
                 IAccessManager.canCall.selector,
                 nonDepositor,
                 address(_allocator),
-                bytes4(keccak256("depositIdleFunds(address)"))
+                bytes4(IAllocator.depositIdleFunds.selector)
             ),
             abi.encode(false)
         );

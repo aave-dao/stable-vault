@@ -78,6 +78,7 @@ contract EndToEndTest is BaseTest {
 
         // 3. Manager sends the money to the Earning Chain via CCIP
         uint256 bridgeFeeAmount = 1000;
+        address defaultUsdcVault_earningChain = allocator_earningChain.getDefaultStrategy(address(USDC));
         {
             vm.prank(everyRoleAccount);
             vm.deal(everyRoleAccount, bridgeFeeAmount);
@@ -95,7 +96,6 @@ contract EndToEndTest is BaseTest {
             );
 
             // - check that the funds land on Earning Chain and are dropped into default liquidity vault there
-            address defaultUsdcVault_earningChain = allocator_earningChain.getDefaultStrategy(address(USDC));
             console.log("Earning Chain default vault for USDC is: %s", defaultUsdcVault_earningChain);
             console.log("It's balance of USDC is: %s", IERC20(address(USDC)).balanceOf(defaultUsdcVault_earningChain));
             assertEq(
@@ -125,10 +125,13 @@ contract EndToEndTest is BaseTest {
             callDatas[0] = abi.encodeCall(IERC20.transfer, (address(this), userInitialDeposit));
             Swapper.SlippageParams memory slippageParams = Swapper.SlippageParams(0, address(0));
 
-            IAllocator.SwapParams[] memory swaps = new IAllocator.SwapParams[](1);
-            swaps[0] = IAllocator.SwapParams(
+            defaultGhoVault_earningChain = allocator_earningChain.getDefaultStrategy(address(GHO));
+            IAllocator.RebalanceParams[] memory rebalanceParams = new IAllocator.RebalanceParams[](1);
+            rebalanceParams[0] = IAllocator.RebalanceParams(
                 address(USDC),
+                defaultUsdcVault_earningChain,
                 address(GHO),
+                defaultGhoVault_earningChain,
                 userInitialDeposit,
                 address(swapper_earningChain),
                 abi.encode(targets, callDatas, slippageParams)
@@ -136,10 +139,9 @@ contract EndToEndTest is BaseTest {
 
             console.log("Rebalancing by swap from USDC to GHO on the Earning chain...");
             vm.prank(everyRoleAccount);
-            allocator_earningChain.rebalance(IAllocator.CrossAssetRebalanceParams(swaps));
+            allocator_earningChain.rebalance(rebalanceParams);
 
             // - check that the funds are swapped to GHO
-            defaultGhoVault_earningChain = allocator_earningChain.getDefaultStrategy(address(GHO));
             console.log(
                 "\tBalance of GHO in The GHO Vault is: %s", IERC20(address(GHO)).balanceOf(defaultGhoVault_earningChain)
             );
@@ -229,6 +231,7 @@ contract EndToEndTest is BaseTest {
 
         // 7. Manager brings back the money from the Earning Chain to the Accounting Chain via CCIP in GHO
         uint256 userEarningsInGho;
+        address defaultGhoVault_accountingChain = allocator_accountingChain.getDefaultStrategy(address(GHO));
         {
             userEarningsInGho = userEarningsInRay.rayToAssetDecimals(address(GHO));
             vm.prank(everyRoleAccount);
@@ -246,7 +249,6 @@ contract EndToEndTest is BaseTest {
             );
 
             // - check that the funds land on the Accounting Chain and are dropped into default liquidity vault there
-            address defaultGhoVault_accountingChain = allocator_accountingChain.getDefaultStrategy(address(GHO));
             console.log("Accounting Chain default vault for GHO is: %s", defaultGhoVault_accountingChain);
             console.log("It's balance of GHO is: %s", IERC20(address(GHO)).balanceOf(defaultGhoVault_accountingChain));
             assertEq(
@@ -276,10 +278,13 @@ contract EndToEndTest is BaseTest {
             callDatas[0] = abi.encodeCall(IERC20.transfer, (address(this), userEarningsInGho));
             Swapper.SlippageParams memory slippageParams = Swapper.SlippageParams(0, address(0));
 
-            IAllocator.SwapParams[] memory swaps = new IAllocator.SwapParams[](1);
-            swaps[0] = IAllocator.SwapParams(
+            address defaultUsdcVault_accountingChain = allocator_accountingChain.getDefaultStrategy(address(USDC));
+            IAllocator.RebalanceParams[] memory rebalanceParams = new IAllocator.RebalanceParams[](1);
+            rebalanceParams[0] = IAllocator.RebalanceParams(
                 address(GHO),
+                defaultGhoVault_accountingChain,
                 address(USDC),
+                defaultUsdcVault_accountingChain,
                 userEarningsInGho,
                 address(swapper_accountingChain),
                 abi.encode(targets, callDatas, slippageParams)
@@ -287,10 +292,9 @@ contract EndToEndTest is BaseTest {
 
             console.log("Rebalancing by swap from GHO to USDC on the Accounting chain...");
             vm.prank(everyRoleAccount);
-            allocator_accountingChain.rebalance(IAllocator.CrossAssetRebalanceParams(swaps));
+            allocator_accountingChain.rebalance(rebalanceParams);
 
             // - check that the funds are swapped to USDC
-            address defaultUsdcVault_accountingChain = allocator_accountingChain.getDefaultStrategy(address(USDC));
             console.log(
                 "\tBalance of USDC in The USDC Vault is: %s",
                 IERC20(address(USDC)).balanceOf(defaultUsdcVault_accountingChain)

@@ -19,21 +19,21 @@ interface IAllocator {
         uint256 amount;
     }
 
-    struct SwapParams {
+    struct RebalanceParams {
         // Swap input asset transferred to swapper
         address assetIn;
+        // Strategy to deallocate assetIn from
+        address fromStrategy;
         // Asset to swap to that will be resupplied within the allocator
         address assetOut;
+        // Strategy to deposit assetOut into
+        address toStrategy;
         // Amount of assetIn
         uint256 amountIn;
         // Address of the swapper to use to execute the swap
         address swapper;
         // Custom data required by the swapper to execute the swap
         bytes swapData;
-    }
-
-    struct CrossAssetRebalanceParams {
-        SwapParams[] swaps;
     }
 
     /// @dev Returns an array of balances where each amount is denominated in the corresponding asset's decimals.
@@ -48,12 +48,20 @@ interface IAllocator {
     /// @dev Returns if a given strategy is supported for allocating or deallocating, regardless of the asset.
     function isStrategySupported(address strategy) external view returns (bool);
 
-    /// @dev Deallocates a given amount of an asset from the immediate liquidity strategy; funds stay idle on the
-    /// contract. @param asset Asset to deallocate.
-    /// @param amount Amount of the asset to deallocate. Zero to deallocate the maximum possible amount.
-    /// @param strategy strategy to deallocate from.
-    /// @dev Returns the amount of shares burned liquidity source strategy shares burned.
+    /// @dev Deallocates a given amount of an asset from the given strategy; funds stay idle on the
+    /// contract.
+    /// @param asset Asset to deallocate.
+    /// @param amount Amount of the asset to deallocate.
+    /// @param strategy Strategy to deallocate from.
+    /// @dev Returns the amount of shares of the strategy that were burned.
     function deallocate(address asset, uint256 amount, address strategy) external returns (uint256);
+
+    /// @dev Deallocates the maximum possible amount of an asset from the given strategy; funds stay idle on the
+    /// contract.
+    /// @param asset Asset to deallocate.
+    /// @param strategy Strategy to deallocate from.
+    /// @dev Returns the amount of shares of the strategy that were burned.
+    function maxDeallocate(address asset, address strategy) external returns (uint256);
 
     /// @notice Moves all idle funds of a given asset on the contract to a strategy.
     function depositIdleFunds(address asset) external;
@@ -63,14 +71,7 @@ interface IAllocator {
     /// @notice Rebalance the mix of underlying tokens by pulling from strategies, executing swaps and resupplying to
     /// strategies.
     /// @dev Swapping is only performed on idle balances or assets in the default yield strategy.
-    function rebalance(CrossAssetRebalanceParams memory params) external;
-
-    /// @notice Reallocates a given amount of an asset from one strategy to another.
-    /// @param asset Asset to reallocate.
-    /// @param amount Amount of the asset expected to be reallocated.
-    /// @param fromStrategy strategy to deallocate from.
-    /// @param toStrategy strategy to allocate to.
-    function reallocate(address asset, uint256 amount, address fromStrategy, address toStrategy) external;
+    function rebalance(RebalanceParams[] memory params) external;
 
     /// @notice Withdraws a given amount of an asset from the immediate liquidity strategy a.k.a the default strategy
     /// strategy for the asset.

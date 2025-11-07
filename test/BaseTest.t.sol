@@ -745,7 +745,6 @@ contract BaseTest is Test {
                 IAllocator.deallocate.selector,
                 IAllocator.depositIdleFunds.selector,
                 IAllocator.rebalance.selector,
-                IAllocator.reallocate.selector,
                 IAllocator.setDefaultStrategy.selector
             ),
             OPERATOR_ROLE
@@ -844,7 +843,6 @@ contract BaseTest is Test {
                 IAllocator.deallocate.selector,
                 IAllocator.depositIdleFunds.selector,
                 IAllocator.rebalance.selector,
-                IAllocator.reallocate.selector,
                 IAllocator.setDefaultStrategy.selector
             ),
             OPERATOR_ROLE
