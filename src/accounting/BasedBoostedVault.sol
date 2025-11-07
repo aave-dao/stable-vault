@@ -417,6 +417,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
         // We don't check for sharesToRedeem > 0 here because we check for actualAmountInRay > 0 below.
         _burnShares(user, sharesToRedeem);
         uint256 originalDeposit = _positions[user].originalDepositRay;
+        _globalOriginalDepositsRay -= originalDeposit;
         delete _positions[user];
         if (actualAmountOfWithdrawalRay < originalDeposit) {
             // We round it up because we guarantee originalDeposit
@@ -455,6 +456,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
             amountTakenFromOriginalDepositRay = actualAmountOfWithdrawal;
         }
         _positions[user].originalDepositRay -= amountTakenFromOriginalDepositRay;
+        _globalOriginalDepositsRay -= amountTakenFromOriginalDepositRay;
         return amountTakenFromOriginalDepositRay;
     }
 
