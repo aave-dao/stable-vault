@@ -113,7 +113,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
     ) internal virtual onlyInitializing {
         __AccessManaged_init(accessManager);
         _assetRegistry = assetRegistry;
-        _setDefaultSubVault(_createSubVault(defaultSubVaultPerSecondRate), defaultSubVaultPerSecondRate);
+        _setDefaultSubVault(_getOrCreateSubVaultWithRate(defaultSubVaultPerSecondRate), defaultSubVaultPerSecondRate);
     }
 
     /// @inheritdoc IBasedBoostedVault
