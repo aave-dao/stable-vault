@@ -182,53 +182,7 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
     /// @inheritdoc IAllocator
     function rebalance(RebalanceParams[] memory params) external override restricted {
         for (uint256 i = 0; i < params.length; i++) {
-            RebalanceParams memory param = params[i];
-
-            require(
-                IAssetRegistry(ASSET_REGISTRY).isAllowedSwapInputToken(param.assetIn),
-                ErrorsLib.UnsupportedAsset(param.assetIn)
-            );
-            require(
-                IAssetRegistry(ASSET_REGISTRY).isAllowedSwapOutputToken(param.assetOut),
-                ErrorsLib.UnsupportedAsset(param.assetOut)
-            );
-            require(
-                _isStrategySupportedForAsset({strategy: param.fromStrategy, asset: param.assetIn}),
-                ErrorsLib.AddressNotWhitelisted()
-            );
-            require(
-                _isStrategySupportedForAsset({strategy: param.toStrategy, asset: param.assetOut}),
-                ErrorsLib.AddressNotWhitelisted()
-            );
-
-            uint256 amountIn = param.amountIn;
-            uint256 idleBalanceAssetIn = IERC20(param.assetIn).balanceOf(address(this));
-            if (idleBalanceAssetIn < amountIn) {
-                _deallocate(param.assetIn, amountIn - idleBalanceAssetIn, address(this), param.fromStrategy);
-            }
-
-            uint256 assetOutAmount;
-            if (param.assetIn == param.assetOut) {
-                // A swap is not needed if same asset, so supply directly to the toStrategy.
-                assetOutAmount = amountIn;
-            } else {
-                // A swap is needed in case of different assets.
-                // Transfer assetIn to the swapper
-                IERC20(param.assetIn).safeTransfer(param.swapper, amountIn);
-
-                // Execute the swap and require 1:1 conversion
-                assetOutAmount =
-                    ISwapper(param.swapper).executeSwap(param.assetIn, param.assetOut, amountIn, param.swapData);
-                require(
-                    assetOutAmount >= amountIn.convertAssetDecimals(param.assetIn, param.assetOut),
-                    ErrorsLib.InsufficientAmountOut()
-                );
-
-                // Pull the `assetOut` from the Swapper to the Allocator
-                IERC20(param.assetOut).safeTransferFrom(param.swapper, address(this), assetOutAmount);
-            }
-
-            _deposit(param.assetOut, assetOutAmount, param.toStrategy);
+            _rebalance(params[i]);
         }
     }
 
@@ -284,6 +238,65 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
             IERC20(asset).forceApprove(strategy, 0);
         }
         return callSucceeded;
+    }
+
+    function _rebalance(RebalanceParams memory rebalanceParams) internal {
+        require(
+            IAssetRegistry(ASSET_REGISTRY).isAllowedSwapInputToken(rebalanceParams.assetIn),
+            ErrorsLib.UnsupportedAsset(rebalanceParams.assetIn)
+        );
+        require(
+            IAssetRegistry(ASSET_REGISTRY).isAllowedSwapOutputToken(rebalanceParams.assetOut),
+            ErrorsLib.UnsupportedAsset(rebalanceParams.assetOut)
+        );
+        require(
+            _isStrategySupportedForAsset({strategy: rebalanceParams.fromStrategy, asset: rebalanceParams.assetIn}),
+            ErrorsLib.AddressNotWhitelisted()
+        );
+        require(
+            _isStrategySupportedForAsset({strategy: rebalanceParams.toStrategy, asset: rebalanceParams.assetOut}),
+            ErrorsLib.AddressNotWhitelisted()
+        );
+
+        uint256 amountIn = rebalanceParams.amountIn;
+        uint256 idleBalanceAssetIn = IERC20(rebalanceParams.assetIn).balanceOf(address(this));
+        if (idleBalanceAssetIn < amountIn) {
+            _deallocate(
+                rebalanceParams.assetIn, amountIn - idleBalanceAssetIn, address(this), rebalanceParams.fromStrategy
+            );
+        }
+
+        uint256 assetOutAmount;
+        if (rebalanceParams.assetIn == rebalanceParams.assetOut) {
+            // A swap is not needed if same asset, so supply directly to the toStrategy.
+            assetOutAmount = amountIn;
+        } else {
+            // A swap is needed in case of different assets.
+            assetOutAmount = _swap(rebalanceParams);
+        }
+
+        _deposit(rebalanceParams.assetOut, assetOutAmount, rebalanceParams.toStrategy);
+    }
+
+    function _swap(RebalanceParams memory rebalanceParams) internal returns (uint256) {
+        // Transfer assetIn to the swapper
+        IERC20(rebalanceParams.assetIn).safeTransfer(rebalanceParams.swapper, rebalanceParams.amountIn);
+
+        // Execute the swap and require 1:1 conversion
+        uint256 assetOutAmount = ISwapper(rebalanceParams.swapper)
+            .executeSwap(
+                rebalanceParams.assetIn, rebalanceParams.assetOut, rebalanceParams.amountIn, rebalanceParams.swapData
+            );
+        require(
+            assetOutAmount
+                >= rebalanceParams.amountIn.convertAssetDecimals(rebalanceParams.assetIn, rebalanceParams.assetOut),
+            ErrorsLib.InsufficientAmountOut()
+        );
+
+        // Pull the `assetOut` from the Swapper to the Allocator
+        IERC20(rebalanceParams.assetOut).safeTransferFrom(rebalanceParams.swapper, address(this), assetOutAmount);
+
+        return assetOutAmount;
     }
 
     function _tryWithdrawFromStrategy(address asset, uint256 amount, address strategy) internal returns (uint256) {
