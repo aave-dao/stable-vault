@@ -467,12 +467,12 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
     }
 
     function _getVaultObligations() internal view returns (uint256) {
-        uint256 vaultObligations;
+        uint256 activeSubVaultsObligations;
         for (uint256 i = 0; i < _activeSubVaultsIds.length; i++) {
-            vaultObligations += _subVaultById[_activeSubVaultsIds[i]].totalShares
+            activeSubVaultsObligations += _subVaultById[_activeSubVaultsIds[i]].totalShares
                 .rayMulDown(_previewSubVaultConversionRate(_activeSubVaultsIds[i]));
         }
-        return vaultObligations;
+        return activeSubVaultsObligations + _getIousInCirculation();
     }
 
     function _getVaultAggregatedBalance() internal view returns (uint256) {
