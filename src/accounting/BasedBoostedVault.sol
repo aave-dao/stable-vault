@@ -415,18 +415,15 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
 
         uint256 sharesToRedeem = _positions[user].shares;
         uint256 actualAmountOfWithdrawalRay = sharesToRedeem.rayMulDown(conversionRate);
-        require(actualAmountOfWithdrawalRay > 0, ErrorsLib.InsufficientAmountOut());
-        // We don't check for sharesToRedeem > 0 here because we check for actualAmountInRay > 0 below.
+        assert(actualAmountOfWithdrawalRay > 0); // TODO: This should never happen. Consider removing it.
+        // We don't check for sharesToRedeem > 0 here because we check for actualAmountOfWithdrawalRay > 0 above.
         _burnShares(user, sharesToRedeem);
         uint256 originalDepositRay = _positions[user].originalDepositRay;
         delete _positions[user];
-        if (actualAmountOfWithdrawalRay < originalDeposit) {
-            // We round it up because we guarantee originalDeposit
-            // TODO: Write some tests to prove that, but this should be OK
-            actualAmountOfWithdrawalRay = originalDeposit;
-        }
-
-        return (actualAmountOfWithdrawalRay, originalDeposit, sharesToRedeem);
+        // TODO: This should never happen. If it does, we should replace the assert by rounding it up to guarantee
+        // originalDeposit, i.e. `actualAmountOfWithdrawalRay = originalDepositRay`
+        assert(actualAmountOfWithdrawalRay >= originalDepositRay);
+        return (actualAmountOfWithdrawalRay, originalDepositRay, sharesToRedeem);
     }
 
     function _partialWithdrawalRequest(address user, uint256 requestedAmountInRay)
