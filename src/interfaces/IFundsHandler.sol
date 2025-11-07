@@ -51,7 +51,4 @@ interface IFundsHandler {
         external;
 
     function fundsArrivedFromChainCallback(address asset, uint256 amount) external;
-
-    /// @dev Retrieve funds from liquidity source to make available to spend.
-    function pullFromLiquidity(address asset, uint256 amount) external;
 }

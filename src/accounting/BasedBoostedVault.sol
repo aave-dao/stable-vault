@@ -302,7 +302,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
         uint256 fee = vaultAssetsRay - vaultObligationsRay;
         uint256 accumulatedAmountRay;
         for (uint256 i = 0; i < assets.length; i++) {
-            IFundsHandler(FUNDS_HANDLER).pullFromLiquidity(assets[i], amounts[i]);
+            IFundsHandler(FUNDS_HANDLER).processWithdrawal(assets[i], amounts[i]);
             accumulatedAmountRay += amounts[i].assetDecimalsToRay(assets[i]);
             if (amounts[i] > 0) {
                 IERC20(assets[i]).safeTransferFrom(FUNDS_HANDLER, msg.sender, amounts[i]);

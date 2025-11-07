@@ -640,16 +640,16 @@ contract BaseTest is Test {
         ccipAdapter_earningChain.setDestinationChainAdapter(ACCOUNTING_CHAIN_ID, address(ccipAdapter_accountingChain));
 
         // Set up Allocator on Accounting chain
-        allocator_accountingChain.addVault(address(GHO), address(ghoStrategyVault_accountingChain));
-        allocator_accountingChain.addVault(address(USDC), address(usdcStrategyVault_accountingChain));
-        allocator_accountingChain.setDefaultVault(address(GHO), address(ghoStrategyVault_accountingChain));
-        allocator_accountingChain.setDefaultVault(address(USDC), address(usdcStrategyVault_accountingChain));
+        allocator_accountingChain.addStrategy(address(GHO), address(ghoStrategyVault_accountingChain));
+        allocator_accountingChain.addStrategy(address(USDC), address(usdcStrategyVault_accountingChain));
+        allocator_accountingChain.setDefaultStrategy(address(GHO), address(ghoStrategyVault_accountingChain));
+        allocator_accountingChain.setDefaultStrategy(address(USDC), address(usdcStrategyVault_accountingChain));
 
         // Set up Allocator on Earning chain
-        allocator_earningChain.addVault(address(GHO), address(ghoStrategyVault_earningChain));
-        allocator_earningChain.addVault(address(USDC), address(usdcStrategyVault_earningChain));
-        allocator_earningChain.setDefaultVault(address(GHO), address(ghoStrategyVault_earningChain));
-        allocator_earningChain.setDefaultVault(address(USDC), address(usdcStrategyVault_earningChain));
+        allocator_earningChain.addStrategy(address(GHO), address(ghoStrategyVault_earningChain));
+        allocator_earningChain.addStrategy(address(USDC), address(usdcStrategyVault_earningChain));
+        allocator_earningChain.setDefaultStrategy(address(GHO), address(ghoStrategyVault_earningChain));
+        allocator_earningChain.setDefaultStrategy(address(USDC), address(usdcStrategyVault_earningChain));
 
         // Enable everything for assets
         IAssetRegistry.AssetConfig memory unrestrictedAssetConfig = IAssetRegistry.AssetConfig({
@@ -693,7 +693,7 @@ contract BaseTest is Test {
         //_setUpRole(accessManager, APPENDER_ROLE, everyRoleAccount, 1 days * 7);
         _setUpRole(accessManager, APPENDER_ROLE, everyRoleAccount, 0);
         accessManager.setTargetFunctionRole(
-            address(allocator_accountingChain), _toSelectorArray(IAllocator.addVault.selector), APPENDER_ROLE
+            address(allocator_accountingChain), _toSelectorArray(IAllocator.addStrategy.selector), APPENDER_ROLE
         );
         accessManager.setTargetFunctionRole(
             address(assetRegistry_accountingChain),
@@ -716,7 +716,7 @@ contract BaseTest is Test {
         // ----- Set up Remover -----
         _setUpRole(accessManager, REMOVER_ROLE, everyRoleAccount, 0);
         accessManager.setTargetFunctionRole(
-            address(allocator_accountingChain), _toSelectorArray(IAllocator.removeVault.selector), REMOVER_ROLE
+            address(allocator_accountingChain), _toSelectorArray(IAllocator.removeStrategy.selector), REMOVER_ROLE
         );
         accessManager.setTargetFunctionRole(
             address(accountingChainGateway), _toSelectorArray(IChainGateway.removeBridgeAdapter.selector), REMOVER_ROLE
@@ -746,7 +746,7 @@ contract BaseTest is Test {
                 IAllocator.depositIdleFunds.selector,
                 IAllocator.rebalance.selector,
                 IAllocator.reallocate.selector,
-                IAllocator.setDefaultVault.selector
+                IAllocator.setDefaultStrategy.selector
             ),
             OPERATOR_ROLE
         );
@@ -801,7 +801,7 @@ contract BaseTest is Test {
         //_setUpRole(accessManager, APPENDER_ROLE, everyRoleAccount, 1 days * 7);
         _setUpRole(accessManager, APPENDER_ROLE, everyRoleAccount, 0);
         accessManager.setTargetFunctionRole(
-            address(allocator_earningChain), _toSelectorArray(IAllocator.addVault.selector), APPENDER_ROLE
+            address(allocator_earningChain), _toSelectorArray(IAllocator.addStrategy.selector), APPENDER_ROLE
         );
         accessManager.setTargetFunctionRole(
             address(assetRegistry_earningChain), _toSelectorArray(IAssetRegistry.setAssetConfig.selector), APPENDER_ROLE
@@ -822,7 +822,7 @@ contract BaseTest is Test {
         // ----- Set up Remover -----
         _setUpRole(accessManager, REMOVER_ROLE, everyRoleAccount, 0);
         accessManager.setTargetFunctionRole(
-            address(allocator_earningChain), _toSelectorArray(IAllocator.removeVault.selector), REMOVER_ROLE
+            address(allocator_earningChain), _toSelectorArray(IAllocator.removeStrategy.selector), REMOVER_ROLE
         );
         accessManager.setTargetFunctionRole(
             address(earningChainGateway), _toSelectorArray(IChainGateway.removeBridgeAdapter.selector), REMOVER_ROLE
@@ -845,7 +845,7 @@ contract BaseTest is Test {
                 IAllocator.depositIdleFunds.selector,
                 IAllocator.rebalance.selector,
                 IAllocator.reallocate.selector,
-                IAllocator.setDefaultVault.selector
+                IAllocator.setDefaultStrategy.selector
             ),
             OPERATOR_ROLE
         );
