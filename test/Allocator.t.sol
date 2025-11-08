@@ -1276,6 +1276,227 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), amountOut);
     }
 
+    function test_addStrategy_reverts_ifUnauthorizedCaller(address operator) public {
+        vm.assume(operator != everyRoleAccount);
+        vm.assume(operator != address(0));
+        _assumeNotProxyAdmin(operator, address(_allocator));
+
+        vm.mockCall(
+            address(_mockAccessManager),
+            abi.encodeWithSelector(
+                IAccessManager.canCall.selector, operator, address(_allocator), bytes4(IAllocator.addStrategy.selector)
+            ),
+            abi.encode(false)
+        );
+
+        vm.prank(operator);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, operator));
+        _allocator.addStrategy(address(_mockUsdt), address(_defaultUsdtStrategy));
+    }
+
+    function test_addStrategy_reverts_ifStrategyIsAlreadyAdded() public {
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(ErrorsLib.AddressAlreadyWhitelisted.selector);
+        _allocator.addStrategy(address(_mockUsdt), address(_defaultUsdtStrategy));
+    }
+
+    function test_addStrategy_reverts_ifStrategyIsNotSupportedForAsset() public {
+        // Remove the extra strategy first to be able to add it back
+        vm.prank(admin);
+        _allocator.removeStrategy(address(_extraGhoStrategy));
+        vm.prank(admin);
+        _allocator.removeStrategy(address(_extraUsdtStrategy));
+
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.InvalidAsset.selector, address(_mockUsdt)));
+        _allocator.addStrategy(address(_mockUsdt), address(_extraGhoStrategy));
+
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.InvalidAsset.selector, address(_mockGho)));
+        _allocator.addStrategy(address(_mockGho), address(_extraUsdtStrategy));
+    }
+
+    function test_setDefaultStrategy_reverts_ifUnauthorizedCaller(address operator) public {
+        vm.assume(operator != everyRoleAccount);
+        vm.assume(operator != address(0));
+        _assumeNotProxyAdmin(operator, address(_allocator));
+
+        vm.mockCall(
+            address(_mockAccessManager),
+            abi.encodeWithSelector(
+                IAccessManager.canCall.selector,
+                operator,
+                address(_allocator),
+                bytes4(IAllocator.setDefaultStrategy.selector)
+            ),
+            abi.encode(false)
+        );
+
+        vm.prank(operator);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, operator));
+        _allocator.setDefaultStrategy(address(_mockUsdt), address(_defaultUsdtStrategy));
+    }
+
+    function test_setDefaultStrategy_reverts_ifStrategyIsNotSupportedForAsset(address strategy) public {
+        address asset = address(_mockUsdt);
+        vm.assume(strategy != address(_defaultUsdtStrategy));
+        vm.assume(strategy != address(_extraUsdtStrategy));
+
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(ErrorsLib.AddressNotWhitelisted.selector);
+        _allocator.setDefaultStrategy(asset, address(strategy));
+    }
+
+    function test_setDefaultStrategy_reverts_ifStrategyIsAlreadySet() public {
+        address asset = address(_mockUsdt);
+        address strategy = address(_defaultUsdtStrategy);
+
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(ErrorsLib.AddressAlreadyWhitelisted.selector);
+        _allocator.setDefaultStrategy(asset, strategy);
+    }
+
+    function test_removeStrategy_unsetsDefaultStrategy() public {
+        vm.prank(address(everyRoleAccount));
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.DefaultStrategySet(address(_mockUsdt), address(0));
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.StrategyRemoved(address(_mockUsdt), address(_defaultUsdtStrategy));
+        _allocator.removeStrategy(address(_defaultUsdtStrategy));
+        assertEq(_allocator.getDefaultStrategy(address(_mockUsdt)), address(0));
+
+        // If user deposits then funds sit idle
+        uint256 amount = 1000;
+        _mockUsdt.mint(depositor, amount);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(_allocator), amount);
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), amount);
+
+        // Check balances
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount);
+        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
+
+        vm.prank(address(everyRoleAccount));
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.DefaultStrategySet(address(_mockGho), address(0));
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.StrategyRemoved(address(_mockGho), address(_defaultGhoStrategy));
+        _allocator.removeStrategy(address(_defaultGhoStrategy));
+        assertEq(_allocator.getDefaultStrategy(address(_mockGho)), address(0));
+    }
+
+    function test_removeStrategy_removesStrategyFromAssetStrategies() public {
+        vm.prank(address(everyRoleAccount));
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.DefaultStrategySet(address(_mockUsdt), address(0));
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.StrategyRemoved(address(_mockUsdt), address(_defaultUsdtStrategy));
+        _allocator.removeStrategy(address(_defaultUsdtStrategy));
+
+        vm.prank(address(everyRoleAccount));
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.StrategyRemoved(address(_mockUsdt), address(_extraUsdtStrategy));
+        _allocator.removeStrategy(address(_extraUsdtStrategy));
+
+        vm.prank(address(everyRoleAccount));
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.DefaultStrategySet(address(_mockGho), address(0));
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.StrategyRemoved(address(_mockGho), address(_defaultGhoStrategy));
+        _allocator.removeStrategy(address(_defaultGhoStrategy));
+
+        vm.prank(address(everyRoleAccount));
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.StrategyRemoved(address(_mockGho), address(_extraGhoStrategy));
+        _allocator.removeStrategy(address(_extraGhoStrategy));
+
+        // Check balance return 0 since internal __assetsWithSupportedStrategies is empty
+        IAllocator.AllocatorBalance[] memory balances = _allocator.getAssetBalances();
+        assertEq(balances.length, 0);
+
+        // Add back a strategy and make it the default
+        vm.prank(address(everyRoleAccount));
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.StrategyAdded(address(_mockUsdt), address(_extraUsdtStrategy));
+        _allocator.addStrategy(address(_mockUsdt), address(_extraUsdtStrategy));
+        vm.prank(address(everyRoleAccount));
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.DefaultStrategySet(address(_mockUsdt), address(_extraUsdtStrategy));
+        _allocator.setDefaultStrategy(address(_mockUsdt), address(_extraUsdtStrategy));
+
+        // Check the default strategy is the extra strategy
+        assertEq(_allocator.getDefaultStrategy(address(_mockUsdt)), address(_extraUsdtStrategy));
+
+        // Deposit funds into the allocator
+        uint256 amount = 1000;
+        _mockUsdt.mint(depositor, amount);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(_allocator), amount);
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), amount);
+
+        // Check the balances
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount);
+        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), amount);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
+
+        balances = _allocator.getAssetBalances();
+        assertEq(balances.length, 1);
+        bool foundUsdt = false;
+        bool foundGho = false;
+        for (uint256 i = 0; i < balances.length; i++) {
+            if (balances[i].asset == address(_mockUsdt)) {
+                foundUsdt = true;
+                assertEq(balances[i].amount, amount);
+            }
+            if (balances[i].asset == address(_mockGho)) {
+                foundGho = true;
+            }
+        }
+        assertTrue(foundUsdt);
+        assertFalse(foundGho);
+    }
+
+    function test_removeStrategy_reverts_ifUnauthorizedCaller(address operator) public {
+        vm.assume(operator != everyRoleAccount);
+        vm.assume(operator != address(0));
+        _assumeNotProxyAdmin(operator, address(_allocator));
+
+        vm.mockCall(
+            address(_mockAccessManager),
+            abi.encodeWithSelector(
+                IAccessManager.canCall.selector,
+                operator,
+                address(_allocator),
+                bytes4(IAllocator.removeStrategy.selector)
+            ),
+            abi.encode(false)
+        );
+
+        vm.prank(operator);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, operator));
+        _allocator.removeStrategy(address(_defaultUsdtStrategy));
+    }
+
+    function test_removeStrategy_reverts_ifStrategyIsNotSupported(address strategy) public {
+        vm.assume(strategy != address(_defaultUsdtStrategy));
+        vm.assume(strategy != address(_extraUsdtStrategy));
+        vm.assume(strategy != address(_defaultGhoStrategy));
+        vm.assume(strategy != address(_extraGhoStrategy));
+
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(ErrorsLib.AddressNotWhitelisted.selector);
+        _allocator.removeStrategy(strategy);
+    }
+
     function _getDepositIdleFundsRebalanceParams(address asset)
         internal
         view

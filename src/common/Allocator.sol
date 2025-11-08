@@ -353,7 +353,7 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
             uint32 index = strategyData.indexInAssetStrategies;
             _assetStrategies[strategyData.asset][index] =
                 _assetStrategies[strategyData.asset][_assetStrategies[strategyData.asset].length - 1];
-            _strategyData[strategy].indexInAssetStrategies = index;
+            _strategyData[_assetStrategies[strategyData.asset][index]].indexInAssetStrategies = index;
         }
         _assetStrategies[strategyData.asset].pop();
 
@@ -361,7 +361,7 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
         if (_allStrategies.length > 1) {
             uint32 indexInAllStrategies = strategyData.indexInAllStrategies;
             _allStrategies[indexInAllStrategies] = _allStrategies[_allStrategies.length - 1];
-            _strategyData[strategy].indexInAllStrategies = indexInAllStrategies;
+            _strategyData[_allStrategies[indexInAllStrategies]].indexInAllStrategies = indexInAllStrategies;
         }
         _allStrategies.pop();
 
