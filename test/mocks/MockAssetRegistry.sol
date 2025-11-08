@@ -48,6 +48,14 @@ contract MockAssetRegistry is IAssetRegistry {
         _isNotAllowedToWithdrawFromAllocator[asset] = true;
     }
 
+    function mockToDisallowSwapInputToken(address asset) external {
+        _isNotAllowedToSwapInputTokenInAllocator[asset] = true;
+    }
+
+    function mockToDisallowSwapOutputToken(address asset) external {
+        _isNotAllowedToSwapOutputTokenInAllocator[asset] = true;
+    }
+
     function isAllowedToDepositIntoBBV(address asset) external view override returns (bool) {
         return !_isNotAllowedToDepositIntoBBV[asset];
     }
