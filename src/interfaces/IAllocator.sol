@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-/// @dev Assumes single strategy per asset; multiple assets per Allocator.
-/// @dev Deals with assets in their native decimals.
 interface IAllocator {
-    event AssetDeallocated(address indexed asset, address indexed strategy, uint256 amount, uint256 burnedShares);
+    event AssetDeallocated(address indexed asset, address indexed strategy, uint256 amount);
+    event AssetAllocated(address indexed asset, address indexed strategy, uint256 amount);
     /// @notice emitted when funds fails to deposit to yield strategy and left idle in Allocator.
     event StrategyDepositFailed(address indexed strategy, uint256 amount);
     event StrategyAdded(address indexed asset, address indexed strategy);

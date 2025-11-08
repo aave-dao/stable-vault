@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
+import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
+import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {Allocator} from "../src/common/Allocator.sol";
@@ -19,6 +22,7 @@ import {MockAssetRegistry} from "./mocks/MockAssetRegistry.sol";
 import {IMockErc20} from "./mocks/MockErc20.sol";
 import {MockNonStandardErc20} from "./mocks/MockNonStandardErc20.sol";
 import {TestErc4626} from "./mocks/TestErc4626.sol";
+import {TestErc4626WithSlippage} from "./mocks/TestErc4626WithSlippage.sol";
 
 contract AllocatorTest is TestWithHelpers {
     using MathLib for uint256;
@@ -649,6 +653,29 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.withdraw(address(_mockUsdt), amount);
     }
 
+    function test_rebalance_reverts_ifNotAuthorized(address operator) public {
+        vm.assume(operator != everyRoleAccount);
+        vm.assume(operator != address(0));
+        _assumeNotProxyAdmin(operator, address(_allocator));
+
+        vm.mockCall(
+            address(_mockAccessManager),
+            abi.encodeWithSelector(
+                IAccessManager.canCall.selector, operator, address(_allocator), bytes4(IAllocator.rebalance.selector)
+            ),
+            abi.encode(false)
+        );
+
+        vm.prank(operator);
+        IAllocator.RebalanceParams[] memory rebalanceParams = _initializeRebalanceParams(1);
+        IAllocator.DeallocationParams[] memory deallocations = _initializeDeallocationParams(1);
+        deallocations[0] = _buildDeallocationParams(address(_mockUsdt), address(_defaultUsdtStrategy), 0);
+        rebalanceParams[0] =
+            _buildRebalanceParams(deallocations, _initializeSwapParams(0), _initializeAllocationParams(0));
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, operator));
+        _allocator.rebalance(rebalanceParams);
+    }
+
     function test_rebalance_allocate_depositsIdleFundsIntoDefaultVault(uint256 amount) public {
         amount = _boundAssetAmount(address(_mockUsdt), amount);
         _mockUsdt.mint(address(_allocator), amount);
@@ -718,6 +745,335 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.rebalance(rebalanceParams);
     }
 
+    function test_rabalance_allocate_ifAmountSpecified(uint256 amountUsdt, uint256 amountGho) public {
+        amountUsdt = _boundAssetAmount(address(_mockUsdt), amountUsdt);
+        amountGho = _boundAssetAmount(address(_mockGho), amountGho);
+        vm.assume(amountUsdt > 0);
+        vm.assume(amountGho > 0);
+
+        uint256 allocationAmountUsdt = 1234;
+        uint256 allocationAmountGho = 5678;
+        vm.assume(allocationAmountUsdt < amountUsdt);
+        vm.assume(allocationAmountGho < amountGho);
+
+        // Airdrop funds to the Allocator
+        _mockUsdt.mint(address(_allocator), amountUsdt);
+        _mockGho.mint(address(_allocator), amountGho);
+
+        vm.prank(address(everyRoleAccount));
+        IAllocator.RebalanceParams[] memory rebalanceParams = _initializeRebalanceParams(1);
+        IAllocator.AllocationParams[] memory allocations = _initializeAllocationParams(2);
+        allocations[0] = _buildAllocationParams(
+            address(_mockUsdt), _allocator.getDefaultStrategy(address(_mockUsdt)), allocationAmountUsdt
+        );
+        allocations[1] = _buildAllocationParams(
+            address(_mockGho), _allocator.getDefaultStrategy(address(_mockGho)), allocationAmountGho
+        );
+        rebalanceParams[0] =
+            _buildRebalanceParams(_initializeDeallocationParams(0), _initializeSwapParams(0), allocations);
+        _allocator.rebalance(rebalanceParams);
+
+        // Check balances after allocating to default strategy
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amountUsdt);
+        assertEq(_allocator.getAssetBalance(address(_mockGho)), amountGho);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), allocationAmountUsdt);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), allocationAmountGho);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
+
+        // Airdrop funds to the Allocator again
+        _mockUsdt.mint(address(_allocator), amountUsdt);
+        _mockGho.mint(address(_allocator), amountGho);
+
+        rebalanceParams = _initializeRebalanceParams(1);
+        allocations = _initializeAllocationParams(2);
+        // Put funds into the non-default strategy
+        allocations[0] = _buildAllocationParams(address(_mockUsdt), address(_extraUsdtStrategy), allocationAmountUsdt);
+        allocations[1] = _buildAllocationParams(address(_mockGho), address(_extraGhoStrategy), allocationAmountGho);
+        rebalanceParams[0] =
+            _buildRebalanceParams(_initializeDeallocationParams(0), _initializeSwapParams(0), allocations);
+        vm.prank(address(everyRoleAccount));
+        _allocator.rebalance(rebalanceParams);
+
+        // Check balances after allocating to default strategy
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amountUsdt * 2);
+        assertEq(_allocator.getAssetBalance(address(_mockGho)), amountGho * 2);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), allocationAmountUsdt);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), allocationAmountUsdt);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), allocationAmountGho);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), allocationAmountGho);
+    }
+
+    function test_rebalance_allocate_reverts_ifAmountGreaterThanBalance(uint256 amountUsdt) public {
+        amountUsdt = _boundAssetAmount(address(_mockUsdt), amountUsdt);
+        vm.assume(amountUsdt > 0);
+
+        // Airdrop funds to the Allocator
+        _mockUsdt.mint(address(_allocator), amountUsdt);
+        IAllocator.AllocationParams[] memory allocations = _initializeAllocationParams(1);
+        allocations[0] = _buildAllocationParams(
+            address(_mockUsdt), _allocator.getDefaultStrategy(address(_mockUsdt)), amountUsdt + 1
+        );
+        IAllocator.RebalanceParams[] memory rebalanceParams = _initializeRebalanceParams(1);
+        rebalanceParams[0] =
+            _buildRebalanceParams(_initializeDeallocationParams(0), _initializeSwapParams(0), allocations);
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(IAllocator.FailedToDepositIntoStrategy.selector);
+        _allocator.rebalance(rebalanceParams);
+    }
+
+    function test_rebalance_deallocate_maxAmount(uint256 depositAmountUsdt, uint256 depositAmountGho) public {
+        depositAmountUsdt = _boundAssetAmount(address(_mockUsdt), depositAmountUsdt);
+        depositAmountGho = _boundAssetAmount(address(_mockGho), depositAmountGho);
+        vm.assume(depositAmountUsdt > 0);
+        vm.assume(depositAmountGho > 0);
+
+        // Deposit funds into the strategy vault on behalf of the Allocator
+        _mockUsdt.mint(depositor, depositAmountUsdt);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(_defaultUsdtStrategy), depositAmountUsdt);
+        vm.prank(depositor);
+        _defaultUsdtStrategy.deposit(depositAmountUsdt, address(_allocator));
+
+        _mockUsdt.mint(depositor, depositAmountUsdt);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(_extraUsdtStrategy), depositAmountUsdt);
+        vm.prank(depositor);
+        _extraUsdtStrategy.deposit(depositAmountUsdt, address(_allocator));
+
+        _mockGho.mint(depositor, depositAmountGho);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockGho)).approve(address(_defaultGhoStrategy), depositAmountGho);
+        vm.prank(depositor);
+        _defaultGhoStrategy.deposit(depositAmountGho, address(_allocator));
+
+        _mockGho.mint(depositor, depositAmountGho);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockGho)).approve(address(_extraGhoStrategy), depositAmountGho);
+        vm.prank(depositor);
+        _extraGhoStrategy.deposit(depositAmountGho, address(_allocator));
+
+        // Check balances before deallocation
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), depositAmountUsdt * 2);
+        assertEq(_allocator.getAssetBalance(address(_mockGho)), depositAmountGho * 2);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), depositAmountUsdt);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), depositAmountUsdt);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), depositAmountGho);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), depositAmountGho);
+
+        IAllocator.RebalanceParams[] memory rebalanceParams = _initializeRebalanceParams(1);
+        IAllocator.DeallocationParams[] memory deallocations = _initializeDeallocationParams(4);
+        deallocations[0] = _buildDeallocationParams(address(_mockUsdt), address(_defaultUsdtStrategy), 0);
+        deallocations[1] = _buildDeallocationParams(address(_mockUsdt), address(_extraUsdtStrategy), 0);
+        deallocations[2] = _buildDeallocationParams(address(_mockGho), address(_defaultGhoStrategy), 0);
+        deallocations[3] = _buildDeallocationParams(address(_mockGho), address(_extraGhoStrategy), 0);
+        rebalanceParams[0] =
+            _buildRebalanceParams(deallocations, _initializeSwapParams(0), _initializeAllocationParams(0));
+
+        vm.prank(address(everyRoleAccount));
+        _allocator.rebalance(rebalanceParams);
+
+        // Check balances after deallocating from default strategy
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), depositAmountUsdt * 2);
+        assertEq(_allocator.getAssetBalance(address(_mockGho)), depositAmountGho * 2);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
+    }
+
+    function test_rebalance_deallocate_specifiedAmount(uint256 depositAmountUsdt, uint256 depositAmountGho) public {
+        depositAmountUsdt = _boundAssetAmount(address(_mockUsdt), depositAmountUsdt);
+        depositAmountGho = _boundAssetAmount(address(_mockGho), depositAmountGho);
+        vm.assume(depositAmountUsdt > 0);
+        vm.assume(depositAmountGho > 0);
+
+        uint256 deallocateAmountUsdt = 1234;
+        uint256 deallocateAmountGho = 5678;
+        vm.assume(deallocateAmountUsdt < depositAmountUsdt);
+        vm.assume(deallocateAmountGho < depositAmountGho);
+
+        // Deposit funds into the strategy vault on behalf of the Allocator
+        _mockUsdt.mint(depositor, depositAmountUsdt);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(_defaultUsdtStrategy), depositAmountUsdt);
+        vm.prank(depositor);
+        _defaultUsdtStrategy.deposit(depositAmountUsdt, address(_allocator));
+
+        _mockGho.mint(depositor, depositAmountGho);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockGho)).approve(address(_defaultGhoStrategy), depositAmountGho);
+        vm.prank(depositor);
+        _defaultGhoStrategy.deposit(depositAmountGho, address(_allocator));
+
+        _mockUsdt.mint(depositor, depositAmountUsdt);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(_extraUsdtStrategy), depositAmountUsdt);
+        vm.prank(depositor);
+        _extraUsdtStrategy.deposit(depositAmountUsdt, address(_allocator));
+
+        _mockGho.mint(depositor, depositAmountGho);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockGho)).approve(address(_extraGhoStrategy), depositAmountGho);
+        vm.prank(depositor);
+        _extraGhoStrategy.deposit(depositAmountGho, address(_allocator));
+
+        // Check balances before deallocation
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), depositAmountUsdt * 2);
+        assertEq(_allocator.getAssetBalance(address(_mockGho)), depositAmountGho * 2);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), depositAmountUsdt);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), depositAmountUsdt);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), depositAmountGho);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), depositAmountGho);
+
+        IAllocator.RebalanceParams[] memory rebalanceParams = _initializeRebalanceParams(1);
+        IAllocator.DeallocationParams[] memory deallocations = _initializeDeallocationParams(4);
+        deallocations[0] =
+            _buildDeallocationParams(address(_mockUsdt), address(_defaultUsdtStrategy), deallocateAmountUsdt);
+        deallocations[1] =
+            _buildDeallocationParams(address(_mockUsdt), address(_extraUsdtStrategy), deallocateAmountUsdt);
+        deallocations[2] =
+            _buildDeallocationParams(address(_mockGho), address(_defaultGhoStrategy), deallocateAmountGho);
+        deallocations[3] = _buildDeallocationParams(address(_mockGho), address(_extraGhoStrategy), deallocateAmountGho);
+        rebalanceParams[0] =
+            _buildRebalanceParams(deallocations, _initializeSwapParams(0), _initializeAllocationParams(0));
+
+        vm.prank(address(everyRoleAccount));
+        _allocator.rebalance(rebalanceParams);
+
+        // Check balances after deallocation
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), depositAmountUsdt * 2);
+        assertEq(_allocator.getAssetBalance(address(_mockGho)), depositAmountGho * 2);
+        assertEq(
+            _allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)),
+            depositAmountUsdt - deallocateAmountUsdt
+        );
+        assertEq(
+            _allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), depositAmountUsdt - deallocateAmountUsdt
+        );
+        assertEq(
+            _allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), depositAmountGho - deallocateAmountGho
+        );
+        assertEq(
+            _allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), depositAmountGho - deallocateAmountGho
+        );
+    }
+
+    function test_rebalance_deallocate_specifiedAmount_reverts_ifStrategyDoesNotReturnSufficientAmount(uint256 depositAmountUsdt)
+        public
+    {
+        depositAmountUsdt = _boundAssetAmount(address(_mockUsdt), depositAmountUsdt);
+        vm.assume(depositAmountUsdt > 0);
+
+        uint256 deallocateAmountUsdt = 1234;
+        vm.assume(deallocateAmountUsdt < depositAmountUsdt);
+
+        TestErc4626WithSlippage _strategyWithSlippage = new TestErc4626WithSlippage(_mockUsdt);
+
+        vm.prank(admin);
+        _allocator.addStrategy(address(_mockUsdt), address(_strategyWithSlippage));
+
+        // Deposit funds into the strategy vault on behalf of the Allocator
+        _mockUsdt.mint(depositor, depositAmountUsdt);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(_strategyWithSlippage), depositAmountUsdt);
+        vm.prank(depositor);
+        _strategyWithSlippage.deposit(depositAmountUsdt, address(_allocator));
+
+        IAllocator.RebalanceParams[] memory rebalanceParams = _initializeRebalanceParams(1);
+        IAllocator.DeallocationParams[] memory deallocations = _initializeDeallocationParams(1);
+        deallocations[0] =
+            _buildDeallocationParams(address(_mockUsdt), address(_strategyWithSlippage), deallocateAmountUsdt);
+        rebalanceParams[0] =
+            _buildRebalanceParams(deallocations, _initializeSwapParams(0), _initializeAllocationParams(0));
+
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(ErrorsLib.InsufficientAmountOut.selector);
+        _allocator.rebalance(rebalanceParams);
+    }
+
+    function test_rebalance_deallocate_maxAmount_reverts_ifStrategyDoesNotReturnSufficientAmount(uint256 depositAmountUsdt)
+        public
+    {
+        depositAmountUsdt = _boundAssetAmount(address(_mockUsdt), depositAmountUsdt);
+        vm.assume(depositAmountUsdt > 0);
+
+        TestErc4626WithSlippage _strategyWithSlippage = new TestErc4626WithSlippage(_mockUsdt);
+
+        vm.prank(admin);
+        _allocator.addStrategy(address(_mockUsdt), address(_strategyWithSlippage));
+
+        // Deposit funds into the strategy vault on behalf of the Allocator
+        _mockUsdt.mint(depositor, depositAmountUsdt);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(_strategyWithSlippage), depositAmountUsdt);
+        vm.prank(depositor);
+        _strategyWithSlippage.deposit(depositAmountUsdt, address(_allocator));
+
+        IAllocator.RebalanceParams[] memory rebalanceParams = _initializeRebalanceParams(1);
+        IAllocator.DeallocationParams[] memory deallocations = _initializeDeallocationParams(1);
+        deallocations[0] = _buildDeallocationParams(address(_mockUsdt), address(_strategyWithSlippage), 0);
+        rebalanceParams[0] =
+            _buildRebalanceParams(deallocations, _initializeSwapParams(0), _initializeAllocationParams(0));
+
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(ErrorsLib.InsufficientAmountOut.selector);
+        _allocator.rebalance(rebalanceParams);
+    }
+
+    function test_rebalance_deallocate_specifiedAmount_reverts_ifAmountGreaterThanBalance(uint256 depositAmountUsdt)
+        public
+    {
+        depositAmountUsdt = _boundAssetAmount(address(_mockUsdt), depositAmountUsdt);
+        vm.assume(depositAmountUsdt > 0);
+
+        uint256 deallocateAmountUsdt = depositAmountUsdt + 1;
+        vm.assume(deallocateAmountUsdt > depositAmountUsdt);
+
+        // Deposit funds into the strategy vault on behalf of the Allocator
+        _mockUsdt.mint(depositor, depositAmountUsdt);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(_defaultUsdtStrategy), depositAmountUsdt);
+        vm.prank(depositor);
+        _defaultUsdtStrategy.deposit(depositAmountUsdt, address(_allocator));
+
+        IAllocator.RebalanceParams[] memory rebalanceParams = _initializeRebalanceParams(1);
+        IAllocator.DeallocationParams[] memory deallocations = _initializeDeallocationParams(1);
+        deallocations[0] =
+            _buildDeallocationParams(address(_mockUsdt), address(_defaultUsdtStrategy), deallocateAmountUsdt);
+        rebalanceParams[0] =
+            _buildRebalanceParams(deallocations, _initializeSwapParams(0), _initializeAllocationParams(0));
+
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ERC4626.ERC4626ExceededMaxWithdraw.selector,
+                address(_allocator),
+                deallocateAmountUsdt,
+                depositAmountUsdt
+            )
+        );
+        _allocator.rebalance(rebalanceParams);
+    }
+
+    function test_rebalance_deallocate_specifiedAmount_reverts_ifStrategyIsNotSupportedForAsset(
+        address strategy,
+        uint256 depositAmountUsdt
+    ) public {
+        depositAmountUsdt = _boundAssetAmountAllowingZero(address(_mockUsdt), depositAmountUsdt);
+        vm.assume(!_allocator.isStrategySupportedForAsset(address(_mockUsdt), strategy));
+
+        IAllocator.RebalanceParams[] memory rebalanceParams = _initializeRebalanceParams(1);
+        IAllocator.DeallocationParams[] memory deallocations = _initializeDeallocationParams(1);
+        deallocations[0] = _buildDeallocationParams(address(_mockUsdt), strategy, depositAmountUsdt);
+        rebalanceParams[0] =
+            _buildRebalanceParams(deallocations, _initializeSwapParams(0), _initializeAllocationParams(0));
+
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(ErrorsLib.AddressNotWhitelisted.selector);
+        _allocator.rebalance(rebalanceParams);
+    }
+
     function _getDepositIdleFundsRebalanceParams(address asset)
         internal
         view
@@ -737,23 +1093,29 @@ contract AllocatorTest is TestWithHelpers {
         return rebalances;
     }
 
-    function _initializeDeallocationParams(uint16 length) internal returns (IAllocator.DeallocationParams[] memory) {
+    function _initializeDeallocationParams(uint16 length)
+        internal
+        pure
+        returns (IAllocator.DeallocationParams[] memory)
+    {
         return new IAllocator.DeallocationParams[](length);
     }
 
     function _buildDeallocationParams(address asset, address strategy, uint256 amount)
         internal
+        pure
         returns (IAllocator.DeallocationParams memory)
     {
         return IAllocator.DeallocationParams({asset: asset, strategy: strategy, amount: amount});
     }
 
-    function _initializeSwapParams(uint16 length) internal returns (IAllocator.SwapParams[] memory) {
+    function _initializeSwapParams(uint16 length) internal pure returns (IAllocator.SwapParams[] memory) {
         return new IAllocator.SwapParams[](length);
     }
 
     function _buildSwapParams(address assetIn, uint256 amountIn, address assetOut, address swapper, bytes memory data)
         internal
+        pure
         returns (IAllocator.SwapParams memory)
     {
         return
@@ -762,18 +1124,19 @@ contract AllocatorTest is TestWithHelpers {
             });
     }
 
-    function _initializeAllocationParams(uint16 length) internal returns (IAllocator.AllocationParams[] memory) {
+    function _initializeAllocationParams(uint16 length) internal pure returns (IAllocator.AllocationParams[] memory) {
         return new IAllocator.AllocationParams[](length);
     }
 
     function _buildAllocationParams(address asset, address strategy, uint256 amount)
         internal
+        pure
         returns (IAllocator.AllocationParams memory)
     {
         return IAllocator.AllocationParams({asset: asset, strategy: strategy, amount: amount});
     }
 
-    function _initializeRebalanceParams(uint16 length) internal returns (IAllocator.RebalanceParams[] memory) {
+    function _initializeRebalanceParams(uint16 length) internal pure returns (IAllocator.RebalanceParams[] memory) {
         return new IAllocator.RebalanceParams[](length);
     }
 
@@ -781,7 +1144,7 @@ contract AllocatorTest is TestWithHelpers {
         IAllocator.DeallocationParams[] memory deallocations,
         IAllocator.SwapParams[] memory swaps,
         IAllocator.AllocationParams[] memory allocations
-    ) internal returns (IAllocator.RebalanceParams memory) {
+    ) internal pure returns (IAllocator.RebalanceParams memory) {
         return IAllocator.RebalanceParams({deallocations: deallocations, swaps: swaps, allocations: allocations});
     }
 }
