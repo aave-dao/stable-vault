@@ -61,7 +61,7 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
 
     /// @inheritdoc IEarningChainGateway
     function sendBalanceUpdateWithFeePayer(IChainGateway.BridgeParams memory bridgeParams) external payable override {
-        address adapter = _defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID];
+        address adapter = $BaseChainGateway().defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID];
         require(adapter != address(0), AdapterNotFound());
         _prepareBridgeFeeForAdapter(adapter, bridgeParams.feePayer, bridgeParams.feeToken, bridgeParams.feeAmount);
         _sendCrossChainMessage(
@@ -79,7 +79,7 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         require(iouTokenAmountRay > 0, ErrorsLib.ZeroAmount());
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(msg.sender, iouTokenAmountRay);
 
-        address adapter = _defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID];
+        address adapter = $BaseChainGateway().defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID];
         require(adapter != address(0), AdapterNotFound());
 
         // TODO: apply a withdrawal fee here?
@@ -154,7 +154,7 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         uint256 amount,
         IChainGateway.BridgeParams memory bridgeParams
     ) internal {
-        address bridgeAdapter = _defaultBridgeAdapter[asset][ACCOUNTING_CHAIN_ID];
+        address bridgeAdapter = $BaseChainGateway().defaultBridgeAdapter[asset][ACCOUNTING_CHAIN_ID];
         require(bridgeAdapter != address(0), AdapterNotFound());
 
         // Send a single cross chain message with the asset and the balance snapshot. The bridge must support both
