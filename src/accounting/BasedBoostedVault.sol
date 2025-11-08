@@ -134,7 +134,6 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
 
     /// @inheritdoc IBasedBoostedVault
     function deposit(address user, address asset, uint256 amount) external override {
-        require(msg.sender == user, InvalidMsgSender());
         require(
             IAssetRegistry($storage().assetRegistry).isAllowedToDepositIntoBBV(asset), ErrorsLib.UnsupportedAsset(asset)
         );

@@ -272,17 +272,33 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         bbv.deposit(user, address(mockAsset), amount);
     }
 
-    function test_deposit_reverts_ifMsgSenderIsNotTheUserDepositing(address user, uint256 amount) public {
+    function test_deposit_allowsToDepositOnBehalfOfOtherUser(address user, address msgSender, uint256 amount) public {
         vm.assume(user != address(0));
+        vm.assume(msgSender != address(0));
         vm.assume(user != address(mockFundsHandler));
+        vm.assume(msgSender != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(msgSender, address(bbv));
         amount = _boundAssetAmount(address(mockAsset), amount);
 
-        mockAsset.mint(user, amount);
+        vm.assume(bbv.getUserBalance(user) == 0);
+        vm.assume(bbv.getUserBalance(msgSender) == 0);
 
-        vm.prank(user);
-        vm.expectRevert((IBasedBoostedVault.InvalidMsgSender.selector));
-        bbv.deposit(makeAddr("otherUser"), address(mockAsset), amount);
+        mockAsset.mint(msgSender, amount);
+        vm.prank(msgSender);
+        mockAsset.forceApprove(address(bbv), amount);
+
+        vm.assume(mockAsset.balanceOf(user) == 0);
+        vm.assume(mockAsset.balanceOf(msgSender) == amount);
+
+        vm.prank(msgSender);
+        bbv.deposit(user, address(mockAsset), amount);
+
+        assertTrue(bbv.getUserBalance(user) > 0);
+        assertTrue(bbv.getUserBalance(msgSender) == 0);
+
+        vm.assume(mockAsset.balanceOf(user) == 0);
+        vm.assume(mockAsset.balanceOf(msgSender) == 0);
     }
 
     function test_deposit_callsFundsHandlerToProcessDepositWithExpectedParams(address user, uint256 amount) public {
