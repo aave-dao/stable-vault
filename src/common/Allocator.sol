@@ -219,7 +219,7 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
         // Execute the swap and require 1:1 conversion
         uint256 amountOut = ISwapper(swap.swapper).executeSwap(swap.assetIn, swap.assetOut, swap.amountIn, swap.data);
         require(
-            amountOut >= swap.amountIn.convertAssetDecimals(swap.assetIn, swap.assetOut),
+            amountOut > 0 && amountOut >= swap.amountIn.convertAssetDecimals(swap.assetIn, swap.assetOut),
             ErrorsLib.InsufficientAmountOut()
         );
 

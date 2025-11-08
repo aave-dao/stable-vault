@@ -21,6 +21,7 @@ import {MockAccessManager} from "./mocks/MockAccessManager.sol";
 import {MockAssetRegistry} from "./mocks/MockAssetRegistry.sol";
 import {IMockErc20} from "./mocks/MockErc20.sol";
 import {MockNonStandardErc20} from "./mocks/MockNonStandardErc20.sol";
+import {MockSwapper} from "./mocks/MockSwapper.sol";
 import {TestErc4626} from "./mocks/TestErc4626.sol";
 import {TestErc4626WithSlippage} from "./mocks/TestErc4626WithSlippage.sol";
 
@@ -47,6 +48,7 @@ contract AllocatorTest is TestWithHelpers {
     TestErc4626 internal _extraUsdtStrategy;
     TestErc4626 internal _defaultGhoStrategy;
     TestErc4626 internal _extraGhoStrategy;
+    MockSwapper internal _mockSwapper;
 
     Allocator internal _allocator;
 
@@ -91,6 +93,8 @@ contract AllocatorTest is TestWithHelpers {
 
         _mockAssetRegistry = new MockAssetRegistry();
         _mockAccessManager = new MockAccessManager(admin);
+
+        _mockSwapper = new MockSwapper();
 
         // Set up Asset Registry
         vm.prank(admin);
@@ -1072,6 +1076,204 @@ contract AllocatorTest is TestWithHelpers {
         vm.prank(address(everyRoleAccount));
         vm.expectRevert(ErrorsLib.AddressNotWhitelisted.selector);
         _allocator.rebalance(rebalanceParams);
+    }
+
+    function test_rebalance_swap_multipleCallsToSwapper(uint256 amountAssetInSwapOne, uint256 amountAssetInSwapTwo)
+        public
+    {
+        address assetIn = address(_mockUsdt);
+        address assetOut = address(_mockGho);
+        amountAssetInSwapOne = _boundAssetAmount(assetIn, amountAssetInSwapOne);
+        amountAssetInSwapTwo = _boundAssetAmount(assetIn, amountAssetInSwapTwo);
+        uint256 amountAssetOutOne = amountAssetInSwapOne.convertAssetDecimals(assetIn, assetOut);
+        uint256 amountAssetOutTwo = amountAssetInSwapTwo.convertAssetDecimals(assetIn, assetOut);
+        vm.assume(amountAssetOutOne > 0);
+        vm.assume(amountAssetOutTwo > 0);
+
+        // Airdrop assetIn to the Allocator
+        _mockUsdt.mint(address(_allocator), amountAssetInSwapOne + amountAssetInSwapTwo);
+
+        // Mint assetOut to the swapper
+        uint256 totalAmountOut = amountAssetOutOne + amountAssetOutTwo;
+        _mockGho.mint(address(_mockSwapper), totalAmountOut);
+
+        // Check balances before the swap
+        assertEq(_allocator.getAssetBalance(assetIn), amountAssetInSwapOne + amountAssetInSwapTwo);
+        assertEq(_allocator.getAssetBalance(assetOut), 0);
+
+        // invoke a swap
+        IAllocator.RebalanceParams[] memory rebalanceParams = _initializeRebalanceParams(1);
+        IAllocator.SwapParams[] memory swaps = _initializeSwapParams(2);
+        swaps[0] = _buildSwapParams(assetIn, amountAssetInSwapOne, assetOut, address(_mockSwapper), "");
+        swaps[1] = _buildSwapParams(assetIn, amountAssetInSwapTwo, assetOut, address(_mockSwapper), "");
+        rebalanceParams[0] =
+            _buildRebalanceParams(_initializeDeallocationParams(0), swaps, _initializeAllocationParams(0));
+        vm.prank(address(everyRoleAccount));
+        _allocator.rebalance(rebalanceParams);
+
+        // Check balances after the swap
+        assertEq(_allocator.getAssetBalance(assetIn), 0);
+        assertEq(_allocator.getAssetBalance(assetOut), totalAmountOut);
+    }
+
+    function test_rebalance_swap_reverts_ifAmountOutIsZero() public {
+        // assetIn has more decimals than assetOut
+        address assetIn = address(_mockGho);
+        address assetOut = address(_mockUsdt);
+        uint256 amountAssetIn = 100_000_000;
+        uint256 amountAssetOut = amountAssetIn.convertAssetDecimals(assetIn, assetOut);
+        require(amountAssetOut == 0);
+
+        // Airdrop assetIn to the swapper
+        _mockGho.mint(address(_allocator), amountAssetIn);
+
+        // Invoke a swap
+        IAllocator.RebalanceParams[] memory rebalanceParams = _initializeRebalanceParams(1);
+        IAllocator.SwapParams[] memory swaps = _initializeSwapParams(1);
+        swaps[0] = _buildSwapParams(assetIn, amountAssetIn, assetOut, address(_mockSwapper), "");
+        rebalanceParams[0] =
+            _buildRebalanceParams(_initializeDeallocationParams(0), swaps, _initializeAllocationParams(0));
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(ErrorsLib.InsufficientAmountOut.selector);
+        _allocator.rebalance(rebalanceParams);
+
+        // Check balances
+        assertEq(_allocator.getAssetBalance(assetIn), amountAssetIn);
+        assertEq(_allocator.getAssetBalance(assetOut), 0);
+    }
+
+    function test_rebalance_swap_reverts_ifAssetOutIncursSlippage(uint256 amountAssetInSwapOne) public {
+        address assetIn = address(_mockUsdt);
+        address assetOut = address(_mockGho);
+        amountAssetInSwapOne = _boundAssetAmount(assetIn, amountAssetInSwapOne);
+        uint256 amountAssetOut = amountAssetInSwapOne.convertAssetDecimals(assetIn, assetOut);
+        vm.assume(amountAssetOut > 0);
+
+        // Airdrop assetIn to the Allocator
+        _mockUsdt.mint(address(_allocator), amountAssetInSwapOne);
+
+        // Mint assetOut to the swapper
+        _mockGho.mint(address(_mockSwapper), amountAssetOut);
+
+        // Check balances before the swap
+        assertEq(_allocator.getAssetBalance(assetIn), amountAssetInSwapOne);
+        assertEq(_allocator.getAssetBalance(assetOut), 0);
+
+        // invoke a swap
+        IAllocator.RebalanceParams[] memory rebalanceParams = _initializeRebalanceParams(1);
+        IAllocator.SwapParams[] memory swaps = _initializeSwapParams(1);
+        swaps[0] = _buildSwapParams(assetIn, amountAssetInSwapOne, assetOut, address(_mockSwapper), "");
+        rebalanceParams[0] =
+            _buildRebalanceParams(_initializeDeallocationParams(0), swaps, _initializeAllocationParams(0));
+
+        // Mock slippage
+        _mockSwapper.mockSlippage(true);
+
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(ErrorsLib.InsufficientAmountOut.selector);
+        _allocator.rebalance(rebalanceParams);
+
+        // Check balances after the swap to make sure of no change
+        assertEq(_allocator.getAssetBalance(assetIn), amountAssetInSwapOne);
+        assertEq(_allocator.getAssetBalance(assetOut), 0);
+    }
+
+    function test_rebalance_swap_reverts_ifAssetInIsNotSupported() public {
+        address assetIn = address(_mockUnsupportedAsset);
+        address assetOut = address(_mockGho);
+        uint256 amountAssetIn = 100_000_000;
+        uint256 amountAssetOut = amountAssetIn.convertAssetDecimals(assetIn, assetOut);
+        vm.assume(amountAssetOut > 0);
+
+        // Airdrop assetIn to the Allocator
+        _mockUnsupportedAsset.mint(address(_allocator), amountAssetIn);
+
+        _mockAssetRegistry.mockToDisallowSwapInputToken(assetIn);
+
+        // Invoke a swap
+        IAllocator.RebalanceParams[] memory rebalanceParams = _initializeRebalanceParams(1);
+        IAllocator.SwapParams[] memory swaps = _initializeSwapParams(1);
+        swaps[0] = _buildSwapParams(assetIn, amountAssetIn, assetOut, address(_mockSwapper), "");
+        rebalanceParams[0] =
+            _buildRebalanceParams(_initializeDeallocationParams(0), swaps, _initializeAllocationParams(0));
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, assetIn));
+        _allocator.rebalance(rebalanceParams);
+
+        // Check balances after the swap to make sure of no change
+        assertEq(_allocator.getAssetBalance(assetIn), amountAssetIn);
+        assertEq(_allocator.getAssetBalance(assetOut), 0);
+    }
+
+    function test_rebalance_swap_reverts_ifAssetOutIsNotSupported() public {
+        address assetIn = address(_mockUsdt);
+        address assetOut = address(_mockUnsupportedAsset);
+        uint256 amountAssetIn = 100_000_000;
+        uint256 amountAssetOut = amountAssetIn.convertAssetDecimals(assetIn, assetOut);
+        vm.assume(amountAssetOut > 0);
+
+        // Airdrop assetIn to the Allocator
+        _mockUsdt.mint(address(_allocator), amountAssetIn);
+
+        _mockAssetRegistry.mockToDisallowSwapOutputToken(assetOut);
+
+        // Invoke a swap
+        IAllocator.RebalanceParams[] memory rebalanceParams = _initializeRebalanceParams(1);
+        IAllocator.SwapParams[] memory swaps = _initializeSwapParams(1);
+        swaps[0] = _buildSwapParams(assetIn, amountAssetIn, assetOut, address(_mockSwapper), "");
+        rebalanceParams[0] =
+            _buildRebalanceParams(_initializeDeallocationParams(0), swaps, _initializeAllocationParams(0));
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, assetOut));
+        _allocator.rebalance(rebalanceParams);
+
+        // Check balances after the swap to make sure of no change
+        assertEq(_allocator.getAssetBalance(assetIn), amountAssetIn);
+        assertEq(_allocator.getAssetBalance(assetOut), 0);
+    }
+
+    // TODO: test deallocate, swap, allocate
+    function test_rebalance_entireFlow(uint256 amountIn) public {
+        address assetIn = address(_mockUsdt);
+        address assetOut = address(_mockGho);
+
+        amountIn = _boundAssetAmount(assetIn, amountIn);
+        uint256 amountOut = amountIn.convertAssetDecimals(assetIn, assetOut);
+        vm.assume(amountOut > 0);
+
+        // Deposit assetIn into strategy vault on behalf of the Allocator
+        _mockUsdt.mint(depositor, amountIn);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(_defaultUsdtStrategy), amountIn);
+        vm.prank(depositor);
+        _defaultUsdtStrategy.deposit(amountIn, address(_allocator));
+
+        // Deposit assetOut into swapper
+        _mockGho.mint(address(_mockSwapper), amountOut);
+
+        // Check balances before the rebalance
+        assertEq(_allocator.getAssetBalance(assetIn), amountIn);
+        assertEq(_allocator.getAssetBalance(assetOut), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), amountIn);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
+
+        // Invoke a rebalance where we need to deallocate, swap, and allocate
+        IAllocator.RebalanceParams[] memory rebalanceParams = _initializeRebalanceParams(1);
+        IAllocator.DeallocationParams[] memory deallocations = _initializeDeallocationParams(1);
+        deallocations[0] = _buildDeallocationParams(assetIn, address(_defaultUsdtStrategy), amountIn);
+        IAllocator.SwapParams[] memory swaps = _initializeSwapParams(1);
+        swaps[0] = _buildSwapParams(assetIn, amountIn, assetOut, address(_mockSwapper), "");
+        IAllocator.AllocationParams[] memory allocations = _initializeAllocationParams(1);
+        allocations[0] = _buildAllocationParams(assetOut, address(_defaultGhoStrategy), amountOut);
+        rebalanceParams[0] = _buildRebalanceParams(deallocations, swaps, allocations);
+        vm.prank(address(everyRoleAccount));
+        _allocator.rebalance(rebalanceParams);
+
+        // Check balances after the rebalance
+        assertEq(_allocator.getAssetBalance(assetIn), 0);
+        assertEq(_allocator.getAssetBalance(assetOut), amountOut);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), amountOut);
     }
 
     function _getDepositIdleFundsRebalanceParams(address asset)
