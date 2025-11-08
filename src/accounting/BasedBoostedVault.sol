@@ -26,7 +26,6 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
     using SafeERC20 for IERC20;
 
     /// @notice A subVault works like a virtual fixed-rate vault.
-    ///
     /// @param perSecondRate The total per second rate of growth associated with the subVault.
     /// @param conversionRate The cumulative growth factor at a point in time; acts as conversion rate between shares
     /// and assets.
@@ -42,7 +41,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
     /// @notice The representation of an user's position. A single user will have at most 1 position.
     /// @param originalDepositRay The amount deposited by the user before accruing any interest.
     /// @param subVaultId The ID of the subVault where the user's assets are.
-    /// @param shares The shares of the user, scaled, normalized by `_baseConversionRate * subVault.conversionRate`.
+    /// @param shares The shares of the user, scaled, normalized by subVault conversionRate.
     struct UserPosition {
         uint256 originalDepositRay;
         uint256 subVaultId;
@@ -57,30 +56,47 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
 
     address internal immutable FUNDS_HANDLER;
 
-    address internal _assetRegistry;
+    /// @custom:storage-location erc7201:aave.storage.BasedBoostedVault
+    struct BasedBoostedVaultStorage {
+        address assetRegistry;
 
-    uint256 internal _globalOriginalDepositsRay;
+        uint256 globalOriginalDepositsRay;
 
-    /// @dev The ID of the last subVault created; monotonically increasing.
-    uint256 internal _lastSubVaultId;
+        /// @dev The ID of the last subVault created; monotonically increasing.
+        uint256 lastSubVaultId;
 
-    /// @dev The ID of the subVault where users without existing positions' deposits are allocated to.
-    uint256 internal _defaultSubVaultId;
+        /// @dev The ID of the subVault where users without existing positions' deposits are allocated to.
+        uint256 defaultSubVaultId;
 
-    /// @dev Stores a SubVault by its ID.
-    mapping(uint256 subVaultId => SubVault subVault) internal _subVaultById;
+        /// @dev Stores a SubVault by its ID.
+        mapping(uint256 subVaultId => SubVault subVault) subVaultById;
 
-    /// @dev The IDs of the SubVaults that have liquidity i.e. some user's assets on it.
-    uint256[] internal _activeSubVaultsIds;
+        /// @dev The IDs of the SubVaults that have liquidity i.e. some user's assets on it.
+        uint256[] activeSubVaultsIds;
 
-    /// @dev SubVault index in the `_activeSubVaultsIds` array.
-    mapping(uint256 subVaultId => uint256 subVaultIndex) internal _activeSubVaultIndexById;
+        /// @dev SubVault index in the `activeSubVaultsIds` array.
+        mapping(uint256 subVaultId => uint256 subVaultIndex) activeSubVaultIndexById;
 
-    /// @dev SubVault ID by subVault per-second rate.
-    mapping(uint256 subVaultRate => uint256 subVaultId) internal _subVaultIdByRate;
+        /// @dev SubVault ID by subVault per-second rate.
+        mapping(uint256 subVaultRate => uint256 subVaultId) subVaultIdByRate;
 
-    /// @dev User position by user address.
-    mapping(address user => UserPosition position) internal _positions;
+        /// @dev User position by user address.
+        mapping(address user => UserPosition position) positions;
+    }
+
+    // keccak256(abi.encode(uint256(keccak256("aave.storage.BasedBoostedVault")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant STORAGE_SLOT_BASED_BOOSTED_VAULT =
+        0xb8df01cf10d37fdfab5674a951575d5924fe29a8ad03fbfb69e60d893a967b00;
+
+    function $storage() private pure returns (BasedBoostedVaultStorage storage _storage) {
+        assembly {
+            _storage.slot := STORAGE_SLOT_BASED_BOOSTED_VAULT
+        }
+    }
+
+    function $BasedBoostedVault() internal pure returns (BasedBoostedVaultStorage storage) {
+        return $storage();
+    }
 
     /// @dev Constructor.
     /// @param maxValidPerSecondRate The maximum valid per-second rate, in Ray units (27 decimals).
@@ -112,26 +128,28 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
         address assetRegistry
     ) internal virtual onlyInitializing {
         __AccessManaged_init(accessManager);
-        _assetRegistry = assetRegistry;
+        $storage().assetRegistry = assetRegistry;
         _setDefaultSubVault(_getOrCreateSubVaultWithRate(defaultSubVaultPerSecondRate), defaultSubVaultPerSecondRate);
     }
 
     /// @inheritdoc IBasedBoostedVault
     function deposit(address user, address asset, uint256 amount) external override {
         require(msg.sender == user, InvalidMsgSender());
-        require(IAssetRegistry(_assetRegistry).isAllowedToDepositIntoBBV(asset), ErrorsLib.UnsupportedAsset(asset));
+        require(
+            IAssetRegistry($storage().assetRegistry).isAllowedToDepositIntoBBV(asset), ErrorsLib.UnsupportedAsset(asset)
+        );
         require(amount > 0, ErrorsLib.InvalidAmount());
         IERC20(asset).safeTransferFrom(msg.sender, FUNDS_HANDLER, amount);
 
-        uint256 subVaultId = _positions[user].subVaultId;
+        uint256 subVaultId = $storage().positions[user].subVaultId;
         if (subVaultId == 0) {
-            subVaultId = _defaultSubVaultId;
-            _positions[user].subVaultId = subVaultId;
+            subVaultId = $storage().defaultSubVaultId;
+            $storage().positions[user].subVaultId = subVaultId;
         }
 
         _accrueSubVaultConversionRate(subVaultId);
 
-        uint256 conversionRate = _subVaultById[subVaultId].conversionRate;
+        uint256 conversionRate = $storage().subVaultById[subVaultId].conversionRate;
         uint256 amountInRay = amount.assetDecimalsToRay(asset);
         uint256 shares = amountInRay.rayDivDown(conversionRate);
 
@@ -139,10 +157,10 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
             _addSubVaultToActive(subVaultId);
         }
 
-        _subVaultById[subVaultId].totalShares += shares;
-        _positions[user].shares += shares;
-        _positions[user].originalDepositRay += amountInRay;
-        _globalOriginalDepositsRay += amountInRay;
+        $storage().subVaultById[subVaultId].totalShares += shares;
+        $storage().positions[user].shares += shares;
+        $storage().positions[user].originalDepositRay += amountInRay;
+        $storage().globalOriginalDepositsRay += amountInRay;
 
         IFundsHandler(FUNDS_HANDLER).processDeposit(asset, amount);
 
@@ -162,8 +180,8 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
         require(!_existsSubVaultWithRate(newPerSecondRate), SubVaultAlreadyExists());
         require(_existsSubVaultWithId(subVaultId), SubVaultDoesNotExist());
         _accrueSubVaultConversionRate(subVaultId);
-        _subVaultById[subVaultId].perSecondRate = newPerSecondRate;
-        _subVaultIdByRate[newPerSecondRate] = subVaultId;
+        $storage().subVaultById[subVaultId].perSecondRate = newPerSecondRate;
+        $storage().subVaultIdByRate[newPerSecondRate] = subVaultId;
         emit SubVaultRateSet(subVaultId, newPerSecondRate);
     }
 
@@ -171,7 +189,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
     function requestWithdrawal(address user, uint256 requestedAmountInRay) external override returns (uint256) {
         require(msg.sender == user, InvalidMsgSender());
 
-        uint256 subVaultId = _positions[user].subVaultId;
+        uint256 subVaultId = $storage().positions[user].subVaultId;
         require(subVaultId > 0, NonExistentPosition());
 
         _accrueSubVaultConversionRate(subVaultId);
@@ -191,7 +209,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
         uint256 totalAssetsRay = _getVaultAggregatedBalance();
         // There is no overlap between original deposits and circulating IOUs because original deposits are decremented
         // when new issue IOUs are minted.
-        uint256 guaranteedObligationsRay = _getIousInCirculation() + _globalOriginalDepositsRay;
+        uint256 guaranteedObligationsRay = _getIousInCirculation() + $storage().globalOriginalDepositsRay;
         // This can underflow if Earning chain(s) have not sent back the balance update and user positions have been
         // removed (they've claimed IOUs).
         uint256 globalWithdrawableInterestRay =
@@ -202,7 +220,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
             InsufficientAssets(user, actualAmountInRay, guaranteedAmountRay + globalWithdrawableInterestRay)
         );
 
-        _globalOriginalDepositsRay -= guaranteedAmountRay;
+        $storage().globalOriginalDepositsRay -= guaranteedAmountRay;
 
         if (!_isActiveSubVaultById(subVaultId)) {
             _removeSubVaultFromActive(subVaultId);
@@ -218,7 +236,8 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
     function executeWithdrawal(address user, address assetOut, uint256 iouAmountRay) external override {
         require(msg.sender == user, InvalidMsgSender());
         require(
-            IAssetRegistry(_assetRegistry).isAllowedToWithdrawFromBBV(assetOut), ErrorsLib.UnsupportedAsset(assetOut)
+            IAssetRegistry($storage().assetRegistry).isAllowedToWithdrawFromBBV(assetOut),
+            ErrorsLib.UnsupportedAsset(assetOut)
         );
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(user, iouAmountRay);
         uint256 assetAmount = iouAmountRay.rayToAssetDecimals(assetOut);
@@ -232,7 +251,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
         _setDefaultSubVault(_getOrCreateSubVaultWithRate(perSecondRate), perSecondRate);
     }
 
-    // TODO(registry-config): Should we have a "fee recipient" storage field or function param?
+    // TODO: Should we have a "fee recipient" storage field or function param?
     /// @inheritdoc IBasedBoostedVault
     function claimFees(address[] calldata assets, uint256[] calldata amounts) external override restricted {
         uint256 vaultObligationsRay = _getVaultObligations();
@@ -260,15 +279,15 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
 
     /// @inheritdoc IBasedBoostedVault
     function getGlobalOriginalDepositAmount() external view override returns (uint256) {
-        return _globalOriginalDepositsRay;
+        return $storage().globalOriginalDepositsRay;
     }
 
     /// @inheritdoc IBasedBoostedVault
     function getActiveSubVaults() external view override returns (SubVaultData[] memory) {
-        SubVaultData[] memory activeSubVaults = new SubVaultData[](_activeSubVaultsIds.length);
-        for (uint256 i = 0; i < _activeSubVaultsIds.length; i++) {
-            uint256 subVaultId = _activeSubVaultsIds[i];
-            uint256 perSecondRate = _subVaultById[subVaultId].perSecondRate;
+        SubVaultData[] memory activeSubVaults = new SubVaultData[]($storage().activeSubVaultsIds.length);
+        for (uint256 i = 0; i < $storage().activeSubVaultsIds.length; i++) {
+            uint256 subVaultId = $storage().activeSubVaultsIds[i];
+            uint256 perSecondRate = $storage().subVaultById[subVaultId].perSecondRate;
             activeSubVaults[i] = SubVaultData({perSecondRate: perSecondRate, id: subVaultId});
         }
         return activeSubVaults;
@@ -286,34 +305,35 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
 
     /// @inheritdoc IBasedBoostedVault
     function getUserBalance(address user) external view override returns (uint256) {
-        if (_positions[user].shares == 0) {
+        if ($storage().positions[user].shares == 0) {
             return 0;
         }
-        return _positions[user].shares.rayMulDown(_previewSubVaultConversionRate(_positions[user].subVaultId));
+        return $storage().positions[user].shares
+            .rayMulDown(_previewSubVaultConversionRate($storage().positions[user].subVaultId));
     }
 
     /// @inheritdoc IBasedBoostedVault
     function getUserSubVault(address user) external view override returns (SubVaultData memory) {
-        uint256 subVaultId = _positions[user].subVaultId;
-        uint256 subVaultRate = _subVaultById[subVaultId].perSecondRate;
+        uint256 subVaultId = $storage().positions[user].subVaultId;
+        uint256 subVaultRate = $storage().subVaultById[subVaultId].perSecondRate;
         return SubVaultData({perSecondRate: subVaultRate, id: subVaultId});
     }
 
     /// @inheritdoc IBasedBoostedVault
     function getDefaultSubVault() external view override returns (SubVaultData memory) {
-        uint256 subVaultId = _defaultSubVaultId;
-        uint256 subVaultRate = _subVaultById[subVaultId].perSecondRate;
+        uint256 subVaultId = $storage().defaultSubVaultId;
+        uint256 subVaultRate = $storage().subVaultById[subVaultId].perSecondRate;
         return SubVaultData({perSecondRate: subVaultRate, id: subVaultId});
     }
 
     /// @inheritdoc IBasedBoostedVault
     function getSubVaultRateById(uint256 subVaultId) external view override returns (uint256) {
-        return _subVaultById[subVaultId].perSecondRate;
+        return $storage().subVaultById[subVaultId].perSecondRate;
     }
 
     /// @inheritdoc IBasedBoostedVault
     function getSubVaultIdByRate(uint256 perSecondRate) external view override returns (uint256) {
-        return _subVaultIdByRate[perSecondRate];
+        return $storage().subVaultIdByRate[perSecondRate];
     }
 
     function getMaxValidPerSecondRate() external view returns (uint256) {
@@ -328,27 +348,27 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
 
     function _getOrCreateSubVaultWithRate(uint256 perSecondRate) internal returns (uint256) {
         if (_existsSubVaultWithRate(perSecondRate)) {
-            return _subVaultIdByRate[perSecondRate];
+            return $storage().subVaultIdByRate[perSecondRate];
         } else {
             return _createSubVault(perSecondRate);
         }
     }
 
     function _setDefaultSubVault(uint256 subVaultId, uint256 perSecondRate) internal {
-        _defaultSubVaultId = subVaultId;
+        $storage().defaultSubVaultId = subVaultId;
         emit DefaultSubVaultSet(subVaultId, perSecondRate);
     }
 
     function _createSubVault(uint256 newPerSecondRate) internal returns (uint256) {
         _validateRate(newPerSecondRate);
-        uint256 newSubVaultId = ++_lastSubVaultId;
-        _subVaultById[newSubVaultId] = SubVault({
+        uint256 newSubVaultId = ++$storage().lastSubVaultId;
+        $storage().subVaultById[newSubVaultId] = SubVault({
             perSecondRate: newPerSecondRate,
             conversionRate: MathLib.RAY,
             lastAccrualTimestamp: uint256(block.timestamp),
             totalShares: 0
         });
-        _subVaultIdByRate[newPerSecondRate] = newSubVaultId;
+        $storage().subVaultIdByRate[newPerSecondRate] = newSubVaultId;
         emit SubVaultCreated(newSubVaultId, newPerSecondRate);
         return newSubVaultId;
     }
@@ -356,20 +376,20 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
     function _migrateUserToSubVault(address user, uint256 oldSubVaultId, uint256 newSubVaultId) internal {
         _accrueSubVaultConversionRate(oldSubVaultId);
         _accrueSubVaultConversionRate(newSubVaultId);
-        uint256 oldConversionRate = _subVaultById[oldSubVaultId].conversionRate;
-        uint256 newConversionRate = _subVaultById[newSubVaultId].conversionRate;
-        uint256 userOldShares = _positions[user].shares;
+        uint256 oldConversionRate = $storage().subVaultById[oldSubVaultId].conversionRate;
+        uint256 newConversionRate = $storage().subVaultById[newSubVaultId].conversionRate;
+        uint256 userOldShares = $storage().positions[user].shares;
         uint256 userNewShares = userOldShares.rayMulDown(oldConversionRate).rayDivDown(newConversionRate);
 
         if (!_isActiveSubVaultById(newSubVaultId)) {
             _addSubVaultToActive(newSubVaultId);
         }
 
-        _subVaultById[oldSubVaultId].totalShares -= userOldShares;
-        _subVaultById[newSubVaultId].totalShares += userNewShares;
+        $storage().subVaultById[oldSubVaultId].totalShares -= userOldShares;
+        $storage().subVaultById[newSubVaultId].totalShares += userNewShares;
 
-        _positions[user].shares = userNewShares;
-        _positions[user].subVaultId = newSubVaultId;
+        $storage().positions[user].shares = userNewShares;
+        $storage().positions[user].subVaultId = newSubVaultId;
 
         if (!_isActiveSubVaultById(oldSubVaultId)) {
             _removeSubVaultFromActive(oldSubVaultId);
@@ -377,49 +397,49 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
     }
 
     function _addSubVaultToActive(uint256 subVaultId) internal {
-        _activeSubVaultsIds.push(subVaultId);
-        _activeSubVaultIndexById[subVaultId] = _activeSubVaultsIds.length - 1;
+        $storage().activeSubVaultsIds.push(subVaultId);
+        $storage().activeSubVaultIndexById[subVaultId] = $storage().activeSubVaultsIds.length - 1;
     }
 
-    // Assumes that if it is called then `subVaultId` is indeed active, thus `_activeSubVaultsIds.length > 0`
+    // Assumes that if it is called then `subVaultId` is indeed active, thus `$storage().activeSubVaultsIds.length > 0`
     function _removeSubVaultFromActive(uint256 subVaultId) internal {
-        uint256 subVaultIndex = _activeSubVaultIndexById[subVaultId];
-        uint256 lastSubVaultIndex = _activeSubVaultsIds.length - 1;
+        uint256 subVaultIndex = $storage().activeSubVaultIndexById[subVaultId];
+        uint256 lastSubVaultIndex = $storage().activeSubVaultsIds.length - 1;
         if (subVaultIndex != lastSubVaultIndex) {
-            uint256 lastSubVaultId = _activeSubVaultsIds[lastSubVaultIndex];
-            _activeSubVaultsIds[subVaultIndex] = lastSubVaultId;
-            _activeSubVaultIndexById[lastSubVaultId] = subVaultIndex;
+            uint256 lastSubVaultId = $storage().activeSubVaultsIds[lastSubVaultIndex];
+            $storage().activeSubVaultsIds[subVaultIndex] = lastSubVaultId;
+            $storage().activeSubVaultIndexById[lastSubVaultId] = subVaultIndex;
         }
-        _activeSubVaultsIds.pop();
-        delete _activeSubVaultIndexById[subVaultId];
+        $storage().activeSubVaultsIds.pop();
+        delete $storage().activeSubVaultIndexById[subVaultId];
     }
 
     function _previewSubVaultConversionRate(uint256 subVaultId) internal view returns (uint256) {
-        uint256 secondsSinceLastAccrual = block.timestamp - _subVaultById[subVaultId].lastAccrualTimestamp;
-        uint256 newConversionRate = _subVaultById[subVaultId].conversionRate;
+        uint256 secondsSinceLastAccrual = block.timestamp - $storage().subVaultById[subVaultId].lastAccrualTimestamp;
+        uint256 newConversionRate = $storage().subVaultById[subVaultId].conversionRate;
         if (secondsSinceLastAccrual != 0) {
-            uint256 growthFactor = _subVaultById[subVaultId].perSecondRate.rpow(secondsSinceLastAccrual);
-            newConversionRate = _subVaultById[subVaultId].conversionRate.rayMulDown(growthFactor);
+            uint256 growthFactor = $storage().subVaultById[subVaultId].perSecondRate.rpow(secondsSinceLastAccrual);
+            newConversionRate = $storage().subVaultById[subVaultId].conversionRate.rayMulDown(growthFactor);
         }
         return newConversionRate;
     }
 
     function _accrueSubVaultConversionRate(uint256 subVaultId) internal {
-        _subVaultById[subVaultId].conversionRate = _previewSubVaultConversionRate(subVaultId);
-        _subVaultById[subVaultId].lastAccrualTimestamp = block.timestamp;
+        $storage().subVaultById[subVaultId].conversionRate = _previewSubVaultConversionRate(subVaultId);
+        $storage().subVaultById[subVaultId].lastAccrualTimestamp = block.timestamp;
     }
 
     function _fullWithdrawalRequest(address user) internal returns (uint256, uint256, uint256) {
-        uint256 subVaultId = _positions[user].subVaultId;
-        uint256 conversionRate = _subVaultById[subVaultId].conversionRate;
+        uint256 subVaultId = $storage().positions[user].subVaultId;
+        uint256 conversionRate = $storage().subVaultById[subVaultId].conversionRate;
 
-        uint256 sharesToRedeem = _positions[user].shares;
+        uint256 sharesToRedeem = $storage().positions[user].shares;
         uint256 actualAmountOfWithdrawalRay = sharesToRedeem.rayMulDown(conversionRate);
         assert(actualAmountOfWithdrawalRay > 0); // TODO: This should never happen. Consider removing it.
         // We don't check for sharesToRedeem > 0 here because we check for actualAmountOfWithdrawalRay > 0 above.
         _burnShares(user, sharesToRedeem);
-        uint256 originalDepositRay = _positions[user].originalDepositRay;
-        delete _positions[user];
+        uint256 originalDepositRay = $storage().positions[user].originalDepositRay;
+        delete $storage().positions[user];
         // TODO: This should never happen. If it does, we should replace the assert by rounding it up to guarantee
         // originalDeposit, i.e. `actualAmountOfWithdrawalRay = originalDepositRay`
         assert(actualAmountOfWithdrawalRay >= originalDepositRay);
@@ -430,16 +450,16 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
         internal
         returns (uint256, uint256, uint256)
     {
-        uint256 subVaultId = _positions[user].subVaultId;
-        uint256 conversionRate = _subVaultById[subVaultId].conversionRate;
+        uint256 subVaultId = $storage().positions[user].subVaultId;
+        uint256 conversionRate = $storage().subVaultById[subVaultId].conversionRate;
 
         uint256 sharesToRedeem = requestedAmountInRay.rayDivUp(conversionRate);
-        require(sharesToRedeem <= _positions[user].shares, ErrorsLib.InvalidAmount());
+        require(sharesToRedeem <= $storage().positions[user].shares, ErrorsLib.InvalidAmount());
         _burnShares(user, sharesToRedeem);
         uint256 amountTakenFromOriginalDepositRay = _decrementOriginalDeposit(user, requestedAmountInRay);
 
-        if (_positions[user].shares == 0) {
-            delete _positions[user];
+        if ($storage().positions[user].shares == 0) {
+            delete $storage().positions[user];
         }
 
         return (requestedAmountInRay, amountTakenFromOriginalDepositRay, sharesToRedeem);
@@ -447,27 +467,27 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
 
     function _decrementOriginalDeposit(address user, uint256 actualAmountOfWithdrawal) internal returns (uint256) {
         uint256 amountTakenFromOriginalDepositRay;
-        if (actualAmountOfWithdrawal >= _positions[user].originalDepositRay) {
+        if (actualAmountOfWithdrawal >= $storage().positions[user].originalDepositRay) {
             // The remaining portion of user's withdrawable balance is not guaranteed unless user deposits more funds.
-            amountTakenFromOriginalDepositRay = _positions[user].originalDepositRay;
+            amountTakenFromOriginalDepositRay = $storage().positions[user].originalDepositRay;
         } else {
             amountTakenFromOriginalDepositRay = actualAmountOfWithdrawal;
         }
-        _positions[user].originalDepositRay -= amountTakenFromOriginalDepositRay;
+        $storage().positions[user].originalDepositRay -= amountTakenFromOriginalDepositRay;
         return amountTakenFromOriginalDepositRay;
     }
 
     function _burnShares(address user, uint256 shares) internal {
-        uint256 subVaultId = _positions[user].subVaultId;
-        _positions[user].shares -= shares;
-        _subVaultById[subVaultId].totalShares -= shares;
+        uint256 subVaultId = $storage().positions[user].subVaultId;
+        $storage().positions[user].shares -= shares;
+        $storage().subVaultById[subVaultId].totalShares -= shares;
     }
 
     function _getVaultObligations() internal view returns (uint256) {
         uint256 activeSubVaultsObligations;
-        for (uint256 i = 0; i < _activeSubVaultsIds.length; i++) {
-            activeSubVaultsObligations += _subVaultById[_activeSubVaultsIds[i]].totalShares
-                .rayMulDown(_previewSubVaultConversionRate(_activeSubVaultsIds[i]));
+        for (uint256 i = 0; i < $storage().activeSubVaultsIds.length; i++) {
+            activeSubVaultsObligations += $storage().subVaultById[$storage().activeSubVaultsIds[i]].totalShares
+                .rayMulDown(_previewSubVaultConversionRate($storage().activeSubVaultsIds[i]));
         }
         return activeSubVaultsObligations + _getIousInCirculation();
     }
@@ -486,21 +506,21 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
     }
 
     function _isActiveSubVaultById(uint256 subVaultId) internal view returns (bool) {
-        return _subVaultById[subVaultId].totalShares > 0;
+        return $storage().subVaultById[subVaultId].totalShares > 0;
     }
 
     function _existsSubVaultWithRate(uint256 perSecondRate) internal view returns (bool) {
-        return _subVaultIdByRate[perSecondRate] != 0;
+        return $storage().subVaultIdByRate[perSecondRate] != 0;
     }
 
     function _existsSubVaultWithId(uint256 subVaultId) internal view returns (bool) {
-        return subVaultId > 0 && subVaultId <= _lastSubVaultId;
+        return subVaultId > 0 && subVaultId <= $storage().lastSubVaultId;
     }
 
     function _setUserRate(address user, uint256 newPerSecondRate) internal {
-        uint256 oldSubVaultId = _positions[user].subVaultId;
+        uint256 oldSubVaultId = $storage().positions[user].subVaultId;
         require(oldSubVaultId > 0, NonExistentPosition());
-        require(_subVaultById[oldSubVaultId].perSecondRate != newPerSecondRate, RedundantRate());
+        require($storage().subVaultById[oldSubVaultId].perSecondRate != newPerSecondRate, RedundantRate());
 
         uint256 newSubVaultId = _getOrCreateSubVaultWithRate(newPerSecondRate);
 
