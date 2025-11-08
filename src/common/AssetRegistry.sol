@@ -8,7 +8,24 @@ import {
 import {IAssetRegistry} from "../interfaces/IAssetRegistry.sol";
 
 contract AssetRegistry is AccessManagedUpgradeable, IAssetRegistry {
-    mapping(address asset => AssetConfig config) internal _configByAsset;
+    /// @custom:storage-location erc7201:aave.storage.AssetRegistry
+    struct AssetRegistryStorage {
+        mapping(address asset => AssetConfig config) configByAsset;
+    }
+
+    // keccak256(abi.encode(uint256(keccak256("aave.storage.AssetRegistry")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant STORAGE_SLOT_ASSET_REGISTRY =
+        0xe40dab217194b6f9bf5c5919f11bf88986c74d7e324e41f214286ca4657cc900;
+
+    function $storage() private pure returns (AssetRegistryStorage storage _storage) {
+        assembly {
+            _storage.slot := STORAGE_SLOT_ASSET_REGISTRY
+        }
+    }
+
+    function $AssetRegistry() internal pure returns (AssetRegistryStorage storage) {
+        return $storage();
+    }
 
     /// @dev Constructor. Just disables initializers.
     constructor() {
@@ -26,33 +43,33 @@ contract AssetRegistry is AccessManagedUpgradeable, IAssetRegistry {
     }
 
     function setAssetConfig(address asset, AssetConfig memory config) external restricted {
-        _configByAsset[asset] = config;
+        $storage().configByAsset[asset] = config;
         emit AssetConfigSet(asset, config);
     }
 
     // /////////////////////// PERMISSION SPECIFIC GETTERS ////////////////////////////
 
     function isAllowedToDepositIntoBBV(address asset) external view override returns (bool) {
-        return _configByAsset[asset].depositIntoBBVAllowed;
+        return $storage().configByAsset[asset].depositIntoBBVAllowed;
     }
 
     function isAllowedToWithdrawFromBBV(address asset) external view override returns (bool) {
-        return _configByAsset[asset].withdrawFromBBVAllowed;
+        return $storage().configByAsset[asset].withdrawFromBBVAllowed;
     }
 
     function isAllowedToDepositIntoAllocator(address asset) external view override returns (bool) {
-        return _configByAsset[asset].depositIntoAllocatorAllowed;
+        return $storage().configByAsset[asset].depositIntoAllocatorAllowed;
     }
 
     function isAllowedToWithdrawFromAllocator(address asset) external view override returns (bool) {
-        return _configByAsset[asset].withdrawFromAllocatorAllowed;
+        return $storage().configByAsset[asset].withdrawFromAllocatorAllowed;
     }
 
     function isAllowedSwapInputToken(address asset) external view override returns (bool) {
-        return _configByAsset[asset].swapInputTokenAllowed;
+        return $storage().configByAsset[asset].swapInputTokenAllowed;
     }
 
     function isAllowedSwapOutputToken(address asset) external view override returns (bool) {
-        return _configByAsset[asset].swapOutputTokenAllowed;
+        return $storage().configByAsset[asset].swapOutputTokenAllowed;
     }
 }
