@@ -4,12 +4,6 @@ pragma solidity ^0.8.22;
 library MathLib {
     uint256 constant RAY = 1e27;
 
-    function mulByRay(uint256 a, uint256 b) internal pure returns (uint256) {
-        unchecked {
-            return (a * b + RAY / 2) / RAY; // bankers' rounding (half up)
-        }
-    }
-
     /// @dev Multiplies two ray, rounding down
     /// @dev assembly optimized for improved gas savings, see
     /// https://twitter.com/transmissions11/status/1451131036377571328
@@ -41,13 +35,6 @@ library MathLib {
         }
     }
 
-    function wadDivByRay(uint256 wadAmount, uint256 rayDivisor) internal pure returns (uint256) {
-        require(rayDivisor != 0, "DIV_BY_ZERO");
-        unchecked {
-            return (wadAmount * RAY + rayDivisor / 2) / rayDivisor; // bankers' rounding (half up)
-        }
-    }
-
     /// @dev Divides two ray, rounding down
     /// @dev assembly optimized for improved gas savings, see
     /// https://twitter.com/transmissions11/status/1451131036377571328
@@ -69,15 +56,16 @@ library MathLib {
     function rayDivUp(uint256 a, uint256 b) internal pure returns (uint256 c) {
         // to avoid overflow, a <= type(uint256).max / RAY
         assembly ("memory-safe") {
-            if or(iszero(b), iszero(iszero(gt(a, div(not(0), RAY))))) {
-                revert(0, 0)
-            }
+            if or(iszero(b), iszero(iszero(gt(a, div(not(0), RAY))))) { revert(0, 0) }
             c := mul(a, RAY)
             // Add 1 if (a * RAY) % b > 0 to round up the division of (a * RAY) by b
             c := add(div(c, b), gt(mod(c, b), 0))
         }
     }
 
+    /// @param x The base (in RAY)
+    /// @param n The exponent (integer)
+    /// @return z The result (in RAY)
     function rpow(uint256 x, uint256 n) internal pure returns (uint256 z) {
         assembly {
             switch x
