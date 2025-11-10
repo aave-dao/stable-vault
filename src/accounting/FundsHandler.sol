@@ -34,7 +34,24 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
     address internal immutable GATEWAY;
     address internal immutable ALLOCATOR;
 
-    ChainBalanceSnapshot[] internal _chainBalances;
+    /// @custom:storage-location erc7201:aave.storage.FundsHandler
+    struct FundsHandlerStorage {
+        ChainBalanceSnapshot[] chainBalances;
+    }
+
+    // keccak256(abi.encode(uint256(keccak256("aave.storage.FundsHandler")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant STORAGE_SLOT_FUNDS_HANDLER =
+        0xffa5bdc69644e89163c8759837db1aeb0b569037bb5259c74309b23147440c00;
+
+    function $storage() private pure returns (FundsHandlerStorage storage _storage) {
+        assembly {
+            _storage.slot := STORAGE_SLOT_FUNDS_HANDLER
+        }
+    }
+
+    function $FundsHandler() internal pure returns (FundsHandlerStorage storage) {
+        return $storage();
+    }
 
     modifier onlyBasedBoostedVault() {
         require(msg.sender == VAULT, NotBasedBoostedVault());
@@ -76,8 +93,8 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
         for (uint16 i = 0; i < allocatorAssets.length; i++) {
             totalBalanceRay += allocatorAssets[i].amount.assetDecimalsToRay(allocatorAssets[i].asset);
         }
-        for (uint16 i = 0; i < _chainBalances.length; i++) {
-            totalBalanceRay += _chainBalances[i].amountRay;
+        for (uint16 i = 0; i < $storage().chainBalances.length; i++) {
+            totalBalanceRay += $storage().chainBalances[i].amountRay;
         }
         return totalBalanceRay;
     }
@@ -85,7 +102,7 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
     /// @inheritdoc IFundsHandler
     function getAssetBalances() external view override returns (AssetBalance[] memory) {
         IAllocator.AllocatorBalance[] memory allocatorAssets = IAllocator(ALLOCATOR).getAssetBalances();
-        AssetBalance[] memory balances = new AssetBalance[](allocatorAssets.length + _chainBalances.length);
+        AssetBalance[] memory balances = new AssetBalance[](allocatorAssets.length + $storage().chainBalances.length);
         for (uint16 i = 0; i < allocatorAssets.length; i++) {
             balances[i] = AssetBalance({
                 chainId: block.chainid,
@@ -93,9 +110,11 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
                 amountRay: allocatorAssets[i].amount.assetDecimalsToRay(allocatorAssets[i].asset)
             });
         }
-        for (uint16 i = 0; i < _chainBalances.length; i++) {
+        for (uint16 i = 0; i < $storage().chainBalances.length; i++) {
             balances[allocatorAssets.length + i] = AssetBalance({
-                chainId: _chainBalances[i].chainId, asset: address(0), amountRay: _chainBalances[i].amountRay
+                chainId: $storage().chainBalances[i].chainId,
+                asset: address(0),
+                amountRay: $storage().chainBalances[i].amountRay
             });
         }
         return balances;
@@ -166,23 +185,24 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
         internal
     {
         bool chainExists;
-        for (uint16 i = 0; i < _chainBalances.length; i++) {
-            if (_chainBalances[i].chainId == chainId) {
+        for (uint16 i = 0; i < $storage().chainBalances.length; i++) {
+            if ($storage().chainBalances[i].chainId == chainId) {
                 chainExists = true;
                 // Nonces should always be strictly increasing.
                 // Use < to avoid replayable nonces.
-                if (_chainBalances[i].nonce < chainBalanceSnapshotNonce) {
-                    _chainBalances[i].nonce = chainBalanceSnapshotNonce;
-                    _chainBalances[i].amountRay = snapshotBalanceRay;
+                if ($storage().chainBalances[i].nonce < chainBalanceSnapshotNonce) {
+                    $storage().chainBalances[i].nonce = chainBalanceSnapshotNonce;
+                    $storage().chainBalances[i].amountRay = snapshotBalanceRay;
                 }
             }
         }
         if (!chainExists) {
-            _chainBalances.push(
-                ChainBalanceSnapshot({
-                    chainId: chainId, amountRay: snapshotBalanceRay, nonce: chainBalanceSnapshotNonce
-                })
-            );
+            $storage().chainBalances
+                .push(
+                    ChainBalanceSnapshot({
+                        chainId: chainId, amountRay: snapshotBalanceRay, nonce: chainBalanceSnapshotNonce
+                    })
+                );
         }
     }
 
@@ -192,14 +212,15 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
     /// ignored.
     function _updateChainBalanceBeforeBridging(uint256 chainId, uint256 amountToIncrementRay) internal {
         bool chainExists;
-        for (uint16 i = 0; i < _chainBalances.length; i++) {
-            if (_chainBalances[i].chainId == chainId) {
+        for (uint16 i = 0; i < $storage().chainBalances.length; i++) {
+            if ($storage().chainBalances[i].chainId == chainId) {
                 chainExists = true;
-                _chainBalances[i].amountRay += amountToIncrementRay;
+                $storage().chainBalances[i].amountRay += amountToIncrementRay;
             }
         }
         if (!chainExists) {
-            _chainBalances.push(ChainBalanceSnapshot({chainId: chainId, amountRay: amountToIncrementRay, nonce: 0}));
+            $storage().chainBalances
+                .push(ChainBalanceSnapshot({chainId: chainId, amountRay: amountToIncrementRay, nonce: 0}));
         }
     }
 

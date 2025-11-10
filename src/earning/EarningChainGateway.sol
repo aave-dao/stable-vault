@@ -22,7 +22,21 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
 
     uint256 internal immutable ACCOUNTING_CHAIN_ID;
     address internal immutable ALLOCATOR;
-    uint256 internal _balanceSnapshotNonce;
+
+    /// @custom:storage-location erc7201:aave.storage.EarningChainGateway
+    struct EarningChainGatewayStorage {
+        uint256 balanceSnapshotNonce;
+    }
+
+    // keccak256(abi.encode(uint256(keccak256("aave.storage.EarningChainGateway")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant STORAGE_SLOT_EARNING_CHAIN_GATEWAY =
+        0x5a762c9d6afe1d5e726c4d055708c9f75f61c70b417d4c903b07b242b2457100;
+
+    function $EarningChainGateway() private pure returns (EarningChainGatewayStorage storage _storage) {
+        assembly {
+            _storage.slot := STORAGE_SLOT_EARNING_CHAIN_GATEWAY
+        }
+    }
 
     /// @dev Constructor.
     /// @param accountingChainId The Chain ID of the Accounting Chain.
@@ -61,7 +75,7 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
 
     /// @inheritdoc IEarningChainGateway
     function sendBalanceUpdateWithFeePayer(IChainGateway.BridgeParams memory bridgeParams) external payable override {
-        address adapter = _defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID];
+        address adapter = $BaseChainGateway().defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID];
         require(adapter != address(0), AdapterNotFound());
         _prepareBridgeFeeForAdapter(adapter, bridgeParams.feePayer, bridgeParams.feeToken, bridgeParams.feeAmount);
         _sendCrossChainMessage(
@@ -79,7 +93,7 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         require(iouTokenAmountRay > 0, ErrorsLib.ZeroAmount());
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(msg.sender, iouTokenAmountRay);
 
-        address adapter = _defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID];
+        address adapter = $BaseChainGateway().defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID];
         require(adapter != address(0), AdapterNotFound());
 
         // TODO: apply a withdrawal fee here?
@@ -154,7 +168,7 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         uint256 amount,
         IChainGateway.BridgeParams memory bridgeParams
     ) internal {
-        address bridgeAdapter = _defaultBridgeAdapter[asset][ACCOUNTING_CHAIN_ID];
+        address bridgeAdapter = $BaseChainGateway().defaultBridgeAdapter[asset][ACCOUNTING_CHAIN_ID];
         require(bridgeAdapter != address(0), AdapterNotFound());
 
         // Send a single cross chain message with the asset and the balance snapshot. The bridge must support both
@@ -178,7 +192,7 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
     /// @dev Assumes the Accounting Chain does not allow non-replayable nonces, so the new nonce sent is always higher
     /// than the previous nonce stored on Accounting Chain.
     function _getAndUpdateBalanceSnapshotNonce() internal returns (uint256) {
-        return ++_balanceSnapshotNonce;
+        return ++$EarningChainGateway().balanceSnapshotNonce;
     }
 
     function _getBalanceSnapshotData() internal returns (bytes memory) {

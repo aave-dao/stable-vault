@@ -12,17 +12,17 @@ contract ExtendedBasedBoostedVault is BasedBoostedVault {
     {}
 
     function getDefaultConversionRate() public view returns (uint256) {
-        SubVault storage defaultVault = _subVaultById[_defaultSubVaultId];
+        SubVault storage defaultVault = $BasedBoostedVault().subVaultById[$BasedBoostedVault().defaultSubVaultId];
         return defaultVault.conversionRate;
     }
 
     function getBaseApr() public view returns (uint256) {
         // The "default" subvault that has the effective base rate will always have id 1
-        SubVault storage defaultVault = _subVaultById[_defaultSubVaultId];
+        SubVault storage defaultVault = $BasedBoostedVault().subVaultById[$BasedBoostedVault().defaultSubVaultId];
         return (defaultVault.perSecondRate - MathLib.RAY) * SECONDS_PER_YEAR;
     }
 
     function forceAccrueSubVaultConversionRate() public {
-        _accrueSubVaultConversionRate(_defaultSubVaultId);
+        _accrueSubVaultConversionRate($BasedBoostedVault().defaultSubVaultId);
     }
 }
