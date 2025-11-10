@@ -26,6 +26,7 @@ import {FundsHandler} from "./../src/accounting/FundsHandler.sol";
 import {CcipAdapter} from "./../src/bridging/CcipAdapter.sol";
 import {Allocator} from "./../src/common/Allocator.sol";
 import {Swapper} from "./../src/common/Swapper.sol";
+import {TransferHelper} from "./../src/common/TransferHelper.sol";
 import {EarningChainGateway} from "./../src/earning/EarningChainGateway.sol";
 import {AssetLib} from "./../src/libraries/AssetLib.sol";
 import {MathLib} from "./../src/libraries/MathLib.sol";
@@ -34,8 +35,7 @@ import {MockCCIPRouter} from "./mocks/MockRouter.sol";
 import {TestErc20} from "./mocks/TestErc20.sol";
 import {TestErc4626} from "./mocks/TestErc4626.sol";
 
-// forge-lint: disable-next-line(unaliased-plain-import)
-import "test/helpers/TypeHelpers.sol";
+import {_toSelectorArray} from "test/helpers/TypeHelpers.sol";
 
 contract BaseTest is Test {
     using MathLib for uint256;
@@ -62,6 +62,10 @@ contract BaseTest is Test {
     uint64 public constant ACCOUNTING_CHAIN_CCIP_SELECTOR = 10;
     uint64 public constant EARNING_CHAIN_ID = 2;
     uint64 public constant EARNING_CHAIN_CCIP_SELECTOR = 20;
+
+    // Transfer Helper
+    address transferHelper_accountingChainAddress;
+    address transferHelper_earningChainAddress;
 
     // Currencies
     TestErc20 GHO = new TestErc20(18);
@@ -196,6 +200,8 @@ contract BaseTest is Test {
         // 16. CCIP Adapter
         // 17. Strategy Vault/4626
 
+        transferHelper_accountingChainAddress = address(new TransferHelper());
+
         // Pre compute addresses for contracts that are with circular dependencies
         uint256 deployerNonce_accountingChain = vm.getNonce(address(this));
         console.log("\tDeployer Nonce (Accounting Chain): %s", deployerNonce_accountingChain);
@@ -276,7 +282,11 @@ contract BaseTest is Test {
         // 4. IOU Token Manager
         address iouTokenManager_accountingChain_impl = address(
             new IouTokenManager(
-                iouToken_accountingChainAddress, chainGateway_accountingChainAddress, vault_accountingChainAddress, true
+                iouToken_accountingChainAddress,
+                chainGateway_accountingChainAddress,
+                vault_accountingChainAddress,
+                transferHelper_accountingChainAddress,
+                true
             )
         );
         iouTokenManager_accountingChain = IouTokenManager(
@@ -327,7 +337,10 @@ contract BaseTest is Test {
         // 7. Funds Handler
         address fundsHandler_impl = address(
             new FundsHandler(
-                vault_accountingChainAddress, chainGateway_accountingChainAddress, allocator_accountingChainAddress
+                vault_accountingChainAddress,
+                chainGateway_accountingChainAddress,
+                allocator_accountingChainAddress,
+                transferHelper_accountingChainAddress
             )
         );
         fundsHandler = FundsHandler(
@@ -374,7 +387,10 @@ contract BaseTest is Test {
 
         // 10. CCIP Adapter
         ccipAdapter_accountingChain = new CcipAdapter(
-            accessManager_accountingChainAddress, chainGateway_accountingChainAddress, address(mockCcipRouter)
+            accessManager_accountingChainAddress,
+            chainGateway_accountingChainAddress,
+            address(mockCcipRouter),
+            transferHelper_accountingChainAddress
         );
         console.log("\tCCIP Adapter: %s", address(ccipAdapter_accountingChain));
         require(
@@ -408,6 +424,8 @@ contract BaseTest is Test {
         // 10. Earning Chain Gateway Impl
         // 11. Earning Chain Gateway Proxy
         // 12. Strategy Vault/4626
+
+        transferHelper_earningChainAddress = address(new TransferHelper());
 
         uint256 deployerNonce_earningChain = vm.getNonce(address(this));
         accessManager_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
@@ -473,7 +491,10 @@ contract BaseTest is Test {
 
         // 3. CCIP Router
         ccipAdapter_earningChain = new CcipAdapter(
-            accessManager_earningChainAddress, chainGateway_earningChainAddress, address(mockCcipRouter)
+            accessManager_earningChainAddress,
+            chainGateway_earningChainAddress,
+            address(mockCcipRouter),
+            transferHelper_earningChainAddress
         );
         console.log("\tCCIP Adapter: %s", address(ccipAdapter_earningChain));
         require(
@@ -490,7 +511,13 @@ contract BaseTest is Test {
 
         // 5. IOU Token Manager
         address iouTokenManager_earningChain_impl = address(
-            new IouTokenManager(iouToken_earningChainAddress, chainGateway_earningChainAddress, address(0), false)
+            new IouTokenManager(
+                iouToken_earningChainAddress,
+                chainGateway_earningChainAddress,
+                address(0),
+                transferHelper_earningChainAddress,
+                false
+            )
         );
         iouTokenManager_earningChain = IouTokenManager(
             address(new TransparentUpgradeableProxy(iouTokenManager_earningChain_impl, proxyAdmin, ""))

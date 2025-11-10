@@ -100,8 +100,10 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
                 )
             })
         );
-        _prepareBridgeFeeForAdapter(adapter, bridgeParams.feePayer, bridgeParams.feeToken, bridgeParams.feeAmount);
-        _sendCrossChainMessage(destinationChainId, adapter, ASSET_FOR_DATA_ONLY_BRIDGE, 0, data, bridgeParams);
+        IBridgeAdapter(adapter)
+            .publishMessageToChainWithFeePayer(
+                destinationChainId, new IBridgeAdapter.BridgeAsset[](0), data, bridgeParams
+            );
     }
 
     /// @inheritdoc RescuableAssets
@@ -141,6 +143,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
         require($storage().supportedBridgeAdapters[asset][sourceChainId][msg.sender], AdapterNotFound());
     }
 
+    // TODO: Remove if not needed after the TransferHelper is fully integrated.
     /// @dev Assumes the bridge fee has not yet been pulled from the caller into this contract.
     /// @dev Be mindful of overriding the token approval made by this function.
     function _prepareBridgeFeeForAdapter(
@@ -158,6 +161,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
         }
     }
 
+    // TODO: Remove if not needed after the TransferHelper is fully integrated.
     /// @dev The Gateway must have ownership of the assets being bridged as it allows the adapter as a spender.
     function _sendCrossChainMessage(
         uint256 destinationChainId,
@@ -167,14 +171,12 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
         bytes memory dataToBridge,
         BridgeParams memory bridgeParams
     ) internal {
-        IBridgeAdapter.BridgeAsset[] memory assets = new IBridgeAdapter.BridgeAsset[](0);
-        if (assetToBridge != FEE_ON_NATIVE_CURRENCY) {
+        IBridgeAdapter.BridgeAsset[] memory assets;
+        if (assetToBridge != ASSET_FOR_DATA_ONLY_BRIDGE) {
             assets = new IBridgeAdapter.BridgeAsset[](1);
             assets[0] = IBridgeAdapter.BridgeAsset({asset: assetToBridge, amount: amountToBridge});
-            for (uint256 i = 0; i < assets.length; i++) {
-                // Increase allowance in case of the fee token matching the token being bridged.
-                IERC20(assets[i].asset).safeIncreaseAllowance(adapter, assets[i].amount);
-            }
+            // Increase allowance in case of the fee token matching the token being bridged.
+            IERC20(assetToBridge).safeIncreaseAllowance(adapter, amountToBridge);
         }
         IBridgeAdapter(adapter).publishMessageToChainWithFeePayer{value: msg.value}(
             destinationChainId, assets, dataToBridge, bridgeParams

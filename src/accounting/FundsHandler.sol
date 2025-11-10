@@ -33,6 +33,7 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
     address internal immutable VAULT;
     address internal immutable GATEWAY;
     address internal immutable ALLOCATOR;
+    address internal immutable TRANSFER_HELPER;
 
     /// @custom:storage-location erc7201:aave.storage.FundsHandler
     struct FundsHandlerStorage {
@@ -67,11 +68,13 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
     /// @param basedBoostedVault The address of the BasedBoostedVault contract, which triggers deposits and withdrawals.
     /// @param gateway The address of the Gateway contract to use for cross-chain communication.
     /// @param allocator The address of the Allocator contract to use for immediate liquidity management.
-    constructor(address basedBoostedVault, address gateway, address allocator) {
+    /// @param transferHelper The address of the TransferHelper contract to use for minimizing the number of transfers.
+    constructor(address basedBoostedVault, address gateway, address allocator, address transferHelper) {
         _disableInitializers();
         VAULT = basedBoostedVault;
         GATEWAY = gateway;
         ALLOCATOR = allocator;
+        TRANSFER_HELPER = transferHelper;
     }
 
     /// @dev Initializer.
@@ -141,20 +144,13 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
         IChainGateway.BridgeParams memory bridgeParams
     ) external payable override restricted {
         require(amount > 0, ErrorsLib.ZeroAmount());
-
-        if (bridgeParams.feeToken != BRIDGE_FEE_ON_NATIVE_CURRENCY) {
-            IERC20(bridgeParams.feeToken).safeTransferFrom(bridgeParams.feePayer, address(this), bridgeParams.feeAmount);
-            IERC20(bridgeParams.feeToken).forceApprove(GATEWAY, bridgeParams.feeAmount);
-        }
-
         _pullFundsFromImmediateLiquidity(asset, amount);
-        // Increase allowance in case of the fee token matching the token being bridged.
-        IERC20(asset).safeIncreaseAllowance(GATEWAY, amount);
+
+        _sendAssetAndBridgeFeeToTransferHelper(asset, amount, bridgeParams);
+
         // Increment the chain balance snapshot for the target chain.
         _updateChainBalanceBeforeBridging(chainId, amount.assetDecimalsToRay(asset));
-        IAccountingChainGateway(GATEWAY).sendPushFundsToChainMessage{value: msg.value}(
-            asset, amount, chainId, bridgeParams
-        );
+        IAccountingChainGateway(GATEWAY).sendPushFundsToChainMessage(asset, amount, chainId, bridgeParams);
     }
 
     /// @inheritdoc RescuableAssets
@@ -180,6 +176,27 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
     }
 
     ////////////////////////////////////////////////// INTERNAL ////////////////////////////////////////////////////////
+
+    function _sendAssetAndBridgeFeeToTransferHelper(
+        address asset,
+        uint256 amount,
+        IChainGateway.BridgeParams memory bridgeParams
+    ) internal {
+        if (bridgeParams.feeToken == asset) {
+            IERC20(bridgeParams.feeToken)
+                .safeTransferFrom(bridgeParams.feePayer, TRANSFER_HELPER, amount + bridgeParams.feeAmount);
+        } else {
+            require(msg.value >= bridgeParams.feeAmount, ErrorsLib.InsufficientFunds());
+            if (bridgeParams.feeToken == BRIDGE_FEE_ON_NATIVE_CURRENCY) {
+                (bool callSucceeded,) = TRANSFER_HELPER.call{value: msg.value}("");
+                require(callSucceeded, ErrorsLib.NativeTransferFailed());
+            } else {
+                IERC20(bridgeParams.feeToken)
+                    .safeTransferFrom(bridgeParams.feePayer, TRANSFER_HELPER, bridgeParams.feeAmount);
+            }
+            IERC20(asset).safeTransfer(TRANSFER_HELPER, amount);
+        }
+    }
 
     function _updateChainBalance(uint256 chainId, uint256 snapshotBalanceRay, uint256 chainBalanceSnapshotNonce)
         internal
