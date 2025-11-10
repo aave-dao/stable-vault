@@ -13,25 +13,28 @@ import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 contract TransferHelper is ITransferHelper {
     using SafeERC20 for IERC20;
 
-    function pull(address[] memory assets, uint256[] memory amounts) external payable override {
+    /// @inheritdoc ITransferHelper
+    function pull(address[] memory assets, uint256[] memory amounts) external override {
         for (uint256 i = 0; i < assets.length; i++) {
             _transfer(assets[i], amounts[i], msg.sender);
         }
     }
 
-    function transfer(address[] memory assets, uint256[] memory amounts, address destination)
-        external
-        payable
-        override
-    {
+    /// @inheritdoc ITransferHelper
+    function pull(address asset, uint256 amount) external override {
+        _transfer(asset, amount, msg.sender);
+    }
+
+    /// @inheritdoc ITransferHelper
+    function transfer(address[] memory assets, uint256[] memory amounts, address destination) external override {
         for (uint256 i = 0; i < assets.length; i++) {
             _transfer(assets[i], amounts[i], destination);
         }
     }
 
+    /// @inheritdoc ITransferHelper
     function transfer(address[] memory assets, uint256[] memory amounts, address[] memory destinations)
         external
-        payable
         override
     {
         for (uint256 i = 0; i < assets.length; i++) {
@@ -39,6 +42,12 @@ contract TransferHelper is ITransferHelper {
         }
     }
 
+    /// @inheritdoc ITransferHelper
+    function transfer(address asset, uint256 amount, address destination) external override {
+        _transfer(asset, amount, destination);
+    }
+
+    /// @inheritdoc ITransferHelper
     function getBalance(address asset) external view override returns (uint256) {
         if (asset == address(0)) {
             return address(this).balance;

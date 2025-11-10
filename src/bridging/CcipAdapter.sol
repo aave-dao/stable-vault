@@ -85,6 +85,7 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
         }
         assetsToPull[assetsToPull.length - 1] = bridgeParams.feeToken;
         amountsToPull[amountsToPull.length - 1] = bridgeParams.feeAmount;
+
         if (bridgeParams.feeToken != FEE_ON_NATIVE_CURRENCY) {
             // Increase allowance in case of the fee token matching an asset being bridged.
             IERC20(bridgeParams.feeToken).safeIncreaseAllowance(CCIP_ROUTER, bridgeParams.feeAmount);
@@ -167,12 +168,6 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
         if (feeToken == FEE_ON_NATIVE_CURRENCY) {
             msgValue = estimatedFeeAmount;
         }
-        // else {
-        //     // Pull the fee amount from the sender into this contract.
-        //     IERC20(feeToken).safeTransferFrom(msg.sender, address(this), estimatedFeeAmount);
-        //     // Approve the Router to pull the estimated fee.
-        //     IERC20(feeToken).safeIncreaseAllowance(CCIP_ROUTER, estimatedFeeAmount);
-        // }
         // Return any excess fee to the fee payer.
         if (allocatedFeeAmount > estimatedFeeAmount) {
             if (feeToken == FEE_ON_NATIVE_CURRENCY) {
@@ -183,6 +178,4 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
         }
         IRouterClient(CCIP_ROUTER).ccipSend{value: msgValue}(chainSelector, message);
     }
-
-    receive() external payable {}
 }

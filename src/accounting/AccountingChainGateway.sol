@@ -54,23 +54,12 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
     ) external payable override onlyFundsHandler {
         address adapter = $BaseChainGateway().defaultBridgeAdapter[asset][targetChainId];
         require(adapter != address(0), AdapterNotFound());
-
-        // The FundsHandler will have transferred the fee token from the caller to the TransferHelper component.
-        IBridgeAdapter.BridgeAsset[] memory assets;
-        if (asset != ASSET_FOR_DATA_ONLY_BRIDGE) {
-            assets = new IBridgeAdapter.BridgeAsset[](1);
-            assets[0] = IBridgeAdapter.BridgeAsset({asset: asset, amount: amount});
-        }
-        IBridgeAdapter(adapter)
-            .publishMessageToChainWithFeePayer(targetChainId, assets, bridgeParams.data, bridgeParams);
+        _sendCrossChainMessage(targetChainId, adapter, asset, amount, bridgeParams.data, bridgeParams);
     }
 
     function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal override {
         for (uint256 i = 0; i < assets.length; i++) {
-            address asset = assets[i].asset;
-            uint256 amount = assets[i].amount;
-            IERC20(asset).safeTransferFrom(msg.sender, FUNDS_HANDLER, amount);
-            IFundsHandler(FUNDS_HANDLER).fundsArrivedFromChainCallback(asset, amount);
+            IFundsHandler(FUNDS_HANDLER).fundsArrivedFromChainCallback(assets[i].asset, assets[i].amount);
         }
     }
 

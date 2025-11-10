@@ -4,8 +4,6 @@ pragma solidity ^0.8.22;
 import {
     AccessManagedUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
@@ -14,8 +12,6 @@ import {RescuableAssets} from "./RescuableAssets.sol";
 
 // TODO: this contract should be pausable.... if bridge is compromised we should not ingest messages from it.
 abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets, IChainGateway {
-    using SafeERC20 for IERC20;
-
     address internal constant FEE_ON_NATIVE_CURRENCY = address(0);
     address internal constant ASSET_FOR_DATA_ONLY_BRIDGE = address(0);
 
@@ -143,25 +139,6 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
         require($storage().supportedBridgeAdapters[asset][sourceChainId][msg.sender], AdapterNotFound());
     }
 
-    // TODO: Remove if not needed after the TransferHelper is fully integrated.
-    /// @dev Assumes the bridge fee has not yet been pulled from the caller into this contract.
-    /// @dev Be mindful of overriding the token approval made by this function.
-    function _prepareBridgeFeeForAdapter(
-        address adapter,
-        address feeSource,
-        address bridgeFeeToken,
-        uint256 bridgeFeeAmount
-    ) internal {
-        require(bridgeFeeAmount > 0, ErrorsLib.ZeroAmount());
-        if (bridgeFeeToken == FEE_ON_NATIVE_CURRENCY) {
-            require(msg.value >= bridgeFeeAmount, ErrorsLib.InsufficientFunds());
-        } else {
-            IERC20(bridgeFeeToken).safeTransferFrom(feeSource, address(this), bridgeFeeAmount);
-            IERC20(bridgeFeeToken).forceApprove(adapter, bridgeFeeAmount);
-        }
-    }
-
-    // TODO: Remove if not needed after the TransferHelper is fully integrated.
     /// @dev The Gateway must have ownership of the assets being bridged as it allows the adapter as a spender.
     function _sendCrossChainMessage(
         uint256 destinationChainId,
@@ -175,8 +152,6 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
         if (assetToBridge != ASSET_FOR_DATA_ONLY_BRIDGE) {
             assets = new IBridgeAdapter.BridgeAsset[](1);
             assets[0] = IBridgeAdapter.BridgeAsset({asset: assetToBridge, amount: amountToBridge});
-            // Increase allowance in case of the fee token matching the token being bridged.
-            IERC20(assetToBridge).safeIncreaseAllowance(adapter, amountToBridge);
         }
         IBridgeAdapter(adapter).publishMessageToChainWithFeePayer{value: msg.value}(
             destinationChainId, assets, dataToBridge, bridgeParams

@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-
 import {BaseChainGateway} from "../common/BaseChainGateway.sol";
 import {IAllocator} from "../interfaces/IAllocator.sol";
 import {IAllocator} from "../interfaces/IAllocator.sol";
@@ -11,17 +8,18 @@ import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {IEarningChainGateway} from "../interfaces/IEarningChainGateway.sol";
 import {IIouTokenManager} from "../interfaces/IIouTokenManager.sol";
+import {ITransferHelper} from "../interfaces/ITransferHelper.sol";
 import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 /// @title EarningChainGateway
 /// @notice Facilitates cross chain messaging with exactly one Accounting Chain.
 contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
-    using SafeERC20 for IERC20;
     using AssetLib for uint256;
 
     uint256 internal immutable ACCOUNTING_CHAIN_ID;
     address internal immutable ALLOCATOR;
+    address internal immutable TRANSFER_HELPER;
 
     /// @custom:storage-location erc7201:aave.storage.EarningChainGateway
     struct EarningChainGatewayStorage {
@@ -42,12 +40,13 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
     /// @param accountingChainId The Chain ID of the Accounting Chain.
     /// @param allocator The address of the Allocator contract.
     /// @param iouTokenManager The address of the IOU token manager contract.
-    constructor(uint256 accountingChainId, address allocator, address iouTokenManager)
+    constructor(uint256 accountingChainId, address allocator, address iouTokenManager, address transferHelper)
         BaseChainGateway(iouTokenManager)
     {
         _disableInitializers();
         ACCOUNTING_CHAIN_ID = accountingChainId;
         ALLOCATOR = allocator;
+        TRANSFER_HELPER = transferHelper;
     }
 
     /// @dev Initializer.
@@ -77,7 +76,6 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
     function sendBalanceUpdateWithFeePayer(IChainGateway.BridgeParams memory bridgeParams) external payable override {
         address adapter = $BaseChainGateway().defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID];
         require(adapter != address(0), AdapterNotFound());
-        _prepareBridgeFeeForAdapter(adapter, bridgeParams.feePayer, bridgeParams.feeToken, bridgeParams.feeAmount);
         _sendCrossChainMessage(
             ACCOUNTING_CHAIN_ID, adapter, ASSET_FOR_DATA_ONLY_BRIDGE, 0, _getBalanceSnapshotData(), bridgeParams
         );
@@ -99,7 +97,7 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         // TODO: apply a withdrawal fee here?
         uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(tokenOut);
         IAllocator(ALLOCATOR).withdraw(tokenOut, amountOut);
-        IERC20(tokenOut).safeTransfer(tokenOutReceiver, amountOut);
+        ITransferHelper(TRANSFER_HELPER).transfer(tokenOut, amountOut, tokenOutReceiver);
         bytes memory data = abi.encode(
             IChainGateway.CrossChainMessage({
                 messageType: IChainGateway.MessageType.BURN_IOUTOKEN,
@@ -112,7 +110,6 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
                 )
             })
         );
-        _prepareBridgeFeeForAdapter(adapter, bridgeParams.feePayer, bridgeParams.feeToken, bridgeParams.feeAmount);
         _sendCrossChainMessage(ACCOUNTING_CHAIN_ID, adapter, ASSET_FOR_DATA_ONLY_BRIDGE, 0, data, bridgeParams);
         // TODO: emit event?
         return amountOut;
@@ -132,11 +129,7 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
 
     function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal override {
         for (uint256 i = 0; i < assets.length; i++) {
-            address asset = assets[i].asset;
-            uint256 amount = assets[i].amount;
-            IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
-            IERC20(asset).forceApprove(ALLOCATOR, amount);
-            IAllocator(ALLOCATOR).deposit(asset, amount);
+            IAllocator(ALLOCATOR).deposit(assets[i].asset, assets[i].amount);
         }
     }
 
@@ -170,10 +163,8 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
     ) internal {
         address bridgeAdapter = $BaseChainGateway().defaultBridgeAdapter[asset][ACCOUNTING_CHAIN_ID];
         require(bridgeAdapter != address(0), AdapterNotFound());
-
-        // Send a single cross chain message with the asset and the balance snapshot. The bridge must support both
+        // Sends a single cross chain message with the asset and the balance snapshot. The bridge must support both
         // assets and arbitrary data.
-        _prepareBridgeFeeForAdapter(bridgeAdapter, bridgeParams.feePayer, bridgeParams.feeToken, bridgeParams.feeAmount);
         _sendCrossChainMessage(
             ACCOUNTING_CHAIN_ID, bridgeAdapter, asset, amount, _getBalanceSnapshotData(), bridgeParams
         );

@@ -11,6 +11,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IAllocator} from "../interfaces/IAllocator.sol";
 import {IAssetRegistry} from "../interfaces/IAssetRegistry.sol";
 import {ISwapper} from "../interfaces/ISwapper.sol";
+import {ITransferHelper} from "../interfaces/ITransferHelper.sol";
 
 import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
@@ -34,6 +35,7 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
     address internal immutable DEPOSITOR;
     address internal immutable WITHDRAWER;
     address internal immutable ASSET_REGISTRY;
+    address internal immutable TRANSFER_HELPER;
 
     /// @custom:storage-location erc7201:aave.storage.Allocator
     struct AllocatorStorage {
@@ -77,11 +79,12 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
     /// @param assetRegistry The address of the AssetRegistry contract.
     /// @param depositor The address of the depositor to whitelist.
     /// @param withdrawer The address of the withdrawer to whitelist.
-    constructor(address assetRegistry, address depositor, address withdrawer) {
+    constructor(address assetRegistry, address depositor, address withdrawer, address transferHelper) {
         _disableInitializers();
         DEPOSITOR = depositor;
         WITHDRAWER = withdrawer;
         ASSET_REGISTRY = assetRegistry;
+        TRANSFER_HELPER = transferHelper;
     }
 
     /// @dev Initializer.
@@ -124,7 +127,7 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
 
     /// @inheritdoc IAllocator
     function deposit(address asset, uint256 amount) external override onlyDepositor {
-        IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
+        ITransferHelper(TRANSFER_HELPER).pull(asset, amount);
         _depositToStrategy({asset: asset, amount: amount, strategy: $storage().defaultStrategyByAsset[asset]});
     }
 
@@ -153,7 +156,7 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
                 }
             }
         }
-        IERC20(asset).safeTransfer(msg.sender, amount);
+        IERC20(asset).safeTransfer(TRANSFER_HELPER, amount);
     }
 
     //////////////////////////////////////////// MANAGER FUNCTIONS /////////////////////////////////////////////////////

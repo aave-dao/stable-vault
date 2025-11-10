@@ -57,4 +57,6 @@ abstract contract BaseBridgeAdapter is AccessManaged, IBridgeAdapter {
         }
         IChainGateway(GATEWAY).receiveMessage(sourceChainId, assets, "");
     }
+
+    receive() external payable {}
 }
