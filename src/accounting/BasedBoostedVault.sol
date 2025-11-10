@@ -134,12 +134,10 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
 
     /// @inheritdoc IBasedBoostedVault
     function deposit(address user, address asset, uint256 amount) external override {
-        require(msg.sender == user, InvalidMsgSender());
         require(
             IAssetRegistry($storage().assetRegistry).isAllowedToDepositIntoBBV(asset), ErrorsLib.UnsupportedAsset(asset)
         );
         require(amount > 0, ErrorsLib.InvalidAmount());
-        IERC20(asset).safeTransferFrom(msg.sender, FUNDS_HANDLER, amount);
 
         uint256 subVaultId = $storage().positions[user].subVaultId;
         if (subVaultId == 0) {
@@ -162,6 +160,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
         $storage().positions[user].originalDepositRay += amountInRay;
         $storage().globalOriginalDepositsRay += amountInRay;
 
+        IERC20(asset).safeTransferFrom(msg.sender, FUNDS_HANDLER, amount);
         IFundsHandler(FUNDS_HANDLER).processDeposit(asset, amount);
 
         emit Deposit(user, asset, amount);
