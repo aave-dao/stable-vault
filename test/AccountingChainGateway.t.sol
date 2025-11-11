@@ -235,13 +235,6 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         vm.prank(address(bridgeFeePayer));
         MockNonStandardErc20(bridgeFeeToken).approve(address(_accountingChainGateway), feeAmount);
 
-        // Expect call from Gateway to transfer the bridge fee token from fee payer to the Gateway
-        vm.expectCall(
-            bridgeFeeToken,
-            abi.encodeCall(IERC20.transferFrom, (address(bridgeFeePayer), address(_accountingChainGateway), feeAmount))
-        );
-        // Expect call from Gateway to bridge fee token to approve adapter as spender of bridge fee token
-        vm.expectCall(bridgeFeeToken, abi.encodeCall(IERC20.approve, (address(_mockBridgeAdapterData), feeAmount)));
         // Expect call to Bridge Adapter to publish message with fee payer
         vm.expectCall(
             address(_mockBridgeAdapterData),
@@ -296,7 +289,8 @@ contract AccountingChainGatewayTest is TestWithHelpers {
 
         vm.expectCall(
             address(_mockBridgeAdapterData),
-            bridgeFeeAmount,
+            // native asset would be transferred to TransferHelper from IOU Token Manager
+            0,
             abi.encodeCall(
                 IBridgeAdapter.publishMessageToChainWithFeePayer,
                 (
@@ -368,26 +362,6 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         );
     }
 
-    function test_sendBridgeIouTokenMessageWithFeePayer_reverts_ifInsufficientFundsForNativeBridgeFee() public {
-        vm.expectRevert(ErrorsLib.InsufficientFunds.selector);
-        vm.prank(address(_mockIouTokenManager));
-        uint256 bridgeFeeAmount = 100_000;
-        uint256 insufficientAmount = bridgeFeeAmount - 1;
-        vm.deal(address(_mockIouTokenManager), insufficientAmount);
-        _accountingChainGateway.sendBridgeIouTokenMessageWithFeePayer{value: insufficientAmount}(
-            EARNING_CHAIN_ID,
-            makeAddr("iouTokenRecipient"),
-            100_000,
-            IChainGateway.BridgeParams({
-                feePayer: makeAddr("bridgeFeePayer"),
-                feeToken: address(0),
-                feeAmount: bridgeFeeAmount,
-                gasLimit: 100000,
-                data: ""
-            })
-        );
-    }
-
     function test_sendBridgeIouTokenMessageWithFeePayer_reverts_ifAdapterNotFound() public {
         // Remove the adapter for message bridge
         vm.prank(admin);
@@ -417,26 +391,16 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         _mockUsdt.mint(address(_mockBridgeAdapterAssets), amountUsdt);
         vm.prank(address(_mockBridgeAdapterAssets));
         MockNonStandardErc20(address(_mockUsdt)).approve(address(_accountingChainGateway), amountUsdt);
+
         _mockGho.mint(address(_mockBridgeAdapterAssets), amountGho);
         vm.prank(address(_mockBridgeAdapterAssets));
         MockNonStandardErc20(address(_mockGho)).approve(address(_accountingChainGateway), amountGho);
 
-        // Expect received assets to be pushed to FH
-        vm.expectCall(
-            address(_mockUsdt),
-            abi.encodeCall(
-                IERC20.transferFrom, (address(_mockBridgeAdapterAssets), address(_mockFundsHandler), amountUsdt)
-            )
-        );
+        // Expect received assets to be pushed to TransferHelper
+        // The assets would be transferred to the TransferHelper from the adapter
         vm.expectCall(
             address(_mockFundsHandler),
             abi.encodeCall(IFundsHandler.fundsArrivedFromChainCallback, (address(_mockUsdt), amountUsdt))
-        );
-        vm.expectCall(
-            address(_mockGho),
-            abi.encodeCall(
-                IERC20.transferFrom, (address(_mockBridgeAdapterAssets), address(_mockFundsHandler), amountGho)
-            )
         );
         vm.expectCall(
             address(_mockFundsHandler),
@@ -462,22 +426,16 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         _mockUsdt.mint(address(unknownAdapter), amountUsdt);
         vm.prank(address(unknownAdapter));
         MockNonStandardErc20(address(_mockUsdt)).approve(address(_accountingChainGateway), amountUsdt);
+
         _mockGho.mint(address(unknownAdapter), amountGho);
         vm.prank(address(unknownAdapter));
         MockNonStandardErc20(address(_mockGho)).approve(address(_accountingChainGateway), amountGho);
 
-        // Expect received assets to be pushed to FH
-        vm.expectCall(
-            address(_mockUsdt),
-            abi.encodeCall(IERC20.transferFrom, (address(unknownAdapter), address(_mockFundsHandler), amountUsdt))
-        );
+        // Expect received assets to be pushed to TransferHelper
+        // The assets would be transferred to the TransferHelper from the adapter
         vm.expectCall(
             address(_mockFundsHandler),
             abi.encodeCall(IFundsHandler.fundsArrivedFromChainCallback, (address(_mockUsdt), amountUsdt))
-        );
-        vm.expectCall(
-            address(_mockGho),
-            abi.encodeCall(IERC20.transferFrom, (address(unknownAdapter), address(_mockFundsHandler), amountGho))
         );
         vm.expectCall(
             address(_mockFundsHandler),
@@ -660,46 +618,10 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         bridgeFeeAmount = _boundAssetAmount(bridgeFeeToken, bridgeFeeAmount);
         vm.assume(bridgeFeePayer != address(0));
 
-        // Mint the bridge fee token to Funds Handler as it is expected to pull funds from the bridgeFeePayer
-        IMockErc20(bridgeFeeToken).mint(address(_mockFundsHandler), bridgeFeeAmount);
-        assertEq(IERC20(bridgeFeeToken).balanceOf(address(_mockFundsHandler)), bridgeFeeAmount);
-
-        // Mint assets to the Funds Handler to mimic funds being made available from Allocator liquidity
-        IMockErc20(assetToBridge).mint(address(_mockFundsHandler), amount);
-
-        // Approve the gateway to spend the assets
-        // Bridge fee token same as the token being bridged
-        vm.prank(address(_mockFundsHandler));
-        MockNonStandardErc20(assetToBridge).approve(address(_accountingChainGateway), bridgeFeeAmount + amount);
-        assertEq(
-            IERC20(_mockUsdt).allowance(address(_mockFundsHandler), address(_accountingChainGateway)),
-            bridgeFeeAmount + amount
-        );
-
+        // native asset would be transferred to TransferHelper from IOU Token Manager
         IChainGateway.BridgeParams memory bridgeParams = IChainGateway.BridgeParams({
             feePayer: bridgeFeePayer, feeToken: bridgeFeeToken, feeAmount: bridgeFeeAmount, gasLimit: 100000, data: ""
         });
-
-        // Funds are pulled from Funds Handler to the Gateway
-        vm.expectCall(
-            assetToBridge,
-            abi.encodeCall(IERC20.transferFrom, (address(_mockFundsHandler), address(_accountingChainGateway), amount))
-        );
-        // Bridge fee funds are pulled from Funds Handler to the Gateway
-        vm.expectCall(
-            bridgeFeeToken,
-            abi.encodeCall(
-                IERC20.transferFrom, (address(_mockFundsHandler), address(_accountingChainGateway), bridgeFeeAmount)
-            )
-        );
-        // Bridge fee token is approved for the bridge adapter
-        vm.expectCall(
-            bridgeFeeToken, abi.encodeCall(IERC20.approve, (address(_mockBridgeAdapterAssets), bridgeFeeAmount))
-        );
-        // Check increase allowance for the bridge adapter since bridged asset is the same as the bridge fee token
-        vm.expectCall(
-            assetToBridge, abi.encodeCall(IERC20.approve, (address(_mockBridgeAdapterAssets), bridgeFeeAmount + amount))
-        );
 
         vm.expectCall(
             address(_mockBridgeAdapterAssets),
@@ -724,44 +646,9 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         bridgeFeeAmount = _boundAssetAmount(bridgeFeeToken, bridgeFeeAmount);
         vm.assume(bridgeFeePayer != address(0));
 
-        // Mint the bridge fee token to Funds Handler as it is expected to pull funds from the bridgeFeePayer
-        IMockErc20(bridgeFeeToken).mint(address(_mockFundsHandler), bridgeFeeAmount);
-        assertEq(IERC20(bridgeFeeToken).balanceOf(address(_mockFundsHandler)), bridgeFeeAmount);
-        vm.prank(address(_mockFundsHandler));
-        MockNonStandardErc20(bridgeFeeToken).approve(address(_accountingChainGateway), bridgeFeeAmount);
-        assertEq(
-            IERC20(_mockGho).allowance(address(_mockFundsHandler), address(_accountingChainGateway)), bridgeFeeAmount
-        );
-
-        // Mint assets to the Funds Handler to mimic funds being made available from Allocator liquidity
-        IMockErc20(assetToBridge).mint(address(_mockFundsHandler), amount);
-        // Approve the gateway to spend the assets
-        vm.prank(address(_mockFundsHandler));
-        MockNonStandardErc20(assetToBridge).approve(address(_accountingChainGateway), amount);
-        assertEq(IERC20(_mockUsdt).allowance(address(_mockFundsHandler), address(_accountingChainGateway)), amount);
-
         IChainGateway.BridgeParams memory bridgeParams = IChainGateway.BridgeParams({
             feePayer: bridgeFeePayer, feeToken: bridgeFeeToken, feeAmount: bridgeFeeAmount, gasLimit: 100000, data: ""
         });
-
-        // Funds are pulled from Funds Handler to the Gateway
-        vm.expectCall(
-            assetToBridge,
-            abi.encodeCall(IERC20.transferFrom, (address(_mockFundsHandler), address(_accountingChainGateway), amount))
-        );
-        // Bridge fee funds are pulled from Funds Handler to the Gateway
-        vm.expectCall(
-            bridgeFeeToken,
-            abi.encodeCall(
-                IERC20.transferFrom, (address(_mockFundsHandler), address(_accountingChainGateway), bridgeFeeAmount)
-            )
-        );
-        // Bridge fee token is approved for the bridge adapter
-        vm.expectCall(
-            bridgeFeeToken, abi.encodeCall(IERC20.approve, (address(_mockBridgeAdapterAssets), bridgeFeeAmount))
-        );
-        // Check increase allowance for the bridge adapter since bridged asset is different from the bridge fee token
-        vm.expectCall(assetToBridge, abi.encodeCall(IERC20.approve, (address(_mockBridgeAdapterAssets), amount)));
 
         vm.expectCall(
             address(_mockBridgeAdapterAssets),
@@ -785,27 +672,13 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         address bridgeFeeToken = address(0);
         bridgeFeeAmount = _boundNativeAmount(bridgeFeeAmount);
 
-        // Mint assets to the Funds Handler to mimic funds being made available from Allocator liquidity
-        IMockErc20(assetToBridge).mint(address(_mockFundsHandler), amount);
-        // Approve the gateway to spend the assets
-        vm.prank(address(_mockFundsHandler));
-        MockNonStandardErc20(assetToBridge).approve(address(_accountingChainGateway), amount);
-        assertEq(IERC20(_mockUsdt).allowance(address(_mockFundsHandler), address(_accountingChainGateway)), amount);
-
         IChainGateway.BridgeParams memory bridgeParams = IChainGateway.BridgeParams({
             feePayer: everyRoleAccount, feeToken: bridgeFeeToken, feeAmount: bridgeFeeAmount, gasLimit: 100000, data: ""
         });
 
-        // Funds are pulled from Funds Handler to the Gateway
-        vm.expectCall(
-            assetToBridge,
-            abi.encodeCall(IERC20.transferFrom, (address(_mockFundsHandler), address(_accountingChainGateway), amount))
-        );
-        // Check gateway approves the token being bridged
-        vm.expectCall(assetToBridge, abi.encodeCall(IERC20.approve, (address(_mockBridgeAdapterAssets), amount)));
         vm.expectCall(
             address(_mockBridgeAdapterAssets),
-            bridgeFeeAmount,
+            0,
             abi.encodeCall(
                 IBridgeAdapter.publishMessageToChainWithFeePayer,
                 (EARNING_CHAIN_ID, _buildBridgeAssets(assetToBridge, amount), "", bridgeParams)
@@ -815,80 +688,6 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         vm.deal(address(_mockFundsHandler), bridgeFeeAmount);
         vm.prank(address(_mockFundsHandler));
         _accountingChainGateway.sendPushFundsToChainMessage{value: bridgeFeeAmount}(
-            assetToBridge, amount, EARNING_CHAIN_ID, bridgeParams
-        );
-    }
-
-    function test_sendPushFundsToChainMessage_reverts_ifZeroValueForTokenBridgeFee(uint256 amount) public {
-        address assetToBridge = address(_mockUsdt);
-        amount = _boundAssetAmount(assetToBridge, amount);
-        address bridgeFeeToken = address(_mockUsdt);
-        uint256 bridgeFeeAmount = 0;
-
-        // Mint assets to the Funds Handler to mimic funds being made available from Allocator liquidity
-        IMockErc20(assetToBridge).mint(address(_mockFundsHandler), amount);
-        // Approve the gateway to spend the assets
-        vm.prank(address(_mockFundsHandler));
-        MockNonStandardErc20(assetToBridge).approve(address(_accountingChainGateway), amount);
-        assertEq(IERC20(_mockUsdt).allowance(address(_mockFundsHandler), address(_accountingChainGateway)), amount);
-
-        IChainGateway.BridgeParams memory bridgeParams = IChainGateway.BridgeParams({
-            feePayer: everyRoleAccount, feeToken: bridgeFeeToken, feeAmount: bridgeFeeAmount, gasLimit: 100000, data: ""
-        });
-
-        vm.expectRevert(ErrorsLib.ZeroAmount.selector);
-        vm.prank(address(_mockFundsHandler));
-        _accountingChainGateway.sendPushFundsToChainMessage(assetToBridge, amount, EARNING_CHAIN_ID, bridgeParams);
-    }
-
-    function test_sendPushFundsToChainMessage_reverts_ifZeroValueForNativeBridgeFee(uint256 amount) public {
-        address assetToBridge = address(_mockUsdt);
-        amount = _boundAssetAmount(assetToBridge, amount);
-        // Use native asset
-        address bridgeFeeToken = address(0);
-        uint256 bridgeFeeAmount = 0;
-
-        // Mint assets to the Funds Handler to mimic funds being made available from Allocator liquidity
-        IMockErc20(assetToBridge).mint(address(_mockFundsHandler), amount);
-        // Approve the gateway to spend the assets
-        vm.prank(address(_mockFundsHandler));
-        MockNonStandardErc20(assetToBridge).approve(address(_accountingChainGateway), amount);
-        assertEq(IERC20(_mockUsdt).allowance(address(_mockFundsHandler), address(_accountingChainGateway)), amount);
-
-        IChainGateway.BridgeParams memory bridgeParams = IChainGateway.BridgeParams({
-            feePayer: everyRoleAccount, feeToken: bridgeFeeToken, feeAmount: bridgeFeeAmount, gasLimit: 100000, data: ""
-        });
-
-        vm.expectRevert(ErrorsLib.ZeroAmount.selector);
-        vm.prank(address(_mockFundsHandler));
-        _accountingChainGateway.sendPushFundsToChainMessage{value: bridgeFeeAmount}(
-            assetToBridge, amount, EARNING_CHAIN_ID, bridgeParams
-        );
-    }
-
-    function test_sendPushFundsToChainMessage_reverts_ifInsufficientValueForNativeBridgeFee(uint256 amount) public {
-        address assetToBridge = address(_mockUsdt);
-        amount = _boundAssetAmount(assetToBridge, amount);
-        // Use native asset
-        address bridgeFeeToken = address(0);
-        uint256 bridgeFeeAmount = 123;
-
-        // Mint assets to the Funds Handler to mimic funds being made available from Allocator liquidity
-        IMockErc20(assetToBridge).mint(address(_mockFundsHandler), amount);
-        // Approve the gateway to spend the assets
-        vm.prank(address(_mockFundsHandler));
-        MockNonStandardErc20(assetToBridge).approve(address(_accountingChainGateway), amount);
-        assertEq(IERC20(_mockUsdt).allowance(address(_mockFundsHandler), address(_accountingChainGateway)), amount);
-
-        IChainGateway.BridgeParams memory bridgeParams = IChainGateway.BridgeParams({
-            feePayer: everyRoleAccount, feeToken: bridgeFeeToken, feeAmount: bridgeFeeAmount, gasLimit: 100000, data: ""
-        });
-
-        uint256 insufficientAmount = bridgeFeeAmount - 1;
-        vm.deal(address(_mockFundsHandler), insufficientAmount);
-        vm.expectRevert(ErrorsLib.InsufficientFunds.selector);
-        vm.prank(address(_mockFundsHandler));
-        _accountingChainGateway.sendPushFundsToChainMessage{value: insufficientAmount}(
             assetToBridge, amount, EARNING_CHAIN_ID, bridgeParams
         );
     }
