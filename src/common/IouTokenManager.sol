@@ -16,6 +16,7 @@ import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 /// @notice Manages the IOU token locking, releasing, minting, burning.
 contract IouTokenManager is IIouTokenManager {
     using SafeERC20 for IERC20;
+    using BridgeParamsLib for IChainGateway.BridgeParams;
 
     address internal immutable IOU_TOKEN;
     address internal immutable CHAIN_GATEWAY;
@@ -87,13 +88,9 @@ contract IouTokenManager is IIouTokenManager {
         } else {
             _burnTokens(msg.sender, iouTokenAmountRay);
         }
-        if (bridgeParams.feeToken == BridgeParamsLib.BRIDGE_FEE_ON_NATIVE_CURRENCY) {
-            require(msg.value >= bridgeParams.feeAmount, ErrorsLib.InsufficientFunds());
-            (bool callSucceeded,) = TRANSFER_HELPER.call{value: msg.value}("");
-            require(callSucceeded, ErrorsLib.NativeTransferFailed());
-        } else {
-            IERC20(bridgeParams.feeToken).safeTransferFrom(msg.sender, TRANSFER_HELPER, bridgeParams.feeAmount);
-        }
+        // Send the bridge fee to the TransferHelper to be pulled by Bridge Adapter.
+        bridgeParams.sendBridgeFeeToTransferHelper(TRANSFER_HELPER);
+
         IChainGateway(CHAIN_GATEWAY)
             .sendBridgeIouTokenMessageWithFeePayer(
                 destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeParams
