@@ -265,11 +265,9 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
         for (uint256 i = 0; i < assets.length; i++) {
             IFundsHandler(FUNDS_HANDLER).processWithdrawal(assets[i], amounts[i]);
             accumulatedAmountRay += amounts[i].assetDecimalsToRay(assets[i]);
-            if (amounts[i] > 0) {
-                ITransferHelper(TRANSFER_HELPER).transfer(assets[i], amounts[i], msg.sender);
-            }
         }
         require(accumulatedAmountRay <= fee, ErrorsLib.InvalidAmount());
+        ITransferHelper(TRANSFER_HELPER).transfer(assets, amounts, msg.sender);
         emit FeesClaimed(assets, amounts);
     }
 
