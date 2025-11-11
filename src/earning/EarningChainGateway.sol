@@ -106,7 +106,7 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         ITransferHelper(TRANSFER_HELPER).transfer(tokenOut, amountOut, tokenOutReceiver);
 
         // Prepare data to synchronize the Accounting Chain's state.
-        bytes memory data = abi.encode(
+        bytes memory burnIouTokenMessageEncoded = abi.encode(
             IChainGateway.CrossChainMessage({
                 messageType: IChainGateway.MessageType.BURN_IOU_TOKEN,
                 data: abi.encode(
@@ -122,7 +122,9 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         // Send the bridge fee to the TransferHelper to be pulled by Bridge Adapter.
         bridgeParams.sendBridgeFeeToTransferHelper(TRANSFER_HELPER);
 
-        _sendCrossChainMessage(ACCOUNTING_CHAIN_ID, adapter, ASSET_FOR_DATA_ONLY_BRIDGE, 0, data, bridgeParams);
+        _sendCrossChainMessage(
+            ACCOUNTING_CHAIN_ID, adapter, ASSET_FOR_DATA_ONLY_BRIDGE, 0, burnIouTokenMessageEncoded, bridgeParams
+        );
 
         // TODO: emit event?
         return amountOut;

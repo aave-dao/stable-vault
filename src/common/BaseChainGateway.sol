@@ -87,7 +87,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
         address adapter = $storage().defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId];
         require(adapter != address(0), AdapterNotFound());
 
-        bytes memory data = abi.encode(
+        bytes memory bridgeIouTokenMessageEncoded = abi.encode(
             IChainGateway.CrossChainMessage({
                 messageType: IChainGateway.MessageType.BRIDGE_IOU_TOKEN,
                 data: abi.encode(
@@ -97,7 +97,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
         );
         IBridgeAdapter(adapter)
             .publishMessageToChainWithFeePayer(
-                destinationChainId, new IBridgeAdapter.BridgeAsset[](0), data, bridgeParams
+                destinationChainId, new IBridgeAdapter.BridgeAsset[](0), bridgeIouTokenMessageEncoded, bridgeParams
             );
     }
 
