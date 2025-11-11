@@ -13,6 +13,7 @@ import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {ICcipBridgeAdapter} from "../interfaces/ICcipBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {ITransferHelper} from "../interfaces/ITransferHelper.sol";
+import {BridgeParamsLib} from "../libraries/BridgeParamsLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {BaseBridgeAdapter} from "./BaseBridgeAdapter.sol";
 
@@ -21,10 +22,7 @@ import {BaseBridgeAdapter} from "./BaseBridgeAdapter.sol";
 contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
     using SafeERC20 for IERC20;
 
-    address internal constant FEE_ON_NATIVE_CURRENCY = address(0);
-
     address internal immutable CCIP_ROUTER;
-    address internal immutable TRANSFER_HELPER;
 
     address internal _feeToken;
 
@@ -44,10 +42,9 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
     }
 
     constructor(address accessManager, address gateway, address ccipRouter, address transferHelper)
-        BaseBridgeAdapter(accessManager, gateway)
+        BaseBridgeAdapter(accessManager, gateway, transferHelper)
     {
         CCIP_ROUTER = ccipRouter;
-        TRANSFER_HELPER = transferHelper;
     }
 
     /// @inheritdoc ICcipBridgeAdapter
@@ -86,7 +83,7 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
         assetsToPull[assetsToPull.length - 1] = bridgeParams.feeToken;
         amountsToPull[amountsToPull.length - 1] = bridgeParams.feeAmount;
 
-        if (bridgeParams.feeToken != FEE_ON_NATIVE_CURRENCY) {
+        if (bridgeParams.feeToken != BridgeParamsLib.BRIDGE_FEE_ON_NATIVE_CURRENCY) {
             // Increase allowance in case of the fee token matching an asset being bridged.
             IERC20(bridgeParams.feeToken).safeIncreaseAllowance(CCIP_ROUTER, bridgeParams.feeAmount);
         }
@@ -147,7 +144,7 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
         uint64 chainSelector = _chainSelectorOf[chainId];
         uint256 fee = IRouterClient(CCIP_ROUTER).getFee(chainSelector, message);
         uint256 msgValue;
-        if (message.feeToken == FEE_ON_NATIVE_CURRENCY) {
+        if (message.feeToken == BridgeParamsLib.BRIDGE_FEE_ON_NATIVE_CURRENCY) {
             msgValue = fee;
         } else {
             IERC20(_feeToken).safeIncreaseAllowance(CCIP_ROUTER, fee);
@@ -165,12 +162,12 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
         uint64 chainSelector = _chainSelectorOf[chainId];
         uint256 estimatedFeeAmount = IRouterClient(CCIP_ROUTER).getFee(chainSelector, message);
         uint256 msgValue;
-        if (feeToken == FEE_ON_NATIVE_CURRENCY) {
+        if (feeToken == BridgeParamsLib.BRIDGE_FEE_ON_NATIVE_CURRENCY) {
             msgValue = estimatedFeeAmount;
         }
         // Return any excess fee to the fee payer.
         if (allocatedFeeAmount > estimatedFeeAmount) {
-            if (feeToken == FEE_ON_NATIVE_CURRENCY) {
+            if (feeToken == BridgeParamsLib.BRIDGE_FEE_ON_NATIVE_CURRENCY) {
                 payable(feePayer).transfer(allocatedFeeAmount - estimatedFeeAmount);
             } else {
                 IERC20(feeToken).safeTransfer(feePayer, allocatedFeeAmount - estimatedFeeAmount);

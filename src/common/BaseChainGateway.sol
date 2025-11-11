@@ -12,7 +12,6 @@ import {RescuableAssets} from "./RescuableAssets.sol";
 
 // TODO: this contract should be pausable.... if bridge is compromised we should not ingest messages from it.
 abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets, IChainGateway {
-    address internal constant FEE_ON_NATIVE_CURRENCY = address(0);
     address internal constant ASSET_FOR_DATA_ONLY_BRIDGE = address(0);
 
     address internal immutable IOU_TOKEN_MANAGER;
@@ -153,9 +152,8 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
             assets = new IBridgeAdapter.BridgeAsset[](1);
             assets[0] = IBridgeAdapter.BridgeAsset({asset: assetToBridge, amount: amountToBridge});
         }
-        IBridgeAdapter(adapter).publishMessageToChainWithFeePayer{value: msg.value}(
-            destinationChainId, assets, dataToBridge, bridgeParams
-        );
+        IBridgeAdapter(adapter)
+            .publishMessageToChainWithFeePayer(destinationChainId, assets, dataToBridge, bridgeParams);
     }
 
     function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal virtual;

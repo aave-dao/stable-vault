@@ -13,6 +13,7 @@ import {IAllocator} from "../interfaces/IAllocator.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
 import {AssetLib} from "../libraries/AssetLib.sol";
+import {BridgeParamsLib} from "../libraries/BridgeParamsLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 /// @title FundsHandler
@@ -20,6 +21,7 @@ import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandler {
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
+    using BridgeParamsLib for IChainGateway.BridgeParams;
 
     struct ChainBalanceSnapshot {
         uint256 chainId;
@@ -27,8 +29,6 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
         uint256 amountRay;
         uint256 nonce;
     }
-
-    address internal constant BRIDGE_FEE_ON_NATIVE_CURRENCY = address(0);
 
     address internal immutable VAULT;
     address internal immutable GATEWAY;
@@ -143,10 +143,11 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
         IChainGateway.BridgeParams memory bridgeParams
     ) external payable override restricted {
         require(amount > 0, ErrorsLib.ZeroAmount());
-        // Pull funds from liquidity into the TransferHelper
+        // Pull funds from liquidity into the TransferHelper.
         _pullFundsFromImmediateLiquidity(asset, amount);
-        // Send the bridge fee to the TransferHelper to be pulled by Bridge Adapter
-        _sendBridgeFeeToTransferHelper(bridgeParams);
+
+        // Send the bridge fee to the TransferHelper to be pulled by Bridge Adapter.
+        bridgeParams.sendBridgeFeeToTransferHelper(TRANSFER_HELPER);
 
         // Increment the chain balance snapshot for the target chain.
         _updateChainBalanceBeforeBridging(chainId, amount.assetDecimalsToRay(asset));
@@ -176,24 +177,6 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
     }
 
     ////////////////////////////////////////////////// INTERNAL ////////////////////////////////////////////////////////
-
-    function _sendBridgeFeeToTransferHelper(IChainGateway.BridgeParams memory bridgeParams) internal {
-        if (msg.value > 0) {
-            // If there is some msg.value, we transfer it to the TransferHelper, regardless of the fee token.
-            // There might be scenarios where the bridge implementation requires some native assets to operate in
-            // addition to the ERC-20 fee token.
-            (bool callSucceeded,) = TRANSFER_HELPER.call{value: msg.value}("");
-            require(callSucceeded, ErrorsLib.NativeTransferFailed());
-        }
-
-        if (bridgeParams.feeToken == BRIDGE_FEE_ON_NATIVE_CURRENCY) {
-            // We already transferred all the msg.value above. Here we just check that it covers the fee amount.
-            require(msg.value >= bridgeParams.feeAmount, ErrorsLib.InsufficientFunds());
-        } else {
-            IERC20(bridgeParams.feeToken)
-                .safeTransferFrom(bridgeParams.feePayer, TRANSFER_HELPER, bridgeParams.feeAmount);
-        }
-    }
 
     function _updateChainBalance(uint256 chainId, uint256 snapshotBalanceRay, uint256 chainBalanceSnapshotNonce)
         internal

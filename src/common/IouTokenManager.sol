@@ -7,6 +7,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {IIouTokenManager} from "../interfaces/IIouTokenManager.sol";
 import {IMintableBurnableIERC20} from "../interfaces/IMintableBurnableIERC20.sol";
+import {BridgeParamsLib} from "../libraries/BridgeParamsLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 // TODO: add events
@@ -15,8 +16,6 @@ import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 /// @notice Manages the IOU token locking, releasing, minting, burning.
 contract IouTokenManager is IIouTokenManager {
     using SafeERC20 for IERC20;
-
-    address internal constant FEE_ON_NATIVE_CURRENCY = address(0);
 
     address internal immutable IOU_TOKEN;
     address internal immutable CHAIN_GATEWAY;
@@ -88,7 +87,7 @@ contract IouTokenManager is IIouTokenManager {
         } else {
             _burnTokens(msg.sender, iouTokenAmountRay);
         }
-        if (bridgeParams.feeToken == FEE_ON_NATIVE_CURRENCY) {
+        if (bridgeParams.feeToken == BridgeParamsLib.BRIDGE_FEE_ON_NATIVE_CURRENCY) {
             require(msg.value >= bridgeParams.feeAmount, ErrorsLib.InsufficientFunds());
             (bool callSucceeded,) = TRANSFER_HELPER.call{value: msg.value}("");
             require(callSucceeded, ErrorsLib.NativeTransferFailed());

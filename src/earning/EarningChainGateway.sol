@@ -10,12 +10,14 @@ import {IEarningChainGateway} from "../interfaces/IEarningChainGateway.sol";
 import {IIouTokenManager} from "../interfaces/IIouTokenManager.sol";
 import {ITransferHelper} from "../interfaces/ITransferHelper.sol";
 import {AssetLib} from "../libraries/AssetLib.sol";
+import {BridgeParamsLib} from "../libraries/BridgeParamsLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 /// @title EarningChainGateway
 /// @notice Facilitates cross chain messaging with exactly one Accounting Chain.
 contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
     using AssetLib for uint256;
+    using BridgeParamsLib for IChainGateway.BridgeParams;
 
     uint256 internal immutable ACCOUNTING_CHAIN_ID;
     address internal immutable ALLOCATOR;
@@ -76,6 +78,10 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
     function sendBalanceUpdateWithFeePayer(IChainGateway.BridgeParams memory bridgeParams) external payable override {
         address adapter = $BaseChainGateway().defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID];
         require(adapter != address(0), AdapterNotFound());
+
+        // Send the bridge fee to the TransferHelper to be pulled by Bridge Adapter.
+        bridgeParams.sendBridgeFeeToTransferHelper(TRANSFER_HELPER);
+
         _sendCrossChainMessage(
             ACCOUNTING_CHAIN_ID, adapter, ASSET_FOR_DATA_ONLY_BRIDGE, 0, _getBalanceSnapshotData(), bridgeParams
         );
@@ -98,6 +104,8 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(tokenOut);
         IAllocator(ALLOCATOR).withdraw(tokenOut, amountOut);
         ITransferHelper(TRANSFER_HELPER).transfer(tokenOut, amountOut, tokenOutReceiver);
+
+        // Prepare data to synchronize the Accounting Chain's state.
         bytes memory data = abi.encode(
             IChainGateway.CrossChainMessage({
                 messageType: IChainGateway.MessageType.BURN_IOUTOKEN,
@@ -110,7 +118,12 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
                 )
             })
         );
+
+        // Send the bridge fee to the TransferHelper to be pulled by Bridge Adapter.
+        bridgeParams.sendBridgeFeeToTransferHelper(TRANSFER_HELPER);
+
         _sendCrossChainMessage(ACCOUNTING_CHAIN_ID, adapter, ASSET_FOR_DATA_ONLY_BRIDGE, 0, data, bridgeParams);
+
         // TODO: emit event?
         return amountOut;
     }
@@ -124,6 +137,10 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
     {
         require(amount > 0, ErrorsLib.ZeroAmount());
         IAllocator(ALLOCATOR).withdraw(asset, amount);
+
+        // Send the bridge fee to the TransferHelper to be pulled by Bridge Adapter
+        bridgeParams.sendBridgeFeeToTransferHelper(TRANSFER_HELPER);
+
         _returnFundsWithBalanceSnapshot(asset, amount, bridgeParams);
     }
 
@@ -163,6 +180,7 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
     ) internal {
         address bridgeAdapter = $BaseChainGateway().defaultBridgeAdapter[asset][ACCOUNTING_CHAIN_ID];
         require(bridgeAdapter != address(0), AdapterNotFound());
+
         // Sends a single cross chain message with the asset and the balance snapshot. The bridge must support both
         // assets and arbitrary data.
         _sendCrossChainMessage(
