@@ -617,8 +617,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         availableFeesToClaimRay = _boundRayAmount(availableFeesToClaimRay);
         vm.assume(requestedAssetsToClaim.assetDecimalsToRay(address(mockAsset)) <= availableFeesToClaimRay);
 
-        mockAsset.mint(address(mockFundsHandler), availableFeesToClaimRay);
-        mockFundsHandler.mockApprove(address(bbv), address(mockAsset), availableFeesToClaimRay);
+        mockTransferHelper.mockAsset(address(mockAsset), availableFeesToClaimRay);
 
         mockFundsHandler.mockAggregatedBalance(availableFeesToClaimRay);
 
@@ -644,8 +643,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(requestedAssetsToClaim.assetDecimalsToRay(address(mockAsset)) <= availableFeesToClaimRay);
         vm.assume(mockAsset.balanceOf(msgSender) == 0);
 
-        mockAsset.mint(address(mockFundsHandler), availableFeesToClaimRay);
-        mockFundsHandler.mockApprove(address(bbv), address(mockAsset), availableFeesToClaimRay);
+        mockTransferHelper.mockAsset(address(mockAsset), availableFeesToClaimRay);
 
         mockFundsHandler.mockAggregatedBalance(availableFeesToClaimRay);
 
@@ -1120,7 +1118,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockIouToken.mint(user, iouAmountRay);
 
         uint256 actualWithdrawnAssets = iouAmountRay.rayToAssetDecimals(address(mockAsset));
-        mockAsset.mint(address(mockFundsHandler), actualWithdrawnAssets); // Mocking funds into the FH
+        mockTransferHelper.mockAsset(address(mockAsset), actualWithdrawnAssets);
 
         vm.expectEmit(true, true, true, true);
         emit IBasedBoostedVault.WithdrawalExecuted(user, address(mockAsset), actualWithdrawnAssets);
@@ -1144,7 +1142,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         assertEq(mockIouToken.balanceOf(user), userIouBalance);
 
         uint256 actualWithdrawnAssets = iouAmountRay.rayToAssetDecimals(address(mockAsset));
-        mockAsset.mint(address(mockFundsHandler), actualWithdrawnAssets); // Mocking funds into the FH
+        mockTransferHelper.mockAsset(address(mockAsset), actualWithdrawnAssets);
 
         vm.prank(user);
         bbv.executeWithdrawal(user, address(mockAsset), iouAmountRay);
@@ -1161,7 +1159,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(mockAsset.balanceOf(user) == 0);
 
         uint256 actualWithdrawnAssets = iouAmountRay.rayToAssetDecimals(address(mockAsset));
-        mockAsset.mint(address(mockFundsHandler), actualWithdrawnAssets); // Mocking funds into the FH
+        mockTransferHelper.mockAsset(address(mockAsset), actualWithdrawnAssets);
 
         vm.prank(user);
         bbv.executeWithdrawal(user, address(mockAsset), iouAmountRay);
