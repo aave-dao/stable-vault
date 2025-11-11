@@ -22,6 +22,7 @@ import {MockAssetRegistry} from "./mocks/MockAssetRegistry.sol";
 import {IMockErc20} from "./mocks/MockErc20.sol";
 import {MockNonStandardErc20} from "./mocks/MockNonStandardErc20.sol";
 import {MockSwapper} from "./mocks/MockSwapper.sol";
+import {MockTransferHelper} from "./mocks/MockTransferHelper.sol";
 import {TestErc4626} from "./mocks/TestErc4626.sol";
 import {TestErc4626WithSlippage} from "./mocks/TestErc4626WithSlippage.sol";
 
@@ -49,11 +50,15 @@ contract AllocatorTest is TestWithHelpers {
     TestErc4626 internal _defaultGhoStrategy;
     TestErc4626 internal _extraGhoStrategy;
     MockSwapper internal _mockSwapper;
+    MockTransferHelper internal _mockTransferHelper;
 
     Allocator internal _allocator;
 
-    function _deployAllocator(MockAccessManager mockAccessManager, address assetRegistry) internal returns (Allocator) {
-        address allocatorImpl = address(new Allocator(assetRegistry, depositor, withdrawer));
+    function _deployAllocator(MockAccessManager mockAccessManager, address assetRegistry, address transferHelper)
+        internal
+        returns (Allocator)
+    {
+        address allocatorImpl = address(new Allocator(assetRegistry, depositor, withdrawer, transferHelper));
         Allocator allocator = Allocator(
             address(
                 new TransparentUpgradeableProxy(
@@ -122,7 +127,7 @@ contract AllocatorTest is TestWithHelpers {
             })
         );
 
-        _allocator = _deployAllocator(_mockAccessManager, address(_mockAssetRegistry));
+        _allocator = _deployAllocator(_mockAccessManager, address(_mockAssetRegistry), address(_mockTransferHelper));
     }
 
     function test_getAssetBalances_returnsExpectedAssetBalances(uint256 depositAmountUsdt, uint256 depositAmountGho)

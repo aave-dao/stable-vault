@@ -253,7 +253,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
                     new IBridgeAdapter.BridgeAsset[](0),
                     abi.encode(
                         IChainGateway.CrossChainMessage({
-                            messageType: IChainGateway.MessageType.BRIDGE_IOUTOKEN,
+                            messageType: IChainGateway.MessageType.BRIDGE_IOU_TOKEN,
                             data: abi.encode(
                                 IChainGateway.IouTokenBridgeMessage({
                                     recipient: iouTokenRecipient, amount: iouTokenAmountRay
@@ -304,7 +304,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
                     new IBridgeAdapter.BridgeAsset[](0),
                     abi.encode(
                         IChainGateway.CrossChainMessage({
-                            messageType: IChainGateway.MessageType.BRIDGE_IOUTOKEN,
+                            messageType: IChainGateway.MessageType.BRIDGE_IOU_TOKEN,
                             data: abi.encode(
                                 IChainGateway.IouTokenBridgeMessage({
                                     recipient: iouTokenRecipient, amount: iouTokenAmountRay
@@ -528,7 +528,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
             new IBridgeAdapter.BridgeAsset[](0),
             abi.encode(
                 IChainGateway.CrossChainMessage({
-                    messageType: IChainGateway.MessageType.BRIDGE_IOUTOKEN,
+                    messageType: IChainGateway.MessageType.BRIDGE_IOU_TOKEN,
                     data: abi.encode(
                         IChainGateway.IouTokenBridgeMessage({recipient: iouTokenRecipient, amount: iouTokenAmountRay})
                     )
@@ -562,7 +562,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
             new IBridgeAdapter.BridgeAsset[](0),
             abi.encode(
                 IChainGateway.CrossChainMessage({
-                    messageType: IChainGateway.MessageType.BURN_IOUTOKEN,
+                    messageType: IChainGateway.MessageType.BURN_IOU_TOKEN,
                     data: abi.encode(
                         IChainGateway.BurnIouTokenMessage({
                             iouTokenAmountBurnedRay: iouTokenAmountBurnedRay,
@@ -606,7 +606,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
             new IBridgeAdapter.BridgeAsset[](0),
             abi.encode(
                 IChainGateway.CrossChainMessage({
-                    messageType: IChainGateway.MessageType.BURN_IOUTOKEN,
+                    messageType: IChainGateway.MessageType.BURN_IOU_TOKEN,
                     data: abi.encode(
                         IChainGateway.BurnIouTokenMessage({
                             iouTokenAmountBurnedRay: iouTokenAmountBurnedRay,

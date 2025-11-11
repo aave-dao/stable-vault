@@ -23,6 +23,7 @@ import {MockBridgeAdapter} from "./mocks/MockBridgeAdapter.sol";
 import {MockDummyIouTokenManager} from "./mocks/MockDummyIouTokenManager.sol";
 import {IMockErc20} from "./mocks/MockErc20.sol";
 import {MockNonStandardErc20} from "./mocks/MockNonStandardErc20.sol";
+import {MockTransferHelper} from "./mocks/MockTransferHelper.sol";
 
 contract EarningChainGatewayTest is TestWithHelpers {
     using MathLib for uint256;
@@ -44,15 +45,19 @@ contract EarningChainGatewayTest is TestWithHelpers {
     MockBridgeAdapter internal _mockBridgeAdapterData;
     MockDummyIouTokenManager internal _mockIouTokenManager;
     MockAssetRegistry internal _mockAssetRegistry;
+    MockTransferHelper internal _mockTransferHelper;
 
     EarningChainGateway internal _earningChainGateway;
 
-    function _deployEarningChainGateway(MockAccessManager mockAccessManager, address iouTokenManager, address allocator)
-        internal
-        returns (EarningChainGateway)
-    {
-        address earningChainGatewayImpl =
-            address(new EarningChainGateway(ACCOUNTING_CHAIN_ID, allocator, iouTokenManager));
+    function _deployEarningChainGateway(
+        MockAccessManager mockAccessManager,
+        address iouTokenManager,
+        address allocator,
+        address transferHelper
+    ) internal returns (EarningChainGateway) {
+        address earningChainGatewayImpl = address(
+            new EarningChainGateway(ACCOUNTING_CHAIN_ID, allocator, iouTokenManager, transferHelper)
+        );
         EarningChainGateway earningChainGateway = EarningChainGateway(
             address(
                 new TransparentUpgradeableProxy(
@@ -101,8 +106,11 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         _mockAccessManager = new MockAccessManager(admin);
 
-        _earningChainGateway =
-            _deployEarningChainGateway(_mockAccessManager, address(_mockIouTokenManager), address(_mockAllocator));
+        _mockTransferHelper = new MockTransferHelper();
+
+        _earningChainGateway = _deployEarningChainGateway(
+            _mockAccessManager, address(_mockIouTokenManager), address(_mockAllocator), address(_mockTransferHelper)
+        );
     }
 
     function test_getIouTokenManager_returnsExpectedIouTokenManager() public view {
@@ -519,7 +527,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
                 data = abi.encode(
                     IChainGateway.CrossChainMessage({
-                        messageType: IChainGateway.MessageType.BURN_IOUTOKEN,
+                        messageType: IChainGateway.MessageType.BURN_IOU_TOKEN,
                         data: abi.encode(
                             IChainGateway.BurnIouTokenMessage({
                                 iouTokenAmountBurnedRay: iouTokenAmountRay,
@@ -599,7 +607,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 );
                 data = abi.encode(
                     IChainGateway.CrossChainMessage({
-                        messageType: IChainGateway.MessageType.BURN_IOUTOKEN, data: dataInner
+                        messageType: IChainGateway.MessageType.BURN_IOU_TOKEN, data: dataInner
                     })
                 );
             }
@@ -689,7 +697,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
             bytes memory data = abi.encode(
                 IChainGateway.CrossChainMessage({
-                    messageType: IChainGateway.MessageType.BURN_IOUTOKEN,
+                    messageType: IChainGateway.MessageType.BURN_IOU_TOKEN,
                     data: abi.encode(
                         IChainGateway.BurnIouTokenMessage({
                             iouTokenAmountBurnedRay: iouTokenAmountRay,
@@ -1277,7 +1285,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     new IBridgeAdapter.BridgeAsset[](0),
                     abi.encode(
                         IChainGateway.CrossChainMessage({
-                            messageType: IChainGateway.MessageType.BRIDGE_IOUTOKEN,
+                            messageType: IChainGateway.MessageType.BRIDGE_IOU_TOKEN,
                             data: abi.encode(
                                 IChainGateway.IouTokenBridgeMessage({
                                     recipient: iouTokenRecipient, amount: iouTokenAmountRay
@@ -1324,7 +1332,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     new IBridgeAdapter.BridgeAsset[](0),
                     abi.encode(
                         IChainGateway.CrossChainMessage({
-                            messageType: IChainGateway.MessageType.BRIDGE_IOUTOKEN,
+                            messageType: IChainGateway.MessageType.BRIDGE_IOU_TOKEN,
                             data: abi.encode(
                                 IChainGateway.IouTokenBridgeMessage({
                                     recipient: iouTokenRecipient, amount: iouTokenAmountRay
@@ -1440,7 +1448,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         bytes memory data = abi.encode(
             IChainGateway.CrossChainMessage({
-                messageType: IChainGateway.MessageType.BRIDGE_IOUTOKEN,
+                messageType: IChainGateway.MessageType.BRIDGE_IOU_TOKEN,
                 data: abi.encode(
                     IChainGateway.IouTokenBridgeMessage({recipient: iouTokenRecipient, amount: iouTokenAmountRay})
                 )
@@ -1465,7 +1473,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         bytes memory data = abi.encode(
             IChainGateway.CrossChainMessage({
-                messageType: IChainGateway.MessageType.BRIDGE_IOUTOKEN,
+                messageType: IChainGateway.MessageType.BRIDGE_IOU_TOKEN,
                 data: abi.encode(
                     IChainGateway.IouTokenBridgeMessage({recipient: iouTokenRecipient, amount: iouTokenAmountRay})
                 )
@@ -1543,7 +1551,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             new IBridgeAdapter.BridgeAsset[](0),
             abi.encode(
                 IChainGateway.CrossChainMessage({
-                    messageType: IChainGateway.MessageType.BRIDGE_IOUTOKEN,
+                    messageType: IChainGateway.MessageType.BRIDGE_IOU_TOKEN,
                     data: abi.encode(
                         IChainGateway.IouTokenBridgeMessage({recipient: makeAddr("iouTokenRecipient"), amount: 100_000})
                     )

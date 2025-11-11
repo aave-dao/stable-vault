@@ -144,9 +144,12 @@ contract BaseTest is Test {
         uint256 defaultSubVaultPerSecondRate,
         address iouTokenManager,
         address fundsHandlerAddr,
-        address assetRegistry
+        address assetRegistry,
+        address transferHelper
     ) internal virtual returns (ExtendedBasedBoostedVault) {
-        address vaultImpl = address(new ExtendedBasedBoostedVault(maxPerSecondRate, iouTokenManager, fundsHandlerAddr));
+        address vaultImpl = address(
+            new ExtendedBasedBoostedVault(maxPerSecondRate, iouTokenManager, fundsHandlerAddr, transferHelper)
+        );
         return ExtendedBasedBoostedVault(
             address(
                 new TransparentUpgradeableProxy(
@@ -306,7 +309,8 @@ contract BaseTest is Test {
             initialBasePerSecondRate,
             iouTokenManager_accountingChainAddress,
             fundsHandler_accountingChainAddress,
-            assetRegistry_accountingChainAddress
+            assetRegistry_accountingChainAddress,
+            transferHelper_accountingChainAddress
         );
         console.log("\tVault: %s", vault_accountingChainAddress);
         require(address(vault) == vault_accountingChainAddress, "Vault (Accounting Chain) address mismatch");
@@ -316,7 +320,8 @@ contract BaseTest is Test {
             new Allocator(
                 assetRegistry_accountingChainAddress,
                 fundsHandler_accountingChainAddress,
-                fundsHandler_accountingChainAddress
+                fundsHandler_accountingChainAddress,
+                transferHelper_accountingChainAddress
             )
         );
         allocator_accountingChain = Allocator(
@@ -531,7 +536,10 @@ contract BaseTest is Test {
         // 6. Allocator
         address allocator_earningChain_impl = address(
             new Allocator(
-                assetRegistry_earningChainAddress, chainGateway_earningChainAddress, chainGateway_earningChainAddress
+                assetRegistry_earningChainAddress,
+                chainGateway_earningChainAddress,
+                chainGateway_earningChainAddress,
+                transferHelper_earningChainAddress
             )
         );
         allocator_earningChain = Allocator(
@@ -559,7 +567,10 @@ contract BaseTest is Test {
         // 8. Earning Chain Gateway
         address earningChainGateway_impl = address(
             new EarningChainGateway(
-                ACCOUNTING_CHAIN_ID, allocator_earningChainAddress, iouTokenManager_earningChainAddress
+                ACCOUNTING_CHAIN_ID,
+                allocator_earningChainAddress,
+                iouTokenManager_earningChainAddress,
+                transferHelper_earningChainAddress
             )
         );
         earningChainGateway = EarningChainGateway(

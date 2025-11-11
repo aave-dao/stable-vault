@@ -11,7 +11,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 contract MockIouTokenManager is IIouTokenManager {
     using SafeERC20 for IERC20;
 
-    address internal _iouToken;
+    address internal _IOU_TOKEN;
 
     uint256 internal _lockedBalance;
 
@@ -22,21 +22,21 @@ contract MockIouTokenManager is IIouTokenManager {
     }
 
     function mockIouToken(address iouToken) external {
-        _iouToken = iouToken;
+        _IOU_TOKEN = iouToken;
     }
 
     function mockLockedBalance(uint256 lockedBalance) external {
         _lockedBalance = lockedBalance;
-        uint256 currentBalance = IERC20(_iouToken).balanceOf(address(this));
+        uint256 currentBalance = IERC20(_IOU_TOKEN).balanceOf(address(this));
         if (currentBalance < lockedBalance) {
-            IMintableBurnableIERC20(_iouToken).mint(address(this), lockedBalance - currentBalance);
+            IMintableBurnableIERC20(_IOU_TOKEN).mint(address(this), lockedBalance - currentBalance);
         } else if (currentBalance > lockedBalance) {
-            IMintableBurnableIERC20(_iouToken).burn(address(this), currentBalance - lockedBalance);
+            IMintableBurnableIERC20(_IOU_TOKEN).burn(address(this), currentBalance - lockedBalance);
         }
     }
 
     function getAsset() external view override returns (address) {
-        return _iouToken;
+        return _IOU_TOKEN;
     }
 
     function getLockedBalance() external view override returns (uint256) {
@@ -61,11 +61,11 @@ contract MockIouTokenManager is IIouTokenManager {
     }
 
     function mintTokens(address to, uint256 amount) external override {
-        IMintableBurnableIERC20(_iouToken).mint(to, amount);
+        IMintableBurnableIERC20(_IOU_TOKEN).mint(to, amount);
     }
 
     function burnTokens(address from, uint256 amount) external override {
-        IMintableBurnableIERC20(_iouToken).burn(from, amount);
+        IMintableBurnableIERC20(_IOU_TOKEN).burn(from, amount);
     }
 
     function burnLockedTokens(uint256 amount) external override {
@@ -77,15 +77,15 @@ contract MockIouTokenManager is IIouTokenManager {
     function releaseTokens(address to, uint256 amount) external override {
         require(_lockedBalance >= amount, InsufficientLockedBalance());
         _lockedBalance -= amount;
-        IERC20(_iouToken).safeTransfer(to, amount);
+        IERC20(_IOU_TOKEN).safeTransfer(to, amount);
     }
 
     function _lockTokens(address from, uint256 amount) internal {
         _lockedBalance += amount;
-        IERC20(_iouToken).safeTransferFrom(from, address(this), amount);
+        IERC20(_IOU_TOKEN).safeTransferFrom(from, address(this), amount);
     }
 
     function _burnTokens(address from, uint256 amount) internal {
-        IMintableBurnableIERC20(_iouToken).burn(from, amount);
+        IMintableBurnableIERC20(_IOU_TOKEN).burn(from, amount);
     }
 }

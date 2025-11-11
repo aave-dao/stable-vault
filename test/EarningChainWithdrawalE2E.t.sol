@@ -33,10 +33,12 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         uint256 defaultSubVaultPerSecondRate,
         address iouToken,
         address fundsHandler,
-        address assetRegistry
+        address assetRegistry,
+        address transferHelper
     ) internal virtual override returns (ExtendedBasedBoostedVault) {
         // Deploy a vault without restriction in the valid per-second rate
-        address vaultImpl = address(new ExtendedBasedBoostedVault(type(uint256).max, iouToken, fundsHandler));
+        address vaultImpl =
+            address(new ExtendedBasedBoostedVault(type(uint256).max, iouToken, fundsHandler, transferHelper));
         return ExtendedBasedBoostedVault(
             address(
                 new TransparentUpgradeableProxy(
