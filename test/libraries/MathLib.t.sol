@@ -136,8 +136,7 @@ contract MathLibDifferentialTests is Test {
         ApyVsrTestCase[] memory testCases = new ApyVsrTestCase[](rows.length);
         for (uint256 i = 0; i < rows.length; i++) {
             testCases[i] = ApyVsrTestCase({
-                apy: vm.parseUint(vm.split(rows[i], ",")[0]),
-                vsr: vm.parseUint(vm.split(rows[i], ",")[1])
+                apy: vm.parseUint(vm.split(rows[i], ",")[0]), vsr: vm.parseUint(vm.split(rows[i], ",")[1])
             });
         }
         return testCases;
