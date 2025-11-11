@@ -637,11 +637,13 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     ) public {
         vm.assume(msgSender != address(0));
         vm.assume(msgSender != address(mockFundsHandler));
+        vm.assume(msgSender != address(mockTransferHelper));
         _assumeNotProxyAdmin(msgSender, address(bbv));
         requestedAssetsToClaim = _boundAssetAmount(address(mockAsset), requestedAssetsToClaim);
         availableFeesToClaimRay = _boundRayAmount(availableFeesToClaimRay);
         vm.assume(requestedAssetsToClaim.assetDecimalsToRay(address(mockAsset)) <= availableFeesToClaimRay);
         vm.assume(mockAsset.balanceOf(msgSender) == 0);
+        vm.assume(mockTransferHelper.getBalance(address(mockAsset)) == 0);
 
         mockTransferHelper.mockAsset(address(mockAsset), availableFeesToClaimRay);
 
