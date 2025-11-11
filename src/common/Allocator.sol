@@ -15,6 +15,7 @@ import {ITransferHelper} from "../interfaces/ITransferHelper.sol";
 
 import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
+import {TransferHelperClient} from "./TransferHelperClient.sol";
 
 /// @dev Assumptions:
 ///      - 1 default strategy per asset
@@ -22,7 +23,7 @@ import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 ///      - assumes all assets in Allocator share a common denomination
 ///      - asset amounts are treated in their native decimals
 ///      - 100% of assets deposited into Allocator belong to the same entity (the Allocator does not track depositors)
-contract Allocator is AccessManagedUpgradeable, IAllocator {
+contract Allocator is AccessManagedUpgradeable, TransferHelperClient, IAllocator {
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
 
@@ -35,7 +36,6 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
     address internal immutable DEPOSITOR;
     address internal immutable WITHDRAWER;
     address internal immutable ASSET_REGISTRY;
-    address internal immutable TRANSFER_HELPER;
 
     /// @custom:storage-location erc7201:aave.storage.Allocator
     struct AllocatorStorage {
@@ -79,12 +79,13 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
     /// @param assetRegistry The address of the AssetRegistry contract.
     /// @param depositor The address of the depositor to whitelist.
     /// @param withdrawer The address of the withdrawer to whitelist.
-    constructor(address assetRegistry, address depositor, address withdrawer, address transferHelper) {
+    constructor(address assetRegistry, address depositor, address withdrawer, address transferHelper)
+        TransferHelperClient(transferHelper)
+    {
         _disableInitializers();
         DEPOSITOR = depositor;
         WITHDRAWER = withdrawer;
         ASSET_REGISTRY = assetRegistry;
-        TRANSFER_HELPER = transferHelper;
     }
 
     /// @dev Initializer.
@@ -156,7 +157,7 @@ contract Allocator is AccessManagedUpgradeable, IAllocator {
                 }
             }
         }
-        IERC20(asset).safeTransfer(TRANSFER_HELPER, amount);
+        _transferToTransferHelper(asset, amount);
     }
 
     //////////////////////////////////////////// MANAGER FUNCTIONS /////////////////////////////////////////////////////

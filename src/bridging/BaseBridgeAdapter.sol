@@ -5,6 +5,7 @@ import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManage
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+import {TransferHelperClient} from "../common/TransferHelperClient.sol";
 import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
@@ -14,11 +15,10 @@ import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 /// @dev Tokens inbound to this contract should be pulled into this contract with spend permission.
 /// @dev Tokens outbound from this contract will be approved to be spent by predetermined spender. Outbound funds are
 /// pulled from this contract.
-abstract contract BaseBridgeAdapter is AccessManaged, IBridgeAdapter {
+abstract contract BaseBridgeAdapter is AccessManaged, TransferHelperClient, IBridgeAdapter {
     using SafeERC20 for IERC20;
 
     address internal immutable GATEWAY;
-    address internal immutable TRANSFER_HELPER;
 
     mapping(uint256 chainId => address destinationChainAdapter) internal _destinationChainAdapterOf;
 
@@ -27,9 +27,11 @@ abstract contract BaseBridgeAdapter is AccessManaged, IBridgeAdapter {
         _;
     }
 
-    constructor(address accessManager, address gateway, address transferHelper) AccessManaged(accessManager) {
+    constructor(address accessManager, address gateway, address transferHelper)
+        AccessManaged(accessManager)
+        TransferHelperClient(transferHelper)
+    {
         GATEWAY = gateway;
-        TRANSFER_HELPER = transferHelper;
     }
 
     function publishMessageToChainWithFeePayer(
@@ -51,11 +53,14 @@ abstract contract BaseBridgeAdapter is AccessManaged, IBridgeAdapter {
         _processReceivedFunds(sourceChainId, assets);
     }
 
-    function _processReceivedFunds(uint256 sourceChainId, IBridgeAdapter.BridgeAsset[] memory assets) internal {
+    function _processReceivedFunds(uint256 sourceChainId, IBridgeAdapter.BridgeAsset[] memory assets)
+        internal
+        assertingTransferHelperBalanceForBridgeAssets(assets)
+    {
         for (uint256 i = 0; i < assets.length; i++) {
             address asset = assets[i].asset;
             uint256 amount = assets[i].amount;
-            IERC20(asset).safeTransfer(TRANSFER_HELPER, amount);
+            _transferToTransferHelper(asset, amount);
         }
         IChainGateway(GATEWAY).receiveMessage(sourceChainId, assets, "");
     }

@@ -4,24 +4,20 @@ pragma solidity ^0.8.22;
 import {
     AccessManagedUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {RescuableAssets} from "../common/RescuableAssets.sol";
+import {TransferHelperClient} from "../common/TransferHelperClient.sol";
 import {IAccountingChainGateway} from "../interfaces/IAccountingChainGateway.sol";
 import {IAllocator} from "../interfaces/IAllocator.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
 import {AssetLib} from "../libraries/AssetLib.sol";
-import {BridgeParamsLib} from "../libraries/BridgeParamsLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 /// @title FundsHandler
 /// @notice Handles push/pull of funds across the system.
-contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandler {
-    using SafeERC20 for IERC20;
+contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, TransferHelperClient, IFundsHandler {
     using AssetLib for uint256;
-    using BridgeParamsLib for IChainGateway.BridgeParams;
 
     struct ChainBalanceSnapshot {
         uint256 chainId;
@@ -33,7 +29,6 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
     address internal immutable VAULT;
     address internal immutable GATEWAY;
     address internal immutable ALLOCATOR;
-    address internal immutable TRANSFER_HELPER;
 
     /// @custom:storage-location erc7201:aave.storage.FundsHandler
     struct FundsHandlerStorage {
@@ -69,12 +64,13 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
     /// @param gateway The address of the Gateway contract to use for cross-chain communication.
     /// @param allocator The address of the Allocator contract to use for immediate liquidity management.
     /// @param transferHelper The address of the TransferHelper contract to use for minimizing the number of transfers.
-    constructor(address basedBoostedVault, address gateway, address allocator, address transferHelper) {
+    constructor(address basedBoostedVault, address gateway, address allocator, address transferHelper)
+        TransferHelperClient(transferHelper)
+    {
         _disableInitializers();
         VAULT = basedBoostedVault;
         GATEWAY = gateway;
         ALLOCATOR = allocator;
-        TRANSFER_HELPER = transferHelper;
     }
 
     /// @dev Initializer.
@@ -141,13 +137,19 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
         uint256 amount,
         uint256 chainId,
         IChainGateway.BridgeParams memory bridgeParams
-    ) external payable override restricted {
+    )
+        external
+        payable
+        override
+        restricted
+        assertingTransferHelperBalanceFor(bridgeParams.feeToken)
+        assertingTransferHelperBalanceFor(asset)
+    {
         require(amount > 0, ErrorsLib.ZeroAmount());
         // Pull funds from liquidity into the TransferHelper.
         _pullFundsFromImmediateLiquidity(asset, amount);
 
-        // Send the bridge fee to the TransferHelper to be pulled by Bridge Adapter.
-        bridgeParams.sendBridgeFeeToTransferHelper(TRANSFER_HELPER);
+        _transferBridgeFeeToTransferHelper(bridgeParams);
 
         // Increment the chain balance snapshot for the target chain.
         _updateChainBalanceBeforeBridging(chainId, amount.assetDecimalsToRay(asset));

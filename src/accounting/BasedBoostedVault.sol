@@ -8,6 +8,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {RescuableAssets} from "../common/RescuableAssets.sol";
+import {TransferHelperClient} from "../common/TransferHelperClient.sol";
 import {IAssetRegistry} from "../interfaces/IAssetRegistry.sol";
 import {IBasedBoostedVault} from "../interfaces/IBasedBoostedVault.sol";
 import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
@@ -21,7 +22,7 @@ import {MathLib} from "../libraries/MathLib.sol";
 /// @notice Semi-fixed rate vault.
 /// @dev Assets balances are tracked in RAY internally; conversions from and to specific asset denomination is made on
 /// deposit and on withdrawal execution.
-contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedBoostedVault {
+contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, TransferHelperClient, IBasedBoostedVault {
     using MathLib for uint256;
     using AssetLib for uint256;
     using SafeERC20 for IERC20;
@@ -56,8 +57,6 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
     uint256 internal immutable MAX_VALID_PER_SECOND_RATE;
 
     address internal immutable FUNDS_HANDLER;
-
-    address internal immutable TRANSFER_HELPER;
 
     /// @custom:storage-location erc7201:aave.storage.BasedBoostedVault
     struct BasedBoostedVaultStorage {
@@ -105,13 +104,14 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
     /// @param maxValidPerSecondRate The maximum valid per-second rate, in Ray units (27 decimals).
     /// @param iouTokenManager The address of the IOU token manager.
     /// @param fundsHandler The address of the FundsHandler contract.
-    constructor(uint256 maxValidPerSecondRate, address iouTokenManager, address fundsHandler, address transferHelper) {
+    constructor(uint256 maxValidPerSecondRate, address iouTokenManager, address fundsHandler, address transferHelper)
+        TransferHelperClient(transferHelper)
+    {
         _disableInitializers();
         require(maxValidPerSecondRate > MathLib.RAY, InvalidRate());
         MAX_VALID_PER_SECOND_RATE = maxValidPerSecondRate;
         IOU_TOKEN_MANAGER = iouTokenManager;
         FUNDS_HANDLER = fundsHandler;
-        TRANSFER_HELPER = transferHelper;
     }
 
     /// @dev Initializer.
@@ -137,7 +137,11 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
     }
 
     /// @inheritdoc IBasedBoostedVault
-    function deposit(address user, address asset, uint256 amount) external override {
+    function deposit(address user, address asset, uint256 amount)
+        external
+        override
+        assertingTransferHelperBalanceFor(asset)
+    {
         require(
             IAssetRegistry($storage().assetRegistry).isAllowedToDepositIntoBBV(asset), ErrorsLib.UnsupportedAsset(asset)
         );
@@ -164,7 +168,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
         $storage().positions[user].originalDepositRay += amountInRay;
         $storage().globalOriginalDepositsRay += amountInRay;
 
-        IERC20(asset).safeTransferFrom(msg.sender, TRANSFER_HELPER, amount);
+        _transferToTransferHelper(msg.sender, asset, amount);
         IFundsHandler(FUNDS_HANDLER).processDeposit(asset, amount);
 
         emit Deposit(user, asset, amount);
@@ -236,7 +240,11 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
     }
 
     /// @inheritdoc IBasedBoostedVault
-    function executeWithdrawal(address user, address assetOut, uint256 iouAmountRay) external override {
+    function executeWithdrawal(address user, address assetOut, uint256 iouAmountRay)
+        external
+        override
+        assertingTransferHelperBalanceFor(assetOut)
+    {
         require(msg.sender == user, InvalidMsgSender());
         require(
             IAssetRegistry($storage().assetRegistry).isAllowedToWithdrawFromBBV(assetOut),
@@ -256,7 +264,12 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
 
     // TODO: Should we have a "fee recipient" storage field or function param?
     /// @inheritdoc IBasedBoostedVault
-    function claimFees(address[] calldata assets, uint256[] calldata amounts) external override restricted {
+    function claimFees(address[] calldata assets, uint256[] calldata amounts)
+        external
+        override
+        restricted
+        assertingTransferHelperBalanceForAssets(assets)
+    {
         uint256 vaultObligationsRay = _getVaultObligations();
         uint256 vaultAssetsRay = _getVaultAggregatedBalance();
         require(vaultObligationsRay <= vaultAssetsRay, NoFeesToClaim());
