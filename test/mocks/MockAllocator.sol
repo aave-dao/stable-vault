@@ -16,9 +16,7 @@ contract MockAllocator is IAllocator {
     function deposit(address asset, uint256 amount) external override {}
     function rebalance(RebalanceParams[] memory params) external override {}
 
-    function withdraw(address asset, uint256 amount) external override {
-        IERC20(asset).safeTransfer(msg.sender, amount);
-    }
+    function withdraw(address asset, uint256 amount) external override {}
 
     function addStrategy(address asset, address strategy) external override {}
     function removeStrategy(address strategy) external override {}
