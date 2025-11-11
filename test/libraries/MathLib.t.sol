@@ -5,8 +5,6 @@ pragma solidity ^0.8.0;
 import {Test} from "forge-std/Test.sol";
 import {MathLibWrapper} from "test/mocks/MathLibWrapper.sol";
 
-import {console} from "forge-std/console.sol";
-
 contract MathLibDifferentialTests is Test {
     MathLibWrapper internal w;
 
@@ -45,7 +43,7 @@ contract MathLibDifferentialTests is Test {
         assertEq(w.rayDivUp(a, b), a == 0 ? 0 : (a * w.RAY() - 1) / b + 1);
     }
 
-    function test_rayMul() public {
+    function test_rayMul() public view {
         assertEq(w.rayMulDown(0, 1e27), 0);
         assertEq(w.rayMulDown(1e27, 0), 0);
         assertEq(w.rayMulDown(0, 0), 0);
@@ -97,7 +95,7 @@ contract MathLibDifferentialTests is Test {
         assertEq(w.rayDivUp(2, 100000000000000e27), 1);
     }
 
-    function testRPow() public {
+    function testRPow() public view {
         assertEq(w.rpow(0, 0), w.RAY());
         assertEq(w.rpow(1, 0), w.RAY());
         assertEq(w.rpow(0, 1), 0);
