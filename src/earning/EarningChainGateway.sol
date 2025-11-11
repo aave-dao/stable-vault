@@ -108,7 +108,7 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         // Prepare data to synchronize the Accounting Chain's state.
         bytes memory data = abi.encode(
             IChainGateway.CrossChainMessage({
-                messageType: IChainGateway.MessageType.BURN_IOUTOKEN,
+                messageType: IChainGateway.MessageType.BURN_IOU_TOKEN,
                 data: abi.encode(
                     IChainGateway.BurnIouTokenMessage({
                         iouTokenAmountBurnedRay: iouTokenAmountRay,
@@ -153,7 +153,7 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
     function _receiveData(uint256 sourceChainId, bytes memory data) internal override {
         _onlyAdapter(ASSET_FOR_DATA_ONLY_BRIDGE, sourceChainId);
         IChainGateway.CrossChainMessage memory crossChainMessage = abi.decode(data, (IChainGateway.CrossChainMessage));
-        if (crossChainMessage.messageType == IChainGateway.MessageType.BRIDGE_IOUTOKEN) {
+        if (crossChainMessage.messageType == IChainGateway.MessageType.BRIDGE_IOU_TOKEN) {
             _bridgeIouTokenFromAccountingChain(sourceChainId, crossChainMessage.data);
         } else {
             revert IChainGateway.InvalidMessageType();

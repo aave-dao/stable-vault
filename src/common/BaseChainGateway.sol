@@ -89,7 +89,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
 
         bytes memory data = abi.encode(
             IChainGateway.CrossChainMessage({
-                messageType: IChainGateway.MessageType.BRIDGE_IOUTOKEN,
+                messageType: IChainGateway.MessageType.BRIDGE_IOU_TOKEN,
                 data: abi.encode(
                     IChainGateway.IouTokenBridgeMessage({recipient: iouTokenRecipient, amount: iouTokenAmountRay})
                 )

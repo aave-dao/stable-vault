@@ -68,9 +68,9 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
         IChainGateway.CrossChainMessage memory crossChainMessage = abi.decode(data, (IChainGateway.CrossChainMessage));
         if (crossChainMessage.messageType == IChainGateway.MessageType.BALANCE_SNAPSHOT) {
             _updateChainBalanceSnapshot(sourceChainId, crossChainMessage.data);
-        } else if (crossChainMessage.messageType == IChainGateway.MessageType.BRIDGE_IOUTOKEN) {
+        } else if (crossChainMessage.messageType == IChainGateway.MessageType.BRIDGE_IOU_TOKEN) {
             _bridgeIouTokenFromEarningChain(sourceChainId, crossChainMessage.data);
-        } else if (crossChainMessage.messageType == IChainGateway.MessageType.BURN_IOUTOKEN) {
+        } else if (crossChainMessage.messageType == IChainGateway.MessageType.BURN_IOU_TOKEN) {
             _burnIouToken(sourceChainId, crossChainMessage.data);
         } else {
             revert IChainGateway.InvalidMessageType();
