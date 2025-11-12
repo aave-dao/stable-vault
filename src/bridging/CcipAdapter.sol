@@ -140,18 +140,6 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
         return interfaceId == type(IAny2EVMMessageReceiver).interfaceId || interfaceId == type(IERC165).interfaceId;
     }
 
-    function _sendMessage(uint256 chainId, Client.EVM2AnyMessage memory message) internal {
-        uint64 chainSelector = _chainSelectorOf[chainId];
-        uint256 fee = IRouterClient(CCIP_ROUTER).getFee(chainSelector, message);
-        uint256 msgValue;
-        if (message.feeToken == BridgeParamsLib.BRIDGE_FEE_ON_NATIVE_CURRENCY) {
-            msgValue = fee;
-        } else {
-            IERC20(_feeToken).safeIncreaseAllowance(CCIP_ROUTER, fee);
-        }
-        IRouterClient(CCIP_ROUTER).ccipSend{value: msgValue}(chainSelector, message);
-    }
-
     function _sendMessageWithFeePayer(
         uint256 chainId,
         Client.EVM2AnyMessage memory message,
