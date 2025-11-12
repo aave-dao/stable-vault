@@ -7,6 +7,7 @@ import {
 
 import {IAssetRegistry} from "../interfaces/IAssetRegistry.sol";
 
+// TODO: should we extend multicall to allow disabling deposits for mulitple assets?
 contract AssetRegistry is AccessManagedUpgradeable, IAssetRegistry {
     /// @custom:storage-location erc7201:aave.storage.AssetRegistry
     struct AssetRegistryStorage {

@@ -6,14 +6,13 @@ import {ITransferHelper} from "../../src/interfaces/ITransferHelper.sol";
 import {IMockErc20} from "./MockErc20.sol";
 
 contract MockTransferHelper is ITransferHelper, TransferHelper {
-
     function mockAsset(address asset, uint256 amount) external {
         IMockErc20(asset).mint(address(this), amount);
     }
 
     function mockAssetBalance(address asset, uint256 balance) external {
         uint256 currentBalance = IMockErc20(asset).balanceOf(address(this));
-        if (currentBalance < balance ) {
+        if (currentBalance < balance) {
             IMockErc20(asset).mint(address(this), balance - currentBalance);
         } else if (currentBalance > balance) {
             IMockErc20(asset).burn(address(this), currentBalance - balance);

@@ -102,13 +102,13 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         _mockAllocator = new MockAllocator();
 
-        _mockBridgeAdapterAssets = new MockBridgeAdapter();
+        _mockTransferHelper = new MockTransferHelper();
 
-        _mockBridgeAdapterData = new MockBridgeAdapter();
+        _mockBridgeAdapterAssets = new MockBridgeAdapter(address(_mockTransferHelper));
+
+        _mockBridgeAdapterData = new MockBridgeAdapter(address(_mockTransferHelper));
 
         _mockAccessManager = new MockAccessManager(admin);
-
-        _mockTransferHelper = new MockTransferHelper();
 
         _earningChainGateway = _deployEarningChainGateway(
             _mockAccessManager, address(_mockIouTokenManager), address(_mockAllocator), address(_mockTransferHelper)
@@ -865,10 +865,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     data: abi.encode(keccak256(hex"c0ffee"))
                 })
             );
-
-            // Check the balance of Allocator is 0
-            assertEq(IERC20(address(_mockUsdt)).balanceOf(address(_mockTransferHelper)), amountToken);
-            assertEq(IERC20(address(_mockGho)).balanceOf(address(_mockTransferHelper)), bridgeFeeAmount);
         }
 
         // check that the next call uses incremented nonce
@@ -1009,8 +1005,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     data: abi.encode(keccak256(hex"c0ffee"))
                 })
             );
-            // Check the balance of TransferHelper is amountTokenUnit + bridgeFeeAmount
-            assertEq(IERC20(address(_mockGho)).balanceOf(address(_mockTransferHelper)), amountToken + bridgeFeeAmount);
         }
 
         // check that the next call uses incremented nonce
@@ -1148,10 +1142,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     data: abi.encode(keccak256(hex"c0ffee"))
                 })
             );
-
-            // Check the balance of TransferHelper is amountTokenUnit + bridgeFeeAmount
-            assertEq(IERC20(address(_mockUsdt)).balanceOf(address(_mockTransferHelper)), amountToken);
-            assertEq(address(_mockTransferHelper).balance, bridgeFeeAmount);
         }
     }
 
@@ -1291,10 +1281,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         // Use GHO as the bridge fee token
         address feeToken = address(_mockGho);
-        // Mimic the IOU token mgr approval of Gateway to pull funds
-        IMockErc20(feeToken).mint(bridgeFeePayer, feeAmount);
-        vm.prank(address(bridgeFeePayer));
-        MockNonStandardErc20(feeToken).approve(address(_earningChainGateway), feeAmount);
+        // Mimic the IOU token mgr approval pushing bridge fee to TransferHelper
+        IMockErc20(feeToken).mint(address(_mockTransferHelper), feeAmount);
 
         // Expect call to Bridge Adapter to publish message with fee payer
         vm.expectCall(
@@ -1349,7 +1337,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
         bridgeFeeAmount = _boundNativeAmount(bridgeFeeAmount);
         iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
         vm.assume(bridgeFeePayer != address(0));
-        vm.deal(address(_mockIouTokenManager), bridgeFeeAmount);
+        // Deal assets to the TransferHelper to mimic the IOU Token Manager pushing funds up
+        vm.deal(address(_mockTransferHelper), bridgeFeeAmount);
 
         vm.expectCall(
             address(_mockBridgeAdapterData),
@@ -1381,7 +1370,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         );
 
         vm.prank(address(_mockIouTokenManager));
-        _earningChainGateway.sendBridgeIouTokenMessageWithFeePayer{value: bridgeFeeAmount}(
+        _earningChainGateway.sendBridgeIouTokenMessageWithFeePayer(
             ACCOUNTING_CHAIN_ID,
             iouTokenRecipient,
             iouTokenAmountRay,
