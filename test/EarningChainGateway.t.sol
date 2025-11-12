@@ -288,7 +288,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                         feeToken: bridgeFeeToken,
                         feeAmount: bridgeFeeAmount,
                         gasLimit: 100000,
-                        data: ""
+                        data: abi.encode(keccak256(hex"c0ffee"))
                     })
                 )
             )
@@ -300,7 +300,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 feeToken: bridgeFeeToken,
                 feeAmount: bridgeFeeAmount,
                 gasLimit: 100000,
-                data: ""
+                data: abi.encode(keccak256(hex"c0ffee"))
             })
         );
 
@@ -334,7 +334,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                         feeToken: bridgeFeeToken,
                         feeAmount: bridgeFeeAmount,
                         gasLimit: 100000,
-                        data: ""
+                        data: abi.encode(keccak256(hex"c0ffee"))
                     })
                 )
             )
@@ -346,7 +346,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 feeToken: bridgeFeeToken,
                 feeAmount: bridgeFeeAmount,
                 gasLimit: 100000,
-                data: ""
+                data: abi.encode(keccak256(hex"c0ffee"))
             })
         );
     }
@@ -397,7 +397,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                         feeToken: bridgeFeeToken,
                         feeAmount: bridgeFeeAmount,
                         gasLimit: 100000,
-                        data: ""
+                        data: abi.encode(keccak256(hex"c0ffee"))
                     })
                 )
             )
@@ -408,7 +408,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 feeToken: bridgeFeeToken,
                 feeAmount: bridgeFeeAmount,
                 gasLimit: 100000,
-                data: ""
+                data: abi.encode(keccak256(hex"c0ffee"))
             })
         );
 
@@ -436,7 +436,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                         feeToken: bridgeFeeToken,
                         feeAmount: bridgeFeeAmount,
                         gasLimit: 100000,
-                        data: ""
+                        data: abi.encode(keccak256(hex"c0ffee"))
                     })
                 )
             )
@@ -447,7 +447,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 feeToken: bridgeFeeToken,
                 feeAmount: bridgeFeeAmount,
                 gasLimit: 100000,
-                data: ""
+                data: abi.encode(keccak256(hex"c0ffee"))
             })
         );
     }
@@ -460,7 +460,11 @@ contract EarningChainGatewayTest is TestWithHelpers {
         vm.expectRevert(IChainGateway.AdapterNotFound.selector);
         _earningChainGateway.sendBalanceUpdateWithFeePayer(
             IChainGateway.BridgeParams({
-                feePayer: makeAddr("bridgeFeePayer"), feeToken: address(0), feeAmount: 123, gasLimit: 100000, data: ""
+                feePayer: makeAddr("bridgeFeePayer"),
+                feeToken: address(0),
+                feeAmount: 123,
+                gasLimit: 100000,
+                data: abi.encode(keccak256(hex"c0ffee"))
             })
         );
     }
@@ -469,7 +473,11 @@ contract EarningChainGatewayTest is TestWithHelpers {
         vm.expectRevert(ErrorsLib.InsufficientFunds.selector);
         _earningChainGateway.sendBalanceUpdateWithFeePayer{value: 0}(
             IChainGateway.BridgeParams({
-                feePayer: makeAddr("bridgeFeePayer"), feeToken: address(0), feeAmount: 123, gasLimit: 100000, data: ""
+                feePayer: makeAddr("bridgeFeePayer"),
+                feeToken: address(0),
+                feeAmount: 123,
+                gasLimit: 100000,
+                data: abi.encode(keccak256(hex"c0ffee"))
             })
         );
     }
@@ -550,7 +558,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                             feeToken: bridgeFeeToken,
                             feeAmount: bridgeFeeAmount,
                             gasLimit: 100000,
-                            data: ""
+                            data: abi.encode(keccak256(hex"c0ffee"))
                         })
                     )
                 )
@@ -568,7 +576,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     feeToken: bridgeFeeToken,
                     feeAmount: bridgeFeeAmount,
                     gasLimit: 100000,
-                    data: ""
+                    data: abi.encode(keccak256(hex"c0ffee"))
                 })
             );
         }
@@ -620,7 +628,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                             feeToken: bridgeFeeToken,
                             feeAmount: bridgeFeeAmount,
                             gasLimit: 100000,
-                            data: ""
+                            data: abi.encode(keccak256(hex"c0ffee"))
                         })
                     )
                 )
@@ -637,7 +645,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     feeToken: bridgeFeeToken,
                     feeAmount: bridgeFeeAmount,
                     gasLimit: 100000,
-                    data: ""
+                    data: abi.encode(keccak256(hex"c0ffee"))
                 })
             );
         }
@@ -695,7 +703,11 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
             uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(tokenOut);
             bridgeParams = IChainGateway.BridgeParams({
-                feePayer: bridgeFeePayer, feeToken: address(0), feeAmount: bridgeFeeAmount, gasLimit: 100000, data: ""
+                feePayer: bridgeFeePayer,
+                feeToken: address(0),
+                feeAmount: bridgeFeeAmount,
+                gasLimit: 100000,
+                data: abi.encode(keccak256(hex"c0ffee"))
             });
             _mockTransferHelper.mockAsset(address(_mockUsdt), amountOut);
             vm.expectCall(address(_mockUsdt), abi.encodeCall(IERC20.transfer, (tokenOutReceiver, amountOut)));
@@ -722,7 +734,11 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockUsdt),
             makeAddr("tokenOutReceiver"),
             IChainGateway.BridgeParams({
-                feePayer: makeAddr("bridgeFeePayer"), feeToken: address(0), feeAmount: 0, gasLimit: 100000, data: ""
+                feePayer: makeAddr("bridgeFeePayer"),
+                feeToken: address(0),
+                feeAmount: 0,
+                gasLimit: 100000,
+                data: abi.encode(keccak256(hex"c0ffee"))
             })
         );
     }
@@ -739,7 +755,11 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockUsdt),
             makeAddr("tokenOutReceiver"),
             IChainGateway.BridgeParams({
-                feePayer: makeAddr("bridgeFeePayer"), feeToken: address(0), feeAmount: 123, gasLimit: 100000, data: ""
+                feePayer: makeAddr("bridgeFeePayer"),
+                feeToken: address(0),
+                feeAmount: 123,
+                gasLimit: 100000,
+                data: abi.encode(keccak256(hex"c0ffee"))
             })
         );
     }
@@ -757,7 +777,11 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockUsdt),
             tokenOutReceiver,
             IChainGateway.BridgeParams({
-                feePayer: makeAddr("bridgeFeePayer"), feeToken: address(0), feeAmount: 123, gasLimit: 100000, data: ""
+                feePayer: makeAddr("bridgeFeePayer"),
+                feeToken: address(0),
+                feeAmount: 123,
+                gasLimit: 100000,
+                data: abi.encode(keccak256(hex"c0ffee"))
             })
         );
     }
@@ -819,7 +843,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                             feeToken: bridgeFeeToken,
                             feeAmount: bridgeFeeAmount,
                             gasLimit: 100000,
-                            data: ""
+                            data: abi.encode(keccak256(hex"c0ffee"))
                         })
                     )
                 )
@@ -834,7 +858,11 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 address(_mockUsdt),
                 amountToken,
                 IChainGateway.BridgeParams({
-                    feePayer: feePayer, feeToken: bridgeFeeToken, feeAmount: bridgeFeeAmount, gasLimit: 100000, data: ""
+                    feePayer: feePayer,
+                    feeToken: bridgeFeeToken,
+                    feeAmount: bridgeFeeAmount,
+                    gasLimit: 100000,
+                    data: abi.encode(keccak256(hex"c0ffee"))
                 })
             );
 
@@ -882,7 +910,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                             feeToken: bridgeFeeToken,
                             feeAmount: bridgeFeeAmount,
                             gasLimit: 100000,
-                            data: ""
+                            data: abi.encode(keccak256(hex"c0ffee"))
                         })
                     )
                 )
@@ -893,7 +921,11 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 address(_mockUsdt),
                 amountToken,
                 IChainGateway.BridgeParams({
-                    feePayer: feePayer, feeToken: bridgeFeeToken, feeAmount: bridgeFeeAmount, gasLimit: 100000, data: ""
+                    feePayer: feePayer,
+                    feeToken: bridgeFeeToken,
+                    feeAmount: bridgeFeeAmount,
+                    gasLimit: 100000,
+                    data: abi.encode(keccak256(hex"c0ffee"))
                 })
             );
         }
@@ -955,7 +987,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                             feeToken: bridgeFeeToken,
                             feeAmount: bridgeFeeAmount,
                             gasLimit: 100000,
-                            data: ""
+                            data: abi.encode(keccak256(hex"c0ffee"))
                         })
                     )
                 )
@@ -970,7 +1002,11 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 address(_mockGho),
                 amountToken,
                 IChainGateway.BridgeParams({
-                    feePayer: feePayer, feeToken: bridgeFeeToken, feeAmount: bridgeFeeAmount, gasLimit: 100000, data: ""
+                    feePayer: feePayer,
+                    feeToken: bridgeFeeToken,
+                    feeAmount: bridgeFeeAmount,
+                    gasLimit: 100000,
+                    data: abi.encode(keccak256(hex"c0ffee"))
                 })
             );
             // Check the balance of TransferHelper is amountTokenUnit + bridgeFeeAmount
@@ -1015,7 +1051,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                             feeToken: bridgeFeeToken,
                             feeAmount: bridgeFeeAmount,
                             gasLimit: 100000,
-                            data: ""
+                            data: abi.encode(keccak256(hex"c0ffee"))
                         })
                     )
                 )
@@ -1029,7 +1065,11 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 address(_mockGho),
                 amountToken,
                 IChainGateway.BridgeParams({
-                    feePayer: feePayer, feeToken: bridgeFeeToken, feeAmount: bridgeFeeAmount, gasLimit: 100000, data: ""
+                    feePayer: feePayer,
+                    feeToken: bridgeFeeToken,
+                    feeAmount: bridgeFeeAmount,
+                    gasLimit: 100000,
+                    data: abi.encode(keccak256(hex"c0ffee"))
                 })
             );
         }
@@ -1090,7 +1130,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                             feeToken: bridgeFeeToken,
                             feeAmount: bridgeFeeAmount,
                             gasLimit: 100000,
-                            data: ""
+                            data: abi.encode(keccak256(hex"c0ffee"))
                         })
                     )
                 )
@@ -1101,7 +1141,11 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 address(_mockUsdt),
                 amountToken,
                 IChainGateway.BridgeParams({
-                    feePayer: feePayer, feeToken: bridgeFeeToken, feeAmount: bridgeFeeAmount, gasLimit: 100000, data: ""
+                    feePayer: feePayer,
+                    feeToken: bridgeFeeToken,
+                    feeAmount: bridgeFeeAmount,
+                    gasLimit: 100000,
+                    data: abi.encode(keccak256(hex"c0ffee"))
                 })
             );
 
@@ -1133,7 +1177,11 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockUsdt),
             100_000_000_000_000 * 10 ** 6,
             IChainGateway.BridgeParams({
-                feePayer: everyRoleAccount, feeToken: address(0), feeAmount: 0, gasLimit: 100000, data: ""
+                feePayer: everyRoleAccount,
+                feeToken: address(0),
+                feeAmount: 0,
+                gasLimit: 100000,
+                data: abi.encode(keccak256(hex"c0ffee"))
             })
         );
     }
@@ -1145,7 +1193,11 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockUsdt),
             0,
             IChainGateway.BridgeParams({
-                feePayer: everyRoleAccount, feeToken: address(0), feeAmount: 0, gasLimit: 100000, data: ""
+                feePayer: everyRoleAccount,
+                feeToken: address(0),
+                feeAmount: 0,
+                gasLimit: 100000,
+                data: abi.encode(keccak256(hex"c0ffee"))
             })
         );
     }
@@ -1161,7 +1213,11 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockUsdt),
             amount,
             IChainGateway.BridgeParams({
-                feePayer: everyRoleAccount, feeToken: address(0), feeAmount: 123, gasLimit: 100000, data: ""
+                feePayer: everyRoleAccount,
+                feeToken: address(0),
+                feeAmount: 123,
+                gasLimit: 100000,
+                data: abi.encode(keccak256(hex"c0ffee"))
             })
         );
     }
@@ -1200,7 +1256,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 feeToken: bridgeFeeToken,
                 feeAmount: bridgeFeeAmount,
                 gasLimit: 100000,
-                data: ""
+                data: abi.encode(keccak256(hex"c0ffee"))
             })
         );
     }
@@ -1214,7 +1270,11 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockUsdt),
             100_000_000_000_000 * 10 ** 6,
             IChainGateway.BridgeParams({
-                feePayer: everyRoleAccount, feeToken: address(0), feeAmount: 0, gasLimit: 100000, data: ""
+                feePayer: everyRoleAccount,
+                feeToken: address(0),
+                feeAmount: 0,
+                gasLimit: 100000,
+                data: abi.encode(keccak256(hex"c0ffee"))
             })
         );
     }
@@ -1255,7 +1315,11 @@ contract EarningChainGatewayTest is TestWithHelpers {
                         })
                     ),
                     IChainGateway.BridgeParams({
-                        feePayer: bridgeFeePayer, feeToken: feeToken, feeAmount: feeAmount, gasLimit: 100000, data: ""
+                        feePayer: bridgeFeePayer,
+                        feeToken: feeToken,
+                        feeAmount: feeAmount,
+                        gasLimit: 100000,
+                        data: abi.encode(keccak256(hex"c0ffee"))
                     })
                 )
             )
@@ -1267,7 +1331,11 @@ contract EarningChainGatewayTest is TestWithHelpers {
             iouTokenRecipient,
             iouTokenAmountRay,
             IChainGateway.BridgeParams({
-                feePayer: bridgeFeePayer, feeToken: address(_mockGho), feeAmount: feeAmount, gasLimit: 100000, data: ""
+                feePayer: bridgeFeePayer,
+                feeToken: address(_mockGho),
+                feeAmount: feeAmount,
+                gasLimit: 100000,
+                data: abi.encode(keccak256(hex"c0ffee"))
             })
         );
     }
@@ -1306,7 +1374,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                         feeToken: address(0),
                         feeAmount: bridgeFeeAmount,
                         gasLimit: 100000,
-                        data: ""
+                        data: abi.encode(keccak256(hex"c0ffee"))
                     })
                 )
             )
@@ -1318,7 +1386,11 @@ contract EarningChainGatewayTest is TestWithHelpers {
             iouTokenRecipient,
             iouTokenAmountRay,
             IChainGateway.BridgeParams({
-                feePayer: bridgeFeePayer, feeToken: address(0), feeAmount: bridgeFeeAmount, gasLimit: 100000, data: ""
+                feePayer: bridgeFeePayer,
+                feeToken: address(0),
+                feeAmount: bridgeFeeAmount,
+                gasLimit: 100000,
+                data: abi.encode(keccak256(hex"c0ffee"))
             })
         );
     }
@@ -1335,7 +1407,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 feeToken: address(_mockUsdt),
                 feeAmount: 100_000,
                 gasLimit: 100000,
-                data: ""
+                data: abi.encode(keccak256(hex"c0ffee"))
             })
         );
     }
@@ -1353,7 +1425,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 feeToken: address(_mockUsdt),
                 feeAmount: 100_000,
                 gasLimit: 100000,
-                data: ""
+                data: abi.encode(keccak256(hex"c0ffee"))
             })
         );
     }
@@ -1374,7 +1446,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 feeToken: address(_mockUsdt),
                 feeAmount: 100_000,
                 gasLimit: 100000,
-                data: ""
+                data: abi.encode(keccak256(hex"c0ffee"))
             })
         );
     }
