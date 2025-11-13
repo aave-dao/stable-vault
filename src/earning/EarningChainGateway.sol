@@ -112,6 +112,7 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
     {
         require(iouTokenAmountRay > 0, ErrorsLib.ZeroAmount());
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(msg.sender, iouTokenAmountRay);
+        // TODO: check if user withdrawal of asset is allowed on AssetRegistry
 
         address adapter =
             $BaseChainGateway().defaultBridgeAdapter[ConstantsLib.ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID];
