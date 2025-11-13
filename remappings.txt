@@ -1,3 +1,4 @@
 @openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
 @openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/
 @chainlink-ccip/contracts/=lib/chainlink-ccip/chains/evm/contracts/
+@solady/=lib/solady/src/
