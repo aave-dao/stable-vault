@@ -50,8 +50,6 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         uint256 shares;
     }
 
-    uint256 internal constant SECONDS_PER_YEAR = 31_536_000;
-
     address internal immutable IOU_TOKEN_MANAGER;
 
     uint256 internal immutable MAX_VALID_PER_SECOND_RATE;

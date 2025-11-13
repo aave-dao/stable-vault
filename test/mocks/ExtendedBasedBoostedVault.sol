@@ -7,6 +7,8 @@ import {MathLib} from "../../src/libraries/MathLib.sol";
 contract ExtendedBasedBoostedVault is BasedBoostedVault {
     using MathLib for uint256;
 
+    uint256 internal constant SECONDS_PER_YEAR = 31_536_000;
+
     constructor(uint256 maxPerSecondRate, address iouTokenManager, address fundsHandler, address transferHelper)
         BasedBoostedVault(maxPerSecondRate, iouTokenManager, fundsHandler, transferHelper)
     {}

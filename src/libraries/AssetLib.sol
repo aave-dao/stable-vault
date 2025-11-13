@@ -3,15 +3,15 @@ pragma solidity ^0.8.22;
 
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-library AssetLib {
-    uint256 constant RAY_DECIMALS = 27;
+import {ConstantsLib} from "../libraries/ConstantsLib.sol";
 
+library AssetLib {
     function assetDecimalsToRay(uint256 amount, address asset) internal view returns (uint256) {
-        return convertDecimals(amount, getDecimals(asset), RAY_DECIMALS);
+        return convertDecimals(amount, getDecimals(asset), ConstantsLib.RAY_DECIMALS);
     }
 
     function rayToAssetDecimals(uint256 amount, address asset) internal view returns (uint256) {
-        return convertDecimals(amount, RAY_DECIMALS, getDecimals(asset));
+        return convertDecimals(amount, ConstantsLib.RAY_DECIMALS, getDecimals(asset));
     }
 
     function convertAssetDecimals(uint256 amount, address fromAsset, address toAsset) internal view returns (uint256) {
