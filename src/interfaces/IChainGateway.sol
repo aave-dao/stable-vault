@@ -16,8 +16,8 @@ interface IChainGateway {
     enum MessageType {
         INVALID,
         BALANCE_SNAPSHOT,
-        BRIDGE_IOUTOKEN,
-        BURN_IOUTOKEN
+        BRIDGE_IOU_TOKEN,
+        BURN_IOU_TOKEN
     }
 
     struct BridgeParams {

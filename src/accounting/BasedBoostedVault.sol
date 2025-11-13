@@ -12,6 +12,7 @@ import {IAssetRegistry} from "../interfaces/IAssetRegistry.sol";
 import {IBasedBoostedVault} from "../interfaces/IBasedBoostedVault.sol";
 import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
 import {IIouTokenManager} from "../interfaces/IIouTokenManager.sol";
+import {ITransferHelper} from "../interfaces/ITransferHelper.sol";
 import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {MathLib} from "../libraries/MathLib.sol";
@@ -55,6 +56,8 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
     uint256 internal immutable MAX_VALID_PER_SECOND_RATE;
 
     address internal immutable FUNDS_HANDLER;
+
+    address internal immutable TRANSFER_HELPER;
 
     /// @custom:storage-location erc7201:aave.storage.BasedBoostedVault
     struct BasedBoostedVaultStorage {
@@ -102,12 +105,13 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
     /// @param maxValidPerSecondRate The maximum valid per-second rate, in Ray units (27 decimals).
     /// @param iouTokenManager The address of the IOU token manager.
     /// @param fundsHandler The address of the FundsHandler contract.
-    constructor(uint256 maxValidPerSecondRate, address iouTokenManager, address fundsHandler) {
+    constructor(uint256 maxValidPerSecondRate, address iouTokenManager, address fundsHandler, address transferHelper) {
         _disableInitializers();
         require(maxValidPerSecondRate > MathLib.RAY, InvalidRate());
         MAX_VALID_PER_SECOND_RATE = maxValidPerSecondRate;
         IOU_TOKEN_MANAGER = iouTokenManager;
         FUNDS_HANDLER = fundsHandler;
+        TRANSFER_HELPER = transferHelper;
     }
 
     /// @dev Initializer.
@@ -160,7 +164,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
         $storage().positions[user].originalDepositRay += amountInRay;
         $storage().globalOriginalDepositsRay += amountInRay;
 
-        IERC20(asset).safeTransferFrom(msg.sender, FUNDS_HANDLER, amount);
+        IERC20(asset).safeTransferFrom(msg.sender, TRANSFER_HELPER, amount);
         IFundsHandler(FUNDS_HANDLER).processDeposit(asset, amount);
 
         emit Deposit(user, asset, amount);
@@ -241,7 +245,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(user, iouAmountRay);
         uint256 assetAmount = iouAmountRay.rayToAssetDecimals(assetOut);
         IFundsHandler(FUNDS_HANDLER).processWithdrawal(assetOut, assetAmount);
-        IERC20(assetOut).safeTransferFrom(FUNDS_HANDLER, user, assetAmount);
+        ITransferHelper(TRANSFER_HELPER).transfer(assetOut, assetAmount, user);
         emit WithdrawalExecuted(user, assetOut, assetAmount);
     }
 
@@ -261,11 +265,9 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, IBasedB
         for (uint256 i = 0; i < assets.length; i++) {
             IFundsHandler(FUNDS_HANDLER).processWithdrawal(assets[i], amounts[i]);
             accumulatedAmountRay += amounts[i].assetDecimalsToRay(assets[i]);
-            if (amounts[i] > 0) {
-                IERC20(assets[i]).safeTransferFrom(FUNDS_HANDLER, msg.sender, amounts[i]);
-            }
         }
         require(accumulatedAmountRay <= fee, ErrorsLib.InvalidAmount());
+        ITransferHelper(TRANSFER_HELPER).transfer(assets, amounts, msg.sender);
         emit FeesClaimed(assets, amounts);
     }
 

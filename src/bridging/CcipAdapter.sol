@@ -12,6 +12,8 @@ import {Client} from "@chainlink-ccip/contracts/libraries/Client.sol";
 import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {ICcipBridgeAdapter} from "../interfaces/ICcipBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
+import {ITransferHelper} from "../interfaces/ITransferHelper.sol";
+import {BridgeParamsLib} from "../libraries/BridgeParamsLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {BaseBridgeAdapter} from "./BaseBridgeAdapter.sol";
 
@@ -20,9 +22,8 @@ import {BaseBridgeAdapter} from "./BaseBridgeAdapter.sol";
 contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
     using SafeERC20 for IERC20;
 
-    address internal constant FEE_ON_NATIVE_CURRENCY = address(0);
-
     address internal immutable CCIP_ROUTER;
+
     address internal _feeToken;
 
     mapping(uint256 chainId => uint64 ccipChainSelector) internal _chainSelectorOf;
@@ -40,7 +41,9 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
         _;
     }
 
-    constructor(address accessManager, address gateway, address ccipRouter) BaseBridgeAdapter(accessManager, gateway) {
+    constructor(address accessManager, address gateway, address ccipRouter, address transferHelper)
+        BaseBridgeAdapter(accessManager, gateway, transferHelper)
+    {
         CCIP_ROUTER = ccipRouter;
     }
 
@@ -63,17 +66,28 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
         IChainGateway.BridgeParams memory bridgeParams
     ) external payable override onlyGateway {
         Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](assets.length);
+        address[] memory assetsToPull = new address[](assets.length + 1);
+        uint256[] memory amountsToPull = new uint256[](assets.length + 1);
         if (assets.length > 0) {
             for (uint256 i = 0; i < assets.length; i++) {
                 address asset = assets[i].asset;
                 uint256 amount = assets[i].amount;
-                // Pull funds from caller into this contract
-                IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
-                // Approve the CCIP Router to spend the funds
-                IERC20(asset).forceApprove(CCIP_ROUTER, amount);
                 tokenAmounts[i] = Client.EVMTokenAmount({token: asset, amount: amount});
+
+                // Approve the CCIP Router to spend the funds
+                assetsToPull[i] = asset;
+                amountsToPull[i] = amount;
+                IERC20(asset).forceApprove(CCIP_ROUTER, amount);
             }
         }
+        assetsToPull[assetsToPull.length - 1] = bridgeParams.feeToken;
+        amountsToPull[amountsToPull.length - 1] = bridgeParams.feeAmount;
+
+        if (bridgeParams.feeToken != BridgeParamsLib.BRIDGE_FEE_ON_NATIVE_CURRENCY) {
+            // Increase allowance in case of the fee token matching an asset being bridged.
+            IERC20(bridgeParams.feeToken).safeIncreaseAllowance(CCIP_ROUTER, bridgeParams.feeAmount);
+        }
+        ITransferHelper(TRANSFER_HELPER).pull(assetsToPull, amountsToPull);
         Client.EVM2AnyMessage memory ccipMessage = Client.EVM2AnyMessage({
             receiver: abi.encode(_destinationChainAdapterOf[destinationChainId]),
             data: data,
@@ -126,18 +140,6 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
         return interfaceId == type(IAny2EVMMessageReceiver).interfaceId || interfaceId == type(IERC165).interfaceId;
     }
 
-    function _sendMessage(uint256 chainId, Client.EVM2AnyMessage memory message) internal {
-        uint64 chainSelector = _chainSelectorOf[chainId];
-        uint256 fee = IRouterClient(CCIP_ROUTER).getFee(chainSelector, message);
-        uint256 msgValue;
-        if (message.feeToken == FEE_ON_NATIVE_CURRENCY) {
-            msgValue = fee;
-        } else {
-            IERC20(_feeToken).safeIncreaseAllowance(CCIP_ROUTER, fee);
-        }
-        IRouterClient(CCIP_ROUTER).ccipSend{value: msgValue}(chainSelector, message);
-    }
-
     function _sendMessageWithFeePayer(
         uint256 chainId,
         Client.EVM2AnyMessage memory message,
@@ -148,17 +150,12 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
         uint64 chainSelector = _chainSelectorOf[chainId];
         uint256 estimatedFeeAmount = IRouterClient(CCIP_ROUTER).getFee(chainSelector, message);
         uint256 msgValue;
-        if (feeToken == FEE_ON_NATIVE_CURRENCY) {
+        if (feeToken == BridgeParamsLib.BRIDGE_FEE_ON_NATIVE_CURRENCY) {
             msgValue = estimatedFeeAmount;
-        } else {
-            // Pull the fee amount from the sender into this contract.
-            IERC20(feeToken).safeTransferFrom(msg.sender, address(this), estimatedFeeAmount);
-            // Approve the Router to pull the estimated fee.
-            IERC20(feeToken).safeIncreaseAllowance(CCIP_ROUTER, estimatedFeeAmount);
         }
         // Return any excess fee to the fee payer.
         if (allocatedFeeAmount > estimatedFeeAmount) {
-            if (feeToken == FEE_ON_NATIVE_CURRENCY) {
+            if (feeToken == BridgeParamsLib.BRIDGE_FEE_ON_NATIVE_CURRENCY) {
                 payable(feePayer).transfer(allocatedFeeAmount - estimatedFeeAmount);
             } else {
                 IERC20(feeToken).safeTransfer(feePayer, allocatedFeeAmount - estimatedFeeAmount);

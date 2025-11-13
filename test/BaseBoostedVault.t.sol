@@ -22,6 +22,7 @@ import {IMockErc20} from "./mocks/MockErc20.sol";
 import {MockFundsHandler} from "./mocks/MockFundsHandler.sol";
 import {MockIouTokenManager} from "./mocks/MockIouTokenManager.sol";
 import {MockNonStandardErc20} from "./mocks/MockNonStandardErc20.sol";
+import {MockTransferHelper} from "./mocks/MockTransferHelper.sol";
 
 contract BasedBoostedVaultTest is TestWithHelpers {
     using MathLib for uint256;
@@ -38,6 +39,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     MockErc20 mockIouToken;
     MockIouTokenManager mockIouTokenManager;
     MockAssetRegistry mockAssetRegistry;
+    MockTransferHelper mockTransferHelper;
     IBasedBoostedVault bbv;
 
     function _deployDefaultAsset() internal returns (IMockErc20) {
@@ -50,9 +52,12 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 defaultSubVaultPerSecondRate,
         address iouTokenManager,
         address fundsHandler,
-        address assetRegistry
+        address assetRegistry,
+        address transferHelper
     ) internal returns (IBasedBoostedVault) {
-        address vaultImpl = address(new BasedBoostedVault(maxPerSecondRate, iouTokenManager, fundsHandler));
+        address vaultImpl = address(
+            new BasedBoostedVault(maxPerSecondRate, iouTokenManager, fundsHandler, transferHelper)
+        );
         return BasedBoostedVault(
             address(
                 new TransparentUpgradeableProxy(
@@ -74,27 +79,32 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockAssetRegistry = new MockAssetRegistry();
         mockAsset = _deployDefaultAsset();
         mockFundsHandler = new MockFundsHandler();
+        mockTransferHelper = new MockTransferHelper();
         bbv = _deployBasedBoostedVault(
             address(mockAccessManager),
             DEFAULT_MAX_PER_SECOND_RATE,
             DEFAULT_PER_SECOND_RATE,
             address(mockIouTokenManager),
             address(mockFundsHandler),
-            address(mockAssetRegistry)
+            address(mockAssetRegistry),
+            address(mockTransferHelper)
         );
     }
 
     function test_constructor_setsTheExpectedValues(
         uint256 expectedMaxValidPerSecondRate,
         address expectedIouManager,
-        address expectedFundsHandler
+        address expectedFundsHandler,
+        address expectedTransferHelper
     ) public {
         vm.assume(expectedIouManager != address(0));
         vm.assume(expectedFundsHandler != address(0));
+        vm.assume(expectedTransferHelper != address(0));
         vm.assume(expectedMaxValidPerSecondRate > MathLib.RAY);
 
-        BasedBoostedVault newBbv =
-            new BasedBoostedVault(expectedMaxValidPerSecondRate, expectedIouManager, expectedFundsHandler);
+        BasedBoostedVault newBbv = new BasedBoostedVault(
+            expectedMaxValidPerSecondRate, expectedIouManager, expectedFundsHandler, expectedTransferHelper
+        );
 
         assertEq(newBbv.getMaxValidPerSecondRate(), expectedMaxValidPerSecondRate);
     }
@@ -103,7 +113,12 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(invalidMaxValidPerSecondRate <= MathLib.RAY);
 
         vm.expectRevert(IBasedBoostedVault.InvalidRate.selector);
-        new BasedBoostedVault(invalidMaxValidPerSecondRate, address(mockIouTokenManager), address(mockFundsHandler));
+        new BasedBoostedVault(
+            invalidMaxValidPerSecondRate,
+            address(mockIouTokenManager),
+            address(mockFundsHandler),
+            address(mockTransferHelper)
+        );
     }
 
     function test_initialize_setsTheExpectedValues(
@@ -116,7 +131,12 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         expectedDefaultSubVaultRate = _boundRate(expectedDefaultSubVaultRate);
 
         address bbvImpl = address(
-            new BasedBoostedVault(DEFAULT_MAX_PER_SECOND_RATE, address(mockIouTokenManager), address(mockFundsHandler))
+            new BasedBoostedVault(
+                DEFAULT_MAX_PER_SECOND_RATE,
+                address(mockIouTokenManager),
+                address(mockFundsHandler),
+                address(mockTransferHelper)
+            )
         );
 
         BasedBoostedVault newBbv = BasedBoostedVault(
@@ -141,7 +161,12 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(invalidDefaultSubVaultRate < MathLib.RAY || invalidDefaultSubVaultRate > DEFAULT_MAX_PER_SECOND_RATE);
 
         address bbvImpl = address(
-            new BasedBoostedVault(DEFAULT_MAX_PER_SECOND_RATE, address(mockIouTokenManager), address(mockFundsHandler))
+            new BasedBoostedVault(
+                DEFAULT_MAX_PER_SECOND_RATE,
+                address(mockIouTokenManager),
+                address(mockFundsHandler),
+                address(mockTransferHelper)
+            )
         );
 
         vm.expectRevert(IBasedBoostedVault.InvalidRate.selector);
@@ -592,8 +617,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         availableFeesToClaimRay = _boundRayAmount(availableFeesToClaimRay);
         vm.assume(requestedAssetsToClaim.assetDecimalsToRay(address(mockAsset)) <= availableFeesToClaimRay);
 
-        mockAsset.mint(address(mockFundsHandler), availableFeesToClaimRay);
-        mockFundsHandler.mockApprove(address(bbv), address(mockAsset), availableFeesToClaimRay);
+        mockTransferHelper.mockAsset(address(mockAsset), availableFeesToClaimRay);
 
         mockFundsHandler.mockAggregatedBalance(availableFeesToClaimRay);
 
@@ -613,14 +637,15 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     ) public {
         vm.assume(msgSender != address(0));
         vm.assume(msgSender != address(mockFundsHandler));
+        vm.assume(msgSender != address(mockTransferHelper));
         _assumeNotProxyAdmin(msgSender, address(bbv));
         requestedAssetsToClaim = _boundAssetAmount(address(mockAsset), requestedAssetsToClaim);
         availableFeesToClaimRay = _boundRayAmount(availableFeesToClaimRay);
         vm.assume(requestedAssetsToClaim.assetDecimalsToRay(address(mockAsset)) <= availableFeesToClaimRay);
         vm.assume(mockAsset.balanceOf(msgSender) == 0);
+        vm.assume(mockTransferHelper.getBalance(address(mockAsset)) == 0);
 
-        mockAsset.mint(address(mockFundsHandler), availableFeesToClaimRay);
-        mockFundsHandler.mockApprove(address(bbv), address(mockAsset), availableFeesToClaimRay);
+        mockTransferHelper.mockAsset(address(mockAsset), availableFeesToClaimRay);
 
         mockFundsHandler.mockAggregatedBalance(availableFeesToClaimRay);
 
@@ -1095,7 +1120,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockIouToken.mint(user, iouAmountRay);
 
         uint256 actualWithdrawnAssets = iouAmountRay.rayToAssetDecimals(address(mockAsset));
-        mockAsset.mint(address(mockFundsHandler), actualWithdrawnAssets); // Mocking funds into the FH
+        mockTransferHelper.mockAsset(address(mockAsset), actualWithdrawnAssets);
 
         vm.expectEmit(true, true, true, true);
         emit IBasedBoostedVault.WithdrawalExecuted(user, address(mockAsset), actualWithdrawnAssets);
@@ -1119,7 +1144,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         assertEq(mockIouToken.balanceOf(user), userIouBalance);
 
         uint256 actualWithdrawnAssets = iouAmountRay.rayToAssetDecimals(address(mockAsset));
-        mockAsset.mint(address(mockFundsHandler), actualWithdrawnAssets); // Mocking funds into the FH
+        mockTransferHelper.mockAsset(address(mockAsset), actualWithdrawnAssets);
 
         vm.prank(user);
         bbv.executeWithdrawal(user, address(mockAsset), iouAmountRay);
@@ -1136,7 +1161,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(mockAsset.balanceOf(user) == 0);
 
         uint256 actualWithdrawnAssets = iouAmountRay.rayToAssetDecimals(address(mockAsset));
-        mockAsset.mint(address(mockFundsHandler), actualWithdrawnAssets); // Mocking funds into the FH
+        mockTransferHelper.mockAsset(address(mockAsset), actualWithdrawnAssets);
 
         vm.prank(user);
         bbv.executeWithdrawal(user, address(mockAsset), iouAmountRay);

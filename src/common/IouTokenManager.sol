@@ -7,6 +7,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {IIouTokenManager} from "../interfaces/IIouTokenManager.sol";
 import {IMintableBurnableIERC20} from "../interfaces/IMintableBurnableIERC20.sol";
+import {BridgeParamsLib} from "../libraries/BridgeParamsLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 // TODO: add events
@@ -15,13 +16,13 @@ import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 /// @notice Manages the IOU token locking, releasing, minting, burning.
 contract IouTokenManager is IIouTokenManager {
     using SafeERC20 for IERC20;
-
-    address internal constant FEE_ON_NATIVE_CURRENCY = address(0);
+    using BridgeParamsLib for IChainGateway.BridgeParams;
 
     address internal immutable IOU_TOKEN;
     address internal immutable CHAIN_GATEWAY;
     address internal immutable VAULT;
-    bool internal immutable IS_CONANICAL_CHAIN;
+    address internal immutable TRANSFER_HELPER;
+    bool internal immutable IS_CANONICAL_CHAIN;
 
     /// @custom:storage-location erc7201:aave.storage.IouTokenManager
     struct IouTokenManagerStorage {
@@ -43,7 +44,7 @@ contract IouTokenManager is IIouTokenManager {
     }
 
     modifier onlyAllowedReleaser() {
-        require(IS_CONANICAL_CHAIN, NotCanonicalChain());
+        require(IS_CANONICAL_CHAIN, NotCanonicalChain());
         require(msg.sender == CHAIN_GATEWAY, ErrorsLib.NotAuthorized());
         _;
     }
@@ -58,11 +59,12 @@ contract IouTokenManager is IIouTokenManager {
         _;
     }
 
-    constructor(address iouToken, address chainGateway, address vault, bool isCanonicalChain) {
+    constructor(address iouToken, address chainGateway, address vault, address transferHelper, bool isCanonicalChain) {
         IOU_TOKEN = iouToken;
         CHAIN_GATEWAY = chainGateway;
         VAULT = vault;
-        IS_CONANICAL_CHAIN = isCanonicalChain;
+        TRANSFER_HELPER = transferHelper;
+        IS_CANONICAL_CHAIN = isCanonicalChain;
     }
 
     function getAsset() external view override returns (address) {
@@ -81,14 +83,18 @@ contract IouTokenManager is IIouTokenManager {
         IChainGateway.BridgeParams memory bridgeParams
     ) external payable override {
         require(destinationChainId != block.chainid, ErrorsLib.InvalidDestinationChainId());
-        if (IS_CONANICAL_CHAIN) {
+        if (IS_CANONICAL_CHAIN) {
             _lockTokens(msg.sender, iouTokenAmountRay);
         } else {
             _burnTokens(msg.sender, iouTokenAmountRay);
         }
-        IChainGateway(CHAIN_GATEWAY).sendBridgeIouTokenMessageWithFeePayer{value: msg.value}(
-            destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeParams
-        );
+        // Send the bridge fee to the TransferHelper to be pulled by Bridge Adapter.
+        bridgeParams.sendBridgeFeeToTransferHelper(TRANSFER_HELPER);
+
+        IChainGateway(CHAIN_GATEWAY)
+            .sendBridgeIouTokenMessageWithFeePayer(
+                destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeParams
+            );
     }
 
     /// @inheritdoc IIouTokenManager

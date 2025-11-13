@@ -54,21 +54,12 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
     ) external payable override onlyFundsHandler {
         address adapter = $BaseChainGateway().defaultBridgeAdapter[asset][targetChainId];
         require(adapter != address(0), AdapterNotFound());
-
-        IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
-
-        // The FundsHandler will have pulled the fee token from the caller to itself.
-        // Pull the fee token from the FundsHandler to this contract.
-        _prepareBridgeFeeForAdapter(adapter, msg.sender, bridgeParams.feeToken, bridgeParams.feeAmount);
         _sendCrossChainMessage(targetChainId, adapter, asset, amount, "", bridgeParams);
     }
 
     function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal override {
         for (uint256 i = 0; i < assets.length; i++) {
-            address asset = assets[i].asset;
-            uint256 amount = assets[i].amount;
-            IERC20(asset).safeTransferFrom(msg.sender, FUNDS_HANDLER, amount);
-            IFundsHandler(FUNDS_HANDLER).fundsArrivedFromChainCallback(asset, amount);
+            IFundsHandler(FUNDS_HANDLER).fundsArrivedFromChainCallback(assets[i].asset, assets[i].amount);
         }
     }
 
@@ -77,9 +68,9 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
         IChainGateway.CrossChainMessage memory crossChainMessage = abi.decode(data, (IChainGateway.CrossChainMessage));
         if (crossChainMessage.messageType == IChainGateway.MessageType.BALANCE_SNAPSHOT) {
             _updateChainBalanceSnapshot(sourceChainId, crossChainMessage.data);
-        } else if (crossChainMessage.messageType == IChainGateway.MessageType.BRIDGE_IOUTOKEN) {
+        } else if (crossChainMessage.messageType == IChainGateway.MessageType.BRIDGE_IOU_TOKEN) {
             _bridgeIouTokenFromEarningChain(sourceChainId, crossChainMessage.data);
-        } else if (crossChainMessage.messageType == IChainGateway.MessageType.BURN_IOUTOKEN) {
+        } else if (crossChainMessage.messageType == IChainGateway.MessageType.BURN_IOU_TOKEN) {
             _burnIouToken(sourceChainId, crossChainMessage.data);
         } else {
             revert IChainGateway.InvalidMessageType();

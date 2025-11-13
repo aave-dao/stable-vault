@@ -18,6 +18,7 @@ abstract contract BaseBridgeAdapter is AccessManaged, IBridgeAdapter {
     using SafeERC20 for IERC20;
 
     address internal immutable GATEWAY;
+    address internal immutable TRANSFER_HELPER;
 
     mapping(uint256 chainId => address destinationChainAdapter) internal _destinationChainAdapterOf;
 
@@ -26,8 +27,9 @@ abstract contract BaseBridgeAdapter is AccessManaged, IBridgeAdapter {
         _;
     }
 
-    constructor(address accessManager, address gateway) AccessManaged(accessManager) {
+    constructor(address accessManager, address gateway, address transferHelper) AccessManaged(accessManager) {
         GATEWAY = gateway;
+        TRANSFER_HELPER = transferHelper;
     }
 
     function publishMessageToChainWithFeePayer(
@@ -53,8 +55,10 @@ abstract contract BaseBridgeAdapter is AccessManaged, IBridgeAdapter {
         for (uint256 i = 0; i < assets.length; i++) {
             address asset = assets[i].asset;
             uint256 amount = assets[i].amount;
-            IERC20(asset).forceApprove(GATEWAY, amount);
+            IERC20(asset).safeTransfer(TRANSFER_HELPER, amount);
         }
         IChainGateway(GATEWAY).receiveMessage(sourceChainId, assets, "");
     }
+
+    receive() external payable {}
 }

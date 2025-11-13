@@ -22,6 +22,7 @@ import {MockAssetRegistry} from "./mocks/MockAssetRegistry.sol";
 import {IMockErc20} from "./mocks/MockErc20.sol";
 import {MockNonStandardErc20} from "./mocks/MockNonStandardErc20.sol";
 import {MockSwapper} from "./mocks/MockSwapper.sol";
+import {MockTransferHelper} from "./mocks/MockTransferHelper.sol";
 import {TestErc4626} from "./mocks/TestErc4626.sol";
 import {TestErc4626WithSlippage} from "./mocks/TestErc4626WithSlippage.sol";
 
@@ -49,11 +50,15 @@ contract AllocatorTest is TestWithHelpers {
     TestErc4626 internal _defaultGhoStrategy;
     TestErc4626 internal _extraGhoStrategy;
     MockSwapper internal _mockSwapper;
+    MockTransferHelper internal _mockTransferHelper;
 
     Allocator internal _allocator;
 
-    function _deployAllocator(MockAccessManager mockAccessManager, address assetRegistry) internal returns (Allocator) {
-        address allocatorImpl = address(new Allocator(assetRegistry, depositor, withdrawer));
+    function _deployAllocator(MockAccessManager mockAccessManager, address assetRegistry, address transferHelper)
+        internal
+        returns (Allocator)
+    {
+        address allocatorImpl = address(new Allocator(assetRegistry, depositor, withdrawer, transferHelper));
         Allocator allocator = Allocator(
             address(
                 new TransparentUpgradeableProxy(
@@ -95,6 +100,7 @@ contract AllocatorTest is TestWithHelpers {
         _mockAccessManager = new MockAccessManager(admin);
 
         _mockSwapper = new MockSwapper();
+        _mockTransferHelper = new MockTransferHelper();
 
         // Set up Asset Registry
         vm.prank(admin);
@@ -122,7 +128,7 @@ contract AllocatorTest is TestWithHelpers {
             })
         );
 
-        _allocator = _deployAllocator(_mockAccessManager, address(_mockAssetRegistry));
+        _allocator = _deployAllocator(_mockAccessManager, address(_mockAssetRegistry), address(_mockTransferHelper));
     }
 
     function test_getAssetBalances_returnsExpectedAssetBalances(uint256 depositAmountUsdt, uint256 depositAmountGho)
@@ -152,19 +158,11 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
 
-        // Deposit USDT into the default vaults
-        _mockUsdt.mint(depositor, depositAmountUsdt);
-        // Approve the Allocator to spend the USDT
-        vm.prank(depositor);
-        MockNonStandardErc20(address(_mockUsdt)).approve(address(_allocator), depositAmountUsdt);
+        _mockTransferHelper.mockAsset(address(_mockUsdt), depositAmountUsdt);
         vm.prank(depositor);
         _allocator.deposit(address(_mockUsdt), depositAmountUsdt);
 
-        // Deposit GHO into the default vaults
-        _mockGho.mint(depositor, depositAmountGho);
-        // Approve the Allocator to spend the GHO
-        vm.prank(depositor);
-        MockNonStandardErc20(address(_mockGho)).approve(address(_allocator), depositAmountGho);
+        _mockTransferHelper.mockAsset(address(_mockGho), depositAmountGho);
         vm.prank(depositor);
         _allocator.deposit(address(_mockGho), depositAmountGho);
 
@@ -219,7 +217,7 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), depositAmountGho);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
 
-        // Deposit funds into the extra vaults on half of the allocator
+        // Deposit funds into the extra vaults on behalf of the allocator
         _mockUsdt.mint(address(depositor), depositAmountUsdt);
         vm.prank(depositor);
         MockNonStandardErc20(address(_mockUsdt)).approve(address(_extraUsdtStrategy), depositAmountUsdt);
@@ -292,9 +290,7 @@ contract AllocatorTest is TestWithHelpers {
     function test_deposit_depositsFundsIntoDefaultVault(uint256 depositAmountUsdt) public {
         depositAmountUsdt = _boundAssetAmount(address(_mockUsdt), depositAmountUsdt);
 
-        _mockUsdt.mint(depositor, depositAmountUsdt);
-        vm.prank(depositor);
-        MockNonStandardErc20(address(_mockUsdt)).approve(address(_allocator), depositAmountUsdt);
+        _mockTransferHelper.mockAsset(address(_mockUsdt), depositAmountUsdt);
         vm.prank(depositor);
         _allocator.deposit(address(_mockUsdt), depositAmountUsdt);
 
@@ -308,9 +304,7 @@ contract AllocatorTest is TestWithHelpers {
     function test_deposit_whereVaultRejectsDeposit(uint256 depositAmountUsdt) public {
         depositAmountUsdt = _boundAssetAmount(address(_mockUsdt), depositAmountUsdt);
 
-        _mockUsdt.mint(depositor, depositAmountUsdt);
-        vm.prank(depositor);
-        MockNonStandardErc20(address(_mockUsdt)).approve(address(_allocator), depositAmountUsdt);
+        _mockTransferHelper.mockAsset(address(_mockUsdt), depositAmountUsdt);
 
         // Mock the vault to reject the deposit
         vm.mockCallRevert(
@@ -339,9 +333,7 @@ contract AllocatorTest is TestWithHelpers {
         // Add the asset to the mock AssetRegistry
         _mockAssetRegistry.mockToAllowAssetDepositsIntoAllocator(address(_mockUnsupportedAsset));
 
-        _mockUnsupportedAsset.mint(depositor, amount);
-        vm.prank(depositor);
-        MockNonStandardErc20(address(_mockUnsupportedAsset)).approve(address(_allocator), amount);
+        _mockTransferHelper.mockAsset(address(_mockUnsupportedAsset), amount);
         vm.prank(depositor);
         _allocator.deposit(address(_mockUnsupportedAsset), amount);
 
@@ -371,9 +363,8 @@ contract AllocatorTest is TestWithHelpers {
 
         _mockAssetRegistry.mockToDisallowAssetDepositsIntoAllocator(address(_mockUnsupportedAsset));
 
-        _mockUnsupportedAsset.mint(depositor, amount);
-        vm.prank(depositor);
-        MockNonStandardErc20(address(_mockUnsupportedAsset)).approve(address(_allocator), amount);
+        _mockTransferHelper.mockAsset(address(_mockUnsupportedAsset), amount);
+
         vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(_mockUnsupportedAsset)));
         vm.prank(depositor);
         _allocator.deposit(address(_mockUnsupportedAsset), amount);
@@ -390,9 +381,7 @@ contract AllocatorTest is TestWithHelpers {
         amount = _boundAssetAmount(address(_mockUsdt), amount);
         vm.assume(amount > amountRemaining);
 
-        _mockUsdt.mint(depositor, amount);
-        vm.prank(depositor);
-        MockNonStandardErc20(address(_mockUsdt)).approve(address(_allocator), amount);
+        _mockTransferHelper.mockAsset(address(_mockUsdt), amount);
         vm.prank(depositor);
         _allocator.deposit(address(_mockUsdt), amount);
 
@@ -410,7 +399,7 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.withdraw(address(_mockUsdt), amountToWithdraw);
 
         // Check balances after partial withdrawal
-        assertEq(_mockUsdt.balanceOf(withdrawer), amountToWithdraw);
+        assertEq(_mockUsdt.balanceOf(address(_mockTransferHelper)), amountToWithdraw);
         assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amountRemaining);
         assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), amountRemaining);
@@ -423,7 +412,7 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.withdraw(address(_mockUsdt), amountRemaining);
 
         // Check balances after full withdrawal
-        assertEq(_mockUsdt.balanceOf(withdrawer), amount);
+        assertEq(_mockUsdt.balanceOf(address(_mockTransferHelper)), amount);
         assertEq(_allocator.getAssetBalance(address(_mockUsdt)), 0);
         assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
@@ -441,7 +430,7 @@ contract AllocatorTest is TestWithHelpers {
         vm.prank(depositor);
         MockNonStandardErc20(address(_mockUsdt)).approve(address(_extraUsdtStrategy), amount);
         vm.prank(depositor);
-        // Deposit on behalf of the Allocator
+        // Deposit directly into the strategy on behalf of the Allocator
         _extraUsdtStrategy.deposit(amount, address(_allocator));
 
         // Check balances
@@ -458,7 +447,7 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.withdraw(address(_mockUsdt), amountToWithdraw);
 
         // Check balances after partial withdrawal
-        assertEq(_mockUsdt.balanceOf(withdrawer), amountToWithdraw);
+        assertEq(_mockUsdt.balanceOf(address(_mockTransferHelper)), amountToWithdraw);
         assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amountRemaining);
         assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
@@ -471,7 +460,7 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.withdraw(address(_mockUsdt), amountRemaining);
 
         // Check balances after full withdrawal
-        assertEq(_mockUsdt.balanceOf(withdrawer), amount);
+        assertEq(_mockUsdt.balanceOf(address(_mockTransferHelper)), amount);
         assertEq(_allocator.getAssetBalance(address(_mockUsdt)), 0);
         assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
@@ -503,7 +492,7 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.withdraw(address(_mockUsdt), amountToWithdraw);
 
         // Check balances after partial withdrawal
-        assertEq(_mockUsdt.balanceOf(withdrawer), amountToWithdraw);
+        assertEq(_mockUsdt.balanceOf(address(_mockTransferHelper)), amountToWithdraw);
         assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amountRemaining);
         assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
@@ -516,7 +505,7 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.withdraw(address(_mockUsdt), amountRemaining);
 
         // Check balances after full withdrawal
-        assertEq(_mockUsdt.balanceOf(withdrawer), amount);
+        assertEq(_mockUsdt.balanceOf(address(_mockTransferHelper)), amount);
         assertEq(_allocator.getAssetBalance(address(_mockUsdt)), 0);
         assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
@@ -533,9 +522,7 @@ contract AllocatorTest is TestWithHelpers {
         uint256 totalDeposited = amount * 2;
 
         // Deposit funds into the strategy vault
-        _mockUsdt.mint(depositor, amount);
-        vm.prank(depositor);
-        MockNonStandardErc20(address(_mockUsdt)).approve(address(_allocator), amount);
+        _mockTransferHelper.mockAsset(address(_mockUsdt), amount);
         vm.prank(depositor);
         _allocator.deposit(address(_mockUsdt), amount);
 
@@ -556,7 +543,7 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.withdraw(address(_mockUsdt), amountToWithdraw);
 
         // Check balances after partial withdrawal (uses idle funds first)
-        assertEq(_mockUsdt.balanceOf(withdrawer), amountToWithdraw);
+        assertEq(_mockUsdt.balanceOf(address(_mockTransferHelper)), amountToWithdraw);
         assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amountRemaining);
         assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), amountRemaining);
@@ -569,7 +556,7 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.withdraw(address(_mockUsdt), amountRemaining);
 
         // Check balances after full withdrawal
-        assertEq(_mockUsdt.balanceOf(withdrawer), totalDeposited);
+        assertEq(_mockUsdt.balanceOf(address(_mockTransferHelper)), totalDeposited);
         assertEq(_allocator.getAssetBalance(address(_mockUsdt)), 0);
         assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
@@ -582,9 +569,7 @@ contract AllocatorTest is TestWithHelpers {
         amount = _boundAssetAmount(address(_mockUsdt), amount);
         vm.assume(amount > 0);
 
-        _mockUsdt.mint(depositor, amount);
-        vm.prank(depositor);
-        MockNonStandardErc20(address(_mockUsdt)).approve(address(_allocator), amount);
+        _mockTransferHelper.mockAsset(address(_mockUsdt), amount);
         vm.prank(depositor);
         _allocator.deposit(address(_mockUsdt), amount);
 
@@ -1367,9 +1352,7 @@ contract AllocatorTest is TestWithHelpers {
 
         // If user deposits then funds sit idle
         uint256 amount = 1000;
-        _mockUsdt.mint(depositor, amount);
-        vm.prank(depositor);
-        MockNonStandardErc20(address(_mockUsdt)).approve(address(_allocator), amount);
+        _mockTransferHelper.mockAsset(address(_mockUsdt), amount);
         vm.prank(depositor);
         _allocator.deposit(address(_mockUsdt), amount);
 
@@ -1434,9 +1417,7 @@ contract AllocatorTest is TestWithHelpers {
 
         // Deposit funds into the allocator
         uint256 amount = 1000;
-        _mockUsdt.mint(depositor, amount);
-        vm.prank(depositor);
-        MockNonStandardErc20(address(_mockUsdt)).approve(address(_allocator), amount);
+        _mockTransferHelper.mockAsset(address(_mockUsdt), amount);
         vm.prank(depositor);
         _allocator.deposit(address(_mockUsdt), amount);
 

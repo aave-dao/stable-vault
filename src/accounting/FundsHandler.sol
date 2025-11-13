@@ -13,6 +13,7 @@ import {IAllocator} from "../interfaces/IAllocator.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
 import {AssetLib} from "../libraries/AssetLib.sol";
+import {BridgeParamsLib} from "../libraries/BridgeParamsLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 /// @title FundsHandler
@@ -20,6 +21,7 @@ import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandler {
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
+    using BridgeParamsLib for IChainGateway.BridgeParams;
 
     struct ChainBalanceSnapshot {
         uint256 chainId;
@@ -28,11 +30,10 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
         uint256 nonce;
     }
 
-    address internal constant BRIDGE_FEE_ON_NATIVE_CURRENCY = address(0);
-
     address internal immutable VAULT;
     address internal immutable GATEWAY;
     address internal immutable ALLOCATOR;
+    address internal immutable TRANSFER_HELPER;
 
     /// @custom:storage-location erc7201:aave.storage.FundsHandler
     struct FundsHandlerStorage {
@@ -67,11 +68,13 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
     /// @param basedBoostedVault The address of the BasedBoostedVault contract, which triggers deposits and withdrawals.
     /// @param gateway The address of the Gateway contract to use for cross-chain communication.
     /// @param allocator The address of the Allocator contract to use for immediate liquidity management.
-    constructor(address basedBoostedVault, address gateway, address allocator) {
+    /// @param transferHelper The address of the TransferHelper contract to use for minimizing the number of transfers.
+    constructor(address basedBoostedVault, address gateway, address allocator, address transferHelper) {
         _disableInitializers();
         VAULT = basedBoostedVault;
         GATEWAY = gateway;
         ALLOCATOR = allocator;
+        TRANSFER_HELPER = transferHelper;
     }
 
     /// @dev Initializer.
@@ -128,7 +131,6 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
     /// @inheritdoc IFundsHandler
     function processWithdrawal(address asset, uint256 amount) external override onlyBasedBoostedVault {
         _pullFundsFromImmediateLiquidity(asset, amount);
-        IERC20(asset).forceApprove(VAULT, amount);
     }
 
     //////////////////////////////////////////// MANAGER FUNCTIONS /////////////////////////////////////////////////////
@@ -141,20 +143,15 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
         IChainGateway.BridgeParams memory bridgeParams
     ) external payable override restricted {
         require(amount > 0, ErrorsLib.ZeroAmount());
-
-        if (bridgeParams.feeToken != BRIDGE_FEE_ON_NATIVE_CURRENCY) {
-            IERC20(bridgeParams.feeToken).safeTransferFrom(bridgeParams.feePayer, address(this), bridgeParams.feeAmount);
-            IERC20(bridgeParams.feeToken).forceApprove(GATEWAY, bridgeParams.feeAmount);
-        }
-
+        // Pull funds from liquidity into the TransferHelper.
         _pullFundsFromImmediateLiquidity(asset, amount);
-        // Increase allowance in case of the fee token matching the token being bridged.
-        IERC20(asset).safeIncreaseAllowance(GATEWAY, amount);
+
+        // Send the bridge fee to the TransferHelper to be pulled by Bridge Adapter.
+        bridgeParams.sendBridgeFeeToTransferHelper(TRANSFER_HELPER);
+
         // Increment the chain balance snapshot for the target chain.
         _updateChainBalanceBeforeBridging(chainId, amount.assetDecimalsToRay(asset));
-        IAccountingChainGateway(GATEWAY).sendPushFundsToChainMessage{value: msg.value}(
-            asset, amount, chainId, bridgeParams
-        );
+        IAccountingChainGateway(GATEWAY).sendPushFundsToChainMessage(asset, amount, chainId, bridgeParams);
     }
 
     /// @inheritdoc RescuableAssets
@@ -225,7 +222,6 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, IFundsHandle
     }
 
     function _pushFundsToImmediateLiquidity(address asset, uint256 amount) internal {
-        IERC20(asset).forceApprove(ALLOCATOR, amount);
         IAllocator(ALLOCATOR).deposit(asset, amount);
     }
 

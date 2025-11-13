@@ -6,21 +6,28 @@ import {console} from "forge-std/console.sol";
 import {IERC20} from "forge-std/interfaces/IERC20.sol";
 
 import {BasedBoostedVault} from "../src/accounting/BasedBoostedVault.sol";
+import {IouToken} from "../src/common/IouToken.sol";
+import {IouTokenManager} from "../src/common/IouTokenManager.sol";
+import {EarningChainGateway} from "../src/earning/EarningChainGateway.sol";
 import {IBasedBoostedVault} from "../src/interfaces/IBasedBoostedVault.sol";
 import {IChainGateway} from "../src/interfaces/IChainGateway.sol";
 import {AssetLib} from "../src/libraries/AssetLib.sol";
 import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
 import {BaseTest} from "./BaseTest.t.sol";
 import {ExtendedBasedBoostedVault} from "./mocks/ExtendedBasedBoostedVault.sol";
+import {TestErc20} from "./mocks/TestErc20.sol";
 
-/// @title EarningChainWithdrawalE2ETest
+/// @title EarningChainWithdrawalTokenFeeE2ETest
 /// @notice Test the withdrawal of funds from the Earning Chain to the Accounting Chain.
 /// @dev Deposit made to BBV on Accounting Chain, IOU tokens bridged to Earning Chain, and then used to withdraw assets.
-contract EarningChainWithdrawalE2ETest is BaseTest {
+contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
     using AssetLib for uint256;
 
     address user1 = makeAddr("USER1");
     address user2 = makeAddr("USER2");
+
+    TestErc20 bridgeFeeToken = USDC;
+    uint256 bridgeFeeAmount = 1000;
 
     function setUp() public override {
         super.setUp();
@@ -52,8 +59,8 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         );
     }
 
-    function test_earningChainWithdrawalE2E() public {
-        console.log("\nEarningChainWithE2ETest");
+    function test_earningChainWithdrawalTokenFeeE2E() public {
+        console.log("\nEarningChainWithdrawalTokenFeeE2ETest");
 
         uint256 userInitialDeposit = 500 * (10 ** 6);
 
@@ -78,15 +85,18 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         );
 
         // 2. Bridge the assets to the Earning Chain
+        _mintAndApproveBridgeFeeToken(everyRoleAccount, address(fundsHandler));
         vm.prank(everyRoleAccount);
-        uint256 bridgeFeeAmount = 1000;
-        vm.deal(everyRoleAccount, bridgeFeeAmount);
-        fundsHandler.pushFundsToChain{value: bridgeFeeAmount}(
-            address(USDC),
+        fundsHandler.pushFundsToChain(
+            address(bridgeFeeToken),
             userInitialDeposit,
             EARNING_CHAIN_ID,
             IChainGateway.BridgeParams({
-                feePayer: everyRoleAccount, feeToken: address(0), feeAmount: bridgeFeeAmount, gasLimit: 300000, data: ""
+                feePayer: everyRoleAccount,
+                feeToken: address(bridgeFeeToken),
+                feeAmount: bridgeFeeAmount,
+                gasLimit: 300000,
+                data: ""
             })
         );
 
@@ -138,17 +148,9 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         // 6. Bridge user1 IOUs to Earning chain and check supplies are expected
         // The user will use native asset to pay for bridge fees
         // User must approve the IOU token manager to spend the IOU tokens
-        vm.prank(user1);
-        iouToken_accountingChain.approve(address(iouTokenManager_accountingChain), iouAmountRequestedRay);
-        vm.prank(user1);
-        vm.deal(user1, bridgeFeeAmount);
-        iouTokenManager_accountingChain.bridgeTokens{value: bridgeFeeAmount}(
-            EARNING_CHAIN_ID,
-            user1,
-            iouAmountRequestedRay,
-            IChainGateway.BridgeParams({
-                feePayer: user1, feeToken: address(0), feeAmount: bridgeFeeAmount, gasLimit: 300000, data: ""
-            })
+        _mintAndApproveBridgeFeeToken(user1, address(iouTokenManager_accountingChain));
+        _runIouTokenBridge(
+            iouToken_accountingChain, iouTokenManager_accountingChain, user1, iouAmountRequestedRay, EARNING_CHAIN_ID
         );
         // Check the IOU token balance on Accounting Chain went down
         assertEq(iouToken_accountingChain.balanceOf(user1), 0, "User should have bridged IOU tokens");
@@ -220,17 +222,9 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             "IOUS ON EARNING CHAIN (BEFORE USER2 BRIDGE TO ACCOUNTING CHAIN) =",
             iousOnEarningBeforeUser2BridgeToAccountingChain
         );
-        vm.prank(user2);
-        iouToken_accountingChain.approve(address(iouTokenManager_accountingChain), iouAmountRequestedRay);
-        vm.prank(user2);
-        vm.deal(user2, bridgeFeeAmount);
-        iouTokenManager_accountingChain.bridgeTokens{value: bridgeFeeAmount}(
-            EARNING_CHAIN_ID,
-            user2,
-            iouAmountRequestedRay,
-            IChainGateway.BridgeParams({
-                feePayer: user2, feeToken: address(0), feeAmount: bridgeFeeAmount, gasLimit: 100000, data: ""
-            })
+        _mintAndApproveBridgeFeeToken(user2, address(iouTokenManager_accountingChain));
+        _runIouTokenBridge(
+            iouToken_accountingChain, iouTokenManager_accountingChain, user2, iouAmountRequestedRay, EARNING_CHAIN_ID
         );
         require(
             iouToken_accountingChain.totalSupply() == iousOnAccountBeforeUser2BridgeToEarningChain,
@@ -243,17 +237,9 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         );
 
         // Bridge the tokens back to Accounting chain and check the supply on both chains is expected
-        vm.prank(user2);
-        iouToken_earningChain.approve(address(iouTokenManager_earningChain), iouAmountRequestedRay);
-        vm.deal(user2, bridgeFeeAmount);
-        vm.prank(user2);
-        iouTokenManager_earningChain.bridgeTokens{value: bridgeFeeAmount}(
-            ACCOUNTING_CHAIN_ID,
-            user2,
-            iouAmountRequestedRay,
-            IChainGateway.BridgeParams({
-                feePayer: user2, feeToken: address(0), feeAmount: bridgeFeeAmount, gasLimit: 100000, data: ""
-            })
+        _mintAndApproveBridgeFeeToken(user2, address(iouTokenManager_earningChain));
+        _runIouTokenBridge(
+            iouToken_earningChain, iouTokenManager_earningChain, user2, iouAmountRequestedRay, ACCOUNTING_CHAIN_ID
         );
         require(
             iouToken_accountingChain.totalSupply() == iousOnAccountBeforeUser2BridgeToEarningChain,
@@ -264,67 +250,62 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             "Supply on Earning Chain should decrease by the amount of IOUs bridged"
         );
 
-        // 9. User1 echanges IOUs for assets on Earning chain and checks their balance is expected
+        // 9. User1 exchanges IOUs for assets on Earning chain and checks their balance is expected
+        {
+            uint256 assetsOnEarningBeforeUser1ExchangeIous = earningChainGateway.getAggregatedBalance();
+            // Tokens should be burned from iouTokenManager_accountingChain
+            uint256 iouSupplyOnAccountingChainBeforeIouExchange = iouToken_accountingChain.totalSupply();
+            uint256 iouLockedBalanceOnAccountingChainBeforeIouExchange =
+                iouTokenManager_accountingChain.getLockedBalance();
+            // Tokens on Earning chain should be burned
+            uint256 iouSupplyOnEarningChainBeforeIouExchange = iouToken_earningChain.totalSupply();
 
-        uint256 assetsOnEarningBeforeUser1ExchangeIous = earningChainGateway.getAggregatedBalance();
-        // Tokens should be burned from iouTokenManager_accountingChain
-        uint256 iouSupplyOnAccountingChainBeforeIouExchange = iouToken_accountingChain.totalSupply();
-        uint256 iouLockedBalanceOnAccountingChainBeforeIouExchange = iouTokenManager_accountingChain.getLockedBalance();
-        // Tokens on Earning chain should be burned
-        uint256 iouSupplyOnEarningChainBeforeIouExchange = iouToken_earningChain.totalSupply();
+            uint256 user1IouBalanceOnEarningChainBeforeIouExchange = iouToken_earningChain.balanceOf(user1);
+            uint256 amountIouToExchange = 225 * (10 ** 27);
+            assertGt(
+                iouToken_earningChain.balanceOf(user1), amountIouToExchange, "User should have enough IOUs to exchange"
+            );
+            {
+                _runExchangeIouTokens(earningChainGateway, user1, amountIouToExchange);
+            }
 
-        uint256 user1IouBalanceOnEarningChainBeforeIouExchange = iouToken_earningChain.balanceOf(user1);
-        uint256 amountIouToExchange = 225 * (10 ** 27);
-        assertGt(
-            iouToken_earningChain.balanceOf(user1), amountIouToExchange, "User should have enough IOUs to exchange"
-        );
-        vm.deal(user1, 1000);
-        vm.prank(user1);
-        earningChainGateway.exchangeIouTokens{value: 1}(
-            amountIouToExchange,
-            address(USDC),
-            user1,
-            IChainGateway.BridgeParams({
-                feePayer: user1, feeToken: address(0), feeAmount: 1, gasLimit: 100000, data: ""
-            })
-        );
-
-        // Check user1 IOU balance on Earning chain went down
-        assertEq(
-            iouToken_earningChain.balanceOf(user1),
-            user1IouBalanceOnEarningChainBeforeIouExchange - amountIouToExchange,
-            "User should have less IOUs after exchanging"
-        );
-        // Check IOU supply on Earning chain went down
-        assertEq(
-            iouToken_earningChain.totalSupply(),
-            iouSupplyOnEarningChainBeforeIouExchange - amountIouToExchange,
-            "Supply on Earning Chain should decrease by the amount of IOUs exchanged"
-        );
-        // Check IOU supply on Accounting chain went down
-        assertEq(
-            iouToken_accountingChain.totalSupply(),
-            iouSupplyOnAccountingChainBeforeIouExchange - amountIouToExchange,
-            "Supply on Accounting Chain should decrease by the amount of IOUs exchanged"
-        );
-        assertEq(
-            iouTokenManager_accountingChain.getLockedBalance(),
-            iouLockedBalanceOnAccountingChainBeforeIouExchange - amountIouToExchange,
-            "Locked balance on Accounting Chain should decrease by the amount of IOUs exchanged"
-        );
-        // Check the assets in the Earning chain went down
-        assertEq(
-            earningChainGateway.getAggregatedBalance(),
-            assetsOnEarningBeforeUser1ExchangeIous - amountIouToExchange,
-            "Assets on Earning Chain should decrease by the amount of IOUs exchanged"
-        );
-        // Check the assets in the Accounting chain are now the 500 deposit from user2 + the snapshot update after
-        // User1's withdrawal on Earning chain of 225 (500 + 500 - 225)
-        assertEq(
-            fundsHandler.getAggregatedBalance(),
-            775000000000000000000000000000,
-            "Assets on Accounting Chain should increase by the amount of IOUs exchanged"
-        );
+            // Check user1 IOU balance on Earning chain went down
+            assertEq(
+                iouToken_earningChain.balanceOf(user1),
+                user1IouBalanceOnEarningChainBeforeIouExchange - amountIouToExchange,
+                "User should have less IOUs after exchanging"
+            );
+            // Check IOU supply on Earning chain went down
+            assertEq(
+                iouToken_earningChain.totalSupply(),
+                iouSupplyOnEarningChainBeforeIouExchange - amountIouToExchange,
+                "Supply on Earning Chain should decrease by the amount of IOUs exchanged"
+            );
+            // Check IOU supply on Accounting chain went down
+            assertEq(
+                iouToken_accountingChain.totalSupply(),
+                iouSupplyOnAccountingChainBeforeIouExchange - amountIouToExchange,
+                "Supply on Accounting Chain should decrease by the amount of IOUs exchanged"
+            );
+            assertEq(
+                iouTokenManager_accountingChain.getLockedBalance(),
+                iouLockedBalanceOnAccountingChainBeforeIouExchange - amountIouToExchange,
+                "Locked balance on Accounting Chain should decrease by the amount of IOUs exchanged"
+            );
+            // Check the assets in the Earning chain went down
+            assertEq(
+                earningChainGateway.getAggregatedBalance(),
+                assetsOnEarningBeforeUser1ExchangeIous - amountIouToExchange,
+                "Assets on Earning Chain should decrease by the amount of IOUs exchanged"
+            );
+            // Check the assets in the Accounting chain are now the 500 deposit from user2 + the snapshot update after
+            // User1's withdrawal on Earning chain of 225 (500 + 500 - 225)
+            assertEq(
+                fundsHandler.getAggregatedBalance(),
+                775000000000000000000000000000,
+                "Assets on Accounting Chain should increase by the amount of IOUs exchanged"
+            );
+        }
     }
 
     function _mintAndDepositUsdcToBBV(address user, uint256 amount) internal {
@@ -333,5 +314,54 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         USDC.approve(address(vault), amount);
         vault.deposit(user, address(USDC), amount);
         vm.stopPrank();
+    }
+
+    function _mintAndApproveBridgeFeeToken(address feePayer, address feeSpender) internal {
+        bridgeFeeToken.mint(feePayer, bridgeFeeAmount);
+        vm.prank(feePayer);
+        bridgeFeeToken.approve(feeSpender, bridgeFeeAmount);
+    }
+
+    function _runIouTokenBridge(
+        IouToken iouToken,
+        IouTokenManager iouTokenManager,
+        address user,
+        uint256 iouAmountRequestedRay,
+        uint256 destinationChainId
+    ) internal {
+        vm.prank(user);
+        iouToken.approve(address(iouTokenManager), iouAmountRequestedRay);
+        vm.prank(user);
+        iouTokenManager.bridgeTokens(
+            destinationChainId,
+            user,
+            iouAmountRequestedRay,
+            IChainGateway.BridgeParams({
+                feePayer: user,
+                feeToken: address(bridgeFeeToken),
+                feeAmount: bridgeFeeAmount,
+                gasLimit: 100000,
+                data: ""
+            })
+        );
+    }
+
+    function _runExchangeIouTokens(EarningChainGateway earningChainGateway, address user, uint256 iouAmountRequestedRay)
+        internal
+    {
+        _mintAndApproveBridgeFeeToken(user1, address(earningChainGateway));
+        vm.prank(user);
+        earningChainGateway.exchangeIouTokens(
+            iouAmountRequestedRay,
+            address(USDC),
+            user,
+            IChainGateway.BridgeParams({
+                feePayer: user,
+                feeToken: address(bridgeFeeToken),
+                feeAmount: bridgeFeeAmount,
+                gasLimit: 100000,
+                data: ""
+            })
+        );
     }
 }
