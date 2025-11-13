@@ -142,9 +142,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         override
         assertingTransferHelperBalanceFor(asset)
     {
-        require(
-            IAssetRegistry($storage().assetRegistry).isAllowedToDepositIntoBBV(asset), ErrorsLib.UnsupportedAsset(asset)
-        );
+        require(IAssetRegistry($storage().assetRegistry).isUserDepositAllowed(asset), ErrorsLib.UnsupportedAsset(asset));
         require(amount > 0, ErrorsLib.InvalidAmount());
 
         uint256 subVaultId = $storage().positions[user].subVaultId;
@@ -247,7 +245,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
     {
         require(msg.sender == user, InvalidMsgSender());
         require(
-            IAssetRegistry($storage().assetRegistry).isAllowedToWithdrawFromBBV(assetOut),
+            IAssetRegistry($storage().assetRegistry).isUserWithdrawalAllowed(assetOut),
             ErrorsLib.UnsupportedAsset(assetOut)
         );
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(user, iouAmountRay);

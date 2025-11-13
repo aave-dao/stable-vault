@@ -691,8 +691,8 @@ contract BaseTest is Test {
 
         // Enable everything for assets
         IAssetRegistry.AssetConfig memory unrestrictedAssetConfig = IAssetRegistry.AssetConfig({
-            depositIntoBBVAllowed: true,
-            withdrawFromBBVAllowed: true,
+            depositFromUserAllowed: true,
+            withdrawToUserAllowed: true,
             depositIntoAllocatorAllowed: true,
             withdrawFromAllocatorAllowed: true,
             swapInputTokenAllowed: true,
