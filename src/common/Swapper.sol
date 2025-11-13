@@ -17,7 +17,6 @@ contract Swapper is ISwapper, Ownable, ReentrancyGuard {
 
     uint256 internal constant MAX_BPS = 10_000;
 
-    // TODO: Make a note about Owner being the Allocator
     constructor(address owner) Ownable(owner) {}
 
     struct SlippageParams {
@@ -45,7 +44,7 @@ contract Swapper is ISwapper, Ownable, ReentrancyGuard {
 
         uint256 amountOut = IERC20(assetOut).balanceOf(address(this));
 
-        // We want 1:1 swaps
+        // Enforce 1:1 swap between `assetIn` and `assetOut`.
         uint256 expectedAmountOut = amountIn.convertAssetDecimals(assetIn, assetOut);
         if (amountOut < expectedAmountOut) {
             uint256 slippageAmount = expectedAmountOut - amountOut;
@@ -53,7 +52,7 @@ contract Swapper is ISwapper, Ownable, ReentrancyGuard {
             IERC20(assetOut).safeTransferFrom(slippageParams.slippageCoverageSource, address(this), slippageAmount);
         }
 
-        // Approve funds to be pulled by the caller
+        // Approve funds to be pulled by the caller i.e. the owner of the Swapper.
         IERC20(assetOut).forceApprove(msg.sender, amountOut);
 
         return amountOut;
