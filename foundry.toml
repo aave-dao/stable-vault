@@ -1,5 +1,3 @@
-# TODO: Clean up this file
-
 [profile.default]
 src = "src"
 out = "out"
