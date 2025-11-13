@@ -113,7 +113,7 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
             require(
                 abi.decode(message.sender, (address))
                     == _destinationChainAdapterOf[_chainIdOf[message.sourceChainSelector]],
-                ErrorsLib.NotDestinationChainAdapter()
+                NotDestinationChainAdapter()
             );
             IChainGateway(GATEWAY)
                 .receiveMessage(

@@ -7,6 +7,8 @@ interface IBridgeAdapter {
     /// @notice Emitted when the processing of bridged funds fails.
     event BridgedFundsProcessingFailed(uint256 sourceChainId, bytes message, bytes error);
 
+    /// @notice Address checked is not the destination chain adapter.
+    error NotDestinationChainAdapter();
     error NotBridgeRouter();
 
     struct BridgeAsset {
