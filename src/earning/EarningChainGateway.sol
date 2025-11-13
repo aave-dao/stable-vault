@@ -162,9 +162,11 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
         assertingTransferHelperBalanceFor(asset)
     {
         require(amount > 0, ErrorsLib.ZeroAmount());
-        IAllocator(ALLOCATOR).withdraw(asset, amount);
-
+        // Transfer the bridge fee to the TransferHelper.
         _transferBridgeFeeToTransferHelper(bridgeParams);
+
+        // Pull funds from liquidity into the TransferHelper.
+        IAllocator(ALLOCATOR).withdraw(asset, amount);
 
         _returnFundsWithBalanceSnapshot(asset, amount, bridgeParams);
     }
