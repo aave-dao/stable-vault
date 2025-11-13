@@ -2,6 +2,7 @@
 pragma solidity ^0.8.22;
 
 import {BaseChainGateway} from "../common/BaseChainGateway.sol";
+import {TransferHelperClient} from "../common/TransferHelperClient.sol";
 import {IAllocator} from "../interfaces/IAllocator.sol";
 import {IAllocator} from "../interfaces/IAllocator.sol";
 import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
@@ -10,18 +11,15 @@ import {IEarningChainGateway} from "../interfaces/IEarningChainGateway.sol";
 import {IIouTokenManager} from "../interfaces/IIouTokenManager.sol";
 import {ITransferHelper} from "../interfaces/ITransferHelper.sol";
 import {AssetLib} from "../libraries/AssetLib.sol";
-import {BridgeParamsLib} from "../libraries/BridgeParamsLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 /// @title EarningChainGateway
 /// @notice Facilitates cross chain messaging with exactly one Accounting Chain.
-contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
+contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarningChainGateway {
     using AssetLib for uint256;
-    using BridgeParamsLib for IChainGateway.BridgeParams;
 
     uint256 internal immutable ACCOUNTING_CHAIN_ID;
     address internal immutable ALLOCATOR;
-    address internal immutable TRANSFER_HELPER;
 
     /// @custom:storage-location erc7201:aave.storage.EarningChainGateway
     struct EarningChainGatewayStorage {
@@ -43,12 +41,12 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
     /// @param allocator The address of the Allocator contract.
     /// @param iouTokenManager The address of the IOU token manager contract.
     constructor(uint256 accountingChainId, address allocator, address iouTokenManager, address transferHelper)
+        TransferHelperClient(transferHelper)
         BaseChainGateway(iouTokenManager)
     {
         _disableInitializers();
         ACCOUNTING_CHAIN_ID = accountingChainId;
         ALLOCATOR = allocator;
-        TRANSFER_HELPER = transferHelper;
     }
 
     /// @dev Initializer.
@@ -75,12 +73,16 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
     }
 
     /// @inheritdoc IEarningChainGateway
-    function sendBalanceUpdateWithFeePayer(IChainGateway.BridgeParams memory bridgeParams) external payable override {
+    function sendBalanceUpdateWithFeePayer(IChainGateway.BridgeParams memory bridgeParams)
+        external
+        payable
+        override
+        assertingTransferHelperBalanceFor(bridgeParams.feeToken)
+    {
         address adapter = $BaseChainGateway().defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID];
         require(adapter != address(0), AdapterNotFound());
 
-        // Send the bridge fee to the TransferHelper to be pulled by Bridge Adapter.
-        bridgeParams.sendBridgeFeeToTransferHelper(TRANSFER_HELPER);
+        _transferBridgeFeeToTransferHelper(bridgeParams);
 
         _sendCrossChainMessage(
             ACCOUNTING_CHAIN_ID, adapter, ASSET_FOR_DATA_ONLY_BRIDGE, 0, _getBalanceSnapshotData(), bridgeParams
@@ -93,7 +95,14 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         address tokenOut,
         address tokenOutReceiver,
         IChainGateway.BridgeParams memory bridgeParams
-    ) external payable override returns (uint256) {
+    )
+        external
+        payable
+        override
+        assertingTransferHelperBalanceFor(bridgeParams.feeToken)
+        assertingTransferHelperBalanceFor(tokenOut)
+        returns (uint256)
+    {
         require(iouTokenAmountRay > 0, ErrorsLib.ZeroAmount());
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(msg.sender, iouTokenAmountRay);
 
@@ -119,8 +128,7 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
             })
         );
 
-        // Send the bridge fee to the TransferHelper to be pulled by Bridge Adapter.
-        bridgeParams.sendBridgeFeeToTransferHelper(TRANSFER_HELPER);
+        _transferBridgeFeeToTransferHelper(bridgeParams);
 
         _sendCrossChainMessage(
             ACCOUNTING_CHAIN_ID, adapter, ASSET_FOR_DATA_ONLY_BRIDGE, 0, burnIouTokenMessageEncoded, bridgeParams
@@ -136,12 +144,13 @@ contract EarningChainGateway is BaseChainGateway, IEarningChainGateway {
         payable
         override
         restricted
+        assertingTransferHelperBalanceFor(bridgeParams.feeToken)
+        assertingTransferHelperBalanceFor(asset)
     {
         require(amount > 0, ErrorsLib.ZeroAmount());
         IAllocator(ALLOCATOR).withdraw(asset, amount);
 
-        // Send the bridge fee to the TransferHelper to be pulled by Bridge Adapter
-        bridgeParams.sendBridgeFeeToTransferHelper(TRANSFER_HELPER);
+        _transferBridgeFeeToTransferHelper(bridgeParams);
 
         _returnFundsWithBalanceSnapshot(asset, amount, bridgeParams);
     }

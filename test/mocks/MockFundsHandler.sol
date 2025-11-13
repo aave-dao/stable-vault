@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
-import {IChainGateway} from "../../src/interfaces/IChainGateway.sol";
-import {IFundsHandler} from "../../src/interfaces/IFundsHandler.sol";
-
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+import {IChainGateway} from "../../src/interfaces/IChainGateway.sol";
+import {IFundsHandler} from "../../src/interfaces/IFundsHandler.sol";
+import {ITransferHelper} from "../../src/interfaces/ITransferHelper.sol";
 
 contract MockFundsHandler is IFundsHandler {
     using SafeERC20 for IERC20;
@@ -13,6 +14,11 @@ contract MockFundsHandler is IFundsHandler {
     mapping(address asset => uint256 balanceRay) _mockedAssetBalancesRay;
     address[] _mockedAssets;
     uint256 _mockedAggregatedBalance;
+    address _mockedTransferHelper;
+
+    constructor(address transferHelper) {
+        _mockedTransferHelper = transferHelper;
+    }
 
     function mockAggregatedBalance(uint256 aggregatedBalance) external {
         _mockedAggregatedBalance = aggregatedBalance;
@@ -34,7 +40,9 @@ contract MockFundsHandler is IFundsHandler {
 
     function getAssetBalances() external view override returns (AssetBalance[] memory) {}
 
-    function processDeposit(address asset, uint256 amount) external override {}
+    function processDeposit(address asset, uint256 amount) external override {
+        ITransferHelper(_mockedTransferHelper).pull(asset, amount);
+    }
 
     function processWithdrawal(address asset, uint256 amount) external override {
         IERC20(asset).forceApprove(msg.sender, amount);

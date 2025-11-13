@@ -7,21 +7,19 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {IIouTokenManager} from "../interfaces/IIouTokenManager.sol";
 import {IMintableBurnableIERC20} from "../interfaces/IMintableBurnableIERC20.sol";
-import {BridgeParamsLib} from "../libraries/BridgeParamsLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
+import {TransferHelperClient} from "./TransferHelperClient.sol";
 
 // TODO: add events
 
 /// @title IouTokenManager
 /// @notice Manages the IOU token locking, releasing, minting, burning.
-contract IouTokenManager is IIouTokenManager {
+contract IouTokenManager is TransferHelperClient, IIouTokenManager {
     using SafeERC20 for IERC20;
-    using BridgeParamsLib for IChainGateway.BridgeParams;
 
     address internal immutable IOU_TOKEN;
     address internal immutable CHAIN_GATEWAY;
     address internal immutable VAULT;
-    address internal immutable TRANSFER_HELPER;
     bool internal immutable IS_CANONICAL_CHAIN;
 
     /// @custom:storage-location erc7201:aave.storage.IouTokenManager
@@ -59,11 +57,12 @@ contract IouTokenManager is IIouTokenManager {
         _;
     }
 
-    constructor(address iouToken, address chainGateway, address vault, address transferHelper, bool isCanonicalChain) {
+    constructor(address iouToken, address chainGateway, address vault, address transferHelper, bool isCanonicalChain)
+        TransferHelperClient(transferHelper)
+    {
         IOU_TOKEN = iouToken;
         CHAIN_GATEWAY = chainGateway;
         VAULT = vault;
-        TRANSFER_HELPER = transferHelper;
         IS_CANONICAL_CHAIN = isCanonicalChain;
     }
 
@@ -81,15 +80,14 @@ contract IouTokenManager is IIouTokenManager {
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
         IChainGateway.BridgeParams memory bridgeParams
-    ) external payable override {
+    ) external payable override assertingTransferHelperBalanceFor(bridgeParams.feeToken) {
         require(destinationChainId != block.chainid, ErrorsLib.InvalidDestinationChainId());
         if (IS_CANONICAL_CHAIN) {
             _lockTokens(msg.sender, iouTokenAmountRay);
         } else {
             _burnTokens(msg.sender, iouTokenAmountRay);
         }
-        // Send the bridge fee to the TransferHelper to be pulled by Bridge Adapter.
-        bridgeParams.sendBridgeFeeToTransferHelper(TRANSFER_HELPER);
+        _transferBridgeFeeToTransferHelper(bridgeParams);
 
         IChainGateway(CHAIN_GATEWAY)
             .sendBridgeIouTokenMessageWithFeePayer(

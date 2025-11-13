@@ -22,6 +22,7 @@ import {MockDummyIouTokenManager} from "./mocks/MockDummyIouTokenManager.sol";
 import {IMockErc20} from "./mocks/MockErc20.sol";
 import {MockFundsHandler} from "./mocks/MockFundsHandler.sol";
 import {MockNonStandardErc20} from "./mocks/MockNonStandardErc20.sol";
+import {MockTransferHelper} from "./mocks/MockTransferHelper.sol";
 
 contract AccountingChainGatewayTest is TestWithHelpers {
     using MathLib for uint256;
@@ -44,6 +45,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
     MockBridgeAdapter internal _mockBridgeAdapterData;
     MockDummyIouTokenManager internal _mockIouTokenManager;
     MockAssetRegistry internal _mockAssetRegistry;
+    MockTransferHelper internal _mockTransferHelper;
 
     AccountingChainGateway internal _accountingChainGateway;
 
@@ -95,11 +97,13 @@ contract AccountingChainGatewayTest is TestWithHelpers {
 
         _mockAssetRegistry = new MockAssetRegistry();
 
-        _mockFundsHandler = new MockFundsHandler();
+        _mockTransferHelper = new MockTransferHelper();
 
-        _mockBridgeAdapterAssets = new MockBridgeAdapter();
+        _mockFundsHandler = new MockFundsHandler(address(_mockTransferHelper));
 
-        _mockBridgeAdapterData = new MockBridgeAdapter();
+        _mockBridgeAdapterAssets = new MockBridgeAdapter(address(_mockTransferHelper));
+
+        _mockBridgeAdapterData = new MockBridgeAdapter(address(_mockTransferHelper));
 
         _mockAccessManager = new MockAccessManager(admin);
 
@@ -230,10 +234,8 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         vm.assume(bridgeFeePayer != address(0));
 
         address bridgeFeeToken = address(_mockGho);
-        // Mimic the IOU token mgr approval of Gateway to pull funds
-        IMockErc20(bridgeFeeToken).mint(bridgeFeePayer, feeAmount);
-        vm.prank(address(bridgeFeePayer));
-        MockNonStandardErc20(bridgeFeeToken).approve(address(_accountingChainGateway), feeAmount);
+        // Mimic the IOU token mgr approval pushing bridge fee to TransferHelper
+        IMockErc20(bridgeFeeToken).mint(address(_mockTransferHelper), feeAmount);
 
         // Expect call to Bridge Adapter to publish message with fee payer
         vm.expectCall(
@@ -289,7 +291,8 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         bridgeFeeAmount = _boundNativeAmount(bridgeFeeAmount);
         iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
         vm.assume(bridgeFeePayer != address(0));
-        vm.deal(address(_mockIouTokenManager), bridgeFeeAmount);
+        // Deal assets to the TransferHelper to mimic the IOU Token Manager pushing funds up
+        vm.deal(address(_mockTransferHelper), bridgeFeeAmount);
 
         vm.expectCall(
             address(_mockBridgeAdapterData),
@@ -322,7 +325,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         );
 
         vm.prank(address(_mockIouTokenManager));
-        _accountingChainGateway.sendBridgeIouTokenMessageWithFeePayer{value: bridgeFeeAmount}(
+        _accountingChainGateway.sendBridgeIouTokenMessageWithFeePayer(
             EARNING_CHAIN_ID,
             iouTokenRecipient,
             iouTokenAmountRay,
@@ -626,6 +629,12 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         bridgeFeeAmount = _boundAssetAmount(bridgeFeeToken, bridgeFeeAmount);
         vm.assume(bridgeFeePayer != address(0));
 
+        // Mimic the FH pushing bridge fee to TransferHelper
+        IMockErc20(bridgeFeeToken).mint(address(_mockTransferHelper), bridgeFeeAmount);
+
+        // Mimic the FH pushing assets to TransferHelper
+        IMockErc20(assetToBridge).mint(address(_mockTransferHelper), amount);
+
         // native asset would be transferred to TransferHelper from IOU Token Manager
         IChainGateway.BridgeParams memory bridgeParams = IChainGateway.BridgeParams({
             feePayer: bridgeFeePayer,
@@ -658,6 +667,12 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         bridgeFeeAmount = _boundAssetAmount(bridgeFeeToken, bridgeFeeAmount);
         vm.assume(bridgeFeePayer != address(0));
 
+        // Mimic the FH pushing bridge fee to TransferHelper
+        IMockErc20(bridgeFeeToken).mint(address(_mockTransferHelper), bridgeFeeAmount);
+
+        // Mimic the FH pushing assets to TransferHelper
+        IMockErc20(assetToBridge).mint(address(_mockTransferHelper), amount);
+
         IChainGateway.BridgeParams memory bridgeParams = IChainGateway.BridgeParams({
             feePayer: bridgeFeePayer,
             feeToken: bridgeFeeToken,
@@ -687,6 +702,12 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         // Use native asset
         address bridgeFeeToken = address(0);
         bridgeFeeAmount = _boundNativeAmount(bridgeFeeAmount);
+
+        // Mimic the FH pushing bridge fee to TransferHelper
+        vm.deal(address(_mockTransferHelper), bridgeFeeAmount);
+
+        // Mimic the FH pushing assets to TransferHelper
+        IMockErc20(assetToBridge).mint(address(_mockTransferHelper), amount);
 
         IChainGateway.BridgeParams memory bridgeParams = IChainGateway.BridgeParams({
             feePayer: everyRoleAccount,

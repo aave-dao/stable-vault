@@ -13,7 +13,7 @@ import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {ICcipBridgeAdapter} from "../interfaces/ICcipBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {ITransferHelper} from "../interfaces/ITransferHelper.sol";
-import {BridgeParamsLib} from "../libraries/BridgeParamsLib.sol";
+import {ConstantsLib} from "../libraries/ConstantsLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {BaseBridgeAdapter} from "./BaseBridgeAdapter.sol";
 
@@ -83,7 +83,7 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
         assetsToPull[assetsToPull.length - 1] = bridgeParams.feeToken;
         amountsToPull[amountsToPull.length - 1] = bridgeParams.feeAmount;
 
-        if (bridgeParams.feeToken != BridgeParamsLib.BRIDGE_FEE_ON_NATIVE_CURRENCY) {
+        if (bridgeParams.feeToken != ConstantsLib.BRIDGE_FEE_ON_NATIVE_CURRENCY) {
             // Increase allowance in case of the fee token matching an asset being bridged.
             IERC20(bridgeParams.feeToken).safeIncreaseAllowance(CCIP_ROUTER, bridgeParams.feeAmount);
         }
@@ -150,12 +150,12 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
         uint64 chainSelector = _chainSelectorOf[chainId];
         uint256 estimatedFeeAmount = IRouterClient(CCIP_ROUTER).getFee(chainSelector, message);
         uint256 msgValue;
-        if (feeToken == BridgeParamsLib.BRIDGE_FEE_ON_NATIVE_CURRENCY) {
+        if (feeToken == ConstantsLib.BRIDGE_FEE_ON_NATIVE_CURRENCY) {
             msgValue = estimatedFeeAmount;
         }
         // Return any excess fee to the fee payer.
         if (allocatedFeeAmount > estimatedFeeAmount) {
-            if (feeToken == BridgeParamsLib.BRIDGE_FEE_ON_NATIVE_CURRENCY) {
+            if (feeToken == ConstantsLib.BRIDGE_FEE_ON_NATIVE_CURRENCY) {
                 payable(feePayer).transfer(allocatedFeeAmount - estimatedFeeAmount);
             } else {
                 IERC20(feeToken).safeTransfer(feePayer, allocatedFeeAmount - estimatedFeeAmount);

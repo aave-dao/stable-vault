@@ -78,8 +78,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockIouTokenManager.mockIouToken(address(mockIouToken));
         mockAssetRegistry = new MockAssetRegistry();
         mockAsset = _deployDefaultAsset();
-        mockFundsHandler = new MockFundsHandler();
         mockTransferHelper = new MockTransferHelper();
+        mockFundsHandler = new MockFundsHandler(address(mockTransferHelper));
         bbv = _deployBasedBoostedVault(
             address(mockAccessManager),
             DEFAULT_MAX_PER_SECOND_RATE,
