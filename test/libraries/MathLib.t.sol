@@ -1,8 +1,8 @@
-// SPDX-License-Identifier: UNLICENSED
-// Copyright (c) 2025 Aave Labs
+// SPDX-License-Identifier: AGPL-3.0-or-later
 pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
+
 import {MathLibWrapper} from "test/mocks/MathLibWrapper.sol";
 
 contract MathLibDifferentialTests is Test {
@@ -117,8 +117,7 @@ contract MathLibDifferentialTests is Test {
         w.rpow(type(uint128).max, 3);
     }
 
-    // TODO: Check if the below is okay with Spark AGPL-3.0-or-later License or we need to do our own tests:
-    // The below tests were taken from Spark Vaults v2 repo:
+    // The tests below were taken from Spark Vaults v2 repo:
     // https://github.com/sparkdotfi/spark-vaults-v2/blob/dev/test/Math.t.sol
 
     struct ApyVsrTestCase {
