@@ -13,7 +13,7 @@ runs = 10_000
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
 
 [lint]
-exclude_lints = ["mixed-case-variable", "mixed-case-function", "unwrapped-modifier-logic", "unsafe-cheatcode"]
+exclude_lints = ["mixed-case-variable", "mixed-case-function", "unwrapped-modifier-logic"]
 
 [fmt]
 

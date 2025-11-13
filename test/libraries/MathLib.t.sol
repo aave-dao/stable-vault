@@ -128,6 +128,8 @@ contract MathLibDifferentialTests is Test {
     // NOTE: The CSV data was sourced from Sky Ecosystem's VSR conversion table:
     //       https://ipfs.io/ipfs/QmVp4mhhbwWGTfbh2BzwQB9eiBrQBKiqcPRZCaAxNUaar6
     function fixtureApyVsr() public view returns (ApyVsrTestCase[] memory) {
+        // It's OK to use the readFile cheatcode here for the rpow tests cases.
+        // forge-lint: disable-next-line(unsafe-cheatcode)
         string memory csv = vm.readFile("test/tables/rpow-apy.csv");
         string[] memory rows = vm.split(csv, "\n");
         ApyVsrTestCase[] memory testCases = new ApyVsrTestCase[](rows.length);
