@@ -218,6 +218,7 @@ contract AssetLibTest is Test {
             uint256 multiplier = 10 ** decimalsDiff;
             inputAmount = bound(inputAmount, 0, type(uint256).max / multiplier);
         }
+        // forge-lint: disable-next-line(unsafe-typecast)
         address asset = address(new TestErc20(uint8(assetDecimals)));
         uint256 expectedResult = _calculateExpectedResult(inputAmount, assetDecimals, outputDecimals);
         assertEq(expectedResult, w.assetDecimalsToRay(inputAmount, asset), "assetDecimalsToRay wrong output");
@@ -231,6 +232,7 @@ contract AssetLibTest is Test {
             uint256 multiplier = 10 ** decimalsDiff;
             inputAmount = bound(inputAmount, 0, type(uint256).max / multiplier);
         }
+        // forge-lint: disable-next-line(unsafe-typecast)
         address asset = address(new TestErc20(uint8(assetDecimals)));
         uint256 expectedResult = _calculateExpectedResult(inputAmount, inputDecimals, assetDecimals);
         assertEq(expectedResult, w.rayToAssetDecimals(inputAmount, asset), "rayToAssetDecimals wrong output");
@@ -253,7 +255,9 @@ contract AssetLibTest is Test {
 
         uint256 expectedResult = _calculateExpectedResult(inputAmount, inputDecimals, outputDecimals);
 
+        // forge-lint: disable-next-line(unsafe-typecast)
         address fromAsset = address(new TestErc20(uint8(inputDecimals)));
+        // forge-lint: disable-next-line(unsafe-typecast)
         address toAsset = address(new TestErc20(uint8(outputDecimals)));
         assertEq(
             expectedResult, w.convertAssetDecimals(inputAmount, fromAsset, toAsset), "convertAssetDecimals wrong output"
@@ -262,6 +266,7 @@ contract AssetLibTest is Test {
 
     function test_getDecimals(uint256 decimals) public {
         decimals = bound(decimals, 0, 77);
+        // forge-lint: disable-next-line(unsafe-typecast)
         address asset = address(new TestErc20(uint8(decimals)));
         vm.expectCall(asset, abi.encodeWithSelector(IERC20Metadata.decimals.selector));
         uint256 decimalsFromAsset = w.getDecimals(asset);
