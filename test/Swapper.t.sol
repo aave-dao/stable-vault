@@ -217,7 +217,7 @@ contract SwapperTest is TestWithHelpers {
         );
         vm.prank(allocator);
         // NOTE: this can either revert if the coverage source does not approve enough to cover slippage or if the min
-        // output of tokenOut is greater than actual output. It is possible that converting 18dp asset value to 6dp
+        // output of tokenOut is less than actual output. It is possible that converting 18dp asset value to 6dp
         // asset value and then calculating the minAmountOut after slippage results in a value that is equal to the
         // actual amount out (the impact of the actual slippage does is not large enough to make amountOut less than
         // what tolerated slippage allows).
