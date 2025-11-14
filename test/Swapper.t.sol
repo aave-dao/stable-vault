@@ -6,6 +6,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {Swapper} from "../src/common/Swapper.sol";
+import {ISwapper} from "../src/interfaces/ISwapper.sol";
 import {AssetLib} from "../src/libraries/AssetLib.sol";
 import {TestWithHelpers} from "./helpers/TestWithHelpers.sol";
 import {IMockDex, MockDex} from "./mocks/MockDex.sol";
@@ -91,7 +92,7 @@ contract SwapperTest is TestWithHelpers {
         IERC20(_mockUsdt).safeTransferFrom(address(_swapper), address(this), minAmountOut);
     }
 
-    function test_executeSwap_18decimalsInput_6decimalsOutput_slippage(uint256 amountIn, uint16 slippageToleranceBps)
+    function test_executeSwap_6decimalsInput_18decimalsOutput_slippage(uint256 amountIn, uint16 slippageToleranceBps)
         public
     {
         vm.assume(slippageToleranceBps <= 10_000);
@@ -125,7 +126,7 @@ contract SwapperTest is TestWithHelpers {
         IERC20(_mockGho).safeTransferFrom(address(_swapper), address(this), amountOutIfNoSlippage);
     }
 
-    function test_executeSwap_6decimalsInput_18decimalsOutput_slippage(uint256 amountIn, uint16 slippageToleranceBps)
+    function test_executeSwap_18decimalsInput_6decimalsOutput_slippage(uint256 amountIn, uint16 slippageToleranceBps)
         public
     {
         vm.assume(slippageToleranceBps <= 10_000);
@@ -157,6 +158,89 @@ contract SwapperTest is TestWithHelpers {
         // Check that the Swapper approved msg.sender to pull the output token
         vm.prank(allocator);
         IERC20(_mockUsdt).safeTransferFrom(address(_swapper), address(this), amountOutIfNoSlippage);
+    }
+
+    function test_executeSwap_reverts_6decimalsInput_18decimalsOutput_slippage(
+        uint256 amountIn,
+        uint16 slippageToleranceBps
+    ) public {
+        vm.assume(slippageToleranceBps < type(uint16).max);
+        uint16 actualSlippage = slippageToleranceBps + 1;
+        vm.assume(actualSlippage <= 10_000);
+        amountIn = _boundAssetAmount(address(_mockUsdt), amountIn);
+        uint256 amountOutIfNoSlippage = amountIn.convertAssetDecimals(address(_mockUsdt), address(_mockGho));
+        vm.assume(amountOutIfNoSlippage > 0);
+        uint256 minAmountOut = amountOutIfNoSlippage * (10_000 - actualSlippage) / 10_000;
+        vm.assume(minAmountOut > 0);
+
+        uint256 amountNeededFromSlippageCoverageSource = amountOutIfNoSlippage - minAmountOut;
+        vm.assume(amountNeededFromSlippageCoverageSource > 0);
+
+        _mockTransferIntoSwapper(_mockUsdt, amountIn);
+        _seedOutputToken(_mockGho, minAmountOut);
+        _setSlippageBps(actualSlippage);
+        _prepareSlippageAndFeeCoverage(_mockGho, amountNeededFromSlippageCoverageSource);
+
+        assertEq(_mockGho.balanceOf(address(slippageCoverageSource)), amountNeededFromSlippageCoverageSource);
+
+        bytes memory data = _encodeDexSwapExactInputData(
+            address(_mockUsdt), address(_mockGho), amountIn, minAmountOut, slippageToleranceBps
+        );
+        vm.prank(allocator);
+        vm.expectRevert(abi.encodeWithSelector(ISwapper.SlippageToleranceExceeded.selector));
+        _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, data);
+    }
+
+    function test_executeSwap_reverts_18decimalsInput_6decimalsOutput_slippage(
+        uint256 amountIn,
+        uint16 slippageToleranceBps
+    ) public {
+        vm.assume(slippageToleranceBps < type(uint16).max);
+        uint16 actualSlippage = slippageToleranceBps + 1;
+        vm.assume(actualSlippage <= 10_000);
+        amountIn = _boundAssetAmount(address(_mockGho), amountIn);
+        uint256 amountOutIfNoSlippage = amountIn.convertAssetDecimals(address(_mockGho), address(_mockUsdt));
+        vm.assume(amountOutIfNoSlippage > 0);
+        uint256 minAmountOut = amountOutIfNoSlippage * (10_000 - actualSlippage) / 10_000;
+        vm.assume(minAmountOut > 0);
+
+        uint256 amountNeededFromSlippageCoverageSource = amountOutIfNoSlippage - minAmountOut;
+        vm.assume(amountNeededFromSlippageCoverageSource > 0);
+
+        _mockTransferIntoSwapper(_mockGho, amountIn);
+        _seedOutputToken(_mockUsdt, minAmountOut);
+        _setSlippageBps(actualSlippage);
+        _prepareSlippageAndFeeCoverage(_mockUsdt, 0);
+
+        bytes memory data = _encodeDexSwapExactInputData(
+            address(_mockGho), address(_mockUsdt), amountIn, minAmountOut, slippageToleranceBps
+        );
+        vm.prank(allocator);
+        // NOTE: this can either revert if the coverage source does not approve enough to cover slippage or if the min
+        // output of tokenOut is greater than actual output. It is possible that converting 18dp asset value to 6dp
+        // asset value and then calculating the minAmountOut after slippage results in a value that is equal to the
+        // actual amount out (the impact of the actual slippage does is not large enough to make amountOut less than
+        // what tolerated slippage allows).
+        vm.expectRevert();
+        _swapper.executeSwap(address(_mockGho), address(_mockUsdt), amountIn, data);
+    }
+
+    function test_executeSwap_reverts_ifCallToTargetFailed() public {
+        uint256 amountIn = 100;
+
+        vm.mockCallRevert(
+            address(_mockDex),
+            abi.encodeWithSelector(
+                IMockDex.swapExactInput.selector, address(_mockUsdt), address(_mockGho), amountIn, 0
+            ),
+            abi.encodeWithSelector(IMockDex.InsufficientLiquidity.selector)
+        );
+
+        bytes memory data = _encodeDexSwapExactInputData(address(_mockUsdt), address(_mockGho), amountIn, 0, 0);
+
+        vm.expectRevert(abi.encodeWithSelector(ISwapper.CallToTargetFailed.selector));
+        vm.prank(allocator);
+        _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, data);
     }
 
     function test_executeSwap_reverts_ifNotOwner(address caller) public {

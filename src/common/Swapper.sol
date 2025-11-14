@@ -20,26 +20,27 @@ contract Swapper is ISwapper, Ownable, ReentrancyGuard {
     constructor(address owner) Ownable(owner) {}
 
     struct SlippageParams {
+        // Accounts for anything that reduces the amount out i.e. slippage, fees, etc.
         uint16 slippageToleranceBps;
+        // The account which much approve the Swapper to pull assetOut to cover slippage, fees, etc.
         address slippageCoverageSource;
     }
 
     /// @inheritdoc ISwapper
+    /// @dev Assumes `amountIn` tokens of `assetIn` were sent from the msg.sender
     function executeSwap(address assetIn, address assetOut, uint256 amountIn, bytes memory data)
         external
         onlyOwner
         nonReentrant
         returns (uint256)
     {
-        // Assumes `amountIn` tokens of `assetIn` were sent from the msg.sender
-
         // TODO: Consider using Multicall's Call struct, allowing calls to fail and adding a msgValue param too
         (address[] memory targets, bytes[] memory callDatas, SlippageParams memory slippageParams) =
             abi.decode(data, (address[], bytes[], SlippageParams));
 
         for (uint256 i = 0; i < targets.length; i++) {
             (bool callSucceeded,) = targets[i].call(callDatas[i]);
-            require(callSucceeded);
+            require(callSucceeded, ISwapper.CallToTargetFailed());
         }
 
         uint256 amountOut = IERC20(assetOut).balanceOf(address(this));
