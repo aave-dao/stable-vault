@@ -18,6 +18,10 @@ import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 abstract contract BaseBridgeAdapter is AccessManaged, TransferHelperClient, IBridgeAdapter {
     using SafeERC20 for IERC20;
 
+    /// @dev Funds handling does not depend on the source chain id (only data handling does).
+    /// @dev Assumes downstream ingestion of received funds does not expect a valid source chain id.
+    uint256 internal immutable RECEIVED_FUNDS_ONLY_SOURCE_CHAIN_ID = 0;
+
     address internal immutable GATEWAY;
 
     mapping(uint256 chainId => address destinationChainAdapter) internal _destinationChainAdapterOf;
@@ -34,6 +38,10 @@ abstract contract BaseBridgeAdapter is AccessManaged, TransferHelperClient, IBri
         GATEWAY = gateway;
     }
 
+    function getGateway() external view returns (address) {
+        return GATEWAY;
+    }
+
     function publishMessageToChainWithFeePayer(
         uint256 destinationChainId,
         IBridgeAdapter.BridgeAsset[] memory assets,
@@ -47,13 +55,12 @@ abstract contract BaseBridgeAdapter is AccessManaged, TransferHelperClient, IBri
 
     /// @notice Replays the funds receiving process for a given source chain and assets. Assets must be on this
     /// contract.
-    /// @param sourceChainId The chain id of the chain which funds arrived from.
     /// @param assets The tokens to replay the receiving process for.
-    function replayFundsReceiving(uint256 sourceChainId, IBridgeAdapter.BridgeAsset[] memory assets) external override {
-        _processReceivedFunds(sourceChainId, assets);
+    function replayFundsReceiving(IBridgeAdapter.BridgeAsset[] memory assets) external override {
+        _processReceivedFunds(assets);
     }
 
-    function _processReceivedFunds(uint256 sourceChainId, IBridgeAdapter.BridgeAsset[] memory assets)
+    function _processReceivedFunds(IBridgeAdapter.BridgeAsset[] memory assets)
         internal
         assertingTransferHelperBalanceForBridgeAssets(assets)
     {
@@ -62,7 +69,7 @@ abstract contract BaseBridgeAdapter is AccessManaged, TransferHelperClient, IBri
             uint256 amount = assets[i].amount;
             _transferToTransferHelper(asset, amount);
         }
-        IChainGateway(GATEWAY).receiveMessage(sourceChainId, assets, "");
+        IChainGateway(GATEWAY).receiveMessage(RECEIVED_FUNDS_ONLY_SOURCE_CHAIN_ID, assets, "");
     }
 
     receive() external payable {}

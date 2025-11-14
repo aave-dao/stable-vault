@@ -24,8 +24,6 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
 
     address internal immutable CCIP_ROUTER;
 
-    address internal _feeToken;
-
     mapping(uint256 chainId => uint64 ccipChainSelector) internal _chainSelectorOf;
     mapping(uint64 ccipChainSelector => uint256 chainId) internal _chainIdOf;
 
@@ -47,15 +45,22 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
         CCIP_ROUTER = ccipRouter;
     }
 
+    function getRouter() external view returns (address) {
+        return address(CCIP_ROUTER);
+    }
+
+    function getChainSelector(uint256 chainId) external view returns (uint64) {
+        return _chainSelectorOf[chainId];
+    }
+
+    function getChainId(uint64 ccipChainSelector) external view returns (uint256) {
+        return _chainIdOf[ccipChainSelector];
+    }
+
     /// @inheritdoc ICcipBridgeAdapter
     function setChainSelector(uint256 chainId, uint64 ccipChainSelector) external override restricted {
         _chainSelectorOf[chainId] = ccipChainSelector;
         _chainIdOf[ccipChainSelector] = chainId;
-    }
-
-    /// @inheritdoc ICcipBridgeAdapter
-    function setFeeToken(address feeToken) external override restricted {
-        _feeToken = feeToken;
     }
 
     /// @inheritdoc IBridgeAdapter
@@ -108,7 +113,7 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
             require(
                 abi.decode(message.sender, (address))
                     == _destinationChainAdapterOf[_chainIdOf[message.sourceChainSelector]],
-                ErrorsLib.NotDestinationChainAdapter()
+                NotDestinationChainAdapter()
             );
             IChainGateway(GATEWAY)
                 .receiveMessage(
@@ -116,24 +121,21 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
                 );
         }
         if (message.destTokenAmounts.length > 0) {
-            try this.processReceivedFunds(_chainIdOf[message.sourceChainSelector], message.destTokenAmounts) {}
+            try this.processReceivedFunds(message.destTokenAmounts) {}
             catch (bytes memory err) {
                 emit BridgedFundsProcessingFailed(_chainIdOf[message.sourceChainSelector], abi.encode(message), err);
             }
         }
     }
 
-    function processReceivedFunds(uint256 sourceChainId, Client.EVMTokenAmount[] memory assetsToProcess)
-        external
-        onlySelf
-    {
+    function processReceivedFunds(Client.EVMTokenAmount[] memory assetsToProcess) external onlySelf {
         IBridgeAdapter.BridgeAsset[] memory assets = new IBridgeAdapter.BridgeAsset[](assetsToProcess.length);
         for (uint256 i = 0; i < assetsToProcess.length; i++) {
             address asset = assetsToProcess[i].token;
             uint256 amount = assetsToProcess[i].amount;
             assets[i] = IBridgeAdapter.BridgeAsset({asset: asset, amount: amount});
         }
-        _processReceivedFunds(sourceChainId, assets);
+        _processReceivedFunds(assets);
     }
 
     function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
