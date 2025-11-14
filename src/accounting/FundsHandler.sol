@@ -45,10 +45,6 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, TransferHelp
         }
     }
 
-    function $FundsHandler() internal pure returns (FundsHandlerStorage storage) {
-        return $storage();
-    }
-
     modifier onlyBasedBoostedVault() {
         require(msg.sender == VAULT, NotBasedBoostedVault());
         _;
