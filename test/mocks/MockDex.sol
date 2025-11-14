@@ -2,8 +2,9 @@
 pragma solidity ^0.8.22;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+import {AssetLib} from "../../src/libraries/AssetLib.sol";
 
 interface IMockDex {
     error InsufficientLiquidity();
@@ -18,25 +19,14 @@ interface IMockDex {
 
 contract MockDex is IMockDex {
     using SafeERC20 for IERC20;
+    using AssetLib for uint256;
 
-    /// @dev amountOut = netIn * 10^(decOut-decIn) * rateBps / 10_000
-    uint16 public rateBps = 10_000;
-    // 100% by default (1:1 after decimal scaling)
-    uint256 public flatFeeIn;
+    uint256 internal constant MAX_BPS = 10_000;
+    uint16 internal _slippageBps = 0;
 
     function setSlippageBps(uint16 slippageBps) external {
         require(slippageBps <= 10_000, "Slippage must be less than or equal to 100%");
-        rateBps = 10_000 - slippageBps;
-    }
-
-    /// @dev Set a fixed fee value on the input token
-    function setFlatFeeIn(uint256 fee) external {
-        flatFeeIn = fee;
-    }
-
-    /// @notice Provide tokenOut liquidity (DEX pays from its balance)
-    function fund(address token, uint256 amount) external {
-        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+        _slippageBps = slippageBps;
     }
 
     function swapExactInput(address tokenIn, address tokenOut, uint256 amountIn, uint256 minAmountOut)
@@ -46,18 +36,9 @@ contract MockDex is IMockDex {
     {
         IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
 
-        uint256 netIn = amountIn > flatFeeIn ? amountIn - flatFeeIn : 0;
+        amountOut = amountIn.convertAssetDecimals(tokenIn, tokenOut);
 
-        uint8 din = IERC20Metadata(tokenIn).decimals();
-        uint8 dout = IERC20Metadata(tokenOut).decimals();
-
-        if (dout >= din) {
-            amountOut = netIn * (10 ** (dout - din));
-        } else {
-            amountOut = netIn / (10 ** (din - dout));
-        }
-
-        amountOut = (amountOut * rateBps) / 10_000;
+        amountOut = (amountOut * (MAX_BPS - _slippageBps)) / MAX_BPS;
         require(amountOut >= minAmountOut, IMockDex.Slippage());
         require(IERC20(tokenOut).balanceOf(address(this)) >= amountOut, IMockDex.InsufficientLiquidity());
 

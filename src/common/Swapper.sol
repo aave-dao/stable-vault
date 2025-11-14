@@ -47,13 +47,14 @@ contract Swapper is ISwapper, Ownable, ReentrancyGuard {
         // Enforce 1:1 swap between `assetIn` and `assetOut`.
         uint256 expectedAmountOut = amountIn.convertAssetDecimals(assetIn, assetOut);
         if (amountOut < expectedAmountOut) {
-            uint256 slippageAmount = expectedAmountOut - amountOut;
-            require(slippageAmount <= amountOut * slippageParams.slippageToleranceBps / MAX_BPS);
+            uint256 minAmountOut = expectedAmountOut * (MAX_BPS - slippageParams.slippageToleranceBps) / MAX_BPS;
+            require(amountOut >= minAmountOut, ISwapper.SlippageToleranceExceeded());
+            uint256 slippageAmount = expectedAmountOut - minAmountOut;
             IERC20(assetOut).safeTransferFrom(slippageParams.slippageCoverageSource, address(this), slippageAmount);
         }
 
         // Approve funds to be pulled by the caller i.e. the owner of the Swapper.
-        IERC20(assetOut).forceApprove(msg.sender, amountOut);
+        IERC20(assetOut).forceApprove(msg.sender, expectedAmountOut);
 
         return amountOut;
     }
