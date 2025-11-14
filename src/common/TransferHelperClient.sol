@@ -8,8 +8,6 @@ import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
-import {console} from "forge-std/console.sol";
-
 /// @title TransferHelperClient
 /// @notice Client for components that push assets into the TransferHelper or expect assets to be pushed into the
 /// TransferHelper.
@@ -76,7 +74,6 @@ contract TransferHelperClient {
     /// @dev Transfers the bridge fee to the TransferHelper to be pulled by Bridge Adapter.
     function _transferBridgeFeeToTransferHelper(IChainGateway.BridgeParams memory bridgeParams) internal {
         if (msg.value > 0) {
-            console.log("transferNativeToTransferHelper", msg.value);
             // If there is some msg.value, we transfer it to the TransferHelper, regardless of the fee token.
             // There might be scenarios where the bridge implementation requires some native assets to operate in
             // addition to the ERC-20 fee token.
