@@ -44,6 +44,12 @@ contract TestErc20 is IERC20, IERC20Metadata {
         emit Transfer(address(0), to, amount);
     }
 
+    function burn(address from, uint256 amount) external {
+        totalSupply -= amount;
+        balanceOf[from] -= amount;
+        emit Transfer(from, address(0), amount);
+    }
+
     function _transfer(address from, address to, uint256 amount) internal {
         require(balanceOf[from] >= amount, "TestErc20: transfer amount exceeds balance");
         balanceOf[from] -= amount;

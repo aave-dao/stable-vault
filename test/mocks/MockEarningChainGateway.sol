@@ -1,39 +1,40 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {IAccountingChainGateway} from "../../src/interfaces/IAccountingChainGateway.sol";
 import {IBridgeAdapter} from "../../src/interfaces/IBridgeAdapter.sol";
-import {IChainGateway} from "../../src/interfaces/IChainGateway.sol";
+import {IEarningChainGateway} from "../../src/interfaces/IEarningChainGateway.sol";
 import {ITransferHelper} from "../../src/interfaces/ITransferHelper.sol";
 
-contract MockAccountingChainGateway is IAccountingChainGateway {
+contract MockEarningChainGateway is IEarningChainGateway {
     address internal immutable TRANSFER_HELPER;
 
     constructor(address transferHelper) {
         TRANSFER_HELPER = transferHelper;
     }
 
-    address[] _assetsToPullFromTransferHelperInNextCall;
-    uint256[] _amountsToPullFromTransferHelperInNextCall;
+    function getAggregatedBalance() external view returns (uint256) {}
 
-    function mockToConsumeAssetFromTransferHelperInNextCall(address asset, uint256 amount) external {
-        _assetsToPullFromTransferHelperInNextCall.push(asset);
-        _amountsToPullFromTransferHelperInNextCall.push(amount);
-    }
+    function sendBalanceUpdateWithFeePayer(BridgeParams memory bridgeParams) external payable {}
+
+    function pushFundsToAccountingChain(address asset, uint256 amount, BridgeParams memory bridgeParams)
+        external
+        payable {}
+
+    function exchangeIouTokens(
+        uint256 iouTokenAmountRay,
+        address tokenOut,
+        address tokenOutReceiver,
+        BridgeParams memory bridgeParams
+    ) external payable returns (uint256) {}
 
     function getDefaultBridgeAdapter(address asset, uint256 chainId) external view returns (address) {}
 
     function sendPushFundsToChainMessage(
-        address, // asset
-        uint256, // amount
-        uint256, // targetChainId
-        IChainGateway.BridgeParams memory // bridgeParams
-    )
-        external
-        payable
-    {
-        _pullAssetsFromTransferHelper();
-    }
+        address asset,
+        uint256 amount,
+        uint256 targetChainId,
+        BridgeParams memory bridgeParams
+    ) external payable {}
 
     function addBridgeAdapter(address asset, uint256 chainId, address adapter) external {}
 
@@ -56,13 +57,6 @@ contract MockAccountingChainGateway is IAccountingChainGateway {
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
-        IChainGateway.BridgeParams memory bridgeParams
+        BridgeParams memory bridgeParams
     ) external payable {}
-
-    function _pullAssetsFromTransferHelper() internal {
-        if (_assetsToPullFromTransferHelperInNextCall.length > 0) {
-            ITransferHelper(TRANSFER_HELPER)
-                .pull(_assetsToPullFromTransferHelperInNextCall, _amountsToPullFromTransferHelperInNextCall);
-        }
-    }
 }

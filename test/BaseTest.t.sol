@@ -31,7 +31,7 @@ import {EarningChainGateway} from "./../src/earning/EarningChainGateway.sol";
 import {AssetLib} from "./../src/libraries/AssetLib.sol";
 import {MathLib} from "./../src/libraries/MathLib.sol";
 import {ExtendedBasedBoostedVault} from "./mocks/ExtendedBasedBoostedVault.sol";
-import {MockCCIPRouter} from "./mocks/MockRouter.sol";
+import {MockCCIPRouter} from "./mocks/MockCcipRouter.sol";
 import {TestErc20} from "./mocks/TestErc20.sol";
 import {TestErc4626} from "./mocks/TestErc4626.sol";
 
@@ -669,8 +669,6 @@ contract BaseTest is Test {
             earningChainGateway.getDefaultBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID)
         );
 
-        // ccipAdapter_accountingChain.setFeeToken(address(USDC));
-        // ccipAdapter_earningChain.setFeeToken(address(USDC));
         ccipAdapter_accountingChain.setChainSelector(EARNING_CHAIN_ID, EARNING_CHAIN_CCIP_SELECTOR);
         ccipAdapter_accountingChain.setDestinationChainAdapter(EARNING_CHAIN_ID, address(ccipAdapter_earningChain));
 
@@ -691,8 +689,8 @@ contract BaseTest is Test {
 
         // Enable everything for assets
         IAssetRegistry.AssetConfig memory unrestrictedAssetConfig = IAssetRegistry.AssetConfig({
-            depositIntoBBVAllowed: true,
-            withdrawFromBBVAllowed: true,
+            depositFromUserAllowed: true,
+            withdrawToUserAllowed: true,
             depositIntoAllocatorAllowed: true,
             withdrawFromAllocatorAllowed: true,
             swapInputTokenAllowed: true,
@@ -744,9 +742,7 @@ contract BaseTest is Test {
         accessManager.setTargetFunctionRole(
             address(ccipAdapter_accountingChain),
             _toSelectorArray(
-                IBridgeAdapter.setDestinationChainAdapter.selector,
-                ICcipBridgeAdapter.setChainSelector.selector,
-                ICcipBridgeAdapter.setFeeToken.selector
+                IBridgeAdapter.setDestinationChainAdapter.selector, ICcipBridgeAdapter.setChainSelector.selector
             ),
             APPENDER_ROLE
         );
@@ -844,9 +840,7 @@ contract BaseTest is Test {
         accessManager.setTargetFunctionRole(
             address(ccipAdapter_earningChain),
             _toSelectorArray(
-                IBridgeAdapter.setDestinationChainAdapter.selector,
-                ICcipBridgeAdapter.setChainSelector.selector,
-                ICcipBridgeAdapter.setFeeToken.selector
+                IBridgeAdapter.setDestinationChainAdapter.selector, ICcipBridgeAdapter.setChainSelector.selector
             ),
             APPENDER_ROLE
         );

@@ -45,10 +45,6 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, TransferHelp
         }
     }
 
-    function $FundsHandler() internal pure returns (FundsHandlerStorage storage) {
-        return $storage();
-    }
-
     modifier onlyBasedBoostedVault() {
         require(msg.sender == VAULT, NotBasedBoostedVault());
         _;
@@ -146,10 +142,12 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, TransferHelp
         assertingTransferHelperBalanceFor(asset)
     {
         require(amount > 0, ErrorsLib.ZeroAmount());
+
+        // Transfer the bridge fee to the TransferHelper.
+        _transferBridgeFeeToTransferHelper(bridgeParams);
+
         // Pull funds from liquidity into the TransferHelper.
         _pullFundsFromImmediateLiquidity(asset, amount);
-
-        _transferBridgeFeeToTransferHelper(bridgeParams);
 
         // Increment the chain balance snapshot for the target chain.
         _updateChainBalanceBeforeBridging(chainId, amount.assetDecimalsToRay(asset));

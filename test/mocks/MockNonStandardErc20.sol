@@ -33,7 +33,7 @@ contract MockNonStandardErc20 {
     /// Also, the additional requirement to not allow approval if was not previously set to 0.
     function approve(address spender, uint256 amount) public virtual {
         address owner = msg.sender;
-        require(!((amount != 0) && (_allowances[owner][spender] != 0)));
+        require(!((amount != 0) && (_allowances[owner][spender] != 0)), "MockNonStandardErc20: allowance already set");
         _approve(owner, spender, amount);
     }
 

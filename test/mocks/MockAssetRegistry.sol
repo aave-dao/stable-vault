@@ -7,10 +7,10 @@ import {IAssetRegistry} from "../../src/interfaces/IAssetRegistry.sol";
 /// @notice Mock implementation of the AssetRegistry contract for testing purposes.
 /// @dev By default it allows all assets to simplify testing. It must be explicitly mocked to disallow assets.
 contract MockAssetRegistry is IAssetRegistry {
-    mapping(address asset => bool isAllowedToDepositIntoBBV) _isNotAllowedToDepositIntoBBV;
-    mapping(address asset => bool isAllowedToWithdrawFromBBV) _isNotAllowedToWithdrawFromBBV;
-    mapping(address asset => bool isAllowedToDepositIntoAllocator) _isNotAllowedToDepositIntoAllocator;
-    mapping(address asset => bool isAllowedToWithdrawFromAllocator) _isNotAllowedToWithdrawFromAllocator;
+    mapping(address asset => bool isUserDepositAllowed) _isNotAllowedToDepositIntoBBV;
+    mapping(address asset => bool isUserWithdrawalAllowed) _isNotAllowedToWithdrawFromBBV;
+    mapping(address asset => bool isDepositToAllocatorAllowed) _isNotAllowedToDepositIntoAllocator;
+    mapping(address asset => bool isWithdrawalFromAllocatorAllowed) _isNotAllowedToWithdrawFromAllocator;
     mapping(address asset => bool isAllowedToSwapInputTokenInAllocator) _isNotAllowedToSwapInputTokenInAllocator;
     mapping(address asset => bool isAllowedToSwapOutputTokenInAllocator) _isNotAllowedToSwapOutputTokenInAllocator;
 
@@ -56,27 +56,27 @@ contract MockAssetRegistry is IAssetRegistry {
         _isNotAllowedToSwapOutputTokenInAllocator[asset] = true;
     }
 
-    function isAllowedToDepositIntoBBV(address asset) external view override returns (bool) {
+    function isUserDepositAllowed(address asset) external view override returns (bool) {
         return !_isNotAllowedToDepositIntoBBV[asset];
     }
 
-    function isAllowedToWithdrawFromBBV(address asset) external view override returns (bool) {
+    function isUserWithdrawalAllowed(address asset) external view override returns (bool) {
         return !_isNotAllowedToWithdrawFromBBV[asset];
     }
 
-    function isAllowedToDepositIntoAllocator(address asset) external view override returns (bool) {
+    function isDepositToAllocatorAllowed(address asset) external view override returns (bool) {
         return !_isNotAllowedToDepositIntoAllocator[asset];
     }
 
-    function isAllowedToWithdrawFromAllocator(address asset) external view override returns (bool) {
+    function isWithdrawalFromAllocatorAllowed(address asset) external view override returns (bool) {
         return !_isNotAllowedToWithdrawFromAllocator[asset];
     }
 
-    function isAllowedSwapInputToken(address asset) external view override returns (bool) {
+    function isSwapInputAllowed(address asset) external view override returns (bool) {
         return !_isNotAllowedToSwapInputTokenInAllocator[asset];
     }
 
-    function isAllowedSwapOutputToken(address asset) external view override returns (bool) {
+    function isSwapOutputAllowed(address asset) external view override returns (bool) {
         return !_isNotAllowedToSwapOutputTokenInAllocator[asset];
     }
 }

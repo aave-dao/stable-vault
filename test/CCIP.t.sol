@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 
-import {MockCCIPRouter} from "./mocks/MockRouter.sol";
+import {MockCCIPRouter} from "./mocks/MockCcipRouter.sol";
 import {TestErc20} from "./mocks/TestErc20.sol";
 import {IAny2EVMMessageReceiver} from "@chainlink-ccip/contracts/interfaces/IAny2EVMMessageReceiver.sol";
 import {Client} from "@chainlink-ccip/contracts/libraries/Client.sol";

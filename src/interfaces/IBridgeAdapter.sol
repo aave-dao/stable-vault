@@ -7,6 +7,8 @@ interface IBridgeAdapter {
     /// @notice Emitted when the processing of bridged funds fails.
     event BridgedFundsProcessingFailed(uint256 sourceChainId, bytes message, bytes error);
 
+    /// @notice Address checked is not the destination chain adapter.
+    error NotDestinationChainAdapter();
     error NotBridgeRouter();
 
     struct BridgeAsset {
@@ -16,7 +18,7 @@ interface IBridgeAdapter {
 
     function setDestinationChainAdapter(uint256 chainId, address destinationChainAdapter) external;
 
-    function replayFundsReceiving(uint256 sourceChainId, BridgeAsset[] memory assets) external;
+    function replayFundsReceiving(BridgeAsset[] memory assets) external;
 
     /// @notice Sends an arbitrary message containing instructions or data updates to a destination chain.
     /// @param destinationChainId The chain id of the chain to publish the message to.
