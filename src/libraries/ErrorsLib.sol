@@ -38,9 +38,6 @@ library ErrorsLib {
     /// @notice Address checked is not the Cross-chain gateway.
     error NotGateway();
 
-    /// @notice Address checked is not the destination chain adapter.
-    error NotDestinationChainAdapter();
-
     /// @notice Address checked is not the self.
     error NotSelf();
 

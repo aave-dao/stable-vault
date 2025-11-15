@@ -1,0 +1,784 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.22;
+
+import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
+import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+
+import {IAny2EVMMessageReceiver} from "@chainlink-ccip/contracts/interfaces/IAny2EVMMessageReceiver.sol";
+import {IRouterClient} from "@chainlink-ccip/contracts/interfaces/IRouterClient.sol";
+import {Client} from "@chainlink-ccip/contracts/libraries/Client.sol";
+
+import {CcipAdapter} from "../../src/bridging/CcipAdapter.sol";
+import {IBridgeAdapter} from "../../src/interfaces/IBridgeAdapter.sol";
+import {ICcipBridgeAdapter} from "../../src/interfaces/ICcipBridgeAdapter.sol";
+import {IChainGateway} from "../../src/interfaces/IChainGateway.sol";
+import {AssetLib} from "../../src/libraries/AssetLib.sol";
+import {ErrorsLib} from "../../src/libraries/ErrorsLib.sol";
+import {MathLib} from "../../src/libraries/MathLib.sol";
+import {TestWithHelpers} from "../helpers/TestWithHelpers.sol";
+import {MockAccessManager} from "../mocks/MockAccessManager.sol";
+import {MockAccountingChainGateway} from "../mocks/MockAccountingChainGateway.sol";
+import {MockAssetRegistry} from "../mocks/MockAssetRegistry.sol";
+import {MockCCIPRouter} from "../mocks/MockCcipRouter.sol";
+import {MockEarningChainGateway} from "../mocks/MockEarningChainGateway.sol";
+import {IMockErc20} from "../mocks/MockErc20.sol";
+import {MockNonStandardErc20} from "../mocks/MockNonStandardErc20.sol";
+import {MockTransferHelper} from "../mocks/MockTransferHelper.sol";
+
+contract CcipAdapterTest is TestWithHelpers {
+    using MathLib for uint256;
+    using AssetLib for uint256;
+    using SafeERC20 for IERC20;
+    using SafeERC20 for IMockErc20;
+
+    uint256 internal ACCOUNTING_CHAIN_ID = 1;
+    uint64 internal ACCOUNTING_CHAIN_CCIP_SELECTOR = 10;
+    uint256 internal EARNING_CHAIN_ID = 2;
+    uint64 internal EARNING_CHAIN_CCIP_SELECTOR = 20;
+
+    address admin = makeAddr("ADMIN");
+    address everyRoleAccount = makeAddr("EVERY_ROLE_ACCOUNT");
+
+    MockAssetRegistry internal _mockAssetRegistry;
+    MockAccessManager internal _mockAccessManager;
+    IMockErc20 internal _mockUsdt;
+    IMockErc20 internal _mockGho;
+    IMockErc20 internal _mockUnsupportedAsset;
+    MockTransferHelper internal _mockTransferHelper;
+    MockCCIPRouter internal _mockCCIPRouter;
+    MockAccountingChainGateway internal _mockAccountingChainGateway;
+    MockEarningChainGateway internal _mockEarningChainGateway;
+
+    CcipAdapter internal _accountingChainCcipAdapter;
+    CcipAdapter internal _earningChainCcipAdapter;
+
+    function _deployCcipAdapter(address accessManager, address gateway, address ccipRouter, address transferHelper)
+        internal
+        returns (CcipAdapter)
+    {
+        CcipAdapter ccipAdapter = new CcipAdapter(accessManager, gateway, ccipRouter, transferHelper);
+        return ccipAdapter;
+    }
+
+    function setUp() public virtual {
+        _mockUsdt = IMockErc20(address(new MockNonStandardErc20("Test USDT", "tUSDT", 6)));
+        _mockGho = IMockErc20(address(new MockNonStandardErc20("Test GHO", "tGHO", 18)));
+        _mockUnsupportedAsset =
+            IMockErc20(address(new MockNonStandardErc20("Test Unsupported Asset", "tUNSUPPORTED", 18)));
+
+        _mockAssetRegistry = new MockAssetRegistry();
+        _mockTransferHelper = new MockTransferHelper();
+        _mockAccessManager = new MockAccessManager(admin);
+
+        _mockCCIPRouter = new MockCCIPRouter();
+
+        _mockAccountingChainGateway = new MockAccountingChainGateway(address(_mockTransferHelper));
+        _mockEarningChainGateway = new MockEarningChainGateway(address(_mockTransferHelper));
+
+        _accountingChainCcipAdapter = _deployCcipAdapter(
+            address(_mockAccessManager),
+            address(_mockAccountingChainGateway),
+            address(_mockCCIPRouter),
+            address(_mockTransferHelper)
+        );
+        _earningChainCcipAdapter = _deployCcipAdapter(
+            address(_mockAccessManager),
+            address(_mockEarningChainGateway),
+            address(_mockCCIPRouter),
+            address(_mockTransferHelper)
+        );
+
+        // Set chain selectors and destination adapters
+        vm.prank(everyRoleAccount);
+        _accountingChainCcipAdapter.setChainSelector(EARNING_CHAIN_ID, EARNING_CHAIN_CCIP_SELECTOR);
+        vm.prank(everyRoleAccount);
+        _accountingChainCcipAdapter.setDestinationChainAdapter(EARNING_CHAIN_ID, address(_earningChainCcipAdapter));
+
+        vm.prank(everyRoleAccount);
+        _earningChainCcipAdapter.setChainSelector(ACCOUNTING_CHAIN_ID, ACCOUNTING_CHAIN_CCIP_SELECTOR);
+        vm.prank(everyRoleAccount);
+        _earningChainCcipAdapter.setDestinationChainAdapter(ACCOUNTING_CHAIN_ID, address(_accountingChainCcipAdapter));
+    }
+
+    function test_getRouter() public view {
+        assertEq(_accountingChainCcipAdapter.getRouter(), address(_mockCCIPRouter));
+        assertEq(_earningChainCcipAdapter.getRouter(), address(_mockCCIPRouter));
+    }
+
+    function test_getGateway() public view {
+        assertEq(_accountingChainCcipAdapter.getGateway(), address(_mockAccountingChainGateway));
+        assertEq(_earningChainCcipAdapter.getGateway(), address(_mockEarningChainGateway));
+    }
+
+    function test_getChainSelector_AccountingChain() public view {
+        assertEq(_accountingChainCcipAdapter.getChainSelector(EARNING_CHAIN_ID), EARNING_CHAIN_CCIP_SELECTOR);
+        assertEq(_accountingChainCcipAdapter.getChainSelector(ACCOUNTING_CHAIN_ID), 0);
+    }
+
+    function test_getChainSelector_EarningChain() public view {
+        assertEq(_earningChainCcipAdapter.getChainSelector(ACCOUNTING_CHAIN_ID), ACCOUNTING_CHAIN_CCIP_SELECTOR);
+        assertEq(_earningChainCcipAdapter.getChainSelector(EARNING_CHAIN_ID), 0);
+    }
+
+    function test_getChainId_AccountingChain() public view {
+        assertEq(_accountingChainCcipAdapter.getChainId(EARNING_CHAIN_CCIP_SELECTOR), EARNING_CHAIN_ID);
+        assertEq(_accountingChainCcipAdapter.getChainId(ACCOUNTING_CHAIN_CCIP_SELECTOR), 0);
+    }
+
+    function test_getChainId_EarningChain() public view {
+        assertEq(_earningChainCcipAdapter.getChainId(ACCOUNTING_CHAIN_CCIP_SELECTOR), ACCOUNTING_CHAIN_ID);
+        assertEq(_earningChainCcipAdapter.getChainId(EARNING_CHAIN_CCIP_SELECTOR), 0);
+    }
+
+    function test_supportsInterface() public view {
+        assertTrue(_accountingChainCcipAdapter.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId));
+        assertTrue(_accountingChainCcipAdapter.supportsInterface(type(IERC165).interfaceId));
+        assertTrue(_earningChainCcipAdapter.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId));
+        assertTrue(_earningChainCcipAdapter.supportsInterface(type(IERC165).interfaceId));
+    }
+
+    function test_replayFundsReceiving_AccountingChain(uint256 amountUsdt, uint256 amountGho) public {
+        // Airdrop tokens into adapter to mimic bridged funds that failed to get handled
+        amountUsdt = _boundAssetAmount(address(_mockUsdt), amountUsdt);
+        amountGho = _boundAssetAmount(address(_mockGho), amountGho);
+
+        _mockUsdt.mint(address(_accountingChainCcipAdapter), amountUsdt);
+        _mockGho.mint(address(_accountingChainCcipAdapter), amountGho);
+
+        IBridgeAdapter.BridgeAsset[] memory bridgeAssets = new IBridgeAdapter.BridgeAsset[](2);
+        bridgeAssets[0] = IBridgeAdapter.BridgeAsset({asset: address(_mockUsdt), amount: amountUsdt});
+        bridgeAssets[1] = IBridgeAdapter.BridgeAsset({asset: address(_mockGho), amount: amountGho});
+
+        // Expect the gateway is approved to pull funds from the adapter
+        vm.expectCall(address(_mockUsdt), abi.encodeCall(IERC20.transfer, (address(_mockTransferHelper), amountUsdt)));
+        vm.expectCall(address(_mockGho), abi.encodeCall(IERC20.transfer, (address(_mockTransferHelper), amountGho)));
+        vm.expectCall(
+            address(_mockAccountingChainGateway), abi.encodeCall(IChainGateway.receiveMessage, (0, bridgeAssets, ""))
+        );
+
+        // Function is not gated - anyone can call
+        _accountingChainCcipAdapter.replayFundsReceiving(bridgeAssets);
+    }
+
+    function test_replayFundsReceiving_EarningChain(uint256 amountUsdt, uint256 amountGho) public {
+        // Airdrop tokens into adapter to mimic bridged funds that failed to get handled
+        amountUsdt = _boundAssetAmount(address(_mockUsdt), amountUsdt);
+        amountGho = _boundAssetAmount(address(_mockGho), amountGho);
+
+        _mockUsdt.mint(address(_earningChainCcipAdapter), amountUsdt);
+        _mockGho.mint(address(_earningChainCcipAdapter), amountGho);
+
+        IBridgeAdapter.BridgeAsset[] memory bridgeAssets = new IBridgeAdapter.BridgeAsset[](2);
+        bridgeAssets[0] = IBridgeAdapter.BridgeAsset({asset: address(_mockUsdt), amount: amountUsdt});
+        bridgeAssets[1] = IBridgeAdapter.BridgeAsset({asset: address(_mockGho), amount: amountGho});
+
+        // Expect the gateway is approved to pull funds from the adapter
+        vm.expectCall(address(_mockUsdt), abi.encodeCall(IERC20.transfer, (address(_mockTransferHelper), amountUsdt)));
+        vm.expectCall(address(_mockGho), abi.encodeCall(IERC20.transfer, (address(_mockTransferHelper), amountGho)));
+        vm.expectCall(
+            address(_mockEarningChainGateway), abi.encodeCall(IChainGateway.receiveMessage, (0, bridgeAssets, ""))
+        );
+
+        // Function is not gated - anyone can call
+        _earningChainCcipAdapter.replayFundsReceiving(bridgeAssets);
+    }
+
+    function test_setChainSelector_reverts_ifNotAuthorized(address operator) public {
+        vm.assume(operator != everyRoleAccount);
+        vm.assume(operator != address(0));
+        _assumeNotProxyAdmin(operator, address(_accountingChainCcipAdapter));
+
+        vm.mockCall(
+            address(_mockAccessManager),
+            abi.encodeWithSelector(
+                IAccessManager.canCall.selector,
+                operator,
+                address(_accountingChainCcipAdapter),
+                bytes4(ICcipBridgeAdapter.setChainSelector.selector)
+            ),
+            abi.encode(false)
+        );
+
+        vm.prank(operator);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, operator));
+        _accountingChainCcipAdapter.setChainSelector(EARNING_CHAIN_ID, EARNING_CHAIN_CCIP_SELECTOR);
+
+        vm.mockCall(
+            address(_mockAccessManager),
+            abi.encodeWithSelector(
+                IAccessManager.canCall.selector,
+                operator,
+                address(_earningChainCcipAdapter),
+                bytes4(ICcipBridgeAdapter.setChainSelector.selector)
+            ),
+            abi.encode(false)
+        );
+        vm.prank(operator);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, operator));
+        _earningChainCcipAdapter.setChainSelector(ACCOUNTING_CHAIN_ID, ACCOUNTING_CHAIN_CCIP_SELECTOR);
+    }
+
+    function test_publishMessageToChainWithFeePayer_withTokenBridgeFee(
+        uint256 amountUsdt,
+        uint256 amountGho,
+        address feePayer,
+        uint256 feeAmount,
+        uint256 gasLimit,
+        bytes memory bridgedData,
+        bytes memory extraParamsData
+    ) public {
+        // Context: Accounting Chain -> Earning Chain
+
+        vm.assume(feePayer != address(0));
+
+        amountUsdt = _boundAssetAmount(address(_mockUsdt), amountUsdt);
+        amountGho = _boundAssetAmount(address(_mockGho), amountGho);
+
+        address feeToken = address(_mockUsdt);
+        feeAmount = _boundAssetAmount(feeToken, feeAmount);
+
+        uint256 totalUsdtAmount = amountUsdt + feeAmount;
+
+        // Airdrop tokens to the TransferHelper as they would be pushed there from feePayer and Allocator
+        _mockTransferHelper.mockAsset(address(_mockUsdt), totalUsdtAmount);
+        _mockTransferHelper.mockAsset(address(_mockGho), amountGho);
+
+        IBridgeAdapter.BridgeAsset[] memory bridgeAssets = new IBridgeAdapter.BridgeAsset[](2);
+        bridgeAssets[0] = IBridgeAdapter.BridgeAsset({asset: address(_mockUsdt), amount: amountUsdt});
+        bridgeAssets[1] = IBridgeAdapter.BridgeAsset({asset: address(_mockGho), amount: amountGho});
+
+        IChainGateway.BridgeParams memory bridgeParams = IChainGateway.BridgeParams({
+            feePayer: feePayer, feeToken: feeToken, feeAmount: feeAmount, gasLimit: gasLimit, data: extraParamsData
+        });
+
+        Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](2);
+        ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
+        ccipTokenAmounts[1] = Client.EVMTokenAmount({token: address(_mockGho), amount: amountGho});
+
+        Client.EVM2AnyMessage memory expectedCcipMessage = Client.EVM2AnyMessage({
+            receiver: abi.encode(_earningChainCcipAdapter),
+            data: bridgedData,
+            tokenAmounts: ccipTokenAmounts,
+            feeToken: feeToken,
+            extraArgs: Client._argsToBytes(
+                Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: false})
+            )
+        });
+
+        {
+            // Mock call to router.getFee - return the fee amount to avoid refund flow (this is tested in another test)
+            vm.mockCall(
+                address(_mockCCIPRouter),
+                abi.encodeWithSelector(IRouterClient.getFee.selector, EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage),
+                abi.encode(feeAmount)
+            );
+
+            // Expect a call to router to approve the bridged assets
+            _expectBridgeAssetsApproval(ccipTokenAmounts);
+
+            // Expect a call to router.ccipSend
+            vm.expectCall(
+                address(_mockCCIPRouter),
+                0,
+                abi.encodeCall(IRouterClient.ccipSend, (EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage))
+            );
+        }
+
+        _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage);
+        vm.prank(address(_mockAccountingChainGateway));
+        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
+            EARNING_CHAIN_ID, bridgeAssets, bridgedData, bridgeParams
+        );
+
+        // Check that the TransferHelper no longer holds the assets
+        assertEq(_mockTransferHelper.getBalance(address(_mockUsdt)), 0);
+        assertEq(_mockTransferHelper.getBalance(address(_mockGho)), 0);
+    }
+
+    function test_publishMessageToChainWithFeePayer_withNativeBridgeFee(
+        uint256 amountUsdt,
+        uint256 amountGho,
+        address feePayer,
+        uint256 feeAmount,
+        uint256 gasLimit,
+        bytes memory bridgedData,
+        bytes memory extraParamsData
+    ) public {
+        // Context: Accounting Chain -> Earning Chain
+
+        vm.assume(feePayer != address(0));
+
+        amountUsdt = _boundAssetAmount(address(_mockUsdt), amountUsdt);
+        amountGho = _boundAssetAmount(address(_mockGho), amountGho);
+
+        address feeToken = address(0);
+        feeAmount = _boundNativeAmount(feeAmount);
+
+        // Airdrop assets to the TransferHelper as they would be pushed there from feePayer and Allocator
+        _mockTransferHelper.mockAsset(address(_mockUsdt), amountUsdt);
+        _mockTransferHelper.mockAsset(address(_mockGho), amountGho);
+        vm.deal(address(_mockTransferHelper), feeAmount);
+
+        IBridgeAdapter.BridgeAsset[] memory bridgeAssets = new IBridgeAdapter.BridgeAsset[](2);
+        bridgeAssets[0] = IBridgeAdapter.BridgeAsset({asset: address(_mockUsdt), amount: amountUsdt});
+        bridgeAssets[1] = IBridgeAdapter.BridgeAsset({asset: address(_mockGho), amount: amountGho});
+
+        IChainGateway.BridgeParams memory bridgeParams = IChainGateway.BridgeParams({
+            feePayer: feePayer, feeToken: feeToken, feeAmount: feeAmount, gasLimit: gasLimit, data: extraParamsData
+        });
+
+        Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](2);
+        ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
+        ccipTokenAmounts[1] = Client.EVMTokenAmount({token: address(_mockGho), amount: amountGho});
+
+        Client.EVM2AnyMessage memory expectedCcipMessage = Client.EVM2AnyMessage({
+            receiver: abi.encode(_earningChainCcipAdapter),
+            data: bridgedData,
+            tokenAmounts: ccipTokenAmounts,
+            feeToken: feeToken,
+            extraArgs: Client._argsToBytes(
+                Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: false})
+            )
+        });
+
+        {
+            // Mock call to router.getFee - return the fee amount to avoid refund flow (this is tested in another test)
+            vm.mockCall(
+                address(_mockCCIPRouter),
+                abi.encodeWithSelector(IRouterClient.getFee.selector, EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage),
+                abi.encode(feeAmount)
+            );
+
+            // Expect a call to router to approve the bridged assets
+            _expectBridgeAssetsApproval(ccipTokenAmounts);
+
+            // Expect a call to router.ccipSend
+            vm.expectCall(
+                address(_mockCCIPRouter),
+                feeAmount,
+                abi.encodeCall(IRouterClient.ccipSend, (EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage))
+            );
+        }
+
+        _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage);
+        vm.prank(address(_mockAccountingChainGateway));
+        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
+            EARNING_CHAIN_ID, bridgeAssets, bridgedData, bridgeParams
+        );
+
+        // Check that the TransferHelper no longer holds the assets
+        assertEq(_mockTransferHelper.getBalance(address(_mockUsdt)), 0);
+        assertEq(_mockTransferHelper.getBalance(address(_mockGho)), 0);
+    }
+
+    function test_publishMessageToChainWithFeePayer_withTokenBridgeFeeAndRefund(
+        uint256 amountUsdt,
+        uint256 amountGho,
+        address feePayer,
+        uint256 feeAmount,
+        uint256 gasLimit,
+        bytes memory bridgedData,
+        bytes memory extraParamsData
+    ) public {
+        // Context: Accounting Chain -> Earning Chain
+
+        vm.assume(feePayer != address(0));
+        vm.assume(feePayer != address(_mockTransferHelper));
+        vm.assume(feePayer != address(_accountingChainCcipAdapter));
+
+        amountUsdt = _boundAssetAmount(address(_mockUsdt), amountUsdt);
+        amountGho = _boundAssetAmount(address(_mockGho), amountGho);
+
+        address feeToken = address(_mockUsdt);
+        feeAmount = _boundAssetAmount(feeToken, feeAmount);
+        vm.assume(feeAmount > 1);
+        uint256 expectedFeeRefund = 1;
+        uint256 actualFeeAmount = feeAmount - expectedFeeRefund;
+
+        uint256 totalUsdtAmount = amountUsdt + feeAmount;
+
+        // Airdrop tokens to the TransferHelper as they would be pushed there from feePayer and Allocator
+        _mockTransferHelper.mockAsset(address(_mockUsdt), totalUsdtAmount);
+        _mockTransferHelper.mockAsset(address(_mockGho), amountGho);
+
+        IBridgeAdapter.BridgeAsset[] memory bridgeAssets = new IBridgeAdapter.BridgeAsset[](2);
+        bridgeAssets[0] = IBridgeAdapter.BridgeAsset({asset: address(_mockUsdt), amount: amountUsdt});
+        bridgeAssets[1] = IBridgeAdapter.BridgeAsset({asset: address(_mockGho), amount: amountGho});
+
+        IChainGateway.BridgeParams memory bridgeParams = IChainGateway.BridgeParams({
+            feePayer: feePayer, feeToken: feeToken, feeAmount: feeAmount, gasLimit: gasLimit, data: extraParamsData
+        });
+
+        Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](2);
+        ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
+        ccipTokenAmounts[1] = Client.EVMTokenAmount({token: address(_mockGho), amount: amountGho});
+
+        Client.EVM2AnyMessage memory expectedCcipMessage = Client.EVM2AnyMessage({
+            receiver: abi.encode(_earningChainCcipAdapter),
+            data: bridgedData,
+            tokenAmounts: ccipTokenAmounts,
+            feeToken: feeToken,
+            extraArgs: Client._argsToBytes(
+                Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: false})
+            )
+        });
+
+        {
+            // Mock call to router.getFee - return the fee amount to avoid refund flow (this is tested in another test)
+            vm.mockCall(
+                address(_mockCCIPRouter),
+                abi.encodeWithSelector(IRouterClient.getFee.selector, EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage),
+                abi.encode(actualFeeAmount)
+            );
+
+            // Expect a call to router to approve the bridged assets
+            _expectBridgeAssetsApproval(ccipTokenAmounts);
+
+            // Expect a call to router.ccipSend
+            vm.expectCall(
+                address(_mockCCIPRouter),
+                0,
+                abi.encodeCall(IRouterClient.ccipSend, (EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage))
+            );
+        }
+
+        _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage);
+        vm.prank(address(_mockAccountingChainGateway));
+        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
+            EARNING_CHAIN_ID, bridgeAssets, bridgedData, bridgeParams
+        );
+
+        // Check that the TransferHelper no longer holds the assets
+        assertEq(_mockTransferHelper.getBalance(address(_mockUsdt)), 0);
+        assertEq(_mockTransferHelper.getBalance(address(_mockGho)), 0);
+        assertEq(_mockUsdt.balanceOf(address(feePayer)), expectedFeeRefund);
+    }
+
+    function test_publishMessageToChainWithFeePayer_withNativeBridgeFeeAndRefund(
+        uint256 amountUsdt,
+        uint256 amountGho,
+        address payable feePayer,
+        uint256 feeAmount,
+        uint256 gasLimit,
+        bytes memory bridgedData,
+        bytes memory extraParamsData
+    ) public {
+        // Context: Accounting Chain -> Earning Chain
+
+        vm.assume(feePayer != address(0));
+        // Avoid sending to contracts in the system that may not have payable fallback
+        vm.assume(feePayer.code.length == 0);
+        // Exclude precompile addresses
+        vm.assume(uint160(address(feePayer)) > 0xff);
+        // Exclude console address
+        vm.assume(feePayer != address(0x000000000000000000636F6e736F6c652e6c6f67));
+
+        uint256 feePayerBalance = address(feePayer).balance;
+
+        amountUsdt = _boundAssetAmount(address(_mockUsdt), amountUsdt);
+        amountGho = _boundAssetAmount(address(_mockGho), amountGho);
+
+        address feeToken = address(0);
+        feeAmount = _boundNativeAmount(feeAmount);
+        vm.assume(feeAmount > 1);
+        uint256 expectedFeeRefund = 1;
+        uint256 actualFeeAmount = feeAmount - expectedFeeRefund;
+
+        // Airdrop assets to the TransferHelper as they would be pushed there from feePayer and Allocator
+        _mockTransferHelper.mockAsset(address(_mockUsdt), amountUsdt);
+        _mockTransferHelper.mockAsset(address(_mockGho), amountGho);
+        vm.deal(address(_mockTransferHelper), feeAmount);
+
+        IBridgeAdapter.BridgeAsset[] memory bridgeAssets = new IBridgeAdapter.BridgeAsset[](2);
+        bridgeAssets[0] = IBridgeAdapter.BridgeAsset({asset: address(_mockUsdt), amount: amountUsdt});
+        bridgeAssets[1] = IBridgeAdapter.BridgeAsset({asset: address(_mockGho), amount: amountGho});
+
+        IChainGateway.BridgeParams memory bridgeParams = IChainGateway.BridgeParams({
+            feePayer: feePayer, feeToken: feeToken, feeAmount: feeAmount, gasLimit: gasLimit, data: extraParamsData
+        });
+
+        Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](2);
+        ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
+        ccipTokenAmounts[1] = Client.EVMTokenAmount({token: address(_mockGho), amount: amountGho});
+
+        Client.EVM2AnyMessage memory expectedCcipMessage = Client.EVM2AnyMessage({
+            receiver: abi.encode(_earningChainCcipAdapter),
+            data: bridgedData,
+            tokenAmounts: ccipTokenAmounts,
+            feeToken: feeToken,
+            extraArgs: Client._argsToBytes(
+                Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: false})
+            )
+        });
+
+        {
+            // Mock call to router.getFee - return the fee amount to avoid refund flow (this is tested in another test)
+            vm.mockCall(
+                address(_mockCCIPRouter),
+                abi.encodeWithSelector(IRouterClient.getFee.selector, EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage),
+                abi.encode(actualFeeAmount)
+            );
+
+            // Expect a call to router to approve the bridged assets
+            _expectBridgeAssetsApproval(ccipTokenAmounts);
+
+            // Expect a call to router.ccipSend
+            vm.expectCall(
+                address(_mockCCIPRouter),
+                actualFeeAmount,
+                abi.encodeCall(IRouterClient.ccipSend, (EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage))
+            );
+        }
+
+        _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage);
+        vm.prank(address(_mockAccountingChainGateway));
+        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
+            EARNING_CHAIN_ID, bridgeAssets, bridgedData, bridgeParams
+        );
+
+        // Check that the TransferHelper no longer holds the assets
+        assertEq(_mockTransferHelper.getBalance(address(_mockUsdt)), 0);
+        assertEq(_mockTransferHelper.getBalance(address(_mockGho)), 0);
+        assertEq(address(feePayer).balance, feePayerBalance + expectedFeeRefund);
+    }
+
+    function test_publishMessageToChainWithFeePayer_reverts_ifNotGateway(address caller) public {
+        vm.assume(caller != address(_mockAccountingChainGateway));
+        vm.assume(caller != address(_mockEarningChainGateway));
+
+        vm.prank(caller);
+        vm.expectRevert(ErrorsLib.NotGateway.selector);
+        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
+            EARNING_CHAIN_ID,
+            new IBridgeAdapter.BridgeAsset[](0),
+            "",
+            IChainGateway.BridgeParams({
+                feePayer: everyRoleAccount, feeToken: address(0), feeAmount: 0, gasLimit: 100000, data: ""
+            })
+        );
+
+        vm.prank(caller);
+        vm.expectRevert(ErrorsLib.NotGateway.selector);
+        _earningChainCcipAdapter.publishMessageToChainWithFeePayer(
+            ACCOUNTING_CHAIN_ID,
+            new IBridgeAdapter.BridgeAsset[](0),
+            "",
+            IChainGateway.BridgeParams({
+                feePayer: everyRoleAccount, feeToken: address(0), feeAmount: 0, gasLimit: 100000, data: ""
+            })
+        );
+    }
+
+    function test_ccipReceive_arbitraryDataPaassedToGateway() public {
+        bytes memory arbitraryData = abi.encode(keccak256(hex"c0ffee"));
+
+        vm.expectCall(
+            address(_mockAccountingChainGateway),
+            abi.encodeCall(
+                IChainGateway.receiveMessage, (EARNING_CHAIN_ID, new IBridgeAdapter.BridgeAsset[](0), arbitraryData)
+            )
+        );
+
+        vm.prank(address(_mockCCIPRouter));
+        _accountingChainCcipAdapter.ccipReceive(
+            Client.Any2EVMMessage({
+                messageId: 0,
+                sourceChainSelector: EARNING_CHAIN_CCIP_SELECTOR,
+                sender: abi.encode(address(_earningChainCcipAdapter)),
+                data: arbitraryData,
+                destTokenAmounts: new Client.EVMTokenAmount[](0)
+            })
+        );
+
+        vm.expectCall(
+            address(_mockEarningChainGateway),
+            abi.encodeCall(
+                IChainGateway.receiveMessage, (ACCOUNTING_CHAIN_ID, new IBridgeAdapter.BridgeAsset[](0), arbitraryData)
+            )
+        );
+
+        vm.prank(address(_mockCCIPRouter));
+        _earningChainCcipAdapter.ccipReceive(
+            Client.Any2EVMMessage({
+                messageId: 0,
+                sourceChainSelector: ACCOUNTING_CHAIN_CCIP_SELECTOR,
+                sender: abi.encode(address(_accountingChainCcipAdapter)),
+                data: arbitraryData,
+                destTokenAmounts: new Client.EVMTokenAmount[](0)
+            })
+        );
+    }
+
+    function test_ccipReceive_handlesFundsReceived(uint256 amountUsdt, uint256 amountGho) public {
+        // Context: Earning Chain -> Accounting Chain
+
+        amountUsdt = _boundAssetAmount(address(_mockUsdt), amountUsdt);
+        amountGho = _boundAssetAmount(address(_mockGho), amountGho);
+
+        // Mint to adapter to mimic bridged funds
+        _mockUsdt.mint(address(_accountingChainCcipAdapter), amountUsdt);
+        _mockGho.mint(address(_accountingChainCcipAdapter), amountGho);
+
+        Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](2);
+        ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
+        ccipTokenAmounts[1] = Client.EVMTokenAmount({token: address(_mockGho), amount: amountGho});
+
+        IBridgeAdapter.BridgeAsset[] memory bridgeAssets = new IBridgeAdapter.BridgeAsset[](2);
+        bridgeAssets[0] = IBridgeAdapter.BridgeAsset({asset: address(_mockUsdt), amount: amountUsdt});
+        bridgeAssets[1] = IBridgeAdapter.BridgeAsset({asset: address(_mockGho), amount: amountGho});
+
+        vm.expectCall(
+            address(_mockAccountingChainGateway), abi.encodeCall(IChainGateway.receiveMessage, (0, bridgeAssets, ""))
+        );
+
+        vm.prank(address(_mockCCIPRouter));
+        _accountingChainCcipAdapter.ccipReceive(
+            Client.Any2EVMMessage({
+                messageId: 0,
+                sourceChainSelector: EARNING_CHAIN_CCIP_SELECTOR,
+                sender: abi.encode(address(_earningChainCcipAdapter)),
+                data: "",
+                destTokenAmounts: ccipTokenAmounts
+            })
+        );
+    }
+
+    // TODO: test both assets and message data are passed to gateway
+    function test_ccipReceive_handlesBothAssetsAndMessageData(uint256 amountUsdt, uint256 amountGho) public {
+        // Context: Earning Chain -> Accounting Chain
+
+        amountUsdt = _boundAssetAmount(address(_mockUsdt), amountUsdt);
+        amountGho = _boundAssetAmount(address(_mockGho), amountGho);
+
+        bytes memory arbitraryData = abi.encode(keccak256(hex"c0ffee"));
+
+        // Mint to adapter to mimic bridged funds
+        _mockUsdt.mint(address(_accountingChainCcipAdapter), amountUsdt);
+        _mockGho.mint(address(_accountingChainCcipAdapter), amountGho);
+
+        Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](2);
+        ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
+        ccipTokenAmounts[1] = Client.EVMTokenAmount({token: address(_mockGho), amount: amountGho});
+
+        IBridgeAdapter.BridgeAsset[] memory bridgeAssets = new IBridgeAdapter.BridgeAsset[](2);
+        bridgeAssets[0] = IBridgeAdapter.BridgeAsset({asset: address(_mockUsdt), amount: amountUsdt});
+        bridgeAssets[1] = IBridgeAdapter.BridgeAsset({asset: address(_mockGho), amount: amountGho});
+
+        // Expect both assets and message data to be passed to gateway in separate calls
+        vm.expectCall(
+            address(_mockAccountingChainGateway), abi.encodeCall(IChainGateway.receiveMessage, (0, bridgeAssets, ""))
+        );
+        vm.expectCall(
+            address(_mockAccountingChainGateway),
+            abi.encodeCall(
+                IChainGateway.receiveMessage, (EARNING_CHAIN_ID, new IBridgeAdapter.BridgeAsset[](0), arbitraryData)
+            )
+        );
+
+        vm.prank(address(_mockCCIPRouter));
+        _accountingChainCcipAdapter.ccipReceive(
+            Client.Any2EVMMessage({
+                messageId: 0,
+                sourceChainSelector: EARNING_CHAIN_CCIP_SELECTOR,
+                sender: abi.encode(address(_earningChainCcipAdapter)),
+                data: arbitraryData,
+                destTokenAmounts: ccipTokenAmounts
+            })
+        );
+    }
+
+    function test_ccipReceive_handlesFundsHandlingFailure(uint256 amountUsdt, uint256 amountGho) public {
+        // Context: Earning Chain -> Accounting Chain
+
+        amountUsdt = _boundAssetAmount(address(_mockUsdt), amountUsdt);
+        amountGho = _boundAssetAmount(address(_mockGho), amountGho);
+
+        _mockUsdt.mint(address(_accountingChainCcipAdapter), amountUsdt);
+        _mockGho.mint(address(_accountingChainCcipAdapter), amountGho);
+
+        Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](2);
+        ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
+        ccipTokenAmounts[1] = Client.EVMTokenAmount({token: address(_mockGho), amount: amountGho});
+
+        IBridgeAdapter.BridgeAsset[] memory bridgeAssets = new IBridgeAdapter.BridgeAsset[](2);
+        bridgeAssets[0] = IBridgeAdapter.BridgeAsset({asset: address(_mockUsdt), amount: amountUsdt});
+        bridgeAssets[1] = IBridgeAdapter.BridgeAsset({asset: address(_mockGho), amount: amountGho});
+
+        Client.Any2EVMMessage memory ccipMessage = Client.Any2EVMMessage({
+            messageId: 0,
+            sourceChainSelector: EARNING_CHAIN_CCIP_SELECTOR,
+            sender: abi.encode(address(_earningChainCcipAdapter)),
+            data: "",
+            destTokenAmounts: ccipTokenAmounts
+        });
+
+        vm.expectEmit(true, true, true, true);
+        emit IBridgeAdapter.BridgedFundsProcessingFailed(EARNING_CHAIN_ID, abi.encode(ccipMessage), abi.encode("test"));
+
+        // mock a revert from downstream fund handling
+        vm.mockCallRevert(
+            address(_mockAccountingChainGateway),
+            abi.encodeCall(IChainGateway.receiveMessage, (0, bridgeAssets, "")),
+            abi.encode("test")
+        );
+
+        vm.prank(address(_mockCCIPRouter));
+        _accountingChainCcipAdapter.ccipReceive(ccipMessage);
+    }
+
+    function test_ccipReceive_reverts_ifNotDestinationChainAdapter(address sender) public {
+        vm.assume(sender != address(_earningChainCcipAdapter));
+        vm.expectRevert(IBridgeAdapter.NotDestinationChainAdapter.selector);
+        vm.prank(address(_mockCCIPRouter));
+        _accountingChainCcipAdapter.ccipReceive(
+            Client.Any2EVMMessage({
+                messageId: 0,
+                sourceChainSelector: EARNING_CHAIN_CCIP_SELECTOR,
+                sender: abi.encode(sender),
+                data: abi.encode(keccak256(hex"c0ffee")),
+                destTokenAmounts: new Client.EVMTokenAmount[](0)
+            })
+        );
+    }
+
+    function test_ccipReceive_reverts_ifNotRouter(address caller) public {
+        vm.assume(caller != address(_mockCCIPRouter));
+        vm.prank(caller);
+        vm.expectRevert(IBridgeAdapter.NotBridgeRouter.selector);
+        _accountingChainCcipAdapter.ccipReceive(
+            Client.Any2EVMMessage({
+                messageId: 0,
+                sourceChainSelector: EARNING_CHAIN_CCIP_SELECTOR,
+                sender: abi.encode(address(0)),
+                data: "",
+                destTokenAmounts: new Client.EVMTokenAmount[](0)
+            })
+        );
+    }
+
+    function test_processReceivedFunds_reverts_ifNotSelf(address caller) public {
+        vm.assume(caller != address(_accountingChainCcipAdapter));
+        vm.prank(caller);
+        vm.expectRevert(ErrorsLib.NotSelf.selector);
+        _accountingChainCcipAdapter.processReceivedFunds(new Client.EVMTokenAmount[](0));
+    }
+
+    function _expectBridgeAssetsApproval(Client.EVMTokenAmount[] memory tokens) internal {
+        for (uint256 i = 0; i < tokens.length; i++) {
+            address asset = tokens[i].token;
+            uint256 amount = tokens[i].amount;
+            vm.expectCall(asset, abi.encodeCall(IERC20.approve, (address(_mockCCIPRouter), amount)));
+        }
+    }
+
+    function _stubCcipRouterSend(uint64 chainSelector, Client.EVM2AnyMessage memory message) internal {
+        vm.mockCall(
+            address(_mockCCIPRouter),
+            abi.encodeWithSelector(IRouterClient.ccipSend.selector, chainSelector, message),
+            abi.encode(true)
+        );
+    }
+}

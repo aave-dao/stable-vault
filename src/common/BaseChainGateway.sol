@@ -7,13 +7,12 @@ import {
 
 import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
+import {ConstantsLib} from "../libraries/ConstantsLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {RescuableAssets} from "./RescuableAssets.sol";
 
 // TODO: this contract should be pausable.... if bridge is compromised we should not ingest messages from it.
 abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets, IChainGateway {
-    address internal constant ASSET_FOR_DATA_ONLY_BRIDGE = address(0);
-
     address internal immutable IOU_TOKEN_MANAGER;
 
     /// @custom:storage-location erc7201:aave.storage.BaseChainGateway
@@ -84,7 +83,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
         require(msg.sender == IOU_TOKEN_MANAGER, ErrorsLib.InvalidMessageSender());
         require(destinationChainId != block.chainid, ErrorsLib.InvalidDestinationChainId());
 
-        address adapter = $storage().defaultBridgeAdapter[ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId];
+        address adapter = $storage().defaultBridgeAdapter[ConstantsLib.ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId];
         require(adapter != address(0), AdapterNotFound());
 
         bytes memory bridgeIouTokenMessageEncoded = abi.encode(
@@ -148,7 +147,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
         BridgeParams memory bridgeParams
     ) internal {
         IBridgeAdapter.BridgeAsset[] memory assets;
-        if (assetToBridge != ASSET_FOR_DATA_ONLY_BRIDGE) {
+        if (assetToBridge != ConstantsLib.ASSET_FOR_DATA_ONLY_BRIDGE) {
             assets = new IBridgeAdapter.BridgeAsset[](1);
             assets[0] = IBridgeAdapter.BridgeAsset({asset: assetToBridge, amount: amountToBridge});
         }

@@ -48,29 +48,54 @@ contract AssetRegistry is AccessManagedUpgradeable, IAssetRegistry {
         emit AssetConfigSet(asset, config);
     }
 
+    /// @dev Deposits must not be enabled using this function because it could have a different restricted config from
+    /// the function which enables deposits.
+    /// @param asset The asset to disable deposits for.
+    /// @param disableUserDeposits Whether to disable user deposits for the asset.
+    /// @param disableAllocatorDeposits Whether to disable allocator deposits for the asset.
+    function disableDeposits(address asset, bool disableUserDeposits, bool disableAllocatorDeposits)
+        external
+        restricted
+    {
+        bool isUserDepositsAllowed = $storage().configByAsset[asset].depositFromUserAllowed;
+        if (isUserDepositsAllowed && disableUserDeposits) {
+            $storage().configByAsset[asset].depositFromUserAllowed = false;
+        }
+        bool isAllocatorDepositsAllowed = $storage().configByAsset[asset].depositIntoAllocatorAllowed;
+        if (isAllocatorDepositsAllowed && disableAllocatorDeposits) {
+            $storage().configByAsset[asset].depositIntoAllocatorAllowed = false;
+        }
+    }
+
     // /////////////////////// PERMISSION SPECIFIC GETTERS ////////////////////////////
 
-    function isAllowedToDepositIntoBBV(address asset) external view override returns (bool) {
-        return $storage().configByAsset[asset].depositIntoBBVAllowed;
+    /// @inheritdoc IAssetRegistry
+    function isUserDepositAllowed(address asset) external view override returns (bool) {
+        return $storage().configByAsset[asset].depositFromUserAllowed;
     }
 
-    function isAllowedToWithdrawFromBBV(address asset) external view override returns (bool) {
-        return $storage().configByAsset[asset].withdrawFromBBVAllowed;
+    /// @inheritdoc IAssetRegistry
+    function isUserWithdrawalAllowed(address asset) external view override returns (bool) {
+        return $storage().configByAsset[asset].withdrawToUserAllowed;
     }
 
-    function isAllowedToDepositIntoAllocator(address asset) external view override returns (bool) {
+    /// @inheritdoc IAssetRegistry
+    function isDepositToAllocatorAllowed(address asset) external view override returns (bool) {
         return $storage().configByAsset[asset].depositIntoAllocatorAllowed;
     }
 
-    function isAllowedToWithdrawFromAllocator(address asset) external view override returns (bool) {
+    /// @inheritdoc IAssetRegistry
+    function isWithdrawalFromAllocatorAllowed(address asset) external view override returns (bool) {
         return $storage().configByAsset[asset].withdrawFromAllocatorAllowed;
     }
 
-    function isAllowedSwapInputToken(address asset) external view override returns (bool) {
+    /// @inheritdoc IAssetRegistry
+    function isSwapInputAllowed(address asset) external view override returns (bool) {
         return $storage().configByAsset[asset].swapInputTokenAllowed;
     }
 
-    function isAllowedSwapOutputToken(address asset) external view override returns (bool) {
+    /// @inheritdoc IAssetRegistry
+    function isSwapOutputAllowed(address asset) external view override returns (bool) {
         return $storage().configByAsset[asset].swapOutputTokenAllowed;
     }
 }

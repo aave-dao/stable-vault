@@ -136,7 +136,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, IAllocator
     function withdraw(address asset, uint256 amount) external override onlyWithdrawer {
         require(amount > 0, ErrorsLib.ZeroAmount());
         require(
-            IAssetRegistry(ASSET_REGISTRY).isAllowedToWithdrawFromAllocator(asset), ErrorsLib.UnsupportedAsset(asset)
+            IAssetRegistry(ASSET_REGISTRY).isWithdrawalFromAllocatorAllowed(asset), ErrorsLib.UnsupportedAsset(asset)
         );
 
         uint256 idleBalance = IERC20(asset).balanceOf(address(this));
@@ -225,12 +225,10 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, IAllocator
 
     function _swap(SwapParams memory swap) internal {
         require(
-            IAssetRegistry(ASSET_REGISTRY).isAllowedSwapInputToken(swap.assetIn),
-            ErrorsLib.UnsupportedAsset(swap.assetIn)
+            IAssetRegistry(ASSET_REGISTRY).isSwapInputAllowed(swap.assetIn), ErrorsLib.UnsupportedAsset(swap.assetIn)
         );
         require(
-            IAssetRegistry(ASSET_REGISTRY).isAllowedSwapOutputToken(swap.assetOut),
-            ErrorsLib.UnsupportedAsset(swap.assetOut)
+            IAssetRegistry(ASSET_REGISTRY).isSwapOutputAllowed(swap.assetOut), ErrorsLib.UnsupportedAsset(swap.assetOut)
         );
 
         // Transfer assetIn to the swapper
@@ -285,9 +283,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, IAllocator
     /// @dev Intended to be the lowest level function used to deposit into a strategy.
     function _depositToStrategy(address asset, uint256 amount, address strategy) internal returns (bool) {
         require(amount > 0, ErrorsLib.ZeroAmount());
-        require(
-            IAssetRegistry(ASSET_REGISTRY).isAllowedToDepositIntoAllocator(asset), ErrorsLib.UnsupportedAsset(asset)
-        );
+        require(IAssetRegistry(ASSET_REGISTRY).isDepositToAllocatorAllowed(asset), ErrorsLib.UnsupportedAsset(asset));
         if (strategy == address(0)) {
             // A strategy for this asset is not set, so the funds stay idle in the Allocator.
             return true;

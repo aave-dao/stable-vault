@@ -28,12 +28,12 @@ contract FundsHandlerTest is TestWithHelpers {
     using AssetLib for uint256;
     using SafeERC20 for IMockErc20;
 
-    address mockBbv = makeAddr("mockBbv");
-    MockAccountingChainGateway mockGateway = new MockAccountingChainGateway();
-    MockAllocator mockAllocator = new MockAllocator();
-    MockTransferHelper mockTransferHelper = new MockTransferHelper();
-    MockAccessManager mockAccessManager = new MockAccessManager(makeAddr("admin"));
-    IMockErc20 mockAsset = IMockErc20(address(new MockNonStandardErc20("Test USD", "tUSD", 6)));
+    address mockBbv;
+    MockAccountingChainGateway mockGateway;
+    MockAllocator mockAllocator;
+    MockTransferHelper mockTransferHelper;
+    MockAccessManager mockAccessManager;
+    IMockErc20 mockAsset;
 
     FundsHandler fundsHandler;
 
@@ -59,6 +59,12 @@ contract FundsHandlerTest is TestWithHelpers {
     }
 
     function setUp() public {
+        mockBbv = makeAddr("mockBbv");
+        mockTransferHelper = new MockTransferHelper();
+        mockGateway = new MockAccountingChainGateway(address(mockTransferHelper));
+        mockAllocator = new MockAllocator();
+        mockAccessManager = new MockAccessManager(makeAddr("admin"));
+        mockAsset = IMockErc20(address(new MockNonStandardErc20("Test USD", "tUSD", 6)));
         fundsHandler = _deployFundsHandler(
             mockBbv,
             address(mockGateway),
@@ -66,7 +72,6 @@ contract FundsHandlerTest is TestWithHelpers {
             address(mockTransferHelper),
             address(mockAccessManager)
         );
-        mockGateway.mockTransferHelper(address(mockTransferHelper));
         mockAllocator.mockTransferHelper(address(mockTransferHelper));
     }
 

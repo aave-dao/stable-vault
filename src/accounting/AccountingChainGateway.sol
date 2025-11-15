@@ -10,6 +10,7 @@ import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
 import {IIouTokenManager} from "../interfaces/IIouTokenManager.sol";
+import {ConstantsLib} from "../libraries/ConstantsLib.sol";
 
 /// @title AccountingChainGateway
 /// @notice Facilitates cross chain messaging one or more Earning Chains.
@@ -64,7 +65,7 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
     }
 
     function _receiveData(uint256 sourceChainId, bytes memory data) internal override {
-        _onlyAdapter(ASSET_FOR_DATA_ONLY_BRIDGE, sourceChainId);
+        _onlyAdapter(ConstantsLib.ASSET_FOR_DATA_ONLY_BRIDGE, sourceChainId);
         IChainGateway.CrossChainMessage memory crossChainMessage = abi.decode(data, (IChainGateway.CrossChainMessage));
         if (crossChainMessage.messageType == IChainGateway.MessageType.BALANCE_SNAPSHOT) {
             _updateChainBalanceSnapshot(sourceChainId, crossChainMessage.data);

@@ -6,6 +6,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
+import {ConstantsLib} from "../libraries/ConstantsLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 /// @title TransferHelperClient
@@ -16,8 +17,6 @@ contract TransferHelperClient {
 
     error TransferHelperBalanceNotConsumed(address asset);
 
-    address internal constant NATIVE_CURRENCY = address(0);
-
     address internal immutable TRANSFER_HELPER;
 
     constructor(address transferHelper) {
@@ -26,14 +25,14 @@ contract TransferHelperClient {
 
     modifier assertingTransferHelperBalanceFor(address asset) {
         uint256 balanceBefore;
-        if (asset != NATIVE_CURRENCY) {
+        if (asset != ConstantsLib.NATIVE_CURRENCY) {
             balanceBefore = IERC20(asset).balanceOf(TRANSFER_HELPER);
         } else {
             balanceBefore = TRANSFER_HELPER.balance;
         }
         _;
         uint256 balanceAfter;
-        if (asset != NATIVE_CURRENCY) {
+        if (asset != ConstantsLib.NATIVE_CURRENCY) {
             balanceAfter = IERC20(asset).balanceOf(TRANSFER_HELPER);
         } else {
             balanceAfter = TRANSFER_HELPER.balance;
@@ -79,7 +78,7 @@ contract TransferHelperClient {
             // addition to the ERC-20 fee token.
             _transferNativeToTransferHelper(msg.value);
         }
-        if (bridgeParams.feeToken == NATIVE_CURRENCY) {
+        if (bridgeParams.feeToken == ConstantsLib.NATIVE_CURRENCY) {
             // We already transferred all the msg.value above. Here we just check that it covers the fee amount.
             require(msg.value >= bridgeParams.feeAmount, ErrorsLib.InsufficientFunds());
         } else {

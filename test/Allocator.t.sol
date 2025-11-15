@@ -107,8 +107,8 @@ contract AllocatorTest is TestWithHelpers {
         _mockAssetRegistry.setAssetConfig(
             address(_mockUsdt),
             IAssetRegistry.AssetConfig({
-                depositIntoBBVAllowed: true,
-                withdrawFromBBVAllowed: true,
+                depositFromUserAllowed: true,
+                withdrawToUserAllowed: true,
                 depositIntoAllocatorAllowed: true,
                 withdrawFromAllocatorAllowed: true,
                 swapInputTokenAllowed: true,
@@ -119,8 +119,8 @@ contract AllocatorTest is TestWithHelpers {
         _mockAssetRegistry.setAssetConfig(
             address(_mockGho),
             IAssetRegistry.AssetConfig({
-                depositIntoBBVAllowed: true,
-                withdrawFromBBVAllowed: true,
+                depositFromUserAllowed: true,
+                withdrawToUserAllowed: true,
                 depositIntoAllocatorAllowed: true,
                 withdrawFromAllocatorAllowed: true,
                 swapInputTokenAllowed: true,
