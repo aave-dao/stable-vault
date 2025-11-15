@@ -55,10 +55,11 @@ contract Swapper is ISwapper, Ownable, ReentrancyGuard {
             );
             uint256 slippageAmount = expectedAmountOut - amountOut;
             IERC20(assetOut).safeTransferFrom(slippageParams.slippageCoverageSource, address(this), slippageAmount);
+            amountOut = expectedAmountOut;
         }
 
         // Approve funds to be pulled by the caller i.e. the owner of the Swapper.
-        IERC20(assetOut).forceApprove(msg.sender, expectedAmountOut);
+        IERC20(assetOut).forceApprove(msg.sender, amountOut);
 
         return amountOut;
     }
