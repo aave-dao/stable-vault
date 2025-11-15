@@ -13,14 +13,27 @@ contract MockAccountingChainGateway is IAccountingChainGateway {
         TRANSFER_HELPER = transferHelper;
     }
 
+    address[] _assetsToPullFromTransferHelperInNextCall;
+    uint256[] _amountsToPullFromTransferHelperInNextCall;
+
+    function mockToConsumeAssetFromTransferHelperInNextCall(address asset, uint256 amount) external {
+        _assetsToPullFromTransferHelperInNextCall.push(asset);
+        _amountsToPullFromTransferHelperInNextCall.push(amount);
+    }
+
     function getDefaultBridgeAdapter(address asset, uint256 chainId) external view returns (address) {}
 
     function sendPushFundsToChainMessage(
-        address asset,
-        uint256 amount,
-        uint256 targetChainId,
-        IChainGateway.BridgeParams memory bridgeParams
-    ) external payable {}
+        address, // asset
+        uint256, // amount
+        uint256, // targetChainId
+        IChainGateway.BridgeParams memory // bridgeParams
+    )
+        external
+        payable
+    {
+        _pullAssetsFromTransferHelper();
+    }
 
     function addBridgeAdapter(address asset, uint256 chainId, address adapter) external {}
 
@@ -45,4 +58,11 @@ contract MockAccountingChainGateway is IAccountingChainGateway {
         uint256 iouTokenAmountRay,
         IChainGateway.BridgeParams memory bridgeParams
     ) external payable {}
+
+    function _pullAssetsFromTransferHelper() internal {
+        if (_assetsToPullFromTransferHelperInNextCall.length > 0) {
+            ITransferHelper(TRANSFER_HELPER)
+                .pull(_assetsToPullFromTransferHelperInNextCall, _amountsToPullFromTransferHelperInNextCall);
+        }
+    }
 }

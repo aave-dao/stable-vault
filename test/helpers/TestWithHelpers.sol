@@ -13,6 +13,10 @@ contract TestWithHelpers is Test {
 
     uint256 constant NATIVE_CURRENCY_DECIMALS = 18;
 
+    function _boundAssetDecimals(uint8 assetDecimals) internal pure returns (uint8) {
+        return uint8(bound(assetDecimals, 2, 18));
+    }
+
     function _assumeNotProxyAdmin(address fuzzedAddress, address targetAddress) internal view {
         address proxyAdmin = address(uint160(uint256(vm.load(targetAddress, ERC1967Utils.ADMIN_SLOT))));
         vm.assume(fuzzedAddress != proxyAdmin);

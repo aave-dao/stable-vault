@@ -108,7 +108,7 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
     /// @inheritdoc IIouTokenManager
     /// @dev Should only be used on canonical chain.
     function burnLockedTokens(uint256 amount) external override onlyAllowedBurner {
-        require($storage().lockedBalance >= amount, InsufficientLockedBalance());
+        require(amount <= $storage().lockedBalance, InsufficientLockedBalance());
         $storage().lockedBalance -= amount;
         _burnTokens(address(this), amount);
     }
@@ -116,7 +116,7 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
     /// @inheritdoc IIouTokenManager
     /// @dev Should only be used on canonical chain.
     function releaseTokens(address to, uint256 amount) external override onlyAllowedReleaser {
-        require($storage().lockedBalance >= amount, InsufficientLockedBalance());
+        require(amount <= $storage().lockedBalance, InsufficientLockedBalance());
         $storage().lockedBalance -= amount;
         IERC20(IOU_TOKEN).safeTransfer(to, amount);
     }
