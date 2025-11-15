@@ -13,13 +13,6 @@ import {IMockDex, MockDex} from "./mocks/MockDex.sol";
 import {IMockErc20} from "./mocks/MockErc20.sol";
 import {MockNonStandardErc20} from "./mocks/MockNonStandardErc20.sol";
 
-// TODO: remove comments
-// execute swap with slippage (need to approve self for DEX to pull funds)
-// execute swap without slippage (need to approve self for DEX to pull funds)
-// execute 1:1 with funds idle in the swapper
-// execute swap where slippage tolerance from input data is breached (expect revert)
-// execute swap where pulling from slippage coverage source fails (expect revert)
-
 contract SwapperTest is TestWithHelpers {
     using AssetLib for uint256;
     using SafeERC20 for IERC20;
@@ -293,4 +286,11 @@ contract SwapperTest is TestWithHelpers {
         callDatas[1] = dexData;
         return abi.encode(targets, callDatas, slippageParams);
     }
+
+    // TODO: Test #1: if the swap gets more amount out than 1:1, we approve and return that, we do not touch slippage
+    // source
+
+    // TODO: Test #2: we do not get more than the min needed to get to 1:1 from slippage source
+
+    // TODO: Test #3: idle funds in swapper are used as amount out (they'll be considered in the amountOut)
 }
