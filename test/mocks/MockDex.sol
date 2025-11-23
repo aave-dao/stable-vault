@@ -42,6 +42,8 @@ contract MockDex is IMockDex {
         require(amountOut >= minAmountOut, IMockDex.Slippage());
         require(IERC20(tokenOut).balanceOf(address(this)) >= amountOut, IMockDex.InsufficientLiquidity());
 
-        IERC20(tokenOut).safeTransfer(msg.sender, amountOut);
+        uint256 actualAmountOut = IERC20(tokenOut).balanceOf(address(this));
+        IERC20(tokenOut).safeTransfer(msg.sender, actualAmountOut);
+        return actualAmountOut;
     }
 }

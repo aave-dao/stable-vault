@@ -50,14 +50,15 @@ contract SwapperTest is TestWithHelpers {
             address(_mockUsdt), address(_mockGho), amountIn, minAmountOut, slippageToleranceBps
         );
         vm.prank(allocator);
-        _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, data);
+        uint256 actualAmountOut = _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, data);
 
         assertEq(IERC20(_mockUsdt).balanceOf(address(_swapper)), 0);
         assertEq(IERC20(_mockGho).balanceOf(address(_swapper)), minAmountOut);
 
         // Check that the Swapper approved msg.sender to pull the output token
         vm.prank(allocator);
-        IERC20(_mockGho).safeTransferFrom(address(_swapper), address(this), minAmountOut);
+        IERC20(_mockGho).safeTransferFrom(address(_swapper), address(this), actualAmountOut);
+        assertEq(IERC20(_mockGho).balanceOf(address(_swapper)), 0);
     }
 
     function test_executeSwap_18decimalsInput_6decimalsOutput_noSlippage(uint256 amountIn) public {
@@ -77,14 +78,15 @@ contract SwapperTest is TestWithHelpers {
             address(_mockGho), address(_mockUsdt), amountIn, minAmountOut, slippageToleranceBps
         );
         vm.prank(allocator);
-        _swapper.executeSwap(address(_mockGho), address(_mockUsdt), amountIn, data);
+        uint256 actualAmountOut = _swapper.executeSwap(address(_mockGho), address(_mockUsdt), amountIn, data);
 
         assertEq(IERC20(_mockGho).balanceOf(address(_swapper)), 0);
         assertEq(IERC20(_mockUsdt).balanceOf(address(_swapper)), minAmountOut);
 
         // Check that the Swapper approved msg.sender to pull the output token
         vm.prank(allocator);
-        IERC20(_mockUsdt).safeTransferFrom(address(_swapper), address(this), minAmountOut);
+        IERC20(_mockUsdt).safeTransferFrom(address(_swapper), address(this), actualAmountOut);
+        assertEq(IERC20(_mockUsdt).balanceOf(address(_swapper)), 0);
     }
 
     function test_executeSwap_6decimalsInput_18decimalsOutput_slippage(uint256 amountIn, uint16 slippageToleranceBps)
@@ -110,7 +112,7 @@ contract SwapperTest is TestWithHelpers {
             address(_mockUsdt), address(_mockGho), amountIn, minAmountOut, slippageToleranceBps
         );
         vm.prank(allocator);
-        _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, data);
+        uint256 actualAmountOut = _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, data);
 
         assertEq(IERC20(_mockUsdt).balanceOf(address(_swapper)), 0);
         assertEq(IERC20(_mockGho).balanceOf(address(_swapper)), amountOutIfNoSlippage);
@@ -118,7 +120,8 @@ contract SwapperTest is TestWithHelpers {
 
         // Check that the Swapper approved msg.sender to pull the output token
         vm.prank(allocator);
-        IERC20(_mockGho).safeTransferFrom(address(_swapper), address(this), amountOutIfNoSlippage);
+        IERC20(_mockGho).safeTransferFrom(address(_swapper), address(this), actualAmountOut);
+        assertEq(IERC20(_mockGho).balanceOf(address(_swapper)), 0);
     }
 
     function test_executeSwap_18decimalsInput_6decimalsOutput_slippage(uint256 amountIn, uint16 slippageToleranceBps)
@@ -146,7 +149,7 @@ contract SwapperTest is TestWithHelpers {
             address(_mockGho), address(_mockUsdt), amountIn, minAmountOut, slippageToleranceBps
         );
         vm.prank(allocator);
-        _swapper.executeSwap(address(_mockGho), address(_mockUsdt), amountIn, data);
+        uint256 actualAmountOut = _swapper.executeSwap(address(_mockGho), address(_mockUsdt), amountIn, data);
 
         assertEq(IERC20(_mockGho).balanceOf(address(_swapper)), 0);
         assertEq(IERC20(_mockUsdt).balanceOf(address(_swapper)), amountOutIfNoSlippage);
@@ -154,7 +157,91 @@ contract SwapperTest is TestWithHelpers {
 
         // Check that the Swapper approved msg.sender to pull the output token
         vm.prank(allocator);
-        IERC20(_mockUsdt).safeTransferFrom(address(_swapper), address(this), amountOutIfNoSlippage);
+        IERC20(_mockUsdt).safeTransferFrom(address(_swapper), address(this), actualAmountOut);
+        assertEq(IERC20(_mockUsdt).balanceOf(address(_swapper)), 0);
+    }
+
+    function test_executeSwap_moreThanOneToOneOutput(uint256 amountIn, uint16 amountOutExtra) public {
+        amountIn = _boundAssetAmount(address(_mockUsdt), amountIn);
+        uint256 amountOutIfNoSlippage = amountIn.convertAssetDecimals(address(_mockUsdt), address(_mockGho));
+        uint256 actualAmountOut = amountOutIfNoSlippage + uint256(amountOutExtra);
+
+        _mockTransferIntoSwapper(_mockUsdt, amountIn);
+        _seedOutputToken(_mockGho, actualAmountOut);
+        _setSlippageBps(0);
+        _prepareSlippageAndFeeCoverage(_mockGho, 0);
+
+        bytes memory data =
+            _encodeDexSwapExactInputData(address(_mockUsdt), address(_mockGho), amountIn, amountOutIfNoSlippage, 0);
+        vm.prank(allocator);
+        uint256 actualAmountOutFromSwap = _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, data);
+
+        // Allocator should be able to pull the output token of actualAmountOut
+        vm.prank(allocator);
+        IERC20(_mockGho).safeTransferFrom(address(_swapper), address(this), actualAmountOutFromSwap);
+        assertEq(IERC20(_mockGho).balanceOf(address(_swapper)), 0);
+    }
+
+    function test_executeSwap_usesIdleFunds(uint256 amountIn) public {
+        amountIn = _boundAssetAmount(address(_mockUsdt), amountIn);
+        uint256 amountOutIfNoSlippage = amountIn.convertAssetDecimals(address(_mockUsdt), address(_mockGho));
+
+        // Airdrop the amountOutIfNoSlippage to the Swapper which a manager might do to float liquidity for a swap.
+        _mockGho.mint(address(_swapper), amountOutIfNoSlippage);
+
+        _mockTransferIntoSwapper(_mockUsdt, amountIn);
+        _seedOutputToken(_mockGho, amountOutIfNoSlippage);
+        _setSlippageBps(0);
+        _prepareSlippageAndFeeCoverage(_mockGho, 0);
+
+        address[] memory targets = new address[](0);
+        bytes[] memory callDatas = new bytes[](0);
+        Swapper.SlippageParams memory slippageParams =
+            Swapper.SlippageParams({slippageToleranceBps: 0, slippageCoverageSource: slippageCoverageSource});
+        bytes memory data = abi.encode(targets, callDatas, slippageParams);
+
+        vm.prank(allocator);
+        uint256 actualAmountOut = _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, data);
+
+        assertEq(IERC20(_mockUsdt).balanceOf(address(_swapper)), amountIn);
+        assertEq(IERC20(_mockGho).balanceOf(address(_swapper)), amountOutIfNoSlippage);
+
+        // Check that the Swapper approved msg.sender to pull the output token
+        vm.prank(allocator);
+        IERC20(_mockGho).safeTransferFrom(address(_swapper), address(this), actualAmountOut);
+        assertEq(IERC20(_mockGho).balanceOf(address(_swapper)), 0);
+    }
+
+    function test_executeSwap_usesIdleFunds_requireSlippageCoverage(uint256 amountIn, uint16 slippageToleranceBps)
+        public
+    {
+        vm.assume(slippageToleranceBps <= 10_000);
+        amountIn = _boundAssetAmount(address(_mockUsdt), amountIn);
+        uint256 amountOutIfNoSlippage = amountIn.convertAssetDecimals(address(_mockUsdt), address(_mockGho));
+        uint256 minAmountOut = amountOutIfNoSlippage * (10_000 - slippageToleranceBps) / 10_000;
+        vm.assume(minAmountOut > 0);
+
+        uint256 amountNeededFromSlippageCoverageSource = amountOutIfNoSlippage - minAmountOut;
+        vm.assume(amountNeededFromSlippageCoverageSource > 0);
+
+        _mockTransferIntoSwapper(_mockUsdt, amountIn);
+        _seedOutputToken(_mockGho, minAmountOut);
+        _setSlippageBps(slippageToleranceBps);
+        _prepareSlippageAndFeeCoverage(_mockGho, amountNeededFromSlippageCoverageSource);
+
+        bytes memory data = _encodeDexSwapExactInputData(
+            address(_mockUsdt), address(_mockGho), amountIn, minAmountOut, slippageToleranceBps
+        );
+        vm.prank(allocator);
+        uint256 actualAmountOut = _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, data);
+
+        // Check that the slippage coverage source no longer has the amount needed to cover slippage
+        assertEq(_mockGho.balanceOf(address(slippageCoverageSource)), 0);
+
+        // Check that the Allocator was approved to pull the amountOutIfNoSlippage
+        vm.prank(allocator);
+        IERC20(_mockGho).safeTransferFrom(address(_swapper), address(this), actualAmountOut);
+        assertEq(IERC20(_mockGho).balanceOf(address(_swapper)), 0);
     }
 
     function test_executeSwap_reverts_6decimalsInput_18decimalsOutput_slippage(
@@ -249,12 +336,7 @@ contract SwapperTest is TestWithHelpers {
         _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, data);
     }
 
-    // TODO: Test #1: if the swap gets more amount out than 1:1, we approve and return that, we do not touch slippage
-    // source
-
-    // TODO: Test #2: we do not get more than the min needed to get to 1:1 from slippage source
-
-    // TODO: Test #3: idle funds in swapper are used as amount out (they'll be considered in the amountOut)
+    // TODO: Test we do not get more than the min needed to get to 1:1 from slippage source
 
     /// @dev Allocator transfer input token into the Swapper before invoking the swap
     function _mockTransferIntoSwapper(IMockErc20 token, uint256 amount) internal {
