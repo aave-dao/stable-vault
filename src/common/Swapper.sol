@@ -46,7 +46,7 @@ contract Swapper is ISwapper, Ownable, ReentrancyGuard {
         uint256 amountOut = IERC20(assetOut).balanceOf(address(this));
 
         // Enforce 1:1 swap between `assetIn` and `assetOut`.
-        uint256 expectedAmountOut = amountIn.convertAssetDecimals(assetIn, assetOut);
+        uint256 expectedAmountOut = amountIn.safeConvertAssetDecimals(assetIn, assetOut);
 
         if (amountOut < expectedAmountOut) {
             require(

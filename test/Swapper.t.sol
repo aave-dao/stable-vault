@@ -62,6 +62,8 @@ contract SwapperTest is TestWithHelpers {
 
     function test_executeSwap_18decimalsInput_6decimalsOutput_noSlippage(uint256 amountIn) public {
         amountIn = _boundAssetAmount(address(_mockGho), amountIn);
+        uint256 divisor = 10 ** (AssetLib.getDecimals(address(_mockGho)) - AssetLib.getDecimals(address(_mockUsdt)));
+        amountIn = amountIn / divisor * divisor;
         uint256 minAmountOut = amountIn.convertAssetDecimals(address(_mockGho), address(_mockUsdt));
         vm.assume(minAmountOut > 0);
 
@@ -124,6 +126,8 @@ contract SwapperTest is TestWithHelpers {
     {
         vm.assume(slippageToleranceBps <= 10_000);
         amountIn = _boundAssetAmount(address(_mockGho), amountIn);
+        uint256 divisor = 10 ** (AssetLib.getDecimals(address(_mockGho)) - AssetLib.getDecimals(address(_mockUsdt)));
+        amountIn = amountIn / divisor * divisor;
         uint256 amountOutIfNoSlippage = amountIn.convertAssetDecimals(address(_mockGho), address(_mockUsdt));
         uint256 minAmountOut = amountOutIfNoSlippage * (10_000 - slippageToleranceBps) / 10_000;
         vm.assume(minAmountOut > 0);
@@ -245,6 +249,13 @@ contract SwapperTest is TestWithHelpers {
         _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, data);
     }
 
+    // TODO: Test #1: if the swap gets more amount out than 1:1, we approve and return that, we do not touch slippage
+    // source
+
+    // TODO: Test #2: we do not get more than the min needed to get to 1:1 from slippage source
+
+    // TODO: Test #3: idle funds in swapper are used as amount out (they'll be considered in the amountOut)
+
     /// @dev Allocator transfer input token into the Swapper before invoking the swap
     function _mockTransferIntoSwapper(IMockErc20 token, uint256 amount) internal {
         MockNonStandardErc20(address(token)).mint(address(_swapper), amount);
@@ -286,11 +297,4 @@ contract SwapperTest is TestWithHelpers {
         callDatas[1] = dexData;
         return abi.encode(targets, callDatas, slippageParams);
     }
-
-    // TODO: Test #1: if the swap gets more amount out than 1:1, we approve and return that, we do not touch slippage
-    // source
-
-    // TODO: Test #2: we do not get more than the min needed to get to 1:1 from slippage source
-
-    // TODO: Test #3: idle funds in swapper are used as amount out (they'll be considered in the amountOut)
 }

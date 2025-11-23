@@ -292,18 +292,20 @@ contract EndToEndTest is BaseTest {
             address[] memory targets = new address[](1);
             targets[0] = address(GHO);
             bytes[] memory callDatas = new bytes[](1);
-            callDatas[0] = abi.encodeCall(IERC20.transfer, (address(this), userEarningsInGho));
+            uint256 divisor = 10 ** (AssetLib.getDecimals(address(GHO)) - AssetLib.getDecimals(address(USDC)));
+            uint256 amountGhoIn = userEarningsInGho / divisor * divisor;
+            callDatas[0] = abi.encodeCall(IERC20.transfer, (address(this), amountGhoIn));
             Swapper.SlippageParams memory slippageParams = Swapper.SlippageParams(0, address(0));
 
             address defaultUsdcVault_accountingChain = allocator_accountingChain.getDefaultStrategy(address(USDC));
             IAllocator.DeallocationParams[] memory deallocationParams = new IAllocator.DeallocationParams[](1);
             deallocationParams[0] =
-                IAllocator.DeallocationParams(address(GHO), defaultGhoVault_accountingChain, userEarningsInGho);
+                IAllocator.DeallocationParams(address(GHO), defaultGhoVault_accountingChain, amountGhoIn);
 
             IAllocator.SwapParams[] memory swapParams = new IAllocator.SwapParams[](1);
             swapParams[0] = IAllocator.SwapParams({
                 assetIn: address(GHO),
-                amountIn: userEarningsInGho,
+                amountIn: amountGhoIn,
                 assetOut: address(USDC),
                 swapper: address(swapper_accountingChain),
                 data: abi.encode(targets, callDatas, slippageParams)

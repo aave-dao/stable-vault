@@ -16,6 +16,14 @@ contract AssetLibWrapper {
         return AssetLib.convertAssetDecimals(amount, fromAsset, toAsset);
     }
 
+    function safeConvertAssetDecimals(uint256 amount, address fromAsset, address toAsset)
+        external
+        view
+        returns (uint256)
+    {
+        return AssetLib.safeConvertAssetDecimals(amount, fromAsset, toAsset);
+    }
+
     function convertDecimals(uint256 inputAmount, uint256 inputDecimals, uint256 outputDecimals)
         external
         pure
