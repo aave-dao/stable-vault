@@ -243,8 +243,6 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         );
 
         // Bridge the tokens back to Accounting chain and check the supply on both chains is expected
-        vm.prank(user2);
-        iouToken_earningChain.approve(address(iouTokenManager_earningChain), iouAmountRequestedRay);
         vm.deal(user2, bridgeFeeAmount);
         vm.prank(user2);
         iouTokenManager_earningChain.bridgeTokens{value: bridgeFeeAmount}(

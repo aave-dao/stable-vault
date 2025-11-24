@@ -81,7 +81,7 @@ contract TransferHelperClient {
         if (bridgeParams.feeToken == ConstantsLib.NATIVE_CURRENCY) {
             // We already transferred all the msg.value above. Here we just check that it covers the fee amount.
             require(msg.value >= bridgeParams.feeAmount, ErrorsLib.InsufficientFunds());
-        } else {
+        } else if (bridgeParams.feeAmount > 0) {
             IERC20(bridgeParams.feeToken)
                 .safeTransferFrom(bridgeParams.feePayer, TRANSFER_HELPER, bridgeParams.feeAmount);
         }
