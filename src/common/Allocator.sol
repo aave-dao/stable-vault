@@ -18,7 +18,7 @@ import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {TransferHelperClient} from "./TransferHelperClient.sol";
 
 /// @dev Assumptions:
-///      - 1 default strategy per asset
+///      - 1 default strategy per asset which serves as the first strategy to deposit to/withdraw from.
 ///      - multiple allowed strategies per asset which require manual rebalancing
 ///      - assumes all assets in Allocator share a common denomination
 ///      - asset amounts are treated in their native decimals

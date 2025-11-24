@@ -161,6 +161,47 @@ contract SwapperTest is TestWithHelpers {
         assertEq(IERC20(_mockUsdt).balanceOf(address(_swapper)), 0);
     }
 
+    function test_executeSwap_pullFromSlippageCoverageSourceWhenNeeded(uint256 amountIn, uint256 amountOut) public {
+        // Assume we allow coverage source to cover entire swap
+        uint16 slippageToleranceBps = 10_000;
+        amountIn = _boundAssetAmount(address(_mockUsdt), amountIn);
+        amountOut = _boundAssetAmountAllowingZero(address(_mockGho), amountOut);
+
+        _mockTransferIntoSwapper(_mockUsdt, amountIn);
+        if (amountOut > 0) {
+            _seedOutputToken(_mockGho, amountOut);
+        }
+        _setSlippageBps(slippageToleranceBps);
+
+        uint256 expectedAmountOut = amountIn.convertAssetDecimals(address(_mockUsdt), address(_mockGho));
+        uint256 amountNeededFromSlippageCoverageSource;
+        if (amountOut < expectedAmountOut) {
+            amountNeededFromSlippageCoverageSource = expectedAmountOut - amountOut;
+        }
+        // We need slippage coverage to cover the difference to get to 1:1.
+        // Seed the coverage source with full amount to make sure that the swapper takes only what is needed.
+        _prepareSlippageAndFeeCoverage(_mockGho, expectedAmountOut);
+
+        // Check slippage coverage source has the amount needed to cover a potential full slippage.
+        assertEq(_mockGho.balanceOf(address(slippageCoverageSource)), expectedAmountOut);
+
+        bytes memory data =
+            _encodeDexSwapExactInputData(address(_mockUsdt), address(_mockGho), amountIn, 0, slippageToleranceBps);
+        vm.prank(allocator);
+        uint256 actualAmountOut = _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, data);
+
+        // Check that the slippage coverage source has no balance left because it was used to cover slippage.
+        assertEq(
+            _mockGho.balanceOf(address(slippageCoverageSource)),
+            expectedAmountOut - amountNeededFromSlippageCoverageSource
+        );
+
+        // Check that the actualAmountOut is the amountOut and can be pulled by the Allocator.
+        vm.prank(allocator);
+        IERC20(_mockGho).safeTransferFrom(address(_swapper), address(this), actualAmountOut);
+        assertEq(IERC20(_mockGho).balanceOf(address(_swapper)), 0);
+    }
+
     function test_executeSwap_moreThanOneToOneOutput(uint256 amountIn, uint16 amountOutExtra) public {
         amountIn = _boundAssetAmount(address(_mockUsdt), amountIn);
         uint256 amountOutIfNoSlippage = amountIn.convertAssetDecimals(address(_mockUsdt), address(_mockGho));
@@ -335,8 +376,6 @@ contract SwapperTest is TestWithHelpers {
         vm.prank(caller);
         _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, data);
     }
-
-    // TODO: Test we do not get more than the min needed to get to 1:1 from slippage source
 
     /// @dev Allocator transfer input token into the Swapper before invoking the swap
     function _mockTransferIntoSwapper(IMockErc20 token, uint256 amount) internal {
