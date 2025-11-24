@@ -42,7 +42,6 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
     }
 
     modifier onlyAllowedReleaser() {
-        require(IS_CANONICAL_CHAIN, NotCanonicalChain());
         require(msg.sender == CHAIN_GATEWAY, ErrorsLib.NotAuthorized());
         _;
     }
@@ -54,6 +53,11 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
 
     modifier onlyAllowedBurner() {
         require(msg.sender == VAULT || msg.sender == CHAIN_GATEWAY, ErrorsLib.NotAuthorized());
+        _;
+    }
+
+    modifier onlyCanonicalChain() {
+        require(IS_CANONICAL_CHAIN, NotCanonicalChain());
         _;
     }
 
@@ -107,7 +111,7 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
 
     /// @inheritdoc IIouTokenManager
     /// @dev Should only be used on canonical chain.
-    function burnLockedTokens(uint256 amount) external override onlyAllowedBurner {
+    function burnLockedTokens(uint256 amount) external override onlyAllowedBurner onlyCanonicalChain {
         require(amount <= $storage().lockedBalance, InsufficientLockedBalance());
         $storage().lockedBalance -= amount;
         _burnTokens(address(this), amount);
@@ -115,7 +119,7 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
 
     /// @inheritdoc IIouTokenManager
     /// @dev Should only be used on canonical chain.
-    function releaseTokens(address to, uint256 amount) external override onlyAllowedReleaser {
+    function releaseTokens(address to, uint256 amount) external override onlyAllowedReleaser onlyCanonicalChain {
         require(amount <= $storage().lockedBalance, InsufficientLockedBalance());
         $storage().lockedBalance -= amount;
         IERC20(IOU_TOKEN).safeTransfer(to, amount);
