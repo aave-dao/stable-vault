@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
+import {IBridgeAdapter} from "./IBridgeAdapter.sol";
 import {IChainGateway} from "./IChainGateway.sol";
 
 interface IAccountingChainGateway is IChainGateway {
@@ -18,6 +19,6 @@ interface IAccountingChainGateway is IChainGateway {
         address asset,
         uint256 amount,
         uint256 targetChainId,
-        BridgeParams memory bridgeParams
+        IBridgeAdapter.BridgeParams memory bridgeParams
     ) external payable;
 }

@@ -7,7 +7,7 @@ import {IERC20} from "forge-std/interfaces/IERC20.sol";
 
 import {BasedBoostedVault} from "../../src/accounting/BasedBoostedVault.sol";
 import {IBasedBoostedVault} from "../../src/interfaces/IBasedBoostedVault.sol";
-import {IChainGateway} from "../../src/interfaces/IChainGateway.sol";
+import {IBridgeAdapter} from "../../src/interfaces/IBridgeAdapter.sol";
 import {AssetLib} from "../../src/libraries/AssetLib.sol";
 import {ErrorsLib} from "../../src/libraries/ErrorsLib.sol";
 import {BaseTest} from "../BaseTest.t.sol";
@@ -85,8 +85,13 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             address(USDC),
             userInitialDeposit,
             EARNING_CHAIN_ID,
-            IChainGateway.BridgeParams({
-                feePayer: everyRoleAccount, feeToken: address(0), feeAmount: bridgeFeeAmount, gasLimit: 300000, data: ""
+            IBridgeAdapter.BridgeParams({
+                feePayer: everyRoleAccount,
+                feeToken: address(0),
+                feeAmount: bridgeFeeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: 300000,
+                data: ""
             })
         );
 
@@ -146,8 +151,13 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             EARNING_CHAIN_ID,
             user1,
             iouAmountRequestedRay,
-            IChainGateway.BridgeParams({
-                feePayer: user1, feeToken: address(0), feeAmount: bridgeFeeAmount, gasLimit: 300000, data: ""
+            IBridgeAdapter.BridgeParams({
+                feePayer: user1,
+                feeToken: address(0),
+                feeAmount: bridgeFeeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: 300000,
+                data: ""
             })
         );
         // Check the IOU token balance on Accounting Chain went down
@@ -228,8 +238,13 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             EARNING_CHAIN_ID,
             user2,
             iouAmountRequestedRay,
-            IChainGateway.BridgeParams({
-                feePayer: user2, feeToken: address(0), feeAmount: bridgeFeeAmount, gasLimit: 100000, data: ""
+            IBridgeAdapter.BridgeParams({
+                feePayer: user2,
+                feeToken: address(0),
+                feeAmount: bridgeFeeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: 100000,
+                data: ""
             })
         );
         require(
@@ -249,8 +264,13 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             ACCOUNTING_CHAIN_ID,
             user2,
             iouAmountRequestedRay,
-            IChainGateway.BridgeParams({
-                feePayer: user2, feeToken: address(0), feeAmount: bridgeFeeAmount, gasLimit: 100000, data: ""
+            IBridgeAdapter.BridgeParams({
+                feePayer: user2,
+                feeToken: address(0),
+                feeAmount: bridgeFeeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: 100000,
+                data: ""
             })
         );
         require(
@@ -282,8 +302,8 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             amountIouToExchange,
             address(USDC),
             user1,
-            IChainGateway.BridgeParams({
-                feePayer: user1, feeToken: address(0), feeAmount: 1, gasLimit: 100000, data: ""
+            IBridgeAdapter.BridgeParams({
+                feePayer: user1, feeToken: address(0), feeAmount: 1, feeRefundThreshold: 0, gasLimit: 100000, data: ""
             })
         );
 

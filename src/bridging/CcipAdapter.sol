@@ -68,7 +68,7 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
         uint256 destinationChainId,
         BridgeAsset[] memory assets,
         bytes memory data,
-        IChainGateway.BridgeParams memory bridgeParams
+        IBridgeAdapter.BridgeParams memory bridgeParams
     ) external payable override onlyGateway {
         Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](assets.length);
         address[] memory assetsToPull = new address[](assets.length + 1);
@@ -103,7 +103,12 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
             )
         });
         _sendMessageWithFeePayer(
-            destinationChainId, ccipMessage, bridgeParams.feePayer, bridgeParams.feeToken, bridgeParams.feeAmount
+            destinationChainId,
+            ccipMessage,
+            bridgeParams.feePayer,
+            bridgeParams.feeToken,
+            bridgeParams.feeAmount,
+            bridgeParams.feeRefundThreshold
         );
     }
 
@@ -147,7 +152,8 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
         Client.EVM2AnyMessage memory message,
         address feePayer,
         address feeToken,
-        uint256 allocatedFeeAmount
+        uint256 allocatedFeeAmount,
+        uint256 feeRefundThreshold
     ) internal {
         uint64 chainSelector = _chainSelectorOf[chainId];
         uint256 estimatedFeeAmount = IRouterClient(CCIP_ROUTER).getFee(chainSelector, message);
@@ -155,14 +161,20 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
         if (feeToken == ConstantsLib.NATIVE_CURRENCY) {
             msgValue = estimatedFeeAmount;
         }
-        // Return any excess fee to the fee payer.
         if (allocatedFeeAmount > estimatedFeeAmount) {
-            if (feeToken == ConstantsLib.NATIVE_CURRENCY) {
-                payable(feePayer).transfer(allocatedFeeAmount - estimatedFeeAmount);
-            } else {
-                IERC20(feeToken).safeTransfer(feePayer, allocatedFeeAmount - estimatedFeeAmount);
+            uint256 excessFee = allocatedFeeAmount - estimatedFeeAmount;
+            if (excessFee > feeRefundThreshold) {
+                _triggerFeeRefund(feePayer, feeToken, excessFee);
             }
         }
         IRouterClient(CCIP_ROUTER).ccipSend{value: msgValue}(chainSelector, message);
+    }
+
+    function _triggerFeeRefund(address feePayer, address feeToken, uint256 excessFee) internal {
+        if (feeToken == ConstantsLib.NATIVE_CURRENCY) {
+            payable(feePayer).transfer(excessFee);
+        } else {
+            IERC20(feeToken).safeTransfer(feePayer, excessFee);
+        }
     }
 }

@@ -5,7 +5,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
-import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {ConstantsLib} from "../libraries/ConstantsLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
@@ -71,7 +70,7 @@ contract TransferHelperClient {
     }
 
     /// @dev Transfers the bridge fee to the TransferHelper to be pulled by Bridge Adapter.
-    function _transferBridgeFeeToTransferHelper(IChainGateway.BridgeParams memory bridgeParams) internal {
+    function _transferBridgeFeeToTransferHelper(IBridgeAdapter.BridgeParams memory bridgeParams) internal {
         if (msg.value > 0) {
             // If there is some msg.value, we transfer it to the TransferHelper, regardless of the fee token.
             // There might be scenarios where the bridge implementation requires some native assets to operate in

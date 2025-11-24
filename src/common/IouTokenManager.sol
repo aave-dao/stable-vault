@@ -4,6 +4,7 @@ pragma solidity ^0.8.22;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {IIouToken} from "../interfaces/IIouToken.sol";
 import {IIouTokenManager} from "../interfaces/IIouTokenManager.sol";
@@ -84,7 +85,7 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
-        IChainGateway.BridgeParams memory bridgeParams
+        IBridgeAdapter.BridgeParams memory bridgeParams
     ) external payable override assertingTransferHelperBalanceFor(bridgeParams.feeToken) {
         require(destinationChainId != block.chainid, ErrorsLib.InvalidDestinationChainId());
         if (IS_ACCOUNTING_CHAIN) {

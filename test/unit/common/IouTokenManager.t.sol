@@ -5,6 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Test} from "forge-std/Test.sol";
 
 import {IouToken} from "../../../src/common/IouToken.sol";
+import {IBridgeAdapter} from "../../../src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../../../src/interfaces/IChainGateway.sol";
 import {IIouTokenManager} from "../../../src/interfaces/IIouTokenManager.sol";
 import {ErrorsLib} from "../../../src/libraries/ErrorsLib.sol";
@@ -212,8 +213,8 @@ contract IouTokenManagerTest_AccountingChain is Test {
         vm.assume(destinationChainId != block.chainid);
         vm.assume(from != address(0));
 
-        IChainGateway.BridgeParams memory bridgeParams = IChainGateway.BridgeParams({
-            feePayer: address(0), feeToken: address(0), feeAmount: 0, gasLimit: 0, data: ""
+        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
+            feePayer: address(0), feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 0, data: ""
         });
         vm.prank(iouTokenManagerAddress);
         TestErc20(iouToken).mint(from, iouTokenAmountRay);
@@ -239,8 +240,8 @@ contract IouTokenManagerTest_AccountingChain is Test {
         uint256 iouTokenAmountRay
     ) public {
         uint256 destinationChainId = block.chainid;
-        IChainGateway.BridgeParams memory bridgeParams = IChainGateway.BridgeParams({
-            feePayer: address(0), feeToken: address(0), feeAmount: 0, gasLimit: 0, data: ""
+        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
+            feePayer: address(0), feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 0, data: ""
         });
         vm.expectRevert(ErrorsLib.InvalidDestinationChainId.selector);
         vm.prank(from);
@@ -264,8 +265,13 @@ contract IouTokenManagerTest_AccountingChain is Test {
         vm.assume(feePayer != address(iouTokenManager));
         vm.assume(feePayer != transferHelper);
         vm.assume(feePayer != address(chainGateway));
-        IChainGateway.BridgeParams memory bridgeParams = IChainGateway.BridgeParams({
-            feePayer: feePayer, feeToken: feeToken, feeAmount: feeAmount, gasLimit: gasLimit, data: data
+        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
+            feePayer: feePayer,
+            feeToken: feeToken,
+            feeAmount: feeAmount,
+            feeRefundThreshold: 0,
+            gasLimit: gasLimit,
+            data: data
         });
         if (feeAmount > 0) {
             TestErc20(feeToken).mint(feePayer, feeAmount);
@@ -301,8 +307,13 @@ contract IouTokenManagerTest_AccountingChain is Test {
         vm.assume(destinationChainId != block.chainid);
         vm.assume(from != address(chainGateway));
         vm.assume(from != address(0));
-        IChainGateway.BridgeParams memory bridgeParams = IChainGateway.BridgeParams({
-            feePayer: address(0), feeToken: address(0), feeAmount: feeAmount, gasLimit: gasLimit, data: data
+        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
+            feePayer: address(0),
+            feeToken: address(0),
+            feeAmount: feeAmount,
+            feeRefundThreshold: 0,
+            gasLimit: gasLimit,
+            data: data
         });
         if (feeAmount > 0) {
             vm.deal(from, feeAmount);

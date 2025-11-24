@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {IChainGateway} from "./IChainGateway.sol";
-
 interface IBridgeAdapter {
     /// @notice Emitted when the processing of bridged funds fails.
     event BridgedFundsProcessingFailed(uint256 sourceChainId, bytes message, bytes error);
@@ -14,6 +12,22 @@ interface IBridgeAdapter {
     struct BridgeAsset {
         address asset;
         uint256 amount;
+    }
+
+    struct BridgeParams {
+        // The address that will pay the bridge fee (also the recipient of any refund).
+        address feePayer;
+        // The token to pay the bridge fee in.
+        address feeToken;
+        // The amount of `feeToken` approved by `feePayer` to spend on fees.
+        uint256 feeAmount;
+        // The minimum amount of `feeToken` that must remain unused in order to trigger a refund to the `feePayer`.
+        uint256 feeRefundThreshold;
+        // Total gas that should be allocated for executions that take place from the message being processed on the
+        // destination chain (including round trips).
+        uint256 gasLimit;
+        // Arbitrary data that may be required by the bridge adapter to operate.
+        bytes data;
     }
 
     function setDestinationChainAdapter(uint256 chainId, address destinationChainAdapter) external;
@@ -29,6 +43,6 @@ interface IBridgeAdapter {
         uint256 destinationChainId,
         BridgeAsset[] memory assets,
         bytes memory data,
-        IChainGateway.BridgeParams memory bridgeParams
+        BridgeParams memory bridgeParams
     ) external payable;
 }

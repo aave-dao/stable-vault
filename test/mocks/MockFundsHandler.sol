@@ -4,7 +4,7 @@ pragma solidity ^0.8.4;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {IChainGateway} from "../../src/interfaces/IChainGateway.sol";
+import {IBridgeAdapter} from "../../src/interfaces/IBridgeAdapter.sol";
 import {IFundsHandler} from "../../src/interfaces/IFundsHandler.sol";
 import {ITransferHelper} from "../../src/interfaces/ITransferHelper.sol";
 
@@ -52,7 +52,7 @@ contract MockFundsHandler is IFundsHandler {
         address asset,
         uint256 amount,
         uint256 chainId,
-        IChainGateway.BridgeParams memory bridgeParams
+        IBridgeAdapter.BridgeParams memory bridgeParams
     ) external payable override {}
 
     function updateChainBalanceCallback(uint256 chainId, uint256 snapshotBalanceRay, uint256 snapshotTimestamp)

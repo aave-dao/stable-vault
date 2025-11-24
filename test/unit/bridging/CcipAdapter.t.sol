@@ -250,8 +250,13 @@ contract CcipAdapterTest is TestWithHelpers {
         bridgeAssets[0] = IBridgeAdapter.BridgeAsset({asset: address(_mockUsdt), amount: amountUsdt});
         bridgeAssets[1] = IBridgeAdapter.BridgeAsset({asset: address(_mockGho), amount: amountGho});
 
-        IChainGateway.BridgeParams memory bridgeParams = IChainGateway.BridgeParams({
-            feePayer: feePayer, feeToken: feeToken, feeAmount: feeAmount, gasLimit: gasLimit, data: extraParamsData
+        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
+            feePayer: feePayer,
+            feeToken: feeToken,
+            feeAmount: feeAmount,
+            feeRefundThreshold: 0,
+            gasLimit: gasLimit,
+            data: extraParamsData
         });
 
         Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](2);
@@ -326,8 +331,13 @@ contract CcipAdapterTest is TestWithHelpers {
         bridgeAssets[0] = IBridgeAdapter.BridgeAsset({asset: address(_mockUsdt), amount: amountUsdt});
         bridgeAssets[1] = IBridgeAdapter.BridgeAsset({asset: address(_mockGho), amount: amountGho});
 
-        IChainGateway.BridgeParams memory bridgeParams = IChainGateway.BridgeParams({
-            feePayer: feePayer, feeToken: feeToken, feeAmount: feeAmount, gasLimit: gasLimit, data: extraParamsData
+        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
+            feePayer: feePayer,
+            feeToken: feeToken,
+            feeAmount: feeAmount,
+            feeRefundThreshold: 0,
+            gasLimit: gasLimit,
+            data: extraParamsData
         });
 
         Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](2);
@@ -408,8 +418,13 @@ contract CcipAdapterTest is TestWithHelpers {
         bridgeAssets[0] = IBridgeAdapter.BridgeAsset({asset: address(_mockUsdt), amount: amountUsdt});
         bridgeAssets[1] = IBridgeAdapter.BridgeAsset({asset: address(_mockGho), amount: amountGho});
 
-        IChainGateway.BridgeParams memory bridgeParams = IChainGateway.BridgeParams({
-            feePayer: feePayer, feeToken: feeToken, feeAmount: feeAmount, gasLimit: gasLimit, data: extraParamsData
+        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
+            feePayer: feePayer,
+            feeToken: feeToken,
+            feeAmount: feeAmount,
+            feeRefundThreshold: 0,
+            gasLimit: gasLimit,
+            data: extraParamsData
         });
 
         Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](2);
@@ -496,8 +511,13 @@ contract CcipAdapterTest is TestWithHelpers {
         bridgeAssets[0] = IBridgeAdapter.BridgeAsset({asset: address(_mockUsdt), amount: amountUsdt});
         bridgeAssets[1] = IBridgeAdapter.BridgeAsset({asset: address(_mockGho), amount: amountGho});
 
-        IChainGateway.BridgeParams memory bridgeParams = IChainGateway.BridgeParams({
-            feePayer: feePayer, feeToken: feeToken, feeAmount: feeAmount, gasLimit: gasLimit, data: extraParamsData
+        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
+            feePayer: feePayer,
+            feeToken: feeToken,
+            feeAmount: feeAmount,
+            feeRefundThreshold: 0,
+            gasLimit: gasLimit,
+            data: extraParamsData
         });
 
         Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](2);
@@ -555,8 +575,13 @@ contract CcipAdapterTest is TestWithHelpers {
             EARNING_CHAIN_ID,
             new IBridgeAdapter.BridgeAsset[](0),
             "",
-            IChainGateway.BridgeParams({
-                feePayer: everyRoleAccount, feeToken: address(0), feeAmount: 0, gasLimit: 100000, data: ""
+            IBridgeAdapter.BridgeParams({
+                feePayer: everyRoleAccount,
+                feeToken: address(0),
+                feeAmount: 0,
+                feeRefundThreshold: 0,
+                gasLimit: 100000,
+                data: ""
             })
         );
 
@@ -566,8 +591,13 @@ contract CcipAdapterTest is TestWithHelpers {
             ACCOUNTING_CHAIN_ID,
             new IBridgeAdapter.BridgeAsset[](0),
             "",
-            IChainGateway.BridgeParams({
-                feePayer: everyRoleAccount, feeToken: address(0), feeAmount: 0, gasLimit: 100000, data: ""
+            IBridgeAdapter.BridgeParams({
+                feePayer: everyRoleAccount,
+                feeToken: address(0),
+                feeAmount: 0,
+                feeRefundThreshold: 0,
+                gasLimit: 100000,
+                data: ""
             })
         );
     }

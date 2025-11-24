@@ -9,7 +9,7 @@ import {RescuableAssets} from "../common/RescuableAssets.sol";
 import {TransferHelperClient} from "../common/TransferHelperClient.sol";
 import {IAccountingChainGateway} from "../interfaces/IAccountingChainGateway.sol";
 import {IAllocator} from "../interfaces/IAllocator.sol";
-import {IChainGateway} from "../interfaces/IChainGateway.sol";
+import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
 import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
@@ -132,7 +132,7 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, TransferHelp
         address asset,
         uint256 amount,
         uint256 chainId,
-        IChainGateway.BridgeParams memory bridgeParams
+        IBridgeAdapter.BridgeParams memory bridgeParams
     )
         external
         payable

@@ -20,20 +20,6 @@ interface IChainGateway {
         BURN_IOU_TOKEN
     }
 
-    struct BridgeParams {
-        // The address that will pay the bridge fee (also the recipient of any refund).
-        address feePayer;
-        // The token to pay the bridge fee in.
-        address feeToken;
-        // The amount of `feeToken` approved by `feePayer` to spend on fees.
-        uint256 feeAmount;
-        // Total gas that should be allocated for executions that take place from the message being processed on the
-        // destination chain (including round trips).
-        uint256 gasLimit;
-        // Arbitrary data that may be required by the bridge adapter to operate.
-        bytes data;
-    }
-
     struct CrossChainMessage {
         MessageType messageType;
         bytes data;
@@ -103,6 +89,6 @@ interface IChainGateway {
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
-        BridgeParams memory bridgeParams
+        IBridgeAdapter.BridgeParams memory bridgeParams
     ) external payable;
 }

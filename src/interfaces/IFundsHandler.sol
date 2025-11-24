@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {IChainGateway} from "./IChainGateway.sol";
+import {IBridgeAdapter} from "./IBridgeAdapter.sol";
 
 interface IFundsHandler {
     error NotBasedBoostedVault();
@@ -40,7 +40,7 @@ interface IFundsHandler {
         address asset,
         uint256 amount,
         uint256 chainId,
-        IChainGateway.BridgeParams memory bridgeParams
+        IBridgeAdapter.BridgeParams memory bridgeParams
     ) external payable;
 
     /// @dev Updates the chain balance snapshot for a given chain.

@@ -14,9 +14,9 @@ contract MockEarningChainGateway is IEarningChainGateway {
 
     function getAggregatedBalance() external view returns (uint256) {}
 
-    function sendBalanceUpdateWithFeePayer(BridgeParams memory bridgeParams) external payable {}
+    function sendBalanceUpdateWithFeePayer(IBridgeAdapter.BridgeParams memory bridgeParams) external payable {}
 
-    function pushFundsToAccountingChain(address asset, uint256 amount, BridgeParams memory bridgeParams)
+    function pushFundsToAccountingChain(address asset, uint256 amount, IBridgeAdapter.BridgeParams memory bridgeParams)
         external
         payable {}
 
@@ -24,7 +24,7 @@ contract MockEarningChainGateway is IEarningChainGateway {
         uint256 iouTokenAmountRay,
         address tokenOut,
         address tokenOutReceiver,
-        BridgeParams memory bridgeParams
+        IBridgeAdapter.BridgeParams memory bridgeParams
     ) external payable returns (uint256) {}
 
     function getDefaultBridgeAdapter(address asset, uint256 chainId) external view returns (address) {}
@@ -33,7 +33,7 @@ contract MockEarningChainGateway is IEarningChainGateway {
         address asset,
         uint256 amount,
         uint256 targetChainId,
-        BridgeParams memory bridgeParams
+        IBridgeAdapter.BridgeParams memory bridgeParams
     ) external payable {}
 
     function addBridgeAdapter(address asset, uint256 chainId, address adapter) external {}
@@ -57,6 +57,6 @@ contract MockEarningChainGateway is IEarningChainGateway {
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
-        BridgeParams memory bridgeParams
+        IBridgeAdapter.BridgeParams memory bridgeParams
     ) external payable {}
 }

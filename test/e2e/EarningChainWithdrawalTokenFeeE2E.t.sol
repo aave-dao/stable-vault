@@ -9,7 +9,7 @@ import {BasedBoostedVault} from "../../src/accounting/BasedBoostedVault.sol";
 import {IouTokenManager} from "../../src/common/IouTokenManager.sol";
 import {EarningChainGateway} from "../../src/earning/EarningChainGateway.sol";
 import {IBasedBoostedVault} from "../../src/interfaces/IBasedBoostedVault.sol";
-import {IChainGateway} from "../../src/interfaces/IChainGateway.sol";
+import {IBridgeAdapter} from "../../src/interfaces/IBridgeAdapter.sol";
 import {AssetLib} from "../../src/libraries/AssetLib.sol";
 import {ErrorsLib} from "../../src/libraries/ErrorsLib.sol";
 import {BaseTest} from "../BaseTest.t.sol";
@@ -90,10 +90,11 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             address(bridgeFeeToken),
             userInitialDeposit,
             EARNING_CHAIN_ID,
-            IChainGateway.BridgeParams({
+            IBridgeAdapter.BridgeParams({
                 feePayer: everyRoleAccount,
                 feeToken: address(bridgeFeeToken),
                 feeAmount: bridgeFeeAmount,
+                feeRefundThreshold: 0,
                 gasLimit: 300000,
                 data: ""
             })
@@ -326,10 +327,11 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             destinationChainId,
             user,
             iouAmountRequestedRay,
-            IChainGateway.BridgeParams({
+            IBridgeAdapter.BridgeParams({
                 feePayer: user,
                 feeToken: address(bridgeFeeToken),
                 feeAmount: bridgeFeeAmount,
+                feeRefundThreshold: 0,
                 gasLimit: 100000,
                 data: ""
             })
@@ -345,10 +347,11 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             iouAmountRequestedRay,
             address(USDC),
             user,
-            IChainGateway.BridgeParams({
+            IBridgeAdapter.BridgeParams({
                 feePayer: user,
                 feeToken: address(bridgeFeeToken),
                 feeAmount: bridgeFeeAmount,
+                feeRefundThreshold: 0,
                 gasLimit: 100000,
                 data: ""
             })

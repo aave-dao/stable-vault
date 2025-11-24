@@ -2,7 +2,6 @@
 pragma solidity ^0.8.22;
 
 import {IBridgeAdapter} from "../../src/interfaces/IBridgeAdapter.sol";
-import {IChainGateway} from "../../src/interfaces/IChainGateway.sol";
 import {ITransferHelper} from "../../src/interfaces/ITransferHelper.sol";
 
 contract MockBridgeAdapter is IBridgeAdapter {
@@ -16,7 +15,7 @@ contract MockBridgeAdapter is IBridgeAdapter {
         uint256 destinationChainId,
         IBridgeAdapter.BridgeAsset[] memory assets,
         bytes memory data,
-        IChainGateway.BridgeParams memory bridgeParams
+        IBridgeAdapter.BridgeParams memory bridgeParams
     ) external payable override {
         (destinationChainId, data);
         // pull assets from TH
