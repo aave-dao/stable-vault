@@ -8,6 +8,7 @@ import {IBridgeAdapter} from "./IBridgeAdapter.sol";
 interface IChainGateway {
     error InvalidMessageType();
     error AdapterNotFound();
+    error NotIouTokenManager();
 
     event BridgeAdapterAdded(address asset, uint256 chainId, address adapter);
     event BridgeAdapterRemoved(address asset, uint256 chainId, address adapter);

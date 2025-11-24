@@ -30,13 +30,23 @@ interface IBasedBoostedVault {
     event DefaultSubVaultSet(uint256 indexed subVaultId, uint256 perSecondRate);
     event FeesClaimed(address[] assets, uint256[] amounts);
 
+    /// @notice Thrown when checked rate is invalid i.e. is out of bounds.
     error InvalidRate();
+    /// @notice Thrown when a position does not exist for a user.
     error NonExistentPosition();
+    /// @notice Thrown when checked rate is already set.
     error RedundantRate();
-    error InvalidMsgSender();
+    /// @notice Thrown when checked address is not the message sender.
+    error NotMessageSender();
+    /// @notice Thrown when a subvault already exists for a given rate.
     error SubVaultAlreadyExists();
+    /// @notice Thrown when a subvault does not exist for a given id.
     error SubVaultDoesNotExist();
+    /// @notice Thrown when there are no fees to claim.
     error NoFeesToClaim();
+    /// @notice Thrown when the amount requested to withdraw is greater than the amount available.
+    /// @dev It is possible the system does not have enough profits i.e. balances over 'original deposits' to cover a
+    /// user's withdrawal request.
     error InsufficientAssets(address user, uint256 amountRequestedRay, uint256 amountAvailableRay);
 
     function setDefaultSubVault(uint256 perSecondRate) external;

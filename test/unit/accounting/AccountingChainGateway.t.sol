@@ -344,7 +344,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
     }
 
     function test_sendBridgeIouTokenMessageWithFeePayer_reverts_ifInvalidMessageSender() public {
-        vm.expectRevert(ErrorsLib.InvalidMessageSender.selector);
+        vm.expectRevert(IChainGateway.NotIouTokenManager.selector);
         _accountingChainGateway.sendBridgeIouTokenMessageWithFeePayer(
             EARNING_CHAIN_ID,
             makeAddr("iouTokenRecipient"),

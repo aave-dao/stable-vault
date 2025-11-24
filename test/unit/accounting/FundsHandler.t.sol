@@ -258,7 +258,7 @@ contract FundsHandlerTest is TestWithHelpers {
         address asset = _deployAssetWithSalt(assetDeploymentSalt, assetDecimals);
         amount = _boundAssetAmountAllowingZero(address(asset), amount);
 
-        vm.expectRevert(IFundsHandler.NotGateway.selector);
+        vm.expectRevert(ErrorsLib.NotGateway.selector);
         vm.prank(msgSender);
         fundsHandler.fundsArrivedFromChainCallback(asset, amount);
     }
@@ -289,7 +289,7 @@ contract FundsHandlerTest is TestWithHelpers {
 
         snapshotBalanceRay = _boundRayAmountAllowingZero(snapshotBalanceRay);
 
-        vm.expectRevert(IFundsHandler.NotGateway.selector);
+        vm.expectRevert(ErrorsLib.NotGateway.selector);
         vm.prank(msgSender);
         fundsHandler.updateChainBalanceCallback(chainId, snapshotBalanceRay, chainBalanceSnapshotNonce);
     }

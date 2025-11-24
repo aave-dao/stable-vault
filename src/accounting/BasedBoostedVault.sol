@@ -190,7 +190,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
 
     /// @inheritdoc IBasedBoostedVault
     function requestWithdrawal(address user, uint256 requestedAmountInRay) external override returns (uint256) {
-        require(msg.sender == user, InvalidMsgSender());
+        require(user == msg.sender, NotMessageSender());
 
         uint256 subVaultId = $storage().positions[user].subVaultId;
         require(subVaultId > 0, NonExistentPosition());
@@ -241,7 +241,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         override
         assertingTransferHelperBalanceFor(assetOut)
     {
-        require(user == msg.sender, InvalidMsgSender());
+        require(user == msg.sender, NotMessageSender());
         require(
             IAssetRegistry($storage().assetRegistry).isUserWithdrawalAllowed(assetOut),
             ErrorsLib.UnsupportedAsset(assetOut)

@@ -80,7 +80,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
         uint256 iouTokenAmountRay,
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) external payable override {
-        require(msg.sender == IOU_TOKEN_MANAGER, ErrorsLib.InvalidMessageSender());
+        require(msg.sender == IOU_TOKEN_MANAGER, NotIouTokenManager());
         require(destinationChainId != block.chainid, ErrorsLib.InvalidDestinationChainId());
 
         address adapter = $storage().defaultBridgeAdapter[ConstantsLib.ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId];

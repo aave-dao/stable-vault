@@ -2,7 +2,9 @@
 pragma solidity ^0.8.22;
 
 interface ISwapper {
+    /// @notice Thrown when the amount of `assetOut` received is less than the minimum amount out expected after a swap.
     error SlippageToleranceExceeded();
+    /// @notice Thrown when a low-level call to a target contract is unsuccessful.
     error CallToTargetFailed();
 
     /// @dev The Swapper must get `fromAmount` of `fromAsset` transferred before the `executeSwap` function is invoked.

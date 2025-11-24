@@ -272,7 +272,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, IAllocator
         }
         bool callSucceeded =
             _depositToStrategy({asset: allocation.asset, amount: amountToAllocate, strategy: allocation.strategy});
-        require(callSucceeded, IAllocator.FailedToDepositIntoStrategy());
+        require(callSucceeded, IAllocator.DepositIntoStrategyFailed(allocation.strategy));
     }
 
     function _tryWithdrawFromStrategy(address asset, uint256 amount, address strategy) internal returns (uint256) {

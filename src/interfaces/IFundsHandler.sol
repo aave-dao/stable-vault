@@ -5,7 +5,6 @@ import {IBridgeAdapter} from "./IBridgeAdapter.sol";
 
 interface IFundsHandler {
     error NotBasedBoostedVault();
-    error NotGateway();
 
     struct AssetBalance {
         address asset;

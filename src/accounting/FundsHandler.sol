@@ -51,7 +51,7 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, TransferHelp
     }
 
     modifier onlyGateway() {
-        require(msg.sender == GATEWAY, NotGateway());
+        require(msg.sender == GATEWAY, ErrorsLib.NotGateway());
         _;
     }
 

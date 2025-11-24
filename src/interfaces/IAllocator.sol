@@ -10,8 +10,8 @@ interface IAllocator {
     event StrategyRemoved(address indexed asset, address indexed strategy);
     event DefaultStrategySet(address indexed asset, address indexed strategy);
 
-    error NonZeroStrategyBalance();
-    error FailedToDepositIntoStrategy();
+    /// @notice Thrown when funds fail to deposit into a yield strategy.
+    error DepositIntoStrategyFailed(address strategy);
 
     struct AllocatorBalance {
         address asset;

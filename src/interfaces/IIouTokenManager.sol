@@ -4,7 +4,10 @@ pragma solidity ^0.8.22;
 import {IBridgeAdapter} from "./IBridgeAdapter.sol";
 
 interface IIouTokenManager {
+    /// @notice Thrown when the amount of locked tokens is insufficient to burn or release.
     error InsufficientLockedBalance();
+    /// @notice Thrown when a function that should only be invoked on the Accounting chain is invoked on an Earning
+    /// chain.
     error NotAccountingChain();
 
     /// @return address of the IOU token.

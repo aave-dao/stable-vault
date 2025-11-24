@@ -23,14 +23,8 @@ library ErrorsLib {
     /// @notice Thrown when input parameter contains unacceptable asset.
     error InvalidAsset(address asset);
 
-    /// @notice Thrown when input parameter contains unacceptable length.
-    error InvalidLength();
-
     /// @notice Thrown when destination chain id checked is the same as the current chain id.
     error InvalidDestinationChainId();
-
-    /// @notice Address checked is not message sender.
-    error InvalidMessageSender();
 
     /// @notice Thrown when caller is not authorized.
     error NotAuthorized();
@@ -46,12 +40,6 @@ library ErrorsLib {
 
     /// @notice Unsupported asset.
     error UnsupportedAsset(address asset);
-
-    /// @notice Address checked is the zero address.
-    error ZeroAddress();
-
-    /// @notice Chain id checked is zero.
-    error ZeroChainId();
 
     /// @notice Token amount checked is zero.
     error ZeroAmount();
