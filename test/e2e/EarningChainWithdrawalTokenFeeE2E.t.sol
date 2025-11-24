@@ -6,7 +6,6 @@ import {console} from "forge-std/console.sol";
 import {IERC20} from "forge-std/interfaces/IERC20.sol";
 
 import {BasedBoostedVault} from "../../src/accounting/BasedBoostedVault.sol";
-import {IouToken} from "../../src/common/IouToken.sol";
 import {IouTokenManager} from "../../src/common/IouTokenManager.sol";
 import {EarningChainGateway} from "../../src/earning/EarningChainGateway.sol";
 import {IBasedBoostedVault} from "../../src/interfaces/IBasedBoostedVault.sol";
