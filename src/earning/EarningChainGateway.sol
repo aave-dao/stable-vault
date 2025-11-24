@@ -74,7 +74,7 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
     }
 
     /// @inheritdoc IEarningChainGateway
-    function sendBalanceUpdateWithFeePayer(IChainGateway.BridgeParams memory bridgeParams)
+    function sendBalanceUpdateWithFeePayer(IBridgeAdapter.BridgeParams memory bridgeParams)
         external
         payable
         override
@@ -101,7 +101,7 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
         uint256 iouTokenAmountRay,
         address tokenOut,
         address tokenOutReceiver,
-        IChainGateway.BridgeParams memory bridgeParams
+        IBridgeAdapter.BridgeParams memory bridgeParams
     )
         external
         payable
@@ -153,7 +153,7 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
     }
 
     /// @inheritdoc IEarningChainGateway
-    function pushFundsToAccountingChain(address asset, uint256 amount, IChainGateway.BridgeParams memory bridgeParams)
+    function pushFundsToAccountingChain(address asset, uint256 amount, IBridgeAdapter.BridgeParams memory bridgeParams)
         external
         payable
         override
@@ -203,7 +203,7 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
     function _returnFundsWithBalanceSnapshot(
         address asset,
         uint256 amount,
-        IChainGateway.BridgeParams memory bridgeParams
+        IBridgeAdapter.BridgeParams memory bridgeParams
     ) internal {
         address bridgeAdapter = $BaseChainGateway().defaultBridgeAdapter[asset][ACCOUNTING_CHAIN_ID];
         require(bridgeAdapter != address(0), AdapterNotFound());

@@ -31,7 +31,7 @@ contract MockGateway is IChainGateway {
         /*iouTokenRecipient*/
         uint256,
         /*iouTokenAmountRay*/
-        IChainGateway.BridgeParams memory /*bridgeParams*/
+        IBridgeAdapter.BridgeParams memory /*bridgeParams*/
     )
         external
         payable

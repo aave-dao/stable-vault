@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {IChainGateway} from "../../src/interfaces/IChainGateway.sol";
-import {IIouTokenManager} from "../../src/interfaces/IIouTokenManager.sol";
-import {IMintableBurnableIERC20} from "../../src/interfaces/IMintableBurnableIERC20.sol";
-
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+import {IBridgeAdapter} from "../../src/interfaces/IBridgeAdapter.sol";
+import {IIouTokenManager} from "../../src/interfaces/IIouTokenManager.sol";
+import {IMintableBurnableIERC20} from "../../src/interfaces/IMintableBurnableIERC20.sol";
 
 contract MockIouTokenManager is IIouTokenManager {
     using SafeERC20 for IERC20;
@@ -47,7 +47,7 @@ contract MockIouTokenManager is IIouTokenManager {
         uint256, // destinationChainId
         address, // iouTokenRecipient
         uint256 iouTokenAmountRay,
-        IChainGateway.BridgeParams memory // bridgeParams
+        IBridgeAdapter.BridgeParams memory // bridgeParams
     )
         external
         payable

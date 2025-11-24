@@ -8,7 +8,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {FundsHandler} from "../../../src/accounting/FundsHandler.sol";
 import {TransferHelperClient} from "../../../src/common/TransferHelperClient.sol";
 import {IAllocator} from "../../../src/interfaces/IAllocator.sol";
-import {IChainGateway} from "../../../src/interfaces/IChainGateway.sol";
+import {IBridgeAdapter} from "../../../src/interfaces/IBridgeAdapter.sol";
 import {IFundsHandler} from "../../../src/interfaces/IFundsHandler.sol";
 import {IRescuableAssets} from "../../../src/interfaces/IRescuableAssets.sol";
 import {AssetLib} from "../../../src/libraries/AssetLib.sol";
@@ -488,10 +488,11 @@ contract FundsHandlerTest is TestWithHelpers {
     ) public {
         bridgeParams_feeAmount = _boundNativeAmount(bridgeParams_feeAmount);
         vm.deal(address(unauthorizedMsgSender), bridgeParams_feeAmount);
-        IChainGateway.BridgeParams memory bridgeParams = IChainGateway.BridgeParams({
+        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
             feePayer: address(unauthorizedMsgSender),
             feeToken: address(0),
             feeAmount: bridgeParams_feeAmount,
+            feeRefundThreshold: 0,
             gasLimit: bridgeParams_gasLimit,
             data: ""
         });
@@ -524,10 +525,11 @@ contract FundsHandlerTest is TestWithHelpers {
         mockAsset.forceApprove(address(fundsHandler), amount);
         bridgeParams_feeAmount = _boundNativeAmount(bridgeParams_feeAmount);
         vm.deal(address(this), bridgeParams_feeAmount);
-        IChainGateway.BridgeParams memory bridgeParams = IChainGateway.BridgeParams({
+        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
             feePayer: address(this),
             feeToken: address(0),
             feeAmount: bridgeParams_feeAmount,
+            feeRefundThreshold: 0,
             gasLimit: bridgeParams_gasLimit,
             data: ""
         });
@@ -550,10 +552,11 @@ contract FundsHandlerTest is TestWithHelpers {
         mockAsset.mint(address(this), bridgeParams_feeAmount);
         mockAsset.forceApprove(address(fundsHandler), bridgeParams_feeAmount);
 
-        IChainGateway.BridgeParams memory bridgeParams = IChainGateway.BridgeParams({
+        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
             feePayer: address(this),
             feeToken: address(mockAsset),
             feeAmount: bridgeParams_feeAmount,
+            feeRefundThreshold: 0,
             gasLimit: bridgeParams_gasLimit,
             data: ""
         });
@@ -580,10 +583,11 @@ contract FundsHandlerTest is TestWithHelpers {
         bridgeParams_feeAmount = _boundNativeAmount(bridgeParams_feeAmount);
         vm.deal(address(this), bridgeParams_feeAmount);
 
-        IChainGateway.BridgeParams memory bridgeParams = IChainGateway.BridgeParams({
+        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
             feePayer: address(this),
             feeToken: address(0),
             feeAmount: bridgeParams_feeAmount,
+            feeRefundThreshold: 0,
             gasLimit: bridgeParams_gasLimit,
             data: ""
         });
@@ -604,10 +608,11 @@ contract FundsHandlerTest is TestWithHelpers {
         mockAsset.mint(address(this), bridgeParams_feeAmount);
         mockAsset.forceApprove(address(fundsHandler), bridgeParams_feeAmount);
 
-        IChainGateway.BridgeParams memory bridgeParams = IChainGateway.BridgeParams({
+        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
             feePayer: address(this),
             feeToken: address(mockAsset),
             feeAmount: bridgeParams_feeAmount,
+            feeRefundThreshold: 0,
             gasLimit: bridgeParams_gasLimit,
             data: ""
         });
@@ -639,10 +644,11 @@ contract FundsHandlerTest is TestWithHelpers {
         IMockErc20(feeToken).mint(address(this), bridgeParams_feeAmount);
         IMockErc20(feeToken).forceApprove(address(fundsHandler), bridgeParams_feeAmount);
 
-        IChainGateway.BridgeParams memory bridgeParams = IChainGateway.BridgeParams({
+        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
             feePayer: address(this),
             feeToken: feeToken,
             feeAmount: bridgeParams_feeAmount,
+            feeRefundThreshold: 0,
             gasLimit: bridgeParams_gasLimit,
             data: ""
         });
@@ -671,10 +677,11 @@ contract FundsHandlerTest is TestWithHelpers {
         mockAsset.mint(address(this), bridgeParams_feeAmount);
         mockAsset.forceApprove(address(fundsHandler), bridgeParams_feeAmount);
 
-        IChainGateway.BridgeParams memory bridgeParams = IChainGateway.BridgeParams({
+        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
             feePayer: address(this),
             feeToken: address(mockAsset),
             feeAmount: bridgeParams_feeAmount,
+            feeRefundThreshold: 0,
             gasLimit: bridgeParams_gasLimit,
             data: ""
         });
@@ -708,10 +715,11 @@ contract FundsHandlerTest is TestWithHelpers {
 
         assertEq(fundsHandler.getAssetBalances().length, 0);
 
-        IChainGateway.BridgeParams memory bridgeParams = IChainGateway.BridgeParams({
+        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
             feePayer: address(this),
             feeToken: address(mockAsset),
             feeAmount: bridgeParams_feeAmount,
+            feeRefundThreshold: 0,
             gasLimit: bridgeParams_gasLimit,
             data: ""
         });
@@ -752,10 +760,11 @@ contract FundsHandlerTest is TestWithHelpers {
         assertEq(fundsHandler.getAssetBalances()[0].amountRay, currentChainBalanceRay);
         assertEq(fundsHandler.getAssetBalances()[0].chainId, chainId);
 
-        IChainGateway.BridgeParams memory bridgeParams = IChainGateway.BridgeParams({
+        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
             feePayer: address(this),
             feeToken: address(mockAsset),
             feeAmount: bridgeParams_feeAmount,
+            feeRefundThreshold: 0,
             gasLimit: bridgeParams_gasLimit,
             data: ""
         });

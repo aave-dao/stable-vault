@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {IChainGateway} from "./IChainGateway.sol";
+import {IBridgeAdapter} from "./IBridgeAdapter.sol";
 
 interface IIouTokenManager {
     error InsufficientLockedBalance();
@@ -23,7 +23,7 @@ interface IIouTokenManager {
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
-        IChainGateway.BridgeParams memory bridgeParams
+        IBridgeAdapter.BridgeParams memory bridgeParams
     ) external payable;
 
     /// @notice Mints tokens and transfers them to the caller (assumes this contract has mint privileges on the IOU

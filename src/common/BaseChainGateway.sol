@@ -78,7 +78,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
-        BridgeParams memory bridgeParams
+        IBridgeAdapter.BridgeParams memory bridgeParams
     ) external payable override {
         require(msg.sender == IOU_TOKEN_MANAGER, ErrorsLib.InvalidMessageSender());
         require(destinationChainId != block.chainid, ErrorsLib.InvalidDestinationChainId());
@@ -144,7 +144,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
         address assetToBridge,
         uint256 amountToBridge,
         bytes memory dataToBridge,
-        BridgeParams memory bridgeParams
+        IBridgeAdapter.BridgeParams memory bridgeParams
     ) internal {
         IBridgeAdapter.BridgeAsset[] memory assets;
         if (assetToBridge != ConstantsLib.ASSET_FOR_DATA_ONLY_BRIDGE) {

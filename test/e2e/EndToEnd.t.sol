@@ -8,7 +8,7 @@ import {IERC4626} from "forge-std/interfaces/IERC4626.sol";
 import {Swapper} from "../../src/common/Swapper.sol";
 import {IAllocator} from "../../src/interfaces/IAllocator.sol";
 import {IBasedBoostedVault} from "../../src/interfaces/IBasedBoostedVault.sol";
-import {IChainGateway} from "../../src/interfaces/IChainGateway.sol";
+import {IBridgeAdapter} from "../../src/interfaces/IBridgeAdapter.sol";
 import {AssetLib} from "../../src/libraries/AssetLib.sol";
 import {BaseTest} from "../BaseTest.t.sol";
 
@@ -86,10 +86,11 @@ contract EndToEndTest is BaseTest {
                 address(USDC),
                 userInitialDeposit,
                 EARNING_CHAIN_ID,
-                IChainGateway.BridgeParams({
+                IBridgeAdapter.BridgeParams({
                     feePayer: everyRoleAccount,
                     feeToken: address(0),
                     feeAmount: bridgeFeeAmount,
+                    feeRefundThreshold: 0,
                     gasLimit: 300000,
                     data: ""
                 })
@@ -215,10 +216,11 @@ contract EndToEndTest is BaseTest {
             vm.prank(everyRoleAccount);
             vm.deal(everyRoleAccount, bridgeFeeAmount);
             earningChainGateway.sendBalanceUpdateWithFeePayer{value: bridgeFeeAmount}(
-                IChainGateway.BridgeParams({
+                IBridgeAdapter.BridgeParams({
                     feePayer: everyRoleAccount,
                     feeToken: address(0),
                     feeAmount: bridgeFeeAmount,
+                    feeRefundThreshold: 0,
                     gasLimit: 300000,
                     data: ""
                 })
@@ -256,10 +258,11 @@ contract EndToEndTest is BaseTest {
             earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
                 address(GHO),
                 userEarningsInGho,
-                IChainGateway.BridgeParams({
+                IBridgeAdapter.BridgeParams({
                     feePayer: everyRoleAccount,
                     feeToken: address(0),
                     feeAmount: bridgeFeeAmount,
+                    feeRefundThreshold: 0,
                     gasLimit: 300000,
                     data: ""
                 })
@@ -378,10 +381,11 @@ contract EndToEndTest is BaseTest {
             earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
                 address(GHO),
                 ghoBalanceOnVaultLeft,
-                IChainGateway.BridgeParams({
+                IBridgeAdapter.BridgeParams({
                     feePayer: everyRoleAccount,
                     feeToken: address(0),
                     feeAmount: bridgeFeeAmount,
+                    feeRefundThreshold: 0,
                     gasLimit: 300000,
                     data: ""
                 })

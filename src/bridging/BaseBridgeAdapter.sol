@@ -46,7 +46,7 @@ abstract contract BaseBridgeAdapter is AccessManaged, TransferHelperClient, IBri
         uint256 destinationChainId,
         IBridgeAdapter.BridgeAsset[] memory assets,
         bytes memory data,
-        IChainGateway.BridgeParams memory bridgeParams
+        IBridgeAdapter.BridgeParams memory bridgeParams
     ) external payable virtual;
 
     function setDestinationChainAdapter(uint256 chainId, address destinationChainAdapter) external override restricted {
