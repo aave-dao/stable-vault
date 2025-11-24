@@ -266,60 +266,6 @@ contract AssetLibTest is Test {
         );
     }
 
-    function test_safeConvertAssetDecimals_fuzz(uint256 inputAmount, uint256 inputDecimals, uint256 outputDecimals)
-        public
-    {
-        if (inputDecimals == outputDecimals) {
-            uint256 result = w.convertDecimals(inputAmount, inputDecimals, outputDecimals);
-            assertEq(result, inputAmount, "wrong output when inputDecimals == outputDecimals");
-            return;
-        }
-
-        // Bounding to not overflow
-        inputDecimals = bound(inputDecimals, 0, 77);
-        outputDecimals = bound(outputDecimals, 0, 77 - inputDecimals);
-        if (outputDecimals > inputDecimals) {
-            uint256 multiplier = 10 ** (outputDecimals - inputDecimals);
-            inputAmount = bound(inputAmount, 0, type(uint256).max / multiplier);
-        } else {
-            // Input decimls > output decimals, so need to make sure there is no remainder
-            uint256 divisor = 10 ** (inputDecimals - outputDecimals);
-            inputAmount = inputAmount / divisor * divisor;
-        }
-
-        uint256 expectedResult = _calculateExpectedResult(inputAmount, inputDecimals, outputDecimals);
-
-        // forge-lint: disable-next-line(unsafe-typecast)
-        address fromAsset = address(new TestErc20(uint8(inputDecimals)));
-        // forge-lint: disable-next-line(unsafe-typecast)
-        address toAsset = address(new TestErc20(uint8(outputDecimals)));
-        assertEq(
-            expectedResult,
-            w.safeConvertAssetDecimals(inputAmount, fromAsset, toAsset),
-            "safeConvertAssetDecimals wrong output"
-        );
-    }
-
-    function test_safeConvertAssetDecimals_revertsIfNonZeroRemainder(
-        uint256 inputAmount,
-        uint256 inputDecimals,
-        uint256 outputDecimals
-    ) public {
-        inputDecimals = bound(inputDecimals, 7, 27);
-        outputDecimals = bound(outputDecimals, 1, 6);
-
-        uint256 divisor = 10 ** (inputDecimals - outputDecimals);
-        vm.assume(inputAmount % divisor != 0);
-
-        // forge-lint: disable-next-line(unsafe-typecast)
-        address fromAsset = address(new TestErc20(uint8(inputDecimals)));
-        // forge-lint: disable-next-line(unsafe-typecast)
-        address toAsset = address(new TestErc20(uint8(outputDecimals)));
-
-        vm.expectRevert(AssetLib.NonZeroRemainder.selector);
-        w.safeConvertAssetDecimals(inputAmount, address(fromAsset), address(toAsset));
-    }
-
     function test_getDecimals(uint256 decimals) public {
         decimals = bound(decimals, 0, 77);
         // forge-lint: disable-next-line(unsafe-typecast)

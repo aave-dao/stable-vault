@@ -230,6 +230,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, IAllocator
         require(
             IAssetRegistry(ASSET_REGISTRY).isSwapOutputAllowed(swap.assetOut), ErrorsLib.UnsupportedAsset(swap.assetOut)
         );
+        _validateSwapAmountIn(swap.assetIn, swap.amountIn, swap.assetOut);
 
         // Transfer assetIn to the swapper
         IERC20(swap.assetIn).safeTransfer(swap.swapper, swap.amountIn);
@@ -237,12 +238,25 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, IAllocator
         // Execute the swap and require 1:1 conversion
         uint256 amountOut = ISwapper(swap.swapper).executeSwap(swap.assetIn, swap.assetOut, swap.amountIn, swap.data);
         require(
-            amountOut > 0 && amountOut >= swap.amountIn.convertAssetDecimals(swap.assetIn, swap.assetOut),
+            amountOut >= swap.amountIn.convertAssetDecimals(swap.assetIn, swap.assetOut),
             ErrorsLib.InsufficientAmountOut()
         );
 
         // Pull the `assetOut` from the Swapper to the Allocator
         IERC20(swap.assetOut).safeTransferFrom(swap.swapper, address(this), amountOut);
+    }
+
+    /// @notice Validates that dust from `amountIn` would not be truncated when converting to a value of `assetOut`.
+    /// @dev Dust from `amountIn` can be leaked out of the system if the `assetOut` has fewer decimals than `assetIn`.
+    /// @dev When checking for 1:1 swap between `assetIn` and `assetOut`, we truncate `amountIn` to have number of
+    /// decimals for `assetOut`. @dev Dust that is input into a swap would be unaccounted for and could be lost.
+    function _validateSwapAmountIn(address assetIn, uint256 amountIn, address assetOut) internal view {
+        uint256 inputDecimals = AssetLib.getDecimals(assetIn);
+        uint256 outputDecimals = AssetLib.getDecimals(assetOut);
+        if (inputDecimals > outputDecimals) {
+            // Check there is no remainder when truncating `amountIn` to `assetOut` decimals.
+            require(amountIn % 10 ** (inputDecimals - outputDecimals) == 0, ErrorsLib.InvalidAmount());
+        }
     }
 
     function _allocate(AllocationParams memory allocation) internal {

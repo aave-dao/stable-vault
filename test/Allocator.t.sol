@@ -1101,13 +1101,13 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalance(assetOut), totalAmountOut);
     }
 
-    function test_rebalance_swap_reverts_ifAmountOutIsZero() public {
+    function test_rebalance_swap_reverts_ifNonZeroAmountTruncated(uint256 amountAssetIn) public {
         // assetIn has more decimals than assetOut
         address assetIn = address(_mockGho);
         address assetOut = address(_mockUsdt);
-        uint256 amountAssetIn = 100_000_000;
-        uint256 amountAssetOut = amountAssetIn.convertAssetDecimals(assetIn, assetOut);
-        require(amountAssetOut == 0);
+        amountAssetIn = _boundAssetAmount(assetIn, amountAssetIn);
+        vm.assume(amountAssetIn > 0);
+        vm.assume(amountAssetIn % 10 ** (AssetLib.getDecimals(assetIn) - AssetLib.getDecimals(assetOut)) != 0);
 
         // Airdrop assetIn to the swapper
         _mockGho.mint(address(_allocator), amountAssetIn);
@@ -1119,7 +1119,7 @@ contract AllocatorTest is TestWithHelpers {
         rebalanceParams[0] =
             _buildRebalanceParams(_initializeDeallocationParams(0), swaps, _initializeAllocationParams(0));
         vm.prank(address(everyRoleAccount));
-        vm.expectRevert(ErrorsLib.InsufficientAmountOut.selector);
+        vm.expectRevert(ErrorsLib.InvalidAmount.selector);
         _allocator.rebalance(rebalanceParams);
 
         // Check balances

@@ -20,21 +20,6 @@ library AssetLib {
         return convertDecimals(amount, getDecimals(fromAsset), getDecimals(toAsset));
     }
 
-    /// @notice Converts `amount` from `fromAsset` to `toAsset` and reverts if there is a non zero remainder.
-    /// @dev Used to avoid the system leaking the remainder of the `amount`.
-    function safeConvertAssetDecimals(uint256 amount, address fromAsset, address toAsset)
-        internal
-        view
-        returns (uint256)
-    {
-        uint8 inputDecimals = getDecimals(fromAsset);
-        uint8 outputDecimals = getDecimals(toAsset);
-        if (inputDecimals > outputDecimals && amount % 10 ** (inputDecimals - outputDecimals) != 0) {
-            revert NonZeroRemainder();
-        }
-        return convertDecimals(amount, inputDecimals, outputDecimals);
-    }
-
     function convertDecimals(uint256 inputAmount, uint256 inputDecimals, uint256 outputDecimals)
         internal
         pure

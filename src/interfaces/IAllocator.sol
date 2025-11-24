@@ -26,7 +26,7 @@ interface IAllocator {
 
     struct SwapParams {
         address assetIn;
-        uint256 amountIn; // TODO: Consider passing zero as wildcard for `amountIn = assetIn.balanceOf(allocator)`
+        uint256 amountIn;
         address assetOut;
         address swapper;
         bytes data; // Custom data that may be required by the swapper to execute the swap
