@@ -20,7 +20,7 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
     address internal immutable IOU_TOKEN;
     address internal immutable CHAIN_GATEWAY;
     address internal immutable VAULT;
-    bool internal immutable IS_CANONICAL_CHAIN;
+    bool internal immutable IS_ACCOUNTING_CHAIN;
 
     /// @custom:storage-location erc7201:aave.storage.IouTokenManager
     struct IouTokenManagerStorage {
@@ -56,18 +56,18 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
         _;
     }
 
-    modifier onlyCanonicalChain() {
-        require(IS_CANONICAL_CHAIN, NotCanonicalChain());
+    modifier onlyAccountingChain() {
+        require(IS_ACCOUNTING_CHAIN, NotAccountingChain());
         _;
     }
 
-    constructor(address iouToken, address chainGateway, address vault, address transferHelper, bool isCanonicalChain)
+    constructor(address iouToken, address chainGateway, address vault, address transferHelper, bool isAccountingChain)
         TransferHelperClient(transferHelper)
     {
         IOU_TOKEN = iouToken;
         CHAIN_GATEWAY = chainGateway;
         VAULT = vault;
-        IS_CANONICAL_CHAIN = isCanonicalChain;
+        IS_ACCOUNTING_CHAIN = isAccountingChain;
     }
 
     function getAsset() external view override returns (address) {
@@ -86,7 +86,7 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
         IChainGateway.BridgeParams memory bridgeParams
     ) external payable override assertingTransferHelperBalanceFor(bridgeParams.feeToken) {
         require(destinationChainId != block.chainid, ErrorsLib.InvalidDestinationChainId());
-        if (IS_CANONICAL_CHAIN) {
+        if (IS_ACCOUNTING_CHAIN) {
             _lockTokens(msg.sender, iouTokenAmountRay);
         } else {
             _burnTokens(msg.sender, iouTokenAmountRay);
@@ -110,22 +110,20 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
     }
 
     /// @inheritdoc IIouTokenManager
-    /// @dev Should only be used on canonical chain.
-    function burnLockedTokens(uint256 amount) external override onlyAllowedBurner onlyCanonicalChain {
+    function burnLockedTokens(uint256 amount) external override onlyAllowedBurner onlyAccountingChain {
         require(amount <= $storage().lockedBalance, InsufficientLockedBalance());
         $storage().lockedBalance -= amount;
         _burnTokens(address(this), amount);
     }
 
     /// @inheritdoc IIouTokenManager
-    /// @dev Should only be used on canonical chain.
-    function releaseTokens(address to, uint256 amount) external override onlyAllowedReleaser onlyCanonicalChain {
+    function releaseTokens(address to, uint256 amount) external override onlyAllowedReleaser onlyAccountingChain {
         require(amount <= $storage().lockedBalance, InsufficientLockedBalance());
         $storage().lockedBalance -= amount;
         IERC20(IOU_TOKEN).safeTransfer(to, amount);
     }
 
-    /// @dev should only be used on canonical chain.
+    /// @dev should only be used on Accounting chain.
     function _lockTokens(address from, uint256 amount) internal {
         $storage().lockedBalance += amount;
         IERC20(IOU_TOKEN).safeTransferFrom(from, address(this), amount);

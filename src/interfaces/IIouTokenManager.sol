@@ -5,7 +5,7 @@ import {IChainGateway} from "./IChainGateway.sol";
 
 interface IIouTokenManager {
     error InsufficientLockedBalance();
-    error NotCanonicalChain();
+    error NotAccountingChain();
 
     /// @return address of the IOU token.
     function getAsset() external view returns (address);
@@ -38,7 +38,7 @@ interface IIouTokenManager {
     function burnLockedTokens(uint256 amount) external;
 
     /// @notice Unlocks tokens and transfers them to the caller.
-    /// @dev This is used if IOU tokens are bridged back to the canonical chain.
+    /// @dev This is used if IOU tokens are bridged back to the Accounting chain.
     /// @param to The address to send the unlocked IOU tokens to.
     /// @param amount The amount of IOU tokens to release.
     function releaseTokens(address to, uint256 amount) external;

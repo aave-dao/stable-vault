@@ -13,7 +13,7 @@ import {MockGateway} from "../../mocks/MockGateway.sol";
 import {MockTransferHelper} from "../../mocks/MockTransferHelper.sol";
 import {TestErc20} from "../../mocks/TestErc20.sol";
 
-contract IouTokenManagerTest_CanonicalChain is Test {
+contract IouTokenManagerTest_AccountingChain is Test {
     ExtendedIouTokenManager public iouTokenManager;
     address public iouToken;
     address payable public chainGateway;
@@ -79,7 +79,7 @@ contract IouTokenManagerTest_CanonicalChain is Test {
 
     // Burning locked tokens
 
-    function test_burnLockedTokens_withGateway(uint256 lockedBalance, uint256 amountToBurn) public {
+    function test_burnLockedTokens_withGateway(uint256 lockedBalance, uint256 amountToBurn) public virtual {
         amountToBurn = bound(amountToBurn, 0, lockedBalance);
         TestErc20(iouToken).mint(address(iouTokenManager), lockedBalance);
         iouTokenManager.mockLockedBalance(lockedBalance);
@@ -93,7 +93,7 @@ contract IouTokenManagerTest_CanonicalChain is Test {
         assertEq(lockedBalanceAfter, lockedBalanceBefore - amountToBurn, "Locked balance not properly updated");
     }
 
-    function test_burnLockedTokens_withVault(uint256 lockedBalance, uint256 amountToBurn) public {
+    function test_burnLockedTokens_withVault(uint256 lockedBalance, uint256 amountToBurn) public virtual {
         amountToBurn = bound(amountToBurn, 0, lockedBalance);
         TestErc20(iouToken).mint(address(iouTokenManager), lockedBalance);
         iouTokenManager.mockLockedBalance(lockedBalance);
@@ -107,7 +107,10 @@ contract IouTokenManagerTest_CanonicalChain is Test {
         assertEq(lockedBalanceAfter, lockedBalanceBefore - amountToBurn, "Locked balance not properly updated");
     }
 
-    function test_burnLockedTokens_reverts_if_notAllowedBurner(address nonAllowedBurner, uint256 amountToBurn) public {
+    function test_burnLockedTokens_reverts_if_notAllowedBurner(address nonAllowedBurner, uint256 amountToBurn)
+        public
+        virtual
+    {
         vm.assume(nonAllowedBurner != chainGateway && nonAllowedBurner != vault);
         vm.expectRevert(ErrorsLib.NotAuthorized.selector);
         vm.prank(nonAllowedBurner);
@@ -117,7 +120,7 @@ contract IouTokenManagerTest_CanonicalChain is Test {
     function test_burnLockedTokens_reverts_if_insufficientLockedBalance_withGateway(
         uint256 lockedBalance,
         uint256 amountToBurn
-    ) public {
+    ) public virtual {
         vm.assume(lockedBalance < type(uint256).max);
         amountToBurn = bound(amountToBurn, lockedBalance + 1, type(uint256).max);
         TestErc20(iouToken).mint(address(iouTokenManager), lockedBalance);
@@ -129,7 +132,7 @@ contract IouTokenManagerTest_CanonicalChain is Test {
     function test_burnLockedTokens_reverts_if_insufficientLockedBalance_withVault(
         uint256 lockedBalance,
         uint256 amountToBurn
-    ) public {
+    ) public virtual {
         vm.assume(lockedBalance < type(uint256).max);
         amountToBurn = bound(amountToBurn, lockedBalance + 1, type(uint256).max);
         TestErc20(iouToken).mint(address(iouTokenManager), lockedBalance);
@@ -303,14 +306,30 @@ contract IouTokenManagerTest_CanonicalChain is Test {
     }
 }
 
-contract IouTokenManagerTest_NonCanonicalChain is IouTokenManagerTest_CanonicalChain {
+contract IouTokenManagerTest_EarningChain is IouTokenManagerTest_AccountingChain {
     function setUp() public override {
         super.setUp();
         iouTokenManager = new ExtendedIouTokenManager(iouToken, chainGateway, vault, transferHelper, false);
     }
 
-    // Skip Release Tokens tests on non-canonical chain.
+    // Skip Release Tokens tests on non-Accounting chain.
     function test_releaseTokens_withGateway(uint256 lockedBalance, uint256 amountToRelease) public override {}
+
+    // Skip Burn Locked Tokens tests on non-Accounting chain.
+    function test_burnLockedTokens_withGateway(uint256 lockedBalance, uint256 amountToBurn) public override {}
+    function test_burnLockedTokens_withVault(uint256 lockedBalance, uint256 amountToBurn) public override {}
+    function test_burnLockedTokens_reverts_if_notAllowedBurner(address nonAllowedBurner, uint256 amountToBurn)
+        public
+        override
+    {}
+    function test_burnLockedTokens_reverts_if_insufficientLockedBalance_withGateway(
+        uint256 lockedBalance,
+        uint256 amountToBurn
+    ) public override {}
+    function test_burnLockedTokens_reverts_if_insufficientLockedBalance_withVault(
+        uint256 lockedBalance,
+        uint256 amountToBurn
+    ) public override {}
 
     function test_releaseTokens_reverts_if_notAllowedReleaser(address nonAllowedReleaser, uint256 amountToRelease)
         public
@@ -322,9 +341,15 @@ contract IouTokenManagerTest_NonCanonicalChain is IouTokenManagerTest_CanonicalC
         override
     {}
 
-    function test_releaseTokens_reverts_nonCanonicalChain(uint256 amountToRelease) public {
-        vm.expectRevert(IIouTokenManager.NotCanonicalChain.selector);
+    function test_releaseTokens_reverts_earningChain(uint256 amountToRelease) public {
+        vm.expectRevert(IIouTokenManager.NotAccountingChain.selector);
         vm.prank(chainGateway);
         iouTokenManager.releaseTokens(msg.sender, amountToRelease);
+    }
+
+    function test_burnLockedTokens_reverts_earningChain(uint256 amountToBurn) public {
+        vm.expectRevert(IIouTokenManager.NotAccountingChain.selector);
+        vm.prank(chainGateway);
+        iouTokenManager.burnLockedTokens(amountToBurn);
     }
 }
