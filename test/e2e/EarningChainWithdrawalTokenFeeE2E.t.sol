@@ -149,9 +149,7 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
         // The user will use native asset to pay for bridge fees
         // User must approve the IOU token manager to spend the IOU tokens
         _mintAndApproveBridgeFeeToken(user1, address(iouTokenManager_accountingChain));
-        _runIouTokenBridge(
-            iouToken_accountingChain, iouTokenManager_accountingChain, user1, iouAmountRequestedRay, EARNING_CHAIN_ID
-        );
+        _runIouTokenBridge(iouTokenManager_accountingChain, user1, iouAmountRequestedRay, EARNING_CHAIN_ID);
         // Check the IOU token balance on Accounting Chain went down
         assertEq(iouToken_accountingChain.balanceOf(user1), 0, "User should have bridged IOU tokens");
         // Check that supply on Accounting Chain stayed the same
@@ -223,9 +221,7 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             iousOnEarningBeforeUser2BridgeToAccountingChain
         );
         _mintAndApproveBridgeFeeToken(user2, address(iouTokenManager_accountingChain));
-        _runIouTokenBridge(
-            iouToken_accountingChain, iouTokenManager_accountingChain, user2, iouAmountRequestedRay, EARNING_CHAIN_ID
-        );
+        _runIouTokenBridge(iouTokenManager_accountingChain, user2, iouAmountRequestedRay, EARNING_CHAIN_ID);
         require(
             iouToken_accountingChain.totalSupply() == iousOnAccountBeforeUser2BridgeToEarningChain,
             "Supply on Accounting Chain should NOT have decreased by the amount of IOUs bridged"
@@ -238,9 +234,7 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
 
         // Bridge the tokens back to Accounting chain and check the supply on both chains is expected
         _mintAndApproveBridgeFeeToken(user2, address(iouTokenManager_earningChain));
-        _runIouTokenBridge(
-            iouToken_earningChain, iouTokenManager_earningChain, user2, iouAmountRequestedRay, ACCOUNTING_CHAIN_ID
-        );
+        _runIouTokenBridge(iouTokenManager_earningChain, user2, iouAmountRequestedRay, ACCOUNTING_CHAIN_ID);
         require(
             iouToken_accountingChain.totalSupply() == iousOnAccountBeforeUser2BridgeToEarningChain,
             "Supply on Accounting Chain should increase by the amount of IOUs bridged"
@@ -323,14 +317,11 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
     }
 
     function _runIouTokenBridge(
-        IouToken iouToken,
         IouTokenManager iouTokenManager,
         address user,
         uint256 iouAmountRequestedRay,
         uint256 destinationChainId
     ) internal {
-        vm.prank(user);
-        iouToken.approve(address(iouTokenManager), iouAmountRequestedRay);
         vm.prank(user);
         iouTokenManager.bridgeTokens(
             destinationChainId,

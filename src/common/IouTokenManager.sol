@@ -5,6 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
+import {IIouToken} from "../interfaces/IIouToken.sol";
 import {IIouTokenManager} from "../interfaces/IIouTokenManager.sol";
 import {IMintableBurnableIERC20} from "../interfaces/IMintableBurnableIERC20.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
@@ -126,7 +127,7 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
     /// @dev should only be used on Accounting chain.
     function _lockTokens(address from, uint256 amount) internal {
         $storage().lockedBalance += amount;
-        IERC20(IOU_TOKEN).safeTransferFrom(from, address(this), amount);
+        IIouToken(IOU_TOKEN).lock(from, amount);
     }
 
     function _burnTokens(address from, uint256 amount) internal {
