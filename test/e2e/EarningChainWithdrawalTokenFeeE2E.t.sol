@@ -5,17 +5,17 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transpa
 import {console} from "forge-std/console.sol";
 import {IERC20} from "forge-std/interfaces/IERC20.sol";
 
-import {BasedBoostedVault} from "../src/accounting/BasedBoostedVault.sol";
-import {IouToken} from "../src/common/IouToken.sol";
-import {IouTokenManager} from "../src/common/IouTokenManager.sol";
-import {EarningChainGateway} from "../src/earning/EarningChainGateway.sol";
-import {IBasedBoostedVault} from "../src/interfaces/IBasedBoostedVault.sol";
-import {IChainGateway} from "../src/interfaces/IChainGateway.sol";
-import {AssetLib} from "../src/libraries/AssetLib.sol";
-import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
-import {BaseTest} from "./BaseTest.t.sol";
-import {ExtendedBasedBoostedVault} from "./mocks/ExtendedBasedBoostedVault.sol";
-import {TestErc20} from "./mocks/TestErc20.sol";
+import {BasedBoostedVault} from "../../src/accounting/BasedBoostedVault.sol";
+import {IouToken} from "../../src/common/IouToken.sol";
+import {IouTokenManager} from "../../src/common/IouTokenManager.sol";
+import {EarningChainGateway} from "../../src/earning/EarningChainGateway.sol";
+import {IBasedBoostedVault} from "../../src/interfaces/IBasedBoostedVault.sol";
+import {IChainGateway} from "../../src/interfaces/IChainGateway.sol";
+import {AssetLib} from "../../src/libraries/AssetLib.sol";
+import {ErrorsLib} from "../../src/libraries/ErrorsLib.sol";
+import {BaseTest} from "../BaseTest.t.sol";
+import {ExtendedBasedBoostedVault} from "../mocks/ExtendedBasedBoostedVault.sol";
+import {TestErc20} from "../mocks/TestErc20.sol";
 
 /// @title EarningChainWithdrawalTokenFeeE2ETest
 /// @notice Test the withdrawal of funds from the Earning Chain to the Accounting Chain.

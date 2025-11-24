@@ -6,23 +6,23 @@ import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.so
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {BasedBoostedVault} from "./../src/accounting/BasedBoostedVault.sol";
-import {IBasedBoostedVault} from "./../src/interfaces/IBasedBoostedVault.sol";
-import {IFundsHandler} from "./../src/interfaces/IFundsHandler.sol";
-import {IRescuableAssets} from "./../src/interfaces/IRescuableAssets.sol";
-import {AssetLib} from "./../src/libraries/AssetLib.sol";
-import {ErrorsLib} from "./../src/libraries/ErrorsLib.sol";
-import {MathLib} from "./../src/libraries/MathLib.sol";
-import {TestWithHelpers} from "./helpers/TestWithHelpers.sol";
-import {_toAddressArray, _toUint256Array} from "./helpers/TypeHelpers.sol";
-import {MockAccessManager} from "./mocks/MockAccessManager.sol";
-import {MockAssetRegistry} from "./mocks/MockAssetRegistry.sol";
-import {MockErc20} from "./mocks/MockErc20.sol";
-import {IMockErc20} from "./mocks/MockErc20.sol";
-import {MockFundsHandler} from "./mocks/MockFundsHandler.sol";
-import {MockIouTokenManager} from "./mocks/MockIouTokenManager.sol";
-import {MockNonStandardErc20} from "./mocks/MockNonStandardErc20.sol";
-import {MockTransferHelper} from "./mocks/MockTransferHelper.sol";
+import {BasedBoostedVault} from "../../../src/accounting/BasedBoostedVault.sol";
+import {IBasedBoostedVault} from "../../../src/interfaces/IBasedBoostedVault.sol";
+import {IFundsHandler} from "../../../src/interfaces/IFundsHandler.sol";
+import {IRescuableAssets} from "../../../src/interfaces/IRescuableAssets.sol";
+import {AssetLib} from "../../../src/libraries/AssetLib.sol";
+import {ErrorsLib} from "../../../src/libraries/ErrorsLib.sol";
+import {MathLib} from "../../../src/libraries/MathLib.sol";
+import {TestWithHelpers} from "../../helpers/TestWithHelpers.sol";
+import {_toAddressArray, _toUint256Array} from "../../helpers/TypeHelpers.sol";
+import {MockAccessManager} from "../../mocks/MockAccessManager.sol";
+import {MockAssetRegistry} from "../../mocks/MockAssetRegistry.sol";
+import {MockErc20} from "../../mocks/MockErc20.sol";
+import {IMockErc20} from "../../mocks/MockErc20.sol";
+import {MockFundsHandler} from "../../mocks/MockFundsHandler.sol";
+import {MockIouTokenManager} from "../../mocks/MockIouTokenManager.sol";
+import {MockNonStandardErc20} from "../../mocks/MockNonStandardErc20.sol";
+import {MockTransferHelper} from "../../mocks/MockTransferHelper.sol";
 
 contract BasedBoostedVaultTest is TestWithHelpers {
     using MathLib for uint256;

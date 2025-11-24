@@ -5,13 +5,13 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {Swapper} from "../src/common/Swapper.sol";
-import {ISwapper} from "../src/interfaces/ISwapper.sol";
-import {AssetLib} from "../src/libraries/AssetLib.sol";
-import {TestWithHelpers} from "./helpers/TestWithHelpers.sol";
-import {IMockDex, MockDex} from "./mocks/MockDex.sol";
-import {IMockErc20} from "./mocks/MockErc20.sol";
-import {MockNonStandardErc20} from "./mocks/MockNonStandardErc20.sol";
+import {Swapper} from "../../../src/common/Swapper.sol";
+import {ISwapper} from "../../../src/interfaces/ISwapper.sol";
+import {AssetLib} from "../../../src/libraries/AssetLib.sol";
+import {TestWithHelpers} from "../../helpers/TestWithHelpers.sol";
+import {IMockDex, MockDex} from "../../mocks/MockDex.sol";
+import {IMockErc20} from "../../mocks/MockErc20.sol";
+import {MockNonStandardErc20} from "../../mocks/MockNonStandardErc20.sol";
 
 contract SwapperTest is TestWithHelpers {
     using AssetLib for uint256;
