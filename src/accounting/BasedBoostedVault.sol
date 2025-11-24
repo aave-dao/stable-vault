@@ -241,7 +241,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         override
         assertingTransferHelperBalanceFor(assetOut)
     {
-        require(msg.sender == user, InvalidMsgSender());
+        require(user == msg.sender, InvalidMsgSender());
         require(
             IAssetRegistry($storage().assetRegistry).isUserWithdrawalAllowed(assetOut),
             ErrorsLib.UnsupportedAsset(assetOut)
@@ -530,7 +530,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
     function _setUserRate(address user, uint256 newPerSecondRate) internal {
         uint256 oldSubVaultId = $storage().positions[user].subVaultId;
         require(oldSubVaultId > 0, NonExistentPosition());
-        require($storage().subVaultById[oldSubVaultId].perSecondRate != newPerSecondRate, RedundantRate());
+        require(newPerSecondRate != $storage().subVaultById[oldSubVaultId].perSecondRate, RedundantRate());
 
         uint256 newSubVaultId = _getOrCreateSubVaultWithRate(newPerSecondRate);
 

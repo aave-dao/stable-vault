@@ -182,7 +182,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, IAllocator
     /// @inheritdoc IAllocator
     function setDefaultStrategy(address asset, address strategy) external restricted {
         // Strategy must be allowed to be set as the default strategy for the asset
-        require($storage().defaultStrategyByAsset[asset] != strategy, ErrorsLib.AddressAlreadyWhitelisted());
+        require(strategy != $storage().defaultStrategyByAsset[asset], ErrorsLib.AddressAlreadyWhitelisted());
         require(_isStrategySupportedForAsset({strategy: strategy, asset: asset}), ErrorsLib.AddressNotWhitelisted());
         $storage().defaultStrategyByAsset[asset] = strategy;
         emit DefaultStrategySet(asset, strategy);
@@ -350,7 +350,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, IAllocator
 
     function _addStrategy(address asset, address strategy) internal {
         require(!_isStrategySupported(strategy), ErrorsLib.AddressAlreadyWhitelisted());
-        require(IERC4626(strategy).asset() == asset, ErrorsLib.InvalidAsset(asset));
+        require(asset == IERC4626(strategy).asset(), ErrorsLib.InvalidAsset(asset));
         $storage().assetStrategies[asset].push(strategy);
         $storage().allStrategies.push(strategy);
         $storage().strategyData[strategy] = StrategyData({
