@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {IouToken} from "../src/common/IouToken.sol";
-import {IChainGateway} from "../src/interfaces/IChainGateway.sol";
-import {IIouTokenManager} from "../src/interfaces/IIouTokenManager.sol";
-import {ErrorsLib} from "../src/libraries/ErrorsLib.sol";
-import {ExtendedIouTokenManager} from "./mocks/ExtendedIouTokenManager.sol";
-import {MockGateway} from "./mocks/MockGateway.sol";
-import {MockTransferHelper} from "./mocks/MockTransferHelper.sol";
-import {TestErc20} from "./mocks/TestErc20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Test} from "forge-std/Test.sol";
+
+import {IouToken} from "../../../src/common/IouToken.sol";
+import {IChainGateway} from "../../../src/interfaces/IChainGateway.sol";
+import {IIouTokenManager} from "../../../src/interfaces/IIouTokenManager.sol";
+import {ErrorsLib} from "../../../src/libraries/ErrorsLib.sol";
+import {ExtendedIouTokenManager} from "../../mocks/ExtendedIouTokenManager.sol";
+import {MockGateway} from "../../mocks/MockGateway.sol";
+import {MockTransferHelper} from "../../mocks/MockTransferHelper.sol";
+import {TestErc20} from "../../mocks/TestErc20.sol";
 
 contract IouTokenManagerTest_CanonicalChain is Test {
     ExtendedIouTokenManager public iouTokenManager;

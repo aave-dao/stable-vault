@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 pragma solidity ^0.8.0;
 
-import {IouToken} from "../src/common/IouToken.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Test} from "forge-std/Test.sol";
+
+import {IouToken} from "../../../src/common/IouToken.sol";
 
 contract IouTokenTest is Test {
     address public iouToken;

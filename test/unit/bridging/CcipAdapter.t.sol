@@ -11,22 +11,22 @@ import {IAny2EVMMessageReceiver} from "@chainlink-ccip/contracts/interfaces/IAny
 import {IRouterClient} from "@chainlink-ccip/contracts/interfaces/IRouterClient.sol";
 import {Client} from "@chainlink-ccip/contracts/libraries/Client.sol";
 
-import {CcipAdapter} from "../../src/bridging/CcipAdapter.sol";
-import {IBridgeAdapter} from "../../src/interfaces/IBridgeAdapter.sol";
-import {ICcipBridgeAdapter} from "../../src/interfaces/ICcipBridgeAdapter.sol";
-import {IChainGateway} from "../../src/interfaces/IChainGateway.sol";
-import {AssetLib} from "../../src/libraries/AssetLib.sol";
-import {ErrorsLib} from "../../src/libraries/ErrorsLib.sol";
-import {MathLib} from "../../src/libraries/MathLib.sol";
-import {TestWithHelpers} from "../helpers/TestWithHelpers.sol";
-import {MockAccessManager} from "../mocks/MockAccessManager.sol";
-import {MockAccountingChainGateway} from "../mocks/MockAccountingChainGateway.sol";
-import {MockAssetRegistry} from "../mocks/MockAssetRegistry.sol";
-import {MockCCIPRouter} from "../mocks/MockCcipRouter.sol";
-import {MockEarningChainGateway} from "../mocks/MockEarningChainGateway.sol";
-import {IMockErc20} from "../mocks/MockErc20.sol";
-import {MockNonStandardErc20} from "../mocks/MockNonStandardErc20.sol";
-import {MockTransferHelper} from "../mocks/MockTransferHelper.sol";
+import {CcipAdapter} from "../../../src/bridging/CcipAdapter.sol";
+import {IBridgeAdapter} from "../../../src/interfaces/IBridgeAdapter.sol";
+import {ICcipBridgeAdapter} from "../../../src/interfaces/ICcipBridgeAdapter.sol";
+import {IChainGateway} from "../../../src/interfaces/IChainGateway.sol";
+import {AssetLib} from "../../../src/libraries/AssetLib.sol";
+import {ErrorsLib} from "../../../src/libraries/ErrorsLib.sol";
+import {MathLib} from "../../../src/libraries/MathLib.sol";
+import {TestWithHelpers} from "../../helpers/TestWithHelpers.sol";
+import {MockAccessManager} from "../../mocks/MockAccessManager.sol";
+import {MockAccountingChainGateway} from "../../mocks/MockAccountingChainGateway.sol";
+import {MockAssetRegistry} from "../../mocks/MockAssetRegistry.sol";
+import {MockCCIPRouter} from "../../mocks/MockCcipRouter.sol";
+import {MockEarningChainGateway} from "../../mocks/MockEarningChainGateway.sol";
+import {IMockErc20} from "../../mocks/MockErc20.sol";
+import {MockNonStandardErc20} from "../../mocks/MockNonStandardErc20.sol";
+import {MockTransferHelper} from "../../mocks/MockTransferHelper.sol";
 
 contract CcipAdapterTest is TestWithHelpers {
     using MathLib for uint256;
