@@ -17,45 +17,58 @@ contract Swapper is ISwapper, Ownable, ReentrancyGuard {
 
     uint256 internal constant MAX_BPS = 10_000;
 
-    // TODO: Make a note about Owner being the Allocator
     constructor(address owner) Ownable(owner) {}
 
     struct SlippageParams {
+        // Accounts for anything that reduces the amount out i.e. slippage, fees, etc.
         uint16 slippageToleranceBps;
+        // The account which much approve the Swapper to pull assetOut to cover slippage, fees, etc.
         address slippageCoverageSource;
     }
 
     /// @inheritdoc ISwapper
+    /// @dev Assumes `amountIn` tokens of `assetIn` were sent from the msg.sender
     function executeSwap(address assetIn, address assetOut, uint256 amountIn, bytes memory data)
         external
         onlyOwner
         nonReentrant
         returns (uint256)
     {
-        // Assumes `amountIn` tokens of `assetIn` were sent from the msg.sender
-
         // TODO: Consider using Multicall's Call struct, allowing calls to fail and adding a msgValue param too
         (address[] memory targets, bytes[] memory callDatas, SlippageParams memory slippageParams) =
             abi.decode(data, (address[], bytes[], SlippageParams));
 
         for (uint256 i = 0; i < targets.length; i++) {
             (bool callSucceeded,) = targets[i].call(callDatas[i]);
-            require(callSucceeded);
+            require(callSucceeded, ISwapper.CallToTargetFailed());
         }
 
         uint256 amountOut = IERC20(assetOut).balanceOf(address(this));
 
-        // We want 1:1 swaps
+        // Enforce 1:1 swap between `assetIn` and `assetOut`.
         uint256 expectedAmountOut = amountIn.convertAssetDecimals(assetIn, assetOut);
+
         if (amountOut < expectedAmountOut) {
+            require(
+                _minToleratedAmountOut(expectedAmountOut, slippageParams.slippageToleranceBps) <= amountOut,
+                ISwapper.SlippageToleranceExceeded()
+            );
             uint256 slippageAmount = expectedAmountOut - amountOut;
-            require(slippageAmount <= amountOut * slippageParams.slippageToleranceBps / MAX_BPS);
             IERC20(assetOut).safeTransferFrom(slippageParams.slippageCoverageSource, address(this), slippageAmount);
+            amountOut = expectedAmountOut;
         }
 
-        // Approve funds to be pulled by the caller
+        // Approve funds to be pulled by the caller i.e. the owner of the Swapper.
         IERC20(assetOut).forceApprove(msg.sender, amountOut);
 
         return amountOut;
+    }
+
+    function _minToleratedAmountOut(uint256 expectedAmountOut, uint16 slippageToleranceBps)
+        internal
+        pure
+        returns (uint256)
+    {
+        return expectedAmountOut * (MAX_BPS - slippageToleranceBps) / MAX_BPS;
     }
 }

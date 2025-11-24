@@ -6,6 +6,8 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {ConstantsLib} from "../libraries/ConstantsLib.sol";
 
 library AssetLib {
+    error NonZeroRemainder();
+
     function assetDecimalsToRay(uint256 amount, address asset) internal view returns (uint256) {
         return convertDecimals(amount, getDecimals(asset), ConstantsLib.RAY_DECIMALS);
     }

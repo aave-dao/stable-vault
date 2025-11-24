@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {AssetLibWrapper} from "../mocks/AssetLibWrapper.sol";
-import {TestErc20} from "../mocks/TestErc20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {Test} from "forge-std/Test.sol";
+
+import {AssetLibWrapper} from "../mocks/AssetLibWrapper.sol";
+import {TestErc20} from "../mocks/TestErc20.sol";
 
 contract AssetLibTest is Test {
     AssetLibWrapper internal w;
