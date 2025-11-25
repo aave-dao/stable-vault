@@ -11,6 +11,7 @@ interface IAllocator {
     event DefaultStrategySet(address indexed asset, address indexed strategy);
 
     /// @notice Thrown when funds fail to deposit into a yield strategy.
+    /// @custom:selector 0x3868bf52
     error DepositIntoStrategyFailed(address strategy);
 
     struct AllocatorBalance {

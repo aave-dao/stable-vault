@@ -5,6 +5,8 @@ import {IBridgeAdapter} from "./IBridgeAdapter.sol";
 import {IChainGateway} from "./IChainGateway.sol";
 
 interface IAccountingChainGateway is IChainGateway {
+    /// @notice Thrown when the caller is not the FundsHandler.
+    /// @custom:selector 0xdc7a7100
     error NotFundsHandler();
 
     /// @notice Sends assets to an Earning Chain.

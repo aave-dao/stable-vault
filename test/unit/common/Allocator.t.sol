@@ -131,6 +131,10 @@ contract AllocatorTest is TestWithHelpers {
         _allocator = _deployAllocator(_mockAccessManager, address(_mockAssetRegistry), address(_mockTransferHelper));
     }
 
+    function test_selectors() public pure {
+        assertEq(IAllocator.DepositIntoStrategyFailed.selector, bytes4(keccak256("DepositIntoStrategyFailed(address)")));
+    }
+
     function test_getAssetBalances_returnsExpectedAssetBalances(uint256 depositAmountUsdt, uint256 depositAmountGho)
         public
     {

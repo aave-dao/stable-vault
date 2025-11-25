@@ -5,9 +5,11 @@ import {IBridgeAdapter} from "./IBridgeAdapter.sol";
 
 interface IIouTokenManager {
     /// @notice Thrown when the amount of locked tokens is insufficient to burn or release.
+    /// @custom:selector 0xb646ec7b
     error InsufficientLockedBalance();
     /// @notice Thrown when a function that should only be invoked on the Accounting chain is invoked on an Earning
     /// chain.
+    /// @custom:selector 0x03ad5c40
     error NotAccountingChain();
 
     /// @return address of the IOU token.
