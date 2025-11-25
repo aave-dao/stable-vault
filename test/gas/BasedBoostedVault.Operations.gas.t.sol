@@ -5,7 +5,6 @@ import {BaseTest} from "../BaseTest.t.sol";
 
 import {IBasedBoostedVault} from "../../src/interfaces/IBasedBoostedVault.sol";
 import {AssetLib} from "../../src/libraries/AssetLib.sol";
-import {MathLib} from "../../src/libraries/MathLib.sol";
 
 contract BasedBoostedVaultOperationsGasTest is BaseTest {
     using AssetLib for uint256;
@@ -132,7 +131,7 @@ contract BasedBoostedVaultOperationsGasTest is BaseTest {
 
     function test_setUserRate_differentRates() public {
         // Context: each user will migrate to a unique and net new subvault which requires new storage writes.
-        
+
         uint256 newRate = 1_000000001547125957863212449;
         IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](0);
 
