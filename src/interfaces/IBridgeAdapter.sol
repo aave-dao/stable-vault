@@ -6,12 +6,12 @@ interface IBridgeAdapter {
     event BridgedFundsProcessingFailed(uint256 sourceChainId, bytes message, bytes error);
 
     /// @notice Address checked is not the destination chain adapter.
-    /// @custom:selector 0xeee7f56d
-    error NotDestinationChainAdapter();
+    /// @custom:selector 0x75503511
+    error OnlyDestinationChainAdapter();
 
     /// @notice Address checked is not the bridge router.
-    /// @custom:selector 0x5a194e79
-    error NotBridgeRouter();
+    /// @custom:selector 0x60055a30
+    error OnlyBridgeRouter();
 
     struct BridgeAsset {
         address asset;

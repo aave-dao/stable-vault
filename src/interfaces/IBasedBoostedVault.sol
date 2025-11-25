@@ -37,6 +37,12 @@ interface IBasedBoostedVault {
 
     event FeesClaimed(address[] assets, uint256[] amounts);
 
+    /// @notice Thrown when the amount requested to withdraw is greater than the amount available.
+    /// @dev It is possible the system does not have enough profits i.e. balances over 'original deposits' to cover a
+    /// user's withdrawal request.
+    /// @custom:selector 0xf9ff070e
+    error InsufficientAssets(address user, uint256 amountRequestedRay, uint256 amountAvailableRay);
+
     /// @notice Thrown when checked rate is invalid i.e. is out of bounds.
     /// @custom:selector 0x6a43f8d1
     error InvalidRate();
@@ -45,31 +51,25 @@ interface IBasedBoostedVault {
     /// @custom:selector 0x6668308f
     error NonExistentPosition();
 
-    /// @notice Thrown when checked rate is already set.
-    /// @custom:selector 0xb4a82df7
-    error RedundantRate();
-
-    /// @notice Thrown when checked address is not the message sender.
-    /// @custom:selector 0x6d73caae
-    error NotMessageSender();
-
-    /// @notice Thrown when a subvault already exists for a given rate.
-    /// @custom:selector 0xdd81131b
-    error SubVaultAlreadyExists();
-
-    /// @notice Thrown when a subvault does not exist for a given id.
-    /// @custom:selector 0xcac93e89
-    error SubVaultDoesNotExist();
-
     /// @notice Thrown when there are no fees to claim.
     /// @custom:selector 0x846d8c5c
     error NoFeesToClaim();
 
-    /// @notice Thrown when the amount requested to withdraw is greater than the amount available.
-    /// @dev It is possible the system does not have enough profits i.e. balances over 'original deposits' to cover a
-    /// user's withdrawal request.
-    /// @custom:selector 0xf9ff070e
-    error InsufficientAssets(address user, uint256 amountRequestedRay, uint256 amountAvailableRay);
+    /// @notice Thrown when checked address is not the message sender.
+    /// @custom:selector 0x9b3a19e9
+    error OnlyUser();
+
+    /// @notice Thrown when checked rate is already set.
+    /// @custom:selector 0xb4a82df7
+    error RedundantRate();
+
+    /// @notice Thrown when a sub-vault already exists for a given rate.
+    /// @custom:selector 0xdd81131b
+    error SubVaultAlreadyExists();
+
+    /// @notice Thrown when a sub-vault does not exist for a given id.
+    /// @custom:selector 0xcac93e89
+    error SubVaultDoesNotExist();
 
     function setDefaultSubVault(uint256 perSecondRate) external;
 

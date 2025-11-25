@@ -43,12 +43,12 @@ library ErrorsLib {
     error NotAuthorized();
 
     /// @notice Address checked is not the Cross-chain gateway.
-    /// @custom:selector 0xe7e601db
-    error NotGateway();
+    /// @custom:selector 0xec76af13
+    error OnlyGateway();
 
-    /// @notice Address checked is not the self.
-    /// @custom:selector 0x29c3b7ee
-    error NotSelf();
+    /// @notice Address checked is not the contract being called.
+    /// @custom:selector 0x14d4a4e8
+    error OnlySelf();
 
     /// @notice Unsupported asset.
     /// @custom:selector 0xee84f40b

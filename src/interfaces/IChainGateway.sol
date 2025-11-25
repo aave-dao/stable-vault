@@ -6,17 +6,17 @@ import {IBridgeAdapter} from "./IBridgeAdapter.sol";
 /// @notice Interface for handling the communication between chains for bridging assets and data.
 /// @dev Assumes bridged assets and bridged data can be handled independently of each other.
 interface IChainGateway {
-    /// @notice Thrown when the message type for the arbitrary message data is not recognized.
-    /// @custom:selector 0x5b60892f
-    error InvalidMessageType();
-
     /// @notice Thrown when an adapter is not found for a given asset and chain.
     /// @custom:selector 0xf7b1bf8e
     error AdapterNotFound();
 
+    /// @notice Thrown when the message type for the arbitrary message data is not recognized.
+    /// @custom:selector 0x5b60892f
+    error InvalidMessageType();
+
     /// @notice Thrown when the caller is not the IOU token manager.
-    /// @custom:selector 0x8fd491fa
-    error NotIouTokenManager();
+    /// @custom:selector 0x4084b1f2
+    error OnlyIouTokenManager();
 
     event BridgeAdapterAdded(address asset, uint256 chainId, address adapter);
     event BridgeAdapterRemoved(address asset, uint256 chainId, address adapter);

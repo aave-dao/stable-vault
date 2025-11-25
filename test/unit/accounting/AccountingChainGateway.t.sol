@@ -344,7 +344,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
     }
 
     function test_sendBridgeIouTokenMessageWithFeePayer_reverts_ifInvalidMessageSender() public {
-        vm.expectRevert(IChainGateway.NotIouTokenManager.selector);
+        vm.expectRevert(IChainGateway.OnlyIouTokenManager.selector);
         _accountingChainGateway.sendBridgeIouTokenMessageWithFeePayer(
             EARNING_CHAIN_ID,
             makeAddr("iouTokenRecipient"),
@@ -743,8 +743,8 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         );
     }
 
-    function test_sendPushFundsToChainMessage_reverts_ifNotFundsHandler() public {
-        vm.expectRevert(IAccountingChainGateway.NotFundsHandler.selector);
+    function test_sendPushFundsToChainMessage_reverts_ifOnlyFundsHandler() public {
+        vm.expectRevert(IAccountingChainGateway.OnlyFundsHandler.selector);
         _accountingChainGateway.sendPushFundsToChainMessage(
             address(_mockUsdt),
             100_000_000_000_000 * 10 ** 6,

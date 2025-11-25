@@ -6,8 +6,8 @@ import {IChainGateway} from "./IChainGateway.sol";
 
 interface IAccountingChainGateway is IChainGateway {
     /// @notice Thrown when the caller is not the FundsHandler.
-    /// @custom:selector 0xdc7a7100
-    error NotFundsHandler();
+    /// @custom:selector 0x77607b1a
+    error OnlyFundsHandler();
 
     /// @notice Sends assets to an Earning Chain.
     /// @dev The Accounting Chain does not prescribe to the Earning Chain which strategy to push assets to.

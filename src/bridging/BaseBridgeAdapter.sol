@@ -27,7 +27,7 @@ abstract contract BaseBridgeAdapter is AccessManaged, TransferHelperClient, IBri
     mapping(uint256 chainId => address destinationChainAdapter) internal _destinationChainAdapterOf;
 
     modifier onlyGateway() {
-        require(msg.sender == GATEWAY, ErrorsLib.NotGateway());
+        require(msg.sender == GATEWAY, ErrorsLib.OnlyGateway());
         _;
     }
 

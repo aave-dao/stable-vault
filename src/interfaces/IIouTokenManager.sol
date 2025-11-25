@@ -10,8 +10,8 @@ interface IIouTokenManager {
 
     /// @notice Thrown when a function that should only be invoked on the Accounting chain is invoked on an Earning
     /// chain.
-    /// @custom:selector 0x03ad5c40
-    error NotAccountingChain();
+    /// @custom:selector 0x4f0475a7
+    error OnlyAccountingChain();
 
     /// @return address of the IOU token.
     function getAsset() external view returns (address);
