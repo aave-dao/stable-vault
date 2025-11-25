@@ -56,11 +56,11 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         address fundsHandler,
         address assetRegistry,
         address transferHelper,
-        address withdrawalFeeCalculator
+        address withdrawalFeeCalculatorAddress
     ) internal returns (IBasedBoostedVault) {
         address vaultImpl = address(
             new BasedBoostedVault(
-                maxPerSecondRate, iouTokenManager, fundsHandler, transferHelper, withdrawalFeeCalculator
+                maxPerSecondRate, iouTokenManager, fundsHandler, transferHelper, withdrawalFeeCalculatorAddress
             )
         );
         return BasedBoostedVault(

@@ -5,6 +5,7 @@ import {IWithdrawalFeeCalculator} from "../interfaces/IWithdrawalFeeCalculator.s
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import {EfficientHashLib} from "@solady/utils/EfficientHashLib.sol";
 
 contract WithdrawalFeeCalculator is IWithdrawalFeeCalculator, Ownable, EIP712 {
     bytes32 public constant WITHDRAWAL_FEE_TYPEHASH =
@@ -56,7 +57,10 @@ contract WithdrawalFeeCalculator is IWithdrawalFeeCalculator, Ownable, EIP712 {
         uint256 personalFee,
         bytes memory signature
     ) internal view {
-        bytes32 structHash = keccak256(abi.encode(WITHDRAWAL_FEE_TYPEHASH, user, assetOut, iouAmountRay, personalFee));
+        // TODO: Should we replace this weird contraption with ignore lint [asm-keccak256]?
+        // This saves a bit of gas, but looks non-standard.
+        bytes32 structHash =
+            EfficientHashLib.hash(abi.encode(WITHDRAWAL_FEE_TYPEHASH, user, assetOut, iouAmountRay, personalFee));
         bytes32 digest = _hashTypedDataV4(structHash);
         address signer = ECDSA.recover(digest, signature);
         if (!$storage().signers[signer]) {
