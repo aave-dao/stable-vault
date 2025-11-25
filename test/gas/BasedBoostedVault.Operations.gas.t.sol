@@ -75,8 +75,6 @@ contract BasedBoostedVaultOperationsGasTest is BaseTest {
         vault.setUserRate(userRateData);
         vm.snapshotGasLastCall(NAMESPACE, "setUserRate: count: 2");
 
-        // Subvault is removed from active set storage because all users in subvault migrate to another subvault.
-        // This triggers a gas refund.
         uint256 numberOfUsers = 11;
         userRateData = new IBasedBoostedVault.UserRateData[](numberOfUsers - 1);
         for (uint256 i = 0; i < numberOfUsers; i++) {
@@ -130,6 +128,65 @@ contract BasedBoostedVaultOperationsGasTest is BaseTest {
         vm.prank(everyRoleAccount);
         vault.setUserRate(userRateData);
         vm.snapshotGasLastCall(NAMESPACE, "setUserRate: count: 1000");
+    }
+
+    function test_setUserRate_differentRates() public {
+        uint256 newRate = 1_000000001547125957863212449;
+        IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](0);
+
+        uint256 numberOfUsers = 11;
+        userRateData = new IBasedBoostedVault.UserRateData[](numberOfUsers - 1);
+        for (uint256 i = 0; i < numberOfUsers; i++) {
+            address user = makeAddr(string(abi.encodePacked("USER:", i)));
+            _seedUser(user);
+            vm.prank(user);
+            vault.deposit(user, address(USDC), amount);
+            // Do not change the rate for the last user so that the subvault remains in active set (to avoid gas refund
+            // for storage clearance).
+            if (i != numberOfUsers - 1) {
+                userRateData[i] = IBasedBoostedVault.UserRateData(user, newRate++);
+            }
+        }
+
+        vm.prank(everyRoleAccount);
+        vault.setUserRate(userRateData);
+        vm.snapshotGasLastCall(NAMESPACE, "setUserRate (different rates): count: 10");
+
+        numberOfUsers = 101;
+        userRateData = new IBasedBoostedVault.UserRateData[](numberOfUsers - 1);
+        for (uint256 i = 0; i < numberOfUsers; i++) {
+            address user = makeAddr(string(abi.encodePacked("USER::", i)));
+            _seedUser(user);
+            vm.prank(user);
+            vault.deposit(user, address(USDC), amount);
+            // Do not change the rate for the last user so that the subvault remains in active set (to avoid gas refund
+            // for storage clearance).
+            if (i != numberOfUsers - 1) {
+                userRateData[i] = IBasedBoostedVault.UserRateData(user, newRate++);
+            }
+        }
+
+        vm.prank(everyRoleAccount);
+        vault.setUserRate(userRateData);
+        vm.snapshotGasLastCall(NAMESPACE, "setUserRate (different rates): count: 100");
+
+        numberOfUsers = 1001;
+        userRateData = new IBasedBoostedVault.UserRateData[](numberOfUsers - 1);
+        for (uint256 i = 0; i < numberOfUsers; i++) {
+            address user = makeAddr(string(abi.encodePacked("USER:::", i)));
+            _seedUser(user);
+            vm.prank(user);
+            vault.deposit(user, address(USDC), amount);
+            // Do not change the rate for the last user so that the subvault remains in active set (to avoid gas refund
+            // for storage clearance).
+            if (i != numberOfUsers - 1) {
+                userRateData[i] = IBasedBoostedVault.UserRateData(user, newRate++);
+            }
+        }
+
+        vm.prank(everyRoleAccount);
+        vault.setUserRate(userRateData);
+        vm.snapshotGasLastCall(NAMESPACE, "setUserRate (different rates): count: 1000");
     }
 
     function test_requestWithdrawal() public {
