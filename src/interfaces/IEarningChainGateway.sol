@@ -25,11 +25,13 @@ interface IEarningChainGateway is IChainGateway {
     /// @param tokenOut The asset to exchange the IOU tokens for.
     /// @param tokenOutReceiver The address to send the exchanged asset to.
     /// @param bridgeParams The parameters for the bridge adapter.
+    /// @param data Additional data for the withdrawal fee calculation.
     /// @return amountOut The amount of the exchanged asset transferred to the tokenOutReceiver.
     function exchangeIouTokens(
         uint256 iouTokenAmountRay,
         address tokenOut,
         address tokenOutReceiver,
-        IBridgeAdapter.BridgeParams memory bridgeParams
+        IBridgeAdapter.BridgeParams memory bridgeParams,
+        bytes memory data
     ) external payable returns (uint256);
 }

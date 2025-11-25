@@ -241,7 +241,7 @@ contract EndToEndTest is BaseTest {
             // 0) );
             vm.prank(user);
             vm.expectRevert("TestErc20: transfer amount exceeds balance");
-            vault.executeWithdrawal(user, address(USDC), iouAmountRequestedRay);
+            vault.executeWithdrawal(user, address(USDC), iouAmountRequestedRay, "");
 
             // - check that we don't owe the user any funds
             console.log("User balance in RAY after withdrawal request: %s", vault.getUserBalance(user));
@@ -354,7 +354,7 @@ contract EndToEndTest is BaseTest {
         // 9. User triggers the execute() withdrawal to send the funds back to the user
         {
             vm.prank(user);
-            vault.executeWithdrawal(user, address(USDC), iouAmountRequestedRay);
+            vault.executeWithdrawal(user, address(USDC), iouAmountRequestedRay, "");
             // Check IOU token balance went down
             assertEq(iouToken_accountingChain.balanceOf(user), 0, "User should have minted IOU tokens");
 

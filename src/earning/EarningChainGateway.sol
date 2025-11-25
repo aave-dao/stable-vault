@@ -10,6 +10,7 @@ import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {IEarningChainGateway} from "../interfaces/IEarningChainGateway.sol";
 import {IIouTokenManager} from "../interfaces/IIouTokenManager.sol";
 import {ITransferHelper} from "../interfaces/ITransferHelper.sol";
+import {IWithdrawalFeeCalculator} from "../interfaces/IWithdrawalFeeCalculator.sol";
 import {AssetLib} from "../libraries/AssetLib.sol";
 import {ConstantsLib} from "../libraries/ConstantsLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
@@ -21,6 +22,7 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
 
     uint256 internal immutable ACCOUNTING_CHAIN_ID;
     address internal immutable ALLOCATOR;
+    address internal immutable WITHDRAWAL_FEE_CALCULATOR;
 
     /// @custom:storage-location erc7201:aave.storage.EarningChainGateway
     struct EarningChainGatewayStorage {
@@ -41,13 +43,17 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
     /// @param accountingChainId The Chain ID of the Accounting Chain.
     /// @param allocator The address of the Allocator contract.
     /// @param iouTokenManager The address of the IOU token manager contract.
-    constructor(uint256 accountingChainId, address allocator, address iouTokenManager, address transferHelper)
-        TransferHelperClient(transferHelper)
-        BaseChainGateway(iouTokenManager)
-    {
+    constructor(
+        uint256 accountingChainId,
+        address allocator,
+        address iouTokenManager,
+        address transferHelper,
+        address withdrawalFeeCalculator
+    ) TransferHelperClient(transferHelper) BaseChainGateway(iouTokenManager) {
         _disableInitializers();
         ACCOUNTING_CHAIN_ID = accountingChainId;
         ALLOCATOR = allocator;
+        WITHDRAWAL_FEE_CALCULATOR = withdrawalFeeCalculator;
     }
 
     /// @dev Initializer.
@@ -101,7 +107,8 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
         uint256 iouTokenAmountRay,
         address tokenOut,
         address tokenOutReceiver,
-        IBridgeAdapter.BridgeParams memory bridgeParams
+        IBridgeAdapter.BridgeParams memory bridgeParams,
+        bytes memory data
     )
         external
         payable
@@ -118,11 +125,27 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
             $BaseChainGateway().defaultBridgeAdapter[ConstantsLib.ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID];
         require(adapter != address(0), AdapterNotFound());
 
-        // TODO: apply a withdrawal fee here?
-        uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(tokenOut);
+        uint256 withdrawalFee = IWithdrawalFeeCalculator(WITHDRAWAL_FEE_CALCULATOR)
+            .calculateWithdrawalFee(msg.sender, tokenOut, iouTokenAmountRay, data);
+        uint256 amountOut = (iouTokenAmountRay - withdrawalFee).rayToAssetDecimals(tokenOut);
         IAllocator(ALLOCATOR).withdraw(tokenOut, amountOut);
         ITransferHelper(TRANSFER_HELPER).transfer(tokenOut, amountOut, tokenOutReceiver);
 
+        _transferBridgeFeeToTransferHelper(bridgeParams);
+
+        // Send data to synchronize the Accounting Chain's state.
+        _sendBurnIouTokenMessage(iouTokenAmountRay, adapter, bridgeParams);
+
+        // TODO: emit event?
+        return amountOut;
+    }
+
+    // This function is just needed to prevent StackTooDeep
+    function _sendBurnIouTokenMessage(
+        uint256 iouTokenAmountRay,
+        address adapter,
+        IBridgeAdapter.BridgeParams memory bridgeParams
+    ) internal {
         // Prepare data to synchronize the Accounting Chain's state.
         bytes memory burnIouTokenMessageEncoded = abi.encode(
             IChainGateway.CrossChainMessage({
@@ -137,8 +160,6 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
             })
         );
 
-        _transferBridgeFeeToTransferHelper(bridgeParams);
-
         _sendCrossChainMessage(
             ACCOUNTING_CHAIN_ID,
             adapter,
@@ -147,9 +168,6 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
             burnIouTokenMessageEncoded,
             bridgeParams
         );
-
-        // TODO: emit event?
-        return amountOut;
     }
 
     /// @inheritdoc IEarningChainGateway

@@ -9,9 +9,13 @@ contract ExtendedBasedBoostedVault is BasedBoostedVault {
 
     uint256 internal constant SECONDS_PER_YEAR = 31_536_000;
 
-    constructor(uint256 maxPerSecondRate, address iouTokenManager, address fundsHandler, address transferHelper)
-        BasedBoostedVault(maxPerSecondRate, iouTokenManager, fundsHandler, transferHelper)
-    {}
+    constructor(
+        uint256 maxPerSecondRate,
+        address iouTokenManager,
+        address fundsHandler,
+        address transferHelper,
+        address withdrawalFeeCalculator
+    ) BasedBoostedVault(maxPerSecondRate, iouTokenManager, fundsHandler, transferHelper, withdrawalFeeCalculator) {}
 
     function getDefaultConversionRate() public view returns (uint256) {
         SubVault storage defaultVault = $BasedBoostedVault().subVaultById[$BasedBoostedVault().defaultSubVaultId];

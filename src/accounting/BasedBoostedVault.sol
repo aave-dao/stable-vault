@@ -14,6 +14,7 @@ import {IBasedBoostedVault} from "../interfaces/IBasedBoostedVault.sol";
 import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
 import {IIouTokenManager} from "../interfaces/IIouTokenManager.sol";
 import {ITransferHelper} from "../interfaces/ITransferHelper.sol";
+import {IWithdrawalFeeCalculator} from "../interfaces/IWithdrawalFeeCalculator.sol";
 import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {MathLib} from "../libraries/MathLib.sol";
@@ -55,6 +56,8 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
     uint256 internal immutable MAX_VALID_PER_SECOND_RATE;
 
     address internal immutable FUNDS_HANDLER;
+
+    address internal immutable WITHDRAWAL_FEE_CALCULATOR;
 
     /// @custom:storage-location erc7201:aave.storage.BasedBoostedVault
     struct BasedBoostedVaultStorage {
@@ -102,14 +105,19 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
     /// @param maxValidPerSecondRate The maximum valid per-second rate, in Ray units (27 decimals).
     /// @param iouTokenManager The address of the IOU token manager.
     /// @param fundsHandler The address of the FundsHandler contract.
-    constructor(uint256 maxValidPerSecondRate, address iouTokenManager, address fundsHandler, address transferHelper)
-        TransferHelperClient(transferHelper)
-    {
+    constructor(
+        uint256 maxValidPerSecondRate,
+        address iouTokenManager,
+        address fundsHandler,
+        address transferHelper,
+        address withdrawalFeeCalculator
+    ) TransferHelperClient(transferHelper) {
         _disableInitializers();
         require(maxValidPerSecondRate > MathLib.RAY, InvalidRate());
         MAX_VALID_PER_SECOND_RATE = maxValidPerSecondRate;
         IOU_TOKEN_MANAGER = iouTokenManager;
         FUNDS_HANDLER = fundsHandler;
+        WITHDRAWAL_FEE_CALCULATOR = withdrawalFeeCalculator;
     }
 
     /// @dev Initializer.
@@ -236,7 +244,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
     }
 
     /// @inheritdoc IBasedBoostedVault
-    function executeWithdrawal(address user, address assetOut, uint256 iouAmountRay)
+    function executeWithdrawal(address user, address assetOut, uint256 iouAmountRay, bytes memory data)
         external
         override
         assertingTransferHelperBalanceFor(assetOut)
@@ -247,7 +255,9 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
             ErrorsLib.UnsupportedAsset(assetOut)
         );
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(user, iouAmountRay);
-        uint256 assetAmount = iouAmountRay.rayToAssetDecimals(assetOut);
+        uint256 withdrawalFee = IWithdrawalFeeCalculator(WITHDRAWAL_FEE_CALCULATOR)
+            .calculateWithdrawalFee(user, assetOut, iouAmountRay, data);
+        uint256 assetAmount = (iouAmountRay - withdrawalFee).rayToAssetDecimals(assetOut);
         IFundsHandler(FUNDS_HANDLER).processWithdrawal(assetOut, assetAmount);
         ITransferHelper(TRANSFER_HELPER).transfer(assetOut, assetAmount, user);
         emit WithdrawalExecuted(user, assetOut, assetAmount);

@@ -24,7 +24,8 @@ contract MockEarningChainGateway is IEarningChainGateway {
         uint256 iouTokenAmountRay,
         address tokenOut,
         address tokenOutReceiver,
-        IBridgeAdapter.BridgeParams memory bridgeParams
+        IBridgeAdapter.BridgeParams memory bridgeParams,
+        bytes memory data
     ) external payable returns (uint256) {}
 
     function getDefaultBridgeAdapter(address asset, uint256 chainId) external view returns (address) {}

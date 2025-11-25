@@ -7,6 +7,7 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transpa
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {BasedBoostedVault} from "../../../src/accounting/BasedBoostedVault.sol";
+import {WithdrawalFeeCalculator} from "../../../src/common/WithdrawalFeeCalculator.sol";
 import {IBasedBoostedVault} from "../../../src/interfaces/IBasedBoostedVault.sol";
 import {IFundsHandler} from "../../../src/interfaces/IFundsHandler.sol";
 import {IRescuableAssets} from "../../../src/interfaces/IRescuableAssets.sol";
@@ -40,6 +41,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     MockIouTokenManager mockIouTokenManager;
     MockAssetRegistry mockAssetRegistry;
     MockTransferHelper mockTransferHelper;
+    WithdrawalFeeCalculator withdrawalFeeCalculator;
     IBasedBoostedVault bbv;
 
     function _deployDefaultAsset() internal returns (IMockErc20) {
@@ -53,10 +55,13 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         address iouTokenManager,
         address fundsHandler,
         address assetRegistry,
-        address transferHelper
+        address transferHelper,
+        address withdrawalFeeCalculator
     ) internal returns (IBasedBoostedVault) {
         address vaultImpl = address(
-            new BasedBoostedVault(maxPerSecondRate, iouTokenManager, fundsHandler, transferHelper)
+            new BasedBoostedVault(
+                maxPerSecondRate, iouTokenManager, fundsHandler, transferHelper, withdrawalFeeCalculator
+            )
         );
         return BasedBoostedVault(
             address(
@@ -80,6 +85,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockAsset = _deployDefaultAsset();
         mockTransferHelper = new MockTransferHelper();
         mockFundsHandler = new MockFundsHandler(address(mockTransferHelper));
+        withdrawalFeeCalculator = new WithdrawalFeeCalculator(admin);
         bbv = _deployBasedBoostedVault(
             address(mockAccessManager),
             DEFAULT_MAX_PER_SECOND_RATE,
@@ -87,7 +93,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockIouTokenManager),
             address(mockFundsHandler),
             address(mockAssetRegistry),
-            address(mockTransferHelper)
+            address(mockTransferHelper),
+            address(withdrawalFeeCalculator)
         );
     }
 
@@ -103,7 +110,11 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(expectedMaxValidPerSecondRate > MathLib.RAY);
 
         BasedBoostedVault newBbv = new BasedBoostedVault(
-            expectedMaxValidPerSecondRate, expectedIouManager, expectedFundsHandler, expectedTransferHelper
+            expectedMaxValidPerSecondRate,
+            expectedIouManager,
+            expectedFundsHandler,
+            expectedTransferHelper,
+            address(withdrawalFeeCalculator)
         );
 
         assertEq(newBbv.getMaxValidPerSecondRate(), expectedMaxValidPerSecondRate);
@@ -117,7 +128,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             invalidMaxValidPerSecondRate,
             address(mockIouTokenManager),
             address(mockFundsHandler),
-            address(mockTransferHelper)
+            address(mockTransferHelper),
+            address(withdrawalFeeCalculator)
         );
     }
 
@@ -135,7 +147,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
                 DEFAULT_MAX_PER_SECOND_RATE,
                 address(mockIouTokenManager),
                 address(mockFundsHandler),
-                address(mockTransferHelper)
+                address(mockTransferHelper),
+                address(withdrawalFeeCalculator)
             )
         );
 
@@ -165,7 +178,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
                 DEFAULT_MAX_PER_SECOND_RATE,
                 address(mockIouTokenManager),
                 address(mockFundsHandler),
-                address(mockTransferHelper)
+                address(mockTransferHelper),
+                address(withdrawalFeeCalculator)
             )
         );
 
@@ -1069,7 +1083,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         vm.expectRevert(IBasedBoostedVault.InvalidMsgSender.selector);
         vm.prank(msgSender);
-        bbv.executeWithdrawal(user, address(mockAsset), iouAmountRay);
+        bbv.executeWithdrawal(user, address(mockAsset), iouAmountRay, "");
     }
 
     function test_executeWithdrawal_reverts_ifAssetIsNotAllowedToWithdrawFromBbv(
@@ -1089,7 +1103,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(mockAsset)));
         vm.prank(user);
-        bbv.executeWithdrawal(user, address(mockAsset), iouAmountRay);
+        bbv.executeWithdrawal(user, address(mockAsset), iouAmountRay, "");
     }
 
     function test_executeWithdrawal_reverts_ifIouAmountIsGreaterThanUserBalance(
@@ -1109,7 +1123,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             abi.encodeWithSelector(IERC20Errors.ERC20InsufficientBalance.selector, user, userIouBalance, iouAmountRay)
         );
         vm.prank(user);
-        bbv.executeWithdrawal(user, address(mockAsset), iouAmountRay);
+        bbv.executeWithdrawal(user, address(mockAsset), iouAmountRay, "");
     }
 
     function test_executeWithdrawal_emitsExpectedEvent(address user, uint256 iouAmountRay) public {
@@ -1126,7 +1140,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         emit IBasedBoostedVault.WithdrawalExecuted(user, address(mockAsset), actualWithdrawnAssets);
 
         vm.prank(user);
-        bbv.executeWithdrawal(user, address(mockAsset), iouAmountRay);
+        bbv.executeWithdrawal(user, address(mockAsset), iouAmountRay, "");
     }
 
     function test_executeWithdrawal_burnsExpectedAmountOfIouTokens(
@@ -1147,7 +1161,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockTransferHelper.mockAsset(address(mockAsset), actualWithdrawnAssets);
 
         vm.prank(user);
-        bbv.executeWithdrawal(user, address(mockAsset), iouAmountRay);
+        bbv.executeWithdrawal(user, address(mockAsset), iouAmountRay, "");
 
         assertEq(mockIouToken.balanceOf(user), userIouBalance - iouAmountRay);
     }
@@ -1164,7 +1178,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockTransferHelper.mockAsset(address(mockAsset), actualWithdrawnAssets);
 
         vm.prank(user);
-        bbv.executeWithdrawal(user, address(mockAsset), iouAmountRay);
+        bbv.executeWithdrawal(user, address(mockAsset), iouAmountRay, "");
 
         assertEq(mockAsset.balanceOf(user), actualWithdrawnAssets);
     }
