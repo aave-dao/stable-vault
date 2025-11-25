@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {IBasedBoostedVault} from "../../src/interfaces/IBasedBoostedVault.sol";
-import {MathLib} from "../../src/libraries/MathLib.sol";
 import {BaseTest} from "../BaseTest.t.sol";
 
+import {IBasedBoostedVault} from "../../src/interfaces/IBasedBoostedVault.sol";
+import {AssetLib} from "../../src/libraries/AssetLib.sol";
+import {MathLib} from "../../src/libraries/MathLib.sol";
+
 contract BasedBoostedVaultOperationsGasTest is BaseTest {
+    using AssetLib for uint256;
+
     string internal NAMESPACE = "BasedBoostedVault.Operations";
 
     uint256 amount = 100e6;
@@ -49,6 +53,11 @@ contract BasedBoostedVaultOperationsGasTest is BaseTest {
         vm.prank(user2);
         vault.deposit(user2, address(USDC), amount);
 
+        address user3 = makeAddr("USER3");
+        _seedUser(user3);
+        vm.prank(user3);
+        vault.deposit(user3, address(USDC), amount);
+
         uint256 newRate = 1_000000001547125957863212449; // 5% APY
         IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](1);
         userRateData[0] = IBasedBoostedVault.UserRateData(user1, newRate);
@@ -66,19 +75,115 @@ contract BasedBoostedVaultOperationsGasTest is BaseTest {
         vault.setUserRate(userRateData);
         vm.snapshotGasLastCall(NAMESPACE, "setUserRate: count: 2");
 
-        uint256 numberOfUsers = 10;
-        userRateData = new IBasedBoostedVault.UserRateData[](numberOfUsers);
+        // Subvault is removed from active set storage because all users in subvault migrate to another subvault.
+        // This triggers a gas refund.
+        uint256 numberOfUsers = 11;
+        userRateData = new IBasedBoostedVault.UserRateData[](numberOfUsers - 1);
         for (uint256 i = 0; i < numberOfUsers; i++) {
             address user = makeAddr(string(abi.encodePacked("USER:", i)));
             _seedUser(user);
             vm.prank(user);
             vault.deposit(user, address(USDC), amount);
-            userRateData[i] = IBasedBoostedVault.UserRateData(user, newRate);
+            // Do not change the rate for the last user so that the subvault remains in active set (to avoid gas refund
+            // for storage clearance).
+            if (i != numberOfUsers - 1) {
+                userRateData[i] = IBasedBoostedVault.UserRateData(user, newRate);
+            }
         }
 
         vm.prank(everyRoleAccount);
         vault.setUserRate(userRateData);
         vm.snapshotGasLastCall(NAMESPACE, "setUserRate: count: 10");
+
+        numberOfUsers = 101;
+        userRateData = new IBasedBoostedVault.UserRateData[](numberOfUsers - 1);
+        for (uint256 i = 0; i < numberOfUsers; i++) {
+            address user = makeAddr(string(abi.encodePacked("USER::", i)));
+            _seedUser(user);
+            vm.prank(user);
+            vault.deposit(user, address(USDC), amount);
+            // Do not change the rate for the last user so that the subvault remains in active set (to avoid gas refund
+            // for storage clearance).
+            if (i != numberOfUsers - 1) {
+                userRateData[i] = IBasedBoostedVault.UserRateData(user, newRate);
+            }
+        }
+
+        vm.prank(everyRoleAccount);
+        vault.setUserRate(userRateData);
+        vm.snapshotGasLastCall(NAMESPACE, "setUserRate: count: 100");
+
+        numberOfUsers = 1001;
+        userRateData = new IBasedBoostedVault.UserRateData[](numberOfUsers - 1);
+        for (uint256 i = 0; i < numberOfUsers; i++) {
+            address user = makeAddr(string(abi.encodePacked("USER:::", i)));
+            _seedUser(user);
+            vm.prank(user);
+            vault.deposit(user, address(USDC), amount);
+            // Do not change the rate for the last user so that the subvault remains in active set (to avoid gas refund
+            // for storage clearance).
+            if (i != numberOfUsers - 1) {
+                userRateData[i] = IBasedBoostedVault.UserRateData(user, newRate);
+            }
+        }
+
+        vm.prank(everyRoleAccount);
+        vault.setUserRate(userRateData);
+        vm.snapshotGasLastCall(NAMESPACE, "setUserRate: count: 1000");
+    }
+
+    function test_requestWithdrawal() public {
+        _seedUser(user1);
+        vm.prank(user1);
+        vault.deposit(user1, address(USDC), amount);
+
+        _seedUser(user2);
+        vm.prank(user2);
+        vault.deposit(user2, address(USDC), amount);
+
+        uint256 partialWithdrawalAmountRay = (amount / 2).assetDecimalsToRay(address(USDC));
+
+        vm.prank(user1);
+        vault.requestWithdrawal(user1, partialWithdrawalAmountRay);
+        vm.snapshotGasLastCall(NAMESPACE, "requestWithdrawal: user1 requests partial withdrawal");
+
+        vm.prank(user2);
+        vault.requestWithdrawal(user2, partialWithdrawalAmountRay);
+        vm.snapshotGasLastCall(NAMESPACE, "requestWithdrawal: user2 requests partial withdrawal");
+
+        vm.prank(user1);
+        vault.requestWithdrawal(user1, 0);
+        vm.snapshotGasLastCall(NAMESPACE, "requestWithdrawal: user1 requests full withdrawal");
+
+        vm.prank(user2);
+        vault.requestWithdrawal(user2, 0);
+        vm.snapshotGasLastCall(NAMESPACE, "requestWithdrawal: user2 requests full withdrawal");
+    }
+
+    function test_executeWithdrawal() public {
+        _seedUser(user1);
+        vm.prank(user1);
+        vault.deposit(user1, address(USDC), amount);
+
+        _seedUser(user2);
+        vm.prank(user2);
+        vault.deposit(user2, address(USDC), amount);
+
+        uint256 amountToWithdrawRay = amount.assetDecimalsToRay(address(USDC));
+
+        vm.prank(user1);
+        vault.requestWithdrawal(user1, amountToWithdrawRay);
+
+        vm.prank(user2);
+        vault.requestWithdrawal(user2, amountToWithdrawRay);
+
+        vm.prank(user1);
+        vault.executeWithdrawal(user1, address(USDC), amountToWithdrawRay);
+        vm.snapshotGasLastCall(NAMESPACE, "executeWithdrawal: user1 executes withdrawal");
+
+        vm.prank(user2);
+        vault.executeWithdrawal(user2, address(USDC), amountToWithdrawRay);
+        vm.snapshotGasLastCall(NAMESPACE, "executeWithdrawal: user2 executes withdrawal");
     }
 
     function _seedUser(address user) internal {

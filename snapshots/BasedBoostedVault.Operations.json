@@ -3,7 +3,15 @@
   "deposit: user1 second deposit": "116986",
   "deposit: user2 first deposit": "183082",
   "deposit: user2 second deposit": "116986",
+  "executeWithdrawal: user1 executes withdrawal": "128690",
+  "executeWithdrawal: user2 executes withdrawal": "128700",
+  "requestWithdrawal: user1 requests full withdrawal": "52545",
+  "requestWithdrawal: user1 requests partial withdrawal": "139241",
+  "requestWithdrawal: user2 requests full withdrawal": "54987",
+  "requestWithdrawal: user2 requests partial withdrawal": "74841",
   "setUserRate: count: 1": "190198",
-  "setUserRate: count: 10": "99645",
-  "setUserRate: count: 2": "188682"
+  "setUserRate: count: 10": "97203",
+  "setUserRate: count: 100": "917722",
+  "setUserRate: count: 1000": "9129877",
+  "setUserRate: count: 2": "185348"
 }

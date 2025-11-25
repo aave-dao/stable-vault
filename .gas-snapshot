@@ -1,2 +1,4 @@
-BasedBoostedVaultOperationsGasTest:test_deposit() (gas: 848995)
-BasedBoostedVaultOperationsGasTest:test_setUserRate() (gas: 2947648)
+BasedBoostedVaultOperationsGasTest:test_deposit() (gas: 849012)
+BasedBoostedVaultOperationsGasTest:test_executeWithdrawal() (gas: 966480)
+BasedBoostedVaultOperationsGasTest:test_requestWithdrawal() (gas: 845631)
+BasedBoostedVaultOperationsGasTest:test_setUserRate() (gas: 224487274)

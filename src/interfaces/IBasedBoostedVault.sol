@@ -36,6 +36,7 @@ interface IBasedBoostedVault {
     event DefaultSubVaultSet(uint256 indexed subVaultId, uint256 perSecondRate);
 
     event FeesClaimed(address[] assets, uint256[] amounts);
+
     event SubVaultRemovedFromActive(uint256 indexed subVaultId);
 
     /// @notice Thrown when the amount requested to withdraw is greater than the amount available.
