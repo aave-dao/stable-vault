@@ -392,13 +392,13 @@ contract IouTokenManagerTest_EarningChain is IouTokenManagerTest_AccountingChain
     {}
 
     function test_releaseTokens_reverts_earningChain(uint256 amountToRelease) public {
-        vm.expectRevert(IIouTokenManager.NotAccountingChain.selector);
+        vm.expectRevert(IIouTokenManager.OnlyAccountingChain.selector);
         vm.prank(chainGateway);
         iouTokenManager.releaseTokens(msg.sender, amountToRelease);
     }
 
     function test_burnLockedTokens_reverts_earningChain(uint256 amountToBurn) public {
-        vm.expectRevert(IIouTokenManager.NotAccountingChain.selector);
+        vm.expectRevert(IIouTokenManager.OnlyAccountingChain.selector);
         vm.prank(chainGateway);
         iouTokenManager.burnLockedTokens(amountToBurn);
     }

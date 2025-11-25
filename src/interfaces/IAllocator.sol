@@ -3,15 +3,21 @@ pragma solidity ^0.8.22;
 
 interface IAllocator {
     event AssetDeallocated(address indexed asset, address indexed strategy, uint256 amount);
+
     event AssetAllocated(address indexed asset, address indexed strategy, uint256 amount);
+
     /// @notice emitted when funds fails to deposit to yield strategy and left idle in Allocator.
     event StrategyDepositFailed(address indexed strategy, uint256 amount);
+
     event StrategyAdded(address indexed asset, address indexed strategy);
+
     event StrategyRemoved(address indexed asset, address indexed strategy);
+
     event DefaultStrategySet(address indexed asset, address indexed strategy);
 
-    error NonZeroStrategyBalance();
-    error FailedToDepositIntoStrategy();
+    /// @notice Thrown when funds fail to deposit into a yield strategy.
+    /// @custom:selector 0x3868bf52
+    error DepositIntoStrategyFailed(address strategy);
 
     struct AllocatorBalance {
         address asset;

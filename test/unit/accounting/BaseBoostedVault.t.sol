@@ -809,7 +809,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         _deposit(user, depositAmount);
         withdrawalAmountRay = bound(withdrawalAmountRay, 0, depositAmount.assetDecimalsToRay(address(mockAsset)));
 
-        vm.expectRevert(IBasedBoostedVault.InvalidMsgSender.selector);
+        vm.expectRevert(IBasedBoostedVault.OnlyUser.selector);
         vm.prank(msgSender);
         bbv.requestWithdrawal(user, withdrawalAmountRay);
     }
@@ -1067,7 +1067,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         iouAmountRay = _boundRayAmount(iouAmountRay);
         mockIouToken.mint(user, iouAmountRay);
 
-        vm.expectRevert(IBasedBoostedVault.InvalidMsgSender.selector);
+        vm.expectRevert(IBasedBoostedVault.OnlyUser.selector);
         vm.prank(msgSender);
         bbv.executeWithdrawal(user, address(mockAsset), iouAmountRay);
     }

@@ -59,7 +59,7 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
     }
 
     modifier onlyAccountingChain() {
-        require(IS_ACCOUNTING_CHAIN, NotAccountingChain());
+        require(IS_ACCOUNTING_CHAIN, OnlyAccountingChain());
         _;
     }
 
