@@ -9,9 +9,11 @@ interface IChainGateway {
     /// @notice Thrown when the message type for the arbitrary message data is not recognized.
     /// @custom:selector 0x5b60892f
     error InvalidMessageType();
+
     /// @notice Thrown when an adapter is not found for a given asset and chain.
     /// @custom:selector 0xf7b1bf8e
     error AdapterNotFound();
+
     /// @notice Thrown when the caller is not the IOU token manager.
     /// @custom:selector 0x8fd491fa
     error NotIouTokenManager();

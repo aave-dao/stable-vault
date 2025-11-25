@@ -5,6 +5,7 @@ interface ISwapper {
     /// @notice Thrown when the amount of `assetOut` received is less than the minimum amount out expected after a swap.
     /// @custom:selector 0x6728a9f6
     error SlippageToleranceExceeded();
+
     /// @notice Thrown when a low-level call to a target contract is unsuccessful.
     /// @custom:selector 0x7f1f16cd
     error CallToTargetFailed();
