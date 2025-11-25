@@ -1,0 +1,2 @@
+BasedBoostedVaultOperationsGasTest:test_deposit() (gas: 848995)
+BasedBoostedVaultOperationsGasTest:test_setUserRate() (gas: 2947648)

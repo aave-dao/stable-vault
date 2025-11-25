@@ -1,0 +1,9 @@
+{
+  "deposit: user1 first deposit": "390234",
+  "deposit: user1 second deposit": "116986",
+  "deposit: user2 first deposit": "183082",
+  "deposit: user2 second deposit": "116986",
+  "setUserRate: count: 1": "190198",
+  "setUserRate: count: 10": "99645",
+  "setUserRate: count: 2": "188682"
+}
