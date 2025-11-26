@@ -27,6 +27,7 @@ import {CcipAdapter} from "./../src/bridging/CcipAdapter.sol";
 import {Allocator} from "./../src/common/Allocator.sol";
 import {Swapper} from "./../src/common/Swapper.sol";
 import {TransferHelper} from "./../src/common/TransferHelper.sol";
+import {WithdrawalFeeCalculator} from "./../src/common/WithdrawalFeeCalculator.sol";
 import {EarningChainGateway} from "./../src/earning/EarningChainGateway.sol";
 import {AssetLib} from "./../src/libraries/AssetLib.sol";
 import {MathLib} from "./../src/libraries/MathLib.sol";
@@ -123,6 +124,10 @@ contract BaseTest is Test {
     // Mock CCIP Router
     MockCCIPRouter public mockCcipRouter;
 
+    // Mock Withdrawal Fee Calculator
+    WithdrawalFeeCalculator public withdrawalFeeCalculator_accountingChain;
+    WithdrawalFeeCalculator public withdrawalFeeCalculator_earningChain;
+
     function _prepareTokens() internal {
         GHO.mint(address(this), 10000 ether);
         USDC.mint(address(this), 10000 * (10 ** 6));
@@ -145,10 +150,13 @@ contract BaseTest is Test {
         address iouTokenManager,
         address fundsHandlerAddr,
         address assetRegistry,
-        address transferHelper
+        address transferHelper,
+        address withdrawalFeeCalculator
     ) internal virtual returns (ExtendedBasedBoostedVault) {
         address vaultImpl = address(
-            new ExtendedBasedBoostedVault(maxPerSecondRate, iouTokenManager, fundsHandlerAddr, transferHelper)
+            new ExtendedBasedBoostedVault(
+                maxPerSecondRate, iouTokenManager, fundsHandlerAddr, transferHelper, withdrawalFeeCalculator
+            )
         );
         return ExtendedBasedBoostedVault(
             address(
@@ -204,6 +212,11 @@ contract BaseTest is Test {
         // 17. Strategy Vault/4626
 
         transferHelper_accountingChainAddress = address(new TransferHelper());
+
+        withdrawalFeeCalculator_accountingChain = new WithdrawalFeeCalculator(admin);
+        console.log(
+            "\tWithdrawal Fee Calculator (Accounting Chain): %s", address(withdrawalFeeCalculator_accountingChain)
+        );
 
         // Pre compute addresses for contracts that are with circular dependencies
         uint256 deployerNonce_accountingChain = vm.getNonce(address(this));
@@ -310,7 +323,8 @@ contract BaseTest is Test {
             iouTokenManager_accountingChainAddress,
             fundsHandler_accountingChainAddress,
             assetRegistry_accountingChainAddress,
-            transferHelper_accountingChainAddress
+            transferHelper_accountingChainAddress,
+            address(withdrawalFeeCalculator_accountingChain)
         );
         console.log("\tVault: %s", vault_accountingChainAddress);
         require(address(vault) == vault_accountingChainAddress, "Vault (Accounting Chain) address mismatch");
@@ -431,6 +445,9 @@ contract BaseTest is Test {
         // 12. Strategy Vault/4626
 
         transferHelper_earningChainAddress = address(new TransferHelper());
+
+        withdrawalFeeCalculator_earningChain = new WithdrawalFeeCalculator(admin);
+        console.log("\tWithdrawal Fee Calculator (Earning Chain): %s", address(withdrawalFeeCalculator_earningChain));
 
         uint256 deployerNonce_earningChain = vm.getNonce(address(this));
         accessManager_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
@@ -570,7 +587,8 @@ contract BaseTest is Test {
                 ACCOUNTING_CHAIN_ID,
                 allocator_earningChainAddress,
                 iouTokenManager_earningChainAddress,
-                transferHelper_earningChainAddress
+                transferHelper_earningChainAddress,
+                address(withdrawalFeeCalculator_earningChain)
             )
         );
         earningChainGateway = EarningChainGateway(

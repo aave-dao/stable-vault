@@ -38,6 +38,9 @@ library ErrorsLib {
     /// @custom:selector 0xf4b3b1bc
     error NativeTransferFailed();
 
+    /// @notice Thrown when input parameter contains unacceptable value.
+    error InvalidParameter();
+
     /// @notice Thrown when caller is not authorized.
     /// @custom:selector 0xea8e4eb5
     error NotAuthorized();

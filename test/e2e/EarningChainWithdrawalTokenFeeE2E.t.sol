@@ -40,11 +40,15 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
         address iouToken,
         address fundsHandler,
         address assetRegistry,
-        address transferHelper
+        address transferHelper,
+        address withdrawalFeeCalculator
     ) internal virtual override returns (ExtendedBasedBoostedVault) {
         // Deploy a vault without restriction in the valid per-second rate
-        address vaultImpl =
-            address(new ExtendedBasedBoostedVault(type(uint256).max, iouToken, fundsHandler, transferHelper));
+        address vaultImpl = address(
+            new ExtendedBasedBoostedVault(
+                type(uint256).max, iouToken, fundsHandler, transferHelper, withdrawalFeeCalculator
+            )
+        );
         return ExtendedBasedBoostedVault(
             address(
                 new TransparentUpgradeableProxy(
@@ -354,7 +358,8 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
                 feeRefundThreshold: 0,
                 gasLimit: 100000,
                 data: ""
-            })
+            }),
+            ""
         );
     }
 }

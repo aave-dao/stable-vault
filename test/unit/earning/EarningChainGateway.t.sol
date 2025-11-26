@@ -8,6 +8,7 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transpa
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+import {WithdrawalFeeCalculator} from "../../../src/common/WithdrawalFeeCalculator.sol";
 import {EarningChainGateway} from "../../../src/earning/EarningChainGateway.sol";
 import {IAllocator} from "../../../src/interfaces/IAllocator.sol";
 import {IBridgeAdapter} from "../../../src/interfaces/IBridgeAdapter.sol";
@@ -48,6 +49,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     MockDummyIouTokenManager internal _mockIouTokenManager;
     MockAssetRegistry internal _mockAssetRegistry;
     MockTransferHelper internal _mockTransferHelper;
+    WithdrawalFeeCalculator internal _withdrawalFeeCalculator;
 
     EarningChainGateway internal _earningChainGateway;
 
@@ -55,10 +57,13 @@ contract EarningChainGatewayTest is TestWithHelpers {
         MockAccessManager mockAccessManager,
         address iouTokenManager,
         address allocator,
-        address transferHelper
+        address transferHelper,
+        address withdrawalFeeCalculator
     ) internal returns (EarningChainGateway) {
         address earningChainGatewayImpl = address(
-            new EarningChainGateway(ACCOUNTING_CHAIN_ID, allocator, iouTokenManager, transferHelper)
+            new EarningChainGateway(
+                ACCOUNTING_CHAIN_ID, allocator, iouTokenManager, transferHelper, withdrawalFeeCalculator
+            )
         );
         EarningChainGateway earningChainGateway = EarningChainGateway(
             address(
@@ -110,8 +115,14 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         _mockAccessManager = new MockAccessManager(admin);
 
+        _withdrawalFeeCalculator = new WithdrawalFeeCalculator(admin);
+
         _earningChainGateway = _deployEarningChainGateway(
-            _mockAccessManager, address(_mockIouTokenManager), address(_mockAllocator), address(_mockTransferHelper)
+            _mockAccessManager,
+            address(_mockIouTokenManager),
+            address(_mockAllocator),
+            address(_mockTransferHelper),
+            address(_withdrawalFeeCalculator)
         );
     }
 
@@ -589,7 +600,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     feeRefundThreshold: 0,
                     gasLimit: 100000,
                     data: abi.encode(keccak256(hex"c0ffee"))
-                })
+                }),
+                ""
             );
         }
 
@@ -660,7 +672,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     feeRefundThreshold: 0,
                     gasLimit: 100000,
                     data: abi.encode(keccak256(hex"c0ffee"))
-                })
+                }),
+                ""
             );
         }
     }
@@ -738,7 +751,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         vm.deal(tokenOutReceiver, bridgeFeeAmount);
         vm.prank(tokenOutReceiver);
         _earningChainGateway.exchangeIouTokens{value: bridgeFeeAmount}(
-            iouTokenAmountRay, tokenOut, tokenOutReceiver, bridgeParams
+            iouTokenAmountRay, tokenOut, tokenOutReceiver, bridgeParams, ""
         );
     }
 
@@ -755,7 +768,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 feeRefundThreshold: 0,
                 gasLimit: 100000,
                 data: abi.encode(keccak256(hex"c0ffee"))
-            })
+            }),
+            ""
         );
     }
 
@@ -777,7 +791,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 feeRefundThreshold: 0,
                 gasLimit: 100000,
                 data: abi.encode(keccak256(hex"c0ffee"))
-            })
+            }),
+            ""
         );
     }
 
@@ -800,7 +815,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 feeRefundThreshold: 0,
                 gasLimit: 100000,
                 data: abi.encode(keccak256(hex"c0ffee"))
-            })
+            }),
+            ""
         );
     }
 
