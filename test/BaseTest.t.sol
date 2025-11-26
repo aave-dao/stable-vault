@@ -7,6 +7,7 @@ import {console} from "forge-std/console.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
+import {BasedBoostedVault} from "../src/accounting/BasedBoostedVault.sol";
 import {AssetRegistry} from "../src/common/AssetRegistry.sol";
 import {ExtendedAccessManager} from "../src/common/ExtendedAccessManager.sol";
 import {IouToken} from "../src/common/IouToken.sol";
@@ -31,9 +32,8 @@ import {WithdrawalFeeCalculator} from "./../src/common/WithdrawalFeeCalculator.s
 import {EarningChainGateway} from "./../src/earning/EarningChainGateway.sol";
 import {AssetLib} from "./../src/libraries/AssetLib.sol";
 import {MathLib} from "./../src/libraries/MathLib.sol";
-import {ExtendedBasedBoostedVault} from "./mocks/ExtendedBasedBoostedVault.sol";
 import {MockCCIPRouter} from "./mocks/MockCcipRouter.sol";
-import {TestErc20} from "./mocks/TestErc20.sol";
+import {MockErc20} from "./mocks/MockErc20.sol";
 import {TestErc4626} from "./mocks/TestErc4626.sol";
 
 import {_toSelectorArray} from "test/helpers/TypeHelpers.sol";
@@ -69,8 +69,8 @@ contract BaseTest is Test {
     address transferHelper_earningChainAddress;
 
     // Currencies
-    TestErc20 GHO = new TestErc20(18);
-    TestErc20 USDC = new TestErc20(6);
+    MockErc20 GHO = new MockErc20("Test GHO", "tGHO", 18);
+    MockErc20 USDC = new MockErc20("Test USDC", "tUSDC", 6);
 
     // Accounting Chain: BBV, FH, Swapper, Allocator, Accounting Chain Gateway, CCIP Adapter, CCIP Router, Strategy
     // Vault/4626
@@ -87,7 +87,7 @@ contract BaseTest is Test {
     address ghoStrategyVault_accountingChainAddress;
     address usdcStrategyVault_accountingChainAddress;
     ExtendedAccessManager accessManager_accountingChain;
-    ExtendedBasedBoostedVault vault;
+    BasedBoostedVault vault;
     IouToken iouToken_accountingChain;
     IouTokenManager iouTokenManager_accountingChain;
     AssetRegistry assetRegistry_accountingChain;
@@ -152,23 +152,26 @@ contract BaseTest is Test {
         address assetRegistry,
         address transferHelper,
         address withdrawalFeeCalculator
-    ) internal virtual returns (ExtendedBasedBoostedVault) {
+    ) internal virtual returns (BasedBoostedVault) {
         address vaultImpl = address(
-            new ExtendedBasedBoostedVault(
+            new BasedBoostedVault(
                 maxPerSecondRate, iouTokenManager, fundsHandlerAddr, transferHelper, withdrawalFeeCalculator
             )
         );
-        return ExtendedBasedBoostedVault(
-            address(
-                new TransparentUpgradeableProxy(
-                    vaultImpl,
-                    address(this),
-                    abi.encodeCall(
-                        BasedBoostedVault.initialize, (accessManager, defaultSubVaultPerSecondRate, assetRegistry)
-                    )
+
+        address bbv = address(
+            new TransparentUpgradeableProxy(
+                vaultImpl,
+                address(this),
+                abi.encodeCall(
+                    BasedBoostedVault.initialize, (accessManager, defaultSubVaultPerSecondRate, assetRegistry)
                 )
             )
         );
+
+        vm.label(bbv, "BBV");
+
+        return BasedBoostedVault(bbv);
     }
 
     function _deployContracts() internal {
@@ -249,6 +252,7 @@ contract BaseTest is Test {
         deployerNonce_accountingChain++; // Incrementing for FH implementation
         fundsHandler_accountingChainAddress = vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
         console.log("\tFunds Handler (Accounting Chain) Predicted Address: %s", fundsHandler_accountingChainAddress);
+        vm.label(fundsHandler_accountingChainAddress, "FundsHandler");
 
         deployerNonce_accountingChain++; // Incrementing for Gateway implementation
         chainGateway_accountingChainAddress = vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);

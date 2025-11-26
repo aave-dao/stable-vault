@@ -5,7 +5,7 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {Test} from "forge-std/Test.sol";
 
 import {AssetLibWrapper} from "../mocks/AssetLibWrapper.sol";
-import {TestErc20} from "../mocks/TestErc20.sol";
+import {MockErc20} from "../mocks/MockErc20.sol";
 
 contract AssetLibTest is Test {
     AssetLibWrapper internal w;
@@ -45,7 +45,7 @@ contract AssetLibTest is Test {
     }
 
     function test_assetDecimalsToRay() public {
-        address assetWith6Decimals = address(new TestErc20(6));
+        address assetWith6Decimals = address(new MockErc20("Test USD", "TUSD", 6));
         assertEq(w.assetDecimalsToRay(0, assetWith6Decimals), 0);
         assertEq(w.assetDecimalsToRay(1, assetWith6Decimals), 1 * 1e21);
         assertEq(w.assetDecimalsToRay(12, assetWith6Decimals), 12 * 1e21);
@@ -55,7 +55,7 @@ contract AssetLibTest is Test {
         assertEq(w.assetDecimalsToRay(123456, assetWith6Decimals), 123456 * 1e21);
         assertEq(w.assetDecimalsToRay(1234567, assetWith6Decimals), 1234567 * 1e21);
 
-        address assetWith18Decimals = address(new TestErc20(18));
+        address assetWith18Decimals = address(new MockErc20("Test USD", "TUSD", 18));
         assertEq(w.assetDecimalsToRay(0, assetWith18Decimals), 0);
         assertEq(w.assetDecimalsToRay(1, assetWith18Decimals), 1 * 1e9);
         assertEq(w.assetDecimalsToRay(12, assetWith18Decimals), 12 * 1e9);
@@ -65,7 +65,7 @@ contract AssetLibTest is Test {
         assertEq(w.assetDecimalsToRay(123456, assetWith18Decimals), 123456 * 1e9);
         assertEq(w.assetDecimalsToRay(1234567, assetWith18Decimals), 1234567 * 1e9);
 
-        address assetWith27Decimals = address(new TestErc20(27));
+        address assetWith27Decimals = address(new MockErc20("Test USD", "TUSD", 27));
         assertEq(w.assetDecimalsToRay(0, assetWith27Decimals), 0);
         assertEq(w.assetDecimalsToRay(1, assetWith27Decimals), 1);
         assertEq(w.assetDecimalsToRay(12, assetWith27Decimals), 12);
@@ -75,7 +75,7 @@ contract AssetLibTest is Test {
         assertEq(w.assetDecimalsToRay(123456, assetWith27Decimals), 123456);
         assertEq(w.assetDecimalsToRay(1234567, assetWith27Decimals), 1234567);
 
-        address assetWith33Decimals = address(new TestErc20(33));
+        address assetWith33Decimals = address(new MockErc20("Test USD", "TUSD", 33));
         assertEq(w.assetDecimalsToRay(0, assetWith33Decimals), 0);
         assertEq(w.assetDecimalsToRay(1, assetWith33Decimals), 0);
         assertEq(w.assetDecimalsToRay(12, assetWith33Decimals), 0);
@@ -96,7 +96,7 @@ contract AssetLibTest is Test {
     }
 
     function test_rayToAssetDecimals() public {
-        address assetWith6Decimals = address(new TestErc20(6));
+        address assetWith6Decimals = address(new MockErc20("Test USD", "TUSD", 6));
         assertEq(w.rayToAssetDecimals(0, assetWith6Decimals), 0);
         assertEq(w.rayToAssetDecimals(1, assetWith6Decimals), 0);
         assertEq(w.rayToAssetDecimals(12, assetWith6Decimals), 0);
@@ -126,7 +126,7 @@ contract AssetLibTest is Test {
         assertEq(w.rayToAssetDecimals(12345678901234567890123456, assetWith6Decimals), 12345);
         assertEq(w.rayToAssetDecimals(123456789012345678901234567, assetWith6Decimals), 123456);
 
-        address assetWith18Decimals = address(new TestErc20(18));
+        address assetWith18Decimals = address(new MockErc20("Test USD", "TUSD", 18));
         assertEq(w.rayToAssetDecimals(0, assetWith18Decimals), 0);
         assertEq(w.rayToAssetDecimals(1, assetWith18Decimals), 0);
         assertEq(w.rayToAssetDecimals(12, assetWith18Decimals), 0);
@@ -144,7 +144,7 @@ contract AssetLibTest is Test {
         assertEq(w.rayToAssetDecimals(12345678901234, assetWith18Decimals), 12345);
         assertEq(w.rayToAssetDecimals(123456789012345, assetWith18Decimals), 123456);
 
-        address assetWith27Decimals = address(new TestErc20(27));
+        address assetWith27Decimals = address(new MockErc20("Test USD", "TUSD", 27));
         assertEq(w.rayToAssetDecimals(0, assetWith27Decimals), 0);
         assertEq(w.rayToAssetDecimals(1, assetWith27Decimals), 1);
         assertEq(w.rayToAssetDecimals(12, assetWith27Decimals), 12);
@@ -154,7 +154,7 @@ contract AssetLibTest is Test {
         assertEq(w.rayToAssetDecimals(123456, assetWith27Decimals), 123456);
         assertEq(w.rayToAssetDecimals(1234567, assetWith27Decimals), 1234567);
 
-        address assetWith33Decimals = address(new TestErc20(33));
+        address assetWith33Decimals = address(new MockErc20("Test USD", "TUSD", 33));
         assertEq(w.rayToAssetDecimals(0, assetWith33Decimals), 0);
         assertEq(w.rayToAssetDecimals(1, assetWith33Decimals), 1 * 1e6);
         assertEq(w.rayToAssetDecimals(12, assetWith33Decimals), 12 * 1e6);
@@ -220,7 +220,7 @@ contract AssetLibTest is Test {
             inputAmount = bound(inputAmount, 0, type(uint256).max / multiplier);
         }
         // forge-lint: disable-next-line(unsafe-typecast)
-        address asset = address(new TestErc20(uint8(assetDecimals)));
+        address asset = address(new MockErc20("Test USD", "TUSD", uint8(assetDecimals)));
         uint256 expectedResult = _calculateExpectedResult(inputAmount, assetDecimals, outputDecimals);
         assertEq(expectedResult, w.assetDecimalsToRay(inputAmount, asset), "assetDecimalsToRay wrong output");
     }
@@ -234,7 +234,7 @@ contract AssetLibTest is Test {
             inputAmount = bound(inputAmount, 0, type(uint256).max / multiplier);
         }
         // forge-lint: disable-next-line(unsafe-typecast)
-        address asset = address(new TestErc20(uint8(assetDecimals)));
+        address asset = address(new MockErc20("Test USD", "TUSD", uint8(assetDecimals)));
         uint256 expectedResult = _calculateExpectedResult(inputAmount, inputDecimals, assetDecimals);
         assertEq(expectedResult, w.rayToAssetDecimals(inputAmount, asset), "rayToAssetDecimals wrong output");
     }
@@ -257,9 +257,9 @@ contract AssetLibTest is Test {
         uint256 expectedResult = _calculateExpectedResult(inputAmount, inputDecimals, outputDecimals);
 
         // forge-lint: disable-next-line(unsafe-typecast)
-        address fromAsset = address(new TestErc20(uint8(inputDecimals)));
+        address fromAsset = address(new MockErc20("Test USD", "TUSD", uint8(inputDecimals)));
         // forge-lint: disable-next-line(unsafe-typecast)
-        address toAsset = address(new TestErc20(uint8(outputDecimals)));
+        address toAsset = address(new MockErc20("Test USD", "TUSD", uint8(outputDecimals)));
         assertEq(
             expectedResult, w.convertAssetDecimals(inputAmount, fromAsset, toAsset), "convertAssetDecimals wrong output"
         );
@@ -268,7 +268,7 @@ contract AssetLibTest is Test {
     function test_getDecimals(uint256 decimals) public {
         decimals = bound(decimals, 0, 77);
         // forge-lint: disable-next-line(unsafe-typecast)
-        address asset = address(new TestErc20(uint8(decimals)));
+        address asset = address(new MockErc20("Test USD", "TUSD", uint8(decimals)));
         vm.expectCall(asset, abi.encodeWithSelector(IERC20Metadata.decimals.selector));
         uint256 decimalsFromAsset = w.getDecimals(asset);
         assertEq(decimalsFromAsset, decimals, "got wrong decimals from asset");

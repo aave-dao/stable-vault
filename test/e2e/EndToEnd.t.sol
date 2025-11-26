@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import {console} from "forge-std/console.sol";
 import {IERC20} from "forge-std/interfaces/IERC20.sol";
 import {IERC4626} from "forge-std/interfaces/IERC4626.sol";
@@ -236,11 +237,16 @@ contract EndToEndTest is BaseTest {
             // Check user IOU token balance
             assertGt(iouToken_accountingChain.balanceOf(user), 0, "User should have minted IOU tokens");
 
-            // vm.expectRevert(
-            // abi.encodeWithSelector(ERC4626ExceededMaxWithdraw.selector, allocator_accountingChain, userBalanceInUsdc,
-            // 0) );
+            uint256 iouAmountRequestedUsdc = iouAmountRequestedRay.rayToAssetDecimals(address(USDC));
             vm.prank(user);
-            vm.expectRevert("TestErc20: transfer amount exceeds balance");
+            vm.expectRevert(
+                abi.encodeWithSelector(
+                    IERC20Errors.ERC20InsufficientBalance.selector,
+                    address(allocator_accountingChain),
+                    0,
+                    iouAmountRequestedUsdc
+                )
+            );
             vault.executeWithdrawal(user, address(USDC), iouAmountRequestedRay, "");
 
             // - check that we don't owe the user any funds

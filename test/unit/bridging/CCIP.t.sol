@@ -10,7 +10,7 @@ import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 
 import {MockCCIPRouter} from "../../mocks/MockCcipRouter.sol";
-import {TestErc20} from "../../mocks/TestErc20.sol";
+import {MockErc20} from "../../mocks/MockErc20.sol";
 
 contract CCIPTest is Test {
     using SafeERC20 for IERC20;
@@ -33,9 +33,9 @@ contract CCIPTest is Test {
         mockRouter.setFee(0.1 ether);
         deal(address(this), 100 ether);
 
-        _token = address(new TestErc20(18));
+        _token = address(new MockErc20("Test USD", "TUSD", 18));
         console.log("Token: %s", _token);
-        TestErc20(_token).mint(address(this), 10 ether);
+        MockErc20(_token).mint(address(this), 10 ether);
     }
 
     function test_ccipSend() public {

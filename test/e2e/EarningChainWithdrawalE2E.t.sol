@@ -6,12 +6,12 @@ import {console} from "forge-std/console.sol";
 import {IERC20} from "forge-std/interfaces/IERC20.sol";
 
 import {BasedBoostedVault} from "../../src/accounting/BasedBoostedVault.sol";
+import {BasedBoostedVault} from "../../src/accounting/BasedBoostedVault.sol";
 import {IBasedBoostedVault} from "../../src/interfaces/IBasedBoostedVault.sol";
 import {IBridgeAdapter} from "../../src/interfaces/IBridgeAdapter.sol";
 import {AssetLib} from "../../src/libraries/AssetLib.sol";
 import {ErrorsLib} from "../../src/libraries/ErrorsLib.sol";
 import {BaseTest} from "../BaseTest.t.sol";
-import {ExtendedBasedBoostedVault} from "../mocks/ExtendedBasedBoostedVault.sol";
 
 /// @title EarningChainWithdrawalE2ETest
 /// @notice Test the withdrawal of funds from the Earning Chain to the Accounting Chain.
@@ -36,14 +36,12 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         address assetRegistry,
         address transferHelper,
         address withdrawalFeeCalculator
-    ) internal virtual override returns (ExtendedBasedBoostedVault) {
+    ) internal virtual override returns (BasedBoostedVault) {
         // Deploy a vault without restriction in the valid per-second rate
         address vaultImpl = address(
-            new ExtendedBasedBoostedVault(
-                type(uint256).max, iouToken, fundsHandler, transferHelper, withdrawalFeeCalculator
-            )
+            new BasedBoostedVault(type(uint256).max, iouToken, fundsHandler, transferHelper, withdrawalFeeCalculator)
         );
-        return ExtendedBasedBoostedVault(
+        return BasedBoostedVault(
             address(
                 new TransparentUpgradeableProxy(
                     address(vaultImpl),
