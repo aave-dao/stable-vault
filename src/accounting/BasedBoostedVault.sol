@@ -422,7 +422,6 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         }
         $storage().activeSubVaultsIds.pop();
         delete $storage().activeSubVaultIndexById[subVaultId];
-        emit SubVaultRemovedFromActive(subVaultId);
     }
 
     function _previewSubVaultConversionRate(uint256 subVaultId) internal view returns (uint256) {
