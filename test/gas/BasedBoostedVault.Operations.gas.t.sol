@@ -253,12 +253,12 @@ contract BasedBoostedVaultOperationsGasTest is BaseTest {
 
         vm.prank(user1);
         vm.startSnapshotGas(NAMESPACE, "executeWithdrawal: user1 executes withdrawal");
-        vault.executeWithdrawal(user1, address(USDC), amountToWithdrawRay);
+        vault.executeWithdrawal(user1, address(USDC), amountToWithdrawRay, "");
         vm.stopSnapshotGas();
 
         vm.prank(user2);
         vm.startSnapshotGas(NAMESPACE, "executeWithdrawal: user2 executes withdrawal");
-        vault.executeWithdrawal(user2, address(USDC), amountToWithdrawRay);
+        vault.executeWithdrawal(user2, address(USDC), amountToWithdrawRay, "");
         vm.stopSnapshotGas();
     }
 
