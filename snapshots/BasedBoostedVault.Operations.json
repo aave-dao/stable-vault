@@ -7,7 +7,7 @@
   "executeWithdrawal: user2 executes withdrawal": "128700",
   "requestWithdrawal: user1 requests full withdrawal": "52545",
   "requestWithdrawal: user1 requests partial withdrawal": "139241",
-  "requestWithdrawal: user2 requests full withdrawal": "54987",
+  "requestWithdrawal: user2 requests full withdrawal": "53832",
   "requestWithdrawal: user2 requests partial withdrawal": "74841",
   "setUserRate (different rates): count: 10": "1691907",
   "setUserRate (different rates): count: 100": "16692050",
@@ -16,5 +16,5 @@
   "setUserRate: count: 10": "97203",
   "setUserRate: count: 100": "917722",
   "setUserRate: count: 1000": "9129877",
-  "setUserRate: count: 2": "185348"
+  "setUserRate: count: 2": "184193"
 }
