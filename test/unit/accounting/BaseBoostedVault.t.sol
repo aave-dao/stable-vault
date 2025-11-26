@@ -486,9 +486,9 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 newPerSecondRate,
         uint256 anotherNewPerSecondRate
     ) public {
-        vm.assume(newPerSecondRate != anotherNewPerSecondRate);
         newPerSecondRate = _boundRate(newPerSecondRate);
         anotherNewPerSecondRate = _boundRate(anotherNewPerSecondRate);
+        vm.assume(newPerSecondRate != anotherNewPerSecondRate);
         vm.assume(bbv.getSubVaultIdByRate(newPerSecondRate) == 0);
         vm.assume(bbv.getSubVaultIdByRate(anotherNewPerSecondRate) == 0);
 
