@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {EfficientHashLib} from "@solady/utils/EfficientHashLib.sol";
@@ -9,7 +9,7 @@ import {EfficientHashLib} from "@solady/utils/EfficientHashLib.sol";
 import {IWithdrawalFeeCalculator} from "../interfaces/IWithdrawalFeeCalculator.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
-contract WithdrawalFeeCalculator is IWithdrawalFeeCalculator, Ownable, EIP712 {
+contract WithdrawalFeeCalculator is AccessManaged, EIP712, IWithdrawalFeeCalculator {
     bytes32 public constant WITHDRAWAL_FEE_TYPEHASH =
         keccak256("WithdrawalFee(address user,address assetOut,uint256 iouAmountRay,uint256 personalFee)");
 
@@ -44,7 +44,7 @@ contract WithdrawalFeeCalculator is IWithdrawalFeeCalculator, Ownable, EIP712 {
     //     return $storage();
     // }
 
-    constructor(address owner) Ownable(owner) EIP712("WithdrawalFeeCalculator", "1") {}
+    constructor(address accessManager) EIP712("WithdrawalFeeCalculator", "1") AccessManaged(accessManager) {}
 
     function calculateWithdrawalFee(address user, address assetOut, uint256 iouAmountRay, bytes memory data)
         external
@@ -84,18 +84,18 @@ contract WithdrawalFeeCalculator is IWithdrawalFeeCalculator, Ownable, EIP712 {
         }
     }
 
-    function setBasicFeeBps(uint256 newBasicFeeBps) external onlyOwner {
+    function setBasicFeeBps(uint256 newBasicFeeBps) external restricted {
         $storage().basicFeeBps = newBasicFeeBps;
     }
 
-    function setAssetFeeBps(address asset, uint256 newAssetFeeBps, bool isSet) external onlyOwner {
+    function setAssetFeeBps(address asset, uint256 newAssetFeeBps, bool isSet) external restricted {
         require(newAssetFeeBps <= BPS_BASE, ErrorsLib.InvalidParameter());
         // forge-lint: disable-next-line(unsafe-typecast)
         $storage().feeBpsConfigByAsset[asset].feeBps = uint16(newAssetFeeBps);
         $storage().feeBpsConfigByAsset[asset].isSet = isSet;
     }
 
-    function setSigner(address signer, bool whitelistedSigner) external onlyOwner {
+    function setSigner(address signer, bool whitelistedSigner) external restricted {
         $storage().signers[signer] = whitelistedSigner;
     }
 
