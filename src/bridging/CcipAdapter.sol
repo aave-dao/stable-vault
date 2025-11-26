@@ -28,13 +28,13 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
     mapping(uint64 ccipChainSelector => uint256 chainId) internal _chainIdOf;
 
     modifier onlyRouter() {
-        require(msg.sender == CCIP_ROUTER, NotBridgeRouter());
+        require(msg.sender == CCIP_ROUTER, OnlyBridgeRouter());
         _;
     }
 
     modifier onlySelf() {
         if (msg.sender != address(this)) {
-            revert ErrorsLib.NotSelf();
+            revert ErrorsLib.OnlySelf();
         }
         _;
     }
@@ -118,7 +118,7 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
             require(
                 abi.decode(message.sender, (address))
                     == _destinationChainAdapterOf[_chainIdOf[message.sourceChainSelector]],
-                NotDestinationChainAdapter()
+                OnlyDestinationChainAdapter()
             );
             IChainGateway(GATEWAY)
                 .receiveMessage(

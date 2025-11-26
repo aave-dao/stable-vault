@@ -18,7 +18,7 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
     using SafeERC20 for IERC20;
 
     modifier onlyFundsHandler() {
-        require(msg.sender == FUNDS_HANDLER, NotFundsHandler());
+        require(msg.sender == FUNDS_HANDLER, OnlyFundsHandler());
         _;
     }
 

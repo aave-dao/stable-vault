@@ -765,12 +765,12 @@ contract CcipAdapterTest is TestWithHelpers {
         assertEq(address(feePayer).balance, expectedFeeRefund);
     }
 
-    function test_publishMessageToChainWithFeePayer_reverts_ifNotGateway(address caller) public {
+    function test_publishMessageToChainWithFeePayer_reverts_ifOnlyGateway(address caller) public {
         vm.assume(caller != address(_mockAccountingChainGateway));
         vm.assume(caller != address(_mockEarningChainGateway));
 
         vm.prank(caller);
-        vm.expectRevert(ErrorsLib.NotGateway.selector);
+        vm.expectRevert(ErrorsLib.OnlyGateway.selector);
         _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
             EARNING_CHAIN_ID,
             new IBridgeAdapter.BridgeAsset[](0),
@@ -786,7 +786,7 @@ contract CcipAdapterTest is TestWithHelpers {
         );
 
         vm.prank(caller);
-        vm.expectRevert(ErrorsLib.NotGateway.selector);
+        vm.expectRevert(ErrorsLib.OnlyGateway.selector);
         _earningChainCcipAdapter.publishMessageToChainWithFeePayer(
             ACCOUNTING_CHAIN_ID,
             new IBridgeAdapter.BridgeAsset[](0),
@@ -958,9 +958,9 @@ contract CcipAdapterTest is TestWithHelpers {
         _accountingChainCcipAdapter.ccipReceive(ccipMessage);
     }
 
-    function test_ccipReceive_reverts_ifNotDestinationChainAdapter(address sender) public {
+    function test_ccipReceive_reverts_ifOnlyDestinationChainAdapter(address sender) public {
         vm.assume(sender != address(_earningChainCcipAdapter));
-        vm.expectRevert(IBridgeAdapter.NotDestinationChainAdapter.selector);
+        vm.expectRevert(IBridgeAdapter.OnlyDestinationChainAdapter.selector);
         vm.prank(address(_mockCCIPRouter));
         _accountingChainCcipAdapter.ccipReceive(
             Client.Any2EVMMessage({
@@ -976,7 +976,7 @@ contract CcipAdapterTest is TestWithHelpers {
     function test_ccipReceive_reverts_ifNotRouter(address caller) public {
         vm.assume(caller != address(_mockCCIPRouter));
         vm.prank(caller);
-        vm.expectRevert(IBridgeAdapter.NotBridgeRouter.selector);
+        vm.expectRevert(IBridgeAdapter.OnlyBridgeRouter.selector);
         _accountingChainCcipAdapter.ccipReceive(
             Client.Any2EVMMessage({
                 messageId: 0,
@@ -988,10 +988,10 @@ contract CcipAdapterTest is TestWithHelpers {
         );
     }
 
-    function test_processReceivedFunds_reverts_ifNotSelf(address caller) public {
+    function test_processReceivedFunds_reverts_ifOnlySelf(address caller) public {
         vm.assume(caller != address(_accountingChainCcipAdapter));
         vm.prank(caller);
-        vm.expectRevert(ErrorsLib.NotSelf.selector);
+        vm.expectRevert(ErrorsLib.OnlySelf.selector);
         _accountingChainCcipAdapter.processReceivedFunds(new Client.EVMTokenAmount[](0));
     }
 

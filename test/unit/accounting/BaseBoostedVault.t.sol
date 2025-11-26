@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.22;
 
 import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
@@ -500,9 +500,9 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 newPerSecondRate,
         uint256 anotherNewPerSecondRate
     ) public {
-        vm.assume(newPerSecondRate != anotherNewPerSecondRate);
         newPerSecondRate = _boundRate(newPerSecondRate);
         anotherNewPerSecondRate = _boundRate(anotherNewPerSecondRate);
+        vm.assume(newPerSecondRate != anotherNewPerSecondRate);
         vm.assume(bbv.getSubVaultIdByRate(newPerSecondRate) == 0);
         vm.assume(bbv.getSubVaultIdByRate(anotherNewPerSecondRate) == 0);
 
@@ -823,7 +823,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         _deposit(user, depositAmount);
         withdrawalAmountRay = bound(withdrawalAmountRay, 0, depositAmount.assetDecimalsToRay(address(mockAsset)));
 
-        vm.expectRevert(IBasedBoostedVault.InvalidMsgSender.selector);
+        vm.expectRevert(IBasedBoostedVault.OnlyUser.selector);
         vm.prank(msgSender);
         bbv.requestWithdrawal(user, withdrawalAmountRay);
     }
@@ -1081,7 +1081,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         iouAmountRay = _boundRayAmount(iouAmountRay);
         mockIouToken.mint(user, iouAmountRay);
 
-        vm.expectRevert(IBasedBoostedVault.InvalidMsgSender.selector);
+        vm.expectRevert(IBasedBoostedVault.OnlyUser.selector);
         vm.prank(msgSender);
         bbv.executeWithdrawal(user, address(mockAsset), iouAmountRay, "");
     }

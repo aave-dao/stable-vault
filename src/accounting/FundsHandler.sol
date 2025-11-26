@@ -46,12 +46,12 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, TransferHelp
     }
 
     modifier onlyBasedBoostedVault() {
-        require(msg.sender == VAULT, NotBasedBoostedVault());
+        require(msg.sender == VAULT, OnlyBasedBoostedVault());
         _;
     }
 
     modifier onlyGateway() {
-        require(msg.sender == GATEWAY, NotGateway());
+        require(msg.sender == GATEWAY, ErrorsLib.OnlyGateway());
         _;
     }
 

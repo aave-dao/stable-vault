@@ -4,8 +4,9 @@ pragma solidity ^0.8.22;
 import {IBridgeAdapter} from "./IBridgeAdapter.sol";
 
 interface IFundsHandler {
-    error NotBasedBoostedVault();
-    error NotGateway();
+    /// @notice Thrown when the caller is not the BasedBoostedVault.
+    /// @custom:selector 0x93ce7047
+    error OnlyBasedBoostedVault();
 
     struct AssetBalance {
         address asset;

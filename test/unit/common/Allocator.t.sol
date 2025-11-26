@@ -131,6 +131,10 @@ contract AllocatorTest is TestWithHelpers {
         _allocator = _deployAllocator(_mockAccessManager, address(_mockAssetRegistry), address(_mockTransferHelper));
     }
 
+    function test_selectors() public pure {
+        assertEq(IAllocator.DepositIntoStrategyFailed.selector, bytes4(keccak256("DepositIntoStrategyFailed(address)")));
+    }
+
     function test_getAssetBalances_returnsExpectedAssetBalances(uint256 depositAmountUsdt, uint256 depositAmountGho)
         public
     {
@@ -727,9 +731,7 @@ contract AllocatorTest is TestWithHelpers {
         IAllocator.RebalanceParams[] memory rebalanceParams = _getDepositIdleFundsRebalanceParams(address(_mockUsdt));
         vm.prank(address(everyRoleAccount));
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IAllocator.FailedToDepositIntoStrategy.selector, address(_defaultUsdtStrategy), amount
-            )
+            abi.encodeWithSelector(IAllocator.DepositIntoStrategyFailed.selector, address(_defaultUsdtStrategy), amount)
         );
         _allocator.rebalance(rebalanceParams);
     }
@@ -807,7 +809,11 @@ contract AllocatorTest is TestWithHelpers {
         rebalanceParams[0] =
             _buildRebalanceParams(_initializeDeallocationParams(0), _initializeSwapParams(0), allocations);
         vm.prank(address(everyRoleAccount));
-        vm.expectRevert(IAllocator.FailedToDepositIntoStrategy.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAllocator.DepositIntoStrategyFailed.selector, _allocator.getDefaultStrategy(address(_mockUsdt))
+            )
+        );
         _allocator.rebalance(rebalanceParams);
     }
 

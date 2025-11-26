@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.22;
 
 import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -210,7 +210,7 @@ contract FundsHandlerTest is TestWithHelpers {
 
         amount = _boundAssetAmountAllowingZero(address(asset), amount);
 
-        vm.expectRevert(IFundsHandler.NotBasedBoostedVault.selector);
+        vm.expectRevert(IFundsHandler.OnlyBasedBoostedVault.selector);
         vm.prank(msgSender);
         fundsHandler.processDeposit(asset, amount);
     }
@@ -241,7 +241,7 @@ contract FundsHandlerTest is TestWithHelpers {
         address asset = _deployAssetWithSalt(assetDeploymentSalt, assetDecimals);
         amount = _boundAssetAmountAllowingZero(address(asset), amount);
 
-        vm.expectRevert(IFundsHandler.NotBasedBoostedVault.selector);
+        vm.expectRevert(IFundsHandler.OnlyBasedBoostedVault.selector);
         vm.prank(msgSender);
         fundsHandler.processWithdrawal(asset, amount);
     }
@@ -258,7 +258,7 @@ contract FundsHandlerTest is TestWithHelpers {
         address asset = _deployAssetWithSalt(assetDeploymentSalt, assetDecimals);
         amount = _boundAssetAmountAllowingZero(address(asset), amount);
 
-        vm.expectRevert(IFundsHandler.NotGateway.selector);
+        vm.expectRevert(ErrorsLib.OnlyGateway.selector);
         vm.prank(msgSender);
         fundsHandler.fundsArrivedFromChainCallback(asset, amount);
     }
@@ -289,7 +289,7 @@ contract FundsHandlerTest is TestWithHelpers {
 
         snapshotBalanceRay = _boundRayAmountAllowingZero(snapshotBalanceRay);
 
-        vm.expectRevert(IFundsHandler.NotGateway.selector);
+        vm.expectRevert(ErrorsLib.OnlyGateway.selector);
         vm.prank(msgSender);
         fundsHandler.updateChainBalanceCallback(chainId, snapshotBalanceRay, chainBalanceSnapshotNonce);
     }

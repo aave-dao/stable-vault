@@ -1439,7 +1439,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
     function test_sendBridgeIouTokenMessageWithFeePayer_reverts_ifInvalidMessageSender() public {
         // Context: only callable by IOU Token Manager
-        vm.expectRevert(ErrorsLib.InvalidMessageSender.selector);
+        vm.expectRevert(IChainGateway.OnlyIouTokenManager.selector);
         _earningChainGateway.sendBridgeIouTokenMessageWithFeePayer(
             EARNING_CHAIN_ID,
             makeAddr("iouTokenRecipient"),
