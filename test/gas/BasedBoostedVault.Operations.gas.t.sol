@@ -24,27 +24,23 @@ contract BasedBoostedVaultOperationsGasTest is BaseTest {
 
         _seedUser(user1);
         vm.prank(user1);
-        vm.startSnapshotGas(NAMESPACE, "deposit: user1 first deposit");
         vault.deposit(user1, address(USDC), amount);
-        vm.stopSnapshotGas();
+        vm.snapshotGasLastCall(NAMESPACE, "deposit: user1 first deposit");
 
         _seedUser(user1);
         vm.prank(user1);
-        vm.startSnapshotGas(NAMESPACE, "deposit: user1 second deposit");
         vault.deposit(user1, address(USDC), amount);
-        vm.stopSnapshotGas();
+        vm.snapshotGasLastCall(NAMESPACE, "deposit: user1 second deposit");
 
         _seedUser(user2);
         vm.prank(user2);
-        vm.startSnapshotGas(NAMESPACE, "deposit: user2 first deposit");
         vault.deposit(user2, address(USDC), amount);
-        vm.stopSnapshotGas();
+        vm.snapshotGasLastCall(NAMESPACE, "deposit: user2 first deposit");
 
         _seedUser(user2);
         vm.prank(user2);
-        vm.startSnapshotGas(NAMESPACE, "deposit: user2 second deposit");
         vault.deposit(user2, address(USDC), amount);
-        vm.stopSnapshotGas();
+        vm.snapshotGasLastCall(NAMESPACE, "deposit: user2 second deposit");
     }
 
     function test_setUserRate() public {
@@ -66,9 +62,8 @@ contract BasedBoostedVaultOperationsGasTest is BaseTest {
         userRateData[0] = IBasedBoostedVault.UserRateData(user1, newRate);
 
         vm.prank(everyRoleAccount);
-        vm.startSnapshotGas(NAMESPACE, "setUserRate: count: 1");
         vault.setUserRate(userRateData);
-        vm.stopSnapshotGas();
+        vm.snapshotGasLastCall(NAMESPACE, "setUserRate: count: 1");
 
         newRate = 1_000000003022265980097387650; // 10% APY
         userRateData = new IBasedBoostedVault.UserRateData[](2);
@@ -76,9 +71,8 @@ contract BasedBoostedVaultOperationsGasTest is BaseTest {
         userRateData[1] = IBasedBoostedVault.UserRateData(user2, newRate);
 
         vm.prank(everyRoleAccount);
-        vm.startSnapshotGas(NAMESPACE, "setUserRate: count: 2");
         vault.setUserRate(userRateData);
-        vm.stopSnapshotGas();
+        vm.snapshotGasLastCall(NAMESPACE, "setUserRate: count: 2");
 
         uint256 numberOfUsers = 11;
         userRateData = new IBasedBoostedVault.UserRateData[](numberOfUsers - 1);
@@ -95,9 +89,8 @@ contract BasedBoostedVaultOperationsGasTest is BaseTest {
         }
 
         vm.prank(everyRoleAccount);
-        vm.startSnapshotGas(NAMESPACE, "setUserRate: count: 10");
         vault.setUserRate(userRateData);
-        vm.stopSnapshotGas();
+        vm.snapshotGasLastCall(NAMESPACE, "setUserRate: count: 10");
 
         numberOfUsers = 101;
         userRateData = new IBasedBoostedVault.UserRateData[](numberOfUsers - 1);
@@ -114,9 +107,8 @@ contract BasedBoostedVaultOperationsGasTest is BaseTest {
         }
 
         vm.prank(everyRoleAccount);
-        vm.startSnapshotGas(NAMESPACE, "setUserRate: count: 100");
         vault.setUserRate(userRateData);
-        vm.stopSnapshotGas();
+        vm.snapshotGasLastCall(NAMESPACE, "setUserRate: count: 100");
 
         numberOfUsers = 1001;
         userRateData = new IBasedBoostedVault.UserRateData[](numberOfUsers - 1);
@@ -133,9 +125,8 @@ contract BasedBoostedVaultOperationsGasTest is BaseTest {
         }
 
         vm.prank(everyRoleAccount);
-        vm.startSnapshotGas(NAMESPACE, "setUserRate: count: 1000");
         vault.setUserRate(userRateData);
-        vm.stopSnapshotGas();
+        vm.snapshotGasLastCall(NAMESPACE, "setUserRate: count: 1000");
     }
 
     function test_setUserRate_differentRates() public {
@@ -159,9 +150,8 @@ contract BasedBoostedVaultOperationsGasTest is BaseTest {
         }
 
         vm.prank(everyRoleAccount);
-        vm.startSnapshotGas(NAMESPACE, "setUserRate (different rates): count: 10");
         vault.setUserRate(userRateData);
-        vm.stopSnapshotGas();
+        vm.snapshotGasLastCall(NAMESPACE, "setUserRate (different rates): count: 10");
 
         numberOfUsers = 101;
         userRateData = new IBasedBoostedVault.UserRateData[](numberOfUsers - 1);
@@ -178,9 +168,8 @@ contract BasedBoostedVaultOperationsGasTest is BaseTest {
         }
 
         vm.prank(everyRoleAccount);
-        vm.startSnapshotGas(NAMESPACE, "setUserRate (different rates): count: 100");
         vault.setUserRate(userRateData);
-        vm.stopSnapshotGas();
+        vm.snapshotGasLastCall(NAMESPACE, "setUserRate (different rates): count: 100");
 
         numberOfUsers = 1001;
         userRateData = new IBasedBoostedVault.UserRateData[](numberOfUsers - 1);
@@ -197,9 +186,8 @@ contract BasedBoostedVaultOperationsGasTest is BaseTest {
         }
 
         vm.prank(everyRoleAccount);
-        vm.startSnapshotGas(NAMESPACE, "setUserRate (different rates): count: 1000");
         vault.setUserRate(userRateData);
-        vm.stopSnapshotGas();
+        vm.snapshotGasLastCall(NAMESPACE, "setUserRate (different rates): count: 1000");
     }
 
     function test_requestWithdrawal() public {
@@ -214,24 +202,20 @@ contract BasedBoostedVaultOperationsGasTest is BaseTest {
         uint256 partialWithdrawalAmountRay = (amount / 2).assetDecimalsToRay(address(USDC));
 
         vm.prank(user1);
-        vm.startSnapshotGas(NAMESPACE, "requestWithdrawal: user1 requests partial withdrawal");
         vault.requestWithdrawal(user1, partialWithdrawalAmountRay);
-        vm.stopSnapshotGas();
+        vm.snapshotGasLastCall(NAMESPACE, "requestWithdrawal: user1 requests partial withdrawal");
 
         vm.prank(user2);
-        vm.startSnapshotGas(NAMESPACE, "requestWithdrawal: user2 requests partial withdrawal");
         vault.requestWithdrawal(user2, partialWithdrawalAmountRay);
-        vm.stopSnapshotGas();
+        vm.snapshotGasLastCall(NAMESPACE, "requestWithdrawal: user2 requests partial withdrawal");
 
         vm.prank(user1);
-        vm.startSnapshotGas(NAMESPACE, "requestWithdrawal: user1 requests full withdrawal");
         vault.requestWithdrawal(user1, 0);
-        vm.stopSnapshotGas();
+        vm.snapshotGasLastCall(NAMESPACE, "requestWithdrawal: user1 requests full withdrawal");
 
         vm.prank(user2);
-        vm.startSnapshotGas(NAMESPACE, "requestWithdrawal: user2 requests full withdrawal");
         vault.requestWithdrawal(user2, 0);
-        vm.stopSnapshotGas();
+        vm.snapshotGasLastCall(NAMESPACE, "requestWithdrawal: user2 requests full withdrawal");
     }
 
     function test_executeWithdrawal() public {
@@ -252,14 +236,12 @@ contract BasedBoostedVaultOperationsGasTest is BaseTest {
         vault.requestWithdrawal(user2, amountToWithdrawRay);
 
         vm.prank(user1);
-        vm.startSnapshotGas(NAMESPACE, "executeWithdrawal: user1 executes withdrawal");
         vault.executeWithdrawal(user1, address(USDC), amountToWithdrawRay, "");
-        vm.stopSnapshotGas();
+        vm.snapshotGasLastCall(NAMESPACE, "executeWithdrawal: user1 executes withdrawal");
 
         vm.prank(user2);
-        vm.startSnapshotGas(NAMESPACE, "executeWithdrawal: user2 executes withdrawal");
         vault.executeWithdrawal(user2, address(USDC), amountToWithdrawRay, "");
-        vm.stopSnapshotGas();
+        vm.snapshotGasLastCall(NAMESPACE, "executeWithdrawal: user2 executes withdrawal");
     }
 
     function _seedUser(address user) internal {

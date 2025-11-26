@@ -10,6 +10,11 @@ fs_permissions = [
 [profile.default.fuzz]
 runs = 10_000
 
+[profile.gas]
+gas_snapshot_check = true
+test = 'tests/gas'
+isolate = true
+
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
 
 [lint]
