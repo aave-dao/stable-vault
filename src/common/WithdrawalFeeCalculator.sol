@@ -55,6 +55,11 @@ contract WithdrawalFeeCalculator is AccessManaged, EIP712, IWithdrawalFeeCalcula
         if (data.length > 0) {
             // Is there a personal fee?
             (uint256 personalFeeBps, bytes memory signature) = abi.decode(data, (uint256, bytes));
+            if ($storage().feeBpsConfigByAsset[assetOut].isSet) {
+                require(personalFeeBps <= $storage().feeBpsConfigByAsset[assetOut].feeBps, ErrorsLib.InvalidParameter());
+            } else {
+                require(personalFeeBps <= $storage().basicFeeBps, ErrorsLib.InvalidParameter());
+            }
             _validateSignature(user, assetOut, iouAmountRay, personalFeeBps, signature);
             return iouAmountRay * personalFeeBps / 10000;
         } else if ($storage().feeBpsConfigByAsset[assetOut].isSet) {
@@ -85,6 +90,8 @@ contract WithdrawalFeeCalculator is AccessManaged, EIP712, IWithdrawalFeeCalcula
     }
 
     function setBasicFeeBps(uint256 newBasicFeeBps) external restricted {
+        // TODO: We cannot verify that this wouldn't suddenly become less than any of the asset-specific fees.
+        // But should we?
         $storage().basicFeeBps = newBasicFeeBps;
     }
 
