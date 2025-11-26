@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.22;
 
 import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
@@ -486,9 +486,9 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 newPerSecondRate,
         uint256 anotherNewPerSecondRate
     ) public {
-        vm.assume(newPerSecondRate != anotherNewPerSecondRate);
         newPerSecondRate = _boundRate(newPerSecondRate);
         anotherNewPerSecondRate = _boundRate(anotherNewPerSecondRate);
+        vm.assume(newPerSecondRate != anotherNewPerSecondRate);
         vm.assume(bbv.getSubVaultIdByRate(newPerSecondRate) == 0);
         vm.assume(bbv.getSubVaultIdByRate(anotherNewPerSecondRate) == 0);
 
