@@ -32,6 +32,9 @@ library ErrorsLib {
     /// @notice Address checked is not message sender.
     error InvalidMessageSender();
 
+    /// @notice Thrown when input parameter contains unacceptable value.
+    error InvalidParameter();
+
     /// @notice Thrown when caller is not authorized.
     error NotAuthorized();
 

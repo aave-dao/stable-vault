@@ -1,21 +1,31 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {IWithdrawalFeeCalculator} from "../interfaces/IWithdrawalFeeCalculator.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {EfficientHashLib} from "@solady/utils/EfficientHashLib.sol";
 
+import {IWithdrawalFeeCalculator} from "../interfaces/IWithdrawalFeeCalculator.sol";
+import {ErrorsLib} from "../libraries/ErrorsLib.sol";
+
 contract WithdrawalFeeCalculator is IWithdrawalFeeCalculator, Ownable, EIP712 {
     bytes32 public constant WITHDRAWAL_FEE_TYPEHASH =
         keccak256("WithdrawalFee(address user,address assetOut,uint256 iouAmountRay,uint256 personalFee)");
 
+    uint256 internal constant BPS_BASE = 100_00; // TODO: Should we move this to constants lib?
+
     error InvalidSignature();
+
+    struct AssetFeeBpsConfig {
+        uint16 feeBps; // TODO: Remember which order these need to be and if that matters for further storage extension.
+        bool isSet;
+    }
 
     /// @custom:storage-location erc7201:aave.storage.WithdrawalFeeCalculator
     struct WithdrawalFeeCalculatorStorage {
-        uint256 basicFee;
+        uint256 basicFeeBps;
+        mapping(address asset => AssetFeeBpsConfig assetFeeBpsConfig) feeBpsConfigByAsset;
         mapping(address signer => bool isSigner) signers;
     }
 
@@ -43,24 +53,30 @@ contract WithdrawalFeeCalculator is IWithdrawalFeeCalculator, Ownable, EIP712 {
         returns (uint256)
     {
         if (data.length > 0) {
-            (uint256 personalFee, bytes memory signature) = abi.decode(data, (uint256, bytes));
-            _validateSignature(user, assetOut, iouAmountRay, personalFee, signature);
-            return personalFee;
+            // Is there a personal fee?
+            (uint256 personalFeeBps, bytes memory signature) = abi.decode(data, (uint256, bytes));
+            _validateSignature(user, assetOut, iouAmountRay, personalFeeBps, signature);
+            return iouAmountRay * personalFeeBps / 10000;
+        } else if ($storage().feeBpsConfigByAsset[assetOut].isSet) {
+            // Is there an asset-specific fee?
+            return iouAmountRay * $storage().feeBpsConfigByAsset[assetOut].feeBps / 10000;
+        } else {
+            // There's no personal or asset-specific fee, so it's the basic fee.
+            return iouAmountRay * $storage().basicFeeBps / 10000;
         }
-        return $storage().basicFee;
     }
 
     function _validateSignature(
         address user,
         address assetOut,
         uint256 iouAmountRay,
-        uint256 personalFee,
+        uint256 personalFeeBps,
         bytes memory signature
     ) internal view {
         // TODO: Should we replace this weird contraption with ignore lint [asm-keccak256]?
         // This saves a bit of gas, but looks non-standard.
         bytes32 structHash =
-            EfficientHashLib.hash(abi.encode(WITHDRAWAL_FEE_TYPEHASH, user, assetOut, iouAmountRay, personalFee));
+            EfficientHashLib.hash(abi.encode(WITHDRAWAL_FEE_TYPEHASH, user, assetOut, iouAmountRay, personalFeeBps));
         bytes32 digest = _hashTypedDataV4(structHash);
         address signer = ECDSA.recover(digest, signature);
         if (!$storage().signers[signer]) {
@@ -68,16 +84,28 @@ contract WithdrawalFeeCalculator is IWithdrawalFeeCalculator, Ownable, EIP712 {
         }
     }
 
-    function setBasicFee(uint256 newBasicFee) external onlyOwner {
-        $storage().basicFee = newBasicFee;
+    function setBasicFeeBps(uint256 newBasicFeeBps) external onlyOwner {
+        $storage().basicFeeBps = newBasicFeeBps;
+    }
+
+    function setAssetFeeBps(address asset, uint256 newAssetFeeBps, bool isSet) external onlyOwner {
+        require(newAssetFeeBps <= BPS_BASE, ErrorsLib.InvalidParameter());
+        // forge-lint: disable-next-line(unsafe-typecast)
+        $storage().feeBpsConfigByAsset[asset].feeBps = uint16(newAssetFeeBps);
+        $storage().feeBpsConfigByAsset[asset].isSet = isSet;
     }
 
     function setSigner(address signer, bool whitelistedSigner) external onlyOwner {
         $storage().signers[signer] = whitelistedSigner;
     }
 
-    function getBasicFee() external view returns (uint256) {
-        return $storage().basicFee;
+    function getBasicFeeBps() external view returns (uint256) {
+        return $storage().basicFeeBps;
+    }
+
+    // TODO: Should we replace this with two getters? getAssetFeeBps and isAssetFeeBpsSet?
+    function getAssetFeeBpsConfig(address asset) external view returns (AssetFeeBpsConfig memory) {
+        return $storage().feeBpsConfigByAsset[asset];
     }
 
     function isSigner(address signer) external view returns (bool) {
