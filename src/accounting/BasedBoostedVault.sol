@@ -166,9 +166,9 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         uint256 conversionRateRoundedUp = _previewSubVaultConversionRateRoundingUp(subVaultId);
         // Round down the amount of granted shares, so that the rounding is in favor of the protocol.
         uint256 shares = amountInRay.rayDivDown(conversionRateRoundedUp);
-        _accrueSubVaultConversionRate(subVaultId);
         // Prevent deposits that result in 0 shares (would cause withdrawal to fail)
         require(shares > 0, ErrorsLib.InvalidAmount());
+        _accrueSubVaultConversionRate(subVaultId);
 
         if (!_isActiveSubVaultById(subVaultId)) {
             _addSubVaultToActive(subVaultId);
