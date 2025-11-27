@@ -166,7 +166,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         uint256 conversionRateRoundedUp = _previewSubVaultConversionRateRoundingUp(subVaultId);
         // Round down the amount of granted shares, so that the rounding is in favor of the protocol.
         uint256 shares = amountInRay.rayDivDown(conversionRateRoundedUp);
-        // Prevent deposits that result in 0 shares (would cause withdrawal to fail)
+        // Prevent deposits that result in 0 shares to avoid user getting nothing in return for their deposit.
         require(shares > 0, ErrorsLib.InvalidAmount());
         _accrueSubVaultConversionRate(subVaultId);
 
@@ -176,6 +176,9 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
 
         $storage().subVaultById[subVaultId].totalShares += shares;
         $storage().positions[user].shares += shares;
+        // Require user position to have minimum share threshold to avoid sub-vault migration leading to depleting of
+        // shares to 0 (sub-vault migration uses a calculation which divides the users current shares).
+        require($storage().positions[user].shares >= ConstantsLib.MIN_SHARES_QUANTITY, ErrorsLib.InvalidAmount());
         $storage().positions[user].originalDepositRay += amountInRay;
         $storage().globalOriginalDepositsRay += amountInRay;
 
@@ -219,10 +222,6 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         if (requestedAmountInRay == 0) {
             (actualAmountInRay, guaranteedAmountRay, redeemedShares) = _fullWithdrawalRequest(user);
         } else {
-            uint256 requestedAmountInMaxSupportedDecimals = requestedAmountInRay.convertDecimals(
-                ConstantsLib.RAY_DECIMALS, ConstantsLib.MAX_SUPPORTED_ASSET_DECIMALS
-            );
-            require(requestedAmountInMaxSupportedDecimals > 0, ErrorsLib.InvalidAmount());
             (actualAmountInRay, guaranteedAmountRay, redeemedShares) =
                 _partialWithdrawalRequest(user, requestedAmountInRay);
         }
@@ -509,9 +508,12 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         // Round up the amount of shares to redeem for the requested amount of assets, so that the rounding is
         // in favor of the protocol.
         uint256 sharesToRedeem = requestedAmountInRay.rayDivUp(conversionRate);
-        // Withdrawal of partial amount should not allow the position to have amount < 1e9
-        // TODO: can this underflow?
-        require(sharesToRedeem <= $storage().positions[user].shares - 1e9, ErrorsLib.InvalidAmount());
+        // Do not allow the user position share quantity after the withdrawal to drop below the minimum share threshold.
+        // If this happens then the user is exepcted to just perform a full withdrawal.
+        require(
+            sharesToRedeem <= $storage().positions[user].shares - ConstantsLib.MIN_SHARES_QUANTITY,
+            ErrorsLib.InvalidAmount()
+        );
         _burnShares(user, sharesToRedeem);
         uint256 amountTakenFromOriginalDepositRay = _decrementOriginalDeposit(user, requestedAmountInRay);
 
