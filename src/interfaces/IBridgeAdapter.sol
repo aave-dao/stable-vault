@@ -27,9 +27,8 @@ interface IBridgeAdapter {
     /// @param feeAmount Amount of `feeToken` approved by `feePayer` to spend on fees.
     /// @param feeRefundThreshold Minimum amount of `feeToken` that must remain unused in order to trigger a refund to
     /// the `feePayer`.
-    /// @param gasLimit Total gas that should be allocated for executions that take place from the
-    /// message being processed on the
-    /// destination chain (including round trips).
+    /// @param gasLimit Total gas that should be allocated for executions that take place from the message being
+    /// processed on the destination chain (including round trips).
     /// @param data Arbitrary data that may be required by the bridge adapter to operate.
     struct BridgeParams {
         address feePayer;
