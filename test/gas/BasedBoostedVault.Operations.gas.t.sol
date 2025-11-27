@@ -5,6 +5,7 @@ import {BaseTest} from "../BaseTest.t.sol";
 
 import {IBasedBoostedVault} from "../../src/interfaces/IBasedBoostedVault.sol";
 import {AssetLib} from "../../src/libraries/AssetLib.sol";
+import {Strings} from "openzeppelin-contracts/contracts/utils/Strings.sol";
 
 contract BasedBoostedVaultOperationsGasTest is BaseTest {
     using AssetLib for uint256;
@@ -12,239 +13,258 @@ contract BasedBoostedVaultOperationsGasTest is BaseTest {
     string internal NAMESPACE = "BasedBoostedVault.Operations";
 
     uint256 amount = 100e6;
-    address user1 = makeAddr("USER1");
-    address user2 = makeAddr("USER2");
+    uint256 userSeed = 0;
 
     function setUp() public override {
         super.setUp();
+
+        // First deposit ever has some extra gas cost related to minting default sub-vault shares and adding it to the
+        // active sub-vaults array, which in practice should only happen once.
+        // Also, we want the default sub-vault to always remain as an active sub-vault after any operation, which is
+        // also the expected behavior in practice.
+        // This is why we make the following deposit from a user that will never interact again with the vault.
+        address user = _generateNewUser();
+        _mintAndApprove(user);
+        vm.prank(user);
+        vault.deposit(user, address(USDC), amount);
     }
 
-    function test_deposit() public {
-        // Context: deposits to the default sub-vault
+    function test_deposit_firstDepositFromUser_baseSubVault() public {
+        address user = _generateNewUser();
+        _mintAndApprove(user);
 
-        _seedUser(user1);
-        vm.prank(user1);
-        vault.deposit(user1, address(USDC), amount);
-        vm.snapshotGasLastCall(NAMESPACE, "deposit: user1 first deposit");
-
-        _seedUser(user1);
-        vm.prank(user1);
-        vault.deposit(user1, address(USDC), amount);
-        vm.snapshotGasLastCall(NAMESPACE, "deposit: user1 second deposit");
-
-        _seedUser(user2);
-        vm.prank(user2);
-        vault.deposit(user2, address(USDC), amount);
-        vm.snapshotGasLastCall(NAMESPACE, "deposit: user2 first deposit");
-
-        _seedUser(user2);
-        vm.prank(user2);
-        vault.deposit(user2, address(USDC), amount);
-        vm.snapshotGasLastCall(NAMESPACE, "deposit: user2 second deposit");
+        vm.prank(user);
+        vault.deposit(user, address(USDC), amount);
+        vm.snapshotGasLastCall(NAMESPACE, "[deposit] base sub-vault - user's 1st deposit");
     }
 
-    function test_setUserRate() public {
-        _seedUser(user1);
-        vm.prank(user1);
-        vault.deposit(user1, address(USDC), amount);
+    function test_deposit_secondDepositFromUser_baseSubVault() public {
+        address user = _generateNewUser();
 
-        _seedUser(user2);
-        vm.prank(user2);
-        vault.deposit(user2, address(USDC), amount);
+        _mintAndApprove(user);
+        vm.prank(user);
+        vault.deposit(user, address(USDC), amount);
 
-        address user3 = makeAddr("USER3");
-        _seedUser(user3);
-        vm.prank(user3);
-        vault.deposit(user3, address(USDC), amount);
+        _mintAndApprove(user);
+        vm.prank(user);
+        vault.deposit(user, address(USDC), amount);
+        vm.snapshotGasLastCall(NAMESPACE, "[deposit] base sub-vault - user's 2nd deposit");
+    }
+
+    function test_deposit_thirdDepositFromUser_baseSubVault() public {
+        address user = _generateNewUser();
+
+        _mintAndApprove(user);
+        vm.prank(user);
+        vault.deposit(user, address(USDC), amount);
+
+        _mintAndApprove(user);
+        vm.prank(user);
+        vault.deposit(user, address(USDC), amount);
+
+        _mintAndApprove(user);
+        vm.prank(user);
+        vault.deposit(user, address(USDC), amount);
+        vm.snapshotGasLastCall(NAMESPACE, "[deposit] base sub-vault - user's 3rd deposit");
+    }
+
+    function test_setUserRate_fromDefaultSubVaultToNewSubVault() public {
+        address user = _generateNewUser();
+
+        _mintAndApprove(user);
+        vm.prank(user);
+        vault.deposit(user, address(USDC), amount);
 
         uint256 newRate = 1_000000001547125957863212449; // 5% APY
         IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](1);
-        userRateData[0] = IBasedBoostedVault.UserRateData(user1, newRate);
+        userRateData[0] = IBasedBoostedVault.UserRateData(user, newRate);
 
         vm.prank(everyRoleAccount);
         vault.setUserRate(userRateData);
-        vm.snapshotGasLastCall(NAMESPACE, "setUserRate: count: 1");
-
-        newRate = 1_000000003022265980097387650; // 10% APY
-        userRateData = new IBasedBoostedVault.UserRateData[](2);
-        userRateData[0] = IBasedBoostedVault.UserRateData(user1, newRate);
-        userRateData[1] = IBasedBoostedVault.UserRateData(user2, newRate);
-
-        vm.prank(everyRoleAccount);
-        vault.setUserRate(userRateData);
-        vm.snapshotGasLastCall(NAMESPACE, "setUserRate: count: 2");
-
-        uint256 numberOfUsers = 11;
-        userRateData = new IBasedBoostedVault.UserRateData[](numberOfUsers - 1);
-        for (uint256 i = 0; i < numberOfUsers; i++) {
-            address user = makeAddr(string(abi.encodePacked("USER:", i)));
-            _seedUser(user);
-            vm.prank(user);
-            vault.deposit(user, address(USDC), amount);
-            // Do not change the rate for the last user so that the sub-vault remains in active set (to avoid gas refund
-            // for storage clearance).
-            if (i != numberOfUsers - 1) {
-                userRateData[i] = IBasedBoostedVault.UserRateData(user, newRate);
-            }
-        }
-
-        vm.prank(everyRoleAccount);
-        vault.setUserRate(userRateData);
-        vm.snapshotGasLastCall(NAMESPACE, "setUserRate: count: 10");
-
-        numberOfUsers = 101;
-        userRateData = new IBasedBoostedVault.UserRateData[](numberOfUsers - 1);
-        for (uint256 i = 0; i < numberOfUsers; i++) {
-            address user = makeAddr(string(abi.encodePacked("USER::", i)));
-            _seedUser(user);
-            vm.prank(user);
-            vault.deposit(user, address(USDC), amount);
-            // Do not change the rate for the last user so that the sub-vault remains in active set (to avoid gas refund
-            // for storage clearance).
-            if (i != numberOfUsers - 1) {
-                userRateData[i] = IBasedBoostedVault.UserRateData(user, newRate);
-            }
-        }
-
-        vm.prank(everyRoleAccount);
-        vault.setUserRate(userRateData);
-        vm.snapshotGasLastCall(NAMESPACE, "setUserRate: count: 100");
-
-        numberOfUsers = 1001;
-        userRateData = new IBasedBoostedVault.UserRateData[](numberOfUsers - 1);
-        for (uint256 i = 0; i < numberOfUsers; i++) {
-            address user = makeAddr(string(abi.encodePacked("USER:::", i)));
-            _seedUser(user);
-            vm.prank(user);
-            vault.deposit(user, address(USDC), amount);
-            // Do not change the rate for the last user so that the sub-vault remains in active set (to avoid gas refund
-            // for storage clearance).
-            if (i != numberOfUsers - 1) {
-                userRateData[i] = IBasedBoostedVault.UserRateData(user, newRate);
-            }
-        }
-
-        vm.prank(everyRoleAccount);
-        vault.setUserRate(userRateData);
-        vm.snapshotGasLastCall(NAMESPACE, "setUserRate: count: 1000");
+        vm.snapshotGasLastCall(NAMESPACE, "[setUserRate] default sub-vault to new sub-vault - 1 user");
     }
 
-    function test_setUserRate_differentRates() public {
-        // Context: each user will migrate to a unique and net new sub-vault which requires new storage writes.
+    function test_setUserRate_10Users_fromDefaultSubVaultToSameNewSubVault() public {
+        uint256 numberOfUsers = 10;
+        uint256 newRate = 1_000000001547125957863212449; // 5% APY
+        IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](numberOfUsers);
+        for (uint256 i = 0; i < numberOfUsers; i++) {
+            address user = _generateNewUser();
+            _mintAndApprove(user);
+            vm.prank(user);
+            vault.deposit(user, address(USDC), amount);
+            userRateData[i] = IBasedBoostedVault.UserRateData(user, newRate);
+        }
 
+        vm.prank(everyRoleAccount);
+        vault.setUserRate(userRateData);
+        vm.snapshotGasLastCall(NAMESPACE, "[setUserRate] default sub-vault to same new sub-vault - 10 users");
+    }
+
+    function test_setUserRate_100Users_fromDefaultSubVaultToSameNewSubVault() public {
+        uint256 numberOfUsers = 100;
+        uint256 newRate = 1_000000001547125957863212449; // 5% APY
+        IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](numberOfUsers);
+        for (uint256 i = 0; i < numberOfUsers; i++) {
+            address user = _generateNewUser();
+            _mintAndApprove(user);
+            vm.prank(user);
+            vault.deposit(user, address(USDC), amount);
+            userRateData[i] = IBasedBoostedVault.UserRateData(user, newRate);
+        }
+
+        vm.prank(everyRoleAccount);
+        vault.setUserRate(userRateData);
+        vm.snapshotGasLastCall(NAMESPACE, "[setUserRate] default sub-vault to same new sub-vault - 100 users");
+    }
+
+    function test_setUserRate_1000Users_fromDefaultSubVaultToSameNewSubVault() public {
+        uint256 numberOfUsers = 1000;
+        uint256 newRate = 1_000000001547125957863212449; // 5% APY
+        IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](numberOfUsers);
+        for (uint256 i = 0; i < numberOfUsers; i++) {
+            address user = _generateNewUser();
+            _mintAndApprove(user);
+            vm.prank(user);
+            vault.deposit(user, address(USDC), amount);
+            userRateData[i] = IBasedBoostedVault.UserRateData(user, newRate);
+        }
+
+        vm.prank(everyRoleAccount);
+        vault.setUserRate(userRateData);
+        vm.snapshotGasLastCall(NAMESPACE, "[setUserRate] default sub-vault to same new sub-vault - 1000 users");
+    }
+
+    function test_setUserRate_10Users_fromDefaultSubVaultToAllNewDifferentSubVaults() public {
         uint256 newRate = 1_000000001547125957863212449;
-        IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](0);
 
-        uint256 numberOfUsers = 11;
-        userRateData = new IBasedBoostedVault.UserRateData[](numberOfUsers - 1);
+        uint256 numberOfUsers = 10;
+        IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](numberOfUsers);
         for (uint256 i = 0; i < numberOfUsers; i++) {
-            address user = makeAddr(string(abi.encodePacked("USER:", i)));
-            _seedUser(user);
+            address user = _generateNewUser();
+            _mintAndApprove(user);
             vm.prank(user);
             vault.deposit(user, address(USDC), amount);
-            // Do not change the rate for the last user so that the sub-vault remains in active set (to avoid gas refund
-            // for storage clearance).
-            if (i != numberOfUsers - 1) {
-                userRateData[i] = IBasedBoostedVault.UserRateData(user, newRate++);
-            }
+
+            userRateData[i] = IBasedBoostedVault.UserRateData(user, ++newRate);
         }
 
         vm.prank(everyRoleAccount);
         vault.setUserRate(userRateData);
-        vm.snapshotGasLastCall(NAMESPACE, "setUserRate (different rates): count: 10");
-
-        numberOfUsers = 101;
-        userRateData = new IBasedBoostedVault.UserRateData[](numberOfUsers - 1);
-        for (uint256 i = 0; i < numberOfUsers; i++) {
-            address user = makeAddr(string(abi.encodePacked("USER::", i)));
-            _seedUser(user);
-            vm.prank(user);
-            vault.deposit(user, address(USDC), amount);
-            // Do not change the rate for the last user so that the sub-vault remains in active set (to avoid gas refund
-            // for storage clearance).
-            if (i != numberOfUsers - 1) {
-                userRateData[i] = IBasedBoostedVault.UserRateData(user, newRate++);
-            }
-        }
-
-        vm.prank(everyRoleAccount);
-        vault.setUserRate(userRateData);
-        vm.snapshotGasLastCall(NAMESPACE, "setUserRate (different rates): count: 100");
-
-        numberOfUsers = 1001;
-        userRateData = new IBasedBoostedVault.UserRateData[](numberOfUsers - 1);
-        for (uint256 i = 0; i < numberOfUsers; i++) {
-            address user = makeAddr(string(abi.encodePacked("USER:::", i)));
-            _seedUser(user);
-            vm.prank(user);
-            vault.deposit(user, address(USDC), amount);
-            // Do not change the rate for the last user so that the sub-vault remains in active set (to avoid gas refund
-            // for storage clearance).
-            if (i != numberOfUsers - 1) {
-                userRateData[i] = IBasedBoostedVault.UserRateData(user, newRate++);
-            }
-        }
-
-        vm.prank(everyRoleAccount);
-        vault.setUserRate(userRateData);
-        vm.snapshotGasLastCall(NAMESPACE, "setUserRate (different rates): count: 1000");
+        vm.snapshotGasLastCall(NAMESPACE, "[setUserRate] default sub-vault to all new different sub-vaults - 10 users");
     }
 
-    function test_requestWithdrawal() public {
-        _seedUser(user1);
-        vm.prank(user1);
-        vault.deposit(user1, address(USDC), amount);
+    function test_setUserRate_100Users_fromDefaultSubVaultToAllNewDifferentSubVaults() public {
+        uint256 newRate = 1_000000001547125957863212449;
 
-        _seedUser(user2);
-        vm.prank(user2);
-        vault.deposit(user2, address(USDC), amount);
+        uint256 numberOfUsers = 100;
+        IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](numberOfUsers);
+        for (uint256 i = 0; i < numberOfUsers; i++) {
+            address user = _generateNewUser();
+            _mintAndApprove(user);
+            vm.prank(user);
+            vault.deposit(user, address(USDC), amount);
+
+            userRateData[i] = IBasedBoostedVault.UserRateData(user, ++newRate);
+        }
+
+        vm.prank(everyRoleAccount);
+        vault.setUserRate(userRateData);
+        vm.snapshotGasLastCall(NAMESPACE, "[setUserRate] default sub-vault to all new different sub-vaults - 100 users");
+    }
+
+    function test_setUserRate_1000Users_fromDefaultSubVaultToAllNewDifferentSubVaults() public {
+        uint256 newRate = 1_000000001547125957863212449;
+
+        uint256 numberOfUsers = 1000;
+        IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](numberOfUsers);
+        for (uint256 i = 0; i < numberOfUsers; i++) {
+            address user = _generateNewUser();
+            _mintAndApprove(user);
+            vm.prank(user);
+            vault.deposit(user, address(USDC), amount);
+
+            userRateData[i] = IBasedBoostedVault.UserRateData(user, ++newRate);
+        }
+
+        vm.prank(everyRoleAccount);
+        vault.setUserRate(userRateData);
+        vm.snapshotGasLastCall(
+            NAMESPACE, "[setUserRate] default sub-vault to all new different sub-vaults - 1000 users"
+        );
+    }
+
+    function test_requestWithdrawal_partialWithdrawal() public {
+        address user = _generateNewUser();
+
+        _mintAndApprove(user);
+        vm.prank(user);
+        vault.deposit(user, address(USDC), amount);
 
         uint256 partialWithdrawalAmountRay = (amount / 2).assetDecimalsToRay(address(USDC));
 
-        vm.prank(user1);
-        vault.requestWithdrawal(user1, partialWithdrawalAmountRay);
-        vm.snapshotGasLastCall(NAMESPACE, "requestWithdrawal: user1 requests partial withdrawal");
-
-        vm.prank(user2);
-        vault.requestWithdrawal(user2, partialWithdrawalAmountRay);
-        vm.snapshotGasLastCall(NAMESPACE, "requestWithdrawal: user2 requests partial withdrawal");
-
-        vm.prank(user1);
-        vault.requestWithdrawal(user1, 0);
-        vm.snapshotGasLastCall(NAMESPACE, "requestWithdrawal: user1 requests full withdrawal");
-
-        vm.prank(user2);
-        vault.requestWithdrawal(user2, 0);
-        vm.snapshotGasLastCall(NAMESPACE, "requestWithdrawal: user2 requests full withdrawal");
+        vm.prank(user);
+        vault.requestWithdrawal(user, partialWithdrawalAmountRay);
+        vm.snapshotGasLastCall(NAMESPACE, "[requestWithdrawal] partial withdrawal");
     }
 
-    function test_executeWithdrawal() public {
-        _seedUser(user1);
-        vm.prank(user1);
-        vault.deposit(user1, address(USDC), amount);
+    function test_requestWithdrawal_fullWithdrawal() public {
+        address user = _generateNewUser();
 
-        _seedUser(user2);
-        vm.prank(user2);
-        vault.deposit(user2, address(USDC), amount);
+        _mintAndApprove(user);
+        vm.prank(user);
+        vault.deposit(user, address(USDC), amount);
 
-        uint256 amountToWithdrawRay = amount.assetDecimalsToRay(address(USDC));
+        uint256 fullWithdrawalAmountRay = amount.assetDecimalsToRay(address(USDC));
 
-        vm.prank(user1);
-        vault.requestWithdrawal(user1, amountToWithdrawRay);
-
-        vm.prank(user2);
-        vault.requestWithdrawal(user2, amountToWithdrawRay);
-
-        vm.prank(user1);
-        vault.executeWithdrawal(user1, address(USDC), amountToWithdrawRay, "");
-        vm.snapshotGasLastCall(NAMESPACE, "executeWithdrawal: user1 executes withdrawal");
-
-        vm.prank(user2);
-        vault.executeWithdrawal(user2, address(USDC), amountToWithdrawRay, "");
-        vm.snapshotGasLastCall(NAMESPACE, "executeWithdrawal: user2 executes withdrawal");
+        vm.prank(user);
+        vault.requestWithdrawal(user, fullWithdrawalAmountRay);
+        vm.snapshotGasLastCall(NAMESPACE, "[requestWithdrawal] full withdrawal");
     }
 
-    function _seedUser(address user) internal {
+    function test_executeWithdrawal_partialWithdrawal() public {
+        address user = _generateNewUser();
+
+        _mintAndApprove(user);
+        vm.prank(user);
+        vault.deposit(user, address(USDC), amount);
+
+        uint256 partialWithdrawalAmountRay = (amount / 2).assetDecimalsToRay(address(USDC));
+
+        vm.prank(user);
+        vault.requestWithdrawal(user, partialWithdrawalAmountRay);
+
+        vm.prank(user);
+        vault.executeWithdrawal(user, address(USDC), partialWithdrawalAmountRay, "");
+        vm.snapshotGasLastCall(NAMESPACE, "[executeWithdrawal] partial withdrawal");
+    }
+
+    function test_executeWithdrawal_fullWithdrawal() public {
+        address user = _generateNewUser();
+
+        _mintAndApprove(user);
+        vm.prank(user);
+        vault.deposit(user, address(USDC), amount);
+
+        uint256 fullWithdrawalAmountRay = amount.assetDecimalsToRay(address(USDC));
+
+        vm.prank(user);
+        vault.requestWithdrawal(user, fullWithdrawalAmountRay);
+
+        vm.prank(user);
+        vault.executeWithdrawal(user, address(USDC), fullWithdrawalAmountRay, "");
+        vm.snapshotGasLastCall(NAMESPACE, "[executeWithdrawal] full withdrawal");
+    }
+
+    function _generateNewUser() internal returns (address) {
+        return _generateUser(userSeed++);
+    }
+
+    function _generateUser(uint256 seed) internal returns (address) {
+        return makeAddr(string.concat("USER[", Strings.toString(seed), "]"));
+    }
+
+    function _mintAndApprove(address user) internal {
         USDC.mint(user, amount);
         vm.prank(user);
         USDC.approve(address(vault), amount);
