@@ -17,6 +17,9 @@ import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {TransferHelperClient} from "./TransferHelperClient.sol";
 
+/// @title Allocator
+/// @author Aave Labs
+/// @notice Allocator contract for managing asset allocations into yield strategies.
 /// @dev Assumptions:
 ///      - 1 default strategy per asset which serves as the first strategy to deposit to/withdraw from.
 ///      - multiple allowed strategies per asset which require manual rebalancing
@@ -27,6 +30,10 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, IAllocator
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
 
+    /// @notice The data for a strategy.
+    /// @param asset Address of the asset that the strategy is for.
+    /// @param indexInAssetStrategies Index of the strategy in the asset's strategies array.
+    /// @param indexInAllStrategies Index of the strategy in the all strategies array.
     struct StrategyData {
         address asset;
         uint32 indexInAssetStrategies;
@@ -180,7 +187,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, IAllocator
     }
 
     /// @inheritdoc IAllocator
-    function setDefaultStrategy(address asset, address strategy) external restricted {
+    function setDefaultStrategy(address asset, address strategy) external override restricted {
         // Strategy must be allowed to be set as the default strategy for the asset
         require(strategy != $storage().defaultStrategyByAsset[asset], ErrorsLib.AddressAlreadyWhitelisted());
         require(_isStrategySupportedForAsset({strategy: strategy, asset: asset}), ErrorsLib.AddressNotWhitelisted());

@@ -6,9 +6,13 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {IRescuableAssets} from "../interfaces/IRescuableAssets.sol";
 
+/// @title RescuableAssets
+/// @author Aave Labs
+/// @notice Abstract base contract for contracts that can rescue tokens.
 contract RescuableAssets is IRescuableAssets {
     using SafeERC20 for IERC20;
 
+    /// @inheritdoc IRescuableAssets
     function rescueTokens(address asset, uint256 amount) public virtual override {
         // TODO: send to treasury? If so can make this public.
         IERC20(asset).safeTransfer(msg.sender, amount);

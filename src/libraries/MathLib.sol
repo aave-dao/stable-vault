@@ -3,6 +3,9 @@ pragma solidity ^0.8.22;
 
 import {FixedPointMathLib} from "@solady/utils/FixedPointMathLib.sol";
 
+/// @title MathLib
+/// @author Aave Labs
+/// @notice Util library for math operations.
 library MathLib {
     uint256 constant RAY = 1e27;
 

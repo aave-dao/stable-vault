@@ -18,6 +18,7 @@ import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {BaseBridgeAdapter} from "./BaseBridgeAdapter.sol";
 
 /// @title CcipAdapter
+/// @author Aave Labs
 /// @notice Adapter for sending and receiving messages via Chainlink CCIP.
 contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
     using SafeERC20 for IERC20;
@@ -39,21 +40,29 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
         _;
     }
 
+    /// @dev Constructor.
+    /// @param accessManager Address of the IAccessManager contract used for handling access control.
+    /// @param gateway Address of the Gateway contract.
+    /// @param ccipRouter Address of the Chainlink CCIP router.
+    /// @param transferHelper Address of the TransferHelper contract.
     constructor(address accessManager, address gateway, address ccipRouter, address transferHelper)
         BaseBridgeAdapter(accessManager, gateway, transferHelper)
     {
         CCIP_ROUTER = ccipRouter;
     }
 
-    function getRouter() external view returns (address) {
+    /// @inheritdoc ICcipBridgeAdapter
+    function getRouter() external view override returns (address) {
         return address(CCIP_ROUTER);
     }
 
-    function getChainSelector(uint256 chainId) external view returns (uint64) {
+    /// @inheritdoc ICcipBridgeAdapter
+    function getChainSelector(uint256 chainId) external view override returns (uint64) {
         return _chainSelectorOf[chainId];
     }
 
-    function getChainId(uint64 ccipChainSelector) external view returns (uint256) {
+    /// @inheritdoc ICcipBridgeAdapter
+    function getChainId(uint64 ccipChainSelector) external view override returns (uint256) {
         return _chainIdOf[ccipChainSelector];
     }
 

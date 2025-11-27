@@ -11,6 +11,8 @@ contract MockBridgeAdapter is IBridgeAdapter {
         TRANSFER_HELPER = transferHelper;
     }
 
+    function getGateway() external view override returns (address) {}
+
     function publishMessageToChainWithFeePayer(
         uint256 destinationChainId,
         IBridgeAdapter.BridgeAsset[] memory assets,

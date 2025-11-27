@@ -3,6 +3,9 @@ pragma solidity ^0.8.22;
 
 import {IBridgeAdapter} from "./IBridgeAdapter.sol";
 
+/// @title IIouTokenManager
+/// @author Aave Labs
+/// @notice Interface for the IOU token manager.
 interface IIouTokenManager {
     /// @notice Thrown when the amount of locked tokens is insufficient to burn or release.
     /// @custom:selector 0xb646ec7b
@@ -13,10 +16,10 @@ interface IIouTokenManager {
     /// @custom:selector 0x4f0475a7
     error OnlyAccountingChain();
 
-    /// @return address of the IOU token.
+    /// @notice Returns the address of the IOU token.
     function getAsset() external view returns (address);
 
-    /// @return the locked balance of the IOU token.
+    /// @notice Returns the locked balance of the IOU token.
     function getLockedBalance() external view returns (uint256);
 
     /// @notice Entry point for IOU token owners to bridge tokens to a destination chain.
@@ -34,18 +37,24 @@ interface IIouTokenManager {
 
     /// @notice Mints tokens and transfers them to the caller (assumes this contract has mint privileges on the IOU
     /// token).
+    /// @param to Address to mint the tokens to.
+    /// @param amount Amount of tokens to mint.
     function mintTokens(address to, uint256 amount) external;
 
     /// @notice Burns tokens and transfers them to the caller (assumes this contract has burn privileges on the IOU
     /// token).
+    /// @param from Address to burn the tokens from.
+    /// @param amount Amount of tokens to burn.
     function burnTokens(address from, uint256 amount) external;
 
     /// @notice Burns locked tokens.
+    /// @dev This is used only on the Accounting chain because tokens are only locked when bridging to an Earning chain.
+    /// @param amount Amount of locked tokens to burn.
     function burnLockedTokens(uint256 amount) external;
 
     /// @notice Unlocks tokens and transfers them to the caller.
     /// @dev This is used if IOU tokens are bridged back to the Accounting chain.
-    /// @param to The address to send the unlocked IOU tokens to.
-    /// @param amount The amount of IOU tokens to release.
+    /// @param to Address to send the unlocked IOU tokens to.
+    /// @param amount Amount of IOU tokens to release.
     function releaseTokens(address to, uint256 amount) external;
 }

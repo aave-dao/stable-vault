@@ -20,6 +20,7 @@ import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {MathLib} from "../libraries/MathLib.sol";
 
 /// @title BasedBoostedVault.
+/// @author Aave Labs
 /// @notice Semi-fixed rate vault.
 /// @dev Assets balances are tracked in RAY internally; conversions from and to specific asset denomination is made on
 /// deposit and on withdrawal execution.
@@ -121,9 +122,9 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
     }
 
     /// @dev Initializer.
-    /// @param accessManager The address of the IAccessManager contract used for handling access control.
-    /// @param defaultSubVaultPerSecondRate The base per-second rate, in Ray units (27 decimals).
-    /// @param assetRegistry The address of the contract that manages the permissions for handling assets.
+    /// @param accessManager Address of the IAccessManager contract used for handling access control.
+    /// @param defaultSubVaultPerSecondRate Base per-second rate, in Ray units (27 decimals).
+    /// @param assetRegistry Address of the AssetRegistry contract that manages the permissions for handling assets.
     function initialize(address accessManager, uint256 defaultSubVaultPerSecondRate, address assetRegistry)
         external
         virtual
@@ -186,7 +187,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
     }
 
     /// @inheritdoc IBasedBoostedVault
-    function setSubVaultRate(uint256 subVaultId, uint256 newPerSecondRate) external restricted {
+    function setSubVaultRate(uint256 subVaultId, uint256 newPerSecondRate) external override restricted {
         _validateRate(newPerSecondRate);
         require(!_existsSubVaultWithRate(newPerSecondRate), SubVaultAlreadyExists());
         require(_existsSubVaultWithId(subVaultId), SubVaultDoesNotExist());
@@ -356,7 +357,8 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         return $storage().subVaultIdByRate[perSecondRate];
     }
 
-    function getMaxValidPerSecondRate() external view returns (uint256) {
+    /// @inheritdoc IBasedBoostedVault
+    function getMaxValidPerSecondRate() external view override returns (uint256) {
         return MAX_VALID_PER_SECOND_RATE;
     }
 

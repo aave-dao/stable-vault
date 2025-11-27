@@ -15,6 +15,7 @@ import {TransferHelperClient} from "./TransferHelperClient.sol";
 // TODO: add events
 
 /// @title IouTokenManager
+/// @author Aave Labs
 /// @notice Manages the IOU token locking, releasing, minting, burning.
 contract IouTokenManager is TransferHelperClient, IIouTokenManager {
     using SafeERC20 for IERC20;
@@ -63,6 +64,12 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
         _;
     }
 
+    /// @dev Constructor.
+    /// @param iouToken Address of the IOU token.
+    /// @param chainGateway Address of the ChainGateway contract.
+    /// @param vault Address of the Vault contract.
+    /// @param transferHelper Address of the TransferHelper contract.
+    /// @param isAccountingChain Whether the current chain is the Accounting chain.
     constructor(address iouToken, address chainGateway, address vault, address transferHelper, bool isAccountingChain)
         TransferHelperClient(transferHelper)
     {
@@ -72,11 +79,13 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
         IS_ACCOUNTING_CHAIN = isAccountingChain;
     }
 
+    /// @inheritdoc IIouTokenManager
     function getAsset() external view override returns (address) {
         return IOU_TOKEN;
     }
 
-    function getLockedBalance() external view returns (uint256) {
+    /// @inheritdoc IIouTokenManager
+    function getLockedBalance() external view override returns (uint256) {
         return $storage().lockedBalance;
     }
 

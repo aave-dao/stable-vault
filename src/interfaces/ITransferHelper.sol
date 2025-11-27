@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
+/// @title ITransferHelper
+/// @author Aave Labs
+/// @notice Interface for the TransferHelper contract.
 interface ITransferHelper {
     /// @notice Allows the caller to pull assets from the contract. Essentially, to do transfers from the contract to
     /// the caller.

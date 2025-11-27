@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
+/// @title IAllocator
+/// @author Aave Labs
+/// @notice Interface for the Allocator contract.
 interface IAllocator {
     event AssetDeallocated(address indexed asset, address indexed strategy, uint256 amount);
 
     event AssetAllocated(address indexed asset, address indexed strategy, uint256 amount);
 
-    /// @notice emitted when funds fails to deposit to yield strategy and left idle in Allocator.
     event StrategyDepositFailed(address indexed strategy, uint256 amount);
 
     event StrategyAdded(address indexed asset, address indexed strategy);
@@ -19,32 +21,54 @@ interface IAllocator {
     /// @custom:selector 0x3868bf52
     error DepositIntoStrategyFailed(address strategy);
 
+    /// @notice The representation of an asset balance.
+    /// @param asset Address of the asset.
+    /// @param amount Amount of the asset.
     struct AllocatorBalance {
         address asset;
         uint256 amount;
     }
 
+    /// @notice The parameters for a deallocation.
+    /// @param asset Address of the asset to deallocate.
+    /// @param strategy Address of the strategy to deallocate from.
+    /// @param amount Amount of the asset to deallocate (zero amount indicates max deallocation of `asset` from
+    /// `strategy`).
     struct DeallocationParams {
         address asset;
         address strategy;
-        uint256 amount; // Zero amount indicates max deallocation of `asset` from `strategy`
+        uint256 amount;
     }
 
+    /// @notice The parameters for a swap.
+    /// @param assetIn Address of the asset to swap from.
+    /// @param amountIn Amount of the asset to swap from.
+    /// @param assetOut Address of the asset to swap to.
+    /// @param swapper Address of the swapper contract.
+    /// @param data Custom data that may be required by the swapper to execute the swap.
     struct SwapParams {
         address assetIn;
         uint256 amountIn;
         address assetOut;
         address swapper;
-        bytes data; // Custom data that may be required by the swapper to execute the swap
+        bytes data;
     }
 
+    /// @notice The parameters for an allocation.
+    /// @param asset Address of the asset to allocate.
+    /// @param strategy Address of the strategy to allocate to.
+    /// @param amount Amount of the asset to allocate (zero amount indicates max allocation of `asset` balance to
+    /// `strategy`).
     struct AllocationParams {
         address asset;
         address strategy;
-        uint256 amount; // Zero amount indicates max allocation of `asset` balance to `strategy`
+        uint256 amount;
     }
 
-    /// @dev A rebalance is a combination of deallocations, swaps, and allocations.
+    /// @notice The parameters for a rebalance which is an ordered combination of deallocations, swaps, and allocations.
+    /// @param deallocations Array of deallocation parameters.
+    /// @param swaps Array of swap parameters.
+    /// @param allocations Array of allocation parameters.
     /// @dev The rebalance will follow a strict order of:
     ///         Step 1. Execute all deallocations in the order specified by the deallocations array.
     ///         Step 2. Execute all swaps in the order specified by the swaps array.
@@ -55,18 +79,20 @@ interface IAllocator {
         AllocationParams[] allocations;
     }
 
-    /// @dev Returns an array of balances where each amount is denominated in the corresponding asset's decimals.
+    /// @notice Returns an array of balances where each amount is denominated in the corresponding asset's decimals.
     function getAssetBalances() external view returns (AllocatorBalance[] memory);
 
-    /// @dev Returns yield strategy for a given asset.
+    /// @notice Returns yield strategy for a given asset.
     function getDefaultStrategy(address asset) external view returns (address);
 
-    /// @dev Returns if a given strategy is supported for allocating to or deallocating from a given asset.
+    /// @notice Returns if a given strategy is supported for allocating to or deallocating from a given asset.
     function isStrategySupportedForAsset(address asset, address strategy) external view returns (bool);
 
-    /// @dev Returns if a given strategy is supported for allocating or deallocating, regardless of the asset.
+    /// @notice Returns if a given strategy is supported for allocating or deallocating, regardless of the asset.
     function isStrategySupported(address strategy) external view returns (bool);
 
+    /// @notice Deposits a given amount of an asset into the default strategy
+    /// for the asset.
     function deposit(address asset, uint256 amount) external;
 
     /// @notice Rebalances underlying assets.
@@ -74,24 +100,23 @@ interface IAllocator {
     /// swaps between assets, and allocation of assets to strategies.
     function rebalance(RebalanceParams[] memory params) external;
 
-    /// @notice Withdraws a given amount of an asset from the immediate liquidity strategy a.k.a the default strategy
-    /// strategy for the asset.
+    /// @notice Withdraws a given amount of an asset from the default strategy for the given asset.
     /// @dev Prioritizes idle funds, default strategy, then non-default strategy(s).
-    /// @param asset Asset to withdraw.
+    /// @param asset Address of the asset to withdraw.
     /// @param amount Amount of the asset to withdraw.
     function withdraw(address asset, uint256 amount) external;
 
-    /// @dev Adds a new yield strategy to the allocator.
-    /// @param asset The asset to add the strategy for.
-    /// @param strategy The ERC-4626 strategy address.
+    /// @notice Adds a new yield strategy to the allocator.
+    /// @param asset Address of the asset to add the strategy for.
+    /// @param strategy Address of the ERC-4626 strategy to add.
     function addStrategy(address asset, address strategy) external;
 
-    /// @dev Removes a yield strategy from the allocator.
-    /// @param strategy The ERC-4626 strategy address to remove.
+    /// @notice Removes a yield strategy from the allocator.
+    /// @param strategy Address of the ERC-4626 strategy to remove.
     function removeStrategy(address strategy) external;
 
-    /// @dev Sets the default yield strategy for an asset.
-    /// @param asset The asset to set the default strategy for.
-    /// @param strategy The ERC-4626 strategy address to set as the default.
+    /// @notice Sets the default yield strategy for an asset.
+    /// @param asset Address of the asset to set the default strategy for.
+    /// @param strategy Address of the ERC-4626 strategy to set as the default.
     function setDefaultStrategy(address asset, address strategy) external;
 }

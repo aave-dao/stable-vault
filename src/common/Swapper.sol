@@ -4,25 +4,29 @@ pragma solidity ^0.8.22;
 import {ISwapper} from "../interfaces/ISwapper.sol";
 import {AssetLib} from "../libraries/AssetLib.sol";
 
+import {ConstantsLib} from "../libraries/ConstantsLib.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /// @title Swapper
-/// @notice Executes swaps through approved routers and selectors with slippage & access control.
+/// @author Aave Labs
+/// @notice Swapper contract for executing swaps with slippage & access control.
 contract Swapper is ISwapper, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
 
-    uint256 internal constant MAX_BPS = 10_000;
+    /// @dev Constructor.
+    /// @param allocator Address of the allocator which is the owner of the Swapper.
+    constructor(address allocator) Ownable(allocator) {}
 
-    constructor(address owner) Ownable(owner) {}
-
+    /// @notice The parameters for the slippage tolerance.
+    /// @param slippageToleranceBps The slippage tolerance in basis points.
+    /// @param slippageCoverageSource The account which must approve the Swapper to pull `assetOut` to cover slippage,
+    /// fees, etc.
     struct SlippageParams {
-        // Accounts for anything that reduces the amount out i.e. slippage, fees, etc.
         uint16 slippageToleranceBps;
-        // The account which much approve the Swapper to pull assetOut to cover slippage, fees, etc.
         address slippageCoverageSource;
     }
 
@@ -30,6 +34,7 @@ contract Swapper is ISwapper, Ownable, ReentrancyGuard {
     /// @dev Assumes `amountIn` tokens of `assetIn` were sent from the msg.sender
     function executeSwap(address assetIn, address assetOut, uint256 amountIn, bytes memory data)
         external
+        override
         onlyOwner
         nonReentrant
         returns (uint256)
@@ -69,6 +74,6 @@ contract Swapper is ISwapper, Ownable, ReentrancyGuard {
         pure
         returns (uint256)
     {
-        return expectedAmountOut * (MAX_BPS - slippageToleranceBps) / MAX_BPS;
+        return expectedAmountOut * (ConstantsLib.MAX_BPS - slippageToleranceBps) / ConstantsLib.MAX_BPS;
     }
 }

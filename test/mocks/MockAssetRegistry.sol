@@ -16,6 +16,11 @@ contract MockAssetRegistry is IAssetRegistry {
 
     function setAssetConfig(address asset, AssetConfig memory config) external override {}
 
+    function disableDeposits(address asset, bool disableUserDeposits, bool disableAllocatorDeposits)
+        external
+        override
+    {}
+
     function mockToAllowAssetDepositsIntoBBV(address asset) external {
         _isNotAllowedToDepositIntoBBV[asset] = false;
     }

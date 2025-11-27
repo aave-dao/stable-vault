@@ -6,7 +6,7 @@ import {AccessManager} from "@openzeppelin/contracts/access/manager/AccessManage
 contract ExtendedAccessManager is AccessManager {
     constructor(address initialAdmin) AccessManager(initialAdmin) {}
 
-    // @inheritdoc AccessManager
+    /// @inheritdoc AccessManager
     function expiration() public pure override returns (uint32) {
         return 21 days;
     }

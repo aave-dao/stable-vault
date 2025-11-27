@@ -13,6 +13,7 @@ import {IIouTokenManager} from "../interfaces/IIouTokenManager.sol";
 import {ConstantsLib} from "../libraries/ConstantsLib.sol";
 
 /// @title AccountingChainGateway
+/// @author Aave Labs
 /// @notice Facilitates cross chain messaging one or more Earning Chains.
 contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
     using SafeERC20 for IERC20;
@@ -70,7 +71,7 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
         if (crossChainMessage.messageType == IChainGateway.MessageType.BALANCE_SNAPSHOT) {
             _updateChainBalanceSnapshot(sourceChainId, crossChainMessage.data);
         } else if (crossChainMessage.messageType == IChainGateway.MessageType.BRIDGE_IOU_TOKEN) {
-            _bridgeIouTokenFromEarningChain(sourceChainId, crossChainMessage.data);
+            _bridgeIouTokenFromEarningChain(crossChainMessage.data);
         } else if (crossChainMessage.messageType == IChainGateway.MessageType.BURN_IOU_TOKEN) {
             _burnIouToken(sourceChainId, crossChainMessage.data);
         } else {
@@ -78,13 +79,7 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
         }
     }
 
-    function _bridgeIouTokenFromEarningChain(
-        uint256,
-        /* sourceChainId */
-        bytes memory data
-    )
-        internal
-    {
+    function _bridgeIouTokenFromEarningChain(bytes memory data) internal {
         IChainGateway.IouTokenBridgeMessage memory iouTokenBridgeMessage =
             abi.decode(data, (IChainGateway.IouTokenBridgeMessage));
         IIouTokenManager(IOU_TOKEN_MANAGER).releaseTokens(iouTokenBridgeMessage.recipient, iouTokenBridgeMessage.amount);
