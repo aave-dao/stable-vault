@@ -162,6 +162,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
 
         uint256 conversionRate = $storage().subVaultById[subVaultId].conversionRate;
         uint256 amountInRay = amount.assetDecimalsToRay(asset);
+        // Round down the amount of granted shares, so that the rounding is in favor of the protocol.
         uint256 shares = amountInRay.rayDivDown(conversionRate);
 
         if (!_isActiveSubVaultById(subVaultId)) {
@@ -328,6 +329,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         if ($storage().positions[user].shares == 0) {
             return 0;
         }
+        // Round down the user balance, so that the rounding is in favor of the protocol.
         return $storage().positions[user].shares
             .rayMulDown(_previewSubVaultConversionRate($storage().positions[user].subVaultId));
     }
@@ -400,6 +402,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         uint256 oldConversionRate = $storage().subVaultById[oldSubVaultId].conversionRate;
         uint256 newConversionRate = $storage().subVaultById[newSubVaultId].conversionRate;
         uint256 userOldShares = $storage().positions[user].shares;
+        // Round down the amount of shares after sub-vault migration, so that the rounding is in favor of the protocol.
         uint256 userNewShares = userOldShares.rayMulDown(oldConversionRate).rayDivDown(newConversionRate);
 
         if (!_isActiveSubVaultById(newSubVaultId)) {
@@ -440,6 +443,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         uint256 newConversionRate = $storage().subVaultById[subVaultId].conversionRate;
         if (secondsSinceLastAccrual != 0) {
             uint256 growthFactor = $storage().subVaultById[subVaultId].perSecondRate.rpow(secondsSinceLastAccrual);
+            // Round down the interest accrual conversion rate, so that the rounding is in favor of the protocol.
             newConversionRate = $storage().subVaultById[subVaultId].conversionRate.rayMulDown(growthFactor);
         }
         return newConversionRate;
@@ -455,6 +459,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         uint256 conversionRate = $storage().subVaultById[subVaultId].conversionRate;
 
         uint256 sharesToRedeem = $storage().positions[user].shares;
+        // Round down the withdrawal amount, so that the rounding is in favor of the protocol.
         uint256 actualAmountOfWithdrawalRay = sharesToRedeem.rayMulDown(conversionRate);
         // Must never happen: conversionRate always > 1, sharesToRedeem > 0 (otherwise reverts with NonExistentPosition)
         assert(actualAmountOfWithdrawalRay > 0);
@@ -474,6 +479,8 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         uint256 subVaultId = $storage().positions[user].subVaultId;
         uint256 conversionRate = $storage().subVaultById[subVaultId].conversionRate;
 
+        // Round up the amount of shares to redeem for the requested amount of assets, so that the rounding is
+        // in favor of the protocol.
         uint256 sharesToRedeem = requestedAmountInRay.rayDivUp(conversionRate);
         require(sharesToRedeem <= $storage().positions[user].shares, ErrorsLib.InvalidAmount());
         _burnShares(user, sharesToRedeem);
@@ -507,8 +514,9 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
     function _getVaultObligations() internal view returns (uint256) {
         uint256 activeSubVaultsObligations;
         for (uint256 i = 0; i < $storage().activeSubVaultsIds.length; i++) {
+            // Round up the obligations, so that the rounding is in favor of the protocol.
             activeSubVaultsObligations += $storage().subVaultById[$storage().activeSubVaultsIds[i]].totalShares
-                .rayMulDown(_previewSubVaultConversionRate($storage().activeSubVaultsIds[i]));
+                .rayMulUp(_previewSubVaultConversionRate($storage().activeSubVaultsIds[i]));
         }
         return activeSubVaultsObligations + _getIousInCirculation();
     }
