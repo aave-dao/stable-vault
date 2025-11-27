@@ -269,7 +269,6 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         _setDefaultSubVault(_getOrCreateSubVaultWithRate(perSecondRate), perSecondRate);
     }
 
-    // TODO: Should we have a "fee recipient" storage field or function param?
     /// @inheritdoc IBasedBoostedVault
     function claimFees(address[] calldata assets, uint256[] calldata amounts)
         external
