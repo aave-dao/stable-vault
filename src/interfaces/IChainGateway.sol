@@ -3,6 +3,8 @@ pragma solidity ^0.8.22;
 
 import {IBridgeAdapter} from "./IBridgeAdapter.sol";
 
+/// @title IChainGateway
+/// @author Aave Labs
 /// @notice Interface for handling the communication between chains for bridging assets and data.
 /// @dev Assumes bridged assets and bridged data can be handled independently of each other.
 interface IChainGateway {
@@ -29,23 +31,38 @@ interface IChainGateway {
         BURN_IOU_TOKEN
     }
 
+    /// @notice The representation of a cross-chain message.
+    /// @param messageType Type of message used to determine how to decode the `data` field.
+    /// @param data Arbitrary data that may be required by the message type.
     struct CrossChainMessage {
         MessageType messageType;
         bytes data;
     }
 
-    /// @dev Struct for arbitrary data containing a balance snapshot from a source chain.
+    /// @notice The representation of a balance snapshot from a source chain.
+    /// @dev For message type `BALANCE_SNAPSHOT`.
+    /// @param totalAssetsInRay Cumulative balance of all tokens with common denomination in RAY.
+    /// @param nonce Nonce of the balance snapshot.
     struct BalanceSnapshot {
-        // Cumulative balance of all tokens with common denomination in RAY.
         uint256 totalAssetsInRay;
         uint256 nonce;
     }
 
+    /// @notice The representation of a message to bridge IOU tokens to a destination chain.
+    /// @dev For message type `BRIDGE_IOU_TOKEN`.
+    /// @param recipient Address to send the IOU tokens to on the destination chain.
+    /// @param amount Amount of IOU tokens to bridge.
     struct IouTokenBridgeMessage {
         address recipient;
         uint256 amount;
     }
 
+    /// @notice The representation of a message to burn IOU tokens on a source chain.
+    /// @dev For message type `BURN_IOU_TOKEN`.
+    /// @param iouTokenAmountBurnedRay Amount of IOU tokens to burn.
+    /// @param chainBalanceSnapshotNonce Nonce of the balance snapshot on the source chain.
+    /// @param balanceSnapshotTotalAssetsInRay Cumulative balance of all tokens with common denomination in RAY on the
+    /// source chain.
     struct BurnIouTokenMessage {
         uint256 iouTokenAmountBurnedRay;
         uint256 chainBalanceSnapshotNonce;

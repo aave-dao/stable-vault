@@ -11,7 +11,9 @@ import {ConstantsLib} from "../libraries/ConstantsLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {RescuableAssets} from "./RescuableAssets.sol";
 
-// TODO: this contract should be pausable.... if bridge is compromised we should not ingest messages from it.
+/// @title BaseChainGateway
+/// @author Aave Labs
+/// @notice Abstract base contract for ChainGateway contracts.
 abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets, IChainGateway {
     address internal immutable IOU_TOKEN_MANAGER;
 
@@ -41,7 +43,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
     }
 
     /// @dev Constructor.
-    /// @param iouTokenManager The address of the IOU token manager.
+    /// @param iouTokenManager Address of the IOU token manager.
     constructor(address iouTokenManager) {
         _disableInitializers();
         IOU_TOKEN_MANAGER = iouTokenManager;

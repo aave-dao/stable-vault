@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
+/// @title ErrorsLib
+/// @author Aave Labs
+/// @notice Library for errors shared across contracts.
 library ErrorsLib {
     /// @notice Address checked is already whitelisted.
     /// @custom:selector 0x78426ef8

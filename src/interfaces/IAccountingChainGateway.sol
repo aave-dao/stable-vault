@@ -4,6 +4,9 @@ pragma solidity ^0.8.22;
 import {IBridgeAdapter} from "./IBridgeAdapter.sol";
 import {IChainGateway} from "./IChainGateway.sol";
 
+/// @title IAccountingChainGateway
+/// @author Aave Labs
+/// @notice Interface for gateway functionality required on the Accounting Chain.
 interface IAccountingChainGateway is IChainGateway {
     /// @notice Thrown when the caller is not the FundsHandler.
     /// @custom:selector 0x77607b1a

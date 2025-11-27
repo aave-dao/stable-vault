@@ -7,20 +7,21 @@ import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {EfficientHashLib} from "@solady/utils/EfficientHashLib.sol";
 
 import {IWithdrawalFeeCalculator} from "../interfaces/IWithdrawalFeeCalculator.sol";
+import {ConstantsLib} from "../libraries/ConstantsLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
+/// @title WithdrawalFeeCalculator
+/// @author Aave Labs
+/// @notice Contract for calculating withdrawal fees based on personal fees, asset-specific fees, and basic fees.
+/// @dev This contract does not take ownership of the fee. It is expected the client of this contract takes the fee
+/// returned by this contract.
 contract WithdrawalFeeCalculator is AccessManaged, EIP712, IWithdrawalFeeCalculator {
     bytes32 public constant WITHDRAWAL_FEE_TYPEHASH =
         keccak256("WithdrawalFee(address user,address assetOut,uint256 iouAmountRay,uint256 personalFee)");
 
-    uint256 internal constant BPS_BASE = 100_00; // TODO: Should we move this to constants lib?
-
+    /// @notice Thrown when a receovered signer is not a whitelisted signer.
+    /// @custom:selector 0x8baa579f
     error InvalidSignature();
-
-    struct AssetFeeBpsConfig {
-        uint16 feeBps; // TODO: Remember which order these need to be and if that matters for further storage extension.
-        bool isSet;
-    }
 
     /// @custom:storage-location erc7201:aave.storage.WithdrawalFeeCalculator
     struct WithdrawalFeeCalculatorStorage {
@@ -44,8 +45,27 @@ contract WithdrawalFeeCalculator is AccessManaged, EIP712, IWithdrawalFeeCalcula
     //     return $storage();
     // }
 
+    /// @dev Constructor.
+    /// @param accessManager Address of the IAccessManager contract used for handling access control.
     constructor(address accessManager) EIP712("WithdrawalFeeCalculator", "1") AccessManaged(accessManager) {}
 
+    // TODO: Should we replace this with two getters? getAssetFeeBps and isAssetFeeBpsSet?
+    /// @inheritdoc IWithdrawalFeeCalculator
+    function getAssetFeeBpsConfig(address asset) external view override returns (AssetFeeBpsConfig memory) {
+        return $storage().feeBpsConfigByAsset[asset];
+    }
+
+    /// @inheritdoc IWithdrawalFeeCalculator
+    function getBasicFeeBps() external view override returns (uint256) {
+        return $storage().basicFeeBps;
+    }
+
+    /// @inheritdoc IWithdrawalFeeCalculator
+    function isSigner(address signer) external view override returns (bool) {
+        return $storage().signers[signer];
+    }
+
+    /// @inheritdoc IWithdrawalFeeCalculator
     function calculateWithdrawalFee(address user, address assetOut, uint256 iouAmountRay, bytes memory data)
         external
         view
@@ -61,14 +81,36 @@ contract WithdrawalFeeCalculator is AccessManaged, EIP712, IWithdrawalFeeCalcula
                 require(personalFeeBps <= $storage().basicFeeBps, ErrorsLib.InvalidParameter());
             }
             _validateSignature(user, assetOut, iouAmountRay, personalFeeBps, signature);
-            return iouAmountRay * personalFeeBps / 10000;
+            return iouAmountRay * personalFeeBps / ConstantsLib.MAX_BPS;
         } else if ($storage().feeBpsConfigByAsset[assetOut].isSet) {
             // Is there an asset-specific fee?
-            return iouAmountRay * $storage().feeBpsConfigByAsset[assetOut].feeBps / 10000;
+            return iouAmountRay * $storage().feeBpsConfigByAsset[assetOut].feeBps / ConstantsLib.MAX_BPS;
         } else {
             // There's no personal or asset-specific fee, so it's the basic fee.
-            return iouAmountRay * $storage().basicFeeBps / 10000;
+            return iouAmountRay * $storage().basicFeeBps / ConstantsLib.MAX_BPS;
         }
+    }
+
+    // Restricted functions
+
+    /// @inheritdoc IWithdrawalFeeCalculator
+    function setAssetFeeBps(address asset, uint256 newAssetFeeBps, bool isSet) external override restricted {
+        require(newAssetFeeBps <= ConstantsLib.MAX_BPS, ErrorsLib.InvalidParameter());
+        // forge-lint: disable-next-line(unsafe-typecast)
+        $storage().feeBpsConfigByAsset[asset].feeBps = uint16(newAssetFeeBps);
+        $storage().feeBpsConfigByAsset[asset].isSet = isSet;
+    }
+
+    /// @inheritdoc IWithdrawalFeeCalculator
+    function setBasicFeeBps(uint256 newBasicFeeBps) external override restricted {
+        // TODO: We cannot verify that this wouldn't suddenly become less than any of the asset-specific fees.
+        // But should we?
+        $storage().basicFeeBps = newBasicFeeBps;
+    }
+
+    /// @inheritdoc IWithdrawalFeeCalculator
+    function setSigner(address signer, bool whitelistedSigner) external override restricted {
+        $storage().signers[signer] = whitelistedSigner;
     }
 
     function _validateSignature(
@@ -87,35 +129,5 @@ contract WithdrawalFeeCalculator is AccessManaged, EIP712, IWithdrawalFeeCalcula
         if (!$storage().signers[signer]) {
             revert InvalidSignature();
         }
-    }
-
-    function setBasicFeeBps(uint256 newBasicFeeBps) external restricted {
-        // TODO: We cannot verify that this wouldn't suddenly become less than any of the asset-specific fees.
-        // But should we?
-        $storage().basicFeeBps = newBasicFeeBps;
-    }
-
-    function setAssetFeeBps(address asset, uint256 newAssetFeeBps, bool isSet) external restricted {
-        require(newAssetFeeBps <= BPS_BASE, ErrorsLib.InvalidParameter());
-        // forge-lint: disable-next-line(unsafe-typecast)
-        $storage().feeBpsConfigByAsset[asset].feeBps = uint16(newAssetFeeBps);
-        $storage().feeBpsConfigByAsset[asset].isSet = isSet;
-    }
-
-    function setSigner(address signer, bool whitelistedSigner) external restricted {
-        $storage().signers[signer] = whitelistedSigner;
-    }
-
-    function getBasicFeeBps() external view returns (uint256) {
-        return $storage().basicFeeBps;
-    }
-
-    // TODO: Should we replace this with two getters? getAssetFeeBps and isAssetFeeBpsSet?
-    function getAssetFeeBpsConfig(address asset) external view returns (AssetFeeBpsConfig memory) {
-        return $storage().feeBpsConfigByAsset[asset];
-    }
-
-    function isSigner(address signer) external view returns (bool) {
-        return $storage().signers[signer];
     }
 }

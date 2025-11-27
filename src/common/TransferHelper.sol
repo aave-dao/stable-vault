@@ -8,6 +8,7 @@ import {ITransferHelper} from "../interfaces/ITransferHelper.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 /// @title TransferHelper
+/// @author Aave Labs
 /// @notice Helper contract for transferring assets between non-adjacent contracts, helping to minimize the number of
 /// transfers in complex transaction flows.
 contract TransferHelper is ITransferHelper {

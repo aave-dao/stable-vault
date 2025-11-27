@@ -9,8 +9,10 @@ import {ConstantsLib} from "../libraries/ConstantsLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 /// @title TransferHelperClient
+/// @author Aave Labs
 /// @notice Client for components that push assets into the TransferHelper or expect assets to be pushed into the
 /// TransferHelper.
+/// @dev This contract is used to assert that the TransferHelper has consumed the assets it is expected to consume.
 contract TransferHelperClient {
     using SafeERC20 for IERC20;
 
@@ -18,6 +20,8 @@ contract TransferHelperClient {
 
     address internal immutable TRANSFER_HELPER;
 
+    /// @dev Constructor.
+    /// @param transferHelper Address of the TransferHelper contract.
     constructor(address transferHelper) {
         TRANSFER_HELPER = transferHelper;
     }

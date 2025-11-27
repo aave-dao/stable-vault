@@ -3,39 +3,46 @@ pragma solidity ^0.8.22;
 
 import {IBridgeAdapter} from "./IBridgeAdapter.sol";
 
+/// @title IFundsHandler
+/// @author Aave Labs
+/// @notice Interface for the FundsHandler contract.
 interface IFundsHandler {
     /// @notice Thrown when the caller is not the BasedBoostedVault.
     /// @custom:selector 0x93ce7047
     error OnlyBasedBoostedVault();
 
+    /// @notice The representation of an asset balance.
+    /// @param asset Address of the asset.
+    /// @param amountRay Amount of the asset in RAY.
+    /// @param chainId Chain id of the chain that the balance is on.
     struct AssetBalance {
         address asset;
         uint256 amountRay;
         uint256 chainId;
     }
 
-    /// @dev Returns the total liquidity across all supported chains in RAY of supported asset denomination.
+    /// @notice Returns the total liquidity across all supported chains in RAY of supported asset denomination.
     function getAggregatedBalance() external view returns (uint256);
 
-    /// @dev Returns the asset balances for all supported chains including the native chain.
+    /// @notice Returns the asset balances for all supported chains including the native chain.
     function getAssetBalances() external view returns (AssetBalance[] memory);
 
-    /// @dev Forward a deposit to a liquidity source.
-    /// @param asset The asset to deposit.
-    /// @param amount The amount of the asset to deposit.
+    /// @notice Forward a deposit to a liquidity source.
+    /// @param asset Address of the asset to deposit.
+    /// @param amount Amount of the asset to deposit.
     function processDeposit(address asset, uint256 amount) external;
 
-    /// @dev Executes a withdrawal request by pulling funds from the liquidity source and allowing them to be returned
-    /// to the recipient with the data passed to the request.
-    /// @param asset the token to pull from liquidity sources
-    /// @param amount the value of asset in decimals of the asset
+    /// @notice Executes a withdrawal request by pulling funds from the liquidity source and allowing them to be
+    /// returned to the recipient with the data passed to the request.
+    /// @param asset Address of the asset to pull from liquidity sources
+    /// @param amount Amount of the asset to pull from liquidity sources
     function processWithdrawal(address asset, uint256 amount) external;
 
-    /// @dev Retrieves funds from liquidity source on native chain before pushing funds to another chain through the
+    /// @notice Retrieves funds from liquidity source on native chain before pushing funds to another chain through the
     /// Gateway contract.
-    /// @param asset The asset to push to the Accounting Chain.
-    /// @param amount The amount of the asset to push to the Accounting Chain.
-    /// @param chainId The chain id of the Accounting Chain.
+    /// @param asset Address of the asset to push to the Accounting Chain.
+    /// @param amount Amount of the asset to push to the Accounting Chain.
+    /// @param chainId Chain id of the Accounting Chain.
     /// @param bridgeParams The parameters for the bridge adapter.
     function pushFundsToChain(
         address asset,
@@ -44,12 +51,15 @@ interface IFundsHandler {
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) external payable;
 
-    /// @dev Updates the chain balance snapshot for a given chain.
-    /// @param chainId The chain id of the chain that sent the balance update
-    /// @param snapshotBalanceRay The balance snapshot on the source chain in RAY of supported asset denomination
-    /// @param chainBalanceSnapshotNonce The nonce of the balance snapshot from the source chain.
+    /// @notice Updates the chain balance snapshot for a given chain.
+    /// @param chainId Chain id of the chain that sent the balance update.
+    /// @param snapshotBalanceRay Balance snapshot on the source chain in RAY of supported asset denomination.
+    /// @param chainBalanceSnapshotNonce Nonce of the balance snapshot from the source chain.
     function updateChainBalanceCallback(uint256 chainId, uint256 snapshotBalanceRay, uint256 chainBalanceSnapshotNonce)
         external;
 
+    /// @notice Callback function for when funds arrive from a chain.
+    /// @param asset Address of the asset that arrived from the chain.
+    /// @param amount Amount of the asset that arrived from the chain.
     function fundsArrivedFromChainCallback(address asset, uint256 amount) external;
 }

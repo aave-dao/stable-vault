@@ -8,6 +8,10 @@ import {
 import {IAssetRegistry} from "../interfaces/IAssetRegistry.sol";
 
 // TODO: should we extend multicall to allow disabling deposits for mulitple assets?
+
+/// @title AssetRegistry
+/// @author Aave Labs
+/// @notice AssetRegistry contract for managing asset configurations.
 contract AssetRegistry is AccessManagedUpgradeable, IAssetRegistry {
     /// @custom:storage-location erc7201:aave.storage.AssetRegistry
     struct AssetRegistryStorage {
@@ -43,18 +47,16 @@ contract AssetRegistry is AccessManagedUpgradeable, IAssetRegistry {
         __AccessManaged_init(accessManager);
     }
 
-    function setAssetConfig(address asset, AssetConfig memory config) external restricted {
+    /// @inheritdoc IAssetRegistry
+    function setAssetConfig(address asset, AssetConfig memory config) external override restricted {
         $storage().configByAsset[asset] = config;
         emit AssetConfigSet(asset, config);
     }
 
-    /// @dev Deposits must not be enabled using this function because it could have a different restricted config from
-    /// the function which enables deposits.
-    /// @param asset The asset to disable deposits for.
-    /// @param disableUserDeposits Whether to disable user deposits for the asset.
-    /// @param disableAllocatorDeposits Whether to disable allocator deposits for the asset.
+    /// @inheritdoc IAssetRegistry
     function disableDeposits(address asset, bool disableUserDeposits, bool disableAllocatorDeposits)
         external
+        override
         restricted
     {
         bool isUserDepositsAllowed = $storage().configByAsset[asset].depositFromUserAllowed;

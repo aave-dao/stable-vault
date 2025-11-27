@@ -17,6 +17,9 @@ import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {TransferHelperClient} from "./TransferHelperClient.sol";
 
+/// @title Allocator
+/// @author Aave Labs
+/// @notice Allocator contract for managing asset allocations into yield strategies.
 /// @dev Assumptions:
 ///      - 1 default strategy per asset which serves as the first strategy to deposit to/withdraw from.
 ///      - multiple allowed strategies per asset which require manual rebalancing
@@ -27,6 +30,10 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, IAllocator
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
 
+    /// @notice The data for a strategy.
+    /// @param asset Address of the asset that the strategy is for.
+    /// @param indexInAssetStrategies Index of the strategy in the asset's strategies array.
+    /// @param indexInAllStrategies Index of the strategy in the all strategies array.
     struct StrategyData {
         address asset;
         uint32 indexInAssetStrategies;
@@ -180,7 +187,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, IAllocator
     }
 
     /// @inheritdoc IAllocator
-    function setDefaultStrategy(address asset, address strategy) external restricted {
+    function setDefaultStrategy(address asset, address strategy) external override restricted {
         // Strategy must be allowed to be set as the default strategy for the asset
         require(strategy != $storage().defaultStrategyByAsset[asset], ErrorsLib.AddressAlreadyWhitelisted());
         require(_isStrategySupportedForAsset({strategy: strategy, asset: asset}), ErrorsLib.AddressNotWhitelisted());
@@ -249,7 +256,8 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, IAllocator
     /// @notice Validates that dust from `amountIn` would not be truncated when converting to a value of `assetOut`.
     /// @dev Dust from `amountIn` can be leaked out of the system if the `assetOut` has fewer decimals than `assetIn`.
     /// @dev When checking for 1:1 swap between `assetIn` and `assetOut`, we truncate `amountIn` to have number of
-    /// decimals for `assetOut`. @dev Dust that is input into a swap would be unaccounted for and could be lost.
+    /// decimals for `assetOut`.
+    /// @dev Dust that is input into a swap would be unaccounted for and could be lost.
     function _validateSwapAmountIn(address assetIn, uint256 amountIn, address assetOut) internal view {
         uint256 inputDecimals = AssetLib.getDecimals(assetIn);
         uint256 outputDecimals = AssetLib.getDecimals(assetOut);

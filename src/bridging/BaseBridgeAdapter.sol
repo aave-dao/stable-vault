@@ -11,10 +11,8 @@ import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 /// @title BaseBridgeAdapter
+/// @author Aave Labs
 /// @notice Base contract for bridge adapters.
-/// @dev Tokens inbound to this contract should be pulled into this contract with spend permission.
-/// @dev Tokens outbound from this contract will be approved to be spent by predetermined spender. Outbound funds are
-/// pulled from this contract.
 abstract contract BaseBridgeAdapter is AccessManaged, TransferHelperClient, IBridgeAdapter {
     using SafeERC20 for IERC20;
 
@@ -31,6 +29,10 @@ abstract contract BaseBridgeAdapter is AccessManaged, TransferHelperClient, IBri
         _;
     }
 
+    /// @dev Constructor.
+    /// @param accessManager Address of the IAccessManager contract used for handling access control.
+    /// @param gateway Address of the Gateway contract.
+    /// @param transferHelper Address of the TransferHelper.
     constructor(address accessManager, address gateway, address transferHelper)
         AccessManaged(accessManager)
         TransferHelperClient(transferHelper)
@@ -38,24 +40,24 @@ abstract contract BaseBridgeAdapter is AccessManaged, TransferHelperClient, IBri
         GATEWAY = gateway;
     }
 
-    function getGateway() external view returns (address) {
+    /// @inheritdoc IBridgeAdapter
+    function getGateway() external view override returns (address) {
         return GATEWAY;
     }
 
+    /// @inheritdoc IBridgeAdapter
     function publishMessageToChainWithFeePayer(
         uint256 destinationChainId,
         IBridgeAdapter.BridgeAsset[] memory assets,
         bytes memory data,
         IBridgeAdapter.BridgeParams memory bridgeParams
-    ) external payable virtual;
+    ) external payable virtual override;
 
     function setDestinationChainAdapter(uint256 chainId, address destinationChainAdapter) external override restricted {
         _destinationChainAdapterOf[chainId] = destinationChainAdapter;
     }
 
-    /// @notice Replays the funds receiving process for a given source chain and assets. Assets must be on this
-    /// contract.
-    /// @param assets The tokens to replay the receiving process for.
+    /// @inheritdoc IBridgeAdapter
     function replayFundsReceiving(IBridgeAdapter.BridgeAsset[] memory assets) external override {
         _processReceivedFunds(assets);
     }

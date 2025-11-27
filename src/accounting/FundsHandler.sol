@@ -15,10 +15,15 @@ import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 /// @title FundsHandler
+/// @author Aave Labs
 /// @notice Handles push/pull of funds across the system.
 contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, TransferHelperClient, IFundsHandler {
     using AssetLib for uint256;
 
+    /// @notice The representation of an Earnings Chain's balance snapshot.
+    /// @param chainId The chain id of the Earnings Chain.
+    /// @param amountRay The cumulative value of assets in RAY.
+    /// @param nonce The nonce of the balance snapshot (monotonically increasing).
     struct ChainBalanceSnapshot {
         uint256 chainId;
         // Assumes all balances have common denomination.
@@ -171,7 +176,6 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, TransferHelp
     }
 
     /// @inheritdoc IFundsHandler
-    /// @dev Caller must have have transferred funds to this contract
     function fundsArrivedFromChainCallback(address asset, uint256 amount) external override onlyGateway {
         _pushFundsToImmediateLiquidity(asset, amount);
     }
