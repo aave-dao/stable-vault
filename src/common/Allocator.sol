@@ -256,7 +256,8 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, IAllocator
     /// @notice Validates that dust from `amountIn` would not be truncated when converting to a value of `assetOut`.
     /// @dev Dust from `amountIn` can be leaked out of the system if the `assetOut` has fewer decimals than `assetIn`.
     /// @dev When checking for 1:1 swap between `assetIn` and `assetOut`, we truncate `amountIn` to have number of
-    /// decimals for `assetOut`. @dev Dust that is input into a swap would be unaccounted for and could be lost.
+    /// decimals for `assetOut`.
+    /// @dev Dust that is input into a swap would be unaccounted for and could be lost.
     function _validateSwapAmountIn(address assetIn, uint256 amountIn, address assetOut) internal view {
         uint256 inputDecimals = AssetLib.getDecimals(assetIn);
         uint256 outputDecimals = AssetLib.getDecimals(assetOut);

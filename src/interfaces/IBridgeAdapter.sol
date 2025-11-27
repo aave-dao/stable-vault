@@ -26,7 +26,8 @@ interface IBridgeAdapter {
     /// @param feeToken Token to pay the bridge fee in.
     /// @param feeAmount Amount of `feeToken` approved by `feePayer` to spend on fees.
     /// @param feeRefundThreshold Minimum amount of `feeToken` that must remain unused in order to trigger a refund to
-    /// the `feePayer`. @param gasLimit Total gas that should be allocated for executions that take place from the
+    /// the `feePayer`.
+    /// @param gasLimit Total gas that should be allocated for executions that take place from the
     /// message being processed on the
     /// destination chain (including round trips).
     /// @param data Arbitrary data that may be required by the bridge adapter to operate.
@@ -44,8 +45,8 @@ interface IBridgeAdapter {
 
     /// @notice Sets the destination chain adapter for a given chain id.
     /// @dev The adapter on the destination chain must support receiving of messages from the bridge which this adapter
-    /// publishes to. @dev This destination adapter is used to receive funds and arbitrary data on the destination
-    /// chain.
+    /// publishes to.
+    /// @dev This destination adapter is used to receive funds and arbitrary data on the destination chain.
     /// @param chainId Chain id of the chain to set the destination adapter for.
     /// @param destinationChainAdapter Address of the destination chain adapter.
     function setDestinationChainAdapter(uint256 chainId, address destinationChainAdapter) external;

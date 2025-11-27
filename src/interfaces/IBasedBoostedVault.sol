@@ -82,7 +82,8 @@ interface IBasedBoostedVault {
 
     /// @notice Sets the default sub-vault.
     /// @dev The default sub-vault is the sub-vault that is used when a depositing user does not have a specific
-    /// sub-vault set. @param perSecondRate Per-second rate associated with the sub-vault to be set as the default
+    /// sub-vault set.
+    /// @param perSecondRate Per-second rate associated with the sub-vault to be set as the default
     /// sub-vault.
     function setDefaultSubVault(uint256 perSecondRate) external;
 
