@@ -456,8 +456,8 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
 
         uint256 sharesToRedeem = $storage().positions[user].shares;
         uint256 actualAmountOfWithdrawalRay = sharesToRedeem.rayMulDown(conversionRate);
-        assert(actualAmountOfWithdrawalRay > 0); // TODO: This should never happen. Consider removing it.
-        // We don't check for sharesToRedeem > 0 here because we check for actualAmountOfWithdrawalRay > 0 above.
+        // Must never happen: conversionRate always > 1, sharesToRedeem > 0 (otherwise reverts with NonExistentPosition)
+        assert(actualAmountOfWithdrawalRay > 0);
         _burnShares(user, sharesToRedeem);
         uint256 originalDepositRay = $storage().positions[user].originalDepositRay;
         delete $storage().positions[user];
