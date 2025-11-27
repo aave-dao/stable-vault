@@ -10,9 +10,9 @@ import {IChainGateway} from "../../../src/interfaces/IChainGateway.sol";
 import {IIouTokenManager} from "../../../src/interfaces/IIouTokenManager.sol";
 import {ErrorsLib} from "../../../src/libraries/ErrorsLib.sol";
 import {ExtendedIouTokenManager} from "../../mocks/ExtendedIouTokenManager.sol";
+import {MockErc20} from "../../mocks/MockErc20.sol";
 import {MockGateway} from "../../mocks/MockGateway.sol";
 import {MockTransferHelper} from "../../mocks/MockTransferHelper.sol";
-import {TestErc20} from "../../mocks/TestErc20.sol";
 
 contract IouTokenManagerTest_AccountingChain is Test {
     ExtendedIouTokenManager public iouTokenManager;
@@ -69,7 +69,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
     function test_burnTokens_withGateway(address burnFrom, uint256 amountToBurn) public {
         vm.assume(burnFrom != address(0));
         vm.prank(iouTokenManagerAddress);
-        TestErc20(iouToken).mint(burnFrom, amountToBurn);
+        MockErc20(iouToken).mint(burnFrom, amountToBurn);
         vm.expectCall(iouToken, abi.encodeWithSelector(IouToken.burn.selector, burnFrom, amountToBurn), 1);
         vm.prank(chainGateway);
         iouTokenManager.burnTokens(burnFrom, amountToBurn);
@@ -78,7 +78,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
     function test_burnTokens_withVault(address burnFrom, uint256 amountToBurn) public {
         vm.assume(burnFrom != address(0));
         vm.prank(iouTokenManagerAddress);
-        TestErc20(iouToken).mint(burnFrom, amountToBurn);
+        MockErc20(iouToken).mint(burnFrom, amountToBurn);
         vm.expectCall(iouToken, abi.encodeWithSelector(IouToken.burn.selector, burnFrom, amountToBurn), 1);
         vm.prank(vault);
         iouTokenManager.burnTokens(burnFrom, amountToBurn);
@@ -101,7 +101,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
     function test_burnLockedTokens_withGateway(uint256 lockedBalance, uint256 amountToBurn) public virtual {
         amountToBurn = bound(amountToBurn, 0, lockedBalance);
         vm.prank(iouTokenManagerAddress);
-        TestErc20(iouToken).mint(address(iouTokenManager), lockedBalance);
+        MockErc20(iouToken).mint(address(iouTokenManager), lockedBalance);
         iouTokenManager.mockLockedBalance(lockedBalance);
         uint256 lockedBalanceBefore = iouTokenManager.getLockedBalance();
         vm.expectCall(
@@ -116,7 +116,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
     function test_burnLockedTokens_withVault(uint256 lockedBalance, uint256 amountToBurn) public virtual {
         amountToBurn = bound(amountToBurn, 0, lockedBalance);
         vm.prank(iouTokenManagerAddress);
-        TestErc20(iouToken).mint(address(iouTokenManager), lockedBalance);
+        MockErc20(iouToken).mint(address(iouTokenManager), lockedBalance);
         iouTokenManager.mockLockedBalance(lockedBalance);
         uint256 lockedBalanceBefore = iouTokenManager.getLockedBalance();
         vm.expectCall(
@@ -145,7 +145,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
         vm.assume(lockedBalance < type(uint256).max);
         amountToBurn = bound(amountToBurn, lockedBalance + 1, type(uint256).max);
         vm.prank(iouTokenManagerAddress);
-        TestErc20(iouToken).mint(address(iouTokenManager), lockedBalance);
+        MockErc20(iouToken).mint(address(iouTokenManager), lockedBalance);
         vm.expectRevert(IIouTokenManager.InsufficientLockedBalance.selector);
         vm.prank(chainGateway);
         iouTokenManager.burnLockedTokens(amountToBurn);
@@ -158,7 +158,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
         vm.assume(lockedBalance < type(uint256).max);
         amountToBurn = bound(amountToBurn, lockedBalance + 1, type(uint256).max);
         vm.prank(iouTokenManagerAddress);
-        TestErc20(iouToken).mint(address(iouTokenManager), lockedBalance);
+        MockErc20(iouToken).mint(address(iouTokenManager), lockedBalance);
         vm.expectRevert(IIouTokenManager.InsufficientLockedBalance.selector);
         vm.prank(vault);
         iouTokenManager.burnLockedTokens(amountToBurn);
@@ -169,7 +169,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
     function test_releaseTokens_withGateway(uint256 lockedBalance, uint256 amountToRelease) public virtual {
         amountToRelease = bound(amountToRelease, 0, lockedBalance);
         vm.prank(iouTokenManagerAddress);
-        TestErc20(iouToken).mint(address(iouTokenManager), lockedBalance);
+        MockErc20(iouToken).mint(address(iouTokenManager), lockedBalance);
         iouTokenManager.mockLockedBalance(lockedBalance);
         uint256 lockedBalanceBefore = iouTokenManager.getLockedBalance();
         vm.expectCall(iouToken, abi.encodeWithSelector(IERC20.transfer.selector, msg.sender, amountToRelease), 1);
@@ -196,7 +196,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
         vm.assume(lockedBalance < type(uint256).max);
         amountToRelease = bound(amountToRelease, lockedBalance + 1, type(uint256).max);
         vm.prank(iouTokenManagerAddress);
-        TestErc20(iouToken).mint(address(iouTokenManager), lockedBalance);
+        MockErc20(iouToken).mint(address(iouTokenManager), lockedBalance);
         iouTokenManager.mockLockedBalance(lockedBalance);
         vm.expectRevert(IIouTokenManager.InsufficientLockedBalance.selector);
         vm.prank(chainGateway);
@@ -217,7 +217,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
             feePayer: address(0), feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 0, data: ""
         });
         vm.prank(iouTokenManagerAddress);
-        TestErc20(iouToken).mint(from, iouTokenAmountRay);
+        MockErc20(iouToken).mint(from, iouTokenAmountRay);
         vm.prank(from);
         IERC20(iouToken).approve(address(iouTokenManager), iouTokenAmountRay);
         vm.expectCall(
@@ -260,7 +260,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
     ) public {
         vm.assume(from != address(0));
         vm.assume(destinationChainId != block.chainid);
-        address feeToken = address(new TestErc20(6));
+        address feeToken = address(new MockErc20("Test USD", "TUSD", 6));
         vm.assume(feePayer != address(0));
         vm.assume(feePayer != address(iouTokenManager));
         vm.assume(feePayer != transferHelper);
@@ -274,13 +274,13 @@ contract IouTokenManagerTest_AccountingChain is Test {
             data: data
         });
         if (feeAmount > 0) {
-            TestErc20(feeToken).mint(feePayer, feeAmount);
+            MockErc20(feeToken).mint(feePayer, feeAmount);
             vm.prank(feePayer);
             IERC20(feeToken).approve(address(iouTokenManager), feeAmount);
         }
         if (iouTokenAmountRay > 0) {
             vm.prank(iouTokenManagerAddress);
-            TestErc20(iouToken).mint(from, iouTokenAmountRay);
+            MockErc20(iouToken).mint(from, iouTokenAmountRay);
             vm.prank(from);
             IERC20(iouToken).approve(address(iouTokenManager), iouTokenAmountRay);
         }
@@ -321,7 +321,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
         }
         if (iouTokenAmountRay > 0) {
             vm.prank(iouTokenManagerAddress);
-            TestErc20(iouToken).mint(from, iouTokenAmountRay);
+            MockErc20(iouToken).mint(from, iouTokenAmountRay);
             vm.prank(from);
             IERC20(iouToken).approve(address(iouTokenManager), iouTokenAmountRay);
         }

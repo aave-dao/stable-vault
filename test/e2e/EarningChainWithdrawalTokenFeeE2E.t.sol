@@ -6,6 +6,7 @@ import {console} from "forge-std/console.sol";
 import {IERC20} from "forge-std/interfaces/IERC20.sol";
 
 import {BasedBoostedVault} from "../../src/accounting/BasedBoostedVault.sol";
+import {BasedBoostedVault} from "../../src/accounting/BasedBoostedVault.sol";
 import {IouTokenManager} from "../../src/common/IouTokenManager.sol";
 import {EarningChainGateway} from "../../src/earning/EarningChainGateway.sol";
 import {IBasedBoostedVault} from "../../src/interfaces/IBasedBoostedVault.sol";
@@ -13,8 +14,7 @@ import {IBridgeAdapter} from "../../src/interfaces/IBridgeAdapter.sol";
 import {AssetLib} from "../../src/libraries/AssetLib.sol";
 import {ErrorsLib} from "../../src/libraries/ErrorsLib.sol";
 import {BaseTest} from "../BaseTest.t.sol";
-import {ExtendedBasedBoostedVault} from "../mocks/ExtendedBasedBoostedVault.sol";
-import {TestErc20} from "../mocks/TestErc20.sol";
+import {MockErc20} from "../mocks/MockErc20.sol";
 
 /// @title EarningChainWithdrawalTokenFeeE2ETest
 /// @notice Test the withdrawal of funds from the Earning Chain to the Accounting Chain.
@@ -25,7 +25,7 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
     address user1 = makeAddr("USER1");
     address user2 = makeAddr("USER2");
 
-    TestErc20 bridgeFeeToken = USDC;
+    MockErc20 bridgeFeeToken = USDC;
     uint256 bridgeFeeAmount = 1000;
 
     function setUp() public override {
@@ -42,14 +42,12 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
         address assetRegistry,
         address transferHelper,
         address withdrawalFeeCalculator
-    ) internal virtual override returns (ExtendedBasedBoostedVault) {
+    ) internal virtual override returns (BasedBoostedVault) {
         // Deploy a vault without restriction in the valid per-second rate
         address vaultImpl = address(
-            new ExtendedBasedBoostedVault(
-                type(uint256).max, iouToken, fundsHandler, transferHelper, withdrawalFeeCalculator
-            )
+            new BasedBoostedVault(type(uint256).max, iouToken, fundsHandler, transferHelper, withdrawalFeeCalculator)
         );
-        return ExtendedBasedBoostedVault(
+        return BasedBoostedVault(
             address(
                 new TransparentUpgradeableProxy(
                     address(vaultImpl),
