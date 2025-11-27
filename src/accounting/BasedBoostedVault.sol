@@ -16,6 +16,7 @@ import {IIouTokenManager} from "../interfaces/IIouTokenManager.sol";
 import {ITransferHelper} from "../interfaces/ITransferHelper.sol";
 import {IWithdrawalFeeCalculator} from "../interfaces/IWithdrawalFeeCalculator.sol";
 import {AssetLib} from "../libraries/AssetLib.sol";
+import {ConstantsLib} from "../libraries/ConstantsLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {MathLib} from "../libraries/MathLib.sol";
 
@@ -158,12 +159,14 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
             $storage().positions[user].subVaultId = subVaultId;
         }
 
-        _accrueSubVaultConversionRate(subVaultId);
-
-        uint256 conversionRate = $storage().subVaultById[subVaultId].conversionRate;
         uint256 amountInRay = amount.assetDecimalsToRay(asset);
+        // Round up the conversion rate used to calculate the shares the user receives.
+        // During deposits the conversion rate is a divisor, so we overshoot to effectively grant the user a safe share
+        // quantity.
+        uint256 conversionRateRoundedUp = _previewSubVaultConversionRateRoundingUp(subVaultId);
         // Round down the amount of granted shares, so that the rounding is in favor of the protocol.
-        uint256 shares = amountInRay.rayDivDown(conversionRate);
+        uint256 shares = amountInRay.rayDivDown(conversionRateRoundedUp);
+        _accrueSubVaultConversionRate(subVaultId);
         // Prevent deposits that result in 0 shares (would cause withdrawal to fail)
         require(shares > 0, ErrorsLib.InvalidAmount());
 
@@ -216,6 +219,10 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         if (requestedAmountInRay == 0) {
             (actualAmountInRay, guaranteedAmountRay, redeemedShares) = _fullWithdrawalRequest(user);
         } else {
+            uint256 requestedAmountInMaxSupportedDecimals = requestedAmountInRay.convertDecimals(
+                ConstantsLib.RAY_DECIMALS, ConstantsLib.MAX_SUPPORTED_ASSET_DECIMALS
+            );
+            require(requestedAmountInMaxSupportedDecimals > 0, ErrorsLib.InvalidAmount());
             (actualAmountInRay, guaranteedAmountRay, redeemedShares) =
                 _partialWithdrawalRequest(user, requestedAmountInRay);
         }
@@ -333,7 +340,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         }
         // Round down the user balance, so that the rounding is in favor of the protocol.
         return $storage().positions[user].shares
-            .rayMulDown(_previewSubVaultConversionRate($storage().positions[user].subVaultId));
+            .rayMulDown(_previewSubVaultConversionRateRoundingDown($storage().positions[user].subVaultId));
     }
 
     /// @inheritdoc IBasedBoostedVault
@@ -406,6 +413,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         uint256 userOldShares = $storage().positions[user].shares;
         // Round down the amount of shares after sub-vault migration, so that the rounding is in favor of the protocol.
         uint256 userNewShares = userOldShares.rayMulDown(oldConversionRate).rayDivDown(newConversionRate);
+        // 1e9 * 1e27 / 1e36
 
         if (!_isActiveSubVaultById(newSubVaultId)) {
             _addSubVaultToActive(newSubVaultId);
@@ -440,19 +448,33 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         delete $storage().activeSubVaultIndexById[subVaultId];
     }
 
-    function _previewSubVaultConversionRate(uint256 subVaultId) internal view returns (uint256) {
+    function _previewSubVaultConversionRateRoundingDown(uint256 subVaultId) internal view returns (uint256) {
+        return _previewSubVaultConversionRate({subVaultId: subVaultId, roundDown: true});
+    }
+
+    function _previewSubVaultConversionRateRoundingUp(uint256 subVaultId) internal view returns (uint256) {
+        return _previewSubVaultConversionRate({subVaultId: subVaultId, roundDown: false});
+    }
+
+    /// @dev Rounding direction should be determined based on context of usage of this function.
+    /// @dev To undershoot the new conversion rate `roundDown` should be true.
+    /// @dev To overshoot the new conversion rate `roundDown` should be false.
+    function _previewSubVaultConversionRate(uint256 subVaultId, bool roundDown) internal view returns (uint256) {
         uint256 secondsSinceLastAccrual = block.timestamp - $storage().subVaultById[subVaultId].lastAccrualTimestamp;
         uint256 newConversionRate = $storage().subVaultById[subVaultId].conversionRate;
         if (secondsSinceLastAccrual != 0) {
             uint256 growthFactor = $storage().subVaultById[subVaultId].perSecondRate.rpow(secondsSinceLastAccrual);
-            // Round down the interest accrual conversion rate, so that the rounding is in favor of the protocol.
-            newConversionRate = $storage().subVaultById[subVaultId].conversionRate.rayMulDown(growthFactor);
+            if (roundDown) {
+                newConversionRate = newConversionRate.rayMulDown(growthFactor);
+            } else {
+                newConversionRate = newConversionRate.rayMulUp(growthFactor);
+            }
         }
         return newConversionRate;
     }
 
     function _accrueSubVaultConversionRate(uint256 subVaultId) internal {
-        $storage().subVaultById[subVaultId].conversionRate = _previewSubVaultConversionRate(subVaultId);
+        $storage().subVaultById[subVaultId].conversionRate = _previewSubVaultConversionRateRoundingDown(subVaultId);
         $storage().subVaultById[subVaultId].lastAccrualTimestamp = block.timestamp;
     }
 
@@ -487,7 +509,9 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         // Round up the amount of shares to redeem for the requested amount of assets, so that the rounding is
         // in favor of the protocol.
         uint256 sharesToRedeem = requestedAmountInRay.rayDivUp(conversionRate);
-        require(sharesToRedeem <= $storage().positions[user].shares, ErrorsLib.InvalidAmount());
+        // Withdrawal of partial amount should not allow the position to have amount < 1e9
+        // TODO: can this underflow?
+        require(sharesToRedeem <= $storage().positions[user].shares - 1e9, ErrorsLib.InvalidAmount());
         _burnShares(user, sharesToRedeem);
         uint256 amountTakenFromOriginalDepositRay = _decrementOriginalDeposit(user, requestedAmountInRay);
 
@@ -521,7 +545,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         for (uint256 i = 0; i < $storage().activeSubVaultsIds.length; i++) {
             // Round up the obligations, so that the rounding is in favor of the protocol.
             activeSubVaultsObligations += $storage().subVaultById[$storage().activeSubVaultsIds[i]].totalShares
-                .rayMulUp(_previewSubVaultConversionRate($storage().activeSubVaultsIds[i]));
+                .rayMulUp(_previewSubVaultConversionRateRoundingUp($storage().activeSubVaultsIds[i]));
         }
         return activeSubVaultsObligations + _getIousInCirculation();
     }

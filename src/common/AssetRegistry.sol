@@ -48,6 +48,7 @@ contract AssetRegistry is AccessManagedUpgradeable, IAssetRegistry {
     }
 
     /// @inheritdoc IAssetRegistry
+    // TODO: Require asset::decimals to be <= 18
     function setAssetConfig(address asset, AssetConfig memory config) external override restricted {
         $storage().configByAsset[asset] = config;
         emit AssetConfigSet(asset, config);

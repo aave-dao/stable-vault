@@ -199,6 +199,94 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         );
     }
 
+    function test_deposit_immediatelyFullWithdraw(uint256 amount, uint256 timeBetweenDeposits) public {
+        address user1 = makeAddr("USER1");
+        address user2 = makeAddr("USER2");
+        amount = _boundAssetAmount(address(mockAsset), amount);
+        timeBetweenDeposits = bound(timeBetweenDeposits, 5 minutes, 30 * 365 days);
+
+        // Deposit 1
+        mockAsset.mint(user1, amount);
+        vm.prank(user1);
+        mockAsset.forceApprove(address(bbv), amount);
+        vm.prank(user1);
+        bbv.deposit(user1, address(mockAsset), amount);
+        vm.warp(timeBetweenDeposits);
+
+        // Deposit 2
+        mockAsset.mint(user2, amount);
+        vm.prank(user2);
+        mockAsset.forceApprove(address(bbv), amount);
+        vm.prank(user2);
+        bbv.deposit(user2, address(mockAsset), amount);
+
+        // Request Full Withdrawal
+        vm.prank(user2);
+        uint256 iouTokenAmount = bbv.requestWithdrawal(user2, 0);
+
+        assertGe(iouTokenAmount, amount.assetDecimalsToRay(address(mockAsset)));
+    }
+
+    /// @notice This test demonstrates that the assertion `actualAmountOfWithdrawalRay >= originalDepositRay`
+    /// can fail when a user deposits after conversionRate has grown beyond RAY.
+    /// Mathematical proof:
+    /// - D = originalDeposit, C = conversionRate (where C > RAY)
+    /// - At deposit: shares = floor(D * RAY / C)
+    /// - At withdrawal: actualAmount = floor(shares * C / RAY)
+    /// - Due to double rounding: actualAmount < D when D is not perfectly divisible by (C / RAY)
+    function test_requestWithdrawal_assertionFailsWhenDepositingAfterConversionRateGrows() public {
+        address user = makeAddr("testUser");
+
+        // Use an 18-decimal token to have finer granularity
+        MockErc20 ghoToken = new MockErc20("GHO", "GHO", 18);
+
+        // Create a new vault with a rate that causes non-exact division
+        // Using 1.5 * RAY (50% per second) for demonstration
+        // This rate causes rounding when deposit amounts don't divide evenly
+        uint256 highRate = (3 * MathLib.RAY) / 2; // 1.5 * RAY = 50% per second
+        IBasedBoostedVault highRateVault = _deployBasedBoostedVault(
+            address(mockAccessManager),
+            highRate + 1, // max rate slightly higher
+            highRate,
+            address(mockIouTokenManager),
+            address(mockFundsHandler),
+            address(mockAssetRegistry),
+            address(mockTransferHelper),
+            address(withdrawalFeeCalculator)
+        );
+
+        // IMPORTANT: Warp time AFTER vault creation so that conversionRate accrues
+        // The subvault was created with lastAccrualTimestamp = block.timestamp at creation time
+        // Now we advance time so that when deposit() calls _accrueSubVaultConversionRate(),
+        // the conversionRate grows to 1.5 * RAY
+        vm.warp(block.timestamp + 1);
+
+        // Deposit exactly 1 unit (1e18 wei for 18-decimal token = 1e27 in Ray)
+        // With conversionRate = 1.5 * RAY = 1.5e27:
+        // shares = floor(1e27 * 1e27 / 1.5e27) = floor(0.666...e27) ≈ 6.66e26
+        // actualAmount = floor(6.66e26 * 1.5e27 / 1e27) ≈ 0.999...e27
+        // originalDeposit = 1e27
+        // 0.999e27 < 1e27 -> ASSERTION FAILS
+        uint256 depositAmount = 1e18; // 1 token with 18 decimals = 1e27 in Ray
+
+        ghoToken.mint(user, depositAmount);
+
+        vm.prank(user);
+        ghoToken.approve(address(highRateVault), depositAmount);
+
+        vm.prank(user);
+        highRateVault.deposit(user, address(ghoToken), depositAmount);
+
+        // Mock the aggregated balance to allow withdrawal (high enough to cover any interest)
+        mockFundsHandler.mockAggregatedBalance(depositAmount.assetDecimalsToRay(address(ghoToken)) * 10);
+
+        // This should trigger the assertion failure
+        // The assertion is: assert(actualAmountOfWithdrawalRay >= originalDepositRay)
+        // With our values: ~0.999e27 >= 1e27 is FALSE
+        vm.prank(user);
+        highRateVault.requestWithdrawal(user, 0); // 0 = full withdrawal
+    }
+
     function test_deposit_firstUserDepositGoesToDefaultSubVault(address user, uint256 amount) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
@@ -944,9 +1032,9 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     }
 
     function test_requestWithdrawal_reverts_ifInterestToWithdrawIsGreaterThanAvailableInterest(
-        address user, // 0x0000000000000000000000000000000000000ac9
-        uint256 depositAmount, // 74
-        uint256 timeElapsed // 5285
+        address user,
+        uint256 depositAmount,
+        uint256 timeElapsed
     ) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
