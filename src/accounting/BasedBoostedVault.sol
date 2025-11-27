@@ -466,9 +466,12 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         _burnShares(user, sharesToRedeem);
         uint256 originalDepositRay = $storage().positions[user].originalDepositRay;
         delete $storage().positions[user];
-        // TODO: This should never happen. If it does, we should replace the assert by rounding it up to guarantee
-        // originalDeposit, i.e. `actualAmountOfWithdrawalRay = originalDepositRay`
-        assert(actualAmountOfWithdrawalRay >= originalDepositRay);
+        // Due to rounding in rayDivDown (deposit) and rayMulDown (withdrawal),
+        // actualAmountOfWithdrawalRay can be slightly less than originalDepositRay.
+        // We guarantee the user gets at least their original deposit back.
+        if (actualAmountOfWithdrawalRay < originalDepositRay) {
+            actualAmountOfWithdrawalRay = originalDepositRay;
+        }
         return (actualAmountOfWithdrawalRay, originalDepositRay, sharesToRedeem);
     }
 

@@ -24,6 +24,7 @@ import {MockFundsHandler} from "../../mocks/MockFundsHandler.sol";
 import {MockIouTokenManager} from "../../mocks/MockIouTokenManager.sol";
 import {MockNonStandardErc20} from "../../mocks/MockNonStandardErc20.sol";
 import {MockTransferHelper} from "../../mocks/MockTransferHelper.sol";
+import {console} from "forge-std/console.sol";
 
 contract BasedBoostedVaultTest is TestWithHelpers {
     using MathLib for uint256;
@@ -1224,6 +1225,81 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         assertEq(mockAsset.balanceOf(msgSender), assetAmountToRescue);
         assertEq(mockAsset.balanceOf(address(bbv)), bbvAssetBalance - assetAmountToRescue);
+    }
+
+    /// @notice This test demonstrates that due to rounding in rayDivDown (deposit) and rayMulDown (withdrawal),
+    /// the actualAmountOfWithdrawal can be LESS than originalDeposit, causing the user to lose principal.
+    ///
+    /// Mathematical proof:
+    /// - D = originalDeposit, C = conversionRate (where C > RAY)
+    /// - At deposit: shares = floor(D * RAY / C)
+    /// - At withdrawal: actualAmount = floor(shares * C / RAY)
+    /// - Due to double rounding: actualAmount < D when D is not perfectly divisible by (C / RAY)
+    function test_requestWithdrawal_roundingCausesUserToLosePrincipal() public {
+        // ==================== SETUP ====================
+        address user = makeAddr("testUser");
+        MockErc20 ghoToken = new MockErc20("GHO", "GHO", 18);
+
+        // Use rate = 1.5 * RAY which causes non-exact division
+        uint256 highRate = (3 * MathLib.RAY) / 2; // 1.5 * RAY
+        IBasedBoostedVault highRateVault = _deployBasedBoostedVault(
+            address(mockAccessManager),
+            highRate + 1,
+            highRate,
+            address(mockIouTokenManager),
+            address(mockFundsHandler),
+            address(mockAssetRegistry),
+            address(mockTransferHelper),
+            address(withdrawalFeeCalculator)
+        );
+
+        // Warp 1 second so conversionRate accrues to 1.5 * RAY
+        vm.warp(block.timestamp + 1);
+
+        // ==================== DEPOSIT ====================
+        uint256 depositAmount = 1e18; // 1 token
+        uint256 originalDepositRay = depositAmount.assetDecimalsToRay(address(ghoToken)); // 1e27
+
+        ghoToken.mint(user, depositAmount);
+        vm.prank(user);
+        ghoToken.approve(address(highRateVault), depositAmount);
+        vm.prank(user);
+        highRateVault.deposit(user, address(ghoToken), depositAmount);
+
+        // ==================== VERIFY THE EDGE CASE EXISTS ====================
+        // Calculate what the contract will compute:
+        uint256 conversionRate = highRate; // 1.5e27 after 1 second of accrual
+
+        // At deposit: shares = rayDivDown(originalDeposit, conversionRate)
+        uint256 shares = originalDepositRay.rayDivDown(conversionRate);
+
+        // At withdrawal: actualAmount = rayMulDown(shares, conversionRate)
+        uint256 actualAmountOfWithdrawalRay = shares.rayMulDown(conversionRate);
+
+        // THE EDGE CASE: actualAmount < originalDeposit due to rounding!
+        assertLt(
+            actualAmountOfWithdrawalRay,
+            originalDepositRay,
+            "Edge case not demonstrated: actualAmount >= originalDeposit"
+        );
+
+        // Log the exact values for clarity
+        console.log("originalDepositRay:", originalDepositRay);
+        console.log("conversionRate:", conversionRate);
+        console.log("shares:", shares);
+        console.log("actualAmountOfWithdrawalRay:", actualAmountOfWithdrawalRay);
+        console.log("LOSS (originalDeposit - actualAmount):", originalDepositRay - actualAmountOfWithdrawalRay);
+
+        // ==================== WITHDRAWAL WITH FIX ====================
+        // The fix ensures user gets at least their originalDeposit back:
+        //   if (actualAmountOfWithdrawalRay < originalDepositRay) {
+        //       actualAmountOfWithdrawalRay = originalDepositRay;
+        //   }
+        mockFundsHandler.mockAggregatedBalance(originalDepositRay * 10);
+
+        vm.prank(user);
+        uint256 withdrawnAmount = highRateVault.requestWithdrawal(user, 0);
+        assertEq(withdrawnAmount, originalDepositRay, "User should get their full original deposit back");
     }
 
     ////////////////////////////// HELPERS ///////////////////////////////
