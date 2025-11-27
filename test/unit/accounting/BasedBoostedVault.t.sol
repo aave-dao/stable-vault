@@ -1302,6 +1302,66 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         assertEq(withdrawnAmount, originalDepositRay, "User should get their full original deposit back");
     }
 
+    /// @notice This test demonstrates that depositing when conversionRate > RAY
+    /// can result in 0 shares for tokens with high decimals.
+    ///
+    /// With a 27-decimal token (same as Ray), 1 smallest unit = 1 Ray.
+    /// After just 1 second with 20% APY, conversionRate > RAY, so:
+    /// - shares = floor(1 * RAY / conversionRate) = floor(RAY / conversionRate) = 0
+    ///
+    /// Without protection, user's funds would be stuck (withdrawal panics).
+    /// The fix: require(shares > 0, ErrorsLib.InvalidAmount()) reverts early.
+    function test_deposit_zeroSharesEdgeCase() public {
+        address user = makeAddr("testUser");
+
+        // 27-decimal token: 1 smallest unit = 1 Ray
+        MockErc20 highDecimalToken = new MockErc20("HighDecimal", "HD27", 27);
+
+        // Use realistic 20% APY rate
+        uint256 twentyPercentApy = 1000000005781378656804591713; // ~20% APY
+        IBasedBoostedVault vault = _deployBasedBoostedVault(
+            address(mockAccessManager),
+            twentyPercentApy + 1, // max rate slightly higher
+            twentyPercentApy,
+            address(mockIouTokenManager),
+            address(mockFundsHandler),
+            address(mockAssetRegistry),
+            address(mockTransferHelper),
+            address(withdrawalFeeCalculator)
+        );
+
+        // Warp just 1 second - conversionRate grows slightly above RAY
+        vm.warp(block.timestamp + 1);
+
+        // Calculate conversionRate after 1 second
+        uint256 expectedConversionRate = MathLib.RAY.rayMulDown(twentyPercentApy.rpow(1));
+        console.log("conversionRate after 1 second:", expectedConversionRate);
+        console.log("RAY:", MathLib.RAY);
+        console.log("conversionRate > RAY:", expectedConversionRate > MathLib.RAY);
+
+        // Deposit 1 smallest unit (= 1 Ray for 27-decimal token)
+        uint256 depositAmount = 1; // 1 smallest unit
+        uint256 amountInRay = depositAmount.assetDecimalsToRay(address(highDecimalToken));
+        console.log("amountInRay:", amountInRay);
+
+        // Verify that shares will be 0
+        // shares = floor(1 * RAY / conversionRate) = floor(1e27 / 1.0000000057...e27) = 0
+        uint256 expectedShares = amountInRay.rayDivDown(expectedConversionRate);
+        console.log("expectedShares:", expectedShares);
+        assertEq(expectedShares, 0, "Edge case not demonstrated: shares != 0");
+
+        // ==================== WITH FIX: DEPOSIT REVERTS EARLY ====================
+        // The fix: require(shares > 0, ErrorsLib.InvalidAmount());
+        // Deposit should revert instead of silently accepting 0 shares
+        highDecimalToken.mint(user, depositAmount);
+        vm.prank(user);
+        highDecimalToken.approve(address(vault), depositAmount);
+
+        vm.prank(user);
+        vm.expectRevert(ErrorsLib.InvalidAmount.selector);
+        vault.deposit(user, address(highDecimalToken), depositAmount);
+    }
+
     ////////////////////////////// HELPERS ///////////////////////////////
 
     function _deposit(address user, uint256 amount) public {
