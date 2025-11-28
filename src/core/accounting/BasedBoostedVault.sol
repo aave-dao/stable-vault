@@ -16,15 +16,23 @@ import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
+import {Multicall} from "src/misc/Multicall.sol";
 import {RescuableAssets} from "src/misc/RescuableAssets.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
 
 /// @title BasedBoostedVault.
 /// @author Aave Labs
 /// @notice Semi-fixed rate vault.
+/// @dev This contract supports batching of calls using the Multicall contract.
 /// @dev Assets balances are tracked in RAY internally; conversions from and to specific asset denomination is made on
 /// deposit and on withdrawal execution.
-contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, TransferHelperClient, IBasedBoostedVault {
+contract BasedBoostedVault is
+    AccessManagedUpgradeable,
+    RescuableAssets,
+    TransferHelperClient,
+    Multicall,
+    IBasedBoostedVault
+{
     using MathLib for uint256;
     using AssetLib for uint256;
     using SafeERC20 for IERC20;
