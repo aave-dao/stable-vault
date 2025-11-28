@@ -146,10 +146,9 @@ contract WithdrawalPolicy is AccessManaged, EIP712, IWithdrawalPolicy {
         uint16 personalFeeBps,
         bytes memory signature
     ) internal view {
-        // TODO: Should we replace this weird contraption with ignore lint [asm-keccak256]?
-        // This saves a bit of gas, but looks non-standard.
-        bytes32 structHash =
-            EfficientHashLib.hash(abi.encode(WITHDRAWAL_FEE_TYPEHASH, user, assetOut, iouAmountRay, personalFeeBps));
+        bytes32 structHash = EfficientHashLib.hash(
+            abi.encode(WITHDRAWAL_FEE_TYPEHASH, user, assetOut, iouAmountRay, personalFeeBps)
+        );
         bytes32 digest = _hashTypedDataV4(structHash);
         address signer = ECDSA.recover(digest, signature);
         if (!$storage().signers[signer]) {
