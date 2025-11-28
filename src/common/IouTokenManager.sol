@@ -12,8 +12,6 @@ import {IMintableBurnableIERC20} from "../interfaces/IMintableBurnableIERC20.sol
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {TransferHelperClient} from "./TransferHelperClient.sol";
 
-// TODO: add events
-
 /// @title IouTokenManager
 /// @author Aave Labs
 /// @notice Manages the IOU token locking, releasing, minting, burning.
@@ -108,11 +106,13 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
             .sendBridgeIouTokenMessageWithFeePayer(
                 destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeParams
             );
+
+        emit TokensBridged(destinationChainId, iouTokenRecipient, iouTokenAmountRay);
     }
 
     /// @inheritdoc IIouTokenManager
     function mintTokens(address to, uint256 amount) external override onlyAllowedMinter {
-        IMintableBurnableIERC20(IOU_TOKEN).mint(to, amount);
+        _mintTokens(to, amount);
     }
 
     /// @inheritdoc IIouTokenManager
@@ -125,6 +125,7 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
         require(amount <= $storage().lockedBalance, InsufficientLockedBalance());
         $storage().lockedBalance -= amount;
         _burnTokens(address(this), amount);
+        emit LockedTokensBurned(address(this), amount);
     }
 
     /// @inheritdoc IIouTokenManager
@@ -132,6 +133,7 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
         require(amount <= $storage().lockedBalance, InsufficientLockedBalance());
         $storage().lockedBalance -= amount;
         IERC20(IOU_TOKEN).safeTransfer(to, amount);
+        emit LockedTokensReleased(to, amount);
     }
 
     /// @dev should only be used on Accounting chain.
@@ -142,5 +144,9 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
 
     function _burnTokens(address from, uint256 amount) internal {
         IMintableBurnableIERC20(IOU_TOKEN).burn(from, amount);
+    }
+
+    function _mintTokens(address to, uint256 amount) internal {
+        IMintableBurnableIERC20(IOU_TOKEN).mint(to, amount);
     }
 }

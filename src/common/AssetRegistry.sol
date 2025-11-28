@@ -7,9 +7,9 @@ import {
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import {IAssetRegistry} from "../interfaces/IAssetRegistry.sol";
-import {Multicall} from "../utils/Multicall.sol";
 import {ConstantsLib} from "../libraries/ConstantsLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
+import {Multicall} from "../utils/Multicall.sol";
 
 /// @title AssetRegistry
 /// @author Aave Labs
