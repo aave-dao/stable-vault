@@ -24,7 +24,7 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
     uint256 internal immutable ACCOUNTING_CHAIN_ID;
     address internal immutable ALLOCATOR;
     address internal immutable ASSET_REGISTRY;
-    address internal immutable WITHDRAWAL_FEE_CALCULATOR;
+    address internal immutable WITHDRAWAL_POLICY;
 
     /// @custom:storage-location erc7201:aave.storage.EarningChainGateway
     struct EarningChainGatewayStorage {
@@ -52,13 +52,13 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
         address assetRegistry,
         address iouTokenManager,
         address transferHelper,
-        address withdrawalFeeCalculator
+        address withdrawalPolicy
     ) TransferHelperClient(transferHelper) BaseChainGateway(iouTokenManager) {
         _disableInitializers();
         ACCOUNTING_CHAIN_ID = accountingChainId;
         ALLOCATOR = allocator;
         ASSET_REGISTRY = assetRegistry;
-        WITHDRAWAL_FEE_CALCULATOR = withdrawalFeeCalculator;
+        WITHDRAWAL_POLICY = withdrawalPolicy;
     }
 
     /// @dev Initializer.
@@ -130,7 +130,7 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
             $BaseChainGateway().defaultBridgeAdapter[ConstantsLib.ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID];
         require(adapter != address(0), AdapterNotFound());
 
-        uint256 withdrawalFeeRay = IWithdrawalFeeCalculator(WITHDRAWAL_FEE_CALCULATOR)
+        uint256 withdrawalFeeRay = IWithdrawalFeeCalculator(WITHDRAWAL_POLICY)
             .calculateWithdrawalFee(msg.sender, tokenOut, iouTokenAmountRay, data);
         uint256 amountOut = (iouTokenAmountRay - withdrawalFeeRay).rayToAssetDecimals(tokenOut);
         require(amountOut > 0, ErrorsLib.InsufficientAmountOut());

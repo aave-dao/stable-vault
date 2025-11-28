@@ -28,7 +28,7 @@ import {CcipAdapter} from "./../src/bridging/CcipAdapter.sol";
 import {Allocator} from "./../src/common/Allocator.sol";
 import {Swapper} from "./../src/common/Swapper.sol";
 import {TransferHelper} from "./../src/common/TransferHelper.sol";
-import {WithdrawalFeeCalculator} from "./../src/common/WithdrawalFeeCalculator.sol";
+import {WithdrawalPolicy} from "./../src/common/WithdrawalPolicy.sol";
 import {EarningChainGateway} from "./../src/earning/EarningChainGateway.sol";
 import {AssetLib} from "./../src/libraries/AssetLib.sol";
 import {MathLib} from "./../src/libraries/MathLib.sol";
@@ -125,8 +125,8 @@ contract BaseTest is Test {
     MockCCIPRouter public mockCcipRouter;
 
     // Mock Withdrawal Fee Calculator
-    WithdrawalFeeCalculator public withdrawalFeeCalculator_accountingChain;
-    WithdrawalFeeCalculator public withdrawalFeeCalculator_earningChain;
+    WithdrawalPolicy public withdrawalPolicy_accountingChain;
+    WithdrawalPolicy public withdrawalPolicy_earningChain;
 
     function _prepareTokens() internal {
         GHO.mint(address(this), 10000 ether);
@@ -219,10 +219,8 @@ contract BaseTest is Test {
 
         transferHelper_accountingChainAddress = address(new TransferHelper());
 
-        withdrawalFeeCalculator_accountingChain = new WithdrawalFeeCalculator(admin);
-        console.log(
-            "\tWithdrawal Fee Calculator (Accounting Chain): %s", address(withdrawalFeeCalculator_accountingChain)
-        );
+        withdrawalPolicy_accountingChain = new WithdrawalPolicy(admin);
+        console.log("\tWithdrawal Policy (Accounting Chain): %s", address(withdrawalPolicy_accountingChain));
 
         // Pre compute addresses for contracts that are with circular dependencies
         uint256 deployerNonce_accountingChain = vm.getNonce(address(this));
@@ -331,7 +329,7 @@ contract BaseTest is Test {
             fundsHandler_accountingChainAddress,
             assetRegistry_accountingChainAddress,
             transferHelper_accountingChainAddress,
-            address(withdrawalFeeCalculator_accountingChain)
+            address(withdrawalPolicy_accountingChain)
         );
         console.log("\tVault: %s", vault_accountingChainAddress);
         require(address(vault) == vault_accountingChainAddress, "Vault (Accounting Chain) address mismatch");
@@ -453,8 +451,8 @@ contract BaseTest is Test {
 
         transferHelper_earningChainAddress = address(new TransferHelper());
 
-        withdrawalFeeCalculator_earningChain = new WithdrawalFeeCalculator(admin);
-        console.log("\tWithdrawal Fee Calculator (Earning Chain): %s", address(withdrawalFeeCalculator_earningChain));
+        withdrawalPolicy_earningChain = new WithdrawalPolicy(admin);
+        console.log("\tWithdrawal Policy (Earning Chain): %s", address(withdrawalPolicy_earningChain));
 
         uint256 deployerNonce_earningChain = vm.getNonce(address(this));
         accessManager_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
@@ -596,7 +594,7 @@ contract BaseTest is Test {
                 assetRegistry_earningChainAddress,
                 iouTokenManager_earningChainAddress,
                 transferHelper_earningChainAddress,
-                address(withdrawalFeeCalculator_earningChain)
+                address(withdrawalPolicy_earningChain)
             )
         );
         earningChainGateway = EarningChainGateway(

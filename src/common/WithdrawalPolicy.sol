@@ -10,41 +10,43 @@ import {IWithdrawalFeeCalculator} from "../interfaces/IWithdrawalFeeCalculator.s
 import {ConstantsLib} from "../libraries/ConstantsLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
-/// @title WithdrawalFeeCalculator
+/// @title WithdrawalPolicy
 /// @author Aave Labs
-/// @notice Contract for calculating withdrawal fees based on personal fees, asset-specific fees, and basic fees.
+/// @notice Contract used to enforce withdrawal policies such as fees.
+/// @dev Withdrawal fees are calculated based on personal fees, asset-specific fees, or a fallback fee.
+/// @dev Withdrawal fees are in basis points (bps) and are applied to the IOU tokens being exchanged for assets.
 /// @dev This contract does not take ownership of the fee. It is expected the client of this contract takes the fee
 /// returned by this contract.
-contract WithdrawalFeeCalculator is AccessManaged, EIP712, IWithdrawalFeeCalculator {
+contract WithdrawalPolicy is AccessManaged, EIP712, IWithdrawalFeeCalculator {
     // EIP-712 typeHash:
     // keccak256("WithdrawalFee(address user,address assetOut,uint256 iouAmountRay,uint256 personalFee)").
     bytes32 public constant WITHDRAWAL_FEE_TYPEHASH =
         0x70053184e810124de211241896d50cf6caf42eac7fb6ee3f16afe61ee6a3f1b2;
 
-    /// @custom:storage-location erc7201:aave.storage.WithdrawalFeeCalculator
-    struct WithdrawalFeeCalculatorStorage {
+    /// @custom:storage-location erc7201:aave.storage.WithdrawalPolicy
+    struct WithdrawalPolicyStorage {
         uint256 basicFeeBps;
         mapping(address asset => AssetFeeBpsConfig assetFeeBpsConfig) feeBpsConfigByAsset;
         mapping(address signer => bool isSigner) signers;
     }
 
-    // keccak256(abi.encode(uint256(keccak256("aave.storage.WithdrawalFeeCalculator")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant STORAGE_SLOT_WITHDRAWAL_FEE_CALCULATOR =
-        0xb4766a4633e61aded0a93de3a0e2b80dc0041dc0533fcc8f3fdb067abd96b000;
+    // keccak256(abi.encode(uint256(keccak256("aave.storage.WithdrawalPolicy")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant STORAGE_SLOT_WITHDRAWAL_POLICY =
+        0x48eb1b6299cf8fd4c062909cb421828ec45d2e192a5da81d7bd68b7aecc6f800;
 
-    function $storage() private pure returns (WithdrawalFeeCalculatorStorage storage _storage) {
+    function $storage() private pure returns (WithdrawalPolicyStorage storage _storage) {
         assembly {
-            _storage.slot := STORAGE_SLOT_WITHDRAWAL_FEE_CALCULATOR
+            _storage.slot := STORAGE_SLOT_WITHDRAWAL_POLICY
         }
     }
 
-    function $WithdrawalFeeCalculator() internal pure returns (WithdrawalFeeCalculatorStorage storage) {
+    function $WithdrawalPolicy() internal pure returns (WithdrawalPolicyStorage storage) {
         return $storage();
     }
 
     /// @dev Constructor.
     /// @param accessManager Address of the IAccessManager contract used for handling access control.
-    constructor(address accessManager) EIP712("WithdrawalFeeCalculator", "1") AccessManaged(accessManager) {}
+    constructor(address accessManager) EIP712("WithdrawalPolicy", "1") AccessManaged(accessManager) {}
 
     // TODO: Should we replace this with two getters? getAssetFeeBps and isAssetFeeBpsSet?
     /// @inheritdoc IWithdrawalFeeCalculator

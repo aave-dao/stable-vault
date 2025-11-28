@@ -60,7 +60,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
 
     address internal immutable FUNDS_HANDLER;
 
-    address internal immutable WITHDRAWAL_FEE_CALCULATOR;
+    address internal immutable WITHDRAWAL_POLICY;
 
     /// @custom:storage-location erc7201:aave.storage.BasedBoostedVault
     struct BasedBoostedVaultStorage {
@@ -115,7 +115,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         address iouTokenManager,
         address fundsHandler,
         address transferHelper,
-        address withdrawalFeeCalculator
+        address withdrawalPolicy
     ) TransferHelperClient(transferHelper) {
         _disableInitializers();
         require(maxValidPerSecondRate > MathLib.RAY, InvalidRate());
@@ -123,7 +123,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         ASSET_REGISTRY = assetRegistry;
         IOU_TOKEN_MANAGER = iouTokenManager;
         FUNDS_HANDLER = fundsHandler;
-        WITHDRAWAL_FEE_CALCULATOR = withdrawalFeeCalculator;
+        WITHDRAWAL_POLICY = withdrawalPolicy;
     }
 
     /// @dev Initializer.
@@ -254,8 +254,8 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         require(user == msg.sender, OnlyUser());
         require(IAssetRegistry(ASSET_REGISTRY).isUserWithdrawalAllowed(assetOut), ErrorsLib.UnsupportedAsset(assetOut));
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(user, iouAmountRay);
-        uint256 withdrawalFeeRay = IWithdrawalFeeCalculator(WITHDRAWAL_FEE_CALCULATOR)
-            .calculateWithdrawalFee(user, assetOut, iouAmountRay, data);
+        uint256 withdrawalFeeRay =
+            IWithdrawalFeeCalculator(WITHDRAWAL_POLICY).calculateWithdrawalFee(user, assetOut, iouAmountRay, data);
         uint256 assetAmount = (iouAmountRay - withdrawalFeeRay).rayToAssetDecimals(assetOut);
         require(assetAmount > 0, ErrorsLib.InsufficientAmountOut());
         IFundsHandler(FUNDS_HANDLER).processWithdrawal(assetOut, assetAmount);

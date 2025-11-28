@@ -3,7 +3,7 @@ pragma solidity ^0.8.22;
 
 /// @title IWithdrawalFeeCalculator
 /// @author Aave Labs
-/// @notice Interface for the WithdrawalFeeCalculator contract.
+/// @notice Interface for the WithdrawalPolicy contract.
 interface IWithdrawalFeeCalculator {
     /// @notice Thrown when a recovered signer is not a whitelisted signer.
     /// @custom:selector 0x8baa579f
