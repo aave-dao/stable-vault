@@ -314,7 +314,7 @@ contract WithdrawalFeeCalculatorTest is TestWithHelpers {
         bytes memory signature = _signPersonalFee(signerPk, wrongUser, assetOut, iouAmountRay, personalFeeBps);
 
         bytes memory data = abi.encode(personalFeeBps, signature);
-        vm.expectRevert(WithdrawalFeeCalculator.InvalidSignature.selector);
+        vm.expectRevert(IWithdrawalFeeCalculator.InvalidSignature.selector);
         withdrawalFeeCalculator.calculateWithdrawalFee(user, assetOut, iouAmountRay, data);
     }
 
@@ -344,7 +344,7 @@ contract WithdrawalFeeCalculatorTest is TestWithHelpers {
         bytes memory signature = _signPersonalFee(signerPk, user, wrongAssetOut, iouAmountRay, personalFeeBps);
 
         bytes memory data = abi.encode(personalFeeBps, signature);
-        vm.expectRevert(WithdrawalFeeCalculator.InvalidSignature.selector);
+        vm.expectRevert(IWithdrawalFeeCalculator.InvalidSignature.selector);
         withdrawalFeeCalculator.calculateWithdrawalFee(user, assetOut, iouAmountRay, data);
     }
 
@@ -376,7 +376,7 @@ contract WithdrawalFeeCalculatorTest is TestWithHelpers {
         bytes memory signature = _signPersonalFee(signerPk, user, assetOut, wrongIouAmountRay, personalFeeBps);
 
         bytes memory data = abi.encode(personalFeeBps, signature);
-        vm.expectRevert(WithdrawalFeeCalculator.InvalidSignature.selector);
+        vm.expectRevert(IWithdrawalFeeCalculator.InvalidSignature.selector);
         withdrawalFeeCalculator.calculateWithdrawalFee(user, assetOut, iouAmountRay, data);
     }
 
@@ -408,7 +408,7 @@ contract WithdrawalFeeCalculatorTest is TestWithHelpers {
         bytes memory signature = _signPersonalFee(signerPk, user, assetOut, iouAmountRay, wrongPersonalFeeBps);
 
         bytes memory data = abi.encode(personalFeeBps, signature);
-        vm.expectRevert(WithdrawalFeeCalculator.InvalidSignature.selector);
+        vm.expectRevert(IWithdrawalFeeCalculator.InvalidSignature.selector);
         withdrawalFeeCalculator.calculateWithdrawalFee(user, assetOut, iouAmountRay, data);
     }
 
