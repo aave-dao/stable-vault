@@ -7,22 +7,21 @@ import {IMulticall} from "../interfaces/IMulticall.sol";
 /// @title Multicall
 /// @author Aave Labs
 /// @notice This contract allows for batching multiple calls into a single call.
-/// @dev Inspired by the OpenZeppelin Multicall contract.
+/// @dev Inspired by OpenZeppelin's Multicall contract.
 abstract contract Multicall is IMulticall {
     /// @inheritdoc IMulticall
     function multicall(bytes[] calldata data) external returns (bytes[] memory) {
-        bytes[] memory results = new bytes[](data.length);
+        bytes[] memory returnDatas = new bytes[](data.length);
         for (uint256 i; i < data.length; ++i) {
-            (bool ok, bytes memory res) = address(this).delegatecall(data[i]);
-
+            (bool callSucceeded, bytes memory returnData) = address(this).delegatecall(data[i]);
             assembly ("memory-safe") {
-                if iszero(ok) {
-                    revert(add(res, 32), mload(res)) // bubble up first revert
+                if iszero(callSucceeded) {
+                    // Bubble up first revert
+                    revert(add(returnData, 32), mload(returnData))
                 }
             }
-
-            results[i] = res;
+            returnDatas[i] = returnData;
         }
-        return results;
+        return returnDatas;
     }
 }
