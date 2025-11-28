@@ -5,13 +5,12 @@ import {BaseChainGateway} from "../common/BaseChainGateway.sol";
 import {TransferHelperClient} from "../common/TransferHelperClient.sol";
 import {IAllocator} from "../interfaces/IAllocator.sol";
 import {IAllocator} from "../interfaces/IAllocator.sol";
-import {IAssetRegistry} from "../interfaces/IAssetRegistry.sol";
 import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {IEarningChainGateway} from "../interfaces/IEarningChainGateway.sol";
 import {IIouTokenManager} from "../interfaces/IIouTokenManager.sol";
 import {ITransferHelper} from "../interfaces/ITransferHelper.sol";
-import {IWithdrawalFeeCalculator} from "../interfaces/IWithdrawalFeeCalculator.sol";
+import {IWithdrawalPolicy} from "../interfaces/IWithdrawalPolicy.sol";
 import {AssetLib} from "../libraries/AssetLib.sol";
 import {ConstantsLib} from "../libraries/ConstantsLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
@@ -23,8 +22,7 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
 
     uint256 internal immutable ACCOUNTING_CHAIN_ID;
     address internal immutable ALLOCATOR;
-    address internal immutable ASSET_REGISTRY;
-    address internal immutable WITHDRAWAL_FEE_CALCULATOR;
+    address internal immutable WITHDRAWAL_POLICY;
 
     /// @custom:storage-location erc7201:aave.storage.EarningChainGateway
     struct EarningChainGatewayStorage {
@@ -43,22 +41,21 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
 
     /// @dev Constructor.
     /// @param accountingChainId The Chain ID of the Accounting Chain.
-    /// @param allocator The address of the Allocator contract.
-    /// @param assetRegistry The address of the AssetRegistry contract.
-    /// @param iouTokenManager The address of the IOU token manager contract.
+    /// @param allocator Address of the Allocator contract.
+    /// @param iouTokenManager Address of the IOU token manager contract used to mint and burn bridged or exchanged IOU
+    /// tokens. @param transferHelper Address of the TransferHelper contract used to transfer assets across components.
+    /// @param withdrawalPolicy Address of the WithdrawalPolicy contract used to check withdrawal policies and fees.
     constructor(
         uint256 accountingChainId,
         address allocator,
-        address assetRegistry,
         address iouTokenManager,
         address transferHelper,
-        address withdrawalFeeCalculator
+        address withdrawalPolicy
     ) TransferHelperClient(transferHelper) BaseChainGateway(iouTokenManager) {
         _disableInitializers();
         ACCOUNTING_CHAIN_ID = accountingChainId;
         ALLOCATOR = allocator;
-        ASSET_REGISTRY = assetRegistry;
-        WITHDRAWAL_FEE_CALCULATOR = withdrawalFeeCalculator;
+        WITHDRAWAL_POLICY = withdrawalPolicy;
     }
 
     /// @dev Initializer.
@@ -124,14 +121,13 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
     {
         require(iouTokenAmountRay > 0, ErrorsLib.ZeroAmount());
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(msg.sender, iouTokenAmountRay);
-        require(IAssetRegistry(ASSET_REGISTRY).isUserWithdrawalAllowed(tokenOut), ErrorsLib.UnsupportedAsset(tokenOut));
 
         address adapter =
             $BaseChainGateway().defaultBridgeAdapter[ConstantsLib.ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID];
         require(adapter != address(0), AdapterNotFound());
 
-        uint256 withdrawalFeeRay = IWithdrawalFeeCalculator(WITHDRAWAL_FEE_CALCULATOR)
-            .calculateWithdrawalFee(msg.sender, tokenOut, iouTokenAmountRay, data);
+        (uint256 withdrawalFeeRay,) =
+            IWithdrawalPolicy(WITHDRAWAL_POLICY).evaluateWithdrawal(msg.sender, tokenOut, iouTokenAmountRay, data);
         uint256 amountOut = (iouTokenAmountRay - withdrawalFeeRay).rayToAssetDecimals(tokenOut);
         require(amountOut > 0, ErrorsLib.InsufficientAmountOut());
         IAllocator(ALLOCATOR).withdraw(tokenOut, amountOut);
