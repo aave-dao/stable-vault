@@ -472,12 +472,9 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
     function _fullWithdrawalRequest(address user) internal returns (uint256, uint256, uint256) {
         uint256 subVaultId = $storage().positions[user].subVaultId;
         uint256 conversionRate = $storage().subVaultById[subVaultId].conversionRate;
-
         uint256 sharesToRedeem = $storage().positions[user].shares;
         // Round down the withdrawal amount, so that the rounding is in favor of the protocol.
         uint256 actualAmountOfWithdrawalRay = sharesToRedeem.rayMulDown(conversionRate);
-        // Must never happen: conversionRate always > 1, sharesToRedeem > 0 (otherwise reverts with NonExistentPosition)
-        assert(actualAmountOfWithdrawalRay > 0);
         _burnShares(user, sharesToRedeem);
         uint256 originalDepositRay = $storage().positions[user].originalDepositRay;
         delete $storage().positions[user];
