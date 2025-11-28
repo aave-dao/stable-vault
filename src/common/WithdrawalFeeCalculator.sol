@@ -16,13 +16,10 @@ import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 /// @dev This contract does not take ownership of the fee. It is expected the client of this contract takes the fee
 /// returned by this contract.
 contract WithdrawalFeeCalculator is AccessManaged, EIP712, IWithdrawalFeeCalculator {
-    // TODO: Consider replacing this with a constant
+    // EIP-712 typeHash:
+    // keccak256("WithdrawalFee(address user,address assetOut,uint256 iouAmountRay,uint256 personalFee)").
     bytes32 public constant WITHDRAWAL_FEE_TYPEHASH =
-        keccak256("WithdrawalFee(address user,address assetOut,uint256 iouAmountRay,uint256 personalFee)");
-
-    /// @notice Thrown when a receovered signer is not a whitelisted signer.
-    /// @custom:selector 0x8baa579f
-    error InvalidSignature();
+        0x70053184e810124de211241896d50cf6caf42eac7fb6ee3f16afe61ee6a3f1b2;
 
     /// @custom:storage-location erc7201:aave.storage.WithdrawalFeeCalculator
     struct WithdrawalFeeCalculatorStorage {
@@ -41,10 +38,9 @@ contract WithdrawalFeeCalculator is AccessManaged, EIP712, IWithdrawalFeeCalcula
         }
     }
 
-    // TODO: I don't think this is needed:
-    // function $WithdrawalFeeCalculator() internal pure returns (WithdrawalFeeCalculatorStorage storage) {
-    //     return $storage();
-    // }
+    function $WithdrawalFeeCalculator() internal pure returns (WithdrawalFeeCalculatorStorage storage) {
+        return $storage();
+    }
 
     /// @dev Constructor.
     /// @param accessManager Address of the IAccessManager contract used for handling access control.

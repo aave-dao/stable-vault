@@ -5,11 +5,15 @@ pragma solidity ^0.8.22;
 /// @author Aave Labs
 /// @notice Interface for the WithdrawalFeeCalculator contract.
 interface IWithdrawalFeeCalculator {
+    /// @notice Thrown when a recovered signer is not a whitelisted signer.
+    /// @custom:selector 0x8baa579f
+    error InvalidSignature();
+
     /// @notice The configuration for an asset-specific fee.
     /// @param feeBps The fee in basis points.
     /// @param isSet Whether the fee is set.
     struct AssetFeeBpsConfig {
-        uint16 feeBps; // TODO: Remember which order these need to be and if that matters for further storage extension.
+        uint16 feeBps;
         bool isSet;
     }
 

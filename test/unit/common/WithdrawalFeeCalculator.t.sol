@@ -284,7 +284,7 @@ contract WithdrawalFeeCalculatorTest is TestWithHelpers {
         bytes memory signature = _signPersonalFee(nonWhitelistedSignerPk, user, assetOut, iouAmountRay, personalFeeBps);
 
         bytes memory data = abi.encode(personalFeeBps, signature);
-        vm.expectRevert(WithdrawalFeeCalculator.InvalidSignature.selector);
+        vm.expectRevert(IWithdrawalFeeCalculator.InvalidSignature.selector);
         withdrawalFeeCalculator.calculateWithdrawalFee(user, assetOut, iouAmountRay, data);
     }
 
