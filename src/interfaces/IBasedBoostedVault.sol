@@ -21,15 +21,11 @@ interface IBasedBoostedVault {
         uint256 newPerSecondRate;
     }
 
-    // TODO: after initial testing we can fallback to using WithdrawalRequested
-    // event WithdrawalRequested(address indexed user, address indexed asset, uint256 indexed withdrawalRequestId,
-    // uint256 requestedAmount, uint256 guaranteedAmount);
-    event WithdrawalRequestedWithShares(
+    event WithdrawalRequested(
         address indexed user,
         uint256 subVaultId,
-        uint256 subVaultShares,
-        uint256 requestedAmount,
-        uint256 guaranteedAmount
+        uint256 redeemedIouTokenAmountRay,
+        uint256 guaranteedWithdrawableAmountRay
     );
 
     event WithdrawalExecuted(address indexed user, address asset, uint256 amount);

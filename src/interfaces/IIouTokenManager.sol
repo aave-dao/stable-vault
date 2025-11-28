@@ -7,6 +7,14 @@ import {IBridgeAdapter} from "./IBridgeAdapter.sol";
 /// @author Aave Labs
 /// @notice Interface for the IOU token manager.
 interface IIouTokenManager {
+    event TokensBridged(
+        uint256 indexed destinationChainId, address indexed iouTokenRecipient, uint256 iouTokenAmountRay
+    );
+
+    event LockedTokensReleased(address indexed to, uint256 amountRay);
+
+    event LockedTokensBurned(address indexed from, uint256 amountRay);
+
     /// @notice Thrown when the amount of locked tokens is insufficient to burn or release.
     /// @custom:selector 0xb646ec7b
     error InsufficientLockedBalance();

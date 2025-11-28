@@ -7,7 +7,6 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transpa
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {BasedBoostedVault} from "../../../src/accounting/BasedBoostedVault.sol";
-import {WithdrawalFeeCalculator} from "../../../src/common/WithdrawalFeeCalculator.sol";
 import {IBasedBoostedVault} from "../../../src/interfaces/IBasedBoostedVault.sol";
 import {IFundsHandler} from "../../../src/interfaces/IFundsHandler.sol";
 import {IRescuableAssets} from "../../../src/interfaces/IRescuableAssets.sol";
@@ -24,6 +23,7 @@ import {MockFundsHandler} from "../../mocks/MockFundsHandler.sol";
 import {MockIouTokenManager} from "../../mocks/MockIouTokenManager.sol";
 import {MockNonStandardErc20} from "../../mocks/MockNonStandardErc20.sol";
 import {MockTransferHelper} from "../../mocks/MockTransferHelper.sol";
+import {MockWithdrawalFeeCalculator} from "../../mocks/MockWithdrawalFeeCalculator.sol";
 
 contract BasedBoostedVaultTest is TestWithHelpers {
     using MathLib for uint256;
@@ -41,7 +41,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     MockIouTokenManager mockIouTokenManager;
     MockAssetRegistry mockAssetRegistry;
     MockTransferHelper mockTransferHelper;
-    WithdrawalFeeCalculator withdrawalFeeCalculator;
+    MockWithdrawalFeeCalculator mockWithdrawalFeeCalculator;
     IBasedBoostedVault bbv;
 
     function _deployDefaultAsset() internal returns (IMockErc20) {
@@ -60,7 +60,12 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     ) internal returns (IBasedBoostedVault) {
         address vaultImpl = address(
             new BasedBoostedVault(
-                maxPerSecondRate, iouTokenManager, fundsHandler, transferHelper, withdrawalFeeCalculatorAddress
+                maxPerSecondRate,
+                assetRegistry,
+                iouTokenManager,
+                fundsHandler,
+                transferHelper,
+                withdrawalFeeCalculatorAddress
             )
         );
         return BasedBoostedVault(
@@ -68,9 +73,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
                 new TransparentUpgradeableProxy(
                     vaultImpl,
                     address(this),
-                    abi.encodeCall(
-                        BasedBoostedVault.initialize, (accessManager, defaultSubVaultPerSecondRate, assetRegistry)
-                    )
+                    abi.encodeCall(BasedBoostedVault.initialize, (accessManager, defaultSubVaultPerSecondRate))
                 )
             )
         );
@@ -85,7 +88,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockAsset = _deployDefaultAsset();
         mockTransferHelper = new MockTransferHelper();
         mockFundsHandler = new MockFundsHandler(address(mockTransferHelper));
-        withdrawalFeeCalculator = new WithdrawalFeeCalculator(admin);
+        mockWithdrawalFeeCalculator = new MockWithdrawalFeeCalculator();
         bbv = _deployBasedBoostedVault(
             address(mockAccessManager),
             DEFAULT_MAX_PER_SECOND_RATE,
@@ -94,7 +97,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(withdrawalFeeCalculator)
+            address(mockWithdrawalFeeCalculator)
         );
     }
 
@@ -111,10 +114,11 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         BasedBoostedVault newBbv = new BasedBoostedVault(
             expectedMaxValidPerSecondRate,
+            address(mockAssetRegistry),
             expectedIouManager,
             expectedFundsHandler,
             expectedTransferHelper,
-            address(withdrawalFeeCalculator)
+            address(mockWithdrawalFeeCalculator)
         );
 
         assertEq(newBbv.getMaxValidPerSecondRate(), expectedMaxValidPerSecondRate);
@@ -126,10 +130,11 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.expectRevert(IBasedBoostedVault.InvalidRate.selector);
         new BasedBoostedVault(
             invalidMaxValidPerSecondRate,
+            address(mockAssetRegistry),
             address(mockIouTokenManager),
             address(mockFundsHandler),
             address(mockTransferHelper),
-            address(withdrawalFeeCalculator)
+            address(mockWithdrawalFeeCalculator)
         );
     }
 
@@ -145,10 +150,11 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         address bbvImpl = address(
             new BasedBoostedVault(
                 DEFAULT_MAX_PER_SECOND_RATE,
+                address(mockAssetRegistry),
                 address(mockIouTokenManager),
                 address(mockFundsHandler),
                 address(mockTransferHelper),
-                address(withdrawalFeeCalculator)
+                address(mockWithdrawalFeeCalculator)
             )
         );
 
@@ -157,10 +163,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
                 new TransparentUpgradeableProxy(
                     bbvImpl,
                     address(this),
-                    abi.encodeCall(
-                        BasedBoostedVault.initialize,
-                        (expectedAccessManager, expectedDefaultSubVaultRate, expectedAssetRegistry)
-                    )
+                    abi.encodeCall(BasedBoostedVault.initialize, (expectedAccessManager, expectedDefaultSubVaultRate))
                 )
             )
         );
@@ -176,10 +179,11 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         address bbvImpl = address(
             new BasedBoostedVault(
                 DEFAULT_MAX_PER_SECOND_RATE,
+                address(mockAssetRegistry),
                 address(mockIouTokenManager),
                 address(mockFundsHandler),
                 address(mockTransferHelper),
-                address(withdrawalFeeCalculator)
+                address(mockWithdrawalFeeCalculator)
             )
         );
 
@@ -190,8 +194,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
                     bbvImpl,
                     address(this),
                     abi.encodeCall(
-                        BasedBoostedVault.initialize,
-                        (address(mockAccessManager), invalidDefaultSubVaultRate, address(mockAssetRegistry))
+                        BasedBoostedVault.initialize, (address(mockAccessManager), invalidDefaultSubVaultRate)
                     )
                 )
             )
@@ -311,6 +314,50 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         bbv.deposit(user, address(mockAsset), amount);
     }
 
+    function test_deposit_reverts_ifUserGetsZeroShares() public {
+        // The system will not allow tokens with more than 18 decimals (enforced in AssetRegistry).
+        // However, we use a 27-decimal token to trigger the edge case of getting 0 shares on deposit and test that
+        // the system would revert to not allow it.
+        address user = makeAddr("testUser");
+
+        // After just 1 second with 20% APY, conversionRate > RAY, so:
+        // shares = floor(1 * RAY / conversionRate) = floor(RAY / conversionRate) = 0
+        MockErc20 highDecimalToken = new MockErc20("HighDecimal", "HD27", 27);
+
+        uint256 twentyPercentApy = 1000000005781378656804591713; // ~20% APY
+        IBasedBoostedVault vault = _deployBasedBoostedVault(
+            address(mockAccessManager),
+            twentyPercentApy + 1,
+            twentyPercentApy,
+            address(mockIouTokenManager),
+            address(mockFundsHandler),
+            address(mockAssetRegistry),
+            address(mockTransferHelper),
+            address(mockWithdrawalFeeCalculator)
+        );
+
+        // Warp just 1 second, conversionRate grows slightly above RAY
+        vm.warp(block.timestamp + 1);
+
+        uint256 expectedConversionRate = MathLib.RAY.rayMulDown(twentyPercentApy.rpow(1));
+
+        uint256 depositAmount = 1;
+        uint256 amountInRay = depositAmount.assetDecimalsToRay(address(highDecimalToken));
+
+        // Verify that shares will be 0
+        // shares = floor(1 * RAY / conversionRate) = floor(1e27 / 1.0000000057...e27) = 0
+        uint256 expectedShares = amountInRay.rayDivDown(expectedConversionRate);
+        assertEq(expectedShares, 0);
+
+        highDecimalToken.mint(user, depositAmount);
+        vm.prank(user);
+        highDecimalToken.approve(address(vault), depositAmount);
+
+        vm.prank(user);
+        vm.expectRevert(ErrorsLib.InvalidAmount.selector);
+        vault.deposit(user, address(highDecimalToken), depositAmount);
+    }
+
     function test_deposit_allowsToDepositOnBehalfOfOtherUser(address user, address msgSender, uint256 amount) public {
         vm.assume(user != address(0));
         vm.assume(msgSender != address(0));
@@ -392,6 +439,58 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.prank(manager);
         vm.expectRevert(IBasedBoostedVault.RedundantRate.selector);
         _setUserRate(user, currentRate);
+    }
+
+    function test_setUserRate_smallConversionRateToLargeConversionRate() public {
+        // Override bbv with a low default sub-vault rate
+        bbv = _deployBasedBoostedVault(
+            address(mockAccessManager),
+            DEFAULT_MAX_PER_SECOND_RATE,
+            MathLib.RAY,
+            address(mockIouTokenManager),
+            address(mockFundsHandler),
+            address(mockAssetRegistry),
+            address(mockTransferHelper),
+            address(mockWithdrawalFeeCalculator)
+        );
+        mockAsset = IMockErc20(address(new MockNonStandardErc20("Test GHO", "tGHO", 18)));
+
+        uint256 newRate = 1000000005781378656804591713; // ~20% APY
+
+        address user1 = makeAddr("user1");
+        address user2 = makeAddr("user2");
+        uint256 amount = 1;
+
+        // Deposit from a user and move them into a new sub-vault to create the sub-vault
+        mockAsset.mint(user1, amount);
+
+        vm.prank(user1);
+        mockAsset.forceApprove(address(bbv), amount);
+
+        vm.prank(user1);
+        bbv.deposit(user1, address(mockAsset), amount);
+
+        IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](1);
+        userRateData[0] = IBasedBoostedVault.UserRateData(user1, newRate);
+        vm.prank(manager);
+        bbv.setUserRate(userRateData);
+
+        // Warp a long time to allow the conversion rate of the new sub-vault to grow.
+        vm.warp(115 * 365 days);
+
+        // User 2 deposits and has their position migrated to the new sub-vault
+        mockAsset.mint(user2, amount);
+        vm.prank(user2);
+        mockAsset.forceApprove(address(bbv), amount);
+        vm.prank(user2);
+        bbv.deposit(user2, address(mockAsset), amount);
+
+        vm.prank(manager);
+        userRateData = new IBasedBoostedVault.UserRateData[](1);
+        userRateData[0] = IBasedBoostedVault.UserRateData(user2, newRate);
+        // Check this reverts because the user would end up with 0 shares in the new sub-vault.
+        vm.expectRevert(ErrorsLib.InvalidAmount.selector);
+        bbv.setUserRate(userRateData);
     }
 
     function test_setUserRate_twoUsersWithSameRateLandsInTheSameSubVault(
@@ -943,9 +1042,9 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     }
 
     function test_requestWithdrawal_reverts_ifInterestToWithdrawIsGreaterThanAvailableInterest(
-        address user, // 0x0000000000000000000000000000000000000ac9
-        uint256 depositAmount, // 74
-        uint256 timeElapsed // 5285
+        address user,
+        uint256 depositAmount,
+        uint256 timeElapsed
     ) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
@@ -996,31 +1095,26 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         assertEq(actualWithdrawalAmountRay, expectedIouTokens);
     }
 
-    // TODO: Implement tests after we decide which event are we going to use. This one requires calculation of shares.
-    // function test_requestWithdrawal_emitsExpectedEvent(
-    //     address user,
-    //     uint256 depositAmount,
-    //     uint256 withdrawalAmountRay
-    // ) public {
-    //     vm.assume(user != address(0));
-    //     vm.assume(user != address(mockFundsHandler));
-    //     _assumeNotProxyAdmin(user, address(bbv));
-    //     depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
-    //     _deposit(user, depositAmount);
-    //     vm.assume(withdrawalAmountRay < depositAmount.assetDecimalsToRay(address(mockAsset)));
+    function test_requestWithdrawal_emitsExpectedEvent(address user, uint256 depositAmount, uint256 withdrawalAmountRay)
+        public
+    {
+        vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
+        _assumeNotProxyAdmin(user, address(bbv));
+        depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
+        _deposit(user, depositAmount);
+        vm.assume(withdrawalAmountRay < depositAmount.assetDecimalsToRay(address(mockAsset)));
 
-    //     mockFundsHandler.mockAggregatedBalance(depositAmount);
+        mockFundsHandler.mockAggregatedBalance(depositAmount);
 
-    //     uint256 actualWithdrawalAmount = withdrawalAmountRay == 0 ? bbv.getUserBalance(user) : withdrawalAmountRay;
+        uint256 actualWithdrawalAmount = withdrawalAmountRay == 0 ? bbv.getUserBalance(user) : withdrawalAmountRay;
 
-    //     vm.expectEmit(true, true, true, true);
-    //     emit IBasedBoostedVault.WithdrawalRequestedWithShares(
-    //         user, subVaultId, redeemedShares, actualWithdrawalAmount, guaranteedAmountRay
-    //     );
+        vm.expectEmit(true, true, true, true);
+        emit IBasedBoostedVault.WithdrawalRequested(user, 1, actualWithdrawalAmount, actualWithdrawalAmount);
 
-    //     vm.prank(user);
-    //     bbv.requestWithdrawal(user, withdrawalAmountRay);
-    // }
+        vm.prank(user);
+        bbv.requestWithdrawal(user, withdrawalAmountRay);
+    }
 
     function test_requestWithdrawal_returnsExpectedAmount(
         address user,
@@ -1066,6 +1160,92 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         assertEq(actualReturnValue, actualWithdrawalAmountRay);
         assertEq(bbv.getUserBalance(user), userBalanceBefore - actualWithdrawalAmountRay);
+    }
+
+    function test_requestWithdrawal_depositAndImmediatelyFullWithdraw_IOUsNeverUnderOriginalDeposit(
+        uint256 amount,
+        uint256 timeBetweenDeposits
+    ) public {
+        address user1 = makeAddr("USER1");
+        address user2 = makeAddr("USER2");
+        amount = _boundAssetAmount(address(mockAsset), amount);
+        timeBetweenDeposits = bound(timeBetweenDeposits, 5 minutes, 30 * 365 days);
+
+        // Deposit 1
+        mockAsset.mint(user1, amount);
+        vm.prank(user1);
+        mockAsset.forceApprove(address(bbv), amount);
+        vm.prank(user1);
+        bbv.deposit(user1, address(mockAsset), amount);
+        vm.warp(timeBetweenDeposits);
+
+        // Deposit 2
+        mockAsset.mint(user2, amount);
+        vm.prank(user2);
+        mockAsset.forceApprove(address(bbv), amount);
+        vm.prank(user2);
+        bbv.deposit(user2, address(mockAsset), amount);
+
+        // Request Full Withdrawal
+        vm.prank(user2);
+        uint256 iouTokenAmount = bbv.requestWithdrawal(user2, 0);
+
+        // After removing the assertion and replacing it with the code below from _fullWithdrawalRequest() we expect the
+        // IOU quantity to be at least original deposit normalized to RAY decimals:
+        //      if (actualAmountOfWithdrawalRay < originalDepositRay) {
+        //         actualAmountOfWithdrawalRay = originalDepositRay;
+        //      }
+        assertGe(iouTokenAmount, amount.assetDecimalsToRay(address(mockAsset)));
+    }
+
+    function test_requestWithdrawal_depositAfterConversionRateGrownALot_IOUsNeverUnderOriginalDeposit() public {
+        address user = makeAddr("testUser");
+
+        MockErc20 ghoToken = new MockErc20("GHO", "GHO", 18);
+
+        // Create a new vault with a rate that causes non-exact division
+        // Using 1.5 * RAY (50% per second) for demonstration
+        // This rate causes rounding when deposit amounts don't divide evenly
+        uint256 highRate = (3 * MathLib.RAY) / 2; // 1.5 * RAY = 50% per second
+        IBasedBoostedVault highRateVault = _deployBasedBoostedVault(
+            address(mockAccessManager),
+            highRate + 1, // max rate slightly higher
+            highRate,
+            address(mockIouTokenManager),
+            address(mockFundsHandler),
+            address(mockAssetRegistry),
+            address(mockTransferHelper),
+            address(mockWithdrawalFeeCalculator)
+        );
+
+        vm.warp(block.timestamp + 1);
+
+        // Deposit exactly 1 unit (1e18 wei for 18-decimal token = 1e27 in Ray)
+        // With conversionRate = 1.5 * RAY = 1.5e27:
+        // shares = floor(1e27 * 1e27 / 1.5e27) = floor(0.666...e27) ≈ 6.66e26
+        // actualAmount = floor(6.66e26 * 1.5e27 / 1e27) ≈ 0.999...e27
+        // originalDeposit = 1e27
+        // => 0.999e27 < 1e27
+        uint256 depositAmount = 1e18; // 1 token with 18 decimals = 1e27 in Ray
+
+        ghoToken.mint(user, depositAmount);
+
+        vm.prank(user);
+        ghoToken.approve(address(highRateVault), depositAmount);
+
+        vm.prank(user);
+        highRateVault.deposit(user, address(ghoToken), depositAmount);
+
+        // Mock the aggregated balance to allow withdrawal (high enough to cover any interest)
+        mockFundsHandler.mockAggregatedBalance(depositAmount.assetDecimalsToRay(address(ghoToken)) * 10);
+
+        // We expect the IOU quantity to be at least original deposit normalized to RAY decimals:
+        //      if (actualAmountOfWithdrawalRay < originalDepositRay) {
+        //         actualAmountOfWithdrawalRay = originalDepositRay;
+        //      }
+        vm.prank(user);
+        uint256 iouTokenAmount = highRateVault.requestWithdrawal(user, 0);
+        assertEq(iouTokenAmount, depositAmount.assetDecimalsToRay(address(ghoToken)));
     }
 
     function test_executeWithdrawal_reverts_ifMsgSenderIsNotTheUser(
@@ -1126,6 +1306,35 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         bbv.executeWithdrawal(user, address(mockAsset), iouAmountRay, "");
     }
 
+    function test_executeWithdrawal_reverts_ifAssetAmountIsZero_fromWithdrawalFee(
+        address user,
+        uint256 userIouBalance,
+        uint256 iouAmountRay
+    ) public {
+        vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
+        _assumeNotProxyAdmin(user, address(bbv));
+        userIouBalance = _boundRayAmountAllowingZero(userIouBalance);
+        iouAmountRay = _boundRayAmount(iouAmountRay);
+        vm.assume(iouAmountRay <= userIouBalance);
+        mockIouToken.mint(user, userIouBalance);
+        assertEq(mockIouToken.balanceOf(user), userIouBalance);
+        vm.assume(iouAmountRay.rayToAssetDecimals(address(mockAsset)) > 0);
+
+        vm.mockCall(
+            address(mockWithdrawalFeeCalculator),
+            abi.encodeWithSelector(MockWithdrawalFeeCalculator.calculateWithdrawalFee.selector),
+            abi.encode(iouAmountRay)
+        );
+
+        uint256 actualWithdrawnAssets = iouAmountRay.rayToAssetDecimals(address(mockAsset));
+        mockTransferHelper.mockAsset(address(mockAsset), actualWithdrawnAssets);
+
+        vm.prank(user);
+        vm.expectRevert(ErrorsLib.InsufficientAmountOut.selector);
+        bbv.executeWithdrawal(user, address(mockAsset), iouAmountRay, "");
+    }
+
     function test_executeWithdrawal_emitsExpectedEvent(address user, uint256 iouAmountRay) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
@@ -1134,6 +1343,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockIouToken.mint(user, iouAmountRay);
 
         uint256 actualWithdrawnAssets = iouAmountRay.rayToAssetDecimals(address(mockAsset));
+        vm.assume(actualWithdrawnAssets > 0);
         mockTransferHelper.mockAsset(address(mockAsset), actualWithdrawnAssets);
 
         vm.expectEmit(true, true, true, true);
@@ -1156,6 +1366,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(iouAmountRay <= userIouBalance);
         mockIouToken.mint(user, userIouBalance);
         assertEq(mockIouToken.balanceOf(user), userIouBalance);
+        vm.assume(iouAmountRay.rayToAssetDecimals(address(mockAsset)) > 0);
 
         uint256 actualWithdrawnAssets = iouAmountRay.rayToAssetDecimals(address(mockAsset));
         mockTransferHelper.mockAsset(address(mockAsset), actualWithdrawnAssets);
@@ -1172,6 +1383,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         _assumeNotProxyAdmin(user, address(bbv));
         iouAmountRay = _boundRayAmount(iouAmountRay);
         mockIouToken.mint(user, iouAmountRay);
+        vm.assume(iouAmountRay.rayToAssetDecimals(address(mockAsset)) > 0);
         vm.assume(mockAsset.balanceOf(user) == 0);
 
         uint256 actualWithdrawnAssets = iouAmountRay.rayToAssetDecimals(address(mockAsset));

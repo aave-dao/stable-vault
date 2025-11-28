@@ -16,4 +16,7 @@ library ConstantsLib {
 
     /// @dev The number of decimals for the RAY denomination.
     uint8 internal constant RAY_DECIMALS = 27;
+
+    /// @dev Maximum number of decimals for a token supported by the system.
+    uint8 internal constant MAX_SUPPORTED_ASSET_DECIMALS = 18;
 }

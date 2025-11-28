@@ -17,7 +17,7 @@ library ErrorsLib {
     /// @custom:selector 0x3b6566d0
     error AssetAlreadySupported(address asset);
 
-    /// @notice Insufficient amount due to slippage tolerance being exceeded.
+    /// @notice Insufficient amount due to slippage/fee tolerance being exceeded.
     /// @custom:selector 0xe52970aa
     error InsufficientAmountOut();
 
@@ -37,12 +37,13 @@ library ErrorsLib {
     /// @custom:selector 0x90eaaa70
     error InvalidDestinationChainId();
 
+    /// @notice Thrown when input parameter contains unacceptable value.
+    /// @custom:selector 0x613970e0
+    error InvalidParameter();
+
     /// @notice Thrown when native currency transfer failed.
     /// @custom:selector 0xf4b3b1bc
     error NativeTransferFailed();
-
-    /// @notice Thrown when input parameter contains unacceptable value.
-    error InvalidParameter();
 
     /// @notice Thrown when caller is not authorized.
     /// @custom:selector 0xea8e4eb5

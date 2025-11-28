@@ -52,6 +52,8 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         uint256 shares;
     }
 
+    address internal immutable ASSET_REGISTRY;
+
     address internal immutable IOU_TOKEN_MANAGER;
 
     uint256 internal immutable MAX_VALID_PER_SECOND_RATE;
@@ -62,8 +64,9 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
 
     /// @custom:storage-location erc7201:aave.storage.BasedBoostedVault
     struct BasedBoostedVaultStorage {
-        address assetRegistry;
-
+        /// @dev Keeps track of the sum of all users' original deposits.
+        /// @dev Does not overlap with circulating IOUs because original deposits are decremented when new issue IOUs
+        /// are minted.
         uint256 globalOriginalDepositsRay;
 
         /// @dev The ID of the last subVault created; monotonically increasing.
@@ -108,6 +111,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
     /// @param fundsHandler The address of the FundsHandler contract.
     constructor(
         uint256 maxValidPerSecondRate,
+        address assetRegistry,
         address iouTokenManager,
         address fundsHandler,
         address transferHelper,
@@ -116,6 +120,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         _disableInitializers();
         require(maxValidPerSecondRate > MathLib.RAY, InvalidRate());
         MAX_VALID_PER_SECOND_RATE = maxValidPerSecondRate;
+        ASSET_REGISTRY = assetRegistry;
         IOU_TOKEN_MANAGER = iouTokenManager;
         FUNDS_HANDLER = fundsHandler;
         WITHDRAWAL_FEE_CALCULATOR = withdrawalFeeCalculator;
@@ -124,22 +129,16 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
     /// @dev Initializer.
     /// @param accessManager Address of the IAccessManager contract used for handling access control.
     /// @param defaultSubVaultPerSecondRate Base per-second rate, in Ray units (27 decimals).
-    /// @param assetRegistry Address of the AssetRegistry contract that manages the permissions for handling assets.
-    function initialize(address accessManager, uint256 defaultSubVaultPerSecondRate, address assetRegistry)
-        external
-        virtual
-        initializer
-    {
-        __BasedBoostedVault_init(accessManager, defaultSubVaultPerSecondRate, assetRegistry);
+    function initialize(address accessManager, uint256 defaultSubVaultPerSecondRate) external virtual initializer {
+        __BasedBoostedVault_init(accessManager, defaultSubVaultPerSecondRate);
     }
 
-    function __BasedBoostedVault_init(
-        address accessManager,
-        uint256 defaultSubVaultPerSecondRate,
-        address assetRegistry
-    ) internal virtual onlyInitializing {
+    function __BasedBoostedVault_init(address accessManager, uint256 defaultSubVaultPerSecondRate)
+        internal
+        virtual
+        onlyInitializing
+    {
         __AccessManaged_init(accessManager);
-        $storage().assetRegistry = assetRegistry;
         _setDefaultSubVault(_getOrCreateSubVaultWithRate(defaultSubVaultPerSecondRate), defaultSubVaultPerSecondRate);
     }
 
@@ -149,7 +148,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         override
         assertingTransferHelperBalanceFor(asset)
     {
-        require(IAssetRegistry($storage().assetRegistry).isUserDepositAllowed(asset), ErrorsLib.UnsupportedAsset(asset));
+        require(IAssetRegistry(ASSET_REGISTRY).isUserDepositAllowed(asset), ErrorsLib.UnsupportedAsset(asset));
         require(amount > 0, ErrorsLib.InvalidAmount());
 
         uint256 subVaultId = $storage().positions[user].subVaultId;
@@ -158,11 +157,15 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
             $storage().positions[user].subVaultId = subVaultId;
         }
 
-        _accrueSubVaultConversionRate(subVaultId);
-
-        uint256 conversionRate = $storage().subVaultById[subVaultId].conversionRate;
         uint256 amountInRay = amount.assetDecimalsToRay(asset);
-        uint256 shares = amountInRay.rayDivDown(conversionRate);
+        // Round up the conversion rate used as divisor to calculate the shares the user receives. In this way, we
+        // end up undershooting the amount of granted shares, favoring the protocol.
+        uint256 conversionRateRoundedUp = _previewSubVaultConversionRateRoundingUp(subVaultId);
+        // Round down the division with the same goal of undershooting amount of granted shares.
+        uint256 shares = amountInRay.rayDivDown(conversionRateRoundedUp);
+        // Prevent deposits that result in 0 shares to avoid user getting nothing in return for their deposit.
+        require(shares > 0, ErrorsLib.InvalidAmount());
+        _accrueSubVaultConversionRate(subVaultId);
 
         if (!_isActiveSubVaultById(subVaultId)) {
             _addSubVaultToActive(subVaultId);
@@ -222,8 +225,6 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         // There is no overlap between original deposits and circulating IOUs because original deposits are decremented
         // when new issue IOUs are minted.
         uint256 guaranteedObligationsRay = _getIousInCirculation() + $storage().globalOriginalDepositsRay;
-        // This can underflow if Earning chain(s) have not sent back the balance update and user positions have been
-        // removed (they've claimed IOUs).
         uint256 globalWithdrawableInterestRay =
             totalAssetsRay > guaranteedObligationsRay ? totalAssetsRay - guaranteedObligationsRay : 0;
         uint256 withdrawalRequestInterestRay = actualAmountInRay - guaranteedAmountRay;
@@ -240,7 +241,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
 
         _mintIous(user, actualAmountInRay);
 
-        emit WithdrawalRequestedWithShares(user, subVaultId, redeemedShares, actualAmountInRay, guaranteedAmountRay);
+        emit WithdrawalRequested(user, subVaultId, actualAmountInRay, guaranteedAmountRay);
         return actualAmountInRay;
     }
 
@@ -251,14 +252,12 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         assertingTransferHelperBalanceFor(assetOut)
     {
         require(user == msg.sender, OnlyUser());
-        require(
-            IAssetRegistry($storage().assetRegistry).isUserWithdrawalAllowed(assetOut),
-            ErrorsLib.UnsupportedAsset(assetOut)
-        );
+        require(IAssetRegistry(ASSET_REGISTRY).isUserWithdrawalAllowed(assetOut), ErrorsLib.UnsupportedAsset(assetOut));
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(user, iouAmountRay);
         uint256 withdrawalFeeRay = IWithdrawalFeeCalculator(WITHDRAWAL_FEE_CALCULATOR)
             .calculateWithdrawalFee(user, assetOut, iouAmountRay, data);
         uint256 assetAmount = (iouAmountRay - withdrawalFeeRay).rayToAssetDecimals(assetOut);
+        require(assetAmount > 0, ErrorsLib.InsufficientAmountOut());
         IFundsHandler(FUNDS_HANDLER).processWithdrawal(assetOut, assetAmount);
         ITransferHelper(TRANSFER_HELPER).transfer(assetOut, assetAmount, user);
         emit WithdrawalExecuted(user, assetOut, assetAmount);
@@ -269,7 +268,6 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         _setDefaultSubVault(_getOrCreateSubVaultWithRate(perSecondRate), perSecondRate);
     }
 
-    // TODO: Should we have a "fee recipient" storage field or function param?
     /// @inheritdoc IBasedBoostedVault
     function claimFees(address[] calldata assets, uint256[] calldata amounts)
         external
@@ -329,8 +327,9 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         if ($storage().positions[user].shares == 0) {
             return 0;
         }
+        // Round down the user balance, so that the rounding is in favor of the protocol.
         return $storage().positions[user].shares
-            .rayMulDown(_previewSubVaultConversionRate($storage().positions[user].subVaultId));
+            .rayMulDown(_previewSubVaultConversionRateRoundingDown($storage().positions[user].subVaultId));
     }
 
     /// @inheritdoc IBasedBoostedVault
@@ -401,7 +400,11 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         uint256 oldConversionRate = $storage().subVaultById[oldSubVaultId].conversionRate;
         uint256 newConversionRate = $storage().subVaultById[newSubVaultId].conversionRate;
         uint256 userOldShares = $storage().positions[user].shares;
+        // Round down the amount of shares after sub-vault migration, so that the rounding is in favor of the protocol.
         uint256 userNewShares = userOldShares.rayMulDown(oldConversionRate).rayDivDown(newConversionRate);
+        // Do not allow the user position share quantity to deplete to zero which can happen if a user has a small
+        // userOldShares quantity and newConversionRate is large.
+        require(userNewShares > 0, ErrorsLib.InvalidAmount());
 
         if (!_isActiveSubVaultById(newSubVaultId)) {
             _addSubVaultToActive(newSubVaultId);
@@ -436,35 +439,51 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         delete $storage().activeSubVaultIndexById[subVaultId];
     }
 
-    function _previewSubVaultConversionRate(uint256 subVaultId) internal view returns (uint256) {
+    function _previewSubVaultConversionRateRoundingDown(uint256 subVaultId) internal view returns (uint256) {
+        return _previewSubVaultConversionRate({subVaultId: subVaultId, roundDown: true});
+    }
+
+    function _previewSubVaultConversionRateRoundingUp(uint256 subVaultId) internal view returns (uint256) {
+        return _previewSubVaultConversionRate({subVaultId: subVaultId, roundDown: false});
+    }
+
+    /// @dev Rounding direction should be determined based on context of usage of this function.
+    /// @dev To undershoot the new conversion rate `roundDown` should be true.
+    /// @dev To overshoot the new conversion rate `roundDown` should be false.
+    function _previewSubVaultConversionRate(uint256 subVaultId, bool roundDown) internal view returns (uint256) {
         uint256 secondsSinceLastAccrual = block.timestamp - $storage().subVaultById[subVaultId].lastAccrualTimestamp;
         uint256 newConversionRate = $storage().subVaultById[subVaultId].conversionRate;
         if (secondsSinceLastAccrual != 0) {
             uint256 growthFactor = $storage().subVaultById[subVaultId].perSecondRate.rpow(secondsSinceLastAccrual);
-            newConversionRate = $storage().subVaultById[subVaultId].conversionRate.rayMulDown(growthFactor);
+            if (roundDown) {
+                newConversionRate = newConversionRate.rayMulDown(growthFactor);
+            } else {
+                newConversionRate = newConversionRate.rayMulUp(growthFactor);
+            }
         }
         return newConversionRate;
     }
 
     function _accrueSubVaultConversionRate(uint256 subVaultId) internal {
-        $storage().subVaultById[subVaultId].conversionRate = _previewSubVaultConversionRate(subVaultId);
+        $storage().subVaultById[subVaultId].conversionRate = _previewSubVaultConversionRateRoundingDown(subVaultId);
         $storage().subVaultById[subVaultId].lastAccrualTimestamp = block.timestamp;
     }
 
     function _fullWithdrawalRequest(address user) internal returns (uint256, uint256, uint256) {
         uint256 subVaultId = $storage().positions[user].subVaultId;
         uint256 conversionRate = $storage().subVaultById[subVaultId].conversionRate;
-
         uint256 sharesToRedeem = $storage().positions[user].shares;
+        // Round down the withdrawal amount, so that the rounding is in favor of the protocol.
         uint256 actualAmountOfWithdrawalRay = sharesToRedeem.rayMulDown(conversionRate);
-        assert(actualAmountOfWithdrawalRay > 0); // TODO: This should never happen. Consider removing it.
-        // We don't check for sharesToRedeem > 0 here because we check for actualAmountOfWithdrawalRay > 0 above.
         _burnShares(user, sharesToRedeem);
         uint256 originalDepositRay = $storage().positions[user].originalDepositRay;
         delete $storage().positions[user];
-        // TODO: This should never happen. If it does, we should replace the assert by rounding it up to guarantee
-        // originalDeposit, i.e. `actualAmountOfWithdrawalRay = originalDepositRay`
-        assert(actualAmountOfWithdrawalRay >= originalDepositRay);
+        // Due to rounding in rayDivDown (deposit) and rayMulDown (withdrawal),
+        // actualAmountOfWithdrawalRay can be slightly less than originalDepositRay.
+        // We guarantee the user gets at least their original deposit back.
+        if (actualAmountOfWithdrawalRay < originalDepositRay) {
+            actualAmountOfWithdrawalRay = originalDepositRay;
+        }
         return (actualAmountOfWithdrawalRay, originalDepositRay, sharesToRedeem);
     }
 
@@ -475,6 +494,8 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         uint256 subVaultId = $storage().positions[user].subVaultId;
         uint256 conversionRate = $storage().subVaultById[subVaultId].conversionRate;
 
+        // Round up the amount of shares to redeem (burn on the position) for the requested amount of assets, so that
+        // the rounding is in favor of the protocol.
         uint256 sharesToRedeem = requestedAmountInRay.rayDivUp(conversionRate);
         require(sharesToRedeem <= $storage().positions[user].shares, ErrorsLib.InvalidAmount());
         _burnShares(user, sharesToRedeem);
@@ -508,8 +529,9 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
     function _getVaultObligations() internal view returns (uint256) {
         uint256 activeSubVaultsObligations;
         for (uint256 i = 0; i < $storage().activeSubVaultsIds.length; i++) {
+            // Round up the obligations, so that the rounding is in favor of the protocol.
             activeSubVaultsObligations += $storage().subVaultById[$storage().activeSubVaultsIds[i]].totalShares
-                .rayMulDown(_previewSubVaultConversionRate($storage().activeSubVaultsIds[i]));
+                .rayMulUp(_previewSubVaultConversionRateRoundingUp($storage().activeSubVaultsIds[i]));
         }
         return activeSubVaultsObligations + _getIousInCirculation();
     }

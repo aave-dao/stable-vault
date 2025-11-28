@@ -45,16 +45,16 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
     ) internal virtual override returns (BasedBoostedVault) {
         // Deploy a vault without restriction in the valid per-second rate
         address vaultImpl = address(
-            new BasedBoostedVault(type(uint256).max, iouToken, fundsHandler, transferHelper, withdrawalFeeCalculator)
+            new BasedBoostedVault(
+                type(uint256).max, assetRegistry, iouToken, fundsHandler, transferHelper, withdrawalFeeCalculator
+            )
         );
         return BasedBoostedVault(
             address(
                 new TransparentUpgradeableProxy(
                     address(vaultImpl),
                     proxyAdmin,
-                    abi.encodeCall(
-                        BasedBoostedVault.initialize, (adminParam, defaultSubVaultPerSecondRate, assetRegistry)
-                    )
+                    abi.encodeCall(BasedBoostedVault.initialize, (adminParam, defaultSubVaultPerSecondRate))
                 )
             )
         );

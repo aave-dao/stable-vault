@@ -155,7 +155,12 @@ contract BaseTest is Test {
     ) internal virtual returns (BasedBoostedVault) {
         address vaultImpl = address(
             new BasedBoostedVault(
-                maxPerSecondRate, iouTokenManager, fundsHandlerAddr, transferHelper, withdrawalFeeCalculator
+                maxPerSecondRate,
+                assetRegistry,
+                iouTokenManager,
+                fundsHandlerAddr,
+                transferHelper,
+                withdrawalFeeCalculator
             )
         );
 
@@ -163,9 +168,7 @@ contract BaseTest is Test {
             new TransparentUpgradeableProxy(
                 vaultImpl,
                 address(this),
-                abi.encodeCall(
-                    BasedBoostedVault.initialize, (accessManager, defaultSubVaultPerSecondRate, assetRegistry)
-                )
+                abi.encodeCall(BasedBoostedVault.initialize, (accessManager, defaultSubVaultPerSecondRate))
             )
         );
 
@@ -590,6 +593,7 @@ contract BaseTest is Test {
             new EarningChainGateway(
                 ACCOUNTING_CHAIN_ID,
                 allocator_earningChainAddress,
+                assetRegistry_earningChainAddress,
                 iouTokenManager_earningChainAddress,
                 transferHelper_earningChainAddress,
                 address(withdrawalFeeCalculator_earningChain)

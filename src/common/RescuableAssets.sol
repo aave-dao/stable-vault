@@ -14,7 +14,6 @@ contract RescuableAssets is IRescuableAssets {
 
     /// @inheritdoc IRescuableAssets
     function rescueTokens(address asset, uint256 amount) public virtual override {
-        // TODO: send to treasury? If so can make this public.
         IERC20(asset).safeTransfer(msg.sender, amount);
     }
 }
