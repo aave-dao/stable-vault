@@ -201,95 +201,6 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         );
     }
 
-    function test_deposit_immediatelyFullWithdraw(uint256 amount, uint256 timeBetweenDeposits) public {
-        address user1 = makeAddr("USER1");
-        address user2 = makeAddr("USER2");
-        amount = _boundAssetAmount(address(mockAsset), amount);
-        timeBetweenDeposits = bound(timeBetweenDeposits, 5 minutes, 30 * 365 days);
-
-        // Deposit 1
-        mockAsset.mint(user1, amount);
-        vm.prank(user1);
-        mockAsset.forceApprove(address(bbv), amount);
-        vm.prank(user1);
-        bbv.deposit(user1, address(mockAsset), amount);
-        vm.warp(timeBetweenDeposits);
-
-        // Deposit 2
-        mockAsset.mint(user2, amount);
-        vm.prank(user2);
-        mockAsset.forceApprove(address(bbv), amount);
-        vm.prank(user2);
-        bbv.deposit(user2, address(mockAsset), amount);
-
-        // Request Full Withdrawal
-        vm.prank(user2);
-        uint256 iouTokenAmount = bbv.requestWithdrawal(user2, 0);
-
-        assertGe(iouTokenAmount, amount.assetDecimalsToRay(address(mockAsset)));
-    }
-
-    /// @notice This test demonstrates that the assertion `actualAmountOfWithdrawalRay >= originalDepositRay`
-    /// can fail when a user deposits after conversionRate has grown beyond RAY.
-    /// Mathematical proof:
-    /// - D = originalDeposit, C = conversionRate (where C > RAY)
-    /// - At deposit: shares = floor(D * RAY / C)
-    /// - At withdrawal: actualAmount = floor(shares * C / RAY)
-    /// - Due to double rounding: actualAmount < D when D is not perfectly divisible by (C / RAY)
-    function test_requestWithdrawal_assertionFailsWhenDepositingAfterConversionRateGrows() public {
-        address user = makeAddr("testUser");
-
-        // Use an 18-decimal token to have finer granularity
-        MockErc20 ghoToken = new MockErc20("GHO", "GHO", 18);
-
-        // Create a new vault with a rate that causes non-exact division
-        // Using 1.5 * RAY (50% per second) for demonstration
-        // This rate causes rounding when deposit amounts don't divide evenly
-        uint256 highRate = (3 * MathLib.RAY) / 2; // 1.5 * RAY = 50% per second
-        IBasedBoostedVault highRateVault = _deployBasedBoostedVault(
-            address(mockAccessManager),
-            highRate + 1, // max rate slightly higher
-            highRate,
-            address(mockIouTokenManager),
-            address(mockFundsHandler),
-            address(mockAssetRegistry),
-            address(mockTransferHelper),
-            address(mockWithdrawalFeeCalculator)
-        );
-
-        // IMPORTANT: Warp time AFTER vault creation so that conversionRate accrues
-        // The subvault was created with lastAccrualTimestamp = block.timestamp at creation time
-        // Now we advance time so that when deposit() calls _accrueSubVaultConversionRate(),
-        // the conversionRate grows to 1.5 * RAY
-        vm.warp(block.timestamp + 1);
-
-        // Deposit exactly 1 unit (1e18 wei for 18-decimal token = 1e27 in Ray)
-        // With conversionRate = 1.5 * RAY = 1.5e27:
-        // shares = floor(1e27 * 1e27 / 1.5e27) = floor(0.666...e27) ≈ 6.66e26
-        // actualAmount = floor(6.66e26 * 1.5e27 / 1e27) ≈ 0.999...e27
-        // originalDeposit = 1e27
-        // 0.999e27 < 1e27 -> ASSERTION FAILS
-        uint256 depositAmount = 1e18; // 1 token with 18 decimals = 1e27 in Ray
-
-        ghoToken.mint(user, depositAmount);
-
-        vm.prank(user);
-        ghoToken.approve(address(highRateVault), depositAmount);
-
-        vm.prank(user);
-        highRateVault.deposit(user, address(ghoToken), depositAmount);
-
-        // Mock the aggregated balance to allow withdrawal (high enough to cover any interest)
-        mockFundsHandler.mockAggregatedBalance(depositAmount.assetDecimalsToRay(address(ghoToken)) * 10);
-
-        // This should trigger the assertion failure
-        // The assertion is: assert(actualAmountOfWithdrawalRay >= originalDepositRay)
-        // With our values: ~0.999e27 >= 1e27 is FALSE
-        vm.prank(user);
-        uint256 iouTokenAmount = highRateVault.requestWithdrawal(user, 0); // 0 = full withdrawal
-        assertEq(iouTokenAmount, depositAmount.assetDecimalsToRay(address(ghoToken)));
-    }
-
     function test_deposit_firstUserDepositGoesToDefaultSubVault(address user, uint256 amount) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
@@ -401,6 +312,50 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.prank(user);
         vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(mockAsset)));
         bbv.deposit(user, address(mockAsset), amount);
+    }
+
+    function test_deposit_reverts_ifUserGetsZeroShares() public {
+        // The system will not allow tokens with more than 18 decimals (enforced in AssetRegistry).
+        // However, we use a 27-decimal token to trigger the edge case of getting 0 shares on deposit and test that
+        // the system would revert to not allow it.
+        address user = makeAddr("testUser");
+
+        // After just 1 second with 20% APY, conversionRate > RAY, so:
+        // shares = floor(1 * RAY / conversionRate) = floor(RAY / conversionRate) = 0
+        MockErc20 highDecimalToken = new MockErc20("HighDecimal", "HD27", 27);
+
+        uint256 twentyPercentApy = 1000000005781378656804591713; // ~20% APY
+        IBasedBoostedVault vault = _deployBasedBoostedVault(
+            address(mockAccessManager),
+            twentyPercentApy + 1,
+            twentyPercentApy,
+            address(mockIouTokenManager),
+            address(mockFundsHandler),
+            address(mockAssetRegistry),
+            address(mockTransferHelper),
+            address(mockWithdrawalFeeCalculator)
+        );
+
+        // Warp just 1 second, conversionRate grows slightly above RAY
+        vm.warp(block.timestamp + 1);
+
+        uint256 expectedConversionRate = MathLib.RAY.rayMulDown(twentyPercentApy.rpow(1));
+
+        uint256 depositAmount = 1;
+        uint256 amountInRay = depositAmount.assetDecimalsToRay(address(highDecimalToken));
+
+        // Verify that shares will be 0
+        // shares = floor(1 * RAY / conversionRate) = floor(1e27 / 1.0000000057...e27) = 0
+        uint256 expectedShares = amountInRay.rayDivDown(expectedConversionRate);
+        assertEq(expectedShares, 0);
+
+        highDecimalToken.mint(user, depositAmount);
+        vm.prank(user);
+        highDecimalToken.approve(address(vault), depositAmount);
+
+        vm.prank(user);
+        vm.expectRevert(ErrorsLib.InvalidAmount.selector);
+        vault.deposit(user, address(highDecimalToken), depositAmount);
     }
 
     function test_deposit_allowsToDepositOnBehalfOfOtherUser(address user, address msgSender, uint256 amount) public {
@@ -1207,6 +1162,92 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         assertEq(bbv.getUserBalance(user), userBalanceBefore - actualWithdrawalAmountRay);
     }
 
+    function test_requestWithdrawal_depositAndImmediatelyFullWithdraw_IOUsNeverUnderOriginalDeposit(
+        uint256 amount,
+        uint256 timeBetweenDeposits
+    ) public {
+        address user1 = makeAddr("USER1");
+        address user2 = makeAddr("USER2");
+        amount = _boundAssetAmount(address(mockAsset), amount);
+        timeBetweenDeposits = bound(timeBetweenDeposits, 5 minutes, 30 * 365 days);
+
+        // Deposit 1
+        mockAsset.mint(user1, amount);
+        vm.prank(user1);
+        mockAsset.forceApprove(address(bbv), amount);
+        vm.prank(user1);
+        bbv.deposit(user1, address(mockAsset), amount);
+        vm.warp(timeBetweenDeposits);
+
+        // Deposit 2
+        mockAsset.mint(user2, amount);
+        vm.prank(user2);
+        mockAsset.forceApprove(address(bbv), amount);
+        vm.prank(user2);
+        bbv.deposit(user2, address(mockAsset), amount);
+
+        // Request Full Withdrawal
+        vm.prank(user2);
+        uint256 iouTokenAmount = bbv.requestWithdrawal(user2, 0);
+
+        // After removing the assertion and replacing it with the code below from _fullWithdrawalRequest() we expect the
+        // IOU quantity to be at least original deposit normalized to RAY decimals:
+        //      if (actualAmountOfWithdrawalRay < originalDepositRay) {
+        //         actualAmountOfWithdrawalRay = originalDepositRay;
+        //      }
+        assertGe(iouTokenAmount, amount.assetDecimalsToRay(address(mockAsset)));
+    }
+
+    function test_requestWithdrawal_depositAfterConversionRateGrownALot_IOUsNeverUnderOriginalDeposit() public {
+        address user = makeAddr("testUser");
+
+        MockErc20 ghoToken = new MockErc20("GHO", "GHO", 18);
+
+        // Create a new vault with a rate that causes non-exact division
+        // Using 1.5 * RAY (50% per second) for demonstration
+        // This rate causes rounding when deposit amounts don't divide evenly
+        uint256 highRate = (3 * MathLib.RAY) / 2; // 1.5 * RAY = 50% per second
+        IBasedBoostedVault highRateVault = _deployBasedBoostedVault(
+            address(mockAccessManager),
+            highRate + 1, // max rate slightly higher
+            highRate,
+            address(mockIouTokenManager),
+            address(mockFundsHandler),
+            address(mockAssetRegistry),
+            address(mockTransferHelper),
+            address(mockWithdrawalFeeCalculator)
+        );
+
+        vm.warp(block.timestamp + 1);
+
+        // Deposit exactly 1 unit (1e18 wei for 18-decimal token = 1e27 in Ray)
+        // With conversionRate = 1.5 * RAY = 1.5e27:
+        // shares = floor(1e27 * 1e27 / 1.5e27) = floor(0.666...e27) ≈ 6.66e26
+        // actualAmount = floor(6.66e26 * 1.5e27 / 1e27) ≈ 0.999...e27
+        // originalDeposit = 1e27
+        // => 0.999e27 < 1e27
+        uint256 depositAmount = 1e18; // 1 token with 18 decimals = 1e27 in Ray
+
+        ghoToken.mint(user, depositAmount);
+
+        vm.prank(user);
+        ghoToken.approve(address(highRateVault), depositAmount);
+
+        vm.prank(user);
+        highRateVault.deposit(user, address(ghoToken), depositAmount);
+
+        // Mock the aggregated balance to allow withdrawal (high enough to cover any interest)
+        mockFundsHandler.mockAggregatedBalance(depositAmount.assetDecimalsToRay(address(ghoToken)) * 10);
+
+        // We expect the IOU quantity to be at least original deposit normalized to RAY decimals:
+        //      if (actualAmountOfWithdrawalRay < originalDepositRay) {
+        //         actualAmountOfWithdrawalRay = originalDepositRay;
+        //      }
+        vm.prank(user);
+        uint256 iouTokenAmount = highRateVault.requestWithdrawal(user, 0);
+        assertEq(iouTokenAmount, depositAmount.assetDecimalsToRay(address(ghoToken)));
+    }
+
     function test_executeWithdrawal_reverts_ifMsgSenderIsNotTheUser(
         address user,
         address msgSender,
@@ -1395,124 +1436,6 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         assertEq(mockAsset.balanceOf(msgSender), assetAmountToRescue);
         assertEq(mockAsset.balanceOf(address(bbv)), bbvAssetBalance - assetAmountToRescue);
-    }
-
-    /// @notice This test demonstrates that due to rounding in rayDivDown (deposit) and rayMulDown (withdrawal),
-    /// the actualAmountOfWithdrawal can be LESS than originalDeposit, causing the user to lose principal.
-    ///
-    /// Mathematical proof:
-    /// - D = originalDeposit, C = conversionRate (where C > RAY)
-    /// - At deposit: shares = floor(D * RAY / C)
-    /// - At withdrawal: actualAmount = floor(shares * C / RAY)
-    /// - Due to double rounding: actualAmount < D when D is not perfectly divisible by (C / RAY)
-    function test_requestWithdrawal_roundingCausesUserToLosePrincipal() public {
-        address user = makeAddr("testUser");
-        MockErc20 ghoToken = new MockErc20("GHO", "GHO", 18);
-
-        // Use rate = 1.5 * RAY which causes non-exact division
-        uint256 highRate = (3 * MathLib.RAY) / 2; // 1.5 * RAY
-        IBasedBoostedVault highRateVault = _deployBasedBoostedVault(
-            address(mockAccessManager),
-            highRate + 1,
-            highRate,
-            address(mockIouTokenManager),
-            address(mockFundsHandler),
-            address(mockAssetRegistry),
-            address(mockTransferHelper),
-            address(mockWithdrawalFeeCalculator)
-        );
-
-        // Warp 1 second so conversionRate accrues to 1.5 * RAY
-        vm.warp(block.timestamp + 1);
-
-        uint256 depositAmount = 1e18; // 1 token
-        uint256 originalDepositRay = depositAmount.assetDecimalsToRay(address(ghoToken)); // 1e27
-
-        ghoToken.mint(user, depositAmount);
-        vm.prank(user);
-        ghoToken.approve(address(highRateVault), depositAmount);
-        vm.prank(user);
-        highRateVault.deposit(user, address(ghoToken), depositAmount);
-
-        // Calculate what the contract will compute:
-        uint256 conversionRate = highRate; // 1.5e27 after 1 second of accrual
-
-        // At deposit: shares = rayDivDown(originalDeposit, conversionRate)
-        uint256 shares = originalDepositRay.rayDivDown(conversionRate);
-
-        // At withdrawal: actualAmount = rayMulDown(shares, conversionRate)
-        uint256 actualAmountOfWithdrawalRay = shares.rayMulDown(conversionRate);
-
-        // THE EDGE CASE: actualAmount < originalDeposit due to rounding!
-        assertLt(
-            actualAmountOfWithdrawalRay,
-            originalDepositRay,
-            "Edge case not demonstrated: actualAmount >= originalDeposit"
-        );
-
-        // The fix ensures user gets at least their originalDeposit back:
-        //   if (actualAmountOfWithdrawalRay < originalDepositRay) {
-        //       actualAmountOfWithdrawalRay = originalDepositRay;
-        //   }
-        mockFundsHandler.mockAggregatedBalance(originalDepositRay * 10);
-
-        vm.prank(user);
-        uint256 withdrawnAmount = highRateVault.requestWithdrawal(user, 0);
-        assertEq(withdrawnAmount, originalDepositRay, "User should get their full original deposit back");
-    }
-
-    /// @notice This test demonstrates that depositing when conversionRate > RAY
-    /// can result in 0 shares for tokens with high decimals.
-    ///
-    /// With a 27-decimal token (same as Ray), 1 smallest unit = 1 Ray.
-    /// After just 1 second with 20% APY, conversionRate > RAY, so:
-    /// - shares = floor(1 * RAY / conversionRate) = floor(RAY / conversionRate) = 0
-    ///
-    /// Without protection, user's funds would be stuck (withdrawal panics).
-    /// The fix: require(shares > 0, ErrorsLib.InvalidAmount()) reverts early.
-    function test_deposit_zeroSharesEdgeCase() public {
-        address user = makeAddr("testUser");
-
-        // 27-decimal token: 1 smallest unit = 1 Ray
-        MockErc20 highDecimalToken = new MockErc20("HighDecimal", "HD27", 27);
-
-        // Use realistic 20% APY rate
-        uint256 twentyPercentApy = 1000000005781378656804591713; // ~20% APY
-        IBasedBoostedVault vault = _deployBasedBoostedVault(
-            address(mockAccessManager),
-            twentyPercentApy + 1, // max rate slightly higher
-            twentyPercentApy,
-            address(mockIouTokenManager),
-            address(mockFundsHandler),
-            address(mockAssetRegistry),
-            address(mockTransferHelper),
-            address(mockWithdrawalFeeCalculator)
-        );
-
-        // Warp just 1 second - conversionRate grows slightly above RAY
-        vm.warp(block.timestamp + 1);
-
-        // Calculate conversionRate after 1 second
-        uint256 expectedConversionRate = MathLib.RAY.rayMulDown(twentyPercentApy.rpow(1));
-
-        // Deposit 1 smallest unit (= 1 Ray for 27-decimal token)
-        uint256 depositAmount = 1; // 1 smallest unit
-        uint256 amountInRay = depositAmount.assetDecimalsToRay(address(highDecimalToken));
-
-        // Verify that shares will be 0
-        // shares = floor(1 * RAY / conversionRate) = floor(1e27 / 1.0000000057...e27) = 0
-        uint256 expectedShares = amountInRay.rayDivDown(expectedConversionRate);
-        assertEq(expectedShares, 0, "Edge case not demonstrated: shares != 0");
-
-        // The fix: require(shares > 0, ErrorsLib.InvalidAmount());
-        // Deposit should revert instead of silently accepting 0 shares
-        highDecimalToken.mint(user, depositAmount);
-        vm.prank(user);
-        highDecimalToken.approve(address(vault), depositAmount);
-
-        vm.prank(user);
-        vm.expectRevert(ErrorsLib.InvalidAmount.selector);
-        vault.deposit(user, address(highDecimalToken), depositAmount);
     }
 
     ////////////////////////////// HELPERS ///////////////////////////////
