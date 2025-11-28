@@ -64,6 +64,9 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
 
     /// @custom:storage-location erc7201:aave.storage.BasedBoostedVault
     struct BasedBoostedVaultStorage {
+        /// @dev Keeps track of the sum of all users' original deposits.
+        /// @dev Does not overlap with circulating IOUs because original deposits are decremented when new issue IOUs
+        /// are minted.
         uint256 globalOriginalDepositsRay;
 
         /// @dev The ID of the last subVault created; monotonically increasing.
@@ -155,11 +158,10 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         }
 
         uint256 amountInRay = amount.assetDecimalsToRay(asset);
-        // Round up the conversion rate used to calculate the shares the user receives.
-        // During deposits the conversion rate is a divisor, so we overshoot to effectively grant the user a safe share
-        // quantity.
+        // Round up the conversion rate used as divisor to calculate the shares the user receives. In this way, we
+        // end up undershooting the amount of granted shares, favoring the protocol.
         uint256 conversionRateRoundedUp = _previewSubVaultConversionRateRoundingUp(subVaultId);
-        // Round down the amount of granted shares, so that the rounding is in favor of the protocol.
+        // Round down the division with the same goal of undershooting amount of granted shares.
         uint256 shares = amountInRay.rayDivDown(conversionRateRoundedUp);
         // Prevent deposits that result in 0 shares to avoid user getting nothing in return for their deposit.
         require(shares > 0, ErrorsLib.InvalidAmount());
