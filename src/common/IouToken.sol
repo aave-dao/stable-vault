@@ -30,6 +30,7 @@ contract IouToken is ERC20, Ownable, IIouToken {
     /// @inheritdoc IIouToken
     function lock(address from, uint256 amount) external override onlyOwner {
         _transfer(from, owner(), amount);
+        emit Locked(from, amount);
     }
 
     /// @inheritdoc ERC20
