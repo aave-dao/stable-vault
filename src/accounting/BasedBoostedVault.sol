@@ -52,6 +52,8 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         uint256 shares;
     }
 
+    address internal immutable ASSET_REGISTRY;
+
     address internal immutable IOU_TOKEN_MANAGER;
 
     uint256 internal immutable MAX_VALID_PER_SECOND_RATE;
@@ -62,8 +64,6 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
 
     /// @custom:storage-location erc7201:aave.storage.BasedBoostedVault
     struct BasedBoostedVaultStorage {
-        address assetRegistry;
-
         uint256 globalOriginalDepositsRay;
 
         /// @dev The ID of the last subVault created; monotonically increasing.
@@ -108,6 +108,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
     /// @param fundsHandler The address of the FundsHandler contract.
     constructor(
         uint256 maxValidPerSecondRate,
+        address assetRegistry,
         address iouTokenManager,
         address fundsHandler,
         address transferHelper,
@@ -116,6 +117,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         _disableInitializers();
         require(maxValidPerSecondRate > MathLib.RAY, InvalidRate());
         MAX_VALID_PER_SECOND_RATE = maxValidPerSecondRate;
+        ASSET_REGISTRY = assetRegistry;
         IOU_TOKEN_MANAGER = iouTokenManager;
         FUNDS_HANDLER = fundsHandler;
         WITHDRAWAL_FEE_CALCULATOR = withdrawalFeeCalculator;
@@ -124,22 +126,16 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
     /// @dev Initializer.
     /// @param accessManager Address of the IAccessManager contract used for handling access control.
     /// @param defaultSubVaultPerSecondRate Base per-second rate, in Ray units (27 decimals).
-    /// @param assetRegistry Address of the AssetRegistry contract that manages the permissions for handling assets.
-    function initialize(address accessManager, uint256 defaultSubVaultPerSecondRate, address assetRegistry)
-        external
-        virtual
-        initializer
-    {
-        __BasedBoostedVault_init(accessManager, defaultSubVaultPerSecondRate, assetRegistry);
+    function initialize(address accessManager, uint256 defaultSubVaultPerSecondRate) external virtual initializer {
+        __BasedBoostedVault_init(accessManager, defaultSubVaultPerSecondRate);
     }
 
-    function __BasedBoostedVault_init(
-        address accessManager,
-        uint256 defaultSubVaultPerSecondRate,
-        address assetRegistry
-    ) internal virtual onlyInitializing {
+    function __BasedBoostedVault_init(address accessManager, uint256 defaultSubVaultPerSecondRate)
+        internal
+        virtual
+        onlyInitializing
+    {
         __AccessManaged_init(accessManager);
-        $storage().assetRegistry = assetRegistry;
         _setDefaultSubVault(_getOrCreateSubVaultWithRate(defaultSubVaultPerSecondRate), defaultSubVaultPerSecondRate);
     }
 
@@ -149,7 +145,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         override
         assertingTransferHelperBalanceFor(asset)
     {
-        require(IAssetRegistry($storage().assetRegistry).isUserDepositAllowed(asset), ErrorsLib.UnsupportedAsset(asset));
+        require(IAssetRegistry(ASSET_REGISTRY).isUserDepositAllowed(asset), ErrorsLib.UnsupportedAsset(asset));
         require(amount > 0, ErrorsLib.InvalidAmount());
 
         uint256 subVaultId = $storage().positions[user].subVaultId;
@@ -254,10 +250,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         assertingTransferHelperBalanceFor(assetOut)
     {
         require(user == msg.sender, OnlyUser());
-        require(
-            IAssetRegistry($storage().assetRegistry).isUserWithdrawalAllowed(assetOut),
-            ErrorsLib.UnsupportedAsset(assetOut)
-        );
+        require(IAssetRegistry(ASSET_REGISTRY).isUserWithdrawalAllowed(assetOut), ErrorsLib.UnsupportedAsset(assetOut));
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(user, iouAmountRay);
         uint256 withdrawalFeeRay = IWithdrawalFeeCalculator(WITHDRAWAL_FEE_CALCULATOR)
             .calculateWithdrawalFee(user, assetOut, iouAmountRay, data);

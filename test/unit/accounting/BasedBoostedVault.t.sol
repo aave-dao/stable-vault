@@ -60,7 +60,12 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     ) internal returns (IBasedBoostedVault) {
         address vaultImpl = address(
             new BasedBoostedVault(
-                maxPerSecondRate, iouTokenManager, fundsHandler, transferHelper, withdrawalFeeCalculatorAddress
+                maxPerSecondRate,
+                assetRegistry,
+                iouTokenManager,
+                fundsHandler,
+                transferHelper,
+                withdrawalFeeCalculatorAddress
             )
         );
         return BasedBoostedVault(
@@ -68,9 +73,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
                 new TransparentUpgradeableProxy(
                     vaultImpl,
                     address(this),
-                    abi.encodeCall(
-                        BasedBoostedVault.initialize, (accessManager, defaultSubVaultPerSecondRate, assetRegistry)
-                    )
+                    abi.encodeCall(BasedBoostedVault.initialize, (accessManager, defaultSubVaultPerSecondRate))
                 )
             )
         );
@@ -111,6 +114,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         BasedBoostedVault newBbv = new BasedBoostedVault(
             expectedMaxValidPerSecondRate,
+            address(mockAssetRegistry),
             expectedIouManager,
             expectedFundsHandler,
             expectedTransferHelper,
@@ -126,6 +130,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.expectRevert(IBasedBoostedVault.InvalidRate.selector);
         new BasedBoostedVault(
             invalidMaxValidPerSecondRate,
+            address(mockAssetRegistry),
             address(mockIouTokenManager),
             address(mockFundsHandler),
             address(mockTransferHelper),
@@ -145,6 +150,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         address bbvImpl = address(
             new BasedBoostedVault(
                 DEFAULT_MAX_PER_SECOND_RATE,
+                address(mockAssetRegistry),
                 address(mockIouTokenManager),
                 address(mockFundsHandler),
                 address(mockTransferHelper),
@@ -157,10 +163,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
                 new TransparentUpgradeableProxy(
                     bbvImpl,
                     address(this),
-                    abi.encodeCall(
-                        BasedBoostedVault.initialize,
-                        (expectedAccessManager, expectedDefaultSubVaultRate, expectedAssetRegistry)
-                    )
+                    abi.encodeCall(BasedBoostedVault.initialize, (expectedAccessManager, expectedDefaultSubVaultRate))
                 )
             )
         );
@@ -176,6 +179,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         address bbvImpl = address(
             new BasedBoostedVault(
                 DEFAULT_MAX_PER_SECOND_RATE,
+                address(mockAssetRegistry),
                 address(mockIouTokenManager),
                 address(mockFundsHandler),
                 address(mockTransferHelper),
@@ -190,8 +194,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
                     bbvImpl,
                     address(this),
                     abi.encodeCall(
-                        BasedBoostedVault.initialize,
-                        (address(mockAccessManager), invalidDefaultSubVaultRate, address(mockAssetRegistry))
+                        BasedBoostedVault.initialize, (address(mockAccessManager), invalidDefaultSubVaultRate)
                     )
                 )
             )

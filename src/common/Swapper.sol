@@ -39,7 +39,6 @@ contract Swapper is ISwapper, Ownable, ReentrancyGuard {
         nonReentrant
         returns (uint256)
     {
-        // TODO: Consider using Multicall's Call struct, allowing calls to fail and adding a msgValue param too
         (address[] memory targets, bytes[] memory callDatas, SlippageParams memory slippageParams) =
             abi.decode(data, (address[], bytes[], SlippageParams));
 

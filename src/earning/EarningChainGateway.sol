@@ -5,6 +5,7 @@ import {BaseChainGateway} from "../common/BaseChainGateway.sol";
 import {TransferHelperClient} from "../common/TransferHelperClient.sol";
 import {IAllocator} from "../interfaces/IAllocator.sol";
 import {IAllocator} from "../interfaces/IAllocator.sol";
+import {IAssetRegistry} from "../interfaces/IAssetRegistry.sol";
 import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../interfaces/IChainGateway.sol";
 import {IEarningChainGateway} from "../interfaces/IEarningChainGateway.sol";
@@ -22,6 +23,7 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
 
     uint256 internal immutable ACCOUNTING_CHAIN_ID;
     address internal immutable ALLOCATOR;
+    address internal immutable ASSET_REGISTRY;
     address internal immutable WITHDRAWAL_FEE_CALCULATOR;
 
     /// @custom:storage-location erc7201:aave.storage.EarningChainGateway
@@ -42,10 +44,12 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
     /// @dev Constructor.
     /// @param accountingChainId The Chain ID of the Accounting Chain.
     /// @param allocator The address of the Allocator contract.
+    /// @param assetRegistry The address of the AssetRegistry contract.
     /// @param iouTokenManager The address of the IOU token manager contract.
     constructor(
         uint256 accountingChainId,
         address allocator,
+        address assetRegistry,
         address iouTokenManager,
         address transferHelper,
         address withdrawalFeeCalculator
@@ -53,6 +57,7 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
         _disableInitializers();
         ACCOUNTING_CHAIN_ID = accountingChainId;
         ALLOCATOR = allocator;
+        ASSET_REGISTRY = assetRegistry;
         WITHDRAWAL_FEE_CALCULATOR = withdrawalFeeCalculator;
     }
 
@@ -119,7 +124,7 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
     {
         require(iouTokenAmountRay > 0, ErrorsLib.ZeroAmount());
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(msg.sender, iouTokenAmountRay);
-        // TODO: check if user withdrawal of asset is allowed on AssetRegistry
+        require(IAssetRegistry(ASSET_REGISTRY).isUserWithdrawalAllowed(tokenOut), ErrorsLib.UnsupportedAsset(tokenOut));
 
         address adapter =
             $BaseChainGateway().defaultBridgeAdapter[ConstantsLib.ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID];
@@ -136,7 +141,6 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
         // Send data to synchronize the Accounting Chain's state.
         _sendBurnIouTokenMessage(iouTokenAmountRay, adapter, bridgeParams);
 
-        // TODO: emit event?
         return amountOut;
     }
 
@@ -199,23 +203,16 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
         _onlyAdapter(ConstantsLib.ASSET_FOR_DATA_ONLY_BRIDGE, sourceChainId);
         IChainGateway.CrossChainMessage memory crossChainMessage = abi.decode(data, (IChainGateway.CrossChainMessage));
         if (crossChainMessage.messageType == IChainGateway.MessageType.BRIDGE_IOU_TOKEN) {
-            _bridgeIouTokenFromAccountingChain(sourceChainId, crossChainMessage.data);
+            _bridgeIouTokenFromAccountingChain(crossChainMessage.data);
         } else {
             revert IChainGateway.InvalidMessageType();
         }
     }
 
-    function _bridgeIouTokenFromAccountingChain(
-        uint256,
-        /* sourceChainId */
-        bytes memory data
-    )
-        internal
-    {
+    function _bridgeIouTokenFromAccountingChain(bytes memory data) internal {
         IChainGateway.IouTokenBridgeMessage memory iouTokenBridgeMessage =
             abi.decode(data, (IChainGateway.IouTokenBridgeMessage));
         IIouTokenManager(IOU_TOKEN_MANAGER).mintTokens(iouTokenBridgeMessage.recipient, iouTokenBridgeMessage.amount);
-        // TODO: emit event?
     }
 
     function _returnFundsWithBalanceSnapshot(

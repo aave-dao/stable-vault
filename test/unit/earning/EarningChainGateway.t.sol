@@ -55,6 +55,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
     function _deployEarningChainGateway(
         MockAccessManager mockAccessManager,
+        address assetRegistry,
         address iouTokenManager,
         address allocator,
         address transferHelper,
@@ -62,7 +63,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     ) internal returns (EarningChainGateway) {
         address earningChainGatewayImpl = address(
             new EarningChainGateway(
-                ACCOUNTING_CHAIN_ID, allocator, iouTokenManager, transferHelper, withdrawalFeeCalculator
+                ACCOUNTING_CHAIN_ID, allocator, assetRegistry, iouTokenManager, transferHelper, withdrawalFeeCalculator
             )
         );
         EarningChainGateway earningChainGateway = EarningChainGateway(
@@ -119,6 +120,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         _earningChainGateway = _deployEarningChainGateway(
             _mockAccessManager,
+            address(_mockAssetRegistry),
             address(_mockIouTokenManager),
             address(_mockAllocator),
             address(_mockTransferHelper),
@@ -780,6 +782,31 @@ contract EarningChainGatewayTest is TestWithHelpers {
         _mockTransferHelper.mockAsset(address(_mockUsdt), amountOut);
 
         vm.expectRevert(ErrorsLib.InsufficientFunds.selector);
+        _earningChainGateway.exchangeIouTokens(
+            iouTokenAmountRay,
+            address(_mockUsdt),
+            makeAddr("tokenOutReceiver"),
+            IBridgeAdapter.BridgeParams({
+                feePayer: makeAddr("bridgeFeePayer"),
+                feeToken: address(0),
+                feeAmount: 123,
+                feeRefundThreshold: 0,
+                gasLimit: 100000,
+                data: abi.encode(keccak256(hex"c0ffee"))
+            }),
+            ""
+        );
+    }
+
+    function test_exchangeIouTokens_reverts_ifAssetWithdrawalNotAllowed(uint256 iouTokenAmountRay) public {
+        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(address(_mockUsdt));
+        // Put funds idle into TH to mimic withdrawal from Allocator
+        _mockTransferHelper.mockAsset(address(_mockUsdt), amountOut);
+
+        _mockAssetRegistry.mockToDisallowAssetWithdrawals(address(_mockUsdt));
+
+        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(_mockUsdt)));
         _earningChainGateway.exchangeIouTokens(
             iouTokenAmountRay,
             address(_mockUsdt),
