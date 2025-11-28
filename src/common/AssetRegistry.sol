@@ -31,10 +31,6 @@ contract AssetRegistry is AccessManagedUpgradeable, Multicall, IAssetRegistry {
         }
     }
 
-    function $AssetRegistry() internal pure returns (AssetRegistryStorage storage) {
-        return $storage();
-    }
-
     /// @dev Constructor. Just disables initializers.
     constructor() {
         _disableInitializers();
