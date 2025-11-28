@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {IouToken} from "../../src/common/IouToken.sol";
+import {IouToken} from "src/core/ious/IouToken.sol";
 
 contract MockIouToken is IouToken {
     constructor(address owner) IouToken(owner) {}

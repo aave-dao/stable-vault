@@ -3,7 +3,7 @@ pragma solidity ^0.8.22;
 
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import {ConstantsLib} from "../libraries/ConstantsLib.sol";
+import {ConstantsLib} from "src/libraries/ConstantsLib.sol";
 
 /// @title AssetLib
 /// @author Aave Labs

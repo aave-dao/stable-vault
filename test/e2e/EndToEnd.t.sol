@@ -6,12 +6,13 @@ import {console} from "forge-std/console.sol";
 import {IERC20} from "forge-std/interfaces/IERC20.sol";
 import {IERC4626} from "forge-std/interfaces/IERC4626.sol";
 
-import {Swapper} from "../../src/common/Swapper.sol";
-import {IAllocator} from "../../src/interfaces/IAllocator.sol";
-import {IBasedBoostedVault} from "../../src/interfaces/IBasedBoostedVault.sol";
-import {IBridgeAdapter} from "../../src/interfaces/IBridgeAdapter.sol";
-import {AssetLib} from "../../src/libraries/AssetLib.sol";
-import {BaseTest} from "../BaseTest.t.sol";
+import {IAllocator} from "src/interfaces/IAllocator.sol";
+import {IBasedBoostedVault} from "src/interfaces/IBasedBoostedVault.sol";
+import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
+import {AssetLib} from "src/libraries/AssetLib.sol";
+import {Swapper} from "src/periphery/Swapper.sol";
+
+import {BaseTest} from "test/BaseTest.t.sol";
 
 contract EndToEndTest is BaseTest {
     using AssetLib for uint256;

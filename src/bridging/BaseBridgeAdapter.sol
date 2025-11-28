@@ -5,10 +5,10 @@ import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManage
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {TransferHelperClient} from "../common/TransferHelperClient.sol";
-import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
-import {IChainGateway} from "../interfaces/IChainGateway.sol";
-import {ErrorsLib} from "../libraries/ErrorsLib.sol";
+import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
+import {IChainGateway} from "src/interfaces/IChainGateway.sol";
+import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
+import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
 
 /// @title BaseBridgeAdapter
 /// @author Aave Labs

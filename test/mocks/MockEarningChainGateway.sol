@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {IBridgeAdapter} from "../../src/interfaces/IBridgeAdapter.sol";
-import {IEarningChainGateway} from "../../src/interfaces/IEarningChainGateway.sol";
-import {ITransferHelper} from "../../src/interfaces/ITransferHelper.sol";
+import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
+import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
+import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 
 contract MockEarningChainGateway is IEarningChainGateway {
     address internal immutable TRANSFER_HELPER;

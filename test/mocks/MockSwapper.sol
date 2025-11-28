@@ -4,8 +4,8 @@ pragma solidity ^0.8.22;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {ISwapper} from "../../src/interfaces/ISwapper.sol";
-import {AssetLib} from "../../src/libraries/AssetLib.sol";
+import {ISwapper} from "src/interfaces/ISwapper.sol";
+import {AssetLib} from "src/libraries/AssetLib.sol";
 
 contract MockSwapper is ISwapper {
     using SafeERC20 for IERC20;

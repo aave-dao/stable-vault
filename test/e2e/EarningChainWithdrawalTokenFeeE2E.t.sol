@@ -5,16 +5,17 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transpa
 import {console} from "forge-std/console.sol";
 import {IERC20} from "forge-std/interfaces/IERC20.sol";
 
-import {BasedBoostedVault} from "../../src/accounting/BasedBoostedVault.sol";
-import {BasedBoostedVault} from "../../src/accounting/BasedBoostedVault.sol";
-import {IouTokenManager} from "../../src/common/IouTokenManager.sol";
-import {EarningChainGateway} from "../../src/earning/EarningChainGateway.sol";
-import {IBasedBoostedVault} from "../../src/interfaces/IBasedBoostedVault.sol";
-import {IBridgeAdapter} from "../../src/interfaces/IBridgeAdapter.sol";
-import {AssetLib} from "../../src/libraries/AssetLib.sol";
-import {ErrorsLib} from "../../src/libraries/ErrorsLib.sol";
-import {BaseTest} from "../BaseTest.t.sol";
-import {MockErc20} from "../mocks/MockErc20.sol";
+import {BasedBoostedVault} from "src/core/accounting/BasedBoostedVault.sol";
+import {BasedBoostedVault} from "src/core/accounting/BasedBoostedVault.sol";
+import {EarningChainGateway} from "src/core/earning/EarningChainGateway.sol";
+import {IouTokenManager} from "src/core/ious/IouTokenManager.sol";
+import {IBasedBoostedVault} from "src/interfaces/IBasedBoostedVault.sol";
+import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
+import {AssetLib} from "src/libraries/AssetLib.sol";
+import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
+
+import {BaseTest} from "test/BaseTest.t.sol";
+import {MockErc20} from "test/mocks/MockErc20.sol";
 
 /// @title EarningChainWithdrawalTokenFeeE2ETest
 /// @notice Test the withdrawal of funds from the Earning Chain to the Accounting Chain.

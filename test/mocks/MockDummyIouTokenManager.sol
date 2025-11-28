@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {IBridgeAdapter} from "../../src/interfaces/IBridgeAdapter.sol";
-import {IIouTokenManager} from "../../src/interfaces/IIouTokenManager.sol";
+import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
+import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
 
 contract MockDummyIouTokenManager is IIouTokenManager {
     function getAsset() external view override returns (address) {}

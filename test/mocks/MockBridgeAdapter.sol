@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {IBridgeAdapter} from "../../src/interfaces/IBridgeAdapter.sol";
-import {ITransferHelper} from "../../src/interfaces/ITransferHelper.sol";
+import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
+import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 
 contract MockBridgeAdapter is IBridgeAdapter {
     address internal immutable TRANSFER_HELPER;

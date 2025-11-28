@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {IMintableBurnableIERC20} from "./IMintableBurnableIERC20.sol";
+import {IMintableBurnableIERC20} from "src/interfaces/IMintableBurnableIERC20.sol";
 
 /// @title IIouToken
 /// @author Aave Labs

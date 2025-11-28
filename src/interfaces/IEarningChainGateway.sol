@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {IBridgeAdapter} from "./IBridgeAdapter.sol";
-import {IChainGateway} from "./IChainGateway.sol";
+import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
+import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 
 interface IEarningChainGateway is IChainGateway {
     /// @notice The aggregated balance of the Earning Chain.
