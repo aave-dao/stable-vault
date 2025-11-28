@@ -9,8 +9,8 @@ import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 
-import {MockCCIPRouter} from "../../mocks/MockCcipRouter.sol";
-import {MockErc20} from "../../mocks/MockErc20.sol";
+import {MockCCIPRouter} from "test/mocks/MockCcipRouter.sol";
+import {MockErc20} from "test/mocks/MockErc20.sol";
 
 contract CCIPTest is Test {
     using SafeERC20 for IERC20;

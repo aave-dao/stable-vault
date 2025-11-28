@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {IBridgeAdapter} from "./IBridgeAdapter.sol";
+import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 
 /// @title IChainGateway
 /// @author Aave Labs

@@ -9,13 +9,13 @@ import {IAny2EVMMessageReceiver} from "@chainlink-ccip/contracts/interfaces/IAny
 import {IRouterClient} from "@chainlink-ccip/contracts/interfaces/IRouterClient.sol";
 import {Client} from "@chainlink-ccip/contracts/libraries/Client.sol";
 
-import {IBridgeAdapter} from "../interfaces/IBridgeAdapter.sol";
-import {ICcipBridgeAdapter} from "../interfaces/ICcipBridgeAdapter.sol";
-import {IChainGateway} from "../interfaces/IChainGateway.sol";
-import {ITransferHelper} from "../interfaces/ITransferHelper.sol";
-import {ConstantsLib} from "../libraries/ConstantsLib.sol";
-import {ErrorsLib} from "../libraries/ErrorsLib.sol";
-import {BaseBridgeAdapter} from "./BaseBridgeAdapter.sol";
+import {BaseBridgeAdapter} from "src/bridging/BaseBridgeAdapter.sol";
+import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
+import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
+import {IChainGateway} from "src/interfaces/IChainGateway.sol";
+import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
+import {ConstantsLib} from "src/libraries/ConstantsLib.sol";
+import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
 
 /// @title CcipAdapter
 /// @author Aave Labs

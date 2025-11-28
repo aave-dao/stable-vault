@@ -5,9 +5,9 @@ import {IAny2EVMMessageReceiver} from "@chainlink-ccip/contracts/interfaces/IAny
 import {IRouter} from "@chainlink-ccip/contracts/interfaces/IRouter.sol";
 import {IRouterClient} from "@chainlink-ccip/contracts/interfaces/IRouterClient.sol";
 
-import {CallWithExactGas} from "./libraries/CallWithExactGas.sol";
 import {Client} from "@chainlink-ccip/contracts/libraries/Client.sol";
 import {Internal} from "@chainlink-ccip/contracts/libraries/Internal.sol";
+import {CallWithExactGas} from "src/interfaces/libraries/CallWithExactGas.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";

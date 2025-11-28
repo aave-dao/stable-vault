@@ -1,42 +1,41 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 
-import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-
-import {BasedBoostedVault} from "../src/accounting/BasedBoostedVault.sol";
-import {AssetRegistry} from "../src/common/AssetRegistry.sol";
-import {ExtendedAccessManager} from "../src/common/ExtendedAccessManager.sol";
-import {IouToken} from "../src/common/IouToken.sol";
-import {IouTokenManager} from "../src/common/IouTokenManager.sol";
-import {IAllocator} from "../src/interfaces/IAllocator.sol";
-import {IAssetRegistry} from "../src/interfaces/IAssetRegistry.sol";
-import {IBasedBoostedVault} from "../src/interfaces/IBasedBoostedVault.sol";
-import {IBridgeAdapter} from "../src/interfaces/IBridgeAdapter.sol";
-import {ICcipBridgeAdapter} from "../src/interfaces/ICcipBridgeAdapter.sol";
-import {IChainGateway} from "../src/interfaces/IChainGateway.sol";
-import {IEarningChainGateway} from "../src/interfaces/IEarningChainGateway.sol";
-import {IFundsHandler} from "../src/interfaces/IFundsHandler.sol";
-import {IRescuableAssets} from "../src/interfaces/IRescuableAssets.sol";
-import {AccountingChainGateway} from "./../src/accounting/AccountingChainGateway.sol";
-import {BasedBoostedVault} from "./../src/accounting/BasedBoostedVault.sol";
-import {FundsHandler} from "./../src/accounting/FundsHandler.sol";
-import {CcipAdapter} from "./../src/bridging/CcipAdapter.sol";
-import {Allocator} from "./../src/common/Allocator.sol";
-import {Swapper} from "./../src/common/Swapper.sol";
-import {TransferHelper} from "./../src/common/TransferHelper.sol";
-import {WithdrawalPolicy} from "./../src/common/WithdrawalPolicy.sol";
-import {EarningChainGateway} from "./../src/earning/EarningChainGateway.sol";
-import {AssetLib} from "./../src/libraries/AssetLib.sol";
-import {MathLib} from "./../src/libraries/MathLib.sol";
-import {MockCCIPRouter} from "./mocks/MockCcipRouter.sol";
-import {MockErc20} from "./mocks/MockErc20.sol";
-import {TestErc4626} from "./mocks/TestErc4626.sol";
+import {ExtendedAccessManager} from "src/access/ExtendedAccessManager.sol";
+import {CcipAdapter} from "src/bridging/CcipAdapter.sol";
+import {Allocator} from "src/core/Allocator.sol";
+import {AccountingChainGateway} from "src/core/accounting/AccountingChainGateway.sol";
+import {BasedBoostedVault} from "src/core/accounting/BasedBoostedVault.sol";
+import {BasedBoostedVault} from "src/core/accounting/BasedBoostedVault.sol";
+import {FundsHandler} from "src/core/accounting/FundsHandler.sol";
+import {EarningChainGateway} from "src/core/earning/EarningChainGateway.sol";
+import {IouToken} from "src/core/ious/IouToken.sol";
+import {IouTokenManager} from "src/core/ious/IouTokenManager.sol";
+import {IAllocator} from "src/interfaces/IAllocator.sol";
+import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
+import {IBasedBoostedVault} from "src/interfaces/IBasedBoostedVault.sol";
+import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
+import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
+import {IChainGateway} from "src/interfaces/IChainGateway.sol";
+import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
+import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
+import {IRescuableAssets} from "src/interfaces/IRescuableAssets.sol";
+import {AssetLib} from "src/libraries/AssetLib.sol";
+import {MathLib} from "src/libraries/MathLib.sol";
+import {AssetRegistry} from "src/periphery/AssetRegistry.sol";
+import {Swapper} from "src/periphery/Swapper.sol";
+import {TransferHelper} from "src/periphery/TransferHelper.sol";
+import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 
 import {_toSelectorArray} from "test/helpers/TypeHelpers.sol";
+import {MockCCIPRouter} from "test/mocks/MockCcipRouter.sol";
+import {MockErc20} from "test/mocks/MockErc20.sol";
+import {TestErc4626} from "test/mocks/TestErc4626.sol";
 
 contract BaseTest is Test {
     using MathLib for uint256;

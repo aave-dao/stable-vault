@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {MathLib} from "../../src/libraries/MathLib.sol";
-import {IMockErc20} from "../mocks/MockErc20.sol";
 import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
 import {Test} from "forge-std/Test.sol";
+
+import {MathLib} from "src/libraries/MathLib.sol";
+
+import {IMockErc20} from "test/mocks/MockErc20.sol";
 
 contract TestWithHelpers is Test {
     uint256 constant DEFAULT_MAX_PER_SECOND_RATE = 1000000005781378656804591713; // ~20% APY

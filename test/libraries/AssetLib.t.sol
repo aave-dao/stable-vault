@@ -4,8 +4,8 @@ pragma solidity ^0.8.22;
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {Test} from "forge-std/Test.sol";
 
-import {AssetLibWrapper} from "../mocks/AssetLibWrapper.sol";
-import {MockErc20} from "../mocks/MockErc20.sol";
+import {AssetLibWrapper} from "test/mocks/AssetLibWrapper.sol";
+import {MockErc20} from "test/mocks/MockErc20.sol";
 
 contract AssetLibTest is Test {
     AssetLibWrapper internal w;

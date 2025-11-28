@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {BaseTest} from "../BaseTest.t.sol";
-
-import {IBasedBoostedVault} from "../../src/interfaces/IBasedBoostedVault.sol";
-import {AssetLib} from "../../src/libraries/AssetLib.sol";
 import {Strings} from "openzeppelin-contracts/contracts/utils/Strings.sol";
+
+import {IBasedBoostedVault} from "src/interfaces/IBasedBoostedVault.sol";
+import {AssetLib} from "src/libraries/AssetLib.sol";
+
+import {BaseTest} from "test/BaseTest.t.sol";
 
 contract BasedBoostedVaultOperationsGasTest is BaseTest {
     using AssetLib for uint256;

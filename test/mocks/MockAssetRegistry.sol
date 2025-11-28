@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
-import {IAssetRegistry} from "../../src/interfaces/IAssetRegistry.sol";
+import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 
 /// @title MockAssetRegistry.
 /// @notice Mock implementation of the AssetRegistry contract for testing purposes.
