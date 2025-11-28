@@ -8,12 +8,14 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transpa
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+import {WithdrawalPolicy} from "../../../src/common/WithdrawalPolicy.sol";
 import {EarningChainGateway} from "../../../src/earning/EarningChainGateway.sol";
 import {IAllocator} from "../../../src/interfaces/IAllocator.sol";
 import {IBridgeAdapter} from "../../../src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "../../../src/interfaces/IChainGateway.sol";
 import {IEarningChainGateway} from "../../../src/interfaces/IEarningChainGateway.sol";
 import {IIouTokenManager} from "../../../src/interfaces/IIouTokenManager.sol";
+import {IWithdrawalPolicy} from "../../../src/interfaces/IWithdrawalPolicy.sol";
 import {AssetLib} from "../../../src/libraries/AssetLib.sol";
 import {ErrorsLib} from "../../../src/libraries/ErrorsLib.sol";
 import {MathLib} from "../../../src/libraries/MathLib.sol";
@@ -26,7 +28,6 @@ import {MockDummyIouTokenManager} from "../../mocks/MockDummyIouTokenManager.sol
 import {IMockErc20} from "../../mocks/MockErc20.sol";
 import {MockNonStandardErc20} from "../../mocks/MockNonStandardErc20.sol";
 import {MockTransferHelper} from "../../mocks/MockTransferHelper.sol";
-import {MockWithdrawalFeeCalculator} from "../../mocks/MockWithdrawalFeeCalculator.sol";
 
 contract EarningChainGatewayTest is TestWithHelpers {
     using MathLib for uint256;
@@ -49,7 +50,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     MockDummyIouTokenManager internal _mockIouTokenManager;
     MockAssetRegistry internal _mockAssetRegistry;
     MockTransferHelper internal _mockTransferHelper;
-    MockWithdrawalFeeCalculator internal _mockWithdrawalFeeCalculator;
+    WithdrawalPolicy internal _mockWithdrawalPolicy;
 
     EarningChainGateway internal _earningChainGateway;
 
@@ -59,11 +60,11 @@ contract EarningChainGatewayTest is TestWithHelpers {
         address iouTokenManager,
         address allocator,
         address transferHelper,
-        address withdrawalFeeCalculator
+        address withdrawalPolicy
     ) internal returns (EarningChainGateway) {
         address earningChainGatewayImpl = address(
             new EarningChainGateway(
-                ACCOUNTING_CHAIN_ID, allocator, assetRegistry, iouTokenManager, transferHelper, withdrawalFeeCalculator
+                ACCOUNTING_CHAIN_ID, allocator, assetRegistry, iouTokenManager, transferHelper, withdrawalPolicy
             )
         );
         EarningChainGateway earningChainGateway = EarningChainGateway(
@@ -116,7 +117,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         _mockAccessManager = new MockAccessManager(admin);
 
-        _mockWithdrawalFeeCalculator = new MockWithdrawalFeeCalculator();
+        _mockWithdrawalPolicy = new WithdrawalPolicy(address(_mockAccessManager), address(_mockAssetRegistry));
 
         _earningChainGateway = _deployEarningChainGateway(
             _mockAccessManager,
@@ -124,7 +125,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockIouTokenManager),
             address(_mockAllocator),
             address(_mockTransferHelper),
-            address(_mockWithdrawalFeeCalculator)
+            address(_mockWithdrawalPolicy)
         );
     }
 
@@ -807,9 +808,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
         uint256 withdrawalFeeRay = 1e21;
 
         vm.mockCall(
-            address(_mockWithdrawalFeeCalculator),
-            abi.encodeWithSelector(MockWithdrawalFeeCalculator.calculateWithdrawalFee.selector),
-            abi.encode(withdrawalFeeRay)
+            address(_mockWithdrawalPolicy),
+            abi.encodeWithSelector(IWithdrawalPolicy.previewWithdrawal.selector),
+            abi.encode(withdrawalFeeRay, 1)
         );
 
         vm.expectRevert(ErrorsLib.InsufficientAmountOut.selector);

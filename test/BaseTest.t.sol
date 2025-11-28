@@ -79,6 +79,7 @@ contract BaseTest is Test {
     address iouToken_accountingChainAddress;
     address iouTokenManager_accountingChainAddress;
     address assetRegistry_accountingChainAddress;
+    address withdrawalPolicy_accountingChainAddress;
     address fundsHandler_accountingChainAddress;
     address allocator_accountingChainAddress;
     address swapper_accountingChainAddress;
@@ -91,6 +92,7 @@ contract BaseTest is Test {
     IouToken iouToken_accountingChain;
     IouTokenManager iouTokenManager_accountingChain;
     AssetRegistry assetRegistry_accountingChain;
+    WithdrawalPolicy withdrawalPolicy_accountingChain;
     FundsHandler fundsHandler;
     Allocator allocator_accountingChain;
     Swapper swapper_accountingChain;
@@ -102,6 +104,7 @@ contract BaseTest is Test {
     // Earning Chain: Earning Chain Gateway, CCIP Adapter, CCIP Router, Swapper, Allocator, Strategy Vault/4626
     address accessManager_earningChainAddress;
     address assetRegistry_earningChainAddress;
+    address withdrawalPolicy_earningChainAddress;
     address iouToken_earningChainAddress;
     address iouTokenManager_earningChainAddress;
     address ccipAdapter_earningChainAddress;
@@ -112,6 +115,7 @@ contract BaseTest is Test {
     address usdcStrategyVault_earningChainAddress;
     ExtendedAccessManager accessManager_earningChain;
     AssetRegistry assetRegistry_earningChain;
+    WithdrawalPolicy withdrawalPolicy_earningChain;
     IouToken iouToken_earningChain;
     IouTokenManager iouTokenManager_earningChain;
     CcipAdapter ccipAdapter_earningChain;
@@ -123,10 +127,6 @@ contract BaseTest is Test {
 
     // Mock CCIP Router
     MockCCIPRouter public mockCcipRouter;
-
-    // Mock Withdrawal Fee Calculator
-    WithdrawalPolicy public withdrawalPolicy_accountingChain;
-    WithdrawalPolicy public withdrawalPolicy_earningChain;
 
     function _prepareTokens() internal {
         GHO.mint(address(this), 10000 ether);
@@ -202,25 +202,24 @@ contract BaseTest is Test {
         // 1. Access Manager
         // 2. Asset Registry Impl
         // 3. Asset Registry Proxy
-        // 4. IOU Token
-        // 5. IOU Token Manager Impl
-        // 6. IOU Token Manager Proxy
-        // 7. Based Boosted Vault Impl
-        // 8. Based Boosted Vault Proxy
-        // 9. Allocator Impl
-        // 10. Allocator Proxy
-        // 11. Funds Handler Impl
-        // 12. Funds Handler Proxy
-        // 13. Accounting Chain Gateway Impl
-        // 14. Accounting Chain Gateway Proxy
-        // 15. Swapper
-        // 16. CCIP Adapter
-        // 17. Strategy Vault/4626
+        // 4. Withdrawal Policy Impl
+        // 5. Withdrawal Policy Proxy
+        // 6. IOU Token
+        // 7. IOU Token Manager Impl
+        // 8. IOU Token Manager Proxy
+        // 9. Based Boosted Vault Impl
+        // 10. Based Boosted Vault Proxy
+        // 11. Allocator Impl
+        // 12. Allocator Proxy
+        // 13. Funds Handler Impl
+        // 14. Funds Handler Proxy
+        // 15. Accounting Chain Gateway Impl
+        // 16. Accounting Chain Gateway Proxy
+        // 17. Swapper
+        // 18. CCIP Adapter
+        // 19. Strategy Vault/4626
 
         transferHelper_accountingChainAddress = address(new TransferHelper());
-
-        withdrawalPolicy_accountingChain = new WithdrawalPolicy(admin);
-        console.log("\tWithdrawal Policy (Accounting Chain): %s", address(withdrawalPolicy_accountingChain));
 
         // Pre compute addresses for contracts that are with circular dependencies
         uint256 deployerNonce_accountingChain = vm.getNonce(address(this));
@@ -232,6 +231,13 @@ contract BaseTest is Test {
         deployerNonce_accountingChain++; // Incrementing for Asset Registry implementation
         assetRegistry_accountingChainAddress = vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
         console.log("\tAsset Registry (Accounting Chain) Predicted Address: %s", assetRegistry_accountingChainAddress);
+
+        deployerNonce_accountingChain++; // Incrementing for Withdrawal Policy implementation
+        withdrawalPolicy_accountingChainAddress =
+            vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
+        console.log(
+            "\tWithdrawal Policy (Accounting Chain) Predicted Address: %s", withdrawalPolicy_accountingChainAddress
+        );
 
         iouToken_accountingChainAddress = vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
         console.log("\tIOU Token (Accounting Chain) Predicted Address: %s", iouToken_accountingChainAddress);
@@ -292,7 +298,19 @@ contract BaseTest is Test {
             "Asset Registry (Accounting Chain) address mismatch"
         );
 
-        // 3. IOU Token
+        // 3. Withdrawal Policy
+        address withdrawalPolicy_accountingChain_impl =
+            address(new WithdrawalPolicy(admin, assetRegistry_accountingChainAddress));
+        withdrawalPolicy_accountingChain = WithdrawalPolicy(
+            address(new TransparentUpgradeableProxy(withdrawalPolicy_accountingChain_impl, proxyAdmin, ""))
+        );
+        console.log("\tWithdrawal Policy (Accounting Chain): %s", address(withdrawalPolicy_accountingChain));
+        require(
+            address(withdrawalPolicy_accountingChain) == withdrawalPolicy_accountingChainAddress,
+            "Withdrawal Policy (Accounting Chain) address mismatch"
+        );
+
+        // 4. IOU Token
         iouToken_accountingChain = new IouToken(iouTokenManager_accountingChainAddress);
         console.log("\tIOU Token (Accounting Chain): %s", iouToken_accountingChainAddress);
         require(
@@ -300,7 +318,7 @@ contract BaseTest is Test {
             "IOU Token (Accounting Chain) address mismatch"
         );
 
-        // 4. IOU Token Manager
+        // 5. IOU Token Manager
         address iouTokenManager_accountingChain_impl = address(
             new IouTokenManager(
                 iouToken_accountingChainAddress,
@@ -319,7 +337,7 @@ contract BaseTest is Test {
             "IOU Token Manager (Accounting Chain) address mismatch"
         );
 
-        // 5. Based Boosted Vault
+        // 6. Based Boosted Vault
         // Impl and proxy deployed in the internal `_deployBasedBoostedVault` function
         vault = _deployBasedBoostedVault(
             accessManager_accountingChainAddress,
@@ -329,7 +347,7 @@ contract BaseTest is Test {
             fundsHandler_accountingChainAddress,
             assetRegistry_accountingChainAddress,
             transferHelper_accountingChainAddress,
-            address(withdrawalPolicy_accountingChain)
+            withdrawalPolicy_accountingChainAddress
         );
         console.log("\tVault: %s", vault_accountingChainAddress);
         require(address(vault) == vault_accountingChainAddress, "Vault (Accounting Chain) address mismatch");
@@ -437,22 +455,21 @@ contract BaseTest is Test {
         // Deployment order:
         // 1. Access Manager
         // 2. Asset Registry Impl
-        // 2. Asset Registry Proxy
+        // 3. Asset Registry Proxy
+        // 4. Withdrawal Policy Impl
+        // 5. Withdrawal Policy Proxy
         // 3. CCIP Router
-        // 4. IOU Token
-        // 5. IOU Token Manager Impl
-        // 6. IOU Token Manager Proxy
-        // 7. Allocator Impl
-        // 8. Allocator Proxy
-        // 9. Swapper
-        // 10. Earning Chain Gateway Impl
-        // 11. Earning Chain Gateway Proxy
-        // 12. Strategy Vault/4626
+        // 6. IOU Token
+        // 7. IOU Token Manager Impl
+        // 8. IOU Token Manager Proxy
+        // 9. Allocator Impl
+        // 10. Allocator Proxy
+        // 11. Swapper
+        // 12. Earning Chain Gateway Impl
+        // 13. Earning Chain Gateway Proxy
+        // 14. Strategy Vault/4626
 
         transferHelper_earningChainAddress = address(new TransferHelper());
-
-        withdrawalPolicy_earningChain = new WithdrawalPolicy(admin);
-        console.log("\tWithdrawal Policy (Earning Chain): %s", address(withdrawalPolicy_earningChain));
 
         uint256 deployerNonce_earningChain = vm.getNonce(address(this));
         accessManager_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
@@ -461,6 +478,10 @@ contract BaseTest is Test {
         deployerNonce_earningChain++; // Incrementing for Asset Registry implementation
         assetRegistry_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
         console.log("\tAsset Registry (Earning Chain) Predicted Address: %s", assetRegistry_earningChainAddress);
+
+        deployerNonce_earningChain++; // Incrementing for Withdrawal Policy implementation
+        withdrawalPolicy_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
+        console.log("\tWithdrawal Policy (Earning Chain) Predicted Address: %s", withdrawalPolicy_earningChainAddress);
 
         ccipAdapter_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
         console.log("\tCCIP Adapter (Earning Chain) Predicted Address: %s", ccipAdapter_earningChainAddress);
@@ -516,7 +537,19 @@ contract BaseTest is Test {
             "Asset Registry (Earning Chain) address mismatch"
         );
 
-        // 3. CCIP Router
+        // 3. Withdrawal Policy
+        address withdrawalPolicy_earningChain_impl =
+            address(new WithdrawalPolicy(admin, assetRegistry_earningChainAddress));
+        withdrawalPolicy_earningChain = WithdrawalPolicy(
+            address(new TransparentUpgradeableProxy(withdrawalPolicy_earningChain_impl, proxyAdmin, ""))
+        );
+        console.log("\tWithdrawal Policy (Earning Chain): %s", address(withdrawalPolicy_earningChain));
+        require(
+            address(withdrawalPolicy_earningChain) == withdrawalPolicy_earningChainAddress,
+            "Withdrawal Policy (Earning Chain) address mismatch"
+        );
+
+        // 4. CCIP Router
         ccipAdapter_earningChain = new CcipAdapter(
             accessManager_earningChainAddress,
             chainGateway_earningChainAddress,
@@ -529,14 +562,14 @@ contract BaseTest is Test {
             "CCIP Adapter (Earning Chain) address mismatch"
         );
 
-        // 4. IOU Token
+        // 5. IOU Token
         iouToken_earningChain = new IouToken(iouTokenManager_earningChainAddress);
         console.log("\tIOU Token (Earning Chain): %s", address(iouToken_earningChain));
         require(
             address(iouToken_earningChain) == iouToken_earningChainAddress, "IOU Token (Earning Chain) address mismatch"
         );
 
-        // 5. IOU Token Manager
+        // 6. IOU Token Manager
         address iouTokenManager_earningChain_impl = address(
             new IouTokenManager(
                 iouToken_earningChainAddress,
@@ -555,7 +588,7 @@ contract BaseTest is Test {
             "IOU Token Manager (Earning Chain) address mismatch"
         );
 
-        // 6. Allocator
+        // 7. Allocator
         address allocator_earningChain_impl = address(
             new Allocator(
                 assetRegistry_earningChainAddress,
@@ -579,14 +612,14 @@ contract BaseTest is Test {
             "Allocator (Earning Chain) address mismatch"
         );
 
-        // 7. Swapper
+        // 8. Swapper
         swapper_earningChain = new Swapper(allocator_earningChainAddress);
         console.log("\tSwapper: %s", address(swapper_earningChain));
         require(
             address(swapper_earningChain) == swapper_earningChainAddress, "Swapper (Earning Chain) address mismatch"
         );
 
-        // 8. Earning Chain Gateway
+        // 9. Earning Chain Gateway
         address earningChainGateway_impl = address(
             new EarningChainGateway(
                 ACCOUNTING_CHAIN_ID,
@@ -612,7 +645,7 @@ contract BaseTest is Test {
             "Earning Chain Gateway (Earning Chain) address mismatch"
         );
 
-        // 9. Strategy Vault/4626
+        // 10. Strategy Vault/4626
         ghoStrategyVault_earningChain = new TestErc4626(GHO);
         console.log("\tGHO Strategy Vault (Earning Chain): %s", address(ghoStrategyVault_earningChain));
         usdcStrategyVault_earningChain = new TestErc4626(USDC);

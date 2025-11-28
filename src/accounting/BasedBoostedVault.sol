@@ -14,7 +14,7 @@ import {IBasedBoostedVault} from "../interfaces/IBasedBoostedVault.sol";
 import {IFundsHandler} from "../interfaces/IFundsHandler.sol";
 import {IIouTokenManager} from "../interfaces/IIouTokenManager.sol";
 import {ITransferHelper} from "../interfaces/ITransferHelper.sol";
-import {IWithdrawalFeeCalculator} from "../interfaces/IWithdrawalFeeCalculator.sol";
+import {IWithdrawalPolicy} from "../interfaces/IWithdrawalPolicy.sol";
 import {AssetLib} from "../libraries/AssetLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {MathLib} from "../libraries/MathLib.sol";
@@ -252,10 +252,9 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         assertingTransferHelperBalanceFor(assetOut)
     {
         require(user == msg.sender, OnlyUser());
-        require(IAssetRegistry(ASSET_REGISTRY).isUserWithdrawalAllowed(assetOut), ErrorsLib.UnsupportedAsset(assetOut));
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(user, iouAmountRay);
-        uint256 withdrawalFeeRay =
-            IWithdrawalFeeCalculator(WITHDRAWAL_POLICY).calculateWithdrawalFee(user, assetOut, iouAmountRay, data);
+        (uint256 withdrawalFeeRay,) =
+            IWithdrawalPolicy(WITHDRAWAL_POLICY).previewWithdrawal(user, assetOut, iouAmountRay, data);
         uint256 assetAmount = (iouAmountRay - withdrawalFeeRay).rayToAssetDecimals(assetOut);
         require(assetAmount > 0, ErrorsLib.InsufficientAmountOut());
         IFundsHandler(FUNDS_HANDLER).processWithdrawal(assetOut, assetAmount);

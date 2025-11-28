@@ -4,20 +4,22 @@ pragma solidity ^0.8.20;
 import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 
 import {WithdrawalPolicy} from "../../../src/common/WithdrawalPolicy.sol";
-import {IWithdrawalFeeCalculator} from "../../../src/interfaces/IWithdrawalFeeCalculator.sol";
 import {ConstantsLib} from "../../../src/libraries/ConstantsLib.sol";
 import {ErrorsLib} from "../../../src/libraries/ErrorsLib.sol";
 import {TestWithHelpers} from "../../helpers/TestWithHelpers.sol";
 import {MockAccessManager} from "../../mocks/MockAccessManager.sol";
+import {MockAssetRegistry} from "../../mocks/MockAssetRegistry.sol";
 
-contract WithdrawalFeeCalculatorTest is TestWithHelpers {
+contract WithdrawalPolicyTest is TestWithHelpers {
     WithdrawalPolicy withdrawalPolicy;
     MockAccessManager mockAccessManager;
+    MockAssetRegistry mockAssetRegistry;
     address admin = makeAddr("admin");
 
     function setUp() public {
         mockAccessManager = new MockAccessManager(admin);
-        withdrawalPolicy = new WithdrawalPolicy(address(mockAccessManager));
+        mockAssetRegistry = new MockAssetRegistry();
+        withdrawalPolicy = new WithdrawalPolicy(address(mockAccessManager), address(mockAssetRegistry));
     }
 
     // Restricted functions access control tests
@@ -31,14 +33,15 @@ contract WithdrawalFeeCalculatorTest is TestWithHelpers {
         vm.assume(unauthorizedMsgSender != address(0));
 
         mockAccessManager.mockRejectCall(
-            unauthorizedMsgSender, address(withdrawalPolicy), IWithdrawalFeeCalculator.setAssetFeeBps.selector
+            unauthorizedMsgSender, address(withdrawalPolicy), WithdrawalPolicy.setAssetFeeBps.selector
         );
 
         vm.expectRevert(
             abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
         );
         vm.prank(unauthorizedMsgSender);
-        withdrawalPolicy.setAssetFeeBps(asset, newAssetFeeBps, isSet);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        withdrawalPolicy.setAssetFeeBps(asset, uint16(newAssetFeeBps), isSet);
     }
 
     function test_setBasicFeeBps_reverts_ifMsgSenderIsNotAuthorized(
@@ -48,14 +51,15 @@ contract WithdrawalFeeCalculatorTest is TestWithHelpers {
         vm.assume(unauthorizedMsgSender != address(0));
 
         mockAccessManager.mockRejectCall(
-            unauthorizedMsgSender, address(withdrawalPolicy), IWithdrawalFeeCalculator.setBasicFeeBps.selector
+            unauthorizedMsgSender, address(withdrawalPolicy), WithdrawalPolicy.setBasicFeeBps.selector
         );
 
         vm.expectRevert(
             abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
         );
         vm.prank(unauthorizedMsgSender);
-        withdrawalPolicy.setBasicFeeBps(newBasicFeeBps);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        withdrawalPolicy.setBasicFeeBps(uint16(newBasicFeeBps));
     }
 
     function test_setSigner_reverts_ifMsgSenderIsNotAuthorized(
@@ -66,7 +70,7 @@ contract WithdrawalFeeCalculatorTest is TestWithHelpers {
         vm.assume(unauthorizedMsgSender != address(0));
 
         mockAccessManager.mockRejectCall(
-            unauthorizedMsgSender, address(withdrawalPolicy), IWithdrawalFeeCalculator.setSigner.selector
+            unauthorizedMsgSender, address(withdrawalPolicy), WithdrawalPolicy.setSigner.selector
         );
 
         vm.expectRevert(
@@ -82,36 +86,40 @@ contract WithdrawalFeeCalculatorTest is TestWithHelpers {
         feeBps = bound(feeBps, 0, 10_000); // ConstantsLib.MAX_BPS
 
         vm.prank(admin);
-        withdrawalPolicy.setAssetFeeBps(asset, feeBps, isSet);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        withdrawalPolicy.setAssetFeeBps(asset, uint16(feeBps), isSet);
 
-        IWithdrawalFeeCalculator.AssetFeeBpsConfig memory config = withdrawalPolicy.getAssetFeeBpsConfig(asset);
+        WithdrawalPolicy.AssetFeeBpsConfig memory config = withdrawalPolicy.getAssetFeeBpsConfig(asset);
         assertEq(config.feeBps, feeBps);
         assertEq(config.isSet, isSet);
     }
 
     function test_setAssetFeeBps_reverts_ifFeeBpsIsInvalid(address asset, uint256 feeBps, bool isSet) public {
-        feeBps = bound(feeBps, 10_001, type(uint256).max);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        uint16 feeBps16 = uint16(bound(feeBps, 10_001, type(uint16).max));
 
         vm.expectRevert(ErrorsLib.InvalidParameter.selector);
         vm.prank(admin);
-        withdrawalPolicy.setAssetFeeBps(asset, feeBps, isSet);
+        withdrawalPolicy.setAssetFeeBps(asset, feeBps16, isSet);
     }
 
     function test_setBasicFeeBps_setsExpectedFee(uint256 feeBps) public {
         feeBps = bound(feeBps, 0, ConstantsLib.MAX_BPS);
 
         vm.prank(admin);
-        withdrawalPolicy.setBasicFeeBps(feeBps);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        withdrawalPolicy.setBasicFeeBps(uint16(feeBps));
 
         assertEq(withdrawalPolicy.getBasicFeeBps(), feeBps);
     }
 
     function test_setBasicFeeBps_reverts_ifFeeBpsIsInvalid(uint256 feeBps) public {
-        feeBps = bound(feeBps, ConstantsLib.MAX_BPS + 1, type(uint256).max);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        uint16 feeBps16 = uint16(bound(feeBps, ConstantsLib.MAX_BPS + 1, type(uint16).max));
 
         vm.expectRevert(ErrorsLib.InvalidParameter.selector);
         vm.prank(admin);
-        withdrawalPolicy.setBasicFeeBps(feeBps);
+        withdrawalPolicy.setBasicFeeBps(feeBps16);
     }
 
     function test_setSigner_setsSignerStatus(address signer, bool isSigner) public {
@@ -133,15 +141,18 @@ contract WithdrawalFeeCalculatorTest is TestWithHelpers {
         iouAmountRay = bound(iouAmountRay, 0, type(uint256).max / ConstantsLib.MAX_BPS);
 
         vm.prank(admin);
-        withdrawalPolicy.setBasicFeeBps(baseFeeBps);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        withdrawalPolicy.setBasicFeeBps(uint16(baseFeeBps));
 
         uint256 expectedFee = iouAmountRay * baseFeeBps / ConstantsLib.MAX_BPS;
 
         assertFalse(withdrawalPolicy.getAssetFeeBpsConfig(assetOut).isSet, "Asset fee is set");
 
         bytes memory data = "";
-        uint256 actualFee = withdrawalPolicy.calculateWithdrawalFee(user, assetOut, iouAmountRay, data);
+        (uint256 actualFee, uint16 actualFeeBps) =
+            withdrawalPolicy.previewWithdrawal(user, assetOut, iouAmountRay, data);
         assertEq(actualFee, expectedFee);
+        assertEq(actualFeeBps, baseFeeBps);
     }
 
     function test_calculateWithdrawalFee_returnsAssetFee(
@@ -156,11 +167,13 @@ contract WithdrawalFeeCalculatorTest is TestWithHelpers {
         iouAmountRay = bound(iouAmountRay, 0, type(uint256).max / ConstantsLib.MAX_BPS);
 
         vm.prank(admin);
-        withdrawalPolicy.setBasicFeeBps(baseFeeBps);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        withdrawalPolicy.setBasicFeeBps(uint16(baseFeeBps));
         assertEq(withdrawalPolicy.getBasicFeeBps(), baseFeeBps);
 
         vm.prank(admin);
-        withdrawalPolicy.setAssetFeeBps(assetOut, assetFeeBps, true);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        withdrawalPolicy.setAssetFeeBps(assetOut, uint16(assetFeeBps), true);
 
         uint256 expectedFee = iouAmountRay * assetFeeBps / ConstantsLib.MAX_BPS;
 
@@ -168,7 +181,9 @@ contract WithdrawalFeeCalculatorTest is TestWithHelpers {
         assertEq(withdrawalPolicy.getAssetFeeBpsConfig(assetOut).feeBps, assetFeeBps);
 
         bytes memory data = "";
-        uint256 actualFee = withdrawalPolicy.calculateWithdrawalFee(user, assetOut, iouAmountRay, data);
+        (uint256 actualFee, uint16 actualFeeBps) =
+            withdrawalPolicy.previewWithdrawal(user, assetOut, iouAmountRay, data);
+        assertEq(actualFeeBps, assetFeeBps);
         assertEq(actualFee, expectedFee);
     }
 
@@ -192,12 +207,14 @@ contract WithdrawalFeeCalculatorTest is TestWithHelpers {
 
         // Setup base fee
         vm.prank(admin);
-        withdrawalPolicy.setBasicFeeBps(baseFeeBps);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        withdrawalPolicy.setBasicFeeBps(uint16(baseFeeBps));
 
         // Setup asset fee
         if (isAssetFeeSet) {
             vm.prank(admin);
-            withdrawalPolicy.setAssetFeeBps(assetOut, assetFeeBps, true);
+            // forge-lint: disable-next-line(unsafe-typecast)
+            withdrawalPolicy.setAssetFeeBps(assetOut, uint16(assetFeeBps), true);
         }
 
         // Create signer wallet and whitelist it
@@ -212,7 +229,9 @@ contract WithdrawalFeeCalculatorTest is TestWithHelpers {
         uint256 expectedFee = iouAmountRay * personalFeeBps / ConstantsLib.MAX_BPS;
 
         bytes memory data = abi.encode(personalFeeBps, signature);
-        uint256 actualFee = withdrawalPolicy.calculateWithdrawalFee(user, assetOut, iouAmountRay, data);
+        (uint256 actualFee, uint16 actualFeeBps) =
+            withdrawalPolicy.previewWithdrawal(user, assetOut, iouAmountRay, data);
+        assertEq(actualFeeBps, personalFeeBps);
         assertEq(actualFee, expectedFee);
     }
 
@@ -227,21 +246,24 @@ contract WithdrawalFeeCalculatorTest is TestWithHelpers {
     ) public {
         baseFeeBps = bound(baseFeeBps, 0, ConstantsLib.MAX_BPS);
         assetFeeBps = bound(assetFeeBps, 0, ConstantsLib.MAX_BPS);
+        uint16 personalFeeBps16;
         if (isAssetFeeSet) {
-            personalFeeBps = bound(personalFeeBps, assetFeeBps + 1, type(uint256).max);
+            personalFeeBps16 = uint16(bound(personalFeeBps, 100_01, type(uint16).max));
         } else {
-            personalFeeBps = bound(personalFeeBps, baseFeeBps + 1, type(uint256).max);
+            personalFeeBps16 = uint16(bound(personalFeeBps, 100_01, type(uint16).max));
         }
         iouAmountRay = bound(iouAmountRay, 0, type(uint256).max / ConstantsLib.MAX_BPS);
 
         // Setup base fee
         vm.prank(admin);
-        withdrawalPolicy.setBasicFeeBps(baseFeeBps);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        withdrawalPolicy.setBasicFeeBps(uint16(baseFeeBps));
 
         // Setup asset fee
         if (isAssetFeeSet) {
             vm.prank(admin);
-            withdrawalPolicy.setAssetFeeBps(assetOut, assetFeeBps, true);
+            // forge-lint: disable-next-line(unsafe-typecast)
+            withdrawalPolicy.setAssetFeeBps(assetOut, uint16(assetFeeBps), true);
         }
 
         // Create signer wallet and whitelist it
@@ -251,11 +273,11 @@ contract WithdrawalFeeCalculatorTest is TestWithHelpers {
         assertTrue(withdrawalPolicy.isSigner(signer), "Signer is not whitelisted");
 
         // Build EIP712 signature
-        bytes memory signature = _signPersonalFee(signerPk, user, assetOut, iouAmountRay, personalFeeBps);
+        bytes memory signature = _signPersonalFee(signerPk, user, assetOut, iouAmountRay, personalFeeBps16);
 
-        bytes memory data = abi.encode(personalFeeBps, signature);
+        bytes memory data = abi.encode(personalFeeBps16, signature);
         vm.expectRevert(ErrorsLib.InvalidParameter.selector);
-        withdrawalPolicy.calculateWithdrawalFee(user, assetOut, iouAmountRay, data);
+        withdrawalPolicy.previewWithdrawal(user, assetOut, iouAmountRay, data);
     }
 
     function test_calculateWithdrawalFee_reverts_ifSignerIsNotWhitelisted(
@@ -278,14 +300,15 @@ contract WithdrawalFeeCalculatorTest is TestWithHelpers {
 
         // Setup base fee
         vm.prank(admin);
-        withdrawalPolicy.setBasicFeeBps(baseFeeBps);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        withdrawalPolicy.setBasicFeeBps(uint16(baseFeeBps));
 
         // Build EIP712 signature with non-whitelisted signer
         bytes memory signature = _signPersonalFee(nonWhitelistedSignerPk, user, assetOut, iouAmountRay, personalFeeBps);
 
         bytes memory data = abi.encode(personalFeeBps, signature);
-        vm.expectRevert(IWithdrawalFeeCalculator.InvalidSignature.selector);
-        withdrawalPolicy.calculateWithdrawalFee(user, assetOut, iouAmountRay, data);
+        vm.expectRevert(WithdrawalPolicy.InvalidSignature.selector);
+        withdrawalPolicy.previewWithdrawal(user, assetOut, iouAmountRay, data);
     }
 
     function test_calculateWithdrawalFee_reverts_ifSignatureIsForDifferentUser(
@@ -303,7 +326,8 @@ contract WithdrawalFeeCalculatorTest is TestWithHelpers {
 
         // Setup base fee
         vm.prank(admin);
-        withdrawalPolicy.setBasicFeeBps(baseFeeBps);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        withdrawalPolicy.setBasicFeeBps(uint16(baseFeeBps));
 
         // Create signer wallet and whitelist it
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
@@ -314,8 +338,8 @@ contract WithdrawalFeeCalculatorTest is TestWithHelpers {
         bytes memory signature = _signPersonalFee(signerPk, wrongUser, assetOut, iouAmountRay, personalFeeBps);
 
         bytes memory data = abi.encode(personalFeeBps, signature);
-        vm.expectRevert(IWithdrawalFeeCalculator.InvalidSignature.selector);
-        withdrawalPolicy.calculateWithdrawalFee(user, assetOut, iouAmountRay, data);
+        vm.expectRevert(WithdrawalPolicy.InvalidSignature.selector);
+        withdrawalPolicy.previewWithdrawal(user, assetOut, iouAmountRay, data);
     }
 
     function test_calculateWithdrawalFee_reverts_ifSignatureIsForDifferentAsset(
@@ -333,7 +357,8 @@ contract WithdrawalFeeCalculatorTest is TestWithHelpers {
 
         // Setup base fee
         vm.prank(admin);
-        withdrawalPolicy.setBasicFeeBps(baseFeeBps);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        withdrawalPolicy.setBasicFeeBps(uint16(baseFeeBps));
 
         // Create signer wallet and whitelist it
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
@@ -344,8 +369,8 @@ contract WithdrawalFeeCalculatorTest is TestWithHelpers {
         bytes memory signature = _signPersonalFee(signerPk, user, wrongAssetOut, iouAmountRay, personalFeeBps);
 
         bytes memory data = abi.encode(personalFeeBps, signature);
-        vm.expectRevert(IWithdrawalFeeCalculator.InvalidSignature.selector);
-        withdrawalPolicy.calculateWithdrawalFee(user, assetOut, iouAmountRay, data);
+        vm.expectRevert(WithdrawalPolicy.InvalidSignature.selector);
+        withdrawalPolicy.previewWithdrawal(user, assetOut, iouAmountRay, data);
     }
 
     function test_calculateWithdrawalFee_reverts_ifSignatureIsForDifferentAmount(
@@ -365,7 +390,8 @@ contract WithdrawalFeeCalculatorTest is TestWithHelpers {
 
         // Setup base fee
         vm.prank(admin);
-        withdrawalPolicy.setBasicFeeBps(baseFeeBps);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        withdrawalPolicy.setBasicFeeBps(uint16(baseFeeBps));
 
         // Create signer wallet and whitelist it
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
@@ -376,8 +402,8 @@ contract WithdrawalFeeCalculatorTest is TestWithHelpers {
         bytes memory signature = _signPersonalFee(signerPk, user, assetOut, wrongIouAmountRay, personalFeeBps);
 
         bytes memory data = abi.encode(personalFeeBps, signature);
-        vm.expectRevert(IWithdrawalFeeCalculator.InvalidSignature.selector);
-        withdrawalPolicy.calculateWithdrawalFee(user, assetOut, iouAmountRay, data);
+        vm.expectRevert(WithdrawalPolicy.InvalidSignature.selector);
+        withdrawalPolicy.previewWithdrawal(user, assetOut, iouAmountRay, data);
     }
 
     function test_calculateWithdrawalFee_reverts_ifSignatureIsForDifferentPersonalFee(
@@ -397,7 +423,8 @@ contract WithdrawalFeeCalculatorTest is TestWithHelpers {
 
         // Setup base fee
         vm.prank(admin);
-        withdrawalPolicy.setBasicFeeBps(baseFeeBps);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        withdrawalPolicy.setBasicFeeBps(uint16(baseFeeBps));
 
         // Create signer wallet and whitelist it
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
@@ -408,8 +435,8 @@ contract WithdrawalFeeCalculatorTest is TestWithHelpers {
         bytes memory signature = _signPersonalFee(signerPk, user, assetOut, iouAmountRay, wrongPersonalFeeBps);
 
         bytes memory data = abi.encode(personalFeeBps, signature);
-        vm.expectRevert(IWithdrawalFeeCalculator.InvalidSignature.selector);
-        withdrawalPolicy.calculateWithdrawalFee(user, assetOut, iouAmountRay, data);
+        vm.expectRevert(WithdrawalPolicy.InvalidSignature.selector);
+        withdrawalPolicy.previewWithdrawal(user, assetOut, iouAmountRay, data);
     }
 
     function test_calculateWithdrawalFee_reverts_ifSignatureIsMalformed(
@@ -427,7 +454,8 @@ contract WithdrawalFeeCalculatorTest is TestWithHelpers {
 
         // Setup base fee
         vm.prank(admin);
-        withdrawalPolicy.setBasicFeeBps(baseFeeBps);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        withdrawalPolicy.setBasicFeeBps(uint16(baseFeeBps));
 
         // Create signer wallet and whitelist it
         (address signer,) = makeAddrAndKey("signer");
@@ -436,7 +464,7 @@ contract WithdrawalFeeCalculatorTest is TestWithHelpers {
 
         bytes memory data = abi.encode(personalFeeBps, malformedSignature);
         vm.expectRevert();
-        withdrawalPolicy.calculateWithdrawalFee(user, assetOut, iouAmountRay, data);
+        withdrawalPolicy.previewWithdrawal(user, assetOut, iouAmountRay, data);
     }
 
     function _signPersonalFee(
@@ -447,11 +475,12 @@ contract WithdrawalFeeCalculatorTest is TestWithHelpers {
         uint256 personalFeeBps
     ) internal view returns (bytes memory) {
         bytes32 WITHDRAWAL_FEE_TYPEHASH = keccak256(
-            "WithdrawalFee(address user,address assetOut,uint256 iouAmountRay,uint256 personalFee)"
+            "WithdrawalFee(address user,address assetOut,uint256 iouAmountRay,uint16 personalFee)"
         );
 
         bytes32 structHash =
-            keccak256(abi.encode(WITHDRAWAL_FEE_TYPEHASH, user, assetOut, iouAmountRay, personalFeeBps));
+        // forge-lint: disable-next-line(unsafe-typecast)
+        keccak256(abi.encode(WITHDRAWAL_FEE_TYPEHASH, user, assetOut, iouAmountRay, uint16(personalFeeBps)));
 
         bytes32 domainSeparator = keccak256(
             abi.encode(

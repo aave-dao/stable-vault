@@ -7,9 +7,11 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transpa
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {BasedBoostedVault} from "../../../src/accounting/BasedBoostedVault.sol";
+import {WithdrawalPolicy} from "../../../src/common/WithdrawalPolicy.sol";
 import {IBasedBoostedVault} from "../../../src/interfaces/IBasedBoostedVault.sol";
 import {IFundsHandler} from "../../../src/interfaces/IFundsHandler.sol";
 import {IRescuableAssets} from "../../../src/interfaces/IRescuableAssets.sol";
+import {IWithdrawalPolicy} from "../../../src/interfaces/IWithdrawalPolicy.sol";
 import {AssetLib} from "../../../src/libraries/AssetLib.sol";
 import {ErrorsLib} from "../../../src/libraries/ErrorsLib.sol";
 import {MathLib} from "../../../src/libraries/MathLib.sol";
@@ -23,7 +25,6 @@ import {MockFundsHandler} from "../../mocks/MockFundsHandler.sol";
 import {MockIouTokenManager} from "../../mocks/MockIouTokenManager.sol";
 import {MockNonStandardErc20} from "../../mocks/MockNonStandardErc20.sol";
 import {MockTransferHelper} from "../../mocks/MockTransferHelper.sol";
-import {MockWithdrawalFeeCalculator} from "../../mocks/MockWithdrawalFeeCalculator.sol";
 
 contract BasedBoostedVaultTest is TestWithHelpers {
     using MathLib for uint256;
@@ -41,7 +42,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     MockIouTokenManager mockIouTokenManager;
     MockAssetRegistry mockAssetRegistry;
     MockTransferHelper mockTransferHelper;
-    MockWithdrawalFeeCalculator mockWithdrawalFeeCalculator;
+    WithdrawalPolicy mockWithdrawalPolicy;
     IBasedBoostedVault bbv;
 
     function _deployDefaultAsset() internal returns (IMockErc20) {
@@ -88,7 +89,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockAsset = _deployDefaultAsset();
         mockTransferHelper = new MockTransferHelper();
         mockFundsHandler = new MockFundsHandler(address(mockTransferHelper));
-        mockWithdrawalFeeCalculator = new MockWithdrawalFeeCalculator();
+        mockWithdrawalPolicy = new WithdrawalPolicy(address(mockAccessManager), address(mockAssetRegistry));
         bbv = _deployBasedBoostedVault(
             address(mockAccessManager),
             DEFAULT_MAX_PER_SECOND_RATE,
@@ -97,7 +98,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalFeeCalculator)
+            address(mockWithdrawalPolicy)
         );
     }
 
@@ -118,7 +119,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             expectedIouManager,
             expectedFundsHandler,
             expectedTransferHelper,
-            address(mockWithdrawalFeeCalculator)
+            address(mockWithdrawalPolicy)
         );
 
         assertEq(newBbv.getMaxValidPerSecondRate(), expectedMaxValidPerSecondRate);
@@ -134,7 +135,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockIouTokenManager),
             address(mockFundsHandler),
             address(mockTransferHelper),
-            address(mockWithdrawalFeeCalculator)
+            address(mockWithdrawalPolicy)
         );
     }
 
@@ -154,7 +155,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
                 address(mockIouTokenManager),
                 address(mockFundsHandler),
                 address(mockTransferHelper),
-                address(mockWithdrawalFeeCalculator)
+                address(mockWithdrawalPolicy)
             )
         );
 
@@ -183,7 +184,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
                 address(mockIouTokenManager),
                 address(mockFundsHandler),
                 address(mockTransferHelper),
-                address(mockWithdrawalFeeCalculator)
+                address(mockWithdrawalPolicy)
             )
         );
 
@@ -333,7 +334,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalFeeCalculator)
+            address(mockWithdrawalPolicy)
         );
 
         // Warp just 1 second, conversionRate grows slightly above RAY
@@ -451,7 +452,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalFeeCalculator)
+            address(mockWithdrawalPolicy)
         );
         mockAsset = IMockErc20(address(new MockNonStandardErc20("Test GHO", "tGHO", 18)));
 
@@ -1215,7 +1216,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalFeeCalculator)
+            address(mockWithdrawalPolicy)
         );
 
         vm.warp(block.timestamp + 1);
@@ -1322,9 +1323,9 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(iouAmountRay.rayToAssetDecimals(address(mockAsset)) > 0);
 
         vm.mockCall(
-            address(mockWithdrawalFeeCalculator),
-            abi.encodeWithSelector(MockWithdrawalFeeCalculator.calculateWithdrawalFee.selector),
-            abi.encode(iouAmountRay)
+            address(mockWithdrawalPolicy),
+            abi.encodeWithSelector(IWithdrawalPolicy.previewWithdrawal.selector),
+            abi.encode(iouAmountRay, 1)
         );
 
         uint256 actualWithdrawnAssets = iouAmountRay.rayToAssetDecimals(address(mockAsset));
