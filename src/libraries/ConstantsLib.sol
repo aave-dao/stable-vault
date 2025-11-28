@@ -19,9 +19,4 @@ library ConstantsLib {
 
     /// @dev Maximum number of decimals for a token supported by the system.
     uint8 internal constant MAX_SUPPORTED_ASSET_DECIMALS = 18;
-
-    /// @dev Minimum share quantity that a user can have on their position.
-    /// @dev When a users position migrates from  This protects the users position shares from depleting to 0 after
-    /// dividing.
-    uint256 internal constant MIN_SHARES_QUANTITY = 1e9;
 }

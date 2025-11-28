@@ -24,7 +24,6 @@ import {MockFundsHandler} from "../../mocks/MockFundsHandler.sol";
 import {MockIouTokenManager} from "../../mocks/MockIouTokenManager.sol";
 import {MockNonStandardErc20} from "../../mocks/MockNonStandardErc20.sol";
 import {MockTransferHelper} from "../../mocks/MockTransferHelper.sol";
-import {console} from "forge-std/console.sol";
 
 contract BasedBoostedVaultTest is TestWithHelpers {
     using MathLib for uint256;
@@ -481,6 +480,58 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.prank(manager);
         vm.expectRevert(IBasedBoostedVault.RedundantRate.selector);
         _setUserRate(user, currentRate);
+    }
+
+    function test_setUserRate_smallConversionRateToLargeConversionRate() public {
+        // Override bbv with a low default sub-vault rate
+        bbv = _deployBasedBoostedVault(
+            address(mockAccessManager),
+            DEFAULT_MAX_PER_SECOND_RATE,
+            MathLib.RAY,
+            address(mockIouTokenManager),
+            address(mockFundsHandler),
+            address(mockAssetRegistry),
+            address(mockTransferHelper),
+            address(withdrawalFeeCalculator)
+        );
+        mockAsset = IMockErc20(address(new MockNonStandardErc20("Test GHO", "tGHO", 18)));
+
+        uint256 newRate = 1000000005781378656804591713; // ~20% APY
+
+        address user1 = makeAddr("user1");
+        address user2 = makeAddr("user2");
+        uint256 amount = 1;
+
+        // Deposit from a user and move them into a new sub-vault to create the sub-vault
+        mockAsset.mint(user1, amount);
+
+        vm.prank(user1);
+        mockAsset.forceApprove(address(bbv), amount);
+
+        vm.prank(user1);
+        bbv.deposit(user1, address(mockAsset), amount);
+
+        IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](1);
+        userRateData[0] = IBasedBoostedVault.UserRateData(user1, newRate);
+        vm.prank(manager);
+        bbv.setUserRate(userRateData);
+
+        // Warp a long time to allow the conversion rate of the new sub-vault to grow.
+        vm.warp(115 * 365 days);
+
+        // User 2 deposits and has their position migrated to the new sub-vault
+        mockAsset.mint(user2, amount);
+        vm.prank(user2);
+        mockAsset.forceApprove(address(bbv), amount);
+        vm.prank(user2);
+        bbv.deposit(user2, address(mockAsset), amount);
+
+        vm.prank(manager);
+        userRateData = new IBasedBoostedVault.UserRateData[](1);
+        userRateData[0] = IBasedBoostedVault.UserRateData(user2, newRate);
+        // Check this reverts because the user would end up with 0 shares in the new sub-vault.
+        vm.expectRevert(ErrorsLib.InvalidAmount.selector);
+        bbv.setUserRate(userRateData);
     }
 
     function test_setUserRate_twoUsersWithSameRateLandsInTheSameSubVault(
@@ -1324,7 +1375,6 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     /// - At withdrawal: actualAmount = floor(shares * C / RAY)
     /// - Due to double rounding: actualAmount < D when D is not perfectly divisible by (C / RAY)
     function test_requestWithdrawal_roundingCausesUserToLosePrincipal() public {
-        // ==================== SETUP ====================
         address user = makeAddr("testUser");
         MockErc20 ghoToken = new MockErc20("GHO", "GHO", 18);
 
@@ -1344,7 +1394,6 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         // Warp 1 second so conversionRate accrues to 1.5 * RAY
         vm.warp(block.timestamp + 1);
 
-        // ==================== DEPOSIT ====================
         uint256 depositAmount = 1e18; // 1 token
         uint256 originalDepositRay = depositAmount.assetDecimalsToRay(address(ghoToken)); // 1e27
 
@@ -1354,7 +1403,6 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.prank(user);
         highRateVault.deposit(user, address(ghoToken), depositAmount);
 
-        // ==================== VERIFY THE EDGE CASE EXISTS ====================
         // Calculate what the contract will compute:
         uint256 conversionRate = highRate; // 1.5e27 after 1 second of accrual
 
@@ -1371,14 +1419,6 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             "Edge case not demonstrated: actualAmount >= originalDeposit"
         );
 
-        // Log the exact values for clarity
-        console.log("originalDepositRay:", originalDepositRay);
-        console.log("conversionRate:", conversionRate);
-        console.log("shares:", shares);
-        console.log("actualAmountOfWithdrawalRay:", actualAmountOfWithdrawalRay);
-        console.log("LOSS (originalDeposit - actualAmount):", originalDepositRay - actualAmountOfWithdrawalRay);
-
-        // ==================== WITHDRAWAL WITH FIX ====================
         // The fix ensures user gets at least their originalDeposit back:
         //   if (actualAmountOfWithdrawalRay < originalDepositRay) {
         //       actualAmountOfWithdrawalRay = originalDepositRay;
@@ -1423,22 +1463,16 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         // Calculate conversionRate after 1 second
         uint256 expectedConversionRate = MathLib.RAY.rayMulDown(twentyPercentApy.rpow(1));
-        console.log("conversionRate after 1 second:", expectedConversionRate);
-        console.log("RAY:", MathLib.RAY);
-        console.log("conversionRate > RAY:", expectedConversionRate > MathLib.RAY);
 
         // Deposit 1 smallest unit (= 1 Ray for 27-decimal token)
         uint256 depositAmount = 1; // 1 smallest unit
         uint256 amountInRay = depositAmount.assetDecimalsToRay(address(highDecimalToken));
-        console.log("amountInRay:", amountInRay);
 
         // Verify that shares will be 0
         // shares = floor(1 * RAY / conversionRate) = floor(1e27 / 1.0000000057...e27) = 0
         uint256 expectedShares = amountInRay.rayDivDown(expectedConversionRate);
-        console.log("expectedShares:", expectedShares);
         assertEq(expectedShares, 0, "Edge case not demonstrated: shares != 0");
 
-        // ==================== WITH FIX: DEPOSIT REVERTS EARLY ====================
         // The fix: require(shares > 0, ErrorsLib.InvalidAmount());
         // Deposit should revert instead of silently accepting 0 shares
         highDecimalToken.mint(user, depositAmount);

@@ -16,7 +16,6 @@ import {IIouTokenManager} from "../interfaces/IIouTokenManager.sol";
 import {ITransferHelper} from "../interfaces/ITransferHelper.sol";
 import {IWithdrawalFeeCalculator} from "../interfaces/IWithdrawalFeeCalculator.sol";
 import {AssetLib} from "../libraries/AssetLib.sol";
-import {ConstantsLib} from "../libraries/ConstantsLib.sol";
 import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 import {MathLib} from "../libraries/MathLib.sol";
 
@@ -176,9 +175,6 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
 
         $storage().subVaultById[subVaultId].totalShares += shares;
         $storage().positions[user].shares += shares;
-        // Require user position to have minimum share threshold to avoid sub-vault migration leading to depleting of
-        // shares to 0 (sub-vault migration uses a calculation which divides the users current shares).
-        require($storage().positions[user].shares >= ConstantsLib.MIN_SHARES_QUANTITY, ErrorsLib.InvalidAmount());
         $storage().positions[user].originalDepositRay += amountInRay;
         $storage().globalOriginalDepositsRay += amountInRay;
 
@@ -231,8 +227,6 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         // There is no overlap between original deposits and circulating IOUs because original deposits are decremented
         // when new issue IOUs are minted.
         uint256 guaranteedObligationsRay = _getIousInCirculation() + $storage().globalOriginalDepositsRay;
-        // This can underflow if Earning chain(s) have not sent back the balance update and user positions have been
-        // removed (they've claimed IOUs).
         uint256 globalWithdrawableInterestRay =
             totalAssetsRay > guaranteedObligationsRay ? totalAssetsRay - guaranteedObligationsRay : 0;
         uint256 withdrawalRequestInterestRay = actualAmountInRay - guaranteedAmountRay;
@@ -412,7 +406,9 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         uint256 userOldShares = $storage().positions[user].shares;
         // Round down the amount of shares after sub-vault migration, so that the rounding is in favor of the protocol.
         uint256 userNewShares = userOldShares.rayMulDown(oldConversionRate).rayDivDown(newConversionRate);
-        // 1e9 * 1e27 / 1e36
+        // Do not allow the user position share quantity to deplete to zero which can happen if a user has a small
+        // userOldShares quantity and newConversionRate is large.
+        require(userNewShares > 0, ErrorsLib.InvalidAmount());
 
         if (!_isActiveSubVaultById(newSubVaultId)) {
             _addSubVaultToActive(newSubVaultId);
@@ -505,15 +501,10 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         uint256 subVaultId = $storage().positions[user].subVaultId;
         uint256 conversionRate = $storage().subVaultById[subVaultId].conversionRate;
 
-        // Round up the amount of shares to redeem for the requested amount of assets, so that the rounding is
-        // in favor of the protocol.
+        // Round up the amount of shares to redeem (burn on the position) for the requested amount of assets, so that
+        // the rounding is in favor of the protocol.
         uint256 sharesToRedeem = requestedAmountInRay.rayDivUp(conversionRate);
-        // Do not allow the user position share quantity after the withdrawal to drop below the minimum share threshold.
-        // If this happens then the user is exepcted to just perform a full withdrawal.
-        require(
-            sharesToRedeem <= $storage().positions[user].shares - ConstantsLib.MIN_SHARES_QUANTITY,
-            ErrorsLib.InvalidAmount()
-        );
+        require(sharesToRedeem <= $storage().positions[user].shares, ErrorsLib.InvalidAmount());
         _burnShares(user, sharesToRedeem);
         uint256 amountTakenFromOriginalDepositRay = _decrementOriginalDeposit(user, requestedAmountInRay);
 
