@@ -1139,31 +1139,26 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         assertEq(actualWithdrawalAmountRay, expectedIouTokens);
     }
 
-    // TODO: Implement tests after we decide which event are we going to use. This one requires calculation of shares.
-    // function test_requestWithdrawal_emitsExpectedEvent(
-    //     address user,
-    //     uint256 depositAmount,
-    //     uint256 withdrawalAmountRay
-    // ) public {
-    //     vm.assume(user != address(0));
-    //     vm.assume(user != address(mockFundsHandler));
-    //     _assumeNotProxyAdmin(user, address(bbv));
-    //     depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
-    //     _deposit(user, depositAmount);
-    //     vm.assume(withdrawalAmountRay < depositAmount.assetDecimalsToRay(address(mockAsset)));
+    function test_requestWithdrawal_emitsExpectedEvent(address user, uint256 depositAmount, uint256 withdrawalAmountRay)
+        public
+    {
+        vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
+        _assumeNotProxyAdmin(user, address(bbv));
+        depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
+        _deposit(user, depositAmount);
+        vm.assume(withdrawalAmountRay < depositAmount.assetDecimalsToRay(address(mockAsset)));
 
-    //     mockFundsHandler.mockAggregatedBalance(depositAmount);
+        mockFundsHandler.mockAggregatedBalance(depositAmount);
 
-    //     uint256 actualWithdrawalAmount = withdrawalAmountRay == 0 ? bbv.getUserBalance(user) : withdrawalAmountRay;
+        uint256 actualWithdrawalAmount = withdrawalAmountRay == 0 ? bbv.getUserBalance(user) : withdrawalAmountRay;
 
-    //     vm.expectEmit(true, true, true, true);
-    //     emit IBasedBoostedVault.WithdrawalRequestedWithShares(
-    //         user, subVaultId, redeemedShares, actualWithdrawalAmount, guaranteedAmountRay
-    //     );
+        vm.expectEmit(true, true, true, true);
+        emit IBasedBoostedVault.WithdrawalRequested(user, 1, actualWithdrawalAmount, actualWithdrawalAmount);
 
-    //     vm.prank(user);
-    //     bbv.requestWithdrawal(user, withdrawalAmountRay);
-    // }
+        vm.prank(user);
+        bbv.requestWithdrawal(user, withdrawalAmountRay);
+    }
 
     function test_requestWithdrawal_returnsExpectedAmount(
         address user,

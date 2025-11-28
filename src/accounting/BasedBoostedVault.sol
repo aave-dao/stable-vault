@@ -239,7 +239,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
 
         _mintIous(user, actualAmountInRay);
 
-        emit WithdrawalRequestedWithShares(user, subVaultId, redeemedShares, actualAmountInRay, guaranteedAmountRay);
+        emit WithdrawalRequested(user, subVaultId, actualAmountInRay, guaranteedAmountRay);
         return actualAmountInRay;
     }
 
