@@ -286,7 +286,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         // The assertion is: assert(actualAmountOfWithdrawalRay >= originalDepositRay)
         // With our values: ~0.999e27 >= 1e27 is FALSE
         vm.prank(user);
-        highRateVault.requestWithdrawal(user, 0); // 0 = full withdrawal
+        uint256 iouTokenAmount = highRateVault.requestWithdrawal(user, 0); // 0 = full withdrawal
+        assertEq(iouTokenAmount, depositAmount.assetDecimalsToRay(address(ghoToken)));
     }
 
     function test_deposit_firstUserDepositGoesToDefaultSubVault(address user, uint256 amount) public {
