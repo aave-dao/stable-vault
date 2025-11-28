@@ -16,6 +16,7 @@ import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 /// @dev This contract does not take ownership of the fee. It is expected the client of this contract takes the fee
 /// returned by this contract.
 contract WithdrawalFeeCalculator is AccessManaged, EIP712, IWithdrawalFeeCalculator {
+    // TODO: Consider replacing this with a constant
     bytes32 public constant WITHDRAWAL_FEE_TYPEHASH =
         keccak256("WithdrawalFee(address user,address assetOut,uint256 iouAmountRay,uint256 personalFee)");
 
@@ -73,8 +74,10 @@ contract WithdrawalFeeCalculator is AccessManaged, EIP712, IWithdrawalFeeCalcula
         returns (uint256)
     {
         if (data.length > 0) {
-            // Is there a personal fee?
+            // There is a personal fee.
             (uint256 personalFeeBps, bytes memory signature) = abi.decode(data, (uint256, bytes));
+            // Personal fee cannot be higher than non-personal one (asset-specific or basic, whatever is applied by
+            // default).
             if ($storage().feeBpsConfigByAsset[assetOut].isSet) {
                 require(personalFeeBps <= $storage().feeBpsConfigByAsset[assetOut].feeBps, ErrorsLib.InvalidParameter());
             } else {
@@ -83,10 +86,10 @@ contract WithdrawalFeeCalculator is AccessManaged, EIP712, IWithdrawalFeeCalcula
             _validateSignature(user, assetOut, iouAmountRay, personalFeeBps, signature);
             return iouAmountRay * personalFeeBps / ConstantsLib.MAX_BPS;
         } else if ($storage().feeBpsConfigByAsset[assetOut].isSet) {
-            // Is there an asset-specific fee?
+            // There is an asset-specific fee - we apply it.
             return iouAmountRay * $storage().feeBpsConfigByAsset[assetOut].feeBps / ConstantsLib.MAX_BPS;
         } else {
-            // There's no personal or asset-specific fee, so it's the basic fee.
+            // There's no personal or asset-specific fee, so we apply the default basic fee.
             return iouAmountRay * $storage().basicFeeBps / ConstantsLib.MAX_BPS;
         }
     }
@@ -95,6 +98,8 @@ contract WithdrawalFeeCalculator is AccessManaged, EIP712, IWithdrawalFeeCalcula
 
     /// @inheritdoc IWithdrawalFeeCalculator
     function setAssetFeeBps(address asset, uint256 newAssetFeeBps, bool isSet) external override restricted {
+        // We don't check for new asset fee being less than the basic fee because maybe we want some specific asset to
+        // have a higher fee than the basic fee.
         require(newAssetFeeBps <= ConstantsLib.MAX_BPS, ErrorsLib.InvalidParameter());
         // forge-lint: disable-next-line(unsafe-typecast)
         $storage().feeBpsConfigByAsset[asset].feeBps = uint16(newAssetFeeBps);
@@ -103,8 +108,7 @@ contract WithdrawalFeeCalculator is AccessManaged, EIP712, IWithdrawalFeeCalcula
 
     /// @inheritdoc IWithdrawalFeeCalculator
     function setBasicFeeBps(uint256 newBasicFeeBps) external override restricted {
-        // TODO: We cannot verify that this wouldn't suddenly become less than any of the asset-specific fees.
-        // But should we?
+        require(newBasicFeeBps <= ConstantsLib.MAX_BPS, ErrorsLib.InvalidParameter());
         $storage().basicFeeBps = newBasicFeeBps;
     }
 
