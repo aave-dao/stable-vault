@@ -22,8 +22,6 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
 
     uint256 internal immutable ACCOUNTING_CHAIN_ID;
     address internal immutable ALLOCATOR;
-    // TODO: remove asset registry
-    address internal immutable ASSET_REGISTRY;
     address internal immutable WITHDRAWAL_POLICY;
 
     /// @custom:storage-location erc7201:aave.storage.EarningChainGateway
@@ -43,13 +41,13 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
 
     /// @dev Constructor.
     /// @param accountingChainId The Chain ID of the Accounting Chain.
-    /// @param allocator The address of the Allocator contract.
-    /// @param assetRegistry The address of the AssetRegistry contract.
-    /// @param iouTokenManager The address of the IOU token manager contract.
+    /// @param allocator Address of the Allocator contract.
+    /// @param iouTokenManager Address of the IOU token manager contract used to mint and burn bridged or exchanged IOU tokens.
+    /// @param transferHelper Address of the TransferHelper contract used to transfer assets across components.
+    /// @param withdrawalPolicy Address of the WithdrawalPolicy contract used to check withdrawal policies and fees.
     constructor(
         uint256 accountingChainId,
         address allocator,
-        address assetRegistry,
         address iouTokenManager,
         address transferHelper,
         address withdrawalPolicy
@@ -57,7 +55,6 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
         _disableInitializers();
         ACCOUNTING_CHAIN_ID = accountingChainId;
         ALLOCATOR = allocator;
-        ASSET_REGISTRY = assetRegistry;
         WITHDRAWAL_POLICY = withdrawalPolicy;
     }
 

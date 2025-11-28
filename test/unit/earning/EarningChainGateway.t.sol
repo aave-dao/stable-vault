@@ -56,7 +56,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
     function _deployEarningChainGateway(
         MockAccessManager mockAccessManager,
-        address assetRegistry,
         address iouTokenManager,
         address allocator,
         address transferHelper,
@@ -64,7 +63,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     ) internal returns (EarningChainGateway) {
         address earningChainGatewayImpl = address(
             new EarningChainGateway(
-                ACCOUNTING_CHAIN_ID, allocator, assetRegistry, iouTokenManager, transferHelper, withdrawalPolicy
+                ACCOUNTING_CHAIN_ID, allocator, iouTokenManager, transferHelper, withdrawalPolicy
             )
         );
         EarningChainGateway earningChainGateway = EarningChainGateway(
@@ -121,7 +120,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         _earningChainGateway = _deployEarningChainGateway(
             _mockAccessManager,
-            address(_mockAssetRegistry),
             address(_mockIouTokenManager),
             address(_mockAllocator),
             address(_mockTransferHelper),

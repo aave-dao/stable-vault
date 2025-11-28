@@ -624,7 +624,6 @@ contract BaseTest is Test {
             new EarningChainGateway(
                 ACCOUNTING_CHAIN_ID,
                 allocator_earningChainAddress,
-                assetRegistry_earningChainAddress,
                 iouTokenManager_earningChainAddress,
                 transferHelper_earningChainAddress,
                 address(withdrawalPolicy_earningChain)
