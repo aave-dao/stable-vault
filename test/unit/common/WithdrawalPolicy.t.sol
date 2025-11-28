@@ -131,7 +131,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
     // Calculation tests
 
-    function test_calculateWithdrawalFee_returnsBaseFee(
+    function test_previewWithdrawal_returnsBaseFee(
         address user,
         address assetOut,
         uint256 iouAmountRay,
@@ -155,7 +155,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         assertEq(actualFeeBps, baseFeeBps);
     }
 
-    function test_calculateWithdrawalFee_returnsAssetFee(
+    function test_previewWithdrawal_returnsAssetFee(
         address user,
         address assetOut,
         uint256 iouAmountRay,
@@ -187,7 +187,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         assertEq(actualFee, expectedFee);
     }
 
-    function test_calculateWithdrawalFee_returnsPersonalFee(
+    function test_previewWithdrawal_returnsPersonalFee(
         address user,
         address assetOut,
         uint256 iouAmountRay,
@@ -235,7 +235,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         assertEq(actualFee, expectedFee);
     }
 
-    function test_calculateWithdrawalFee_reverts_ifPersonalFeeExceedsOtherFees(
+    function test_previewWithdrawal_reverts_ifPersonalFeeExceedsOtherFees(
         address user,
         address assetOut,
         uint256 iouAmountRay,
@@ -280,7 +280,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         withdrawalPolicy.previewWithdrawal(user, assetOut, iouAmountRay, data);
     }
 
-    function test_calculateWithdrawalFee_reverts_ifSignerIsNotWhitelisted(
+    function test_previewWithdrawal_reverts_ifSignerIsNotWhitelisted(
         address user,
         address assetOut,
         uint256 iouAmountRay,
@@ -311,7 +311,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         withdrawalPolicy.previewWithdrawal(user, assetOut, iouAmountRay, data);
     }
 
-    function test_calculateWithdrawalFee_reverts_ifSignatureIsForDifferentUser(
+    function test_previewWithdrawal_reverts_ifSignatureIsForDifferentUser(
         address user,
         address wrongUser,
         address assetOut,
@@ -342,7 +342,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         withdrawalPolicy.previewWithdrawal(user, assetOut, iouAmountRay, data);
     }
 
-    function test_calculateWithdrawalFee_reverts_ifSignatureIsForDifferentAsset(
+    function test_previewWithdrawal_reverts_ifSignatureIsForDifferentAsset(
         address user,
         address assetOut,
         address wrongAssetOut,
@@ -373,7 +373,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         withdrawalPolicy.previewWithdrawal(user, assetOut, iouAmountRay, data);
     }
 
-    function test_calculateWithdrawalFee_reverts_ifSignatureIsForDifferentAmount(
+    function test_previewWithdrawal_reverts_ifSignatureIsForDifferentAmount(
         address user,
         address assetOut,
         uint256 iouAmountRay,
@@ -406,7 +406,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         withdrawalPolicy.previewWithdrawal(user, assetOut, iouAmountRay, data);
     }
 
-    function test_calculateWithdrawalFee_reverts_ifSignatureIsForDifferentPersonalFee(
+    function test_previewWithdrawal_reverts_ifSignatureIsForDifferentPersonalFee(
         address user,
         address assetOut,
         uint256 iouAmountRay,
@@ -439,7 +439,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         withdrawalPolicy.previewWithdrawal(user, assetOut, iouAmountRay, data);
     }
 
-    function test_calculateWithdrawalFee_reverts_ifSignatureIsMalformed(
+    function test_previewWithdrawal_reverts_ifSignatureIsMalformed(
         address user,
         address assetOut,
         uint256 iouAmountRay,
@@ -465,6 +465,15 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         bytes memory data = abi.encode(personalFeeBps, malformedSignature);
         vm.expectRevert();
         withdrawalPolicy.previewWithdrawal(user, assetOut, iouAmountRay, data);
+    }
+
+    function test_previewWithdrawal_reverts_ifAssetIsNotSupported(address user, address assetOut, uint256 iouAmountRay)
+        public
+    {
+        mockAssetRegistry.mockToDisallowAssetWithdrawals(assetOut);
+
+        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, assetOut));
+        withdrawalPolicy.previewWithdrawal(user, assetOut, iouAmountRay, "");
     }
 
     function _signPersonalFee(
