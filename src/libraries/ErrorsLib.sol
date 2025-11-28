@@ -42,6 +42,7 @@ library ErrorsLib {
     error NativeTransferFailed();
 
     /// @notice Thrown when input parameter contains unacceptable value.
+    /// @custom:selector 0x613970e0
     error InvalidParameter();
 
     /// @notice Thrown when caller is not authorized.

@@ -4,15 +4,18 @@ pragma solidity ^0.8.22;
 import {
     AccessManagedUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import {IAssetRegistry} from "../interfaces/IAssetRegistry.sol";
-
-// TODO: should we extend multicall to allow disabling deposits for mulitple assets?
+import {Multicall} from "../utils/Multicall.sol";
+import {ConstantsLib} from "../libraries/ConstantsLib.sol";
+import {ErrorsLib} from "../libraries/ErrorsLib.sol";
 
 /// @title AssetRegistry
 /// @author Aave Labs
 /// @notice AssetRegistry contract for managing asset configurations.
-contract AssetRegistry is AccessManagedUpgradeable, IAssetRegistry {
+/// @dev Inherits from Multicall to allow disabling deposits for multiple assets in a single call.
+contract AssetRegistry is AccessManagedUpgradeable, Multicall, IAssetRegistry {
     /// @custom:storage-location erc7201:aave.storage.AssetRegistry
     struct AssetRegistryStorage {
         mapping(address asset => AssetConfig config) configByAsset;
@@ -48,8 +51,13 @@ contract AssetRegistry is AccessManagedUpgradeable, IAssetRegistry {
     }
 
     /// @inheritdoc IAssetRegistry
-    // TODO: Require asset::decimals to be <= 18
     function setAssetConfig(address asset, AssetConfig memory config) external override restricted {
+        uint8 assetDecimals = IERC20Metadata(asset).decimals();
+        if (assetDecimals < 1 || assetDecimals > ConstantsLib.MAX_SUPPORTED_ASSET_DECIMALS) {
+            // The system assumes a 9 decimal place (27 - 18) margin for the BasedBoostedVault conversion rate
+            // precision.
+            revert ErrorsLib.InvalidAsset(asset);
+        }
         $storage().configByAsset[asset] = config;
         emit AssetConfigSet(asset, config);
     }
