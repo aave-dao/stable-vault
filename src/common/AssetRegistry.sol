@@ -52,12 +52,10 @@ contract AssetRegistry is AccessManagedUpgradeable, Multicall, IAssetRegistry {
 
     /// @inheritdoc IAssetRegistry
     function setAssetConfig(address asset, AssetConfig memory config) external override restricted {
-        uint8 assetDecimals = IERC20Metadata(asset).decimals();
-        if (assetDecimals < 1 || assetDecimals > ConstantsLib.MAX_SUPPORTED_ASSET_DECIMALS) {
-            // The system assumes a 9 decimal place (27 - 18) margin for the BasedBoostedVault conversion rate
-            // precision.
-            revert ErrorsLib.InvalidAsset(asset);
-        }
+        // The system uses RAY Math (27 decimals), so we leave a 9-decimal place (27 - 18) margin for better precision.
+        require(
+            IERC20Metadata(asset).decimals() <= ConstantsLib.MAX_SUPPORTED_ASSET_DECIMALS, ErrorsLib.InvalidAsset(asset)
+        );
         $storage().configByAsset[asset] = config;
         emit AssetConfigSet(asset, config);
     }
