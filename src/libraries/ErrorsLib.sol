@@ -37,13 +37,13 @@ library ErrorsLib {
     /// @custom:selector 0x90eaaa70
     error InvalidDestinationChainId();
 
-    /// @notice Thrown when native currency transfer failed.
-    /// @custom:selector 0xf4b3b1bc
-    error NativeTransferFailed();
-
     /// @notice Thrown when input parameter contains unacceptable value.
     /// @custom:selector 0x613970e0
     error InvalidParameter();
+
+    /// @notice Thrown when native currency transfer failed.
+    /// @custom:selector 0xf4b3b1bc
+    error NativeTransferFailed();
 
     /// @notice Thrown when caller is not authorized.
     /// @custom:selector 0xea8e4eb5
