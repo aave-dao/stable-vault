@@ -78,7 +78,7 @@ contract WithdrawalPolicy is AccessManaged, EIP712, IWithdrawalPolicy {
     }
 
     /// @inheritdoc IWithdrawalPolicy
-    function previewWithdrawal(address user, address assetOut, uint256 iouAmountRay, bytes memory data)
+    function evaluateWithdrawal(address user, address assetOut, uint256 iouAmountRay, bytes memory data)
         external
         view
         override

@@ -254,7 +254,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         require(user == msg.sender, OnlyUser());
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(user, iouAmountRay);
         (uint256 withdrawalFeeRay,) =
-            IWithdrawalPolicy(WITHDRAWAL_POLICY).previewWithdrawal(user, assetOut, iouAmountRay, data);
+            IWithdrawalPolicy(WITHDRAWAL_POLICY).evaluateWithdrawal(user, assetOut, iouAmountRay, data);
         uint256 assetAmount = (iouAmountRay - withdrawalFeeRay).rayToAssetDecimals(assetOut);
         require(assetAmount > 0, ErrorsLib.InsufficientAmountOut());
         IFundsHandler(FUNDS_HANDLER).processWithdrawal(assetOut, assetAmount);

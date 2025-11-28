@@ -1324,7 +1324,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         vm.mockCall(
             address(mockWithdrawalPolicy),
-            abi.encodeWithSelector(IWithdrawalPolicy.previewWithdrawal.selector),
+            abi.encodeWithSelector(IWithdrawalPolicy.evaluateWithdrawal.selector),
             abi.encode(iouAmountRay, 1)
         );
 

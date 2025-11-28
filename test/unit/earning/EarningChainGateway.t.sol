@@ -805,7 +805,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         vm.mockCall(
             address(_mockWithdrawalPolicy),
-            abi.encodeWithSelector(IWithdrawalPolicy.previewWithdrawal.selector),
+            abi.encodeWithSelector(IWithdrawalPolicy.evaluateWithdrawal.selector),
             abi.encode(withdrawalFeeRay, 1)
         );
 
