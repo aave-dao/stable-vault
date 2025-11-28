@@ -2,7 +2,8 @@
 pragma solidity ^0.8.20;
 
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
-import {IMockErc20} from "src/interfaces/MockErc20.sol";
+import {IMockErc20} from "test/mocks/MockErc20.sol";
+
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
 
 contract MockTransferHelper is ITransferHelper, TransferHelper {
