@@ -101,10 +101,6 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         }
     }
 
-    function $BasedBoostedVault() internal pure returns (BasedBoostedVaultStorage storage) {
-        return $storage();
-    }
-
     /// @dev Constructor.
     /// @param maxValidPerSecondRate The maximum valid per-second rate, in Ray units (27 decimals).
     /// @param iouTokenManager The address of the IOU token manager.

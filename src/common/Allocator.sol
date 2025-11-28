@@ -68,10 +68,6 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, IAllocator
         }
     }
 
-    function $Allocator() internal pure returns (AllocatorStorage storage) {
-        return $storage();
-    }
-
     modifier onlyDepositor() {
         require(msg.sender == DEPOSITOR, ErrorsLib.AddressNotWhitelisted());
         _;
