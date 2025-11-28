@@ -62,9 +62,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         address withdrawalPolicy
     ) internal returns (EarningChainGateway) {
         address earningChainGatewayImpl = address(
-            new EarningChainGateway(
-                ACCOUNTING_CHAIN_ID, allocator, iouTokenManager, transferHelper, withdrawalPolicy
-            )
+            new EarningChainGateway(ACCOUNTING_CHAIN_ID, allocator, iouTokenManager, transferHelper, withdrawalPolicy)
         );
         EarningChainGateway earningChainGateway = EarningChainGateway(
             address(
