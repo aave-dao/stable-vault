@@ -130,9 +130,10 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
             $BaseChainGateway().defaultBridgeAdapter[ConstantsLib.ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID];
         require(adapter != address(0), AdapterNotFound());
 
-        uint256 withdrawalFee = IWithdrawalFeeCalculator(WITHDRAWAL_FEE_CALCULATOR)
+        uint256 withdrawalFeeRay = IWithdrawalFeeCalculator(WITHDRAWAL_FEE_CALCULATOR)
             .calculateWithdrawalFee(msg.sender, tokenOut, iouTokenAmountRay, data);
-        uint256 amountOut = (iouTokenAmountRay - withdrawalFee).rayToAssetDecimals(tokenOut);
+        uint256 amountOut = (iouTokenAmountRay - withdrawalFeeRay).rayToAssetDecimals(tokenOut);
+        require(amountOut > 0, ErrorsLib.InsufficientAmountOut());
         IAllocator(ALLOCATOR).withdraw(tokenOut, amountOut);
         ITransferHelper(TRANSFER_HELPER).transfer(tokenOut, amountOut, tokenOutReceiver);
 

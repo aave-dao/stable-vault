@@ -7,7 +7,6 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transpa
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {BasedBoostedVault} from "../../../src/accounting/BasedBoostedVault.sol";
-import {WithdrawalFeeCalculator} from "../../../src/common/WithdrawalFeeCalculator.sol";
 import {IBasedBoostedVault} from "../../../src/interfaces/IBasedBoostedVault.sol";
 import {IFundsHandler} from "../../../src/interfaces/IFundsHandler.sol";
 import {IRescuableAssets} from "../../../src/interfaces/IRescuableAssets.sol";
@@ -24,6 +23,7 @@ import {MockFundsHandler} from "../../mocks/MockFundsHandler.sol";
 import {MockIouTokenManager} from "../../mocks/MockIouTokenManager.sol";
 import {MockNonStandardErc20} from "../../mocks/MockNonStandardErc20.sol";
 import {MockTransferHelper} from "../../mocks/MockTransferHelper.sol";
+import {MockWithdrawalFeeCalculator} from "../../mocks/MockWithdrawalFeeCalculator.sol";
 
 contract BasedBoostedVaultTest is TestWithHelpers {
     using MathLib for uint256;
@@ -41,7 +41,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     MockIouTokenManager mockIouTokenManager;
     MockAssetRegistry mockAssetRegistry;
     MockTransferHelper mockTransferHelper;
-    WithdrawalFeeCalculator withdrawalFeeCalculator;
+    MockWithdrawalFeeCalculator mockWithdrawalFeeCalculator;
     IBasedBoostedVault bbv;
 
     function _deployDefaultAsset() internal returns (IMockErc20) {
@@ -88,7 +88,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockAsset = _deployDefaultAsset();
         mockTransferHelper = new MockTransferHelper();
         mockFundsHandler = new MockFundsHandler(address(mockTransferHelper));
-        withdrawalFeeCalculator = new WithdrawalFeeCalculator(admin);
+        mockWithdrawalFeeCalculator = new MockWithdrawalFeeCalculator();
         bbv = _deployBasedBoostedVault(
             address(mockAccessManager),
             DEFAULT_MAX_PER_SECOND_RATE,
@@ -97,7 +97,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(withdrawalFeeCalculator)
+            address(mockWithdrawalFeeCalculator)
         );
     }
 
@@ -118,7 +118,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             expectedIouManager,
             expectedFundsHandler,
             expectedTransferHelper,
-            address(withdrawalFeeCalculator)
+            address(mockWithdrawalFeeCalculator)
         );
 
         assertEq(newBbv.getMaxValidPerSecondRate(), expectedMaxValidPerSecondRate);
@@ -134,7 +134,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockIouTokenManager),
             address(mockFundsHandler),
             address(mockTransferHelper),
-            address(withdrawalFeeCalculator)
+            address(mockWithdrawalFeeCalculator)
         );
     }
 
@@ -154,7 +154,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
                 address(mockIouTokenManager),
                 address(mockFundsHandler),
                 address(mockTransferHelper),
-                address(withdrawalFeeCalculator)
+                address(mockWithdrawalFeeCalculator)
             )
         );
 
@@ -183,7 +183,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
                 address(mockIouTokenManager),
                 address(mockFundsHandler),
                 address(mockTransferHelper),
-                address(withdrawalFeeCalculator)
+                address(mockWithdrawalFeeCalculator)
             )
         );
 
@@ -254,7 +254,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(withdrawalFeeCalculator)
+            address(mockWithdrawalFeeCalculator)
         );
 
         // IMPORTANT: Warp time AFTER vault creation so that conversionRate accrues
@@ -495,7 +495,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(withdrawalFeeCalculator)
+            address(mockWithdrawalFeeCalculator)
         );
         mockAsset = IMockErc20(address(new MockNonStandardErc20("Test GHO", "tGHO", 18)));
 
@@ -1269,6 +1269,35 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         bbv.executeWithdrawal(user, address(mockAsset), iouAmountRay, "");
     }
 
+    function test_executeWithdrawal_reverts_ifAssetAmountIsZero_fromWithdrawalFee(
+        address user,
+        uint256 userIouBalance,
+        uint256 iouAmountRay
+    ) public {
+        vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
+        _assumeNotProxyAdmin(user, address(bbv));
+        userIouBalance = _boundRayAmountAllowingZero(userIouBalance);
+        iouAmountRay = _boundRayAmount(iouAmountRay);
+        vm.assume(iouAmountRay <= userIouBalance);
+        mockIouToken.mint(user, userIouBalance);
+        assertEq(mockIouToken.balanceOf(user), userIouBalance);
+        vm.assume(iouAmountRay.rayToAssetDecimals(address(mockAsset)) > 0);
+
+        vm.mockCall(
+            address(mockWithdrawalFeeCalculator),
+            abi.encodeWithSelector(MockWithdrawalFeeCalculator.calculateWithdrawalFee.selector),
+            abi.encode(iouAmountRay)
+        );
+
+        uint256 actualWithdrawnAssets = iouAmountRay.rayToAssetDecimals(address(mockAsset));
+        mockTransferHelper.mockAsset(address(mockAsset), actualWithdrawnAssets);
+
+        vm.prank(user);
+        vm.expectRevert(ErrorsLib.InsufficientAmountOut.selector);
+        bbv.executeWithdrawal(user, address(mockAsset), iouAmountRay, "");
+    }
+
     function test_executeWithdrawal_emitsExpectedEvent(address user, uint256 iouAmountRay) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
@@ -1277,6 +1306,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockIouToken.mint(user, iouAmountRay);
 
         uint256 actualWithdrawnAssets = iouAmountRay.rayToAssetDecimals(address(mockAsset));
+        vm.assume(actualWithdrawnAssets > 0);
         mockTransferHelper.mockAsset(address(mockAsset), actualWithdrawnAssets);
 
         vm.expectEmit(true, true, true, true);
@@ -1299,6 +1329,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(iouAmountRay <= userIouBalance);
         mockIouToken.mint(user, userIouBalance);
         assertEq(mockIouToken.balanceOf(user), userIouBalance);
+        vm.assume(iouAmountRay.rayToAssetDecimals(address(mockAsset)) > 0);
 
         uint256 actualWithdrawnAssets = iouAmountRay.rayToAssetDecimals(address(mockAsset));
         mockTransferHelper.mockAsset(address(mockAsset), actualWithdrawnAssets);
@@ -1315,6 +1346,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         _assumeNotProxyAdmin(user, address(bbv));
         iouAmountRay = _boundRayAmount(iouAmountRay);
         mockIouToken.mint(user, iouAmountRay);
+        vm.assume(iouAmountRay.rayToAssetDecimals(address(mockAsset)) > 0);
         vm.assume(mockAsset.balanceOf(user) == 0);
 
         uint256 actualWithdrawnAssets = iouAmountRay.rayToAssetDecimals(address(mockAsset));
@@ -1391,7 +1423,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(withdrawalFeeCalculator)
+            address(mockWithdrawalFeeCalculator)
         );
 
         // Warp 1 second so conversionRate accrues to 1.5 * RAY
@@ -1458,7 +1490,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(withdrawalFeeCalculator)
+            address(mockWithdrawalFeeCalculator)
         );
 
         // Warp just 1 second - conversionRate grows slightly above RAY

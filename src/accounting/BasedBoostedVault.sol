@@ -255,6 +255,7 @@ contract BasedBoostedVault is AccessManagedUpgradeable, RescuableAssets, Transfe
         uint256 withdrawalFeeRay = IWithdrawalFeeCalculator(WITHDRAWAL_FEE_CALCULATOR)
             .calculateWithdrawalFee(user, assetOut, iouAmountRay, data);
         uint256 assetAmount = (iouAmountRay - withdrawalFeeRay).rayToAssetDecimals(assetOut);
+        require(assetAmount > 0, ErrorsLib.InsufficientAmountOut());
         IFundsHandler(FUNDS_HANDLER).processWithdrawal(assetOut, assetAmount);
         ITransferHelper(TRANSFER_HELPER).transfer(assetOut, assetAmount, user);
         emit WithdrawalExecuted(user, assetOut, assetAmount);

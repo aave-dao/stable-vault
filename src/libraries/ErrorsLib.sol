@@ -17,7 +17,7 @@ library ErrorsLib {
     /// @custom:selector 0x3b6566d0
     error AssetAlreadySupported(address asset);
 
-    /// @notice Insufficient amount due to slippage tolerance being exceeded.
+    /// @notice Insufficient amount due to slippage/fee tolerance being exceeded.
     /// @custom:selector 0xe52970aa
     error InsufficientAmountOut();
 

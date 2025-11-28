@@ -8,7 +8,6 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transpa
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {WithdrawalFeeCalculator} from "../../../src/common/WithdrawalFeeCalculator.sol";
 import {EarningChainGateway} from "../../../src/earning/EarningChainGateway.sol";
 import {IAllocator} from "../../../src/interfaces/IAllocator.sol";
 import {IBridgeAdapter} from "../../../src/interfaces/IBridgeAdapter.sol";
@@ -27,6 +26,7 @@ import {MockDummyIouTokenManager} from "../../mocks/MockDummyIouTokenManager.sol
 import {IMockErc20} from "../../mocks/MockErc20.sol";
 import {MockNonStandardErc20} from "../../mocks/MockNonStandardErc20.sol";
 import {MockTransferHelper} from "../../mocks/MockTransferHelper.sol";
+import {MockWithdrawalFeeCalculator} from "../../mocks/MockWithdrawalFeeCalculator.sol";
 
 contract EarningChainGatewayTest is TestWithHelpers {
     using MathLib for uint256;
@@ -49,7 +49,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     MockDummyIouTokenManager internal _mockIouTokenManager;
     MockAssetRegistry internal _mockAssetRegistry;
     MockTransferHelper internal _mockTransferHelper;
-    WithdrawalFeeCalculator internal _withdrawalFeeCalculator;
+    MockWithdrawalFeeCalculator internal _mockWithdrawalFeeCalculator;
 
     EarningChainGateway internal _earningChainGateway;
 
@@ -116,7 +116,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         _mockAccessManager = new MockAccessManager(admin);
 
-        _withdrawalFeeCalculator = new WithdrawalFeeCalculator(admin);
+        _mockWithdrawalFeeCalculator = new MockWithdrawalFeeCalculator();
 
         _earningChainGateway = _deployEarningChainGateway(
             _mockAccessManager,
@@ -124,7 +124,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockIouTokenManager),
             address(_mockAllocator),
             address(_mockTransferHelper),
-            address(_withdrawalFeeCalculator)
+            address(_mockWithdrawalFeeCalculator)
         );
     }
 
@@ -520,6 +520,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         address tokenOut = address(_mockUsdt);
         uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(tokenOut);
+        vm.assume(amountOut > 0);
 
         // First exchange
         {
@@ -693,6 +694,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         vm.assume(bridgeFeePayer != address(0));
 
         address tokenOut = address(_mockUsdt);
+        vm.assume(iouTokenAmountRay.rayToAssetDecimals(tokenOut) > 0);
 
         IBridgeAdapter.BridgeParams memory bridgeParams;
         // Setup mocks and expectations
@@ -775,9 +777,62 @@ contract EarningChainGatewayTest is TestWithHelpers {
         );
     }
 
+    function test_exchangeIouTokens_reverts_ifZeroAssetOutAmmount_fromRayConversion() public {
+        // Converting this to 6 decimals will result in 0
+        uint256 iouTokenAmountRay = 1e20;
+
+        // Put funds idle into TH to mimic withdrawal from Allocator
+        //_mockTransferHelper.mockAsset(address(_mockUsdt), amountOut);
+
+        vm.expectRevert(ErrorsLib.InsufficientAmountOut.selector);
+        _earningChainGateway.exchangeIouTokens(
+            iouTokenAmountRay,
+            address(_mockUsdt),
+            makeAddr("tokenOutReceiver"),
+            IBridgeAdapter.BridgeParams({
+                feePayer: makeAddr("bridgeFeePayer"),
+                feeToken: address(0),
+                feeAmount: 0,
+                feeRefundThreshold: 0,
+                gasLimit: 100000,
+                data: abi.encode(keccak256(hex"c0ffee"))
+            }),
+            ""
+        );
+    }
+
+    function test_exchangeIouTokens_reverts_ifZeroAssetOutAmmount_fromWithdrawalFee() public {
+        // Converting this to 6 decimals will result in 1 unit withdrawal, but withdrawal fee is 1e21 so amount out is 0
+        uint256 iouTokenAmountRay = 1e21;
+        uint256 withdrawalFeeRay = 1e21;
+
+        vm.mockCall(
+            address(_mockWithdrawalFeeCalculator),
+            abi.encodeWithSelector(MockWithdrawalFeeCalculator.calculateWithdrawalFee.selector),
+            abi.encode(withdrawalFeeRay)
+        );
+
+        vm.expectRevert(ErrorsLib.InsufficientAmountOut.selector);
+        _earningChainGateway.exchangeIouTokens(
+            iouTokenAmountRay,
+            address(_mockUsdt),
+            makeAddr("tokenOutReceiver"),
+            IBridgeAdapter.BridgeParams({
+                feePayer: makeAddr("bridgeFeePayer"),
+                feeToken: address(0),
+                feeAmount: 0,
+                feeRefundThreshold: 0,
+                gasLimit: 100000,
+                data: abi.encode(keccak256(hex"c0ffee"))
+            }),
+            ""
+        );
+    }
+
     function test_exchangeIouTokens_reverts_ifInsufficientValueForNativeBridgeFee(uint256 iouTokenAmountRay) public {
         iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
         uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(address(_mockUsdt));
+        vm.assume(amountOut > 0);
         // Put funds idle into TH to mimic withdrawal from Allocator
         _mockTransferHelper.mockAsset(address(_mockUsdt), amountOut);
 
