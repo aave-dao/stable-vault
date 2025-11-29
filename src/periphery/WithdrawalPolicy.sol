@@ -112,7 +112,8 @@ contract WithdrawalPolicy is AccessManaged, EIP712, IWithdrawalPolicy {
     }
 
     /// @notice Sets the fallback fee in basis points which is used when a personal fee or asset-specific fee is not
-    /// available. @param newBasicFeeBps The fee in basis points applied to the IOU quantity being exchanged for the
+    /// available.
+    ///@param newBasicFeeBps The fee in basis points applied to the IOU quantity being exchanged for the
     /// asset.
     function setBasicFeeBps(uint16 newBasicFeeBps) external restricted {
         require(newBasicFeeBps <= ConstantsLib.MAX_BPS, ErrorsLib.InvalidParameter());
