@@ -65,14 +65,20 @@ contract WithdrawalPolicy is AccessManaged, EIP712, IWithdrawalPolicy {
         ASSET_REGISTRY = assetRegistry;
     }
 
+    /// @notice Returns the configuration for an asset-specific fee.
+    /// @param asset Address of the asset to get the configuration for.
     function getAssetFeeBpsConfig(address asset) external view returns (AssetFeeBpsConfig memory) {
         return $storage().feeBpsConfigByAsset[asset];
     }
 
+    /// @notice Returns the fallback fee in basis points which is used when a personal fee or asset-specific fee is not
+    /// available.
     function getBasicFeeBps() external view returns (uint16) {
         return $storage().basicFeeBps;
     }
 
+    /// @notice Returns whether a signer is whitelisted.
+    /// @param signer Address of the signer to check.
     function isSigner(address signer) external view returns (bool) {
         return $storage().signers[signer];
     }
@@ -93,6 +99,10 @@ contract WithdrawalPolicy is AccessManaged, EIP712, IWithdrawalPolicy {
 
     // Restricted functions
 
+    /// @notice Sets the configuration for an asset-specific fee.
+    /// @param asset Address of the asset to set the configuration for.
+    /// @param newAssetFeeBps The fee in basis points applied to the IOU quantity being exchanged for the asset.
+    /// @param isSet Whether the fee is set (used for lookups).
     function setAssetFeeBps(address asset, uint16 newAssetFeeBps, bool isSet) external restricted {
         // We don't check for new asset fee being less than the basic fee because maybe we want some specific asset to
         // have a higher fee than the basic fee.
@@ -101,11 +111,18 @@ contract WithdrawalPolicy is AccessManaged, EIP712, IWithdrawalPolicy {
         $storage().feeBpsConfigByAsset[asset].isSet = isSet;
     }
 
+    /// @notice Sets the fallback fee in basis points which is used when a personal fee or asset-specific fee is not
+    /// available.
+    ///@param newBasicFeeBps The fee in basis points applied to the IOU quantity being exchanged for the
+    /// asset.
     function setBasicFeeBps(uint16 newBasicFeeBps) external restricted {
         require(newBasicFeeBps <= ConstantsLib.MAX_BPS, ErrorsLib.InvalidParameter());
         $storage().basicFeeBps = newBasicFeeBps;
     }
 
+    /// @notice Sets the signer to be used for signature verification.
+    /// @param signer Address of the signer to set.
+    /// @param whitelistedSigner Whether the signer is enabled for signature verification.
     function setSigner(address signer, bool whitelistedSigner) external restricted {
         $storage().signers[signer] = whitelistedSigner;
     }

@@ -14,18 +14,20 @@ import {ISwapper} from "src/interfaces/ISwapper.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
+import {Multicall} from "src/misc/Multicall.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
 
 /// @title Allocator
 /// @author Aave Labs
 /// @notice Allocator contract for managing asset allocations into yield strategies.
+/// @dev This contract supports batching of calls using the Multicall contract.
 /// @dev Assumptions:
 ///      - 1 default strategy per asset which serves as the first strategy to deposit to/withdraw from.
 ///      - multiple allowed strategies per asset which require manual rebalancing
 ///      - assumes all assets in Allocator share a common denomination
 ///      - asset amounts are treated in their native decimals
 ///      - 100% of assets deposited into Allocator belong to the same entity (the Allocator does not track depositors)
-contract Allocator is AccessManagedUpgradeable, TransferHelperClient, IAllocator {
+contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall, IAllocator {
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
 
