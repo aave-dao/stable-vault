@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
+import {
+    AccessManagedUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
+import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {EfficientHashLib} from "@solady/utils/EfficientHashLib.sol";
 
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
@@ -18,7 +20,7 @@ import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
 /// @dev Withdrawal fees are in basis points (bps) and are applied to the IOU tokens being exchanged for assets.
 /// @dev This contract does not take ownership of the fee. It is expected the client of this contract takes the fee
 /// returned by this contract.
-contract WithdrawalPolicy is AccessManaged, EIP712, IWithdrawalPolicy {
+contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithdrawalPolicy {
     /// @notice Thrown when a recovered signer is not a whitelisted signer.
     /// @custom:selector 0x8baa579f
     error InvalidSignature();
@@ -55,14 +57,22 @@ contract WithdrawalPolicy is AccessManaged, EIP712, IWithdrawalPolicy {
         }
     }
 
-    /// @dev Constructor.
-    /// @param accessManager Address of the IAccessManager contract used for handling access control.
+    /// @dev Constructor.s
     /// @param assetRegistry Address of the AssetRegistry contract used for managing asset configurations.
-    constructor(address accessManager, address assetRegistry)
-        EIP712("WithdrawalPolicy", "1")
-        AccessManaged(accessManager)
-    {
+    constructor(address assetRegistry) EIP712Upgradeable() {
+        _disableInitializers();
         ASSET_REGISTRY = assetRegistry;
+    }
+
+    /// @dev Initializer.
+    /// @param accessManager The address of the IAccessManager contract used for handling access control.
+    function initialize(address accessManager) external virtual initializer {
+        __WithdrawalPolicy_init(accessManager);
+    }
+
+    function __WithdrawalPolicy_init(address accessManager) internal virtual onlyInitializing {
+        __AccessManaged_init(accessManager);
+        __EIP712_init("WithdrawalPolicy", "1");
     }
 
     /// @notice Returns the configuration for an asset-specific fee.

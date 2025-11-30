@@ -81,6 +81,17 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         );
     }
 
+    function _deployWithdrawalPolicy(address accessManager, address assetRegistry) internal returns (WithdrawalPolicy) {
+        address withdrawalPolicyImpl = address(new WithdrawalPolicy(assetRegistry));
+        return WithdrawalPolicy(
+            address(
+                new TransparentUpgradeableProxy(
+                    withdrawalPolicyImpl, address(this), abi.encodeCall(WithdrawalPolicy.initialize, (accessManager))
+                )
+            )
+        );
+    }
+
     function setUp() public {
         mockAccessManager = new MockAccessManager(admin);
         mockIouToken = new MockErc20("I Owe You Tokens", "IOU", 18);
@@ -90,7 +101,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockAsset = _deployDefaultAsset();
         mockTransferHelper = new MockTransferHelper();
         mockFundsHandler = new MockFundsHandler(address(mockTransferHelper));
-        mockWithdrawalPolicy = new WithdrawalPolicy(address(mockAccessManager), address(mockAssetRegistry));
+        mockWithdrawalPolicy = _deployWithdrawalPolicy(address(mockAccessManager), address(mockAssetRegistry));
         bbv = _deployBasedBoostedVault(
             address(mockAccessManager),
             DEFAULT_MAX_PER_SECOND_RATE,
