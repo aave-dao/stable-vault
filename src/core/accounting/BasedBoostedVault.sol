@@ -474,6 +474,9 @@ contract BasedBoostedVault is
 
     function _fullWithdrawalRequest(address user) internal returns (uint256, uint256, uint256) {
         uint256 subVaultId = $storage().positions[user].subVaultId;
+        // The conversion rate was accrued in the higher order withdrawal function using rounding that favors the
+        // protocol. We want the conversion rate's calculation to be rounded down so that we undershoot result of
+        // sharesToRedeem * conversionRate.
         uint256 conversionRate = $storage().subVaultById[subVaultId].conversionRate;
         uint256 sharesToRedeem = $storage().positions[user].shares;
         // Round down the withdrawal amount, so that the rounding is in favor of the protocol.
@@ -495,6 +498,9 @@ contract BasedBoostedVault is
         returns (uint256, uint256, uint256)
     {
         uint256 subVaultId = $storage().positions[user].subVaultId;
+        // The conversion rate was accrued in the higher order withdrawal function using rounding that favors the
+        // protocol. We want the conversion rate's calculation to be rounded down so that we undershoot the divisor used
+        // to calculate the amount of shares to redeem/burn.
         uint256 conversionRate = $storage().subVaultById[subVaultId].conversionRate;
 
         // Round up the amount of shares to redeem (burn on the position) for the requested amount of assets, so that
