@@ -40,8 +40,8 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     }
 
     /// @notice Configuration for an asset-specific fee.
-    /// @param feeBps The fee in basis points.
-    /// @param isSet Whether the fee is set used for lookups.
+    /// @param feeBps Fee in basis points applied to the IOU quantity being exchanged for the asset.
+    /// @param isSet Whether the fee is set (used for lookups).
     struct AssetFeeBpsConfig {
         uint16 feeBps;
         bool isSet;
@@ -75,20 +75,24 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
         __EIP712_init("WithdrawalPolicy", "1");
     }
 
-    /// @notice Returns the configuration for an asset-specific fee.
+    /// @notice Getter for the configuration for an asset-specific fee.
     /// @param asset Address of the asset to get the configuration for.
+    /// @return assetFeeBpsConfig Configuration for the asset-specific fee.
+    /// @return config fee data for the asset.
     function getAssetFeeBpsConfig(address asset) external view returns (AssetFeeBpsConfig memory) {
         return $storage().feeBpsConfigByAsset[asset];
     }
 
-    /// @notice Returns the fallback fee in basis points which is used when a personal fee or asset-specific fee is not
-    /// available.
+    /// @notice Getter for the fallback fee in basis points which is used when a personal fee or asset-specific fee is
+    /// not available.
+    /// @return basicFeeBps Fallback fee in basis points.
     function getBasicFeeBps() external view returns (uint16) {
         return $storage().basicFeeBps;
     }
 
-    /// @notice Returns whether a signer is whitelisted.
+    /// @notice Getter for whether a signer is whitelisted.
     /// @param signer Address of the signer to check.
+    /// @return isSigner Whether the signer is whitelisted.
     function isSigner(address signer) external view returns (bool) {
         return $storage().signers[signer];
     }

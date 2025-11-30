@@ -21,10 +21,13 @@ interface IFundsHandler {
         uint256 chainId;
     }
 
-    /// @notice Returns the total liquidity across all supported chains in RAY of supported asset denomination.
+    /// @notice Getter for the total assets in the local Allocator and the Allocators on all Earning Chains.
+    /// @return aggregatedBalance Total liquidity across all supported chains in RAY of supported asset denomination.
     function getAggregatedBalance() external view returns (uint256);
 
-    /// @notice Returns the asset balances for all supported chains including the native chain.
+    /// @notice Getter for the asset specific and chain specific balances in the local Allocator and the Allocators on
+    /// all Earning Chains. @return assetBalances Array of asset balances for all supported chains including the native
+    /// chain.
     function getAssetBalances() external view returns (AssetBalance[] memory);
 
     /// @notice Forward a deposit to a liquidity source.

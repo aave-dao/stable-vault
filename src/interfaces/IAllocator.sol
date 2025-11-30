@@ -79,25 +79,35 @@ interface IAllocator {
         AllocationParams[] allocations;
     }
 
-    /// @notice Returns an array of balances where each amount is denominated in the corresponding asset's decimals.
-    function getAssetBalances() external view returns (AllocatorBalance[] memory);
+    /// @notice Getter for the balances on the Allocator.
+    /// @return balances Array of balances where each amount is denominated in the corresponding asset's decimals.
+    function getAssetBalances() external view returns (AllocatorBalance[] memory balances);
 
-    /// @notice Returns yield strategy for a given asset.
+    /// @notice Getter for the default strategy for a given asset.
+    /// @param asset Address of the asset to get the default strategy for.
+    /// @return strategy Address of the default strategy for the asset.
     function getDefaultStrategy(address asset) external view returns (address);
 
-    /// @notice Returns if a given strategy is supported for allocating to or deallocating from a given asset.
+    /// @notice Getter for whether a strategy is supported for a given asset.
+    /// @param asset Address of the asset to check if the strategy is supported for.
+    /// @param strategy Address of the strategy to check if it is supported for the asset.
+    /// @return isSupported Whether the strategy is supported for the asset.
     function isStrategySupportedForAsset(address asset, address strategy) external view returns (bool);
 
-    /// @notice Returns if a given strategy is supported for allocating or deallocating, regardless of the asset.
+    /// @notice Getter for whether a strategy is supported for allocating or deallocating, regardless of the asset.
+    /// @param strategy Address of the strategy to check if it is supported for allocating or deallocating.
+    /// @return isSupported Whether the strategy is supported for allocating or deallocating.
     function isStrategySupported(address strategy) external view returns (bool);
 
-    /// @notice Deposits a given amount of an asset into the default strategy
-    /// for the asset.
+    /// @notice Deposits a given amount of an asset into the default strategy for the asset.
+    /// @param asset Address of the asset to deposit.
+    /// @param amount Amount of the asset to deposit.
     function deposit(address asset, uint256 amount) external;
 
     /// @notice Rebalances underlying assets.
     /// @dev A rebalance is an ordered combination of the following operations: deallocation of assets from strategies,
     /// swaps between assets, and allocation of assets to strategies.
+    /// @param params Array of rebalance parameters.
     function rebalance(RebalanceParams[] memory params) external;
 
     /// @notice Withdraws a given amount of an asset from the default strategy for the given asset.
