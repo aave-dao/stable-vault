@@ -78,7 +78,6 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     /// @notice Getter for the configuration for an asset-specific fee.
     /// @param asset Address of the asset to get the configuration for.
     /// @return assetFeeBpsConfig Configuration for the asset-specific fee.
-    /// @return config fee data for the asset.
     function getAssetFeeBpsConfig(address asset) external view returns (AssetFeeBpsConfig memory) {
         return $storage().feeBpsConfigByAsset[asset];
     }
