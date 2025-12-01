@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {ConstantsLib} from "src/libraries/ConstantsLib.sol";
 import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
@@ -17,10 +18,21 @@ contract WithdrawalPolicyTest is TestWithHelpers {
     MockAssetRegistry mockAssetRegistry;
     address admin = makeAddr("admin");
 
+    function _deployWithdrawalPolicy(address accessManager, address assetRegistry) internal returns (WithdrawalPolicy) {
+        address withdrawalPolicyImpl = address(new WithdrawalPolicy(assetRegistry));
+        return WithdrawalPolicy(
+            address(
+                new TransparentUpgradeableProxy(
+                    withdrawalPolicyImpl, address(this), abi.encodeCall(WithdrawalPolicy.initialize, (accessManager))
+                )
+            )
+        );
+    }
+
     function setUp() public {
         mockAccessManager = new MockAccessManager(admin);
         mockAssetRegistry = new MockAssetRegistry();
-        withdrawalPolicy = new WithdrawalPolicy(address(mockAccessManager), address(mockAssetRegistry));
+        withdrawalPolicy = _deployWithdrawalPolicy(address(mockAccessManager), address(mockAssetRegistry));
     }
 
     // Restricted functions access control tests
@@ -32,6 +44,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         bool isSet
     ) public {
         vm.assume(unauthorizedMsgSender != address(0));
+        _assumeNotProxyAdmin(unauthorizedMsgSender, address(withdrawalPolicy));
 
         mockAccessManager.mockRejectCall(
             unauthorizedMsgSender, address(withdrawalPolicy), WithdrawalPolicy.setAssetFeeBps.selector
@@ -50,6 +63,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         uint256 newBasicFeeBps
     ) public {
         vm.assume(unauthorizedMsgSender != address(0));
+        _assumeNotProxyAdmin(unauthorizedMsgSender, address(withdrawalPolicy));
 
         mockAccessManager.mockRejectCall(
             unauthorizedMsgSender, address(withdrawalPolicy), WithdrawalPolicy.setBasicFeeBps.selector
@@ -69,7 +83,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         bool whitelistedSigner
     ) public {
         vm.assume(unauthorizedMsgSender != address(0));
-
+        _assumeNotProxyAdmin(unauthorizedMsgSender, address(withdrawalPolicy));
         mockAccessManager.mockRejectCall(
             unauthorizedMsgSender, address(withdrawalPolicy), WithdrawalPolicy.setSigner.selector
         );

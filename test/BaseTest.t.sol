@@ -299,9 +299,15 @@ contract BaseTest is Test {
 
         // 3. Withdrawal Policy
         address withdrawalPolicy_accountingChain_impl =
-            address(new WithdrawalPolicy(admin, assetRegistry_accountingChainAddress));
+            address(new WithdrawalPolicy(assetRegistry_accountingChainAddress));
         withdrawalPolicy_accountingChain = WithdrawalPolicy(
-            address(new TransparentUpgradeableProxy(withdrawalPolicy_accountingChain_impl, proxyAdmin, ""))
+            address(
+                new TransparentUpgradeableProxy(
+                    withdrawalPolicy_accountingChain_impl,
+                    proxyAdmin,
+                    abi.encodeCall(WithdrawalPolicy.initialize, (accessManager_accountingChainAddress))
+                )
+            )
         );
         console.log("\tWithdrawal Policy (Accounting Chain): %s", address(withdrawalPolicy_accountingChain));
         require(
@@ -537,10 +543,15 @@ contract BaseTest is Test {
         );
 
         // 3. Withdrawal Policy
-        address withdrawalPolicy_earningChain_impl =
-            address(new WithdrawalPolicy(admin, assetRegistry_earningChainAddress));
+        address withdrawalPolicy_earningChain_impl = address(new WithdrawalPolicy(assetRegistry_earningChainAddress));
         withdrawalPolicy_earningChain = WithdrawalPolicy(
-            address(new TransparentUpgradeableProxy(withdrawalPolicy_earningChain_impl, proxyAdmin, ""))
+            address(
+                new TransparentUpgradeableProxy(
+                    withdrawalPolicy_earningChain_impl,
+                    proxyAdmin,
+                    abi.encodeCall(WithdrawalPolicy.initialize, (accessManager_earningChainAddress))
+                )
+            )
         );
         console.log("\tWithdrawal Policy (Earning Chain): %s", address(withdrawalPolicy_earningChain));
         require(

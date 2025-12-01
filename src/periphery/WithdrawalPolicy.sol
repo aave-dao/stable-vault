@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
+import {
+    AccessManagedUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
+import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {EfficientHashLib} from "@solady/utils/EfficientHashLib.sol";
 
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
@@ -18,7 +20,7 @@ import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
 /// @dev Withdrawal fees are in basis points (bps) and are applied to the IOU tokens being exchanged for assets.
 /// @dev This contract does not take ownership of the fee. It is expected the client of this contract takes the fee
 /// returned by this contract.
-contract WithdrawalPolicy is AccessManaged, EIP712, IWithdrawalPolicy {
+contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithdrawalPolicy {
     /// @notice Thrown when a recovered signer is not a whitelisted signer.
     /// @custom:selector 0x8baa579f
     error InvalidSignature();
@@ -38,8 +40,8 @@ contract WithdrawalPolicy is AccessManaged, EIP712, IWithdrawalPolicy {
     }
 
     /// @notice Configuration for an asset-specific fee.
-    /// @param feeBps The fee in basis points.
-    /// @param isSet Whether the fee is set used for lookups.
+    /// @param feeBps Fee in basis points applied to the IOU quantity being exchanged for the asset.
+    /// @param isSet Whether the fee is set (used for lookups).
     struct AssetFeeBpsConfig {
         uint16 feeBps;
         bool isSet;
@@ -55,24 +57,41 @@ contract WithdrawalPolicy is AccessManaged, EIP712, IWithdrawalPolicy {
         }
     }
 
-    /// @dev Constructor.
-    /// @param accessManager Address of the IAccessManager contract used for handling access control.
+    /// @dev Constructor.s
     /// @param assetRegistry Address of the AssetRegistry contract used for managing asset configurations.
-    constructor(address accessManager, address assetRegistry)
-        EIP712("WithdrawalPolicy", "1")
-        AccessManaged(accessManager)
-    {
+    constructor(address assetRegistry) EIP712Upgradeable() {
+        _disableInitializers();
         ASSET_REGISTRY = assetRegistry;
     }
 
+    /// @dev Initializer.
+    /// @param accessManager The address of the IAccessManager contract used for handling access control.
+    function initialize(address accessManager) external virtual initializer {
+        __WithdrawalPolicy_init(accessManager);
+    }
+
+    function __WithdrawalPolicy_init(address accessManager) internal virtual onlyInitializing {
+        __AccessManaged_init(accessManager);
+        __EIP712_init("WithdrawalPolicy", "1");
+    }
+
+    /// @notice Getter for the configuration for an asset-specific fee.
+    /// @param asset Address of the asset to get the configuration for.
+    /// @return assetFeeBpsConfig Configuration for the asset-specific fee.
     function getAssetFeeBpsConfig(address asset) external view returns (AssetFeeBpsConfig memory) {
         return $storage().feeBpsConfigByAsset[asset];
     }
 
+    /// @notice Getter for the fallback fee in basis points which is used when a personal fee or asset-specific fee is
+    /// not available.
+    /// @return basicFeeBps Fallback fee in basis points.
     function getBasicFeeBps() external view returns (uint16) {
         return $storage().basicFeeBps;
     }
 
+    /// @notice Getter for whether a signer is whitelisted.
+    /// @param signer Address of the signer to check.
+    /// @return isSigner Whether the signer is whitelisted.
     function isSigner(address signer) external view returns (bool) {
         return $storage().signers[signer];
     }
@@ -93,6 +112,10 @@ contract WithdrawalPolicy is AccessManaged, EIP712, IWithdrawalPolicy {
 
     // Restricted functions
 
+    /// @notice Sets the configuration for an asset-specific fee.
+    /// @param asset Address of the asset to set the configuration for.
+    /// @param newAssetFeeBps The fee in basis points applied to the IOU quantity being exchanged for the asset.
+    /// @param isSet Whether the fee is set (used for lookups).
     function setAssetFeeBps(address asset, uint16 newAssetFeeBps, bool isSet) external restricted {
         // We don't check for new asset fee being less than the basic fee because maybe we want some specific asset to
         // have a higher fee than the basic fee.
@@ -101,11 +124,18 @@ contract WithdrawalPolicy is AccessManaged, EIP712, IWithdrawalPolicy {
         $storage().feeBpsConfigByAsset[asset].isSet = isSet;
     }
 
+    /// @notice Sets the fallback fee in basis points which is used when a personal fee or asset-specific fee is not
+    /// available.
+    ///@param newBasicFeeBps The fee in basis points applied to the IOU quantity being exchanged for the
+    /// asset.
     function setBasicFeeBps(uint16 newBasicFeeBps) external restricted {
         require(newBasicFeeBps <= ConstantsLib.MAX_BPS, ErrorsLib.InvalidParameter());
         $storage().basicFeeBps = newBasicFeeBps;
     }
 
+    /// @notice Sets the signer to be used for signature verification.
+    /// @param signer Address of the signer to set.
+    /// @param whitelistedSigner Whether the signer is enabled for signature verification.
     function setSigner(address signer, bool whitelistedSigner) external restricted {
         $storage().signers[signer] = whitelistedSigner;
     }

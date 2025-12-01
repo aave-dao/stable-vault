@@ -39,7 +39,8 @@ interface IBridgeAdapter {
         bytes data;
     }
 
-    /// @notice Returns the address of the Gateway contract.
+    /// @notice Getter for the address of the Gateway contract.
+    /// @return gateway Address of the Gateway contract.
     function getGateway() external view returns (address);
 
     /// @notice Sets the destination chain adapter for a given chain id.

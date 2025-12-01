@@ -93,6 +93,17 @@ contract EarningChainGatewayTest is TestWithHelpers {
         return earningChainGateway;
     }
 
+    function _deployWithdrawalPolicy(address accessManager, address assetRegistry) internal returns (WithdrawalPolicy) {
+        address withdrawalPolicyImpl = address(new WithdrawalPolicy(assetRegistry));
+        return WithdrawalPolicy(
+            address(
+                new TransparentUpgradeableProxy(
+                    withdrawalPolicyImpl, address(this), abi.encodeCall(WithdrawalPolicy.initialize, (accessManager))
+                )
+            )
+        );
+    }
+
     function setUp() public {
         _mockUsdt = IMockErc20(address(new MockNonStandardErc20("Test USDT", "tUSDT", 6)));
 
@@ -115,7 +126,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         _mockAccessManager = new MockAccessManager(admin);
 
-        _mockWithdrawalPolicy = new WithdrawalPolicy(address(_mockAccessManager), address(_mockAssetRegistry));
+        _mockWithdrawalPolicy = _deployWithdrawalPolicy(address(_mockAccessManager), address(_mockAssetRegistry));
 
         _earningChainGateway = _deployEarningChainGateway(
             _mockAccessManager,
