@@ -100,18 +100,24 @@ interface IBasedBoostedVault {
     /// @param userRateData.newPerSecondRate New per-second rate for the user.
     function setUserRate(UserRateData[] calldata userRateData) external;
 
-    /// @notice Returns the default sub-vault data.
-    function getDefaultSubVault() external view returns (SubVaultData memory);
+    /// @notice Getter for the default sub-vault.
+    /// @return defaultSubVault Default sub-vault data.
+    function getDefaultSubVault() external view returns (SubVaultData memory defaultSubVault);
 
-    /// @notice Returns the maximum valid per-second rate that can be set for a sub-vault.
+    /// @notice Getter for the maximum rate that can be set for a sub-vault.
+    /// @return maxValidPerSecondRate Maximum valid per-second rate that can be set for a sub-vault.
     function getMaxValidPerSecondRate() external view returns (uint256);
 
-    /// @notice Returns the rate for a sub-vault.
-    /// @param subVaultId ID of the sub-vault to return the rate for.
+    /// @notice Getter for the rate for a sub-vault.
+    /// @param subVaultId ID of the sub-vault to get the rate for.
+    /// @return rate per-second rate of the sub-vault or 0 if the sub-vault does not exist.
     function getSubVaultRateById(uint256 subVaultId) external view returns (uint256);
 
-    /// @notice Returns the ID of a sub-vault for a given rate.
-    /// @param perSecondRate Rate of the sub-vault to return the ID for.
+    /// @notice Getter for the ID of a sub-vault for a given rate.
+    /// @dev Only one sub-vault can have a given rate.
+    /// @param perSecondRate Rate of the sub-vault to get the ID for.
+    /// @return subVaultId ID of the sub-vault for the given rate or 0 if no sub-vault does not exist for the given
+    /// rate.
     function getSubVaultIdByRate(uint256 perSecondRate) external view returns (uint256);
 
     /// @notice Deposits assets into the vault.
@@ -121,11 +127,11 @@ interface IBasedBoostedVault {
     function deposit(address user, address asset, uint256 amount) external;
 
     /// @notice Requests a withdrawal of assets from the vault.
-    /// @notice Returns the amount of IOU tokens minted to the user.
     /// @dev User shares are burned; the amount requested to withdraw stops accruing yield.
     /// @dev User is minted units of IOUs which can be used to claim assets.
     /// @param user The address of the user requesting the withdrawal
     /// @param requestedAmountInRay The amount of assets requested to withdraw (normalized to RAY units)
+    /// @return amountOfIouTokensMinted Amount of IOU tokens minted to the user.
     function requestWithdrawal(address user, uint256 requestedAmountInRay) external returns (uint256);
 
     /// @notice Exchanges IOUs for a supported asset.
@@ -135,24 +141,30 @@ interface IBasedBoostedVault {
     /// @param data Additional data for the withdrawal execution.
     function executeWithdrawal(address user, address tokenOut, uint256 iouAmountRay, bytes memory data) external;
 
-    /// @notice Returns the aggregated obligations owned to depositors in RAY of denomination asset.
+    /// @notice Getter for the aggregated obligations owned to depositors in RAY of denomination asset.
+    /// @return obligations Aggregated obligations owned to depositors in RAY of denomination asset.
     function getVaultObligations() external view returns (uint256);
 
-    /// @notice Returns the aggregated balance of the vault in RAY of denomination asset.
+    /// @notice Getter for the aggregated balance on the local Allocator and the Allocator on Earning Chains.
+    /// @return aggregatedBalance Aggregated balance of the vault in RAY of denomination asset.
     function getAggregatedBalance() external view returns (uint256);
 
-    /// @notice Returns the balance of a user in RAY of denomination asset.
+    /// @notice Getter for the balance of a user in RAY of denomination asset including accrued interest.
     /// @param user Address of the user.
+    /// @return balance Balance of the user in RAY of denomination asset.
     function getUserBalance(address user) external view returns (uint256);
 
-    /// @notice Returns the active sub-vaults.
+    /// @notice Getter for the sub-vaults that have user positions.
+    /// @return activeSubVaults Array of active sub-vaults.
     function getActiveSubVaults() external view returns (SubVaultData[] memory);
 
-    /// @notice Returns the sub-vault data for a user.
+    /// @notice Getter for the sub-vault data for a user.
     /// @param user Address of the user.
-    function getUserSubVault(address user) external view returns (SubVaultData memory);
+    /// @return subVaultData Sub-vault data for the user.
+    function getUserSubVault(address user) external view returns (SubVaultData memory subVaultData);
 
-    /// @notice Returns the global original deposit amount in RAY of denomination asset.
+    /// @notice Getter for the global original deposit amount in RAY of denomination asset.
     /// @dev Original deposits are the invested principal from users (not including accrued interest).
-    function getGlobalOriginalDepositAmount() external view returns (uint256);
+    /// @return globalOriginalDepositAmount Global original deposit amount in RAY of denomination asset.
+    function getGlobalOriginalDepositAmount() external view returns (uint256 globalOriginalDepositAmount);
 }

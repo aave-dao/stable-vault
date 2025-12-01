@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
+import {
+    AccessManagedUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
+import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {EfficientHashLib} from "@solady/utils/EfficientHashLib.sol";
 
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
@@ -18,7 +20,7 @@ import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
 /// @dev Withdrawal fees are in basis points (bps) and are applied to the IOU tokens being exchanged for assets.
 /// @dev This contract does not take ownership of the fee. It is expected the client of this contract takes the fee
 /// returned by this contract.
-contract WithdrawalPolicy is AccessManaged, EIP712, IWithdrawalPolicy {
+contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithdrawalPolicy {
     /// @notice Thrown when a recovered signer is not a whitelisted signer.
     /// @custom:selector 0x8baa579f
     error InvalidSignature();
@@ -38,8 +40,8 @@ contract WithdrawalPolicy is AccessManaged, EIP712, IWithdrawalPolicy {
     }
 
     /// @notice Configuration for an asset-specific fee.
-    /// @param feeBps The fee in basis points.
-    /// @param isSet Whether the fee is set used for lookups.
+    /// @param feeBps Fee in basis points applied to the IOU quantity being exchanged for the asset.
+    /// @param isSet Whether the fee is set (used for lookups).
     struct AssetFeeBpsConfig {
         uint16 feeBps;
         bool isSet;
@@ -55,30 +57,41 @@ contract WithdrawalPolicy is AccessManaged, EIP712, IWithdrawalPolicy {
         }
     }
 
-    /// @dev Constructor.
-    /// @param accessManager Address of the IAccessManager contract used for handling access control.
+    /// @dev Constructor.s
     /// @param assetRegistry Address of the AssetRegistry contract used for managing asset configurations.
-    constructor(address accessManager, address assetRegistry)
-        EIP712("WithdrawalPolicy", "1")
-        AccessManaged(accessManager)
-    {
+    constructor(address assetRegistry) EIP712Upgradeable() {
+        _disableInitializers();
         ASSET_REGISTRY = assetRegistry;
     }
 
-    /// @notice Returns the configuration for an asset-specific fee.
+    /// @dev Initializer.
+    /// @param accessManager The address of the IAccessManager contract used for handling access control.
+    function initialize(address accessManager) external virtual initializer {
+        __WithdrawalPolicy_init(accessManager);
+    }
+
+    function __WithdrawalPolicy_init(address accessManager) internal virtual onlyInitializing {
+        __AccessManaged_init(accessManager);
+        __EIP712_init("WithdrawalPolicy", "1");
+    }
+
+    /// @notice Getter for the configuration for an asset-specific fee.
     /// @param asset Address of the asset to get the configuration for.
+    /// @return assetFeeBpsConfig Configuration for the asset-specific fee.
     function getAssetFeeBpsConfig(address asset) external view returns (AssetFeeBpsConfig memory) {
         return $storage().feeBpsConfigByAsset[asset];
     }
 
-    /// @notice Returns the fallback fee in basis points which is used when a personal fee or asset-specific fee is not
-    /// available.
+    /// @notice Getter for the fallback fee in basis points which is used when a personal fee or asset-specific fee is
+    /// not available.
+    /// @return basicFeeBps Fallback fee in basis points.
     function getBasicFeeBps() external view returns (uint16) {
         return $storage().basicFeeBps;
     }
 
-    /// @notice Returns whether a signer is whitelisted.
+    /// @notice Getter for whether a signer is whitelisted.
     /// @param signer Address of the signer to check.
+    /// @return isSigner Whether the signer is whitelisted.
     function isSigner(address signer) external view returns (bool) {
         return $storage().signers[signer];
     }

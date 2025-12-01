@@ -24,14 +24,19 @@ interface IIouTokenManager {
     /// @custom:selector 0x4f0475a7
     error OnlyAccountingChain();
 
-    /// @notice Returns the address of the IOU token.
+    /// @notice Getter for the address of the IOU token.
+    /// @return asset Address of the IOU token.
     function getAsset() external view returns (address);
 
-    /// @notice Returns the locked balance of the IOU token.
+    /// @notice Getter for the locked balance of the IOU token which have been bridged to Earning Chain(s).
+    /// @dev Lock IOU tokens sit in the contract until they are burned due to an asset exchange on an Earning Chain or
+    /// bridged back to the Accounting Chain.
+    /// @dev This function should return 0 on Earning Chains as IOU tokens are not
+    /// locked on Earning Chains.
+    /// @return lockedBalance Locked balance of the IOU token.
     function getLockedBalance() external view returns (uint256);
 
     /// @notice Entry point for IOU token owners to bridge tokens to a destination chain.
-    /// @dev Pulls tokens from caller and holds them in the contract until unlock is called.
     /// @param destinationChainId The chain id of the chain to publish the message to.
     /// @param iouTokenRecipient The address to send the IOU tokens to on the destination chain.
     /// @param iouTokenAmountRay The amount of IOU tokens to bridge.
