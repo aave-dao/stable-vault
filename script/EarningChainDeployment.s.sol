@@ -18,22 +18,26 @@ import {TransferHelper} from "src/periphery/TransferHelper.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 
 contract EarningChainDeployment is Create3Deployment, Create3AddressBook, Script {
-    address constant DEPLOYER = address(0); // TODO: set proper address, consider reading from .env
+    address constant DEPLOYER = address(0xBB700dA5CCC9Ec5605780Fc40695f1206B090303);
 
-    address constant ALLOCATOR_PROXY_ADMIN = address(0); // TODO: set proper address, consider reading from .env
-    address constant WITHDRAWAL_POLICY_PROXY_ADMIN = address(0); // TODO: set proper address, consider reading from .env
-    address constant ASSET_REGISTRY_PROXY_ADMIN = address(0); // TODO: set proper address, consider reading from .env
-    address constant GATEWAY_PROXY_ADMIN = address(0); // TODO: set proper address, consider reading from .env
-    address constant IOU_TOKEN_MANAGER_PROXY_ADMIN = address(0); // TODO: set proper address, consider reading from .env
+    address constant PROXY_ADMIN = DEPLOYER;
+    address constant ALLOCATOR_PROXY_ADMIN = PROXY_ADMIN;
+    address constant WITHDRAWAL_POLICY_PROXY_ADMIN = PROXY_ADMIN;
+    address constant ASSET_REGISTRY_PROXY_ADMIN = PROXY_ADMIN;
+    address constant GATEWAY_PROXY_ADMIN = PROXY_ADMIN;
+    address constant IOU_TOKEN_MANAGER_PROXY_ADMIN = PROXY_ADMIN;
 
-    address constant ALLOCATOR_DEPOSITOR = address(0); // TODO: set proper address, consider reading from .env
-    address constant ALLOCATOR_WITHDRAWER = address(0); // TODO: set proper address, consider reading from .env
+    address immutable ALLOCATOR_DEPOSITOR = getGatewayAddress(DEPLOYER);
+    address immutable ALLOCATOR_WITHDRAWER = getGatewayAddress(DEPLOYER);
 
-    address constant CCIP_ROUTER_ADDRESS = address(0); // TODO: set proper address, consider reading from .env
+    // Set to Base CCIP Router address
+    address constant CCIP_ROUTER_ADDRESS = address(0x881e3A65B4d4a04dD529061dd0071cf975F58bCD);
 
     function run() public {
+        vm.startBroadcast(DEPLOYER);
         _deployContracts();
         _setupContracts();
+        vm.stopBroadcast();
     }
 
     function _deployContracts() internal {

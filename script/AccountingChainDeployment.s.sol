@@ -20,27 +20,31 @@ import {TransferHelper} from "src/periphery/TransferHelper.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 
 contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, Script {
-    address constant DEPLOYER = address(0); // TODO: set proper address, consider reading from .env
+    address constant DEPLOYER = address(0xBB700dA5CCC9Ec5605780Fc40695f1206B090303);
 
     uint256 constant DEFAULT_MAX_PER_SECOND_RATE = 1000000005781378656804591713; // ~20% APY
     uint256 constant DEFAULT_SUB_VAULT_PER_SECOND_RATE = 1000000001243680656318820313; // ~4% APY
 
-    address constant BBV_PROXY_ADMIN = address(0); // TODO: set proper address, consider reading from .env
-    address constant ALLOCATOR_PROXY_ADMIN = address(0); // TODO: set proper address, consider reading from .env
-    address constant WITHDRAWAL_POLICY_PROXY_ADMIN = address(0); // TODO: set proper address, consider reading from .env
-    address constant ASSET_REGISTRY_PROXY_ADMIN = address(0); // TODO: set proper address, consider reading from .env
-    address constant GATEWAY_PROXY_ADMIN = address(0); // TODO: set proper address, consider reading from .env
-    address constant IOU_TOKEN_MANAGER_PROXY_ADMIN = address(0); // TODO: set proper address, consider reading from .env
-    address constant FUNDS_HANDLER_PROXY_ADMIN = address(0); // TODO: set proper address, consider reading from .env
+    address constant PROXY_ADMIN = DEPLOYER;
+    address constant BBV_PROXY_ADMIN = PROXY_ADMIN;
+    address constant ALLOCATOR_PROXY_ADMIN = PROXY_ADMIN;
+    address constant WITHDRAWAL_POLICY_PROXY_ADMIN = PROXY_ADMIN;
+    address constant ASSET_REGISTRY_PROXY_ADMIN = PROXY_ADMIN;
+    address constant GATEWAY_PROXY_ADMIN = PROXY_ADMIN;
+    address constant IOU_TOKEN_MANAGER_PROXY_ADMIN = PROXY_ADMIN;
+    address constant FUNDS_HANDLER_PROXY_ADMIN = PROXY_ADMIN;
 
-    address constant ALLOCATOR_DEPOSITOR = address(0); // TODO: set proper address, consider reading from .env
-    address constant ALLOCATOR_WITHDRAWER = address(0); // TODO: set proper address, consider reading from .env
+    address immutable ALLOCATOR_DEPOSITOR = getFundsHandlerAddress(DEPLOYER);
+    address immutable ALLOCATOR_WITHDRAWER = getFundsHandlerAddress(DEPLOYER);
 
-    address constant CCIP_ROUTER_ADDRESS = address(0); // TODO: set proper address, consider reading from .env
+    // Set to Ethereum CCIP Router address
+    address constant CCIP_ROUTER_ADDRESS = address(0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D);
 
     function run() public {
+        vm.startBroadcast(DEPLOYER);
         _deployContracts();
         _setupContracts();
+        vm.stopBroadcast();
     }
 
     function _deployContracts() internal {
