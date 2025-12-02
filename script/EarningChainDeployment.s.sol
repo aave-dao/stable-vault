@@ -12,6 +12,8 @@ import {Allocator} from "src/core/Allocator.sol";
 import {EarningChainGateway} from "src/core/earning/EarningChainGateway.sol";
 import {IouToken} from "src/core/ious/IouToken.sol";
 import {IouTokenManager} from "src/core/ious/IouTokenManager.sol";
+import {IAllocator} from "src/interfaces/IAllocator.sol";
+import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
 import {AssetRegistry} from "src/periphery/AssetRegistry.sol";
@@ -64,11 +66,13 @@ contract EarningChainDeployment is Create3Deployment, Create3AddressBook, Script
         _deployGateway();
         _deploySwapper();
         _deployCcipAdapter();
-        // _deployStrategyVault();
     }
 
     function _setupContracts() internal {
         _setupAccessManager();
+        _setupBridgeAdapters();
+        _setupAllocator();
+        _setupAssetRegistry();
     }
 
     function _setupAccessManager() internal {
@@ -97,6 +101,32 @@ contract EarningChainDeployment is Create3Deployment, Create3AddressBook, Script
 
         ICcipBridgeAdapter(localCcipAdapter).setChainSelector(ACCOUNTING_CHAIN_ID, ACCOUNTING_CHAIN_CCIP_SELECTOR);
         ICcipBridgeAdapter(localCcipAdapter).setDestinationChainAdapter(ACCOUNTING_CHAIN_ID, accountingCcipAdapter);
+    }
+
+    function _setupAllocator() internal {
+        IAllocator allocator = IAllocator(getAllocatorAddress(DEPLOYER));
+
+        address ghoYieldStrategy = address(0); // TODO: Deploy GHO Yield Strategy
+        allocator.addStrategy(GHO, ghoYieldStrategy);
+        allocator.setDefaultStrategy(GHO, ghoYieldStrategy);
+
+        address usdcYieldStrategy = address(0); // TODO: Deploy USDC Yield Strategy
+        allocator.addStrategy(USDC, usdcYieldStrategy);
+        allocator.setDefaultStrategy(USDC, usdcYieldStrategy);
+    }
+
+    function _setupAssetRegistry() internal {
+        IAssetRegistry assetRegistry = IAssetRegistry(getAssetRegistryAddress(DEPLOYER));
+        IAssetRegistry.AssetConfig memory unrestrictedAssetConfig = IAssetRegistry.AssetConfig({
+            depositFromUserAllowed: true,
+            withdrawToUserAllowed: true,
+            depositIntoAllocatorAllowed: true,
+            withdrawFromAllocatorAllowed: true,
+            swapInputTokenAllowed: true,
+            swapOutputTokenAllowed: true
+        });
+        assetRegistry.setAssetConfig(GHO, unrestrictedAssetConfig);
+        assetRegistry.setAssetConfig(USDC, unrestrictedAssetConfig);
     }
 
     function _deployTransferHelper() internal returns (address) {
