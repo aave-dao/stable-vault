@@ -12,12 +12,19 @@ import {Allocator} from "src/core/Allocator.sol";
 import {EarningChainGateway} from "src/core/earning/EarningChainGateway.sol";
 import {IouToken} from "src/core/ious/IouToken.sol";
 import {IouTokenManager} from "src/core/ious/IouTokenManager.sol";
+import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
+import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
 import {AssetRegistry} from "src/periphery/AssetRegistry.sol";
 import {Swapper} from "src/periphery/Swapper.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 
 contract EarningChainDeployment is Create3Deployment, Create3AddressBook, Script {
+    // Base Chain ID
+    uint256 constant ACCOUNTING_CHAIN_ID = 8453;
+    // Base CCIP Selector
+    uint64 constant ACCOUNTING_CHAIN_CCIP_SELECTOR = 15971525489660198786;
+
     address constant DEPLOYER = address(0xBB700dA5CCC9Ec5605780Fc40695f1206B090303);
 
     address constant PROXY_ADMIN = DEPLOYER;
@@ -32,8 +39,12 @@ contract EarningChainDeployment is Create3Deployment, Create3AddressBook, Script
     address immutable ALLOCATOR_DEPOSITOR = getGatewayAddress(DEPLOYER);
     address immutable ALLOCATOR_WITHDRAWER = getGatewayAddress(DEPLOYER);
 
-    // Set to Base CCIP Router address
-    address constant CCIP_ROUTER_ADDRESS = address(0x881e3A65B4d4a04dD529061dd0071cf975F58bCD);
+    // Set to Ethereum CCIP Router address
+    address constant CCIP_ROUTER_ADDRESS = address(0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D);
+
+    // ERC20s on Ethereum
+    address GHO = address(0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f);
+    address USDC = address(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
 
     function run() public {
         vm.startBroadcast(DEPLOYER);
@@ -56,7 +67,37 @@ contract EarningChainDeployment is Create3Deployment, Create3AddressBook, Script
         // _deployStrategyVault();
     }
 
-    function _setupContracts() internal {}
+    function _setupContracts() internal {
+        _setupAccessManager();
+    }
+
+    function _setupAccessManager() internal {
+        // Right now we just keep the admin, we should setup more roles here.
+    }
+
+    function _setupBridgeAdapters() internal {
+        // NOTE: This assumes adapters of same type are having the same address on all chains.
+        address localCcipAdapter = getCcipAdapterAddress(DEPLOYER);
+        address accountingCcipAdapter = localCcipAdapter;
+
+        IEarningChainGateway gateway = IEarningChainGateway(getGatewayAddress(DEPLOYER));
+
+        // GHO uses CCIP Adapter
+        gateway.addBridgeAdapter(GHO, ACCOUNTING_CHAIN_ID, localCcipAdapter);
+        gateway.setDefaultBridgeAdapter(GHO, ACCOUNTING_CHAIN_ID, localCcipAdapter);
+
+        // USDC uses CCIP Adapter
+        gateway.addBridgeAdapter(USDC, ACCOUNTING_CHAIN_ID, localCcipAdapter);
+        gateway.setDefaultBridgeAdapter(USDC, ACCOUNTING_CHAIN_ID, localCcipAdapter);
+
+        // Message uses CCIP Adapter
+        address messageOnly = address(0);
+        gateway.addBridgeAdapter(messageOnly, ACCOUNTING_CHAIN_ID, localCcipAdapter);
+        gateway.setDefaultBridgeAdapter(messageOnly, ACCOUNTING_CHAIN_ID, localCcipAdapter);
+
+        ICcipBridgeAdapter(localCcipAdapter).setChainSelector(ACCOUNTING_CHAIN_ID, ACCOUNTING_CHAIN_CCIP_SELECTOR);
+        ICcipBridgeAdapter(localCcipAdapter).setDestinationChainAdapter(ACCOUNTING_CHAIN_ID, accountingCcipAdapter);
+    }
 
     function _deployTransferHelper() internal returns (address) {
         address transferHelper = _deploy_create3({

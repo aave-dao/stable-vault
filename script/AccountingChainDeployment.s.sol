@@ -14,6 +14,8 @@ import {BasedBoostedVault} from "src/core/accounting/BasedBoostedVault.sol";
 import {FundsHandler} from "src/core/accounting/FundsHandler.sol";
 import {IouToken} from "src/core/ious/IouToken.sol";
 import {IouTokenManager} from "src/core/ious/IouTokenManager.sol";
+import {IAccountingChainGateway} from "src/interfaces/IAccountingChainGateway.sol";
+import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {AssetRegistry} from "src/periphery/AssetRegistry.sol";
 import {Swapper} from "src/periphery/Swapper.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
@@ -39,8 +41,12 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, Scr
     address immutable ALLOCATOR_DEPOSITOR = getFundsHandlerAddress(DEPLOYER);
     address immutable ALLOCATOR_WITHDRAWER = getFundsHandlerAddress(DEPLOYER);
 
-    // Set to Ethereum CCIP Router address
-    address constant CCIP_ROUTER_ADDRESS = address(0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D);
+    // Set to Base CCIP Router address
+    address constant CCIP_ROUTER_ADDRESS = address(0x881e3A65B4d4a04dD529061dd0071cf975F58bCD);
+
+    // ERC20s on Base
+    address GHO = address(0x6Bb7a212910682DCFdbd5BCBb3e28FB4E8da10Ee);
+    address USDC = address(0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913);
 
     function run() public {
         vm.startBroadcast(DEPLOYER);
@@ -67,9 +73,40 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, Scr
 
     function _setupContracts() internal {
         _setupAccessManager();
+
+        _setupBridgeAdapters();
     }
 
-    function _setupAccessManager() internal {}
+    function _setupAccessManager() internal {
+        // Right now we just keep the admin, we should setup more roles here.
+    }
+
+    function _setupBridgeAdapters() internal {
+        // NOTE: This assumes adapters of same type are having the same address on all chains.
+        address localCcipAdapter = getCcipAdapterAddress(DEPLOYER);
+        address mainnetCcipAdapter = localCcipAdapter;
+
+        IAccountingChainGateway gateway = IAccountingChainGateway(getGatewayAddress(DEPLOYER));
+
+        uint256 mainnetChainId = 1;
+        uint64 mainnetCcipChainSelector = 5009297550715157269;
+
+        // GHO uses CCIP Adapter
+        gateway.addBridgeAdapter(GHO, mainnetChainId, localCcipAdapter);
+        gateway.setDefaultBridgeAdapter(GHO, mainnetChainId, localCcipAdapter);
+
+        // USDC uses CCIP Adapter
+        gateway.addBridgeAdapter(USDC, mainnetChainId, localCcipAdapter);
+        gateway.setDefaultBridgeAdapter(USDC, mainnetChainId, localCcipAdapter);
+
+        // Message uses CCIP Adapter
+        address messageOnly = address(0);
+        gateway.addBridgeAdapter(messageOnly, mainnetChainId, localCcipAdapter);
+        gateway.setDefaultBridgeAdapter(messageOnly, mainnetChainId, localCcipAdapter);
+
+        ICcipBridgeAdapter(localCcipAdapter).setChainSelector(mainnetChainId, mainnetCcipChainSelector);
+        ICcipBridgeAdapter(localCcipAdapter).setDestinationChainAdapter(mainnetChainId, mainnetCcipAdapter);
+    }
 
     function _deployTransferHelper() internal returns (address) {
         address transferHelper = _deploy_create3({
