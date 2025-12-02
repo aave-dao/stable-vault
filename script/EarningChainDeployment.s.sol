@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import {Script} from "forge-std/Script.sol";
 
+import {ATokenVaultDeployment} from "script/base/ATokenVaultDeployment.sol";
 import {Create3AddressBook} from "script/base/Create3AddressBook.sol";
 import {Create3Deployment} from "script/base/Create3Deployment.sol";
 
@@ -21,7 +22,7 @@ import {Swapper} from "src/periphery/Swapper.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 
-contract EarningChainDeployment is Create3Deployment, Create3AddressBook, Script {
+contract EarningChainDeployment is Create3Deployment, Create3AddressBook, ATokenVaultDeployment, Script {
     // Base Chain ID
     uint256 constant ACCOUNTING_CHAIN_ID = 8453;
     // Base CCIP Selector
@@ -106,11 +107,13 @@ contract EarningChainDeployment is Create3Deployment, Create3AddressBook, Script
     function _setupAllocator() internal {
         IAllocator allocator = IAllocator(getAllocatorAddress(DEPLOYER));
 
-        address ghoYieldStrategy = address(0); // TODO: Deploy GHO Yield Strategy
+        address poolAddressProvider = address(0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e);
+
+        address ghoYieldStrategy = _deployATokenVault(GHO, poolAddressProvider, DEPLOYER);
         allocator.addStrategy(GHO, ghoYieldStrategy);
         allocator.setDefaultStrategy(GHO, ghoYieldStrategy);
 
-        address usdcYieldStrategy = address(0); // TODO: Deploy USDC Yield Strategy
+        address usdcYieldStrategy = _deployATokenVault(USDC, poolAddressProvider, DEPLOYER);
         allocator.addStrategy(USDC, usdcYieldStrategy);
         allocator.setDefaultStrategy(USDC, usdcYieldStrategy);
     }
