@@ -3,6 +3,8 @@ pragma solidity ^0.8.20;
 
 import {Script} from "forge-std/Script.sol";
 
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
+
 import {ATokenVaultDeployment} from "script/base/ATokenVaultDeployment.sol";
 import {Create3AddressBook} from "script/base/Create3AddressBook.sol";
 import {Create3Deployment} from "script/base/Create3Deployment.sol";
@@ -25,6 +27,8 @@ import {TransferHelper} from "src/periphery/TransferHelper.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 
 contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATokenVaultDeployment, Script {
+    using Strings for address;
+
     address constant DEPLOYER = address(0xBB700dA5CCC9Ec5605780Fc40695f1206B090303);
 
     uint256 constant DEFAULT_MAX_PER_SECOND_RATE = 1000000005781378656804591713; // ~20% APY
@@ -119,10 +123,12 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
         address ghoYieldStrategy = _deployATokenVault(GHO, poolAddressProvider, DEPLOYER);
         allocator.addStrategy(GHO, ghoYieldStrategy);
         allocator.setDefaultStrategy(GHO, ghoYieldStrategy);
+        _logDeployment("GHO aTokenVault", "", ghoYieldStrategy);
 
         address usdcYieldStrategy = _deployATokenVault(USDC, poolAddressProvider, DEPLOYER);
         allocator.addStrategy(USDC, usdcYieldStrategy);
         allocator.setDefaultStrategy(USDC, usdcYieldStrategy);
+        _logDeployment("USDC aTokenVault", "", usdcYieldStrategy);
     }
 
     function _setupAssetRegistry() internal {
@@ -146,6 +152,7 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
             initCode: abi.encodePacked(type(TransferHelper).creationCode)
         });
         require(transferHelper == getTransferHelperAddress(DEPLOYER), "TransferHelper does not match expected address");
+        _logDeployment("TransferHelper", TRANSFER_HELPER_SALT_SEED, transferHelper);
         return transferHelper;
     }
 
@@ -156,6 +163,7 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
             initCode: abi.encodePacked(type(ExtendedAccessManager).creationCode, abi.encode(ACCESS_MANAGER_ADMIN))
         });
         require(accessManager == getAccessManagerAddress(DEPLOYER), "AccessManager does not match expected address");
+        _logDeployment("AccessManager", ACCESS_MANAGER_SALT_SEED, accessManager);
         return accessManager;
     }
 
@@ -169,6 +177,7 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
             initCalldata: abi.encodeCall(AssetRegistry.initialize, (getAccessManagerAddress(DEPLOYER)))
         });
         require(assetRegistry == getAssetRegistryAddress(DEPLOYER), "AssetRegistry does not match expected address");
+        _logDeployment("AssetRegistry", ASSET_REGISTRY_SALT_SEED, assetRegistry);
         return assetRegistry;
     }
 
@@ -184,6 +193,7 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
         require(
             withdrawalPolicy == getWithdrawalPolicyAddress(DEPLOYER), "WithdrawalPolicy does not match expected address"
         );
+        _logDeployment("WithdrawalPolicy", WITHDRAWAL_POLICY_SALT_SEED, withdrawalPolicy);
         return withdrawalPolicy;
     }
 
@@ -194,6 +204,7 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
             initCode: abi.encodePacked(type(IouToken).creationCode, abi.encode(getIouTokenManagerAddress(DEPLOYER)))
         });
         require(iouToken == getIouTokenAddress(DEPLOYER), "IouToken does not match expected address");
+        _logDeployment("IouToken", IOU_TOKEN_SALT_SEED, iouToken);
         return iouToken;
     }
 
@@ -217,6 +228,7 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
         require(
             iouTokenManager == getIouTokenManagerAddress(DEPLOYER), "IouTokenManager does not match expected address"
         );
+        _logDeployment("IouTokenManager", IOU_TOKEN_MANAGER_SALT_SEED, iouTokenManager);
         return iouTokenManager;
     }
 
@@ -241,6 +253,7 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
             )
         });
         require(bbv == getBasedBoostedVaultAddress(DEPLOYER), "BasedBoostedVault does not match expected address");
+        _logDeployment("BasedBoostedVault", BASED_BOOSTED_VAULT_SALT_SEED, bbv);
         return bbv;
     }
 
@@ -261,6 +274,7 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
             initCalldata: abi.encodeCall(Allocator.initialize, (getAccessManagerAddress(DEPLOYER)))
         });
         require(allocator == getAllocatorAddress(DEPLOYER), "Allocator does not match expected address");
+        _logDeployment("Allocator", ALLOCATOR_SALT_SEED, allocator);
         return allocator;
     }
 
@@ -281,6 +295,7 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
             initCalldata: abi.encodeCall(FundsHandler.initialize, (getAccessManagerAddress(DEPLOYER)))
         });
         require(fundsHandler == getFundsHandlerAddress(DEPLOYER), "FundsHandler does not match expected address");
+        _logDeployment("FundsHandler", FUNDS_HANDLER_SALT_SEED, fundsHandler);
         return fundsHandler;
     }
 
@@ -298,6 +313,7 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
             initCalldata: abi.encodeCall(AccountingChainGateway.initialize, (getAccessManagerAddress(DEPLOYER)))
         });
         require(gateway == getGatewayAddress(DEPLOYER), "Gateway does not match expected address");
+        _logDeployment("Gateway", GATEWAY_SALT_SEED, gateway);
         return gateway;
     }
 
@@ -326,6 +342,13 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
             )
         });
         require(ccipAdapter == getCcipAdapterAddress(DEPLOYER), "CcipAdapter does not match expected address");
+        _logDeployment("CcipAdapter", CCIP_ADAPTER_SALT_SEED, ccipAdapter);
         return ccipAdapter;
+    }
+
+    function _logDeployment(string memory name, string memory saltSeed, address addr) internal {
+        string memory jsonObject =
+            string.concat('{ "address": "', addr.toHexString(), '", "saltSeed": "', saltSeed, '" }');
+        vm.writeJson(jsonObject, "deployments/vnet/accounting.json", string.concat(".", name));
     }
 }
