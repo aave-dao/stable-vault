@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
+import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
+
 /// @title ICcipBridgeAdapter
 /// @author Aave Labs
 /// @notice Interface for the CcipBridgeAdapter contract.
-interface ICcipBridgeAdapter {
+interface ICcipBridgeAdapter is IBridgeAdapter {
     /// @notice Getter for the address of the Chainlink CCIP router.
     /// @return router Address of the Chainlink CCIP router.
     function getRouter() external view returns (address);
