@@ -27,6 +27,8 @@ contract EarningChainDeployment is Create3Deployment, Create3AddressBook, Script
     address constant GATEWAY_PROXY_ADMIN = PROXY_ADMIN;
     address constant IOU_TOKEN_MANAGER_PROXY_ADMIN = PROXY_ADMIN;
 
+    address constant ACCESS_MANAGER_ADMIN = DEPLOYER;
+
     address immutable ALLOCATOR_DEPOSITOR = getGatewayAddress(DEPLOYER);
     address immutable ALLOCATOR_WITHDRAWER = getGatewayAddress(DEPLOYER);
 
@@ -70,7 +72,7 @@ contract EarningChainDeployment is Create3Deployment, Create3AddressBook, Script
         address accessManager = _deploy_create3({
             namespacedSaltSeed: ACCESS_MANAGER_SALT_SEED,
             deployer: DEPLOYER,
-            initCode: abi.encodePacked(type(ExtendedAccessManager).creationCode)
+            initCode: abi.encodePacked(type(ExtendedAccessManager).creationCode, abi.encode(ACCESS_MANAGER_ADMIN))
         });
         require(accessManager == getAccessManagerAddress(DEPLOYER), "AccessManager does not match expected address");
         return accessManager;
@@ -108,7 +110,7 @@ contract EarningChainDeployment is Create3Deployment, Create3AddressBook, Script
         address iouToken = _deploy_create3({
             namespacedSaltSeed: IOU_TOKEN_SALT_SEED,
             deployer: DEPLOYER,
-            initCode: abi.encodePacked(type(IouToken).creationCode)
+            initCode: abi.encodePacked(type(IouToken).creationCode, abi.encode(getIouTokenManagerAddress(DEPLOYER)))
         });
         require(iouToken == getIouTokenAddress(DEPLOYER), "IouToken does not match expected address");
         return iouToken;
@@ -182,7 +184,7 @@ contract EarningChainDeployment is Create3Deployment, Create3AddressBook, Script
         address swapper = _deploy_create3({
             namespacedSaltSeed: SWAPPER_SALT_SEED,
             deployer: DEPLOYER,
-            initCode: abi.encodePacked(type(Swapper).creationCode)
+            initCode: abi.encodePacked(type(Swapper).creationCode, abi.encode(getAllocatorAddress(DEPLOYER)))
         });
         require(swapper == getSwapperAddress(DEPLOYER), "Swapper does not match expected address");
         return swapper;
@@ -194,10 +196,12 @@ contract EarningChainDeployment is Create3Deployment, Create3AddressBook, Script
             deployer: DEPLOYER,
             initCode: abi.encodePacked(
                 type(CcipAdapter).creationCode,
-                getAccessManagerAddress(DEPLOYER),
-                getGatewayAddress(DEPLOYER),
-                CCIP_ROUTER_ADDRESS,
-                getTransferHelperAddress(DEPLOYER)
+                abi.encode(
+                    getAccessManagerAddress(DEPLOYER),
+                    getGatewayAddress(DEPLOYER),
+                    CCIP_ROUTER_ADDRESS,
+                    getTransferHelperAddress(DEPLOYER)
+                )
             )
         });
         require(ccipAdapter == getCcipAdapterAddress(DEPLOYER), "CcipAdapter does not match expected address");
