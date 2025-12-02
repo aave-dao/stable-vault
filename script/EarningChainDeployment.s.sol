@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {Script} from "forge-std/Script.sol";
+import {console} from "forge-std/console.sol";
 
 import {ATokenVaultDeployment} from "script/base/ATokenVaultDeployment.sol";
 import {Create3AddressBook} from "script/base/Create3AddressBook.sol";
@@ -48,6 +49,7 @@ contract EarningChainDeployment is Create3Deployment, Create3AddressBook, AToken
     // ERC20s on Ethereum
     address GHO = address(0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f);
     address USDC = address(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
+    address USDT = address(0xdAC17F958D2ee523a2206206994597C13D831ec7);
 
     function run() public {
         vm.startBroadcast(DEPLOYER);
@@ -109,13 +111,18 @@ contract EarningChainDeployment is Create3Deployment, Create3AddressBook, AToken
 
         address poolAddressProvider = address(0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e);
 
-        address ghoYieldStrategy = _deployATokenVault(GHO, poolAddressProvider, DEPLOYER);
-        allocator.addStrategy(GHO, ghoYieldStrategy);
-        allocator.setDefaultStrategy(GHO, ghoYieldStrategy);
+        // TODO: Deploy GHO Yield Strategy, in mainnet it cannot be supplied so we cannot do aTokenVault for it.
+        // address ghoYieldStrategy = address(0);
+        // allocator.addStrategy(GHO, ghoYieldStrategy);
+        // allocator.setDefaultStrategy(GHO, ghoYieldStrategy);
 
         address usdcYieldStrategy = _deployATokenVault(USDC, poolAddressProvider, DEPLOYER);
         allocator.addStrategy(USDC, usdcYieldStrategy);
         allocator.setDefaultStrategy(USDC, usdcYieldStrategy);
+
+        address usdtYieldStrategy = _deployATokenVault(USDT, poolAddressProvider, DEPLOYER);
+        allocator.addStrategy(USDT, usdtYieldStrategy);
+        allocator.setDefaultStrategy(USDT, usdtYieldStrategy);
     }
 
     function _setupAssetRegistry() internal {
