@@ -169,6 +169,7 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
 
     function _deployAssetRegistry() internal returns (address) {
         address implementation = address(new AssetRegistry());
+        _logDeployment("AssetRegistry::Implementation", "", implementation);
         address assetRegistry = _deployTransparentProxy_create3({
             namespacedSaltSeed: ASSET_REGISTRY_SALT_SEED,
             deployer: DEPLOYER,
@@ -183,6 +184,7 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
 
     function _deployWithdrawalPolicy() internal returns (address) {
         address implementation = address(new WithdrawalPolicy({assetRegistry: getAssetRegistryAddress(DEPLOYER)}));
+        _logDeployment("WithdrawalPolicy::Implementation", "", implementation);
         address withdrawalPolicy = _deployTransparentProxy_create3({
             namespacedSaltSeed: WITHDRAWAL_POLICY_SALT_SEED,
             deployer: DEPLOYER,
@@ -218,6 +220,7 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
                 isAccountingChain: true
             })
         );
+        _logDeployment("IouTokenManager::Implementation", "", implementation);
         address iouTokenManager = _deployTransparentProxy_create3({
             namespacedSaltSeed: IOU_TOKEN_MANAGER_SALT_SEED,
             deployer: DEPLOYER,
@@ -243,6 +246,7 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
                 withdrawalPolicy: getWithdrawalPolicyAddress(DEPLOYER)
             })
         );
+        _logDeployment("BasedBoostedVault::Implementation", "", implementation);
         address bbv = _deployTransparentProxy_create3({
             namespacedSaltSeed: BASED_BOOSTED_VAULT_SALT_SEED,
             deployer: DEPLOYER,
@@ -266,6 +270,7 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
                 transferHelper: getTransferHelperAddress(DEPLOYER)
             })
         );
+        _logDeployment("Allocator::Implementation", "", implementation);
         address allocator = _deployTransparentProxy_create3({
             namespacedSaltSeed: ALLOCATOR_SALT_SEED,
             deployer: DEPLOYER,
@@ -287,6 +292,7 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
                 transferHelper: getTransferHelperAddress(DEPLOYER)
             })
         );
+        _logDeployment("FundsHandler::Implementation", "", implementation);
         address fundsHandler = _deployTransparentProxy_create3({
             namespacedSaltSeed: FUNDS_HANDLER_SALT_SEED,
             deployer: DEPLOYER,
@@ -305,6 +311,7 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
                 fundsHandler: getFundsHandlerAddress(DEPLOYER), iouTokenManager: getIouTokenManagerAddress(DEPLOYER)
             })
         );
+        _logDeployment("AccountingChainGateway::Implementation", "", implementation);
         address gateway = _deployTransparentProxy_create3({
             namespacedSaltSeed: GATEWAY_SALT_SEED,
             deployer: DEPLOYER,
@@ -313,7 +320,7 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
             initCalldata: abi.encodeCall(AccountingChainGateway.initialize, (getAccessManagerAddress(DEPLOYER)))
         });
         require(gateway == getGatewayAddress(DEPLOYER), "Gateway does not match expected address");
-        _logDeployment("Gateway", GATEWAY_SALT_SEED, gateway);
+        _logDeployment("AccountingChainGateway", GATEWAY_SALT_SEED, gateway);
         return gateway;
     }
 
