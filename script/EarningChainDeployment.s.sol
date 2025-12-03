@@ -259,6 +259,7 @@ contract EarningChainDeployment is Create3Deployment, Create3AddressBook, AToken
     function _deployGateway() internal returns (address) {
         address implementation = address(
             new EarningChainGateway({
+                // FIXME: set this to be the actual accounting chain id
                 accountingChainId: block.chainid,
                 allocator: getAllocatorAddress(DEPLOYER),
                 iouTokenManager: getIouTokenManagerAddress(DEPLOYER),
