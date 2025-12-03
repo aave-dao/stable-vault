@@ -8,6 +8,8 @@ fs_permissions = [
     { access = "read-write", path = "deployments" },
 ]
 cbor_metadata = true
+optimizer = true
+optimizer_runs = 1_000_000
 
 [profile.default.fuzz]
 runs = 10_000
