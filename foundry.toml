@@ -4,8 +4,10 @@ out = "out"
 libs = ["lib"]
 solc_version = "0.8.28"
 fs_permissions = [
-    { access = "read", path = "test/tables" }
+    { access = "read", path = "test/tables" },
+    { access = "read-write", path = "deployments" },
 ]
+cbor_metadata = true
 
 [profile.default.fuzz]
 runs = 10_000

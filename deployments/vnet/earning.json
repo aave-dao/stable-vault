@@ -1,0 +1,70 @@
+{
+  "TransferHelper": {
+    "address": "0x9c0d4c4e85df91a16b79b405676f289cdb06632b",
+    "saltSeed": "aave.based-boosted-vault.TransferHelper"
+  },
+  "AccessManager": {
+    "address": "0xba2533cb389802bcd18e0356b6186afb1829f6ff",
+    "saltSeed": "aave.based-boosted-vault.AccessManager"
+  },
+  "AssetRegistry::Implementation": {
+    "address": "0x4fb37a25131790880c8668d6bd07fa93d358d2bb",
+    "saltSeed": ""
+  },
+  "AssetRegistry": {
+    "address": "0xb0b9a4b122cff529b6dc4f93e0b9496afafaef3b",
+    "saltSeed": "aave.based-boosted-vault.AssetRegistry"
+  },
+  "WithdrawalPolicy::Implementation": {
+    "address": "0xe448581c3dff6720c0b4944fbaef8bf44d7419ea",
+    "saltSeed": ""
+  },
+  "WithdrawalPolicy": {
+    "address": "0x96ec72dd6a226c9fc2187f00b65f41851ff2643c",
+    "saltSeed": "aave.based-boosted-vault.WithdrawalPolicy"
+  },
+  "IouToken": {
+    "address": "0x9f1b1815af9aa9e8ecb0be9c939a3481ee7ff3f6",
+    "saltSeed": "aave.based-boosted-vault.IouToken"
+  },
+  "IouTokenManager::Implementation": {
+    "address": "0xb929a69fe0ceaa9e1bc0f47750e21005aeb19ccd",
+    "saltSeed": ""
+  },
+  "IouTokenManager": {
+    "address": "0x14fc7c26e112ac6f7ed7e5b6adcb795562fdaf10",
+    "saltSeed": "aave.based-boosted-vault.IouTokenManager"
+  },
+  "Allocator::Implementation": {
+    "address": "0x6da09c73d3c26c2d4a12857d1f2e1dd32fab22bd",
+    "saltSeed": ""
+  },
+  "Allocator": {
+    "address": "0x07623d7cb79b98ffceecef180c3ec41ef0c90789",
+    "saltSeed": "aave.based-boosted-vault.Allocator"
+  },
+  "EarningChainGateway::Implementation": {
+    "address": "0x105dc45c592a882ef213ffdbd7c0ed9147fe27e3",
+    "saltSeed": ""
+  },
+  "EarningChainGateway": {
+    "address": "0xb93e374af729e77e42294791c20f947e7bdffde6",
+    "saltSeed": "aave.based-boosted-vault.Gateway"
+  },
+  "Swapper": {
+    "address": "0xd0451c8f04442ef15791734b7adec78dd05ef203",
+    "saltSeed": "aave.based-boosted-vault.Swapper"
+  },
+  "CcipAdapter": {
+    "address": "0x18b2b16456162b546aa8f3227c5d15b5add4ba41",
+    "saltSeed": "aave.based-boosted-vault.CcipAdapter"
+  },
+  "USDC aTokenVault": {
+    "address": "0x2ee1dcb6806daaf883146761d135432d8c1223a4",
+    "saltSeed": ""
+  },
+  "USDT aTokenVault": {
+    "address": "0x2c9681a4e5c6df7560ba79d940c1b3d076c0b6a4",
+    "saltSeed": ""
+  }
+}

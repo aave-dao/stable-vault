@@ -78,7 +78,7 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
         BridgeAsset[] memory assets,
         bytes memory data,
         IBridgeAdapter.BridgeParams memory bridgeParams
-    ) external payable override onlyGateway {
+    ) external payable override(BaseBridgeAdapter, IBridgeAdapter) onlyGateway {
         Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](assets.length);
         address[] memory assetsToPull = new address[](assets.length + 1);
         uint256[] memory amountsToPull = new uint256[](assets.length + 1);

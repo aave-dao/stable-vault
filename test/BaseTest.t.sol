@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
@@ -781,16 +780,6 @@ contract BaseTest is Test {
         // ----- Set up Guardian -----
         accessManager.grantRole(GUARDIAN_ROLE, everyRoleAccount, 0);
 
-        // ----- Set up Upgrade Proxy Admin -----
-        //_setUpRole(accessManager, UPGRADE_PROXY_ADMIN_ROLE, everyRoleAccount, 1 days * 15);
-        _setUpRole(accessManager, UPGRADE_PROXY_ADMIN_ROLE, everyRoleAccount, 0);
-        bytes4[] memory upgradeSelectors = _toSelectorArray(ITransparentUpgradeableProxy.upgradeToAndCall.selector);
-        // TODO(upgrade): add all upgradabale targets here
-        address[] memory upgradeTargets = new address[](0);
-        for (uint256 i = 0; i < upgradeTargets.length; i++) {
-            accessManager.setTargetFunctionRole(upgradeTargets[i], upgradeSelectors, UPGRADE_PROXY_ADMIN_ROLE);
-        }
-
         // ----- Set up Appender -----
         //_setUpRole(accessManager, APPENDER_ROLE, everyRoleAccount, 1 days * 7);
         _setUpRole(accessManager, APPENDER_ROLE, everyRoleAccount, 0);
@@ -880,16 +869,6 @@ contract BaseTest is Test {
 
         // ----- Set up Guardian -----
         accessManager.grantRole(GUARDIAN_ROLE, everyRoleAccount, 0);
-
-        // ----- Set up Upgrade Proxy Admin -----
-        //_setUpRole(accessManager, UPGRADE_PROXY_ADMIN_ROLE, everyRoleAccount, 1 days * 15);
-        _setUpRole(accessManager, UPGRADE_PROXY_ADMIN_ROLE, everyRoleAccount, 0);
-        bytes4[] memory upgradeSelectors = _toSelectorArray(ITransparentUpgradeableProxy.upgradeToAndCall.selector);
-        // TODO(upgrade): add all upgradabale targets here
-        address[] memory upgradeTargets = new address[](0);
-        for (uint256 i = 0; i < upgradeTargets.length; i++) {
-            accessManager.setTargetFunctionRole(upgradeTargets[i], upgradeSelectors, UPGRADE_PROXY_ADMIN_ROLE);
-        }
 
         // ----- Set up Appender -----
         //_setUpRole(accessManager, APPENDER_ROLE, everyRoleAccount, 1 days * 7);
