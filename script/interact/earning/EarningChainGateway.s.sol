@@ -6,6 +6,14 @@ import {EarningChainBaseScript} from "script/interact/earning/EarningChainBaseSc
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
 
+/// @dev See example usage below:
+/// 1. > export RPC_URL=<rpc-url>
+/// 2. > cast wallet import <account_name> --private-key 0xYOUR_PRIVATE_KEY
+/// 3. > forge script script/interact/earning/EarningChainGateway.s.sol \
+///  --rpc-url $RPC_URL \
+///  --sig "sendBalanceUpdateWithFeePayer()" \
+///  --account <account_name> \
+///  --broadcast // leave this out to simular the tx
 contract EarningChainGateway is EarningChainBaseScript {
     address constant EARNING_CHAIN_GATEWAY = 0xb93E374aF729E77e42294791c20F947e7BdFFdE6;
 

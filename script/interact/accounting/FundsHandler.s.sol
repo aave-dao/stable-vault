@@ -6,6 +6,14 @@ import {AccountingChainBaseScript} from "script/interact/accounting/AccountingCh
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 
+/// @dev See example usage below:
+/// 1. > export RPC_URL=<rpc-url>
+/// 2. > cast wallet import <account_name> --private-key 0xYOUR_PRIVATE_KEY
+/// 3. > forge script script/interact/accounting/FundsHandler.s.sol \
+///  --rpc-url $RPC_URL \
+///  --sig "pushFundsToChain()" \
+///  --account <account_name> \
+///  --broadcast // leave this out to simular the tx
 contract FundsHandler is AccountingChainBaseScript {
     address constant FUNDS_HANDLER = 0xd2F851e7A5f4f43B3347376cd93824524A1b0187;
 
