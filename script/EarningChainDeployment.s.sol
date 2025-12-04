@@ -142,6 +142,7 @@ contract EarningChainDeployment is Create3Deployment, Create3AddressBook, AToken
         });
         assetRegistry.setAssetConfig(GHO, unrestrictedAssetConfig);
         assetRegistry.setAssetConfig(USDC, unrestrictedAssetConfig);
+        assetRegistry.setAssetConfig(USDT, unrestrictedAssetConfig);
     }
 
     function _deployTransferHelper() internal returns (address) {
@@ -259,7 +260,7 @@ contract EarningChainDeployment is Create3Deployment, Create3AddressBook, AToken
     function _deployGateway() internal returns (address) {
         address implementation = address(
             new EarningChainGateway({
-                accountingChainId: block.chainid,
+                accountingChainId: ACCOUNTING_CHAIN_ID,
                 allocator: getAllocatorAddress(DEPLOYER),
                 iouTokenManager: getIouTokenManagerAddress(DEPLOYER),
                 transferHelper: getTransferHelperAddress(DEPLOYER),
