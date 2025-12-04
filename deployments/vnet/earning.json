@@ -44,7 +44,7 @@
     "saltSeed": "aave.based-boosted-vault.Allocator"
   },
   "EarningChainGateway::Implementation": {
-    "address": "0x105dc45c592a882ef213ffdbd7c0ed9147fe27e3",
+    "address": "0xb8a950875d513e82c2fdcaa0d9be8334fefe8bb5",
     "saltSeed": ""
   },
   "EarningChainGateway": {
