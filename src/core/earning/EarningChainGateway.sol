@@ -142,7 +142,63 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
         return amountOut;
     }
 
-    // This function is just needed to prevent StackTooDeep
+    /// @inheritdoc IEarningChainGateway
+    function pushFundsToAccountingChain(address asset, uint256 amount, IBridgeAdapter.BridgeParams memory bridgeParams)
+        external
+        payable
+        override
+        restricted
+        assertingTransferHelperBalanceFor(bridgeParams.feeToken)
+        assertingTransferHelperBalanceFor(asset)
+    {
+        require(amount > 0, ErrorsLib.ZeroAmount());
+        // Transfer the bridge fee to the TransferHelper.
+        _transferBridgeFeeToTransferHelper(bridgeParams);
+
+        // Pull funds from liquidity into the TransferHelper.
+        IAllocator(ALLOCATOR).withdraw(asset, amount);
+
+        _returnFundsWithBalanceSnapshot(asset, amount, bridgeParams);
+    }
+
+    function _bridgeIouTokenFromAccountingChain(bytes memory data) internal {
+        IChainGateway.IouTokenBridgeMessage memory iouTokenBridgeMessage =
+            abi.decode(data, (IChainGateway.IouTokenBridgeMessage));
+        IIouTokenManager(IOU_TOKEN_MANAGER).mintTokens(iouTokenBridgeMessage.recipient, iouTokenBridgeMessage.amount);
+    }
+
+    function _receiveData(uint256 sourceChainId, bytes memory data) internal override {
+        _onlyAdapter(ConstantsLib.ASSET_FOR_DATA_ONLY_BRIDGE, sourceChainId);
+        IChainGateway.CrossChainMessage memory crossChainMessage = abi.decode(data, (IChainGateway.CrossChainMessage));
+        if (crossChainMessage.messageType == IChainGateway.MessageType.BRIDGE_IOU_TOKEN) {
+            _bridgeIouTokenFromAccountingChain(crossChainMessage.data);
+        } else {
+            revert IChainGateway.InvalidMessageType();
+        }
+    }
+
+    function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal override {
+        for (uint256 i = 0; i < assets.length; i++) {
+            IAllocator(ALLOCATOR).deposit(assets[i].asset, assets[i].amount);
+        }
+    }
+
+    function _returnFundsWithBalanceSnapshot(
+        address asset,
+        uint256 amount,
+        IBridgeAdapter.BridgeParams memory bridgeParams
+    ) internal {
+        address bridgeAdapter = $BaseChainGateway().defaultBridgeAdapter[asset][ACCOUNTING_CHAIN_ID];
+        require(bridgeAdapter != address(0), AdapterNotFound());
+
+        // Sends a single cross chain message with the asset and the balance snapshot. The bridge must support both
+        // assets and arbitrary data.
+        _sendCrossChainMessage(
+            ACCOUNTING_CHAIN_ID, bridgeAdapter, asset, amount, _getBalanceSnapshotData(), bridgeParams
+        );
+    }
+
+    /// @dev This function is just needed to prevent StackTooDeep
     function _sendBurnIouTokenMessage(
         uint256 iouTokenAmountRay,
         address adapter,
@@ -169,62 +225,6 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
             0,
             burnIouTokenMessageEncoded,
             bridgeParams
-        );
-    }
-
-    /// @inheritdoc IEarningChainGateway
-    function pushFundsToAccountingChain(address asset, uint256 amount, IBridgeAdapter.BridgeParams memory bridgeParams)
-        external
-        payable
-        override
-        restricted
-        assertingTransferHelperBalanceFor(bridgeParams.feeToken)
-        assertingTransferHelperBalanceFor(asset)
-    {
-        require(amount > 0, ErrorsLib.ZeroAmount());
-        // Transfer the bridge fee to the TransferHelper.
-        _transferBridgeFeeToTransferHelper(bridgeParams);
-
-        // Pull funds from liquidity into the TransferHelper.
-        IAllocator(ALLOCATOR).withdraw(asset, amount);
-
-        _returnFundsWithBalanceSnapshot(asset, amount, bridgeParams);
-    }
-
-    function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal override {
-        for (uint256 i = 0; i < assets.length; i++) {
-            IAllocator(ALLOCATOR).deposit(assets[i].asset, assets[i].amount);
-        }
-    }
-
-    function _receiveData(uint256 sourceChainId, bytes memory data) internal override {
-        _onlyAdapter(ConstantsLib.ASSET_FOR_DATA_ONLY_BRIDGE, sourceChainId);
-        IChainGateway.CrossChainMessage memory crossChainMessage = abi.decode(data, (IChainGateway.CrossChainMessage));
-        if (crossChainMessage.messageType == IChainGateway.MessageType.BRIDGE_IOU_TOKEN) {
-            _bridgeIouTokenFromAccountingChain(crossChainMessage.data);
-        } else {
-            revert IChainGateway.InvalidMessageType();
-        }
-    }
-
-    function _bridgeIouTokenFromAccountingChain(bytes memory data) internal {
-        IChainGateway.IouTokenBridgeMessage memory iouTokenBridgeMessage =
-            abi.decode(data, (IChainGateway.IouTokenBridgeMessage));
-        IIouTokenManager(IOU_TOKEN_MANAGER).mintTokens(iouTokenBridgeMessage.recipient, iouTokenBridgeMessage.amount);
-    }
-
-    function _returnFundsWithBalanceSnapshot(
-        address asset,
-        uint256 amount,
-        IBridgeAdapter.BridgeParams memory bridgeParams
-    ) internal {
-        address bridgeAdapter = $BaseChainGateway().defaultBridgeAdapter[asset][ACCOUNTING_CHAIN_ID];
-        require(bridgeAdapter != address(0), AdapterNotFound());
-
-        // Sends a single cross chain message with the asset and the balance snapshot. The bridge must support both
-        // assets and arbitrary data.
-        _sendCrossChainMessage(
-            ACCOUNTING_CHAIN_ID, bridgeAdapter, asset, amount, _getBalanceSnapshotData(), bridgeParams
         );
     }
 
