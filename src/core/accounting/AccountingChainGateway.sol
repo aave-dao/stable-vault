@@ -18,12 +18,12 @@ import {ConstantsLib} from "src/libraries/ConstantsLib.sol";
 contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
     using SafeERC20 for IERC20;
 
+    address internal immutable FUNDS_HANDLER;
+
     modifier onlyFundsHandler() {
         require(msg.sender == FUNDS_HANDLER, OnlyFundsHandler());
         _;
     }
-
-    address internal immutable FUNDS_HANDLER;
 
     /// @dev Constructor.
     /// @param fundsHandler The address of the FundsHandler contract.

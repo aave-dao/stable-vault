@@ -188,6 +188,7 @@ contract BasedBoostedVault is
 
     /// @inheritdoc IBasedBoostedVault
     function setUserRate(UserRateData[] calldata userRateData) external override restricted {
+        // limit the size of this input?????????
         for (uint256 i = 0; i < userRateData.length; i++) {
             _setUserRate(userRateData[i].user, userRateData[i].newPerSecondRate);
         }
@@ -290,11 +291,6 @@ contract BasedBoostedVault is
         require(accumulatedAmountRay <= fee, ErrorsLib.InvalidAmount());
         ITransferHelper(TRANSFER_HELPER).transfer(assets, amounts, msg.sender);
         emit FeesClaimed(assets, amounts);
-    }
-
-    /// @inheritdoc RescuableAssets
-    function rescueTokens(address asset, uint256 amount) public override restricted {
-        super.rescueTokens(asset, amount);
     }
 
     ////////////////////////////////////////////////// GETTERS /////////////////////////////////////////////////////
@@ -580,5 +576,17 @@ contract BasedBoostedVault is
         _migrateUserToSubVault(user, oldSubVaultId, newSubVaultId);
 
         emit UserRateSet(user, newSubVaultId, newPerSecondRate);
+    }
+
+    function _beforeRescueTokens(
+        address, // asset
+        uint256 // amount
+    )
+        internal
+        virtual
+        override
+    {
+        // Equivalent to adding the `restricted` modifier.
+        _checkCanCall(_msgSender(), _msgData());
     }
 }

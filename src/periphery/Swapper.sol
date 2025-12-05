@@ -13,7 +13,7 @@ import {ConstantsLib} from "src/libraries/ConstantsLib.sol";
 /// @title Swapper
 /// @author Aave Labs
 /// @notice Swapper contract for executing swaps with slippage & access control.
-contract Swapper is ISwapper, Ownable, ReentrancyGuard {
+contract Swapper is Ownable, ReentrancyGuard, ISwapper {
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
 

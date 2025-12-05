@@ -132,12 +132,13 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
         uint256 amountOut = (iouTokenAmountRay - withdrawalFeeRay).rayToAssetDecimals(tokenOut);
         require(amountOut > 0, ErrorsLib.InsufficientAmountOut());
         IAllocator(ALLOCATOR).withdraw(tokenOut, amountOut);
-        ITransferHelper(TRANSFER_HELPER).transfer(tokenOut, amountOut, tokenOutReceiver);
 
         _transferBridgeFeeToTransferHelper(bridgeParams);
 
         // Send data to synchronize the Accounting Chain's state.
         _sendBurnIouTokenMessage(iouTokenAmountRay, adapter, bridgeParams);
+
+        ITransferHelper(TRANSFER_HELPER).transfer(tokenOut, amountOut, tokenOutReceiver);
 
         return amountOut;
     }

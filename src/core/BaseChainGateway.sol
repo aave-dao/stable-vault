@@ -102,11 +102,6 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
             );
     }
 
-    /// @inheritdoc RescuableAssets
-    function rescueTokens(address asset, uint256 amount) public override restricted {
-        super.rescueTokens(asset, amount);
-    }
-
     /// @inheritdoc IChainGateway
     function addBridgeAdapter(address asset, uint256 chainId, address adapter) external override restricted {
         require(!$storage().supportedBridgeAdapters[asset][chainId][adapter], ErrorsLib.AddressAlreadyWhitelisted());
@@ -155,6 +150,18 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
         }
         IBridgeAdapter(adapter)
             .publishMessageToChainWithFeePayer(destinationChainId, assets, dataToBridge, bridgeParams);
+    }
+
+    function _beforeRescueTokens(
+        address, // asset
+        uint256 // amount
+    )
+        internal
+        virtual
+        override
+    {
+        // Equivalent to adding the `restricted` modifier.
+        _checkCanCall(_msgSender(), _msgData());
     }
 
     function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal virtual;
