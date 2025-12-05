@@ -137,6 +137,7 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
         if (message.destTokenAmounts.length > 0) {
             try this.processReceivedFunds(message.destTokenAmounts) {}
             catch (bytes memory err) {
+                // TODO: emit event that indicate the assets and their amounts
                 emit BridgedFundsProcessingFailed(_chainIdOf[message.sourceChainSelector], abi.encode(message), err);
             }
         }
