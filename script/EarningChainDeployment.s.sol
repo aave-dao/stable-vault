@@ -100,6 +100,8 @@ contract EarningChainDeployment is Create3Deployment, Create3AddressBook, AToken
         gateway.addBridgeAdapter(USDC, ACCOUNTING_CHAIN_ID, localCcipAdapter);
         gateway.setDefaultBridgeAdapter(USDC, ACCOUNTING_CHAIN_ID, localCcipAdapter);
 
+        // TODO: Add USDT bridge adapter
+
         // Message uses CCIP Adapter
         address messageOnly = address(0);
         gateway.addBridgeAdapter(messageOnly, ACCOUNTING_CHAIN_ID, localCcipAdapter);
@@ -259,7 +261,6 @@ contract EarningChainDeployment is Create3Deployment, Create3AddressBook, AToken
     function _deployGateway() internal returns (address) {
         address implementation = address(
             new EarningChainGateway({
-                // FIXME: set this to be the actual accounting chain id
                 accountingChainId: block.chainid,
                 allocator: getAllocatorAddress(DEPLOYER),
                 iouTokenManager: getIouTokenManagerAddress(DEPLOYER),

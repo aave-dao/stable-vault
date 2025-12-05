@@ -10,18 +10,17 @@ import {IBasedBoostedVault} from "src/interfaces/IBasedBoostedVault.sol";
 /// @dev See example usage below:
 /// 1. > export RPC_URL=<rpc-url>
 /// 2. > cast wallet import <account_name> --private-key 0xYOUR_PRIVATE_KEY
-/// 3. > forge script script/interact/accounting/BasedBoostedVault.s.sol \
+/// 3. > forge script script/interact/accounting/BasedBoostedVaultInteractionScript.s.sol \
 ///  --rpc-url $RPC_URL \
 ///  --sig "executeWithdrawal()" \
 ///  --account <account_name> \
-///  --sender <account_address> \
-///  --broadcast // leave this out to simular the tx
-contract BasedBoostedVault is AccountingChainBaseScript {
-    address constant BASED_BOOSTED_VAULT = 0xb49bD8C7fa9d910D77eF5A356CcFdF6A4ba14602;
-
+///  --sender <account_address>
+/// 4. > Add --broadcast to send the tx instead of simulating it.
+/// 5. > Add --slow to force foundry to execute txs sequentially.
+contract BasedBoostedVaultInteractionScript is AccountingChainBaseScript {
     function deposit() public {
-        address asset = USDC;
-        uint256 amount = 123456;
+        address asset = GHO;
+        uint256 amount = 8766 * 10 ** 18;
 
         vm.startBroadcast();
         IERC20(asset).approve(BASED_BOOSTED_VAULT, amount);
@@ -30,7 +29,7 @@ contract BasedBoostedVault is AccountingChainBaseScript {
     }
 
     function requestWithdrawal() public {
-        uint256 amountInRay = 123456000000000000000000000;
+        uint256 amountInRay = 1 * 10 ** 27;
 
         vm.startBroadcast();
         IBasedBoostedVault(BASED_BOOSTED_VAULT).requestWithdrawal(msg.sender, amountInRay);
@@ -39,10 +38,14 @@ contract BasedBoostedVault is AccountingChainBaseScript {
 
     function executeWithdrawal() public {
         address asset = USDC;
-        uint256 amountInRay = 123456000000000000000000000;
+        uint256 amountInRay = 1 * 10 ** 18;
 
         vm.startBroadcast();
         IBasedBoostedVault(BASED_BOOSTED_VAULT).executeWithdrawal(msg.sender, asset, amountInRay, "");
         vm.stopBroadcast();
+    }
+
+    function getAggregatedBalance() public view returns (uint256) {
+        return IBasedBoostedVault(BASED_BOOSTED_VAULT).getAggregatedBalance();
     }
 }

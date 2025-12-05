@@ -106,6 +106,8 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
         gateway.addBridgeAdapter(USDC, mainnetChainId, localCcipAdapter);
         gateway.setDefaultBridgeAdapter(USDC, mainnetChainId, localCcipAdapter);
 
+        // TODO: Add USDT bridge adapter
+
         // Message uses CCIP Adapter
         address messageOnly = address(0);
         gateway.addBridgeAdapter(messageOnly, mainnetChainId, localCcipAdapter);
@@ -129,6 +131,8 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
         allocator.addStrategy(USDC, usdcYieldStrategy);
         allocator.setDefaultStrategy(USDC, usdcYieldStrategy);
         _logDeployment("USDC aTokenVault", "", usdcYieldStrategy);
+
+        // TODO: Add USDT yield strategy
     }
 
     function _setupAssetRegistry() internal {
@@ -143,6 +147,7 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
         });
         assetRegistry.setAssetConfig(GHO, unrestrictedAssetConfig);
         assetRegistry.setAssetConfig(USDC, unrestrictedAssetConfig);
+        // TODO: Add USDT asset config
     }
 
     function _deployTransferHelper() internal returns (address) {

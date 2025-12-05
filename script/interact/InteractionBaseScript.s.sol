@@ -12,8 +12,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 ///  --rpc-url $RPC_URL \
 ///  --sig "approveMax(address,address)" <token_address> <spender_address> \
 ///  --account <account_name> \
-///  --sender <account_address> \
-///  --broadcast // leave this out to simular the tx
+///  --sender <account_address>
+/// 4. > Add --broadcast to send the tx instead of simulating it.
 contract InteractionBaseScript is Script {
     function approveMax(address token, address spender) public virtual {
         vm.startBroadcast();
