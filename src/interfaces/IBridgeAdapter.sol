@@ -8,6 +8,10 @@ interface IBridgeAdapter {
     /// @notice Emitted when the processing of bridged funds fails.
     event BridgedFundsProcessingFailed(uint256 sourceChainId, bytes message, bytes error);
 
+    /// @notice Emitted when the processing of a received token fails downstream from the adapter.
+    /// @dev Indicates that the token will remain on the adapter contract.
+    event ReceivedTokenProcessingFailed(uint256 indexed sourceChainId, address indexed asset, uint256 amount);
+
     /// @notice Address checked is not the destination chain adapter.
     /// @custom:selector 0x75503511
     error OnlyDestinationChainAdapter();

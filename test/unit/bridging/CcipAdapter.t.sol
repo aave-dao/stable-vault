@@ -946,6 +946,10 @@ contract CcipAdapterTest is TestWithHelpers {
         });
 
         vm.expectEmit(true, true, true, true);
+        emit IBridgeAdapter.ReceivedTokenProcessingFailed(EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt);
+        vm.expectEmit(true, true, true, true);
+        emit IBridgeAdapter.ReceivedTokenProcessingFailed(EARNING_CHAIN_ID, address(_mockGho), amountGho);
+        vm.expectEmit(true, true, true, true);
         emit IBridgeAdapter.BridgedFundsProcessingFailed(EARNING_CHAIN_ID, abi.encode(ccipMessage), abi.encode("test"));
 
         // mock a revert from downstream fund handling

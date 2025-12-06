@@ -124,6 +124,10 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
     /// @inheritdoc IAny2EVMMessageReceiver
     function ccipReceive(Client.Any2EVMMessage calldata message) external override onlyRouter {
         if (message.data.length > 0) {
+            // Allow message ingestion to fail because we do not want message ingestion to succeed, but fund ingestion
+            // to succeed. Consider the case where a token is bridged along with a balance snapshot update: this can
+            // lead to double counting assets as the funds would be included in local balances, but a snapshot would
+            // remain stale.
             require(
                 abi.decode(message.sender, (address))
                     == _destinationChainAdapterOf[_chainIdOf[message.sourceChainSelector]],
@@ -137,7 +141,13 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
         if (message.destTokenAmounts.length > 0) {
             try this.processReceivedFunds(message.destTokenAmounts) {}
             catch (bytes memory err) {
-                // TODO: emit event that indicate the assets and their amounts
+                for (uint256 i = 0; i < message.destTokenAmounts.length; i++) {
+                    emit ReceivedTokenProcessingFailed(
+                        _chainIdOf[message.sourceChainSelector],
+                        message.destTokenAmounts[i].token,
+                        message.destTokenAmounts[i].amount
+                    );
+                }
                 emit BridgedFundsProcessingFailed(_chainIdOf[message.sourceChainSelector], abi.encode(message), err);
             }
         }
