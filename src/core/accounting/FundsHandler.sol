@@ -205,6 +205,7 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, TransferHelp
                     })
                 );
         }
+        // TODO: emit event that indicate the chain id, the snapshot balance ray, and the chain balance snapshot nonce
     }
 
     ////////////////////////////////////////////////// INTERNAL /////////////////////////////////////////////////////
@@ -223,6 +224,7 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, TransferHelp
             $storage().chainBalances
                 .push(ChainBalanceSnapshot({chainId: chainId, amountRay: amountToIncrementRay, nonce: 0}));
         }
+        // TODO: emit event that indicate the chain id, the amount to increment ray
     }
 
     function _pushFundsToImmediateLiquidity(address asset, uint256 amount) internal {

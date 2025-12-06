@@ -100,6 +100,8 @@ contract EarningChainDeployment is Create3Deployment, Create3AddressBook, AToken
         gateway.addBridgeAdapter(USDC, ACCOUNTING_CHAIN_ID, localCcipAdapter);
         gateway.setDefaultBridgeAdapter(USDC, ACCOUNTING_CHAIN_ID, localCcipAdapter);
 
+        // TODO: Add USDT bridge adapter
+
         // Message uses CCIP Adapter
         address messageOnly = address(0);
         gateway.addBridgeAdapter(messageOnly, ACCOUNTING_CHAIN_ID, localCcipAdapter);
