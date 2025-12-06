@@ -8,6 +8,14 @@ interface IBridgeAdapter {
     /// @notice Emitted when the processing of bridged funds fails.
     event BridgedFundsProcessingFailed(uint256 sourceChainId, bytes message, bytes error);
 
+    /// @notice Emitted when a message is published with a given message id from the bridge provider.
+    /// @dev The message id matches the one in the `ReceivedMessageWithId` event.
+    event PublishedMessageWithId(bytes32 indexed messageId);
+
+    /// @notice Emitted when a message is received with a given message id from the bridge provider.
+    /// @dev The message id matches the one in the `PublishedMessageWithId` event.
+    event ReceivedMessageWithId(bytes32 indexed messageId);
+
     /// @notice Emitted when the processing of a received token fails downstream from the adapter.
     /// @dev Indicates that the token will remain on the adapter contract.
     event ReceivedTokenProcessingFailed(uint256 indexed sourceChainId, address indexed asset, uint256 amount);

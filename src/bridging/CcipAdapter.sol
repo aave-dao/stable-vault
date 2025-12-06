@@ -123,6 +123,7 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
 
     /// @inheritdoc IAny2EVMMessageReceiver
     function ccipReceive(Client.Any2EVMMessage calldata message) external override onlyRouter {
+        emit ReceivedMessageWithId(message.messageId);
         if (message.data.length > 0) {
             // Allow message ingestion to fail because we do not want message ingestion to succeed, but fund ingestion
             // to succeed. Consider the case where a token is bridged along with a balance snapshot update: this can
@@ -187,7 +188,8 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
                 _triggerFeeRefund(feePayer, feeToken, excessFee);
             }
         }
-        IRouterClient(CCIP_ROUTER).ccipSend{value: msgValue}(chainSelector, message);
+        bytes32 messageId = IRouterClient(CCIP_ROUTER).ccipSend{value: msgValue}(chainSelector, message);
+        emit PublishedMessageWithId(messageId);
     }
 
     function _triggerFeeRefund(address feePayer, address feeToken, uint256 excessFee) internal {
