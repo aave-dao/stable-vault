@@ -752,6 +752,16 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.withdraw(address(_mockUsdt), amount);
     }
 
+    function test_tryWithdrawFromStrategy_revert_ifNotCalledBySelf(address nonSelf) public {
+        uint256 amount = 1000;
+        vm.assume(nonSelf != address(_allocator));
+        _assumeNotProxyAdmin(nonSelf, address(_allocator));
+
+        vm.prank(nonSelf);
+        vm.expectRevert(ErrorsLib.OnlySelf.selector);
+        _allocator.tryWithdrawFromStrategy(address(_mockUsdt), amount, address(_defaultUsdtStrategy));
+    }
+
     function test_rebalance_reverts_ifNotAuthorized(address operator) public {
         vm.assume(operator != everyRoleAccount);
         vm.assume(operator != address(0));
