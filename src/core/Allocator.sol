@@ -7,6 +7,7 @@ import {
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
@@ -30,33 +31,28 @@ import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
 contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall, IAllocator {
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
-
-    /// @notice The data for a strategy.
-    /// @param asset Address of the asset that the strategy is for.
-    /// @param indexInAssetStrategies Index of the strategy in the asset's strategies array.
-    /// @param indexInAllStrategies Index of the strategy in the all strategies array.
-    struct StrategyData {
-        address asset;
-        uint32 indexInAssetStrategies;
-        uint32 indexInAllStrategies;
-    }
+    using EnumerableSet for EnumerableSet.AddressSet;
 
     address internal immutable DEPOSITOR;
     address internal immutable WITHDRAWER;
     address internal immutable ASSET_REGISTRY;
 
+    struct StrategyConfig {
+        address asset;
+        bool depositAllowed;
+        bool withdrawalAllowed;
+    }
+
     /// @custom:storage-location erc7201:aave.storage.Allocator
     struct AllocatorStorage {
         mapping(address asset => address strategy) defaultStrategyByAsset;
-        mapping(address strategy => StrategyData strategyData) strategyData;
+        mapping(address strategy => StrategyConfig strategyConfig) strategyConfigs;
         // To iterate through all strategies for an asset.
-        mapping(address asset => address[]) assetStrategies;
-        // To allow O(1) lookup to see if asset should be added/removed from $storage().assetsWithSupportedStrategies.
-        mapping(address asset => uint256 strategiesCount) assetStrategyCount;
+        mapping(address asset => EnumerableSet.AddressSet) assetStrategies;
         // To iterate through all strategies.
-        address[] allStrategies;
+        EnumerableSet.AddressSet allStrategies;
         // List of all supported assets that have at least one strategy.
-        address[] assetsWithSupportedStrategies;
+        EnumerableSet.AddressSet assetsWithSupportedStrategies;
     }
 
     // keccak256(abi.encode(uint256(keccak256("aave.storage.Allocator")) - 1)) & ~bytes32(uint256(0xff))
@@ -166,8 +162,9 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
             }
 
             // If necessary, pull from remaining strategies
-            for (uint256 i = 0; amountRemaining > 0 && i < $storage().assetStrategies[asset].length; i++) {
-                address strategy = $storage().assetStrategies[asset][i];
+            uint256 length = $storage().assetStrategies[asset].length();
+            for (uint256 i = 0; amountRemaining > 0 && i < length; i++) {
+                address strategy = $storage().assetStrategies[asset].at(i);
                 if (strategy != $storage().defaultStrategyByAsset[asset]) {
                     try this.tryWithdrawFromStrategy(asset, amountRemaining, strategy) returns (uint256 withdrawn) {
                         amountRemaining -= withdrawn;
@@ -345,10 +342,12 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
 
     /// @dev Returns balances grouped by asset.
     function _getAssetBalances() internal view returns (IAllocator.AllocatorBalance[] memory) {
-        IAllocator.AllocatorBalance[] memory allocatedAssets =
-            new IAllocator.AllocatorBalance[]($storage().assetsWithSupportedStrategies.length);
-        for (uint256 i = 0; i < $storage().assetsWithSupportedStrategies.length; i++) {
-            address asset = $storage().assetsWithSupportedStrategies[i];
+        // FIXME: This is not correct - it should iterate through all strategies and assets, not just assets with
+        // supported strategies
+        uint256 assetsLength = $storage().assetsWithSupportedStrategies.length();
+        IAllocator.AllocatorBalance[] memory allocatedAssets = new IAllocator.AllocatorBalance[](assetsLength);
+        for (uint256 i = 0; i < assetsLength; i++) {
+            address asset = $storage().assetsWithSupportedStrategies.at(i);
             allocatedAssets[i] = IAllocator.AllocatorBalance({asset: asset, amount: _getTotalAssetBalance(asset)});
         }
         return allocatedAssets;
@@ -356,8 +355,9 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
 
     function _getTotalAssetBalance(address asset) internal view returns (uint256) {
         uint256 balance = 0;
-        for (uint256 i = 0; i < $storage().assetStrategies[asset].length; i++) {
-            balance += _getAssetBalanceInStrategy(IERC4626($storage().assetStrategies[asset][i]));
+        uint256 strategiesLength = $storage().assetStrategies[asset].length();
+        for (uint256 i = 0; i < strategiesLength; i++) {
+            balance += _getAssetBalanceInStrategy(IERC4626($storage().assetStrategies[asset].at(i)));
         }
         balance += IERC20(asset).balanceOf(address(this));
         return balance;
@@ -369,78 +369,55 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     }
 
     function _isStrategySupportedForAsset(address strategy, address asset) internal view returns (bool) {
-        return $storage().strategyData[strategy].asset == asset;
+        return $storage().strategyConfigs[strategy].asset == asset;
     }
 
     function _isStrategySupported(address strategy) internal view returns (bool) {
-        return $storage().strategyData[strategy].asset != address(0);
+        return $storage().strategyConfigs[strategy].asset != address(0);
     }
 
     function _addStrategy(address asset, address strategy) internal {
         require(!_isStrategySupported(strategy), ErrorsLib.AddressAlreadyWhitelisted());
         require(asset == IERC4626(strategy).asset(), ErrorsLib.InvalidAsset(asset));
-        $storage().assetStrategies[asset].push(strategy);
-        $storage().allStrategies.push(strategy);
-        $storage().strategyData[strategy] = StrategyData({
-            asset: asset,
-            indexInAssetStrategies: uint32($storage().assetStrategies[asset].length - 1),
-            indexInAllStrategies: uint32($storage().allStrategies.length - 1)
-        });
+
+        $storage().strategyConfigs[strategy] =
+            StrategyConfig({asset: asset, depositAllowed: true, withdrawalAllowed: true});
+        $storage().assetStrategies[asset].add(strategy);
+        $storage().allStrategies.add(strategy);
 
         // Add asset to $storage().assetsWithSupportedStrategies if it is not already in the list
-        if ($storage().assetStrategyCount[asset] == 0) {
-            $storage().assetsWithSupportedStrategies.push(asset);
+        if (!$storage().assetsWithSupportedStrategies.contains(asset)) {
+            $storage().assetsWithSupportedStrategies.add(asset);
         }
-        $storage().assetStrategyCount[asset]++;
 
         emit StrategyAdded(asset, strategy);
     }
 
     function _removeStrategy(address strategy) internal {
-        StrategyData memory strategyData = $storage().strategyData[strategy];
-        require(_isStrategySupported(strategy), ErrorsLib.AddressNotWhitelisted());
-        if (strategy == $storage().defaultStrategyByAsset[strategyData.asset]) {
+        address asset = $storage().strategyConfigs[strategy].asset;
+        require(asset != address(0), ErrorsLib.AddressNotWhitelisted());
+        // FIXME: do not allow removal if strategy has funds in it
+
+        if (strategy == $storage().defaultStrategyByAsset[asset]) {
             // Unset the default strategy for the asset - deposits will not flow to this strategy.
-            // If the default strategy is removed, another one should be set as the default for withdrawals.
-            delete $storage().defaultStrategyByAsset[strategyData.asset];
-            emit DefaultStrategySet(strategyData.asset, address(0));
+            // If the default strategy is removed, another one should be set as the default for deposits and
+            // withdrawals.
+            delete $storage().defaultStrategyByAsset[asset];
+            emit DefaultStrategySet(asset, address(0));
         }
 
         // Remove strategy from $storage().assetStrategies
-        if ($storage().assetStrategies[strategyData.asset].length > 1) {
-            uint32 index = strategyData.indexInAssetStrategies;
-            $storage().assetStrategies[strategyData.asset][index] = $storage()
-            .assetStrategies[strategyData.asset][$storage().assetStrategies[strategyData.asset].length - 1];
-            $storage().strategyData[$storage().assetStrategies[strategyData.asset][index]].indexInAssetStrategies =
-            index;
+        $storage().assetStrategies[asset].remove(strategy);
+        // Update storage that tracks assets with supported strategies
+        if ($storage().assetStrategies[asset].length() == 0) {
+            // Remove asset from $storage().assetsWithSupportedStrategies
+            $storage().assetsWithSupportedStrategies.remove(asset);
         }
-        $storage().assetStrategies[strategyData.asset].pop();
 
         // Remove strategy from $storage().allStrategies
-        if ($storage().allStrategies.length > 1) {
-            uint32 indexInAllStrategies = strategyData.indexInAllStrategies;
-            $storage().allStrategies[indexInAllStrategies] =
-                $storage().allStrategies[$storage().allStrategies.length - 1];
-            $storage().strategyData[$storage().allStrategies[indexInAllStrategies]].indexInAllStrategies =
-            indexInAllStrategies;
-        }
-        $storage().allStrategies.pop();
+        $storage().allStrategies.remove(strategy);
 
-        // Update storage that tracks assets with supported strategies
-        $storage().assetStrategyCount[strategyData.asset]--;
-        if ($storage().assetStrategyCount[strategyData.asset] == 0) {
-            // Remove asset from $storage().assetsWithSupportedStrategies
-            for (uint256 i = 0; i < $storage().assetsWithSupportedStrategies.length; i++) {
-                if ($storage().assetsWithSupportedStrategies[i] == strategyData.asset) {
-                    $storage().assetsWithSupportedStrategies[i] =
-                        $storage().assetsWithSupportedStrategies[$storage().assetsWithSupportedStrategies.length - 1];
-                    $storage().assetsWithSupportedStrategies.pop();
-                    break;
-                }
-            }
-        }
-
-        delete $storage().strategyData[strategy];
-        emit StrategyRemoved(strategyData.asset, strategy);
+        delete $storage().strategyConfigs[strategy];
+        emit StrategyRemoved(asset, strategy);
     }
 }
