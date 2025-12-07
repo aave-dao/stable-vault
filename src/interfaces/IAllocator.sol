@@ -9,13 +9,15 @@ interface IAllocator {
 
     event AssetAllocated(address indexed asset, address indexed strategy, uint256 amount);
 
+    event DefaultStrategySet(address indexed asset, address indexed strategy);
+
     event StrategyDepositFailed(address indexed strategy, uint256 amount);
+
+    event StrategyWithdrawalFailed(address indexed strategy, address indexed asset, uint256 amount);
 
     event StrategyAdded(address indexed asset, address indexed strategy);
 
     event StrategyRemoved(address indexed asset, address indexed strategy);
-
-    event DefaultStrategySet(address indexed asset, address indexed strategy);
 
     /// @notice Thrown when funds fail to deposit into a yield strategy.
     /// @custom:selector 0x3868bf52

@@ -79,6 +79,13 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         _;
     }
 
+    modifier onlySelf() {
+        if (msg.sender != address(this)) {
+            revert ErrorsLib.OnlySelf();
+        }
+        _;
+    }
+
     /// @dev Constructor.
     /// @param assetRegistry The address of the AssetRegistry contract.
     /// @param depositor The address of the depositor to whitelist.
@@ -149,19 +156,45 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
             uint256 amountRemaining = amount - idleBalance;
 
             // Consume from default strategy
-            amountRemaining -= _tryWithdrawFromStrategy(
-                asset, amountRemaining, $storage().defaultStrategyByAsset[asset]
-            );
+            // Wrap in a try-catch to avoid impact to searching other strategies
+            try this.tryWithdrawFromStrategy(asset, amountRemaining, $storage().defaultStrategyByAsset[asset]) returns (
+                uint256 withdrawn
+            ) {
+                amountRemaining -= withdrawn;
+            } catch {
+                emit StrategyWithdrawalFailed($storage().defaultStrategyByAsset[asset], asset, amountRemaining);
+            }
 
             // If necessary, pull from remaining strategies
             for (uint256 i = 0; amountRemaining > 0 && i < $storage().assetStrategies[asset].length; i++) {
                 address strategy = $storage().assetStrategies[asset][i];
                 if (strategy != $storage().defaultStrategyByAsset[asset]) {
-                    amountRemaining -= _tryWithdrawFromStrategy(asset, amountRemaining, strategy);
+                    try this.tryWithdrawFromStrategy(asset, amountRemaining, strategy) returns (uint256 withdrawn) {
+                        amountRemaining -= withdrawn;
+                    } catch {
+                        emit StrategyWithdrawalFailed(strategy, asset, amountRemaining);
+                    }
                 }
             }
         }
         _transferToTransferHelper(asset, amount);
+    }
+
+    /// @dev Implements the external and onlySelf modifier because this function is intended to be wrapped in a
+    /// try-catch. @dev Avoids impact to searching other strategies if withdrawal from a previously searched strategy
+    /// fails.
+    function tryWithdrawFromStrategy(address asset, uint256 amount, address strategy)
+        external
+        onlySelf
+        returns (uint256)
+    {
+        uint256 withdrawnAmount;
+        uint256 balanceInStrategy = _getAssetBalanceInStrategy(IERC4626(strategy));
+        if (balanceInStrategy > 0) {
+            withdrawnAmount = balanceInStrategy > amount ? amount : balanceInStrategy;
+            _withdrawFromStrategy(asset, withdrawnAmount, address(this), strategy);
+        }
+        return withdrawnAmount;
     }
 
     //////////////////////////////////////////// MANAGER FUNCTIONS /////////////////////////////////////////////////////
@@ -278,16 +311,6 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         bool callSucceeded =
             _depositToStrategy({asset: allocation.asset, amount: amountToAllocate, strategy: allocation.strategy});
         require(callSucceeded, IAllocator.DepositIntoStrategyFailed(allocation.strategy));
-    }
-
-    function _tryWithdrawFromStrategy(address asset, uint256 amount, address strategy) internal returns (uint256) {
-        uint256 withdrawnAmount;
-        uint256 balanceInStrategy = _getAssetBalanceInStrategy(IERC4626(strategy));
-        if (balanceInStrategy > 0) {
-            withdrawnAmount = balanceInStrategy > amount ? amount : balanceInStrategy;
-            _withdrawFromStrategy(asset, withdrawnAmount, address(this), strategy);
-        }
-        return withdrawnAmount;
     }
 
     /// @dev Intended to be the lowest level function used to withdraw from a strategy.

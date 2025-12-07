@@ -474,6 +474,111 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
     }
 
+    function test_withdraw_withdrawsFromMultipleStrategies_whenStrategyWithdrawalFails(uint256 amount) public {
+        amount = _boundAssetAmount(address(_mockUsdt), amount);
+
+        _mockUsdt.mint(depositor, amount);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(_extraUsdtStrategy), amount);
+        vm.prank(depositor);
+        // Deposit directly into the strategy on behalf of the Allocator
+        _extraUsdtStrategy.deposit(amount, address(_allocator));
+
+        // Deposit into the default strategy as well (this one will fail during withdrawal)
+        _mockUsdt.mint(depositor, amount);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(_defaultUsdtStrategy), amount);
+        vm.prank(depositor);
+        // Deposit directly into the strategy on behalf of the Allocator
+        _defaultUsdtStrategy.deposit(amount, address(_allocator));
+
+        // Check balances
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount * 2);
+        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), amount);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), amount);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
+
+        // Mock the default strategy to fail during withdrawal
+        vm.mockCallRevert(
+            address(_defaultUsdtStrategy),
+            abi.encodeWithSelector(IERC4626.withdraw.selector, amount, address(_allocator), address(_allocator)),
+            abi.encodeWithSelector(IERC20Errors.ERC20InvalidSender.selector, address(_allocator))
+        );
+
+        // Perform withdrawal expecting the withdrawal from the default strategy to fail
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.StrategyWithdrawalFailed(address(_defaultUsdtStrategy), address(_mockUsdt), amount);
+        vm.prank(withdrawer);
+        _allocator.withdraw(address(_mockUsdt), amount);
+
+        // Check balances after first withdrawal
+        assertEq(_mockUsdt.balanceOf(address(_mockTransferHelper)), amount);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount);
+        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), amount);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
+
+        // Check that attempts to withdraw from non-default strategy is also wrapped in a try-catch
+        TestErc4626 nonDefaultStrategy = new TestErc4626(_mockUsdt);
+        vm.prank(admin);
+        _allocator.addStrategy(address(_mockUsdt), address(nonDefaultStrategy));
+
+        // Deposit into the non-default strategies
+        _mockUsdt.mint(depositor, amount);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(nonDefaultStrategy), amount);
+        vm.prank(depositor);
+        nonDefaultStrategy.deposit(amount, address(_allocator));
+
+        _mockUsdt.mint(depositor, amount);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(_extraUsdtStrategy), amount);
+        vm.prank(depositor);
+        _extraUsdtStrategy.deposit(amount, address(_allocator));
+
+        // Check balances
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount * 3);
+        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), amount);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), amount);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(nonDefaultStrategy)), amount);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
+
+        // Even if withdrawal for one non-default strategy fails, attempts to withdraw from other non-default strategies
+        vm.mockCallRevert(
+            address(_defaultUsdtStrategy),
+            abi.encodeWithSelector(IERC4626.withdraw.selector, amount, address(_allocator), address(_allocator)),
+            abi.encodeWithSelector(IERC20Errors.ERC20InvalidSender.selector, address(_allocator))
+        );
+        vm.mockCallRevert(
+            address(_extraUsdtStrategy),
+            abi.encodeWithSelector(IERC4626.withdraw.selector, amount, address(_allocator), address(_allocator)),
+            abi.encodeWithSelector(IERC20Errors.ERC20InvalidSender.selector, address(_allocator))
+        );
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.StrategyWithdrawalFailed(address(_defaultUsdtStrategy), address(_mockUsdt), amount);
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.StrategyWithdrawalFailed(address(_extraUsdtStrategy), address(_mockUsdt), amount);
+
+        vm.prank(withdrawer);
+        _allocator.withdraw(address(_mockUsdt), amount);
+
+        // Check balances are withdrawn from the nonDefaultStrategy
+        assertEq(_mockUsdt.balanceOf(address(_mockTransferHelper)), amount * 2);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount * 2);
+        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), amount);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), amount);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(nonDefaultStrategy)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
+    }
+
     function test_withdraw_usesIdleFundsOnly(uint256 amount) public {
         uint256 amountRemaining = 1000;
         amount = _boundAssetAmount(address(_mockUsdt), amount);
