@@ -1339,7 +1339,56 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalance(assetOut), 0);
     }
 
-    // TODO: test deallocate, swap, allocate
+    function test_rebalance_swap_reverts_ifInputAssetDustIsTruncated(uint256 amountAssetIn) public {
+        address assetIn = address(_mockGho);
+        address assetOut = address(_mockUsdt);
+        amountAssetIn = _boundAssetAmount(assetIn, amountAssetIn);
+        vm.assume(amountAssetIn > 0);
+        vm.assume(amountAssetIn % 10 ** (AssetLib.getDecimals(assetIn) - AssetLib.getDecimals(assetOut)) != 0);
+
+        // Airdrop assetIn to the Allocator
+        _mockGho.mint(address(_allocator), amountAssetIn);
+
+        // Invoke a swap
+        IAllocator.RebalanceParams[] memory rebalanceParams = _initializeRebalanceParams(1);
+        IAllocator.SwapParams[] memory swaps = _initializeSwapParams(1);
+        swaps[0] = _buildSwapParams(assetIn, amountAssetIn, assetOut, address(_mockSwapper), "");
+        rebalanceParams[0] =
+            _buildRebalanceParams(_initializeDeallocationParams(0), swaps, _initializeAllocationParams(0));
+
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(ErrorsLib.InvalidAmount.selector);
+        _allocator.rebalance(rebalanceParams);
+    }
+
+    function test_rebalance_swap_succeeds_ifInputAssetDustIsNotTruncated(uint256 amountAssetIn) public {
+        address assetIn = address(_mockGho);
+        address assetOut = address(_mockUsdt);
+        // Truncate amountAssetIn to the number of decimals of assetOut then convert back to assetIn decimals
+        amountAssetIn = _boundAssetAmount(assetIn, amountAssetIn).convertAssetDecimals(assetIn, assetOut)
+            .convertAssetDecimals(assetOut, assetIn);
+        vm.assume(amountAssetIn > 0);
+
+        // Airdrop assetIn to the Allocator
+        _mockGho.mint(address(_allocator), amountAssetIn);
+
+        // Mint assetOut to the swapper
+        _mockUsdt.mint(address(_mockSwapper), amountAssetIn.convertAssetDecimals(assetIn, assetOut));
+
+        // Invoke a swap
+        IAllocator.RebalanceParams[] memory rebalanceParams = _initializeRebalanceParams(1);
+        IAllocator.SwapParams[] memory swaps = _initializeSwapParams(1);
+        swaps[0] = _buildSwapParams(assetIn, amountAssetIn, assetOut, address(_mockSwapper), "");
+        rebalanceParams[0] =
+            _buildRebalanceParams(_initializeDeallocationParams(0), swaps, _initializeAllocationParams(0));
+        vm.prank(address(everyRoleAccount));
+        _allocator.rebalance(rebalanceParams);
+
+        // Check balances after the swap
+        assertEq(_allocator.getAssetBalance(assetIn), 0);
+        assertEq(_allocator.getAssetBalance(assetOut), amountAssetIn.convertAssetDecimals(assetIn, assetOut));
+    }
+
     function test_rebalance_entireFlow(uint256 amountIn) public {
         address assetIn = address(_mockUsdt);
         address assetOut = address(_mockGho);
