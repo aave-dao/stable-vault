@@ -37,6 +37,10 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     address internal immutable WITHDRAWER;
     address internal immutable ASSET_REGISTRY;
 
+    /// @notice The configuration for a strategy.
+    /// @param asset The asset that the strategy is associated with (assumes 1 asset per strategy).
+    /// @param depositAllowed Boolean indicating whether the strategy is allowed to be deposited into.
+    /// @param withdrawalAllowed Boolean indicating whether the strategy is allowed to be withdrawn from.
     struct StrategyConfig {
         address asset;
         bool depositAllowed;
@@ -178,7 +182,8 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     }
 
     /// @dev Implements the external and onlySelf modifier because this function is intended to be wrapped in a
-    /// try-catch. @dev Avoids impact to searching other strategies if withdrawal from a previously searched strategy
+    /// try-catch.
+    /// @dev Avoids impact to searching other strategies if withdrawal from a previously searched strategy
     /// fails.
     function tryWithdrawFromStrategy(address asset, uint256 amount, address strategy)
         external
@@ -220,6 +225,34 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         require(_isStrategySupportedForAsset({strategy: strategy, asset: asset}), ErrorsLib.AddressNotWhitelisted());
         $storage().defaultStrategyByAsset[asset] = strategy;
         emit DefaultStrategySet(asset, strategy);
+    }
+
+    /// @inheritdoc IAllocator
+    function disableDepositsToStrategy(address strategy) external override restricted {
+        require(_isStrategySupported(strategy), ErrorsLib.AddressNotWhitelisted());
+        $storage().strategyConfigs[strategy].depositAllowed = false;
+        emit StrategyDepositsToggled(strategy, false);
+    }
+
+    /// @inheritdoc IAllocator
+    function enableDepositsToStrategy(address strategy) external override restricted {
+        require(_isStrategySupported(strategy), ErrorsLib.AddressNotWhitelisted());
+        $storage().strategyConfigs[strategy].depositAllowed = true;
+        emit StrategyDepositsToggled(strategy, true);
+    }
+
+    /// @inheritdoc IAllocator
+    function disableWithdrawalsFromStrategy(address strategy) external override restricted {
+        require(_isStrategySupported(strategy), ErrorsLib.AddressNotWhitelisted());
+        $storage().strategyConfigs[strategy].withdrawalAllowed = false;
+        emit StrategyWithdrawalsToggled(strategy, false);
+    }
+
+    /// @inheritdoc IAllocator
+    function enableWithdrawalsFromStrategy(address strategy) external override restricted {
+        require(_isStrategySupported(strategy), ErrorsLib.AddressNotWhitelisted());
+        $storage().strategyConfigs[strategy].withdrawalAllowed = true;
+        emit StrategyWithdrawalsToggled(strategy, true);
     }
 
     ////////////////////////////////////////////////// INTERNAL ////////////////////////////////////////////////////////
@@ -312,6 +345,9 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
 
     /// @dev Intended to be the lowest level function used to withdraw from a strategy.
     function _withdrawFromStrategy(address asset, uint256 amount, address receiver, address strategy) internal {
+        if (!$storage().strategyConfigs[strategy].withdrawalAllowed) {
+            revert WithdrawalsFromStrategyDisabled(strategy);
+        }
         uint256 balanceBefore = IERC20(asset).balanceOf(address(this));
         IERC4626(strategy).withdraw({assets: amount, receiver: receiver, owner: address(this)});
         uint256 balanceAfter = IERC20(asset).balanceOf(address(this));
@@ -326,6 +362,9 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         if (strategy == address(0)) {
             // A strategy for this asset is not set, so the funds stay idle in the Allocator.
             return true;
+        }
+        if (!$storage().strategyConfigs[strategy].depositAllowed) {
+            revert DepositsToStrategyDisabled(strategy);
         }
         IERC20(asset).forceApprove(strategy, amount);
         (bool callSucceeded,) = strategy.call(abi.encodeCall(IERC4626.deposit, (amount, address(this))));

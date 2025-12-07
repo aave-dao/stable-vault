@@ -1600,6 +1600,275 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.removeStrategy(strategy);
     }
 
+    function test_disableDepositsToStrategy_preventsDepositsToStrategy() public {
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.StrategyDepositsToggled(address(_defaultUsdtStrategy), false);
+        vm.prank(address(everyRoleAccount));
+        _allocator.disableDepositsToStrategy(address(_defaultUsdtStrategy));
+
+        // Deposit funds into the allocator
+        uint256 amount = 1000;
+        _mockTransferHelper.mockAsset(address(_mockUsdt), amount);
+        vm.prank(depositor);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAllocator.DepositsToStrategyDisabled.selector, address(_defaultUsdtStrategy))
+        );
+        _allocator.deposit(address(_mockUsdt), amount);
+    }
+
+    function test_disableDepositsToStrategy_withMultiCall() public {
+        bytes memory changeDefaultStrategyData = abi.encodeWithSelector(
+            IAllocator.setDefaultStrategy.selector, address(_mockUsdt), address(_extraUsdtStrategy)
+        );
+        bytes memory disableDepositsToStrategyData =
+            abi.encodeWithSelector(IAllocator.disableDepositsToStrategy.selector, address(_defaultUsdtStrategy));
+        bytes[] memory data = new bytes[](2);
+        data[0] = changeDefaultStrategyData;
+        data[1] = disableDepositsToStrategyData;
+
+        vm.prank(address(everyRoleAccount));
+        bytes[] memory results = _allocator.multicall(data);
+        assertEq(results.length, 2);
+
+        // Deposit funds into the allocator
+        uint256 amount = 1000;
+        _mockTransferHelper.mockAsset(address(_mockUsdt), amount);
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), amount);
+
+        // Check the balances
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount);
+        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), amount);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
+    }
+
+    function test_disableDepositsToStrategy_reverts_ifStrategyIsNotSupported() public {
+        address strategy = makeAddr("newStrategy");
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(ErrorsLib.AddressNotWhitelisted.selector);
+        _allocator.disableDepositsToStrategy(strategy);
+    }
+
+    function test_disableDepositsToStrategy_reverts_ifUnauthorizedCaller(address operator) public {
+        vm.assume(operator != everyRoleAccount);
+        vm.assume(operator != address(0));
+        _assumeNotProxyAdmin(operator, address(_allocator));
+
+        vm.mockCall(
+            address(_mockAccessManager),
+            abi.encodeWithSelector(
+                IAccessManager.canCall.selector,
+                operator,
+                address(_allocator),
+                bytes4(IAllocator.disableDepositsToStrategy.selector)
+            ),
+            abi.encode(false)
+        );
+
+        vm.prank(operator);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, operator));
+        _allocator.disableDepositsToStrategy(address(_defaultUsdtStrategy));
+    }
+
+    function test_enableDepositsToStrategy_enablesDepositsToStrategy() public {
+        // First disable deposits to the strategy
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.StrategyDepositsToggled(address(_defaultUsdtStrategy), false);
+        vm.prank(address(everyRoleAccount));
+        _allocator.disableDepositsToStrategy(address(_defaultUsdtStrategy));
+
+        // Try to deposit into the strategy and it should fail
+        uint256 amount = 1000;
+        _mockTransferHelper.mockAsset(address(_mockUsdt), amount);
+        vm.prank(depositor);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAllocator.DepositsToStrategyDisabled.selector, address(_defaultUsdtStrategy))
+        );
+        _allocator.deposit(address(_mockUsdt), amount);
+
+        // Then enable deposits to the strategy
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.StrategyDepositsToggled(address(_defaultUsdtStrategy), true);
+        vm.prank(address(everyRoleAccount));
+        _allocator.enableDepositsToStrategy(address(_defaultUsdtStrategy));
+
+        // Try to deposit into the strategy and it should succeed
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), amount);
+
+        // Check the balances
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount);
+        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), amount);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
+    }
+
+    function test_enableDepositsToStrategy_reverts_ifStrategyIsNotSupported() public {
+        address strategy = makeAddr("newStrategy");
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(ErrorsLib.AddressNotWhitelisted.selector);
+        _allocator.enableDepositsToStrategy(strategy);
+    }
+
+    function test_enableDepositsToStrategy_reverts_ifUnauthorizedCaller(address operator) public {
+        vm.assume(operator != everyRoleAccount);
+        vm.assume(operator != address(0));
+        _assumeNotProxyAdmin(operator, address(_allocator));
+
+        vm.mockCall(
+            address(_mockAccessManager),
+            abi.encodeWithSelector(
+                IAccessManager.canCall.selector,
+                operator,
+                address(_allocator),
+                bytes4(IAllocator.enableDepositsToStrategy.selector)
+            ),
+            abi.encode(false)
+        );
+
+        vm.prank(operator);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, operator));
+        _allocator.enableDepositsToStrategy(address(_defaultUsdtStrategy));
+    }
+
+    function test_disableWithdrawalsFromStrategy_preventsWithdrawalsFromStrategy() public {
+        // Deposit into the default strategy
+        uint256 amount = 1000;
+        _mockTransferHelper.mockAsset(address(_mockUsdt), amount);
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), amount);
+
+        // Check the balances
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount);
+        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), amount);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
+
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.StrategyWithdrawalsToggled(address(_defaultUsdtStrategy), false);
+        vm.prank(address(everyRoleAccount));
+        _allocator.disableWithdrawalsFromStrategy(address(_defaultUsdtStrategy));
+
+        // Check withdrawal tries to withdraw from the default strategy and fails
+        vm.prank(withdrawer);
+        vm.expectEmit(true, true, true, true);
+        // Error is thrown, but caught by the try-catch in the withdraw function
+        emit IAllocator.StrategyWithdrawalFailed(address(_defaultUsdtStrategy), address(_mockUsdt), amount);
+        // The withdrawal it self reverts because insufficient funds are transferred to the TransferHelper
+        vm.expectRevert("ERC20: transfer amount exceeds balance");
+        _allocator.withdraw(address(_mockUsdt), amount);
+    }
+
+    function test_disableWithdrawalsFromStrategy_reverts_ifStrategyIsNotSupported() public {
+        address strategy = makeAddr("newStrategy");
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(ErrorsLib.AddressNotWhitelisted.selector);
+        _allocator.disableWithdrawalsFromStrategy(strategy);
+    }
+
+    function test_disableWithdrawalsFromStrategy_reverts_ifUnauthorizedCaller(address operator) public {
+        vm.assume(operator != everyRoleAccount);
+        vm.assume(operator != address(0));
+        _assumeNotProxyAdmin(operator, address(_allocator));
+
+        vm.mockCall(
+            address(_mockAccessManager),
+            abi.encodeWithSelector(
+                IAccessManager.canCall.selector,
+                operator,
+                address(_allocator),
+                bytes4(IAllocator.disableWithdrawalsFromStrategy.selector)
+            ),
+            abi.encode(false)
+        );
+
+        vm.prank(operator);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, operator));
+        _allocator.disableWithdrawalsFromStrategy(address(_defaultUsdtStrategy));
+    }
+
+    function test_enableWithdrawalsFromStrategy_enablesWithdrawalsFromStrategy() public {
+        // Deposit into the default strategy
+        uint256 amount = 1000;
+        _mockTransferHelper.mockAsset(address(_mockUsdt), amount);
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), amount);
+
+        // Check the balances
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount);
+        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), amount);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
+
+        // First disable withdrawals from the strategy
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.StrategyWithdrawalsToggled(address(_defaultUsdtStrategy), false);
+        vm.prank(address(everyRoleAccount));
+        _allocator.disableWithdrawalsFromStrategy(address(_defaultUsdtStrategy));
+
+        // Try to withdraw from the strategy and it should fail
+        vm.prank(withdrawer);
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.StrategyWithdrawalFailed(address(_defaultUsdtStrategy), address(_mockUsdt), amount);
+        vm.expectRevert("ERC20: transfer amount exceeds balance");
+        _allocator.withdraw(address(_mockUsdt), amount);
+
+        // Then enable withdrawals from the strategy
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.StrategyWithdrawalsToggled(address(_defaultUsdtStrategy), true);
+        vm.prank(address(everyRoleAccount));
+        _allocator.enableWithdrawalsFromStrategy(address(_defaultUsdtStrategy));
+
+        // Try to withdraw from the strategy and it should succeed
+        vm.prank(withdrawer);
+        _allocator.withdraw(address(_mockUsdt), amount);
+
+        // Check the balances
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
+    }
+
+    function test_enableWithdrawalsFromStrategy_reverts_ifStrategyIsNotSupported() public {
+        address strategy = makeAddr("newStrategy");
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(ErrorsLib.AddressNotWhitelisted.selector);
+        _allocator.enableWithdrawalsFromStrategy(strategy);
+    }
+
+    function test_enableWithdrawalsFromStrategy_reverts_ifUnauthorizedCaller(address operator) public {
+        vm.assume(operator != everyRoleAccount);
+        vm.assume(operator != address(0));
+        _assumeNotProxyAdmin(operator, address(_allocator));
+
+        vm.mockCall(
+            address(_mockAccessManager),
+            abi.encodeWithSelector(
+                IAccessManager.canCall.selector,
+                operator,
+                address(_allocator),
+                bytes4(IAllocator.enableWithdrawalsFromStrategy.selector)
+            ),
+            abi.encode(false)
+        );
+
+        vm.prank(operator);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, operator));
+        _allocator.enableWithdrawalsFromStrategy(address(_defaultUsdtStrategy));
+    }
+
     function _getDepositIdleFundsRebalanceParams(address asset)
         internal
         view
