@@ -435,7 +435,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     function _removeStrategy(address strategy) internal {
         address asset = $storage().strategyConfigs[strategy].asset;
         require(asset != address(0), ErrorsLib.AddressNotWhitelisted());
-        // FIXME: do not allow removal if strategy has funds in it
+        require(_getAssetBalanceInStrategy(IERC4626(strategy)) == 0, ErrorsLib.NonZeroAmount());
 
         if (strategy == $storage().defaultStrategyByAsset[asset]) {
             // Unset the default strategy for the asset - deposits will not flow to this strategy.

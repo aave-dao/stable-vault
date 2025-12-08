@@ -1649,6 +1649,18 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.removeStrategy(strategy);
     }
 
+    function test_removeStrategy_reverts_ifStrategyHasFunds() public {
+        // Deposit funds into the strategy
+        uint256 amount = 1000;
+        _mockTransferHelper.mockAsset(address(_mockUsdt), amount);
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), amount);
+
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(ErrorsLib.NonZeroAmount.selector);
+        _allocator.removeStrategy(address(_defaultUsdtStrategy));
+    }
+
     function test_disableDepositsToStrategy_preventsDepositsToStrategy() public {
         vm.expectEmit(true, true, true, true);
         emit IAllocator.StrategyDepositsToggled(address(_defaultUsdtStrategy), false);

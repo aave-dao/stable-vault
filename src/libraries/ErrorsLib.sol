@@ -64,4 +64,8 @@ library ErrorsLib {
     /// @notice Token amount checked is zero.
     /// @custom:selector 0x1f2a2005
     error ZeroAmount();
+
+    /// @notice Token amount checked is not zero.
+    /// @custom:selector 0xf55c8542
+    error NonZeroAmount();
 }
