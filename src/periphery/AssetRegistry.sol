@@ -5,6 +5,7 @@ import {
     AccessManagedUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {ConstantsLib} from "src/libraries/ConstantsLib.sol";
@@ -16,9 +17,12 @@ import {Multicall} from "src/misc/Multicall.sol";
 /// @notice AssetRegistry contract for managing asset configurations.
 /// @dev Inherits from Multicall to allow disabling deposits for multiple assets in a single call.
 contract AssetRegistry is AccessManagedUpgradeable, Multicall, IAssetRegistry {
+    using EnumerableSet for EnumerableSet.AddressSet;
+
     /// @custom:storage-location erc7201:aave.storage.AssetRegistry
     struct AssetRegistryStorage {
         mapping(address asset => AssetConfig config) configByAsset;
+        EnumerableSet.AddressSet assets;
     }
 
     // keccak256(abi.encode(uint256(keccak256("aave.storage.AssetRegistry")) - 1)) & ~bytes32(uint256(0xff))
@@ -53,6 +57,7 @@ contract AssetRegistry is AccessManagedUpgradeable, Multicall, IAssetRegistry {
             IERC20Metadata(asset).decimals() <= ConstantsLib.MAX_SUPPORTED_ASSET_DECIMALS, ErrorsLib.InvalidAsset(asset)
         );
         $storage().configByAsset[asset] = config;
+        $storage().assets.add(asset);
         emit AssetConfigSet(asset, config);
     }
 
@@ -102,5 +107,10 @@ contract AssetRegistry is AccessManagedUpgradeable, Multicall, IAssetRegistry {
     /// @inheritdoc IAssetRegistry
     function isSwapOutputAllowed(address asset) external view override returns (bool) {
         return $storage().configByAsset[asset].swapOutputTokenAllowed;
+    }
+
+    /// @inheritdoc IAssetRegistry
+    function getRegisteredAssets() external view override returns (address[] memory) {
+        return $storage().assets.values();
     }
 }

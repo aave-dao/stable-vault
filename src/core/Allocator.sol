@@ -381,12 +381,10 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
 
     /// @dev Returns balances grouped by asset.
     function _getAssetBalances() internal view returns (IAllocator.AllocatorBalance[] memory) {
-        // FIXME: This is not correct - it should iterate through all strategies and assets, not just assets with
-        // supported strategies
-        uint256 assetsLength = $storage().assetsWithSupportedStrategies.length();
-        IAllocator.AllocatorBalance[] memory allocatedAssets = new IAllocator.AllocatorBalance[](assetsLength);
-        for (uint256 i = 0; i < assetsLength; i++) {
-            address asset = $storage().assetsWithSupportedStrategies.at(i);
+        address[] memory assets = IAssetRegistry(ASSET_REGISTRY).getRegisteredAssets();
+        IAllocator.AllocatorBalance[] memory allocatedAssets = new IAllocator.AllocatorBalance[](assets.length);
+        for (uint256 i = 0; i < assets.length; i++) {
+            address asset = assets[i];
             allocatedAssets[i] = IAllocator.AllocatorBalance({asset: asset, amount: _getTotalAssetBalance(asset)});
         }
         return allocatedAssets;

@@ -139,6 +139,8 @@ contract AllocatorTest is TestWithHelpers {
     function test_getAssetBalances_returnsExpectedAssetBalances(uint256 depositAmountUsdt, uint256 depositAmountGho)
         public
     {
+        _mockAssetRegistry.mockRegisteredAsset(address(_mockUsdt));
+        _mockAssetRegistry.mockRegisteredAsset(address(_mockGho));
         depositAmountUsdt = _boundAssetAmount(address(_mockUsdt), depositAmountUsdt);
         depositAmountGho = _boundAssetAmount(address(_mockGho), depositAmountGho);
 
@@ -258,6 +260,26 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), depositAmountUsdt);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), depositAmountGho);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), depositAmountGho);
+    }
+
+    function test_getAssetBalances_returnsExpectedAssetBalances_whenAssetIsNotRegistered() public {
+        _mockAssetRegistry.mockRegisteredAsset(address(_mockUsdt));
+
+        // Deposit funds of USDC, USDT into the Allocator
+        uint256 amount = 1000;
+        _mockTransferHelper.mockAsset(address(_mockUsdt), amount);
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), amount);
+
+        _mockTransferHelper.mockAsset(address(_mockUnsupportedAsset), amount);
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUnsupportedAsset), amount);
+
+        // Check that balances only return the registered asset
+        IAllocator.AllocatorBalance[] memory balances = _allocator.getAssetBalances();
+        assertEq(balances.length, 1);
+        assertEq(balances[0].asset, address(_mockUsdt));
+        assertEq(balances[0].amount, amount);
     }
 
     function test_getDefaultStrategy_returnsExpectedDefaultVault() public view {
@@ -1545,6 +1567,8 @@ contract AllocatorTest is TestWithHelpers {
     }
 
     function test_removeStrategy_removesStrategyFromAssetStrategies() public {
+        _mockAssetRegistry.mockRegisteredAsset(address(_mockUsdt));
+
         vm.prank(address(everyRoleAccount));
         vm.expectEmit(true, true, true, true);
         emit IAllocator.DefaultStrategySet(address(_mockUsdt), address(0));
@@ -1569,9 +1593,11 @@ contract AllocatorTest is TestWithHelpers {
         emit IAllocator.StrategyRemoved(address(_mockGho), address(_extraGhoStrategy));
         _allocator.removeStrategy(address(_extraGhoStrategy));
 
-        // Check balance return 0 since internal __assetsWithSupportedStrategies is empty
+        // Check balance return 1 since USDT is still a supported asset in the AssetRegistry
         IAllocator.AllocatorBalance[] memory balances = _allocator.getAssetBalances();
-        assertEq(balances.length, 0);
+        assertEq(balances.length, 1);
+        assertEq(balances[0].asset, address(_mockUsdt));
+        assertEq(balances[0].amount, 0);
 
         // Add back a strategy and make it the default
         vm.prank(address(everyRoleAccount));
