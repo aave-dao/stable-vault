@@ -9,11 +9,14 @@ import {IRescuableAssets} from "src/interfaces/IRescuableAssets.sol";
 /// @title RescuableAssets
 /// @author Aave Labs
 /// @notice Abstract base contract for contracts that can rescue tokens.
-contract RescuableAssets is IRescuableAssets {
+abstract contract RescuableAssets is IRescuableAssets {
     using SafeERC20 for IERC20;
 
     /// @inheritdoc IRescuableAssets
     function rescueTokens(address asset, uint256 amount) public virtual override {
+        _beforeRescueTokens(asset, amount);
         IERC20(asset).safeTransfer(msg.sender, amount);
     }
+
+    function _beforeRescueTokens(address asset, uint256 amount) internal virtual;
 }

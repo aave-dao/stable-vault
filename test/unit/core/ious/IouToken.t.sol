@@ -5,11 +5,11 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Test} from "forge-std/Test.sol";
 
 import {IouToken} from "src/core/ious/IouToken.sol";
+import {ConstantsLib} from "src/libraries/ConstantsLib.sol";
 
 contract IouTokenTest is Test {
     address public iouToken;
     address public owner = makeAddr("OWNER");
-    uint8 internal constant RAY_DECIMALS = 27;
 
     function setUp() public {
         iouToken = address(new IouToken(owner));
@@ -41,7 +41,7 @@ contract IouTokenTest is Test {
     }
 
     function test_decimals() public view {
-        assertEq(IouToken(iouToken).decimals(), RAY_DECIMALS, "decimals mismatch");
+        assertEq(IouToken(iouToken).decimals(), ConstantsLib.RAY_DECIMALS, "decimals mismatch");
     }
 
     function test_name() public view {

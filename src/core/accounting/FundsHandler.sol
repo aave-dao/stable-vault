@@ -159,11 +159,6 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, TransferHelp
         IAccountingChainGateway(GATEWAY).sendPushFundsToChainMessage(asset, amount, chainId, bridgeParams);
     }
 
-    /// @inheritdoc RescuableAssets
-    function rescueTokens(address asset, uint256 amount) public override restricted {
-        super.rescueTokens(asset, amount);
-    }
-
     // Gateway Functions
 
     /// @inheritdoc IFundsHandler
@@ -233,5 +228,17 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, TransferHelp
 
     function _pullFundsFromImmediateLiquidity(address asset, uint256 amount) internal {
         IAllocator(ALLOCATOR).withdraw(asset, amount);
+    }
+
+    function _beforeRescueTokens(
+        address, // asset
+        uint256 // amount
+    )
+        internal
+        virtual
+        override
+    {
+        // Equivalent to adding the `restricted` modifier.
+        _checkCanCall(_msgSender(), _msgData());
     }
 }

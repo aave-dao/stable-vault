@@ -292,11 +292,6 @@ contract BasedBoostedVault is
         emit FeesClaimed(assets, amounts);
     }
 
-    /// @inheritdoc RescuableAssets
-    function rescueTokens(address asset, uint256 amount) public override restricted {
-        super.rescueTokens(asset, amount);
-    }
-
     ////////////////////////////////////////////////// GETTERS /////////////////////////////////////////////////////
 
     /// @inheritdoc IBasedBoostedVault
@@ -580,5 +575,17 @@ contract BasedBoostedVault is
         _migrateUserToSubVault(user, oldSubVaultId, newSubVaultId);
 
         emit UserRateSet(user, newSubVaultId, newPerSecondRate);
+    }
+
+    function _beforeRescueTokens(
+        address, // asset
+        uint256 // amount
+    )
+        internal
+        virtual
+        override
+    {
+        // Equivalent to adding the `restricted` modifier.
+        _checkCanCall(_msgSender(), _msgData());
     }
 }
