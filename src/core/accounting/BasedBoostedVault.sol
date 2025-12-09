@@ -197,8 +197,10 @@ contract BasedBoostedVault is
     function setSubVaultRate(uint256 subVaultId, uint256 newPerSecondRate) external override restricted {
         _validateRate(newPerSecondRate);
         require(!_existsSubVaultWithRate(newPerSecondRate), SubVaultAlreadyExists());
-        require(_existsSubVaultWithId(subVaultId), SubVaultDoesNotExist());
+        uint256 oldPerSecondRate = $storage().subVaultById[subVaultId].perSecondRate;
+        require(oldPerSecondRate != 0, SubVaultDoesNotExist());
         _accrueSubVaultConversionRate(subVaultId);
+        delete $storage().subVaultIdByRate[oldPerSecondRate];
         $storage().subVaultById[subVaultId].perSecondRate = newPerSecondRate;
         $storage().subVaultIdByRate[newPerSecondRate] = subVaultId;
         emit SubVaultRateSet(subVaultId, newPerSecondRate);
@@ -559,10 +561,6 @@ contract BasedBoostedVault is
 
     function _existsSubVaultWithRate(uint256 perSecondRate) internal view returns (bool) {
         return $storage().subVaultIdByRate[perSecondRate] != 0;
-    }
-
-    function _existsSubVaultWithId(uint256 subVaultId) internal view returns (bool) {
-        return subVaultId > 0 && subVaultId <= $storage().lastSubVaultId;
     }
 
     function _setUserRate(address user, uint256 newPerSecondRate) internal {
