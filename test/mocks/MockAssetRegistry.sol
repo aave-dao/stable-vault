@@ -13,6 +13,7 @@ contract MockAssetRegistry is IAssetRegistry {
     mapping(address asset => bool isWithdrawalFromAllocatorAllowed) _isNotAllowedToWithdrawFromAllocator;
     mapping(address asset => bool isAllowedToSwapInputTokenInAllocator) _isNotAllowedToSwapInputTokenInAllocator;
     mapping(address asset => bool isAllowedToSwapOutputTokenInAllocator) _isNotAllowedToSwapOutputTokenInAllocator;
+    address[] _registeredAssets;
 
     function setAssetConfig(address asset, AssetConfig memory config) external override {}
 
@@ -65,6 +66,10 @@ contract MockAssetRegistry is IAssetRegistry {
         _isNotAllowedToSwapOutputTokenInAllocator[asset] = true;
     }
 
+    function mockRegisteredAsset(address asset) external {
+        _registeredAssets.push(asset);
+    }
+
     function isUserDepositAllowed(address asset) external view override returns (bool) {
         return !_isNotAllowedUserDeposit[asset];
     }
@@ -87,5 +92,9 @@ contract MockAssetRegistry is IAssetRegistry {
 
     function isSwapOutputAllowed(address asset) external view override returns (bool) {
         return !_isNotAllowedToSwapOutputTokenInAllocator[asset];
+    }
+
+    function getRegisteredAssets() external view override returns (address[] memory) {
+        return _registeredAssets;
     }
 }

@@ -9,17 +9,35 @@ interface IAllocator {
 
     event AssetAllocated(address indexed asset, address indexed strategy, uint256 amount);
 
+    event DefaultStrategySet(address indexed asset, address indexed strategy);
+
     event StrategyDepositFailed(address indexed strategy, uint256 amount);
+
+    event StrategyDepositsToggled(address indexed strategy, bool depositsEnabled);
+
+    event StrategyWithdrawalFailed(address indexed strategy, address indexed asset, uint256 amount);
+
+    event StrategyWithdrawalsToggled(address indexed strategy, bool withdrawalsEnabled);
 
     event StrategyAdded(address indexed asset, address indexed strategy);
 
     event StrategyRemoved(address indexed asset, address indexed strategy);
 
-    event DefaultStrategySet(address indexed asset, address indexed strategy);
-
     /// @notice Thrown when funds fail to deposit into a yield strategy.
     /// @custom:selector 0x3868bf52
     error DepositIntoStrategyFailed(address strategy);
+
+    /// @notice Thrown when deposits are not allowed to a strategy.
+    /// @custom:selector 0xd7b75095
+    error DepositsToStrategyDisabled(address strategy);
+
+    /// @notice Thrown when a strategy still has assets that belong to the Allocator.
+    /// @custom:selector 0xa01adeda
+    error StrategyStillHasFunds(address strategy);
+
+    /// @notice Thrown when withdrawals are not allowed from a strategy.
+    /// @custom:selector 0xbd54a981
+    error WithdrawalsFromStrategyDisabled(address strategy);
 
     /// @notice The representation of an asset balance.
     /// @param asset Address of the asset.
@@ -129,4 +147,20 @@ interface IAllocator {
     /// @param asset Address of the asset to set the default strategy for.
     /// @param strategy Address of the ERC-4626 strategy to set as the default.
     function setDefaultStrategy(address asset, address strategy) external;
+
+    /// @notice Disables deposits to a given strategy.
+    /// @param strategy Address of the ERC-4626 strategy to disable deposits for.
+    function disableDepositsToStrategy(address strategy) external;
+
+    /// @notice Enables deposits to a given strategy.
+    /// @param strategy Address of the ERC-4626 strategy to enable deposits for.
+    function enableDepositsToStrategy(address strategy) external;
+
+    /// @notice Disables withdrawals from a given strategy.
+    /// @param strategy Address of the ERC-4626 strategy to disable withdrawals for.
+    function disableWithdrawalsFromStrategy(address strategy) external;
+
+    /// @notice Enables withdrawals from a given strategy.
+    /// @param strategy Address of the ERC-4626 strategy to enable withdrawals for.
+    function enableWithdrawalsFromStrategy(address strategy) external;
 }

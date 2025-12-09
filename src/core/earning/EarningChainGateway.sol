@@ -3,7 +3,6 @@ pragma solidity ^0.8.22;
 
 import {BaseChainGateway} from "src/core/BaseChainGateway.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
-import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";

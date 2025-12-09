@@ -76,4 +76,8 @@ interface IAssetRegistry {
     /// @return isAllowed Whether the asset is allowed to be used as swap output token from the Swapper into the
     /// Allocator.
     function isSwapOutputAllowed(address asset) external view returns (bool);
+
+    /// @notice Getter for the list of all registered assets.
+    /// @return assets The list of registered asset addresses.
+    function getRegisteredAssets() external view returns (address[] memory);
 }
