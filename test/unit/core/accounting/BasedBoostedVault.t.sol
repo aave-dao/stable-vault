@@ -782,6 +782,45 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         assertEq(mockAsset.balanceOf(msgSender), requestedAssetsToClaim);
     }
 
+    function test_setSubVaultRate_updatesAssociationBetweenSubVaultIdAndRateProperly(
+        uint256 perSecondRate,
+        uint256 newPerSecondRate
+    ) public {
+        perSecondRate = _boundRate(perSecondRate);
+        newPerSecondRate = _boundRate(newPerSecondRate);
+        vm.assume(perSecondRate != newPerSecondRate);
+        vm.assume(bbv.getSubVaultIdByRate(perSecondRate) == 0);
+        vm.assume(bbv.getSubVaultIdByRate(newPerSecondRate) == 0);
+
+        address user = makeAddr("user");
+        uint256 amount = 100e6;
+        mockAsset.mint(user, amount);
+        vm.prank(user);
+        mockAsset.forceApprove(address(bbv), amount);
+        vm.prank(user);
+        bbv.deposit(user, address(mockAsset), amount);
+        IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](1);
+        userRateData[0] = IBasedBoostedVault.UserRateData(user, perSecondRate);
+        vm.prank(manager);
+        bbv.setUserRate(userRateData);
+
+        uint256 subVaultId = bbv.getUserSubVault(user).id;
+
+        // The association between the sub-vault ID and rate was correctly set
+        assertEq(bbv.getSubVaultRateById(subVaultId), perSecondRate);
+        assertEq(bbv.getSubVaultIdByRate(perSecondRate), subVaultId);
+
+        vm.prank(manager);
+        bbv.setSubVaultRate(subVaultId, newPerSecondRate);
+
+        // The association between the sub-vault ID and rate is updated
+        assertEq(bbv.getSubVaultRateById(subVaultId), newPerSecondRate);
+        assertEq(bbv.getSubVaultIdByRate(newPerSecondRate), subVaultId);
+
+        // The old rate is no longer associated with any sub-vault ID
+        assertEq(bbv.getSubVaultIdByRate(perSecondRate), 0);
+    }
+
     function test_setSubVaultRate_reverts_ifMsgSenderIsNotAuthorized(
         address unauthorizedMsgSender,
         uint256 subVaultId,
