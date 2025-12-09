@@ -422,7 +422,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
 
     function _removeStrategy(address strategy) internal {
         require(_isStrategySupported(strategy), ErrorsLib.AddressNotWhitelisted());
-        require(_getAssetBalanceInStrategy(IERC4626(strategy)) == 0, ErrorsLib.NonZeroAmount());
+        require(_getAssetBalanceInStrategy(IERC4626(strategy)) == 0, StrategyStillHasFunds(strategy));
         address asset = $storage().strategyConfigs[strategy].asset;
 
         if (strategy == $storage().defaultStrategyByAsset[asset]) {

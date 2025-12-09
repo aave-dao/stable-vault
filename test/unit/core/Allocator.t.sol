@@ -1683,7 +1683,9 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.deposit(address(_mockUsdt), amount);
 
         vm.prank(address(everyRoleAccount));
-        vm.expectRevert(ErrorsLib.NonZeroAmount.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAllocator.StrategyStillHasFunds.selector, address(_defaultUsdtStrategy))
+        );
         _allocator.removeStrategy(address(_defaultUsdtStrategy));
     }
 

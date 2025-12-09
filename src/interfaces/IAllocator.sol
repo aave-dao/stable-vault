@@ -31,6 +31,10 @@ interface IAllocator {
     /// @custom:selector 0xd7b75095
     error DepositsToStrategyDisabled(address strategy);
 
+    /// @notice Thrown when a strategy still has assets that belong to the Allocator.
+    /// @custom:selector 0xa01adeda
+    error StrategyStillHasFunds(address strategy);
+
     /// @notice Thrown when withdrawals are not allowed from a strategy.
     /// @custom:selector 0xbd54a981
     error WithdrawalsFromStrategyDisabled(address strategy);
