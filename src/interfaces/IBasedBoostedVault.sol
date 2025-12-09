@@ -136,10 +136,17 @@ interface IBasedBoostedVault {
 
     /// @notice Exchanges IOUs for a supported asset.
     /// @param user Address of the user executing the withdrawal.
-    /// @param tokenOut Address of the token to withdraw.
+    /// @param assetOut Address of the asset to withdraw.
+    /// @param minAmountOut Minimum amount of `assetOut` to receive in exchange of `iouAmountRay` IOUs.
     /// @param iouAmountRay Amount of the IOU tokens to exchange as part of the withdrawal execution.
     /// @param data Additional data for the withdrawal execution.
-    function executeWithdrawal(address user, address tokenOut, uint256 iouAmountRay, bytes memory data) external;
+    function executeWithdrawal(
+        address user,
+        address assetOut,
+        uint256 minAmountOut,
+        uint256 iouAmountRay,
+        bytes memory data
+    ) external;
 
     /// @notice Getter for the aggregated obligations owned to depositors in RAY of denomination asset.
     /// @return obligations Aggregated obligations owned to depositors in RAY of denomination asset.
