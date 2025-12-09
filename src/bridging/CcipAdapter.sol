@@ -123,7 +123,12 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
 
     /// @inheritdoc IAny2EVMMessageReceiver
     function ccipReceive(Client.Any2EVMMessage calldata message) external override onlyRouter {
+        emit MessageReceived(message.messageId);
         if (message.data.length > 0) {
+            // If message processing fails, the whole bridge tx processing must fail too. We do not want to allow the
+            // scenario where the funds are received, but the message is not processed successfully, as this can lead to
+            // double-counting of funds, given that the balance snapshot will still reflect the funds that were just
+            // received.
             require(
                 abi.decode(message.sender, (address))
                     == _destinationChainAdapterOf[_chainIdOf[message.sourceChainSelector]],
@@ -137,7 +142,13 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
         if (message.destTokenAmounts.length > 0) {
             try this.processReceivedFunds(message.destTokenAmounts) {}
             catch (bytes memory err) {
-                // TODO: emit event that indicate the assets and their amounts
+                for (uint256 i = 0; i < message.destTokenAmounts.length; i++) {
+                    emit TokenReceptionFailed(
+                        _chainIdOf[message.sourceChainSelector],
+                        message.destTokenAmounts[i].token,
+                        message.destTokenAmounts[i].amount
+                    );
+                }
                 emit BridgedFundsProcessingFailed(_chainIdOf[message.sourceChainSelector], abi.encode(message), err);
             }
         }
@@ -177,7 +188,8 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
                 _triggerFeeRefund(feePayer, feeToken, excessFee);
             }
         }
-        IRouterClient(CCIP_ROUTER).ccipSend{value: msgValue}(chainSelector, message);
+        bytes32 messageId = IRouterClient(CCIP_ROUTER).ccipSend{value: msgValue}(chainSelector, message);
+        emit MessagePublished(messageId);
     }
 
     function _triggerFeeRefund(address feePayer, address feeToken, uint256 excessFee) internal {
