@@ -75,6 +75,7 @@ contract TransferHelperClient {
 
     /// @dev Transfers the bridge fee to the TransferHelper to be pulled by Bridge Adapter.
     function _transferBridgeFeeToTransferHelper(IBridgeAdapter.BridgeParams memory bridgeParams) internal {
+        require(bridgeParams.feePayer == msg.sender, ErrorsLib.InvalidBridgeFeePayer());
         if (msg.value > 0) {
             // If there is some msg.value, we transfer it to the TransferHelper, regardless of the fee token.
             // There might be scenarios where the bridge implementation requires some native assets to operate in

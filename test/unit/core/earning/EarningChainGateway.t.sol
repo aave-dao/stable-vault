@@ -279,7 +279,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             abi.encode(allocatorBalances)
         );
 
-        address bridgeFeePayer = makeAddr("bridgeFeePayer");
+        address bridgeFeePayer = everyRoleAccount;
 
         _mockGho.mint(bridgeFeePayer, bridgeFeeAmount);
         vm.prank(bridgeFeePayer);
@@ -504,7 +504,22 @@ contract EarningChainGatewayTest is TestWithHelpers {
         vm.expectRevert(ErrorsLib.InsufficientFunds.selector);
         _earningChainGateway.sendBalanceUpdateWithFeePayer{value: 0}(
             IBridgeAdapter.BridgeParams({
-                feePayer: makeAddr("bridgeFeePayer"),
+                // msg.sender must be the fee payer
+                feePayer: address(this),
+                feeToken: address(0),
+                feeAmount: 123,
+                feeRefundThreshold: 0,
+                gasLimit: 100000,
+                data: abi.encode(keccak256(hex"c0ffee"))
+            })
+        );
+    }
+
+    function test_sendBalanceUpdateWithFeePayer_reverts_ifInvalidBridgeFeePayer() public {
+        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.InvalidBridgeFeePayer.selector));
+        _earningChainGateway.sendBalanceUpdateWithFeePayer(
+            IBridgeAdapter.BridgeParams({
+                feePayer: makeAddr("unauthorizedFeePayer"),
                 feeToken: address(0),
                 feeAmount: 123,
                 feeRefundThreshold: 0,
@@ -517,9 +532,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
     function test_exchangeIouTokens_exchangesIouTokensWithTokenBridgeFee(
         uint256 iouTokenAmountRay,
         address tokenOutReceiver,
-        address bridgeFeePayer,
         uint256 bridgeFeeAmount
     ) public {
+        address bridgeFeePayer = tokenOutReceiver;
         iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
         bridgeFeeAmount = _boundNativeAmount(bridgeFeeAmount);
         vm.assume(tokenOutReceiver != address(0));
@@ -693,14 +708,13 @@ contract EarningChainGatewayTest is TestWithHelpers {
     function test_exchangeIouTokens_exchangesIouTokensWithNativeBridgeFee(
         uint256 iouTokenAmountRay,
         address tokenOutReceiver,
-        address bridgeFeePayer,
         uint256 bridgeFeeAmount
     ) public {
+        address bridgeFeePayer = tokenOutReceiver;
         iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
         bridgeFeeAmount = _boundNativeAmount(bridgeFeeAmount);
         vm.assume(tokenOutReceiver != address(0));
         _assumeNotProxyAdmin(tokenOutReceiver, address(_earningChainGateway));
-        vm.assume(bridgeFeePayer != address(0));
 
         address tokenOut = address(_mockUsdt);
         vm.assume(iouTokenAmountRay.rayToAssetDecimals(tokenOut) > 0);
@@ -851,7 +865,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockUsdt),
             makeAddr("tokenOutReceiver"),
             IBridgeAdapter.BridgeParams({
-                feePayer: makeAddr("bridgeFeePayer"),
+                feePayer: address(this),
                 feeToken: address(0),
                 feeAmount: 123,
                 feeRefundThreshold: 0,
@@ -922,7 +936,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         // Mock tokens into TransferHelper to mimic withdrawal from Allocator
         _mockTransferHelper.mockAsset(address(_mockUsdt), amountToken);
 
-        address feePayer = makeAddr("feePayer");
+        address sender = makeAddr("randomAccount");
 
         {
             bytes memory data;
@@ -950,8 +964,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 );
             }
 
-            _mockGho.mint(feePayer, bridgeFeeAmount);
-            vm.prank(feePayer);
+            _mockGho.mint(sender, bridgeFeeAmount);
+            vm.prank(sender);
             MockNonStandardErc20(bridgeFeeToken).approve(address(_earningChainGateway), bridgeFeeAmount);
 
             vm.expectCall(
@@ -964,7 +978,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                         _buildBridgeAssets(address(_mockUsdt), amountToken),
                         data,
                         IBridgeAdapter.BridgeParams({
-                            feePayer: feePayer,
+                            feePayer: sender,
                             feeToken: bridgeFeeToken,
                             feeAmount: bridgeFeeAmount,
                             feeRefundThreshold: 0,
@@ -978,13 +992,12 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 address(_mockAllocator), abi.encodeCall(IAllocator.withdraw, (address(_mockUsdt), amountToken))
             );
 
-            // Call from random account to ensure the fee payer is used
-            vm.prank(makeAddr("randomAccount"));
+            vm.prank(sender);
             _earningChainGateway.pushFundsToAccountingChain(
                 address(_mockUsdt),
                 amountToken,
                 IBridgeAdapter.BridgeParams({
-                    feePayer: feePayer,
+                    feePayer: sender,
                     feeToken: bridgeFeeToken,
                     feeAmount: bridgeFeeAmount,
                     feeRefundThreshold: 0,
@@ -996,8 +1009,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         // check that the next call uses incremented nonce
         {
-            _mockGho.mint(feePayer, bridgeFeeAmount);
-            vm.prank(feePayer);
+            _mockGho.mint(sender, bridgeFeeAmount);
+            vm.prank(sender);
             MockNonStandardErc20(bridgeFeeToken).approve(address(_earningChainGateway), bridgeFeeAmount);
             _mockTransferHelper.mockAsset(address(_mockUsdt), amountToken);
 
@@ -1029,7 +1042,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                         _buildBridgeAssets(address(_mockUsdt), amountToken),
                         data,
                         IBridgeAdapter.BridgeParams({
-                            feePayer: feePayer,
+                            feePayer: sender,
                             feeToken: bridgeFeeToken,
                             feeAmount: bridgeFeeAmount,
                             feeRefundThreshold: 0,
@@ -1039,13 +1052,12 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     )
                 )
             );
-            // Call from a different account to ensure the any account can call this function
-            vm.prank(everyRoleAccount);
+            vm.prank(sender);
             _earningChainGateway.pushFundsToAccountingChain(
                 address(_mockUsdt),
                 amountToken,
                 IBridgeAdapter.BridgeParams({
-                    feePayer: feePayer,
+                    feePayer: sender,
                     feeToken: bridgeFeeToken,
                     feeAmount: bridgeFeeAmount,
                     feeRefundThreshold: 0,
@@ -1067,7 +1079,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         // Mock tokens into TransferHelper to mimic withdrawal from Allocator
         _mockTransferHelper.mockAsset(address(_mockGho), amountToken);
 
-        address feePayer = makeAddr("feePayer");
+        address sender = makeAddr("randomAccount");
 
         {
             bytes memory data;
@@ -1095,8 +1107,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 );
             }
 
-            _mockGho.mint(feePayer, bridgeFeeAmount);
-            vm.prank(feePayer);
+            _mockGho.mint(sender, bridgeFeeAmount);
+            vm.prank(sender);
             MockNonStandardErc20(bridgeFeeToken).approve(address(_earningChainGateway), bridgeFeeAmount);
 
             vm.expectCall(
@@ -1108,7 +1120,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                         _buildBridgeAssets(address(_mockGho), amountToken),
                         data,
                         IBridgeAdapter.BridgeParams({
-                            feePayer: feePayer,
+                            feePayer: sender,
                             feeToken: bridgeFeeToken,
                             feeAmount: bridgeFeeAmount,
                             feeRefundThreshold: 0,
@@ -1123,12 +1135,12 @@ contract EarningChainGatewayTest is TestWithHelpers {
             );
 
             // Call from random account to ensure the fee payer is used
-            vm.prank(makeAddr("randomAccount"));
+            vm.prank(sender);
             _earningChainGateway.pushFundsToAccountingChain(
                 address(_mockGho),
                 amountToken,
                 IBridgeAdapter.BridgeParams({
-                    feePayer: feePayer,
+                    feePayer: sender,
                     feeToken: bridgeFeeToken,
                     feeAmount: bridgeFeeAmount,
                     feeRefundThreshold: 0,
@@ -1140,8 +1152,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         // check that the next call uses incremented nonce
         {
-            _mockGho.mint(feePayer, bridgeFeeAmount);
-            vm.prank(feePayer);
+            _mockGho.mint(sender, bridgeFeeAmount);
+            vm.prank(sender);
             MockNonStandardErc20(bridgeFeeToken).approve(address(_earningChainGateway), bridgeFeeAmount);
             _mockTransferHelper.mockAsset(address(_mockGho), amountToken);
 
@@ -1172,7 +1184,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                         _buildBridgeAssets(address(_mockGho), amountToken),
                         data,
                         IBridgeAdapter.BridgeParams({
-                            feePayer: feePayer,
+                            feePayer: sender,
                             feeToken: bridgeFeeToken,
                             feeAmount: bridgeFeeAmount,
                             feeRefundThreshold: 0,
@@ -1185,13 +1197,12 @@ contract EarningChainGatewayTest is TestWithHelpers {
             vm.expectCall(
                 address(_mockAllocator), abi.encodeCall(IAllocator.withdraw, (address(_mockGho), amountToken))
             );
-            // Call from a different account to ensure the any account can call this function
-            vm.prank(everyRoleAccount);
+            vm.prank(sender);
             _earningChainGateway.pushFundsToAccountingChain(
                 address(_mockGho),
                 amountToken,
                 IBridgeAdapter.BridgeParams({
-                    feePayer: feePayer,
+                    feePayer: sender,
                     feeToken: bridgeFeeToken,
                     feeAmount: bridgeFeeAmount,
                     feeRefundThreshold: 0,
@@ -1350,12 +1361,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
         );
     }
 
-    function test_pushFundsToAccountingChain_reverts_ifAdapterNotFound(
-        uint256 amount,
-        address bridgeFeePayer,
-        uint256 bridgeFeeAmount
-    ) public {
-        vm.assume(bridgeFeePayer != address(0));
+    function test_pushFundsToAccountingChain_reverts_ifAdapterNotFound(uint256 amount, uint256 bridgeFeeAmount) public {
+        address bridgeFeePayer = everyRoleAccount;
         amount = _boundAssetAmount(address(_mockUsdt), amount);
         address bridgeFeeToken = address(_mockGho);
         bridgeFeeAmount = _boundAssetAmount(address(_mockGho), bridgeFeeAmount);
@@ -1400,6 +1407,22 @@ contract EarningChainGatewayTest is TestWithHelpers {
             100_000_000_000_000 * 10 ** 6,
             IBridgeAdapter.BridgeParams({
                 feePayer: everyRoleAccount,
+                feeToken: address(0),
+                feeAmount: 0,
+                feeRefundThreshold: 0,
+                gasLimit: 100000,
+                data: abi.encode(keccak256(hex"c0ffee"))
+            })
+        );
+    }
+
+    function test_pushFundsToAccountingChain_reverts_ifInvalidBridgeFeePayer() public {
+        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.InvalidBridgeFeePayer.selector));
+        _earningChainGateway.pushFundsToAccountingChain(
+            address(_mockUsdt),
+            100_000_000_000_000 * 10 ** 6,
+            IBridgeAdapter.BridgeParams({
+                feePayer: makeAddr("unauthorizedFeePayer"),
                 feeToken: address(0),
                 feeAmount: 0,
                 feeRefundThreshold: 0,

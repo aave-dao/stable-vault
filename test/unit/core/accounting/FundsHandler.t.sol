@@ -666,6 +666,36 @@ contract FundsHandlerTest is TestWithHelpers {
         fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, bridgeParams);
     }
 
+    function test_pushFundsToChain_reverts_ifBridgeFeePayerIsNotTheCaller(
+        uint256 amount,
+        uint256 chainId,
+        uint256 bridgeParams_feeAmount,
+        uint256 bridgeParams_gasLimit
+    ) public {
+        vm.assume(chainId != block.chainid);
+        amount = _boundAssetAmount(address(mockAsset), amount);
+        bridgeParams_feeAmount = _boundAssetAmount(address(mockAsset), bridgeParams_feeAmount);
+        mockAsset.mint(address(this), bridgeParams_feeAmount);
+        mockAsset.forceApprove(address(fundsHandler), bridgeParams_feeAmount);
+
+        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
+            feePayer: makeAddr("unauthorizedFeePayer"),
+            feeToken: address(mockAsset),
+            feeAmount: bridgeParams_feeAmount,
+            feeRefundThreshold: 0,
+            gasLimit: bridgeParams_gasLimit,
+            data: ""
+        });
+
+        mockAsset.mint(address(mockAllocator), amount);
+        mockAllocator.mockToPushToTransferHelperInNextCall(address(mockAsset), amount);
+
+        mockGateway.mockToConsumeAssetFromTransferHelperInNextCall(address(mockAsset), bridgeParams_feeAmount + amount);
+
+        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.InvalidBridgeFeePayer.selector));
+        fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, bridgeParams);
+    }
+
     function test_pushFundsToChain_callsGatewaySendPushFundsMessage(
         uint256 amount,
         uint256 chainId,
