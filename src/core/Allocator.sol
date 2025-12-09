@@ -53,10 +53,6 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         mapping(address strategy => StrategyConfig strategyConfig) strategyConfigs;
         // To iterate through all strategies for an asset.
         mapping(address asset => EnumerableSet.AddressSet) assetStrategies;
-        // To iterate through all strategies.
-        EnumerableSet.AddressSet allStrategies;
-        // List of all supported assets that have at least one strategy.
-        EnumerableSet.AddressSet assetsWithSupportedStrategies;
     }
 
     // keccak256(abi.encode(uint256(keccak256("aave.storage.Allocator")) - 1)) & ~bytes32(uint256(0xff))
@@ -420,12 +416,6 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         $storage().strategyConfigs[strategy] =
             StrategyConfig({asset: asset, depositAllowed: true, withdrawalAllowed: true});
         $storage().assetStrategies[asset].add(strategy);
-        $storage().allStrategies.add(strategy);
-
-        // Add asset to $storage().assetsWithSupportedStrategies if it is not already in the list
-        if (!$storage().assetsWithSupportedStrategies.contains(asset)) {
-            $storage().assetsWithSupportedStrategies.add(asset);
-        }
 
         emit StrategyAdded(asset, strategy);
     }
@@ -443,16 +433,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
             emit DefaultStrategySet(asset, address(0));
         }
 
-        // Remove strategy from $storage().assetStrategies
         $storage().assetStrategies[asset].remove(strategy);
-        // Update storage that tracks assets with supported strategies
-        if ($storage().assetStrategies[asset].length() == 0) {
-            // Remove asset from $storage().assetsWithSupportedStrategies
-            $storage().assetsWithSupportedStrategies.remove(asset);
-        }
-
-        // Remove strategy from $storage().allStrategies
-        $storage().allStrategies.remove(strategy);
 
         delete $storage().strategyConfigs[strategy];
         emit StrategyRemoved(asset, strategy);
