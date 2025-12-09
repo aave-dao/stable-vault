@@ -107,8 +107,9 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
     /// @inheritdoc IEarningChainGateway
     function exchangeIouTokens(
         uint256 iouTokenAmountRay,
-        address tokenOut,
-        address tokenOutReceiver,
+        address assetOut,
+        uint256 minAmountOut,
+        address receiver,
         IBridgeAdapter.BridgeParams memory bridgeParams,
         bytes memory data
     )
@@ -116,28 +117,28 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
         payable
         override
         assertingTransferHelperBalanceFor(bridgeParams.feeToken)
-        assertingTransferHelperBalanceFor(tokenOut)
+        assertingTransferHelperBalanceFor(assetOut)
         returns (uint256)
     {
         require(iouTokenAmountRay > 0, ErrorsLib.ZeroAmount());
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(msg.sender, iouTokenAmountRay);
 
+        (uint256 withdrawalFeeRay,) =
+            IWithdrawalPolicy(WITHDRAWAL_POLICY).evaluateWithdrawal(msg.sender, assetOut, iouTokenAmountRay, data);
+        uint256 amountOut = (iouTokenAmountRay - withdrawalFeeRay).rayToAssetDecimals(assetOut);
+        require(amountOut != 0 && amountOut >= minAmountOut, ErrorsLib.InsufficientAmountOut());
+        IAllocator(ALLOCATOR).withdraw(assetOut, amountOut);
+
+        _transferBridgeFeeToTransferHelper(bridgeParams);
+
         address adapter =
             $BaseChainGateway().defaultBridgeAdapter[ConstantsLib.ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID];
         require(adapter != address(0), AdapterNotFound());
 
-        (uint256 withdrawalFeeRay,) =
-            IWithdrawalPolicy(WITHDRAWAL_POLICY).evaluateWithdrawal(msg.sender, tokenOut, iouTokenAmountRay, data);
-        uint256 amountOut = (iouTokenAmountRay - withdrawalFeeRay).rayToAssetDecimals(tokenOut);
-        require(amountOut > 0, ErrorsLib.InsufficientAmountOut());
-        IAllocator(ALLOCATOR).withdraw(tokenOut, amountOut);
-
-        _transferBridgeFeeToTransferHelper(bridgeParams);
-
         // Send data to synchronize the Accounting Chain's state.
         _sendBurnIouTokenMessage(iouTokenAmountRay, adapter, bridgeParams);
 
-        ITransferHelper(TRANSFER_HELPER).transfer(tokenOut, amountOut, tokenOutReceiver);
+        ITransferHelper(TRANSFER_HELPER).transfer(assetOut, amountOut, receiver);
 
         return amountOut;
     }
