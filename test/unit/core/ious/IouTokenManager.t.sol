@@ -213,6 +213,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
     ) public {
         vm.assume(destinationChainId != block.chainid);
         vm.assume(from != address(0));
+        vm.assume(iouTokenRecipient != address(0));
 
         IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
             feePayer: from, feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 0, data: ""
@@ -240,6 +241,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
         address iouTokenRecipient,
         uint256 iouTokenAmountRay
     ) public {
+        vm.assume(iouTokenRecipient != address(0));
         uint256 destinationChainId = block.chainid;
         IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
             feePayer: address(0), feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 0, data: ""
@@ -259,6 +261,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
         bytes memory data
     ) public {
         vm.assume(from != address(0));
+        vm.assume(iouTokenRecipient != address(0));
         vm.assume(destinationChainId != block.chainid);
         address feeToken = address(new MockErc20("Test USD", "TUSD", 6));
         IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
@@ -303,6 +306,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
         vm.assume(destinationChainId != block.chainid);
         vm.assume(from != address(chainGateway));
         vm.assume(from != address(0));
+        vm.assume(iouTokenRecipient != address(0));
         IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
             feePayer: from,
             feeToken: address(0),
@@ -338,6 +342,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
         uint256 iouTokenAmountRay
     ) public {
         vm.assume(destinationChainId != block.chainid);
+        vm.assume(iouTokenRecipient != address(0));
         vm.assume(feePayer != from);
         vm.assume(from != address(0));
         uint256 feeAmount = 1000;
@@ -352,6 +357,19 @@ contract IouTokenManagerTest_AccountingChain is Test {
         IERC20(iouToken).approve(address(iouTokenManager), iouTokenAmountRay);
 
         vm.expectRevert(abi.encodeWithSelector(ErrorsLib.InvalidBridgeFeePayer.selector));
+        vm.prank(from);
+        iouTokenManager.bridgeTokens(destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeParams);
+    }
+
+    function test_bridgeTokens_reverts_if_invalidIouTokenRecipient() public {
+        address from = makeAddr("randomAccount");
+        uint256 iouTokenAmountRay = 100_000;
+        uint256 destinationChainId = block.chainid + 1;
+        address iouTokenRecipient = address(0);
+        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
+            feePayer: from, feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 0, data: ""
+        });
+        vm.expectRevert(ErrorsLib.InvalidParameter.selector);
         vm.prank(from);
         iouTokenManager.bridgeTokens(destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeParams);
     }

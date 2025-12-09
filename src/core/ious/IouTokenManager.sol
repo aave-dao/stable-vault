@@ -95,6 +95,7 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) external payable override assertingTransferHelperBalanceFor(bridgeParams.feeToken) {
         require(destinationChainId != block.chainid, ErrorsLib.InvalidDestinationChainId());
+        require(iouTokenRecipient != address(0), ErrorsLib.InvalidParameter());
         if (IS_ACCOUNTING_CHAIN) {
             _lockTokens(msg.sender, iouTokenAmountRay);
         } else {
