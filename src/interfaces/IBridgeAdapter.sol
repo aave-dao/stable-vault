@@ -9,16 +9,16 @@ interface IBridgeAdapter {
     event BridgedFundsProcessingFailed(uint256 sourceChainId, bytes message, bytes error);
 
     /// @notice Emitted when a message is published with a given message id from the bridge provider.
-    /// @dev The message id matches the one in the `ReceivedMessageWithId` event.
-    event PublishedMessageWithId(bytes32 indexed messageId);
+    /// @dev The message id matches the one in the `MessageReceived` event.
+    event MessagePublished(bytes32 indexed messageId);
 
     /// @notice Emitted when a message is received with a given message id from the bridge provider.
-    /// @dev The message id matches the one in the `PublishedMessageWithId` event.
-    event ReceivedMessageWithId(bytes32 indexed messageId);
+    /// @dev The message id matches the one in the `MessagePublished` event.
+    event MessageReceived(bytes32 indexed messageId);
 
     /// @notice Emitted when the processing of a received token fails downstream from the adapter.
     /// @dev Indicates that the token will remain on the adapter contract.
-    event ReceivedTokenProcessingFailed(uint256 indexed sourceChainId, address indexed asset, uint256 amount);
+    event TokenReceptionFailed(uint256 indexed sourceChainId, address indexed asset, uint256 amount);
 
     /// @notice Address checked is not the destination chain adapter.
     /// @custom:selector 0x75503511

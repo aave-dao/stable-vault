@@ -297,7 +297,7 @@ contract CcipAdapterTest is TestWithHelpers {
         bytes32 messageId = keccak256("messageId");
         _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, messageId);
         vm.expectEmit(true, true, true, true);
-        emit IBridgeAdapter.PublishedMessageWithId(messageId);
+        emit IBridgeAdapter.MessagePublished(messageId);
         vm.prank(address(_mockAccountingChainGateway));
         _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
             EARNING_CHAIN_ID, bridgeAssets, bridgedData, bridgeParams
@@ -381,7 +381,7 @@ contract CcipAdapterTest is TestWithHelpers {
         bytes32 messageId = keccak256("messageId");
         _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, messageId);
         vm.expectEmit(true, true, true, true);
-        emit IBridgeAdapter.PublishedMessageWithId(messageId);
+        emit IBridgeAdapter.MessagePublished(messageId);
         vm.prank(address(_mockAccountingChainGateway));
         _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
             EARNING_CHAIN_ID, bridgeAssets, bridgedData, bridgeParams
@@ -908,7 +908,7 @@ contract CcipAdapterTest is TestWithHelpers {
         bytes32 messageId = keccak256("messageId");
 
         vm.expectEmit(true, true, true, true);
-        emit IBridgeAdapter.ReceivedMessageWithId(messageId);
+        emit IBridgeAdapter.MessageReceived(messageId);
         vm.prank(address(_mockCCIPRouter));
         _accountingChainCcipAdapter.ccipReceive(
             Client.Any2EVMMessage({
@@ -990,9 +990,9 @@ contract CcipAdapterTest is TestWithHelpers {
         });
 
         vm.expectEmit(true, true, true, true);
-        emit IBridgeAdapter.ReceivedTokenProcessingFailed(EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt);
+        emit IBridgeAdapter.TokenReceptionFailed(EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt);
         vm.expectEmit(true, true, true, true);
-        emit IBridgeAdapter.ReceivedTokenProcessingFailed(EARNING_CHAIN_ID, address(_mockGho), amountGho);
+        emit IBridgeAdapter.TokenReceptionFailed(EARNING_CHAIN_ID, address(_mockGho), amountGho);
         vm.expectEmit(true, true, true, true);
         emit IBridgeAdapter.BridgedFundsProcessingFailed(EARNING_CHAIN_ID, abi.encode(ccipMessage), abi.encode("test"));
 
