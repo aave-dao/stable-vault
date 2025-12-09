@@ -49,6 +49,10 @@ library ErrorsLib {
     /// @custom:selector 0xea8e4eb5
     error NotAuthorized();
 
+    /// @notice Thrown when bridge fee payer is not the expected caller.
+    /// @custom:selector 0xecec4b20
+    error InvalidBridgeFeePayer();
+
     /// @notice Address checked is not the Cross-chain gateway.
     /// @custom:selector 0xec76af13
     error OnlyGateway();
