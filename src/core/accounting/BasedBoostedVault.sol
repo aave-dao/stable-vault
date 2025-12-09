@@ -252,17 +252,19 @@ contract BasedBoostedVault is
     }
 
     /// @inheritdoc IBasedBoostedVault
-    function executeWithdrawal(address user, address assetOut, uint256 iouAmountRay, bytes memory data)
-        external
-        override
-        assertingTransferHelperBalanceFor(assetOut)
-    {
+    function executeWithdrawal(
+        address user,
+        address assetOut,
+        uint256 minAmountOut,
+        uint256 iouAmountRay,
+        bytes memory data
+    ) external override assertingTransferHelperBalanceFor(assetOut) {
         require(user == msg.sender, OnlyUser());
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(user, iouAmountRay);
         (uint256 withdrawalFeeRay,) =
             IWithdrawalPolicy(WITHDRAWAL_POLICY).evaluateWithdrawal(user, assetOut, iouAmountRay, data);
         uint256 assetAmount = (iouAmountRay - withdrawalFeeRay).rayToAssetDecimals(assetOut);
-        require(assetAmount > 0, ErrorsLib.InsufficientAmountOut());
+        require(assetAmount != 0 && assetAmount >= minAmountOut, ErrorsLib.InsufficientAmountOut());
         IFundsHandler(FUNDS_HANDLER).processWithdrawal(assetOut, assetAmount);
         ITransferHelper(TRANSFER_HELPER).transfer(assetOut, assetAmount, user);
         emit WithdrawalExecuted(user, assetOut, assetAmount);

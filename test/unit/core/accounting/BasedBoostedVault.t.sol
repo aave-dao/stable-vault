@@ -1315,7 +1315,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         vm.expectRevert(IBasedBoostedVault.OnlyUser.selector);
         vm.prank(msgSender);
-        bbv.executeWithdrawal(user, address(mockAsset), iouAmountRay, "");
+        bbv.executeWithdrawal(user, address(mockAsset), 0, iouAmountRay, "");
     }
 
     function test_executeWithdrawal_reverts_ifAssetIsNotAllowedToWithdrawFromBbv(
@@ -1335,7 +1335,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(mockAsset)));
         vm.prank(user);
-        bbv.executeWithdrawal(user, address(mockAsset), iouAmountRay, "");
+        bbv.executeWithdrawal(user, address(mockAsset), 0, iouAmountRay, "");
     }
 
     function test_executeWithdrawal_reverts_ifIouAmountIsGreaterThanUserBalance(
@@ -1355,7 +1355,32 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             abi.encodeWithSelector(IERC20Errors.ERC20InsufficientBalance.selector, user, userIouBalance, iouAmountRay)
         );
         vm.prank(user);
-        bbv.executeWithdrawal(user, address(mockAsset), iouAmountRay, "");
+        bbv.executeWithdrawal(user, address(mockAsset), 0, iouAmountRay, "");
+    }
+
+    function test_executeWithdrawal_reverts_ifAmountOutIsLessThanMinAmountOut(
+        address user,
+        uint256 userIouBalance,
+        uint256 iouAmountRay,
+        uint256 minAmountOut
+    ) public {
+        vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
+        _assumeNotProxyAdmin(user, address(bbv));
+        userIouBalance = _boundRayAmountAllowingZero(userIouBalance);
+        iouAmountRay = _boundRayAmount(iouAmountRay);
+        vm.assume(iouAmountRay <= userIouBalance);
+        mockIouToken.mint(user, userIouBalance);
+        assertEq(mockIouToken.balanceOf(user), userIouBalance);
+        vm.assume(iouAmountRay.rayToAssetDecimals(address(mockAsset)) > 0);
+        uint256 actualWithdrawnAssets = iouAmountRay.rayToAssetDecimals(address(mockAsset));
+        minAmountOut = bound(minAmountOut, actualWithdrawnAssets + 1, type(uint256).max);
+
+        mockTransferHelper.mockAsset(address(mockAsset), actualWithdrawnAssets);
+
+        vm.prank(user);
+        vm.expectRevert(ErrorsLib.InsufficientAmountOut.selector);
+        bbv.executeWithdrawal(user, address(mockAsset), minAmountOut, iouAmountRay, "");
     }
 
     function test_executeWithdrawal_reverts_ifAssetAmountIsZero_fromWithdrawalFee(
@@ -1384,7 +1409,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         vm.prank(user);
         vm.expectRevert(ErrorsLib.InsufficientAmountOut.selector);
-        bbv.executeWithdrawal(user, address(mockAsset), iouAmountRay, "");
+        bbv.executeWithdrawal(user, address(mockAsset), 0, iouAmountRay, "");
     }
 
     function test_executeWithdrawal_emitsExpectedEvent(address user, uint256 iouAmountRay) public {
@@ -1402,7 +1427,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         emit IBasedBoostedVault.WithdrawalExecuted(user, address(mockAsset), actualWithdrawnAssets);
 
         vm.prank(user);
-        bbv.executeWithdrawal(user, address(mockAsset), iouAmountRay, "");
+        bbv.executeWithdrawal(user, address(mockAsset), 0, iouAmountRay, "");
     }
 
     function test_executeWithdrawal_burnsExpectedAmountOfIouTokens(
@@ -1424,7 +1449,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockTransferHelper.mockAsset(address(mockAsset), actualWithdrawnAssets);
 
         vm.prank(user);
-        bbv.executeWithdrawal(user, address(mockAsset), iouAmountRay, "");
+        bbv.executeWithdrawal(user, address(mockAsset), 0, iouAmountRay, "");
 
         assertEq(mockIouToken.balanceOf(user), userIouBalance - iouAmountRay);
     }
@@ -1442,7 +1467,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockTransferHelper.mockAsset(address(mockAsset), actualWithdrawnAssets);
 
         vm.prank(user);
-        bbv.executeWithdrawal(user, address(mockAsset), iouAmountRay, "");
+        bbv.executeWithdrawal(user, address(mockAsset), 0, iouAmountRay, "");
 
         assertEq(mockAsset.balanceOf(user), actualWithdrawnAssets);
     }

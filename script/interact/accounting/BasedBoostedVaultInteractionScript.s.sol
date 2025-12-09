@@ -41,7 +41,7 @@ contract BasedBoostedVaultInteractionScript is AccountingChainBaseScript {
         uint256 amountInRay = 1 * 10 ** 18;
 
         vm.startBroadcast();
-        IBasedBoostedVault(BASED_BOOSTED_VAULT).executeWithdrawal(msg.sender, asset, amountInRay, "");
+        IBasedBoostedVault(BASED_BOOSTED_VAULT).executeWithdrawal(msg.sender, asset, 0, amountInRay, "");
         vm.stopBroadcast();
     }
 

@@ -619,6 +619,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             _earningChainGateway.exchangeIouTokens(
                 iouTokenAmountRay,
                 tokenOut,
+                0,
                 tokenOutReceiver,
                 IBridgeAdapter.BridgeParams({
                     feePayer: bridgeFeePayer,
@@ -691,6 +692,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             _earningChainGateway.exchangeIouTokens(
                 iouTokenAmountRay,
                 tokenOut,
+                0,
                 tokenOutReceiver,
                 IBridgeAdapter.BridgeParams({
                     feePayer: bridgeFeePayer,
@@ -778,7 +780,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         vm.deal(tokenOutReceiver, bridgeFeeAmount);
         vm.prank(tokenOutReceiver);
         _earningChainGateway.exchangeIouTokens{value: bridgeFeeAmount}(
-            iouTokenAmountRay, tokenOut, tokenOutReceiver, bridgeParams, ""
+            iouTokenAmountRay, tokenOut, 0, tokenOutReceiver, bridgeParams, ""
         );
     }
 
@@ -787,6 +789,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         _earningChainGateway.exchangeIouTokens(
             0,
             address(_mockUsdt),
+            0,
             makeAddr("tokenOutReceiver"),
             IBridgeAdapter.BridgeParams({
                 feePayer: makeAddr("bridgeFeePayer"),
@@ -800,7 +803,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         );
     }
 
-    function test_exchangeIouTokens_reverts_ifZeroAssetOutAmmount_fromRayConversion() public {
+    function test_exchangeIouTokens_reverts_ifZeroAssetOutAmount_fromRayConversion() public {
         // Converting this to 6 decimals will result in 0
         uint256 iouTokenAmountRay = 1e20;
 
@@ -811,6 +814,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         _earningChainGateway.exchangeIouTokens(
             iouTokenAmountRay,
             address(_mockUsdt),
+            0,
             makeAddr("tokenOutReceiver"),
             IBridgeAdapter.BridgeParams({
                 feePayer: makeAddr("bridgeFeePayer"),
@@ -824,7 +828,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         );
     }
 
-    function test_exchangeIouTokens_reverts_ifZeroAssetOutAmmount_fromWithdrawalFee() public {
+    function test_exchangeIouTokens_reverts_ifZeroAssetOutAmount_fromWithdrawalFee() public {
         // Converting this to 6 decimals will result in 1 unit withdrawal, but withdrawal fee is 1e21 so amount out is 0
         uint256 iouTokenAmountRay = 1e21;
         uint256 withdrawalFeeRay = 1e21;
@@ -839,6 +843,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         _earningChainGateway.exchangeIouTokens(
             iouTokenAmountRay,
             address(_mockUsdt),
+            0,
             makeAddr("tokenOutReceiver"),
             IBridgeAdapter.BridgeParams({
                 feePayer: makeAddr("bridgeFeePayer"),
@@ -863,6 +868,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         _earningChainGateway.exchangeIouTokens(
             iouTokenAmountRay,
             address(_mockUsdt),
+            0,
             makeAddr("tokenOutReceiver"),
             IBridgeAdapter.BridgeParams({
                 feePayer: address(this),
@@ -888,6 +894,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         _earningChainGateway.exchangeIouTokens(
             iouTokenAmountRay,
             address(_mockUsdt),
+            0,
             makeAddr("tokenOutReceiver"),
             IBridgeAdapter.BridgeParams({
                 feePayer: makeAddr("bridgeFeePayer"),
@@ -906,17 +913,57 @@ contract EarningChainGatewayTest is TestWithHelpers {
         vm.prank(admin);
         _earningChainGateway.removeBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, address(_mockBridgeAdapterData));
 
+        uint256 iouTokenAmountRay = 100_000_000_000_000 * 10 ** 27;
+        uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(address(_mockUsdt));
+        // Put funds idle into TH to mimic withdrawal from Allocator
+        _mockTransferHelper.mockAsset(address(_mockUsdt), amountOut);
+
         address tokenOutReceiver = makeAddr("tokenOutReceiver");
+        uint256 bridgeFeeAmount = 123;
+        vm.deal(tokenOutReceiver, bridgeFeeAmount);
         vm.expectRevert(IChainGateway.AdapterNotFound.selector);
         vm.prank(tokenOutReceiver);
-        _earningChainGateway.exchangeIouTokens(
-            100_000_000_000_000 * 10 ** 27,
+        _earningChainGateway.exchangeIouTokens{value: bridgeFeeAmount}(
+            iouTokenAmountRay,
             address(_mockUsdt),
+            0,
             tokenOutReceiver,
             IBridgeAdapter.BridgeParams({
-                feePayer: makeAddr("bridgeFeePayer"),
+                feePayer: tokenOutReceiver,
                 feeToken: address(0),
-                feeAmount: 123,
+                feeAmount: bridgeFeeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: 100000,
+                data: abi.encode(keccak256(hex"c0ffee"))
+            }),
+            ""
+        );
+    }
+
+    function test_exchangeIouTokens_reverts_ifAmountOutIsLessThanMinAmountOut(
+        uint256 iouTokenAmountRay,
+        uint256 minAmountOut
+    ) public {
+        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(address(_mockUsdt));
+        minAmountOut = bound(minAmountOut, amountOut + 1, type(uint256).max);
+        // Put funds idle into TH to mimic withdrawal from Allocator
+        _mockTransferHelper.mockAsset(address(_mockUsdt), amountOut);
+
+        address tokenOutReceiver = makeAddr("tokenOutReceiver");
+        uint256 bridgeFeeAmount = 123;
+        vm.deal(tokenOutReceiver, bridgeFeeAmount);
+        vm.expectRevert(ErrorsLib.InsufficientAmountOut.selector);
+        vm.prank(tokenOutReceiver);
+        _earningChainGateway.exchangeIouTokens{value: bridgeFeeAmount}(
+            iouTokenAmountRay,
+            address(_mockUsdt),
+            minAmountOut,
+            tokenOutReceiver,
+            IBridgeAdapter.BridgeParams({
+                feePayer: tokenOutReceiver,
+                feeToken: address(0),
+                feeAmount: bridgeFeeAmount,
                 feeRefundThreshold: 0,
                 gasLimit: 100000,
                 data: abi.encode(keccak256(hex"c0ffee"))

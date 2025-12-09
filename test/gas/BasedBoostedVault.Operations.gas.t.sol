@@ -236,7 +236,7 @@ contract BasedBoostedVaultOperationsGasTest is BaseTest {
         vault.requestWithdrawal(user, partialWithdrawalAmountRay);
 
         vm.prank(user);
-        vault.executeWithdrawal(user, address(USDC), partialWithdrawalAmountRay, "");
+        vault.executeWithdrawal(user, address(USDC), 0, partialWithdrawalAmountRay, "");
         vm.snapshotGasLastCall(NAMESPACE, "[executeWithdrawal] partial withdrawal");
     }
 
@@ -253,7 +253,7 @@ contract BasedBoostedVaultOperationsGasTest is BaseTest {
         vault.requestWithdrawal(user, fullWithdrawalAmountRay);
 
         vm.prank(user);
-        vault.executeWithdrawal(user, address(USDC), fullWithdrawalAmountRay, "");
+        vault.executeWithdrawal(user, address(USDC), 0, fullWithdrawalAmountRay, "");
         vm.snapshotGasLastCall(NAMESPACE, "[executeWithdrawal] full withdrawal");
     }
 

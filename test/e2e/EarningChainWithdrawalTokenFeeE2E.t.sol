@@ -349,6 +349,7 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
         earningChainGateway.exchangeIouTokens(
             iouAmountRequestedRay,
             address(USDC),
+            0,
             user,
             IBridgeAdapter.BridgeParams({
                 feePayer: user,
