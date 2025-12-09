@@ -188,7 +188,6 @@ contract BasedBoostedVault is
 
     /// @inheritdoc IBasedBoostedVault
     function setUserRate(UserRateData[] calldata userRateData) external override restricted {
-        // limit the size of this input?????????
         for (uint256 i = 0; i < userRateData.length; i++) {
             _setUserRate(userRateData[i].user, userRateData[i].newPerSecondRate);
         }
