@@ -421,9 +421,9 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     }
 
     function _removeStrategy(address strategy) internal {
-        address asset = $storage().strategyConfigs[strategy].asset;
-        require(asset != address(0), ErrorsLib.AddressNotWhitelisted());
+        require(_isStrategySupported(strategy), ErrorsLib.AddressNotWhitelisted());
         require(_getAssetBalanceInStrategy(IERC4626(strategy)) == 0, ErrorsLib.NonZeroAmount());
+        address asset = $storage().strategyConfigs[strategy].asset;
 
         if (strategy == $storage().defaultStrategyByAsset[asset]) {
             // Unset the default strategy for the asset - deposits will not flow to this strategy.
