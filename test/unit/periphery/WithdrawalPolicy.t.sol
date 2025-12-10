@@ -269,7 +269,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         // Build signed fee discount data
         bytes memory data = _createSignedFeeDiscountData(
-            signerPk, user, assetOut, iouAmountRay, uint16(personalFeeBps), DEFAULT_NONCE, DEFAULT_DEADLINE
+            signerPk, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), DEFAULT_NONCE, DEFAULT_DEADLINE
         );
 
         // Fee rounds up, so expectedAmountOut rounds down
@@ -365,7 +365,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
             user,
             assetOut,
             iouAmountRay,
-            uint16(personalFeeBps),
+            _toUint16(personalFeeBps),
             DEFAULT_NONCE,
             DEFAULT_DEADLINE
         );
@@ -399,7 +399,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         // Build signed fee discount data for WRONG user
         bytes memory data = _createSignedFeeDiscountData(
-            signerPk, wrongUser, assetOut, iouAmountRay, uint16(personalFeeBps), DEFAULT_NONCE, DEFAULT_DEADLINE
+            signerPk, wrongUser, assetOut, iouAmountRay, _toUint16(personalFeeBps), DEFAULT_NONCE, DEFAULT_DEADLINE
         );
 
         vm.expectRevert(WithdrawalPolicy.InvalidSignature.selector);
@@ -431,7 +431,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         // Build signed fee discount data for WRONG asset
         bytes memory data = _createSignedFeeDiscountData(
-            signerPk, user, wrongAssetOut, iouAmountRay, uint16(personalFeeBps), DEFAULT_NONCE, DEFAULT_DEADLINE
+            signerPk, user, wrongAssetOut, iouAmountRay, _toUint16(personalFeeBps), DEFAULT_NONCE, DEFAULT_DEADLINE
         );
 
         vm.expectRevert(WithdrawalPolicy.InvalidSignature.selector);
@@ -466,7 +466,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         // Build signed fee discount data for WRONG amount
         bytes memory data = _createSignedFeeDiscountData(
-            signerPk, user, assetOut, wrongIouAmountRay, uint16(personalFeeBps), DEFAULT_NONCE, DEFAULT_DEADLINE
+            signerPk, user, assetOut, wrongIouAmountRay, _toUint16(personalFeeBps), DEFAULT_NONCE, DEFAULT_DEADLINE
         );
 
         vm.expectRevert(WithdrawalPolicy.InvalidSignature.selector);
@@ -504,8 +504,8 @@ contract WithdrawalPolicyTest is TestWithHelpers {
             user,
             assetOut,
             iouAmountRay,
-            uint16(personalFeeBps), // claimed in data
-            uint16(wrongPersonalFeeBps), // signed
+            _toUint16(personalFeeBps), // claimed in data
+            _toUint16(wrongPersonalFeeBps), // signed
             DEFAULT_NONCE,
             DEFAULT_DEADLINE
         );
@@ -540,7 +540,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         // Manually encode SignedFeeDiscount with malformed signature
         bytes memory data = abi.encode(
             WithdrawalPolicy.SignedFeeDiscount({
-                personalFeeBps: uint16(personalFeeBps),
+                personalFeeBps: _toUint16(personalFeeBps),
                 nonce: DEFAULT_NONCE,
                 deadline: DEFAULT_DEADLINE,
                 signature: malformedSignature
@@ -734,7 +734,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         withdrawalPolicy.setSigner(signer, true);
 
         bytes memory data = _createSignedFeeDiscountData(
-            signerPk, user, assetOut, iouAmountRay, uint16(personalFeeBps), nonce, DEFAULT_DEADLINE
+            signerPk, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), nonce, DEFAULT_DEADLINE
         );
 
         // Signer invalidates the nonce before it's used
@@ -767,7 +767,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         withdrawalPolicy.setSigner(signer, true);
 
         bytes memory data = _createSignedFeeDiscountData(
-            signerPk, user, assetOut, iouAmountRay, uint16(personalFeeBps), nonce, DEFAULT_DEADLINE
+            signerPk, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), nonce, DEFAULT_DEADLINE
         );
 
         // Signer invalidates the nonce before it's used
@@ -830,7 +830,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         // Deadline in the future should work
         uint256 deadline = block.timestamp + deadlineOffset;
         bytes memory data = _createSignedFeeDiscountData(
-            signerPk, user, assetOut, iouAmountRay, uint16(personalFeeBps), DEFAULT_NONCE, deadline
+            signerPk, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), DEFAULT_NONCE, deadline
         );
 
         // Should succeed
@@ -866,21 +866,21 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         // First signature with nonce1
         bytes memory data1 = _createSignedFeeDiscountData(
-            signerPk, user, assetOut, iouAmountRay, uint16(personalFeeBps), nonce1, DEFAULT_DEADLINE
+            signerPk, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), nonce1, DEFAULT_DEADLINE
         );
         withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data1));
         assertTrue(withdrawalPolicy.isNonceUsed(signer, nonce1), "Nonce1 should be used");
 
         // Second signature with nonce2 should also work
         bytes memory data2 = _createSignedFeeDiscountData(
-            signerPk, user, assetOut, iouAmountRay, uint16(personalFeeBps), nonce2, DEFAULT_DEADLINE
+            signerPk, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), nonce2, DEFAULT_DEADLINE
         );
         withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data2));
         assertTrue(withdrawalPolicy.isNonceUsed(signer, nonce2), "Nonce2 should be used");
 
         // Third signature with nonce3 should also work
         bytes memory data3 = _createSignedFeeDiscountData(
-            signerPk, user, assetOut, iouAmountRay, uint16(personalFeeBps), nonce3, DEFAULT_DEADLINE
+            signerPk, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), nonce3, DEFAULT_DEADLINE
         );
         withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data3));
         assertTrue(withdrawalPolicy.isNonceUsed(signer, nonce3), "Nonce3 should be used");
@@ -938,7 +938,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         // Signer1 uses the shared nonce
         bytes memory data1 = _createSignedFeeDiscountData(
-            signerPk1, user, assetOut, iouAmountRay, uint16(personalFeeBps), sharedNonce, DEFAULT_DEADLINE
+            signerPk1, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), sharedNonce, DEFAULT_DEADLINE
         );
         withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data1));
         assertTrue(withdrawalPolicy.isNonceUsed(signer1, sharedNonce), "Signer1 nonce should be used");
@@ -946,7 +946,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         // Signer2 can also use the same nonce
         bytes memory data2 = _createSignedFeeDiscountData(
-            signerPk2, user, assetOut, iouAmountRay, uint16(personalFeeBps), sharedNonce, DEFAULT_DEADLINE
+            signerPk2, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), sharedNonce, DEFAULT_DEADLINE
         );
         withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data2));
         assertTrue(withdrawalPolicy.isNonceUsed(signer2, sharedNonce), "Signer2 nonce should now be used");
@@ -974,7 +974,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         withdrawalPolicy.setSigner(signer, true);
 
         bytes memory data = _createSignedFeeDiscountData(
-            signerPk, user, assetOut, iouAmountRay, uint16(personalFeeBps), DEFAULT_NONCE, DEFAULT_DEADLINE
+            signerPk, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), DEFAULT_NONCE, DEFAULT_DEADLINE
         );
 
         // Remove the signer
@@ -1007,7 +1007,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         withdrawalPolicy.setSigner(signer, true);
 
         bytes memory data = _createSignedFeeDiscountData(
-            signerPk, user, assetOut, iouAmountRay, uint16(personalFeeBps), DEFAULT_NONCE, DEFAULT_DEADLINE
+            signerPk, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), DEFAULT_NONCE, DEFAULT_DEADLINE
         );
 
         // Remove the signer
@@ -1039,7 +1039,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         withdrawalPolicy.setSigner(signer, true);
 
         bytes memory data = _createSignedFeeDiscountData(
-            signerPk, user, assetOut, iouAmountRay, uint16(personalFeeBps), DEFAULT_NONCE, DEFAULT_DEADLINE
+            signerPk, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), DEFAULT_NONCE, DEFAULT_DEADLINE
         );
 
         IWithdrawalPolicy.WithdrawalRequest memory request = _buildRequest(user, assetOut, iouAmountRay, data);
@@ -1078,7 +1078,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         withdrawalPolicy.setSigner(signer, true);
 
         bytes memory data = _createSignedFeeDiscountData(
-            signerPk, user, assetOut, iouAmountRay, uint16(personalFeeBps), DEFAULT_NONCE, DEFAULT_DEADLINE
+            signerPk, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), DEFAULT_NONCE, DEFAULT_DEADLINE
         );
 
         // Remove the signer
@@ -1122,10 +1122,10 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         withdrawalPolicy.setSigner(signer2, true);
 
         bytes memory data1 = _createSignedFeeDiscountData(
-            signerPk1, user, assetOut, iouAmountRay, uint16(personalFeeBps), 1, DEFAULT_DEADLINE
+            signerPk1, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), 1, DEFAULT_DEADLINE
         );
         bytes memory data2 = _createSignedFeeDiscountData(
-            signerPk2, user, assetOut, iouAmountRay, uint16(personalFeeBps), 1, DEFAULT_DEADLINE
+            signerPk2, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), 1, DEFAULT_DEADLINE
         );
 
         // Remove signer1
@@ -1162,6 +1162,12 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         vm.prank(signer);
         vm.expectRevert(ErrorsLib.NotAuthorized.selector);
         withdrawalPolicy.invalidateNonce(signer, nonce2);
+    }
+
+    // Helper to safely cast personalFeeBps to uint16 (safe because it's always bounded to MAX_BPS = 10000)
+    function _toUint16(uint256 value) internal pure returns (uint16) {
+        // forge-lint: disable-next-line(unsafe-typecast)
+        return uint16(value);
     }
 
     // Helper to create signed fee discount data
