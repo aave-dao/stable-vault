@@ -261,9 +261,13 @@ contract BasedBoostedVault is
     ) external override assertingTransferHelperBalanceFor(assetOut) {
         require(user == msg.sender, OnlyUser());
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(user, iouAmountRay);
-        (uint256 withdrawalFeeRay,) =
-            IWithdrawalPolicy(WITHDRAWAL_POLICY).evaluateWithdrawal(user, assetOut, iouAmountRay, data);
-        uint256 assetAmount = (iouAmountRay - withdrawalFeeRay).rayToAssetDecimals(assetOut);
+        uint256 amountOutRay = IWithdrawalPolicy(WITHDRAWAL_POLICY)
+            .applyWithdrawalPolicy(
+                IWithdrawalPolicy.WithdrawalRequest({
+                    user: user, assetOut: assetOut, iouAmountRay: iouAmountRay, data: data
+                })
+            );
+        uint256 assetAmount = amountOutRay.rayToAssetDecimals(assetOut);
         require(assetAmount != 0 && assetAmount >= minAmountOut, ErrorsLib.InsufficientAmountOut());
         IFundsHandler(FUNDS_HANDLER).processWithdrawal(assetOut, assetAmount);
         ITransferHelper(TRANSFER_HELPER).transfer(assetOut, assetAmount, user);

@@ -831,12 +831,11 @@ contract EarningChainGatewayTest is TestWithHelpers {
     function test_exchangeIouTokens_reverts_ifZeroAssetOutAmount_fromWithdrawalFee() public {
         // Converting this to 6 decimals will result in 1 unit withdrawal, but withdrawal fee is 1e21 so amount out is 0
         uint256 iouTokenAmountRay = 1e21;
-        uint256 withdrawalFeeRay = 1e21;
 
         vm.mockCall(
             address(_mockWithdrawalPolicy),
-            abi.encodeWithSelector(IWithdrawalPolicy.evaluateWithdrawal.selector),
-            abi.encode(withdrawalFeeRay, 1)
+            abi.encodeWithSelector(IWithdrawalPolicy.applyWithdrawalPolicy.selector),
+            abi.encode(uint256(0)) // amountOutRay = 0, simulating 100% fee
         );
 
         vm.expectRevert(ErrorsLib.InsufficientAmountOut.selector);
