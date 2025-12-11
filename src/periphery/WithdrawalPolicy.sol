@@ -60,7 +60,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
 
     /// @custom:storage-location erc7201:aave.storage.WithdrawalPolicy
     struct WithdrawalPolicyStorage {
-        uint16 basicFeeBps;
+        uint16 defaultFeeBps;
         mapping(address asset => AssetFeeConfig config) assetFeeConfigs;
         mapping(address signer => bool isSigner) signers;
         mapping(address signer => mapping(uint256 nonce => bool used)) usedNonces;
@@ -103,9 +103,9 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
 
     /// @notice Getter for the fallback fee in basis points which is used when a personal fee or asset-specific fee is
     /// not available.
-    /// @return basicFeeBps Fallback fee in basis points.
-    function getBasicFeeBps() external view returns (uint16) {
-        return $storage().basicFeeBps;
+    /// @return defaultFeeBps Fallback fee in basis points.
+    function getDefaultFeeBps() external view returns (uint16) {
+        return $storage().defaultFeeBps;
     }
 
     /// @notice Getter for whether a signer is whitelisted.
@@ -136,7 +136,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
             $storage().usedNonces[signer][nonce] = true;
             feeBps = personalFeeBps;
         } else {
-            feeBps = _getDefaultFeeBps(request.assetOut);
+            feeBps = _getAssetFeeBps(request.assetOut);
         }
 
         uint256 feeRay = (request.iouAmountRay * feeBps + ConstantsLib.MAX_BPS - 1) / ConstantsLib.MAX_BPS;
@@ -155,7 +155,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
             (,, uint16 personalFeeBps) = _verifySignedDiscount(request);
             feeBps = personalFeeBps;
         } else {
-            feeBps = _getDefaultFeeBps(request.assetOut);
+            feeBps = _getAssetFeeBps(request.assetOut);
         }
 
         uint256 feeRay = (request.iouAmountRay * feeBps + ConstantsLib.MAX_BPS - 1) / ConstantsLib.MAX_BPS;
@@ -169,8 +169,8 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     /// @param newAssetFeeBps The fee in basis points applied to the IOU quantity being exchanged for the asset.
     /// @param isSet Whether the fee is set (used for lookups).
     function setAssetFeeBps(address asset, uint16 newAssetFeeBps, bool isSet) external restricted {
-        // We don't check for new asset fee being less than the basic fee because maybe we want some specific asset to
-        // have a higher fee than the basic fee.
+        // We don't check for new asset fee being less than the default fee because maybe we want some specific asset to
+        // have a higher fee than the default fee.
         require(newAssetFeeBps <= ConstantsLib.MAX_BPS, ErrorsLib.InvalidParameter());
         $storage().assetFeeConfigs[asset].feeBps = newAssetFeeBps;
         $storage().assetFeeConfigs[asset].isSet = isSet;
@@ -178,11 +178,11 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
 
     /// @notice Sets the fallback fee in basis points which is used when a personal fee or asset-specific fee is not
     /// available.
-    /// @param newBasicFeeBps The fee in basis points applied to the IOU quantity being exchanged for the
+    /// @param newDefaultFeeBps The fee in basis points applied to the IOU quantity being exchanged for the
     /// asset.
-    function setBasicFeeBps(uint16 newBasicFeeBps) external restricted {
-        require(newBasicFeeBps <= ConstantsLib.MAX_BPS, ErrorsLib.InvalidParameter());
-        $storage().basicFeeBps = newBasicFeeBps;
+    function setDefaultFeeBps(uint16 newDefaultFeeBps) external restricted {
+        require(newDefaultFeeBps <= ConstantsLib.MAX_BPS, ErrorsLib.InvalidParameter());
+        $storage().defaultFeeBps = newDefaultFeeBps;
     }
 
     /// @notice Sets the signer to be used for signature verification.
@@ -214,7 +214,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     {
         SignedFeeDiscount memory discount = abi.decode(request.data, (SignedFeeDiscount));
 
-        require(discount.personalFeeBps <= _getDefaultFeeBps(request.assetOut), ErrorsLib.InvalidParameter());
+        require(discount.personalFeeBps <= _getAssetFeeBps(request.assetOut), ErrorsLib.InvalidParameter());
         require(discount.deadline >= block.timestamp, DeadlineExpired());
 
         signer = _recoverSigner(request, discount);
@@ -244,12 +244,12 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
         return ECDSA.recover(_hashTypedDataV4(structHash), discount.signature);
     }
 
-    /// @dev Returns the default fee for an asset (asset-specific or basic fallback).
-    function _getDefaultFeeBps(address assetOut) internal view returns (uint16) {
+    /// @dev Returns the fee for an asset (asset-specific or default fallback).
+    function _getAssetFeeBps(address assetOut) internal view returns (uint16) {
         if ($storage().assetFeeConfigs[assetOut].isSet) {
             return $storage().assetFeeConfigs[assetOut].feeBps;
         } else {
-            return $storage().basicFeeBps;
+            return $storage().defaultFeeBps;
         }
     }
 }
