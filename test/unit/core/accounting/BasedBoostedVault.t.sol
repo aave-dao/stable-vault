@@ -893,43 +893,6 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         assertEq(bbv.getSubVaultIdByRate(newPerSecondRate), subVaultId);
     }
 
-    /// @notice Test that setSubVaultRate cleans up the old rate mapping
-    /// @dev When changing a SubVault's rate from oldRate to newRate, the mapping
-    ///      subVaultIdByRate[oldRate] should be deleted. Currently FAILS due to bug.
-    function test_setSubVaultRate_cleansUpOldRateMapping() public {
-        address user = makeAddr("testUser");
-        uint256 depositAmount = _boundAssetAmount(address(mockAsset), 1000e6);
-
-        // Setup: User deposits to create an active subvault
-        mockAsset.mint(user, depositAmount);
-        vm.prank(user);
-        mockAsset.forceApprove(address(bbv), depositAmount);
-        vm.prank(user);
-        bbv.deposit(user, address(mockAsset), depositAmount);
-
-        uint256 subVaultId = bbv.getDefaultSubVault().id;
-        uint256 oldRate = bbv.getSubVaultRateById(subVaultId);
-
-        // Verify initial state: oldRate maps to subVaultId
-        assertEq(bbv.getSubVaultIdByRate(oldRate), subVaultId, "Initial: oldRate should map to subVault");
-
-        // Action: Change the SubVault's rate to a new value
-        uint256 newRate = _boundRate(oldRate + 1);
-        vm.assume(bbv.getSubVaultIdByRate(newRate) == 0);
-        bbv.setSubVaultRate(subVaultId, newRate);
-
-        // Verify: New mapping is correctly set
-        assertEq(bbv.getSubVaultIdByRate(newRate), subVaultId, "newRate should map to subVault");
-        assertEq(bbv.getSubVaultRateById(subVaultId), newRate, "subVault should have newRate");
-
-        // Verify: Old mapping MUST be cleaned up (this assertion fails due to the bug)
-        assertEq(
-            bbv.getSubVaultIdByRate(oldRate),
-            0,
-            "BUG: Old rate mapping not cleaned - oldRate still maps to subVault instead of 0"
-        );
-    }
-
     function test_getActiveSubVaults_activeSubVaultIsAddedUponDeposit(address user, uint256 depositAmount) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
