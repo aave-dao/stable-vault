@@ -279,15 +279,15 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         IWithdrawalPolicy.WithdrawalRequest memory request = _buildRequest(user, assetOut, iouAmountRay, data);
 
         // Preview should return same result and NOT consume the nonce
-        assertFalse(withdrawalPolicy.isNonceUsed(signer, DEFAULT_NONCE), "Nonce should not be used before preview");
+        assertFalse(withdrawalPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Nonce should not be used before preview");
         uint256 previewAmountOut = withdrawalPolicy.previewWithdrawalPolicy(request);
         assertEq(previewAmountOut, expectedAmountOut, "Preview should match expected");
-        assertFalse(withdrawalPolicy.isNonceUsed(signer, DEFAULT_NONCE), "Preview should NOT consume nonce");
+        assertFalse(withdrawalPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Preview should NOT consume nonce");
 
         // Apply should return same result and consume the nonce
         uint256 actualAmountOut = withdrawalPolicy.applyWithdrawalPolicy(request);
         assertEq(actualAmountOut, expectedAmountOut, "Apply should match expected");
-        assertTrue(withdrawalPolicy.isNonceUsed(signer, DEFAULT_NONCE), "Apply should consume nonce");
+        assertTrue(withdrawalPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Apply should consume nonce");
     }
 
     function test_applyWithdrawalPolicy_reverts_ifPersonalFeeExceedsOtherFees(
@@ -628,12 +628,12 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         assertEq(preview1, preview2, "Preview results should be consistent");
         assertEq(preview2, preview3, "Preview results should be consistent");
-        assertFalse(withdrawalPolicy.isNonceUsed(signer, DEFAULT_NONCE), "Nonce should not be consumed by preview");
+        assertFalse(withdrawalPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Nonce should not be consumed by preview");
 
         // Apply consumes the nonce
         uint256 applied = withdrawalPolicy.applyWithdrawalPolicy(request);
         assertEq(applied, preview1, "Apply should return same as preview");
-        assertTrue(withdrawalPolicy.isNonceUsed(signer, DEFAULT_NONCE), "Nonce should be consumed by apply");
+        assertTrue(withdrawalPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Nonce should be consumed by apply");
 
         // Now preview should revert because nonce is used
         vm.expectRevert(WithdrawalPolicy.NonceAlreadyUsed.selector);
@@ -680,12 +680,12 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         withdrawalPolicy.setSigner(signer, true);
 
         uint256 nonce = 42;
-        assertFalse(withdrawalPolicy.isNonceUsed(signer, nonce), "Nonce should not be used initially");
+        assertFalse(withdrawalPolicy.wasNonceUsed(signer, nonce), "Nonce should not be used initially");
 
         vm.prank(signer);
         withdrawalPolicy.invalidateNonce(signer, nonce);
 
-        assertTrue(withdrawalPolicy.isNonceUsed(signer, nonce), "Nonce should be invalidated");
+        assertTrue(withdrawalPolicy.wasNonceUsed(signer, nonce), "Nonce should be invalidated");
     }
 
     function test_invalidateNonce_reverts_ifCallerIsNotSigner() public {
@@ -869,21 +869,21 @@ contract WithdrawalPolicyTest is TestWithHelpers {
             signerPk, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), nonce1, DEFAULT_DEADLINE
         );
         withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data1));
-        assertTrue(withdrawalPolicy.isNonceUsed(signer, nonce1), "Nonce1 should be used");
+        assertTrue(withdrawalPolicy.wasNonceUsed(signer, nonce1), "Nonce1 should be used");
 
         // Second signature with nonce2 should also work
         bytes memory data2 = _createSignedFeeDiscountData(
             signerPk, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), nonce2, DEFAULT_DEADLINE
         );
         withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data2));
-        assertTrue(withdrawalPolicy.isNonceUsed(signer, nonce2), "Nonce2 should be used");
+        assertTrue(withdrawalPolicy.wasNonceUsed(signer, nonce2), "Nonce2 should be used");
 
         // Third signature with nonce3 should also work
         bytes memory data3 = _createSignedFeeDiscountData(
             signerPk, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), nonce3, DEFAULT_DEADLINE
         );
         withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data3));
-        assertTrue(withdrawalPolicy.isNonceUsed(signer, nonce3), "Nonce3 should be used");
+        assertTrue(withdrawalPolicy.wasNonceUsed(signer, nonce3), "Nonce3 should be used");
     }
 
     function test_applyWithdrawalPolicy_acceptsNonceZero() public {
@@ -906,11 +906,11 @@ contract WithdrawalPolicyTest is TestWithHelpers {
             signerPk, user, assetOut, iouAmountRay, personalFeeBps, nonceZero, DEFAULT_DEADLINE
         );
 
-        assertFalse(withdrawalPolicy.isNonceUsed(signer, nonceZero), "Nonce 0 should not be used initially");
+        assertFalse(withdrawalPolicy.wasNonceUsed(signer, nonceZero), "Nonce 0 should not be used initially");
 
         uint256 amountOut = withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
         assertGt(amountOut, 0, "Should return non-zero amount");
-        assertTrue(withdrawalPolicy.isNonceUsed(signer, nonceZero), "Nonce 0 should be used after apply");
+        assertTrue(withdrawalPolicy.wasNonceUsed(signer, nonceZero), "Nonce 0 should be used after apply");
     }
 
     function test_applyWithdrawalPolicy_allowsSameNonceFromDifferentSigners(
@@ -941,15 +941,15 @@ contract WithdrawalPolicyTest is TestWithHelpers {
             signerPk1, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), sharedNonce, DEFAULT_DEADLINE
         );
         withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data1));
-        assertTrue(withdrawalPolicy.isNonceUsed(signer1, sharedNonce), "Signer1 nonce should be used");
-        assertFalse(withdrawalPolicy.isNonceUsed(signer2, sharedNonce), "Signer2 nonce should not be used yet");
+        assertTrue(withdrawalPolicy.wasNonceUsed(signer1, sharedNonce), "Signer1 nonce should be used");
+        assertFalse(withdrawalPolicy.wasNonceUsed(signer2, sharedNonce), "Signer2 nonce should not be used yet");
 
         // Signer2 can also use the same nonce
         bytes memory data2 = _createSignedFeeDiscountData(
             signerPk2, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), sharedNonce, DEFAULT_DEADLINE
         );
         withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data2));
-        assertTrue(withdrawalPolicy.isNonceUsed(signer2, sharedNonce), "Signer2 nonce should now be used");
+        assertTrue(withdrawalPolicy.wasNonceUsed(signer2, sharedNonce), "Signer2 nonce should now be used");
     }
 
     // Signer Removal Tests
@@ -1152,7 +1152,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         // Signer can invalidate while whitelisted
         vm.prank(signer);
         withdrawalPolicy.invalidateNonce(signer, nonce1);
-        assertTrue(withdrawalPolicy.isNonceUsed(signer, nonce1), "Nonce1 should be invalidated");
+        assertTrue(withdrawalPolicy.wasNonceUsed(signer, nonce1), "Nonce1 should be invalidated");
 
         // Remove the signer
         vm.prank(admin);

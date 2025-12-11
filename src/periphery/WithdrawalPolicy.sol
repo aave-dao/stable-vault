@@ -63,7 +63,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
         uint16 defaultFeeBps;
         mapping(address asset => AssetFeeConfig config) assetFeeConfigs;
         mapping(address signer => bool isSigner) signers;
-        mapping(address signer => mapping(uint256 nonce => bool used)) usedNonces;
+        mapping(address signer => mapping(uint256 nonce => bool used)) wasNonceUsed;
     }
 
     // keccak256(abi.encode(uint256(keccak256("aave.storage.WithdrawalPolicy")) - 1)) & ~bytes32(uint256(0xff))
@@ -110,7 +110,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
 
     /// @notice Getter for whether a signer is whitelisted.
     /// @param signer Address of the signer to check.
-    /// @return isSigner Whether the signer is whitelisted.
+    /// @return bool True if the address is a signer, false otherwise.
     function isSigner(address signer) external view returns (bool) {
         return $storage().signers[signer];
     }
@@ -118,9 +118,9 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     /// @notice Getter for whether a nonce has been consumed by a signer.
     /// @param signer Address of the signer to check.
     /// @param nonce The nonce to check.
-    /// @return used Whether the nonce has been used.
-    function isNonceUsed(address signer, uint256 nonce) external view returns (bool) {
-        return $storage().usedNonces[signer][nonce];
+    /// @return bool True if the nonce has been used, false otherwise.
+    function wasNonceUsed(address signer, uint256 nonce) external view returns (bool) {
+        return $storage().wasNonceUsed[signer][nonce];
     }
 
     /// @inheritdoc IWithdrawalPolicy
@@ -133,7 +133,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
         uint16 feeBps;
         if (request.data.length > 0) {
             (address signer, uint256 nonce, uint16 personalFeeBps) = _verifySignedDiscount(request);
-            $storage().usedNonces[signer][nonce] = true;
+            $storage().wasNonceUsed[signer][nonce] = true;
             feeBps = personalFeeBps;
         } else {
             feeBps = _getAssetFeeBps(request.assetOut);
@@ -199,8 +199,8 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     function invalidateNonce(address signer, uint256 nonce) external {
         require(msg.sender == signer, ErrorsLib.NotAuthorized());
         require($storage().signers[signer], ErrorsLib.NotAuthorized());
-        require($storage().usedNonces[signer][nonce] == false, NonceAlreadyUsed());
-        $storage().usedNonces[signer][nonce] = true;
+        require($storage().wasNonceUsed[signer][nonce] == false, NonceAlreadyUsed());
+        $storage().wasNonceUsed[signer][nonce] = true;
     }
 
     /// @dev Verifies a signed fee discount and returns the signer, nonce, and personal fee.
@@ -219,7 +219,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
 
         signer = _recoverSigner(request, discount);
         require($storage().signers[signer], InvalidSignature());
-        require(!$storage().usedNonces[signer][discount.nonce], NonceAlreadyUsed());
+        require(!$storage().wasNonceUsed[signer][discount.nonce], NonceAlreadyUsed());
 
         return (signer, discount.nonce, discount.personalFeeBps);
     }
