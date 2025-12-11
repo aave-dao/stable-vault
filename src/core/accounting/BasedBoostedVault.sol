@@ -220,10 +220,18 @@ contract BasedBoostedVault is
         uint256 redeemedShares;
 
         if (requestedAmountInRay == 0) {
-            (actualAmountInRay, guaranteedAmountRay, redeemedShares) = _fullWithdrawalRequest(user);
+            (actualAmountInRay, guaranteedAmountRay, redeemedShares) = _previewFullWithdrawalRequest(user);
         } else {
             (actualAmountInRay, guaranteedAmountRay, redeemedShares) =
-                _partialWithdrawalRequest(user, requestedAmountInRay);
+                _previewPartialWithdrawalRequest(user, requestedAmountInRay);
+        }
+
+        uint256 remainingShares = _burnShares(user, redeemedShares);
+        if (remainingShares == 0) {
+            delete $storage().positions[user];
+        } else {
+            // Only needed if the user has remaining balance, otherwise the whole position is deleted.
+            $storage().positions[user].originalDepositRay -= guaranteedAmountRay;
         }
 
         // Assets in Allocator + last snapshot updates from Earning chains
@@ -471,7 +479,7 @@ contract BasedBoostedVault is
         $storage().subVaultById[subVaultId].lastAccrualTimestamp = block.timestamp;
     }
 
-    function _fullWithdrawalRequest(address user) internal returns (uint256, uint256, uint256) {
+    function _previewFullWithdrawalRequest(address user) internal view returns (uint256, uint256, uint256) {
         uint256 subVaultId = $storage().positions[user].subVaultId;
         // The conversion rate was accrued in the higher order withdrawal function using rounding that favors the
         // protocol. We want the conversion rate's calculation to be rounded down so that we undershoot result of
@@ -480,9 +488,7 @@ contract BasedBoostedVault is
         uint256 sharesToRedeem = $storage().positions[user].shares;
         // Round down the withdrawal amount, so that the rounding is in favor of the protocol.
         uint256 actualAmountOfWithdrawalRay = sharesToRedeem.rayMulDown(conversionRate);
-        _burnShares(user, sharesToRedeem);
         uint256 originalDepositRay = $storage().positions[user].originalDepositRay;
-        delete $storage().positions[user];
         // Due to rounding in rayDivDown (deposit) and rayMulDown (withdrawal),
         // actualAmountOfWithdrawalRay can be slightly less than originalDepositRay.
         // We guarantee the user gets at least their original deposit back.
@@ -492,8 +498,9 @@ contract BasedBoostedVault is
         return (actualAmountOfWithdrawalRay, originalDepositRay, sharesToRedeem);
     }
 
-    function _partialWithdrawalRequest(address user, uint256 requestedAmountInRay)
+    function _previewPartialWithdrawalRequest(address user, uint256 withdrawalAmountRay)
         internal
+        view
         returns (uint256, uint256, uint256)
     {
         uint256 subVaultId = $storage().positions[user].subVaultId;
@@ -501,37 +508,35 @@ contract BasedBoostedVault is
         // protocol. We want the conversion rate's calculation to be rounded down so that we undershoot the divisor used
         // to calculate the amount of shares to redeem/burn.
         uint256 conversionRate = $storage().subVaultById[subVaultId].conversionRate;
-
         // Round up the amount of shares to redeem (burn on the position) for the requested amount of assets, so that
         // the rounding is in favor of the protocol.
-        uint256 sharesToRedeem = requestedAmountInRay.rayDivUp(conversionRate);
+        uint256 sharesToRedeem = withdrawalAmountRay.rayDivUp(conversionRate);
         require(sharesToRedeem <= $storage().positions[user].shares, ErrorsLib.InvalidAmount());
-        _burnShares(user, sharesToRedeem);
-        uint256 amountTakenFromOriginalDepositRay = _decrementOriginalDeposit(user, requestedAmountInRay);
-
-        if ($storage().positions[user].shares == 0) {
-            delete $storage().positions[user];
-        }
-
-        return (requestedAmountInRay, amountTakenFromOriginalDepositRay, sharesToRedeem);
+        return (withdrawalAmountRay, _getAmountTakenFromOriginalDeposit(user, withdrawalAmountRay), sharesToRedeem);
     }
 
-    function _decrementOriginalDeposit(address user, uint256 actualAmountOfWithdrawal) internal returns (uint256) {
+    function _getAmountTakenFromOriginalDeposit(address user, uint256 withdrawalAmountRay)
+        internal
+        view
+        returns (uint256)
+    {
         uint256 amountTakenFromOriginalDepositRay;
-        if (actualAmountOfWithdrawal >= $storage().positions[user].originalDepositRay) {
+        uint256 originalDepositRay = $storage().positions[user].originalDepositRay;
+        if (withdrawalAmountRay >= originalDepositRay) {
             // The remaining portion of user's withdrawable balance is not guaranteed unless user deposits more funds.
-            amountTakenFromOriginalDepositRay = $storage().positions[user].originalDepositRay;
+            amountTakenFromOriginalDepositRay = originalDepositRay;
         } else {
-            amountTakenFromOriginalDepositRay = actualAmountOfWithdrawal;
+            amountTakenFromOriginalDepositRay = withdrawalAmountRay;
         }
-        $storage().positions[user].originalDepositRay -= amountTakenFromOriginalDepositRay;
         return amountTakenFromOriginalDepositRay;
     }
 
-    function _burnShares(address user, uint256 shares) internal {
+    function _burnShares(address user, uint256 sharesToBurn) internal returns (uint256) {
+        uint256 remainingShares = $storage().positions[user].shares - sharesToBurn;
+        $storage().positions[user].shares = remainingShares;
         uint256 subVaultId = $storage().positions[user].subVaultId;
-        $storage().positions[user].shares -= shares;
-        $storage().subVaultById[subVaultId].totalShares -= shares;
+        $storage().subVaultById[subVaultId].totalShares -= sharesToBurn;
+        return remainingShares;
     }
 
     function _getVaultObligations() internal view returns (uint256) {
