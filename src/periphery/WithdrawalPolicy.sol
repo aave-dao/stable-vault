@@ -100,6 +100,21 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
         __EIP712_init("WithdrawalPolicy", "1");
     }
 
+    /// @inheritdoc IWithdrawalPolicy
+    function applyWithdrawalPolicy(WithdrawalRequest calldata request) external override returns (uint256) {
+        (uint256 amountOutRay, address signer, uint256 nonce) = _previewWithdrawalPolicy(request);
+        if (signer != address(0)) {
+            _markNonceAsUsed(signer, nonce);
+        }
+        return amountOutRay;
+    }
+
+    /// @inheritdoc IWithdrawalPolicy
+    function previewWithdrawalPolicy(WithdrawalRequest calldata request) external view override returns (uint256) {
+        (uint256 amountOutRay,,) = _previewWithdrawalPolicy(request);
+        return amountOutRay;
+    }
+
     /// @notice Getter for the configuration for an asset-specific fee.
     /// @param asset Address of the asset to get the configuration for.
     /// @return assetFeeConfig Configuration for the asset-specific fee.
@@ -129,44 +144,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
         return $storage().wasNonceUsed[signer][nonce];
     }
 
-    /// @inheritdoc IWithdrawalPolicy
-    function applyWithdrawalPolicy(WithdrawalRequest calldata request) external override returns (uint256) {
-        (uint256 amountOutRay, address signer, uint256 nonce) = _previewWithdrawalPolicy(request);
-        if (signer != address(0)) {
-            _markNonceAsUsed(signer, nonce);
-        }
-        return amountOutRay;
-    }
-
-    /// @inheritdoc IWithdrawalPolicy
-    function previewWithdrawalPolicy(WithdrawalRequest calldata request) external view override returns (uint256) {
-        (uint256 amountOutRay,,) = _previewWithdrawalPolicy(request);
-        return amountOutRay;
-    }
-
-    /// @dev Returns: (uint256 amountOutRay, address signer, uint256 nonce).
-    function _previewWithdrawalPolicy(WithdrawalRequest calldata request)
-        internal
-        view
-        returns (uint256, address, uint256)
-    {
-        require(
-            IAssetRegistry(ASSET_REGISTRY).isUserWithdrawalAllowed(request.assetOut),
-            ErrorsLib.UnsupportedAsset(request.assetOut)
-        );
-        address signer;
-        uint256 nonce;
-        uint16 feeBps;
-        if (request.data.length > 0) {
-            (signer, nonce, feeBps) = _verifySignedDiscount(request);
-        } else {
-            feeBps = _getAssetFeeBps(request.assetOut);
-        }
-        uint256 feeAmountRay = (request.iouAmountRay * feeBps + ConstantsLib.MAX_BPS - 1) / ConstantsLib.MAX_BPS;
-        return (request.iouAmountRay - feeAmountRay, signer, nonce);
-    }
-
-    // Restricted functions
+    //////////////////////////////// RESTRICTED FUNCTIONS ////////////////////////////////
 
     /// @notice Sets the configuration for an asset-specific fee.
     /// @param asset Address of the asset to set the configuration for.
@@ -205,6 +183,30 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
         require($storage().isSigner[signer], ErrorsLib.NotAuthorized());
         require($storage().wasNonceUsed[signer][nonce] == false, NonceAlreadyUsed());
         _markNonceAsUsed(signer, nonce);
+    }
+
+    //////////////////////////////// INTERNAL FUNCTIONS ////////////////////////////////
+
+    /// @dev Returns: (uint256 amountOutRay, address signer, uint256 nonce).
+    function _previewWithdrawalPolicy(WithdrawalRequest calldata request)
+        internal
+        view
+        returns (uint256, address, uint256)
+    {
+        require(
+            IAssetRegistry(ASSET_REGISTRY).isUserWithdrawalAllowed(request.assetOut),
+            ErrorsLib.UnsupportedAsset(request.assetOut)
+        );
+        address signer;
+        uint256 nonce;
+        uint16 feeBps;
+        if (request.data.length > 0) {
+            (signer, nonce, feeBps) = _verifySignedDiscount(request);
+        } else {
+            feeBps = _getAssetFeeBps(request.assetOut);
+        }
+        uint256 feeAmountRay = (request.iouAmountRay * feeBps + ConstantsLib.MAX_BPS - 1) / ConstantsLib.MAX_BPS;
+        return (request.iouAmountRay - feeAmountRay, signer, nonce);
     }
 
     function _markNonceAsUsed(address signer, uint256 nonce) internal {
