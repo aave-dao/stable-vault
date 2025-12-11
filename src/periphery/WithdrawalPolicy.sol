@@ -62,7 +62,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     struct WithdrawalPolicyStorage {
         uint16 defaultFeeBps;
         mapping(address asset => AssetFeeConfig config) assetFeeConfigs;
-        mapping(address signer => bool isSigner) signers;
+        mapping(address account => bool isSigner) isSigner;
         mapping(address signer => mapping(uint256 nonce => bool used)) wasNonceUsed;
     }
 
@@ -108,11 +108,11 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
         return $storage().defaultFeeBps;
     }
 
-    /// @notice Getter for whether a signer is whitelisted.
-    /// @param signer Address of the signer to check.
-    /// @return bool True if the address is a signer, false otherwise.
-    function isSigner(address signer) external view returns (bool) {
-        return $storage().signers[signer];
+    /// @notice Getter for whether an account is a signer.
+    /// @param account Address of the account to check if it is a signer or not.
+    /// @return bool True if the account is a signer, false otherwise.
+    function isSigner(address account) external view returns (bool) {
+        return $storage().isSigner[account];
     }
 
     /// @notice Getter for whether a nonce has been consumed by a signer.
@@ -187,9 +187,9 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
 
     /// @notice Sets the signer to be used for signature verification.
     /// @param signer Address of the signer to set.
-    /// @param whitelistedSigner Whether the signer is enabled for signature verification.
-    function setSigner(address signer, bool whitelistedSigner) external restricted {
-        $storage().signers[signer] = whitelistedSigner;
+    /// @param whitelistAsSigner Whether the signer is enabled for signature verification.
+    function setSigner(address signer, bool whitelistAsSigner) external restricted {
+        $storage().isSigner[signer] = whitelistAsSigner;
     }
 
     /// @notice Allows a whitelisted signer to invalidate their own nonce.
@@ -198,7 +198,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     /// @param nonce The nonce to invalidate.
     function invalidateNonce(address signer, uint256 nonce) external {
         require(msg.sender == signer, ErrorsLib.NotAuthorized());
-        require($storage().signers[signer], ErrorsLib.NotAuthorized());
+        require($storage().isSigner[signer], ErrorsLib.NotAuthorized());
         require($storage().wasNonceUsed[signer][nonce] == false, NonceAlreadyUsed());
         $storage().wasNonceUsed[signer][nonce] = true;
     }
@@ -218,7 +218,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
         require(discount.deadline >= block.timestamp, DeadlineExpired());
 
         signer = _recoverSigner(request, discount);
-        require($storage().signers[signer], InvalidSignature());
+        require($storage().isSigner[signer], InvalidSignature());
         require(!$storage().wasNonceUsed[signer][discount.nonce], NonceAlreadyUsed());
 
         return (signer, discount.nonce, discount.personalFeeBps);
