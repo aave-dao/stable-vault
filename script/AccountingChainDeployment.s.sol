@@ -33,6 +33,7 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
 
     uint256 constant DEFAULT_MAX_PER_SECOND_RATE = 1000000005781378656804591713; // ~20% APY
     uint256 constant DEFAULT_SUB_VAULT_PER_SECOND_RATE = 1000000001243680656318820313; // ~4% APY
+    uint256 constant DEFAULT_MAX_ACTIVE_SUB_VAULTS = 201;
 
     address constant PROXY_ADMIN = DEPLOYER;
     address constant BBV_PROXY_ADMIN = PROXY_ADMIN;
@@ -248,7 +249,8 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
                 iouTokenManager: getIouTokenManagerAddress(DEPLOYER),
                 fundsHandler: getFundsHandlerAddress(DEPLOYER),
                 transferHelper: getTransferHelperAddress(DEPLOYER),
-                withdrawalPolicy: getWithdrawalPolicyAddress(DEPLOYER)
+                withdrawalPolicy: getWithdrawalPolicyAddress(DEPLOYER),
+                maxActiveSubVaults: DEFAULT_MAX_ACTIVE_SUB_VAULTS
             })
         );
         _logDeployment("BasedBoostedVault::Implementation", "", implementation);
