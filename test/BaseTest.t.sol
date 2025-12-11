@@ -56,11 +56,12 @@ contract BaseTest is Test {
 
     uint256 initialBasePerSecondRate = MathLib.RAY; // 1 RAY
 
-    uint256 constant DEFAULT_MAX_PER_SECOND_RATE = 1000000005781378656804591713; // ~20% APY
-    uint64 public constant ACCOUNTING_CHAIN_ID = 1;
-    uint64 public constant ACCOUNTING_CHAIN_CCIP_SELECTOR = 10;
-    uint64 public constant EARNING_CHAIN_ID = 2;
-    uint64 public constant EARNING_CHAIN_CCIP_SELECTOR = 20;
+    uint256 internal constant DEFAULT_MAX_ACTIVE_SUB_VAULTS = 201;
+    uint256 internal constant DEFAULT_MAX_PER_SECOND_RATE = 1000000005781378656804591713; // ~20% APY
+    uint64 internal constant ACCOUNTING_CHAIN_ID = 1;
+    uint64 internal constant ACCOUNTING_CHAIN_CCIP_SELECTOR = 10;
+    uint64 internal constant EARNING_CHAIN_ID = 2;
+    uint64 internal constant EARNING_CHAIN_CCIP_SELECTOR = 20;
 
     // Transfer Helper
     address transferHelper_accountingChainAddress;
@@ -149,7 +150,8 @@ contract BaseTest is Test {
         address fundsHandlerAddr,
         address assetRegistry,
         address transferHelper,
-        address withdrawalFeeCalculator
+        address withdrawalFeeCalculator,
+        uint256 maxActiveSubVaults
     ) internal virtual returns (BasedBoostedVault) {
         address vaultImpl = address(
             new BasedBoostedVault(
@@ -158,7 +160,8 @@ contract BaseTest is Test {
                 iouTokenManager,
                 fundsHandlerAddr,
                 transferHelper,
-                withdrawalFeeCalculator
+                withdrawalFeeCalculator,
+                maxActiveSubVaults
             )
         );
 
@@ -351,7 +354,8 @@ contract BaseTest is Test {
             fundsHandler_accountingChainAddress,
             assetRegistry_accountingChainAddress,
             transferHelper_accountingChainAddress,
-            withdrawalPolicy_accountingChainAddress
+            withdrawalPolicy_accountingChainAddress,
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS
         );
         console.log("\tVault: %s", vault_accountingChainAddress);
         require(address(vault) == vault_accountingChainAddress, "Vault (Accounting Chain) address mismatch");

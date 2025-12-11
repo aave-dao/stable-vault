@@ -76,6 +76,10 @@ interface IBasedBoostedVault {
     /// @custom:selector 0xcac93e89
     error SubVaultDoesNotExist();
 
+    /// @notice Thrown when the maximum number of active sub-vaults is reached.
+    /// @custom:selector 0xff731b5f
+    error TooManyActiveSubVaults();
+
     /// @notice Sets the default sub-vault.
     /// @dev The default sub-vault is the sub-vault that is used when a depositing user does not have a specific
     /// sub-vault set.

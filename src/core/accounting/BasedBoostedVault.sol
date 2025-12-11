@@ -70,6 +70,8 @@ contract BasedBoostedVault is
 
     address internal immutable WITHDRAWAL_POLICY;
 
+    uint256 internal immutable MAX_ACTIVE_SUB_VAULTS;
+
     /// @custom:storage-location erc7201:aave.storage.BasedBoostedVault
     struct BasedBoostedVaultStorage {
         /// @dev Keeps track of the sum of all users' original deposits.
@@ -111,15 +113,20 @@ contract BasedBoostedVault is
 
     /// @dev Constructor.
     /// @param maxValidPerSecondRate The maximum valid per-second rate, in Ray units (27 decimals).
-    /// @param iouTokenManager The address of the IOU token manager.
-    /// @param fundsHandler The address of the FundsHandler contract.
+    /// @param assetRegistry The address of the contract managing the allowed assets.
+    /// @param iouTokenManager The address of the address that manages the supply of IOUs.
+    /// @param fundsHandler The address of the contract that handles funds of the accounting chain.
+    /// @param transferHelper The address of the contract that helps minimize the number of transfers across flows.
+    /// @param withdrawalPolicy The address of the contract that handles withdrawal policies (e.g. withdrawal fees).
+    /// @param maxActiveSubVaults The maximum number of active sub-vaults allowed.
     constructor(
         uint256 maxValidPerSecondRate,
         address assetRegistry,
         address iouTokenManager,
         address fundsHandler,
         address transferHelper,
-        address withdrawalPolicy
+        address withdrawalPolicy,
+        uint256 maxActiveSubVaults
     ) TransferHelperClient(transferHelper) {
         _disableInitializers();
         require(maxValidPerSecondRate > MathLib.RAY, InvalidRate());
@@ -128,6 +135,7 @@ contract BasedBoostedVault is
         IOU_TOKEN_MANAGER = iouTokenManager;
         FUNDS_HANDLER = fundsHandler;
         WITHDRAWAL_POLICY = withdrawalPolicy;
+        MAX_ACTIVE_SUB_VAULTS = maxActiveSubVaults;
     }
 
     /// @dev Initializer.
@@ -173,6 +181,7 @@ contract BasedBoostedVault is
 
         if (!_isActiveSubVaultById(subVaultId)) {
             _addSubVaultToActive(subVaultId);
+            _validateAmountOfActiveSubVaults();
         }
 
         $storage().subVaultById[subVaultId].totalShares += shares;
@@ -429,6 +438,8 @@ contract BasedBoostedVault is
         if (!_isActiveSubVaultById(oldSubVaultId)) {
             _removeSubVaultFromActive(oldSubVaultId);
         }
+
+        _validateAmountOfActiveSubVaults();
     }
 
     function _addSubVaultToActive(uint256 subVaultId) internal {
@@ -447,6 +458,10 @@ contract BasedBoostedVault is
         }
         $storage().activeSubVaultsIds.pop();
         delete $storage().activeSubVaultIndexById[subVaultId];
+    }
+
+    function _validateAmountOfActiveSubVaults() internal view {
+        require($storage().activeSubVaultsIds.length <= MAX_ACTIVE_SUB_VAULTS, TooManyActiveSubVaults());
     }
 
     function _previewSubVaultConversionRateRoundingDown(uint256 subVaultId) internal view returns (uint256) {

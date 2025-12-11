@@ -1,15 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
+import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Strings} from "openzeppelin-contracts/contracts/utils/Strings.sol";
 
 import {IBasedBoostedVault} from "src/interfaces/IBasedBoostedVault.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 
 import {BaseTest} from "test/BaseTest.t.sol";
+import {_toAddressArray, _toUint256Array} from "test/helpers/TypeHelpers.sol";
+import {IMockErc20} from "test/mocks/MockErc20.sol";
 
 contract BasedBoostedVaultOperationsGasTest is BaseTest {
     using AssetLib for uint256;
+    using SafeERC20 for IMockErc20;
 
     string internal NAMESPACE = "BasedBoostedVault.Operations";
 
@@ -174,27 +178,6 @@ contract BasedBoostedVaultOperationsGasTest is BaseTest {
         vm.snapshotGasLastCall(NAMESPACE, "[setUserRate] default sub-vault to all new different sub-vaults - 100 users");
     }
 
-    function test_setUserRate_1000Users_fromDefaultSubVaultToAllNewDifferentSubVaults() public {
-        uint256 newRate = 1_000000001547125957863212449;
-
-        uint256 numberOfUsers = 1000;
-        IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](numberOfUsers);
-        for (uint256 i = 0; i < numberOfUsers; i++) {
-            address user = _generateNewUser();
-            _mintAndApprove(user);
-            vm.prank(user);
-            vault.deposit(user, address(USDC), amount);
-
-            userRateData[i] = IBasedBoostedVault.UserRateData(user, ++newRate);
-        }
-
-        vm.prank(everyRoleAccount);
-        vault.setUserRate(userRateData);
-        vm.snapshotGasLastCall(
-            NAMESPACE, "[setUserRate] default sub-vault to all new different sub-vaults - 1000 users"
-        );
-    }
-
     function test_requestWithdrawal_partialWithdrawal() public {
         address user = _generateNewUser();
 
@@ -257,12 +240,64 @@ contract BasedBoostedVaultOperationsGasTest is BaseTest {
         vm.snapshotGasLastCall(NAMESPACE, "[executeWithdrawal] full withdrawal");
     }
 
+    function test_claimFees() public {
+        uint256 activeSubVaults = 201;
+        // There is a user already with a deposit
+        uint256 newSubVaultsToCreate = activeSubVaults - 1;
+        uint256 rate = 1_000000001547125957863212449; // 5% APY
+
+        uint256 depositsUsdc;
+        uint256 depositsGho;
+
+        for (uint256 i = 0; i < newSubVaultsToCreate; i++) {
+            address user = _generateNewUser();
+            address asset = i % 2 == 0 ? address(USDC) : address(GHO);
+            uint256 amountToDeposit;
+            if (asset == address(USDC)) {
+                amountToDeposit = 1e6;
+                depositsUsdc += amountToDeposit;
+            } else {
+                amountToDeposit = 1e18;
+                depositsGho += amountToDeposit;
+            }
+            _mintAndApprove(user, asset, amountToDeposit);
+            vm.prank(user);
+            vault.deposit(user, asset, amountToDeposit);
+            IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](1);
+            userRateData[0] = IBasedBoostedVault.UserRateData(user, rate);
+            vm.prank(everyRoleAccount);
+            vault.setUserRate(userRateData);
+            rate++;
+        }
+
+        assertEq(vault.getActiveSubVaults().length, activeSubVaults);
+
+        uint256 profitsGho = 1000e18;
+        uint256 profitsUsdc = 1000e6;
+
+        GHO.mint(address(allocator_accountingChain), profitsGho);
+        USDC.mint(address(allocator_accountingChain), profitsUsdc);
+
+        address[] memory assets = _toAddressArray(address(GHO), address(USDC));
+        uint256[] memory amounts = _toUint256Array(depositsGho, depositsUsdc);
+
+        vm.prank(everyRoleAccount);
+        vault.claimFees(assets, amounts);
+        vm.snapshotGasLastCall(NAMESPACE, "[claimFees] 2 assets - 201 sub-vaults");
+    }
+
     function _generateNewUser() internal returns (address) {
         return _generateUser(userSeed++);
     }
 
     function _generateUser(uint256 seed) internal returns (address) {
         return makeAddr(string.concat("USER[", Strings.toString(seed), "]"));
+    }
+
+    function _mintAndApprove(address user, address asset, uint256 assetAmount) internal {
+        IMockErc20(asset).mint(user, assetAmount);
+        vm.prank(user);
+        IMockErc20(asset).forceApprove(address(vault), assetAmount);
     }
 
     function _mintAndApprove(address user) internal {

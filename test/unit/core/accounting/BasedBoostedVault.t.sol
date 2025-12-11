@@ -5,6 +5,7 @@ import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessMana
 import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {BasedBoostedVault} from "src/core/accounting/BasedBoostedVault.sol";
 import {IBasedBoostedVault} from "src/interfaces/IBasedBoostedVault.sol";
@@ -32,9 +33,11 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     using AssetLib for uint256;
     using SafeERC20 for IMockErc20;
 
+    uint256 userSeed = 0;
     address admin = makeAddr("admin");
     address manager = makeAddr("manager");
 
+    uint256 internal constant DEFAULT_MAX_ACTIVE_SUB_VAULTS = 201;
     uint256 constant DEFAULT_PER_SECOND_RATE = 1000000001243680656318820313; // ~4% APY
     MockAccessManager mockAccessManager;
     IMockErc20 mockAsset;
@@ -58,7 +61,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         address fundsHandler,
         address assetRegistry,
         address transferHelper,
-        address withdrawalFeeCalculatorAddress
+        address withdrawalFeeCalculatorAddress,
+        uint256 maxActiveSubVaults
     ) internal returns (IBasedBoostedVault) {
         address vaultImpl = address(
             new BasedBoostedVault(
@@ -67,7 +71,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
                 iouTokenManager,
                 fundsHandler,
                 transferHelper,
-                withdrawalFeeCalculatorAddress
+                withdrawalFeeCalculatorAddress,
+                maxActiveSubVaults
             )
         );
         return BasedBoostedVault(
@@ -110,7 +115,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy)
+            address(mockWithdrawalPolicy),
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS
         );
     }
 
@@ -131,7 +137,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             expectedIouManager,
             expectedFundsHandler,
             expectedTransferHelper,
-            address(mockWithdrawalPolicy)
+            address(mockWithdrawalPolicy),
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS
         );
 
         assertEq(newBbv.getMaxValidPerSecondRate(), expectedMaxValidPerSecondRate);
@@ -147,7 +154,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockIouTokenManager),
             address(mockFundsHandler),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy)
+            address(mockWithdrawalPolicy),
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS
         );
     }
 
@@ -167,7 +175,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
                 address(mockIouTokenManager),
                 address(mockFundsHandler),
                 address(mockTransferHelper),
-                address(mockWithdrawalPolicy)
+                address(mockWithdrawalPolicy),
+                DEFAULT_MAX_ACTIVE_SUB_VAULTS
             )
         );
 
@@ -196,7 +205,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
                 address(mockIouTokenManager),
                 address(mockFundsHandler),
                 address(mockTransferHelper),
-                address(mockWithdrawalPolicy)
+                address(mockWithdrawalPolicy),
+                DEFAULT_MAX_ACTIVE_SUB_VAULTS
             )
         );
 
@@ -346,7 +356,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy)
+            address(mockWithdrawalPolicy),
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS
         );
 
         // Warp just 1 second, conversionRate grows slightly above RAY
@@ -454,6 +465,87 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         _setUserRate(user, currentRate);
     }
 
+    function test_setUserRate_reverts_ifMaxActiveSubVaultsIsReached_AtDeposit(uint256 maxActiveSubVaults) public {
+        maxActiveSubVaults = bound(maxActiveSubVaults, 1, 500);
+        bbv = _deployBasedBoostedVault(
+            address(mockAccessManager),
+            DEFAULT_MAX_PER_SECOND_RATE,
+            DEFAULT_PER_SECOND_RATE,
+            address(mockIouTokenManager),
+            address(mockFundsHandler),
+            address(mockAssetRegistry),
+            address(mockTransferHelper),
+            address(mockWithdrawalPolicy),
+            maxActiveSubVaults
+        );
+
+        uint256 amountToDeposit = 10e6;
+        uint256 i = 0;
+        address user;
+        while (i < maxActiveSubVaults) {
+            user = _generateNewUser();
+            _deposit(user, amountToDeposit);
+            _setUserRate(user, DEFAULT_PER_SECOND_RATE + i + 1);
+            i++;
+        }
+
+        user = _generateNewUser();
+        mockAsset.mint(user, amountToDeposit);
+        vm.prank(user);
+        mockAsset.forceApprove(address(bbv), amountToDeposit);
+        vm.prank(user);
+
+        assertEq(bbv.getActiveSubVaults().length, maxActiveSubVaults);
+
+        vm.expectRevert(IBasedBoostedVault.TooManyActiveSubVaults.selector);
+        bbv.deposit(user, address(mockAsset), amountToDeposit);
+    }
+
+    function test_setUserRate_reverts_ifMaxActiveSubVaultsIsReached_AtSetUserRate(uint256 maxActiveSubVaults) public {
+        maxActiveSubVaults = bound(maxActiveSubVaults, 1, 500);
+        bbv = _deployBasedBoostedVault(
+            address(mockAccessManager),
+            DEFAULT_MAX_PER_SECOND_RATE,
+            DEFAULT_PER_SECOND_RATE,
+            address(mockIouTokenManager),
+            address(mockFundsHandler),
+            address(mockAssetRegistry),
+            address(mockTransferHelper),
+            address(mockWithdrawalPolicy),
+            maxActiveSubVaults
+        );
+
+        uint256 amountToDeposit = 10e6;
+        uint256 i = 0;
+        address user;
+
+        // Keep the first user in the default sub-vault
+        user = _generateNewUser();
+        _deposit(user, amountToDeposit);
+        i++;
+
+        assertEq(bbv.getActiveSubVaults().length, 1);
+
+        // Create the rest of active sub-vaults
+        while (i < maxActiveSubVaults) {
+            user = _generateNewUser();
+            _deposit(user, amountToDeposit);
+            _setUserRate(user, DEFAULT_PER_SECOND_RATE + i + 1);
+            i++;
+        }
+
+        assertEq(bbv.getActiveSubVaults().length, maxActiveSubVaults);
+
+        user = _generateNewUser();
+        // This deposit does not reach the cap, because it overlaps with the first user's position at default sub-vault
+        _deposit(user, amountToDeposit);
+
+        assertEq(bbv.getActiveSubVaults().length, maxActiveSubVaults);
+
+        vm.expectRevert(IBasedBoostedVault.TooManyActiveSubVaults.selector);
+        _setUserRate(user, DEFAULT_PER_SECOND_RATE + i + 1);
+    }
+
     function test_setUserRate_smallConversionRateToLargeConversionRate() public {
         // Override bbv with a low default sub-vault rate
         bbv = _deployBasedBoostedVault(
@@ -464,7 +556,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy)
+            address(mockWithdrawalPolicy),
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS
         );
         mockAsset = IMockErc20(address(new MockNonStandardErc20("Test GHO", "tGHO", 18)));
 
@@ -1267,7 +1360,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy)
+            address(mockWithdrawalPolicy),
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS
         );
 
         vm.warp(block.timestamp + 1);
@@ -1529,5 +1623,13 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](1);
         userRateData[0] = IBasedBoostedVault.UserRateData(user, newPerSecondRate);
         bbv.setUserRate(userRateData);
+    }
+
+    function _generateNewUser() internal returns (address) {
+        return _generateUser(userSeed++);
+    }
+
+    function _generateUser(uint256 seed) internal returns (address) {
+        return makeAddr(string.concat("USER[", Strings.toString(seed), "]"));
     }
 }

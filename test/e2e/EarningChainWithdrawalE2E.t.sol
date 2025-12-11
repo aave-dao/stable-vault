@@ -36,12 +36,19 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         address fundsHandler,
         address assetRegistry,
         address transferHelper,
-        address withdrawalFeeCalculator
+        address withdrawalFeeCalculator,
+        uint256 maxActiveSubVaults
     ) internal virtual override returns (BasedBoostedVault) {
         // Deploy a vault without restriction in the valid per-second rate
         address vaultImpl = address(
             new BasedBoostedVault(
-                type(uint256).max, assetRegistry, iouToken, fundsHandler, transferHelper, withdrawalFeeCalculator
+                type(uint256).max,
+                assetRegistry,
+                iouToken,
+                fundsHandler,
+                transferHelper,
+                withdrawalFeeCalculator,
+                maxActiveSubVaults
             )
         );
         return BasedBoostedVault(
