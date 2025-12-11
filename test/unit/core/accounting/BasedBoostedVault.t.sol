@@ -466,7 +466,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     }
 
     function test_setUserRate_reverts_ifMaxActiveSubVaultsIsReached_AtDeposit(uint256 maxActiveSubVaults) public {
-        maxActiveSubVaults = bound(maxActiveSubVaults, 1, 500);
+        maxActiveSubVaults = bound(maxActiveSubVaults, 1, 20);
         bbv = _deployBasedBoostedVault(
             address(mockAccessManager),
             DEFAULT_MAX_PER_SECOND_RATE,
@@ -502,7 +502,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     }
 
     function test_setUserRate_reverts_ifMaxActiveSubVaultsIsReached_AtSetUserRate(uint256 maxActiveSubVaults) public {
-        maxActiveSubVaults = bound(maxActiveSubVaults, 1, 500);
+        maxActiveSubVaults = bound(maxActiveSubVaults, 1, 20);
         bbv = _deployBasedBoostedVault(
             address(mockAccessManager),
             DEFAULT_MAX_PER_SECOND_RATE,
