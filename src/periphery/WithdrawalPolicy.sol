@@ -199,6 +199,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     function invalidateNonce(address signer, uint256 nonce) external {
         require(msg.sender == signer, ErrorsLib.NotAuthorized());
         require($storage().signers[signer], ErrorsLib.NotAuthorized());
+        require($storage().usedNonces[signer][nonce] == false, NonceAlreadyUsed());
         $storage().usedNonces[signer][nonce] = true;
     }
 
@@ -217,9 +218,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
         require(discount.deadline >= block.timestamp, DeadlineExpired());
 
         signer = _recoverSigner(request, discount);
-        if (!$storage().signers[signer]) {
-            revert InvalidSignature();
-        }
+        require($storage().signers[signer], InvalidSignature());
         require(!$storage().usedNonces[signer][discount.nonce], NonceAlreadyUsed());
 
         return (signer, discount.nonce, discount.personalFeeBps);
