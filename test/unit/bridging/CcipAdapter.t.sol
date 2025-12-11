@@ -49,7 +49,6 @@ contract CcipAdapterTest is TestWithHelpers {
     MockAccessManager internal _mockAccessManager;
     IMockErc20 internal _mockUsdt;
     IMockErc20 internal _mockGho;
-    IMockErc20 internal _mockUnsupportedAsset;
     MockTransferHelper internal _mockTransferHelper;
     MockCCIPRouter internal _mockCCIPRouter;
     MockAccountingChainGateway internal _mockAccountingChainGateway;
@@ -69,8 +68,6 @@ contract CcipAdapterTest is TestWithHelpers {
     function setUp() public virtual {
         _mockUsdt = IMockErc20(address(new MockNonStandardErc20("Test USDT", "tUSDT", 6)));
         _mockGho = IMockErc20(address(new MockNonStandardErc20("Test GHO", "tGHO", 18)));
-        _mockUnsupportedAsset =
-            IMockErc20(address(new MockNonStandardErc20("Test Unsupported Asset", "tUNSUPPORTED", 18)));
 
         _mockAssetRegistry = new MockAssetRegistry();
         _mockTransferHelper = new MockTransferHelper();

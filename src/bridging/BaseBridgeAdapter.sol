@@ -30,6 +30,13 @@ abstract contract BaseBridgeAdapter is AccessManaged, TransferHelperClient, IBri
         _;
     }
 
+    modifier onlySelf() {
+        if (msg.sender != address(this)) {
+            revert ErrorsLib.OnlySelf();
+        }
+        _;
+    }
+
     /// @dev Constructor.
     /// @param accessManager Address of the IAccessManager contract used for handling access control.
     /// @param gateway Address of the Gateway contract.
@@ -59,7 +66,7 @@ abstract contract BaseBridgeAdapter is AccessManaged, TransferHelperClient, IBri
     }
 
     /// @inheritdoc IBridgeAdapter
-    function replayFundsReceiving(IBridgeAdapter.BridgeAsset[] memory assets) external override {
+    function replayFundsReceiving(IBridgeAdapter.BridgeAsset[] memory assets) public virtual override {
         _processReceivedFunds(assets);
     }
 

@@ -16,7 +16,6 @@ import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {ConstantsLib} from "src/libraries/ConstantsLib.sol";
-import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
 
 /// @title CcipAdapter
 /// @author Aave Labs
@@ -31,13 +30,6 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
 
     modifier onlyRouter() {
         require(msg.sender == CCIP_ROUTER, OnlyBridgeRouter());
-        _;
-    }
-
-    modifier onlySelf() {
-        if (msg.sender != address(this)) {
-            revert ErrorsLib.OnlySelf();
-        }
         _;
     }
 
