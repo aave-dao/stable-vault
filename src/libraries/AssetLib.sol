@@ -9,6 +9,10 @@ import {ConstantsLib} from "src/libraries/ConstantsLib.sol";
 /// @author Aave Labs
 /// @notice Library for converting between asset decimals and ray.
 library AssetLib {
+    /// @notice Thrown when failing to get asset decimals.
+    /// @custom:selector 0x294bbc84
+    error CannotGetAssetDecimals(address asset);
+
     function assetDecimalsToRay(uint256 amount, address asset) internal view returns (uint256) {
         return convertDecimals(amount, getDecimals(asset), ConstantsLib.RAY_DECIMALS);
     }
@@ -39,17 +43,16 @@ library AssetLib {
     }
 
     function getDecimals(address asset) internal view returns (uint8) {
-        uint8 assetDecimals = 18;
         (bool callSucceeded, bytes memory encodedDecimals) =
-            address(asset).staticcall(abi.encodeWithSelector(IERC20Metadata.decimals.selector));
+            address(asset).staticcall(abi.encodeCall(IERC20Metadata.decimals, ()));
         if (callSucceeded && encodedDecimals.length >= 32) {
             uint256 returnedDecimals = abi.decode(encodedDecimals, (uint256));
             if (returnedDecimals <= type(uint8).max) {
                 // Casting to uint8 is safe because we are checking the value is not greater than type(uint8).max
                 // forge-lint: disable-next-line(unsafe-typecast)
-                assetDecimals = uint8(returnedDecimals);
+                return uint8(returnedDecimals);
             }
         }
-        return assetDecimals;
+        revert CannotGetAssetDecimals(asset);
     }
 }
