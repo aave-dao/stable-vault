@@ -4,8 +4,11 @@ pragma solidity ^0.8.22;
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {Test} from "forge-std/Test.sol";
 
+import {AssetLib} from "src/libraries/AssetLib.sol";
+
 import {AssetLibWrapper} from "test/mocks/AssetLibWrapper.sol";
 import {MockErc20} from "test/mocks/MockErc20.sol";
+import {MockUniversal} from "test/mocks/MockUniversal.sol";
 
 contract AssetLibTest is Test {
     AssetLibWrapper internal w;
@@ -274,11 +277,41 @@ contract AssetLibTest is Test {
         assertEq(decimalsFromAsset, decimals, "got wrong decimals from asset");
     }
 
-    function test_getDecimals_fromNonStandardAsset() public {
-        uint256 defaultDecimals = 18;
-        address asset = makeAddr("NonStandardAsset");
+    function test_getDecimals_reverts_ifAddressDoesNotHaveDecimalsFunction() public {
+        address asset = address(new MockUniversal());
         vm.expectCall(asset, abi.encodeWithSelector(IERC20Metadata.decimals.selector));
-        uint256 decimalsFromAsset = w.getDecimals(asset);
-        assertEq(decimalsFromAsset, defaultDecimals, "got wrong decimals from non-standard asset");
+        vm.expectRevert(abi.encodeWithSelector(AssetLib.CannotGetAssetDecimals.selector, asset));
+        w.getDecimals(asset);
+    }
+
+    function test_getDecimals_reverts_ifBytesReturnedAreLessThan32Bytes() public {
+        address asset = address(new MockUniversal());
+        vm.expectCall(asset, abi.encodeWithSelector(IERC20Metadata.decimals.selector));
+        vm.mockCall(asset, abi.encodeWithSelector(IERC20Metadata.decimals.selector), hex"0001");
+        vm.expectRevert(abi.encodeWithSelector(AssetLib.CannotGetAssetDecimals.selector, asset));
+        w.getDecimals(asset);
+    }
+
+    function test_getDecimals_reverts_ifCallFails() public {
+        address asset = address(new MockUniversal());
+        vm.expectCall(asset, abi.encodeWithSelector(IERC20Metadata.decimals.selector));
+        MockUniversal(asset).mockToRevertOnNextCallWith("Oops!");
+        vm.expectRevert(abi.encodeWithSelector(AssetLib.CannotGetAssetDecimals.selector, asset));
+        w.getDecimals(asset);
+    }
+
+    function test_getDecimals_reverts_ifDecimalsDoNotFitInUint8() public {
+        uint256 decimals = uint256(type(uint8).max) + 1;
+        address asset = address(new MockUniversal());
+        vm.mockCall(asset, abi.encodeWithSelector(IERC20Metadata.decimals.selector), abi.encode(decimals));
+        vm.expectCall(asset, abi.encodeWithSelector(IERC20Metadata.decimals.selector));
+        vm.expectRevert(abi.encodeWithSelector(AssetLib.CannotGetAssetDecimals.selector, asset));
+        w.getDecimals(asset);
+    }
+
+    function test_getDecimals_worksForAnyUint8(uint8 decimals) public {
+        address asset = address(new MockErc20("Test USD", "tUSD", decimals));
+        vm.expectCall(asset, abi.encodeWithSelector(IERC20Metadata.decimals.selector));
+        assertEq(w.getDecimals(asset), decimals);
     }
 }
