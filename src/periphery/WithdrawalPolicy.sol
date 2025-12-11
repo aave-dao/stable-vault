@@ -21,6 +21,10 @@ import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
 /// @dev This contract does not take ownership of the fee. It is expected the client of this contract takes the fee
 /// returned by this contract.
 contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithdrawalPolicy {
+    /// @notice Emitted when a nonce is marked as used, either by a successful appliance of the withdrawal policy or by
+    /// a nonce invalidation.
+    event NonceUsed(address indexed signer, uint256 indexed nonce);
+
     /// @notice Thrown when a recovered signer is not a whitelisted signer.
     /// @custom:selector 0x8baa579f
     error InvalidSignature();
@@ -125,41 +129,39 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
 
     /// @inheritdoc IWithdrawalPolicy
     function applyWithdrawalPolicy(WithdrawalRequest calldata request) external override returns (uint256) {
-        require(
-            IAssetRegistry(ASSET_REGISTRY).isUserWithdrawalAllowed(request.assetOut),
-            ErrorsLib.UnsupportedAsset(request.assetOut)
-        );
-
-        uint16 feeBps;
-        if (request.data.length > 0) {
-            (address signer, uint256 nonce, uint16 personalFeeBps) = _verifySignedDiscount(request);
-            $storage().wasNonceUsed[signer][nonce] = true;
-            feeBps = personalFeeBps;
-        } else {
-            feeBps = _getAssetFeeBps(request.assetOut);
+        (uint256 amountOutRay, address signer, uint256 nonce) = _previewWithdrawalPolicy(request);
+        if (signer != address(0)) {
+            _markNonceAsUsed(signer, nonce);
         }
-
-        uint256 feeRay = (request.iouAmountRay * feeBps + ConstantsLib.MAX_BPS - 1) / ConstantsLib.MAX_BPS;
-        return request.iouAmountRay - feeRay;
+        return amountOutRay;
     }
 
     /// @inheritdoc IWithdrawalPolicy
     function previewWithdrawalPolicy(WithdrawalRequest calldata request) external view override returns (uint256) {
+        (uint256 amountOutRay,,) = _previewWithdrawalPolicy(request);
+        return amountOutRay;
+    }
+
+    /// @dev Returns: (uint256 amountOutRay, address signer, uint256 nonce).
+    function _previewWithdrawalPolicy(WithdrawalRequest calldata request)
+        internal
+        view
+        returns (uint256, address, uint256)
+    {
         require(
             IAssetRegistry(ASSET_REGISTRY).isUserWithdrawalAllowed(request.assetOut),
             ErrorsLib.UnsupportedAsset(request.assetOut)
         );
-
+        address signer;
+        uint256 nonce;
         uint16 feeBps;
         if (request.data.length > 0) {
-            (,, uint16 personalFeeBps) = _verifySignedDiscount(request);
-            feeBps = personalFeeBps;
+            (signer, nonce, feeBps) = _verifySignedDiscount(request);
         } else {
             feeBps = _getAssetFeeBps(request.assetOut);
         }
-
-        uint256 feeRay = (request.iouAmountRay * feeBps + ConstantsLib.MAX_BPS - 1) / ConstantsLib.MAX_BPS;
-        return request.iouAmountRay - feeRay;
+        uint256 feeAmountRay = (request.iouAmountRay * feeBps + ConstantsLib.MAX_BPS - 1) / ConstantsLib.MAX_BPS;
+        return (request.iouAmountRay - feeAmountRay, signer, nonce);
     }
 
     // Restricted functions
@@ -200,7 +202,12 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
         require(msg.sender == signer, ErrorsLib.NotAuthorized());
         require($storage().isSigner[signer], ErrorsLib.NotAuthorized());
         require($storage().wasNonceUsed[signer][nonce] == false, NonceAlreadyUsed());
+        _markNonceAsUsed(signer, nonce);
+    }
+
+    function _markNonceAsUsed(address signer, uint256 nonce) internal {
         $storage().wasNonceUsed[signer][nonce] = true;
+        emit NonceUsed(signer, nonce);
     }
 
     /// @dev Verifies a signed fee discount and returns the signer, nonce, and personal fee.

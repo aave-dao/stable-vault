@@ -688,6 +688,21 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         assertTrue(withdrawalPolicy.wasNonceUsed(signer, nonce), "Nonce should be invalidated");
     }
 
+    function test_invalidateNonce_emitsExpectedEvent(uint256 nonceSalt) public {
+        (address signer,) = makeAddrAndKey("signer");
+        vm.prank(admin);
+        withdrawalPolicy.setSigner(signer, true);
+
+        uint256 nonce = uint256(keccak256(abi.encodePacked("fuzzedNonce:", nonceSalt)));
+        assertFalse(withdrawalPolicy.wasNonceUsed(signer, nonce), "Nonce should not be used initially");
+
+        vm.expectEmit(true, true, true, true);
+        emit WithdrawalPolicy.NonceUsed(signer, nonce);
+
+        vm.prank(signer);
+        withdrawalPolicy.invalidateNonce(signer, nonce);
+    }
+
     function test_invalidateNonce_reverts_ifCallerIsNotSigner() public {
         address notSigner = makeAddr("notSigner");
         (address signer,) = makeAddrAndKey("signer");
