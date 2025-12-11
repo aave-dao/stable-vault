@@ -532,11 +532,11 @@ contract BasedBoostedVault is
     }
 
     function _burnShares(address user, uint256 sharesToBurn) internal returns (uint256) {
-        uint256 newShares = $storage().positions[user].shares - sharesToBurn;
-        $storage().positions[user].shares = newShares;
+        uint256 remainingShares = $storage().positions[user].shares - sharesToBurn;
+        $storage().positions[user].shares = remainingShares;
         uint256 subVaultId = $storage().positions[user].subVaultId;
         $storage().subVaultById[subVaultId].totalShares -= sharesToBurn;
-        return newShares;
+        return remainingShares;
     }
 
     function _getVaultObligations() internal view returns (uint256) {
