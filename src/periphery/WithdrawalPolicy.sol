@@ -21,14 +21,20 @@ import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
 /// @dev This contract does not take ownership of the fee. It is expected the client of this contract takes the fee
 /// returned by this contract.
 contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithdrawalPolicy {
+    /// @notice Emitted when a nonce is marked as used, either by a successful appliance of the withdrawal policy or by
+    /// a nonce invalidation.
+    event NonceUsed(address indexed signer, uint256 indexed nonce);
+
     /// @notice Thrown when a recovered signer is not a whitelisted signer.
     /// @custom:selector 0x8baa579f
     error InvalidSignature();
 
     /// @notice Thrown when a signature nonce has already been consumed.
+    /// @custom:selector 0x1fb09b80
     error NonceAlreadyUsed();
 
     /// @notice Thrown when the signature deadline has passed.
+    /// @custom:selector 0x1ab7da6b
     error DeadlineExpired();
 
     // EIP-712 typeHash:
@@ -60,10 +66,10 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
 
     /// @custom:storage-location erc7201:aave.storage.WithdrawalPolicy
     struct WithdrawalPolicyStorage {
-        uint16 basicFeeBps;
+        uint16 defaultFeeBps;
         mapping(address asset => AssetFeeConfig config) assetFeeConfigs;
-        mapping(address signer => bool isSigner) signers;
-        mapping(address signer => mapping(uint256 nonce => bool used)) usedNonces;
+        mapping(address account => bool isSigner) isSigner;
+        mapping(address signer => mapping(uint256 nonce => bool used)) wasNonceUsed;
     }
 
     // keccak256(abi.encode(uint256(keccak256("aave.storage.WithdrawalPolicy")) - 1)) & ~bytes32(uint256(0xff))
@@ -94,6 +100,21 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
         __EIP712_init("WithdrawalPolicy", "1");
     }
 
+    /// @inheritdoc IWithdrawalPolicy
+    function applyWithdrawalPolicy(WithdrawalRequest calldata request) external override returns (uint256) {
+        (uint256 amountOutRay, address signer, uint256 nonce) = _previewWithdrawalPolicy(request);
+        if (signer != address(0)) {
+            _markNonceAsUsed(signer, nonce);
+        }
+        return amountOutRay;
+    }
+
+    /// @inheritdoc IWithdrawalPolicy
+    function previewWithdrawalPolicy(WithdrawalRequest calldata request) external view override returns (uint256) {
+        (uint256 amountOutRay,,) = _previewWithdrawalPolicy(request);
+        return amountOutRay;
+    }
+
     /// @notice Getter for the configuration for an asset-specific fee.
     /// @param asset Address of the asset to get the configuration for.
     /// @return assetFeeConfig Configuration for the asset-specific fee.
@@ -103,74 +124,35 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
 
     /// @notice Getter for the fallback fee in basis points which is used when a personal fee or asset-specific fee is
     /// not available.
-    /// @return basicFeeBps Fallback fee in basis points.
-    function getBasicFeeBps() external view returns (uint16) {
-        return $storage().basicFeeBps;
+    /// @return defaultFeeBps Fallback fee in basis points.
+    function getDefaultFeeBps() external view returns (uint16) {
+        return $storage().defaultFeeBps;
     }
 
-    /// @notice Getter for whether a signer is whitelisted.
-    /// @param signer Address of the signer to check.
-    /// @return isSigner Whether the signer is whitelisted.
-    function isSigner(address signer) external view returns (bool) {
-        return $storage().signers[signer];
+    /// @notice Getter for whether an account is a signer.
+    /// @param account Address of the account to check if it is a signer or not.
+    /// @return bool True if the account is a signer, false otherwise.
+    function isSigner(address account) external view returns (bool) {
+        return $storage().isSigner[account];
     }
 
     /// @notice Getter for whether a nonce has been consumed by a signer.
     /// @param signer Address of the signer to check.
     /// @param nonce The nonce to check.
-    /// @return used Whether the nonce has been used.
-    function isNonceUsed(address signer, uint256 nonce) external view returns (bool) {
-        return $storage().usedNonces[signer][nonce];
+    /// @return bool True if the nonce has been used, false otherwise.
+    function wasNonceUsed(address signer, uint256 nonce) external view returns (bool) {
+        return $storage().wasNonceUsed[signer][nonce];
     }
 
-    /// @inheritdoc IWithdrawalPolicy
-    function applyWithdrawalPolicy(WithdrawalRequest calldata request) external override returns (uint256) {
-        require(
-            IAssetRegistry(ASSET_REGISTRY).isUserWithdrawalAllowed(request.assetOut),
-            ErrorsLib.UnsupportedAsset(request.assetOut)
-        );
-
-        uint16 feeBps;
-        if (request.data.length > 0) {
-            (address signer, uint256 nonce, uint16 personalFeeBps) = _verifySignedDiscount(request);
-            $storage().usedNonces[signer][nonce] = true;
-            feeBps = personalFeeBps;
-        } else {
-            feeBps = _getDefaultFeeBps(request.assetOut);
-        }
-
-        uint256 feeRay = (request.iouAmountRay * feeBps + ConstantsLib.MAX_BPS - 1) / ConstantsLib.MAX_BPS;
-        return request.iouAmountRay - feeRay;
-    }
-
-    /// @inheritdoc IWithdrawalPolicy
-    function previewWithdrawalPolicy(WithdrawalRequest calldata request) external view override returns (uint256) {
-        require(
-            IAssetRegistry(ASSET_REGISTRY).isUserWithdrawalAllowed(request.assetOut),
-            ErrorsLib.UnsupportedAsset(request.assetOut)
-        );
-
-        uint16 feeBps;
-        if (request.data.length > 0) {
-            (,, uint16 personalFeeBps) = _verifySignedDiscount(request);
-            feeBps = personalFeeBps;
-        } else {
-            feeBps = _getDefaultFeeBps(request.assetOut);
-        }
-
-        uint256 feeRay = (request.iouAmountRay * feeBps + ConstantsLib.MAX_BPS - 1) / ConstantsLib.MAX_BPS;
-        return request.iouAmountRay - feeRay;
-    }
-
-    // Restricted functions
+    //////////////////////////////// RESTRICTED FUNCTIONS ////////////////////////////////
 
     /// @notice Sets the configuration for an asset-specific fee.
     /// @param asset Address of the asset to set the configuration for.
     /// @param newAssetFeeBps The fee in basis points applied to the IOU quantity being exchanged for the asset.
     /// @param isSet Whether the fee is set (used for lookups).
     function setAssetFeeBps(address asset, uint16 newAssetFeeBps, bool isSet) external restricted {
-        // We don't check for new asset fee being less than the basic fee because maybe we want some specific asset to
-        // have a higher fee than the basic fee.
+        // We don't check for new asset fee being less than the default fee because maybe we want some specific asset to
+        // have a higher fee than the default fee.
         require(newAssetFeeBps <= ConstantsLib.MAX_BPS, ErrorsLib.InvalidParameter());
         $storage().assetFeeConfigs[asset].feeBps = newAssetFeeBps;
         $storage().assetFeeConfigs[asset].isSet = isSet;
@@ -178,18 +160,18 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
 
     /// @notice Sets the fallback fee in basis points which is used when a personal fee or asset-specific fee is not
     /// available.
-    /// @param newBasicFeeBps The fee in basis points applied to the IOU quantity being exchanged for the
+    /// @param newDefaultFeeBps The fee in basis points applied to the IOU quantity being exchanged for the
     /// asset.
-    function setBasicFeeBps(uint16 newBasicFeeBps) external restricted {
-        require(newBasicFeeBps <= ConstantsLib.MAX_BPS, ErrorsLib.InvalidParameter());
-        $storage().basicFeeBps = newBasicFeeBps;
+    function setDefaultFeeBps(uint16 newDefaultFeeBps) external restricted {
+        require(newDefaultFeeBps <= ConstantsLib.MAX_BPS, ErrorsLib.InvalidParameter());
+        $storage().defaultFeeBps = newDefaultFeeBps;
     }
 
     /// @notice Sets the signer to be used for signature verification.
     /// @param signer Address of the signer to set.
-    /// @param whitelistedSigner Whether the signer is enabled for signature verification.
-    function setSigner(address signer, bool whitelistedSigner) external restricted {
-        $storage().signers[signer] = whitelistedSigner;
+    /// @param whitelistAsSigner Whether the signer is enabled for signature verification.
+    function setSigner(address signer, bool whitelistAsSigner) external restricted {
+        $storage().isSigner[signer] = whitelistAsSigner;
     }
 
     /// @notice Allows a whitelisted signer to invalidate their own nonce.
@@ -198,9 +180,38 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     /// @param nonce The nonce to invalidate.
     function invalidateNonce(address signer, uint256 nonce) external {
         require(msg.sender == signer, ErrorsLib.NotAuthorized());
-        require($storage().signers[signer], ErrorsLib.NotAuthorized());
-        require($storage().usedNonces[signer][nonce] == false, NonceAlreadyUsed());
-        $storage().usedNonces[signer][nonce] = true;
+        require($storage().isSigner[signer], ErrorsLib.NotAuthorized());
+        require($storage().wasNonceUsed[signer][nonce] == false, NonceAlreadyUsed());
+        _markNonceAsUsed(signer, nonce);
+    }
+
+    //////////////////////////////// INTERNAL FUNCTIONS ////////////////////////////////
+
+    /// @dev Returns: (uint256 amountOutRay, address signer, uint256 nonce).
+    function _previewWithdrawalPolicy(WithdrawalRequest calldata request)
+        internal
+        view
+        returns (uint256, address, uint256)
+    {
+        require(
+            IAssetRegistry(ASSET_REGISTRY).isUserWithdrawalAllowed(request.assetOut),
+            ErrorsLib.UnsupportedAsset(request.assetOut)
+        );
+        address signer;
+        uint256 nonce;
+        uint16 feeBps;
+        if (request.data.length > 0) {
+            (signer, nonce, feeBps) = _verifySignedDiscount(request);
+        } else {
+            feeBps = _getAssetFeeBps(request.assetOut);
+        }
+        uint256 feeAmountRay = (request.iouAmountRay * feeBps + ConstantsLib.MAX_BPS - 1) / ConstantsLib.MAX_BPS;
+        return (request.iouAmountRay - feeAmountRay, signer, nonce);
+    }
+
+    function _markNonceAsUsed(address signer, uint256 nonce) internal {
+        $storage().wasNonceUsed[signer][nonce] = true;
+        emit NonceUsed(signer, nonce);
     }
 
     /// @dev Verifies a signed fee discount and returns the signer, nonce, and personal fee.
@@ -214,12 +225,12 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     {
         SignedFeeDiscount memory discount = abi.decode(request.data, (SignedFeeDiscount));
 
-        require(discount.personalFeeBps <= _getDefaultFeeBps(request.assetOut), ErrorsLib.InvalidParameter());
+        require(discount.personalFeeBps <= _getAssetFeeBps(request.assetOut), ErrorsLib.InvalidParameter());
         require(discount.deadline >= block.timestamp, DeadlineExpired());
 
         signer = _recoverSigner(request, discount);
-        require($storage().signers[signer], InvalidSignature());
-        require(!$storage().usedNonces[signer][discount.nonce], NonceAlreadyUsed());
+        require($storage().isSigner[signer], InvalidSignature());
+        require(!$storage().wasNonceUsed[signer][discount.nonce], NonceAlreadyUsed());
 
         return (signer, discount.nonce, discount.personalFeeBps);
     }
@@ -244,12 +255,12 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
         return ECDSA.recover(_hashTypedDataV4(structHash), discount.signature);
     }
 
-    /// @dev Returns the default fee for an asset (asset-specific or basic fallback).
-    function _getDefaultFeeBps(address assetOut) internal view returns (uint16) {
+    /// @dev Returns the fee for an asset (asset-specific or default fallback).
+    function _getAssetFeeBps(address assetOut) internal view returns (uint16) {
         if ($storage().assetFeeConfigs[assetOut].isSet) {
             return $storage().assetFeeConfigs[assetOut].feeBps;
         } else {
-            return $storage().basicFeeBps;
+            return $storage().defaultFeeBps;
         }
     }
 }

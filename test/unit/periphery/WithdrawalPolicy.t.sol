@@ -74,15 +74,15 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         withdrawalPolicy.setAssetFeeBps(asset, uint16(newAssetFeeBps), isSet);
     }
 
-    function test_setBasicFeeBps_reverts_ifMsgSenderIsNotAuthorized(
+    function test_setDefaultFeeBps_reverts_ifMsgSenderIsNotAuthorized(
         address unauthorizedMsgSender,
-        uint256 newBasicFeeBps
+        uint256 newDefaultFeeBps
     ) public {
         vm.assume(unauthorizedMsgSender != address(0));
         _assumeNotProxyAdmin(unauthorizedMsgSender, address(withdrawalPolicy));
 
         mockAccessManager.mockRejectCall(
-            unauthorizedMsgSender, address(withdrawalPolicy), WithdrawalPolicy.setBasicFeeBps.selector
+            unauthorizedMsgSender, address(withdrawalPolicy), WithdrawalPolicy.setDefaultFeeBps.selector
         );
 
         vm.expectRevert(
@@ -90,7 +90,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         );
         vm.prank(unauthorizedMsgSender);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setBasicFeeBps(uint16(newBasicFeeBps));
+        withdrawalPolicy.setDefaultFeeBps(uint16(newDefaultFeeBps));
     }
 
     function test_setSigner_reverts_ifMsgSenderIsNotAuthorized(
@@ -134,23 +134,23 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         withdrawalPolicy.setAssetFeeBps(asset, feeBps16, isSet);
     }
 
-    function test_setBasicFeeBps_setsExpectedFee(uint256 feeBps) public {
+    function test_setDefaultFeeBps_setsExpectedFee(uint256 feeBps) public {
         feeBps = bound(feeBps, 0, ConstantsLib.MAX_BPS);
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setBasicFeeBps(uint16(feeBps));
+        withdrawalPolicy.setDefaultFeeBps(uint16(feeBps));
 
-        assertEq(withdrawalPolicy.getBasicFeeBps(), feeBps);
+        assertEq(withdrawalPolicy.getDefaultFeeBps(), feeBps);
     }
 
-    function test_setBasicFeeBps_reverts_ifFeeBpsIsInvalid(uint256 feeBps) public {
+    function test_setDefaultFeeBps_reverts_ifFeeBpsIsInvalid(uint256 feeBps) public {
         // forge-lint: disable-next-line(unsafe-typecast)
         uint16 feeBps16 = uint16(bound(feeBps, ConstantsLib.MAX_BPS + 1, type(uint16).max));
 
         vm.expectRevert(ErrorsLib.InvalidParameter.selector);
         vm.prank(admin);
-        withdrawalPolicy.setBasicFeeBps(feeBps16);
+        withdrawalPolicy.setDefaultFeeBps(feeBps16);
     }
 
     function test_setSigner_setsSignerStatus(address signer, bool isSigner) public {
@@ -162,7 +162,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
     // Calculation tests
 
-    function test_applyWithdrawalPolicy_returnsBaseFee(
+    function test_applyWithdrawalPolicy_returnsDefaultFee(
         address user,
         address assetOut,
         uint256 iouAmountRay,
@@ -173,7 +173,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setBasicFeeBps(uint16(baseFeeBps));
+        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         // Fee rounds up, so expectedAmountOut rounds down
         uint256 expectedFee = (iouAmountRay * baseFeeBps + ConstantsLib.MAX_BPS - 1) / ConstantsLib.MAX_BPS;
@@ -206,8 +206,8 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setBasicFeeBps(uint16(baseFeeBps));
-        assertEq(withdrawalPolicy.getBasicFeeBps(), baseFeeBps);
+        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
+        assertEq(withdrawalPolicy.getDefaultFeeBps(), baseFeeBps);
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
@@ -252,7 +252,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         // Setup base fee
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setBasicFeeBps(uint16(baseFeeBps));
+        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         // Setup asset fee
         if (isAssetFeeSet) {
@@ -279,15 +279,15 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         IWithdrawalPolicy.WithdrawalRequest memory request = _buildRequest(user, assetOut, iouAmountRay, data);
 
         // Preview should return same result and NOT consume the nonce
-        assertFalse(withdrawalPolicy.isNonceUsed(signer, DEFAULT_NONCE), "Nonce should not be used before preview");
+        assertFalse(withdrawalPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Nonce should not be used before preview");
         uint256 previewAmountOut = withdrawalPolicy.previewWithdrawalPolicy(request);
         assertEq(previewAmountOut, expectedAmountOut, "Preview should match expected");
-        assertFalse(withdrawalPolicy.isNonceUsed(signer, DEFAULT_NONCE), "Preview should NOT consume nonce");
+        assertFalse(withdrawalPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Preview should NOT consume nonce");
 
         // Apply should return same result and consume the nonce
         uint256 actualAmountOut = withdrawalPolicy.applyWithdrawalPolicy(request);
         assertEq(actualAmountOut, expectedAmountOut, "Apply should match expected");
-        assertTrue(withdrawalPolicy.isNonceUsed(signer, DEFAULT_NONCE), "Apply should consume nonce");
+        assertTrue(withdrawalPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Apply should consume nonce");
     }
 
     function test_applyWithdrawalPolicy_reverts_ifPersonalFeeExceedsOtherFees(
@@ -312,7 +312,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         // Setup base fee
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setBasicFeeBps(uint16(baseFeeBps));
+        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         // Setup asset fee
         if (isAssetFeeSet) {
@@ -357,7 +357,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         // Setup base fee
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setBasicFeeBps(uint16(baseFeeBps));
+        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         // Build signed fee discount data with non-whitelisted signer
         bytes memory data = _createSignedFeeDiscountData(
@@ -390,7 +390,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         // Setup base fee
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setBasicFeeBps(uint16(baseFeeBps));
+        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         // Create signer wallet and whitelist it
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
@@ -422,7 +422,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         // Setup base fee
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setBasicFeeBps(uint16(baseFeeBps));
+        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         // Create signer wallet and whitelist it
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
@@ -457,7 +457,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         // Setup base fee
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setBasicFeeBps(uint16(baseFeeBps));
+        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         // Create signer wallet and whitelist it
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
@@ -491,7 +491,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         // Setup base fee
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setBasicFeeBps(uint16(baseFeeBps));
+        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         // Create signer wallet and whitelist it
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
@@ -530,7 +530,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         // Setup base fee
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setBasicFeeBps(uint16(baseFeeBps));
+        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         // Create signer wallet and whitelist it
         (address signer,) = makeAddrAndKey("signer");
@@ -576,7 +576,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         uint16 baseFeeBps = 1000;
 
         vm.prank(admin);
-        withdrawalPolicy.setBasicFeeBps(baseFeeBps);
+        withdrawalPolicy.setDefaultFeeBps(baseFeeBps);
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
@@ -609,7 +609,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         uint16 baseFeeBps = 1000; // 10% base fee
 
         vm.prank(admin);
-        withdrawalPolicy.setBasicFeeBps(baseFeeBps);
+        withdrawalPolicy.setDefaultFeeBps(baseFeeBps);
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
@@ -628,12 +628,12 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         assertEq(preview1, preview2, "Preview results should be consistent");
         assertEq(preview2, preview3, "Preview results should be consistent");
-        assertFalse(withdrawalPolicy.isNonceUsed(signer, DEFAULT_NONCE), "Nonce should not be consumed by preview");
+        assertFalse(withdrawalPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Nonce should not be consumed by preview");
 
         // Apply consumes the nonce
         uint256 applied = withdrawalPolicy.applyWithdrawalPolicy(request);
         assertEq(applied, preview1, "Apply should return same as preview");
-        assertTrue(withdrawalPolicy.isNonceUsed(signer, DEFAULT_NONCE), "Nonce should be consumed by apply");
+        assertTrue(withdrawalPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Nonce should be consumed by apply");
 
         // Now preview should revert because nonce is used
         vm.expectRevert(WithdrawalPolicy.NonceAlreadyUsed.selector);
@@ -652,7 +652,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         // Setup: Configure base fee and whitelist signer
         vm.prank(admin);
-        withdrawalPolicy.setBasicFeeBps(baseFeeBps);
+        withdrawalPolicy.setDefaultFeeBps(baseFeeBps);
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
@@ -680,12 +680,27 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         withdrawalPolicy.setSigner(signer, true);
 
         uint256 nonce = 42;
-        assertFalse(withdrawalPolicy.isNonceUsed(signer, nonce), "Nonce should not be used initially");
+        assertFalse(withdrawalPolicy.wasNonceUsed(signer, nonce), "Nonce should not be used initially");
 
         vm.prank(signer);
         withdrawalPolicy.invalidateNonce(signer, nonce);
 
-        assertTrue(withdrawalPolicy.isNonceUsed(signer, nonce), "Nonce should be invalidated");
+        assertTrue(withdrawalPolicy.wasNonceUsed(signer, nonce), "Nonce should be invalidated");
+    }
+
+    function test_invalidateNonce_emitsExpectedEvent(uint256 nonceSalt) public {
+        (address signer,) = makeAddrAndKey("signer");
+        vm.prank(admin);
+        withdrawalPolicy.setSigner(signer, true);
+
+        uint256 nonce = uint256(keccak256(abi.encodePacked("fuzzedNonce:", nonceSalt)));
+        assertFalse(withdrawalPolicy.wasNonceUsed(signer, nonce), "Nonce should not be used initially");
+
+        vm.expectEmit(true, true, true, true);
+        emit WithdrawalPolicy.NonceUsed(signer, nonce);
+
+        vm.prank(signer);
+        withdrawalPolicy.invalidateNonce(signer, nonce);
     }
 
     function test_invalidateNonce_reverts_ifCallerIsNotSigner() public {
@@ -727,7 +742,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setBasicFeeBps(uint16(baseFeeBps));
+        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
@@ -760,7 +775,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setBasicFeeBps(uint16(baseFeeBps));
+        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
@@ -789,7 +804,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         uint16 baseFeeBps = 1000;
 
         vm.prank(admin);
-        withdrawalPolicy.setBasicFeeBps(baseFeeBps);
+        withdrawalPolicy.setDefaultFeeBps(baseFeeBps);
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
@@ -821,7 +836,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setBasicFeeBps(uint16(baseFeeBps));
+        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
@@ -858,7 +873,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setBasicFeeBps(uint16(baseFeeBps));
+        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
@@ -869,21 +884,21 @@ contract WithdrawalPolicyTest is TestWithHelpers {
             signerPk, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), nonce1, DEFAULT_DEADLINE
         );
         withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data1));
-        assertTrue(withdrawalPolicy.isNonceUsed(signer, nonce1), "Nonce1 should be used");
+        assertTrue(withdrawalPolicy.wasNonceUsed(signer, nonce1), "Nonce1 should be used");
 
         // Second signature with nonce2 should also work
         bytes memory data2 = _createSignedFeeDiscountData(
             signerPk, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), nonce2, DEFAULT_DEADLINE
         );
         withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data2));
-        assertTrue(withdrawalPolicy.isNonceUsed(signer, nonce2), "Nonce2 should be used");
+        assertTrue(withdrawalPolicy.wasNonceUsed(signer, nonce2), "Nonce2 should be used");
 
         // Third signature with nonce3 should also work
         bytes memory data3 = _createSignedFeeDiscountData(
             signerPk, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), nonce3, DEFAULT_DEADLINE
         );
         withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data3));
-        assertTrue(withdrawalPolicy.isNonceUsed(signer, nonce3), "Nonce3 should be used");
+        assertTrue(withdrawalPolicy.wasNonceUsed(signer, nonce3), "Nonce3 should be used");
     }
 
     function test_applyWithdrawalPolicy_acceptsNonceZero() public {
@@ -894,7 +909,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         uint16 baseFeeBps = 1000;
 
         vm.prank(admin);
-        withdrawalPolicy.setBasicFeeBps(baseFeeBps);
+        withdrawalPolicy.setDefaultFeeBps(baseFeeBps);
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
@@ -906,11 +921,11 @@ contract WithdrawalPolicyTest is TestWithHelpers {
             signerPk, user, assetOut, iouAmountRay, personalFeeBps, nonceZero, DEFAULT_DEADLINE
         );
 
-        assertFalse(withdrawalPolicy.isNonceUsed(signer, nonceZero), "Nonce 0 should not be used initially");
+        assertFalse(withdrawalPolicy.wasNonceUsed(signer, nonceZero), "Nonce 0 should not be used initially");
 
         uint256 amountOut = withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
         assertGt(amountOut, 0, "Should return non-zero amount");
-        assertTrue(withdrawalPolicy.isNonceUsed(signer, nonceZero), "Nonce 0 should be used after apply");
+        assertTrue(withdrawalPolicy.wasNonceUsed(signer, nonceZero), "Nonce 0 should be used after apply");
     }
 
     function test_applyWithdrawalPolicy_allowsSameNonceFromDifferentSigners(
@@ -927,7 +942,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setBasicFeeBps(uint16(baseFeeBps));
+        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         (address signer1, uint256 signerPk1) = makeAddrAndKey("signer1");
         (address signer2, uint256 signerPk2) = makeAddrAndKey("signer2");
@@ -941,15 +956,15 @@ contract WithdrawalPolicyTest is TestWithHelpers {
             signerPk1, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), sharedNonce, DEFAULT_DEADLINE
         );
         withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data1));
-        assertTrue(withdrawalPolicy.isNonceUsed(signer1, sharedNonce), "Signer1 nonce should be used");
-        assertFalse(withdrawalPolicy.isNonceUsed(signer2, sharedNonce), "Signer2 nonce should not be used yet");
+        assertTrue(withdrawalPolicy.wasNonceUsed(signer1, sharedNonce), "Signer1 nonce should be used");
+        assertFalse(withdrawalPolicy.wasNonceUsed(signer2, sharedNonce), "Signer2 nonce should not be used yet");
 
         // Signer2 can also use the same nonce
         bytes memory data2 = _createSignedFeeDiscountData(
             signerPk2, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), sharedNonce, DEFAULT_DEADLINE
         );
         withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data2));
-        assertTrue(withdrawalPolicy.isNonceUsed(signer2, sharedNonce), "Signer2 nonce should now be used");
+        assertTrue(withdrawalPolicy.wasNonceUsed(signer2, sharedNonce), "Signer2 nonce should now be used");
     }
 
     // Signer Removal Tests
@@ -967,7 +982,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setBasicFeeBps(uint16(baseFeeBps));
+        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
@@ -1000,7 +1015,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setBasicFeeBps(uint16(baseFeeBps));
+        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
@@ -1032,7 +1047,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setBasicFeeBps(uint16(baseFeeBps));
+        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
@@ -1071,7 +1086,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setBasicFeeBps(uint16(baseFeeBps));
+        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
@@ -1112,7 +1127,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setBasicFeeBps(uint16(baseFeeBps));
+        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         (address signer1, uint256 signerPk1) = makeAddrAndKey("signer1");
         (address signer2, uint256 signerPk2) = makeAddrAndKey("signer2");
@@ -1152,7 +1167,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         // Signer can invalidate while whitelisted
         vm.prank(signer);
         withdrawalPolicy.invalidateNonce(signer, nonce1);
-        assertTrue(withdrawalPolicy.isNonceUsed(signer, nonce1), "Nonce1 should be invalidated");
+        assertTrue(withdrawalPolicy.wasNonceUsed(signer, nonce1), "Nonce1 should be invalidated");
 
         // Remove the signer
         vm.prank(admin);
