@@ -30,9 +30,11 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     error InvalidSignature();
 
     /// @notice Thrown when a signature nonce has already been consumed.
+    /// @custom:selector 0x1fb09b80
     error NonceAlreadyUsed();
 
     /// @notice Thrown when the signature deadline has passed.
+    /// @custom:selector 0x1ab7da6b
     error DeadlineExpired();
 
     // EIP-712 typeHash:
