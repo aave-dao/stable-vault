@@ -1400,8 +1400,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         vm.mockCall(
             address(mockWithdrawalPolicy),
-            abi.encodeWithSelector(IWithdrawalPolicy.evaluateWithdrawal.selector),
-            abi.encode(iouAmountRay, 1)
+            abi.encodeWithSelector(IWithdrawalPolicy.applyWithdrawalPolicy.selector),
+            abi.encode(uint256(0)) // amountOutRay = 0, simulating 100% fee
         );
 
         uint256 actualWithdrawnAssets = iouAmountRay.rayToAssetDecimals(address(mockAsset));

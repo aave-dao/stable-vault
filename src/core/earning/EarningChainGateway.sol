@@ -123,9 +123,13 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
         require(iouTokenAmountRay > 0, ErrorsLib.ZeroAmount());
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(msg.sender, iouTokenAmountRay);
 
-        (uint256 withdrawalFeeRay,) =
-            IWithdrawalPolicy(WITHDRAWAL_POLICY).evaluateWithdrawal(msg.sender, assetOut, iouTokenAmountRay, data);
-        uint256 amountOut = (iouTokenAmountRay - withdrawalFeeRay).rayToAssetDecimals(assetOut);
+        uint256 amountOutRay = IWithdrawalPolicy(WITHDRAWAL_POLICY)
+            .applyWithdrawalPolicy(
+                IWithdrawalPolicy.WithdrawalRequest({
+                    user: msg.sender, assetOut: assetOut, iouAmountRay: iouTokenAmountRay, data: data
+                })
+            );
+        uint256 amountOut = amountOutRay.rayToAssetDecimals(assetOut);
         require(amountOut != 0 && amountOut >= minAmountOut, ErrorsLib.InsufficientAmountOut());
         IAllocator(ALLOCATOR).withdraw(assetOut, amountOut);
 

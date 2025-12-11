@@ -4,10 +4,13 @@ pragma solidity ^0.8.20;
 import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
 
 contract MockWithdrawalPolicy is IWithdrawalPolicy {
-    function evaluateWithdrawal(address user, address assetOut, uint256 iouAmountRay, bytes memory data)
-        external
-        view
-        override
-        returns (uint256, uint16)
-    {}
+    /// @dev Returns the full iouAmountRay (no fee) for testing purposes.
+    function applyWithdrawalPolicy(WithdrawalRequest calldata request) external pure override returns (uint256) {
+        return request.iouAmountRay;
+    }
+
+    /// @dev Returns the full iouAmountRay (no fee) for testing purposes.
+    function previewWithdrawalPolicy(WithdrawalRequest calldata request) external pure override returns (uint256) {
+        return request.iouAmountRay;
+    }
 }

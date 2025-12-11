@@ -25,26 +25,45 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     /// @custom:selector 0x8baa579f
     error InvalidSignature();
 
+    /// @notice Thrown when a signature nonce has already been consumed.
+    error NonceAlreadyUsed();
+
+    /// @notice Thrown when the signature deadline has passed.
+    error DeadlineExpired();
+
     // EIP-712 typeHash:
-    // keccak256("WithdrawalFee(address user,address assetOut,uint256 iouAmountRay,uint16 personalFee)").
-    bytes32 public constant WITHDRAWAL_FEE_TYPEHASH =
-        0x54fba3749597da90eaf91d291455c28cbcff7df8b965c964e65b00308f73e31c;
+    // keccak256("FeeDiscount(address user,address assetOut,uint256 iouAmountRay,uint16 personalFeeBps,uint256
+    // nonce,uint256 deadline)").
+    bytes32 public constant FEE_DISCOUNT_TYPEHASH = 0x646ab18e84d3d6045718daa407509f2935bc43bae73437f6cfccb5fd55c34544;
 
     address internal immutable ASSET_REGISTRY;
 
-    /// @custom:storage-location erc7201:aave.storage.WithdrawalPolicy
-    struct WithdrawalPolicyStorage {
-        uint16 basicFeeBps;
-        mapping(address asset => AssetFeeBpsConfig assetFeeBpsConfig) feeBpsConfigByAsset;
-        mapping(address signer => bool isSigner) signers;
+    /// @notice Signed fee discount data (decoded from WithdrawalRequest.data).
+    /// @param personalFeeBps The personal fee in basis points signed by a whitelisted signer.
+    /// @param nonce Unique nonce to prevent signature replay.
+    /// @param deadline Timestamp after which the signature is no longer valid.
+    /// @param signature The EIP-712 signature from a whitelisted signer.
+    struct SignedFeeDiscount {
+        uint16 personalFeeBps;
+        uint256 nonce;
+        uint256 deadline;
+        bytes signature;
     }
 
     /// @notice Configuration for an asset-specific fee.
     /// @param feeBps Fee in basis points applied to the IOU quantity being exchanged for the asset.
     /// @param isSet Whether the fee is set (used for lookups).
-    struct AssetFeeBpsConfig {
+    struct AssetFeeConfig {
         uint16 feeBps;
         bool isSet;
+    }
+
+    /// @custom:storage-location erc7201:aave.storage.WithdrawalPolicy
+    struct WithdrawalPolicyStorage {
+        uint16 basicFeeBps;
+        mapping(address asset => AssetFeeConfig config) assetFeeConfigs;
+        mapping(address signer => bool isSigner) signers;
+        mapping(address signer => mapping(uint256 nonce => bool used)) usedNonces;
     }
 
     // keccak256(abi.encode(uint256(keccak256("aave.storage.WithdrawalPolicy")) - 1)) & ~bytes32(uint256(0xff))
@@ -57,7 +76,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
         }
     }
 
-    /// @dev Constructor.s
+    /// @dev Constructor.
     /// @param assetRegistry Address of the AssetRegistry contract used for managing asset configurations.
     constructor(address assetRegistry) EIP712Upgradeable() {
         _disableInitializers();
@@ -77,9 +96,9 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
 
     /// @notice Getter for the configuration for an asset-specific fee.
     /// @param asset Address of the asset to get the configuration for.
-    /// @return assetFeeBpsConfig Configuration for the asset-specific fee.
-    function getAssetFeeBpsConfig(address asset) external view returns (AssetFeeBpsConfig memory) {
-        return $storage().feeBpsConfigByAsset[asset];
+    /// @return assetFeeConfig Configuration for the asset-specific fee.
+    function getAssetFeeConfig(address asset) external view returns (AssetFeeConfig memory) {
+        return $storage().assetFeeConfigs[asset];
     }
 
     /// @notice Getter for the fallback fee in basis points which is used when a personal fee or asset-specific fee is
@@ -96,18 +115,51 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
         return $storage().signers[signer];
     }
 
-    /// @inheritdoc IWithdrawalPolicy
-    function evaluateWithdrawal(address user, address assetOut, uint256 iouAmountRay, bytes memory data)
-        external
-        view
-        override
-        returns (uint256, uint16)
-    {
-        // Validate the asset can be withdrawn.
-        require(IAssetRegistry(ASSET_REGISTRY).isUserWithdrawalAllowed(assetOut), ErrorsLib.UnsupportedAsset(assetOut));
+    /// @notice Getter for whether a nonce has been consumed by a signer.
+    /// @param signer Address of the signer to check.
+    /// @param nonce The nonce to check.
+    /// @return used Whether the nonce has been used.
+    function isNonceUsed(address signer, uint256 nonce) external view returns (bool) {
+        return $storage().usedNonces[signer][nonce];
+    }
 
-        // Calculate and return the withdrawal fee data.
-        return _calculateWithdrawalFee(user, assetOut, iouAmountRay, data);
+    /// @inheritdoc IWithdrawalPolicy
+    function applyWithdrawalPolicy(WithdrawalRequest calldata request) external override returns (uint256) {
+        require(
+            IAssetRegistry(ASSET_REGISTRY).isUserWithdrawalAllowed(request.assetOut),
+            ErrorsLib.UnsupportedAsset(request.assetOut)
+        );
+
+        uint16 feeBps;
+        if (request.data.length > 0) {
+            (address signer, uint256 nonce, uint16 personalFeeBps) = _verifySignedDiscount(request);
+            $storage().usedNonces[signer][nonce] = true;
+            feeBps = personalFeeBps;
+        } else {
+            feeBps = _getDefaultFeeBps(request.assetOut);
+        }
+
+        uint256 feeRay = (request.iouAmountRay * feeBps + ConstantsLib.MAX_BPS - 1) / ConstantsLib.MAX_BPS;
+        return request.iouAmountRay - feeRay;
+    }
+
+    /// @inheritdoc IWithdrawalPolicy
+    function previewWithdrawalPolicy(WithdrawalRequest calldata request) external view override returns (uint256) {
+        require(
+            IAssetRegistry(ASSET_REGISTRY).isUserWithdrawalAllowed(request.assetOut),
+            ErrorsLib.UnsupportedAsset(request.assetOut)
+        );
+
+        uint16 feeBps;
+        if (request.data.length > 0) {
+            (,, uint16 personalFeeBps) = _verifySignedDiscount(request);
+            feeBps = personalFeeBps;
+        } else {
+            feeBps = _getDefaultFeeBps(request.assetOut);
+        }
+
+        uint256 feeRay = (request.iouAmountRay * feeBps + ConstantsLib.MAX_BPS - 1) / ConstantsLib.MAX_BPS;
+        return request.iouAmountRay - feeRay;
     }
 
     // Restricted functions
@@ -120,13 +172,13 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
         // We don't check for new asset fee being less than the basic fee because maybe we want some specific asset to
         // have a higher fee than the basic fee.
         require(newAssetFeeBps <= ConstantsLib.MAX_BPS, ErrorsLib.InvalidParameter());
-        $storage().feeBpsConfigByAsset[asset].feeBps = newAssetFeeBps;
-        $storage().feeBpsConfigByAsset[asset].isSet = isSet;
+        $storage().assetFeeConfigs[asset].feeBps = newAssetFeeBps;
+        $storage().assetFeeConfigs[asset].isSet = isSet;
     }
 
     /// @notice Sets the fallback fee in basis points which is used when a personal fee or asset-specific fee is not
     /// available.
-    ///@param newBasicFeeBps The fee in basis points applied to the IOU quantity being exchanged for the
+    /// @param newBasicFeeBps The fee in basis points applied to the IOU quantity being exchanged for the
     /// asset.
     function setBasicFeeBps(uint16 newBasicFeeBps) external restricted {
         require(newBasicFeeBps <= ConstantsLib.MAX_BPS, ErrorsLib.InvalidParameter());
@@ -140,49 +192,64 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
         $storage().signers[signer] = whitelistedSigner;
     }
 
-    function _calculateWithdrawalFee(address user, address assetOut, uint256 iouAmountRay, bytes memory data)
-        internal
-        view
-        returns (uint256, uint16)
-    {
-        if (data.length > 0) {
-            // There is a personal fee that should be parsed out and verified.
-            (uint16 personalFeeBps, bytes memory signature) = abi.decode(data, (uint16, bytes));
-            // Personal fee cannot be higher than non-personal one (asset-specific or basic, whatever is applied by
-            // default).
-            if ($storage().feeBpsConfigByAsset[assetOut].isSet) {
-                require(personalFeeBps <= $storage().feeBpsConfigByAsset[assetOut].feeBps, ErrorsLib.InvalidParameter());
-            } else {
-                require(personalFeeBps <= $storage().basicFeeBps, ErrorsLib.InvalidParameter());
-            }
-            _validateSignature(user, assetOut, iouAmountRay, personalFeeBps, signature);
-            return (iouAmountRay * personalFeeBps / ConstantsLib.MAX_BPS, personalFeeBps);
-        } else if ($storage().feeBpsConfigByAsset[assetOut].isSet) {
-            // There is an asset-specific fee - we apply it.
-            return (
-                iouAmountRay * $storage().feeBpsConfigByAsset[assetOut].feeBps / ConstantsLib.MAX_BPS,
-                $storage().feeBpsConfigByAsset[assetOut].feeBps
-            );
-        } else {
-            // There's no personal or asset-specific fee, so we apply the default basic fee.
-            return (iouAmountRay * $storage().basicFeeBps / ConstantsLib.MAX_BPS, $storage().basicFeeBps);
-        }
+    /// @notice Allows a whitelisted signer to invalidate their own nonce.
+    /// @dev Useful for cancelling a signed fee discount before it's used.
+    /// @param signer The signer whose nonce to invalidate (must be msg.sender).
+    /// @param nonce The nonce to invalidate.
+    function invalidateNonce(address signer, uint256 nonce) external {
+        require(msg.sender == signer, ErrorsLib.NotAuthorized());
+        require($storage().signers[signer], ErrorsLib.NotAuthorized());
+        require($storage().usedNonces[signer][nonce] == false, NonceAlreadyUsed());
+        $storage().usedNonces[signer][nonce] = true;
     }
 
-    function _validateSignature(
-        address user,
-        address assetOut,
-        uint256 iouAmountRay,
-        uint16 personalFeeBps,
-        bytes memory signature
-    ) internal view {
+    /// @dev Verifies a signed fee discount and returns the signer, nonce, and personal fee.
+    /// @return signer The address that signed the discount.
+    /// @return nonce The nonce from the signed discount.
+    /// @return personalFeeBps The personal fee from the signed discount.
+    function _verifySignedDiscount(WithdrawalRequest calldata request)
+        internal
+        view
+        returns (address signer, uint256 nonce, uint16 personalFeeBps)
+    {
+        SignedFeeDiscount memory discount = abi.decode(request.data, (SignedFeeDiscount));
+
+        require(discount.personalFeeBps <= _getDefaultFeeBps(request.assetOut), ErrorsLib.InvalidParameter());
+        require(discount.deadline >= block.timestamp, DeadlineExpired());
+
+        signer = _recoverSigner(request, discount);
+        require($storage().signers[signer], InvalidSignature());
+        require(!$storage().usedNonces[signer][discount.nonce], NonceAlreadyUsed());
+
+        return (signer, discount.nonce, discount.personalFeeBps);
+    }
+
+    /// @dev Recovers the signer address from the EIP-712 signature.
+    function _recoverSigner(WithdrawalRequest calldata request, SignedFeeDiscount memory discount)
+        internal
+        view
+        returns (address)
+    {
         bytes32 structHash = EfficientHashLib.hash(
-            abi.encode(WITHDRAWAL_FEE_TYPEHASH, user, assetOut, iouAmountRay, personalFeeBps)
+            abi.encode(
+                FEE_DISCOUNT_TYPEHASH,
+                request.user,
+                request.assetOut,
+                request.iouAmountRay,
+                discount.personalFeeBps,
+                discount.nonce,
+                discount.deadline
+            )
         );
-        bytes32 digest = _hashTypedDataV4(structHash);
-        address signer = ECDSA.recover(digest, signature);
-        if (!$storage().signers[signer]) {
-            revert InvalidSignature();
+        return ECDSA.recover(_hashTypedDataV4(structHash), discount.signature);
+    }
+
+    /// @dev Returns the default fee for an asset (asset-specific or basic fallback).
+    function _getDefaultFeeBps(address assetOut) internal view returns (uint16) {
+        if ($storage().assetFeeConfigs[assetOut].isSet) {
+            return $storage().assetFeeConfigs[assetOut].feeBps;
+        } else {
+            return $storage().basicFeeBps;
         }
     }
 }
