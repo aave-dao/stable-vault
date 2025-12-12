@@ -7,14 +7,11 @@ pragma solidity ^0.8.22;
 interface IAssetRegistry {
     /// @notice The configuration for an asset.
     /// @param depositFromUserAllowed Whether the asset is allowed to be deposited into the system by a user.
-    /// @param withdrawToUserAllowed Whether the asset is allowed to be withdrawn from the system by a user.
     /// @param depositIntoAllocatorAllowed Whether the asset is allowed to be deposited into the Allocator.
-    /// @param withdrawFromAllocatorAllowed Whether the asset is allowed to be withdrawn from the Allocator.
     /// @param swapInputTokenAllowed Whether the asset is allowed to be used as swap input token in the Allocator.
     /// @param swapOutputTokenAllowed Whether the asset is allowed to be used as swap output token in the Allocator.
     struct AssetConfig {
         bool depositFromUserAllowed;
-        bool withdrawToUserAllowed;
         bool depositIntoAllocatorAllowed;
         bool withdrawFromAllocatorAllowed;
         bool swapInputTokenAllowed;
@@ -40,12 +37,6 @@ interface IAssetRegistry {
     /// @param asset Address of the asset to check if it is allowed to be deposited into the system by a user.
     /// @return isAllowed Whether the asset is allowed to be deposited into the system by a user.
     function isUserDepositAllowed(address asset) external view returns (bool);
-
-    /// @notice Getter for whether the asset is allowed to be withdrawn from the system by a user.
-    /// @param asset Address of the asset to check if it is allowed to be withdrawn from the system by a user.
-    /// @return isAllowed Whether the asset is allowed to be withdrawn from the system by a user.
-    /// @dev Withdrawals may be executed on either Accounting or Earning chains.
-    function isUserWithdrawalAllowed(address asset) external view returns (bool);
 
     /// @notice Getter for whether the asset is allowed to be deposited into the Allocator.
     /// @dev Deposits into the Allocator are made either during a user deposit, rebalancing, or when funds are received

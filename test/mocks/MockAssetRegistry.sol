@@ -8,7 +8,6 @@ import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 /// @dev By default it allows all assets to simplify testing. It must be explicitly mocked to disallow assets.
 contract MockAssetRegistry is IAssetRegistry {
     mapping(address asset => bool isUserDepositAllowed) _isNotAllowedUserDeposit;
-    mapping(address asset => bool isUserWithdrawalAllowed) _isNotAllowedToWithdraw;
     mapping(address asset => bool isDepositToAllocatorAllowed) _isNotAllowedToDepositIntoAllocator;
     mapping(address asset => bool isWithdrawalFromAllocatorAllowed) _isNotAllowedToWithdrawFromAllocator;
     mapping(address asset => bool isAllowedToSwapInputTokenInAllocator) _isNotAllowedToSwapInputTokenInAllocator;
@@ -26,20 +25,8 @@ contract MockAssetRegistry is IAssetRegistry {
         _isNotAllowedUserDeposit[asset] = false;
     }
 
-    function mockToAllowAssetWithdrawalsFromBBV(address asset) external {
-        _isNotAllowedToWithdraw[asset] = false;
-    }
-
     function mockToDisallowAssetDepositsIntoBBV(address asset) external {
         _isNotAllowedUserDeposit[asset] = true;
-    }
-
-    function mockToDisallowAssetWithdrawalsFromBBV(address asset) external {
-        _isNotAllowedToWithdraw[asset] = true;
-    }
-
-    function mockToDisallowAssetWithdrawals(address asset) external {
-        _isNotAllowedToWithdraw[asset] = true;
     }
 
     function mockToAllowAssetDepositsIntoAllocator(address asset) external {
@@ -72,10 +59,6 @@ contract MockAssetRegistry is IAssetRegistry {
 
     function isUserDepositAllowed(address asset) external view override returns (bool) {
         return !_isNotAllowedUserDeposit[asset];
-    }
-
-    function isUserWithdrawalAllowed(address asset) external view override returns (bool) {
-        return !_isNotAllowedToWithdraw[asset];
     }
 
     function isDepositToAllocatorAllowed(address asset) external view override returns (bool) {

@@ -85,11 +85,6 @@ contract AssetRegistry is AccessManagedUpgradeable, Multicall, IAssetRegistry {
     }
 
     /// @inheritdoc IAssetRegistry
-    function isUserWithdrawalAllowed(address asset) external view override returns (bool) {
-        return $storage().configByAsset[asset].withdrawToUserAllowed;
-    }
-
-    /// @inheritdoc IAssetRegistry
     function isDepositToAllocatorAllowed(address asset) external view override returns (bool) {
         return $storage().configByAsset[asset].depositIntoAllocatorAllowed;
     }

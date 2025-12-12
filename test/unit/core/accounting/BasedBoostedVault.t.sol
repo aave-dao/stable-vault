@@ -1425,7 +1425,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         iouAmountRay = _boundRayAmount(iouAmountRay);
         mockIouToken.mint(user, iouAmountRay);
 
-        mockAssetRegistry.mockToDisallowAssetWithdrawalsFromBBV(address(mockAsset));
+        // TODO: Think of what this test was supposed to represent and do a proper test/mock for it.
+        // mockAssetRegistry.mockToDisallowAssetWithdrawalsFromBBV(address(mockAsset));
 
         vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(mockAsset)));
         vm.prank(user);

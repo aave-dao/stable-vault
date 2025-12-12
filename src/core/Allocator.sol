@@ -44,7 +44,6 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     struct StrategyConfig {
         address asset;
         bool depositAllowed;
-        bool withdrawalAllowed;
     }
 
     /// @custom:storage-location erc7201:aave.storage.Allocator
@@ -237,20 +236,6 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         emit StrategyDepositsToggled(strategy, true);
     }
 
-    /// @inheritdoc IAllocator
-    function disableWithdrawalsFromStrategy(address strategy) external override restricted {
-        require(_isStrategySupported(strategy), ErrorsLib.AddressNotWhitelisted());
-        $storage().strategyConfigs[strategy].withdrawalAllowed = false;
-        emit StrategyWithdrawalsToggled(strategy, false);
-    }
-
-    /// @inheritdoc IAllocator
-    function enableWithdrawalsFromStrategy(address strategy) external override restricted {
-        require(_isStrategySupported(strategy), ErrorsLib.AddressNotWhitelisted());
-        $storage().strategyConfigs[strategy].withdrawalAllowed = true;
-        emit StrategyWithdrawalsToggled(strategy, true);
-    }
-
     ////////////////////////////////////////////////// INTERNAL ////////////////////////////////////////////////////////
 
     function _rebalance(RebalanceParams memory rebalanceParams) internal {
@@ -341,9 +326,6 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
 
     /// @dev Intended to be the lowest level function used to withdraw from a strategy.
     function _withdrawFromStrategy(address asset, uint256 amount, address receiver, address strategy) internal {
-        if (!$storage().strategyConfigs[strategy].withdrawalAllowed) {
-            revert WithdrawalsFromStrategyDisabled(strategy);
-        }
         uint256 balanceBefore = IERC20(asset).balanceOf(address(this));
         IERC4626(strategy).withdraw({assets: amount, receiver: receiver, owner: address(this)});
         uint256 balanceAfter = IERC20(asset).balanceOf(address(this));
@@ -413,8 +395,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         require(!_isStrategySupported(strategy), ErrorsLib.AddressAlreadyWhitelisted());
         require(asset == IERC4626(strategy).asset(), ErrorsLib.InvalidAsset(asset));
 
-        $storage().strategyConfigs[strategy] =
-            StrategyConfig({asset: asset, depositAllowed: true, withdrawalAllowed: true});
+        $storage().strategyConfigs[strategy] = StrategyConfig({asset: asset, depositAllowed: true});
         $storage().assetStrategies[asset].add(strategy);
 
         emit StrategyAdded(asset, strategy);
