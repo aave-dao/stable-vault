@@ -11,6 +11,7 @@ import {AcrossAdapter} from "src/bridging/AcrossAdapter.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 
+import {IAcrossSpokePoolV3} from "src/dependencies/across/IAcrossSpokePoolV3.sol";
 import {IAcrossV3Receiver} from "src/dependencies/across/IAcrossV3Receiver.sol";
 import {IAcrossBridgeAdapter} from "src/interfaces/IAcrossBridgeAdapter.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
@@ -82,7 +83,7 @@ contract AcrossAdapterTest is TestWithHelpers {
     IMockErc20 internal _mockUsdt;
     IMockErc20 internal _mockGho;
     MockTransferHelper internal _mockTransferHelper;
-    MockAcrossSpokePool internal _mockAcrossSpokePool;
+    IAcrossSpokePoolV3 internal _mockAcrossSpokePool;
     MockAccountingChainGateway internal _mockAccountingChainGateway;
     MockEarningChainGateway internal _mockEarningChainGateway;
 
@@ -109,7 +110,7 @@ contract AcrossAdapterTest is TestWithHelpers {
         _mockAccessManager = new MockAccessManager(admin);
         _mockAccountingChainGateway = new MockAccountingChainGateway(address(_mockTransferHelper));
         _mockEarningChainGateway = new MockEarningChainGateway(address(_mockTransferHelper));
-        _mockAcrossSpokePool = new MockAcrossSpokePool();
+        _mockAcrossSpokePool = IAcrossSpokePoolV3(address(new MockAcrossSpokePool()));
     }
 
     function _setupAccountingChainAdapter() internal {
@@ -1322,7 +1323,7 @@ contract AcrossAdapterTest is TestWithHelpers {
         });
 
         return abi.encodeCall(
-            MockAcrossSpokePool.depositV3,
+            IAcrossSpokePoolV3.depositV3,
             (
                 p.depositor,
                 p.recipient,
