@@ -13,7 +13,6 @@ interface IAssetRegistry {
     struct AssetConfig {
         bool depositFromUserAllowed;
         bool depositIntoAllocatorAllowed;
-        bool withdrawFromAllocatorAllowed;
         bool swapInputTokenAllowed;
         bool swapOutputTokenAllowed;
     }
@@ -48,6 +47,7 @@ interface IAssetRegistry {
     /// @notice Getter for whether the asset is allowed to be withdrawn from the Allocator.
     /// @dev Withdrawals from the Allocator are made either during a user withdrawal or when funds are pushed to another
     /// chain.
+    /// @dev Ensures an asset is registered in the AssetRegistry before it can be withdrawn from the Allocator.
     /// @param asset Address of the asset to check if it is allowed to be withdrawn from the Allocator.
     /// @return isAllowed Whether the asset is allowed to be withdrawn from the Allocator.
     function isWithdrawalFromAllocatorAllowed(address asset) external view returns (bool);

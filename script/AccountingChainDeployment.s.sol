@@ -141,7 +141,6 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
         IAssetRegistry.AssetConfig memory unrestrictedAssetConfig = IAssetRegistry.AssetConfig({
             depositFromUserAllowed: true,
             depositIntoAllocatorAllowed: true,
-            withdrawFromAllocatorAllowed: true,
             swapInputTokenAllowed: true,
             swapOutputTokenAllowed: true
         });

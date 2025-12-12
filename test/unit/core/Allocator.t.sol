@@ -110,7 +110,6 @@ contract AllocatorTest is TestWithHelpers {
             IAssetRegistry.AssetConfig({
                 depositFromUserAllowed: true,
                 depositIntoAllocatorAllowed: true,
-                withdrawFromAllocatorAllowed: true,
                 swapInputTokenAllowed: true,
                 swapOutputTokenAllowed: true
             })
@@ -121,7 +120,6 @@ contract AllocatorTest is TestWithHelpers {
             IAssetRegistry.AssetConfig({
                 depositFromUserAllowed: true,
                 depositIntoAllocatorAllowed: true,
-                withdrawFromAllocatorAllowed: true,
                 swapInputTokenAllowed: true,
                 swapOutputTokenAllowed: true
             })
