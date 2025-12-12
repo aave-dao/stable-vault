@@ -721,6 +721,8 @@ contract AcrossAdapterTest is TestWithHelpers {
     }
 
     function test_handleV3AcrossMessage_onEarningChain(uint256 bridgedAmount) public {
+        // Context: the Accounting Chain does not bridge arbitrary data when sending tokens, so the signature is not
+        // verified
         bridgedAmount = _boundAssetAmount(address(_mockGho), bridgedAmount);
         // Mint the assets to the AcrossAdapter
         _mockGho.mint(address(_earningChainAcrossAdapter), bridgedAmount);
@@ -762,15 +764,14 @@ contract AcrossAdapterTest is TestWithHelpers {
 
         vm.expectEmit(true, true, true, true);
         emit IBridgeAdapter.MessageReceived(messageId);
-        vm.expectEmit(true, true, true, true);
-        emit IAcrossBridgeAdapter.NonceConsumed(earningChainSigner, signatureNonce);
         vm.prank(address(_mockAcrossSpokePool));
         _earningChainAcrossAdapter.handleV3AcrossMessage(
             address(_mockGho), bridgedAmount, address(0), abi.encode(acrossPacket)
         );
 
-        // Check that the nonce is consumed
-        assertEq(_earningChainAcrossAdapter.isNonceUsed(earningChainSigner, signatureNonce), true);
+        // Check that the nonce is not consumed because there was no need to verify the signature (no arbitrary data was
+        // bridged)
+        assertEq(_earningChainAcrossAdapter.isNonceUsed(earningChainSigner, signatureNonce), false);
 
         // Check that the TransferHelper moved the assets to the Earning Chain Gateway
         assertEq(_mockGho.balanceOf(address(_earningChainAcrossAdapter)), 0);

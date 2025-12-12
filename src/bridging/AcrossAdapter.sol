@@ -20,6 +20,9 @@ import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
 /// @title AcrossAdapter
 /// @author Aave Labs
 /// @notice Adapter for sending and receiving messages via Across.
+/// @dev Requires tokens to be bridged with/without an arbitrary message. Fees are paid in the token being bridged.
+/// @dev Signature verification is not performed if no arbitrary message is bridged. This assumes the Earning Chain will
+/// always include a snapshot message with funds bridged to the Accounting Chain.
 contract AcrossAdapter is BaseBridgeAdapter, EIP712, IAcrossBridgeAdapter, IERC165 {
     using SafeERC20 for IERC20;
 
@@ -149,21 +152,21 @@ contract AcrossAdapter is BaseBridgeAdapter, EIP712, IAcrossBridgeAdapter, IERC1
         AcrossPacket memory acrossPacket = abi.decode(message, (AcrossPacket));
         emit MessageReceived(acrossPacket.messageId);
 
-        require(acrossPacket.signatureExpirationTs >= block.timestamp, ErrorsLib.SignatureTimestampExpired());
-        address signer = _recoverSigner(
-            acrossPacket.signature,
-            acrossPacket.sourceChainId,
-            acrossPacket.signatureNonce,
-            acrossPacket.signatureExpirationTs,
-            token,
-            amount
-        );
-        require(_isSigner[signer], ErrorsLib.InvalidSignature());
-        _consumeNonce(signer, acrossPacket.signatureNonce);
-
         bytes memory underlyingMessage = acrossPacket.message;
         if (underlyingMessage.length > 0) {
-            // This is required to succeed before handling received funds.
+            require(acrossPacket.signatureExpirationTs >= block.timestamp, ErrorsLib.SignatureTimestampExpired());
+            address signer = _recoverSigner(
+                acrossPacket.signature,
+                acrossPacket.sourceChainId,
+                acrossPacket.signatureNonce,
+                acrossPacket.signatureExpirationTs,
+                token,
+                amount
+            );
+            require(_isSigner[signer], ErrorsLib.InvalidSignature());
+            _consumeNonce(signer, acrossPacket.signatureNonce);
+            // This is required to succeed before handling received funds. We should not handle funds if a message
+            // containing data for a state update is not successfully processed.
             IChainGateway(GATEWAY)
                 .receiveMessage(acrossPacket.sourceChainId, new IBridgeAdapter.BridgeAsset[](0), underlyingMessage);
         }
