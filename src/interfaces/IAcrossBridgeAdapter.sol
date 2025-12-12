@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {IAcrossV3Receiver} from "src/dependencies/across/IAcrossV3Receiver.sol";
+import {IAcrossV3Receiver} from "src/bridging/across/IAcrossV3Receiver.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 
 /// @title IAcrossBridgeAdapter

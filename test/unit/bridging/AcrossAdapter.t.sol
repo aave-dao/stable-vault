@@ -7,12 +7,12 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
-import {AcrossAdapter} from "src/bridging/AcrossAdapter.sol";
+import {AcrossAdapter} from "src/bridging/across/AcrossAdapter.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 
-import {IAcrossSpokePoolV3} from "src/dependencies/across/IAcrossSpokePoolV3.sol";
-import {IAcrossV3Receiver} from "src/dependencies/across/IAcrossV3Receiver.sol";
+import {IAcrossSpokePoolV3} from "src/bridging/across/IAcrossSpokePoolV3.sol";
+import {IAcrossV3Receiver} from "src/bridging/across/IAcrossV3Receiver.sol";
 import {IAcrossBridgeAdapter} from "src/interfaces/IAcrossBridgeAdapter.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";

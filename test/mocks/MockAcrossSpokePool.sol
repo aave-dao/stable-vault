@@ -3,7 +3,8 @@ pragma solidity ^0.8.22;
 
 // import {IAcrossSpokePoolV3} from "src/dependencies/across/IAcrossSpokePoolV3.sol";
 
-// Fighting stack too deep in intricate ways...
+/// @dev This was supposed to inherit IAcrossSpokePoolV3, but it causes stack too deep.
+/// So we went for a fallback function instead.
 // contract MockAcrossSpokePool is IAcrossSpokePoolV3 {
 contract MockAcrossSpokePool {
     // function depositV3(

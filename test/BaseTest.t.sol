@@ -7,7 +7,7 @@ import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 
 import {ExtendedAccessManager} from "src/access/ExtendedAccessManager.sol";
-import {CcipAdapter} from "src/bridging/CcipAdapter.sol";
+import {CcipAdapter} from "src/bridging/ccip/CcipAdapter.sol";
 import {Allocator} from "src/core/Allocator.sol";
 import {AccountingChainGateway} from "src/core/accounting/AccountingChainGateway.sol";
 import {BasedBoostedVault} from "src/core/accounting/BasedBoostedVault.sol";

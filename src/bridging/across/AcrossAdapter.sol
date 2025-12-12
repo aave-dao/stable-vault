@@ -9,8 +9,8 @@ import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {EfficientHashLib} from "@solady/utils/EfficientHashLib.sol";
 
 import {BaseBridgeAdapter} from "src/bridging/BaseBridgeAdapter.sol";
-import {IAcrossSpokePoolV3} from "src/dependencies/across/IAcrossSpokePoolV3.sol";
-import {IAcrossV3Receiver} from "src/dependencies/across/IAcrossV3Receiver.sol";
+import {IAcrossSpokePoolV3} from "src/bridging/across/IAcrossSpokePoolV3.sol";
+import {IAcrossV3Receiver} from "src/bridging/across/IAcrossV3Receiver.sol";
 import {IAcrossBridgeAdapter} from "src/interfaces/IAcrossBridgeAdapter.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
