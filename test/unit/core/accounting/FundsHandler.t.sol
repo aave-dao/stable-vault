@@ -306,6 +306,8 @@ contract FundsHandlerTest is TestWithHelpers {
 
         assertEq(fundsHandler.getAssetBalances().length, 0);
 
+        vm.expectEmit(true, true, true, true);
+        emit IFundsHandler.ChainBalanceSnapshotReceived(chainId, snapshotBalanceRay, chainBalanceSnapshotNonce);
         vm.prank(address(mockGateway));
         fundsHandler.updateChainBalanceCallback(chainId, snapshotBalanceRay, chainBalanceSnapshotNonce);
 
@@ -722,6 +724,8 @@ contract FundsHandlerTest is TestWithHelpers {
 
         mockGateway.mockToConsumeAssetFromTransferHelperInNextCall(address(mockAsset), bridgeParams_feeAmount + amount);
 
+        vm.expectEmit(true, true, true, true);
+        emit IFundsHandler.ChainBalanceSnapshotUpdated(chainId, amount.assetDecimalsToRay(address(mockAsset)));
         vm.expectCall(
             address(mockGateway),
             abi.encodeCall(

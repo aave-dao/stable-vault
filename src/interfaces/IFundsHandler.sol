@@ -11,6 +11,17 @@ interface IFundsHandler {
     /// @custom:selector 0x93ce7047
     error OnlyBasedBoostedVault();
 
+    /// @notice Emitted when the chain balance snapshot is received from a chain.
+    /// @param chainId Chain id of the chain that the snapshot (and potentially funds) arrived from.
+    /// @param amountRay Amount of total assets on the chain in RAY.
+    /// @param nonce Nonce of the balance snapshot from the source chain.
+    event ChainBalanceSnapshotReceived(uint256 chainId, uint256 amountRay, uint256 nonce);
+
+    /// @notice Emitted when the chain balance snapshot is updated before pushing funds to a chain.
+    /// @param chainId Chain id of the chain that funds are being pushed to.
+    /// @param deltaAmountRay Amount of the asset to increment the chain balance snapshot by in RAY.
+    event ChainBalanceSnapshotUpdated(uint256 chainId, uint256 deltaAmountRay);
+
     /// @notice The representation of an asset balance.
     /// @param asset Address of the asset.
     /// @param amountRay Amount of the asset in RAY.
