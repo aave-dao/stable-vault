@@ -16,6 +16,6 @@ contract MockAcrossSpokePool is IAcrossSpokePoolV3 {
         uint32 quoteTimestamp,
         uint32 fillDeadline,
         uint32 exclusivityDeadline,
-        bytes calldata message
+        bytes memory message
     ) external payable override {}
 }
