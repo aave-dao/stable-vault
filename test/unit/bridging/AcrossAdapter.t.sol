@@ -233,6 +233,12 @@ contract AcrossAdapterTest is TestWithHelpers {
         _earningChainAcrossAdapter.invalidateNonce(earningChainSigner, nonce);
     }
 
+    function test_invalidateNonce_reverts_ifMsgSenderIsNotSigner_earningChain(address signer, uint256 nonce) public {
+        vm.assume(signer != address(this));
+        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.NotAuthorized.selector));
+        _earningChainAcrossAdapter.invalidateNonce(signer, nonce);
+    }
+
     function test_invalidateNonce_reverts_ifMsgSenderIsNotAuthorized_earningChain(address signer, uint256 nonce)
         public
     {
@@ -1179,6 +1185,56 @@ contract AcrossAdapterTest is TestWithHelpers {
 
         // Check that the funds are still in the AcrossAdapter
         assertEq(_mockUsdt.balanceOf(address(_accountingChainAcrossAdapter)), bridgedAmount);
+    }
+
+    function test_handleV3AcrossMessage_handlesFundsHandlingFailure(uint256 bridgedAmount) public {
+        bridgedAmount = _boundAssetAmount(address(_mockUsdt), bridgedAmount);
+        // Mint the assets to the AcrossAdapter
+        _mockUsdt.mint(address(_accountingChainAcrossAdapter), bridgedAmount);
+
+        uint256 signatureNonce = 1;
+        uint256 signatureExpirationTs = uint32(block.timestamp + 2000);
+        bytes memory signature = _signBridgeData(
+            SignBridgeDataParams({
+                signerPk: accountingChainSignerPk,
+                // Need to use block.chainid since that is what is read in the AcrossAdapter contract
+                destinationChainId: block.chainid,
+                verifyingContractAddress: address(_accountingChainAcrossAdapter),
+                sourceChainId: EARNING_CHAIN_ID,
+                signatureNonce: signatureNonce,
+                signatureExpirationTs: signatureExpirationTs,
+                asset: address(_mockUsdt),
+                amount: bridgedAmount
+            })
+        );
+
+        bytes memory bridgedMessage = abi.encode(hex"c0ffee");
+        bytes32 messageId = keccak256(signature);
+        AcrossAdapter.AcrossPacket memory acrossPacket = AcrossAdapter.AcrossPacket({
+            message: bridgedMessage,
+            sourceChainId: EARNING_CHAIN_ID,
+            signatureNonce: signatureNonce,
+            signatureExpirationTs: signatureExpirationTs,
+            signature: signature,
+            messageId: messageId
+        });
+
+        vm.expectEmit(true, true, true, true);
+        emit IBridgeAdapter.TokenReceptionFailed(EARNING_CHAIN_ID, address(_mockUsdt), bridgedAmount);
+        vm.expectEmit(true, true, true, true);
+        emit IBridgeAdapter.BridgedFundsProcessingFailed(EARNING_CHAIN_ID, abi.encode(acrossPacket), abi.encode("test"));
+
+        IBridgeAdapter.BridgeAsset[] memory assets = new IBridgeAdapter.BridgeAsset[](1);
+        assets[0] = IBridgeAdapter.BridgeAsset({asset: address(_mockUsdt), amount: bridgedAmount});
+        vm.mockCallRevert(
+            address(_mockAccountingChainGateway),
+            abi.encodeCall(IChainGateway.receiveMessage, (0, assets, "")),
+            abi.encode("test")
+        );
+        vm.prank(address(_mockAcrossSpokePool));
+        _accountingChainAcrossAdapter.handleV3AcrossMessage(
+            address(_mockUsdt), bridgedAmount, address(0), abi.encode(acrossPacket)
+        );
     }
 
     function test_setSigner(address signer, bool whitelistedSigner) public {
