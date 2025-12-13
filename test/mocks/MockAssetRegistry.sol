@@ -1,4 +1,5 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
+// Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.4;
 
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
