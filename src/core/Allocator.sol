@@ -39,10 +39,11 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
 
     /// @notice The configuration for a strategy.
     /// @param asset The asset that the strategy is associated with (assumes 1 asset per strategy).
+    /// @param isRegistered Boolean indicating whether the strategy is configured.
     /// @param depositAllowed Boolean indicating whether the strategy is allowed to be deposited into.
-    /// @param withdrawalAllowed Boolean indicating whether the strategy is allowed to be withdrawn from.
     struct StrategyConfig {
         address asset;
+        bool isRegistered;
         bool depositAllowed;
     }
 
@@ -141,9 +142,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     /// @inheritdoc IAllocator
     function withdraw(address asset, uint256 amount) external override onlyWithdrawer {
         require(amount > 0, ErrorsLib.ZeroAmount());
-        require(
-            IAssetRegistry(ASSET_REGISTRY).isWithdrawalFromAllocatorAllowed(asset), ErrorsLib.UnsupportedAsset(asset)
-        );
+        _validateCanWithdraw(asset);
 
         uint256 idleBalance = IERC20(asset).balanceOf(address(this));
         if (idleBalance < amount) {
@@ -294,6 +293,16 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         IERC20(swap.assetOut).safeTransferFrom(swap.swapper, address(this), amountOut);
     }
 
+    function _validateCanWithdraw(address asset) internal view {
+        // Ensure that the asset is registered in the AssetRegistry.
+        // This helps avoid withdrawal of an asset that is held in the Allocator that is not intended to be withdrawn by
+        // users. The Allocator may hold assets it received accidentally or from rewards earned from supplying to
+        // strategies.
+        require(IAssetRegistry(ASSET_REGISTRY).isAssetRegistered(asset), ErrorsLib.UnsupportedAsset(asset));
+        // Ensure that the asset being withdrawn is not a strategy share that may be held by the Allocator.
+        require(!$storage().strategyConfigs[asset].isRegistered, ErrorsLib.UnsupportedAsset(asset));
+    }
+
     /// @notice Validates that dust from `amountIn` would not be truncated when converting to a value of `assetOut`.
     /// @dev Dust from `amountIn` can be leaked out of the system if the `assetOut` has fewer decimals than `assetIn`.
     /// @dev When checking for 1:1 swap between `assetIn` and `assetOut`, we truncate `amountIn` to have number of
@@ -395,7 +404,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         require(!_isStrategySupported(strategy), ErrorsLib.AddressAlreadyWhitelisted());
         require(asset == IERC4626(strategy).asset(), ErrorsLib.InvalidAsset(asset));
 
-        $storage().strategyConfigs[strategy] = StrategyConfig({asset: asset, depositAllowed: true});
+        $storage().strategyConfigs[strategy] = StrategyConfig({asset: asset, isRegistered: true, depositAllowed: true});
         $storage().assetStrategies[asset].add(strategy);
 
         emit StrategyAdded(asset, strategy);

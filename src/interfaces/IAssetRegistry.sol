@@ -44,13 +44,10 @@ interface IAssetRegistry {
     /// @return isAllowed Whether the asset is allowed to be deposited into the Allocator.
     function isDepositToAllocatorAllowed(address asset) external view returns (bool);
 
-    /// @notice Getter for whether the asset is allowed to be withdrawn from the Allocator.
-    /// @dev Withdrawals from the Allocator are made either during a user withdrawal or when funds are pushed to another
-    /// chain.
-    /// @dev Ensures an asset is registered in the AssetRegistry before it can be withdrawn from the Allocator.
-    /// @param asset Address of the asset to check if it is allowed to be withdrawn from the Allocator.
-    /// @return isAllowed Whether the asset is allowed to be withdrawn from the Allocator.
-    function isWithdrawalFromAllocatorAllowed(address asset) external view returns (bool);
+    /// @notice Getter for whether the asset is registered in the AssetRegistry.
+    /// @param asset Address of the asset to check if it is registered in the AssetRegistry.
+    /// @return isRegistered Whether the asset is registered in the AssetRegistry.
+    function isAssetRegistered(address asset) external view returns (bool);
 
     /// @notice Getter for whether the asset is allowed to be used as swap input token from the Allocator into the
     /// Swapper.

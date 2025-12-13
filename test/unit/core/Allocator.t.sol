@@ -400,6 +400,7 @@ contract AllocatorTest is TestWithHelpers {
     }
 
     function test_withdraw_withdrawsFromDefaultVault(uint256 amount) public {
+        _mockAssetRegistry.mockRegisteredAsset(address(_mockUsdt));
         uint256 amountRemaining = 1000;
         amount = _boundAssetAmount(address(_mockUsdt), amount);
         vm.assume(amount > amountRemaining);
@@ -445,6 +446,7 @@ contract AllocatorTest is TestWithHelpers {
     }
 
     function test_withdraw_withdrawsFromMultipleStrategies(uint256 amount) public {
+        _mockAssetRegistry.mockRegisteredAsset(address(_mockUsdt));
         uint256 amountRemaining = 1000;
         amount = _boundAssetAmount(address(_mockUsdt), amount);
         vm.assume(amount > amountRemaining);
@@ -493,6 +495,7 @@ contract AllocatorTest is TestWithHelpers {
     }
 
     function test_withdraw_withdrawsFromMultipleStrategies_whenStrategyWithdrawalFails(uint256 amount) public {
+        _mockAssetRegistry.mockRegisteredAsset(address(_mockUsdt));
         amount = _boundAssetAmount(address(_mockUsdt), amount);
 
         _mockUsdt.mint(depositor, amount);
@@ -598,6 +601,7 @@ contract AllocatorTest is TestWithHelpers {
     }
 
     function test_withdraw_usesIdleFundsOnly(uint256 amount) public {
+        _mockAssetRegistry.mockRegisteredAsset(address(_mockUsdt));
         uint256 amountRemaining = 1000;
         amount = _boundAssetAmount(address(_mockUsdt), amount);
         vm.assume(amount > amountRemaining);
@@ -643,6 +647,7 @@ contract AllocatorTest is TestWithHelpers {
     }
 
     function test_withdraw_usesIdleFundsFirst(uint256 amount) public {
+        _mockAssetRegistry.mockRegisteredAsset(address(_mockUsdt));
         uint256 amountRemaining = 1000;
         amount = _boundAssetAmount(address(_mockUsdt), amount);
         vm.assume(amount > amountRemaining);
@@ -694,6 +699,7 @@ contract AllocatorTest is TestWithHelpers {
     }
 
     function test_withdraw_reverts_ifDefaultVaultHasInsufficientFunds(uint256 amount) public {
+        _mockAssetRegistry.mockRegisteredAsset(address(_mockUsdt));
         amount = _boundAssetAmount(address(_mockUsdt), amount);
         vm.assume(amount > 0);
 
@@ -714,6 +720,7 @@ contract AllocatorTest is TestWithHelpers {
     }
 
     function test_withdraw_reverts_ifStrategiesHaveInsufficientFunds(uint256 amount) public {
+        _mockAssetRegistry.mockRegisteredAsset(address(_mockUsdt));
         amount = _boundAssetAmount(address(_mockUsdt), amount);
         vm.assume(amount > 0);
 
@@ -742,11 +749,10 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.withdraw(address(_mockUsdt), 0);
     }
 
-    function test_withdraw_reverts_ifVaultIsNotSupportedForAsset(uint256 amount) public {
+    function test_withdraw_reverts_ifAssetIsNotRegistered(uint256 amount) public {
+        // Unsupported asset is not registered in the AssetRegistry
         amount = _boundAssetAmount(address(_mockUnsupportedAsset), amount);
 
-        _mockAssetRegistry.mockToDisallowAssetWithdrawalsFromAllocator(address(_mockUnsupportedAsset));
-
         vm.prank(withdrawer);
         vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(_mockUnsupportedAsset)));
         _allocator.withdraw(address(_mockUnsupportedAsset), amount);
@@ -754,6 +760,16 @@ contract AllocatorTest is TestWithHelpers {
         vm.prank(withdrawer);
         vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(_mockUnsupportedAsset)));
         _allocator.withdraw(address(_mockUnsupportedAsset), amount);
+    }
+
+    function test_withdraw_reverts_ifAssetIsConfiguredAsStrategy() public {
+        _mockAssetRegistry.mockRegisteredAsset(address(_defaultUsdtStrategy));
+        uint256 amount = 1000;
+        amount = _boundAssetAmount(address(_mockUsdt), amount);
+
+        vm.prank(withdrawer);
+        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(_defaultUsdtStrategy)));
+        _allocator.withdraw(address(_defaultUsdtStrategy), amount);
     }
 
     function test_withdraw_reverts_ifNonWithdrawerCalls(address nonWithdrawer, uint256 amount) public {
