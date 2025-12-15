@@ -1413,20 +1413,37 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         bbv.executeWithdrawal(user, address(mockAsset), 0, iouAmountRay, "");
     }
 
-    function test_executeWithdrawal_reverts_ifAssetIsNotAllowedToWithdrawFromBbv(
+    function test_executeWithdrawal_reverts_ifAssetIsNotAllowedToWithdrawFromAllocator(
         address user,
         address msgSender,
         uint256 iouAmountRay
     ) public {
+        // Context: user requests to withdraw shares of a strategy - this should revert since the strategy is not a
+        // registered asset.
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(bbv));
         _assumeNotProxyAdmin(msgSender, address(bbv));
         vm.assume(msgSender != user);
         iouAmountRay = _boundRayAmount(iouAmountRay);
+        vm.assume(iouAmountRay.rayToAssetDecimals(address(mockAsset)) > 0);
         mockIouToken.mint(user, iouAmountRay);
 
-        mockAssetRegistry.mockToDisallowAssetWithdrawalsFromBBV(address(mockAsset));
+        vm.mockCall(
+            address(mockWithdrawalPolicy),
+            abi.encodeWithSelector(IWithdrawalPolicy.applyWithdrawalPolicy.selector, address(mockAsset), iouAmountRay),
+            abi.encode(iouAmountRay)
+        );
+
+        vm.mockCallRevert(
+            address(mockFundsHandler),
+            abi.encodeWithSelector(
+                IFundsHandler.processWithdrawal.selector,
+                address(mockAsset),
+                iouAmountRay.rayToAssetDecimals(address(mockAsset))
+            ),
+            abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(mockAsset))
+        );
 
         vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(mockAsset)));
         vm.prank(user);

@@ -884,20 +884,38 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
     function test_exchangeIouTokens_reverts_ifAssetWithdrawalNotAllowed(uint256 iouTokenAmountRay) public {
         iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
-        uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(address(_mockUsdt));
+        uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(address(_mockUnsupportedAsset));
+        vm.assume(amountOut > 0);
         // Put funds idle into TH to mimic withdrawal from Allocator
-        _mockTransferHelper.mockAsset(address(_mockUsdt), amountOut);
+        _mockTransferHelper.mockAsset(address(_mockUnsupportedAsset), amountOut);
 
-        _mockAssetRegistry.mockToDisallowAssetWithdrawals(address(_mockUsdt));
+        vm.mockCall(
+            address(_mockWithdrawalPolicy),
+            abi.encodeWithSelector(
+                IWithdrawalPolicy.applyWithdrawalPolicy.selector, address(_mockUnsupportedAsset), iouTokenAmountRay
+            ),
+            abi.encode(iouTokenAmountRay)
+        );
 
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(_mockUsdt)));
+        // Mock a revert from Allocator since the strategy is not a registered asset.
+        vm.mockCallRevert(
+            address(_mockAllocator),
+            abi.encodeWithSelector(
+                IAllocator.withdraw.selector,
+                address(_mockUnsupportedAsset),
+                iouTokenAmountRay.rayToAssetDecimals(address(_mockUnsupportedAsset))
+            ),
+            abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(_mockUnsupportedAsset))
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(_mockUnsupportedAsset)));
         _earningChainGateway.exchangeIouTokens(
             iouTokenAmountRay,
-            address(_mockUsdt),
+            address(_mockUnsupportedAsset),
             0,
             makeAddr("tokenOutReceiver"),
             IBridgeAdapter.BridgeParams({
-                feePayer: makeAddr("bridgeFeePayer"),
+                feePayer: address(this),
                 feeToken: address(0),
                 feeAmount: 123,
                 feeRefundThreshold: 0,

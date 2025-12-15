@@ -552,23 +552,6 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
     }
 
-    function test_applyWithdrawalPolicy_reverts_ifAssetIsNotSupported(
-        address user,
-        address assetOut,
-        uint256 iouAmountRay
-    ) public {
-        mockAssetRegistry.mockToDisallowAssetWithdrawals(assetOut);
-
-        IWithdrawalPolicy.WithdrawalRequest memory request = _buildRequest(user, assetOut, iouAmountRay, "");
-
-        // Both preview and apply should revert
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, assetOut));
-        withdrawalPolicy.previewWithdrawalPolicy(request);
-
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, assetOut));
-        withdrawalPolicy.applyWithdrawalPolicy(request);
-    }
-
     function test_applyWithdrawalPolicy_reverts_ifDeadlineExpired() public {
         address user = makeAddr("user");
         address assetOut = makeAddr("assetOut");
@@ -727,6 +710,19 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         vm.prank(signer1);
         vm.expectRevert(ErrorsLib.NotAuthorized.selector);
         withdrawalPolicy.invalidateNonce(signer2, 1);
+    }
+
+    function test_invalidateNonce_reverts_ifAlreadyInvalidated() public {
+        (address signer,) = makeAddrAndKey("signer");
+        vm.prank(admin);
+        withdrawalPolicy.setSigner(signer, true);
+
+        vm.prank(signer);
+        withdrawalPolicy.invalidateNonce(signer, 1);
+
+        vm.expectRevert(WithdrawalPolicy.NonceAlreadyUsed.selector);
+        vm.prank(signer);
+        withdrawalPolicy.invalidateNonce(signer, 1);
     }
 
     function test_invalidateNonce_preventsSignatureFromBeingApplied(

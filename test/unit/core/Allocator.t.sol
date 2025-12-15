@@ -110,9 +110,7 @@ contract AllocatorTest is TestWithHelpers {
             address(_mockUsdt),
             IAssetRegistry.AssetConfig({
                 depositFromUserAllowed: true,
-                withdrawToUserAllowed: true,
                 depositIntoAllocatorAllowed: true,
-                withdrawFromAllocatorAllowed: true,
                 swapInputTokenAllowed: true,
                 swapOutputTokenAllowed: true
             })
@@ -122,9 +120,7 @@ contract AllocatorTest is TestWithHelpers {
             address(_mockGho),
             IAssetRegistry.AssetConfig({
                 depositFromUserAllowed: true,
-                withdrawToUserAllowed: true,
                 depositIntoAllocatorAllowed: true,
-                withdrawFromAllocatorAllowed: true,
                 swapInputTokenAllowed: true,
                 swapOutputTokenAllowed: true
             })
@@ -405,6 +401,7 @@ contract AllocatorTest is TestWithHelpers {
     }
 
     function test_withdraw_withdrawsFromDefaultVault(uint256 amount) public {
+        _mockAssetRegistry.mockRegisteredAsset(address(_mockUsdt));
         uint256 amountRemaining = 1000;
         amount = _boundAssetAmount(address(_mockUsdt), amount);
         vm.assume(amount > amountRemaining);
@@ -450,6 +447,7 @@ contract AllocatorTest is TestWithHelpers {
     }
 
     function test_withdraw_withdrawsFromMultipleStrategies(uint256 amount) public {
+        _mockAssetRegistry.mockRegisteredAsset(address(_mockUsdt));
         uint256 amountRemaining = 1000;
         amount = _boundAssetAmount(address(_mockUsdt), amount);
         vm.assume(amount > amountRemaining);
@@ -498,6 +496,7 @@ contract AllocatorTest is TestWithHelpers {
     }
 
     function test_withdraw_withdrawsFromMultipleStrategies_whenStrategyWithdrawalFails(uint256 amount) public {
+        _mockAssetRegistry.mockRegisteredAsset(address(_mockUsdt));
         amount = _boundAssetAmount(address(_mockUsdt), amount);
 
         _mockUsdt.mint(depositor, amount);
@@ -603,6 +602,7 @@ contract AllocatorTest is TestWithHelpers {
     }
 
     function test_withdraw_usesIdleFundsOnly(uint256 amount) public {
+        _mockAssetRegistry.mockRegisteredAsset(address(_mockUsdt));
         uint256 amountRemaining = 1000;
         amount = _boundAssetAmount(address(_mockUsdt), amount);
         vm.assume(amount > amountRemaining);
@@ -648,6 +648,7 @@ contract AllocatorTest is TestWithHelpers {
     }
 
     function test_withdraw_usesIdleFundsFirst(uint256 amount) public {
+        _mockAssetRegistry.mockRegisteredAsset(address(_mockUsdt));
         uint256 amountRemaining = 1000;
         amount = _boundAssetAmount(address(_mockUsdt), amount);
         vm.assume(amount > amountRemaining);
@@ -699,6 +700,7 @@ contract AllocatorTest is TestWithHelpers {
     }
 
     function test_withdraw_reverts_ifDefaultVaultHasInsufficientFunds(uint256 amount) public {
+        _mockAssetRegistry.mockRegisteredAsset(address(_mockUsdt));
         amount = _boundAssetAmount(address(_mockUsdt), amount);
         vm.assume(amount > 0);
 
@@ -719,6 +721,7 @@ contract AllocatorTest is TestWithHelpers {
     }
 
     function test_withdraw_reverts_ifStrategiesHaveInsufficientFunds(uint256 amount) public {
+        _mockAssetRegistry.mockRegisteredAsset(address(_mockUsdt));
         amount = _boundAssetAmount(address(_mockUsdt), amount);
         vm.assume(amount > 0);
 
@@ -747,11 +750,10 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.withdraw(address(_mockUsdt), 0);
     }
 
-    function test_withdraw_reverts_ifVaultIsNotSupportedForAsset(uint256 amount) public {
+    function test_withdraw_reverts_ifAssetIsNotRegistered(uint256 amount) public {
+        // Unsupported asset is not registered in the AssetRegistry
         amount = _boundAssetAmount(address(_mockUnsupportedAsset), amount);
 
-        _mockAssetRegistry.mockToDisallowAssetWithdrawalsFromAllocator(address(_mockUnsupportedAsset));
-
         vm.prank(withdrawer);
         vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(_mockUnsupportedAsset)));
         _allocator.withdraw(address(_mockUnsupportedAsset), amount);
@@ -759,6 +761,16 @@ contract AllocatorTest is TestWithHelpers {
         vm.prank(withdrawer);
         vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(_mockUnsupportedAsset)));
         _allocator.withdraw(address(_mockUnsupportedAsset), amount);
+    }
+
+    function test_withdraw_reverts_ifAssetIsConfiguredAsStrategy() public {
+        _mockAssetRegistry.mockRegisteredAsset(address(_defaultUsdtStrategy));
+        uint256 amount = 1000;
+        amount = _boundAssetAmount(address(_mockUsdt), amount);
+
+        vm.prank(withdrawer);
+        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(_defaultUsdtStrategy)));
+        _allocator.withdraw(address(_defaultUsdtStrategy), amount);
     }
 
     function test_withdraw_reverts_ifNonWithdrawerCalls(address nonWithdrawer, uint256 amount) public {
@@ -1824,139 +1836,6 @@ contract AllocatorTest is TestWithHelpers {
         vm.prank(operator);
         vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, operator));
         _allocator.enableDepositsToStrategy(address(_defaultUsdtStrategy));
-    }
-
-    function test_disableWithdrawalsFromStrategy_preventsWithdrawalsFromStrategy() public {
-        // Deposit into the default strategy
-        uint256 amount = 1000;
-        _mockTransferHelper.mockAsset(address(_mockUsdt), amount);
-        vm.prank(depositor);
-        _allocator.deposit(address(_mockUsdt), amount);
-
-        // Check the balances
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
-        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), amount);
-        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
-        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
-        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
-
-        vm.expectEmit(true, true, true, true);
-        emit IAllocator.StrategyWithdrawalsToggled(address(_defaultUsdtStrategy), false);
-        vm.prank(address(everyRoleAccount));
-        _allocator.disableWithdrawalsFromStrategy(address(_defaultUsdtStrategy));
-
-        // Check withdrawal tries to withdraw from the default strategy and fails
-        vm.prank(withdrawer);
-        vm.expectEmit(true, true, true, true);
-        // Error is thrown, but caught by the try-catch in the withdraw function
-        emit IAllocator.StrategyWithdrawalFailed(address(_defaultUsdtStrategy), address(_mockUsdt), amount);
-        // The withdrawal it self reverts because insufficient funds are transferred to the TransferHelper
-        vm.expectRevert("ERC20: transfer amount exceeds balance");
-        _allocator.withdraw(address(_mockUsdt), amount);
-    }
-
-    function test_disableWithdrawalsFromStrategy_reverts_ifStrategyIsNotSupported() public {
-        address strategy = makeAddr("newStrategy");
-        vm.prank(address(everyRoleAccount));
-        vm.expectRevert(ErrorsLib.AddressNotWhitelisted.selector);
-        _allocator.disableWithdrawalsFromStrategy(strategy);
-    }
-
-    function test_disableWithdrawalsFromStrategy_reverts_ifUnauthorizedCaller(address operator) public {
-        vm.assume(operator != everyRoleAccount);
-        vm.assume(operator != address(0));
-        _assumeNotProxyAdmin(operator, address(_allocator));
-
-        vm.mockCall(
-            address(_mockAccessManager),
-            abi.encodeWithSelector(
-                IAccessManager.canCall.selector,
-                operator,
-                address(_allocator),
-                bytes4(IAllocator.disableWithdrawalsFromStrategy.selector)
-            ),
-            abi.encode(false)
-        );
-
-        vm.prank(operator);
-        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, operator));
-        _allocator.disableWithdrawalsFromStrategy(address(_defaultUsdtStrategy));
-    }
-
-    function test_enableWithdrawalsFromStrategy_enablesWithdrawalsFromStrategy() public {
-        // Deposit into the default strategy
-        uint256 amount = 1000;
-        _mockTransferHelper.mockAsset(address(_mockUsdt), amount);
-        vm.prank(depositor);
-        _allocator.deposit(address(_mockUsdt), amount);
-
-        // Check the balances
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
-        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), amount);
-        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
-        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
-        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
-
-        // First disable withdrawals from the strategy
-        vm.expectEmit(true, true, true, true);
-        emit IAllocator.StrategyWithdrawalsToggled(address(_defaultUsdtStrategy), false);
-        vm.prank(address(everyRoleAccount));
-        _allocator.disableWithdrawalsFromStrategy(address(_defaultUsdtStrategy));
-
-        // Try to withdraw from the strategy and it should fail
-        vm.prank(withdrawer);
-        vm.expectEmit(true, true, true, true);
-        emit IAllocator.StrategyWithdrawalFailed(address(_defaultUsdtStrategy), address(_mockUsdt), amount);
-        vm.expectRevert("ERC20: transfer amount exceeds balance");
-        _allocator.withdraw(address(_mockUsdt), amount);
-
-        // Then enable withdrawals from the strategy
-        vm.expectEmit(true, true, true, true);
-        emit IAllocator.StrategyWithdrawalsToggled(address(_defaultUsdtStrategy), true);
-        vm.prank(address(everyRoleAccount));
-        _allocator.enableWithdrawalsFromStrategy(address(_defaultUsdtStrategy));
-
-        // Try to withdraw from the strategy and it should succeed
-        vm.prank(withdrawer);
-        _allocator.withdraw(address(_mockUsdt), amount);
-
-        // Check the balances
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), 0);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
-        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
-        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
-        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
-        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
-    }
-
-    function test_enableWithdrawalsFromStrategy_reverts_ifStrategyIsNotSupported() public {
-        address strategy = makeAddr("newStrategy");
-        vm.prank(address(everyRoleAccount));
-        vm.expectRevert(ErrorsLib.AddressNotWhitelisted.selector);
-        _allocator.enableWithdrawalsFromStrategy(strategy);
-    }
-
-    function test_enableWithdrawalsFromStrategy_reverts_ifUnauthorizedCaller(address operator) public {
-        vm.assume(operator != everyRoleAccount);
-        vm.assume(operator != address(0));
-        _assumeNotProxyAdmin(operator, address(_allocator));
-
-        vm.mockCall(
-            address(_mockAccessManager),
-            abi.encodeWithSelector(
-                IAccessManager.canCall.selector,
-                operator,
-                address(_allocator),
-                bytes4(IAllocator.enableWithdrawalsFromStrategy.selector)
-            ),
-            abi.encode(false)
-        );
-
-        vm.prank(operator);
-        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, operator));
-        _allocator.enableWithdrawalsFromStrategy(address(_defaultUsdtStrategy));
     }
 
     function _getDepositIdleFundsRebalanceParams(address asset)

@@ -2,19 +2,20 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.4;
 
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 
 /// @title MockAssetRegistry.
 /// @notice Mock implementation of the AssetRegistry contract for testing purposes.
 /// @dev By default it allows all assets to simplify testing. It must be explicitly mocked to disallow assets.
 contract MockAssetRegistry is IAssetRegistry {
+    using EnumerableSet for EnumerableSet.AddressSet;
     mapping(address asset => bool isUserDepositAllowed) _isNotAllowedUserDeposit;
-    mapping(address asset => bool isUserWithdrawalAllowed) _isNotAllowedToWithdraw;
     mapping(address asset => bool isDepositToAllocatorAllowed) _isNotAllowedToDepositIntoAllocator;
-    mapping(address asset => bool isWithdrawalFromAllocatorAllowed) _isNotAllowedToWithdrawFromAllocator;
     mapping(address asset => bool isAllowedToSwapInputTokenInAllocator) _isNotAllowedToSwapInputTokenInAllocator;
     mapping(address asset => bool isAllowedToSwapOutputTokenInAllocator) _isNotAllowedToSwapOutputTokenInAllocator;
-    address[] _registeredAssets;
+    EnumerableSet.AddressSet _registeredAssets;
 
     function setAssetConfig(address asset, AssetConfig memory config) external override {}
 
@@ -27,20 +28,8 @@ contract MockAssetRegistry is IAssetRegistry {
         _isNotAllowedUserDeposit[asset] = false;
     }
 
-    function mockToAllowAssetWithdrawalsFromBBV(address asset) external {
-        _isNotAllowedToWithdraw[asset] = false;
-    }
-
     function mockToDisallowAssetDepositsIntoBBV(address asset) external {
         _isNotAllowedUserDeposit[asset] = true;
-    }
-
-    function mockToDisallowAssetWithdrawalsFromBBV(address asset) external {
-        _isNotAllowedToWithdraw[asset] = true;
-    }
-
-    function mockToDisallowAssetWithdrawals(address asset) external {
-        _isNotAllowedToWithdraw[asset] = true;
     }
 
     function mockToAllowAssetDepositsIntoAllocator(address asset) external {
@@ -49,14 +38,6 @@ contract MockAssetRegistry is IAssetRegistry {
 
     function mockToDisallowAssetDepositsIntoAllocator(address asset) external {
         _isNotAllowedToDepositIntoAllocator[asset] = true;
-    }
-
-    function mockToAllowAssetWithdrawalsFromAllocator(address asset) external {
-        _isNotAllowedToWithdrawFromAllocator[asset] = false;
-    }
-
-    function mockToDisallowAssetWithdrawalsFromAllocator(address asset) external {
-        _isNotAllowedToWithdrawFromAllocator[asset] = true;
     }
 
     function mockToDisallowSwapInputToken(address asset) external {
@@ -68,23 +49,19 @@ contract MockAssetRegistry is IAssetRegistry {
     }
 
     function mockRegisteredAsset(address asset) external {
-        _registeredAssets.push(asset);
+        _registeredAssets.add(asset);
+    }
+
+    function isAssetRegistered(address asset) external view override returns (bool) {
+        return _registeredAssets.contains(asset);
     }
 
     function isUserDepositAllowed(address asset) external view override returns (bool) {
         return !_isNotAllowedUserDeposit[asset];
     }
 
-    function isUserWithdrawalAllowed(address asset) external view override returns (bool) {
-        return !_isNotAllowedToWithdraw[asset];
-    }
-
     function isDepositToAllocatorAllowed(address asset) external view override returns (bool) {
         return !_isNotAllowedToDepositIntoAllocator[asset];
-    }
-
-    function isWithdrawalFromAllocatorAllowed(address asset) external view override returns (bool) {
-        return !_isNotAllowedToWithdrawFromAllocator[asset];
     }
 
     function isSwapInputAllowed(address asset) external view override returns (bool) {
@@ -96,6 +73,6 @@ contract MockAssetRegistry is IAssetRegistry {
     }
 
     function getRegisteredAssets() external view override returns (address[] memory) {
-        return _registeredAssets;
+        return _registeredAssets.values();
     }
 }

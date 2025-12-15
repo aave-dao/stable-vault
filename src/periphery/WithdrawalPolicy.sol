@@ -9,7 +9,6 @@ import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/crypt
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {EfficientHashLib} from "@solady/utils/EfficientHashLib.sol";
 
-import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
 import {ConstantsLib} from "src/libraries/ConstantsLib.sol";
 import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
@@ -194,10 +193,6 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
         view
         returns (uint256, address, uint256)
     {
-        require(
-            IAssetRegistry(ASSET_REGISTRY).isUserWithdrawalAllowed(request.assetOut),
-            ErrorsLib.UnsupportedAsset(request.assetOut)
-        );
         address signer;
         uint256 nonce;
         uint16 feeBps;

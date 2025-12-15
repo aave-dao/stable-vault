@@ -10,9 +10,7 @@ contract AssetRegistryInteractionScript is InteractionBaseScript {
     function enableFull(address assetRegistry, address asset) public {
         IAssetRegistry.AssetConfig memory config = IAssetRegistry.AssetConfig({
             depositFromUserAllowed: true,
-            withdrawToUserAllowed: true,
             depositIntoAllocatorAllowed: true,
-            withdrawFromAllocatorAllowed: true,
             swapInputTokenAllowed: true,
             swapOutputTokenAllowed: true
         });
