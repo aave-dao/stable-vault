@@ -21,8 +21,6 @@ import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
 /// @author Aave Labs
 /// @notice Adapter for sending and receiving messages via Across.
 /// @dev Requires tokens to be bridged with/without an arbitrary message. Fees are paid in the token being bridged.
-/// @dev Signature verification is not performed if no arbitrary message is bridged. This assumes the Earning Chain will
-/// always include a snapshot message with funds bridged to the Accounting Chain.
 contract AcrossAdapter is BaseBridgeAdapter, IAcrossBridgeAdapter, IERC165 {
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
