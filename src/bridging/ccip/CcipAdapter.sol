@@ -136,6 +136,7 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
             try this.processReceivedFunds(message.destTokenAmounts) {}
             catch (bytes memory err) {
                 for (uint256 i = 0; i < message.destTokenAmounts.length; i++) {
+                    // TODO: emit message ID here?
                     emit TokenReceptionFailed(
                         _chainIdOf[message.sourceChainSelector],
                         message.destTokenAmounts[i].token,

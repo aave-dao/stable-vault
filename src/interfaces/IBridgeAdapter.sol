@@ -21,6 +21,10 @@ interface IBridgeAdapter {
     /// @dev Indicates that the token will remain on the adapter contract.
     event TokenReceptionFailed(uint256 indexed sourceChainId, address indexed asset, uint256 amount);
 
+    /// @notice Thrown when arbitrary data is not allowed to be bridged.
+    /// @custom:selector 0x48c51a0f
+    error ArbitraryDataNotAllowed();
+
     /// @notice Address checked is not the destination chain adapter.
     /// @custom:selector 0x75503511
     error OnlyDestinationChainAdapter();

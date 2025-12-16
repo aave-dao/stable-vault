@@ -62,4 +62,6 @@ contract MockFundsHandler is IFundsHandler {
     {}
 
     function fundsArrivedFromChainCallback(address asset, uint256 amount) external override {}
+
+    function decrementChainBalanceSnapshotCallback(uint256 chainId, uint256 amountRay) external override {}
 }
