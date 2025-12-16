@@ -92,6 +92,17 @@ interface IAllocator {
         AllocationParams[] allocations;
     }
 
+    /// @notice Getter for the balance of a given asset on the Allocator.
+    /// @param asset Address of the asset to get the balance of.
+    /// @return balance Balance of the asset in asset decimals in the Allocator (idle + aggregate balance in
+    /// strategies).
+    function getAssetBalance(address asset) external view returns (uint256);
+
+    /// @notice Getter for the balance of a given strategy on the Allocator.
+    /// @param strategy Address of the strategy to get the balance of.
+    /// @return balance Balance of tokens in the strategy in asset decimals (assumes one asset per strategy).
+    function getAssetBalanceInStrategy(address strategy) external view returns (uint256);
+
     /// @notice Getter for the balances on the Allocator.
     /// @return balances Array of balances where each amount is denominated in the corresponding asset's decimals.
     function getAssetBalances() external view returns (AllocatorBalance[] memory balances);
