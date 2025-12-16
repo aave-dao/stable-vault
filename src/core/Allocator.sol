@@ -106,10 +106,12 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         __AccessManaged_init(accessManager);
     }
 
+    /// @inheritdoc IAllocator
     function getAssetBalance(address asset) external view returns (uint256) {
         return _getTotalAssetBalance(asset);
     }
 
+    /// @inheritdoc IAllocator
     function getAssetBalanceInStrategy(address strategy) external view returns (uint256) {
         return _getAssetBalanceInStrategy(IERC4626(strategy));
     }
