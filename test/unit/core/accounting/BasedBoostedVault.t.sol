@@ -1141,8 +1141,151 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.prank(user);
         bbv.requestWithdrawal(user, depositAmountInRay - 1);
 
+        // A partial withdrawal that would leave unwithdrawable dust triggers an auto-full-withdrawal which deletes the
+        // position. Only request the remainder if the position still exists.
+        if (bbv.getUserSubVault(user).id != 0) {
+            vm.prank(user);
+            bbv.requestWithdrawal(user, 0);
+        }
+    }
+
+    function test_requestWithdrawal_autoFullWithdrawalWhenDustWouldRemain(
+        address user,
+        uint256 depositAmount,
+        uint256 timeElapsed,
+        uint256 perSecondRate,
+        uint256 dustRemainderShares
+    ) public {
+        vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
+        _assumeNotProxyAdmin(user, address(bbv));
+
+        depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
+        timeElapsed = bound(timeElapsed, 1, 365 days * 50);
+        perSecondRate = _boundRate(perSecondRate);
+
+        // Ensure the user's position accrues at the fuzzed vault APY.
+        vm.prank(manager);
+        bbv.setDefaultSubVault(perSecondRate);
+        _deposit(user, depositAmount);
+        uint256 originalDepositRay = depositAmount.assetDecimalsToRay(address(mockAsset));
+        // Because the deposit happens without any accrual (`conversionRate == RAY`), the user gets:
+        // shares = depositRay / RAY = depositRay.
+        uint256 userShares = originalDepositRay;
+        assertEq(bbv.getGlobalOriginalDepositAmount(), originalDepositRay);
+        assertEq(bbv.getUserBalance(user), originalDepositRay);
+        assertEq(bbv.getUserSubVault(user).perSecondRate, perSecondRate);
+        assertEq(bbv.getUserSubVault(user).id, bbv.getDefaultSubVault().id);
+
+        vm.warp(block.timestamp + timeElapsed);
+
+        uint256 requestedAmountRay;
+        uint256 expectedFullWithdrawalRay;
+        {
+            // This matches the contract's `_accrueSubVaultConversionRate` rounding down, starting from
+            // `conversionRate = RAY`.
+            uint256 conversionRate = MathLib.RAY.rayMulDown(perSecondRate.rpow(timeElapsed));
+            uint256 minSharesToRedeemOneWei = uint256(1e9).rayDivUp(conversionRate);
+            assertTrue(minSharesToRedeemOneWei > 1);
+            dustRemainderShares = bound(dustRemainderShares, 1, minSharesToRedeemOneWei - 1);
+
+            // Pick a non-zero partial withdrawal that would leave `dustRemainderShares` in shares, which is below the
+            // dust threshold and should trigger an auto-full-withdrawal.
+            assertTrue(userShares > dustRemainderShares);
+            uint256 sharesToRedeem = userShares - dustRemainderShares;
+            requestedAmountRay = sharesToRedeem.rayMulDown(conversionRate);
+
+            // Prove (pre-call) that the request would leave exactly `dustRemainderShares` after the contract's
+            // `rayDivUp`-based share redemption computation.
+            uint256 expectedRedeemedShares = requestedAmountRay.rayDivUp(conversionRate);
+            assertEq(expectedRedeemedShares, sharesToRedeem);
+            assertEq(userShares - expectedRedeemedShares, dustRemainderShares);
+            assertTrue(dustRemainderShares < minSharesToRedeemOneWei);
+
+            // Ensure there's enough assets in the vault to satisfy the full withdrawal.
+            expectedFullWithdrawalRay = userShares.rayMulDown(conversionRate);
+            if (expectedFullWithdrawalRay < originalDepositRay) {
+                expectedFullWithdrawalRay = originalDepositRay;
+            }
+        }
+        mockFundsHandler.mockAggregatedBalance(expectedFullWithdrawalRay);
+
         vm.prank(user);
-        bbv.requestWithdrawal(user, 0);
+        uint256 actualAmountRay = bbv.requestWithdrawal(user, requestedAmountRay);
+
+        assertEq(actualAmountRay, expectedFullWithdrawalRay);
+        assertEq(mockIouToken.balanceOf(user), actualAmountRay);
+        assertTrue(actualAmountRay > requestedAmountRay);
+        assertTrue(actualAmountRay >= originalDepositRay);
+        assertEq(bbv.getUserSubVault(user).id, 0);
+        assertEq(bbv.getGlobalOriginalDepositAmount(), 0);
+    }
+
+    function test_requestWithdrawal_neverLeavesRemainingSharesBelowMinSharesToRedeemOneWei(
+        address user,
+        uint256 depositAmount,
+        uint256 timeElapsed,
+        uint256 perSecondRate,
+        uint256 requestedAmountRay
+    ) public {
+        vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
+        _assumeNotProxyAdmin(user, address(bbv));
+
+        depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
+        timeElapsed = bound(timeElapsed, 1, 365 days * 50);
+        perSecondRate = _boundRate(perSecondRate);
+
+        // Ensure the user's position accrues at the fuzzed vault APY.
+        vm.prank(manager);
+        bbv.setDefaultSubVault(perSecondRate);
+        _deposit(user, depositAmount);
+        uint256 originalDepositRay = depositAmount.assetDecimalsToRay(address(mockAsset));
+        uint256 userShares = originalDepositRay;
+
+        vm.warp(block.timestamp + timeElapsed);
+
+        uint256 maxWithdrawRay;
+        uint256 minSharesToRedeemOneWei;
+        uint256 expectedRemainingShares;
+        uint256 conversionRate;
+        {
+            // Matches the contract's `_accrueSubVaultConversionRate` rounding down, starting from `conversionRate =
+            // RAY`.
+            conversionRate = MathLib.RAY.rayMulDown(perSecondRate.rpow(timeElapsed));
+            minSharesToRedeemOneWei = uint256(1e9).rayDivUp(conversionRate);
+            maxWithdrawRay = userShares.rayMulDown(conversionRate);
+
+            requestedAmountRay = bound(requestedAmountRay, 0, maxWithdrawRay);
+
+            // What the user would have left after a partial withdrawal; if it falls into dust, the vault switches to a
+            // full withdrawal, leaving 0 shares instead.
+            if (requestedAmountRay == 0) {
+                expectedRemainingShares = 0;
+            } else {
+                expectedRemainingShares = userShares - requestedAmountRay.rayDivUp(conversionRate);
+                if (expectedRemainingShares != 0 && expectedRemainingShares < minSharesToRedeemOneWei) {
+                    expectedRemainingShares = 0;
+                }
+            }
+        }
+
+        // Ensure there's enough assets in the vault to satisfy even a full withdrawal.
+        mockFundsHandler.mockAggregatedBalance(maxWithdrawRay);
+
+        vm.prank(user);
+        bbv.requestWithdrawal(user, requestedAmountRay);
+
+        if (expectedRemainingShares == 0) {
+            assertEq(bbv.getUserSubVault(user).id, 0);
+            assertEq(bbv.getUserBalance(user), 0);
+        } else {
+            // Property: if a position remains, it is never left with unwithdrawable dust shares.
+            assertTrue(expectedRemainingShares >= minSharesToRedeemOneWei);
+            assertEq(bbv.getUserSubVault(user).id, bbv.getDefaultSubVault().id);
+            assertEq(bbv.getUserSubVault(user).perSecondRate, perSecondRate);
+            assertEq(bbv.getUserBalance(user), expectedRemainingShares.rayMulDown(conversionRate));
+        }
     }
 
     function test_requestWithdrawal_tinyAmountWorksAsExpected(address user) public {

@@ -234,6 +234,15 @@ contract BasedBoostedVault is
         } else {
             (actualAmountInRay, guaranteedAmountRay, redeemedShares) =
                 _previewPartialWithdrawalRequest(user, requestedAmountInRay);
+
+            uint256 remainingSharesAfterRedeem = $storage().positions[user].shares - redeemedShares;
+            uint256 minSharesToRedeemOneWei =
+                _minSharesToRedeemOneWei($storage().subVaultById[subVaultId].conversionRate);
+            // If the remainder dust is not redeemable (<1 wei of an 18-decimal token), perform a full withdrawal
+            // instead to avoid leaving unwithdrawable dust shares.
+            if (remainingSharesAfterRedeem != 0 && remainingSharesAfterRedeem < minSharesToRedeemOneWei) {
+                (actualAmountInRay, guaranteedAmountRay, redeemedShares) = _previewFullWithdrawalRequest(user);
+            }
         }
 
         uint256 remainingShares = _burnShares(user, redeemedShares);
@@ -538,6 +547,21 @@ contract BasedBoostedVault is
         uint256 sharesToRedeem = withdrawalAmountRay.rayDivUp(conversionRate);
         require(sharesToRedeem <= $storage().positions[user].shares, ErrorsLib.InvalidAmount());
         return (withdrawalAmountRay, _getAmountTakenFromOriginalDeposit(user, withdrawalAmountRay), sharesToRedeem);
+    }
+
+    function _minSharesToRedeemOneWei(uint256 conversionRate) internal pure returns (uint256) {
+        // 1e9 is the smallest withdrawable amount in RAY for the maximum supported token decimals (18):
+        // 10^(RAY_DECIMALS - MAX_SUPPORTED_ASSET_DECIMALS) = 10^(27-18) = 1e9.
+        //
+        // We want the remainder after a partial withdrawal to be redeemable for at least 1 wei (18-dec) of value.
+        // A share balance S (in RAY units) redeems to:
+        //   valueRay = rayMulDown(S * conversionRate)
+        // and it is withdrawable iff:
+        //   rayMulDown(S * conversionRate) >= 1e9
+        // which implies:
+        //   S >= rayDivUp(1e9, conversionRate)
+        uint256 smallestWithdrawableAmountRay = 1e9;
+        return smallestWithdrawableAmountRay.rayDivUp(conversionRate);
     }
 
     function _getAmountTakenFromOriginalDeposit(address user, uint256 withdrawalAmountRay)
