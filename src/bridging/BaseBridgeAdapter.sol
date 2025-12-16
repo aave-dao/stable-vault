@@ -66,7 +66,7 @@ abstract contract BaseBridgeAdapter is AccessManaged, TransferHelperClient, IBri
     }
 
     /// @inheritdoc IBridgeAdapter
-    function replayFundsReceiving(IBridgeAdapter.BridgeAsset[] memory assets) public virtual override {
+    function replayFundsReceiving(IBridgeAdapter.BridgeAsset[] memory assets) external virtual override {
         _processReceivedFunds(assets);
     }
 

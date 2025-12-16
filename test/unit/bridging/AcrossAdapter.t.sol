@@ -838,6 +838,8 @@ contract AcrossAdapterTest is TestWithHelpers {
     }
 
     function test_handleV3AcrossMessage_revert_ifInvalidAcrossPacket(uint256 bridgedAmount) public {
+        _mockAssetRegistry.mockRegisteredAsset(address(_mockUsdtAccountingChain));
+        _mockAssetRegistry.mockToDisallowAssetDepositsIntoAllocator(address(_mockUsdtAccountingChain));
         bridgedAmount = _boundAssetAmount(address(_mockUsdtAccountingChain), bridgedAmount);
         // Mint the assets to the AcrossAdapter
         _mockUsdtAccountingChain.mint(address(_accountingChainAcrossAdapter), bridgedAmount);

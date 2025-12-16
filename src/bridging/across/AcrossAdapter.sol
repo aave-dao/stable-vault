@@ -125,9 +125,10 @@ contract AcrossAdapter is BaseBridgeAdapter, IAcrossBridgeAdapter, IERC165 {
         emit MessageReceived(acrossPacket.messageId);
 
         if (IS_ACCOUNTING_CHAIN) {
-            // Ensure that the asset is registered to avoid decrementing the source chain's snapshot with an asset that
-            // is not actually supported.
-            require(IAssetRegistry(ASSET_REGISTRY).isAssetRegistered(token), ErrorsLib.UnsupportedAsset(token));
+            // Do not update snapshot state if an asset will be rejected by the Allocator.
+            require(
+                IAssetRegistry(ASSET_REGISTRY).isDepositToAllocatorAllowed(token), ErrorsLib.UnsupportedAsset(token)
+            );
             bytes memory decrementBalanceSnapshotMessage = abi.encode(
                 IChainGateway.CrossChainMessage({
                     messageType: IChainGateway.MessageType.DECREMENT_BALANCE_SNAPSHOT,
@@ -171,11 +172,11 @@ contract AcrossAdapter is BaseBridgeAdapter, IAcrossBridgeAdapter, IERC165 {
     /// balance snapshot message still has not been processed then this will lead to the Accounting Chain's balance
     /// reflecting a duplicate amount of the funds that were received.
     function replayFundsReceiving(BridgeAsset[] memory assets)
-        public
+        external
         override(BaseBridgeAdapter, IBridgeAdapter)
         restricted
     {
-        super.replayFundsReceiving(assets);
+        _processReceivedFunds(assets);
     }
 
     /// @inheritdoc IAcrossBridgeAdapter
