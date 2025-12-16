@@ -286,7 +286,7 @@ contract BasedBoostedVault is
                 })
             );
         // Note: The rayToAssetDecimals conversion truncates, so the user may burn slightly more IOUs than the
-        // exact RAY-equivalent of the assets received. This "dust" loss is at most 10^(27-decimals)-1 RAY per
+        // exact RAY-equivalent of the assets received. This "dust" loss is at most `10 ^ (27 - assetDecimals) - 1` RAY per
         // withdrawal, which is economically negligible (e.g., <$0.000001 for 6-decimal stablecoins, <$0.001 for
         // 8-decimal assets like BTC at $100k). The gas cost of preventing this (~1,600 gas for an extra conversion)
         // exceeds the value of the dust, so we accept this minor rounding in favor of the protocol.
