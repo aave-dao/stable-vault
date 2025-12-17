@@ -979,8 +979,9 @@ contract CcipAdapterTest is TestWithHelpers {
         bridgeAssets[0] = IBridgeAdapter.BridgeAsset({asset: address(_mockUsdt), amount: amountUsdt});
         bridgeAssets[1] = IBridgeAdapter.BridgeAsset({asset: address(_mockGho), amount: amountGho});
 
+        bytes32 messageId = keccak256("messageId");
         Client.Any2EVMMessage memory ccipMessage = Client.Any2EVMMessage({
-            messageId: 0,
+            messageId: messageId,
             sourceChainSelector: EARNING_CHAIN_CCIP_SELECTOR,
             sender: abi.encode(address(_earningChainCcipAdapter)),
             data: "",
@@ -988,11 +989,13 @@ contract CcipAdapterTest is TestWithHelpers {
         });
 
         vm.expectEmit(true, true, true, true);
-        emit IBridgeAdapter.TokenReceptionFailed(EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt);
+        emit IBridgeAdapter.TokenReceptionFailed(messageId, EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt);
         vm.expectEmit(true, true, true, true);
-        emit IBridgeAdapter.TokenReceptionFailed(EARNING_CHAIN_ID, address(_mockGho), amountGho);
+        emit IBridgeAdapter.TokenReceptionFailed(messageId, EARNING_CHAIN_ID, address(_mockGho), amountGho);
         vm.expectEmit(true, true, true, true);
-        emit IBridgeAdapter.BridgedFundsProcessingFailed(EARNING_CHAIN_ID, abi.encode(ccipMessage), abi.encode("test"));
+        emit IBridgeAdapter.BridgedFundsProcessingFailed(
+            messageId, EARNING_CHAIN_ID, abi.encode(ccipMessage), abi.encode("test")
+        );
 
         // mock a revert from downstream fund handling
         vm.mockCallRevert(

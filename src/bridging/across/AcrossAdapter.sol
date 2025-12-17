@@ -149,9 +149,10 @@ contract AcrossAdapter is BaseBridgeAdapter, IAcrossBridgeAdapter, IERC165 {
 
         try this.processReceivedFunds(token, amount) {}
         catch (bytes memory err) {
-            // TODO: emit message ID here?
-            emit TokenReceptionFailed(acrossPacket.sourceChainId, token, amount);
-            emit BridgedFundsProcessingFailed(acrossPacket.sourceChainId, abi.encode(acrossPacket), err);
+            emit TokenReceptionFailed(acrossPacket.messageId, acrossPacket.sourceChainId, token, amount);
+            emit BridgedFundsProcessingFailed(
+                acrossPacket.messageId, acrossPacket.sourceChainId, abi.encode(acrossPacket), err
+            );
         }
     }
 

@@ -7,7 +7,7 @@ pragma solidity ^0.8.22;
 /// @notice Interface for the base BridgeAdapter contract.
 interface IBridgeAdapter {
     /// @notice Emitted when the processing of bridged funds fails.
-    event BridgedFundsProcessingFailed(uint256 sourceChainId, bytes message, bytes error);
+    event BridgedFundsProcessingFailed(bytes32 indexed messageId, uint256 sourceChainId, bytes message, bytes error);
 
     /// @notice Emitted when a message is published with a given message id from the bridge provider.
     /// @dev The message id matches the one in the `MessageReceived` event.
@@ -19,7 +19,9 @@ interface IBridgeAdapter {
 
     /// @notice Emitted when the processing of a received token fails downstream from the adapter.
     /// @dev Indicates that the token will remain on the adapter contract.
-    event TokenReceptionFailed(uint256 indexed sourceChainId, address indexed asset, uint256 amount);
+    event TokenReceptionFailed(
+        bytes32 indexed messageId, uint256 indexed sourceChainId, address indexed asset, uint256 amount
+    );
 
     /// @notice Thrown when arbitrary data is not allowed to be bridged.
     /// @custom:selector 0x48c51a0f

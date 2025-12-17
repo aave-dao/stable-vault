@@ -871,9 +871,11 @@ contract AcrossAdapterTest is TestWithHelpers {
         vm.expectEmit(true, true, true, true);
         emit IBridgeAdapter.MessageReceived(messageId);
         vm.expectEmit(true, true, true, true);
-        emit IBridgeAdapter.TokenReceptionFailed(EARNING_CHAIN_ID, address(_mockUsdtAccountingChain), bridgedAmount);
+        emit IBridgeAdapter.TokenReceptionFailed(
+            messageId, EARNING_CHAIN_ID, address(_mockUsdtAccountingChain), bridgedAmount
+        );
         vm.expectEmit(true, true, true, true);
-        emit IBridgeAdapter.BridgedFundsProcessingFailed(EARNING_CHAIN_ID, abi.encode(acrossPacket), error);
+        emit IBridgeAdapter.BridgedFundsProcessingFailed(messageId, EARNING_CHAIN_ID, abi.encode(acrossPacket), error);
 
         IBridgeAdapter.BridgeAsset[] memory assets = new IBridgeAdapter.BridgeAsset[](1);
         assets[0] = IBridgeAdapter.BridgeAsset({asset: address(_mockUsdtAccountingChain), amount: bridgedAmount});
