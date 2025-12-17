@@ -10,18 +10,23 @@ contract MockGateway is IChainGateway {
     address internal _transferHelper;
     uint256 internal _balanceToConsume;
     address internal _tokenToComsume;
+    address internal _destination;
 
-    function mockConsumeOnNextCall(address transferHelper, uint256 balanceToConsume, address tokenToComsumeBalance)
-        external
-    {
+    function mockConsumeOnNextCall(
+        address transferHelper,
+        uint256 balanceToConsume,
+        address tokenToComsumeBalance,
+        address destination
+    ) external {
         _transferHelper = transferHelper;
         _balanceToConsume = balanceToConsume;
         _tokenToComsume = tokenToComsumeBalance;
+        _destination = destination;
     }
 
     function _mockConsume() internal {
         if (_balanceToConsume > 0) {
-            ITransferHelper(_transferHelper).pull(_tokenToComsume, _balanceToConsume);
+            ITransferHelper(_transferHelper).transfer(_tokenToComsume, _balanceToConsume, _destination);
         }
     }
 
@@ -35,7 +40,6 @@ contract MockGateway is IChainGateway {
         IBridgeAdapter.BridgeParams memory /*bridgeParams*/
     )
         external
-        payable
         override
     {
         _mockConsume();
@@ -47,6 +51,4 @@ contract MockGateway is IChainGateway {
     function setDefaultBridgeAdapter(address asset, uint256 chainId, address adapter) external {}
     function receiveMessage(uint256 sourceChainId, IBridgeAdapter.BridgeAsset[] memory assets, bytes memory data)
         external {}
-
-    receive() external payable {}
 }

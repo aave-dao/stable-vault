@@ -57,7 +57,7 @@ contract MockAccountingChainGateway is IAccountingChainGateway {
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
         IBridgeAdapter.BridgeParams memory bridgeParams
-    ) external payable {}
+    ) external {}
 
     function _pullAssetsFromTransferHelper() internal {
         if (_assetsToPullFromTransferHelperInNextCall.length > 0) {

@@ -19,14 +19,14 @@ import {MockTransferHelper} from "test/mocks/MockTransferHelper.sol";
 contract IouTokenManagerTest_AccountingChain is Test {
     ExtendedIouTokenManager public iouTokenManager;
     address public iouToken;
-    address payable public chainGateway;
+    address public chainGateway;
     address public vault = makeAddr("VAULT");
     address public transferHelper;
     address iouTokenManagerAddress;
     address iouTokenAddress;
 
     function setUp() public virtual {
-        chainGateway = payable(new MockGateway());
+        chainGateway = address(new MockGateway());
         transferHelper = address(new MockTransferHelper());
 
         uint256 deployerNonce = vm.getNonce(address(this));
@@ -284,8 +284,9 @@ contract IouTokenManagerTest_AccountingChain is Test {
             vm.prank(from);
             IERC20(iouToken).approve(address(iouTokenManager), iouTokenAmountRay);
         }
+        address feeRecipient = makeAddr("bridgeAdapter");
         if (feeAmount > 0) {
-            MockGateway(chainGateway).mockConsumeOnNextCall(transferHelper, feeAmount, feeToken);
+            MockGateway(chainGateway).mockConsumeOnNextCall(transferHelper, feeAmount, feeToken, feeRecipient);
             vm.expectCall(
                 bridgeParams.feeToken,
                 abi.encodeWithSelector(IERC20.transferFrom.selector, from, transferHelper, feeAmount)
@@ -293,6 +294,14 @@ contract IouTokenManagerTest_AccountingChain is Test {
         }
         vm.prank(from);
         iouTokenManager.bridgeTokens(destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeParams);
+        assertEq(
+            IERC20(feeToken).balanceOf(address(transferHelper)),
+            0,
+            "Token fee not properly transferred out of TransferHelper"
+        );
+        assertEq(
+            IERC20(feeToken).balanceOf(feeRecipient), feeAmount, "Token fee not properly transferred to bridge adapter"
+        );
     }
 
     function test_bridgeTokens_bridgeParams_ClientTransfersNativeFeeToken(
@@ -316,9 +325,10 @@ contract IouTokenManagerTest_AccountingChain is Test {
             gasLimit: gasLimit,
             data: data
         });
+        address feeRecipient = makeAddr("bridgeAdapter");
         if (feeAmount > 0) {
             vm.deal(from, feeAmount);
-            MockGateway(chainGateway).mockConsumeOnNextCall(transferHelper, feeAmount, address(0));
+            MockGateway(chainGateway).mockConsumeOnNextCall(transferHelper, feeAmount, address(0), feeRecipient);
         }
         if (iouTokenAmountRay > 0) {
             vm.prank(iouTokenManagerAddress);
@@ -326,13 +336,12 @@ contract IouTokenManagerTest_AccountingChain is Test {
             vm.prank(from);
             IERC20(iouToken).approve(address(iouTokenManager), iouTokenAmountRay);
         }
-        uint256 balanceBefore = address(chainGateway).balance;
         vm.prank(from);
         iouTokenManager.bridgeTokens{value: feeAmount}(
             destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeParams
         );
-        uint256 balanceAfter = address(chainGateway).balance;
-        assertEq(balanceAfter, balanceBefore + feeAmount, "Native fee not properly transferred to Gateway");
+        assertEq(transferHelper.balance, 0, "Native fee not properly transferred out of TransferHelper");
+        assertEq(feeRecipient.balance, feeAmount, "Native fee not properly transferred to bridge adapter");
     }
 
     function test_bridgeTokens_reverts_if_invalidBridgeFeePayer(

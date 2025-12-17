@@ -61,5 +61,5 @@ contract MockEarningChainGateway is IEarningChainGateway {
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
         IBridgeAdapter.BridgeParams memory bridgeParams
-    ) external payable {}
+    ) external {}
 }
