@@ -260,6 +260,8 @@ contract AcrossAdapter is BaseBridgeAdapter, IAcrossBridgeAdapter, IERC165 {
         view
         returns (bytes32)
     {
-        return EfficientHashLib.hash(abi.encode(block.chainid, block.timestamp, destinationChainId, asset, amount));
+        return EfficientHashLib.hash(
+            abi.encode(block.chainid, block.timestamp, address(this), destinationChainId, asset, amount)
+        );
     }
 }

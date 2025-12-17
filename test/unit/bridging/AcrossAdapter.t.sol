@@ -231,8 +231,12 @@ contract AcrossAdapterTest is TestWithHelpers {
             data: abi.encode(acrossBridgeParams)
         });
 
-        bytes32 expectedMessageId =
-            _buildMessageId(EARNING_CHAIN_ID, address(_mockUsdtAccountingChain), totalInputAmount);
+        bytes32 expectedMessageId = _buildMessageId(
+            address(_accountingChainAcrossAdapter),
+            EARNING_CHAIN_ID,
+            address(_mockUsdtAccountingChain),
+            totalInputAmount
+        );
         bytes memory expectedCallData = _buildDepositV3ExpectCallData(
             DepositV3ExpectCallParams({
                 depositor: address(_accountingChainAcrossAdapter),
@@ -306,8 +310,9 @@ contract AcrossAdapterTest is TestWithHelpers {
             data: abi.encode(acrossBridgeParams)
         });
 
-        bytes32 expectedMessageId =
-            _buildMessageId(ACCOUNTING_CHAIN_ID, address(_mockGhoEarningChain), totalInputAmount);
+        bytes32 expectedMessageId = _buildMessageId(
+            address(_earningChainAcrossAdapter), ACCOUNTING_CHAIN_ID, address(_mockGhoEarningChain), totalInputAmount
+        );
         bytes memory expectedCallData = _buildDepositV3ExpectCallData(
             DepositV3ExpectCallParams({
                 depositor: address(_earningChainAcrossAdapter),
@@ -580,8 +585,9 @@ contract AcrossAdapterTest is TestWithHelpers {
             data: abi.encode(acrossBridgeParams)
         });
 
-        bytes32 expectedMessageId =
-            _buildMessageId(ACCOUNTING_CHAIN_ID, address(_mockGhoEarningChain), totalInputAmount);
+        bytes32 expectedMessageId = _buildMessageId(
+            address(_earningChainAcrossAdapter), ACCOUNTING_CHAIN_ID, address(_mockGhoEarningChain), totalInputAmount
+        );
         bytes memory expectedCallData = _buildDepositV3ExpectCallData(
             DepositV3ExpectCallParams({
                 depositor: address(_earningChainAcrossAdapter),
@@ -670,8 +676,9 @@ contract AcrossAdapterTest is TestWithHelpers {
             data: abi.encode(acrossBridgeParams)
         });
 
-        bytes32 expectedMessageId =
-            _buildMessageId(ACCOUNTING_CHAIN_ID, address(_mockGhoEarningChain), totalInputAmount);
+        bytes32 expectedMessageId = _buildMessageId(
+            address(_earningChainAcrossAdapter), ACCOUNTING_CHAIN_ID, address(_mockGhoEarningChain), totalInputAmount
+        );
         bytes memory expectedCallData = _buildDepositV3ExpectCallData(
             DepositV3ExpectCallParams({
                 depositor: address(_earningChainAcrossAdapter),
@@ -730,7 +737,9 @@ contract AcrossAdapterTest is TestWithHelpers {
 
         // Message ID is built on the source chain, so use the Earning chain USDT address and set Accounting chain ID as
         // destination chainId.
-        bytes32 messageId = _buildMessageId(ACCOUNTING_CHAIN_ID, address(_mockUsdtEarningChain), bridgedAmount);
+        bytes32 messageId = _buildMessageId(
+            address(_earningChainAcrossAdapter), ACCOUNTING_CHAIN_ID, address(_mockUsdtEarningChain), bridgedAmount
+        );
 
         AcrossAdapter.AcrossPacket memory acrossPacket =
             AcrossAdapter.AcrossPacket({sourceChainId: EARNING_CHAIN_ID, messageId: messageId});
@@ -779,7 +788,9 @@ contract AcrossAdapterTest is TestWithHelpers {
         // Mint the assets to the AcrossAdapter
         _mockGhoEarningChain.mint(address(_earningChainAcrossAdapter), bridgedAmount);
 
-        bytes32 messageId = _buildMessageId(EARNING_CHAIN_ID, address(_mockGhoEarningChain), bridgedAmount);
+        bytes32 messageId = _buildMessageId(
+            address(_earningChainAcrossAdapter), EARNING_CHAIN_ID, address(_mockGhoEarningChain), bridgedAmount
+        );
 
         AcrossAdapter.AcrossPacket memory acrossPacket =
             AcrossAdapter.AcrossPacket({sourceChainId: ACCOUNTING_CHAIN_ID, messageId: messageId});
@@ -862,7 +873,9 @@ contract AcrossAdapterTest is TestWithHelpers {
         // Mint the assets to the AcrossAdapter
         _mockUsdtAccountingChain.mint(address(_accountingChainAcrossAdapter), bridgedAmount);
 
-        bytes32 messageId = _buildMessageId(EARNING_CHAIN_ID, address(_mockUsdtAccountingChain), bridgedAmount);
+        bytes32 messageId = _buildMessageId(
+            address(_earningChainAcrossAdapter), EARNING_CHAIN_ID, address(_mockUsdtAccountingChain), bridgedAmount
+        );
         AcrossAdapter.AcrossPacket memory acrossPacket =
             AcrossAdapter.AcrossPacket({sourceChainId: EARNING_CHAIN_ID, messageId: messageId});
 
@@ -941,12 +954,14 @@ contract AcrossAdapterTest is TestWithHelpers {
         _accountingChainAcrossAdapter.replayFundsReceiving(assets);
     }
 
-    function _buildMessageId(uint256 destinationChainId, address asset, uint256 amount)
+    function _buildMessageId(address acrossAdapter, uint256 destinationChainId, address asset, uint256 amount)
         internal
         view
         returns (bytes32)
     {
-        return EfficientHashLib.hash(abi.encode(block.chainid, block.timestamp, destinationChainId, asset, amount));
+        return EfficientHashLib.hash(
+            abi.encode(block.chainid, block.timestamp, acrossAdapter, destinationChainId, asset, amount)
+        );
     }
 
     function _buildDepositV3ExpectCallData(DepositV3ExpectCallParams memory p) internal view returns (bytes memory) {
