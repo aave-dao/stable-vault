@@ -14,6 +14,7 @@ import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IRescuableAssets} from "src/interfaces/IRescuableAssets.sol";
 import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
+import {ConstantsLib} from "src/libraries/ConstantsLib.sol";
 import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
@@ -1169,7 +1170,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         bbv.setDefaultSubVault(perSecondRate);
         _deposit(user, depositAmount);
         uint256 originalDepositRay = depositAmount.assetDecimalsToRay(address(mockAsset));
-        // Because the deposit happens without any accrual (`conversionRate == RAY`), the user gets:
+        // Because the deposit happens without any accrual (`conversionRate == RAY` before vm.warp), the user gets:
         // shares = depositRay / RAY = depositRay.
         uint256 userShares = originalDepositRay;
         assertEq(bbv.getGlobalOriginalDepositAmount(), originalDepositRay);
@@ -1185,7 +1186,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             // This matches the contract's `_accrueSubVaultConversionRate` rounding down, starting from
             // `conversionRate = RAY`.
             uint256 conversionRate = MathLib.RAY.rayMulDown(perSecondRate.rpow(timeElapsed));
-            uint256 minSharesToRedeemOneWei = uint256(1e9).rayDivUp(conversionRate);
+            uint256 minSharesToRedeemOneWei = uint256(ConstantsLib.MIN_WITHDRAWABLE_AMOUNT_RAY).rayDivUp(conversionRate);
             assertTrue(minSharesToRedeemOneWei > 1);
             dustRemainderShares = bound(dustRemainderShares, 1, minSharesToRedeemOneWei - 1);
 
@@ -1241,6 +1242,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         bbv.setDefaultSubVault(perSecondRate);
         _deposit(user, depositAmount);
         uint256 originalDepositRay = depositAmount.assetDecimalsToRay(address(mockAsset));
+        // Because the deposit happens without any accrual (`conversionRate == RAY` before vm.warp), the user gets:
+        // shares = depositRay / RAY = depositRay.
         uint256 userShares = originalDepositRay;
 
         vm.warp(block.timestamp + timeElapsed);
@@ -1253,7 +1256,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             // Matches the contract's `_accrueSubVaultConversionRate` rounding down, starting from `conversionRate =
             // RAY`.
             conversionRate = MathLib.RAY.rayMulDown(perSecondRate.rpow(timeElapsed));
-            minSharesToRedeemOneWei = uint256(1e9).rayDivUp(conversionRate);
+            minSharesToRedeemOneWei = uint256(ConstantsLib.MIN_WITHDRAWABLE_AMOUNT_RAY).rayDivUp(conversionRate);
             maxWithdrawRay = userShares.rayMulDown(conversionRate);
 
             requestedAmountRay = bound(requestedAmountRay, 0, maxWithdrawRay);

@@ -15,6 +15,7 @@ import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
+import {ConstantsLib} from "src/libraries/ConstantsLib.sol";
 import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {Multicall} from "src/misc/Multicall.sol";
@@ -550,9 +551,6 @@ contract BasedBoostedVault is
     }
 
     function _minSharesToRedeemOneWei(uint256 conversionRate) internal pure returns (uint256) {
-        // 1e9 is the smallest withdrawable amount in RAY for the maximum supported token decimals (18):
-        // 10^(RAY_DECIMALS - MAX_SUPPORTED_ASSET_DECIMALS) = 10^(27-18) = 1e9.
-        //
         // We want the remainder after a partial withdrawal to be redeemable for at least 1 wei (18-dec) of value.
         // A share balance S (in RAY units) redeems to:
         //   valueRay = rayMulDown(S * conversionRate)
@@ -560,8 +558,7 @@ contract BasedBoostedVault is
         //   rayMulDown(S * conversionRate) >= 1e9
         // which implies:
         //   S >= rayDivUp(1e9, conversionRate)
-        uint256 smallestWithdrawableAmountRay = 1e9;
-        return smallestWithdrawableAmountRay.rayDivUp(conversionRate);
+        return ConstantsLib.MIN_WITHDRAWABLE_AMOUNT_RAY.rayDivUp(conversionRate);
     }
 
     function _getAmountTakenFromOriginalDeposit(address user, uint256 withdrawalAmountRay)
