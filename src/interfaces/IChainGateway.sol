@@ -117,5 +117,5 @@ interface IChainGateway {
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
         IBridgeAdapter.BridgeParams memory bridgeParams
-    ) external payable;
+    ) external;
 }
