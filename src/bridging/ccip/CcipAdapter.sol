@@ -16,7 +16,6 @@ import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {ConstantsLib} from "src/libraries/ConstantsLib.sol";
-import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
 
 /// @title CcipAdapter
 /// @author Aave Labs
@@ -31,13 +30,6 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
 
     modifier onlyRouter() {
         require(msg.sender == CCIP_ROUTER, OnlyBridgeRouter());
-        _;
-    }
-
-    modifier onlySelf() {
-        if (msg.sender != address(this)) {
-            revert ErrorsLib.OnlySelf();
-        }
         _;
     }
 
@@ -145,12 +137,15 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
             catch (bytes memory err) {
                 for (uint256 i = 0; i < message.destTokenAmounts.length; i++) {
                     emit TokenReceptionFailed(
+                        message.messageId,
                         _chainIdOf[message.sourceChainSelector],
                         message.destTokenAmounts[i].token,
                         message.destTokenAmounts[i].amount
                     );
                 }
-                emit BridgedFundsProcessingFailed(_chainIdOf[message.sourceChainSelector], abi.encode(message), err);
+                emit BridgedFundsProcessingFailed(
+                    message.messageId, _chainIdOf[message.sourceChainSelector], abi.encode(message), err
+                );
             }
         }
     }

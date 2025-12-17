@@ -553,6 +553,26 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         );
     }
 
+    function test_receiveMessage_whenDecrementBalanceSnapshotIsReceived(uint256 amountRay) public {
+        amountRay = _boundRayAmount(amountRay);
+
+        vm.expectCall(
+            address(_mockFundsHandler),
+            abi.encodeCall(IFundsHandler.decrementChainBalanceSnapshotCallback, (EARNING_CHAIN_ID, amountRay))
+        );
+        vm.prank(address(_mockBridgeAdapterData));
+        _accountingChainGateway.receiveMessage(
+            EARNING_CHAIN_ID,
+            new IBridgeAdapter.BridgeAsset[](0),
+            abi.encode(
+                IChainGateway.CrossChainMessage({
+                    messageType: IChainGateway.MessageType.DECREMENT_BALANCE_SNAPSHOT,
+                    data: abi.encode(IChainGateway.DecrementBalanceSnapshotMessage({amountRay: amountRay}))
+                })
+            )
+        );
+    }
+
     function test_receiveMessage_givenWhitelistedNonDefaultBridgeAdapter(
         uint256 iouTokenAmountBurnedRay,
         uint256 chainBalanceSnapshotNonce,

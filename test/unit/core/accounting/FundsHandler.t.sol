@@ -5,6 +5,7 @@ pragma solidity ^0.8.22;
 import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Vm} from "forge-std/Vm.sol";
 
 import {FundsHandler} from "src/core/accounting/FundsHandler.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
@@ -316,6 +317,76 @@ contract FundsHandlerTest is TestWithHelpers {
         assertEq(fundsHandler.getAssetBalances()[0].asset, address(0));
         assertEq(fundsHandler.getAssetBalances()[0].amountRay, snapshotBalanceRay);
         assertEq(fundsHandler.getAssetBalances()[0].chainId, chainId);
+    }
+
+    function test_decrementChainBalanceSnapshotCallback_reverts_ifMsgSenderIsNotTheGateway(
+        address msgSender,
+        uint256 amountToDecrementRay
+    ) public {
+        uint256 chainId = 1;
+        _assumeNotProxyAdmin(msgSender, address(fundsHandler));
+        vm.assume(msgSender != address(mockGateway));
+
+        amountToDecrementRay = _boundRayAmount(amountToDecrementRay);
+
+        vm.expectRevert(ErrorsLib.OnlyGateway.selector);
+        vm.prank(msgSender);
+        fundsHandler.decrementChainBalanceSnapshotCallback(chainId, amountToDecrementRay);
+    }
+
+    function test_decrementChainBalanceSnapshotCallback_decrementsChainBalance(
+        uint256 chainId,
+        uint256 currentSnapshotBalanceRay,
+        uint256 amountToDecrementRay
+    ) public {
+        vm.assume(chainId != block.chainid);
+        currentSnapshotBalanceRay = _boundRayAmountAllowingZero(currentSnapshotBalanceRay);
+        amountToDecrementRay = _boundRayAmount(amountToDecrementRay);
+
+        assertEq(fundsHandler.getAssetBalances().length, 0);
+
+        // First use the update chain balance callback to set the snapshot balance
+        vm.prank(address(mockGateway));
+        fundsHandler.updateChainBalanceCallback(chainId, currentSnapshotBalanceRay, 0);
+
+        assertEq(fundsHandler.getAssetBalances().length, 1);
+        assertEq(fundsHandler.getAssetBalances()[0].asset, address(0));
+        assertEq(fundsHandler.getAssetBalances()[0].amountRay, currentSnapshotBalanceRay);
+        assertEq(fundsHandler.getAssetBalances()[0].chainId, chainId);
+
+        // Then use the decrement chain balance snapshot callback to decrement the snapshot balance
+        vm.expectEmit(true, true, true, true);
+        emit IFundsHandler.ChainBalanceSnapshotDecremented(chainId, amountToDecrementRay);
+        vm.prank(address(mockGateway));
+        fundsHandler.decrementChainBalanceSnapshotCallback(chainId, amountToDecrementRay);
+
+        assertEq(fundsHandler.getAssetBalances().length, 1);
+        assertEq(fundsHandler.getAssetBalances()[0].asset, address(0));
+        if (currentSnapshotBalanceRay >= amountToDecrementRay) {
+            assertEq(fundsHandler.getAssetBalances()[0].amountRay, currentSnapshotBalanceRay - amountToDecrementRay);
+        } else {
+            assertEq(fundsHandler.getAssetBalances()[0].amountRay, 0);
+        }
+        assertEq(fundsHandler.getAssetBalances()[0].chainId, chainId);
+    }
+
+    function test_decrementChainBalanceSnapshotCallback_decrementsChainBalance_currentSnapshotDoesNotExist(
+        uint256 chainId,
+        uint256 amountToDecrementRay
+    ) public {
+        // Context: check that the event ChainBalanceSnapshotDecremented is not emitted.
+        vm.assume(chainId != block.chainid);
+        amountToDecrementRay = _boundRayAmount(amountToDecrementRay);
+
+        assertEq(fundsHandler.getAssetBalances().length, 0);
+
+        vm.recordLogs();
+        vm.prank(address(mockGateway));
+        fundsHandler.decrementChainBalanceSnapshotCallback(chainId, amountToDecrementRay);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        assertEq(logs.length, 0);
+
+        assertEq(fundsHandler.getAssetBalances().length, 0);
     }
 
     function test_updateChainBalanceCallback_updatesChainBalanceIfChainSendsBalanceSnapshotForFirstTimeRegardlessOfNonce(
@@ -726,7 +797,7 @@ contract FundsHandlerTest is TestWithHelpers {
         mockGateway.mockToConsumeAssetFromTransferHelperInNextCall(address(mockAsset), bridgeParams_feeAmount + amount);
 
         vm.expectEmit(true, true, true, true);
-        emit IFundsHandler.ChainBalanceSnapshotUpdated(chainId, amount.assetDecimalsToRay(address(mockAsset)));
+        emit IFundsHandler.ChainBalanceSnapshotIncremented(chainId, amount.assetDecimalsToRay(address(mockAsset)));
         vm.expectCall(
             address(mockGateway),
             abi.encodeCall(

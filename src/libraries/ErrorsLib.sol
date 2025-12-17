@@ -34,6 +34,10 @@ library ErrorsLib {
     /// @custom:selector 0x6f79c78a
     error InvalidAsset(address asset);
 
+    /// @notice Thrown when bridge fee payer is not the expected caller.
+    /// @custom:selector 0xecec4b20
+    error InvalidBridgeFeePayer();
+
     /// @notice Thrown when destination chain id checked is the same as the current chain id.
     /// @custom:selector 0x90eaaa70
     error InvalidDestinationChainId();
@@ -41,6 +45,10 @@ library ErrorsLib {
     /// @notice Thrown when input parameter contains unacceptable value.
     /// @custom:selector 0x613970e0
     error InvalidParameter();
+
+    /// @notice Thrown when a recovered signer is not a whitelisted signer.
+    /// @custom:selector 0x8baa579f
+    error InvalidSignature();
 
     /// @notice Thrown when native currency transfer failed.
     /// @custom:selector 0xf4b3b1bc
@@ -50,10 +58,6 @@ library ErrorsLib {
     /// @custom:selector 0xea8e4eb5
     error NotAuthorized();
 
-    /// @notice Thrown when bridge fee payer is not the expected caller.
-    /// @custom:selector 0xecec4b20
-    error InvalidBridgeFeePayer();
-
     /// @notice Address checked is not the Cross-chain gateway.
     /// @custom:selector 0xec76af13
     error OnlyGateway();
@@ -61,6 +65,14 @@ library ErrorsLib {
     /// @notice Address checked is not the contract being called.
     /// @custom:selector 0x14d4a4e8
     error OnlySelf();
+
+    /// @notice Thrown when a signature nonce has already been used.
+    /// @custom:selector 0x85127399
+    error SignatureNonceAlreadyConsumed(address signer, uint256 nonce);
+
+    /// @notice Thrown when a signature timestamp has expired.
+    /// @custom:selector 0x2eac42fc
+    error SignatureTimestampExpired();
 
     /// @notice Unsupported asset.
     /// @custom:selector 0xee84f40b

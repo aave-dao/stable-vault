@@ -89,7 +89,9 @@ Withdrawals are a two-step process designed to ensure liquidity management and p
 based-boosted-vaults/
 ├── src/                          # Main source code
 │   ├── access/                   # Access control contracts
-│   ├── bridging/                 # Cross-chain bridge adapters (CCIP, etc.)
+│   ├── bridging/                 # Adapters used by protocol to interface with cross-chain bridges
+│   │   ├── across/               # Across adapter logic and interfaces
+│   │   └── ccip/                 # Chainlink CCIP adapter logic and interfaces
 │   ├── core/                     # Core protocol logic
 │   │   ├── accounting/           # Accounting chain logic (Vault, FundsHandler)
 │   │   ├── earning/              # Earning chain logic

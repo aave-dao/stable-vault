@@ -11,7 +11,7 @@ import {Create3AddressBook} from "script/base/Create3AddressBook.sol";
 import {Create3Deployment} from "script/base/Create3Deployment.sol";
 
 import {ExtendedAccessManager} from "src/access/ExtendedAccessManager.sol";
-import {CcipAdapter} from "src/bridging/CcipAdapter.sol";
+import {CcipAdapter} from "src/bridging/ccip/CcipAdapter.sol";
 import {Allocator} from "src/core/Allocator.sol";
 import {AccountingChainGateway} from "src/core/accounting/AccountingChainGateway.sol";
 import {BasedBoostedVault} from "src/core/accounting/BasedBoostedVault.sol";
