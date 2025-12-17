@@ -5,6 +5,7 @@ pragma solidity ^0.8.22;
 import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Vm} from "forge-std/Vm.sol";
 
 import {FundsHandler} from "src/core/accounting/FundsHandler.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
@@ -373,21 +374,19 @@ contract FundsHandlerTest is TestWithHelpers {
         uint256 chainId,
         uint256 amountToDecrementRay
     ) public {
+        // Context: check that the event ChainBalanceSnapshotDecremented is not emitted.
         vm.assume(chainId != block.chainid);
         amountToDecrementRay = _boundRayAmount(amountToDecrementRay);
 
         assertEq(fundsHandler.getAssetBalances().length, 0);
 
-        vm.expectEmit(true, true, true, true);
-        emit IFundsHandler.ChainBalanceSnapshotDecremented(chainId, amountToDecrementRay);
+        vm.recordLogs();
         vm.prank(address(mockGateway));
         fundsHandler.decrementChainBalanceSnapshotCallback(chainId, amountToDecrementRay);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        assertEq(logs.length, 0);
 
-        assertEq(fundsHandler.getAssetBalances().length, 1);
-        assertEq(fundsHandler.getAssetBalances()[0].asset, address(0));
-        // Balance should not underflow
-        assertEq(fundsHandler.getAssetBalances()[0].amountRay, 0);
-        assertEq(fundsHandler.getAssetBalances()[0].chainId, chainId);
+        assertEq(fundsHandler.getAssetBalances().length, 0);
     }
 
     function test_updateChainBalanceCallback_updatesChainBalanceIfChainSendsBalanceSnapshotForFirstTimeRegardlessOfNonce(

@@ -231,10 +231,8 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, TransferHelp
     /// @dev This does not update the chain balance snapshot nonce because any potential incoming snapshot data would be
     /// ignored.
     function _decrementChainBalanceSnapshot(uint256 chainId, uint256 amountToDecrementRay) internal {
-        bool chainExists;
         for (uint16 i = 0; i < $storage().chainBalances.length; i++) {
             if ($storage().chainBalances[i].chainId == chainId) {
-                chainExists = true;
                 // It is possible for the existing snapshot to be stale and not reflect earnings on the Earning Chain.
                 // If the amount to decrement is greater than the existing snapshot, set the snapshot to 0.
                 if ($storage().chainBalances[i].amountRay >= amountToDecrementRay) {
@@ -242,16 +240,9 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, TransferHelp
                 } else {
                     $storage().chainBalances[i].amountRay = 0;
                 }
+                emit ChainBalanceSnapshotDecremented(chainId, amountToDecrementRay);
             }
         }
-        // In the case that funds were added to the Earning Chain through a top-up (funds deposited to a strategy on
-        // behalf of the Allocator), then it is possible the local snapshot does not exist. The local snapshot would
-        // exist if funds were bridged to the Earning Chain or if a snapshot was previously ingested.
-        // In this case we set the snapshot balance to 0.
-        if (!chainExists) {
-            $storage().chainBalances.push(ChainBalanceSnapshot({chainId: chainId, amountRay: 0, nonce: 0}));
-        }
-        emit ChainBalanceSnapshotDecremented(chainId, amountToDecrementRay);
     }
 
     function _pushFundsToImmediateLiquidity(address asset, uint256 amount) internal {
