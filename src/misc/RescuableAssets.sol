@@ -18,7 +18,7 @@ abstract contract RescuableAssets is IRescuableAssets {
     function rescueTokens(address asset, uint256 amount) public virtual override {
         _beforeRescueTokens(asset, amount);
         if (asset == address(0)) {
-            (bool callSucceeded,) = msg.sender.call{value: address(this).balance}("");
+            (bool callSucceeded,) = msg.sender.call{value: amount, gas: 10_000}("");
             require(callSucceeded, ErrorsLib.NativeTransferFailed());
         } else {
             IERC20(asset).safeTransfer(msg.sender, amount);

@@ -553,6 +553,46 @@ contract FundsHandlerTest is TestWithHelpers {
         assertEq(mockAsset.balanceOf(address(fundsHandler)), fhAssetBalance - assetAmountToRescue);
     }
 
+    function test_rescueTokens_getExpectedAmountOfNativeAssetToMsgSender(
+        uint256 fhAssetBalance,
+        uint256 assetAmountToRescue
+    ) public {
+        // Avoid fuzzing the msgSender address to avoid .call on precompiles and zero address.
+        address msgSender = makeAddr("msgSender");
+
+        fhAssetBalance = _boundNativeAmount(fhAssetBalance);
+        assetAmountToRescue = _boundNativeAmount(assetAmountToRescue);
+        vm.assume(fhAssetBalance >= assetAmountToRescue);
+
+        vm.deal(address(fundsHandler), fhAssetBalance);
+        assertEq(address(fundsHandler).balance, fhAssetBalance);
+        vm.assume(address(msgSender).balance == 0);
+
+        vm.prank(msgSender);
+        IRescuableAssets(address(fundsHandler)).rescueTokens(address(0), assetAmountToRescue);
+
+        assertEq(address(msgSender).balance, assetAmountToRescue);
+        assertEq(address(fundsHandler).balance, fhAssetBalance - assetAmountToRescue);
+    }
+
+    function test_rescueTokens_reverts_ifNativeTransferFails(uint256 fhAssetBalance, uint256 assetAmountToRescue)
+        public
+    {
+        fhAssetBalance = _boundNativeAmount(fhAssetBalance);
+        assetAmountToRescue = _boundNativeAmount(assetAmountToRescue);
+        vm.assume(fhAssetBalance >= assetAmountToRescue);
+        vm.deal(address(fundsHandler), fhAssetBalance);
+        assertEq(address(fundsHandler).balance, fhAssetBalance);
+
+        // Use a precompile address to force a revert after low level call.
+        address msgSender = address(0x09);
+        vm.assume(address(msgSender).balance == 0);
+
+        vm.prank(msgSender);
+        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.NativeTransferFailed.selector));
+        IRescuableAssets(address(fundsHandler)).rescueTokens(address(0), assetAmountToRescue);
+    }
+
     function test_pushFundsToChain_reverts_ifMsgSenderIsNotAuthorized(
         address unauthorizedMsgSender,
         address asset,
