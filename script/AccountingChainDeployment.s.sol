@@ -5,12 +5,12 @@ pragma solidity ^0.8.20;
 import {Script} from "forge-std/Script.sol";
 
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
+import {AccessManager} from "openzeppelin-contracts/contracts/access/manager/AccessManager.sol";
 
 import {ATokenVaultDeployment} from "script/base/ATokenVaultDeployment.sol";
 import {Create3AddressBook} from "script/base/Create3AddressBook.sol";
 import {Create3Deployment} from "script/base/Create3Deployment.sol";
 
-import {ExtendedAccessManager} from "src/access/ExtendedAccessManager.sol";
 import {CcipAdapter} from "src/bridging/ccip/CcipAdapter.sol";
 import {Allocator} from "src/core/Allocator.sol";
 import {AccountingChainGateway} from "src/core/accounting/AccountingChainGateway.sol";
@@ -165,7 +165,7 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
         address accessManager = _deploy_create3({
             namespacedSaltSeed: ACCESS_MANAGER_SALT_SEED,
             deployer: DEPLOYER,
-            initCode: abi.encodePacked(type(ExtendedAccessManager).creationCode, abi.encode(ACCESS_MANAGER_ADMIN))
+            initCode: abi.encodePacked(type(AccessManager).creationCode, abi.encode(ACCESS_MANAGER_ADMIN))
         });
         require(accessManager == getAccessManagerAddress(DEPLOYER), "AccessManager does not match expected address");
         _logDeployment("AccessManager", ACCESS_MANAGER_SALT_SEED, accessManager);
