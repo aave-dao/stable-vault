@@ -33,6 +33,10 @@ interface IAssetRegistry {
     /// @param disableAllocatorDeposits Whether to disable allocator deposits for the asset.
     function disableDeposits(address asset, bool disableUserDeposits, bool disableAllocatorDeposits) external;
 
+    /// @notice Disables an asset to be used as a swap output.
+    /// @param asset Address of the asset to disable swap output for.
+    function disableSwapOutput(address asset) external;
+
     /// @notice Getter for whether the asset is allowed to be deposited into the system by a user.
     /// @param asset Address of the asset to check if it is allowed to be deposited into the system by a user.
     /// @return isAllowed Whether the asset is allowed to be deposited into the system by a user.
