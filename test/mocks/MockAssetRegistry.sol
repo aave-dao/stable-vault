@@ -24,6 +24,8 @@ contract MockAssetRegistry is IAssetRegistry {
         override
     {}
 
+    function disableSwapOutput(address asset) external override {}
+
     function mockToAllowAssetDepositsIntoBBV(address asset) external {
         _isNotAllowedUserDeposit[asset] = false;
     }

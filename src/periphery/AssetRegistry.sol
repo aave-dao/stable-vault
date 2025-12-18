@@ -68,6 +68,7 @@ contract AssetRegistry is AccessManagedUpgradeable, Multicall, IAssetRegistry {
         override
         restricted
     {
+        require(_isAssetRegistered(asset), ErrorsLib.UnsupportedAsset(asset));
         bool isUserDepositsAllowed = $storage().configByAsset[asset].depositFromUserAllowed;
         if (isUserDepositsAllowed && disableUserDeposits) {
             $storage().configByAsset[asset].depositFromUserAllowed = false;
@@ -76,13 +77,21 @@ contract AssetRegistry is AccessManagedUpgradeable, Multicall, IAssetRegistry {
         if (isAllocatorDepositsAllowed && disableAllocatorDeposits) {
             $storage().configByAsset[asset].depositIntoAllocatorAllowed = false;
         }
+        emit AssetConfigSet(asset, $storage().configByAsset[asset]);
+    }
+
+    /// @inheritdoc IAssetRegistry
+    function disableSwapOutput(address asset) external override restricted {
+        require(_isAssetRegistered(asset), ErrorsLib.UnsupportedAsset(asset));
+        $storage().configByAsset[asset].swapOutputTokenAllowed = false;
+        emit AssetConfigSet(asset, $storage().configByAsset[asset]);
     }
 
     // /////////////////////// PERMISSION SPECIFIC GETTERS ////////////////////////////
 
     /// @inheritdoc IAssetRegistry
     function isAssetRegistered(address asset) external view override returns (bool) {
-        return $storage().assets.contains(asset);
+        return _isAssetRegistered(asset);
     }
 
     /// @inheritdoc IAssetRegistry
@@ -108,5 +117,9 @@ contract AssetRegistry is AccessManagedUpgradeable, Multicall, IAssetRegistry {
     /// @inheritdoc IAssetRegistry
     function getRegisteredAssets() external view override returns (address[] memory) {
         return $storage().assets.values();
+    }
+
+    function _isAssetRegistered(address asset) internal view returns (bool) {
+        return $storage().assets.contains(asset);
     }
 }
