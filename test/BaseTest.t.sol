@@ -2,11 +2,12 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.20;
 
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 
-import {ExtendedAccessManager} from "src/access/ExtendedAccessManager.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {AccessManager} from "openzeppelin-contracts/contracts/access/manager/AccessManager.sol";
+
 import {CcipAdapter} from "src/bridging/ccip/CcipAdapter.sol";
 import {Allocator} from "src/core/Allocator.sol";
 import {AccountingChainGateway} from "src/core/accounting/AccountingChainGateway.sol";
@@ -87,7 +88,7 @@ contract BaseTest is Test {
     address ccipAdapter_accountingChainAddress;
     address ghoStrategyVault_accountingChainAddress;
     address usdcStrategyVault_accountingChainAddress;
-    ExtendedAccessManager accessManager_accountingChain;
+    AccessManager accessManager_accountingChain;
     BasedBoostedVault vault;
     IouToken iouToken_accountingChain;
     IouTokenManager iouTokenManager_accountingChain;
@@ -113,7 +114,7 @@ contract BaseTest is Test {
     address swapper_earningChainAddress;
     address ghoStrategyVault_earningChainAddress;
     address usdcStrategyVault_earningChainAddress;
-    ExtendedAccessManager accessManager_earningChain;
+    AccessManager accessManager_earningChain;
     AssetRegistry assetRegistry_earningChain;
     WithdrawalPolicy withdrawalPolicy_earningChain;
     IouToken iouToken_earningChain;
@@ -276,7 +277,7 @@ contract BaseTest is Test {
         console.log("\tCCIP Adapter (Accounting Chain) Predicted Address: %s", ccipAdapter_accountingChainAddress);
 
         // 1. Access Manager
-        accessManager_accountingChain = new ExtendedAccessManager(admin);
+        accessManager_accountingChain = new AccessManager(admin);
         console.log("\tAccess Manager: %s", address(accessManager_accountingChain));
         require(
             address(accessManager_accountingChain) == accessManager_accountingChainAddress,
@@ -522,7 +523,7 @@ contract BaseTest is Test {
         );
 
         // 1. Access Manager
-        accessManager_earningChain = new ExtendedAccessManager(admin);
+        accessManager_earningChain = new AccessManager(admin);
         console.log("\tAccess Manager: %s", address(accessManager_earningChain));
         require(
             address(accessManager_earningChain) == accessManager_earningChainAddress,
@@ -774,7 +775,7 @@ contract BaseTest is Test {
         vm.stopPrank();
     }
 
-    function _setUpAccountingChainAccessManager(ExtendedAccessManager accessManager) internal {
+    function _setUpAccountingChainAccessManager(AccessManager accessManager) internal {
         vm.startPrank(admin);
 
         // TODO: set up RoleAdmin role which can grant and revoke roles
@@ -863,7 +864,7 @@ contract BaseTest is Test {
         vm.stopPrank();
     }
 
-    function _setUpEarningChainAccessManager(ExtendedAccessManager accessManager) internal {
+    function _setUpEarningChainAccessManager(AccessManager accessManager) internal {
         vm.startPrank(admin);
 
         // TODO: set up RoleAdmin role which can grant and revoke roles
@@ -930,9 +931,7 @@ contract BaseTest is Test {
         vm.stopPrank();
     }
 
-    function _setUpRole(ExtendedAccessManager accessManager, uint64 roleId, address account, uint32 executionDelay)
-        internal
-    {
+    function _setUpRole(AccessManager accessManager, uint64 roleId, address account, uint32 executionDelay) internal {
         accessManager.grantRole(roleId, account, executionDelay);
         accessManager.setRoleGuardian(roleId, GUARDIAN_ROLE);
     }
