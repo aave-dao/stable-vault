@@ -139,6 +139,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     /// @inheritdoc IAllocator
     function deposit(address asset, uint256 amount) external override onlyDepositor {
         ITransferHelper(TRANSFER_HELPER).pull(asset, amount);
+        require(IAssetRegistry(ASSET_REGISTRY).isDepositToAllocatorAllowed(asset), ErrorsLib.UnsupportedAsset(asset));
         _depositToStrategy({
             asset: asset, amount: amount, strategy: $storage().defaultStrategyByAsset[asset], revertOnFailure: false
         });
@@ -350,7 +351,6 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     /// @dev Intended to be the lowest level function used to deposit into a strategy.
     function _depositToStrategy(address asset, uint256 amount, address strategy, bool revertOnFailure) internal {
         require(amount > 0, ErrorsLib.ZeroAmount());
-        require(IAssetRegistry(ASSET_REGISTRY).isDepositToAllocatorAllowed(asset), ErrorsLib.UnsupportedAsset(asset));
         if (strategy == address(0)) {
             // If strategy passed is address(0), it means we want to hold the funds idle in the Allocator.
             return;
