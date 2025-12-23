@@ -129,10 +129,6 @@ contract AllocatorTest is TestWithHelpers {
         _allocator = _deployAllocator(_mockAccessManager, address(_mockAssetRegistry), address(_mockTransferHelper));
     }
 
-    function test_selectors() public pure {
-        assertEq(IAllocator.DepositIntoStrategyFailed.selector, bytes4(keccak256("DepositIntoStrategyFailed(address)")));
-    }
-
     function test_getAssetBalances_returnsExpectedAssetBalances(uint256 depositAmountUsdt, uint256 depositAmountGho)
         public
     {
@@ -325,32 +321,6 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
     }
 
-    function test_deposit_whereVaultRejectsDeposit(uint256 depositAmountUsdt) public {
-        depositAmountUsdt = _boundAssetAmount(address(_mockUsdt), depositAmountUsdt);
-
-        _mockTransferHelper.mockAsset(address(_mockUsdt), depositAmountUsdt);
-
-        // Mock the vault to reject the deposit
-        vm.mockCallRevert(
-            address(_defaultUsdtStrategy),
-            abi.encodeWithSelector(IERC4626.deposit.selector, depositAmountUsdt, address(_allocator)),
-            abi.encodeWithSelector(IERC20Errors.ERC20InvalidSender.selector, address(_allocator))
-        );
-
-        vm.expectEmit(true, true, true, true);
-        emit IAllocator.StrategyDepositFailed(address(_defaultUsdtStrategy), depositAmountUsdt);
-        vm.prank(depositor);
-        _allocator.deposit(address(_mockUsdt), depositAmountUsdt);
-
-        // Check the funds are idle in the Allocator
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), depositAmountUsdt);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
-        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
-        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
-        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
-        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
-    }
-
     function test_deposit_withAllowedAssetWithoutStrategy(uint256 amount) public {
         amount = _boundAssetAmount(address(_mockUnsupportedAsset), amount);
 
@@ -369,6 +339,27 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
+    }
+
+    function test_deposit_reverts_whereVaultRejectsDeposit(uint256 depositAmountUsdt) public {
+        depositAmountUsdt = _boundAssetAmount(address(_mockUsdt), depositAmountUsdt);
+
+        _mockTransferHelper.mockAsset(address(_mockUsdt), depositAmountUsdt);
+
+        // Mock the vault to reject the deposit
+        vm.mockCallRevert(
+            address(_defaultUsdtStrategy),
+            abi.encodeWithSelector(IERC4626.deposit.selector, depositAmountUsdt, address(_allocator)),
+            abi.encodeWithSelector(IERC20Errors.ERC20InvalidSender.selector, address(_allocator))
+        );
+
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.StrategyDepositFailed(address(_defaultUsdtStrategy), depositAmountUsdt);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAllocator.DepositIntoStrategyFailed.selector, address(_defaultUsdtStrategy))
+        );
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), depositAmountUsdt);
     }
 
     function test_deposit_reverts_ifNonDepositorCalls(address nonDepositor, uint256 amount) public {
@@ -880,10 +871,12 @@ contract AllocatorTest is TestWithHelpers {
         );
 
         IAllocator.RebalanceParams[] memory rebalanceParams = _getDepositIdleFundsRebalanceParams(address(_mockUsdt));
-        vm.prank(address(everyRoleAccount));
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.StrategyDepositFailed(address(_defaultUsdtStrategy), amount);
         vm.expectRevert(
-            abi.encodeWithSelector(IAllocator.DepositIntoStrategyFailed.selector, address(_defaultUsdtStrategy), amount)
+            abi.encodeWithSelector(IAllocator.DepositIntoStrategyFailed.selector, address(_defaultUsdtStrategy))
         );
+        vm.prank(address(everyRoleAccount));
         _allocator.rebalance(rebalanceParams);
     }
 

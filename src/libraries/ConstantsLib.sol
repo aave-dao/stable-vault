@@ -12,6 +12,9 @@ library ConstantsLib {
     /// @dev The token address used to indicate the asset used to pay a bridge fee is the native currency.
     address public constant NATIVE_CURRENCY = address(0);
 
+    /// @dev The zero address used to check if an address is not set.
+    address internal constant ZERO_ADDRESS = address(0);
+
     /// @dev The token address used in bridging flows when only an arbitrary message is being bridged.
     address internal constant ASSET_FOR_DATA_ONLY_BRIDGE = address(0);
 

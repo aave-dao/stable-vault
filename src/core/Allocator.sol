@@ -15,6 +15,7 @@ import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {ISwapper} from "src/interfaces/ISwapper.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
+import {ConstantsLib} from "src/libraries/ConstantsLib.sol";
 import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
 import {Multicall} from "src/misc/Multicall.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
@@ -140,9 +141,9 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     function deposit(address asset, uint256 amount) external override onlyDepositor {
         ITransferHelper(TRANSFER_HELPER).pull(asset, amount);
         require(IAssetRegistry(ASSET_REGISTRY).isDepositToAllocatorAllowed(asset), ErrorsLib.UnsupportedAsset(asset));
-        _depositToStrategy({
-            asset: asset, amount: amount, strategy: $storage().defaultStrategyByAsset[asset], revertOnFailure: false
-        });
+        if ($storage().defaultStrategyByAsset[asset] != ConstantsLib.ZERO_ADDRESS) {
+            _depositToStrategy({asset: asset, amount: amount, strategy: $storage().defaultStrategyByAsset[asset]});
+        }
     }
 
     /// @inheritdoc IAllocator
@@ -333,9 +334,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         } else {
             amountToAllocate = allocation.amount;
         }
-        _depositToStrategy({
-            asset: allocation.asset, amount: amountToAllocate, strategy: allocation.strategy, revertOnFailure: true
-        });
+        _depositToStrategy({asset: allocation.asset, amount: amountToAllocate, strategy: allocation.strategy});
     }
 
     /// @dev Intended to be the lowest level function used to withdraw from a strategy.
@@ -356,12 +355,8 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     }
 
     /// @dev Intended to be the lowest level function used to deposit into a strategy.
-    function _depositToStrategy(address asset, uint256 amount, address strategy, bool revertOnFailure) internal {
+    function _depositToStrategy(address asset, uint256 amount, address strategy) internal {
         require(amount > 0, ErrorsLib.ZeroAmount());
-        if (strategy == address(0)) {
-            // If strategy passed is address(0), it means we want to hold the funds idle in the Allocator.
-            return;
-        }
         if (!$storage().strategyConfigs[strategy].depositAllowed) {
             revert DepositsToStrategyDisabled(strategy);
         }
@@ -370,10 +365,10 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         if (callSucceeded) {
             emit AssetAllocated(asset, strategy, amount);
         } else {
-            require(!revertOnFailure, IAllocator.DepositIntoStrategyFailed(strategy));
             // Clear the approval since this failure is handled gracefully
             IERC20(asset).forceApprove(strategy, 0);
             emit StrategyDepositFailed(strategy, amount);
+            revert DepositIntoStrategyFailed(strategy);
         }
     }
 
