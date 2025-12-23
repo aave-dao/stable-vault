@@ -710,13 +710,13 @@ contract AllocatorTest is TestWithHelpers {
 
         // Perform withdrawal
         vm.prank(withdrawer);
-        vm.expectRevert("ERC20: transfer amount exceeds balance");
+        vm.expectRevert(ErrorsLib.InsufficientFunds.selector);
         _allocator.withdraw(address(_mockUsdt), amount + 1);
 
         // Try again after airdropping funds to the Allocator
         _mockUsdt.mint(address(_allocator), amount);
         vm.prank(withdrawer);
-        vm.expectRevert("ERC20: transfer amount exceeds balance");
+        vm.expectRevert(ErrorsLib.InsufficientFunds.selector);
         _allocator.withdraw(address(_mockUsdt), amount * 2 + 1);
     }
 
@@ -734,13 +734,13 @@ contract AllocatorTest is TestWithHelpers {
 
         // Perform withdrawal
         vm.prank(withdrawer);
-        vm.expectRevert("ERC20: transfer amount exceeds balance");
+        vm.expectRevert(ErrorsLib.InsufficientFunds.selector);
         _allocator.withdraw(address(_mockUsdt), amount + 1);
 
         // Try again after airdropping funds to the Allocator
         _mockUsdt.mint(address(_allocator), amount);
         vm.prank(withdrawer);
-        vm.expectRevert("ERC20: transfer amount exceeds balance");
+        vm.expectRevert(ErrorsLib.InsufficientFunds.selector);
         _allocator.withdraw(address(_mockUsdt), amount * 2 + 1);
     }
 
@@ -1130,35 +1130,6 @@ contract AllocatorTest is TestWithHelpers {
         IAllocator.DeallocationParams[] memory deallocations = _initializeDeallocationParams(1);
         deallocations[0] =
             _buildDeallocationParams(address(_mockUsdt), address(_strategyWithSlippage), deallocateAmountUsdt);
-        rebalanceParams[0] =
-            _buildRebalanceParams(deallocations, _initializeSwapParams(0), _initializeAllocationParams(0));
-
-        vm.prank(address(everyRoleAccount));
-        vm.expectRevert(ErrorsLib.InsufficientAmountOut.selector);
-        _allocator.rebalance(rebalanceParams);
-    }
-
-    function test_rebalance_deallocate_maxAmount_reverts_ifStrategyDoesNotReturnSufficientAmount(uint256 depositAmountUsdt)
-        public
-    {
-        depositAmountUsdt = _boundAssetAmount(address(_mockUsdt), depositAmountUsdt);
-        vm.assume(depositAmountUsdt > 0);
-
-        TestErc4626WithSlippage _strategyWithSlippage = new TestErc4626WithSlippage(_mockUsdt);
-
-        vm.prank(admin);
-        _allocator.addStrategy(address(_mockUsdt), address(_strategyWithSlippage));
-
-        // Deposit funds into the strategy vault on behalf of the Allocator
-        _mockUsdt.mint(depositor, depositAmountUsdt);
-        vm.prank(depositor);
-        MockNonStandardErc20(address(_mockUsdt)).approve(address(_strategyWithSlippage), depositAmountUsdt);
-        vm.prank(depositor);
-        _strategyWithSlippage.deposit(depositAmountUsdt, address(_allocator));
-
-        IAllocator.RebalanceParams[] memory rebalanceParams = _initializeRebalanceParams(1);
-        IAllocator.DeallocationParams[] memory deallocations = _initializeDeallocationParams(1);
-        deallocations[0] = _buildDeallocationParams(address(_mockUsdt), address(_strategyWithSlippage), 0);
         rebalanceParams[0] =
             _buildRebalanceParams(deallocations, _initializeSwapParams(0), _initializeAllocationParams(0));
 

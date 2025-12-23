@@ -2,7 +2,6 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.20;
 
-import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import {console} from "forge-std/console.sol";
 import {IERC20} from "forge-std/interfaces/IERC20.sol";
 import {IERC4626} from "forge-std/interfaces/IERC4626.sol";
@@ -11,6 +10,7 @@ import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IBasedBoostedVault} from "src/interfaces/IBasedBoostedVault.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
+import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
 import {Swapper} from "src/periphery/Swapper.sol";
 
 import {BaseTest} from "test/BaseTest.t.sol";
@@ -238,17 +238,9 @@ contract EndToEndTest is BaseTest {
             console.log("... request withdrawal minted IOU tokens: %s", iouAmountRequestedRay);
             // Check user IOU token balance
             assertGt(iouToken_accountingChain.balanceOf(user), 0, "User should have minted IOU tokens");
-
-            uint256 iouAmountRequestedUsdc = iouAmountRequestedRay.rayToAssetDecimals(address(USDC));
+            
             vm.prank(user);
-            vm.expectRevert(
-                abi.encodeWithSelector(
-                    IERC20Errors.ERC20InsufficientBalance.selector,
-                    address(allocator_accountingChain),
-                    0,
-                    iouAmountRequestedUsdc
-                )
-            );
+            vm.expectRevert(ErrorsLib.InsufficientFunds.selector);
             vault.executeWithdrawal(user, address(USDC), 0, iouAmountRequestedRay, "");
 
             // - check that we don't owe the user any funds

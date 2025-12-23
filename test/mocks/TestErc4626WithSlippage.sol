@@ -20,4 +20,17 @@ contract TestErc4626WithSlippage is ERC4626 {
 
         return shares;
     }
+
+    function redeem(uint256 shares, address receiver, address owner) public override returns (uint256) {
+        uint256 maxShares = maxRedeem(owner);
+        if (shares > maxShares) {
+            revert ERC4626ExceededMaxRedeem(owner, shares, maxShares);
+        }
+
+        uint256 assets = previewRedeem(shares);
+        uint256 slippageAssets = assets > 0 ? assets - 1 : 0;
+        _withdraw(_msgSender(), receiver, owner, slippageAssets, shares);
+
+        return assets;
+    }
 }

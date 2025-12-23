@@ -177,6 +177,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
                     }
                 }
             }
+            require(amountRemaining == 0, ErrorsLib.InsufficientFunds());
         }
         _transferToTransferHelper(asset, amount);
     }
@@ -267,13 +268,11 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
             _isStrategySupportedForAsset({strategy: deallocation.strategy, asset: deallocation.asset}),
             ErrorsLib.AddressNotWhitelisted()
         );
-        uint256 amountToWithdraw;
         if (deallocation.amount == 0) {
-            amountToWithdraw = _getAssetBalanceInStrategy(IERC4626(deallocation.strategy));
+            _redeemAllFromStrategy(deallocation.asset, deallocation.strategy);
         } else {
-            amountToWithdraw = deallocation.amount;
+            _withdrawFromStrategy(deallocation.asset, deallocation.amount, address(this), deallocation.strategy);
         }
-        _withdrawFromStrategy(deallocation.asset, amountToWithdraw, address(this), deallocation.strategy);
     }
 
     function _swap(SwapParams memory swap) internal {
@@ -344,7 +343,15 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         uint256 balanceBefore = IERC20(asset).balanceOf(address(this));
         IERC4626(strategy).withdraw({assets: amount, receiver: receiver, owner: address(this)});
         uint256 balanceAfter = IERC20(asset).balanceOf(address(this));
-        require(balanceAfter - balanceBefore == amount, ErrorsLib.InsufficientAmountOut());
+        require(balanceAfter - balanceBefore >= amount, ErrorsLib.InsufficientAmountOut());
+        emit AssetDeallocated(asset, strategy, amount);
+    }
+
+    function _redeemAllFromStrategy(address asset, address strategy) internal {
+        uint256 amount = IERC4626(strategy)
+            .redeem({
+                shares: IERC4626(strategy).balanceOf(address(this)), receiver: address(this), owner: address(this)
+            });
         emit AssetDeallocated(asset, strategy, amount);
     }
 
