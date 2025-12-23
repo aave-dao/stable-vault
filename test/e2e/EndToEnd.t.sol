@@ -238,7 +238,7 @@ contract EndToEndTest is BaseTest {
             console.log("... request withdrawal minted IOU tokens: %s", iouAmountRequestedRay);
             // Check user IOU token balance
             assertGt(iouToken_accountingChain.balanceOf(user), 0, "User should have minted IOU tokens");
-            
+
             vm.prank(user);
             vm.expectRevert(ErrorsLib.InsufficientFunds.selector);
             vault.executeWithdrawal(user, address(USDC), 0, iouAmountRequestedRay, "");
