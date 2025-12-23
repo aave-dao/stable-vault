@@ -403,7 +403,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     }
 
     function _isStrategySupported(address strategy) internal view returns (bool) {
-        return $storage().strategyConfigs[strategy].asset != address(0);
+        return $storage().strategyConfigs[strategy].asset != ConstantsLib.ZERO_ADDRESS;
     }
 
     function _addStrategy(address asset, address strategy) internal {
@@ -426,7 +426,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
             // If the default strategy is removed, another one should be set as the default for deposits and
             // withdrawals.
             delete $storage().defaultStrategyByAsset[asset];
-            emit DefaultStrategySet(asset, address(0));
+            emit DefaultStrategySet(asset, ConstantsLib.ZERO_ADDRESS);
         }
 
         $storage().assetStrategies[asset].remove(strategy);

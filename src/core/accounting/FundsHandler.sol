@@ -11,6 +11,7 @@ import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
+import {ConstantsLib} from "src/libraries/ConstantsLib.sol";
 import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
 import {RescuableAssets} from "src/misc/RescuableAssets.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
@@ -114,7 +115,7 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, TransferHelp
         for (uint16 i = 0; i < $storage().chainBalances.length; i++) {
             balances[allocatorAssets.length + i] = AssetBalance({
                 chainId: $storage().chainBalances[i].chainId,
-                asset: address(0),
+                asset: ConstantsLib.ZERO_ADDRESS,
                 amountRay: $storage().chainBalances[i].amountRay
             });
         }
