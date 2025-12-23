@@ -139,7 +139,10 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     /// @inheritdoc IAllocator
     function deposit(address asset, uint256 amount) external override onlyDepositor {
         ITransferHelper(TRANSFER_HELPER).pull(asset, amount);
-        _depositToStrategy({asset: asset, amount: amount, strategy: $storage().defaultStrategyByAsset[asset]});
+        require(IAssetRegistry(ASSET_REGISTRY).isDepositToAllocatorAllowed(asset), ErrorsLib.UnsupportedAsset(asset));
+        _depositToStrategy({
+            asset: asset, amount: amount, strategy: $storage().defaultStrategyByAsset[asset], revertOnFailure: false
+        });
     }
 
     /// @inheritdoc IAllocator
@@ -331,9 +334,9 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         } else {
             amountToAllocate = allocation.amount;
         }
-        bool callSucceeded =
-            _depositToStrategy({asset: allocation.asset, amount: amountToAllocate, strategy: allocation.strategy});
-        require(callSucceeded, IAllocator.DepositIntoStrategyFailed(allocation.strategy));
+        _depositToStrategy({
+            asset: allocation.asset, amount: amountToAllocate, strategy: allocation.strategy, revertOnFailure: true
+        });
     }
 
     /// @dev Intended to be the lowest level function used to withdraw from a strategy.
@@ -346,27 +349,25 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     }
 
     /// @dev Intended to be the lowest level function used to deposit into a strategy.
-    function _depositToStrategy(address asset, uint256 amount, address strategy) internal returns (bool) {
+    function _depositToStrategy(address asset, uint256 amount, address strategy, bool revertOnFailure) internal {
         require(amount > 0, ErrorsLib.ZeroAmount());
-        require(IAssetRegistry(ASSET_REGISTRY).isDepositToAllocatorAllowed(asset), ErrorsLib.UnsupportedAsset(asset));
         if (strategy == address(0)) {
-            // A strategy for this asset is not set, so the funds stay idle in the Allocator.
-            return true;
+            // If strategy passed is address(0), it means we want to hold the funds idle in the Allocator.
+            return;
         }
         if (!$storage().strategyConfigs[strategy].depositAllowed) {
             revert DepositsToStrategyDisabled(strategy);
         }
         IERC20(asset).forceApprove(strategy, amount);
         (bool callSucceeded,) = strategy.call(abi.encodeCall(IERC4626.deposit, (amount, address(this))));
-
-        if (!callSucceeded) {
+        if (callSucceeded) {
+            emit AssetAllocated(asset, strategy, amount);
+        } else {
+            require(!revertOnFailure, IAllocator.DepositIntoStrategyFailed(strategy));
             // Clear the approval since this failure is handled gracefully
             IERC20(asset).forceApprove(strategy, 0);
             emit StrategyDepositFailed(strategy, amount);
-        } else {
-            emit AssetAllocated(asset, strategy, amount);
         }
-        return callSucceeded;
     }
 
     /// @dev Returns balances grouped by asset.
