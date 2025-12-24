@@ -88,8 +88,12 @@ contract AllocatorTest is TestWithHelpers {
     }
 
     function setUp() public virtual {
+        _mockAssetRegistry = new MockAssetRegistry();
+
         _mockUsdt = IMockErc20(address(new MockNonStandardErc20("Test USDT", "tUSDT", 6)));
+        _mockAssetRegistry.mockRegisteredAsset(address(_mockUsdt));
         _mockGho = IMockErc20(address(new MockNonStandardErc20("Test GHO", "tGHO", 18)));
+        _mockAssetRegistry.mockRegisteredAsset(address(_mockGho));
         _mockUnsupportedAsset =
             IMockErc20(address(new MockNonStandardErc20("Test Unsupported Asset", "tUNSUPPORTED", 18)));
 
@@ -98,7 +102,6 @@ contract AllocatorTest is TestWithHelpers {
         _defaultGhoStrategy = new TestErc4626(_mockGho);
         _extraGhoStrategy = new TestErc4626(_mockGho);
 
-        _mockAssetRegistry = new MockAssetRegistry();
         _mockAccessManager = new MockAccessManager(admin);
 
         _mockSwapper = new MockSwapper();
@@ -256,8 +259,6 @@ contract AllocatorTest is TestWithHelpers {
     }
 
     function test_getAssetBalances_returnsExpectedAssetBalances_whenAssetIsNotRegistered() public {
-        _mockAssetRegistry.mockRegisteredAsset(address(_mockUsdt));
-
         // Deposit funds of USDC, USDT into the Allocator
         uint256 amount = 1000;
         _mockTransferHelper.mockAsset(address(_mockUsdt), amount);
@@ -270,9 +271,11 @@ contract AllocatorTest is TestWithHelpers {
 
         // Check that balances only return the registered asset
         IAllocator.AllocatorBalance[] memory balances = _allocator.getAssetBalances();
-        assertEq(balances.length, 1);
+        assertEq(balances.length, 2);
         assertEq(balances[0].asset, address(_mockUsdt));
         assertEq(balances[0].amount, amount);
+        assertEq(balances[1].asset, address(_mockGho));
+        assertEq(balances[1].amount, 0);
     }
 
     function test_getDefaultStrategy_returnsExpectedDefaultVault() public view {
@@ -1455,6 +1458,13 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.addStrategy(address(_mockUsdt), address(_defaultUsdtStrategy));
     }
 
+    function test_addStrategy_reverts_ifAssetIsNotRegistered() public {
+        address unsupportedStrategy = address(new TestErc4626(_mockUnsupportedAsset));
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.InvalidAsset.selector, address(_mockUnsupportedAsset)));
+        _allocator.addStrategy(address(_mockUnsupportedAsset), address(unsupportedStrategy));
+    }
+
     function test_addStrategy_reverts_ifStrategyIsNotSupportedForAsset() public {
         // Remove the extra strategy first to be able to add it back
         vm.prank(admin);
@@ -1583,9 +1593,11 @@ contract AllocatorTest is TestWithHelpers {
 
         // Check balance return 1 since USDT is still a supported asset in the AssetRegistry
         IAllocator.AllocatorBalance[] memory balances = _allocator.getAssetBalances();
-        assertEq(balances.length, 1);
+        assertEq(balances.length, 2);
         assertEq(balances[0].asset, address(_mockUsdt));
         assertEq(balances[0].amount, 0);
+        assertEq(balances[1].asset, address(_mockGho));
+        assertEq(balances[1].amount, 0);
 
         // Add back a strategy and make it the default
         vm.prank(address(everyRoleAccount));
@@ -1615,7 +1627,7 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
 
         balances = _allocator.getAssetBalances();
-        assertEq(balances.length, 1);
+        assertEq(balances.length, 2);
         bool foundUsdt = false;
         bool foundGho = false;
         for (uint256 i = 0; i < balances.length; i++) {
@@ -1625,10 +1637,11 @@ contract AllocatorTest is TestWithHelpers {
             }
             if (balances[i].asset == address(_mockGho)) {
                 foundGho = true;
+                assertEq(balances[i].amount, 0);
             }
         }
         assertTrue(foundUsdt);
-        assertFalse(foundGho);
+        assertTrue(foundGho);
     }
 
     function test_removeStrategy_reverts_ifUnauthorizedCaller(address operator) public {

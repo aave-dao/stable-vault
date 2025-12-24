@@ -409,7 +409,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
 
     function _addStrategy(address asset, address strategy) internal {
         require(!_isStrategySupported(strategy), ErrorsLib.AddressAlreadyWhitelisted());
-        //require(IAssetRegistry(ASSET_REGISTRY).isAssetRegistered(asset), ErrorsLib.InvalidAsset(asset));
+        require(IAssetRegistry(ASSET_REGISTRY).isAssetRegistered(asset), ErrorsLib.InvalidAsset(asset));
         require(asset == IERC4626(strategy).asset(), ErrorsLib.InvalidAsset(asset));
 
         $storage().strategyConfigs[strategy] = StrategyConfig({asset: asset, isRegistered: true, depositAllowed: true});

@@ -746,18 +746,6 @@ contract BaseTest is Test {
         ccipAdapter_earningChain.setChainSelector(ACCOUNTING_CHAIN_ID, ACCOUNTING_CHAIN_CCIP_SELECTOR);
         ccipAdapter_earningChain.setDestinationChainAdapter(ACCOUNTING_CHAIN_ID, address(ccipAdapter_accountingChain));
 
-        // Set up Allocator on Accounting chain
-        allocator_accountingChain.addStrategy(address(GHO), address(ghoStrategyVault_accountingChain));
-        allocator_accountingChain.addStrategy(address(USDC), address(usdcStrategyVault_accountingChain));
-        allocator_accountingChain.setDefaultStrategy(address(GHO), address(ghoStrategyVault_accountingChain));
-        allocator_accountingChain.setDefaultStrategy(address(USDC), address(usdcStrategyVault_accountingChain));
-
-        // Set up Allocator on Earning chain
-        allocator_earningChain.addStrategy(address(GHO), address(ghoStrategyVault_earningChain));
-        allocator_earningChain.addStrategy(address(USDC), address(usdcStrategyVault_earningChain));
-        allocator_earningChain.setDefaultStrategy(address(GHO), address(ghoStrategyVault_earningChain));
-        allocator_earningChain.setDefaultStrategy(address(USDC), address(usdcStrategyVault_earningChain));
-
         // Enable everything for assets
         IAssetRegistry.AssetConfig memory unrestrictedAssetConfig = IAssetRegistry.AssetConfig({
             depositFromUserAllowed: true,
@@ -771,6 +759,18 @@ contract BaseTest is Test {
         // Set up Asset Registry on Earning chain
         assetRegistry_earningChain.setAssetConfig(address(GHO), unrestrictedAssetConfig);
         assetRegistry_earningChain.setAssetConfig(address(USDC), unrestrictedAssetConfig);
+
+        // Set up Allocator on Accounting chain
+        allocator_accountingChain.addStrategy(address(GHO), address(ghoStrategyVault_accountingChain));
+        allocator_accountingChain.addStrategy(address(USDC), address(usdcStrategyVault_accountingChain));
+        allocator_accountingChain.setDefaultStrategy(address(GHO), address(ghoStrategyVault_accountingChain));
+        allocator_accountingChain.setDefaultStrategy(address(USDC), address(usdcStrategyVault_accountingChain));
+
+        // Set up Allocator on Earning chain
+        allocator_earningChain.addStrategy(address(GHO), address(ghoStrategyVault_earningChain));
+        allocator_earningChain.addStrategy(address(USDC), address(usdcStrategyVault_earningChain));
+        allocator_earningChain.setDefaultStrategy(address(GHO), address(ghoStrategyVault_earningChain));
+        allocator_earningChain.setDefaultStrategy(address(USDC), address(usdcStrategyVault_earningChain));
 
         vm.stopPrank();
     }
