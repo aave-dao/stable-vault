@@ -36,7 +36,7 @@
     "saltSeed": "aave.based-boosted-vault.IouTokenManager"
   },
   "BasedBoostedVault::Implementation": {
-    "address": "0x6da09c73d3c26c2d4a12857d1f2e1dd32fab22bd",
+    "address": "0x6aa121cffa43a9ae1d8891752ab3a3ba6c710f72",
     "saltSeed": ""
   },
   "BasedBoostedVault": {
