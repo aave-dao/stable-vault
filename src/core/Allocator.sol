@@ -225,6 +225,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         // Strategy must be allowed to be set as the default strategy for the asset
         require(strategy != $storage().defaultStrategyByAsset[asset], ErrorsLib.AddressAlreadyWhitelisted());
         require(_isStrategySupportedForAsset({strategy: strategy, asset: asset}), ErrorsLib.AddressNotWhitelisted());
+        require($storage().strategyConfigs[strategy].depositAllowed, DepositsToStrategyDisabled(strategy));
         $storage().defaultStrategyByAsset[asset] = strategy;
         emit DefaultStrategySet(asset, strategy);
     }
@@ -408,6 +409,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
 
     function _addStrategy(address asset, address strategy) internal {
         require(!_isStrategySupported(strategy), ErrorsLib.AddressAlreadyWhitelisted());
+        //require(IAssetRegistry(ASSET_REGISTRY).isAssetRegistered(asset), ErrorsLib.InvalidAsset(asset));
         require(asset == IERC4626(strategy).asset(), ErrorsLib.InvalidAsset(asset));
 
         $storage().strategyConfigs[strategy] = StrategyConfig({asset: asset, isRegistered: true, depositAllowed: true});

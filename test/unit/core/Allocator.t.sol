@@ -1511,6 +1511,17 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.setDefaultStrategy(asset, strategy);
     }
 
+    function test_setDefaultStrategy_reverts_ifStrategyHasDepositsDisabled() public {
+        vm.prank(admin);
+        _allocator.disableDepositsToStrategy(address(_extraUsdtStrategy));
+
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(
+            abi.encodeWithSelector(IAllocator.DepositsToStrategyDisabled.selector, address(_extraUsdtStrategy))
+        );
+        _allocator.setDefaultStrategy(address(_mockUsdt), address(_extraUsdtStrategy));
+    }
+
     function test_removeStrategy_unsetsDefaultStrategy() public {
         vm.prank(address(everyRoleAccount));
         vm.expectEmit(true, true, true, true);
