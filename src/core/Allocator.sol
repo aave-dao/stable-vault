@@ -420,6 +420,12 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
 
     function _removeStrategy(address strategy) internal {
         require(_isStrategySupported(strategy), ErrorsLib.AddressNotWhitelisted());
+        // This can get blocked if assets are deposited into the strategy on behalf of the Allocator.
+        // This function is intended to clear storage, so if it gets DoS'd then the consequences are consumed storage.
+        // This function does not allow removing a strategy if balance > 0 to avoid accidentally disregarding asset
+        // balances when fetched by consumers.
+        // This function does not force max withdraw from a strategy to avoid unintended behavior e.g. incurring
+        // slippage.
         require(_getAssetBalanceInStrategy(IERC4626(strategy)) == 0, StrategyStillHasFunds(strategy));
         address asset = $storage().strategyConfigs[strategy].asset;
 
