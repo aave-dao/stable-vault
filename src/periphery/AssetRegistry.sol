@@ -9,9 +9,9 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
-import {ConstantsLib} from "src/libraries/ConstantsLib.sol";
-import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
 import {Multicall} from "src/misc/Multicall.sol";
+import {Constants} from "src/types/Constants.sol";
+import {Errors} from "src/types/Errors.sol";
 
 /// @title AssetRegistry
 /// @author Aave Labs
@@ -54,9 +54,7 @@ contract AssetRegistry is AccessManagedUpgradeable, Multicall, IAssetRegistry {
     /// @inheritdoc IAssetRegistry
     function setAssetConfig(address asset, AssetConfig memory config) external override restricted {
         // The system uses RAY Math (27 decimals), so we leave a 9-decimal place (27 - 18) margin for better precision.
-        require(
-            IERC20Metadata(asset).decimals() <= ConstantsLib.MAX_SUPPORTED_ASSET_DECIMALS, ErrorsLib.InvalidAsset(asset)
-        );
+        require(IERC20Metadata(asset).decimals() <= Constants.MAX_SUPPORTED_ASSET_DECIMALS, Errors.InvalidAsset(asset));
         $storage().configByAsset[asset] = config;
         $storage().assets.add(asset);
         emit AssetConfigSet(asset, config);
@@ -68,7 +66,7 @@ contract AssetRegistry is AccessManagedUpgradeable, Multicall, IAssetRegistry {
         override
         restricted
     {
-        require(_isAssetRegistered(asset), ErrorsLib.UnsupportedAsset(asset));
+        require(_isAssetRegistered(asset), Errors.UnsupportedAsset(asset));
         bool isUserDepositsAllowed = $storage().configByAsset[asset].depositFromUserAllowed;
         if (isUserDepositsAllowed && disableUserDeposits) {
             $storage().configByAsset[asset].depositFromUserAllowed = false;
@@ -82,7 +80,7 @@ contract AssetRegistry is AccessManagedUpgradeable, Multicall, IAssetRegistry {
 
     /// @inheritdoc IAssetRegistry
     function disableSwapOutput(address asset) external override restricted {
-        require(_isAssetRegistered(asset), ErrorsLib.UnsupportedAsset(asset));
+        require(_isAssetRegistered(asset), Errors.UnsupportedAsset(asset));
         $storage().configByAsset[asset].swapOutputTokenAllowed = false;
         emit AssetConfigSet(asset, $storage().configByAsset[asset]);
     }

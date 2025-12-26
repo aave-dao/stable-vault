@@ -10,8 +10,8 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {EfficientHashLib} from "@solady/utils/EfficientHashLib.sol";
 
 import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
-import {ConstantsLib} from "src/libraries/ConstantsLib.sol";
-import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
+import {Constants} from "src/types/Constants.sol";
+import {Errors} from "src/types/Errors.sol";
 
 /// @title WithdrawalPolicy
 /// @author Aave Labs
@@ -153,7 +153,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     function setAssetFeeBps(address asset, uint16 newAssetFeeBps, bool isSet) external restricted {
         // We don't check for new asset fee being less than the default fee because maybe we want some specific asset to
         // have a higher fee than the default fee.
-        require(newAssetFeeBps <= ConstantsLib.MAX_BPS, ErrorsLib.InvalidParameter());
+        require(newAssetFeeBps <= Constants.MAX_BPS, Errors.InvalidParameter());
         $storage().assetFeeConfigs[asset].feeBps = newAssetFeeBps;
         $storage().assetFeeConfigs[asset].isSet = isSet;
     }
@@ -163,7 +163,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     /// @param newDefaultFeeBps The fee in basis points applied to the IOU quantity being exchanged for the
     /// asset.
     function setDefaultFeeBps(uint16 newDefaultFeeBps) external restricted {
-        require(newDefaultFeeBps <= ConstantsLib.MAX_BPS, ErrorsLib.InvalidParameter());
+        require(newDefaultFeeBps <= Constants.MAX_BPS, Errors.InvalidParameter());
         $storage().defaultFeeBps = newDefaultFeeBps;
     }
 
@@ -179,8 +179,8 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     /// @param signer The signer whose nonce to invalidate (must be msg.sender).
     /// @param nonce The nonce to invalidate.
     function invalidateNonce(address signer, uint256 nonce) external {
-        require(msg.sender == signer, ErrorsLib.NotAuthorized());
-        require($storage().isSigner[signer], ErrorsLib.NotAuthorized());
+        require(msg.sender == signer, Errors.NotAuthorized());
+        require($storage().isSigner[signer], Errors.NotAuthorized());
         require($storage().wasNonceUsed[signer][nonce] == false, NonceAlreadyUsed());
         _markNonceAsUsed(signer, nonce);
     }
@@ -201,7 +201,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
         } else {
             feeBps = _getAssetFeeBps(request.assetOut);
         }
-        uint256 feeAmountRay = (request.iouAmountRay * feeBps + ConstantsLib.MAX_BPS - 1) / ConstantsLib.MAX_BPS;
+        uint256 feeAmountRay = (request.iouAmountRay * feeBps + Constants.MAX_BPS - 1) / Constants.MAX_BPS;
         return (request.iouAmountRay - feeAmountRay, signer, nonce);
     }
 
@@ -221,7 +221,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     {
         SignedFeeDiscount memory discount = abi.decode(request.data, (SignedFeeDiscount));
 
-        require(discount.personalFeeBps <= _getAssetFeeBps(request.assetOut), ErrorsLib.InvalidParameter());
+        require(discount.personalFeeBps <= _getAssetFeeBps(request.assetOut), Errors.InvalidParameter());
         require(discount.deadline >= block.timestamp, DeadlineExpired());
 
         signer = _recoverSigner(request, discount);

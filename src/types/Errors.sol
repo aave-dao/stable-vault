@@ -2,10 +2,10 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.22;
 
-/// @title ErrorsLib
+/// @title Errors
 /// @author Aave Labs
 /// @notice Library for errors shared across contracts.
-library ErrorsLib {
+library Errors {
     /// @notice Address checked is already whitelisted.
     /// @custom:selector 0x78426ef8
     error AddressAlreadyWhitelisted();

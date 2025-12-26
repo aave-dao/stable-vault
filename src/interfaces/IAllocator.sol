@@ -22,6 +22,11 @@ interface IAllocator {
 
     event StrategyRemoved(address indexed asset, address indexed strategy);
 
+    /// @notice Thrown when setting as default a strategy that already is the default, or when removing a strategy
+    /// that is currently set as the default.
+    /// @custom:selector 0x13e93f82
+    error DefaultStrategy(address strategy);
+
     /// @notice Thrown when funds fail to deposit into a yield strategy.
     /// @custom:selector 0x3868bf52
     error DepositIntoStrategyFailed(address strategy);
@@ -33,11 +38,6 @@ interface IAllocator {
     /// @notice Thrown when a strategy still has assets that belong to the Allocator.
     /// @custom:selector 0xa01adeda
     error StrategyStillHasFunds(address strategy);
-
-    /// @notice Thrown when setting as default a strategy that already is the default, or when removing a strategy
-    /// that is currently set as the default.
-    /// @custom:selector 0x13e93f82
-    error DefaultStrategy(address strategy);
 
     /// @notice The representation of an asset balance.
     /// @param asset Address of the asset.

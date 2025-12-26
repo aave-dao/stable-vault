@@ -15,7 +15,7 @@ import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
-import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
+import {Errors} from "src/types/Errors.sol";
 
 /// @title AcrossAdapter
 /// @author Aave Labs
@@ -100,7 +100,7 @@ contract AcrossAdapter is BaseBridgeAdapter, IAcrossBridgeAdapter, IERC165 {
         // Across can not bridge data alone (it must be accompanied by a token).
         require(assets.length == 1, InvalidAssetsLength(1, assets.length));
         // Across requires an asset to be bridged as that is how fees are paid.
-        require(assets[0].amount > 0, ErrorsLib.ZeroAmount());
+        require(assets[0].amount > 0, Errors.ZeroAmount());
 
         address asset = assets[0].asset;
         // The fee is paid as a percentage of the input token amount.
@@ -126,9 +126,7 @@ contract AcrossAdapter is BaseBridgeAdapter, IAcrossBridgeAdapter, IERC165 {
 
         if (IS_ACCOUNTING_CHAIN) {
             // Do not update snapshot state if an asset will be rejected by the Allocator.
-            require(
-                IAssetRegistry(ASSET_REGISTRY).isDepositToAllocatorAllowed(token), ErrorsLib.UnsupportedAsset(token)
-            );
+            require(IAssetRegistry(ASSET_REGISTRY).isDepositToAllocatorAllowed(token), Errors.UnsupportedAsset(token));
             bytes memory decrementBalanceSnapshotMessage = abi.encode(
                 IChainGateway.CrossChainMessage({
                     messageType: IChainGateway.MessageType.DECREMENT_BALANCE_SNAPSHOT,

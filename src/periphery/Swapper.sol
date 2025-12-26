@@ -9,7 +9,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 
 import {ISwapper} from "src/interfaces/ISwapper.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
-import {ConstantsLib} from "src/libraries/ConstantsLib.sol";
+import {Constants} from "src/types/Constants.sol";
 
 /// @title Swapper
 /// @author Aave Labs
@@ -74,6 +74,6 @@ contract Swapper is Ownable, ReentrancyGuard, ISwapper {
         pure
         returns (uint256)
     {
-        return expectedAmountOut * (ConstantsLib.MAX_BPS - slippageToleranceBps) / ConstantsLib.MAX_BPS;
+        return expectedAmountOut * (Constants.MAX_BPS - slippageToleranceBps) / Constants.MAX_BPS;
     }
 }

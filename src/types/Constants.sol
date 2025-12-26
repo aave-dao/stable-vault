@@ -2,10 +2,10 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.22;
 
-/// @title ConstantsLib
+/// @title Constants
 /// @author Aave Labs
 /// @notice Library for constants shared across contracts.
-library ConstantsLib {
+library Constants {
     /// @dev The base number of basis points.
     uint256 internal constant MAX_BPS = 100_00;
 

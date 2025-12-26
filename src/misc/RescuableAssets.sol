@@ -6,7 +6,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IRescuableAssets} from "src/interfaces/IRescuableAssets.sol";
-import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
+import {Errors} from "src/types/Errors.sol";
 
 /// @title RescuableAssets
 /// @author Aave Labs
@@ -19,7 +19,7 @@ abstract contract RescuableAssets is IRescuableAssets {
         _beforeRescueTokens(asset, amount);
         if (asset == address(0)) {
             (bool callSucceeded,) = msg.sender.call{value: amount}("");
-            require(callSucceeded, ErrorsLib.NativeTransferFailed());
+            require(callSucceeded, Errors.NativeTransferFailed());
         } else {
             IERC20(asset).safeTransfer(msg.sender, amount);
         }

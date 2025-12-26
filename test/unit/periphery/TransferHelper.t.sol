@@ -5,9 +5,9 @@ pragma solidity ^0.8.20;
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {AssetLib} from "src/libraries/AssetLib.sol";
-import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
+import {Errors} from "src/types/Errors.sol";
 
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
 import {MockErc20} from "test/mocks/MockErc20.sol";
@@ -127,7 +127,7 @@ contract TransferHelperTest is TestWithHelpers {
         vm.deal(address(transferHelper), nativeAmount);
 
         vm.prank(msgSender);
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.NativeTransferFailed.selector));
+        vm.expectRevert(abi.encodeWithSelector(Errors.NativeTransferFailed.selector));
         transferHelper.pull(address(0), pullAmount);
     }
 
@@ -353,7 +353,7 @@ contract TransferHelperTest is TestWithHelpers {
         vm.deal(address(transferHelper), nativeAmount);
 
         vm.prank(msgSender);
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.NativeTransferFailed.selector));
+        vm.expectRevert(abi.encodeWithSelector(Errors.NativeTransferFailed.selector));
         transferHelper.transfer(address(0), pullAmount, destination);
     }
 

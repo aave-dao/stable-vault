@@ -7,7 +7,7 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import {IIouToken} from "src/interfaces/IIouToken.sol";
 import {IMintableBurnableIERC20} from "src/interfaces/IMintableBurnableIERC20.sol";
-import {ConstantsLib} from "src/libraries/ConstantsLib.sol";
+import {Constants} from "src/types/Constants.sol";
 
 /// @title IouToken
 /// @author Aave Labs
@@ -35,6 +35,6 @@ contract IouToken is ERC20, Ownable, IIouToken {
 
     /// @inheritdoc ERC20
     function decimals() public view virtual override returns (uint8) {
-        return ConstantsLib.RAY_DECIMALS;
+        return Constants.RAY_DECIMALS;
     }
 }

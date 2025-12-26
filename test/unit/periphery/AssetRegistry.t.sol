@@ -7,9 +7,9 @@ import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessMana
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
-import {ConstantsLib} from "src/libraries/ConstantsLib.sol";
-import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
 import {AssetRegistry} from "src/periphery/AssetRegistry.sol";
+import {Constants} from "src/types/Constants.sol";
+import {Errors} from "src/types/Errors.sol";
 
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
 import {MockAccessManager} from "test/mocks/MockAccessManager.sol";
@@ -135,7 +135,7 @@ contract AssetRegistryTest is TestWithHelpers {
     }
 
     function test_setAssetConfig_reverts_ifAssetHasUnsupportedDecimals(uint8 decimals) public {
-        vm.assume(decimals > ConstantsLib.MAX_SUPPORTED_ASSET_DECIMALS);
+        vm.assume(decimals > Constants.MAX_SUPPORTED_ASSET_DECIMALS);
         IMockErc20 _mockTokenWithUnsupportedDecimals =
             IMockErc20(address(new MockNonStandardErc20("Test Unsupported Decimals Token", "tUNSUPPORTED", decimals)));
         IAssetRegistry.AssetConfig memory config = IAssetRegistry.AssetConfig({
@@ -146,7 +146,7 @@ contract AssetRegistryTest is TestWithHelpers {
         });
         vm.prank(everyRoleAccount);
         vm.expectRevert(
-            abi.encodeWithSelector(ErrorsLib.InvalidAsset.selector, address(_mockTokenWithUnsupportedDecimals))
+            abi.encodeWithSelector(Errors.InvalidAsset.selector, address(_mockTokenWithUnsupportedDecimals))
         );
         _assetRegistry.setAssetConfig(address(_mockTokenWithUnsupportedDecimals), config);
     }
@@ -298,7 +298,7 @@ contract AssetRegistryTest is TestWithHelpers {
         vm.assume(asset != address(0));
 
         vm.prank(everyRoleAccount);
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, asset));
+        vm.expectRevert(abi.encodeWithSelector(Errors.UnsupportedAsset.selector, asset));
         _assetRegistry.disableDeposits(asset, true, true);
     }
 
@@ -356,7 +356,7 @@ contract AssetRegistryTest is TestWithHelpers {
         vm.assume(asset != address(0));
 
         vm.prank(everyRoleAccount);
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, asset));
+        vm.expectRevert(abi.encodeWithSelector(Errors.UnsupportedAsset.selector, asset));
         _assetRegistry.disableSwapOutput(asset);
     }
 }

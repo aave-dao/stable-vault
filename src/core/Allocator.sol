@@ -15,9 +15,9 @@ import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {ISwapper} from "src/interfaces/ISwapper.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
-import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
 import {Multicall} from "src/misc/Multicall.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
+import {Errors} from "src/types/Errors.sol";
 
 /// @title Allocator
 /// @author Aave Labs
@@ -67,18 +67,18 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     }
 
     modifier onlyDepositor() {
-        require(msg.sender == DEPOSITOR, ErrorsLib.AddressNotWhitelisted());
+        require(msg.sender == DEPOSITOR, Errors.AddressNotWhitelisted());
         _;
     }
 
     modifier onlyWithdrawer() {
-        require(msg.sender == WITHDRAWER, ErrorsLib.AddressNotWhitelisted());
+        require(msg.sender == WITHDRAWER, Errors.AddressNotWhitelisted());
         _;
     }
 
     modifier onlySelf() {
         if (msg.sender != address(this)) {
-            revert ErrorsLib.OnlySelf();
+            revert Errors.OnlySelf();
         }
         _;
     }
@@ -139,7 +139,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     /// @inheritdoc IAllocator
     function deposit(address asset, uint256 amount) external override onlyDepositor {
         ITransferHelper(TRANSFER_HELPER).pull(asset, amount);
-        require(IAssetRegistry(ASSET_REGISTRY).isDepositToAllocatorAllowed(asset), ErrorsLib.UnsupportedAsset(asset));
+        require(IAssetRegistry(ASSET_REGISTRY).isDepositToAllocatorAllowed(asset), Errors.UnsupportedAsset(asset));
         if ($storage().defaultStrategyByAsset[asset] != address(0)) {
             _depositToStrategy({asset: asset, amount: amount, strategy: $storage().defaultStrategyByAsset[asset]});
         }
@@ -147,7 +147,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
 
     /// @inheritdoc IAllocator
     function withdraw(address asset, uint256 amount) external override onlyWithdrawer {
-        require(amount > 0, ErrorsLib.ZeroAmount());
+        require(amount > 0, Errors.ZeroAmount());
         _validateCanWithdraw(asset);
 
         uint256 idleBalance = IERC20(asset).balanceOf(address(this));
@@ -177,7 +177,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
                     }
                 }
             }
-            require(amountRemaining == 0, ErrorsLib.InsufficientFunds());
+            require(amountRemaining == 0, Errors.InsufficientFunds());
         }
         _transferToTransferHelper(asset, amount);
     }
@@ -224,7 +224,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         if (strategy != address(0)) {
             // Strategy must be allowed to be set as the default strategy for the asset
             require(strategy != $storage().defaultStrategyByAsset[asset], DefaultStrategy(strategy));
-            require(_isStrategySupportedForAsset({strategy: strategy, asset: asset}), ErrorsLib.AddressNotWhitelisted());
+            require(_isStrategySupportedForAsset({strategy: strategy, asset: asset}), Errors.AddressNotWhitelisted());
             require($storage().strategyConfigs[strategy].depositAllowed, DepositsToStrategyDisabled(strategy));
         }
         $storage().defaultStrategyByAsset[asset] = strategy;
@@ -233,14 +233,14 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
 
     /// @inheritdoc IAllocator
     function disableDepositsToStrategy(address strategy) external override restricted {
-        require(_isStrategySupported(strategy), ErrorsLib.AddressNotWhitelisted());
+        require(_isStrategySupported(strategy), Errors.AddressNotWhitelisted());
         $storage().strategyConfigs[strategy].depositAllowed = false;
         emit StrategyDepositsToggled(strategy, false);
     }
 
     /// @inheritdoc IAllocator
     function enableDepositsToStrategy(address strategy) external override restricted {
-        require(_isStrategySupported(strategy), ErrorsLib.AddressNotWhitelisted());
+        require(_isStrategySupported(strategy), Errors.AddressNotWhitelisted());
         $storage().strategyConfigs[strategy].depositAllowed = true;
         emit StrategyDepositsToggled(strategy, true);
     }
@@ -269,7 +269,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     function _deallocate(DeallocationParams memory deallocation) internal {
         require(
             _isStrategySupportedForAsset({strategy: deallocation.strategy, asset: deallocation.asset}),
-            ErrorsLib.AddressNotWhitelisted()
+            Errors.AddressNotWhitelisted()
         );
         if (deallocation.amount == 0) {
             _redeemAllFromStrategy(deallocation.asset, deallocation.strategy);
@@ -279,11 +279,9 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     }
 
     function _swap(SwapParams memory swap) internal {
+        require(IAssetRegistry(ASSET_REGISTRY).isSwapInputAllowed(swap.assetIn), Errors.UnsupportedAsset(swap.assetIn));
         require(
-            IAssetRegistry(ASSET_REGISTRY).isSwapInputAllowed(swap.assetIn), ErrorsLib.UnsupportedAsset(swap.assetIn)
-        );
-        require(
-            IAssetRegistry(ASSET_REGISTRY).isSwapOutputAllowed(swap.assetOut), ErrorsLib.UnsupportedAsset(swap.assetOut)
+            IAssetRegistry(ASSET_REGISTRY).isSwapOutputAllowed(swap.assetOut), Errors.UnsupportedAsset(swap.assetOut)
         );
         _validateSwapAmountIn(swap.assetIn, swap.amountIn, swap.assetOut);
 
@@ -293,8 +291,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         // Execute the swap and require 1:1 conversion
         uint256 amountOut = ISwapper(swap.swapper).executeSwap(swap.assetIn, swap.assetOut, swap.amountIn, swap.data);
         require(
-            amountOut >= swap.amountIn.convertAssetDecimals(swap.assetIn, swap.assetOut),
-            ErrorsLib.InsufficientAmountOut()
+            amountOut >= swap.amountIn.convertAssetDecimals(swap.assetIn, swap.assetOut), Errors.InsufficientAmountOut()
         );
 
         // Pull the `assetOut` from the Swapper to the Allocator
@@ -306,9 +303,9 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         // This helps avoid withdrawal of an asset that is held in the Allocator that is not intended to be withdrawn by
         // users. The Allocator may hold assets it received accidentally or from rewards earned from supplying to
         // strategies.
-        require(IAssetRegistry(ASSET_REGISTRY).isAssetRegistered(asset), ErrorsLib.UnsupportedAsset(asset));
+        require(IAssetRegistry(ASSET_REGISTRY).isAssetRegistered(asset), Errors.UnsupportedAsset(asset));
         // Ensure that the asset being withdrawn is not a strategy share that may be held by the Allocator.
-        require(!$storage().strategyConfigs[asset].isRegistered, ErrorsLib.UnsupportedAsset(asset));
+        require(!$storage().strategyConfigs[asset].isRegistered, Errors.UnsupportedAsset(asset));
     }
 
     /// @notice Validates that dust from `amountIn` would not be truncated when converting to a value of `assetOut`.
@@ -321,14 +318,14 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         uint256 outputDecimals = AssetLib.getDecimals(assetOut);
         if (inputDecimals > outputDecimals) {
             // Check there is no remainder when truncating `amountIn` to `assetOut` decimals.
-            require(amountIn % 10 ** (inputDecimals - outputDecimals) == 0, ErrorsLib.InvalidAmount());
+            require(amountIn % 10 ** (inputDecimals - outputDecimals) == 0, Errors.InvalidAmount());
         }
     }
 
     function _allocate(AllocationParams memory allocation) internal {
         require(
             _isStrategySupportedForAsset({strategy: allocation.strategy, asset: allocation.asset}),
-            ErrorsLib.AddressNotWhitelisted()
+            Errors.AddressNotWhitelisted()
         );
         uint256 amountToAllocate;
         if (allocation.amount == 0) {
@@ -344,7 +341,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         uint256 balanceBefore = IERC20(asset).balanceOf(address(this));
         IERC4626(strategy).withdraw({assets: amount, receiver: receiver, owner: address(this)});
         uint256 balanceAfter = IERC20(asset).balanceOf(address(this));
-        require(balanceAfter - balanceBefore >= amount, ErrorsLib.InsufficientAmountOut());
+        require(balanceAfter - balanceBefore >= amount, Errors.InsufficientAmountOut());
         emit AssetDeallocated(asset, strategy, amount);
     }
 
@@ -358,7 +355,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
 
     /// @dev Intended to be the lowest level function used to deposit into a strategy.
     function _depositToStrategy(address asset, uint256 amount, address strategy) internal {
-        require(amount > 0, ErrorsLib.ZeroAmount());
+        require(amount > 0, Errors.ZeroAmount());
         require($storage().strategyConfigs[strategy].depositAllowed, DepositsToStrategyDisabled(strategy));
         IERC20(asset).forceApprove(strategy, amount);
         (bool callSucceeded,) = strategy.call(abi.encodeCall(IERC4626.deposit, (amount, address(this))));
@@ -401,9 +398,9 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     }
 
     function _addStrategy(address asset, address strategy) internal {
-        require(!_isStrategySupported(strategy), ErrorsLib.AddressAlreadyWhitelisted());
-        require(IAssetRegistry(ASSET_REGISTRY).isAssetRegistered(asset), ErrorsLib.InvalidAsset(asset));
-        require(asset == IERC4626(strategy).asset(), ErrorsLib.InvalidAsset(asset));
+        require(!_isStrategySupported(strategy), Errors.AddressAlreadyWhitelisted());
+        require(IAssetRegistry(ASSET_REGISTRY).isAssetRegistered(asset), Errors.InvalidAsset(asset));
+        require(asset == IERC4626(strategy).asset(), Errors.InvalidAsset(asset));
 
         $storage().strategyConfigs[strategy] = StrategyConfig({asset: asset, isRegistered: true, depositAllowed: true});
         $storage().assetStrategies[asset].add(strategy);
@@ -412,7 +409,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     }
 
     function _removeStrategy(address strategy) internal {
-        require(_isStrategySupported(strategy), ErrorsLib.AddressNotWhitelisted());
+        require(_isStrategySupported(strategy), Errors.AddressNotWhitelisted());
         require($storage().defaultStrategyByAsset[IERC4626(strategy).asset()] != strategy, DefaultStrategy(strategy));
         // This can get blocked if assets are deposited into the strategy on behalf of the Allocator.
         // This function is intended to clear storage, so if it gets DoS'd then the consequences are consumed storage.

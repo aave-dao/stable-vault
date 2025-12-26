@@ -11,9 +11,9 @@ import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
-import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
 import {RescuableAssets} from "src/misc/RescuableAssets.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
+import {Errors} from "src/types/Errors.sol";
 
 /// @title FundsHandler
 /// @author Aave Labs
@@ -57,7 +57,7 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, TransferHelp
     }
 
     modifier onlyGateway() {
-        require(msg.sender == GATEWAY, ErrorsLib.OnlyGateway());
+        require(msg.sender == GATEWAY, Errors.OnlyGateway());
         _;
     }
 
@@ -147,7 +147,7 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, TransferHelp
         assertingTransferHelperBalanceFor(bridgeParams.feeToken)
         assertingTransferHelperBalanceFor(asset)
     {
-        require(amount > 0, ErrorsLib.ZeroAmount());
+        require(amount > 0, Errors.ZeroAmount());
 
         // Transfer the bridge fee to the TransferHelper.
         _transferBridgeFeeToTransferHelper(bridgeParams);

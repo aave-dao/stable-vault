@@ -15,12 +15,12 @@ import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
-import {ConstantsLib} from "src/libraries/ConstantsLib.sol";
-import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {Multicall} from "src/misc/Multicall.sol";
 import {RescuableAssets} from "src/misc/RescuableAssets.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
+import {Constants} from "src/types/Constants.sol";
+import {Errors} from "src/types/Errors.sol";
 
 /// @title BasedBoostedVault.
 /// @author Aave Labs
@@ -162,8 +162,8 @@ contract BasedBoostedVault is
         override
         assertingTransferHelperBalanceFor(asset)
     {
-        require(IAssetRegistry(ASSET_REGISTRY).isUserDepositAllowed(asset), ErrorsLib.UnsupportedAsset(asset));
-        require(amount > 0, ErrorsLib.InvalidAmount());
+        require(IAssetRegistry(ASSET_REGISTRY).isUserDepositAllowed(asset), Errors.UnsupportedAsset(asset));
+        require(amount > 0, Errors.InvalidAmount());
 
         uint256 subVaultId = $storage().positions[user].subVaultId;
         if (subVaultId == 0) {
@@ -178,7 +178,7 @@ contract BasedBoostedVault is
         // Round down the division with the same goal of undershooting amount of granted shares.
         uint256 shares = amountInRay.rayDivDown(conversionRateRoundedUp);
         // Prevent deposits that result in 0 shares to avoid user getting nothing in return for their deposit.
-        require(shares > 0, ErrorsLib.InvalidAmount());
+        require(shares > 0, Errors.InvalidAmount());
         _accrueSubVaultConversionRate(subVaultId);
 
         if (!_isActiveSubVaultById(subVaultId)) {
@@ -288,7 +288,7 @@ contract BasedBoostedVault is
         // which implies:
         //   S >= rayDivUp(1e9, conversionRate)
         uint256 minSharesToRedeemOneWei =
-            ConstantsLib.MIN_WITHDRAWABLE_AMOUNT_RAY.rayDivUp($storage().subVaultById[subVaultId].conversionRate);
+            Constants.MIN_WITHDRAWABLE_AMOUNT_RAY.rayDivUp($storage().subVaultById[subVaultId].conversionRate);
         uint256 remainingSharesAfterRedeem = $storage().positions[user].shares - redeemedShares;
         return remainingSharesAfterRedeem >= minSharesToRedeemOneWei;
     }
@@ -315,7 +315,7 @@ contract BasedBoostedVault is
         // >1,000,000 withdrawals to accumulate $1 of loss). The gas cost of preventing this (~1,600 gas for an extra
         // conversion) exceeds the value of the dust, so we accept this minor rounding in favor of the protocol.
         uint256 assetAmount = amountOutRay.rayToAssetDecimals(assetOut);
-        require(assetAmount != 0 && assetAmount >= minAmountOut, ErrorsLib.InsufficientAmountOut());
+        require(assetAmount != 0 && assetAmount >= minAmountOut, Errors.InsufficientAmountOut());
         IFundsHandler(FUNDS_HANDLER).processWithdrawal(assetOut, assetAmount);
         ITransferHelper(TRANSFER_HELPER).transfer(assetOut, assetAmount, user);
         emit WithdrawalExecuted(user, assetOut, assetAmount);
@@ -342,7 +342,7 @@ contract BasedBoostedVault is
             IFundsHandler(FUNDS_HANDLER).processWithdrawal(assets[i], amounts[i]);
             accumulatedAmountRay += amounts[i].assetDecimalsToRay(assets[i]);
         }
-        require(accumulatedAmountRay <= fee, ErrorsLib.InvalidAmount());
+        require(accumulatedAmountRay <= fee, Errors.InvalidAmount());
         ITransferHelper(TRANSFER_HELPER).transfer(assets, amounts, msg.sender);
         emit FeesClaimed(assets, amounts);
     }
@@ -457,7 +457,7 @@ contract BasedBoostedVault is
         uint256 userNewShares = userOldShares.rayMulDown(oldConversionRate).rayDivDown(newConversionRate);
         // Do not allow the user position share quantity to deplete to zero which can happen if a user has a small
         // userOldShares quantity and newConversionRate is large.
-        require(userNewShares > 0, ErrorsLib.InvalidAmount());
+        require(userNewShares > 0, Errors.InvalidAmount());
 
         if (!_isActiveSubVaultById(newSubVaultId)) {
             _addSubVaultToActive(newSubVaultId);
@@ -560,7 +560,7 @@ contract BasedBoostedVault is
         // Round up the amount of shares to redeem (burn on the position) for the requested amount of assets, so that
         // the rounding is in favor of the protocol.
         uint256 sharesToRedeem = withdrawalAmountRay.rayDivUp(conversionRate);
-        require(sharesToRedeem <= $storage().positions[user].shares, ErrorsLib.InvalidAmount());
+        require(sharesToRedeem <= $storage().positions[user].shares, Errors.InvalidAmount());
         return (withdrawalAmountRay, _getAmountTakenFromOriginalDeposit(user, withdrawalAmountRay), sharesToRedeem);
     }
 

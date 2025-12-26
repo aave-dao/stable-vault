@@ -6,8 +6,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
-import {ConstantsLib} from "src/libraries/ConstantsLib.sol";
-import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
+import {Constants} from "src/types/Constants.sol";
+import {Errors} from "src/types/Errors.sol";
 
 /// @title TransferHelperClient
 /// @author Aave Labs
@@ -29,14 +29,14 @@ contract TransferHelperClient {
 
     modifier assertingTransferHelperBalanceFor(address asset) {
         uint256 balanceBefore;
-        if (asset == ConstantsLib.NATIVE_CURRENCY) {
+        if (asset == Constants.NATIVE_CURRENCY) {
             balanceBefore = TRANSFER_HELPER.balance;
         } else {
             balanceBefore = IERC20(asset).balanceOf(TRANSFER_HELPER);
         }
         _;
         uint256 balanceAfter;
-        if (asset == ConstantsLib.NATIVE_CURRENCY) {
+        if (asset == Constants.NATIVE_CURRENCY) {
             balanceAfter = TRANSFER_HELPER.balance;
         } else {
             balanceAfter = IERC20(asset).balanceOf(TRANSFER_HELPER);
@@ -76,16 +76,16 @@ contract TransferHelperClient {
 
     /// @dev Transfers the bridge fee to the TransferHelper to be pulled by Bridge Adapter.
     function _transferBridgeFeeToTransferHelper(IBridgeAdapter.BridgeParams memory bridgeParams) internal {
-        require(bridgeParams.feePayer == msg.sender, ErrorsLib.InvalidBridgeFeePayer());
+        require(bridgeParams.feePayer == msg.sender, Errors.InvalidBridgeFeePayer());
         if (msg.value > 0) {
             // If there is some msg.value, we transfer it to the TransferHelper, regardless of the fee token.
             // There might be scenarios where the bridge implementation requires some native assets to operate in
             // addition to the ERC-20 fee token.
             _transferNativeToTransferHelper(msg.value);
         }
-        if (bridgeParams.feeToken == ConstantsLib.NATIVE_CURRENCY) {
+        if (bridgeParams.feeToken == Constants.NATIVE_CURRENCY) {
             // We already transferred all the msg.value above. Here we just check that it covers the fee amount.
-            require(msg.value >= bridgeParams.feeAmount, ErrorsLib.InsufficientFunds());
+            require(msg.value >= bridgeParams.feeAmount, Errors.InsufficientFunds());
         } else if (bridgeParams.feeAmount > 0) {
             IERC20(bridgeParams.feeToken)
                 .safeTransferFrom(bridgeParams.feePayer, TRANSFER_HELPER, bridgeParams.feeAmount);
@@ -93,7 +93,7 @@ contract TransferHelperClient {
     }
 
     function _transferToTransferHelper(address asset, uint256 amount) internal {
-        if (asset == ConstantsLib.NATIVE_CURRENCY) {
+        if (asset == Constants.NATIVE_CURRENCY) {
             _transferNativeToTransferHelper(amount);
         } else {
             IERC20(asset).safeTransfer(TRANSFER_HELPER, amount);
@@ -101,7 +101,7 @@ contract TransferHelperClient {
     }
 
     function _transferToTransferHelper(address from, address asset, uint256 amount) internal {
-        if (asset == ConstantsLib.NATIVE_CURRENCY) {
+        if (asset == Constants.NATIVE_CURRENCY) {
             _transferNativeToTransferHelper(amount);
         } else {
             IERC20(asset).safeTransferFrom(from, TRANSFER_HELPER, amount);
@@ -110,6 +110,6 @@ contract TransferHelperClient {
 
     function _transferNativeToTransferHelper(uint256 amount) private {
         (bool callSucceeded,) = TRANSFER_HELPER.call{value: amount}("");
-        require(callSucceeded, ErrorsLib.NativeTransferFailed());
+        require(callSucceeded, Errors.NativeTransferFailed());
     }
 }
