@@ -1634,25 +1634,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
         );
     }
 
-    function test_sendBridgeIouTokenMessageWithFeePayer_reverts_ifInvalidDestinationChainId() public {
-        vm.prank(address(_mockIouTokenManager));
-        vm.expectRevert(Errors.InvalidDestinationChainId.selector);
-        _earningChainGateway.sendBridgeIouTokenMessageWithFeePayer(
-            // Can not be the same chain that the Gateway contract is on
-            block.chainid,
-            makeAddr("iouTokenRecipient"),
-            100_000,
-            IBridgeAdapter.BridgeParams({
-                feePayer: makeAddr("bridgeFeePayer"),
-                feeToken: address(_mockUsdt),
-                feeAmount: 100_000,
-                feeRefundThreshold: 0,
-                gasLimit: 100000,
-                data: abi.encode(keccak256(hex"c0ffee"))
-            })
-        );
-    }
-
     function test_sendBridgeIouTokenMessageWithFeePayer_reverts_ifAdapterNotFound() public {
         // Remove the adapter for message bridge
         vm.prank(admin);

@@ -148,6 +148,7 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, TransferHelp
         assertingTransferHelperBalanceFor(asset)
     {
         require(amount > 0, Errors.ZeroAmount());
+        require(chainId != block.chainid, Errors.InvalidDestinationChainId());
 
         // Transfer the bridge fee to the TransferHelper.
         _transferBridgeFeeToTransferHelper(bridgeParams);

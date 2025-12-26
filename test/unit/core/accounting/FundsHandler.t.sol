@@ -810,6 +810,29 @@ contract FundsHandlerTest is TestWithHelpers {
         fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, bridgeParams);
     }
 
+    function test_pushFundsToChain_reverts_ifDestinationChainIdIsTheSameAsTheCurrentChainId(
+        uint256 amount,
+        uint256 bridgeParams_feeAmount,
+        uint256 bridgeParams_gasLimit
+    ) public {
+        amount = _boundAssetAmount(address(mockAsset), amount);
+        bridgeParams_feeAmount = _boundAssetAmount(address(mockAsset), bridgeParams_feeAmount);
+        mockAsset.mint(address(this), bridgeParams_feeAmount);
+        mockAsset.forceApprove(address(fundsHandler), bridgeParams_feeAmount);
+
+        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
+            feePayer: address(this),
+            feeToken: address(mockAsset),
+            feeAmount: bridgeParams_feeAmount,
+            feeRefundThreshold: 0,
+            gasLimit: bridgeParams_gasLimit,
+            data: ""
+        });
+
+        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidDestinationChainId.selector));
+        fundsHandler.pushFundsToChain(address(mockAsset), amount, block.chainid, bridgeParams);
+    }
+
     function test_pushFundsToChain_callsGatewaySendPushFundsMessage(
         uint256 amount,
         uint256 chainId,
