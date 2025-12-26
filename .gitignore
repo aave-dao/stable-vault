@@ -16,6 +16,9 @@ deployments-zk/inMemoryNode/
 # Docs
 docs/
 
+# Local files (e.g. notes, cheat sheets, backups) to keep handy that should not be committed to the repository
+.local
+
 .idea
 
 # .env files, except the example
