@@ -34,6 +34,11 @@ interface IAllocator {
     /// @custom:selector 0xa01adeda
     error StrategyStillHasFunds(address strategy);
 
+    /// @notice Thrown when setting as default a strategy that already is the default, or when removing a strategy
+    /// that is currently set as the default.
+    /// @custom:selector 0x13e93f82
+    error DefaultStrategy(address strategy);
+
     /// @notice The representation of an asset balance.
     /// @param asset Address of the asset.
     /// @param amount Amount of the asset.

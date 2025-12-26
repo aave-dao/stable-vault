@@ -221,10 +221,12 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
 
     /// @inheritdoc IAllocator
     function setDefaultStrategy(address asset, address strategy) external override restricted {
-        // Strategy must be allowed to be set as the default strategy for the asset
-        require(strategy != $storage().defaultStrategyByAsset[asset], ErrorsLib.AddressAlreadyWhitelisted());
-        require(_isStrategySupportedForAsset({strategy: strategy, asset: asset}), ErrorsLib.AddressNotWhitelisted());
-        require($storage().strategyConfigs[strategy].depositAllowed, DepositsToStrategyDisabled(strategy));
+        if (strategy != address(0)) {
+            // Strategy must be allowed to be set as the default strategy for the asset
+            require(strategy != $storage().defaultStrategyByAsset[asset], DefaultStrategy(strategy));
+            require(_isStrategySupportedForAsset({strategy: strategy, asset: asset}), ErrorsLib.AddressNotWhitelisted());
+            require($storage().strategyConfigs[strategy].depositAllowed, DepositsToStrategyDisabled(strategy));
+        }
         $storage().defaultStrategyByAsset[asset] = strategy;
         emit DefaultStrategySet(asset, strategy);
     }
@@ -411,6 +413,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
 
     function _removeStrategy(address strategy) internal {
         require(_isStrategySupported(strategy), ErrorsLib.AddressNotWhitelisted());
+        require($storage().defaultStrategyByAsset[IERC4626(strategy).asset()] != strategy, DefaultStrategy(strategy));
         // This can get blocked if assets are deposited into the strategy on behalf of the Allocator.
         // This function is intended to clear storage, so if it gets DoS'd then the consequences are consumed storage.
         // This function does not allow removing a strategy if balance > 0 to avoid accidentally disregarding asset
@@ -420,16 +423,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         require(_getAssetBalanceInStrategy(IERC4626(strategy)) == 0, StrategyStillHasFunds(strategy));
         address asset = $storage().strategyConfigs[strategy].asset;
 
-        if (strategy == $storage().defaultStrategyByAsset[asset]) {
-            // Unset the default strategy for the asset - deposits will not flow to this strategy.
-            // If the default strategy is removed, another one should be set as the default for deposits and
-            // withdrawals.
-            delete $storage().defaultStrategyByAsset[asset];
-            emit DefaultStrategySet(asset, address(0));
-        }
-
         $storage().assetStrategies[asset].remove(strategy);
-
         delete $storage().strategyConfigs[strategy];
         emit StrategyRemoved(asset, strategy);
     }
