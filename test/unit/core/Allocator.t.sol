@@ -344,6 +344,25 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
     }
 
+    function test_deposit_ifDefaultStrategyIsAddressZero_fundsAreIdle(uint256 depositAmountUsdt) public {
+        depositAmountUsdt = _boundAssetAmount(address(_mockUsdt), depositAmountUsdt);
+
+        // Set the default strategy to address(0)
+        vm.prank(address(everyRoleAccount));
+        _allocator.setDefaultStrategy(address(_mockUsdt), address(0));
+
+        _mockTransferHelper.mockAsset(address(_mockUsdt), depositAmountUsdt);
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), depositAmountUsdt);
+
+        // Check that the funds are idle in the Allocator
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), depositAmountUsdt);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
+    }
+
     function test_deposit_reverts_whereVaultRejectsDeposit(uint256 depositAmountUsdt) public {
         depositAmountUsdt = _boundAssetAmount(address(_mockUsdt), depositAmountUsdt);
 
@@ -1499,6 +1518,8 @@ contract AllocatorTest is TestWithHelpers {
     }
 
     function test_setDefaultStrategy_reverts_ifStrategyIsNotSupportedForAsset(address strategy) public {
+        vm.assume(strategy != address(0));
+
         address asset = address(_mockUsdt);
         vm.assume(strategy != address(_defaultUsdtStrategy));
         vm.assume(strategy != address(_extraUsdtStrategy));
@@ -1513,7 +1534,7 @@ contract AllocatorTest is TestWithHelpers {
         address strategy = address(_defaultUsdtStrategy);
 
         vm.prank(address(everyRoleAccount));
-        vm.expectRevert(ErrorsLib.AddressAlreadyWhitelisted.selector);
+        vm.expectRevert(abi.encodeWithSelector(IAllocator.StrategyIsDefault.selector, strategy));
         _allocator.setDefaultStrategy(asset, strategy);
     }
 
@@ -1528,44 +1549,26 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.setDefaultStrategy(address(_mockUsdt), address(_extraUsdtStrategy));
     }
 
-    function test_removeStrategy_unsetsDefaultStrategy() public {
+    function test_removeStrategy_reverts_ifDefaultStrategy() public {
         vm.prank(address(everyRoleAccount));
-        vm.expectEmit(true, true, true, true);
-        emit IAllocator.DefaultStrategySet(address(_mockUsdt), address(0));
-        vm.expectEmit(true, true, true, true);
-        emit IAllocator.StrategyRemoved(address(_mockUsdt), address(_defaultUsdtStrategy));
+        vm.expectRevert(abi.encodeWithSelector(IAllocator.StrategyIsDefault.selector, address(_defaultUsdtStrategy)));
         _allocator.removeStrategy(address(_defaultUsdtStrategy));
-        assertEq(_allocator.getDefaultStrategy(address(_mockUsdt)), address(0));
-
-        // If user deposits then funds sit idle
-        uint256 amount = 1000;
-        _mockTransferHelper.mockAsset(address(_mockUsdt), amount);
-        vm.prank(depositor);
-        _allocator.deposit(address(_mockUsdt), amount);
-
-        // Check balances
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
-        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
-        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
-        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
-        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
 
         vm.prank(address(everyRoleAccount));
-        vm.expectEmit(true, true, true, true);
-        emit IAllocator.DefaultStrategySet(address(_mockGho), address(0));
-        vm.expectEmit(true, true, true, true);
-        emit IAllocator.StrategyRemoved(address(_mockGho), address(_defaultGhoStrategy));
+        vm.expectRevert(abi.encodeWithSelector(IAllocator.StrategyIsDefault.selector, address(_defaultGhoStrategy)));
         _allocator.removeStrategy(address(_defaultGhoStrategy));
-        assertEq(_allocator.getDefaultStrategy(address(_mockGho)), address(0));
     }
 
     function test_removeStrategy_removesStrategyFromAssetStrategies() public {
         _mockAssetRegistry.mockRegisteredAsset(address(_mockUsdt));
 
+        // First set the default strategy to address(0) to remove the default strategy
         vm.prank(address(everyRoleAccount));
         vm.expectEmit(true, true, true, true);
         emit IAllocator.DefaultStrategySet(address(_mockUsdt), address(0));
+        _allocator.setDefaultStrategy(address(_mockUsdt), address(0));
+        // Then remove the default strategy
+        vm.prank(address(everyRoleAccount));
         vm.expectEmit(true, true, true, true);
         emit IAllocator.StrategyRemoved(address(_mockUsdt), address(_defaultUsdtStrategy));
         _allocator.removeStrategy(address(_defaultUsdtStrategy));
@@ -1575,9 +1578,13 @@ contract AllocatorTest is TestWithHelpers {
         emit IAllocator.StrategyRemoved(address(_mockUsdt), address(_extraUsdtStrategy));
         _allocator.removeStrategy(address(_extraUsdtStrategy));
 
+        // First set the default strategy to address(0) to remove the default strategy
         vm.prank(address(everyRoleAccount));
         vm.expectEmit(true, true, true, true);
         emit IAllocator.DefaultStrategySet(address(_mockGho), address(0));
+        _allocator.setDefaultStrategy(address(_mockGho), address(0));
+        // Then remove the default strategy
+        vm.prank(address(everyRoleAccount));
         vm.expectEmit(true, true, true, true);
         emit IAllocator.StrategyRemoved(address(_mockGho), address(_defaultGhoStrategy));
         _allocator.removeStrategy(address(_defaultGhoStrategy));
@@ -1678,6 +1685,12 @@ contract AllocatorTest is TestWithHelpers {
         _mockTransferHelper.mockAsset(address(_mockUsdt), amount);
         vm.prank(depositor);
         _allocator.deposit(address(_mockUsdt), amount);
+
+        // Swap out the default strategy for the extra strategy
+        vm.prank(address(everyRoleAccount));
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.DefaultStrategySet(address(_mockUsdt), address(_extraUsdtStrategy));
+        _allocator.setDefaultStrategy(address(_mockUsdt), address(_extraUsdtStrategy));
 
         vm.prank(address(everyRoleAccount));
         vm.expectRevert(
