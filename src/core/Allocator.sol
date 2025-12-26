@@ -15,7 +15,6 @@ import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {ISwapper} from "src/interfaces/ISwapper.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
-import {ConstantsLib} from "src/libraries/ConstantsLib.sol";
 import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
 import {Multicall} from "src/misc/Multicall.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
@@ -141,7 +140,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     function deposit(address asset, uint256 amount) external override onlyDepositor {
         ITransferHelper(TRANSFER_HELPER).pull(asset, amount);
         require(IAssetRegistry(ASSET_REGISTRY).isDepositToAllocatorAllowed(asset), ErrorsLib.UnsupportedAsset(asset));
-        if ($storage().defaultStrategyByAsset[asset] != ConstantsLib.ZERO_ADDRESS) {
+        if ($storage().defaultStrategyByAsset[asset] != address(0)) {
             _depositToStrategy({asset: asset, amount: amount, strategy: $storage().defaultStrategyByAsset[asset]});
         }
     }
@@ -404,7 +403,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     }
 
     function _isStrategySupported(address strategy) internal view returns (bool) {
-        return $storage().strategyConfigs[strategy].asset != ConstantsLib.ZERO_ADDRESS;
+        return $storage().strategyConfigs[strategy].asset != address(0);
     }
 
     function _addStrategy(address asset, address strategy) internal {
@@ -434,7 +433,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
             // If the default strategy is removed, another one should be set as the default for deposits and
             // withdrawals.
             delete $storage().defaultStrategyByAsset[asset];
-            emit DefaultStrategySet(asset, ConstantsLib.ZERO_ADDRESS);
+            emit DefaultStrategySet(asset, address(0));
         }
 
         $storage().assetStrategies[asset].remove(strategy);

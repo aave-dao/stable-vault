@@ -29,17 +29,17 @@ contract TransferHelperClient {
 
     modifier assertingTransferHelperBalanceFor(address asset) {
         uint256 balanceBefore;
-        if (asset != ConstantsLib.NATIVE_CURRENCY) {
-            balanceBefore = IERC20(asset).balanceOf(TRANSFER_HELPER);
-        } else {
+        if (asset == ConstantsLib.NATIVE_CURRENCY) {
             balanceBefore = TRANSFER_HELPER.balance;
+        } else {
+            balanceBefore = IERC20(asset).balanceOf(TRANSFER_HELPER);
         }
         _;
         uint256 balanceAfter;
-        if (asset != ConstantsLib.NATIVE_CURRENCY) {
-            balanceAfter = IERC20(asset).balanceOf(TRANSFER_HELPER);
-        } else {
+        if (asset == ConstantsLib.NATIVE_CURRENCY) {
             balanceAfter = TRANSFER_HELPER.balance;
+        } else {
+            balanceAfter = IERC20(asset).balanceOf(TRANSFER_HELPER);
         }
         require(balanceAfter <= balanceBefore, TransferHelperBalanceNotConsumed(asset));
     }
@@ -93,7 +93,7 @@ contract TransferHelperClient {
     }
 
     function _transferToTransferHelper(address asset, uint256 amount) internal {
-        if (asset == address(0)) {
+        if (asset == ConstantsLib.NATIVE_CURRENCY) {
             _transferNativeToTransferHelper(amount);
         } else {
             IERC20(asset).safeTransfer(TRANSFER_HELPER, amount);
@@ -101,7 +101,7 @@ contract TransferHelperClient {
     }
 
     function _transferToTransferHelper(address from, address asset, uint256 amount) internal {
-        if (asset == address(0)) {
+        if (asset == ConstantsLib.NATIVE_CURRENCY) {
             _transferNativeToTransferHelper(amount);
         } else {
             IERC20(asset).safeTransferFrom(from, TRANSFER_HELPER, amount);

@@ -87,7 +87,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
         require(destinationChainId != block.chainid, ErrorsLib.InvalidDestinationChainId());
 
         address adapter = $storage().defaultBridgeAdapter[ConstantsLib.ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId];
-        require(adapter != ConstantsLib.ZERO_ADDRESS, AdapterNotFound());
+        require(adapter != address(0), AdapterNotFound());
 
         bytes memory bridgeIouTokenMessageEncoded = abi.encode(
             IChainGateway.CrossChainMessage({
@@ -117,7 +117,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
         // Remove it from the default adapter if it is the default adapter.
         if ($storage().defaultBridgeAdapter[asset][chainId] == adapter) {
             delete $storage().defaultBridgeAdapter[asset][chainId];
-            emit DefaultBridgeAdapterSet(asset, chainId, ConstantsLib.ZERO_ADDRESS);
+            emit DefaultBridgeAdapterSet(asset, chainId, address(0));
         }
         emit BridgeAdapterRemoved(asset, chainId, adapter);
     }
