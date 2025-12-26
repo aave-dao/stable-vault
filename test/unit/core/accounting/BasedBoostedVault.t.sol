@@ -14,10 +14,10 @@ import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IRescuableAssets} from "src/interfaces/IRescuableAssets.sol";
 import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
-import {ConstantsLib} from "src/libraries/ConstantsLib.sol";
-import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
+import {Constants} from "src/types/Constants.sol";
+import {Errors} from "src/types/Errors.sol";
 
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
 import {_toAddressArray, _toUint256Array} from "test/helpers/TypeHelpers.sol";
@@ -312,7 +312,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         _assumeNotProxyAdmin(user, address(bbv));
 
         vm.prank(user);
-        vm.expectRevert(ErrorsLib.InvalidAmount.selector);
+        vm.expectRevert(Errors.InvalidAmount.selector);
         bbv.deposit(user, address(mockAsset), 0);
     }
 
@@ -335,7 +335,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockAssetRegistry.mockToDisallowAssetDepositsIntoBBV(address(mockAsset));
 
         vm.prank(user);
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(mockAsset)));
+        vm.expectRevert(abi.encodeWithSelector(Errors.UnsupportedAsset.selector, address(mockAsset)));
         bbv.deposit(user, address(mockAsset), amount);
     }
 
@@ -380,7 +380,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         highDecimalToken.approve(address(vault), depositAmount);
 
         vm.prank(user);
-        vm.expectRevert(ErrorsLib.InvalidAmount.selector);
+        vm.expectRevert(Errors.InvalidAmount.selector);
         vault.deposit(user, address(highDecimalToken), depositAmount);
     }
 
@@ -597,7 +597,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         userRateData = new IBasedBoostedVault.UserRateData[](1);
         userRateData[0] = IBasedBoostedVault.UserRateData(user2, newRate);
         // Check this reverts because the user would end up with 0 shares in the new sub-vault.
-        vm.expectRevert(ErrorsLib.InvalidAmount.selector);
+        vm.expectRevert(Errors.InvalidAmount.selector);
         bbv.setUserRate(userRateData);
     }
 
@@ -829,7 +829,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockFundsHandler.mockAggregatedBalance(availableFeesToClaimRay);
 
         vm.prank(manager);
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.InvalidAmount.selector));
+        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidAmount.selector));
         bbv.claimFees(_toAddressArray(address(mockAsset)), _toUint256Array(requestedAssetsToClaim));
     }
 
@@ -1186,7 +1186,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             // This matches the contract's `_accrueSubVaultConversionRate` rounding down, starting from
             // `conversionRate = RAY`.
             uint256 conversionRate = MathLib.RAY.rayMulDown(perSecondRate.rpow(timeElapsed));
-            uint256 minSharesToRedeemOneWei = uint256(ConstantsLib.MIN_WITHDRAWABLE_AMOUNT_RAY).rayDivUp(conversionRate);
+            uint256 minSharesToRedeemOneWei = uint256(Constants.MIN_WITHDRAWABLE_AMOUNT_RAY).rayDivUp(conversionRate);
             assertTrue(minSharesToRedeemOneWei > 1);
             dustRemainderShares = bound(dustRemainderShares, 1, minSharesToRedeemOneWei - 1);
 
@@ -1256,7 +1256,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             // Matches the contract's `_accrueSubVaultConversionRate` rounding down, starting from `conversionRate =
             // RAY`.
             conversionRate = MathLib.RAY.rayMulDown(perSecondRate.rpow(timeElapsed));
-            minSharesToRedeemOneWei = uint256(ConstantsLib.MIN_WITHDRAWABLE_AMOUNT_RAY).rayDivUp(conversionRate);
+            minSharesToRedeemOneWei = uint256(Constants.MIN_WITHDRAWABLE_AMOUNT_RAY).rayDivUp(conversionRate);
             maxWithdrawRay = userShares.rayMulDown(conversionRate);
 
             requestedAmountRay = bound(requestedAmountRay, 0, maxWithdrawRay);
@@ -1328,7 +1328,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         withdrawalAmountRay = _boundRayAmount(withdrawalAmountRay);
         vm.assume(withdrawalAmountRay > userBalanceRay);
 
-        vm.expectRevert(ErrorsLib.InvalidAmount.selector);
+        vm.expectRevert(Errors.InvalidAmount.selector);
         vm.prank(user);
         bbv.requestWithdrawal(user, withdrawalAmountRay);
     }
@@ -1588,10 +1588,10 @@ contract BasedBoostedVaultTest is TestWithHelpers {
                 address(mockAsset),
                 iouAmountRay.rayToAssetDecimals(address(mockAsset))
             ),
-            abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(mockAsset))
+            abi.encodeWithSelector(Errors.UnsupportedAsset.selector, address(mockAsset))
         );
 
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(mockAsset)));
+        vm.expectRevert(abi.encodeWithSelector(Errors.UnsupportedAsset.selector, address(mockAsset)));
         vm.prank(user);
         bbv.executeWithdrawal(user, address(mockAsset), 0, iouAmountRay, "");
     }
@@ -1637,7 +1637,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockTransferHelper.mockAsset(address(mockAsset), actualWithdrawnAssets);
 
         vm.prank(user);
-        vm.expectRevert(ErrorsLib.InsufficientAmountOut.selector);
+        vm.expectRevert(Errors.InsufficientAmountOut.selector);
         bbv.executeWithdrawal(user, address(mockAsset), minAmountOut, iouAmountRay, "");
     }
 
@@ -1666,7 +1666,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockTransferHelper.mockAsset(address(mockAsset), actualWithdrawnAssets);
 
         vm.prank(user);
-        vm.expectRevert(ErrorsLib.InsufficientAmountOut.selector);
+        vm.expectRevert(Errors.InsufficientAmountOut.selector);
         bbv.executeWithdrawal(user, address(mockAsset), 0, iouAmountRay, "");
     }
 

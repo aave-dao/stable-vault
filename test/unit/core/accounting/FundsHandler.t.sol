@@ -13,9 +13,9 @@ import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IRescuableAssets} from "src/interfaces/IRescuableAssets.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
-import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
+import {Errors} from "src/types/Errors.sol";
 
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
 import {MockAccessManager} from "test/mocks/MockAccessManager.sol";
@@ -261,7 +261,7 @@ contract FundsHandlerTest is TestWithHelpers {
         address asset = _deployAssetWithSalt(assetDeploymentSalt, assetDecimals);
         amount = _boundAssetAmountAllowingZero(address(asset), amount);
 
-        vm.expectRevert(ErrorsLib.OnlyGateway.selector);
+        vm.expectRevert(Errors.OnlyGateway.selector);
         vm.prank(msgSender);
         fundsHandler.fundsArrivedFromChainCallback(asset, amount);
     }
@@ -292,7 +292,7 @@ contract FundsHandlerTest is TestWithHelpers {
 
         snapshotBalanceRay = _boundRayAmountAllowingZero(snapshotBalanceRay);
 
-        vm.expectRevert(ErrorsLib.OnlyGateway.selector);
+        vm.expectRevert(Errors.OnlyGateway.selector);
         vm.prank(msgSender);
         fundsHandler.updateChainBalanceCallback(chainId, snapshotBalanceRay, chainBalanceSnapshotNonce);
     }
@@ -329,7 +329,7 @@ contract FundsHandlerTest is TestWithHelpers {
 
         amountToDecrementRay = _boundRayAmount(amountToDecrementRay);
 
-        vm.expectRevert(ErrorsLib.OnlyGateway.selector);
+        vm.expectRevert(Errors.OnlyGateway.selector);
         vm.prank(msgSender);
         fundsHandler.decrementChainBalanceSnapshotCallback(chainId, amountToDecrementRay);
     }
@@ -589,7 +589,7 @@ contract FundsHandlerTest is TestWithHelpers {
         vm.assume(address(msgSender).balance == 0);
 
         vm.prank(msgSender);
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.NativeTransferFailed.selector));
+        vm.expectRevert(abi.encodeWithSelector(Errors.NativeTransferFailed.selector));
         IRescuableAssets(address(fundsHandler)).rescueTokens(address(0), assetAmountToRescue);
     }
 
@@ -707,7 +707,7 @@ contract FundsHandlerTest is TestWithHelpers {
             data: ""
         });
 
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.ZeroAmount.selector));
+        vm.expectRevert(abi.encodeWithSelector(Errors.ZeroAmount.selector));
         fundsHandler.pushFundsToChain{value: bridgeParams_feeAmount}(address(mockAsset), 0, chainId, bridgeParams);
     }
 
@@ -806,7 +806,7 @@ contract FundsHandlerTest is TestWithHelpers {
 
         mockGateway.mockToConsumeAssetFromTransferHelperInNextCall(address(mockAsset), bridgeParams_feeAmount + amount);
 
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.InvalidBridgeFeePayer.selector));
+        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidBridgeFeePayer.selector));
         fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, bridgeParams);
     }
 

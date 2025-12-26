@@ -11,7 +11,7 @@ import {BasedBoostedVault} from "src/core/accounting/BasedBoostedVault.sol";
 import {IBasedBoostedVault} from "src/interfaces/IBasedBoostedVault.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
-import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
+import {Errors} from "src/types/Errors.sol";
 
 import {BaseTest} from "test/BaseTest.t.sol";
 
@@ -187,7 +187,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         assertEq(iouToken_earningChain.totalSupply(), iouAmountRequestedRay, "Supply on Earning Chain should go up");
 
         // Check that requesting another withdrawal fails because the user was alredy given IOUs.
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.InvalidAmount.selector));
+        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidAmount.selector));
         vm.prank(user1);
         vault.requestWithdrawal(user1, iouAmountRequestedRay);
 

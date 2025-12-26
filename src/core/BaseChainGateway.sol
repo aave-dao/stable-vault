@@ -8,9 +8,9 @@ import {
 
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
-import {ConstantsLib} from "src/libraries/ConstantsLib.sol";
-import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
 import {RescuableAssets} from "src/misc/RescuableAssets.sol";
+import {Constants} from "src/types/Constants.sol";
+import {Errors} from "src/types/Errors.sol";
 
 /// @title BaseChainGateway
 /// @author Aave Labs
@@ -84,9 +84,9 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) external override {
         require(msg.sender == IOU_TOKEN_MANAGER, OnlyIouTokenManager());
-        require(destinationChainId != block.chainid, ErrorsLib.InvalidDestinationChainId());
+        require(destinationChainId != block.chainid, Errors.InvalidDestinationChainId());
 
-        address adapter = $storage().defaultBridgeAdapter[ConstantsLib.ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId];
+        address adapter = $storage().defaultBridgeAdapter[Constants.ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId];
         require(adapter != address(0), AdapterNotFound());
 
         bytes memory bridgeIouTokenMessageEncoded = abi.encode(
@@ -105,14 +105,14 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
 
     /// @inheritdoc IChainGateway
     function addBridgeAdapter(address asset, uint256 chainId, address adapter) external override restricted {
-        require(!$storage().supportedBridgeAdapters[asset][chainId][adapter], ErrorsLib.AddressAlreadyWhitelisted());
+        require(!$storage().supportedBridgeAdapters[asset][chainId][adapter], Errors.AddressAlreadyWhitelisted());
         $storage().supportedBridgeAdapters[asset][chainId][adapter] = true;
         emit BridgeAdapterAdded(asset, chainId, adapter);
     }
 
     /// @inheritdoc IChainGateway
     function removeBridgeAdapter(address asset, uint256 chainId, address adapter) external override restricted {
-        require($storage().supportedBridgeAdapters[asset][chainId][adapter], ErrorsLib.AddressNotWhitelisted());
+        require($storage().supportedBridgeAdapters[asset][chainId][adapter], Errors.AddressNotWhitelisted());
         delete $storage().supportedBridgeAdapters[asset][chainId][adapter];
         // Remove it from the default adapter if it is the default adapter.
         if ($storage().defaultBridgeAdapter[asset][chainId] == adapter) {
@@ -124,7 +124,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
 
     /// @inheritdoc IChainGateway
     function setDefaultBridgeAdapter(address asset, uint256 chainId, address adapter) external override restricted {
-        require($storage().supportedBridgeAdapters[asset][chainId][adapter], ErrorsLib.AddressNotWhitelisted());
+        require($storage().supportedBridgeAdapters[asset][chainId][adapter], Errors.AddressNotWhitelisted());
         $storage().defaultBridgeAdapter[asset][chainId] = adapter;
         emit DefaultBridgeAdapterSet(asset, chainId, adapter);
     }
@@ -145,7 +145,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) internal {
         IBridgeAdapter.BridgeAsset[] memory assets;
-        if (assetToBridge != ConstantsLib.ASSET_FOR_DATA_ONLY_BRIDGE) {
+        if (assetToBridge != Constants.ASSET_FOR_DATA_ONLY_BRIDGE) {
             assets = new IBridgeAdapter.BridgeAsset[](1);
             assets[0] = IBridgeAdapter.BridgeAsset({asset: assetToBridge, amount: amountToBridge});
         }

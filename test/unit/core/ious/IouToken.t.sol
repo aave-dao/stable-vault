@@ -6,7 +6,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Test} from "forge-std/Test.sol";
 
 import {IouToken} from "src/core/ious/IouToken.sol";
-import {ConstantsLib} from "src/libraries/ConstantsLib.sol";
+import {Constants} from "src/types/Constants.sol";
 
 contract IouTokenTest is Test {
     address public iouToken;
@@ -42,7 +42,7 @@ contract IouTokenTest is Test {
     }
 
     function test_decimals() public view {
-        assertEq(IouToken(iouToken).decimals(), ConstantsLib.RAY_DECIMALS, "decimals mismatch");
+        assertEq(IouToken(iouToken).decimals(), Constants.RAY_DECIMALS, "decimals mismatch");
     }
 
     function test_name() public view {

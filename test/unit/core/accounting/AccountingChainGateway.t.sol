@@ -13,8 +13,8 @@ import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
-import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
+import {Errors} from "src/types/Errors.sol";
 
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
 import {MockAccessManager} from "test/mocks/MockAccessManager.sol";
@@ -183,13 +183,13 @@ contract AccountingChainGatewayTest is TestWithHelpers {
     }
 
     function test_removeBridgeAdapter_reverts_ifNotWhitelisted() public {
-        vm.expectRevert(ErrorsLib.AddressNotWhitelisted.selector);
+        vm.expectRevert(Errors.AddressNotWhitelisted.selector);
         vm.prank(admin);
         _accountingChainGateway.removeBridgeAdapter(address(0), EARNING_CHAIN_ID, makeAddr("adapter"));
     }
 
     function test_setDefaultBridgeAdapter_reverts_ifNotWhitelisted() public {
-        vm.expectRevert(ErrorsLib.AddressNotWhitelisted.selector);
+        vm.expectRevert(Errors.AddressNotWhitelisted.selector);
         vm.prank(admin);
         _accountingChainGateway.setDefaultBridgeAdapter(address(0), EARNING_CHAIN_ID, makeAddr("adapter"));
     }
@@ -211,7 +211,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
 
         vm.prank(everyRoleAccount);
         _accountingChainGateway.addBridgeAdapter(asset, EARNING_CHAIN_ID, adapter);
-        vm.expectRevert(ErrorsLib.AddressAlreadyWhitelisted.selector);
+        vm.expectRevert(Errors.AddressAlreadyWhitelisted.selector);
         vm.prank(everyRoleAccount);
         _accountingChainGateway.addBridgeAdapter(asset, EARNING_CHAIN_ID, adapter);
     }
@@ -220,7 +220,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         address adapter = makeAddr("adapter");
         address asset = address(_mockUsdt);
 
-        vm.expectRevert(ErrorsLib.AddressNotWhitelisted.selector);
+        vm.expectRevert(Errors.AddressNotWhitelisted.selector);
         vm.prank(everyRoleAccount);
         _accountingChainGateway.setDefaultBridgeAdapter(asset, EARNING_CHAIN_ID, adapter);
     }
@@ -364,7 +364,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
 
     function test_sendBridgeIouTokenMessageWithFeePayer_reverts_ifInvalidDestinationChainId() public {
         vm.prank(address(_mockIouTokenManager));
-        vm.expectRevert(ErrorsLib.InvalidDestinationChainId.selector);
+        vm.expectRevert(Errors.InvalidDestinationChainId.selector);
         _accountingChainGateway.sendBridgeIouTokenMessageWithFeePayer(
             // Can not be the same chain that the Gateway contract is on
             block.chainid,

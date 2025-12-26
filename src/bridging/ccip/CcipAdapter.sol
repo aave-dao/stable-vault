@@ -15,7 +15,7 @@ import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
-import {ConstantsLib} from "src/libraries/ConstantsLib.sol";
+import {Constants} from "src/types/Constants.sol";
 
 /// @title CcipAdapter
 /// @author Aave Labs
@@ -90,7 +90,7 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
         assetsToPull[assetsToPull.length - 1] = bridgeParams.feeToken;
         amountsToPull[amountsToPull.length - 1] = bridgeParams.feeAmount;
 
-        if (bridgeParams.feeToken != ConstantsLib.NATIVE_CURRENCY) {
+        if (bridgeParams.feeToken != Constants.NATIVE_CURRENCY) {
             // Increase allowance in case of the fee token matching an asset being bridged.
             IERC20(bridgeParams.feeToken).safeIncreaseAllowance(CCIP_ROUTER, bridgeParams.feeAmount);
         }
@@ -175,7 +175,7 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
         uint64 chainSelector = _chainSelectorOf[chainId];
         uint256 estimatedFeeAmount = IRouterClient(CCIP_ROUTER).getFee(chainSelector, message);
         uint256 msgValue;
-        if (feeToken == ConstantsLib.NATIVE_CURRENCY) {
+        if (feeToken == Constants.NATIVE_CURRENCY) {
             msgValue = estimatedFeeAmount;
         }
         if (allocatedFeeAmount > estimatedFeeAmount) {
@@ -189,7 +189,7 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
     }
 
     function _triggerFeeRefund(address feePayer, address feeToken, uint256 excessFee) internal {
-        if (feeToken == ConstantsLib.NATIVE_CURRENCY) {
+        if (feeToken == Constants.NATIVE_CURRENCY) {
             payable(feePayer).transfer(excessFee);
         } else {
             IERC20(feeToken).safeTransfer(feePayer, excessFee);

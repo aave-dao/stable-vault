@@ -11,9 +11,9 @@ import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
-import {ConstantsLib} from "src/libraries/ConstantsLib.sol";
-import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
+import {Constants} from "src/types/Constants.sol";
+import {Errors} from "src/types/Errors.sol";
 
 /// @title EarningChainGateway
 /// @notice Facilitates cross chain messaging with exactly one Accounting Chain.
@@ -89,8 +89,8 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
         override
         assertingTransferHelperBalanceFor(bridgeParams.feeToken)
     {
-        address adapter = $BaseChainGateway()
-        .defaultBridgeAdapter[ConstantsLib.ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID];
+        address adapter =
+            $BaseChainGateway().defaultBridgeAdapter[Constants.ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID];
         require(adapter != address(0), AdapterNotFound());
 
         _transferBridgeFeeToTransferHelper(bridgeParams);
@@ -98,7 +98,7 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
         _sendCrossChainMessage(
             ACCOUNTING_CHAIN_ID,
             adapter,
-            ConstantsLib.ASSET_FOR_DATA_ONLY_BRIDGE,
+            Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
             0,
             _getBalanceSnapshotData(),
             bridgeParams
@@ -121,7 +121,7 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
         assertingTransferHelperBalanceFor(assetOut)
         returns (uint256)
     {
-        require(iouTokenAmountRay > 0, ErrorsLib.ZeroAmount());
+        require(iouTokenAmountRay > 0, Errors.ZeroAmount());
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(msg.sender, iouTokenAmountRay);
 
         uint256 amountOutRay = IWithdrawalPolicy(WITHDRAWAL_POLICY)
@@ -136,13 +136,13 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
         // >1,000,000 withdrawals to accumulate $1 of loss). The gas cost of preventing this (~1,600 gas for an extra
         // conversion) exceeds the value of the dust, so we accept this minor rounding in favor of the protocol.
         uint256 amountOut = amountOutRay.rayToAssetDecimals(assetOut);
-        require(amountOut != 0 && amountOut >= minAmountOut, ErrorsLib.InsufficientAmountOut());
+        require(amountOut != 0 && amountOut >= minAmountOut, Errors.InsufficientAmountOut());
         IAllocator(ALLOCATOR).withdraw(assetOut, amountOut);
 
         _transferBridgeFeeToTransferHelper(bridgeParams);
 
         address adapter =
-            $BaseChainGateway().defaultBridgeAdapter[ConstantsLib.ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID];
+            $BaseChainGateway().defaultBridgeAdapter[Constants.ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID];
         require(adapter != address(0), AdapterNotFound());
 
         // Send data to synchronize the Accounting Chain's state.
@@ -162,7 +162,7 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
         assertingTransferHelperBalanceFor(bridgeParams.feeToken)
         assertingTransferHelperBalanceFor(asset)
     {
-        require(amount > 0, ErrorsLib.ZeroAmount());
+        require(amount > 0, Errors.ZeroAmount());
         // Transfer the bridge fee to the TransferHelper.
         _transferBridgeFeeToTransferHelper(bridgeParams);
 
@@ -179,7 +179,7 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
     }
 
     function _receiveData(uint256 sourceChainId, bytes memory data) internal override {
-        _onlyAdapter(ConstantsLib.ASSET_FOR_DATA_ONLY_BRIDGE, sourceChainId);
+        _onlyAdapter(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, sourceChainId);
         IChainGateway.CrossChainMessage memory crossChainMessage = abi.decode(data, (IChainGateway.CrossChainMessage));
         if (crossChainMessage.messageType == IChainGateway.MessageType.BRIDGE_IOU_TOKEN) {
             _bridgeIouTokenFromAccountingChain(crossChainMessage.data);
@@ -232,7 +232,7 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
         _sendCrossChainMessage(
             ACCOUNTING_CHAIN_ID,
             adapter,
-            ConstantsLib.ASSET_FOR_DATA_ONLY_BRIDGE,
+            Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
             0,
             burnIouTokenMessageEncoded,
             bridgeParams

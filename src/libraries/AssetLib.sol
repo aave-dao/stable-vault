@@ -4,7 +4,7 @@ pragma solidity ^0.8.22;
 
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import {ConstantsLib} from "src/libraries/ConstantsLib.sol";
+import {Constants} from "src/types/Constants.sol";
 
 /// @title AssetLib
 /// @author Aave Labs
@@ -15,11 +15,11 @@ library AssetLib {
     error CannotGetAssetDecimals(address asset);
 
     function assetDecimalsToRay(uint256 amount, address asset) internal view returns (uint256) {
-        return convertDecimals(amount, getDecimals(asset), ConstantsLib.RAY_DECIMALS);
+        return convertDecimals(amount, getDecimals(asset), Constants.RAY_DECIMALS);
     }
 
     function rayToAssetDecimals(uint256 amount, address asset) internal view returns (uint256) {
-        return convertDecimals(amount, ConstantsLib.RAY_DECIMALS, getDecimals(asset));
+        return convertDecimals(amount, Constants.RAY_DECIMALS, getDecimals(asset));
     }
 
     function convertAssetDecimals(uint256 amount, address fromAsset, address toAsset) internal view returns (uint256) {

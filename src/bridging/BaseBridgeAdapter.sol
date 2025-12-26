@@ -8,8 +8,8 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
-import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
+import {Errors} from "src/types/Errors.sol";
 
 /// @title BaseBridgeAdapter
 /// @author Aave Labs
@@ -26,13 +26,13 @@ abstract contract BaseBridgeAdapter is AccessManaged, TransferHelperClient, IBri
     mapping(uint256 chainId => address destinationChainAdapter) internal _destinationChainAdapterOf;
 
     modifier onlyGateway() {
-        require(msg.sender == GATEWAY, ErrorsLib.OnlyGateway());
+        require(msg.sender == GATEWAY, Errors.OnlyGateway());
         _;
     }
 
     modifier onlySelf() {
         if (msg.sender != address(this)) {
-            revert ErrorsLib.OnlySelf();
+            revert Errors.OnlySelf();
         }
         _;
     }

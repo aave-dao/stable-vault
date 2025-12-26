@@ -17,9 +17,9 @@ import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
 import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
-import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
+import {Errors} from "src/types/Errors.sol";
 
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
 import {MockAccessManager} from "test/mocks/MockAccessManager.sol";
@@ -189,13 +189,13 @@ contract EarningChainGatewayTest is TestWithHelpers {
     }
 
     function test_removeBridgeAdapter_reverts_ifNotWhitelisted() public {
-        vm.expectRevert(ErrorsLib.AddressNotWhitelisted.selector);
+        vm.expectRevert(Errors.AddressNotWhitelisted.selector);
         vm.prank(admin);
         _earningChainGateway.removeBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, makeAddr("adapter"));
     }
 
     function test_setDefaultBridgeAdapter_reverts_ifNotWhitelisted() public {
-        vm.expectRevert(ErrorsLib.AddressNotWhitelisted.selector);
+        vm.expectRevert(Errors.AddressNotWhitelisted.selector);
         vm.prank(admin);
         _earningChainGateway.setDefaultBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, makeAddr("adapter"));
     }
@@ -230,7 +230,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         vm.prank(everyRoleAccount);
         _earningChainGateway.addBridgeAdapter(asset, ACCOUNTING_CHAIN_ID, adapter);
-        vm.expectRevert(ErrorsLib.AddressAlreadyWhitelisted.selector);
+        vm.expectRevert(Errors.AddressAlreadyWhitelisted.selector);
         vm.prank(everyRoleAccount);
         _earningChainGateway.addBridgeAdapter(asset, ACCOUNTING_CHAIN_ID, adapter);
     }
@@ -239,7 +239,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         address adapter = makeAddr("adapter");
         address asset = address(_mockUsdt);
 
-        vm.expectRevert(ErrorsLib.AddressNotWhitelisted.selector);
+        vm.expectRevert(Errors.AddressNotWhitelisted.selector);
         vm.prank(everyRoleAccount);
         _earningChainGateway.setDefaultBridgeAdapter(asset, ACCOUNTING_CHAIN_ID, adapter);
     }
@@ -502,7 +502,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     }
 
     function test_sendBalanceUpdateWithFeePayer_reverts_ifZeroValueForNativeBridgeFee() public {
-        vm.expectRevert(ErrorsLib.InsufficientFunds.selector);
+        vm.expectRevert(Errors.InsufficientFunds.selector);
         _earningChainGateway.sendBalanceUpdateWithFeePayer{value: 0}(
             IBridgeAdapter.BridgeParams({
                 // msg.sender must be the fee payer
@@ -517,7 +517,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     }
 
     function test_sendBalanceUpdateWithFeePayer_reverts_ifInvalidBridgeFeePayer() public {
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.InvalidBridgeFeePayer.selector));
+        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidBridgeFeePayer.selector));
         _earningChainGateway.sendBalanceUpdateWithFeePayer(
             IBridgeAdapter.BridgeParams({
                 feePayer: makeAddr("unauthorizedFeePayer"),
@@ -786,7 +786,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     }
 
     function test_exchangeIouTokens_reverts_ifZeroAmountAsIouTokenAmountRay() public {
-        vm.expectRevert(ErrorsLib.ZeroAmount.selector);
+        vm.expectRevert(Errors.ZeroAmount.selector);
         _earningChainGateway.exchangeIouTokens(
             0,
             address(_mockUsdt),
@@ -811,7 +811,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         // Put funds idle into TH to mimic withdrawal from Allocator
         //_mockTransferHelper.mockAsset(address(_mockUsdt), amountOut);
 
-        vm.expectRevert(ErrorsLib.InsufficientAmountOut.selector);
+        vm.expectRevert(Errors.InsufficientAmountOut.selector);
         _earningChainGateway.exchangeIouTokens(
             iouTokenAmountRay,
             address(_mockUsdt),
@@ -839,7 +839,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             abi.encode(uint256(0)) // amountOutRay = 0, simulating 100% fee
         );
 
-        vm.expectRevert(ErrorsLib.InsufficientAmountOut.selector);
+        vm.expectRevert(Errors.InsufficientAmountOut.selector);
         _earningChainGateway.exchangeIouTokens(
             iouTokenAmountRay,
             address(_mockUsdt),
@@ -864,7 +864,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         // Put funds idle into TH to mimic withdrawal from Allocator
         _mockTransferHelper.mockAsset(address(_mockUsdt), amountOut);
 
-        vm.expectRevert(ErrorsLib.InsufficientFunds.selector);
+        vm.expectRevert(Errors.InsufficientFunds.selector);
         _earningChainGateway.exchangeIouTokens(
             iouTokenAmountRay,
             address(_mockUsdt),
@@ -905,10 +905,10 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 address(_mockUnsupportedAsset),
                 iouTokenAmountRay.rayToAssetDecimals(address(_mockUnsupportedAsset))
             ),
-            abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(_mockUnsupportedAsset))
+            abi.encodeWithSelector(Errors.UnsupportedAsset.selector, address(_mockUnsupportedAsset))
         );
 
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(_mockUnsupportedAsset)));
+        vm.expectRevert(abi.encodeWithSelector(Errors.UnsupportedAsset.selector, address(_mockUnsupportedAsset)));
         _earningChainGateway.exchangeIouTokens(
             iouTokenAmountRay,
             address(_mockUnsupportedAsset),
@@ -971,7 +971,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         address tokenOutReceiver = makeAddr("tokenOutReceiver");
         uint256 bridgeFeeAmount = 123;
         vm.deal(tokenOutReceiver, bridgeFeeAmount);
-        vm.expectRevert(ErrorsLib.InsufficientAmountOut.selector);
+        vm.expectRevert(Errors.InsufficientAmountOut.selector);
         vm.prank(tokenOutReceiver);
         _earningChainGateway.exchangeIouTokens{value: bridgeFeeAmount}(
             iouTokenAmountRay,
@@ -1389,7 +1389,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     }
 
     function test_pushFundsToAccountingChain_reverts_ifZeroAmountAsAmount() public {
-        vm.expectRevert(ErrorsLib.ZeroAmount.selector);
+        vm.expectRevert(Errors.ZeroAmount.selector);
         vm.prank(everyRoleAccount);
         _earningChainGateway.pushFundsToAccountingChain(
             address(_mockUsdt),
@@ -1410,7 +1410,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         // Put funds idle in Allocator to allow withdrawal to EarningChainGateway
         _mockUsdt.mint(address(_mockAllocator), amount);
 
-        vm.expectRevert(ErrorsLib.InsufficientFunds.selector);
+        vm.expectRevert(Errors.InsufficientFunds.selector);
         vm.prank(everyRoleAccount);
         _earningChainGateway.pushFundsToAccountingChain(
             address(_mockUsdt),
@@ -1482,7 +1482,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     }
 
     function test_pushFundsToAccountingChain_reverts_ifInvalidBridgeFeePayer() public {
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.InvalidBridgeFeePayer.selector));
+        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidBridgeFeePayer.selector));
         _earningChainGateway.pushFundsToAccountingChain(
             address(_mockUsdt),
             100_000_000_000_000 * 10 ** 6,
@@ -1636,7 +1636,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
     function test_sendBridgeIouTokenMessageWithFeePayer_reverts_ifInvalidDestinationChainId() public {
         vm.prank(address(_mockIouTokenManager));
-        vm.expectRevert(ErrorsLib.InvalidDestinationChainId.selector);
+        vm.expectRevert(Errors.InvalidDestinationChainId.selector);
         _earningChainGateway.sendBridgeIouTokenMessageWithFeePayer(
             // Can not be the same chain that the Gateway contract is on
             block.chainid,

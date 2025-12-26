@@ -17,7 +17,7 @@ import {IAcrossV3Receiver} from "src/bridging/across/IAcrossV3Receiver.sol";
 import {IAcrossBridgeAdapter} from "src/interfaces/IAcrossBridgeAdapter.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
-import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
+import {Errors} from "src/types/Errors.sol";
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
 import {MockAccessManager} from "test/mocks/MockAccessManager.sol";
 import {MockAccountingChainGateway} from "test/mocks/MockAccountingChainGateway.sol";
@@ -366,7 +366,7 @@ contract AcrossAdapterTest is TestWithHelpers {
             data: ""
         });
 
-        vm.expectRevert(ErrorsLib.OnlyGateway.selector);
+        vm.expectRevert(Errors.OnlyGateway.selector);
         vm.prank(caller);
         _accountingChainAcrossAdapter.publishMessageToChainWithFeePayer(EARNING_CHAIN_ID, assets, "", bridgeParams);
     }
@@ -422,7 +422,7 @@ contract AcrossAdapterTest is TestWithHelpers {
             data: ""
         });
 
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.ZeroAmount.selector));
+        vm.expectRevert(abi.encodeWithSelector(Errors.ZeroAmount.selector));
         vm.prank(address(_mockAccountingChainGateway));
         _accountingChainAcrossAdapter.publishMessageToChainWithFeePayer(EARNING_CHAIN_ID, assets, "", bridgeParams);
     }

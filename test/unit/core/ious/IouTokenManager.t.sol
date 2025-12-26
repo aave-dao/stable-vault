@@ -9,7 +9,7 @@ import {IouToken} from "src/core/ious/IouToken.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
-import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
+import {Errors} from "src/types/Errors.sol";
 
 import {ExtendedIouTokenManager} from "test/mocks/ExtendedIouTokenManager.sol";
 import {MockErc20} from "test/mocks/MockErc20.sol";
@@ -61,7 +61,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
         public
     {
         vm.assume(nonAllowedMinter != chainGateway && nonAllowedMinter != vault);
-        vm.expectRevert(ErrorsLib.NotAuthorized.selector);
+        vm.expectRevert(Errors.NotAuthorized.selector);
         vm.prank(nonAllowedMinter);
         iouTokenManager.mintTokens(mintTo, amountToMint);
     }
@@ -93,7 +93,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
     ) public {
         vm.assume(burnFrom != address(0));
         vm.assume(nonAllowedBurner != chainGateway && nonAllowedBurner != vault);
-        vm.expectRevert(ErrorsLib.NotAuthorized.selector);
+        vm.expectRevert(Errors.NotAuthorized.selector);
         vm.prank(nonAllowedBurner);
         iouTokenManager.burnTokens(burnFrom, amountToBurn);
     }
@@ -135,7 +135,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
         virtual
     {
         vm.assume(nonAllowedBurner != chainGateway && nonAllowedBurner != vault);
-        vm.expectRevert(ErrorsLib.NotAuthorized.selector);
+        vm.expectRevert(Errors.NotAuthorized.selector);
         vm.prank(nonAllowedBurner);
         iouTokenManager.burnLockedTokens(amountToBurn);
     }
@@ -186,7 +186,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
         virtual
     {
         vm.assume(nonAllowedReleaser != chainGateway);
-        vm.expectRevert(ErrorsLib.NotAuthorized.selector);
+        vm.expectRevert(Errors.NotAuthorized.selector);
         vm.prank(nonAllowedReleaser);
         iouTokenManager.releaseTokens(msg.sender, amountToRelease);
     }
@@ -247,7 +247,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
         IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
             feePayer: address(0), feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 0, data: ""
         });
-        vm.expectRevert(ErrorsLib.InvalidDestinationChainId.selector);
+        vm.expectRevert(Errors.InvalidDestinationChainId.selector);
         vm.prank(from);
         iouTokenManager.bridgeTokens(destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeParams);
     }
@@ -366,7 +366,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
         vm.prank(from);
         IERC20(iouToken).approve(address(iouTokenManager), iouTokenAmountRay);
 
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.InvalidBridgeFeePayer.selector));
+        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidBridgeFeePayer.selector));
         vm.prank(from);
         iouTokenManager.bridgeTokens(destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeParams);
     }
@@ -379,7 +379,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
         IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
             feePayer: from, feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 0, data: ""
         });
-        vm.expectRevert(ErrorsLib.InvalidParameter.selector);
+        vm.expectRevert(Errors.InvalidParameter.selector);
         vm.prank(from);
         iouTokenManager.bridgeTokens(destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeParams);
     }

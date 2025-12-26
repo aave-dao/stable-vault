@@ -10,8 +10,8 @@ import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IIouToken} from "src/interfaces/IIouToken.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
 import {IMintableBurnableIERC20} from "src/interfaces/IMintableBurnableIERC20.sol";
-import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
+import {Errors} from "src/types/Errors.sol";
 
 /// @title IouTokenManager
 /// @author Aave Labs
@@ -44,17 +44,17 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
     }
 
     modifier onlyAllowedReleaser() {
-        require(msg.sender == CHAIN_GATEWAY, ErrorsLib.NotAuthorized());
+        require(msg.sender == CHAIN_GATEWAY, Errors.NotAuthorized());
         _;
     }
 
     modifier onlyAllowedMinter() {
-        require(msg.sender == VAULT || msg.sender == CHAIN_GATEWAY, ErrorsLib.NotAuthorized());
+        require(msg.sender == VAULT || msg.sender == CHAIN_GATEWAY, Errors.NotAuthorized());
         _;
     }
 
     modifier onlyAllowedBurner() {
-        require(msg.sender == VAULT || msg.sender == CHAIN_GATEWAY, ErrorsLib.NotAuthorized());
+        require(msg.sender == VAULT || msg.sender == CHAIN_GATEWAY, Errors.NotAuthorized());
         _;
     }
 
@@ -95,8 +95,8 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
         uint256 iouTokenAmountRay,
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) external payable override assertingTransferHelperBalanceFor(bridgeParams.feeToken) {
-        require(destinationChainId != block.chainid, ErrorsLib.InvalidDestinationChainId());
-        require(iouTokenRecipient != address(0), ErrorsLib.InvalidParameter());
+        require(destinationChainId != block.chainid, Errors.InvalidDestinationChainId());
+        require(iouTokenRecipient != address(0), Errors.InvalidParameter());
         if (IS_ACCOUNTING_CHAIN) {
             _lockTokens(msg.sender, iouTokenAmountRay);
         } else {

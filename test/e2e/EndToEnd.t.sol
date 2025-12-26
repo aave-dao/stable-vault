@@ -10,8 +10,8 @@ import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IBasedBoostedVault} from "src/interfaces/IBasedBoostedVault.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
-import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
 import {Swapper} from "src/periphery/Swapper.sol";
+import {Errors} from "src/types/Errors.sol";
 
 import {BaseTest} from "test/BaseTest.t.sol";
 
@@ -240,7 +240,7 @@ contract EndToEndTest is BaseTest {
             assertGt(iouToken_accountingChain.balanceOf(user), 0, "User should have minted IOU tokens");
 
             vm.prank(user);
-            vm.expectRevert(ErrorsLib.InsufficientFunds.selector);
+            vm.expectRevert(Errors.InsufficientFunds.selector);
             vault.executeWithdrawal(user, address(USDC), 0, iouAmountRequestedRay, "");
 
             // - check that we don't owe the user any funds

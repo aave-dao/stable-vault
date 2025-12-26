@@ -15,8 +15,8 @@ import {Allocator} from "src/core/Allocator.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
-import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
+import {Errors} from "src/types/Errors.sol";
 
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
 import {MockAccessManager} from "test/mocks/MockAccessManager.sol";
@@ -389,7 +389,7 @@ contract AllocatorTest is TestWithHelpers {
 
         _mockUsdt.mint(depositor, amount);
         vm.prank(nonDepositor);
-        vm.expectRevert(ErrorsLib.AddressNotWhitelisted.selector);
+        vm.expectRevert(Errors.AddressNotWhitelisted.selector);
         _allocator.deposit(address(_mockUsdt), amount);
     }
 
@@ -400,13 +400,13 @@ contract AllocatorTest is TestWithHelpers {
 
         _mockTransferHelper.mockAsset(address(_mockUnsupportedAsset), amount);
 
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(_mockUnsupportedAsset)));
+        vm.expectRevert(abi.encodeWithSelector(Errors.UnsupportedAsset.selector, address(_mockUnsupportedAsset)));
         vm.prank(depositor);
         _allocator.deposit(address(_mockUnsupportedAsset), amount);
     }
 
     function test_deposit_reverts_ifAmountIsZero() public {
-        vm.expectRevert(ErrorsLib.ZeroAmount.selector);
+        vm.expectRevert(Errors.ZeroAmount.selector);
         vm.prank(depositor);
         _allocator.deposit(address(_mockUsdt), 0);
     }
@@ -721,13 +721,13 @@ contract AllocatorTest is TestWithHelpers {
 
         // Perform withdrawal
         vm.prank(withdrawer);
-        vm.expectRevert(ErrorsLib.InsufficientFunds.selector);
+        vm.expectRevert(Errors.InsufficientFunds.selector);
         _allocator.withdraw(address(_mockUsdt), amount + 1);
 
         // Try again after airdropping funds to the Allocator
         _mockUsdt.mint(address(_allocator), amount);
         vm.prank(withdrawer);
-        vm.expectRevert(ErrorsLib.InsufficientFunds.selector);
+        vm.expectRevert(Errors.InsufficientFunds.selector);
         _allocator.withdraw(address(_mockUsdt), amount * 2 + 1);
     }
 
@@ -745,18 +745,18 @@ contract AllocatorTest is TestWithHelpers {
 
         // Perform withdrawal
         vm.prank(withdrawer);
-        vm.expectRevert(ErrorsLib.InsufficientFunds.selector);
+        vm.expectRevert(Errors.InsufficientFunds.selector);
         _allocator.withdraw(address(_mockUsdt), amount + 1);
 
         // Try again after airdropping funds to the Allocator
         _mockUsdt.mint(address(_allocator), amount);
         vm.prank(withdrawer);
-        vm.expectRevert(ErrorsLib.InsufficientFunds.selector);
+        vm.expectRevert(Errors.InsufficientFunds.selector);
         _allocator.withdraw(address(_mockUsdt), amount * 2 + 1);
     }
 
     function test_withdraw_reverts_ifAmountIsZero() public {
-        vm.expectRevert(ErrorsLib.ZeroAmount.selector);
+        vm.expectRevert(Errors.ZeroAmount.selector);
         vm.prank(withdrawer);
         _allocator.withdraw(address(_mockUsdt), 0);
     }
@@ -766,11 +766,11 @@ contract AllocatorTest is TestWithHelpers {
         amount = _boundAssetAmount(address(_mockUnsupportedAsset), amount);
 
         vm.prank(withdrawer);
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(_mockUnsupportedAsset)));
+        vm.expectRevert(abi.encodeWithSelector(Errors.UnsupportedAsset.selector, address(_mockUnsupportedAsset)));
         _allocator.withdraw(address(_mockUnsupportedAsset), amount);
 
         vm.prank(withdrawer);
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(_mockUnsupportedAsset)));
+        vm.expectRevert(abi.encodeWithSelector(Errors.UnsupportedAsset.selector, address(_mockUnsupportedAsset)));
         _allocator.withdraw(address(_mockUnsupportedAsset), amount);
     }
 
@@ -780,7 +780,7 @@ contract AllocatorTest is TestWithHelpers {
         amount = _boundAssetAmount(address(_mockUsdt), amount);
 
         vm.prank(withdrawer);
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, address(_defaultUsdtStrategy)));
+        vm.expectRevert(abi.encodeWithSelector(Errors.UnsupportedAsset.selector, address(_defaultUsdtStrategy)));
         _allocator.withdraw(address(_defaultUsdtStrategy), amount);
     }
 
@@ -790,11 +790,11 @@ contract AllocatorTest is TestWithHelpers {
         _assumeNotProxyAdmin(nonWithdrawer, address(_allocator));
 
         vm.prank(nonWithdrawer);
-        vm.expectRevert(ErrorsLib.AddressNotWhitelisted.selector);
+        vm.expectRevert(Errors.AddressNotWhitelisted.selector);
         _allocator.withdraw(address(_mockUsdt), amount);
 
         vm.prank(nonWithdrawer);
-        vm.expectRevert(ErrorsLib.AddressNotWhitelisted.selector);
+        vm.expectRevert(Errors.AddressNotWhitelisted.selector);
         _allocator.withdraw(address(_mockUsdt), amount);
     }
 
@@ -804,7 +804,7 @@ contract AllocatorTest is TestWithHelpers {
         _assumeNotProxyAdmin(nonSelf, address(_allocator));
 
         vm.prank(nonSelf);
-        vm.expectRevert(ErrorsLib.OnlySelf.selector);
+        vm.expectRevert(Errors.OnlySelf.selector);
         _allocator.tryWithdrawFromStrategy(address(_mockUsdt), amount, address(_defaultUsdtStrategy));
     }
 
@@ -876,7 +876,7 @@ contract AllocatorTest is TestWithHelpers {
         IAllocator.RebalanceParams[] memory rebalanceParams =
             _getDepositIdleFundsRebalanceParams(address(_mockUnsupportedAsset));
         vm.prank(address(everyRoleAccount));
-        vm.expectRevert(ErrorsLib.AddressNotWhitelisted.selector);
+        vm.expectRevert(Errors.AddressNotWhitelisted.selector);
         _allocator.rebalance(rebalanceParams);
     }
 
@@ -1145,7 +1145,7 @@ contract AllocatorTest is TestWithHelpers {
             _buildRebalanceParams(deallocations, _initializeSwapParams(0), _initializeAllocationParams(0));
 
         vm.prank(address(everyRoleAccount));
-        vm.expectRevert(ErrorsLib.InsufficientAmountOut.selector);
+        vm.expectRevert(Errors.InsufficientAmountOut.selector);
         _allocator.rebalance(rebalanceParams);
     }
 
@@ -1198,7 +1198,7 @@ contract AllocatorTest is TestWithHelpers {
             _buildRebalanceParams(deallocations, _initializeSwapParams(0), _initializeAllocationParams(0));
 
         vm.prank(address(everyRoleAccount));
-        vm.expectRevert(ErrorsLib.AddressNotWhitelisted.selector);
+        vm.expectRevert(Errors.AddressNotWhitelisted.selector);
         _allocator.rebalance(rebalanceParams);
     }
 
@@ -1258,7 +1258,7 @@ contract AllocatorTest is TestWithHelpers {
         rebalanceParams[0] =
             _buildRebalanceParams(_initializeDeallocationParams(0), swaps, _initializeAllocationParams(0));
         vm.prank(address(everyRoleAccount));
-        vm.expectRevert(ErrorsLib.InvalidAmount.selector);
+        vm.expectRevert(Errors.InvalidAmount.selector);
         _allocator.rebalance(rebalanceParams);
 
         // Check balances
@@ -1294,7 +1294,7 @@ contract AllocatorTest is TestWithHelpers {
         _mockSwapper.mockSlippage(true);
 
         vm.prank(address(everyRoleAccount));
-        vm.expectRevert(ErrorsLib.InsufficientAmountOut.selector);
+        vm.expectRevert(Errors.InsufficientAmountOut.selector);
         _allocator.rebalance(rebalanceParams);
 
         // Check balances after the swap to make sure of no change
@@ -1321,7 +1321,7 @@ contract AllocatorTest is TestWithHelpers {
         rebalanceParams[0] =
             _buildRebalanceParams(_initializeDeallocationParams(0), swaps, _initializeAllocationParams(0));
         vm.prank(address(everyRoleAccount));
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, assetIn));
+        vm.expectRevert(abi.encodeWithSelector(Errors.UnsupportedAsset.selector, assetIn));
         _allocator.rebalance(rebalanceParams);
 
         // Check balances after the swap to make sure of no change
@@ -1348,7 +1348,7 @@ contract AllocatorTest is TestWithHelpers {
         rebalanceParams[0] =
             _buildRebalanceParams(_initializeDeallocationParams(0), swaps, _initializeAllocationParams(0));
         vm.prank(address(everyRoleAccount));
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.UnsupportedAsset.selector, assetOut));
+        vm.expectRevert(abi.encodeWithSelector(Errors.UnsupportedAsset.selector, assetOut));
         _allocator.rebalance(rebalanceParams);
 
         // Check balances after the swap to make sure of no change
@@ -1374,7 +1374,7 @@ contract AllocatorTest is TestWithHelpers {
             _buildRebalanceParams(_initializeDeallocationParams(0), swaps, _initializeAllocationParams(0));
 
         vm.prank(address(everyRoleAccount));
-        vm.expectRevert(ErrorsLib.InvalidAmount.selector);
+        vm.expectRevert(Errors.InvalidAmount.selector);
         _allocator.rebalance(rebalanceParams);
     }
 
@@ -1469,14 +1469,14 @@ contract AllocatorTest is TestWithHelpers {
 
     function test_addStrategy_reverts_ifStrategyIsAlreadyAdded() public {
         vm.prank(address(everyRoleAccount));
-        vm.expectRevert(ErrorsLib.AddressAlreadyWhitelisted.selector);
+        vm.expectRevert(Errors.AddressAlreadyWhitelisted.selector);
         _allocator.addStrategy(address(_mockUsdt), address(_defaultUsdtStrategy));
     }
 
     function test_addStrategy_reverts_ifAssetIsNotRegistered() public {
         address unsupportedStrategy = address(new TestErc4626(_mockUnsupportedAsset));
         vm.prank(address(everyRoleAccount));
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.InvalidAsset.selector, address(_mockUnsupportedAsset)));
+        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidAsset.selector, address(_mockUnsupportedAsset)));
         _allocator.addStrategy(address(_mockUnsupportedAsset), address(unsupportedStrategy));
     }
 
@@ -1488,11 +1488,11 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.removeStrategy(address(_extraUsdtStrategy));
 
         vm.prank(address(everyRoleAccount));
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.InvalidAsset.selector, address(_mockUsdt)));
+        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidAsset.selector, address(_mockUsdt)));
         _allocator.addStrategy(address(_mockUsdt), address(_extraGhoStrategy));
 
         vm.prank(address(everyRoleAccount));
-        vm.expectRevert(abi.encodeWithSelector(ErrorsLib.InvalidAsset.selector, address(_mockGho)));
+        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidAsset.selector, address(_mockGho)));
         _allocator.addStrategy(address(_mockGho), address(_extraUsdtStrategy));
     }
 
@@ -1525,7 +1525,7 @@ contract AllocatorTest is TestWithHelpers {
         vm.assume(strategy != address(_extraUsdtStrategy));
 
         vm.prank(address(everyRoleAccount));
-        vm.expectRevert(ErrorsLib.AddressNotWhitelisted.selector);
+        vm.expectRevert(Errors.AddressNotWhitelisted.selector);
         _allocator.setDefaultStrategy(asset, address(strategy));
     }
 
@@ -1675,7 +1675,7 @@ contract AllocatorTest is TestWithHelpers {
         vm.assume(strategy != address(_extraGhoStrategy));
 
         vm.prank(address(everyRoleAccount));
-        vm.expectRevert(ErrorsLib.AddressNotWhitelisted.selector);
+        vm.expectRevert(Errors.AddressNotWhitelisted.selector);
         _allocator.removeStrategy(strategy);
     }
 
@@ -1747,7 +1747,7 @@ contract AllocatorTest is TestWithHelpers {
     function test_disableDepositsToStrategy_reverts_ifStrategyIsNotSupported() public {
         address strategy = makeAddr("newStrategy");
         vm.prank(address(everyRoleAccount));
-        vm.expectRevert(ErrorsLib.AddressNotWhitelisted.selector);
+        vm.expectRevert(Errors.AddressNotWhitelisted.selector);
         _allocator.disableDepositsToStrategy(strategy);
     }
 
@@ -1810,7 +1810,7 @@ contract AllocatorTest is TestWithHelpers {
     function test_enableDepositsToStrategy_reverts_ifStrategyIsNotSupported() public {
         address strategy = makeAddr("newStrategy");
         vm.prank(address(everyRoleAccount));
-        vm.expectRevert(ErrorsLib.AddressNotWhitelisted.selector);
+        vm.expectRevert(Errors.AddressNotWhitelisted.selector);
         _allocator.enableDepositsToStrategy(strategy);
     }
 

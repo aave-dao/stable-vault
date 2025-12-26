@@ -17,8 +17,8 @@ import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
-import {ErrorsLib} from "src/libraries/ErrorsLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
+import {Errors} from "src/types/Errors.sol";
 
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
 import {MockAccessManager} from "test/mocks/MockAccessManager.sol";
@@ -775,7 +775,7 @@ contract CcipAdapterTest is TestWithHelpers {
         vm.assume(caller != address(_mockEarningChainGateway));
 
         vm.prank(caller);
-        vm.expectRevert(ErrorsLib.OnlyGateway.selector);
+        vm.expectRevert(Errors.OnlyGateway.selector);
         _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
             EARNING_CHAIN_ID,
             new IBridgeAdapter.BridgeAsset[](0),
@@ -791,7 +791,7 @@ contract CcipAdapterTest is TestWithHelpers {
         );
 
         vm.prank(caller);
-        vm.expectRevert(ErrorsLib.OnlyGateway.selector);
+        vm.expectRevert(Errors.OnlyGateway.selector);
         _earningChainCcipAdapter.publishMessageToChainWithFeePayer(
             ACCOUNTING_CHAIN_ID,
             new IBridgeAdapter.BridgeAsset[](0),
@@ -1041,7 +1041,7 @@ contract CcipAdapterTest is TestWithHelpers {
     function test_processReceivedFunds_reverts_ifOnlySelf(address caller) public {
         vm.assume(caller != address(_accountingChainCcipAdapter));
         vm.prank(caller);
-        vm.expectRevert(ErrorsLib.OnlySelf.selector);
+        vm.expectRevert(Errors.OnlySelf.selector);
         _accountingChainCcipAdapter.processReceivedFunds(new Client.EVMTokenAmount[](0));
     }
 
