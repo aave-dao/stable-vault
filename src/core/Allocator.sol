@@ -357,19 +357,11 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     /// @dev Intended to be the lowest level function used to deposit into a strategy.
     function _depositToStrategy(address asset, uint256 amount, address strategy) internal {
         require(amount > 0, ErrorsLib.ZeroAmount());
-        if (!$storage().strategyConfigs[strategy].depositAllowed) {
-            revert DepositsToStrategyDisabled(strategy);
-        }
+        require($storage().strategyConfigs[strategy].depositAllowed, DepositsToStrategyDisabled(strategy));
         IERC20(asset).forceApprove(strategy, amount);
         (bool callSucceeded,) = strategy.call(abi.encodeCall(IERC4626.deposit, (amount, address(this))));
-        if (callSucceeded) {
-            emit AssetAllocated(asset, strategy, amount);
-        } else {
-            // Clear the approval since this failure is handled gracefully
-            IERC20(asset).forceApprove(strategy, 0);
-            emit StrategyDepositFailed(strategy, amount);
-            revert DepositIntoStrategyFailed(strategy);
-        }
+        require(callSucceeded, DepositIntoStrategyFailed(strategy));
+        emit AssetAllocated(asset, strategy, amount);
     }
 
     /// @dev Returns balances grouped by asset.
