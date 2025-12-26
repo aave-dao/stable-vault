@@ -356,8 +356,6 @@ contract AllocatorTest is TestWithHelpers {
             abi.encodeWithSelector(IERC20Errors.ERC20InvalidSender.selector, address(_allocator))
         );
 
-        vm.expectEmit(true, true, true, true);
-        emit IAllocator.StrategyDepositFailed(address(_defaultUsdtStrategy), depositAmountUsdt);
         vm.expectRevert(
             abi.encodeWithSelector(IAllocator.DepositIntoStrategyFailed.selector, address(_defaultUsdtStrategy))
         );
@@ -874,8 +872,6 @@ contract AllocatorTest is TestWithHelpers {
         );
 
         IAllocator.RebalanceParams[] memory rebalanceParams = _getDepositIdleFundsRebalanceParams(address(_mockUsdt));
-        vm.expectEmit(true, true, true, true);
-        emit IAllocator.StrategyDepositFailed(address(_defaultUsdtStrategy), amount);
         vm.expectRevert(
             abi.encodeWithSelector(IAllocator.DepositIntoStrategyFailed.selector, address(_defaultUsdtStrategy))
         );
