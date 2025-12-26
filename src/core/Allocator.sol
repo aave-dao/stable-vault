@@ -422,8 +422,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
 
         if (strategy == $storage().defaultStrategyByAsset[asset]) {
             // Unset the default strategy for the asset - deposits will not flow to this strategy.
-            // If the default strategy is removed, another one should be set as the default for deposits and
-            // withdrawals.
+            // If the default strategy is removed, another one must be set as the default for deposits to succeed.
             delete $storage().defaultStrategyByAsset[asset];
             emit DefaultStrategySet(asset, address(0));
         }
