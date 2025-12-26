@@ -1534,7 +1534,7 @@ contract AllocatorTest is TestWithHelpers {
         address strategy = address(_defaultUsdtStrategy);
 
         vm.prank(address(everyRoleAccount));
-        vm.expectRevert(abi.encodeWithSelector(IAllocator.StrategyIsDefault.selector, strategy));
+        vm.expectRevert(abi.encodeWithSelector(IAllocator.DefaultStrategy.selector, strategy));
         _allocator.setDefaultStrategy(asset, strategy);
     }
 
@@ -1551,11 +1551,11 @@ contract AllocatorTest is TestWithHelpers {
 
     function test_removeStrategy_reverts_ifDefaultStrategy() public {
         vm.prank(address(everyRoleAccount));
-        vm.expectRevert(abi.encodeWithSelector(IAllocator.StrategyIsDefault.selector, address(_defaultUsdtStrategy)));
+        vm.expectRevert(abi.encodeWithSelector(IAllocator.DefaultStrategy.selector, address(_defaultUsdtStrategy)));
         _allocator.removeStrategy(address(_defaultUsdtStrategy));
 
         vm.prank(address(everyRoleAccount));
-        vm.expectRevert(abi.encodeWithSelector(IAllocator.StrategyIsDefault.selector, address(_defaultGhoStrategy)));
+        vm.expectRevert(abi.encodeWithSelector(IAllocator.DefaultStrategy.selector, address(_defaultGhoStrategy)));
         _allocator.removeStrategy(address(_defaultGhoStrategy));
     }
 

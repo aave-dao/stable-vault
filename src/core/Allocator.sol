@@ -223,7 +223,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     function setDefaultStrategy(address asset, address strategy) external override restricted {
         if (strategy != address(0)) {
             // Strategy must be allowed to be set as the default strategy for the asset
-            require(strategy != $storage().defaultStrategyByAsset[asset], StrategyIsDefault(strategy));
+            require(strategy != $storage().defaultStrategyByAsset[asset], DefaultStrategy(strategy));
             require(_isStrategySupportedForAsset({strategy: strategy, asset: asset}), ErrorsLib.AddressNotWhitelisted());
             require($storage().strategyConfigs[strategy].depositAllowed, DepositsToStrategyDisabled(strategy));
         }
@@ -413,7 +413,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
 
     function _removeStrategy(address strategy) internal {
         require(_isStrategySupported(strategy), ErrorsLib.AddressNotWhitelisted());
-        require($storage().defaultStrategyByAsset[IERC4626(strategy).asset()] != strategy, StrategyIsDefault(strategy));
+        require($storage().defaultStrategyByAsset[IERC4626(strategy).asset()] != strategy, DefaultStrategy(strategy));
         // This can get blocked if assets are deposited into the strategy on behalf of the Allocator.
         // This function is intended to clear storage, so if it gets DoS'd then the consequences are consumed storage.
         // This function does not allow removing a strategy if balance > 0 to avoid accidentally disregarding asset
