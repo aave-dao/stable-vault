@@ -106,7 +106,7 @@ contract AssetRegistryTest is TestWithHelpers {
         assertEq(_assetRegistry.isSwapOutputAllowed(address(_mockTokenWithZeroDecimals)), true);
     }
 
-    function test_setAssetConfig_allowsOverwritingAssetConfig() public {
+    function test_setAssetConfig_reverts_ifAttemptingToOverwriteAssetConfig() public {
         IAssetRegistry.AssetConfig memory config = IAssetRegistry.AssetConfig({
             depositFromUserAllowed: false,
             depositIntoAllocatorAllowed: false,
@@ -115,7 +115,6 @@ contract AssetRegistryTest is TestWithHelpers {
         });
         vm.prank(everyRoleAccount);
         _assetRegistry.setAssetConfig(address(_mockUsdt), config);
-        vm.prank(everyRoleAccount);
 
         assertEq(_assetRegistry.isUserDepositAllowed(address(_mockUsdt)), false);
         assertEq(_assetRegistry.isDepositToAllocatorAllowed(address(_mockUsdt)), false);
@@ -126,12 +125,13 @@ contract AssetRegistryTest is TestWithHelpers {
         config.depositIntoAllocatorAllowed = true;
         config.swapInputTokenAllowed = true;
         config.swapOutputTokenAllowed = true;
+        vm.expectRevert(abi.encodeWithSelector(Errors.AddressAlreadyWhitelisted.selector, address(_mockUsdt)));
         vm.prank(everyRoleAccount);
         _assetRegistry.setAssetConfig(address(_mockUsdt), config);
-        assertEq(_assetRegistry.isUserDepositAllowed(address(_mockUsdt)), true);
-        assertEq(_assetRegistry.isDepositToAllocatorAllowed(address(_mockUsdt)), true);
-        assertEq(_assetRegistry.isSwapInputAllowed(address(_mockUsdt)), true);
-        assertEq(_assetRegistry.isSwapOutputAllowed(address(_mockUsdt)), true);
+        assertEq(_assetRegistry.isUserDepositAllowed(address(_mockUsdt)), false);
+        assertEq(_assetRegistry.isDepositToAllocatorAllowed(address(_mockUsdt)), false);
+        assertEq(_assetRegistry.isSwapInputAllowed(address(_mockUsdt)), false);
+        assertEq(_assetRegistry.isSwapOutputAllowed(address(_mockUsdt)), false);
     }
 
     function test_setAssetConfig_reverts_ifAssetHasUnsupportedDecimals(uint8 decimals) public {
@@ -179,7 +179,7 @@ contract AssetRegistryTest is TestWithHelpers {
         _assetRegistry.setAssetConfig(address(_mockUsdt), config);
     }
 
-    function test_disableDeposits_disablesUserDeposits() public {
+    function test_disableUserDeposits_disablesUserDeposits() public {
         vm.prank(everyRoleAccount);
         _assetRegistry.setAssetConfig(
             address(_mockUsdt),
@@ -202,12 +202,12 @@ contract AssetRegistryTest is TestWithHelpers {
             })
         );
         vm.prank(everyRoleAccount);
-        _assetRegistry.disableDeposits(address(_mockUsdt), true, false);
+        _assetRegistry.disableUserDeposits(address(_mockUsdt));
         assertEq(_assetRegistry.isUserDepositAllowed(address(_mockUsdt)), false);
         assertEq(_assetRegistry.isDepositToAllocatorAllowed(address(_mockUsdt)), true);
     }
 
-    function test_disableDeposits_disablesAllocatorDeposits() public {
+    function test_disableAllocatorDeposits_disablesAllocatorDeposits() public {
         vm.prank(everyRoleAccount);
         _assetRegistry.setAssetConfig(
             address(_mockUsdt),
@@ -230,12 +230,20 @@ contract AssetRegistryTest is TestWithHelpers {
             })
         );
         vm.prank(everyRoleAccount);
-        _assetRegistry.disableDeposits(address(_mockUsdt), false, true);
+        _assetRegistry.disableAllocatorDeposits(address(_mockUsdt));
         assertEq(_assetRegistry.isUserDepositAllowed(address(_mockUsdt)), true);
         assertEq(_assetRegistry.isDepositToAllocatorAllowed(address(_mockUsdt)), false);
     }
 
-    function test_disableDeposits_disablesBothUserAndAllocatorDeposits() public {
+    function test_disableDeposits_withMulticall_disablesBothUserAndAllocatorDeposits() public {
+        bytes memory disableUserDepositsData =
+            abi.encodeWithSelector(IAssetRegistry.disableUserDeposits.selector, address(_mockUsdt));
+        bytes memory disableAllocatorDepositsData =
+            abi.encodeWithSelector(IAssetRegistry.disableAllocatorDeposits.selector, address(_mockUsdt));
+        bytes[] memory data = new bytes[](2);
+        data[0] = disableUserDepositsData;
+        data[1] = disableAllocatorDepositsData;
+
         vm.prank(everyRoleAccount);
         _assetRegistry.setAssetConfig(
             address(_mockUsdt),
@@ -248,12 +256,13 @@ contract AssetRegistryTest is TestWithHelpers {
         );
 
         vm.prank(everyRoleAccount);
-        _assetRegistry.disableDeposits(address(_mockUsdt), true, true);
+        bytes[] memory results = _assetRegistry.multicall(data);
+        assertEq(results.length, 2);
         assertEq(_assetRegistry.isUserDepositAllowed(address(_mockUsdt)), false);
         assertEq(_assetRegistry.isDepositToAllocatorAllowed(address(_mockUsdt)), false);
     }
 
-    function test_disableDeposits_doesNothingIfUserDepositsAreAlreadyDisabled() public {
+    function test_disableUserDeposits_reverts_ifUserDepositsAreAlreadyDisabled() public {
         vm.prank(everyRoleAccount);
         _assetRegistry.setAssetConfig(
             address(_mockUsdt),
@@ -266,12 +275,54 @@ contract AssetRegistryTest is TestWithHelpers {
         );
 
         vm.prank(everyRoleAccount);
-        _assetRegistry.disableDeposits(address(_mockUsdt), true, false);
-        assertEq(_assetRegistry.isUserDepositAllowed(address(_mockUsdt)), false);
-        assertEq(_assetRegistry.isDepositToAllocatorAllowed(address(_mockUsdt)), false);
+        vm.expectRevert(abi.encodeWithSelector(IAssetRegistry.AlreadyDisabled.selector));
+        _assetRegistry.disableUserDeposits(address(_mockUsdt));
     }
 
-    function test_disableDeposits_reverts_ifUnauthorizedCaller(address unauthorizedCaller) public {
+    function test_disableAllocatorDeposits_reverts_ifAlreadyDisabled() public {
+        vm.prank(everyRoleAccount);
+        _assetRegistry.setAssetConfig(
+            address(_mockUsdt),
+            IAssetRegistry.AssetConfig({
+                depositFromUserAllowed: false,
+                depositIntoAllocatorAllowed: false,
+                swapInputTokenAllowed: false,
+                swapOutputTokenAllowed: false
+            })
+        );
+        vm.prank(everyRoleAccount);
+        vm.expectRevert(abi.encodeWithSelector(IAssetRegistry.AlreadyDisabled.selector));
+        _assetRegistry.disableAllocatorDeposits(address(_mockUsdt));
+    }
+
+    function test_disableSwapInput_disablesSwapInput() public {
+        vm.prank(everyRoleAccount);
+        _assetRegistry.setAssetConfig(
+            address(_mockUsdt),
+            IAssetRegistry.AssetConfig({
+                depositFromUserAllowed: false,
+                depositIntoAllocatorAllowed: false,
+                swapInputTokenAllowed: true,
+                swapOutputTokenAllowed: false
+            })
+        );
+
+        vm.expectEmit(true, true, true, true);
+        emit IAssetRegistry.AssetConfigSet(
+            address(_mockUsdt),
+            IAssetRegistry.AssetConfig({
+                depositFromUserAllowed: false,
+                depositIntoAllocatorAllowed: false,
+                swapInputTokenAllowed: false,
+                swapOutputTokenAllowed: false
+            })
+        );
+        vm.prank(everyRoleAccount);
+        _assetRegistry.disableSwapInput(address(_mockUsdt));
+        assertEq(_assetRegistry.isSwapInputAllowed(address(_mockUsdt)), false);
+    }
+
+    function test_disableSwapInput_reverts_ifUnauthorizedCaller(address unauthorizedCaller) public {
         vm.assume(unauthorizedCaller != everyRoleAccount);
         vm.assume(unauthorizedCaller != address(0));
         _assumeNotProxyAdmin(unauthorizedCaller, address(_assetRegistry));
@@ -282,24 +333,102 @@ contract AssetRegistryTest is TestWithHelpers {
                 IAccessManager.canCall.selector,
                 unauthorizedCaller,
                 address(_assetRegistry),
-                bytes4(IAssetRegistry.disableDeposits.selector)
+                bytes4(IAssetRegistry.disableSwapInput.selector)
             ),
             abi.encode(false)
         );
 
         vm.prank(unauthorizedCaller);
         vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedCaller));
-        _assetRegistry.disableDeposits(address(_mockUsdt), true, true);
+        _assetRegistry.disableSwapInput(address(_mockUsdt));
     }
 
-    function test_disableDeposits_reverts_ifAssetIsNotRegistered(address asset) public {
+    function test_disableSwapInput_reverts_ifAssetIsNotRegistered(address asset) public {
         vm.assume(asset != address(_mockUsdt));
         vm.assume(asset != address(_mockGho));
         vm.assume(asset != address(0));
 
         vm.prank(everyRoleAccount);
         vm.expectRevert(abi.encodeWithSelector(Errors.UnsupportedAsset.selector, asset));
-        _assetRegistry.disableDeposits(asset, true, true);
+        _assetRegistry.disableSwapInput(asset);
+    }
+
+    function test_disableSwapInput_reverts_ifAlreadyDisabled() public {
+        vm.prank(everyRoleAccount);
+        _assetRegistry.setAssetConfig(
+            address(_mockUsdt),
+            IAssetRegistry.AssetConfig({
+                depositFromUserAllowed: false,
+                depositIntoAllocatorAllowed: false,
+                swapInputTokenAllowed: false,
+                swapOutputTokenAllowed: false
+            })
+        );
+        vm.prank(everyRoleAccount);
+        vm.expectRevert(abi.encodeWithSelector(IAssetRegistry.AlreadyDisabled.selector));
+        _assetRegistry.disableSwapInput(address(_mockUsdt));
+    }
+
+    function test_disableUserDeposits_reverts_ifUnauthorizedCaller(address unauthorizedCaller) public {
+        vm.assume(unauthorizedCaller != everyRoleAccount);
+        vm.assume(unauthorizedCaller != address(0));
+        _assumeNotProxyAdmin(unauthorizedCaller, address(_assetRegistry));
+
+        vm.mockCall(
+            address(_mockAccessManager),
+            abi.encodeWithSelector(
+                IAccessManager.canCall.selector,
+                unauthorizedCaller,
+                address(_assetRegistry),
+                bytes4(IAssetRegistry.disableUserDeposits.selector)
+            ),
+            abi.encode(false)
+        );
+
+        vm.prank(unauthorizedCaller);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedCaller));
+        _assetRegistry.disableUserDeposits(address(_mockUsdt));
+    }
+
+    function test_disableAllocatorDeposits_reverts_ifUnauthorizedCaller(address unauthorizedCaller) public {
+        vm.assume(unauthorizedCaller != everyRoleAccount);
+        vm.assume(unauthorizedCaller != address(0));
+        _assumeNotProxyAdmin(unauthorizedCaller, address(_assetRegistry));
+
+        vm.mockCall(
+            address(_mockAccessManager),
+            abi.encodeWithSelector(
+                IAccessManager.canCall.selector,
+                unauthorizedCaller,
+                address(_assetRegistry),
+                bytes4(IAssetRegistry.disableAllocatorDeposits.selector)
+            ),
+            abi.encode(false)
+        );
+
+        vm.prank(unauthorizedCaller);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedCaller));
+        _assetRegistry.disableAllocatorDeposits(address(_mockUsdt));
+    }
+
+    function test_disableUserDeposits_reverts_ifAssetIsNotRegistered(address asset) public {
+        vm.assume(asset != address(_mockUsdt));
+        vm.assume(asset != address(_mockGho));
+        vm.assume(asset != address(0));
+
+        vm.prank(everyRoleAccount);
+        vm.expectRevert(abi.encodeWithSelector(Errors.UnsupportedAsset.selector, asset));
+        _assetRegistry.disableUserDeposits(asset);
+    }
+
+    function test_disableAllocatorDeposits_reverts_ifAssetIsNotRegistered(address asset) public {
+        vm.assume(asset != address(_mockUsdt));
+        vm.assume(asset != address(_mockGho));
+        vm.assume(asset != address(0));
+
+        vm.prank(everyRoleAccount);
+        vm.expectRevert(abi.encodeWithSelector(Errors.UnsupportedAsset.selector, asset));
+        _assetRegistry.disableAllocatorDeposits(asset);
     }
 
     function test_disableSwapOutput_disablesSwapOutput() public {
@@ -358,5 +487,317 @@ contract AssetRegistryTest is TestWithHelpers {
         vm.prank(everyRoleAccount);
         vm.expectRevert(abi.encodeWithSelector(Errors.UnsupportedAsset.selector, asset));
         _assetRegistry.disableSwapOutput(asset);
+    }
+
+    function test_disableSwapOutput_reverts_ifAlreadyDisabled() public {
+        vm.prank(everyRoleAccount);
+        _assetRegistry.setAssetConfig(
+            address(_mockUsdt),
+            IAssetRegistry.AssetConfig({
+                depositFromUserAllowed: false,
+                depositIntoAllocatorAllowed: false,
+                swapInputTokenAllowed: false,
+                swapOutputTokenAllowed: false
+            })
+        );
+        vm.prank(everyRoleAccount);
+        vm.expectRevert(abi.encodeWithSelector(IAssetRegistry.AlreadyDisabled.selector));
+        _assetRegistry.disableSwapOutput(address(_mockUsdt));
+    }
+
+    function test_enableUserDeposits_enablesUserDeposits() public {
+        vm.prank(everyRoleAccount);
+        _assetRegistry.setAssetConfig(
+            address(_mockUsdt),
+            IAssetRegistry.AssetConfig({
+                depositFromUserAllowed: false,
+                depositIntoAllocatorAllowed: false,
+                swapInputTokenAllowed: false,
+                swapOutputTokenAllowed: false
+            })
+        );
+
+        vm.expectEmit(true, true, true, true);
+        emit IAssetRegistry.AssetConfigSet(
+            address(_mockUsdt),
+            IAssetRegistry.AssetConfig({
+                depositFromUserAllowed: true,
+                depositIntoAllocatorAllowed: false,
+                swapInputTokenAllowed: false,
+                swapOutputTokenAllowed: false
+            })
+        );
+        vm.prank(everyRoleAccount);
+        _assetRegistry.enableUserDeposits(address(_mockUsdt));
+        assertEq(_assetRegistry.isUserDepositAllowed(address(_mockUsdt)), true);
+    }
+
+    function test_enableUserDeposits_reverts_ifUnauthorizedCaller(address unauthorizedCaller) public {
+        vm.assume(unauthorizedCaller != everyRoleAccount);
+        vm.assume(unauthorizedCaller != address(0));
+        _assumeNotProxyAdmin(unauthorizedCaller, address(_assetRegistry));
+
+        vm.mockCall(
+            address(_mockAccessManager),
+            abi.encodeWithSelector(
+                IAccessManager.canCall.selector,
+                unauthorizedCaller,
+                address(_assetRegistry),
+                bytes4(IAssetRegistry.enableUserDeposits.selector)
+            ),
+            abi.encode(false)
+        );
+
+        vm.prank(unauthorizedCaller);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedCaller));
+        _assetRegistry.enableUserDeposits(address(_mockUsdt));
+    }
+
+    function test_enableUserDeposits_reverts_ifAssetIsNotRegistered(address asset) public {
+        vm.assume(asset != address(_mockUsdt));
+        vm.assume(asset != address(_mockGho));
+        vm.assume(asset != address(0));
+
+        vm.prank(everyRoleAccount);
+        vm.expectRevert(abi.encodeWithSelector(Errors.UnsupportedAsset.selector, asset));
+        _assetRegistry.enableUserDeposits(asset);
+    }
+
+    function test_enableUserDeposits_reverts_ifAlreadyEnabled() public {
+        vm.prank(everyRoleAccount);
+        _assetRegistry.setAssetConfig(
+            address(_mockUsdt),
+            IAssetRegistry.AssetConfig({
+                depositFromUserAllowed: true,
+                depositIntoAllocatorAllowed: false,
+                swapInputTokenAllowed: false,
+                swapOutputTokenAllowed: false
+            })
+        );
+        vm.prank(everyRoleAccount);
+        vm.expectRevert(abi.encodeWithSelector(IAssetRegistry.AlreadyEnabled.selector));
+        _assetRegistry.enableUserDeposits(address(_mockUsdt));
+    }
+
+    function test_enableAllocatorDeposits_enablesAllocatorDeposits() public {
+        vm.prank(everyRoleAccount);
+        _assetRegistry.setAssetConfig(
+            address(_mockUsdt),
+            IAssetRegistry.AssetConfig({
+                depositFromUserAllowed: false,
+                depositIntoAllocatorAllowed: false,
+                swapInputTokenAllowed: false,
+                swapOutputTokenAllowed: false
+            })
+        );
+
+        vm.expectEmit(true, true, true, true);
+        emit IAssetRegistry.AssetConfigSet(
+            address(_mockUsdt),
+            IAssetRegistry.AssetConfig({
+                depositFromUserAllowed: false,
+                depositIntoAllocatorAllowed: true,
+                swapInputTokenAllowed: false,
+                swapOutputTokenAllowed: false
+            })
+        );
+        vm.prank(everyRoleAccount);
+        _assetRegistry.enableAllocatorDeposits(address(_mockUsdt));
+        assertEq(_assetRegistry.isDepositToAllocatorAllowed(address(_mockUsdt)), true);
+    }
+
+    function test_enableAllocatorDeposits_reverts_ifUnauthorizedCaller(address unauthorizedCaller) public {
+        vm.assume(unauthorizedCaller != everyRoleAccount);
+        vm.assume(unauthorizedCaller != address(0));
+        _assumeNotProxyAdmin(unauthorizedCaller, address(_assetRegistry));
+
+        vm.mockCall(
+            address(_mockAccessManager),
+            abi.encodeWithSelector(
+                IAccessManager.canCall.selector,
+                unauthorizedCaller,
+                address(_assetRegistry),
+                bytes4(IAssetRegistry.enableAllocatorDeposits.selector)
+            ),
+            abi.encode(false)
+        );
+
+        vm.prank(unauthorizedCaller);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedCaller));
+        _assetRegistry.enableAllocatorDeposits(address(_mockUsdt));
+    }
+
+    function test_enableAllocatorDeposits_reverts_ifAssetIsNotRegistered(address asset) public {
+        vm.assume(asset != address(_mockUsdt));
+        vm.assume(asset != address(_mockGho));
+        vm.assume(asset != address(0));
+
+        vm.prank(everyRoleAccount);
+        vm.expectRevert(abi.encodeWithSelector(Errors.UnsupportedAsset.selector, asset));
+        _assetRegistry.enableAllocatorDeposits(asset);
+    }
+
+    function test_enableAllocatorDeposits_reverts_ifAlreadyEnabled() public {
+        vm.prank(everyRoleAccount);
+        _assetRegistry.setAssetConfig(
+            address(_mockUsdt),
+            IAssetRegistry.AssetConfig({
+                depositFromUserAllowed: false,
+                depositIntoAllocatorAllowed: true,
+                swapInputTokenAllowed: false,
+                swapOutputTokenAllowed: false
+            })
+        );
+        vm.prank(everyRoleAccount);
+        vm.expectRevert(abi.encodeWithSelector(IAssetRegistry.AlreadyEnabled.selector));
+        _assetRegistry.enableAllocatorDeposits(address(_mockUsdt));
+    }
+
+    function test_enableSwapInput_enablesSwapInput() public {
+        vm.prank(everyRoleAccount);
+        _assetRegistry.setAssetConfig(
+            address(_mockUsdt),
+            IAssetRegistry.AssetConfig({
+                depositFromUserAllowed: false,
+                depositIntoAllocatorAllowed: false,
+                swapInputTokenAllowed: false,
+                swapOutputTokenAllowed: false
+            })
+        );
+
+        vm.expectEmit(true, true, true, true);
+        emit IAssetRegistry.AssetConfigSet(
+            address(_mockUsdt),
+            IAssetRegistry.AssetConfig({
+                depositFromUserAllowed: false,
+                depositIntoAllocatorAllowed: false,
+                swapInputTokenAllowed: true,
+                swapOutputTokenAllowed: false
+            })
+        );
+        vm.prank(everyRoleAccount);
+        _assetRegistry.enableSwapInput(address(_mockUsdt));
+        assertEq(_assetRegistry.isSwapInputAllowed(address(_mockUsdt)), true);
+    }
+
+    function test_enableSwapInput_reverts_ifUnauthorizedCaller(address unauthorizedCaller) public {
+        vm.assume(unauthorizedCaller != everyRoleAccount);
+        vm.assume(unauthorizedCaller != address(0));
+        _assumeNotProxyAdmin(unauthorizedCaller, address(_assetRegistry));
+
+        vm.mockCall(
+            address(_mockAccessManager),
+            abi.encodeWithSelector(
+                IAccessManager.canCall.selector,
+                unauthorizedCaller,
+                address(_assetRegistry),
+                bytes4(IAssetRegistry.enableSwapInput.selector)
+            ),
+            abi.encode(false)
+        );
+
+        vm.prank(unauthorizedCaller);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedCaller));
+        _assetRegistry.enableSwapInput(address(_mockUsdt));
+    }
+
+    function test_enableSwapInput_reverts_ifAssetIsNotRegistered(address asset) public {
+        vm.assume(asset != address(_mockUsdt));
+        vm.assume(asset != address(_mockGho));
+        vm.assume(asset != address(0));
+
+        vm.prank(everyRoleAccount);
+        vm.expectRevert(abi.encodeWithSelector(Errors.UnsupportedAsset.selector, asset));
+        _assetRegistry.enableSwapInput(asset);
+    }
+
+    function test_enableSwapInput_reverts_ifAlreadyEnabled() public {
+        vm.prank(everyRoleAccount);
+        _assetRegistry.setAssetConfig(
+            address(_mockUsdt),
+            IAssetRegistry.AssetConfig({
+                depositFromUserAllowed: false,
+                depositIntoAllocatorAllowed: false,
+                swapInputTokenAllowed: true,
+                swapOutputTokenAllowed: false
+            })
+        );
+        vm.prank(everyRoleAccount);
+        vm.expectRevert(abi.encodeWithSelector(IAssetRegistry.AlreadyEnabled.selector));
+        _assetRegistry.enableSwapInput(address(_mockUsdt));
+    }
+
+    function test_enableSwapOutput_enablesSwapOutput() public {
+        vm.prank(everyRoleAccount);
+        _assetRegistry.setAssetConfig(
+            address(_mockUsdt),
+            IAssetRegistry.AssetConfig({
+                depositFromUserAllowed: false,
+                depositIntoAllocatorAllowed: false,
+                swapInputTokenAllowed: false,
+                swapOutputTokenAllowed: false
+            })
+        );
+
+        vm.expectEmit(true, true, true, true);
+        emit IAssetRegistry.AssetConfigSet(
+            address(_mockUsdt),
+            IAssetRegistry.AssetConfig({
+                depositFromUserAllowed: false,
+                depositIntoAllocatorAllowed: false,
+                swapInputTokenAllowed: false,
+                swapOutputTokenAllowed: true
+            })
+        );
+        vm.prank(everyRoleAccount);
+        _assetRegistry.enableSwapOutput(address(_mockUsdt));
+        assertEq(_assetRegistry.isSwapOutputAllowed(address(_mockUsdt)), true);
+    }
+
+    function test_enableSwapOutput_reverts_ifUnauthorizedCaller(address unauthorizedCaller) public {
+        vm.assume(unauthorizedCaller != everyRoleAccount);
+        vm.assume(unauthorizedCaller != address(0));
+        _assumeNotProxyAdmin(unauthorizedCaller, address(_assetRegistry));
+
+        vm.mockCall(
+            address(_mockAccessManager),
+            abi.encodeWithSelector(
+                IAccessManager.canCall.selector,
+                unauthorizedCaller,
+                address(_assetRegistry),
+                bytes4(IAssetRegistry.enableSwapOutput.selector)
+            ),
+            abi.encode(false)
+        );
+
+        vm.prank(unauthorizedCaller);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedCaller));
+        _assetRegistry.enableSwapOutput(address(_mockUsdt));
+    }
+
+    function test_enableSwapOutput_reverts_ifAssetIsNotRegistered(address asset) public {
+        vm.assume(asset != address(_mockUsdt));
+        vm.assume(asset != address(_mockGho));
+        vm.assume(asset != address(0));
+
+        vm.prank(everyRoleAccount);
+        vm.expectRevert(abi.encodeWithSelector(Errors.UnsupportedAsset.selector, asset));
+        _assetRegistry.enableSwapOutput(asset);
+    }
+
+    function test_enableSwapOutput_reverts_ifAlreadyEnabled() public {
+        vm.prank(everyRoleAccount);
+        _assetRegistry.setAssetConfig(
+            address(_mockUsdt),
+            IAssetRegistry.AssetConfig({
+                depositFromUserAllowed: false,
+                depositIntoAllocatorAllowed: false,
+                swapInputTokenAllowed: false,
+                swapOutputTokenAllowed: true
+            })
+        );
+        vm.prank(everyRoleAccount);
+        vm.expectRevert(abi.encodeWithSelector(IAssetRegistry.AlreadyEnabled.selector));
+        _assetRegistry.enableSwapOutput(address(_mockUsdt));
     }
 }
