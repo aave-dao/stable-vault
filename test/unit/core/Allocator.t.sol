@@ -42,6 +42,8 @@ contract AllocatorTest is TestWithHelpers {
     // Represents the FH on Accounting Chain, Earning Chain Gateway on Earning Chain
     address withdrawer = makeAddr("WITHDRAWER");
 
+    uint8 constant MAX_STRATEGIES_PER_ASSET = 15;
+
     MockAssetRegistry internal _mockAssetRegistry;
     MockAccessManager internal _mockAccessManager;
     IMockErc20 internal _mockUsdt;
@@ -56,11 +58,15 @@ contract AllocatorTest is TestWithHelpers {
 
     Allocator internal _allocator;
 
-    function _deployAllocator(MockAccessManager mockAccessManager, address assetRegistry, address transferHelper)
-        internal
-        returns (Allocator)
-    {
-        address allocatorImpl = address(new Allocator(assetRegistry, depositor, withdrawer, transferHelper));
+    function _deployAllocator(
+        MockAccessManager mockAccessManager,
+        address assetRegistry,
+        address transferHelper,
+        uint8 maxStrategiesPerAsset
+    ) internal returns (Allocator) {
+        address allocatorImpl = address(
+            new Allocator(assetRegistry, depositor, withdrawer, transferHelper, maxStrategiesPerAsset)
+        );
         Allocator allocator = Allocator(
             address(
                 new TransparentUpgradeableProxy(
@@ -68,22 +74,6 @@ contract AllocatorTest is TestWithHelpers {
                 )
             )
         );
-
-        // Set up strategy vaults
-        vm.prank(admin);
-        allocator.addStrategy(address(_mockUsdt), address(_defaultUsdtStrategy));
-        vm.prank(admin);
-        allocator.addStrategy(address(_mockUsdt), address(_extraUsdtStrategy));
-        vm.prank(admin);
-        allocator.addStrategy(address(_mockGho), address(_defaultGhoStrategy));
-        vm.prank(admin);
-        allocator.addStrategy(address(_mockGho), address(_extraGhoStrategy));
-
-        vm.prank(everyRoleAccount);
-        allocator.setDefaultStrategy(address(_mockUsdt), address(_defaultUsdtStrategy));
-        vm.prank(everyRoleAccount);
-        allocator.setDefaultStrategy(address(_mockGho), address(_defaultGhoStrategy));
-
         return allocator;
     }
 
@@ -129,7 +119,24 @@ contract AllocatorTest is TestWithHelpers {
             })
         );
 
-        _allocator = _deployAllocator(_mockAccessManager, address(_mockAssetRegistry), address(_mockTransferHelper));
+        _allocator = _deployAllocator(
+            _mockAccessManager, address(_mockAssetRegistry), address(_mockTransferHelper), MAX_STRATEGIES_PER_ASSET
+        );
+
+        // Set up strategy vaults
+        vm.prank(admin);
+        _allocator.addStrategy(address(_mockUsdt), address(_defaultUsdtStrategy));
+        vm.prank(admin);
+        _allocator.addStrategy(address(_mockUsdt), address(_extraUsdtStrategy));
+        vm.prank(admin);
+        _allocator.addStrategy(address(_mockGho), address(_defaultGhoStrategy));
+        vm.prank(admin);
+        _allocator.addStrategy(address(_mockGho), address(_extraGhoStrategy));
+
+        vm.prank(everyRoleAccount);
+        _allocator.setDefaultStrategy(address(_mockUsdt), address(_defaultUsdtStrategy));
+        vm.prank(everyRoleAccount);
+        _allocator.setDefaultStrategy(address(_mockGho), address(_defaultGhoStrategy));
     }
 
     function test_getAssetBalances_returnsExpectedAssetBalances(uint256 depositAmountUsdt, uint256 depositAmountGho)
@@ -1509,6 +1516,26 @@ contract AllocatorTest is TestWithHelpers {
         vm.prank(address(everyRoleAccount));
         vm.expectRevert(abi.encodeWithSelector(Errors.InvalidAsset.selector, address(_mockGho)));
         _allocator.addStrategy(address(_mockGho), address(_extraUsdtStrategy));
+    }
+
+    function test_addStrategy_reverts_ifMaxStrategiesPerAssetIsExceeded(uint8 maxStrategiesPerAsset) public {
+        maxStrategiesPerAsset = uint8(bound(uint256(maxStrategiesPerAsset), 5, 20));
+
+        _allocator = _deployAllocator(
+            _mockAccessManager, address(_mockAssetRegistry), address(_mockTransferHelper), maxStrategiesPerAsset
+        );
+
+        address strategy;
+        for (uint256 i = 0; i < maxStrategiesPerAsset; i++) {
+            strategy = address(new TestErc4626(_mockUsdt));
+            vm.prank(address(everyRoleAccount));
+            _allocator.addStrategy(address(_mockUsdt), address(strategy));
+        }
+
+        strategy = address(new TestErc4626(_mockUsdt));
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(abi.encodeWithSelector(IAllocator.TooManyStrategies.selector, address(_mockUsdt)));
+        _allocator.addStrategy(address(_mockUsdt), address(strategy));
     }
 
     function test_setDefaultStrategy_reverts_ifUnauthorizedCaller(address operator) public {
