@@ -800,4 +800,152 @@ contract AssetRegistryTest is TestWithHelpers {
         vm.expectRevert(abi.encodeWithSelector(IAssetRegistry.AlreadyEnabled.selector));
         _assetRegistry.enableSwapOutput(address(_mockUsdt));
     }
+
+    function test_trustAsset_trustsAsset() public {
+        vm.prank(everyRoleAccount);
+        _assetRegistry.setAssetConfig(
+            address(_mockUsdt),
+            IAssetRegistry.AssetConfig({
+                depositFromUserAllowed: false,
+                depositIntoAllocatorAllowed: false,
+                swapInputTokenAllowed: false,
+                swapOutputTokenAllowed: false
+            })
+        );
+
+        vm.prank(everyRoleAccount);
+        _assetRegistry.distrustAsset(address(_mockUsdt));
+        assertFalse(_assetRegistry.isAssetTrusted(address(_mockUsdt)));
+
+        vm.expectEmit(true, true, true, true);
+        emit IAssetRegistry.AssetTrusted(address(_mockUsdt));
+        vm.prank(everyRoleAccount);
+        _assetRegistry.trustAsset(address(_mockUsdt));
+
+        assertTrue(_assetRegistry.isAssetTrusted(address(_mockUsdt)));
+        address[] memory trustedAssets = _assetRegistry.getTrustedAssets();
+        assertEq(trustedAssets.length, 1);
+        assertEq(trustedAssets[0], address(_mockUsdt));
+    }
+
+    function test_trustAsset_reverts_ifUnauthorizedCaller(address unauthorizedCaller) public {
+        vm.assume(unauthorizedCaller != everyRoleAccount);
+        vm.assume(unauthorizedCaller != address(0));
+        _assumeNotProxyAdmin(unauthorizedCaller, address(_assetRegistry));
+
+        vm.mockCall(
+            address(_mockAccessManager),
+            abi.encodeWithSelector(
+                IAccessManager.canCall.selector,
+                unauthorizedCaller,
+                address(_assetRegistry),
+                bytes4(IAssetRegistry.trustAsset.selector)
+            ),
+            abi.encode(false)
+        );
+
+        vm.prank(unauthorizedCaller);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedCaller));
+        _assetRegistry.trustAsset(address(_mockUsdt));
+    }
+
+    function test_trustAsset_reverts_ifAssetIsNotRegistered(address asset) public {
+        vm.assume(asset != address(_mockUsdt));
+        vm.assume(asset != address(_mockGho));
+        vm.assume(asset != address(0));
+
+        vm.prank(everyRoleAccount);
+        vm.expectRevert(abi.encodeWithSelector(Errors.UnsupportedAsset.selector, asset));
+        _assetRegistry.trustAsset(asset);
+    }
+
+    function test_trustAsset_reverts_ifAlreadyTrusted() public {
+        vm.prank(everyRoleAccount);
+        _assetRegistry.setAssetConfig(
+            address(_mockUsdt),
+            IAssetRegistry.AssetConfig({
+                depositFromUserAllowed: false,
+                depositIntoAllocatorAllowed: false,
+                swapInputTokenAllowed: false,
+                swapOutputTokenAllowed: false
+            })
+        );
+
+        vm.prank(everyRoleAccount);
+        vm.expectRevert(abi.encodeWithSelector(IAssetRegistry.AlreadyTrusted.selector));
+        _assetRegistry.trustAsset(address(_mockUsdt));
+    }
+
+    function test_distrustAsset_distrustsAsset() public {
+        vm.prank(everyRoleAccount);
+        _assetRegistry.setAssetConfig(
+            address(_mockUsdt),
+            IAssetRegistry.AssetConfig({
+                depositFromUserAllowed: false,
+                depositIntoAllocatorAllowed: false,
+                swapInputTokenAllowed: false,
+                swapOutputTokenAllowed: false
+            })
+        );
+
+        vm.expectEmit(true, true, true, true);
+        emit IAssetRegistry.AssetDistrusted(address(_mockUsdt));
+        vm.prank(everyRoleAccount);
+        _assetRegistry.distrustAsset(address(_mockUsdt));
+
+        assertFalse(_assetRegistry.isAssetTrusted(address(_mockUsdt)));
+        address[] memory trustedAssets = _assetRegistry.getTrustedAssets();
+        assertEq(trustedAssets.length, 0);
+    }
+
+    function test_distrustAsset_reverts_ifUnauthorizedCaller(address unauthorizedCaller) public {
+        vm.assume(unauthorizedCaller != everyRoleAccount);
+        vm.assume(unauthorizedCaller != address(0));
+        _assumeNotProxyAdmin(unauthorizedCaller, address(_assetRegistry));
+
+        vm.mockCall(
+            address(_mockAccessManager),
+            abi.encodeWithSelector(
+                IAccessManager.canCall.selector,
+                unauthorizedCaller,
+                address(_assetRegistry),
+                bytes4(IAssetRegistry.distrustAsset.selector)
+            ),
+            abi.encode(false)
+        );
+
+        vm.prank(unauthorizedCaller);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedCaller));
+        _assetRegistry.distrustAsset(address(_mockUsdt));
+    }
+
+    function test_distrustAsset_reverts_ifAssetIsNotRegistered(address asset) public {
+        vm.assume(asset != address(_mockUsdt));
+        vm.assume(asset != address(_mockGho));
+        vm.assume(asset != address(0));
+
+        vm.prank(everyRoleAccount);
+        vm.expectRevert(abi.encodeWithSelector(Errors.UnsupportedAsset.selector, asset));
+        _assetRegistry.distrustAsset(asset);
+    }
+
+    function test_distrustAsset_reverts_ifAlreadyDistrusted() public {
+        vm.prank(everyRoleAccount);
+        _assetRegistry.setAssetConfig(
+            address(_mockUsdt),
+            IAssetRegistry.AssetConfig({
+                depositFromUserAllowed: false,
+                depositIntoAllocatorAllowed: false,
+                swapInputTokenAllowed: false,
+                swapOutputTokenAllowed: false
+            })
+        );
+
+        vm.prank(everyRoleAccount);
+        _assetRegistry.distrustAsset(address(_mockUsdt));
+
+        vm.prank(everyRoleAccount);
+        vm.expectRevert(abi.encodeWithSelector(IAssetRegistry.AlreadyDistrusted.selector));
+        _assetRegistry.distrustAsset(address(_mockUsdt));
+    }
 }
