@@ -194,8 +194,12 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         uint256 withdrawnAmount;
         uint256 balanceInStrategy = _getAssetBalanceInStrategy(IERC4626(strategy));
         if (balanceInStrategy > 0) {
-            withdrawnAmount = balanceInStrategy > amount ? amount : balanceInStrategy;
-            _withdrawFromStrategy(asset, withdrawnAmount, address(this), strategy);
+            if (balanceInStrategy > amount) {
+                withdrawnAmount = amount;
+                _withdrawFromStrategy(asset, withdrawnAmount, address(this), strategy);
+            } else {
+                withdrawnAmount = _redeemAllFromStrategy(asset, strategy);
+            }
         }
         return withdrawnAmount;
     }
@@ -345,12 +349,13 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         emit AssetDeallocated(asset, strategy, amount);
     }
 
-    function _redeemAllFromStrategy(address asset, address strategy) internal {
+    function _redeemAllFromStrategy(address asset, address strategy) internal returns (uint256) {
         uint256 amount = IERC4626(strategy)
             .redeem({
                 shares: IERC4626(strategy).balanceOf(address(this)), receiver: address(this), owner: address(this)
             });
         emit AssetDeallocated(asset, strategy, amount);
+        return amount;
     }
 
     /// @dev Intended to be the lowest level function used to deposit into a strategy.

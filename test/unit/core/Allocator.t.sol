@@ -536,7 +536,12 @@ contract AllocatorTest is TestWithHelpers {
         // Mock the default strategy to fail during withdrawal
         vm.mockCallRevert(
             address(_defaultUsdtStrategy),
-            abi.encodeWithSelector(IERC4626.withdraw.selector, amount, address(_allocator), address(_allocator)),
+            abi.encodeWithSelector(
+                IERC4626.redeem.selector,
+                IERC4626(address(_defaultUsdtStrategy)).balanceOf(address(_allocator)),
+                address(_allocator),
+                address(_allocator)
+            ),
             abi.encodeWithSelector(IERC20Errors.ERC20InvalidSender.selector, address(_allocator))
         );
 
@@ -585,12 +590,22 @@ contract AllocatorTest is TestWithHelpers {
         // Even if withdrawal for one non-default strategy fails, attempts to withdraw from other non-default strategies
         vm.mockCallRevert(
             address(_defaultUsdtStrategy),
-            abi.encodeWithSelector(IERC4626.withdraw.selector, amount, address(_allocator), address(_allocator)),
+            abi.encodeWithSelector(
+                IERC4626.redeem.selector,
+                IERC4626(address(_defaultUsdtStrategy)).balanceOf(address(_allocator)),
+                address(_allocator),
+                address(_allocator)
+            ),
             abi.encodeWithSelector(IERC20Errors.ERC20InvalidSender.selector, address(_allocator))
         );
         vm.mockCallRevert(
             address(_extraUsdtStrategy),
-            abi.encodeWithSelector(IERC4626.withdraw.selector, amount, address(_allocator), address(_allocator)),
+            abi.encodeWithSelector(
+                IERC4626.redeem.selector,
+                IERC4626(address(_extraUsdtStrategy)).balanceOf(address(_allocator)),
+                address(_allocator),
+                address(_allocator)
+            ),
             abi.encodeWithSelector(IERC20Errors.ERC20InvalidSender.selector, address(_allocator))
         );
         vm.expectEmit(true, true, true, true);
