@@ -16,6 +16,7 @@ contract MockAssetRegistry is IAssetRegistry {
     mapping(address asset => bool isAllowedToSwapInputTokenInAllocator) _isNotAllowedToSwapInputTokenInAllocator;
     mapping(address asset => bool isAllowedToSwapOutputTokenInAllocator) _isNotAllowedToSwapOutputTokenInAllocator;
     EnumerableSet.AddressSet _registeredAssets;
+    EnumerableSet.AddressSet _trustedAssets;
 
     function setAssetConfig(address asset, AssetConfig memory config) external override {}
 
@@ -34,6 +35,14 @@ contract MockAssetRegistry is IAssetRegistry {
     function enableSwapOutput(address asset) external override {}
 
     function enableSwapInput(address asset) external override {}
+
+    function trustAsset(address asset) external override {
+        _trustedAssets.add(asset);
+    }
+
+    function distrustAsset(address asset) external override {
+        _trustedAssets.remove(asset);
+    }
 
     function mockToAllowAssetDepositsIntoBBV(address asset) external {
         _isNotAllowedUserDeposit[asset] = false;
@@ -61,10 +70,19 @@ contract MockAssetRegistry is IAssetRegistry {
 
     function mockRegisteredAsset(address asset) external {
         _registeredAssets.add(asset);
+        _trustedAssets.add(asset);
     }
 
     function isAssetRegistered(address asset) external view override returns (bool) {
         return _registeredAssets.contains(asset);
+    }
+
+    function mockDistrustedAsset(address asset) external {
+        _trustedAssets.remove(asset);
+    }
+
+    function isAssetTrusted(address asset) external view override returns (bool) {
+        return _trustedAssets.contains(asset);
     }
 
     function isUserDepositAllowed(address asset) external view override returns (bool) {
@@ -83,7 +101,7 @@ contract MockAssetRegistry is IAssetRegistry {
         return !_isNotAllowedToSwapOutputTokenInAllocator[asset];
     }
 
-    function getRegisteredAssets() external view override returns (address[] memory) {
-        return _registeredAssets.values();
+    function getTrustedAssets() external view override returns (address[] memory) {
+        return _trustedAssets.values();
     }
 }

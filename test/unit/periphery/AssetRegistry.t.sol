@@ -68,7 +68,7 @@ contract AssetRegistryTest is TestWithHelpers {
         assertEq(_assetRegistry.isSwapOutputAllowed(address(_mockUsdt)), swapOutputTokenAllowed);
         assertEq(_assetRegistry.isAssetRegistered(address(_mockUsdt)), true);
 
-        address[] memory registeredAssets = _assetRegistry.getRegisteredAssets();
+        address[] memory registeredAssets = _assetRegistry.getTrustedAssets();
         assertEq(registeredAssets.length, 1);
         assertEq(registeredAssets[0], address(_mockUsdt));
 
@@ -83,7 +83,7 @@ contract AssetRegistryTest is TestWithHelpers {
         assertEq(_assetRegistry.isSwapOutputAllowed(address(_mockGho)), swapOutputTokenAllowed);
         assertEq(_assetRegistry.isAssetRegistered(address(_mockGho)), true);
 
-        registeredAssets = _assetRegistry.getRegisteredAssets();
+        registeredAssets = _assetRegistry.getTrustedAssets();
         assertEq(registeredAssets.length, 2);
         assertEq(registeredAssets[0], address(_mockUsdt));
         assertEq(registeredAssets[1], address(_mockGho));

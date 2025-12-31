@@ -381,7 +381,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
 
     /// @dev Returns balances grouped by asset.
     function _getAssetBalances() internal view returns (IAllocator.AllocatorBalance[] memory) {
-        address[] memory assets = IAssetRegistry(ASSET_REGISTRY).getRegisteredAssets();
+        address[] memory assets = IAssetRegistry(ASSET_REGISTRY).getTrustedAssets();
         IAllocator.AllocatorBalance[] memory allocatedAssets = new IAllocator.AllocatorBalance[](assets.length);
         for (uint256 i = 0; i < assets.length; i++) {
             address asset = assets[i];
