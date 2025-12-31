@@ -39,6 +39,10 @@ interface IAllocator {
     /// @custom:selector 0xa01adeda
     error StrategyStillHasFunds(address strategy);
 
+    /// @notice Thrown when the maximum number of strategies per asset is exceeded.
+    /// @custom:selector 0x83864c08
+    error TooManyStrategies(address asset);
+
     /// @notice The representation of an asset balance.
     /// @param asset Address of the asset.
     /// @param amount Amount of the asset.
