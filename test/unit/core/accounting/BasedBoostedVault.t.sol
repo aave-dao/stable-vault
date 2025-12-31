@@ -1378,7 +1378,19 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         mockFundsHandler.mockAggregatedBalance(depositAmount);
 
-        uint256 expectedIouTokens = withdrawalAmountRay == 0 ? bbv.getUserBalance(user) : withdrawalAmountRay;
+        uint256 expectedIouTokens;
+        if (withdrawalAmountRay == 0) {
+            expectedIouTokens = bbv.getUserBalance(user);
+        } else {
+            uint256 remainingBalance = bbv.getUserBalance(user) - withdrawalAmountRay;
+            // If remaining shares after partial withdrawal are not redeemable for at least 1 wei of 18-decimal asset,
+            // a full withdrawal is performed instead, avoiding leaving non-redeemable dust shares.
+            if (remainingBalance < Constants.MIN_WITHDRAWABLE_AMOUNT_RAY) {
+                expectedIouTokens = bbv.getUserBalance(user);
+            } else {
+                expectedIouTokens = withdrawalAmountRay;
+            }
+        }
 
         vm.prank(user);
         uint256 actualWithdrawalAmountRay = bbv.requestWithdrawal(user, withdrawalAmountRay);
