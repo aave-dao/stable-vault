@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 // Copyright (c) 2025 Aave Labs
-pragma solidity ^0.8.4;
+pragma solidity ^0.8.22;
 
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
@@ -19,12 +19,21 @@ contract MockAssetRegistry is IAssetRegistry {
 
     function setAssetConfig(address asset, AssetConfig memory config) external override {}
 
-    function disableDeposits(address asset, bool disableUserDeposits, bool disableAllocatorDeposits)
-        external
-        override
-    {}
+    function disableUserDeposits(address asset) external override {}
+
+    function disableAllocatorDeposits(address asset) external override {}
 
     function disableSwapOutput(address asset) external override {}
+
+    function disableSwapInput(address asset) external override {}
+
+    function enableUserDeposits(address asset) external override {}
+
+    function enableAllocatorDeposits(address asset) external override {}
+
+    function enableSwapOutput(address asset) external override {}
+
+    function enableSwapInput(address asset) external override {}
 
     function mockToAllowAssetDepositsIntoBBV(address asset) external {
         _isNotAllowedUserDeposit[asset] = false;

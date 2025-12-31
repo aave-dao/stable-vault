@@ -28,22 +28,50 @@ interface IAssetRegistry {
 
     event AssetConfigSet(address asset, AssetConfig config);
 
+    /// @notice Thrown when attempting to disable a feature that is already disabled.
+    /// @custom:selector 0x005ecddb
+    error AlreadyDisabled();
+
+    /// @notice Thrown when attempting to enable a feature that is already enabled.
+    /// @custom:selector 0xf2a5f75a
+    error AlreadyEnabled();
+
     /// @notice Sets the configuration for an asset.
     /// @param asset Address of the asset to set the configuration for.
     /// @param config Configuration for the asset.
     function setAssetConfig(address asset, AssetConfig memory config) external;
 
-    /// @notice Disables deposits for a given asset.
-    /// @dev Separated from `setAssetConfig()` to allow disabling deposits with a different restricted config from
-    /// the function which enables deposits.
-    /// @param asset Address of the asset to disable deposits for.
-    /// @param disableUserDeposits Whether to disable user deposits for the asset.
-    /// @param disableAllocatorDeposits Whether to disable allocator deposits for the asset.
-    function disableDeposits(address asset, bool disableUserDeposits, bool disableAllocatorDeposits) external;
+    /// @notice Disables allocator deposits for a given asset.
+    /// @param asset Address of the asset to disable allocator deposits for.
+    function disableAllocatorDeposits(address asset) external;
+
+    /// @notice Disables an asset to be used as a swap input.
+    /// @param asset Address of the asset to disable swap input for.
+    function disableSwapInput(address asset) external;
 
     /// @notice Disables an asset to be used as a swap output.
     /// @param asset Address of the asset to disable swap output for.
     function disableSwapOutput(address asset) external;
+
+    /// @notice Disables user deposits for a given asset.
+    /// @param asset Address of the asset to disable user deposits for.
+    function disableUserDeposits(address asset) external;
+
+    /// @notice Enables allocator deposits for a given asset.
+    /// @param asset Address of the asset to enable allocator deposits for.
+    function enableAllocatorDeposits(address asset) external;
+
+    /// @notice Enables swap input for a given asset.
+    /// @param asset Address of the asset to enable swap input for.
+    function enableSwapInput(address asset) external;
+
+    /// @notice Enables swap output for a given asset.
+    /// @param asset Address of the asset to enable swap output for.
+    function enableSwapOutput(address asset) external;
+
+    /// @notice Enables user deposits for a given asset.
+    /// @param asset Address of the asset to enable user deposits for.
+    function enableUserDeposits(address asset) external;
 
     /// @notice Getter for whether the asset is allowed to be deposited into the system by a user.
     /// @param asset Address of the asset to check if it is allowed to be deposited into the system by a user.

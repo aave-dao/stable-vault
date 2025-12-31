@@ -53,6 +53,7 @@ contract AssetRegistry is AccessManagedUpgradeable, Multicall, IAssetRegistry {
 
     /// @inheritdoc IAssetRegistry
     function setAssetConfig(address asset, AssetConfig memory config) external override restricted {
+        require(!_isAssetRegistered(asset), Errors.AddressAlreadyWhitelisted());
         // The system uses RAY Math (27 decimals), so we leave a 9-decimal place (27 - 18) margin for better precision.
         require(IERC20Metadata(asset).decimals() <= Constants.MAX_SUPPORTED_ASSET_DECIMALS, Errors.InvalidAsset(asset));
         $storage().configByAsset[asset] = config;
@@ -61,27 +62,66 @@ contract AssetRegistry is AccessManagedUpgradeable, Multicall, IAssetRegistry {
     }
 
     /// @inheritdoc IAssetRegistry
-    function disableDeposits(address asset, bool disableUserDeposits, bool disableAllocatorDeposits)
-        external
-        override
-        restricted
-    {
+    function disableAllocatorDeposits(address asset) external override restricted {
         require(_isAssetRegistered(asset), Errors.UnsupportedAsset(asset));
-        bool isUserDepositsAllowed = $storage().configByAsset[asset].depositFromUserAllowed;
-        if (isUserDepositsAllowed && disableUserDeposits) {
-            $storage().configByAsset[asset].depositFromUserAllowed = false;
-        }
-        bool isAllocatorDepositsAllowed = $storage().configByAsset[asset].depositIntoAllocatorAllowed;
-        if (isAllocatorDepositsAllowed && disableAllocatorDeposits) {
-            $storage().configByAsset[asset].depositIntoAllocatorAllowed = false;
-        }
+        require($storage().configByAsset[asset].depositIntoAllocatorAllowed, AlreadyDisabled());
+        $storage().configByAsset[asset].depositIntoAllocatorAllowed = false;
+        emit AssetConfigSet(asset, $storage().configByAsset[asset]);
+    }
+
+    /// @inheritdoc IAssetRegistry
+    function disableSwapInput(address asset) external override restricted {
+        require(_isAssetRegistered(asset), Errors.UnsupportedAsset(asset));
+        require($storage().configByAsset[asset].swapInputTokenAllowed, AlreadyDisabled());
+        $storage().configByAsset[asset].swapInputTokenAllowed = false;
         emit AssetConfigSet(asset, $storage().configByAsset[asset]);
     }
 
     /// @inheritdoc IAssetRegistry
     function disableSwapOutput(address asset) external override restricted {
         require(_isAssetRegistered(asset), Errors.UnsupportedAsset(asset));
+        require($storage().configByAsset[asset].swapOutputTokenAllowed, AlreadyDisabled());
         $storage().configByAsset[asset].swapOutputTokenAllowed = false;
+        emit AssetConfigSet(asset, $storage().configByAsset[asset]);
+    }
+
+    /// @inheritdoc IAssetRegistry
+    function disableUserDeposits(address asset) external override restricted {
+        require(_isAssetRegistered(asset), Errors.UnsupportedAsset(asset));
+        require($storage().configByAsset[asset].depositFromUserAllowed, AlreadyDisabled());
+        $storage().configByAsset[asset].depositFromUserAllowed = false;
+        emit AssetConfigSet(asset, $storage().configByAsset[asset]);
+    }
+
+    /// @inheritdoc IAssetRegistry
+    function enableAllocatorDeposits(address asset) external override restricted {
+        require(_isAssetRegistered(asset), Errors.UnsupportedAsset(asset));
+        require(!$storage().configByAsset[asset].depositIntoAllocatorAllowed, AlreadyEnabled());
+        $storage().configByAsset[asset].depositIntoAllocatorAllowed = true;
+        emit AssetConfigSet(asset, $storage().configByAsset[asset]);
+    }
+
+    /// @inheritdoc IAssetRegistry
+    function enableSwapInput(address asset) external override restricted {
+        require(_isAssetRegistered(asset), Errors.UnsupportedAsset(asset));
+        require(!$storage().configByAsset[asset].swapInputTokenAllowed, AlreadyEnabled());
+        $storage().configByAsset[asset].swapInputTokenAllowed = true;
+        emit AssetConfigSet(asset, $storage().configByAsset[asset]);
+    }
+
+    /// @inheritdoc IAssetRegistry
+    function enableSwapOutput(address asset) external override restricted {
+        require(_isAssetRegistered(asset), Errors.UnsupportedAsset(asset));
+        require(!$storage().configByAsset[asset].swapOutputTokenAllowed, AlreadyEnabled());
+        $storage().configByAsset[asset].swapOutputTokenAllowed = true;
+        emit AssetConfigSet(asset, $storage().configByAsset[asset]);
+    }
+
+    /// @inheritdoc IAssetRegistry
+    function enableUserDeposits(address asset) external override restricted {
+        require(_isAssetRegistered(asset), Errors.UnsupportedAsset(asset));
+        require(!$storage().configByAsset[asset].depositFromUserAllowed, AlreadyEnabled());
+        $storage().configByAsset[asset].depositFromUserAllowed = true;
         emit AssetConfigSet(asset, $storage().configByAsset[asset]);
     }
 
