@@ -35,6 +35,8 @@ contract EarningChainDeployment is Create3Deployment, Create3AddressBook, AToken
 
     address constant DEPLOYER = address(0xBB700dA5CCC9Ec5605780Fc40695f1206B090303);
 
+    uint8 constant MAX_STRATEGIES_PER_ASSET = 15;
+
     address constant PROXY_ADMIN = DEPLOYER;
     address constant ALLOCATOR_PROXY_ADMIN = PROXY_ADMIN;
     address constant WITHDRAWAL_POLICY_PROXY_ADMIN = PROXY_ADMIN;
@@ -242,7 +244,8 @@ contract EarningChainDeployment is Create3Deployment, Create3AddressBook, AToken
                 assetRegistry: getAssetRegistryAddress(DEPLOYER),
                 depositor: ALLOCATOR_DEPOSITOR,
                 withdrawer: ALLOCATOR_WITHDRAWER,
-                transferHelper: getTransferHelperAddress(DEPLOYER)
+                transferHelper: getTransferHelperAddress(DEPLOYER),
+                maxStrategiesPerAsset: MAX_STRATEGIES_PER_ASSET
             })
         );
         _logDeployment("Allocator::Implementation", "", implementation);

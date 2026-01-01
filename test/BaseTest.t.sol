@@ -58,6 +58,7 @@ contract BaseTest is Test {
 
     uint256 initialBasePerSecondRate = MathLib.RAY; // 1 RAY
 
+    uint8 internal constant MAX_STRATEGIES_PER_ASSET = 15;
     uint256 internal constant DEFAULT_MAX_ACTIVE_SUB_VAULTS = 201;
     uint256 internal constant DEFAULT_MAX_PER_SECOND_RATE = 1000000005781378656804591713; // ~20% APY
     uint64 internal constant ACCOUNTING_CHAIN_ID = 1;
@@ -368,7 +369,8 @@ contract BaseTest is Test {
                 assetRegistry_accountingChainAddress,
                 fundsHandler_accountingChainAddress,
                 fundsHandler_accountingChainAddress,
-                transferHelper_accountingChainAddress
+                transferHelper_accountingChainAddress,
+                MAX_STRATEGIES_PER_ASSET
             )
         );
         allocator_accountingChain = Allocator(
@@ -609,7 +611,8 @@ contract BaseTest is Test {
                 assetRegistry_earningChainAddress,
                 chainGateway_earningChainAddress,
                 chainGateway_earningChainAddress,
-                transferHelper_earningChainAddress
+                transferHelper_earningChainAddress,
+                MAX_STRATEGIES_PER_ASSET
             )
         );
         allocator_earningChain = Allocator(

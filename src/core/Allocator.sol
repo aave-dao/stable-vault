@@ -37,6 +37,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     address internal immutable DEPOSITOR;
     address internal immutable WITHDRAWER;
     address internal immutable ASSET_REGISTRY;
+    uint8 internal immutable MAX_STRATEGIES_PER_ASSET;
 
     /// @notice The configuration for a strategy.
     /// @param asset The asset that the strategy is associated with (assumes 1 asset per strategy).
@@ -87,13 +88,20 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     /// @param assetRegistry The address of the AssetRegistry contract.
     /// @param depositor The address of the depositor to whitelist.
     /// @param withdrawer The address of the withdrawer to whitelist.
-    constructor(address assetRegistry, address depositor, address withdrawer, address transferHelper)
-        TransferHelperClient(transferHelper)
-    {
+    /// @param transferHelper The address of the contract that helps to minimize the number of transfers across flows.
+    /// @param maxStrategiesPerAsset The maximum number of allowed yield strategies per asset.
+    constructor(
+        address assetRegistry,
+        address depositor,
+        address withdrawer,
+        address transferHelper,
+        uint8 maxStrategiesPerAsset
+    ) TransferHelperClient(transferHelper) {
         _disableInitializers();
         DEPOSITOR = depositor;
         WITHDRAWER = withdrawer;
         ASSET_REGISTRY = assetRegistry;
+        MAX_STRATEGIES_PER_ASSET = maxStrategiesPerAsset;
     }
 
     /// @dev Initializer.
@@ -409,6 +417,10 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
 
         $storage().strategyConfigs[strategy] = StrategyConfig({asset: asset, isRegistered: true, depositAllowed: true});
         $storage().assetStrategies[asset].add(strategy);
+
+        require(
+            $storage().assetStrategies[asset].length() <= MAX_STRATEGIES_PER_ASSET, IAllocator.TooManyStrategies(asset)
+        );
 
         emit StrategyAdded(asset, strategy);
     }
