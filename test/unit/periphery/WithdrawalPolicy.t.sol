@@ -24,12 +24,14 @@ contract WithdrawalPolicyTest is TestWithHelpers {
     uint256 constant DEFAULT_NONCE = 1;
     uint256 constant DEFAULT_DEADLINE = type(uint256).max;
 
+    uint16 constant FEE_CAP_BPS = 5_00; // 5.00%
+
     function _deployWithdrawalPolicy(address accessManager, address assetRegistry) internal returns (WithdrawalPolicy) {
         address withdrawalPolicyImpl = address(new WithdrawalPolicy(assetRegistry));
         return WithdrawalPolicy(
             address(
                 new TransparentUpgradeableProxy(
-                    withdrawalPolicyImpl, address(this), abi.encodeCall(WithdrawalPolicy.initialize, (accessManager))
+                    withdrawalPolicyImpl, address(this), abi.encodeCall(WithdrawalPolicy.initialize, (accessManager, 0))
                 )
             )
         );
@@ -115,7 +117,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
     // Setters & Getters tests
 
     function test_setAssetFeeBps_setsExpectedConfig(address asset, uint256 feeBps, bool isSet) public {
-        feeBps = bound(feeBps, 0, 10_000); // Constants.MAX_BPS
+        feeBps = bound(feeBps, 0, FEE_CAP_BPS);
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
@@ -136,7 +138,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
     }
 
     function test_setDefaultFeeBps_setsExpectedFee(uint256 feeBps) public {
-        feeBps = bound(feeBps, 0, Constants.MAX_BPS);
+        feeBps = bound(feeBps, 0, FEE_CAP_BPS);
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
@@ -147,7 +149,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
     function test_setDefaultFeeBps_reverts_ifFeeBpsIsInvalid(uint256 feeBps) public {
         // forge-lint: disable-next-line(unsafe-typecast)
-        uint16 feeBps16 = uint16(bound(feeBps, Constants.MAX_BPS + 1, type(uint16).max));
+        uint16 feeBps16 = uint16(bound(feeBps, FEE_CAP_BPS + 1, type(uint16).max));
 
         vm.expectRevert(Errors.InvalidParameter.selector);
         vm.prank(admin);
@@ -169,7 +171,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         uint256 iouAmountRay,
         uint256 baseFeeBps
     ) public {
-        baseFeeBps = bound(baseFeeBps, 0, Constants.MAX_BPS);
+        baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
 
         vm.prank(admin);
@@ -200,8 +202,8 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         uint256 assetFeeBps,
         uint256 baseFeeBps
     ) public {
-        baseFeeBps = bound(baseFeeBps, 0, Constants.MAX_BPS);
-        assetFeeBps = bound(assetFeeBps, 0, Constants.MAX_BPS);
+        baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
+        assetFeeBps = bound(assetFeeBps, 0, FEE_CAP_BPS);
         // Bound to prevent overflow in fee calculation: iouAmountRay * feeBps + MAX_BPS - 1
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
 
@@ -241,8 +243,8 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         uint256 assetFeeBps,
         uint256 baseFeeBps
     ) public {
-        baseFeeBps = bound(baseFeeBps, 0, Constants.MAX_BPS);
-        assetFeeBps = bound(assetFeeBps, 0, Constants.MAX_BPS);
+        baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
+        assetFeeBps = bound(assetFeeBps, 0, FEE_CAP_BPS);
         if (isAssetFeeSet) {
             personalFeeBps = bound(personalFeeBps, 0, assetFeeBps);
         } else {
@@ -300,8 +302,8 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         uint256 assetFeeBps,
         uint256 baseFeeBps
     ) public {
-        baseFeeBps = bound(baseFeeBps, 0, Constants.MAX_BPS);
-        assetFeeBps = bound(assetFeeBps, 0, Constants.MAX_BPS);
+        baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
+        assetFeeBps = bound(assetFeeBps, 0, FEE_CAP_BPS);
         uint16 personalFeeBps16;
         if (isAssetFeeSet) {
             personalFeeBps16 = uint16(bound(personalFeeBps, 100_01, type(uint16).max));
@@ -351,7 +353,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         address nonWhitelistedSigner = vm.addr(nonWhitelistedSignerPk);
         vm.assume(withdrawalPolicy.isSigner(nonWhitelistedSigner) == false);
 
-        baseFeeBps = bound(baseFeeBps, 0, Constants.MAX_BPS);
+        baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
         personalFeeBps = bound(personalFeeBps, 0, baseFeeBps);
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
 
@@ -384,7 +386,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         uint256 baseFeeBps
     ) public {
         vm.assume(user != wrongUser);
-        baseFeeBps = bound(baseFeeBps, 0, Constants.MAX_BPS);
+        baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
         personalFeeBps = bound(personalFeeBps, 0, baseFeeBps);
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
 
@@ -416,7 +418,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         uint256 baseFeeBps
     ) public {
         vm.assume(assetOut != wrongAssetOut);
-        baseFeeBps = bound(baseFeeBps, 0, Constants.MAX_BPS);
+        baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
         personalFeeBps = bound(personalFeeBps, 0, baseFeeBps);
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
 
@@ -448,7 +450,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         uint256 baseFeeBps
     ) public {
         vm.assume(iouAmountRay != wrongIouAmountRay);
-        baseFeeBps = bound(baseFeeBps, 0, Constants.MAX_BPS);
+        baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
         personalFeeBps = bound(personalFeeBps, 0, baseFeeBps);
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
         wrongIouAmountRay = bound(wrongIouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
@@ -482,7 +484,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         uint256 baseFeeBps
     ) public {
         vm.assume(personalFeeBps != wrongPersonalFeeBps);
-        baseFeeBps = bound(baseFeeBps, 0, Constants.MAX_BPS);
+        baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
         personalFeeBps = bound(personalFeeBps, 0, baseFeeBps);
         wrongPersonalFeeBps = bound(wrongPersonalFeeBps, 0, baseFeeBps);
         vm.assume(personalFeeBps != wrongPersonalFeeBps);
@@ -523,7 +525,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         bytes memory malformedSignature
     ) public {
         vm.assume(malformedSignature.length != 65);
-        baseFeeBps = bound(baseFeeBps, 0, Constants.MAX_BPS);
+        baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
         personalFeeBps = bound(personalFeeBps, 0, baseFeeBps);
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
 
@@ -556,7 +558,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         address assetOut = makeAddr("assetOut");
         uint256 iouAmountRay = 1000e27;
         uint16 personalFeeBps = 0;
-        uint16 baseFeeBps = 1000;
+        uint16 baseFeeBps = 5_00;
 
         vm.prank(admin);
         withdrawalPolicy.setDefaultFeeBps(baseFeeBps);
@@ -588,8 +590,8 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         address user = makeAddr("user");
         address assetOut = makeAddr("assetOut");
         uint256 iouAmountRay = 1000e27;
-        uint16 personalFeeBps = 500; // 5% fee
-        uint16 baseFeeBps = 1000; // 10% base fee
+        uint16 personalFeeBps = 2_50; // 2.5% fee
+        uint16 baseFeeBps = 5_00; // 5% base fee
 
         vm.prank(admin);
         withdrawalPolicy.setDefaultFeeBps(baseFeeBps);
@@ -631,7 +633,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         address assetOut = makeAddr("assetOut");
         uint256 iouAmountRay = 1000e27; // 1000 tokens in RAY
         uint16 personalFeeBps = 0; // 0% fee (waiver)
-        uint16 baseFeeBps = 1000; // 10% base fee
+        uint16 baseFeeBps = 5_00; // 5% base fee
 
         // Setup: Configure base fee and whitelist signer
         vm.prank(admin);
@@ -732,7 +734,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         uint256 baseFeeBps,
         uint256 nonce
     ) public {
-        baseFeeBps = bound(baseFeeBps, 0, Constants.MAX_BPS);
+        baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
         personalFeeBps = bound(personalFeeBps, 0, baseFeeBps);
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
 
@@ -765,7 +767,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         uint256 baseFeeBps,
         uint256 nonce
     ) public {
-        baseFeeBps = bound(baseFeeBps, 0, Constants.MAX_BPS);
+        baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
         personalFeeBps = bound(personalFeeBps, 0, baseFeeBps);
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
 
@@ -796,8 +798,8 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         address user = makeAddr("user");
         address assetOut = makeAddr("assetOut");
         uint256 iouAmountRay = 1000e27;
-        uint16 personalFeeBps = 500;
-        uint16 baseFeeBps = 1000;
+        uint16 personalFeeBps = 2_50;
+        uint16 baseFeeBps = 5_00;
 
         vm.prank(admin);
         withdrawalPolicy.setDefaultFeeBps(baseFeeBps);
@@ -825,7 +827,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         uint256 baseFeeBps,
         uint256 deadlineOffset
     ) public {
-        baseFeeBps = bound(baseFeeBps, 0, Constants.MAX_BPS);
+        baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
         personalFeeBps = bound(personalFeeBps, 0, baseFeeBps);
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
         deadlineOffset = bound(deadlineOffset, 1, 365 days);
@@ -862,7 +864,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         uint256 nonce2,
         uint256 nonce3
     ) public {
-        baseFeeBps = bound(baseFeeBps, 0, Constants.MAX_BPS);
+        baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
         personalFeeBps = bound(personalFeeBps, 0, baseFeeBps);
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
         vm.assume(nonce1 != nonce2 && nonce2 != nonce3 && nonce1 != nonce3);
@@ -901,8 +903,8 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         address user = makeAddr("user");
         address assetOut = makeAddr("assetOut");
         uint256 iouAmountRay = 1000e27;
-        uint16 personalFeeBps = 500;
-        uint16 baseFeeBps = 1000;
+        uint16 personalFeeBps = 2_50;
+        uint16 baseFeeBps = 5_00;
 
         vm.prank(admin);
         withdrawalPolicy.setDefaultFeeBps(baseFeeBps);
@@ -932,7 +934,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         uint256 baseFeeBps,
         uint256 sharedNonce
     ) public {
-        baseFeeBps = bound(baseFeeBps, 0, Constants.MAX_BPS);
+        baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
         personalFeeBps = bound(personalFeeBps, 0, baseFeeBps);
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
 
@@ -972,7 +974,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         uint256 personalFeeBps,
         uint256 baseFeeBps
     ) public {
-        baseFeeBps = bound(baseFeeBps, 0, Constants.MAX_BPS);
+        baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
         personalFeeBps = bound(personalFeeBps, 0, baseFeeBps);
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
 
@@ -1005,7 +1007,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         uint256 personalFeeBps,
         uint256 baseFeeBps
     ) public {
-        baseFeeBps = bound(baseFeeBps, 0, Constants.MAX_BPS);
+        baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
         personalFeeBps = bound(personalFeeBps, 0, baseFeeBps);
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
 
@@ -1037,7 +1039,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         uint256 personalFeeBps,
         uint256 baseFeeBps
     ) public {
-        baseFeeBps = bound(baseFeeBps, 0, Constants.MAX_BPS);
+        baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
         personalFeeBps = bound(personalFeeBps, 0, baseFeeBps);
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
 
@@ -1076,7 +1078,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         uint256 personalFeeBps,
         uint256 baseFeeBps
     ) public {
-        baseFeeBps = bound(baseFeeBps, 0, Constants.MAX_BPS);
+        baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
         personalFeeBps = bound(personalFeeBps, 0, baseFeeBps);
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
 
@@ -1117,7 +1119,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         uint256 personalFeeBps,
         uint256 baseFeeBps
     ) public {
-        baseFeeBps = bound(baseFeeBps, 0, Constants.MAX_BPS);
+        baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
         personalFeeBps = bound(personalFeeBps, 0, baseFeeBps);
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
 
