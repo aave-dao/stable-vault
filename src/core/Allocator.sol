@@ -371,8 +371,11 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         require(amount > 0, Errors.ZeroAmount());
         require($storage().strategyConfigs[strategy].depositAllowed, DepositsToStrategyDisabled(strategy));
         IERC20(asset).forceApprove(strategy, amount);
-        (bool callSucceeded,) = strategy.call(abi.encodeCall(IERC4626.deposit, (amount, address(this))));
+        (bool callSucceeded, bytes memory data) =
+            strategy.call(abi.encodeCall(IERC4626.deposit, (amount, address(this))));
         require(callSucceeded, DepositIntoStrategyFailed(strategy));
+        uint256 sharesMinted = abi.decode(data, (uint256));
+        require(sharesMinted != 0, Errors.InsufficientAmountOut());
         emit AssetAllocated(asset, strategy, amount);
     }
 
