@@ -99,7 +99,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         return WithdrawalPolicy(
             address(
                 new TransparentUpgradeableProxy(
-                    withdrawalPolicyImpl, address(this), abi.encodeCall(WithdrawalPolicy.initialize, (accessManager))
+                    withdrawalPolicyImpl, address(this), abi.encodeCall(WithdrawalPolicy.initialize, (accessManager, 0))
                 )
             )
         );

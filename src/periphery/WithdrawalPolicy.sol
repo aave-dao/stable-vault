@@ -94,13 +94,15 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
 
     /// @dev Initializer.
     /// @param accessManager The address of the IAccessManager contract used for handling access control.
-    function initialize(address accessManager) external virtual initializer {
-        __WithdrawalPolicy_init(accessManager);
+    /// @param defaultFeeBps The initial default fee in basis points.
+    function initialize(address accessManager, uint16 defaultFeeBps) external virtual initializer {
+        __WithdrawalPolicy_init(accessManager, defaultFeeBps);
     }
 
-    function __WithdrawalPolicy_init(address accessManager) internal virtual onlyInitializing {
+    function __WithdrawalPolicy_init(address accessManager, uint16 defaultFeeBps) internal virtual onlyInitializing {
         __AccessManaged_init(accessManager);
         __EIP712_init("WithdrawalPolicy", "1");
+        _setDefaultFeeBps(defaultFeeBps);
     }
 
     /// @inheritdoc IWithdrawalPolicy

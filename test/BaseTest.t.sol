@@ -310,7 +310,7 @@ contract BaseTest is Test {
                 new TransparentUpgradeableProxy(
                     withdrawalPolicy_accountingChain_impl,
                     proxyAdmin,
-                    abi.encodeCall(WithdrawalPolicy.initialize, (accessManager_accountingChainAddress))
+                    abi.encodeCall(WithdrawalPolicy.initialize, (accessManager_accountingChainAddress, 0))
                 )
             )
         );
@@ -556,7 +556,7 @@ contract BaseTest is Test {
                 new TransparentUpgradeableProxy(
                     withdrawalPolicy_earningChain_impl,
                     proxyAdmin,
-                    abi.encodeCall(WithdrawalPolicy.initialize, (accessManager_earningChainAddress))
+                    abi.encodeCall(WithdrawalPolicy.initialize, (accessManager_earningChainAddress, 0))
                 )
             )
         );
