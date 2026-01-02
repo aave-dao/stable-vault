@@ -240,7 +240,7 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
     }
 
     function _getTotalAssetsInRay() internal view returns (uint256) {
-        IAllocator.AllocatorBalance[] memory allocatorBalances = IAllocator(ALLOCATOR).getAssetBalances();
+        IAllocator.AllocatorBalance[] memory allocatorBalances = IAllocator(ALLOCATOR).getTrustedAssetBalances();
         uint256 totalAssetsInRay;
         for (uint256 i = 0; i < allocatorBalances.length; i++) {
             totalAssetsInRay += allocatorBalances[i].amount.assetDecimalsToRay(allocatorBalances[i].asset);

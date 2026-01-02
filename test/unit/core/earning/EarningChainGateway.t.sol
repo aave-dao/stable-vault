@@ -254,7 +254,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             amountUsdt.assetDecimalsToRay(address(_mockUsdt)) + amountGho.assetDecimalsToRay(address(_mockGho));
         vm.mockCall(
             address(_mockAllocator),
-            abi.encodeWithSelector(MockAllocator.getAssetBalances.selector),
+            abi.encodeWithSelector(MockAllocator.getTrustedAssetBalances.selector),
             abi.encode(allocatorBalances)
         );
         assertEq(_earningChainGateway.getAggregatedBalance(), expectedTotalAssetsInRay);
@@ -276,7 +276,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             amountUsdt.assetDecimalsToRay(address(_mockUsdt)) + amountGho.assetDecimalsToRay(address(_mockGho));
         vm.mockCall(
             address(_mockAllocator),
-            abi.encodeWithSelector(MockAllocator.getAssetBalances.selector),
+            abi.encodeWithSelector(MockAllocator.getTrustedAssetBalances.selector),
             abi.encode(allocatorBalances)
         );
 
@@ -395,7 +395,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             amountUsdt.assetDecimalsToRay(address(_mockUsdt)) + amountGho.assetDecimalsToRay(address(_mockGho));
         vm.mockCall(
             address(_mockAllocator),
-            abi.encodeWithSelector(MockAllocator.getAssetBalances.selector),
+            abi.encodeWithSelector(MockAllocator.getTrustedAssetBalances.selector),
             abi.encode(allocatorBalances)
         );
 
@@ -567,7 +567,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     amountUsdt.assetDecimalsToRay(address(_mockUsdt)) + amountGho.assetDecimalsToRay(address(_mockGho));
                 vm.mockCall(
                     address(_mockAllocator),
-                    abi.encodeWithSelector(MockAllocator.getAssetBalances.selector),
+                    abi.encodeWithSelector(MockAllocator.getTrustedAssetBalances.selector),
                     abi.encode(allocatorBalances)
                 );
 
@@ -738,7 +738,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
             vm.mockCall(
                 address(_mockAllocator),
-                abi.encodeWithSelector(MockAllocator.getAssetBalances.selector),
+                abi.encodeWithSelector(MockAllocator.getTrustedAssetBalances.selector),
                 abi.encode(allocatorBalances)
             );
 
@@ -1012,7 +1012,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
                 vm.mockCall(
                     address(_mockAllocator),
-                    abi.encodeWithSelector(MockAllocator.getAssetBalances.selector),
+                    abi.encodeWithSelector(MockAllocator.getTrustedAssetBalances.selector),
                     abi.encode(allocatorBalances)
                 );
 
@@ -1155,7 +1155,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
                 vm.mockCall(
                     address(_mockAllocator),
-                    abi.encodeWithSelector(MockAllocator.getAssetBalances.selector),
+                    abi.encodeWithSelector(MockAllocator.getTrustedAssetBalances.selector),
                     abi.encode(allocatorBalances)
                 );
 
@@ -1300,7 +1300,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
                 vm.mockCall(
                     address(_mockAllocator),
-                    abi.encodeWithSelector(MockAllocator.getAssetBalances.selector),
+                    abi.encodeWithSelector(MockAllocator.getTrustedAssetBalances.selector),
                     abi.encode(allocatorBalances)
                 );
 
