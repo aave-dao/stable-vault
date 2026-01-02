@@ -42,6 +42,9 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     // nonce,uint256 deadline)").
     bytes32 public constant FEE_DISCOUNT_TYPEHASH = 0x646ab18e84d3d6045718daa407509f2935bc43bae73437f6cfccb5fd55c34544;
 
+    /// @dev The maximum fee in basis points that can be applied to a withdrawal. Set to 5.00%.
+    uint16 internal constant FEE_CAP_BPS = 5_00;
+
     address internal immutable ASSET_REGISTRY;
 
     /// @notice Signed fee discount data (decoded from WithdrawalRequest.data).
@@ -153,7 +156,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     function setAssetFeeBps(address asset, uint16 newAssetFeeBps, bool isSet) external restricted {
         // We don't check for new asset fee being less than the default fee because maybe we want some specific asset to
         // have a higher fee than the default fee.
-        require(newAssetFeeBps <= Constants.MAX_BPS, Errors.InvalidParameter());
+        require(newAssetFeeBps <= FEE_CAP_BPS, Errors.InvalidParameter());
         $storage().assetFeeConfigs[asset].feeBps = newAssetFeeBps;
         $storage().assetFeeConfigs[asset].isSet = isSet;
     }
@@ -163,8 +166,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     /// @param newDefaultFeeBps The fee in basis points applied to the IOU quantity being exchanged for the
     /// asset.
     function setDefaultFeeBps(uint16 newDefaultFeeBps) external restricted {
-        require(newDefaultFeeBps <= Constants.MAX_BPS, Errors.InvalidParameter());
-        $storage().defaultFeeBps = newDefaultFeeBps;
+        _setDefaultFeeBps(newDefaultFeeBps);
     }
 
     /// @notice Sets the signer to be used for signature verification.
@@ -258,5 +260,10 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
         } else {
             return $storage().defaultFeeBps;
         }
+    }
+
+    function _setDefaultFeeBps(uint16 newDefaultFeeBps) internal {
+        require(newDefaultFeeBps <= FEE_CAP_BPS, Errors.InvalidParameter());
+        $storage().defaultFeeBps = newDefaultFeeBps;
     }
 }
