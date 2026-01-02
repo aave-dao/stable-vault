@@ -370,6 +370,24 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
     }
 
+    function test_deposit_reverts_ifSharesMintedIsZero() public {
+        uint256 depositAmountUsdt = 1000;
+        depositAmountUsdt = _boundAssetAmount(address(_mockUsdt), depositAmountUsdt);
+
+        TestErc4626WithSlippage _strategyWithSlippage = new TestErc4626WithSlippage(_mockUsdt);
+
+        // Set the strategy to return 0 shares as default
+        vm.startPrank(address(everyRoleAccount));
+        _allocator.addStrategy(address(_mockUsdt), address(_strategyWithSlippage));
+        _allocator.setDefaultStrategy(address(_mockUsdt), address(_strategyWithSlippage));
+        vm.stopPrank();
+
+        _mockTransferHelper.mockAsset(address(_mockUsdt), depositAmountUsdt);
+        vm.expectRevert(Errors.InsufficientAmountOut.selector);
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), depositAmountUsdt);
+    }
+
     function test_deposit_reverts_whereVaultRejectsDeposit(uint256 depositAmountUsdt) public {
         depositAmountUsdt = _boundAssetAmount(address(_mockUsdt), depositAmountUsdt);
 

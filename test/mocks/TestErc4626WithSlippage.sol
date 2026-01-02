@@ -33,4 +33,15 @@ contract TestErc4626WithSlippage is ERC4626 {
 
         return assets;
     }
+
+    function deposit(uint256 assets, address receiver) public override returns (uint256) {
+        uint256 maxAssets = maxDeposit(receiver);
+        if (assets > maxAssets) {
+            revert ERC4626ExceededMaxDeposit(receiver, assets, maxAssets);
+        }
+
+        uint256 shares = previewDeposit(assets);
+        _deposit(_msgSender(), receiver, assets, shares);
+        return 0;
+    }
 }
