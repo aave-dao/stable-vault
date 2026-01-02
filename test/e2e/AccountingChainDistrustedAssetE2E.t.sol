@@ -14,8 +14,7 @@ import {Errors} from "src/types/Errors.sol";
 import {BaseTest} from "test/BaseTest.t.sol";
 
 /// @title AccountingChainDistrustedAssetE2ETest
-/// @notice Test the withdrawal of funds
-/// @dev Deposit made to BBV on Accounting Chain, IOU tokens bridged to Earning Chain, and then used to withdraw assets.
+/// @notice Test the withdrawal of funds on the Accounting Chain when an asset is distrusted.
 contract AccountingChainDistrustedAssetE2ETest is BaseTest {
     using AssetLib for uint256;
 

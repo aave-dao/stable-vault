@@ -154,8 +154,6 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         // The user will use native asset to pay for bridge fees
         // User must approve the IOU token manager to spend the IOU tokens
         vm.prank(user1);
-        iouToken_accountingChain.approve(address(iouTokenManager_accountingChain), iouAmountRequestedRay);
-        vm.prank(user1);
         vm.deal(user1, bridgeFeeAmount);
         iouTokenManager_accountingChain.bridgeTokens{value: bridgeFeeAmount}(
             EARNING_CHAIN_ID,
