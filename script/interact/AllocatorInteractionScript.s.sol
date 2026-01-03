@@ -7,8 +7,8 @@ import {InteractionBaseScript} from "script/interact/InteractionBaseScript.s.sol
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 
 contract AllocatorInteractionScript is InteractionBaseScript {
-    function getAssetBalances(address allocator) public view returns (IAllocator.AllocatorBalance[] memory) {
-        return IAllocator(allocator).getAssetBalances();
+    function getTrustedAssetBalances(address allocator) public view returns (IAllocator.AllocatorBalance[] memory) {
+        return IAllocator(allocator).getTrustedAssetBalances();
     }
 
     function allocate(address allocator, address asset, address strategy, uint256 amount) public {
