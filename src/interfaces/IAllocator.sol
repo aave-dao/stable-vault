@@ -114,7 +114,7 @@ interface IAllocator {
 
     /// @notice Getter for the balances on the Allocator.
     /// @return balances Array of balances where each amount is denominated in the corresponding asset's decimals.
-    function getAssetBalances() external view returns (AllocatorBalance[] memory balances);
+    function getTrustedAssetBalances() external view returns (AllocatorBalance[] memory balances);
 
     /// @notice Getter for the default strategy for a given asset.
     /// @param asset Address of the asset to get the default strategy for.
