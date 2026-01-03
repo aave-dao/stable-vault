@@ -171,15 +171,12 @@ contract BasedBoostedVault is
             $storage().positions[user].subVaultId = subVaultId;
         }
 
+        uint256 conversionRate = _accrueSubVaultConversionRate(subVaultId);
         uint256 amountInRay = amount.assetDecimalsToRay(asset);
-        // Round up the conversion rate used as divisor to calculate the shares the user receives. In this way, we
-        // end up undershooting the amount of granted shares, favoring the protocol.
-        uint256 conversionRateRoundedUp = _previewSubVaultConversionRateRoundingUp(subVaultId);
-        // Round down the division with the same goal of undershooting amount of granted shares.
-        uint256 shares = amountInRay.rayDivDown(conversionRateRoundedUp);
+        // Round down the division to undershoot the amount of granted shares, favoring the protocol.
+        uint256 shares = amountInRay.rayDivDown(conversionRate);
         // Prevent deposits that result in 0 shares to avoid user getting nothing in return for their deposit.
         require(shares > 0, Errors.InvalidAmount());
-        _accrueSubVaultConversionRate(subVaultId);
 
         if (!_isActiveSubVaultById(subVaultId)) {
             _addSubVaultToActive(subVaultId);
@@ -382,7 +379,7 @@ contract BasedBoostedVault is
         }
         // Round down the user balance, so that the rounding is in favor of the protocol.
         return $storage().positions[user].shares
-            .rayMulDown(_previewSubVaultConversionRateRoundingDown($storage().positions[user].subVaultId));
+            .rayMulDown(_previewSubVaultConversionRate($storage().positions[user].subVaultId));
     }
 
     /// @inheritdoc IBasedBoostedVault
@@ -448,10 +445,8 @@ contract BasedBoostedVault is
     }
 
     function _migrateUserToSubVault(address user, uint256 oldSubVaultId, uint256 newSubVaultId) internal {
-        _accrueSubVaultConversionRate(oldSubVaultId);
-        _accrueSubVaultConversionRate(newSubVaultId);
-        uint256 oldConversionRate = $storage().subVaultById[oldSubVaultId].conversionRate;
-        uint256 newConversionRate = $storage().subVaultById[newSubVaultId].conversionRate;
+        uint256 oldConversionRate = _accrueSubVaultConversionRate(oldSubVaultId);
+        uint256 newConversionRate = _accrueSubVaultConversionRate(newSubVaultId);
         uint256 userOldShares = $storage().positions[user].shares;
         // Round down the amount of shares after sub-vault migration, so that the rounding is in favor of the protocol.
         uint256 userNewShares = userOldShares.rayMulDown(oldConversionRate).rayDivDown(newConversionRate);
@@ -498,34 +493,26 @@ contract BasedBoostedVault is
         require($storage().activeSubVaultsIds.length <= MAX_ACTIVE_SUB_VAULTS, TooManyActiveSubVaults());
     }
 
-    function _previewSubVaultConversionRateRoundingDown(uint256 subVaultId) internal view returns (uint256) {
-        return _previewSubVaultConversionRate({subVaultId: subVaultId, roundDown: true});
-    }
-
-    function _previewSubVaultConversionRateRoundingUp(uint256 subVaultId) internal view returns (uint256) {
-        return _previewSubVaultConversionRate({subVaultId: subVaultId, roundDown: false});
-    }
-
-    /// @dev Rounding direction should be determined based on context of usage of this function.
-    /// @dev To undershoot the new conversion rate `roundDown` should be true.
-    /// @dev To overshoot the new conversion rate `roundDown` should be false.
-    function _previewSubVaultConversionRate(uint256 subVaultId, bool roundDown) internal view returns (uint256) {
+    function _previewSubVaultConversionRate(uint256 subVaultId) internal view returns (uint256) {
         uint256 secondsSinceLastAccrual = block.timestamp - $storage().subVaultById[subVaultId].lastAccrualTimestamp;
         uint256 newConversionRate = $storage().subVaultById[subVaultId].conversionRate;
         if (secondsSinceLastAccrual != 0) {
             uint256 growthFactor = $storage().subVaultById[subVaultId].perSecondRate.rpow(secondsSinceLastAccrual);
-            if (roundDown) {
-                newConversionRate = newConversionRate.rayMulDown(growthFactor);
-            } else {
-                newConversionRate = newConversionRate.rayMulUp(growthFactor);
-            }
+            // The conversion rate is used across different operations (e.g. converting assets to shares on deposits,
+            // converting shares to assets on withdrawals, computing total vault obligations, etc.).
+            // The conversion rate calculation rounds down to ensure a conservative and consistent value that subsequent
+            // operations can then use to apply their context-specific rounding on top with the intention of favoring
+            // the protocol.
+            newConversionRate = newConversionRate.rayMulDown(growthFactor);
         }
         return newConversionRate;
     }
 
-    function _accrueSubVaultConversionRate(uint256 subVaultId) internal {
-        $storage().subVaultById[subVaultId].conversionRate = _previewSubVaultConversionRateRoundingDown(subVaultId);
+    function _accrueSubVaultConversionRate(uint256 subVaultId) internal returns (uint256) {
+        uint256 newConversionRate = _previewSubVaultConversionRate(subVaultId);
+        $storage().subVaultById[subVaultId].conversionRate = newConversionRate;
         $storage().subVaultById[subVaultId].lastAccrualTimestamp = block.timestamp;
+        return newConversionRate;
     }
 
     function _previewFullWithdrawalRequest(address user) internal view returns (uint256, uint256, uint256) {
@@ -593,7 +580,7 @@ contract BasedBoostedVault is
         for (uint256 i = 0; i < $storage().activeSubVaultsIds.length; i++) {
             // Round up the obligations, so that the rounding is in favor of the protocol.
             activeSubVaultsObligations += $storage().subVaultById[$storage().activeSubVaultsIds[i]].totalShares
-                .rayMulUp(_previewSubVaultConversionRateRoundingUp($storage().activeSubVaultsIds[i]));
+                .rayMulUp(_previewSubVaultConversionRate($storage().activeSubVaultsIds[i]));
         }
         return activeSubVaultsObligations + _getIousInCirculation();
     }
