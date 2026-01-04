@@ -241,7 +241,7 @@ contract BasedBoostedVaultOperationsGasTest is BaseTest {
         vm.snapshotGasLastCall(NAMESPACE, "[executeWithdrawal] full withdrawal");
     }
 
-    function test_claimFees() public {
+    function test_claimSurplusInterest() public {
         uint256 activeSubVaults = 201;
         // There is a user already with a deposit
         uint256 newSubVaultsToCreate = activeSubVaults - 1;
@@ -283,8 +283,8 @@ contract BasedBoostedVaultOperationsGasTest is BaseTest {
         uint256[] memory amounts = _toUint256Array(depositsGho, depositsUsdc);
 
         vm.prank(everyRoleAccount);
-        vault.claimFees(assets, amounts);
-        vm.snapshotGasLastCall(NAMESPACE, "[claimFees] 2 assets - 201 sub-vaults");
+        vault.claimSurplusInterest(assets, amounts);
+        vm.snapshotGasLastCall(NAMESPACE, "[claimSurplusInterest] 2 assets - 201 sub-vaults");
     }
 
     function _generateNewUser() internal returns (address) {

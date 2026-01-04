@@ -832,7 +832,7 @@ contract BaseTest is Test {
         // ----- Set up Profit Taker -----
         _setUpRole(accessManager, PROFIT_TAKER_ROLE, everyRoleAccount, 0);
         accessManager.setTargetFunctionRole(
-            address(vault), _toSelectorArray(IBasedBoostedVault.claimFees.selector), PROFIT_TAKER_ROLE
+            address(vault), _toSelectorArray(IBasedBoostedVault.claimSurplusInterest.selector), PROFIT_TAKER_ROLE
         );
 
         // ----- Set up Operator -----

@@ -324,7 +324,7 @@ contract BasedBoostedVault is
     }
 
     /// @inheritdoc IBasedBoostedVault
-    function claimFees(address[] calldata assets, uint256[] calldata amounts)
+    function claimSurplusInterest(address[] calldata assets, uint256[] calldata amounts)
         external
         override
         restricted
@@ -332,16 +332,16 @@ contract BasedBoostedVault is
     {
         uint256 vaultObligationsRay = _getVaultObligations();
         uint256 vaultAssetsRay = _getVaultAggregatedBalance();
-        require(vaultObligationsRay <= vaultAssetsRay, NoFeesToClaim());
-        uint256 fee = vaultAssetsRay - vaultObligationsRay;
+        require(vaultObligationsRay <= vaultAssetsRay, NoSurplusInterestToClaim());
+        uint256 surplusInterest = vaultAssetsRay - vaultObligationsRay;
         uint256 accumulatedAmountRay;
         for (uint256 i = 0; i < assets.length; i++) {
             IFundsHandler(FUNDS_HANDLER).processWithdrawal(assets[i], amounts[i]);
             accumulatedAmountRay += amounts[i].assetDecimalsToRay(assets[i]);
         }
-        require(accumulatedAmountRay <= fee, Errors.InvalidAmount());
+        require(accumulatedAmountRay <= surplusInterest, Errors.InvalidAmount());
         ITransferHelper(TRANSFER_HELPER).transfer(assets, amounts, msg.sender);
-        emit FeesClaimed(assets, amounts);
+        emit SurplusInterestClaimed(assets, amounts);
     }
 
     ////////////////////////////////////////////////// GETTERS /////////////////////////////////////////////////////
