@@ -76,12 +76,12 @@ Withdrawals are a two-step process designed to ensure liquidity management and p
    - **Accounting Chain**:
      - **Contract**: `BasedBoostedVault`
      - **Function**: `executeWithdrawal(...)`
-     - **Process**: IOUs are burned via `IouTokenManager`. The `WithdrawalPolicy` is checked for fees. Assets are transferred to the user from the `TransferHelper`.
+     - **Process**: IOUs are burned via `IouTokenManager`. The `WithdrawalPolicy` enforces the protocol's policies and operational costs associated with the withdrawal. Assets are withdrawn from the local `Allocator` then transferred to the user from the `TransferHelper`.
 
    - **Earning Chains**:
      - **Contract**: `EarningChainGateway`
      - **Function**: `exchangeIouTokens(...)`
-     - **Process**: IOUs are burned locally. The `WithdrawalPolicy` is checked for fees. Assets are withdrawn from the local `Allocator`. A cross-chain message is sent to the Accounting Chain to burn the corresponding locked IOUs. Assets are transferred to the user from the `TransferHelper`.
+     - **Process**: IOUs are burned locally. The `WithdrawalPolicy` enforces the protocol's policies and operational costs associated with the withdrawal. Assets are withdrawn from the local `Allocator`. A cross-chain message is sent to the Accounting Chain to burn the corresponding locked IOUs. Assets are transferred to the user from the `TransferHelper`.
 
 ## Repository Structure
 
