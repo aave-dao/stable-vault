@@ -213,8 +213,10 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
         assertEq(vault.getAggregatedBalance(), 0);
     }
 
-    function test_givenProfitsFromDistrustedAsset_claimFeesFails() public {
-        console.log("\nAccountingChainDistrustedAssetE2ETest: givenProfitsFromDistrustedAsset_claimFeesFails");
+    function test_givenProfitsFromDistrustedAsset_claimSurplusInterestFails() public {
+        console.log(
+            "\nAccountingChainDistrustedAssetE2ETest: givenProfitsFromDistrustedAsset_claimSurplusInterestFails"
+        );
 
         uint256 userInitialDeposit = 500 * (10 ** 6);
 
@@ -263,9 +265,9 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = profits;
 
-        vm.expectRevert(IBasedBoostedVault.NoFeesToClaim.selector);
+        vm.expectRevert(IBasedBoostedVault.NoSurplusInterestToClaim.selector);
         vm.prank(everyRoleAccount);
-        vault.claimFees(assets, amounts);
+        vault.claimSurplusInterest(assets, amounts);
     }
 
     function test_givenDonationOfDistrustedAsset_userAttemptToWithdrawProfitsFails() public {

@@ -310,7 +310,7 @@ contract BaseTest is Test {
                 new TransparentUpgradeableProxy(
                     withdrawalPolicy_accountingChain_impl,
                     proxyAdmin,
-                    abi.encodeCall(WithdrawalPolicy.initialize, (accessManager_accountingChainAddress))
+                    abi.encodeCall(WithdrawalPolicy.initialize, (accessManager_accountingChainAddress, 0))
                 )
             )
         );
@@ -556,7 +556,7 @@ contract BaseTest is Test {
                 new TransparentUpgradeableProxy(
                     withdrawalPolicy_earningChain_impl,
                     proxyAdmin,
-                    abi.encodeCall(WithdrawalPolicy.initialize, (accessManager_earningChainAddress))
+                    abi.encodeCall(WithdrawalPolicy.initialize, (accessManager_earningChainAddress, 0))
                 )
             )
         );
@@ -832,7 +832,7 @@ contract BaseTest is Test {
         // ----- Set up Profit Taker -----
         _setUpRole(accessManager, PROFIT_TAKER_ROLE, everyRoleAccount, 0);
         accessManager.setTargetFunctionRole(
-            address(vault), _toSelectorArray(IBasedBoostedVault.claimFees.selector), PROFIT_TAKER_ROLE
+            address(vault), _toSelectorArray(IBasedBoostedVault.claimSurplusInterest.selector), PROFIT_TAKER_ROLE
         );
 
         // ----- Set up Operator -----

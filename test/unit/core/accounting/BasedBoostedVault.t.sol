@@ -93,7 +93,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         return WithdrawalPolicy(
             address(
                 new TransparentUpgradeableProxy(
-                    withdrawalPolicyImpl, address(this), abi.encodeCall(WithdrawalPolicy.initialize, (accessManager))
+                    withdrawalPolicyImpl, address(this), abi.encodeCall(WithdrawalPolicy.initialize, (accessManager, 0))
                 )
             )
         );
@@ -773,24 +773,28 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         assertEq(actualAssets, expectedAssets);
     }
 
-    function test_claimFees_reverts_ifMsgSenderIsNotAuthorized(address unauthorizedMsgSender, uint256 amountToClaim)
-        public
-    {
+    function test_claimSurplusInterest_reverts_ifMsgSenderIsNotAuthorized(
+        address unauthorizedMsgSender,
+        uint256 amountToClaim
+    ) public {
         _assumeNotProxyAdmin(unauthorizedMsgSender, address(bbv));
         amountToClaim = _boundAssetAmount(address(mockAsset), amountToClaim);
 
-        mockAccessManager.mockRejectCall(unauthorizedMsgSender, address(bbv), IBasedBoostedVault.claimFees.selector);
+        mockAccessManager.mockRejectCall(
+            unauthorizedMsgSender, address(bbv), IBasedBoostedVault.claimSurplusInterest.selector
+        );
 
         vm.expectRevert(
             abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
         );
         vm.prank(unauthorizedMsgSender);
-        bbv.claimFees(_toAddressArray(address(mockAsset)), _toUint256Array(amountToClaim));
+        bbv.claimSurplusInterest(_toAddressArray(address(mockAsset)), _toUint256Array(amountToClaim));
     }
 
-    function test_claimFees_reverts_ifObligationsExceedAssets(uint256 obligationsRay, uint256 aggregatedBalanceRay)
-        public
-    {
+    function test_claimSurplusInterest_reverts_ifObligationsExceedAssets(
+        uint256 obligationsRay,
+        uint256 aggregatedBalanceRay
+    ) public {
         obligationsRay = _boundRayAmount(obligationsRay);
         aggregatedBalanceRay = _boundRayAmount(aggregatedBalanceRay);
         uint256 obligationsAfterConversionRay =
@@ -811,11 +815,11 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         assertGt(bbv.getVaultObligations(), bbv.getAggregatedBalance());
 
         vm.prank(manager);
-        vm.expectRevert(abi.encodeWithSelector(IBasedBoostedVault.NoFeesToClaim.selector));
-        bbv.claimFees(_toAddressArray(address(mockAsset)), _toUint256Array(obligationsInAssetDecimals));
+        vm.expectRevert(abi.encodeWithSelector(IBasedBoostedVault.NoSurplusInterestToClaim.selector));
+        bbv.claimSurplusInterest(_toAddressArray(address(mockAsset)), _toUint256Array(obligationsInAssetDecimals));
     }
 
-    function test_claimFees_reverts_ifPullingMoreFundsThanTheAvailableFeesToClaim(
+    function test_claimSurplusInterest_reverts_ifPullingMoreFundsThanTheAvailableFeesToClaim(
         uint256 availableFeesToClaimRay,
         uint256 requestedAssetsToClaim
     ) public {
@@ -830,10 +834,13 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         vm.prank(manager);
         vm.expectRevert(abi.encodeWithSelector(Errors.InvalidAmount.selector));
-        bbv.claimFees(_toAddressArray(address(mockAsset)), _toUint256Array(requestedAssetsToClaim));
+        bbv.claimSurplusInterest(_toAddressArray(address(mockAsset)), _toUint256Array(requestedAssetsToClaim));
     }
 
-    function test_claimFees_emitExpectedEvent(uint256 availableFeesToClaimRay, uint256 requestedAssetsToClaim) public {
+    function test_claimSurplusInterest_emitExpectedEvent(
+        uint256 availableFeesToClaimRay,
+        uint256 requestedAssetsToClaim
+    ) public {
         requestedAssetsToClaim = _boundAssetAmount(address(mockAsset), requestedAssetsToClaim);
         availableFeesToClaimRay = _boundRayAmount(availableFeesToClaimRay);
         vm.assume(requestedAssetsToClaim.assetDecimalsToRay(address(mockAsset)) <= availableFeesToClaimRay);
@@ -843,15 +850,15 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockFundsHandler.mockAggregatedBalance(availableFeesToClaimRay);
 
         vm.expectEmit(true, true, true, true);
-        emit IBasedBoostedVault.FeesClaimed(
+        emit IBasedBoostedVault.SurplusInterestClaimed(
             _toAddressArray(address(mockAsset)), _toUint256Array(requestedAssetsToClaim)
         );
 
         vm.prank(manager);
-        bbv.claimFees(_toAddressArray(address(mockAsset)), _toUint256Array(requestedAssetsToClaim));
+        bbv.claimSurplusInterest(_toAddressArray(address(mockAsset)), _toUint256Array(requestedAssetsToClaim));
     }
 
-    function test_claimFees_sendsExpectedAmountOfFeesToMsgSender(
+    function test_claimSurplusInterest_sendsExpectedAmountOfFeesToMsgSender(
         address msgSender,
         uint256 availableFeesToClaimRay,
         uint256 requestedAssetsToClaim
@@ -872,7 +879,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         // The AccessManager contract we use has all calls allowed by default, only rejections needs to be explicit.
         vm.prank(msgSender);
-        bbv.claimFees(_toAddressArray(address(mockAsset)), _toUint256Array(requestedAssetsToClaim));
+        bbv.claimSurplusInterest(_toAddressArray(address(mockAsset)), _toUint256Array(requestedAssetsToClaim));
 
         assertEq(mockAsset.balanceOf(msgSender), requestedAssetsToClaim);
     }

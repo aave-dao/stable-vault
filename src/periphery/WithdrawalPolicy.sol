@@ -15,11 +15,13 @@ import {Errors} from "src/types/Errors.sol";
 
 /// @title WithdrawalPolicy
 /// @author Aave Labs
-/// @notice Contract used to enforce withdrawal policies such as fees.
-/// @dev Withdrawal fees are calculated based on personal fees, asset-specific fees, or a fallback fee.
-/// @dev Withdrawal fees are in basis points (bps) and are applied to the IOU tokens being exchanged for assets.
-/// @dev This contract does not take ownership of the fee. It is expected the client of this contract takes the fee
-/// returned by this contract.
+/// @notice Contract that enforces conditions during withdrawal executions (i.e. when exchanging IOUs for assets).
+/// @dev This contract does not control who can withdraw, all users have the right to do so. Thus, the conditions
+/// enforced by this contract must not prevent withdrawals, but rather ensure that permissionless withdrawals meet the
+/// protocol's requirements.
+/// @dev The current implementation applies a fee to: deter abuse of arbitrage opportunities through the protocol's
+/// liquidity, discourage spam, and cover protocol operational costs (e.g. bridge or swap fees).
+/// @dev The fee is capped at 5.00% and is expected to be lower in most scenarios.
 contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithdrawalPolicy {
     /// @notice Emitted when a nonce is marked as used, either by a successful appliance of the withdrawal policy or by
     /// a nonce invalidation.
@@ -41,6 +43,9 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     // keccak256("FeeDiscount(address user,address assetOut,uint256 iouAmountRay,uint16 personalFeeBps,uint256
     // nonce,uint256 deadline)").
     bytes32 public constant FEE_DISCOUNT_TYPEHASH = 0x646ab18e84d3d6045718daa407509f2935bc43bae73437f6cfccb5fd55c34544;
+
+    /// @dev The maximum fee in basis points that can be applied to a withdrawal. Set to 5.00%.
+    uint16 internal constant FEE_CAP_BPS = 5_00;
 
     address internal immutable ASSET_REGISTRY;
 
@@ -91,13 +96,15 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
 
     /// @dev Initializer.
     /// @param accessManager The address of the IAccessManager contract used for handling access control.
-    function initialize(address accessManager) external virtual initializer {
-        __WithdrawalPolicy_init(accessManager);
+    /// @param defaultFeeBps The initial default fee in basis points.
+    function initialize(address accessManager, uint16 defaultFeeBps) external virtual initializer {
+        __WithdrawalPolicy_init(accessManager, defaultFeeBps);
     }
 
-    function __WithdrawalPolicy_init(address accessManager) internal virtual onlyInitializing {
+    function __WithdrawalPolicy_init(address accessManager, uint16 defaultFeeBps) internal virtual onlyInitializing {
         __AccessManaged_init(accessManager);
         __EIP712_init("WithdrawalPolicy", "1");
+        _setDefaultFeeBps(defaultFeeBps);
     }
 
     /// @inheritdoc IWithdrawalPolicy
@@ -153,7 +160,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     function setAssetFeeBps(address asset, uint16 newAssetFeeBps, bool isSet) external restricted {
         // We don't check for new asset fee being less than the default fee because maybe we want some specific asset to
         // have a higher fee than the default fee.
-        require(newAssetFeeBps <= Constants.MAX_BPS, Errors.InvalidParameter());
+        require(newAssetFeeBps <= FEE_CAP_BPS, Errors.InvalidParameter());
         $storage().assetFeeConfigs[asset].feeBps = newAssetFeeBps;
         $storage().assetFeeConfigs[asset].isSet = isSet;
     }
@@ -163,8 +170,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     /// @param newDefaultFeeBps The fee in basis points applied to the IOU quantity being exchanged for the
     /// asset.
     function setDefaultFeeBps(uint16 newDefaultFeeBps) external restricted {
-        require(newDefaultFeeBps <= Constants.MAX_BPS, Errors.InvalidParameter());
-        $storage().defaultFeeBps = newDefaultFeeBps;
+        _setDefaultFeeBps(newDefaultFeeBps);
     }
 
     /// @notice Sets the signer to be used for signature verification.
@@ -258,5 +264,10 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
         } else {
             return $storage().defaultFeeBps;
         }
+    }
+
+    function _setDefaultFeeBps(uint16 newDefaultFeeBps) internal {
+        require(newDefaultFeeBps <= FEE_CAP_BPS, Errors.InvalidParameter());
+        $storage().defaultFeeBps = newDefaultFeeBps;
     }
 }

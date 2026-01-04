@@ -4,7 +4,10 @@ pragma solidity ^0.8.22;
 
 /// @title IWithdrawalPolicy
 /// @author Aave Labs
-/// @notice Interface for withdrawal policy contracts that determine the final withdrawal amount.
+/// @notice Interface of the contract enforcing conditions during withdrawal executions.
+/// @dev The implementation must not control who can withdraw, all users have the right to do so. Thus, the conditions
+/// enforced by this contract must not prevent withdrawals, but rather ensure that permissionless withdrawals meet the
+/// protocol's requirements.
 interface IWithdrawalPolicy {
     /// @notice Core parameters for a withdrawal request.
     /// @param user Address of the user withdrawing.
@@ -21,12 +24,12 @@ interface IWithdrawalPolicy {
     /// @notice Applies the withdrawal policy and returns the final amount the user receives.
     /// @dev May have side effects (e.g., consuming nonces). Reverts if policy is violated.
     /// @param request The withdrawal request parameters.
-    /// @return The amount of assets the user will receive (in RAY), after all fees and adjustments.
+    /// @return The amount of assets the user will receive (in RAY), after the withdrawal policy is applied.
     function applyWithdrawalPolicy(WithdrawalRequest calldata request) external returns (uint256);
 
     /// @notice Previews the withdrawal policy result without modifying state.
     /// @dev Validates everything (asset, signature, deadline, nonce) but doesn't consume the nonce.
     /// @param request The withdrawal request parameters.
-    /// @return The amount of assets the user would receive (in RAY), after all fees and adjustments.
+    /// @return The amount of assets the user would receive (in RAY), after the withdrawal policy is applied.
     function previewWithdrawalPolicy(WithdrawalRequest calldata request) external view returns (uint256);
 }

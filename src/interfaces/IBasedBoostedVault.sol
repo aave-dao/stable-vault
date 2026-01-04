@@ -41,7 +41,7 @@ interface IBasedBoostedVault {
 
     event DefaultSubVaultSet(uint256 indexed subVaultId, uint256 perSecondRate);
 
-    event FeesClaimed(address[] assets, uint256[] amounts);
+    event SurplusInterestClaimed(address[] assets, uint256[] amounts);
 
     /// @notice Thrown when the amount requested to withdraw is greater than the amount available.
     /// @dev It is possible the system does not have enough profits i.e. balances over 'original deposits' to cover a
@@ -57,9 +57,9 @@ interface IBasedBoostedVault {
     /// @custom:selector 0x6668308f
     error NonExistentPosition();
 
-    /// @notice Thrown when there are no fees to claim.
-    /// @custom:selector 0x846d8c5c
-    error NoFeesToClaim();
+    /// @notice Thrown when there are no surplus interest to claim.
+    /// @custom:selector 0xc1095626
+    error NoSurplusInterestToClaim();
 
     /// @notice Thrown when checked address is not the message sender.
     /// @custom:selector 0x9b3a19e9
@@ -93,11 +93,12 @@ interface IBasedBoostedVault {
     /// @param newPerSecondRate New per-second rate for the sub-vault.
     function setSubVaultRate(uint256 subVaultId, uint256 newPerSecondRate) external;
 
-    /// @notice Claims fees from the vault.
-    /// @dev Funds requested are pulled from downstream components and transferred to the msg.sender.
-    /// @param assets Assets to claim fees for.
-    /// @param amounts Amounts of assets to claim fees for in their respective asset units.
-    function claimFees(address[] calldata assets, uint256[] calldata amounts) external;
+    /// @notice Claims surplus interest from the vault.
+    /// @dev If funds requested can be covered by the system's surplus interest, the funds are pulled from downstream
+    /// components and transferred to the msg.sender.
+    /// @param assets Assets to claim surplus interest for.
+    /// @param amounts Amounts of assets to claim surplus interest for in their respective asset units.
+    function claimSurplusInterest(address[] calldata assets, uint256[] calldata amounts) external;
 
     /// @notice Sets the rate for a batch of users.
     /// @param userRateData Batch of user rates to set.

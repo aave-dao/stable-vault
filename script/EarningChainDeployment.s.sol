@@ -193,7 +193,7 @@ contract EarningChainDeployment is Create3Deployment, Create3AddressBook, AToken
             deployer: DEPLOYER,
             implementation: implementation,
             proxyAdmin: WITHDRAWAL_POLICY_PROXY_ADMIN,
-            initCalldata: abi.encodeCall(WithdrawalPolicy.initialize, (getAccessManagerAddress(DEPLOYER)))
+            initCalldata: abi.encodeCall(WithdrawalPolicy.initialize, (getAccessManagerAddress(DEPLOYER), 0))
         });
         require(
             withdrawalPolicy == getWithdrawalPolicyAddress(DEPLOYER), "WithdrawalPolicy does not match expected address"

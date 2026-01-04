@@ -399,7 +399,7 @@ contract EndToEndTest is BaseTest {
             console.log("Manager's GHO balance before claiming fees profits: %s GHO", GHO.balanceOf(everyRoleAccount));
 
             vm.prank(everyRoleAccount);
-            vault.claimFees(assets, amounts);
+            vault.claimSurplusInterest(assets, amounts);
 
             uint256 newManagerGhoBalance = GHO.balanceOf(everyRoleAccount);
             console.log("Manager's GHO balance after claiming fees profits: %s GHO", newManagerGhoBalance);

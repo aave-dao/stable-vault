@@ -45,7 +45,7 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
     /// @param iouTokenManager Address of the IOU token manager contract used to mint and burn bridged or exchanged IOU
     /// tokens.
     /// @param transferHelper Address of the TransferHelper contract used to transfer assets across components.
-    /// @param withdrawalPolicy Address of the WithdrawalPolicy contract used to check withdrawal policies and fees.
+    /// @param withdrawalPolicy Address of the contract ensuring protocol's withdrawal requirements are met.
     constructor(
         uint256 accountingChainId,
         address allocator,
