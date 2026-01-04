@@ -119,7 +119,7 @@ contract BasedBoostedVault is
     /// @param iouTokenManager The address of the address that manages the supply of IOUs.
     /// @param fundsHandler The address of the contract that handles funds of the accounting chain.
     /// @param transferHelper The address of the contract that helps minimize the number of transfers across flows.
-    /// @param withdrawalPolicy The address of the contract that handles withdrawal policies (e.g. withdrawal fees).
+    /// @param withdrawalPolicy The address of the contract ensuring protocol's withdrawal requirements are met.
     /// @param maxActiveSubVaults The maximum number of active sub-vaults allowed.
     constructor(
         uint256 maxValidPerSecondRate,

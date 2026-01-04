@@ -15,11 +15,13 @@ import {Errors} from "src/types/Errors.sol";
 
 /// @title WithdrawalPolicy
 /// @author Aave Labs
-/// @notice Contract used to enforce withdrawal policies such as fees.
-/// @dev Withdrawal fees are calculated based on personal fees, asset-specific fees, or a fallback fee.
-/// @dev Withdrawal fees are in basis points (bps) and are applied to the IOU tokens being exchanged for assets.
-/// @dev This contract does not take ownership of the fee. It is expected the client of this contract takes the fee
-/// returned by this contract.
+/// @notice Contract that enforces conditions during withdrawal executions (i.e. when exchanging IOUs for assets).
+/// @dev This contract does not control who can withdraw, all users have the right to do so. Thus, the conditions
+/// enforced by this contract must not prevent withdrawals, but rather ensure that permissionless withdrawals meet the
+/// protocol's requirements.
+/// @dev The current implementation applies a fee to: deter abuse of arbitrage opportunities through the protocol's
+/// liquidity, discourage spam, and cover protocol operational costs (e.g. bridge or swap fees).
+/// @dev The fee is capped at 5.00% and is expected to be lower in most scenarios.
 contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithdrawalPolicy {
     /// @notice Emitted when a nonce is marked as used, either by a successful appliance of the withdrawal policy or by
     /// a nonce invalidation.

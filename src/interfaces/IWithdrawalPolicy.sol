@@ -4,7 +4,10 @@ pragma solidity ^0.8.22;
 
 /// @title IWithdrawalPolicy
 /// @author Aave Labs
-/// @notice Interface for withdrawal policy contracts that determine the final withdrawal amount.
+/// @notice Interface of the contract enforcing conditions during withdrawal executions.
+/// @dev The implementation must not control who can withdraw, all users have the right to do so. Thus, the conditions
+/// enforced by this contract must not prevent withdrawals, but rather ensure that permissionless withdrawals meet the
+/// protocol's requirements.
 interface IWithdrawalPolicy {
     /// @notice Core parameters for a withdrawal request.
     /// @param user Address of the user withdrawing.
