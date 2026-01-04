@@ -75,10 +75,9 @@ interface IChainGateway {
     /// @dev For message type `DECREMENT_BALANCE_SNAPSHOT`.
     /// @dev Used when funds are bridged from an Earning Chain to an Accounting Chain, but the bridge is not used to
     /// communicate the total balance snapshot.
-    /// @dev Decrementing the snapshot is not considered risky because at worst
-    /// the total assets in the system will be understated until an AMB is used to communicate the actual balance
-    /// snapshot. This conservative logic may impact the ability for users/manager(s) to withdraw profits/fees from the
-    /// system.
+    /// @dev Decrementing the snapshot is not considered risky because at worst the total assets in the system will be
+    /// understated until an AMB is used to communicate the actual balance snapshot. This conservative logic may impact
+    /// the system's ability to estimate earned interest.
     /// @param amountRay Amount to decrement the balance snapshot by in RAY.
     struct DecrementBalanceSnapshotMessage {
         uint256 amountRay;

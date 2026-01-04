@@ -57,7 +57,7 @@ interface IBasedBoostedVault {
     /// @custom:selector 0x6668308f
     error NonExistentPosition();
 
-    /// @notice Thrown when there are no fees to claim.
+    /// @notice Thrown when there are no surplus interest to claim.
     /// @custom:selector 0x846d8c5c
     error NoFeesToClaim();
 

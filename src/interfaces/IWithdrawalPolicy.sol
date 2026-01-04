@@ -24,12 +24,12 @@ interface IWithdrawalPolicy {
     /// @notice Applies the withdrawal policy and returns the final amount the user receives.
     /// @dev May have side effects (e.g., consuming nonces). Reverts if policy is violated.
     /// @param request The withdrawal request parameters.
-    /// @return The amount of assets the user will receive (in RAY), after all fees and adjustments.
+    /// @return The amount of assets the user will receive (in RAY), after the withdrawal policy is applied.
     function applyWithdrawalPolicy(WithdrawalRequest calldata request) external returns (uint256);
 
     /// @notice Previews the withdrawal policy result without modifying state.
     /// @dev Validates everything (asset, signature, deadline, nonce) but doesn't consume the nonce.
     /// @param request The withdrawal request parameters.
-    /// @return The amount of assets the user would receive (in RAY), after all fees and adjustments.
+    /// @return The amount of assets the user would receive (in RAY), after the withdrawal policy is applied.
     function previewWithdrawalPolicy(WithdrawalRequest calldata request) external view returns (uint256);
 }
