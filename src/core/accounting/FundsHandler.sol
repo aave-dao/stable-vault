@@ -87,7 +87,7 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, TransferHelp
 
     /// @inheritdoc IFundsHandler
     function getAggregatedBalance() external view override returns (uint256) {
-        IAllocator.AllocatorBalance[] memory allocatorAssets = IAllocator(ALLOCATOR).getAssetBalances();
+        IAllocator.AllocatorBalance[] memory allocatorAssets = IAllocator(ALLOCATOR).getTrustedAssetBalances();
 
         uint256 totalBalanceRay;
 
@@ -102,7 +102,7 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, TransferHelp
 
     /// @inheritdoc IFundsHandler
     function getAssetBalances() external view override returns (AssetBalance[] memory) {
-        IAllocator.AllocatorBalance[] memory allocatorAssets = IAllocator(ALLOCATOR).getAssetBalances();
+        IAllocator.AllocatorBalance[] memory allocatorAssets = IAllocator(ALLOCATOR).getTrustedAssetBalances();
         AssetBalance[] memory balances = new AssetBalance[](allocatorAssets.length + $storage().chainBalances.length);
         for (uint16 i = 0; i < allocatorAssets.length; i++) {
             balances[i] = AssetBalance({

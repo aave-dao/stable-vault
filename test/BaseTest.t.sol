@@ -795,7 +795,11 @@ contract BaseTest is Test {
         );
         accessManager.setTargetFunctionRole(
             address(assetRegistry_accountingChain),
-            _toSelectorArray(IAssetRegistry.setAssetConfig.selector),
+            _toSelectorArray(
+                IAssetRegistry.setAssetConfig.selector,
+                IAssetRegistry.distrustAsset.selector,
+                IAssetRegistry.trustAsset.selector
+            ),
             APPENDER_ROLE
         );
         accessManager.setTargetFunctionRole(
@@ -884,7 +888,13 @@ contract BaseTest is Test {
             address(allocator_earningChain), _toSelectorArray(IAllocator.addStrategy.selector), APPENDER_ROLE
         );
         accessManager.setTargetFunctionRole(
-            address(assetRegistry_earningChain), _toSelectorArray(IAssetRegistry.setAssetConfig.selector), APPENDER_ROLE
+            address(assetRegistry_earningChain),
+            _toSelectorArray(
+                IAssetRegistry.setAssetConfig.selector,
+                IAssetRegistry.distrustAsset.selector,
+                IAssetRegistry.trustAsset.selector
+            ),
+            APPENDER_ROLE
         );
         accessManager.setTargetFunctionRole(
             address(earningChainGateway), _toSelectorArray(IChainGateway.addBridgeAdapter.selector), APPENDER_ROLE

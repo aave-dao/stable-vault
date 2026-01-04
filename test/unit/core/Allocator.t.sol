@@ -139,15 +139,16 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.setDefaultStrategy(address(_mockGho), address(_defaultGhoStrategy));
     }
 
-    function test_getAssetBalances_returnsExpectedAssetBalances(uint256 depositAmountUsdt, uint256 depositAmountGho)
-        public
-    {
+    function test_getTrustedAssetBalances_returnsExpectedAssetBalances(
+        uint256 depositAmountUsdt,
+        uint256 depositAmountGho
+    ) public {
         _mockAssetRegistry.mockRegisteredAsset(address(_mockUsdt));
         _mockAssetRegistry.mockRegisteredAsset(address(_mockGho));
         depositAmountUsdt = _boundAssetAmount(address(_mockUsdt), depositAmountUsdt);
         depositAmountGho = _boundAssetAmount(address(_mockGho), depositAmountGho);
 
-        IAllocator.AllocatorBalance[] memory initialBalances = _allocator.getAssetBalances();
+        IAllocator.AllocatorBalance[] memory initialBalances = _allocator.getTrustedAssetBalances();
         bool foundUsdt = false;
         bool foundGho = false;
         for (uint256 i = 0; i < initialBalances.length; i++) {
@@ -176,7 +177,7 @@ contract AllocatorTest is TestWithHelpers {
         vm.prank(depositor);
         _allocator.deposit(address(_mockGho), depositAmountGho);
 
-        IAllocator.AllocatorBalance[] memory balancesAfterDefaultDeposits = _allocator.getAssetBalances();
+        IAllocator.AllocatorBalance[] memory balancesAfterDefaultDeposits = _allocator.getTrustedAssetBalances();
         assertEq(balancesAfterDefaultDeposits.length, 2);
         foundUsdt = false;
         foundGho = false;
@@ -204,7 +205,7 @@ contract AllocatorTest is TestWithHelpers {
         uint256 idleFundsGho = 2000;
         _mockGho.mint(address(_allocator), idleFundsGho);
 
-        IAllocator.AllocatorBalance[] memory balancesAfterIdleDeposits = _allocator.getAssetBalances();
+        IAllocator.AllocatorBalance[] memory balancesAfterIdleDeposits = _allocator.getTrustedAssetBalances();
         assertEq(balancesAfterIdleDeposits.length, 2);
         foundUsdt = false;
         foundGho = false;
@@ -240,7 +241,7 @@ contract AllocatorTest is TestWithHelpers {
         vm.prank(depositor);
         _extraGhoStrategy.deposit(depositAmountGho, address(_allocator));
 
-        IAllocator.AllocatorBalance[] memory balancesAfterExtraDeposits = _allocator.getAssetBalances();
+        IAllocator.AllocatorBalance[] memory balancesAfterExtraDeposits = _allocator.getTrustedAssetBalances();
         assertEq(balancesAfterExtraDeposits.length, 2);
         foundUsdt = false;
         foundGho = false;
@@ -265,7 +266,7 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), depositAmountGho);
     }
 
-    function test_getAssetBalances_returnsExpectedAssetBalances_whenAssetIsNotRegistered() public {
+    function test_getTrustedAssetBalances_returnsExpectedAssetBalances_whenAssetIsNotRegistered() public {
         // Deposit funds of USDC, USDT into the Allocator
         uint256 amount = 1000;
         _mockTransferHelper.mockAsset(address(_mockUsdt), amount);
@@ -277,7 +278,7 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.deposit(address(_mockUnsupportedAsset), amount);
 
         // Check that balances only return the registered asset
-        IAllocator.AllocatorBalance[] memory balances = _allocator.getAssetBalances();
+        IAllocator.AllocatorBalance[] memory balances = _allocator.getTrustedAssetBalances();
         assertEq(balances.length, 2);
         assertEq(balances[0].asset, address(_mockUsdt));
         assertEq(balances[0].amount, amount);
@@ -368,6 +369,24 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
+    }
+
+    function test_deposit_reverts_ifSharesMintedIsZero() public {
+        uint256 depositAmountUsdt = 1000;
+        depositAmountUsdt = _boundAssetAmount(address(_mockUsdt), depositAmountUsdt);
+
+        TestErc4626WithSlippage _strategyWithSlippage = new TestErc4626WithSlippage(_mockUsdt);
+
+        // Set the strategy to return 0 shares as default
+        vm.startPrank(address(everyRoleAccount));
+        _allocator.addStrategy(address(_mockUsdt), address(_strategyWithSlippage));
+        _allocator.setDefaultStrategy(address(_mockUsdt), address(_strategyWithSlippage));
+        vm.stopPrank();
+
+        _mockTransferHelper.mockAsset(address(_mockUsdt), depositAmountUsdt);
+        vm.expectRevert(Errors.InsufficientAmountOut.selector);
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), depositAmountUsdt);
     }
 
     function test_deposit_reverts_whereVaultRejectsDeposit(uint256 depositAmountUsdt) public {
@@ -1637,7 +1656,7 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.removeStrategy(address(_extraGhoStrategy));
 
         // Check balance return 1 since USDT is still a supported asset in the AssetRegistry
-        IAllocator.AllocatorBalance[] memory balances = _allocator.getAssetBalances();
+        IAllocator.AllocatorBalance[] memory balances = _allocator.getTrustedAssetBalances();
         assertEq(balances.length, 2);
         assertEq(balances[0].asset, address(_mockUsdt));
         assertEq(balances[0].amount, 0);
@@ -1671,7 +1690,7 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
 
-        balances = _allocator.getAssetBalances();
+        balances = _allocator.getTrustedAssetBalances();
         assertEq(balances.length, 2);
         bool foundUsdt = false;
         bool foundGho = false;

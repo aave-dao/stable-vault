@@ -125,8 +125,8 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     }
 
     /// @inheritdoc IAllocator
-    function getAssetBalances() external view override returns (IAllocator.AllocatorBalance[] memory) {
-        return _getAssetBalances();
+    function getTrustedAssetBalances() external view override returns (IAllocator.AllocatorBalance[] memory) {
+        return _getTrustedAssetBalances();
     }
 
     /// @inheritdoc IAllocator
@@ -371,14 +371,17 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         require(amount > 0, Errors.ZeroAmount());
         require($storage().strategyConfigs[strategy].depositAllowed, DepositsToStrategyDisabled(strategy));
         IERC20(asset).forceApprove(strategy, amount);
-        (bool callSucceeded,) = strategy.call(abi.encodeCall(IERC4626.deposit, (amount, address(this))));
+        (bool callSucceeded, bytes memory data) =
+            strategy.call(abi.encodeCall(IERC4626.deposit, (amount, address(this))));
         require(callSucceeded, DepositIntoStrategyFailed(strategy));
+        uint256 sharesMinted = abi.decode(data, (uint256));
+        require(sharesMinted != 0, Errors.InsufficientAmountOut());
         emit AssetAllocated(asset, strategy, amount);
     }
 
     /// @dev Returns balances grouped by asset.
-    function _getAssetBalances() internal view returns (IAllocator.AllocatorBalance[] memory) {
-        address[] memory assets = IAssetRegistry(ASSET_REGISTRY).getRegisteredAssets();
+    function _getTrustedAssetBalances() internal view returns (IAllocator.AllocatorBalance[] memory) {
+        address[] memory assets = IAssetRegistry(ASSET_REGISTRY).getTrustedAssets();
         IAllocator.AllocatorBalance[] memory allocatedAssets = new IAllocator.AllocatorBalance[](assets.length);
         for (uint256 i = 0; i < assets.length; i++) {
             address asset = assets[i];

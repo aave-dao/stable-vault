@@ -33,7 +33,7 @@ contract MockAllocator is IAllocator {
         revert("Not implemented");
     }
 
-    function getAssetBalances() external view override returns (AllocatorBalance[] memory) {
+    function getTrustedAssetBalances() external view override returns (AllocatorBalance[] memory) {
         AllocatorBalance[] memory balances = new AllocatorBalance[](_mockedAssets.length);
         for (uint256 i = 0; i < _mockedAssets.length; i++) {
             balances[i] = AllocatorBalance({asset: _mockedAssets[i], amount: _mockedAssetBalances[_mockedAssets[i]]});

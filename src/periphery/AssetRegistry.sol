@@ -24,6 +24,7 @@ contract AssetRegistry is AccessManagedUpgradeable, Multicall, IAssetRegistry {
     struct AssetRegistryStorage {
         mapping(address asset => AssetConfig config) configByAsset;
         EnumerableSet.AddressSet assets;
+        EnumerableSet.AddressSet trustedAssets;
     }
 
     // keccak256(abi.encode(uint256(keccak256("aave.storage.AssetRegistry")) - 1)) & ~bytes32(uint256(0xff))
@@ -58,6 +59,7 @@ contract AssetRegistry is AccessManagedUpgradeable, Multicall, IAssetRegistry {
         require(IERC20Metadata(asset).decimals() <= Constants.MAX_SUPPORTED_ASSET_DECIMALS, Errors.InvalidAsset(asset));
         $storage().configByAsset[asset] = config;
         $storage().assets.add(asset);
+        $storage().trustedAssets.add(asset);
         emit AssetConfigSet(asset, config);
     }
 
@@ -125,16 +127,39 @@ contract AssetRegistry is AccessManagedUpgradeable, Multicall, IAssetRegistry {
         emit AssetConfigSet(asset, $storage().configByAsset[asset]);
     }
 
+    /// @inheritdoc IAssetRegistry
+    function trustAsset(address asset) external override restricted {
+        require(_isAssetRegistered(asset), Errors.UnsupportedAsset(asset));
+        require(!_isAssetTrusted(asset), AlreadyTrusted());
+        $storage().trustedAssets.add(asset);
+        emit AssetTrusted(asset);
+    }
+
+    /// @inheritdoc IAssetRegistry
+    function distrustAsset(address asset) external override restricted {
+        require(_isAssetRegistered(asset), Errors.UnsupportedAsset(asset));
+        require(_isAssetTrusted(asset), AlreadyDistrusted());
+        $storage().trustedAssets.remove(asset);
+        emit AssetDistrusted(asset);
+    }
+
+    // ///////////////////////// GETTERS ////////////////////////////////
+
+    /// @inheritdoc IAssetRegistry
+    function getTrustedAssets() external view override returns (address[] memory) {
+        return $storage().trustedAssets.values();
+    }
+
+    /// @inheritdoc IAssetRegistry
+    function isAssetTrusted(address asset) external view override returns (bool) {
+        return _isAssetTrusted(asset);
+    }
+
     // /////////////////////// PERMISSION SPECIFIC GETTERS ////////////////////////////
 
     /// @inheritdoc IAssetRegistry
     function isAssetRegistered(address asset) external view override returns (bool) {
         return _isAssetRegistered(asset);
-    }
-
-    /// @inheritdoc IAssetRegistry
-    function isUserDepositAllowed(address asset) external view override returns (bool) {
-        return $storage().configByAsset[asset].depositFromUserAllowed;
     }
 
     /// @inheritdoc IAssetRegistry
@@ -153,11 +178,17 @@ contract AssetRegistry is AccessManagedUpgradeable, Multicall, IAssetRegistry {
     }
 
     /// @inheritdoc IAssetRegistry
-    function getRegisteredAssets() external view override returns (address[] memory) {
-        return $storage().assets.values();
+    function isUserDepositAllowed(address asset) external view override returns (bool) {
+        return $storage().configByAsset[asset].depositFromUserAllowed;
     }
+
+    // ///////////////////////// INTERNAL FUNCTIONS ////////////////////////////////
 
     function _isAssetRegistered(address asset) internal view returns (bool) {
         return $storage().assets.contains(asset);
+    }
+
+    function _isAssetTrusted(address asset) internal view returns (bool) {
+        return $storage().trustedAssets.contains(asset);
     }
 }

@@ -7,7 +7,6 @@ import {console} from "forge-std/console.sol";
 import {IERC20} from "forge-std/interfaces/IERC20.sol";
 
 import {BasedBoostedVault} from "src/core/accounting/BasedBoostedVault.sol";
-import {BasedBoostedVault} from "src/core/accounting/BasedBoostedVault.sol";
 import {IBasedBoostedVault} from "src/interfaces/IBasedBoostedVault.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
@@ -154,8 +153,6 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         // 6. Bridge user1 IOUs to Earning chain and check supplies are expected
         // The user will use native asset to pay for bridge fees
         // User must approve the IOU token manager to spend the IOU tokens
-        vm.prank(user1);
-        iouToken_accountingChain.approve(address(iouTokenManager_accountingChain), iouAmountRequestedRay);
         vm.prank(user1);
         vm.deal(user1, bridgeFeeAmount);
         iouTokenManager_accountingChain.bridgeTokens{value: bridgeFeeAmount}(

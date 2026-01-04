@@ -28,13 +28,25 @@ interface IAssetRegistry {
 
     event AssetConfigSet(address asset, AssetConfig config);
 
+    event AssetTrusted(address asset);
+
+    event AssetDistrusted(address asset);
+
     /// @notice Thrown when attempting to disable a feature that is already disabled.
     /// @custom:selector 0x005ecddb
     error AlreadyDisabled();
 
+    /// @notice Thrown when attempting to distrust an asset that is already distrusted.
+    /// @custom:selector 0x1ed3ece1
+    error AlreadyDistrusted();
+
     /// @notice Thrown when attempting to enable a feature that is already enabled.
     /// @custom:selector 0xf2a5f75a
     error AlreadyEnabled();
+
+    /// @notice Thrown when attempting to trust an asset that is already trusted.
+    /// @custom:selector 0xab73bb5f
+    error AlreadyTrusted();
 
     /// @notice Sets the configuration for an asset.
     /// @param asset Address of the asset to set the configuration for.
@@ -73,10 +85,28 @@ interface IAssetRegistry {
     /// @param asset Address of the asset to enable user deposits for.
     function enableUserDeposits(address asset) external;
 
-    /// @notice Getter for whether the asset is allowed to be deposited into the system by a user.
-    /// @param asset Address of the asset to check if it is allowed to be deposited into the system by a user.
-    /// @return isAllowed Whether the asset is allowed to be deposited into the system by a user.
-    function isUserDepositAllowed(address asset) external view returns (bool);
+    /// @notice Trusts an asset.
+    /// @dev Trusted assets are those that are allowed to contribute to the solvency of the system.
+    /// @param asset Address of the asset to trust.
+    function trustAsset(address asset) external;
+
+    /// @notice Distrusts an asset.
+    /// @dev Distrusted assets are those that for example have depeg'ed and should not be trusted to contribute to the
+    /// solvency of the system.
+    /// @param asset Address of the asset to distrust.
+    function distrustAsset(address asset) external;
+
+    /// @notice Checks if an asset is registered in the AssetRegistry.
+    /// @param asset Address of the asset to check if it is registered in the AssetRegistry.
+    /// @return isRegistered Whether the asset is registered in the AssetRegistry.
+    function isAssetRegistered(address asset) external view returns (bool);
+
+    /// @notice Getter for whether the asset is trusted in the AssetRegistry.
+    /// @dev Distrusted assets are those that for example have depeg'ed and should not be trusted to contribute to the
+    /// solvency of the system.
+    /// @param asset Address of the asset to check if it is trusted in the AssetRegistry.
+    /// @return isTrusted Whether the asset is trusted in the AssetRegistry.
+    function isAssetTrusted(address asset) external view returns (bool);
 
     /// @notice Getter for whether the asset is allowed to be deposited into the Allocator.
     /// @dev Deposits into the Allocator are made either during a user deposit, rebalancing, or when funds are received
@@ -84,11 +114,6 @@ interface IAssetRegistry {
     /// @param asset Address of the asset to check if it is allowed to be deposited into the Allocator.
     /// @return isAllowed Whether the asset is allowed to be deposited into the Allocator.
     function isDepositToAllocatorAllowed(address asset) external view returns (bool);
-
-    /// @notice Getter for whether the asset is registered in the AssetRegistry.
-    /// @param asset Address of the asset to check if it is registered in the AssetRegistry.
-    /// @return isRegistered Whether the asset is registered in the AssetRegistry.
-    function isAssetRegistered(address asset) external view returns (bool);
 
     /// @notice Getter for whether the asset is allowed to be used as swap input token from the Allocator into the
     /// Swapper.
@@ -106,7 +131,14 @@ interface IAssetRegistry {
     /// Allocator.
     function isSwapOutputAllowed(address asset) external view returns (bool);
 
-    /// @notice Getter for the list of all registered assets.
-    /// @return assets The list of registered asset addresses.
-    function getRegisteredAssets() external view returns (address[] memory);
+    /// @notice Getter for whether the asset is allowed to be deposited into the system by a user.
+    /// @param asset Address of the asset to check if it is allowed to be deposited into the system by a user.
+    /// @return isAllowed Whether the asset is allowed to be deposited into the system by a user.
+    function isUserDepositAllowed(address asset) external view returns (bool);
+
+    /// @notice Getter for the list of all trusted assets.
+    /// @dev Distrusted assets are those that for example have depeg'ed and should not be trusted to contribute to the
+    /// solvency of the system.
+    /// @return assets The list of trusted asset addresses.
+    function getTrustedAssets() external view returns (address[] memory);
 }
