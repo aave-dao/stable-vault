@@ -164,12 +164,13 @@ contract AcrossAdapter is BaseBridgeAdapter, IAcrossBridgeAdapter, IERC165 {
 
     /// @inheritdoc BaseBridgeAdapter
     /// @dev This function should not be called if funds have been delivered, but arbitrary message handling via
-    /// handleV3AcrossMessage() is still pending.
-    /// @dev Has restricted modifier because it is possible for funds to be delivered before the AcrossPacket data is
-    /// delivered via a call from the pool spoke to handleV3AcrossMessage(...).
-    /// @dev If funds are received from Earning Chain to Accounting Chain and pushed into the Allocator while the
-    /// balance snapshot message still has not been processed then this will lead to the Accounting Chain's balance
-    /// reflecting a duplicate amount of the funds that were received.
+    /// handleV3AcrossMessage() is still pending or will never be executed because the data has been intentionally
+    /// omitted by the relayer.
+    /// @dev A malicious relayer could intentionally omit the AcrossPacket data and have funds
+    /// arrive on the adapter contract then proceed to invoke the overriden `replayFundsReceiving` function which would
+    /// cause the Accounting Chain to double count the amount (the snapshot is not decremented). The malicious relayer
+    /// would not receive a refund if the message is omitted, but it is not safe to assume malicious actors are
+    /// economically rational.
     function replayFundsReceiving(BridgeAsset[] memory assets)
         external
         override(BaseBridgeAdapter, IBridgeAdapter)
