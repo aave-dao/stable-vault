@@ -2,6 +2,8 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.22;
 
+import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
+
 import {BaseChainGateway} from "src/core/BaseChainGateway.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
@@ -17,7 +19,7 @@ import {Errors} from "src/types/Errors.sol";
 
 /// @title EarningChainGateway
 /// @notice Facilitates cross chain messaging with exactly one Accounting Chain.
-contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarningChainGateway {
+contract EarningChainGateway is BaseChainGateway, TransferHelperClient, ReentrancyGuardTransient, IEarningChainGateway {
     using AssetLib for uint256;
 
     uint256 internal immutable ACCOUNTING_CHAIN_ID;
@@ -117,6 +119,7 @@ contract EarningChainGateway is BaseChainGateway, TransferHelperClient, IEarning
         external
         payable
         override
+        nonReentrant
         assertingTransferHelperBalanceFor(bridgeParams.feeToken)
         assertingTransferHelperBalanceFor(assetOut)
         returns (uint256)
