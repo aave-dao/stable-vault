@@ -5,9 +5,11 @@ pragma solidity ^0.8.22;
 import {
     AccessManagedUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
+import {
+    ReentrancyGuardTransientUpgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardTransientUpgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {IBasedBoostedVault} from "src/interfaces/IBasedBoostedVault.sol";
@@ -34,7 +36,7 @@ contract BasedBoostedVault is
     RescuableAssets,
     TransferHelperClient,
     Multicall,
-    ReentrancyGuardTransient,
+    ReentrancyGuardTransientUpgradeable,
     IBasedBoostedVault
 {
     using MathLib for uint256;
