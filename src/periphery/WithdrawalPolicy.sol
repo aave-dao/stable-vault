@@ -201,14 +201,14 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     {
         address signer;
         uint256 nonce;
-        uint16 feeBps;
-        uint16 personalFeeBps = type(uint16).max;
-
+        uint16 feeBps = _getAssetFeeBps(request.assetOut);
         if (request.data.length > 0) {
+            uint16 personalFeeBps;
             (signer, nonce, personalFeeBps) = _verifySignedDiscount(request);
+            if (personalFeeBps < feeBps) {
+                feeBps = personalFeeBps;
+            }
         }
-        uint16 assetFeeBps = _getAssetFeeBps(request.assetOut);
-        feeBps = personalFeeBps < assetFeeBps ? personalFeeBps : assetFeeBps;
         uint256 feeAmountRay = (request.iouAmountRay * feeBps + Constants.MAX_BPS - 1) / Constants.MAX_BPS;
         return (request.iouAmountRay - feeAmountRay, signer, nonce);
     }
