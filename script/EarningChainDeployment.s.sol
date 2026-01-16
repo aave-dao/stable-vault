@@ -186,7 +186,11 @@ contract EarningChainDeployment is Create3Deployment, Create3AddressBook, AToken
     }
 
     function _deployWithdrawalPolicy() internal returns (address) {
-        address implementation = address(new WithdrawalPolicy({assetRegistry: getAssetRegistryAddress(DEPLOYER)}));
+        address implementation = address(
+            new WithdrawalPolicy({
+                assetRegistry: getAssetRegistryAddress(DEPLOYER), withdrawalPolicyApplier: getGatewayAddress(DEPLOYER)
+            })
+        );
         _logDeployment("WithdrawalPolicy::Implementation", "", implementation);
         address withdrawalPolicy = _deployTransparentProxy_create3({
             namespacedSaltSeed: WITHDRAWAL_POLICY_SALT_SEED,

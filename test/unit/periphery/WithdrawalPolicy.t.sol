@@ -26,8 +26,11 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
     uint16 constant FEE_CAP_BPS = 5_00; // 5.00%
 
-    function _deployWithdrawalPolicy(address accessManager, address assetRegistry) internal returns (WithdrawalPolicy) {
-        address withdrawalPolicyImpl = address(new WithdrawalPolicy(assetRegistry));
+    function _deployWithdrawalPolicy(address accessManager, address assetRegistry, address withdrawalPolicyApplier)
+        internal
+        returns (WithdrawalPolicy)
+    {
+        address withdrawalPolicyImpl = address(new WithdrawalPolicy(assetRegistry, withdrawalPolicyApplier));
         return WithdrawalPolicy(
             address(
                 new TransparentUpgradeableProxy(
@@ -40,7 +43,8 @@ contract WithdrawalPolicyTest is TestWithHelpers {
     function setUp() public {
         mockAccessManager = new MockAccessManager(admin);
         mockAssetRegistry = new MockAssetRegistry();
-        withdrawalPolicy = _deployWithdrawalPolicy(address(mockAccessManager), address(mockAssetRegistry));
+        withdrawalPolicy =
+            _deployWithdrawalPolicy(address(mockAccessManager), address(mockAssetRegistry), address(this));
     }
 
     // Helper to build WithdrawalRequest
@@ -290,6 +294,36 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         // Apply should return same result and consume the nonce
         uint256 actualAmountOut = withdrawalPolicy.applyWithdrawalPolicy(request);
         assertEq(actualAmountOut, expectedAmountOut, "Apply should match expected");
+        assertTrue(withdrawalPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Apply should consume nonce");
+    }
+
+    function test_applyWithdrawalPolicy_reverts_ifCallerIsNotApplier() public {
+        address user = makeAddr("user");
+        address assetOut = makeAddr("assetOut");
+        uint256 iouAmountRay = 1000e27;
+        uint16 personalFeeBps = 0;
+        uint16 baseFeeBps = 5_00;
+
+        vm.prank(admin);
+        withdrawalPolicy.setDefaultFeeBps(baseFeeBps);
+
+        (address signer, uint256 signerPk) = makeAddrAndKey("signer");
+        vm.prank(admin);
+        withdrawalPolicy.setSigner(signer, true);
+
+        bytes memory data = _createSignedFeeDiscountData(
+            signerPk, user, assetOut, iouAmountRay, personalFeeBps, DEFAULT_NONCE, DEFAULT_DEADLINE
+        );
+        IWithdrawalPolicy.WithdrawalRequest memory request = _buildRequest(user, assetOut, iouAmountRay, data);
+
+        address attacker = makeAddr("attacker");
+        vm.expectRevert(Errors.NotAuthorized.selector);
+        vm.prank(attacker);
+        withdrawalPolicy.applyWithdrawalPolicy(request);
+        assertFalse(withdrawalPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Nonce should not be used after revert");
+
+        uint256 amountOut = withdrawalPolicy.applyWithdrawalPolicy(request);
+        assertEq(amountOut, iouAmountRay, "Authorized caller should apply fee waiver");
         assertTrue(withdrawalPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Apply should consume nonce");
     }
 

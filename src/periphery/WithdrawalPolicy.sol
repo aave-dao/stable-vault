@@ -48,6 +48,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     uint16 internal constant FEE_CAP_BPS = 5_00;
 
     address internal immutable ASSET_REGISTRY;
+    address internal immutable WITHDRAWAL_POLICY_APPLIER;
 
     /// @notice Signed fee discount data (decoded from WithdrawalRequest.data).
     /// @param personalFeeBps The personal fee in basis points signed by a whitelisted signer.
@@ -87,11 +88,18 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
         }
     }
 
+    modifier onlyWithdrawalPolicyApplier() {
+        require(msg.sender == WITHDRAWAL_POLICY_APPLIER, Errors.NotAuthorized());
+        _;
+    }
+
     /// @dev Constructor.
     /// @param assetRegistry Address of the AssetRegistry contract used for managing asset configurations.
-    constructor(address assetRegistry) EIP712Upgradeable() {
+    /// @param withdrawalPolicyApplier Address allowed to apply the withdrawal policy.
+    constructor(address assetRegistry, address withdrawalPolicyApplier) EIP712Upgradeable() {
         _disableInitializers();
         ASSET_REGISTRY = assetRegistry;
+        WITHDRAWAL_POLICY_APPLIER = withdrawalPolicyApplier;
     }
 
     /// @dev Initializer.
@@ -108,7 +116,12 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     }
 
     /// @inheritdoc IWithdrawalPolicy
-    function applyWithdrawalPolicy(WithdrawalRequest calldata request) external override returns (uint256) {
+    function applyWithdrawalPolicy(WithdrawalRequest calldata request)
+        external
+        override
+        onlyWithdrawalPolicyApplier
+        returns (uint256)
+    {
         (uint256 amountOutRay, address signer, uint256 nonce) = _previewWithdrawalPolicy(request);
         if (signer != address(0)) {
             _markNonceAsUsed(signer, nonce);

@@ -88,8 +88,11 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         );
     }
 
-    function _deployWithdrawalPolicy(address accessManager, address assetRegistry) internal returns (WithdrawalPolicy) {
-        address withdrawalPolicyImpl = address(new WithdrawalPolicy(assetRegistry));
+    function _deployWithdrawalPolicy(address accessManager, address assetRegistry, address withdrawalPolicyApplier)
+        internal
+        returns (WithdrawalPolicy)
+    {
+        address withdrawalPolicyImpl = address(new WithdrawalPolicy(assetRegistry, withdrawalPolicyApplier));
         return WithdrawalPolicy(
             address(
                 new TransparentUpgradeableProxy(
@@ -108,7 +111,13 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockAsset = _deployDefaultAsset();
         mockTransferHelper = new MockTransferHelper();
         mockFundsHandler = new MockFundsHandler(address(mockTransferHelper));
-        mockWithdrawalPolicy = _deployWithdrawalPolicy(address(mockAccessManager), address(mockAssetRegistry));
+
+        // Predict BBV proxy address after WithdrawalPolicy impl+proxy and BBV impl deployments.
+        uint256 deployerNonce = vm.getNonce(address(this));
+        address expectedBbvProxy = vm.computeCreateAddress(address(this), deployerNonce + 3);
+
+        mockWithdrawalPolicy =
+            _deployWithdrawalPolicy(address(mockAccessManager), address(mockAssetRegistry), expectedBbvProxy);
         bbv = _deployBasedBoostedVault(
             address(mockAccessManager),
             DEFAULT_MAX_PER_SECOND_RATE,
