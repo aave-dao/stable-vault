@@ -15,13 +15,13 @@ abstract contract RescuableToken is IRescuableToken {
     using SafeERC20 for IERC20;
 
     /// @inheritdoc IRescuableToken
-    function rescueTokens(address asset, uint256 amount) public virtual override {
-        _beforeRescueTokens(asset, amount);
-        if (asset == address(0)) {
-            revert Errors.InvalidAsset(asset);
+    function rescueTokens(address token, uint256 amount) public virtual override {
+        _beforeRescueTokens(token, amount);
+        if (token == address(0)) {
+            revert Errors.InvalidAsset(token);
         }
-        IERC20(asset).safeTransfer(msg.sender, amount);
+        IERC20(token).safeTransfer(msg.sender, amount);
     }
 
-    function _beforeRescueTokens(address asset, uint256 amount) internal virtual;
+    function _beforeRescueTokens(address token, uint256 amount) internal virtual;
 }

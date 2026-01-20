@@ -262,7 +262,7 @@ contract FundsHandler is
     }
 
     function _beforeRescueTokens(
-        address, // asset
+        address, // token
         uint256 // amount
     )
         internal
