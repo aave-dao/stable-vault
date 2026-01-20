@@ -8,14 +8,14 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
-import {RescuableAssetNative} from "src/misc/RescuableAssetNative.sol";
+import {RescuableNative} from "src/misc/RescuableNative.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
 import {Errors} from "src/types/Errors.sol";
 
 /// @title BaseBridgeAdapter
 /// @author Aave Labs
 /// @notice Base contract for bridge adapters.
-abstract contract BaseBridgeAdapter is AccessManaged, RescuableAssetNative, TransferHelperClient, IBridgeAdapter {
+abstract contract BaseBridgeAdapter is AccessManaged, RescuableNative, TransferHelperClient, IBridgeAdapter {
     using SafeERC20 for IERC20;
 
     /// @dev Funds handling does not depend on the source chain id (only data handling does).

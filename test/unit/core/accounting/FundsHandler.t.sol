@@ -11,7 +11,7 @@ import {FundsHandler} from "src/core/accounting/FundsHandler.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
-import {IRescuableAssetNative} from "src/interfaces/IRescuableAssetNative.sol";
+import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
@@ -570,7 +570,7 @@ contract FundsHandlerTest is TestWithHelpers {
         vm.assume(address(msgSender).balance == 0);
 
         vm.prank(msgSender);
-        IRescuableAssetNative(address(fundsHandler)).rescueNative(assetAmountToRescue);
+        IRescuableNative(address(fundsHandler)).rescueNative(assetAmountToRescue);
 
         assertEq(address(msgSender).balance, assetAmountToRescue);
         assertEq(address(fundsHandler).balance, fhAssetBalance - assetAmountToRescue);
@@ -591,7 +591,7 @@ contract FundsHandlerTest is TestWithHelpers {
 
         vm.prank(msgSender);
         vm.expectRevert(abi.encodeWithSelector(Errors.NativeTransferFailed.selector));
-        IRescuableAssetNative(address(fundsHandler)).rescueNative(assetAmountToRescue);
+        IRescuableNative(address(fundsHandler)).rescueNative(assetAmountToRescue);
     }
 
     function test_pushFundsToChain_reverts_ifMsgSenderIsNotAuthorized(

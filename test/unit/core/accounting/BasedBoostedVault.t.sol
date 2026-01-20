@@ -11,7 +11,7 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {BasedBoostedVault} from "src/core/accounting/BasedBoostedVault.sol";
 import {IBasedBoostedVault} from "src/interfaces/IBasedBoostedVault.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
-import {IRescuableAssetNative} from "src/interfaces/IRescuableAssetNative.sol";
+import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
@@ -1806,14 +1806,12 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(bbvAssetBalance >= assetAmountToRescue);
         vm.deal(address(bbv), bbvAssetBalance);
 
-        mockAccessManager.mockRejectCall(
-            unauthorizedMsgSender, address(bbv), IRescuableAssetNative.rescueNative.selector
-        );
+        mockAccessManager.mockRejectCall(unauthorizedMsgSender, address(bbv), IRescuableNative.rescueNative.selector);
         vm.expectRevert(
             abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
         );
         vm.prank(unauthorizedMsgSender);
-        IRescuableAssetNative(address(bbv)).rescueNative(assetAmountToRescue);
+        IRescuableNative(address(bbv)).rescueNative(assetAmountToRescue);
     }
 
     function test_rescueNative_getsExpectedAmountOfNativeToMsgSender(
@@ -1831,7 +1829,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(address(msgSender).balance == 0);
 
         vm.prank(msgSender);
-        IRescuableAssetNative(address(bbv)).rescueNative(assetAmountToRescue);
+        IRescuableNative(address(bbv)).rescueNative(assetAmountToRescue);
 
         assertEq(address(msgSender).balance, assetAmountToRescue);
         assertEq(address(bbv).balance, bbvAssetBalance - assetAmountToRescue);

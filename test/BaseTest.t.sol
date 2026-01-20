@@ -25,7 +25,7 @@ import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
-import {IRescuableAssetNative} from "src/interfaces/IRescuableAssetNative.sol";
+import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
@@ -826,7 +826,7 @@ contract BaseTest is Test {
         // ----- Set up Rescuer -----
         _setUpRole(accessManager, RESCUER_ROLE, everyRoleAccount, 0);
         bytes4[] memory rescueSelectorAsArray =
-            _toSelectorArray(IRescuableToken.rescueTokens.selector, IRescuableAssetNative.rescueNative.selector);
+            _toSelectorArray(IRescuableToken.rescueTokens.selector, IRescuableNative.rescueNative.selector);
         accessManager.setTargetFunctionRole(address(vault), rescueSelectorAsArray, RESCUER_ROLE);
         accessManager.setTargetFunctionRole(address(fundsHandler), rescueSelectorAsArray, RESCUER_ROLE);
         accessManager.setTargetFunctionRole(address(accountingChainGateway), rescueSelectorAsArray, RESCUER_ROLE);
@@ -922,7 +922,7 @@ contract BaseTest is Test {
         _setUpRole(accessManager, RESCUER_ROLE, everyRoleAccount, 0);
         accessManager.setTargetFunctionRole(
             address(earningChainGateway),
-            _toSelectorArray(IRescuableToken.rescueTokens.selector, IRescuableAssetNative.rescueNative.selector),
+            _toSelectorArray(IRescuableToken.rescueTokens.selector, IRescuableNative.rescueNative.selector),
             RESCUER_ROLE
         );
 

@@ -16,7 +16,7 @@ import {CcipAdapter} from "src/bridging/ccip/CcipAdapter.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
-import {IRescuableAssetNative} from "src/interfaces/IRescuableAssetNative.sol";
+import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {Errors} from "src/types/Errors.sol";
@@ -146,14 +146,14 @@ contract CcipAdapterTest is TestWithHelpers {
     {
         vm.assume(unauthorizedMsgSender != address(0));
         _mockAccessManager.mockRejectCall(
-            unauthorizedMsgSender, address(_accountingChainCcipAdapter), IRescuableAssetNative.rescueNative.selector
+            unauthorizedMsgSender, address(_accountingChainCcipAdapter), IRescuableNative.rescueNative.selector
         );
 
         vm.expectRevert(
             abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
         );
         vm.prank(unauthorizedMsgSender);
-        IRescuableAssetNative(address(_accountingChainCcipAdapter)).rescueNative(amount);
+        IRescuableNative(address(_accountingChainCcipAdapter)).rescueNative(amount);
     }
 
     function test_rescueNative_getsExpectedAmountOfNativeToMsgSender(uint256 adapterBalance, uint256 amountToRescue)
@@ -170,7 +170,7 @@ contract CcipAdapterTest is TestWithHelpers {
         vm.assume(address(msgSender).balance == 0);
 
         vm.prank(msgSender);
-        IRescuableAssetNative(address(_accountingChainCcipAdapter)).rescueNative(amountToRescue);
+        IRescuableNative(address(_accountingChainCcipAdapter)).rescueNative(amountToRescue);
 
         assertEq(address(msgSender).balance, amountToRescue);
         assertEq(address(_accountingChainCcipAdapter).balance, adapterBalance - amountToRescue);

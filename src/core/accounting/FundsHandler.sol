@@ -11,7 +11,7 @@ import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
-import {RescuableAssetNative} from "src/misc/RescuableAssetNative.sol";
+import {RescuableNative} from "src/misc/RescuableNative.sol";
 import {RescuableToken} from "src/misc/RescuableToken.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
 import {Errors} from "src/types/Errors.sol";
@@ -21,7 +21,7 @@ import {Errors} from "src/types/Errors.sol";
 /// @notice Handles push/pull of funds across the system.
 contract FundsHandler is
     AccessManagedUpgradeable,
-    RescuableAssetNative,
+    RescuableNative,
     RescuableToken,
     TransferHelperClient,
     IFundsHandler

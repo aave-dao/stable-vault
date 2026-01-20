@@ -8,7 +8,7 @@ import {
 
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
-import {RescuableAssetNative} from "src/misc/RescuableAssetNative.sol";
+import {RescuableNative} from "src/misc/RescuableNative.sol";
 import {RescuableToken} from "src/misc/RescuableToken.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
@@ -16,7 +16,7 @@ import {Errors} from "src/types/Errors.sol";
 /// @title BaseChainGateway
 /// @author Aave Labs
 /// @notice Abstract base contract for ChainGateway contracts.
-abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssetNative, RescuableToken, IChainGateway {
+abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative, RescuableToken, IChainGateway {
     address internal immutable IOU_TOKEN_MANAGER;
 
     /// @custom:storage-location erc7201:aave.storage.BaseChainGateway

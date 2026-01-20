@@ -17,7 +17,7 @@ import {IAcrossV3Receiver} from "src/bridging/across/IAcrossV3Receiver.sol";
 import {IAcrossBridgeAdapter} from "src/interfaces/IAcrossBridgeAdapter.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
-import {IRescuableAssetNative} from "src/interfaces/IRescuableAssetNative.sol";
+import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {Errors} from "src/types/Errors.sol";
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
 import {MockAccessManager} from "test/mocks/MockAccessManager.sol";
@@ -202,14 +202,14 @@ contract AcrossAdapterTest is TestWithHelpers {
     {
         vm.assume(unauthorizedMsgSender != address(0));
         _mockAccessManager.mockRejectCall(
-            unauthorizedMsgSender, address(_accountingChainAcrossAdapter), IRescuableAssetNative.rescueNative.selector
+            unauthorizedMsgSender, address(_accountingChainAcrossAdapter), IRescuableNative.rescueNative.selector
         );
 
         vm.expectRevert(
             abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
         );
         vm.prank(unauthorizedMsgSender);
-        IRescuableAssetNative(address(_accountingChainAcrossAdapter)).rescueNative(amount);
+        IRescuableNative(address(_accountingChainAcrossAdapter)).rescueNative(amount);
     }
 
     function test_rescueNative_getsExpectedAmountOfNativeToMsgSender(uint256 adapterBalance, uint256 amountToRescue)
@@ -226,7 +226,7 @@ contract AcrossAdapterTest is TestWithHelpers {
         vm.assume(address(msgSender).balance == 0);
 
         vm.prank(msgSender);
-        IRescuableAssetNative(address(_accountingChainAcrossAdapter)).rescueNative(amountToRescue);
+        IRescuableNative(address(_accountingChainAcrossAdapter)).rescueNative(amountToRescue);
 
         assertEq(address(msgSender).balance, amountToRescue);
         assertEq(address(_accountingChainAcrossAdapter).balance, adapterBalance - amountToRescue);
