@@ -1560,6 +1560,238 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         assertEq(iouTokenAmount, depositAmount.assetDecimalsToRay(address(ghoToken)));
     }
 
+    function test_transfer_reverts_ifRecipientIsZero(address user, uint256 depositAmount) public {
+        vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
+        _assumeNotProxyAdmin(user, address(bbv));
+        depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
+
+        _deposit(user, depositAmount);
+        uint256 amountRay = depositAmount.assetDecimalsToRay(address(mockAsset));
+
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        vm.prank(user);
+        bbv.transfer(address(0), amountRay);
+    }
+
+    function test_transfer_reverts_ifAmountBelowMinimum(address user, address recipient, uint256 depositAmount) public {
+        vm.assume(user != address(0));
+        vm.assume(recipient != address(0));
+        vm.assume(user != recipient);
+        vm.assume(user != address(mockFundsHandler));
+        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(recipient, address(bbv));
+        depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
+
+        _deposit(user, depositAmount);
+        uint256 amountRay = Constants.MIN_WITHDRAWABLE_AMOUNT_RAY - 1;
+
+        vm.expectRevert(Errors.InvalidAmount.selector);
+        vm.prank(user);
+        bbv.transfer(recipient, amountRay);
+    }
+
+    function test_transfer_reverts_ifUserDoesNotHaveAPosition(address user, address recipient) public {
+        vm.assume(user != address(0));
+        vm.assume(recipient != address(0));
+        vm.assume(user != recipient);
+        vm.assume(user != address(mockFundsHandler));
+        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(recipient, address(bbv));
+
+        vm.expectRevert(IBasedBoostedVault.NonExistentPosition.selector);
+        vm.prank(user);
+        bbv.transfer(recipient, Constants.MIN_WITHDRAWABLE_AMOUNT_RAY);
+    }
+
+    function test_transfer_reverts_ifAmountExceedsBalance(address user, address recipient, uint256 depositAmount)
+        public
+    {
+        vm.assume(user != address(0));
+        vm.assume(recipient != address(0));
+        vm.assume(user != recipient);
+        vm.assume(user != address(mockFundsHandler));
+        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(recipient, address(bbv));
+        depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
+
+        _deposit(user, depositAmount);
+        uint256 fullAmountRay = bbv.getUserBalance(user);
+        uint256 amountRay = fullAmountRay + Constants.MIN_WITHDRAWABLE_AMOUNT_RAY;
+
+        vm.expectRevert(Errors.InsufficientFunds.selector);
+        vm.prank(user);
+        bbv.transfer(recipient, amountRay);
+    }
+
+    function test_transfer_doesNotChangeGlobalOriginalDepositOrIous(
+        address user,
+        address recipient,
+        uint256 depositAmount
+    ) public {
+        vm.assume(user != address(0));
+        vm.assume(recipient != address(0));
+        vm.assume(user != recipient);
+        vm.assume(user != address(mockFundsHandler));
+        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(recipient, address(bbv));
+        depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
+
+        _deposit(user, depositAmount);
+        uint256 amountRay = bbv.getUserBalance(user) / 2;
+        vm.assume(amountRay >= Constants.MIN_WITHDRAWABLE_AMOUNT_RAY);
+
+        uint256 globalOriginalBefore = bbv.getGlobalOriginalDepositAmount();
+        uint256 iouSupplyBefore = mockIouToken.totalSupply();
+        uint256 iouSenderBefore = mockIouToken.balanceOf(user);
+        uint256 iouRecipientBefore = mockIouToken.balanceOf(recipient);
+
+        vm.prank(user);
+        bbv.transfer(recipient, amountRay);
+
+        assertEq(bbv.getGlobalOriginalDepositAmount(), globalOriginalBefore);
+        assertEq(mockIouToken.totalSupply(), iouSupplyBefore);
+        assertEq(mockIouToken.balanceOf(user), iouSenderBefore);
+        assertEq(mockIouToken.balanceOf(recipient), iouRecipientBefore);
+    }
+
+    function test_transfer_sameSubVault_transfersExpectedBalances(
+        address user,
+        address recipient,
+        uint256 depositAmount
+    ) public {
+        vm.assume(user != address(0));
+        vm.assume(recipient != address(0));
+        vm.assume(user != recipient);
+        vm.assume(user != address(mockFundsHandler));
+        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(recipient, address(bbv));
+        depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
+
+        _deposit(user, depositAmount);
+        uint256 amountRay = depositAmount.assetDecimalsToRay(address(mockAsset)) / 3;
+        vm.assume(amountRay >= Constants.MIN_WITHDRAWABLE_AMOUNT_RAY);
+
+        uint256 senderBalanceBefore = bbv.getUserBalance(user);
+        uint256 recipientBalanceBefore = bbv.getUserBalance(recipient);
+
+        vm.prank(user);
+        bbv.transfer(recipient, amountRay);
+
+        assertEq(bbv.getUserBalance(user), senderBalanceBefore - amountRay);
+        assertEq(bbv.getUserBalance(recipient), recipientBalanceBefore + amountRay);
+        assertEq(bbv.getUserSubVault(user).id, bbv.getDefaultSubVault().id);
+        assertEq(bbv.getUserSubVault(recipient).id, bbv.getDefaultSubVault().id);
+    }
+
+    function test_transfer_crossSubVault_transfersExpectedBalances(
+        address user,
+        address recipient,
+        uint256 depositAmount,
+        uint256 newPerSecondRate
+    ) public {
+        vm.assume(user != address(0));
+        vm.assume(recipient != address(0));
+        vm.assume(user != recipient);
+        vm.assume(user != address(mockFundsHandler));
+        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(recipient, address(bbv));
+        depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
+        newPerSecondRate = _boundRate(newPerSecondRate);
+        vm.assume(newPerSecondRate != bbv.getDefaultSubVault().perSecondRate);
+
+        _deposit(user, depositAmount);
+        _deposit(recipient, depositAmount);
+
+        _setUserRate(recipient, newPerSecondRate);
+        uint256 newSubVaultId = bbv.getSubVaultIdByRate(newPerSecondRate);
+
+        uint256 amountRay = bbv.getUserBalance(user) / 4;
+        vm.assume(amountRay >= Constants.MIN_WITHDRAWABLE_AMOUNT_RAY);
+
+        uint256 senderBalanceBefore = bbv.getUserBalance(user);
+        uint256 recipientBalanceBefore = bbv.getUserBalance(recipient);
+
+        vm.prank(user);
+        bbv.transfer(recipient, amountRay);
+
+        assertEq(bbv.getUserBalance(user), senderBalanceBefore - amountRay);
+        assertEq(bbv.getUserBalance(recipient), recipientBalanceBefore + amountRay);
+        assertEq(bbv.getUserSubVault(recipient).id, newSubVaultId);
+    }
+
+    function test_transfer_autoFullTransferWhenDustWouldRemain() public {
+        address user = makeAddr("user");
+        address recipient = makeAddr("recipient");
+        uint256 depositAmount = 1_000_000;
+        _deposit(user, depositAmount);
+
+        uint256 fullAmountRay = bbv.getUserBalance(user);
+        uint256 amountRay = fullAmountRay - (Constants.MIN_WITHDRAWABLE_AMOUNT_RAY - 1);
+
+        vm.expectEmit(true, true, true, true);
+        emit IBasedBoostedVault.Transfer(user, recipient, fullAmountRay);
+
+        vm.prank(user);
+        bbv.transfer(recipient, amountRay);
+
+        assertEq(bbv.getUserSubVault(user).id, 0);
+        assertEq(bbv.getUserBalance(user), 0);
+        assertEq(bbv.getUserBalance(recipient), fullAmountRay);
+    }
+
+    function test_transferAll_transfersFullBalanceAndKeepsOriginalDeposit(
+        address user,
+        address recipient,
+        uint256 depositAmount
+    ) public {
+        vm.assume(user != address(0));
+        vm.assume(recipient != address(0));
+        vm.assume(user != recipient);
+        vm.assume(user != address(mockFundsHandler));
+        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(recipient, address(bbv));
+        depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
+
+        _deposit(user, depositAmount);
+        uint256 fullAmountRay = bbv.getUserBalance(user);
+        uint256 globalOriginalBefore = bbv.getGlobalOriginalDepositAmount();
+        uint256 iouSupplyBefore = mockIouToken.totalSupply();
+
+        vm.prank(user);
+        bbv.transferAll(recipient);
+
+        assertEq(bbv.getGlobalOriginalDepositAmount(), globalOriginalBefore);
+        assertEq(mockIouToken.totalSupply(), iouSupplyBefore);
+        assertEq(bbv.getUserBalance(user), 0);
+        assertEq(bbv.getUserBalance(recipient), fullAmountRay);
+    }
+
+    function test_transfer_usesPrincipalFirstWhenRoundingDown() public {
+        address user = makeAddr("user");
+        address recipient = makeAddr("recipient");
+        uint256 newPerSecondRate = MathLib.RAY + 1;
+
+        vm.prank(manager);
+        bbv.setDefaultSubVault(newPerSecondRate);
+
+        _deposit(user, 2_000_000);
+        vm.warp(block.timestamp + 1);
+
+        uint256 amountRay = Constants.MIN_WITHDRAWABLE_AMOUNT_RAY;
+
+        vm.prank(user);
+        bbv.transfer(recipient, amountRay);
+
+        assertLt(bbv.getUserBalance(recipient), amountRay);
+
+        mockFundsHandler.mockAggregatedBalance(bbv.getGlobalOriginalDepositAmount());
+        vm.prank(recipient);
+        uint256 withdrawnRay = bbv.requestWithdrawal(recipient, 0);
+
+        assertGe(withdrawnRay, amountRay);
+    }
+
     function test_executeWithdrawal_reverts_ifMsgSenderIsNotTheUser(
         address user,
         address msgSender,

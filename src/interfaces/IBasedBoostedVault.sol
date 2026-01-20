@@ -33,6 +33,9 @@ interface IBasedBoostedVault {
 
     event Deposit(address indexed user, address indexed asset, uint256 amount);
 
+    /// @notice Emitted on BBV balance transfers (amount is denominated in RAY).
+    event Transfer(address indexed from, address indexed to, uint256 amountRay);
+
     event UserRateSet(address indexed user, uint256 indexed subVaultId, uint256 newPerSecondRate);
 
     event SubVaultRateSet(uint256 indexed subVaultId, uint256 newPerSecondRate);
@@ -131,6 +134,17 @@ interface IBasedBoostedVault {
     /// @param asset Address of the asset being deposited.
     /// @param amount Amount of assets being deposited.
     function deposit(address user, address asset, uint256 amount) external;
+
+    /// @notice Transfers BBV balance (denominated in RAY) to another user.
+    /// @param to Address of the recipient.
+    /// @param amountRay Amount of BBV balance to transfer, denominated in RAY.
+    /// @return success True if the transfer was successful.
+    function transfer(address to, uint256 amountRay) external returns (bool success);
+
+    /// @notice Transfers the sender's full BBV balance (denominated in RAY) to another user.
+    /// @param to Address of the recipient.
+    /// @return success True if the transfer was successful.
+    function transferAll(address to) external returns (bool success);
 
     /// @notice Requests a withdrawal of assets from the vault.
     /// @dev User shares are burned; the amount requested to withdraw stops accruing yield.
