@@ -629,4 +629,9 @@ contract BasedBoostedVault is
         // Equivalent to adding the `restricted` modifier.
         _checkCanCall(_msgSender(), _msgData());
     }
+
+    function _beforeRescueNative(uint256) internal virtual override {
+        // Equivalent to adding the `restricted` modifier.
+        _checkCanCall(_msgSender(), _msgData());
+    }
 }

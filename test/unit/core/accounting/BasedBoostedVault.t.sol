@@ -11,7 +11,8 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {BasedBoostedVault} from "src/core/accounting/BasedBoostedVault.sol";
 import {IBasedBoostedVault} from "src/interfaces/IBasedBoostedVault.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
-import {IRescuableAssets} from "src/interfaces/IRescuableAssets.sol";
+import {IRescuableAssetNative} from "src/interfaces/IRescuableAssetNative.sol";
+import {IRescuableAssetToken} from "src/interfaces/IRescuableAssetToken.sol";
 import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
@@ -1762,12 +1763,14 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(bbvAssetBalance >= assetAmountToRescue);
         mockAsset.mint(address(bbv), bbvAssetBalance);
 
-        mockAccessManager.mockRejectCall(unauthorizedMsgSender, address(bbv), IRescuableAssets.rescueTokens.selector);
+        mockAccessManager.mockRejectCall(
+            unauthorizedMsgSender, address(bbv), IRescuableAssetToken.rescueTokens.selector
+        );
         vm.expectRevert(
             abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
         );
         vm.prank(unauthorizedMsgSender);
-        IRescuableAssets(address(bbv)).rescueTokens(address(mockAsset), assetAmountToRescue);
+        IRescuableAssetToken(address(bbv)).rescueTokens(address(mockAsset), assetAmountToRescue);
     }
 
     function test_rescueTokens_getsExpectedAmountOfAssetsToMsgSender(
@@ -1786,10 +1789,54 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(mockAsset.balanceOf(msgSender) == 0);
 
         vm.prank(msgSender);
-        IRescuableAssets(address(bbv)).rescueTokens(address(mockAsset), assetAmountToRescue);
+        IRescuableAssetToken(address(bbv)).rescueTokens(address(mockAsset), assetAmountToRescue);
 
         assertEq(mockAsset.balanceOf(msgSender), assetAmountToRescue);
         assertEq(mockAsset.balanceOf(address(bbv)), bbvAssetBalance - assetAmountToRescue);
+    }
+
+    function test_rescueNative_reverts_ifMsgSenderIsNotAuthorized(
+        address unauthorizedMsgSender,
+        uint256 bbvAssetBalance,
+        uint256 assetAmountToRescue
+    ) public {
+        vm.assume(unauthorizedMsgSender != address(0));
+        _assumeNotProxyAdmin(unauthorizedMsgSender, address(bbv));
+        vm.assume(unauthorizedMsgSender != manager);
+        bbvAssetBalance = _boundNativeAmount(bbvAssetBalance);
+        assetAmountToRescue = _boundNativeAmount(assetAmountToRescue);
+        vm.assume(bbvAssetBalance >= assetAmountToRescue);
+        vm.deal(address(bbv), bbvAssetBalance);
+
+        mockAccessManager.mockRejectCall(
+            unauthorizedMsgSender, address(bbv), IRescuableAssetNative.rescueNative.selector
+        );
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
+        );
+        vm.prank(unauthorizedMsgSender);
+        IRescuableAssetNative(address(bbv)).rescueNative(assetAmountToRescue);
+    }
+
+    function test_rescueNative_getsExpectedAmountOfNativeToMsgSender(
+        uint256 bbvAssetBalance,
+        uint256 assetAmountToRescue
+    ) public {
+        // Avoid fuzzing the msgSender address to avoid .call on precompiles and zero address.
+        address msgSender = makeAddr("msgSender");
+
+        bbvAssetBalance = _boundNativeAmount(bbvAssetBalance);
+        assetAmountToRescue = _boundNativeAmount(assetAmountToRescue);
+        vm.assume(bbvAssetBalance >= assetAmountToRescue);
+
+        vm.deal(address(bbv), bbvAssetBalance);
+        vm.assume(address(msgSender).balance == 0);
+
+        vm.prank(msgSender);
+        IRescuableAssetNative(address(bbv)).rescueNative(assetAmountToRescue);
+
+        assertEq(address(msgSender).balance, assetAmountToRescue);
+        assertEq(address(bbv).balance, bbvAssetBalance - assetAmountToRescue);
     }
 
     ////////////////////////////// HELPERS ///////////////////////////////

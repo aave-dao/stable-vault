@@ -164,6 +164,11 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
         _checkCanCall(_msgSender(), _msgData());
     }
 
+    function _beforeRescueNative(uint256) internal virtual override {
+        // Equivalent to adding the `restricted` modifier.
+        _checkCanCall(_msgSender(), _msgData());
+    }
+
     function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal virtual;
 
     function _receiveData(uint256 sourceChainId, bytes memory data) internal virtual;
