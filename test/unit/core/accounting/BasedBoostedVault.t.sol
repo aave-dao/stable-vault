@@ -1571,7 +1571,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         vm.expectRevert(Errors.InvalidParameter.selector);
         vm.prank(user);
-        bbv.transfer(address(0), amountRay);
+        assertTrue(bbv.transfer(address(0), amountRay));
     }
 
     function test_transfer_reverts_ifAmountBelowMinimum(address user, address recipient, uint256 depositAmount) public {
@@ -1588,7 +1588,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         vm.expectRevert(Errors.InvalidAmount.selector);
         vm.prank(user);
-        bbv.transfer(recipient, amountRay);
+        assertTrue(bbv.transfer(recipient, amountRay));
     }
 
     function test_transfer_reverts_ifUserDoesNotHaveAPosition(address user, address recipient) public {
@@ -1601,7 +1601,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         vm.expectRevert(IBasedBoostedVault.NonExistentPosition.selector);
         vm.prank(user);
-        bbv.transfer(recipient, Constants.MIN_WITHDRAWABLE_AMOUNT_RAY);
+        assertTrue(bbv.transfer(recipient, Constants.MIN_WITHDRAWABLE_AMOUNT_RAY));
     }
 
     function test_transfer_reverts_ifAmountExceedsBalance(address user, address recipient, uint256 depositAmount)
@@ -1621,7 +1621,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         vm.expectRevert(Errors.InsufficientFunds.selector);
         vm.prank(user);
-        bbv.transfer(recipient, amountRay);
+        assertTrue(bbv.transfer(recipient, amountRay));
     }
 
     function test_transfer_doesNotChangeGlobalOriginalDepositOrIous(
@@ -1647,7 +1647,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 iouRecipientBefore = mockIouToken.balanceOf(recipient);
 
         vm.prank(user);
-        bbv.transfer(recipient, amountRay);
+        assertTrue(bbv.transfer(recipient, amountRay));
 
         assertEq(bbv.getGlobalOriginalDepositAmount(), globalOriginalBefore);
         assertEq(mockIouToken.totalSupply(), iouSupplyBefore);
@@ -1676,7 +1676,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 recipientBalanceBefore = bbv.getUserBalance(recipient);
 
         vm.prank(user);
-        bbv.transfer(recipient, amountRay);
+        assertTrue(bbv.transfer(recipient, amountRay));
 
         assertEq(bbv.getUserBalance(user), senderBalanceBefore - amountRay);
         assertEq(bbv.getUserBalance(recipient), recipientBalanceBefore + amountRay);
@@ -1713,7 +1713,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 recipientBalanceBefore = bbv.getUserBalance(recipient);
 
         vm.prank(user);
-        bbv.transfer(recipient, amountRay);
+        assertTrue(bbv.transfer(recipient, amountRay));
 
         assertEq(bbv.getUserBalance(user), senderBalanceBefore - amountRay);
         assertEq(bbv.getUserBalance(recipient), recipientBalanceBefore + amountRay);
@@ -1733,7 +1733,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         emit IBasedBoostedVault.Transfer(user, recipient, fullAmountRay);
 
         vm.prank(user);
-        bbv.transfer(recipient, amountRay);
+        assertTrue(bbv.transfer(recipient, amountRay));
 
         assertEq(bbv.getUserSubVault(user).id, 0);
         assertEq(bbv.getUserBalance(user), 0);
@@ -1759,7 +1759,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 iouSupplyBefore = mockIouToken.totalSupply();
 
         vm.prank(user);
-        bbv.transferAll(recipient);
+        assertTrue(bbv.transferAll(recipient));
 
         assertEq(bbv.getGlobalOriginalDepositAmount(), globalOriginalBefore);
         assertEq(mockIouToken.totalSupply(), iouSupplyBefore);
@@ -1781,7 +1781,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 amountRay = Constants.MIN_WITHDRAWABLE_AMOUNT_RAY;
 
         vm.prank(user);
-        bbv.transfer(recipient, amountRay);
+        assertTrue(bbv.transfer(recipient, amountRay));
 
         assertLt(bbv.getUserBalance(recipient), amountRay);
 
