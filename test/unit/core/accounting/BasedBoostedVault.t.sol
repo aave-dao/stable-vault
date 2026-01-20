@@ -12,7 +12,7 @@ import {BasedBoostedVault} from "src/core/accounting/BasedBoostedVault.sol";
 import {IBasedBoostedVault} from "src/interfaces/IBasedBoostedVault.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IRescuableAssetNative} from "src/interfaces/IRescuableAssetNative.sol";
-import {IRescuableAssetToken} from "src/interfaces/IRescuableAssetToken.sol";
+import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
@@ -1763,14 +1763,12 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(bbvAssetBalance >= assetAmountToRescue);
         mockAsset.mint(address(bbv), bbvAssetBalance);
 
-        mockAccessManager.mockRejectCall(
-            unauthorizedMsgSender, address(bbv), IRescuableAssetToken.rescueTokens.selector
-        );
+        mockAccessManager.mockRejectCall(unauthorizedMsgSender, address(bbv), IRescuableToken.rescueTokens.selector);
         vm.expectRevert(
             abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
         );
         vm.prank(unauthorizedMsgSender);
-        IRescuableAssetToken(address(bbv)).rescueTokens(address(mockAsset), assetAmountToRescue);
+        IRescuableToken(address(bbv)).rescueTokens(address(mockAsset), assetAmountToRescue);
     }
 
     function test_rescueTokens_getsExpectedAmountOfAssetsToMsgSender(
@@ -1789,7 +1787,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(mockAsset.balanceOf(msgSender) == 0);
 
         vm.prank(msgSender);
-        IRescuableAssetToken(address(bbv)).rescueTokens(address(mockAsset), assetAmountToRescue);
+        IRescuableToken(address(bbv)).rescueTokens(address(mockAsset), assetAmountToRescue);
 
         assertEq(mockAsset.balanceOf(msgSender), assetAmountToRescue);
         assertEq(mockAsset.balanceOf(address(bbv)), bbvAssetBalance - assetAmountToRescue);

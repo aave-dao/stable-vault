@@ -12,7 +12,7 @@ import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IRescuableAssetNative} from "src/interfaces/IRescuableAssetNative.sol";
-import {IRescuableAssetToken} from "src/interfaces/IRescuableAssetToken.sol";
+import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
@@ -523,13 +523,13 @@ contract FundsHandlerTest is TestWithHelpers {
         mockAsset.mint(address(fundsHandler), fhAssetBalance);
 
         mockAccessManager.mockRejectCall(
-            unauthorizedMsgSender, address(fundsHandler), IRescuableAssetToken.rescueTokens.selector
+            unauthorizedMsgSender, address(fundsHandler), IRescuableToken.rescueTokens.selector
         );
         vm.expectRevert(
             abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
         );
         vm.prank(unauthorizedMsgSender);
-        IRescuableAssetToken(address(fundsHandler)).rescueTokens(address(mockAsset), assetAmountToRescue);
+        IRescuableToken(address(fundsHandler)).rescueTokens(address(mockAsset), assetAmountToRescue);
     }
 
     function test_rescueTokens_getsExpectedAmountOfAssetsToMsgSender(
@@ -548,7 +548,7 @@ contract FundsHandlerTest is TestWithHelpers {
         vm.assume(mockAsset.balanceOf(msgSender) == 0);
 
         vm.prank(msgSender);
-        IRescuableAssetToken(address(fundsHandler)).rescueTokens(address(mockAsset), assetAmountToRescue);
+        IRescuableToken(address(fundsHandler)).rescueTokens(address(mockAsset), assetAmountToRescue);
 
         assertEq(mockAsset.balanceOf(msgSender), assetAmountToRescue);
         assertEq(mockAsset.balanceOf(address(fundsHandler)), fhAssetBalance - assetAmountToRescue);

@@ -5,16 +5,16 @@ pragma solidity ^0.8.22;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {IRescuableAssetToken} from "src/interfaces/IRescuableAssetToken.sol";
+import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {Errors} from "src/types/Errors.sol";
 
-/// @title RescuableAssetToken
+/// @title RescuableToken
 /// @author Aave Labs
 /// @notice Abstract base contract for contracts that can rescue tokens.
-abstract contract RescuableAssetToken is IRescuableAssetToken {
+abstract contract RescuableToken is IRescuableToken {
     using SafeERC20 for IERC20;
 
-    /// @inheritdoc IRescuableAssetToken
+    /// @inheritdoc IRescuableToken
     function rescueTokens(address asset, uint256 amount) public virtual override {
         _beforeRescueTokens(asset, amount);
         if (asset == address(0)) {

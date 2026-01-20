@@ -12,7 +12,7 @@ import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {RescuableAssetNative} from "src/misc/RescuableAssetNative.sol";
-import {RescuableAssetToken} from "src/misc/RescuableAssetToken.sol";
+import {RescuableToken} from "src/misc/RescuableToken.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
 import {Errors} from "src/types/Errors.sol";
 
@@ -22,7 +22,7 @@ import {Errors} from "src/types/Errors.sol";
 contract FundsHandler is
     AccessManagedUpgradeable,
     RescuableAssetNative,
-    RescuableAssetToken,
+    RescuableToken,
     TransferHelperClient,
     IFundsHandler
 {
