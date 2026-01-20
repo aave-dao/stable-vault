@@ -11,14 +11,21 @@ import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
-import {RescuableAssets} from "src/misc/RescuableAssets.sol";
+import {RescuableAssetNative} from "src/misc/RescuableAssetNative.sol";
+import {RescuableAssetToken} from "src/misc/RescuableAssetToken.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
 import {Errors} from "src/types/Errors.sol";
 
 /// @title FundsHandler
 /// @author Aave Labs
 /// @notice Handles push/pull of funds across the system.
-contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, TransferHelperClient, IFundsHandler {
+contract FundsHandler is
+    AccessManagedUpgradeable,
+    RescuableAssetNative,
+    RescuableAssetToken,
+    TransferHelperClient,
+    IFundsHandler
+{
     using AssetLib for uint256;
 
     /// @notice The representation of an Earnings Chain's balance snapshot.

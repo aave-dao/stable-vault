@@ -17,7 +17,8 @@ import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {Multicall} from "src/misc/Multicall.sol";
-import {RescuableAssets} from "src/misc/RescuableAssets.sol";
+import {RescuableAssetNative} from "src/misc/RescuableAssetNative.sol";
+import {RescuableAssetToken} from "src/misc/RescuableAssetToken.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
@@ -30,7 +31,8 @@ import {Errors} from "src/types/Errors.sol";
 /// deposit and on withdrawal execution.
 contract BasedBoostedVault is
     AccessManagedUpgradeable,
-    RescuableAssets,
+    RescuableAssetNative,
+    RescuableAssetToken,
     TransferHelperClient,
     Multicall,
     IBasedBoostedVault
