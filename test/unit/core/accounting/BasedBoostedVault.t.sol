@@ -1571,7 +1571,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         vm.expectRevert(Errors.InvalidParameter.selector);
         vm.prank(user);
-        assertTrue(bbv.transfer(address(0), amountRay));
+        assertFalse(bbv.transfer(address(0), amountRay));
     }
 
     function test_transfer_reverts_ifAmountBelowMinimum(address user, address recipient, uint256 depositAmount) public {
@@ -1588,7 +1588,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         vm.expectRevert(Errors.InvalidAmount.selector);
         vm.prank(user);
-        assertTrue(bbv.transfer(recipient, amountRay));
+        assertFalse(bbv.transfer(recipient, amountRay));
     }
 
     function test_transfer_reverts_ifUserDoesNotHaveAPosition(address user, address recipient) public {
@@ -1601,7 +1601,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         vm.expectRevert(IBasedBoostedVault.NonExistentPosition.selector);
         vm.prank(user);
-        assertTrue(bbv.transfer(recipient, Constants.MIN_WITHDRAWABLE_AMOUNT_RAY));
+        assertFalse(bbv.transfer(recipient, Constants.MIN_WITHDRAWABLE_AMOUNT_RAY));
     }
 
     function test_transfer_reverts_ifAmountExceedsBalance(address user, address recipient, uint256 depositAmount)
@@ -1621,7 +1621,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         vm.expectRevert(Errors.InsufficientFunds.selector);
         vm.prank(user);
-        assertTrue(bbv.transfer(recipient, amountRay));
+        assertFalse(bbv.transfer(recipient, amountRay));
     }
 
     function test_transfer_doesNotChangeGlobalOriginalDepositOrIous(
