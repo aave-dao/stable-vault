@@ -305,7 +305,7 @@ contract BaseTest is Test {
 
         // 3. Withdrawal Policy
         address withdrawalPolicy_accountingChain_impl =
-            address(new WithdrawalPolicy(assetRegistry_accountingChainAddress));
+            address(new WithdrawalPolicy(assetRegistry_accountingChainAddress, vault_accountingChainAddress));
         withdrawalPolicy_accountingChain = WithdrawalPolicy(
             address(
                 new TransparentUpgradeableProxy(
@@ -551,7 +551,8 @@ contract BaseTest is Test {
         );
 
         // 3. Withdrawal Policy
-        address withdrawalPolicy_earningChain_impl = address(new WithdrawalPolicy(assetRegistry_earningChainAddress));
+        address withdrawalPolicy_earningChain_impl =
+            address(new WithdrawalPolicy(assetRegistry_earningChainAddress, chainGateway_earningChainAddress));
         withdrawalPolicy_earningChain = WithdrawalPolicy(
             address(
                 new TransparentUpgradeableProxy(
