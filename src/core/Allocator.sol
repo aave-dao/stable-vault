@@ -308,6 +308,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
 
         // Pull the `assetOut` from the Swapper to the Allocator
         IERC20(swap.assetOut).safeTransferFrom(swap.swapper, address(this), amountOut);
+        emit AssetsSwapped(swap.assetIn, swap.assetOut, swap.amountIn, amountOut);
     }
 
     function _validateCanWithdraw(address asset) internal view {
