@@ -24,6 +24,7 @@ import {MockAssetRegistry} from "test/mocks/MockAssetRegistry.sol";
 import {IMockErc20} from "test/mocks/MockErc20.sol";
 import {MockErc4626Strategy} from "test/mocks/MockErc4626Strategy.sol";
 import {MockNonStandardErc20} from "test/mocks/MockNonStandardErc20.sol";
+import {MockPriceOracle} from "test/mocks/MockPriceOracle.sol";
 import {MockSwapper} from "test/mocks/MockSwapper.sol";
 import {MockTransferHelper} from "test/mocks/MockTransferHelper.sol";
 import {TestErc4626} from "test/mocks/TestErc4626.sol";
@@ -55,6 +56,7 @@ contract AllocatorTest is TestWithHelpers {
     TestErc4626 internal _defaultGhoStrategy;
     TestErc4626 internal _extraGhoStrategy;
     MockSwapper internal _mockSwapper;
+    MockPriceOracle internal _mockPriceOracle;
     MockTransferHelper internal _mockTransferHelper;
 
     Allocator internal _allocator;
@@ -62,11 +64,12 @@ contract AllocatorTest is TestWithHelpers {
     function _deployAllocator(
         MockAccessManager mockAccessManager,
         address assetRegistry,
+        address priceOracle,
         address transferHelper,
         uint8 maxStrategiesPerAsset
     ) internal returns (Allocator) {
         address allocatorImpl = address(
-            new Allocator(assetRegistry, depositor, withdrawer, transferHelper, maxStrategiesPerAsset)
+            new Allocator(assetRegistry, depositor, withdrawer, priceOracle, transferHelper, maxStrategiesPerAsset)
         );
         Allocator allocator = Allocator(
             address(
@@ -96,6 +99,7 @@ contract AllocatorTest is TestWithHelpers {
         _mockAccessManager = new MockAccessManager(admin);
 
         _mockSwapper = new MockSwapper();
+        _mockPriceOracle = new MockPriceOracle();
         _mockTransferHelper = new MockTransferHelper();
 
         // Set up Asset Registry
@@ -121,7 +125,11 @@ contract AllocatorTest is TestWithHelpers {
         );
 
         _allocator = _deployAllocator(
-            _mockAccessManager, address(_mockAssetRegistry), address(_mockTransferHelper), MAX_STRATEGIES_PER_ASSET
+            _mockAccessManager,
+            address(_mockAssetRegistry),
+            address(_mockPriceOracle),
+            address(_mockTransferHelper),
+            MAX_STRATEGIES_PER_ASSET
         );
 
         // Set up strategy vaults
@@ -1732,7 +1740,11 @@ contract AllocatorTest is TestWithHelpers {
         maxStrategiesPerAsset = uint8(bound(uint256(maxStrategiesPerAsset), 5, 20));
 
         _allocator = _deployAllocator(
-            _mockAccessManager, address(_mockAssetRegistry), address(_mockTransferHelper), maxStrategiesPerAsset
+            _mockAccessManager,
+            address(_mockAssetRegistry),
+            address(_mockPriceOracle),
+            address(_mockTransferHelper),
+            maxStrategiesPerAsset
         );
 
         address strategy;

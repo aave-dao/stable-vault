@@ -37,6 +37,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         address assetRegistry,
         address transferHelper,
         address withdrawalFeeCalculator,
+        address priceOracle,
         uint256 maxActiveSubVaults
     ) internal virtual override returns (BasedBoostedVault) {
         // Deploy a vault without restriction in the valid per-second rate
@@ -48,6 +49,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
                 fundsHandler,
                 transferHelper,
                 withdrawalFeeCalculator,
+                priceOracle,
                 maxActiveSubVaults
             )
         );

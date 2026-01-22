@@ -255,6 +255,7 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
                 fundsHandler: getFundsHandlerAddress(DEPLOYER),
                 transferHelper: getTransferHelperAddress(DEPLOYER),
                 withdrawalPolicy: getWithdrawalPolicyAddress(DEPLOYER),
+                priceOracle: address(0), // TODO: Deploy Price Oracle properly
                 maxActiveSubVaults: DEFAULT_MAX_ACTIVE_SUB_VAULTS
             })
         );
@@ -279,6 +280,7 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
                 assetRegistry: getAssetRegistryAddress(DEPLOYER),
                 depositor: ALLOCATOR_DEPOSITOR,
                 withdrawer: ALLOCATOR_WITHDRAWER,
+                priceOracle: address(0), // TODO: Deploy Price Oracle properly
                 transferHelper: getTransferHelperAddress(DEPLOYER),
                 maxStrategiesPerAsset: MAX_STRATEGIES_PER_ASSET
             })

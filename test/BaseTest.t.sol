@@ -155,6 +155,7 @@ contract BaseTest is Test {
         address assetRegistry,
         address transferHelper,
         address withdrawalFeeCalculator,
+        address priceOracle,
         uint256 maxActiveSubVaults
     ) internal virtual returns (BasedBoostedVault) {
         address vaultImpl = address(
@@ -165,6 +166,7 @@ contract BaseTest is Test {
                 fundsHandlerAddr,
                 transferHelper,
                 withdrawalFeeCalculator,
+                priceOracle,
                 maxActiveSubVaults
             )
         );
@@ -359,6 +361,7 @@ contract BaseTest is Test {
             assetRegistry_accountingChainAddress,
             transferHelper_accountingChainAddress,
             withdrawalPolicy_accountingChainAddress,
+            address(0), // TODO: Deploy Price Oracle properly
             DEFAULT_MAX_ACTIVE_SUB_VAULTS
         );
         console.log("\tVault: %s", vault_accountingChainAddress);
@@ -370,6 +373,7 @@ contract BaseTest is Test {
                 assetRegistry_accountingChainAddress,
                 fundsHandler_accountingChainAddress,
                 fundsHandler_accountingChainAddress,
+                address(0), // TODO: Deploy Price Oracle properly
                 transferHelper_accountingChainAddress,
                 MAX_STRATEGIES_PER_ASSET
             )
@@ -613,6 +617,7 @@ contract BaseTest is Test {
                 assetRegistry_earningChainAddress,
                 chainGateway_earningChainAddress,
                 chainGateway_earningChainAddress,
+                address(0), // TODO: Deploy Price Oracle properly
                 transferHelper_earningChainAddress,
                 MAX_STRATEGIES_PER_ASSET
             )

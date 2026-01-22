@@ -46,6 +46,10 @@ library Errors {
     /// @custom:selector 0x613970e0
     error InvalidParameter();
 
+    /// @notice Thrown when a price obtained from an oracle for an asset is invalid.
+    /// @custom:selector 0x00bfc921
+    error InvalidPrice();
+
     /// @notice Thrown when a recovered signer is not a whitelisted signer.
     /// @custom:selector 0x8baa579f
     error InvalidSignature();
@@ -73,6 +77,10 @@ library Errors {
     /// @notice Thrown when a signature timestamp has expired.
     /// @custom:selector 0x2eac42fc
     error SignatureTimestampExpired();
+
+    /// @notice Thrown when a price obtained from an oracle for an asset was updated before a threshold timestamp.
+    /// @custom:selector 0x19abf40e
+    error StalePrice();
 
     /// @notice Unsupported asset.
     /// @custom:selector 0xee84f40b

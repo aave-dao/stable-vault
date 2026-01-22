@@ -13,6 +13,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
+import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {ISwapper} from "src/interfaces/ISwapper.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
@@ -38,6 +39,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     address internal immutable DEPOSITOR;
     address internal immutable WITHDRAWER;
     address internal immutable ASSET_REGISTRY;
+    address internal immutable PRICE_ORACLE;
     uint8 internal immutable MAX_STRATEGIES_PER_ASSET;
 
     /// @notice The configuration for a strategy.
@@ -89,18 +91,21 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     /// @param assetRegistry The address of the AssetRegistry contract.
     /// @param depositor The address of the depositor to whitelist.
     /// @param withdrawer The address of the withdrawer to whitelist.
+    /// @param priceOracle The address of the price oracle contract.
     /// @param transferHelper The address of the contract that helps to minimize the number of transfers across flows.
     /// @param maxStrategiesPerAsset The maximum number of allowed yield strategies per asset.
     constructor(
         address assetRegistry,
         address depositor,
         address withdrawer,
+        address priceOracle,
         address transferHelper,
         uint8 maxStrategiesPerAsset
     ) TransferHelperClient(transferHelper) {
         _disableInitializers();
         DEPOSITOR = depositor;
         WITHDRAWER = withdrawer;
+        PRICE_ORACLE = priceOracle;
         ASSET_REGISTRY = assetRegistry;
         MAX_STRATEGIES_PER_ASSET = maxStrategiesPerAsset;
     }
@@ -313,6 +318,8 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
 
         // Pull the `assetOut` from the Swapper to the Allocator
         IERC20(swap.assetOut).safeTransferFrom(swap.swapper, address(this), amountOut);
+
+        IPriceOracle(PRICE_ORACLE).validatePrice(swap.assetOut);
         emit AssetsSwapped(swap.assetIn, swap.assetOut, swap.amountIn, amountOut);
     }
 
@@ -388,6 +395,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
 
     /// @dev Returns balances grouped by asset.
     function _getTrustedAssetBalances() internal view returns (IAllocator.AllocatorBalance[] memory) {
+        // TODO: adjust by oracle price? to protect against donation attack? This would impact the ECG snapshot
         address[] memory assets = IAssetRegistry(ASSET_REGISTRY).getTrustedAssets();
         IAllocator.AllocatorBalance[] memory allocatedAssets = new IAllocator.AllocatorBalance[](assets.length);
         for (uint256 i = 0; i < assets.length; i++) {

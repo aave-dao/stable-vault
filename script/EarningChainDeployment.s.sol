@@ -248,6 +248,7 @@ contract EarningChainDeployment is Create3Deployment, Create3AddressBook, AToken
                 assetRegistry: getAssetRegistryAddress(DEPLOYER),
                 depositor: ALLOCATOR_DEPOSITOR,
                 withdrawer: ALLOCATOR_WITHDRAWER,
+                priceOracle: address(0), // TODO: Deploy Price Oracle properly
                 transferHelper: getTransferHelperAddress(DEPLOYER),
                 maxStrategiesPerAsset: MAX_STRATEGIES_PER_ASSET
             })
