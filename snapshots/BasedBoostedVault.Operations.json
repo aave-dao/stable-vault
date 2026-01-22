@@ -1,10 +1,10 @@
 {
-  "[claimSurplusInterest] 2 assets - 201 sub-vaults": "515718",
+  "[claimSurplusInterest] 2 assets - 201 sub-vaults": "515762",
   "[deposit] base sub-vault - user's 1st deposit": "239421",
   "[deposit] base sub-vault - user's 2nd deposit": "100827",
   "[deposit] base sub-vault - user's 3rd deposit": "100827",
-  "[executeWithdrawal] full withdrawal": "125654",
-  "[executeWithdrawal] partial withdrawal": "125654",
+  "[executeWithdrawal] full withdrawal": "125676",
+  "[executeWithdrawal] partial withdrawal": "125676",
   "[requestWithdrawal] full withdrawal": "121828",
   "[requestWithdrawal] partial withdrawal": "120861",
   "[setUserRate] default sub-vault to all new different sub-vaults - 10 users": "1664648",

@@ -17,7 +17,8 @@ import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {Multicall} from "src/misc/Multicall.sol";
-import {RescuableAssets} from "src/misc/RescuableAssets.sol";
+import {RescuableNative} from "src/misc/RescuableNative.sol";
+import {RescuableToken} from "src/misc/RescuableToken.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
@@ -30,7 +31,8 @@ import {Errors} from "src/types/Errors.sol";
 /// deposit and on withdrawal execution.
 contract BasedBoostedVault is
     AccessManagedUpgradeable,
-    RescuableAssets,
+    RescuableNative,
+    RescuableToken,
     TransferHelperClient,
     Multicall,
     IBasedBoostedVault
@@ -619,13 +621,18 @@ contract BasedBoostedVault is
     }
 
     function _beforeRescueTokens(
-        address, // asset
+        address, // token
         uint256 // amount
     )
         internal
         virtual
         override
     {
+        // Equivalent to adding the `restricted` modifier.
+        _checkCanCall(_msgSender(), _msgData());
+    }
+
+    function _beforeRescueNative(uint256) internal virtual override {
         // Equivalent to adding the `restricted` modifier.
         _checkCanCall(_msgSender(), _msgData());
     }

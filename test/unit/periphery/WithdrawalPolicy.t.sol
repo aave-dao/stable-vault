@@ -327,7 +327,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         assertTrue(withdrawalPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Apply should consume nonce");
     }
 
-    function test_applyWithdrawalPolicy_reverts_ifPersonalFeeExceedsOtherFees(
+    function test_applyWithdrawalPolicy_usesLowerFeeWhenPersonalFeeExceedsOtherFees(
         address user,
         address assetOut,
         uint256 iouAmountRay,
@@ -338,12 +338,8 @@ contract WithdrawalPolicyTest is TestWithHelpers {
     ) public {
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
         assetFeeBps = bound(assetFeeBps, 0, FEE_CAP_BPS);
-        uint16 personalFeeBps16;
-        if (isAssetFeeSet) {
-            personalFeeBps16 = uint16(bound(personalFeeBps, 100_01, type(uint16).max));
-        } else {
-            personalFeeBps16 = uint16(bound(personalFeeBps, 100_01, type(uint16).max));
-        }
+        uint256 fallbackFeeBps = isAssetFeeSet ? assetFeeBps : baseFeeBps;
+        uint16 personalFeeBps16 = uint16(bound(personalFeeBps, fallbackFeeBps + 1, type(uint16).max));
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
 
         // Setup base fee
@@ -369,8 +365,19 @@ contract WithdrawalPolicyTest is TestWithHelpers {
             signerPk, user, assetOut, iouAmountRay, personalFeeBps16, DEFAULT_NONCE, DEFAULT_DEADLINE
         );
 
-        vm.expectRevert(Errors.InvalidParameter.selector);
-        withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
+        uint256 expectedFee = (iouAmountRay * fallbackFeeBps + Constants.MAX_BPS - 1) / Constants.MAX_BPS;
+        uint256 expectedAmountOut = iouAmountRay - expectedFee;
+
+        IWithdrawalPolicy.WithdrawalRequest memory request = _buildRequest(user, assetOut, iouAmountRay, data);
+
+        assertFalse(withdrawalPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Nonce should not be used before preview");
+        uint256 previewAmountOut = withdrawalPolicy.previewWithdrawalPolicy(request);
+        assertEq(previewAmountOut, expectedAmountOut, "Preview should apply lower fee");
+        assertFalse(withdrawalPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Preview should NOT consume nonce");
+
+        uint256 actualAmountOut = withdrawalPolicy.applyWithdrawalPolicy(request);
+        assertEq(actualAmountOut, expectedAmountOut, "Apply should apply lower fee");
+        assertTrue(withdrawalPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Apply should consume nonce");
     }
 
     function test_applyWithdrawalPolicy_reverts_ifSignerIsNotWhitelisted(
