@@ -16,6 +16,7 @@ import {CcipAdapter} from "src/bridging/ccip/CcipAdapter.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
+import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {Errors} from "src/types/Errors.sol";
@@ -138,6 +139,41 @@ contract CcipAdapterTest is TestWithHelpers {
         assertTrue(_accountingChainCcipAdapter.supportsInterface(type(IERC165).interfaceId));
         assertTrue(_earningChainCcipAdapter.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId));
         assertTrue(_earningChainCcipAdapter.supportsInterface(type(IERC165).interfaceId));
+    }
+
+    function test_rescueNative_reverts_ifMsgSenderIsNotAuthorized(address unauthorizedMsgSender, uint256 amount)
+        public
+    {
+        vm.assume(unauthorizedMsgSender != address(0));
+        _mockAccessManager.mockRejectCall(
+            unauthorizedMsgSender, address(_accountingChainCcipAdapter), IRescuableNative.rescueNative.selector
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
+        );
+        vm.prank(unauthorizedMsgSender);
+        IRescuableNative(address(_accountingChainCcipAdapter)).rescueNative(amount);
+    }
+
+    function test_rescueNative_getsExpectedAmountOfNativeToMsgSender(uint256 adapterBalance, uint256 amountToRescue)
+        public
+    {
+        // Avoid fuzzing the msgSender address to avoid .call on precompiles and zero address.
+        address msgSender = makeAddr("msgSender");
+
+        adapterBalance = _boundNativeAmount(adapterBalance);
+        amountToRescue = _boundNativeAmount(amountToRescue);
+        vm.assume(adapterBalance >= amountToRescue);
+
+        vm.deal(address(_accountingChainCcipAdapter), adapterBalance);
+        vm.assume(address(msgSender).balance == 0);
+
+        vm.prank(msgSender);
+        IRescuableNative(address(_accountingChainCcipAdapter)).rescueNative(amountToRescue);
+
+        assertEq(address(msgSender).balance, amountToRescue);
+        assertEq(address(_accountingChainCcipAdapter).balance, adapterBalance - amountToRescue);
     }
 
     function test_replayFundsReceiving_AccountingChain(uint256 amountUsdt, uint256 amountGho) public {

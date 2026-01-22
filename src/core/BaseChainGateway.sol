@@ -8,14 +8,15 @@ import {
 
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
-import {RescuableAssets} from "src/misc/RescuableAssets.sol";
+import {RescuableNative} from "src/misc/RescuableNative.sol";
+import {RescuableToken} from "src/misc/RescuableToken.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
 /// @title BaseChainGateway
 /// @author Aave Labs
 /// @notice Abstract base contract for ChainGateway contracts.
-abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets, IChainGateway {
+abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative, RescuableToken, IChainGateway {
     address internal immutable IOU_TOKEN_MANAGER;
 
     /// @custom:storage-location erc7201:aave.storage.BaseChainGateway
@@ -153,13 +154,18 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableAssets,
     }
 
     function _beforeRescueTokens(
-        address, // asset
+        address, // token
         uint256 // amount
     )
         internal
         virtual
         override
     {
+        // Equivalent to adding the `restricted` modifier.
+        _checkCanCall(_msgSender(), _msgData());
+    }
+
+    function _beforeRescueNative(uint256) internal virtual override {
         // Equivalent to adding the `restricted` modifier.
         _checkCanCall(_msgSender(), _msgData());
     }
