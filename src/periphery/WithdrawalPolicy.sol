@@ -201,11 +201,13 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     {
         address signer;
         uint256 nonce;
-        uint16 feeBps;
+        uint16 feeBps = _getAssetFeeBps(request.assetOut);
         if (request.data.length > 0) {
-            (signer, nonce, feeBps) = _verifySignedDiscount(request);
-        } else {
-            feeBps = _getAssetFeeBps(request.assetOut);
+            uint16 personalFeeBps;
+            (signer, nonce, personalFeeBps) = _verifySignedDiscount(request);
+            if (personalFeeBps < feeBps) {
+                feeBps = personalFeeBps;
+            }
         }
         uint256 feeAmountRay = (request.iouAmountRay * feeBps + Constants.MAX_BPS - 1) / Constants.MAX_BPS;
         return (request.iouAmountRay - feeAmountRay, signer, nonce);
@@ -227,7 +229,6 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     {
         SignedFeeDiscount memory discount = abi.decode(request.data, (SignedFeeDiscount));
 
-        require(discount.personalFeeBps <= _getAssetFeeBps(request.assetOut), Errors.InvalidParameter());
         require(discount.deadline >= block.timestamp, DeadlineExpired());
 
         signer = _recoverSigner(request, discount);
