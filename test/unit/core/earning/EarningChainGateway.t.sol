@@ -5,6 +5,9 @@ pragma solidity ^0.8.22;
 import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 
+import {
+    ReentrancyGuardTransientUpgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardTransientUpgradeable.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -29,6 +32,7 @@ import {MockBridgeAdapter} from "test/mocks/MockBridgeAdapter.sol";
 import {MockDummyIouTokenManager} from "test/mocks/MockDummyIouTokenManager.sol";
 import {IMockErc20} from "test/mocks/MockErc20.sol";
 import {MockNonStandardErc20} from "test/mocks/MockNonStandardErc20.sol";
+import {MockReentrantErc20} from "test/mocks/MockReentrantErc20.sol";
 import {MockTransferHelper} from "test/mocks/MockTransferHelper.sol";
 
 contract EarningChainGatewayTest is TestWithHelpers {
@@ -1786,6 +1790,87 @@ contract EarningChainGatewayTest is TestWithHelpers {
             )
         );
     }
+
+    function test_exchangeIouTokens_reentrancyNotAllowedOnExchangeIouTokens() public {
+        address attacker = makeAddr("attacker");
+
+        MockReentrantErc20 reentrantAsset = new MockReentrantErc20("Reentrant Token", "REENT", 18);
+
+        // Add bridge adapter for the reentrant asset
+        MockBridgeAdapter reentrantBridgeAdapter = new MockBridgeAdapter(address(_mockTransferHelper));
+        vm.prank(admin);
+        _earningChainGateway.addBridgeAdapter(
+            address(reentrantAsset), ACCOUNTING_CHAIN_ID, address(reentrantBridgeAdapter)
+        );
+        vm.prank(admin);
+        _earningChainGateway.setDefaultBridgeAdapter(
+            address(reentrantAsset), ACCOUNTING_CHAIN_ID, address(reentrantBridgeAdapter)
+        );
+
+        uint256 iouTokenAmountRay = 1000e27; // 1000 IOU tokens in RAY
+        uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(address(reentrantAsset));
+
+        // Mock the allocator balance to return the reentrant asset
+        IAllocator.AllocatorBalance[] memory allocatorBalances = new IAllocator.AllocatorBalance[](1);
+        allocatorBalances[0] = IAllocator.AllocatorBalance({asset: address(reentrantAsset), amount: amountOut});
+        vm.mockCall(
+            address(_mockAllocator),
+            abi.encodeWithSelector(MockAllocator.getTrustedAssetBalances.selector),
+            abi.encode(allocatorBalances)
+        );
+
+        // Mock the transfer helper to have the reentrant asset
+        _mockTransferHelper.mockAsset(address(reentrantAsset), amountOut);
+
+        // Mint reentrant tokens to the transfer helper (simulating allocator withdrawal)
+        reentrantAsset.mint(address(_mockTransferHelper), amountOut);
+
+        // Setup the reentrant callback: when transfer() is called, re-enter exchangeIouTokens
+        uint256 bridgeFeeAmount = 100;
+        vm.deal(attacker, bridgeFeeAmount * 2);
+        reentrantAsset.setReentrantCall(
+            address(_earningChainGateway),
+            abi.encodeCall(
+                IEarningChainGateway.exchangeIouTokens,
+                (
+                    iouTokenAmountRay,
+                    address(reentrantAsset),
+                    0,
+                    attacker,
+                    IBridgeAdapter.BridgeParams({
+                        feePayer: attacker,
+                        feeToken: address(0),
+                        feeAmount: bridgeFeeAmount,
+                        feeRefundThreshold: 0,
+                        gasLimit: 100000,
+                        data: abi.encode(keccak256(hex"c0ffee"))
+                    }),
+                    ""
+                )
+            )
+        );
+
+        // Execute exchangeIouTokens - should revert with ReentrancyGuardReentrantCall when trying to re-enter
+        vm.prank(attacker);
+        vm.expectRevert(ReentrancyGuardTransientUpgradeable.ReentrancyGuardReentrantCall.selector);
+        _earningChainGateway.exchangeIouTokens{value: bridgeFeeAmount}(
+            iouTokenAmountRay,
+            address(reentrantAsset),
+            0,
+            attacker,
+            IBridgeAdapter.BridgeParams({
+                feePayer: attacker,
+                feeToken: address(0),
+                feeAmount: bridgeFeeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: 100000,
+                data: abi.encode(keccak256(hex"c0ffee"))
+            }),
+            ""
+        );
+    }
+
+    ////////////////////////////// HELPERS ///////////////////////////////
 
     function _buildAllocatorBalances(uint256 amountUsdt, uint256 amountGho)
         internal

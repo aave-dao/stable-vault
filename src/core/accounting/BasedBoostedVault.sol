@@ -5,6 +5,9 @@ pragma solidity ^0.8.22;
 import {
     AccessManagedUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
+import {
+    ReentrancyGuardTransientUpgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardTransientUpgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -35,6 +38,7 @@ contract BasedBoostedVault is
     RescuableToken,
     TransferHelperClient,
     Multicall,
+    ReentrancyGuardTransientUpgradeable,
     IBasedBoostedVault
 {
     using MathLib for uint256;
@@ -162,6 +166,7 @@ contract BasedBoostedVault is
     function deposit(address user, address asset, uint256 amount)
         external
         override
+        nonReentrant
         assertingTransferHelperBalanceFor(asset)
     {
         require(IAssetRegistry(ASSET_REGISTRY).isUserDepositAllowed(asset), Errors.UnsupportedAsset(asset));
@@ -217,7 +222,12 @@ contract BasedBoostedVault is
     }
 
     /// @inheritdoc IBasedBoostedVault
-    function requestWithdrawal(address user, uint256 requestedAmountInRay) external override returns (uint256) {
+    function requestWithdrawal(address user, uint256 requestedAmountInRay)
+        external
+        override
+        nonReentrant
+        returns (uint256)
+    {
         require(user == msg.sender, OnlyUser());
 
         uint256 subVaultId = $storage().positions[user].subVaultId;
@@ -299,7 +309,7 @@ contract BasedBoostedVault is
         uint256 minAmountOut,
         uint256 iouAmountRay,
         bytes memory data
-    ) external override assertingTransferHelperBalanceFor(assetOut) {
+    ) external override nonReentrant assertingTransferHelperBalanceFor(assetOut) {
         require(user == msg.sender, OnlyUser());
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(user, iouAmountRay);
         uint256 amountOutRay = IWithdrawalPolicy(WITHDRAWAL_POLICY)
