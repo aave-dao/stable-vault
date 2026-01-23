@@ -112,6 +112,10 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
             bridgeParams.feeAmount,
             bridgeParams.feeRefundThreshold
         );
+        if (bridgeParams.feeToken != Constants.NATIVE_CURRENCY) {
+            // Reset allowance to avoid any remaining allowance on the fee token to the CCIP Router.
+            IERC20(bridgeParams.feeToken).forceApprove(CCIP_ROUTER, 0);
+        }
     }
 
     /// @inheritdoc IAny2EVMMessageReceiver
