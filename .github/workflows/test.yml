@@ -38,3 +38,10 @@ jobs:
         run: |
           forge test -vvv
         id: test
+
+      - name: Check Gas Snapshots are up to date
+        run: |
+          if ! git diff --exit-code snapshots/; then
+            echo "::error::Gas snapshots are out of date. Please run 'forge t' locally and commit the updated snapshot files."
+            exit 1
+          fi
