@@ -2,6 +2,9 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.22;
 
+import {
+    ReentrancyGuardTransientUpgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardTransientUpgradeable.sol";
 import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -29,6 +32,7 @@ import {IMockErc20} from "test/mocks/MockErc20.sol";
 import {MockFundsHandler} from "test/mocks/MockFundsHandler.sol";
 import {MockIouTokenManager} from "test/mocks/MockIouTokenManager.sol";
 import {MockNonStandardErc20} from "test/mocks/MockNonStandardErc20.sol";
+import {MockReentrantErc20} from "test/mocks/MockReentrantErc20.sol";
 import {MockTransferHelper} from "test/mocks/MockTransferHelper.sol";
 
 contract BasedBoostedVaultTest is TestWithHelpers {
@@ -1800,6 +1804,152 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         assertEq(mockAsset.balanceOf(msgSender), assetAmountToRescue);
         assertEq(mockAsset.balanceOf(address(bbv)), bbvAssetBalance - assetAmountToRescue);
+    }
+
+    function test_executeWithdrawal_reentrancyNotAllowedOnRequestWithdrawal() public {
+        address attacker = makeAddr("attacker");
+
+        MockReentrantErc20 reentrantAsset = new MockReentrantErc20("Reentrant Token", "REENT", 18);
+
+        // Attacker deposits the reentrant asset
+        uint256 depositAmount = 1000e18;
+        reentrantAsset.mint(attacker, depositAmount);
+
+        vm.startPrank(attacker);
+        reentrantAsset.approve(address(bbv), depositAmount);
+        bbv.deposit(attacker, address(reentrantAsset), depositAmount);
+        vm.stopPrank();
+
+        // Request withdrawal to get IOUs
+        uint256 depositAmountRay = depositAmount.assetDecimalsToRay(address(reentrantAsset));
+        mockFundsHandler.mockAggregatedBalance(depositAmountRay);
+
+        vm.prank(attacker);
+        bbv.requestWithdrawal(attacker, 0);
+
+        uint256 iouBalance = mockIouToken.balanceOf(attacker);
+        assertEq(iouBalance, depositAmountRay);
+
+        // Setup the reentrant callback: when transfer() is called, re-enter requestWithdrawal
+        // This simulates the attack where during executeWithdrawal:
+        // 1. IOUs are burned (liabilities reduced)
+        // 2. processWithdrawal is called
+        // 3. transfer() is called on the reentrant token -> attacker re-enters requestWithdrawal
+        // 4. At this point, liabilities are reduced but assets haven't left yet
+        reentrantAsset.setReentrantCall(
+            address(bbv), abi.encodeCall(IBasedBoostedVault.requestWithdrawal, (attacker, 0))
+        );
+
+        // Mock the asset balance in transfer helper for the withdrawal
+        mockTransferHelper.mockAssetBalance(address(reentrantAsset), depositAmount);
+
+        // Execute withdrawal - should revert with ReentrancyGuardReentrantCall when trying to re-enter
+        vm.prank(attacker);
+        vm.expectRevert(ReentrancyGuardTransientUpgradeable.ReentrancyGuardReentrantCall.selector);
+        bbv.executeWithdrawal(attacker, address(reentrantAsset), 0, iouBalance, "");
+    }
+
+    function test_executeWithdrawal_reentrancyNotAllowedOnDeposit() public {
+        address attacker = makeAddr("attacker");
+
+        MockReentrantErc20 reentrantAsset = new MockReentrantErc20("Reentrant Token", "REENT", 18);
+
+        // Attacker deposits the reentrant asset
+        uint256 depositAmount = 1000e18;
+        reentrantAsset.mint(attacker, depositAmount * 2); // Extra for potential reentrant deposit
+
+        vm.startPrank(attacker);
+        reentrantAsset.approve(address(bbv), type(uint256).max);
+        bbv.deposit(attacker, address(reentrantAsset), depositAmount);
+        vm.stopPrank();
+
+        // Request withdrawal to get IOUs
+        uint256 depositAmountRay = depositAmount.assetDecimalsToRay(address(reentrantAsset));
+        mockFundsHandler.mockAggregatedBalance(depositAmountRay);
+
+        vm.prank(attacker);
+        bbv.requestWithdrawal(attacker, 0);
+
+        uint256 iouBalance = mockIouToken.balanceOf(attacker);
+
+        // Setup the reentrant callback to deposit during transfer
+        reentrantAsset.setReentrantCall(
+            address(bbv), abi.encodeCall(IBasedBoostedVault.deposit, (attacker, address(reentrantAsset), depositAmount))
+        );
+
+        // Mock the asset balance in transfer helper for the withdrawal
+        mockTransferHelper.mockAssetBalance(address(reentrantAsset), depositAmount);
+
+        // Execute withdrawal - should revert with ReentrancyGuardReentrantCall
+        vm.prank(attacker);
+        vm.expectRevert(ReentrancyGuardTransientUpgradeable.ReentrancyGuardReentrantCall.selector);
+        bbv.executeWithdrawal(attacker, address(reentrantAsset), 0, iouBalance, "");
+    }
+
+    function test_executeWithdrawal_reentrancyNotAllowedOnExecuteWithdrawal() public {
+        address attacker = makeAddr("attacker");
+
+        MockReentrantErc20 reentrantAsset = new MockReentrantErc20("Reentrant Token", "REENT", 18);
+
+        // Attacker deposits the reentrant asset
+        uint256 depositAmount = 1000e18;
+        reentrantAsset.mint(attacker, depositAmount);
+
+        vm.startPrank(attacker);
+        reentrantAsset.approve(address(bbv), depositAmount);
+        bbv.deposit(attacker, address(reentrantAsset), depositAmount);
+        vm.stopPrank();
+
+        // Request withdrawal to get IOUs
+        uint256 depositAmountRay = depositAmount.assetDecimalsToRay(address(reentrantAsset));
+        mockFundsHandler.mockAggregatedBalance(depositAmountRay);
+
+        vm.prank(attacker);
+        bbv.requestWithdrawal(attacker, 0);
+
+        uint256 iouBalance = mockIouToken.balanceOf(attacker);
+        uint256 halfIou = iouBalance / 2;
+
+        // Mint extra IOUs for the reentrant call attempt
+        mockIouToken.mint(attacker, halfIou);
+
+        // Setup the reentrant callback to executeWithdrawal during transfer
+        reentrantAsset.setReentrantCall(
+            address(bbv),
+            abi.encodeCall(IBasedBoostedVault.executeWithdrawal, (attacker, address(reentrantAsset), 0, halfIou, ""))
+        );
+
+        // Mock the asset balance in transfer helper for the withdrawal
+        mockTransferHelper.mockAssetBalance(address(reentrantAsset), depositAmount);
+
+        // Execute withdrawal - should revert with ReentrancyGuardReentrantCall
+        vm.prank(attacker);
+        vm.expectRevert(ReentrancyGuardTransientUpgradeable.ReentrancyGuardReentrantCall.selector);
+        bbv.executeWithdrawal(attacker, address(reentrantAsset), 0, halfIou, "");
+    }
+
+    function test_deposit_reentrancyNotAllowedOnDeposit() public {
+        address attacker = makeAddr("attacker");
+
+        MockReentrantErc20 reentrantAsset = new MockReentrantErc20("Reentrant Token", "REENT", 18);
+
+        uint256 depositAmount = 1000e18;
+        reentrantAsset.mint(attacker, depositAmount * 2);
+
+        vm.startPrank(attacker);
+        reentrantAsset.approve(address(bbv), type(uint256).max);
+        vm.stopPrank();
+
+        // Setup the reentrant callback to deposit during transferFrom
+        reentrantAsset.setReentrantCall(
+            address(bbv), abi.encodeCall(IBasedBoostedVault.deposit, (attacker, address(reentrantAsset), depositAmount))
+        );
+        reentrantAsset.setReentrancyOnTransferFrom(true);
+
+        // Deposit - should revert with ReentrancyGuardReentrantCall when trying to re-enter
+        vm.prank(attacker);
+        vm.expectRevert(ReentrancyGuardTransientUpgradeable.ReentrancyGuardReentrantCall.selector);
+        bbv.deposit(attacker, address(reentrantAsset), depositAmount);
     }
 
     function test_rescueNative_reverts_ifMsgSenderIsNotAuthorized(
