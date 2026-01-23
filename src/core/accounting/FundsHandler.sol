@@ -11,14 +11,21 @@ import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
-import {RescuableAssets} from "src/misc/RescuableAssets.sol";
+import {RescuableNative} from "src/misc/RescuableNative.sol";
+import {RescuableToken} from "src/misc/RescuableToken.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
 import {Errors} from "src/types/Errors.sol";
 
 /// @title FundsHandler
 /// @author Aave Labs
 /// @notice Handles push/pull of funds across the system.
-contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, TransferHelperClient, IFundsHandler {
+contract FundsHandler is
+    AccessManagedUpgradeable,
+    RescuableNative,
+    RescuableToken,
+    TransferHelperClient,
+    IFundsHandler
+{
     using AssetLib for uint256;
 
     /// @notice The representation of an Earnings Chain's balance snapshot.
@@ -255,13 +262,18 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, TransferHelp
     }
 
     function _beforeRescueTokens(
-        address, // asset
+        address, // token
         uint256 // amount
     )
         internal
         virtual
         override
     {
+        // Equivalent to adding the `restricted` modifier.
+        _checkCanCall(_msgSender(), _msgData());
+    }
+
+    function _beforeRescueNative(uint256) internal virtual override {
         // Equivalent to adding the `restricted` modifier.
         _checkCanCall(_msgSender(), _msgData());
     }

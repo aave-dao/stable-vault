@@ -98,8 +98,11 @@ contract EarningChainGatewayTest is TestWithHelpers {
         return earningChainGateway;
     }
 
-    function _deployWithdrawalPolicy(address accessManager, address assetRegistry) internal returns (WithdrawalPolicy) {
-        address withdrawalPolicyImpl = address(new WithdrawalPolicy(assetRegistry));
+    function _deployWithdrawalPolicy(address accessManager, address assetRegistry, address withdrawalPolicyApplier)
+        internal
+        returns (WithdrawalPolicy)
+    {
+        address withdrawalPolicyImpl = address(new WithdrawalPolicy(assetRegistry, withdrawalPolicyApplier));
         return WithdrawalPolicy(
             address(
                 new TransparentUpgradeableProxy(
@@ -131,7 +134,12 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         _mockAccessManager = new MockAccessManager(admin);
 
-        _mockWithdrawalPolicy = _deployWithdrawalPolicy(address(_mockAccessManager), address(_mockAssetRegistry));
+        // Predict gateway proxy address after WithdrawalPolicy impl+proxy and gateway impl deployments.
+        uint256 deployerNonce = vm.getNonce(address(this));
+        address expectedGatewayProxy = vm.computeCreateAddress(address(this), deployerNonce + 3);
+
+        _mockWithdrawalPolicy =
+            _deployWithdrawalPolicy(address(_mockAccessManager), address(_mockAssetRegistry), expectedGatewayProxy);
 
         _earningChainGateway = _deployEarningChainGateway(
             _mockAccessManager,

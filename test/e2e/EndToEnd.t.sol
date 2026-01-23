@@ -183,7 +183,7 @@ contract EndToEndTest is BaseTest {
         }
 
         // 5. We wait for half a year
-        vm.warp(183 days);
+        vm.warp(block.timestamp + 183 days);
         console.log("\nHalf a year has gone by so fast...");
 
         // - check how much funds we owe to the user
@@ -209,7 +209,7 @@ contract EndToEndTest is BaseTest {
                 abi.encodeWithSelector(
                     IBasedBoostedVault.InsufficientAssets.selector,
                     user,
-                    512381781828396559943369876000,
+                    512381782621115714946287446500,
                     500000000000000000000000000000
                 )
             );

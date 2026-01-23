@@ -99,7 +99,7 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
         );
 
         // Mimic time passing so that user1's balances increase.
-        vm.warp(183 days);
+        vm.warp(block.timestamp + 183 days);
 
         IFundsHandler.AssetBalance[] memory assetBalances = fundsHandler.getAssetBalances();
         assertEq(assetBalances.length, 3);

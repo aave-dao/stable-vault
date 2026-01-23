@@ -14,7 +14,8 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {BasedBoostedVault} from "src/core/accounting/BasedBoostedVault.sol";
 import {IBasedBoostedVault} from "src/interfaces/IBasedBoostedVault.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
-import {IRescuableAssets} from "src/interfaces/IRescuableAssets.sol";
+import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
+import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
@@ -92,8 +93,11 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         );
     }
 
-    function _deployWithdrawalPolicy(address accessManager, address assetRegistry) internal returns (WithdrawalPolicy) {
-        address withdrawalPolicyImpl = address(new WithdrawalPolicy(assetRegistry));
+    function _deployWithdrawalPolicy(address accessManager, address assetRegistry, address withdrawalPolicyApplier)
+        internal
+        returns (WithdrawalPolicy)
+    {
+        address withdrawalPolicyImpl = address(new WithdrawalPolicy(assetRegistry, withdrawalPolicyApplier));
         return WithdrawalPolicy(
             address(
                 new TransparentUpgradeableProxy(
@@ -112,7 +116,13 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockAsset = _deployDefaultAsset();
         mockTransferHelper = new MockTransferHelper();
         mockFundsHandler = new MockFundsHandler(address(mockTransferHelper));
-        mockWithdrawalPolicy = _deployWithdrawalPolicy(address(mockAccessManager), address(mockAssetRegistry));
+
+        // Predict BBV proxy address after WithdrawalPolicy impl+proxy and BBV impl deployments.
+        uint256 deployerNonce = vm.getNonce(address(this));
+        address expectedBbvProxy = vm.computeCreateAddress(address(this), deployerNonce + 3);
+
+        mockWithdrawalPolicy =
+            _deployWithdrawalPolicy(address(mockAccessManager), address(mockAssetRegistry), expectedBbvProxy);
         bbv = _deployBasedBoostedVault(
             address(mockAccessManager),
             DEFAULT_MAX_PER_SECOND_RATE,
@@ -588,7 +598,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         bbv.setUserRate(userRateData);
 
         // Warp a long time to allow the conversion rate of the new sub-vault to grow.
-        vm.warp(115 * 365 days);
+        vm.warp(block.timestamp + 115 * 365 days);
 
         // User 2 deposits and has their position migrated to the new sub-vault
         mockAsset.mint(user2, amount);
@@ -1492,7 +1502,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockAsset.forceApprove(address(bbv), amount);
         vm.prank(user1);
         bbv.deposit(user1, address(mockAsset), amount);
-        vm.warp(timeBetweenDeposits);
+        vm.warp(block.timestamp + timeBetweenDeposits);
 
         // Deposit 2
         mockAsset.mint(user2, amount);
@@ -1766,12 +1776,12 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(bbvAssetBalance >= assetAmountToRescue);
         mockAsset.mint(address(bbv), bbvAssetBalance);
 
-        mockAccessManager.mockRejectCall(unauthorizedMsgSender, address(bbv), IRescuableAssets.rescueTokens.selector);
+        mockAccessManager.mockRejectCall(unauthorizedMsgSender, address(bbv), IRescuableToken.rescueTokens.selector);
         vm.expectRevert(
             abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
         );
         vm.prank(unauthorizedMsgSender);
-        IRescuableAssets(address(bbv)).rescueTokens(address(mockAsset), assetAmountToRescue);
+        IRescuableToken(address(bbv)).rescueTokens(address(mockAsset), assetAmountToRescue);
     }
 
     function test_rescueTokens_getsExpectedAmountOfAssetsToMsgSender(
@@ -1790,7 +1800,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(mockAsset.balanceOf(msgSender) == 0);
 
         vm.prank(msgSender);
-        IRescuableAssets(address(bbv)).rescueTokens(address(mockAsset), assetAmountToRescue);
+        IRescuableToken(address(bbv)).rescueTokens(address(mockAsset), assetAmountToRescue);
 
         assertEq(mockAsset.balanceOf(msgSender), assetAmountToRescue);
         assertEq(mockAsset.balanceOf(address(bbv)), bbvAssetBalance - assetAmountToRescue);
@@ -1940,6 +1950,48 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.prank(attacker);
         vm.expectRevert(ReentrancyGuardTransientUpgradeable.ReentrancyGuardReentrantCall.selector);
         bbv.deposit(attacker, address(reentrantAsset), depositAmount);
+    }
+
+    function test_rescueNative_reverts_ifMsgSenderIsNotAuthorized(
+        address unauthorizedMsgSender,
+        uint256 bbvAssetBalance,
+        uint256 assetAmountToRescue
+    ) public {
+        vm.assume(unauthorizedMsgSender != address(0));
+        _assumeNotProxyAdmin(unauthorizedMsgSender, address(bbv));
+        vm.assume(unauthorizedMsgSender != manager);
+        bbvAssetBalance = _boundNativeAmount(bbvAssetBalance);
+        assetAmountToRescue = _boundNativeAmount(assetAmountToRescue);
+        vm.assume(bbvAssetBalance >= assetAmountToRescue);
+        vm.deal(address(bbv), bbvAssetBalance);
+
+        mockAccessManager.mockRejectCall(unauthorizedMsgSender, address(bbv), IRescuableNative.rescueNative.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
+        );
+        vm.prank(unauthorizedMsgSender);
+        IRescuableNative(address(bbv)).rescueNative(assetAmountToRescue);
+    }
+
+    function test_rescueNative_getsExpectedAmountOfNativeToMsgSender(
+        uint256 bbvAssetBalance,
+        uint256 assetAmountToRescue
+    ) public {
+        // Avoid fuzzing the msgSender address to avoid .call on precompiles and zero address.
+        address msgSender = makeAddr("msgSender");
+
+        bbvAssetBalance = _boundNativeAmount(bbvAssetBalance);
+        assetAmountToRescue = _boundNativeAmount(assetAmountToRescue);
+        vm.assume(bbvAssetBalance >= assetAmountToRescue);
+
+        vm.deal(address(bbv), bbvAssetBalance);
+        vm.assume(address(msgSender).balance == 0);
+
+        vm.prank(msgSender);
+        IRescuableNative(address(bbv)).rescueNative(assetAmountToRescue);
+
+        assertEq(address(msgSender).balance, assetAmountToRescue);
+        assertEq(address(bbv).balance, bbvAssetBalance - assetAmountToRescue);
     }
 
     ////////////////////////////// HELPERS ///////////////////////////////
