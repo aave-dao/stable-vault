@@ -594,7 +594,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         bbv.setUserRate(userRateData);
 
         // Warp a long time to allow the conversion rate of the new sub-vault to grow.
-        vm.warp(115 * 365 days);
+        vm.warp(block.timestamp + 115 * 365 days);
 
         // User 2 deposits and has their position migrated to the new sub-vault
         mockAsset.mint(user2, amount);
@@ -1498,7 +1498,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockAsset.forceApprove(address(bbv), amount);
         vm.prank(user1);
         bbv.deposit(user1, address(mockAsset), amount);
-        vm.warp(timeBetweenDeposits);
+        vm.warp(block.timestamp + timeBetweenDeposits);
 
         // Deposit 2
         mockAsset.mint(user2, amount);

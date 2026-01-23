@@ -519,7 +519,7 @@ contract AcrossAdapterTest is TestWithHelpers {
     }
 
     function test_publishMessageToChainWithFeePayer_reverts_invalidFillDeadline() public {
-        vm.warp(365 days);
+        vm.warp(block.timestamp + 365 days);
         IBridgeAdapter.BridgeAsset[] memory assets = new IBridgeAdapter.BridgeAsset[](1);
         assets[0] = IBridgeAdapter.BridgeAsset({asset: address(_mockUsdtAccountingChain), amount: 1000000000});
 
