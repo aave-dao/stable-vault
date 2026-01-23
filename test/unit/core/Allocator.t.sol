@@ -1273,6 +1273,10 @@ contract AllocatorTest is TestWithHelpers {
         swaps[1] = _buildSwapParams(assetIn, amountAssetInSwapTwo, assetOut, address(_mockSwapper), "");
         rebalanceParams[0] =
             _buildRebalanceParams(_initializeDeallocationParams(0), swaps, _initializeAllocationParams(0));
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.AssetsSwapped(assetIn, assetOut, amountAssetInSwapOne, amountAssetOutOne);
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.AssetsSwapped(assetIn, assetOut, amountAssetInSwapTwo, amountAssetOutTwo);
         vm.prank(address(everyRoleAccount));
         _allocator.rebalance(rebalanceParams);
 

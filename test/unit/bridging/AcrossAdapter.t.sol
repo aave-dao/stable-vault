@@ -17,6 +17,7 @@ import {IAcrossV3Receiver} from "src/bridging/across/IAcrossV3Receiver.sol";
 import {IAcrossBridgeAdapter} from "src/interfaces/IAcrossBridgeAdapter.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
+import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {Errors} from "src/types/Errors.sol";
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
 import {MockAccessManager} from "test/mocks/MockAccessManager.sol";
@@ -194,6 +195,41 @@ contract AcrossAdapterTest is TestWithHelpers {
         assertEq(_accountingChainAcrossAdapter.supportsInterface(type(IERC165).interfaceId), true);
         assertEq(_earningChainAcrossAdapter.supportsInterface(type(IAcrossV3Receiver).interfaceId), true);
         assertEq(_earningChainAcrossAdapter.supportsInterface(type(IERC165).interfaceId), true);
+    }
+
+    function test_rescueNative_reverts_ifMsgSenderIsNotAuthorized(address unauthorizedMsgSender, uint256 amount)
+        public
+    {
+        vm.assume(unauthorizedMsgSender != address(0));
+        _mockAccessManager.mockRejectCall(
+            unauthorizedMsgSender, address(_accountingChainAcrossAdapter), IRescuableNative.rescueNative.selector
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
+        );
+        vm.prank(unauthorizedMsgSender);
+        IRescuableNative(address(_accountingChainAcrossAdapter)).rescueNative(amount);
+    }
+
+    function test_rescueNative_getsExpectedAmountOfNativeToMsgSender(uint256 adapterBalance, uint256 amountToRescue)
+        public
+    {
+        // Avoid fuzzing the msgSender address to avoid .call on precompiles and zero address.
+        address msgSender = makeAddr("msgSender");
+
+        adapterBalance = _boundNativeAmount(adapterBalance);
+        amountToRescue = _boundNativeAmount(amountToRescue);
+        vm.assume(adapterBalance >= amountToRescue);
+
+        vm.deal(address(_accountingChainAcrossAdapter), adapterBalance);
+        vm.assume(address(msgSender).balance == 0);
+
+        vm.prank(msgSender);
+        IRescuableNative(address(_accountingChainAcrossAdapter)).rescueNative(amountToRescue);
+
+        assertEq(address(msgSender).balance, amountToRescue);
+        assertEq(address(_accountingChainAcrossAdapter).balance, adapterBalance - amountToRescue);
     }
 
     function test_publishMessageToChainWithFeePayer_AccountingChainToEarningChain(
@@ -483,7 +519,7 @@ contract AcrossAdapterTest is TestWithHelpers {
     }
 
     function test_publishMessageToChainWithFeePayer_reverts_invalidFillDeadline() public {
-        vm.warp(365 days);
+        vm.warp(block.timestamp + 365 days);
         IBridgeAdapter.BridgeAsset[] memory assets = new IBridgeAdapter.BridgeAsset[](1);
         assets[0] = IBridgeAdapter.BridgeAsset({asset: address(_mockUsdtAccountingChain), amount: 1000000000});
 

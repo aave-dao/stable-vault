@@ -11,7 +11,8 @@ import {FundsHandler} from "src/core/accounting/FundsHandler.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
-import {IRescuableAssets} from "src/interfaces/IRescuableAssets.sol";
+import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
+import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
@@ -522,13 +523,13 @@ contract FundsHandlerTest is TestWithHelpers {
         mockAsset.mint(address(fundsHandler), fhAssetBalance);
 
         mockAccessManager.mockRejectCall(
-            unauthorizedMsgSender, address(fundsHandler), IRescuableAssets.rescueTokens.selector
+            unauthorizedMsgSender, address(fundsHandler), IRescuableToken.rescueTokens.selector
         );
         vm.expectRevert(
             abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
         );
         vm.prank(unauthorizedMsgSender);
-        IRescuableAssets(address(fundsHandler)).rescueTokens(address(mockAsset), assetAmountToRescue);
+        IRescuableToken(address(fundsHandler)).rescueTokens(address(mockAsset), assetAmountToRescue);
     }
 
     function test_rescueTokens_getsExpectedAmountOfAssetsToMsgSender(
@@ -547,13 +548,13 @@ contract FundsHandlerTest is TestWithHelpers {
         vm.assume(mockAsset.balanceOf(msgSender) == 0);
 
         vm.prank(msgSender);
-        IRescuableAssets(address(fundsHandler)).rescueTokens(address(mockAsset), assetAmountToRescue);
+        IRescuableToken(address(fundsHandler)).rescueTokens(address(mockAsset), assetAmountToRescue);
 
         assertEq(mockAsset.balanceOf(msgSender), assetAmountToRescue);
         assertEq(mockAsset.balanceOf(address(fundsHandler)), fhAssetBalance - assetAmountToRescue);
     }
 
-    function test_rescueTokens_getExpectedAmountOfNativeAssetToMsgSender(
+    function test_rescueNative_getExpectedAmountOfNativeAssetToMsgSender(
         uint256 fhAssetBalance,
         uint256 assetAmountToRescue
     ) public {
@@ -569,13 +570,13 @@ contract FundsHandlerTest is TestWithHelpers {
         vm.assume(address(msgSender).balance == 0);
 
         vm.prank(msgSender);
-        IRescuableAssets(address(fundsHandler)).rescueTokens(address(0), assetAmountToRescue);
+        IRescuableNative(address(fundsHandler)).rescueNative(assetAmountToRescue);
 
         assertEq(address(msgSender).balance, assetAmountToRescue);
         assertEq(address(fundsHandler).balance, fhAssetBalance - assetAmountToRescue);
     }
 
-    function test_rescueTokens_reverts_ifNativeTransferFails(uint256 fhAssetBalance, uint256 assetAmountToRescue)
+    function test_rescueNative_reverts_ifNativeTransferFails(uint256 fhAssetBalance, uint256 assetAmountToRescue)
         public
     {
         fhAssetBalance = _boundNativeAmount(fhAssetBalance);
@@ -590,7 +591,7 @@ contract FundsHandlerTest is TestWithHelpers {
 
         vm.prank(msgSender);
         vm.expectRevert(abi.encodeWithSelector(Errors.NativeTransferFailed.selector));
-        IRescuableAssets(address(fundsHandler)).rescueTokens(address(0), assetAmountToRescue);
+        IRescuableNative(address(fundsHandler)).rescueNative(assetAmountToRescue);
     }
 
     function test_pushFundsToChain_reverts_ifMsgSenderIsNotAuthorized(

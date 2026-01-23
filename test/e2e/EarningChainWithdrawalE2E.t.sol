@@ -114,7 +114,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         );
 
         // 3. Mimic time passing so that user1's balances increase.
-        vm.warp(183 days);
+        vm.warp(block.timestamp + 183 days);
         console.log("\nHalf a year has gone by so fast...");
 
         // Check the user's balance in the BBV on the Accounting Chain
