@@ -180,11 +180,6 @@ contract FundsHandler is
     }
 
     /// @inheritdoc IFundsHandler
-    function decrementChainBalanceSnapshotCallback(uint256 chainId, uint256 amountRay) external override onlyGateway {
-        _decrementChainBalanceSnapshot(chainId, amountRay);
-    }
-
-    /// @inheritdoc IFundsHandler
     function fundsArrivedFromChainCallback(address asset, uint256 amount) external override onlyGateway {
         _pushFundsToImmediateLiquidity(asset, amount);
     }
@@ -234,23 +229,6 @@ contract FundsHandler is
                 .push(ChainBalanceSnapshot({chainId: chainId, amountRay: amountToIncrementRay, nonce: 0}));
         }
         emit ChainBalanceSnapshotIncremented(chainId, amountToIncrementRay);
-    }
-
-    /// @dev This does not update the chain balance snapshot nonce because any potential incoming snapshot data would be
-    /// ignored.
-    function _decrementChainBalanceSnapshot(uint256 chainId, uint256 amountToDecrementRay) internal {
-        for (uint16 i = 0; i < $storage().chainBalances.length; i++) {
-            if ($storage().chainBalances[i].chainId == chainId) {
-                // It is possible for the existing snapshot to be stale and not reflect earnings on the Earning Chain.
-                // If the amount to decrement is greater than the existing snapshot, set the snapshot to 0.
-                if ($storage().chainBalances[i].amountRay >= amountToDecrementRay) {
-                    $storage().chainBalances[i].amountRay -= amountToDecrementRay;
-                } else {
-                    $storage().chainBalances[i].amountRay = 0;
-                }
-                emit ChainBalanceSnapshotDecremented(chainId, amountToDecrementRay);
-            }
-        }
     }
 
     function _pushFundsToImmediateLiquidity(address asset, uint256 amount) internal {

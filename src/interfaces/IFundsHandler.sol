@@ -83,9 +83,4 @@ interface IFundsHandler {
     /// @param asset Address of the asset that arrived from the chain.
     /// @param amount Amount of the asset that arrived from the chain.
     function fundsArrivedFromChainCallback(address asset, uint256 amount) external;
-
-    /// @notice Callback function to decrement a chain balance snapshot.
-    /// @param chainId Chain id of the chain that the balance snapshot was decremented on.
-    /// @param amountRay Amount to decrement the balance snapshot by in RAY.
-    function decrementChainBalanceSnapshotCallback(uint256 chainId, uint256 amountRay) external;
 }
