@@ -163,8 +163,6 @@ contract FundsHandler is
         // Pull funds from liquidity into the TransferHelper.
         _pullFundsFromImmediateLiquidity(asset, amount);
 
-        // Increment the chain balance snapshot for the target chain.
-        _updateChainBalanceBeforeBridging(chainId, amount.assetDecimalsToRay(asset));
         IAccountingChainGateway(GATEWAY).sendPushFundsToChainMessage(asset, amount, chainId, bridgeParams);
     }
 
@@ -210,25 +208,6 @@ contract FundsHandler is
                 );
         }
         emit ChainBalanceSnapshotReceived(chainId, snapshotBalanceRay, chainBalanceSnapshotNonce);
-    }
-
-    ////////////////////////////////////////////////// INTERNAL /////////////////////////////////////////////////////
-
-    /// @dev This does not update the chain balance snapshot nonce because any potential incoming snapshot data would be
-    /// ignored.
-    function _updateChainBalanceBeforeBridging(uint256 chainId, uint256 amountToIncrementRay) internal {
-        bool chainExists;
-        for (uint16 i = 0; i < $storage().chainBalances.length; i++) {
-            if ($storage().chainBalances[i].chainId == chainId) {
-                chainExists = true;
-                $storage().chainBalances[i].amountRay += amountToIncrementRay;
-            }
-        }
-        if (!chainExists) {
-            $storage().chainBalances
-                .push(ChainBalanceSnapshot({chainId: chainId, amountRay: amountToIncrementRay, nonce: 0}));
-        }
-        emit ChainBalanceSnapshotIncremented(chainId, amountToIncrementRay);
     }
 
     function _pushFundsToImmediateLiquidity(address asset, uint256 amount) internal {
