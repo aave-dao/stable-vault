@@ -995,6 +995,9 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         vm.expectEmit(true, true, true, true);
         emit IBasedBoostedVault.SubVaultRateSet(subVaultId, newPerSecondRate);
+        vm.expectEmit(true, true, true, true);
+        emit IBasedBoostedVault.DefaultSubVaultSet(subVaultId, newPerSecondRate);
+        vm.prank(manager);
         bbv.setSubVaultRate(subVaultId, newPerSecondRate);
     }
 
