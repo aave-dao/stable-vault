@@ -219,6 +219,9 @@ contract BasedBoostedVault is
         $storage().subVaultById[subVaultId].perSecondRate = newPerSecondRate;
         $storage().subVaultIdByRate[newPerSecondRate] = subVaultId;
         emit SubVaultRateSet(subVaultId, newPerSecondRate);
+        if ($storage().defaultSubVaultId == subVaultId) {
+            emit DefaultSubVaultSet(subVaultId, newPerSecondRate);
+        }
     }
 
     /// @inheritdoc IBasedBoostedVault
