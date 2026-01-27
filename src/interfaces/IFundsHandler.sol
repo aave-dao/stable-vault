@@ -23,12 +23,6 @@ interface IFundsHandler {
     /// @param deltaAmountRay Amount of the asset to increment the chain balance snapshot by in RAY.
     event ChainBalanceSnapshotIncremented(uint256 chainId, uint256 deltaAmountRay);
 
-    /// @notice Emitted when the chain balance snapshot is decremented when ingesting funds through a bridge adapter
-    /// that is not used to communicate the total balance snapshot.
-    /// @param chainId Chain id of the chain that the funds arrived from.
-    /// @param deltaAmountRay Amount of the asset to decrement the chain balance snapshot by in RAY.
-    event ChainBalanceSnapshotDecremented(uint256 chainId, uint256 deltaAmountRay);
-
     /// @notice The representation of an asset balance.
     /// @param asset Address of the asset.
     /// @param amountRay Amount of the asset in RAY.
