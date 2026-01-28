@@ -25,4 +25,11 @@ library Constants {
     /// which is enforced in AssetRegistry.
     /// @dev 10^(RAY_DECIMALS - MAX_SUPPORTED_ASSET_DECIMALS) = 10^(27-18) = 1e9.
     uint256 internal constant MIN_WITHDRAWABLE_AMOUNT_RAY = 1e9;
+
+    /// @dev The length of an ABI-encoded EVM address in bytes.
+    uint256 internal constant ABI_ENCODED_EVM_ADDRESS_BYTE_LENGTH = 32;
+
+    /// @dev The mask for the ABI-encoded EVM address.
+    bytes32 internal constant ABI_ENCODED_EVM_ADDRESS_MASK =
+        0x000000000000000000000000ffffffffffffffffffffffffffffffffffffffff;
 }

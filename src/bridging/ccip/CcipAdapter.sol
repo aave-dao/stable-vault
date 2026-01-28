@@ -24,6 +24,10 @@ import {Errors} from "src/types/Errors.sol";
 contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
     using SafeERC20 for IERC20;
 
+    /// @notice Encoded data length does not match the expected value.
+    /// @custom:selector 0x9546c78e
+    error UnexpectedDataLength();
+
     address internal immutable CCIP_ROUTER;
 
     mapping(uint256 chainId => uint64 ccipChainSelector) internal _chainSelectorOf;
@@ -199,14 +203,20 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
         }
     }
 
-    function _validateMessageSource(Client.Any2EVMMessage memory message) internal view {
+    function _validateMessageSource(Client.Any2EVMMessage calldata message) internal view {
         uint256 chainIdFromMessageChainSelector = _chainIdOf[message.sourceChainSelector];
         address destinationChainAdapter = _destinationChainAdapterOf[chainIdFromMessageChainSelector];
         require(destinationChainAdapter != address(0), Errors.InvalidParameter());
         require(
-            chainIdFromMessageChainSelector == _chainSelectorOf[chainIdFromMessageChainSelector],
-            Errors.InvalidParameter()
+            message.sourceChainSelector == _chainSelectorOf[chainIdFromMessageChainSelector], Errors.InvalidParameter()
         );
-        require(abi.decode(message.sender, (address)) == destinationChainAdapter, OnlyDestinationChainAdapter());
+        require(_safeAbiDecodeEvmSender(message.sender) == destinationChainAdapter, OnlyDestinationChainAdapter());
+    }
+
+    function _safeAbiDecodeEvmSender(bytes calldata abiEncodedEvmSender) internal pure returns (address) {
+        require(abiEncodedEvmSender.length == Constants.ABI_ENCODED_EVM_ADDRESS_BYTE_LENGTH, UnexpectedDataLength());
+        bytes32 value = bytes32(abiEncodedEvmSender[0:Constants.ABI_ENCODED_EVM_ADDRESS_BYTE_LENGTH]);
+        require((value & Constants.ABI_ENCODED_EVM_ADDRESS_MASK) == value, Errors.InvalidParameter());
+        return abi.decode(abiEncodedEvmSender, (address));
     }
 }
