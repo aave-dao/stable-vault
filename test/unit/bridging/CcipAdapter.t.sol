@@ -305,7 +305,7 @@ contract CcipAdapterTest is TestWithHelpers {
             tokenAmounts: ccipTokenAmounts,
             feeToken: feeToken,
             extraArgs: Client._argsToBytes(
-                Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: false})
+                Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: true})
             )
         });
 
@@ -389,7 +389,7 @@ contract CcipAdapterTest is TestWithHelpers {
             tokenAmounts: ccipTokenAmounts,
             feeToken: feeToken,
             extraArgs: Client._argsToBytes(
-                Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: false})
+                Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: true})
             )
         });
 
@@ -479,7 +479,7 @@ contract CcipAdapterTest is TestWithHelpers {
             tokenAmounts: ccipTokenAmounts,
             feeToken: feeToken,
             extraArgs: Client._argsToBytes(
-                Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: false})
+                Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: true})
             )
         });
 
@@ -572,7 +572,7 @@ contract CcipAdapterTest is TestWithHelpers {
             tokenAmounts: ccipTokenAmounts,
             feeToken: feeToken,
             extraArgs: Client._argsToBytes(
-                Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: false})
+                Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: true})
             )
         });
 
@@ -658,7 +658,7 @@ contract CcipAdapterTest is TestWithHelpers {
             tokenAmounts: ccipTokenAmounts,
             feeToken: feeToken,
             extraArgs: Client._argsToBytes(
-                Client.GenericExtraArgsV2({gasLimit: DEFAULT_GAS_LIMIT, allowOutOfOrderExecution: false})
+                Client.GenericExtraArgsV2({gasLimit: DEFAULT_GAS_LIMIT, allowOutOfOrderExecution: true})
             )
         });
 
@@ -761,7 +761,7 @@ contract CcipAdapterTest is TestWithHelpers {
             tokenAmounts: ccipTokenAmounts,
             feeToken: feeToken,
             extraArgs: Client._argsToBytes(
-                Client.GenericExtraArgsV2({gasLimit: DEFAULT_GAS_LIMIT, allowOutOfOrderExecution: false})
+                Client.GenericExtraArgsV2({gasLimit: DEFAULT_GAS_LIMIT, allowOutOfOrderExecution: true})
             )
         });
 
@@ -1074,6 +1074,42 @@ contract CcipAdapterTest is TestWithHelpers {
         );
     }
 
+    function test_ccipReceive_reverts_ifSenderDataLengthIsNotEvmAddressLength(bytes memory appendedData) public {
+        vm.assume(appendedData.length > 0);
+
+        bytes memory encodedSenderWithExtraBytes = abi.encodePacked(abi.encode(_earningChainCcipAdapter), appendedData);
+
+        vm.expectRevert(CcipAdapter.UnexpectedDataLength.selector);
+        vm.prank(address(_mockCCIPRouter));
+        _accountingChainCcipAdapter.ccipReceive(
+            Client.Any2EVMMessage({
+                messageId: 0,
+                sourceChainSelector: EARNING_CHAIN_CCIP_SELECTOR,
+                sender: encodedSenderWithExtraBytes,
+                data: abi.encode(keccak256(hex"c0ffee")),
+                destTokenAmounts: new Client.EVMTokenAmount[](0)
+            })
+        );
+    }
+
+    function test_ccipReceive_reverts_ifSenderDataIsDirty() public {
+        // This is equivalent to abi.encode(_earningChainCcipAdapter) and then making some bits a bit dirty.
+        bytes memory encodedSenderWithExtraBytes =
+            abi.encodePacked(hex"101000000000000000000000", _earningChainCcipAdapter);
+
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        vm.prank(address(_mockCCIPRouter));
+        _accountingChainCcipAdapter.ccipReceive(
+            Client.Any2EVMMessage({
+                messageId: 0,
+                sourceChainSelector: EARNING_CHAIN_CCIP_SELECTOR,
+                sender: encodedSenderWithExtraBytes,
+                data: abi.encode(keccak256(hex"c0ffee")),
+                destTokenAmounts: new Client.EVMTokenAmount[](0)
+            })
+        );
+    }
+
     function test_processReceivedFunds_reverts_ifOnlySelf(address caller) public {
         vm.assume(caller != address(_accountingChainCcipAdapter));
         vm.prank(caller);
@@ -1122,7 +1158,7 @@ contract CcipAdapterTest is TestWithHelpers {
             tokenAmounts: ccipTokenAmounts,
             feeToken: feeToken,
             extraArgs: Client._argsToBytes(
-                Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: false})
+                Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: true})
             )
         });
 
@@ -1185,7 +1221,7 @@ contract CcipAdapterTest is TestWithHelpers {
             tokenAmounts: ccipTokenAmounts,
             feeToken: feeToken,
             extraArgs: Client._argsToBytes(
-                Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: false})
+                Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: true})
             )
         });
 
@@ -1249,7 +1285,7 @@ contract CcipAdapterTest is TestWithHelpers {
             tokenAmounts: ccipTokenAmounts,
             feeToken: address(_mockUsdt),
             extraArgs: Client._argsToBytes(
-                Client.GenericExtraArgsV2({gasLimit: DEFAULT_GAS_LIMIT, allowOutOfOrderExecution: false})
+                Client.GenericExtraArgsV2({gasLimit: DEFAULT_GAS_LIMIT, allowOutOfOrderExecution: true})
             )
         });
 
@@ -1323,7 +1359,7 @@ contract CcipAdapterTest is TestWithHelpers {
             tokenAmounts: ccipTokenAmounts,
             feeToken: address(_mockUsdt),
             extraArgs: Client._argsToBytes(
-                Client.GenericExtraArgsV2({gasLimit: DEFAULT_GAS_LIMIT, allowOutOfOrderExecution: false})
+                Client.GenericExtraArgsV2({gasLimit: DEFAULT_GAS_LIMIT, allowOutOfOrderExecution: true})
             )
         });
 
@@ -1396,7 +1432,7 @@ contract CcipAdapterTest is TestWithHelpers {
             tokenAmounts: ccipTokenAmounts,
             feeToken: address(0),
             extraArgs: Client._argsToBytes(
-                Client.GenericExtraArgsV2({gasLimit: DEFAULT_GAS_LIMIT, allowOutOfOrderExecution: false})
+                Client.GenericExtraArgsV2({gasLimit: DEFAULT_GAS_LIMIT, allowOutOfOrderExecution: true})
             )
         });
 
