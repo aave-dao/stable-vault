@@ -8,6 +8,10 @@ import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 /// @author Aave Labs
 /// @notice Interface for the CcipBridgeAdapter contract.
 interface ICcipBridgeAdapter is IBridgeAdapter {
+    /// @notice Encoded data length does not match the expected value.
+    /// @custom:selector 0x9546c78e
+    error UnexpectedDataLength();
+
     /// @notice Getter for the address of the Chainlink CCIP router.
     /// @return router Address of the Chainlink CCIP router.
     function getRouter() external view returns (address);
