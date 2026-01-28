@@ -102,10 +102,35 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
         vm.warp(block.timestamp + 183 days);
 
         IFundsHandler.AssetBalance[] memory assetBalances = fundsHandler.getAssetBalances();
-        assertEq(assetBalances.length, 3);
+        // The balances will not reflect the snapshot until a snapshot is sent back to the Accounting Chain
+        assertEq(assetBalances.length, 2);
         bool snapshotBalanceFound = false;
         for (uint256 i = 0; i < assetBalances.length; i++) {
             // Look for address(0) since the snapshot is an aggregate of all assets on the Earning Chain
+            if (assetBalances[i].asset == address(0) && assetBalances[i].chainId == EARNING_CHAIN_ID) {
+                snapshotBalanceFound = true;
+                assertEq(assetBalances[i].amountRay, userInitialDeposit.assetDecimalsToRay(address(USDC)));
+                break;
+            }
+        }
+        assertTrue(!snapshotBalanceFound, "Snapshot balance from Earning Chain should NOT be found");
+
+        // Send snapshot back to the Accounting Chain: this should send a snapshot of 0
+        vm.prank(everyRoleAccount);
+        earningChainGateway.sendBalanceUpdateWithFeePayer{value: bridgeFeeAmount}(
+            IBridgeAdapter.BridgeParams({
+                feePayer: everyRoleAccount,
+                feeToken: address(0),
+                feeAmount: bridgeFeeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: 300000,
+                data: ""
+            })
+        );
+        assetBalances = fundsHandler.getAssetBalances();
+        assertEq(assetBalances.length, 3);
+        snapshotBalanceFound = false;
+        for (uint256 i = 0; i < assetBalances.length; i++) {
             if (assetBalances[i].asset == address(0) && assetBalances[i].chainId == EARNING_CHAIN_ID) {
                 snapshotBalanceFound = true;
                 assertEq(assetBalances[i].amountRay, userInitialDeposit.assetDecimalsToRay(address(USDC)));

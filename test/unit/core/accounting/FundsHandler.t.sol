@@ -789,8 +789,6 @@ contract FundsHandlerTest is TestWithHelpers {
 
         mockGateway.mockToConsumeAssetFromTransferHelperInNextCall(address(mockAsset), bridgeParams_feeAmount + amount);
 
-        vm.expectEmit(true, true, true, true);
-        emit IFundsHandler.ChainBalanceSnapshotIncremented(chainId, amount.assetDecimalsToRay(address(mockAsset)));
         vm.expectCall(
             address(mockGateway),
             abi.encodeCall(
@@ -799,90 +797,9 @@ contract FundsHandlerTest is TestWithHelpers {
             )
         );
         fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, bridgeParams);
-    }
 
-    function test_pushFundsToChain_createsBalanceSnapshotIfChainWasNotPreviouslyUsed(
-        uint256 amount,
-        uint256 chainId,
-        uint256 bridgeParams_feeAmount,
-        uint256 bridgeParams_gasLimit
-    ) public {
-        vm.assume(chainId != block.chainid);
-        amount = _boundAssetAmount(address(mockAsset), amount);
-        bridgeParams_feeAmount = _boundAssetAmount(address(mockAsset), bridgeParams_feeAmount);
-        mockAsset.mint(address(this), bridgeParams_feeAmount);
-        mockAsset.forceApprove(address(fundsHandler), bridgeParams_feeAmount);
-
+        // Check that the snapshot is still empty
         assertEq(fundsHandler.getAssetBalances().length, 0);
-
-        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
-            feePayer: address(this),
-            feeToken: address(mockAsset),
-            feeAmount: bridgeParams_feeAmount,
-            feeRefundThreshold: 0,
-            gasLimit: bridgeParams_gasLimit,
-            data: ""
-        });
-
-        mockAsset.mint(address(mockAllocator), amount);
-        mockAllocator.mockToPushToTransferHelperInNextCall(address(mockAsset), amount);
-
-        mockGateway.mockToConsumeAssetFromTransferHelperInNextCall(address(mockAsset), bridgeParams_feeAmount + amount);
-
-        fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, bridgeParams);
-
-        assertEq(fundsHandler.getAssetBalances().length, 1);
-        assertEq(fundsHandler.getAssetBalances()[0].asset, address(0));
-        assertEq(fundsHandler.getAssetBalances()[0].amountRay, amount.assetDecimalsToRay(address(mockAsset)));
-        assertEq(fundsHandler.getAssetBalances()[0].chainId, chainId);
-    }
-
-    function test_pushFundsToChain_createsBalanceSnapshotIncrementingExistingChainBalance(
-        uint256 amount,
-        uint256 chainId,
-        uint256 currentChainBalanceRay,
-        uint256 nonce,
-        uint256 bridgeParams_feeAmount,
-        uint256 bridgeParams_gasLimit
-    ) public {
-        vm.assume(chainId != block.chainid);
-        currentChainBalanceRay = _boundRayAmountAllowingZero(currentChainBalanceRay);
-        amount = _boundAssetAmount(address(mockAsset), amount);
-        bridgeParams_feeAmount = _boundAssetAmount(address(mockAsset), bridgeParams_feeAmount);
-        mockAsset.mint(address(this), bridgeParams_feeAmount);
-        mockAsset.forceApprove(address(fundsHandler), bridgeParams_feeAmount);
-
-        vm.prank(address(mockGateway));
-        fundsHandler.updateChainBalanceCallback(chainId, currentChainBalanceRay, nonce);
-
-        assertEq(fundsHandler.getAssetBalances().length, 1);
-        assertEq(fundsHandler.getAssetBalances()[0].asset, address(0));
-        assertEq(fundsHandler.getAssetBalances()[0].amountRay, currentChainBalanceRay);
-        assertEq(fundsHandler.getAssetBalances()[0].chainId, chainId);
-
-        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
-            feePayer: address(this),
-            feeToken: address(mockAsset),
-            feeAmount: bridgeParams_feeAmount,
-            feeRefundThreshold: 0,
-            gasLimit: bridgeParams_gasLimit,
-            data: ""
-        });
-
-        mockAsset.mint(address(mockAllocator), amount);
-        mockAllocator.mockToPushToTransferHelperInNextCall(address(mockAsset), amount);
-
-        mockGateway.mockToConsumeAssetFromTransferHelperInNextCall(address(mockAsset), bridgeParams_feeAmount + amount);
-
-        fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, bridgeParams);
-
-        assertEq(fundsHandler.getAssetBalances().length, 1);
-        assertEq(fundsHandler.getAssetBalances()[0].asset, address(0));
-        assertEq(
-            fundsHandler.getAssetBalances()[0].amountRay,
-            currentChainBalanceRay + amount.assetDecimalsToRay(address(mockAsset))
-        );
-        assertEq(fundsHandler.getAssetBalances()[0].chainId, chainId);
     }
 
     //////////////////////////////////////////////// HELPERS ///////////////////////////////////////////////////////////

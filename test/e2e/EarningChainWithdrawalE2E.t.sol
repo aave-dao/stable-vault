@@ -311,8 +311,10 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             address(USDC),
             0,
             user1,
+            // Use a higher gas limit to ensure the transaction is successful on Accounting Chain because the snapshot
+            // struct will be pushed to the FH storage.
             IBridgeAdapter.BridgeParams({
-                feePayer: user1, feeToken: address(0), feeAmount: 1, feeRefundThreshold: 0, gasLimit: 100000, data: ""
+                feePayer: user1, feeToken: address(0), feeAmount: 1, feeRefundThreshold: 0, gasLimit: 300000, data: ""
             }),
             ""
         );

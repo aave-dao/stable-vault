@@ -364,7 +364,10 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
                 feeToken: address(bridgeFeeToken),
                 feeAmount: bridgeFeeAmount,
                 feeRefundThreshold: 0,
-                gasLimit: 100000,
+                // Use a higher gas limit to ensure the transaction is successful on Accounting Chain because the
+                // snapshot
+                // struct may be pushed to the FH storage.
+                gasLimit: 300000,
                 data: ""
             }),
             ""
