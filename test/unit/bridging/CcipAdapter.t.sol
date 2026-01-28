@@ -1079,7 +1079,7 @@ contract CcipAdapterTest is TestWithHelpers {
 
         bytes memory encodedSenderWithExtraBytes = abi.encodePacked(abi.encode(_earningChainCcipAdapter), appendedData);
 
-        vm.expectRevert(CcipAdapter.UnexpectedDataLength.selector);
+        vm.expectRevert(ICcipBridgeAdapter.UnexpectedDataLength.selector);
         vm.prank(address(_mockCCIPRouter));
         _accountingChainCcipAdapter.ccipReceive(
             Client.Any2EVMMessage({

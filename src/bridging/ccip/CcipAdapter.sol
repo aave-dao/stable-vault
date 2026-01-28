@@ -24,10 +24,6 @@ import {Errors} from "src/types/Errors.sol";
 contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
     using SafeERC20 for IERC20;
 
-    /// @notice Encoded data length does not match the expected value.
-    /// @custom:selector 0x9546c78e
-    error UnexpectedDataLength();
-
     address internal immutable CCIP_ROUTER;
 
     mapping(uint256 chainId => uint64 ccipChainSelector) internal _chainSelectorOf;
@@ -214,7 +210,10 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
     }
 
     function _safeAbiDecodeEvmSender(bytes calldata abiEncodedEvmSender) internal pure returns (address) {
-        require(abiEncodedEvmSender.length == Constants.ABI_ENCODED_EVM_ADDRESS_BYTE_LENGTH, UnexpectedDataLength());
+        require(
+            abiEncodedEvmSender.length == Constants.ABI_ENCODED_EVM_ADDRESS_BYTE_LENGTH,
+            ICcipBridgeAdapter.UnexpectedDataLength()
+        );
         bytes32 value = bytes32(abiEncodedEvmSender[0:Constants.ABI_ENCODED_EVM_ADDRESS_BYTE_LENGTH]);
         require((value & Constants.ABI_ENCODED_EVM_ADDRESS_MASK) == value, Errors.InvalidParameter());
         return abi.decode(abiEncodedEvmSender, (address));
