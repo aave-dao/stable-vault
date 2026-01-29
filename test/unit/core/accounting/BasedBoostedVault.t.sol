@@ -1720,20 +1720,23 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         assertEq(bbv.getUserSubVault(recipient).id, newSubVaultId);
     }
 
-    function test_transfer_autoFullTransferWhenDustWouldRemain() public {
+    function test_transfer_revertsWhenDustWouldRemain() public {
         address user = makeAddr("user");
         address recipient = makeAddr("recipient");
         uint256 depositAmount = 1_000_000;
         _deposit(user, depositAmount);
 
         uint256 fullAmountRay = bbv.getUserBalance(user);
+        // Trying to transfer an amount that would leave dust (< MIN_WITHDRAWABLE_AMOUNT_RAY)
         uint256 amountRay = fullAmountRay - (Constants.MIN_WITHDRAWABLE_AMOUNT_RAY - 1);
 
-        vm.expectEmit(true, true, true, true);
-        emit IBasedBoostedVault.Transfer(user, recipient, fullAmountRay);
-
         vm.prank(user);
-        assertTrue(bbv.transfer(recipient, amountRay));
+        vm.expectRevert(Errors.InvalidAmount.selector);
+        bbv.transfer(recipient, amountRay);
+
+        // User should use transferAll() instead
+        vm.prank(user);
+        assertTrue(bbv.transferAll(recipient));
 
         assertEq(bbv.getUserSubVault(user).id, 0);
         assertEq(bbv.getUserBalance(user), 0);
