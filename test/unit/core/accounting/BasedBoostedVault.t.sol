@@ -2001,6 +2001,60 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         bbv.transferAll(recipient);
     }
 
+    function test_transferAll_reverts_ifRecipientGetsZeroShares() public {
+        // Override bbv with a low default sub-vault rate (RAY = no interest)
+        // and use an 18-decimal asset so 1 wei deposit = 1e9 RAY = MIN_WITHDRAWABLE_AMOUNT_RAY
+        bbv = _deployBasedBoostedVault(
+            address(mockAccessManager),
+            DEFAULT_MAX_PER_SECOND_RATE,
+            MathLib.RAY,
+            address(mockIouTokenManager),
+            address(mockFundsHandler),
+            address(mockAssetRegistry),
+            address(mockTransferHelper),
+            address(mockWithdrawalPolicy),
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS
+        );
+        mockAsset = IMockErc20(address(new MockNonStandardErc20("Test GHO", "tGHO", 18)));
+
+        uint256 highRate = DEFAULT_MAX_PER_SECOND_RATE;
+
+        address user = makeAddr("user");
+        address recipient = makeAddr("recipient");
+        uint256 amount = 1;
+
+        // Deposit for recipient and move them to high rate subVault
+        mockAsset.mint(recipient, amount);
+        vm.prank(recipient);
+        mockAsset.forceApprove(address(bbv), amount);
+        vm.prank(recipient);
+        bbv.deposit(recipient, address(mockAsset), amount);
+
+        IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](1);
+        userRateData[0] = IBasedBoostedVault.UserRateData(recipient, highRate);
+        vm.prank(manager);
+        bbv.setUserRate(userRateData);
+
+        // Warp time to grow recipient's subVault conversion rate
+        // At 20% APY for 115 years: 1.2^115 ≈ 1e9, so conversionRate ≈ 1e36
+        vm.warp(block.timestamp + 115 * 365 days);
+
+        // Deposit for sender at base rate (RAY)
+        mockAsset.mint(user, amount);
+        vm.prank(user);
+        mockAsset.forceApprove(address(bbv), amount);
+        vm.prank(user);
+        bbv.deposit(user, address(mockAsset), amount);
+
+        // User has ~1e9 shares (deposited 1e9 RAY at conversionRate = RAY)
+        // Recipient's subVault has conversionRate ≈ 1e36
+        // toUserShares = fromUserShares * fromConversionRate / RAY / toConversionRate
+        //              = 1e9 * 1e27 / 1e27 / 1e36 = 1e9 / 1e36 ≈ 0
+        vm.prank(user);
+        vm.expectRevert(Errors.InvalidAmount.selector);
+        bbv.transferAll(recipient);
+    }
+
     function test_transferAll_emitsTransferEvent(address user, address recipient, uint256 depositAmount) public {
         vm.assume(user != address(0));
         vm.assume(recipient != address(0));

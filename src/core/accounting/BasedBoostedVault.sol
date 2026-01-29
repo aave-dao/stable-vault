@@ -261,6 +261,7 @@ contract BasedBoostedVault is
         uint256 toConversionRate =
             (toSubVaultId == fromSubVaultId) ? fromConversionRate : _accrueSubVaultConversionRate(toSubVaultId);
         uint256 toUserShares = fromUserShares.rayMulDown(fromConversionRate).rayDivDown(toConversionRate);
+        require(toUserShares > 0, Errors.InvalidAmount());
 
         _moveShares({
             from: from,
@@ -604,7 +605,9 @@ contract BasedBoostedVault is
         if (amountRay == fullAmountRay) {
             return (fullGuaranteedAmountRay, fullSharesToRedeem);
         }
+
         uint256 fromUserShares = amountRay.rayDivUp(fromConversionRate);
+
         require(_areRemainingSharesRedeemable(from, fromUserShares, fromSubVaultId), Errors.InvalidAmount());
         uint256 guaranteedAmountRay = _getAmountTakenFromOriginalDeposit(from, amountRay);
         return (guaranteedAmountRay, fromUserShares);
