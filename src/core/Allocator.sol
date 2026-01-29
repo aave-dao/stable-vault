@@ -8,6 +8,7 @@ import {
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import {IAllocator} from "src/interfaces/IAllocator.sol";
@@ -199,16 +200,13 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         onlySelf
         returns (uint256)
     {
-        uint256 withdrawnAmount;
-        uint256 balanceInStrategy = _getAssetBalanceInStrategy(IERC4626(strategy));
-        if (balanceInStrategy > 0) {
-            if (balanceInStrategy > amount) {
-                withdrawnAmount = amount;
-                _withdrawFromStrategy(asset, withdrawnAmount, address(this), strategy);
-            } else {
-                withdrawnAmount = _redeemAllFromStrategy(asset, strategy);
-            }
+        uint256 maxWithdrawable = IERC4626(strategy).maxWithdraw(address(this));
+        if (maxWithdrawable == 0) {
+            // If `maxWithdraw` returned 0, then try withdrawing the full amount that we initially wanted.
+            maxWithdrawable = amount;
         }
+        uint256 withdrawnAmount = Math.min(amount, maxWithdrawable);
+        _withdrawFromStrategy(asset, withdrawnAmount, address(this), strategy);
         return withdrawnAmount;
     }
 
