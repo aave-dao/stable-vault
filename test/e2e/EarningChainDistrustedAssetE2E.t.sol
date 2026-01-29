@@ -8,7 +8,6 @@ import {IERC20} from "forge-std/interfaces/IERC20.sol";
 
 import {BasedBoostedVault} from "src/core/accounting/BasedBoostedVault.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
-import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 
 import {BaseTest} from "test/BaseTest.t.sol";
@@ -103,95 +102,16 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
         // Mimic time passing so that user1's balances increase.
         vm.warp(block.timestamp + 183 days);
 
-        IFundsHandler.AssetBalance[] memory assetBalances = fundsHandler.getAssetBalances();
-        // The balances will not reflect the snapshot until a snapshot is sent back to the Accounting Chain
-        assertEq(assetBalances.length, 2);
-        bool snapshotBalanceFound = false;
-        for (uint256 i = 0; i < assetBalances.length; i++) {
-            // Look for address(0) since the snapshot is an aggregate of all assets on the Earning Chain
-            if (assetBalances[i].asset == address(0) && assetBalances[i].chainId == EARNING_CHAIN_ID) {
-                snapshotBalanceFound = true;
-                assertEq(assetBalances[i].amountRay, userInitialDeposit.assetDecimalsToRay(address(USDC)));
-                break;
-            }
-        }
-        assertTrue(!snapshotBalanceFound, "Snapshot balance from Earning Chain should NOT be found");
-
-        // Send snapshot back to the Accounting Chain: this should send a snapshot of 0
-        vm.prank(everyRoleAccount);
-        earningChainGateway.sendBalanceUpdateWithFeePayer{value: bridgeFeeAmount}(
-            IBridgeAdapter.BridgeParams({
-                feePayer: everyRoleAccount,
-                feeToken: address(0),
-                feeAmount: bridgeFeeAmount,
-                feeRefundThreshold: 0,
-                gasLimit: 300000,
-                data: ""
-            })
-        );
-        assetBalances = fundsHandler.getAssetBalances();
-        assertEq(assetBalances.length, 3);
-        snapshotBalanceFound = false;
-        for (uint256 i = 0; i < assetBalances.length; i++) {
-            if (assetBalances[i].asset == address(0) && assetBalances[i].chainId == EARNING_CHAIN_ID) {
-                snapshotBalanceFound = true;
-                assertEq(assetBalances[i].amountRay, userInitialDeposit.assetDecimalsToRay(address(USDC)));
-                break;
-            }
-        }
-        assertTrue(snapshotBalanceFound, "Snapshot balance from Earning Chain should be found");
-
-        vm.deal(everyRoleAccount, bridgeFeeAmount);
         // Asset depegs so mark it as distrusted on both chains
         vm.startPrank(everyRoleAccount);
         // Distrust the asset on the Accounting Chain
         assetRegistry_accountingChain.distrustAsset(address(USDC));
         // Distrust the asset on the Earning Chain
         assetRegistry_earningChain.distrustAsset(address(USDC));
-        // Send snapshot back to the Accounting Chain: this should send a snapshot of 0
-        earningChainGateway.sendBalanceUpdateWithFeePayer{value: bridgeFeeAmount}(
-            IBridgeAdapter.BridgeParams({
-                feePayer: everyRoleAccount,
-                feeToken: address(0),
-                feeAmount: bridgeFeeAmount,
-                feeRefundThreshold: 0,
-                gasLimit: 300000,
-                data: ""
-            })
-        );
         vm.stopPrank();
 
         // Check the Allocator has the USDC bridged over
         assertEq(allocator_earningChain.getAssetBalance(address(USDC)), userInitialDeposit);
-
-        // Check snapshot is now zero'ed out
-        IFundsHandler.AssetBalance[] memory assetBalancesAfterSnapshot = fundsHandler.getAssetBalances();
-        // Length is 2 out of 3 because the USDC balance is not longer included from Accounting Chain's Allocator
-        assertEq(assetBalancesAfterSnapshot.length, 2);
-        snapshotBalanceFound = false;
-        bool usdcBalanceFound = false;
-        for (uint256 i = 0; i < assetBalancesAfterSnapshot.length; i++) {
-            if (
-                assetBalancesAfterSnapshot[i].asset == address(0)
-                    && assetBalancesAfterSnapshot[i].chainId == EARNING_CHAIN_ID
-            ) {
-                snapshotBalanceFound = true;
-                assertEq(assetBalancesAfterSnapshot[i].amountRay, 0);
-            }
-            if (
-                assetBalancesAfterSnapshot[i].asset == address(USDC)
-                    && assetBalancesAfterSnapshot[i].chainId == block.chainid
-            ) {
-                usdcBalanceFound = true;
-            }
-        }
-        assertTrue(
-            snapshotBalanceFound,
-            "Snapshot balance from Earning Chain should be found after marking asset as distrusted"
-        );
-        assertFalse(
-            usdcBalanceFound, "USDC balance from Accounting Chain should not be found after marking asset as distrusted"
-        );
 
         // User requests withdrawal of their original deposit
         uint256 iouAmountRequestedRay = userInitialDeposit.assetDecimalsToRay(address(USDC));

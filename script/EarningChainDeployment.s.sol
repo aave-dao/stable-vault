@@ -271,6 +271,7 @@ contract EarningChainDeployment is Create3Deployment, Create3AddressBook, AToken
             new EarningChainGateway({
                 accountingChainId: ACCOUNTING_CHAIN_ID,
                 allocator: getAllocatorAddress(DEPLOYER),
+                priceOracle: address(0), // TODO: Deploy Price Oracle properly
                 iouTokenManager: getIouTokenManagerAddress(DEPLOYER),
                 transferHelper: getTransferHelperAddress(DEPLOYER),
                 withdrawalPolicy: getWithdrawalPolicyAddress(DEPLOYER)

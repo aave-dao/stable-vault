@@ -304,7 +304,9 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
                 basedBoostedVault: getBasedBoostedVaultAddress(DEPLOYER),
                 gateway: getGatewayAddress(DEPLOYER),
                 allocator: getAllocatorAddress(DEPLOYER),
-                transferHelper: getTransferHelperAddress(DEPLOYER)
+                priceOracle: address(0), // TODO: Deploy Price Oracle properly
+                transferHelper: getTransferHelperAddress(DEPLOYER),
+                chainBalanceOracle: address(0) // TODO: Deploy Chain Balance Oracle properly
             })
         );
         _logDeployment("FundsHandler::Implementation", "", implementation);

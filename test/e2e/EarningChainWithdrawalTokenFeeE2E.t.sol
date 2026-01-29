@@ -121,6 +121,17 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             "Default USDC strategy vault on Earning Chain should have the deposited amount of USDC"
         );
 
+        // Update the chain balance oracle to reflect the funds on the earning chain
+        uint256 earningChainBalanceRay = userInitialDeposit.assetDecimalsToRay(address(USDC));
+        chainBalanceOracle.mockChainBalance(EARNING_CHAIN_ID, earningChainBalanceRay);
+
+        // Verify the FundsHandler now sees the earning chain balance via the oracle
+        assertEq(
+            fundsHandler.getAggregatedBalance(),
+            earningChainBalanceRay,
+            "FundsHandler should see the earning chain balance via the oracle"
+        );
+
         // 3. Mimic time passing so that user1's balances increase.
         vm.warp(block.timestamp + 183 days);
         console.log("\nHalf a year has gone by so fast...");
@@ -305,12 +316,22 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
                 assetsOnEarningBeforeUser1ExchangeIous - amountIouToExchange,
                 "Assets on Earning Chain should decrease by the amount of IOUs exchanged"
             );
-            // Check the assets in the Accounting chain are now the 500 deposit from user2 + the snapshot update after
-            // User1's withdrawal on Earning chain of 225 (500 + 500 - 225)
+
+            // Update the chain balance oracle to reflect the IOU exchange on the earning chain
+            // Earning chain balance was 500 USDC worth, now decreased by 225 RAY (amountIouToExchange)
+            uint256 remainingEarningChainBalanceRay = assetsOnEarningBeforeUser1ExchangeIous - amountIouToExchange;
+            chainBalanceOracle.mockChainBalance(EARNING_CHAIN_ID, remainingEarningChainBalanceRay);
+
+            // Check the assets in the Accounting chain (cross-chain aggregated balance via oracle)
+            // Local balance: User2's 500 USDC deposit = 500 * 10^27 RAY
+            // Earning chain balance: (500 - 225) * 10^27 RAY = 275 * 10^27 RAY
+            // Total: 775 * 10^27 RAY
+            uint256 localBalanceRay = 500000000000000000000000000000; // 500 * 10^27 RAY
+            uint256 expectedTotalBalanceRay = localBalanceRay + remainingEarningChainBalanceRay;
             assertEq(
                 fundsHandler.getAggregatedBalance(),
-                775000000000000000000000000000,
-                "Assets on Accounting Chain should increase by the amount of IOUs exchanged"
+                expectedTotalBalanceRay,
+                "FundsHandler should see local balance + earning chain balance via oracle"
             );
         }
     }

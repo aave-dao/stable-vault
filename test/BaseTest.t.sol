@@ -36,7 +36,9 @@ import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 
 import {_toSelectorArray} from "test/helpers/TypeHelpers.sol";
 import {MockCCIPRouter} from "test/mocks/MockCcipRouter.sol";
+import {MockChainBalanceOracle} from "test/mocks/MockChainBalanceOracle.sol";
 import {MockErc20} from "test/mocks/MockErc20.sol";
+import {MockPriceOracle} from "test/mocks/MockPriceOracle.sol";
 import {TestErc4626} from "test/mocks/TestErc4626.sol";
 
 contract BaseTest is Test {
@@ -131,6 +133,13 @@ contract BaseTest is Test {
     // Mock CCIP Router
     MockCCIPRouter public mockCcipRouter;
 
+    // Mock Price Oracles
+    MockPriceOracle public priceOracle_accountingChain;
+    MockPriceOracle public priceOracle_earningChain;
+
+    // Mock Chain Balance Oracle (for tracking earning chain balances from accounting chain)
+    MockChainBalanceOracle public chainBalanceOracle;
+
     function _prepareTokens() internal {
         GHO.mint(address(this), 10000 ether);
         USDC.mint(address(this), 10000 * (10 ** 6));
@@ -199,6 +208,22 @@ contract BaseTest is Test {
 
         mockCcipRouter.setSourceChainSelector(EARNING_CHAIN_CCIP_SELECTOR, ACCOUNTING_CHAIN_CCIP_SELECTOR);
         mockCcipRouter.setSourceChainSelector(ACCOUNTING_CHAIN_CCIP_SELECTOR, EARNING_CHAIN_CCIP_SELECTOR);
+
+        // price oracle mocks
+        priceOracle_accountingChain = new MockPriceOracle();
+        priceOracle_earningChain = new MockPriceOracle();
+        console.log("\tMock Price Oracle (Accounting Chain): %s", address(priceOracle_accountingChain));
+        console.log("\tMock Price Oracle (Earning Chain): %s", address(priceOracle_earningChain));
+
+        // Set mock prices (1 RAY = 1:1 price ratio for simplicity)
+        priceOracle_accountingChain.mockPrice(address(GHO), MathLib.RAY);
+        priceOracle_accountingChain.mockPrice(address(USDC), MathLib.RAY);
+        priceOracle_earningChain.mockPrice(address(GHO), MathLib.RAY);
+        priceOracle_earningChain.mockPrice(address(USDC), MathLib.RAY);
+
+        // Chain balance oracle for tracking earning chain balances from accounting chain
+        chainBalanceOracle = new MockChainBalanceOracle();
+        console.log("\tMock Chain Balance Oracle (Earning Chain): %s", address(chainBalanceOracle));
 
         console.log("\nAccounting Chain:");
         // ---- Accounting Chain ----
@@ -361,7 +386,7 @@ contract BaseTest is Test {
             assetRegistry_accountingChainAddress,
             transferHelper_accountingChainAddress,
             withdrawalPolicy_accountingChainAddress,
-            address(0), // TODO: Deploy Price Oracle properly
+            address(priceOracle_accountingChain),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS
         );
         console.log("\tVault: %s", vault_accountingChainAddress);
@@ -373,7 +398,7 @@ contract BaseTest is Test {
                 assetRegistry_accountingChainAddress,
                 fundsHandler_accountingChainAddress,
                 fundsHandler_accountingChainAddress,
-                address(0), // TODO: Deploy Price Oracle properly
+                address(priceOracle_accountingChain),
                 transferHelper_accountingChainAddress,
                 MAX_STRATEGIES_PER_ASSET
             )
@@ -399,7 +424,9 @@ contract BaseTest is Test {
                 vault_accountingChainAddress,
                 chainGateway_accountingChainAddress,
                 allocator_accountingChainAddress,
-                transferHelper_accountingChainAddress
+                address(priceOracle_accountingChain),
+                transferHelper_accountingChainAddress,
+                address(chainBalanceOracle)
             )
         );
         fundsHandler = FundsHandler(
@@ -617,7 +644,7 @@ contract BaseTest is Test {
                 assetRegistry_earningChainAddress,
                 chainGateway_earningChainAddress,
                 chainGateway_earningChainAddress,
-                address(0), // TODO: Deploy Price Oracle properly
+                address(priceOracle_earningChain),
                 transferHelper_earningChainAddress,
                 MAX_STRATEGIES_PER_ASSET
             )
@@ -649,6 +676,7 @@ contract BaseTest is Test {
             new EarningChainGateway(
                 ACCOUNTING_CHAIN_ID,
                 allocator_earningChainAddress,
+                address(priceOracle_earningChain),
                 iouTokenManager_earningChainAddress,
                 transferHelper_earningChainAddress,
                 address(withdrawalPolicy_earningChain)
@@ -782,6 +810,9 @@ contract BaseTest is Test {
         allocator_earningChain.setDefaultStrategy(address(GHO), address(ghoStrategyVault_earningChain));
         allocator_earningChain.setDefaultStrategy(address(USDC), address(usdcStrategyVault_earningChain));
 
+        // Configure the FundsHandler to track the earning chain balance via the oracle
+        fundsHandler.addEarningChain(EARNING_CHAIN_ID);
+
         vm.stopPrank();
     }
 
@@ -873,7 +904,9 @@ contract BaseTest is Test {
 
         // For FundsHandler
         accessManager.setTargetFunctionRole(
-            address(fundsHandler), _toSelectorArray(IFundsHandler.pushFundsToChain.selector), OPERATOR_ROLE
+            address(fundsHandler),
+            _toSelectorArray(IFundsHandler.pushFundsToChain.selector, FundsHandler.addEarningChain.selector),
+            OPERATOR_ROLE
         );
 
         vm.stopPrank();

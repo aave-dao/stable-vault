@@ -476,23 +476,11 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         );
     }
 
-    function test_receiveMessage_whenBurnIouTokenIsReceived(
-        uint256 iouTokenAmountBurnedRay,
-        uint256 chainBalanceSnapshotNonce,
-        uint256 balanceSnapshotTotalAssetsInRay
-    ) public {
+    function test_receiveMessage_whenBurnIouTokenIsReceived(uint256 iouTokenAmountBurnedRay) public {
         iouTokenAmountBurnedRay = _boundRayAmount(iouTokenAmountBurnedRay);
-        balanceSnapshotTotalAssetsInRay = _boundRayAmount(balanceSnapshotTotalAssetsInRay);
 
         vm.expectCall(
             address(_mockIouTokenManager), abi.encodeCall(IIouTokenManager.burnLockedTokens, (iouTokenAmountBurnedRay))
-        );
-        vm.expectCall(
-            address(_mockFundsHandler),
-            abi.encodeCall(
-                IFundsHandler.updateChainBalanceCallback,
-                (EARNING_CHAIN_ID, balanceSnapshotTotalAssetsInRay, chainBalanceSnapshotNonce)
-            )
         );
         // Call must come from whitelisted data bridge adapter
         vm.prank(address(_mockBridgeAdapterData));
@@ -504,26 +492,17 @@ contract AccountingChainGatewayTest is TestWithHelpers {
                 IChainGateway.CrossChainMessage({
                     messageType: IChainGateway.MessageType.BURN_IOU_TOKEN,
                     data: abi.encode(
-                        IChainGateway.BurnIouTokenMessage({
-                            iouTokenAmountBurnedRay: iouTokenAmountBurnedRay,
-                            chainBalanceSnapshotNonce: chainBalanceSnapshotNonce,
-                            balanceSnapshotTotalAssetsInRay: balanceSnapshotTotalAssetsInRay
-                        })
+                        IChainGateway.BurnIouTokenMessage({iouTokenAmountBurnedRay: iouTokenAmountBurnedRay})
                     )
                 })
             )
         );
     }
 
-    function test_receiveMessage_givenWhitelistedNonDefaultBridgeAdapter(
-        uint256 iouTokenAmountBurnedRay,
-        uint256 chainBalanceSnapshotNonce,
-        uint256 balanceSnapshotTotalAssetsInRay
-    ) public {
+    function test_receiveMessage_givenWhitelistedNonDefaultBridgeAdapter(uint256 iouTokenAmountBurnedRay) public {
         // Context: this should be the case for any valid message type
 
         iouTokenAmountBurnedRay = _boundRayAmount(iouTokenAmountBurnedRay);
-        balanceSnapshotTotalAssetsInRay = _boundRayAmount(balanceSnapshotTotalAssetsInRay);
 
         // Add a new whitelisted bridge adapter for message bridge
         address unknownAdapter = makeAddr("unknownAdapter");
@@ -532,13 +511,6 @@ contract AccountingChainGatewayTest is TestWithHelpers {
 
         vm.expectCall(
             address(_mockIouTokenManager), abi.encodeCall(IIouTokenManager.burnLockedTokens, (iouTokenAmountBurnedRay))
-        );
-        vm.expectCall(
-            address(_mockFundsHandler),
-            abi.encodeCall(
-                IFundsHandler.updateChainBalanceCallback,
-                (EARNING_CHAIN_ID, balanceSnapshotTotalAssetsInRay, chainBalanceSnapshotNonce)
-            )
         );
         vm.prank(address(unknownAdapter));
         _accountingChainGateway.receiveMessage(
@@ -549,11 +521,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
                 IChainGateway.CrossChainMessage({
                     messageType: IChainGateway.MessageType.BURN_IOU_TOKEN,
                     data: abi.encode(
-                        IChainGateway.BurnIouTokenMessage({
-                            iouTokenAmountBurnedRay: iouTokenAmountBurnedRay,
-                            chainBalanceSnapshotNonce: chainBalanceSnapshotNonce,
-                            balanceSnapshotTotalAssetsInRay: balanceSnapshotTotalAssetsInRay
-                        })
+                        IChainGateway.BurnIouTokenMessage({iouTokenAmountBurnedRay: iouTokenAmountBurnedRay})
                     )
                 })
             )
@@ -577,11 +545,11 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         vm.prank(admin);
         _accountingChainGateway.removeBridgeAdapter(address(0), EARNING_CHAIN_ID, address(_mockBridgeAdapterData));
 
-        // Build a valid balance snapshot message
+        // Build a valid burn IOU token message
         bytes memory data = abi.encode(
             IChainGateway.CrossChainMessage({
-                messageType: IChainGateway.MessageType.BALANCE_SNAPSHOT,
-                data: abi.encode(IChainGateway.BalanceSnapshot({totalAssetsInRay: 100_000, nonce: 0}))
+                messageType: IChainGateway.MessageType.BURN_IOU_TOKEN,
+                data: abi.encode(IChainGateway.BurnIouTokenMessage({iouTokenAmountBurnedRay: 100_000}))
             })
         );
 

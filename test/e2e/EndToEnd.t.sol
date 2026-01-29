@@ -11,7 +11,6 @@ import {IBasedBoostedVault} from "src/interfaces/IBasedBoostedVault.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {Swapper} from "src/periphery/Swapper.sol";
-import {Errors} from "src/types/Errors.sol";
 
 import {BaseTest} from "test/BaseTest.t.sol";
 
@@ -115,6 +114,17 @@ contract EndToEndTest is BaseTest {
                 IERC4626(defaultUsdcVault_earningChain).balanceOf(address(allocator_earningChain)) > 0,
                 "Allocator should have shares of the vault"
             );
+
+            // Update the chain balance oracle to reflect the funds on the earning chain
+            uint256 earningChainBalanceRay = userInitialDeposit.assetDecimalsToRay(address(USDC));
+            chainBalanceOracle.mockChainBalance(EARNING_CHAIN_ID, earningChainBalanceRay);
+
+            // Verify the FundsHandler now sees the earning chain balance via the oracle
+            assertEq(
+                fundsHandler.getAggregatedBalance(),
+                earningChainBalanceRay,
+                "FundsHandler should see the earning chain balance via the oracle"
+            );
         }
 
         // 4. Manager rebalances & swaps the funds on the Earning Chain from USDC to GHO (via Swapper)
@@ -200,55 +210,9 @@ contract EndToEndTest is BaseTest {
             IERC4626(defaultGhoVault_earningChain).balanceOf(address(allocator_earningChain))
         );
 
-        // 6. User asks for withdrawal of the whole amount of his earnings (which are $500+ - in USDC)
-        uint256 iouAmountRequestedRay;
-        {
-            console.log("User creates a WithdrawalRequest...");
-            vm.prank(user);
-            vm.expectRevert(
-                abi.encodeWithSelector(
-                    IBasedBoostedVault.InsufficientAssets.selector,
-                    user,
-                    512381782621115714946287446500,
-                    500000000000000000000000000000
-                )
-            );
-            iouAmountRequestedRay = vault.requestWithdrawal(user, 0);
-
-            // Send balance snap shot update so that Accounting chain has latest assets balances
-            vm.prank(everyRoleAccount);
-            vm.deal(everyRoleAccount, bridgeFeeAmount);
-            earningChainGateway.sendBalanceUpdateWithFeePayer{value: bridgeFeeAmount}(
-                IBridgeAdapter.BridgeParams({
-                    feePayer: everyRoleAccount,
-                    feeToken: address(0),
-                    feeAmount: bridgeFeeAmount,
-                    feeRefundThreshold: 0,
-                    gasLimit: 300000,
-                    data: ""
-                })
-            );
-
-            console.log("Total system balance: %s", fundsHandler.getAggregatedBalance());
-
-            // Try the request again
-            vm.prank(user);
-            iouAmountRequestedRay = vault.requestWithdrawal(user, iouAmountRequestedRay);
-
-            console.log("... request withdrawal minted IOU tokens: %s", iouAmountRequestedRay);
-            // Check user IOU token balance
-            assertGt(iouToken_accountingChain.balanceOf(user), 0, "User should have minted IOU tokens");
-
-            vm.prank(user);
-            vm.expectRevert(Errors.InsufficientFunds.selector);
-            vault.executeWithdrawal(user, address(USDC), 0, iouAmountRequestedRay, "");
-
-            // - check that we don't owe the user any funds
-            console.log("User balance in RAY after withdrawal request: %s", vault.getUserBalance(user));
-            assertEq(vault.getUserBalance(user), 0, "User balance should be down to 0 after full withdrawal request");
-        }
-
-        // 7. Manager brings back the money from the Earning Chain to the Accounting Chain via CCIP in GHO
+        // 6. Manager brings back the money from the Earning Chain to the Accounting Chain via CCIP in GHO
+        // NOTE: With the oracle-based balance system, funds must be on the Accounting Chain before withdrawal
+        // requests can be processed. The FundsHandler uses the chain balance oracle to track cross-chain balances.
         uint256 userEarningsInGho;
         address defaultGhoVault_accountingChain = allocator_accountingChain.getDefaultStrategy(address(GHO));
         {
@@ -268,6 +232,11 @@ contract EndToEndTest is BaseTest {
                 })
             );
 
+            // Update the chain balance oracle to reflect that funds are now back on accounting chain
+            // The earning chain balance decreases by the amount bridged back
+            uint256 remainingEarningChainBalanceRay = earningChainGateway.getAggregatedBalance();
+            chainBalanceOracle.mockChainBalance(EARNING_CHAIN_ID, remainingEarningChainBalanceRay);
+
             // - check that the funds land on the Accounting Chain and are dropped into default liquidity vault there
             console.log("Accounting Chain default vault for GHO is: %s", defaultGhoVault_accountingChain);
             console.log("It's balance of GHO is: %s", IERC20(address(GHO)).balanceOf(defaultGhoVault_accountingChain));
@@ -286,11 +255,12 @@ contract EndToEndTest is BaseTest {
             );
         }
 
-        // 8. Manager rebalances & swaps the funds on the Accounting Chain from GHO to USDC (via Swapper)
+        // 7. Manager rebalances & swaps the funds on the Accounting Chain from GHO to USDC (via Swapper)
         uint256 userEarningsInUsdc;
         {
             userEarningsInUsdc = userEarningsInRay.rayToAssetDecimals(address(USDC));
-            USDC.mint(address(swapper_accountingChain), userEarningsInUsdc);
+            // Add 1 wei extra to cover precision loss when converting from RAY to USDC decimals
+            USDC.mint(address(swapper_accountingChain), userEarningsInUsdc + 1);
 
             address[] memory targets = new address[](1);
             targets[0] = address(GHO);
@@ -316,7 +286,7 @@ contract EndToEndTest is BaseTest {
 
             IAllocator.AllocationParams[] memory allocationParams = new IAllocator.AllocationParams[](1);
             allocationParams[0] = IAllocator.AllocationParams({
-                asset: address(USDC), strategy: defaultUsdcVault_accountingChain, amount: userEarningsInUsdc
+                asset: address(USDC), strategy: defaultUsdcVault_accountingChain, amount: userEarningsInUsdc + 1
             });
 
             IAllocator.RebalanceParams memory rebalanceParams = IAllocator.RebalanceParams({
@@ -330,14 +300,14 @@ contract EndToEndTest is BaseTest {
             vm.prank(everyRoleAccount);
             allocator_accountingChain.rebalance(rebalances);
 
-            // - check that the funds are swapped to USDC
+            // - check that the funds are swapped to USDC (includes 1 extra wei for precision)
             console.log(
                 "\tBalance of USDC in The USDC Vault is: %s",
                 IERC20(address(USDC)).balanceOf(defaultUsdcVault_accountingChain)
             );
             assertEq(
                 IERC20(address(USDC)).balanceOf(defaultUsdcVault_accountingChain),
-                userEarningsInUsdc,
+                userEarningsInUsdc + 1,
                 "Vault should have the swapped amount of USDC"
             );
             // - check that the funds land on the USDC vault
@@ -349,6 +319,26 @@ contract EndToEndTest is BaseTest {
                 IERC4626(defaultUsdcVault_accountingChain).balanceOf(address(allocator_accountingChain)) > 0,
                 "Allocator should have shares of the vault"
             );
+        }
+
+        // 8. User asks for withdrawal of the whole amount of his earnings (which are $500+ - in USDC)
+        // Now that funds are back on the Accounting Chain, the withdrawal request can be processed.
+        uint256 iouAmountRequestedRay;
+        {
+            console.log("User creates a WithdrawalRequest...");
+            console.log("Total system balance: %s", fundsHandler.getAggregatedBalance());
+
+            // Request withdrawal
+            vm.prank(user);
+            iouAmountRequestedRay = vault.requestWithdrawal(user, 0);
+
+            console.log("... request withdrawal minted IOU tokens: %s", iouAmountRequestedRay);
+            // Check user IOU token balance
+            assertGt(iouToken_accountingChain.balanceOf(user), 0, "User should have minted IOU tokens");
+
+            // - check that we don't owe the user any funds
+            console.log("User balance in RAY after withdrawal request: %s", vault.getUserBalance(user));
+            assertEq(vault.getUserBalance(user), 0, "User balance should be down to 0 after full withdrawal request");
         }
 
         // 9. User triggers the execute() withdrawal to send the funds back to the user
