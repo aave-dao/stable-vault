@@ -7,6 +7,7 @@ import {
 } from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardTransientUpgradeable.sol";
 
 import {BaseChainGateway} from "src/core/BaseChainGateway.sol";
+import {LocalBalanceAggregator} from "src/core/LocalBalanceAggregator.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
@@ -25,12 +26,12 @@ contract EarningChainGateway is
     BaseChainGateway,
     TransferHelperClient,
     ReentrancyGuardTransientUpgradeable,
+    LocalBalanceAggregator,
     IEarningChainGateway
 {
     using AssetLib for uint256;
 
     uint256 internal immutable ACCOUNTING_CHAIN_ID;
-    address internal immutable ALLOCATOR;
     address internal immutable WITHDRAWAL_POLICY;
 
     /// @custom:storage-location erc7201:aave.storage.EarningChainGateway
@@ -51,6 +52,7 @@ contract EarningChainGateway is
     /// @dev Constructor.
     /// @param accountingChainId The Chain ID of the Accounting Chain.
     /// @param allocator Address of the Allocator contract.
+    /// @param priceOracle Address of the PriceOracle contract.
     /// @param iouTokenManager Address of the IOU token manager contract used to mint and burn bridged or exchanged IOU
     /// tokens.
     /// @param transferHelper Address of the TransferHelper contract used to transfer assets across components.
@@ -58,13 +60,17 @@ contract EarningChainGateway is
     constructor(
         uint256 accountingChainId,
         address allocator,
+        address priceOracle,
         address iouTokenManager,
         address transferHelper,
         address withdrawalPolicy
-    ) TransferHelperClient(transferHelper) BaseChainGateway(iouTokenManager) {
+    )
+        TransferHelperClient(transferHelper)
+        BaseChainGateway(iouTokenManager)
+        LocalBalanceAggregator(allocator, priceOracle)
+    {
         _disableInitializers();
         ACCOUNTING_CHAIN_ID = accountingChainId;
-        ALLOCATOR = allocator;
         WITHDRAWAL_POLICY = withdrawalPolicy;
     }
 
@@ -88,30 +94,7 @@ contract EarningChainGateway is
 
     /// @inheritdoc IEarningChainGateway
     function getAggregatedBalance() external view override returns (uint256) {
-        return _getTotalAssetsInRay();
-    }
-
-    /// @inheritdoc IEarningChainGateway
-    function sendBalanceUpdateWithFeePayer(IBridgeAdapter.BridgeParams memory bridgeParams)
-        external
-        payable
-        override
-        assertingTransferHelperBalanceFor(bridgeParams.feeToken)
-    {
-        address adapter =
-            $BaseChainGateway().defaultBridgeAdapter[Constants.ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID];
-        require(adapter != address(0), AdapterNotFound());
-
-        _transferBridgeFeeToTransferHelper(bridgeParams);
-
-        _sendCrossChainMessage(
-            ACCOUNTING_CHAIN_ID,
-            adapter,
-            Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
-            0,
-            _getBalanceSnapshotData(),
-            bridgeParams
-        );
+        return _getLocalAggregatedBalance();
     }
 
     /// @inheritdoc IEarningChainGateway
@@ -214,12 +197,7 @@ contract EarningChainGateway is
     ) internal {
         address bridgeAdapter = $BaseChainGateway().defaultBridgeAdapter[asset][ACCOUNTING_CHAIN_ID];
         require(bridgeAdapter != address(0), AdapterNotFound());
-
-        // Sends a single cross chain message with the asset and the balance snapshot. The bridge must support both
-        // assets and arbitrary data.
-        _sendCrossChainMessage(
-            ACCOUNTING_CHAIN_ID, bridgeAdapter, asset, amount, _getBalanceSnapshotData(), bridgeParams
-        );
+        _sendCrossChainMessage(ACCOUNTING_CHAIN_ID, bridgeAdapter, asset, amount, "", bridgeParams);
     }
 
     /// @dev This function is just needed to prevent StackTooDeep
@@ -232,13 +210,7 @@ contract EarningChainGateway is
         bytes memory burnIouTokenMessageEncoded = abi.encode(
             IChainGateway.CrossChainMessage({
                 messageType: IChainGateway.MessageType.BURN_IOU_TOKEN,
-                data: abi.encode(
-                    IChainGateway.BurnIouTokenMessage({
-                        iouTokenAmountBurnedRay: iouTokenAmountRay,
-                        chainBalanceSnapshotNonce: _getAndUpdateBalanceSnapshotNonce(),
-                        balanceSnapshotTotalAssetsInRay: _getTotalAssetsInRay()
-                    })
-                )
+                data: abi.encode(IChainGateway.BurnIouTokenMessage({iouTokenAmountBurnedRay: iouTokenAmountRay}))
             })
         );
 
@@ -249,35 +221,6 @@ contract EarningChainGateway is
             0,
             burnIouTokenMessageEncoded,
             bridgeParams
-        );
-    }
-
-    function _getTotalAssetsInRay() internal view returns (uint256) {
-        IAllocator.AllocatorBalance[] memory allocatorBalances = IAllocator(ALLOCATOR).getTrustedAssetBalances();
-        uint256 totalAssetsInRay;
-        for (uint256 i = 0; i < allocatorBalances.length; i++) {
-            totalAssetsInRay += allocatorBalances[i].amount.assetDecimalsToRay(allocatorBalances[i].asset);
-        }
-        return totalAssetsInRay;
-    }
-
-    /// @dev Increments the balance snapshot nonce and returns the new nonce
-    /// @dev Assumes the Accounting Chain does not allow non-replayable nonces, so the new nonce sent is always higher
-    /// than the previous nonce stored on Accounting Chain.
-    function _getAndUpdateBalanceSnapshotNonce() internal returns (uint256) {
-        return ++$EarningChainGateway().balanceSnapshotNonce;
-    }
-
-    function _getBalanceSnapshotData() internal returns (bytes memory) {
-        return abi.encode(
-            IChainGateway.CrossChainMessage({
-                messageType: IChainGateway.MessageType.BALANCE_SNAPSHOT,
-                data: abi.encode(
-                    IChainGateway.BalanceSnapshot({
-                        totalAssetsInRay: _getTotalAssetsInRay(), nonce: _getAndUpdateBalanceSnapshotNonce()
-                    })
-                )
-            })
         );
     }
 }

@@ -12,12 +12,6 @@ interface IFundsHandler {
     /// @custom:selector 0x93ce7047
     error OnlyBasedBoostedVault();
 
-    /// @notice Emitted when the chain balance snapshot is received from a chain.
-    /// @param chainId Chain id of the chain that the snapshot (and potentially funds) arrived from.
-    /// @param amountRay Amount of total assets on the chain in RAY.
-    /// @param nonce Nonce of the balance snapshot from the source chain.
-    event ChainBalanceSnapshotReceived(uint256 chainId, uint256 amountRay, uint256 nonce);
-
     /// @notice The representation of an asset balance.
     /// @param asset Address of the asset.
     /// @param amountRay Amount of the asset in RAY.
@@ -60,13 +54,6 @@ interface IFundsHandler {
         uint256 chainId,
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) external payable;
-
-    /// @notice Updates the chain balance snapshot for a given chain.
-    /// @param chainId Chain id of the chain that sent the balance update.
-    /// @param snapshotBalanceRay Balance snapshot on the source chain in RAY of supported asset denomination.
-    /// @param chainBalanceSnapshotNonce Nonce of the balance snapshot from the source chain.
-    function updateChainBalanceCallback(uint256 chainId, uint256 snapshotBalanceRay, uint256 chainBalanceSnapshotNonce)
-        external;
 
     /// @notice Callback function for when funds arrive from a chain.
     /// @param asset Address of the asset that arrived from the chain.

@@ -6,11 +6,14 @@ import {
     AccessManagedUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 
+import {LocalBalanceAggregator} from "src/core/LocalBalanceAggregator.sol";
 import {IAccountingChainGateway} from "src/interfaces/IAccountingChainGateway.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
+import {IChainBalanceOracle} from "src/interfaces/IChainBalanceOracle.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
+import {MathLib} from "src/libraries/MathLib.sol";
 import {RescuableNative} from "src/misc/RescuableNative.sol";
 import {RescuableToken} from "src/misc/RescuableToken.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
@@ -23,29 +26,27 @@ contract FundsHandler is
     AccessManagedUpgradeable,
     RescuableNative,
     RescuableToken,
+    LocalBalanceAggregator,
     TransferHelperClient,
     IFundsHandler
 {
     using AssetLib for uint256;
+    using MathLib for uint256;
 
-    /// @notice The representation of an Earnings Chain's balance snapshot.
+    /// @notice Earning Chain relevant information.
     /// @param chainId The chain id of the Earnings Chain.
-    /// @param amountRay The cumulative value of assets in RAY.
-    /// @param nonce The nonce of the balance snapshot (monotonically increasing).
-    struct ChainBalanceSnapshot {
+    /// @param balanceOracle The address of the ChainBalanceOracle contract for the Earnings Chain.
+    struct EarningChain {
         uint256 chainId;
-        // Assumes all balances have common denomination.
-        uint256 amountRay;
-        uint256 nonce;
+        address balanceOracle;
     }
 
     address internal immutable VAULT;
     address internal immutable GATEWAY;
-    address internal immutable ALLOCATOR;
 
     /// @custom:storage-location erc7201:aave.storage.FundsHandler
     struct FundsHandlerStorage {
-        ChainBalanceSnapshot[] chainBalances;
+        EarningChain[] earningChains;
     }
 
     // keccak256(abi.encode(uint256(keccak256("aave.storage.FundsHandler")) - 1)) & ~bytes32(uint256(0xff))
@@ -72,14 +73,18 @@ contract FundsHandler is
     /// @param basedBoostedVault The address of the BasedBoostedVault contract, which triggers deposits and withdrawals.
     /// @param gateway The address of the Gateway contract to use for cross-chain communication.
     /// @param allocator The address of the Allocator contract to use for immediate liquidity management.
+    /// @param priceOracle The address of the PriceOracle contract to use for pricing assets.
     /// @param transferHelper The address of the TransferHelper contract to use for minimizing the number of transfers.
-    constructor(address basedBoostedVault, address gateway, address allocator, address transferHelper)
-        TransferHelperClient(transferHelper)
-    {
+    constructor(
+        address basedBoostedVault,
+        address gateway,
+        address allocator,
+        address priceOracle,
+        address transferHelper
+    ) TransferHelperClient(transferHelper) LocalBalanceAggregator(allocator, priceOracle) {
         _disableInitializers();
         VAULT = basedBoostedVault;
         GATEWAY = gateway;
-        ALLOCATOR = allocator;
     }
 
     /// @dev Initializer.
@@ -94,15 +99,10 @@ contract FundsHandler is
 
     /// @inheritdoc IFundsHandler
     function getAggregatedBalance() external view override returns (uint256) {
-        IAllocator.AllocatorBalance[] memory allocatorAssets = IAllocator(ALLOCATOR).getTrustedAssetBalances();
-
-        uint256 totalBalanceRay;
-
-        for (uint16 i = 0; i < allocatorAssets.length; i++) {
-            totalBalanceRay += allocatorAssets[i].amount.assetDecimalsToRay(allocatorAssets[i].asset);
-        }
-        for (uint16 i = 0; i < $storage().chainBalances.length; i++) {
-            totalBalanceRay += $storage().chainBalances[i].amountRay;
+        uint256 totalBalanceRay = _getLocalAggregatedBalance();
+        for (uint16 i = 0; i < $storage().earningChains.length; i++) {
+            totalBalanceRay += IChainBalanceOracle($storage().earningChains[i].balanceOracle)
+                .getChainBalance($storage().earningChains[i].chainId);
         }
         return totalBalanceRay;
     }
@@ -110,7 +110,7 @@ contract FundsHandler is
     /// @inheritdoc IFundsHandler
     function getAssetBalances() external view override returns (AssetBalance[] memory) {
         IAllocator.AllocatorBalance[] memory allocatorAssets = IAllocator(ALLOCATOR).getTrustedAssetBalances();
-        AssetBalance[] memory balances = new AssetBalance[](allocatorAssets.length + $storage().chainBalances.length);
+        AssetBalance[] memory balances = new AssetBalance[](allocatorAssets.length + $storage().earningChains.length);
         for (uint16 i = 0; i < allocatorAssets.length; i++) {
             balances[i] = AssetBalance({
                 chainId: block.chainid,
@@ -118,11 +118,12 @@ contract FundsHandler is
                 amountRay: allocatorAssets[i].amount.assetDecimalsToRay(allocatorAssets[i].asset)
             });
         }
-        for (uint16 i = 0; i < $storage().chainBalances.length; i++) {
+        for (uint16 i = 0; i < $storage().earningChains.length; i++) {
+            uint256 chainId = $storage().earningChains[i].chainId;
             balances[allocatorAssets.length + i] = AssetBalance({
-                chainId: $storage().chainBalances[i].chainId,
+                chainId: chainId,
                 asset: address(0),
-                amountRay: $storage().chainBalances[i].amountRay
+                amountRay: IChainBalanceOracle($storage().earningChains[i].balanceOracle).getChainBalance(chainId)
             });
         }
         return balances;
@@ -169,46 +170,11 @@ contract FundsHandler is
     // Gateway Functions
 
     /// @inheritdoc IFundsHandler
-    function updateChainBalanceCallback(uint256 chainId, uint256 snapshotBalanceRay, uint256 chainBalanceSnapshotNonce)
-        external
-        override
-        onlyGateway
-    {
-        _updateChainBalance(chainId, snapshotBalanceRay, chainBalanceSnapshotNonce);
-    }
-
-    /// @inheritdoc IFundsHandler
     function fundsArrivedFromChainCallback(address asset, uint256 amount) external override onlyGateway {
         _pushFundsToImmediateLiquidity(asset, amount);
     }
 
     ////////////////////////////////////////////////// INTERNAL ////////////////////////////////////////////////////////
-
-    function _updateChainBalance(uint256 chainId, uint256 snapshotBalanceRay, uint256 chainBalanceSnapshotNonce)
-        internal
-    {
-        bool chainExists;
-        for (uint16 i = 0; i < $storage().chainBalances.length; i++) {
-            if ($storage().chainBalances[i].chainId == chainId) {
-                chainExists = true;
-                // Nonces should always be strictly increasing.
-                // Use < to avoid replayable nonces.
-                if ($storage().chainBalances[i].nonce < chainBalanceSnapshotNonce) {
-                    $storage().chainBalances[i].nonce = chainBalanceSnapshotNonce;
-                    $storage().chainBalances[i].amountRay = snapshotBalanceRay;
-                }
-            }
-        }
-        if (!chainExists) {
-            $storage().chainBalances
-                .push(
-                    ChainBalanceSnapshot({
-                        chainId: chainId, amountRay: snapshotBalanceRay, nonce: chainBalanceSnapshotNonce
-                    })
-                );
-        }
-        emit ChainBalanceSnapshotReceived(chainId, snapshotBalanceRay, chainBalanceSnapshotNonce);
-    }
 
     function _pushFundsToImmediateLiquidity(address asset, uint256 amount) internal {
         IAllocator(ALLOCATOR).deposit(asset, amount);

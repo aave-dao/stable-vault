@@ -65,12 +65,10 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
 
     function _receiveData(uint256 sourceChainId, bytes memory data) internal override {
         IChainGateway.CrossChainMessage memory crossChainMessage = abi.decode(data, (IChainGateway.CrossChainMessage));
-        if (crossChainMessage.messageType == IChainGateway.MessageType.BALANCE_SNAPSHOT) {
-            _updateChainBalanceSnapshot(sourceChainId, crossChainMessage.data);
-        } else if (crossChainMessage.messageType == IChainGateway.MessageType.BRIDGE_IOU_TOKEN) {
+        if (crossChainMessage.messageType == IChainGateway.MessageType.BRIDGE_IOU_TOKEN) {
             _bridgeIouTokenFromEarningChain(crossChainMessage.data);
         } else if (crossChainMessage.messageType == IChainGateway.MessageType.BURN_IOU_TOKEN) {
-            _burnIouToken(sourceChainId, crossChainMessage.data);
+            _burnIouToken(crossChainMessage.data);
         } else {
             revert IChainGateway.InvalidMessageType();
         }
@@ -82,21 +80,9 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
         IIouTokenManager(IOU_TOKEN_MANAGER).releaseTokens(iouTokenBridgeMessage.recipient, iouTokenBridgeMessage.amount);
     }
 
-    function _burnIouToken(uint256 sourceChainId, bytes memory data) internal {
+    function _burnIouToken(bytes memory data) internal {
         IChainGateway.BurnIouTokenMessage memory burnIouTokenMessage =
             abi.decode(data, (IChainGateway.BurnIouTokenMessage));
         IIouTokenManager(IOU_TOKEN_MANAGER).burnLockedTokens(burnIouTokenMessage.iouTokenAmountBurnedRay);
-        IFundsHandler(FUNDS_HANDLER)
-            .updateChainBalanceCallback(
-                sourceChainId,
-                burnIouTokenMessage.balanceSnapshotTotalAssetsInRay,
-                burnIouTokenMessage.chainBalanceSnapshotNonce
-            );
-    }
-
-    function _updateChainBalanceSnapshot(uint256 sourceChainId, bytes memory data) internal {
-        IChainGateway.BalanceSnapshot memory balanceSnapshot = abi.decode(data, (IChainGateway.BalanceSnapshot));
-        IFundsHandler(FUNDS_HANDLER)
-            .updateChainBalanceCallback(sourceChainId, balanceSnapshot.totalAssetsInRay, balanceSnapshot.nonce);
     }
 }

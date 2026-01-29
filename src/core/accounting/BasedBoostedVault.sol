@@ -265,7 +265,6 @@ contract BasedBoostedVault is
         if (remainingShares == 0) {
             delete $storage().positions[user];
         } else {
-            // Only needed if the user has remaining balance, otherwise the whole position is deleted.
             $storage().positions[user].originalDepositRay -= guaranteedAmountRay;
         }
 

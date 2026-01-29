@@ -37,6 +37,6 @@ contract ChainBalanceOracle is AccessManagedUpgradeable, IChainBalanceOracle {
         address currentAdapter = $storage().oracleAdapterByChainId[chainId];
         IChainBalanceOracleAdapter(adapter).getChainBalance(chainId);
         $storage().oracleAdapterByChainId[chainId] = adapter;
-        // emit ChainBalanceAdapterSet(currentAdapter, adapter);
+        // TODO: emit ChainBalanceAdapterSet(currentAdapter, adapter);
     }
 }

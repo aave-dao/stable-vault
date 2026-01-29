@@ -56,10 +56,5 @@ contract MockFundsHandler is IFundsHandler {
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) external payable override {}
 
-    function updateChainBalanceCallback(uint256 chainId, uint256 snapshotBalanceRay, uint256 snapshotTimestamp)
-        external
-        override
-    {}
-
     function fundsArrivedFromChainCallback(address asset, uint256 amount) external override {}
 }

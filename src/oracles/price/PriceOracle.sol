@@ -16,6 +16,8 @@ contract PriceOracle is AccessManagedUpgradeable, IPriceOracle {
     // (1 * (100_00 - MAX_DEVIATION_BPS)) / 100_00;
     uint256 immutable MIN_VALID_PRICE_RAY;
 
+    uint256 immutable MAX_PRICE_RAY = MathLib.RAY;
+
     /// @custom:storage-location erc7201:aave.storage.PriceOracle
     struct PriceOracleStorage {
         /// @dev Set of asset specific adapters for asset price oracles.
@@ -78,6 +80,10 @@ contract PriceOracle is AccessManagedUpgradeable, IPriceOracle {
             return 0;
         }
         IPriceOracleAdapter.OracleResponse memory response = IPriceOracleAdapter(oracleAdapter).getPrice(asset);
-        return response.isStale ? 0 : response.priceRay;
+        return response.isStale ? 0 : _capToMaxPrice(response.priceRay);
+    }
+
+    function _capToMaxPrice(uint256 priceRay) internal view returns (uint256) {
+        return priceRay > MAX_PRICE_RAY ? MAX_PRICE_RAY : priceRay;
     }
 }

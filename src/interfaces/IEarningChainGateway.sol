@@ -9,10 +9,6 @@ interface IEarningChainGateway is IChainGateway {
     /// @notice The aggregated balance of the Earning Chain.
     function getAggregatedBalance() external view returns (uint256);
 
-    /// @notice Sends a balance update to the Accounting Chain with bridging fees taken by specified payer.
-    /// @param bridgeParams The parameters for the bridge adapter.
-    function sendBalanceUpdateWithFeePayer(IBridgeAdapter.BridgeParams memory bridgeParams) external payable;
-
     /// @notice Withdraws a specific asset from the Allocator and bridges it to the Accounting Chain.
     /// @param asset The asset to withdraw.
     /// @param amount The `amount` must be in RAY to be token agnostic.

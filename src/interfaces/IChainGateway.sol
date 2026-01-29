@@ -29,7 +29,8 @@ interface IChainGateway {
         INVALID,
         BALANCE_SNAPSHOT,
         BRIDGE_IOU_TOKEN,
-        BURN_IOU_TOKEN
+        BURN_IOU_TOKEN,
+        DECREMENT_BALANCE_SNAPSHOT
     }
 
     /// @notice The representation of a cross-chain message.
@@ -61,13 +62,20 @@ interface IChainGateway {
     /// @notice The representation of a message to burn IOU tokens on a source chain.
     /// @dev For message type `BURN_IOU_TOKEN`.
     /// @param iouTokenAmountBurnedRay Amount of IOU tokens to burn.
-    /// @param chainBalanceSnapshotNonce Nonce of the balance snapshot on the source chain.
-    /// @param balanceSnapshotTotalAssetsInRay Cumulative balance of all tokens with common denomination in RAY on the
-    /// source chain.
     struct BurnIouTokenMessage {
         uint256 iouTokenAmountBurnedRay;
-        uint256 chainBalanceSnapshotNonce;
-        uint256 balanceSnapshotTotalAssetsInRay;
+    }
+
+    /// @notice The representation of a message to decrement the balance snapshot on a source chain.
+    /// @dev For message type `DECREMENT_BALANCE_SNAPSHOT`.
+    /// @dev Used when funds are bridged from an Earning Chain to an Accounting Chain, but the bridge is not used to
+    /// communicate the total balance snapshot.
+    /// @dev Decrementing the snapshot is not considered risky because at worst the total assets in the system will be
+    /// understated until an AMB is used to communicate the actual balance snapshot. This conservative logic may impact
+    /// the system's ability to estimate earned interest.
+    /// @param amountRay Amount to decrement the balance snapshot by in RAY.
+    struct DecrementBalanceSnapshotMessage {
+        uint256 amountRay;
     }
 
     /// @notice Gets the default bridge adapter for an asset and chain; the default adapter is used for outbound
