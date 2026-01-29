@@ -581,8 +581,8 @@ contract BasedBoostedVault is
         _validateAmountOfActiveSubVaults();
     }
 
-    function _getOrAssignUserSubVaultId(address user) internal returns (uint256 subVaultId) {
-        subVaultId = $storage().positions[user].subVaultId;
+    function _getOrAssignUserSubVaultId(address user) internal returns (uint256) {
+        uint256 subVaultId = $storage().positions[user].subVaultId;
         if (subVaultId == 0) {
             subVaultId = $storage().defaultSubVaultId;
             $storage().positions[user].subVaultId = subVaultId;
@@ -600,22 +600,14 @@ contract BasedBoostedVault is
         uint256 fullSharesToRedeem,
         uint256 fromSubVaultId,
         uint256 fromConversionRate
-    ) internal view returns (uint256 guaranteedAmountRay, uint256 fromUserShares) {
+    ) internal view returns (uint256, uint256) {
         if (amountRay == fullAmountRay) {
             return (fullGuaranteedAmountRay, fullSharesToRedeem);
         }
-
-        fromUserShares = amountRay.rayDivUp(fromConversionRate);
-
-        // Clamp shares to user's total if rounding caused overshoot
-        if (fromUserShares > fullSharesToRedeem) {
-            fromUserShares = fullSharesToRedeem;
-        }
-
-        // Revert if remaining shares would be below dust threshold - user should use transferAll() instead.
+        uint256 fromUserShares = amountRay.rayDivUp(fromConversionRate);
         require(_areRemainingSharesRedeemable(from, fromUserShares, fromSubVaultId), Errors.InvalidAmount());
-
-        guaranteedAmountRay = _getAmountTakenFromOriginalDeposit(from, amountRay);
+        uint256 guaranteedAmountRay = _getAmountTakenFromOriginalDeposit(from, amountRay);
+        return (guaranteedAmountRay, fromUserShares);
     }
 
     function _addSubVaultToActive(uint256 subVaultId) internal {
