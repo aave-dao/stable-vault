@@ -249,6 +249,7 @@ contract BasedBoostedVault is
 
         (uint256 amountOfWithdrawalRay, uint256 guaranteedAmountRay, uint256 fromUserShares) =
             _previewFullWithdrawalRequest(from);
+        require(amountOfWithdrawalRay > Constants.MIN_WITHDRAWABLE_AMOUNT_RAY, Errors.InvalidAmount());
 
         uint256 toSubVaultId = _getOrAssignUserSubVaultId(to);
 
@@ -351,24 +352,6 @@ contract BasedBoostedVault is
 
         emit WithdrawalRequested(user, subVaultId, actualAmountInRay, guaranteedAmountRay);
         return actualAmountInRay;
-    }
-
-    function _areRemainingSharesRedeemable(address user, uint256 redeemedShares, uint256 subVaultId)
-        internal
-        view
-        returns (bool)
-    {
-        // We want the remainder after a partial withdrawal to be redeemable for at least 1 wei (18-dec) of value.
-        // A share balance S (in RAY units) redeems to:
-        //   valueRay = rayMulDown(S * conversionRate)
-        // and it is withdrawable iff:
-        //   rayMulDown(S * conversionRate) >= 1e9
-        // which implies:
-        //   S >= rayDivUp(1e9, conversionRate)
-        uint256 minSharesToRedeemOneWei =
-            Constants.MIN_WITHDRAWABLE_AMOUNT_RAY.rayDivUp($storage().subVaultById[subVaultId].conversionRate);
-        uint256 remainingSharesAfterRedeem = $storage().positions[user].shares - redeemedShares;
-        return remainingSharesAfterRedeem >= minSharesToRedeemOneWei;
     }
 
     /// @inheritdoc IBasedBoostedVault
@@ -564,6 +547,7 @@ contract BasedBoostedVault is
                 _addSubVaultToActive(toSubVaultId);
             }
         }
+        _validateAmountOfActiveSubVaults();
 
         if (from == to) {
             $storage().positions[to].subVaultId = toSubVaultId;
@@ -577,9 +561,10 @@ contract BasedBoostedVault is
         }
 
         _mintShares(to, toSubVaultId, sharesToMint);
-        _validateAmountOfActiveSubVaults();
     }
 
+    /// @dev Gets the user's subVaultId or assigns a default subVaultId if the user has no position.
+    /// @dev A position is created for the user if they do not have one.
     function _getOrAssignUserSubVaultId(address user) internal returns (uint256) {
         uint256 subVaultId = $storage().positions[user].subVaultId;
         if (subVaultId == 0) {
@@ -609,6 +594,24 @@ contract BasedBoostedVault is
         require(_areRemainingSharesRedeemable(from, fromUserShares, fromSubVaultId), Errors.InvalidAmount());
         uint256 guaranteedAmountRay = _getAmountTakenFromOriginalDeposit(from, amountRay);
         return (guaranteedAmountRay, fromUserShares);
+    }
+
+    function _areRemainingSharesRedeemable(address user, uint256 redeemedShares, uint256 subVaultId)
+        internal
+        view
+        returns (bool)
+    {
+        // We want the remainder after a partial withdrawal to be redeemable for at least 1 wei (18-dec) of value.
+        // A share balance S (in RAY units) redeems to:
+        //   valueRay = rayMulDown(S * conversionRate)
+        // and it is withdrawable iff:
+        //   rayMulDown(S * conversionRate) >= 1e9
+        // which implies:
+        //   S >= rayDivUp(1e9, conversionRate)
+        uint256 minSharesToRedeemOneWei =
+            Constants.MIN_WITHDRAWABLE_AMOUNT_RAY.rayDivUp($storage().subVaultById[subVaultId].conversionRate);
+        uint256 remainingSharesAfterRedeem = $storage().positions[user].shares - redeemedShares;
+        return remainingSharesAfterRedeem >= minSharesToRedeemOneWei;
     }
 
     function _addSubVaultToActive(uint256 subVaultId) internal {

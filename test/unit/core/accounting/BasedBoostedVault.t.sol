@@ -2001,6 +2001,28 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         bbv.transferAll(recipient);
     }
 
+    function test_transferAll_reverts_ifAmountBelowMinimum() public {
+        address user = makeAddr("user");
+        address recipient = makeAddr("recipient");
+        vm.assume(user != address(0));
+        vm.assume(recipient != address(0));
+        vm.assume(user != recipient);
+        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(recipient, address(bbv));
+
+        IMockErc20 mockAsset18dp = IMockErc20(address(new MockNonStandardErc20("Test GHO", "tGHO", 18)));
+        uint256 amount = 1;
+        mockAsset18dp.mint(user, amount);
+        vm.prank(user);
+        mockAsset18dp.forceApprove(address(bbv), amount);
+        vm.prank(user);
+        bbv.deposit(user, address(mockAsset18dp), amount);
+
+        vm.expectRevert(Errors.InvalidAmount.selector);
+        vm.prank(user);
+        bbv.transferAll(recipient);
+    }
+
     function test_transferAll_reverts_ifRecipientGetsZeroShares() public {
         // Override bbv with a low default sub-vault rate (RAY = no interest)
         // and use an 18-decimal asset so 1 wei deposit = 1e9 RAY = MIN_WITHDRAWABLE_AMOUNT_RAY
