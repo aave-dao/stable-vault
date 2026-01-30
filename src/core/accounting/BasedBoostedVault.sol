@@ -208,25 +208,18 @@ contract BasedBoostedVault is
 
         uint256 fromConversionRate = _accrueSubVaultConversionRate(fromSubVaultId);
 
-        (uint256 fullAmountRay, uint256 fullGuaranteedAmountRay, uint256 fullSharesToRedeem) =
-            _previewFullWithdrawalRequest(from);
-
-        require(amountRay <= fullAmountRay, Errors.InsufficientFunds());
-
-        (uint256 guaranteedAmountRay, uint256 fromUserShares) = _computeTransferShares(
-            from,
-            amountRay,
-            fullAmountRay,
-            fullGuaranteedAmountRay,
-            fullSharesToRedeem,
-            fromSubVaultId,
-            fromConversionRate
-        );
+        (uint256 guaranteedAmountRay, uint256 fromUserShares) =
+            _computeTransferShares(from, amountRay, fromSubVaultId, fromConversionRate);
 
         uint256 toSubVaultId = _getOrAssignUserSubVaultId(to);
-        uint256 toConversionRate =
-            (toSubVaultId == fromSubVaultId) ? fromConversionRate : _accrueSubVaultConversionRate(toSubVaultId);
-        uint256 toUserShares = amountRay.rayDivDown(toConversionRate);
+
+        uint256 toUserShares;
+        if (toSubVaultId == fromSubVaultId) {
+            toUserShares = amountRay.rayDivDown(fromConversionRate);
+        } else {
+            uint256 toConversionRate = _accrueSubVaultConversionRate(toSubVaultId);
+            toUserShares = amountRay.rayDivDown(toConversionRate);
+        }
         require(toUserShares > 0, Errors.InvalidAmount());
 
         _moveShares({
@@ -258,9 +251,14 @@ contract BasedBoostedVault is
             _previewFullWithdrawalRequest(from);
 
         uint256 toSubVaultId = _getOrAssignUserSubVaultId(to);
-        uint256 toConversionRate =
-            (toSubVaultId == fromSubVaultId) ? fromConversionRate : _accrueSubVaultConversionRate(toSubVaultId);
-        uint256 toUserShares = fromUserShares.rayMulDown(fromConversionRate).rayDivDown(toConversionRate);
+
+        uint256 toUserShares;
+        if (toSubVaultId == fromSubVaultId) {
+            toUserShares = fromUserShares;
+        } else {
+            uint256 toConversionRate = _accrueSubVaultConversionRate(toSubVaultId);
+            toUserShares = fromUserShares.rayMulDown(fromConversionRate).rayDivDown(toConversionRate);
+        }
         require(toUserShares > 0, Errors.InvalidAmount());
 
         _moveShares({
@@ -593,15 +591,15 @@ contract BasedBoostedVault is
 
     /// @dev Computes the shares to burn from sender and guaranteed amount for a transfer.
     /// @dev Reverts if remaining shares would be below dust threshold - caller should use transferAll() instead.
-    function _computeTransferShares(
-        address from,
-        uint256 amountRay,
-        uint256 fullAmountRay,
-        uint256 fullGuaranteedAmountRay,
-        uint256 fullSharesToRedeem,
-        uint256 fromSubVaultId,
-        uint256 fromConversionRate
-    ) internal view returns (uint256, uint256) {
+    function _computeTransferShares(address from, uint256 amountRay, uint256 fromSubVaultId, uint256 fromConversionRate)
+        internal
+        view
+        returns (uint256, uint256)
+    {
+        (uint256 fullAmountRay, uint256 fullGuaranteedAmountRay, uint256 fullSharesToRedeem) =
+            _previewFullWithdrawalRequest(from);
+        require(amountRay <= fullAmountRay, Errors.InsufficientFunds());
+
         if (amountRay == fullAmountRay) {
             return (fullGuaranteedAmountRay, fullSharesToRedeem);
         }
