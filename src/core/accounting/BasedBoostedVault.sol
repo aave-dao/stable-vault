@@ -249,6 +249,7 @@ contract BasedBoostedVault is
 
         (uint256 amountOfWithdrawalRay, uint256 guaranteedAmountRay, uint256 fromUserShares) =
             _previewFullWithdrawalRequest(from);
+        require(amountOfWithdrawalRay > Constants.MIN_WITHDRAWABLE_AMOUNT_RAY, Errors.InvalidAmount());
 
         uint256 toSubVaultId = _getOrAssignUserSubVaultId(to);
 
