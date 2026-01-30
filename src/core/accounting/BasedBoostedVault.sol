@@ -354,24 +354,6 @@ contract BasedBoostedVault is
         return actualAmountInRay;
     }
 
-    function _areRemainingSharesRedeemable(address user, uint256 redeemedShares, uint256 subVaultId)
-        internal
-        view
-        returns (bool)
-    {
-        // We want the remainder after a partial withdrawal to be redeemable for at least 1 wei (18-dec) of value.
-        // A share balance S (in RAY units) redeems to:
-        //   valueRay = rayMulDown(S * conversionRate)
-        // and it is withdrawable iff:
-        //   rayMulDown(S * conversionRate) >= 1e9
-        // which implies:
-        //   S >= rayDivUp(1e9, conversionRate)
-        uint256 minSharesToRedeemOneWei =
-            Constants.MIN_WITHDRAWABLE_AMOUNT_RAY.rayDivUp($storage().subVaultById[subVaultId].conversionRate);
-        uint256 remainingSharesAfterRedeem = $storage().positions[user].shares - redeemedShares;
-        return remainingSharesAfterRedeem >= minSharesToRedeemOneWei;
-    }
-
     /// @inheritdoc IBasedBoostedVault
     function executeWithdrawal(
         address user,
@@ -610,6 +592,24 @@ contract BasedBoostedVault is
         require(_areRemainingSharesRedeemable(from, fromUserShares, fromSubVaultId), Errors.InvalidAmount());
         uint256 guaranteedAmountRay = _getAmountTakenFromOriginalDeposit(from, amountRay);
         return (guaranteedAmountRay, fromUserShares);
+    }
+
+    function _areRemainingSharesRedeemable(address user, uint256 redeemedShares, uint256 subVaultId)
+        internal
+        view
+        returns (bool)
+    {
+        // We want the remainder after a partial withdrawal to be redeemable for at least 1 wei (18-dec) of value.
+        // A share balance S (in RAY units) redeems to:
+        //   valueRay = rayMulDown(S * conversionRate)
+        // and it is withdrawable iff:
+        //   rayMulDown(S * conversionRate) >= 1e9
+        // which implies:
+        //   S >= rayDivUp(1e9, conversionRate)
+        uint256 minSharesToRedeemOneWei =
+            Constants.MIN_WITHDRAWABLE_AMOUNT_RAY.rayDivUp($storage().subVaultById[subVaultId].conversionRate);
+        uint256 remainingSharesAfterRedeem = $storage().positions[user].shares - redeemedShares;
+        return remainingSharesAfterRedeem >= minSharesToRedeemOneWei;
     }
 
     function _addSubVaultToActive(uint256 subVaultId) internal {
