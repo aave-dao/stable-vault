@@ -563,6 +563,8 @@ contract BasedBoostedVault is
         _validateAmountOfActiveSubVaults();
     }
 
+    /// @dev Gets the user's subVaultId or assigns a default subVaultId if the user has no position.
+    /// @dev A position is created for the user if they do not have one.
     function _getOrAssignUserSubVaultId(address user) internal returns (uint256) {
         uint256 subVaultId = $storage().positions[user].subVaultId;
         if (subVaultId == 0) {
