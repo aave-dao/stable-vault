@@ -309,7 +309,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 IBridgeAdapter.publishMessageToChainWithFeePayer,
                 (
                     ACCOUNTING_CHAIN_ID,
-                    new IBridgeAdapter.BridgeAsset[](0),
+                    address(0),
+                    0,
                     abi.encode(
                         IChainGateway.CrossChainMessage({
                             messageType: IChainGateway.MessageType.BALANCE_SNAPSHOT,
@@ -357,7 +358,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 IBridgeAdapter.publishMessageToChainWithFeePayer,
                 (
                     ACCOUNTING_CHAIN_ID,
-                    new IBridgeAdapter.BridgeAsset[](0),
+                    address(0),
+                    0,
                     abi.encode(
                         IChainGateway.CrossChainMessage({
                             messageType: IChainGateway.MessageType.BALANCE_SNAPSHOT,
@@ -422,7 +424,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 IBridgeAdapter.publishMessageToChainWithFeePayer,
                 (
                     ACCOUNTING_CHAIN_ID,
-                    new IBridgeAdapter.BridgeAsset[](0),
+                    address(0),
+                    0,
                     abi.encode(
                         IChainGateway.CrossChainMessage({
                             messageType: IChainGateway.MessageType.BALANCE_SNAPSHOT,
@@ -463,7 +466,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 IBridgeAdapter.publishMessageToChainWithFeePayer,
                 (
                     ACCOUNTING_CHAIN_ID,
-                    new IBridgeAdapter.BridgeAsset[](0),
+                    address(0),
+                    0,
                     abi.encode(
                         IChainGateway.CrossChainMessage({
                             messageType: IChainGateway.MessageType.BALANCE_SNAPSHOT,
@@ -612,7 +616,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     IBridgeAdapter.publishMessageToChainWithFeePayer,
                     (
                         ACCOUNTING_CHAIN_ID,
-                        new IBridgeAdapter.BridgeAsset[](0),
+                        address(0),
+                        0,
                         data,
                         IBridgeAdapter.BridgeParams({
                             feePayer: bridgeFeePayer,
@@ -686,7 +691,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     IBridgeAdapter.publishMessageToChainWithFeePayer,
                     (
                         ACCOUNTING_CHAIN_ID,
-                        new IBridgeAdapter.BridgeAsset[](0),
+                        address(0),
+                        0,
                         data,
                         IBridgeAdapter.BridgeParams({
                             feePayer: bridgeFeePayer,
@@ -785,7 +791,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 address(_mockBridgeAdapterData),
                 abi.encodeCall(
                     IBridgeAdapter.publishMessageToChainWithFeePayer,
-                    (ACCOUNTING_CHAIN_ID, new IBridgeAdapter.BridgeAsset[](0), data, bridgeParams)
+                    (ACCOUNTING_CHAIN_ID, address(0), 0, data, bridgeParams)
                 )
             );
         }
@@ -1052,7 +1058,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     IBridgeAdapter.publishMessageToChainWithFeePayer,
                     (
                         ACCOUNTING_CHAIN_ID,
-                        _buildBridgeAssets(address(_mockUsdt), amountToken),
+                        address(_mockUsdt),
+                        amountToken,
                         data,
                         IBridgeAdapter.BridgeParams({
                             feePayer: sender,
@@ -1116,7 +1123,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     IBridgeAdapter.publishMessageToChainWithFeePayer,
                     (
                         ACCOUNTING_CHAIN_ID,
-                        _buildBridgeAssets(address(_mockUsdt), amountToken),
+                        address(_mockUsdt),
+                        amountToken,
                         data,
                         IBridgeAdapter.BridgeParams({
                             feePayer: sender,
@@ -1194,7 +1202,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     IBridgeAdapter.publishMessageToChainWithFeePayer,
                     (
                         ACCOUNTING_CHAIN_ID,
-                        _buildBridgeAssets(address(_mockGho), amountToken),
+                        address(_mockGho),
+                        amountToken,
                         data,
                         IBridgeAdapter.BridgeParams({
                             feePayer: sender,
@@ -1258,7 +1267,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     IBridgeAdapter.publishMessageToChainWithFeePayer,
                     (
                         ACCOUNTING_CHAIN_ID,
-                        _buildBridgeAssets(address(_mockGho), amountToken),
+                        address(_mockGho),
+                        amountToken,
                         data,
                         IBridgeAdapter.BridgeParams({
                             feePayer: sender,
@@ -1338,7 +1348,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     IBridgeAdapter.publishMessageToChainWithFeePayer,
                     (
                         ACCOUNTING_CHAIN_ID,
-                        _buildBridgeAssets(address(_mockUsdt), amountToken),
+                        address(_mockUsdt),
+                        amountToken,
                         data,
                         IBridgeAdapter.BridgeParams({
                             feePayer: feePayer,
@@ -1531,7 +1542,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 IBridgeAdapter.publishMessageToChainWithFeePayer,
                 (
                     ACCOUNTING_CHAIN_ID,
-                    new IBridgeAdapter.BridgeAsset[](0),
+                    address(0),
+                    0,
                     abi.encode(
                         IChainGateway.CrossChainMessage({
                             messageType: IChainGateway.MessageType.BRIDGE_IOU_TOKEN,
@@ -1589,7 +1601,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 IBridgeAdapter.publishMessageToChainWithFeePayer,
                 (
                     ACCOUNTING_CHAIN_ID,
-                    new IBridgeAdapter.BridgeAsset[](0),
+                    address(0),
+                    0,
                     abi.encode(
                         IChainGateway.CrossChainMessage({
                             messageType: IChainGateway.MessageType.BRIDGE_IOU_TOKEN,
@@ -1688,7 +1701,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             })
         );
         vm.prank(address(_mockBridgeAdapterData));
-        _earningChainGateway.receiveMessage(ACCOUNTING_CHAIN_ID, new IBridgeAdapter.BridgeAsset[](0), data);
+        _earningChainGateway.receiveMessage(ACCOUNTING_CHAIN_ID, address(0), 0, data);
     }
 
     function test_receiveMessage_givenWhitelistedNonDefaultBridgeAdapter(
@@ -1713,29 +1726,21 @@ contract EarningChainGatewayTest is TestWithHelpers {
             })
         );
         vm.prank(address(unknownAdapter));
-        _earningChainGateway.receiveMessage(ACCOUNTING_CHAIN_ID, new IBridgeAdapter.BridgeAsset[](0), data);
+        _earningChainGateway.receiveMessage(ACCOUNTING_CHAIN_ID, address(0), 0, data);
     }
 
-    function test_receiveMessage_whenBridgeFundsIsReceived(uint256 amountUsdt, uint256 amountGho) public {
+    function test_receiveMessage_whenBridgeFundsIsReceived(uint256 amountUsdt) public {
         amountUsdt = _boundAssetAmount(address(_mockUsdt), amountUsdt);
-        amountGho = _boundAssetAmount(address(_mockGho), amountGho);
 
         // mint this contract with the assets to mimic the Bridge Adapter
         _mockUsdt.mint(address(_mockBridgeAdapterAssets), amountUsdt);
         vm.prank(address(_mockBridgeAdapterAssets));
         MockNonStandardErc20(address(_mockUsdt)).approve(address(_earningChainGateway), amountUsdt);
-        _mockGho.mint(address(_mockBridgeAdapterAssets), amountGho);
-        vm.prank(address(_mockBridgeAdapterAssets));
-        MockNonStandardErc20(address(_mockGho)).approve(address(_earningChainGateway), amountGho);
 
         vm.expectCall(address(_mockAllocator), abi.encodeCall(IAllocator.deposit, (address(_mockUsdt), amountUsdt)));
-        vm.expectCall(address(_mockAllocator), abi.encodeCall(IAllocator.deposit, (address(_mockGho), amountGho)));
 
-        IBridgeAdapter.BridgeAsset[] memory bridgeAssets = new IBridgeAdapter.BridgeAsset[](2);
-        bridgeAssets[0] = IBridgeAdapter.BridgeAsset({asset: address(_mockUsdt), amount: amountUsdt});
-        bridgeAssets[1] = IBridgeAdapter.BridgeAsset({asset: address(_mockGho), amount: amountGho});
         vm.prank(address(_mockBridgeAdapterAssets));
-        _earningChainGateway.receiveMessage(ACCOUNTING_CHAIN_ID, bridgeAssets, "");
+        _earningChainGateway.receiveMessage(ACCOUNTING_CHAIN_ID, address(_mockUsdt), amountUsdt, "");
     }
 
     function test_receiveMessage_receiveFunds_succeedsWhenUnknownAdapter(uint256 amountUsdt) public {
@@ -1743,14 +1748,11 @@ contract EarningChainGatewayTest is TestWithHelpers {
         address adapter = makeAddr("adapter");
         MockNonStandardErc20(address(_mockUsdt)).mint(address(adapter), amountUsdt);
 
-        IBridgeAdapter.BridgeAsset[] memory bridgeAssets = new IBridgeAdapter.BridgeAsset[](1);
-        bridgeAssets[0] = IBridgeAdapter.BridgeAsset({asset: address(_mockUsdt), amount: amountUsdt});
-
         // Mimic usdt is transferred to the TransferHelper from the adapter
         _mockUsdt.mint(address(_mockTransferHelper), amountUsdt);
 
         vm.prank(adapter);
-        _earningChainGateway.receiveMessage(ACCOUNTING_CHAIN_ID, bridgeAssets, "");
+        _earningChainGateway.receiveMessage(ACCOUNTING_CHAIN_ID, address(_mockUsdt), amountUsdt, "");
 
         // Check balance of TransferHelper is amountUsdt as it would not have been pulled down by mock Allocator
         // Funds are transferred to the TransferHelper from the adapter
@@ -1762,7 +1764,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
         vm.expectRevert(IChainGateway.InvalidMessageType.selector);
         _earningChainGateway.receiveMessage(
             ACCOUNTING_CHAIN_ID,
-            new IBridgeAdapter.BridgeAsset[](0),
+            address(0),
+            0,
             abi.encode(
                 IChainGateway.CrossChainMessage({
                     messageType: IChainGateway.MessageType.INVALID,
@@ -1779,7 +1782,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
         vm.prank(makeAddr("notAdapter"));
         _earningChainGateway.receiveMessage(
             ACCOUNTING_CHAIN_ID,
-            new IBridgeAdapter.BridgeAsset[](0),
+            address(0),
+            0,
             abi.encode(
                 IChainGateway.CrossChainMessage({
                     messageType: IChainGateway.MessageType.BRIDGE_IOU_TOKEN,

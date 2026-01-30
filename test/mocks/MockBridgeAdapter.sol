@@ -4,6 +4,7 @@ pragma solidity ^0.8.22;
 
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
+import {Constants} from "src/types/Constants.sol";
 
 contract MockBridgeAdapter is IBridgeAdapter {
     address internal immutable TRANSFER_HELPER;
@@ -16,16 +17,15 @@ contract MockBridgeAdapter is IBridgeAdapter {
 
     function publishMessageToChainWithFeePayer(
         uint256 destinationChainId,
-        IBridgeAdapter.BridgeAsset[] memory assets,
+        address asset,
+        uint256 amount,
         bytes memory data,
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) external payable override {
         (destinationChainId, data);
         // pull assets from TH
-        if (assets.length > 0) {
-            for (uint256 i = 0; i < assets.length; i++) {
-                ITransferHelper(TRANSFER_HELPER).pull(assets[i].asset, assets[i].amount);
-            }
+        if (asset != Constants.ASSET_FOR_DATA_ONLY_BRIDGE && amount > 0) {
+            ITransferHelper(TRANSFER_HELPER).pull(asset, amount);
         }
         ITransferHelper(TRANSFER_HELPER).pull(bridgeParams.feeToken, bridgeParams.feeAmount);
     }

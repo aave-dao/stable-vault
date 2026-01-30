@@ -23,7 +23,6 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
     struct BaseChainGatewayStorage {
         /// @dev Set of adapters whitelisted for usage.
         /// @dev asset == address(0) for data-only bridging.
-        /// @dev Assumes token bridges also support Arbitrary Message Bridging.
         mapping(address asset => mapping(uint256 chainId => mapping(address adapter => bool))) supportedBridgeAdapters;
 
         /// @dev The adapter used to send assets/messages to a destination chain.
@@ -61,16 +60,13 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
     }
 
     /// @inheritdoc IChainGateway
-    function receiveMessage(uint256 sourceChainId, IBridgeAdapter.BridgeAsset[] memory assets, bytes memory data)
-        external
-        override
-    {
-        if (assets.length > 0) {
+    function receiveMessage(uint256 sourceChainId, address asset, uint256 amount, bytes memory data) external override {
+        if (asset != Constants.ASSET_FOR_DATA_ONLY_BRIDGE && amount > 0) {
             // Receiving of funds should not check for whitelisted adapter because we may want to recover tokens from
             // adapter even after removing the adapter. We may have to remove an adapter if we do not trust it for
             // receiving arbitrary messages.
             // If someone wants to send funds to the Gateway then it will take it.
-            _receiveFunds(assets);
+            _receiveFunds(asset, amount);
         }
         if (data.length > 0) {
             _receiveData(sourceChainId, data);
@@ -99,7 +95,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         );
         IBridgeAdapter(adapter)
             .publishMessageToChainWithFeePayer(
-                destinationChainId, new IBridgeAdapter.BridgeAsset[](0), bridgeIouTokenMessageEncoded, bridgeParams
+                destinationChainId, Constants.ASSET_FOR_DATA_ONLY_BRIDGE, 0, bridgeIouTokenMessageEncoded, bridgeParams
             );
     }
 
@@ -144,13 +140,10 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         bytes memory dataToBridge,
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) internal {
-        IBridgeAdapter.BridgeAsset[] memory assets;
-        if (assetToBridge != Constants.ASSET_FOR_DATA_ONLY_BRIDGE) {
-            assets = new IBridgeAdapter.BridgeAsset[](1);
-            assets[0] = IBridgeAdapter.BridgeAsset({asset: assetToBridge, amount: amountToBridge});
-        }
         IBridgeAdapter(adapter)
-            .publishMessageToChainWithFeePayer(destinationChainId, assets, dataToBridge, bridgeParams);
+            .publishMessageToChainWithFeePayer(
+                destinationChainId, assetToBridge, amountToBridge, dataToBridge, bridgeParams
+            );
     }
 
     function _beforeRescueTokens(
@@ -170,7 +163,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         _checkCanCall(_msgSender(), _msgData());
     }
 
-    function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal virtual;
+    function _receiveFunds(address asset, uint256 amount) internal virtual;
 
     function _receiveData(uint256 sourceChainId, bytes memory data) internal virtual;
 }

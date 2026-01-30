@@ -198,10 +198,8 @@ contract EarningChainGateway is
         }
     }
 
-    function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal override {
-        for (uint256 i = 0; i < assets.length; i++) {
-            IAllocator(ALLOCATOR).deposit(assets[i].asset, assets[i].amount);
-        }
+    function _receiveFunds(address asset, uint256 amount) internal override {
+        IAllocator(ALLOCATOR).deposit(asset, amount);
     }
 
     function _returnFundsWithBalanceSnapshot(

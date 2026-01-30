@@ -60,10 +60,8 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
         _sendCrossChainMessage(targetChainId, adapter, asset, amount, "", bridgeParams);
     }
 
-    function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal override {
-        for (uint256 i = 0; i < assets.length; i++) {
-            IFundsHandler(FUNDS_HANDLER).fundsArrivedFromChainCallback(assets[i].asset, assets[i].amount);
-        }
+    function _receiveFunds(address asset, uint256 amount) internal override {
+        IFundsHandler(FUNDS_HANDLER).fundsArrivedFromChainCallback(asset, amount);
     }
 
     function _receiveData(uint256 sourceChainId, bytes memory data) internal override {
