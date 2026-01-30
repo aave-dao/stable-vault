@@ -276,11 +276,13 @@ contract BasedBoostedVault is
             _previewFullWithdrawalRequest(from);
 
         uint256 toSubVaultId = _getOrAssignUserSubVaultId(to);
+        uint256 toUserShares;
         if (toSubVaultId != fromSubVaultId) {
-            _accrueSubVaultConversionRate(toSubVaultId);
+            uint256 toConversionRate = _accrueSubVaultConversionRate(toSubVaultId);
+            toUserShares = fromUserShares.rayMulDown(fromConversionRate).rayDivDown(toConversionRate);
+        } else {
+            toUserShares = fromUserShares;
         }
-        uint256 toConversionRate = _accrueSubVaultConversionRate(toSubVaultId);
-        uint256 toUserShares = fromUserShares.rayMulDown(fromConversionRate).rayDivDown(toConversionRate);
 
         _moveShares({
             from: from,
