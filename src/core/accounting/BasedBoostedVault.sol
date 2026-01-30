@@ -547,6 +547,7 @@ contract BasedBoostedVault is
                 _addSubVaultToActive(toSubVaultId);
             }
         }
+        _validateAmountOfActiveSubVaults();
 
         if (from == to) {
             $storage().positions[to].subVaultId = toSubVaultId;
@@ -560,7 +561,6 @@ contract BasedBoostedVault is
         }
 
         _mintShares(to, toSubVaultId, sharesToMint);
-        _validateAmountOfActiveSubVaults();
     }
 
     /// @dev Gets the user's subVaultId or assigns a default subVaultId if the user has no position.
