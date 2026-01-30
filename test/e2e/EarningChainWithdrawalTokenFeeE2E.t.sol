@@ -120,7 +120,7 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
         );
 
         // 3. Mimic time passing so that user1's balances increase.
-        vm.warp(183 days);
+        vm.warp(block.timestamp + 183 days);
         console.log("\nHalf a year has gone by so fast...");
 
         // Check the user's balance in the BBV on the Accounting Chain
@@ -364,7 +364,10 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
                 feeToken: address(bridgeFeeToken),
                 feeAmount: bridgeFeeAmount,
                 feeRefundThreshold: 0,
-                gasLimit: 100000,
+                // Use a higher gas limit to ensure the transaction is successful on Accounting Chain because the
+                // snapshot
+                // struct may be pushed to the FH storage.
+                gasLimit: 300000,
                 data: ""
             }),
             ""

@@ -75,8 +75,6 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
             _bridgeIouTokenFromEarningChain(crossChainMessage.data);
         } else if (crossChainMessage.messageType == IChainGateway.MessageType.BURN_IOU_TOKEN) {
             _burnIouToken(sourceChainId, crossChainMessage.data);
-        } else if (crossChainMessage.messageType == IChainGateway.MessageType.DECREMENT_BALANCE_SNAPSHOT) {
-            _decrementBalanceSnapshot(sourceChainId, crossChainMessage.data);
         } else {
             revert IChainGateway.InvalidMessageType();
         }
@@ -104,12 +102,5 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
         IChainGateway.BalanceSnapshot memory balanceSnapshot = abi.decode(data, (IChainGateway.BalanceSnapshot));
         IFundsHandler(FUNDS_HANDLER)
             .updateChainBalanceCallback(sourceChainId, balanceSnapshot.totalAssetsInRay, balanceSnapshot.nonce);
-    }
-
-    function _decrementBalanceSnapshot(uint256 sourceChainId, bytes memory data) internal {
-        IChainGateway.DecrementBalanceSnapshotMessage memory decrementBalanceSnapshotMessage =
-            abi.decode(data, (IChainGateway.DecrementBalanceSnapshotMessage));
-        IFundsHandler(FUNDS_HANDLER)
-            .decrementChainBalanceSnapshotCallback(sourceChainId, decrementBalanceSnapshotMessage.amountRay);
     }
 }

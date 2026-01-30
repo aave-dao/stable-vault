@@ -5,13 +5,13 @@ pragma solidity ^0.8.22;
 import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {Vm} from "forge-std/Vm.sol";
 
 import {FundsHandler} from "src/core/accounting/FundsHandler.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
-import {IRescuableAssets} from "src/interfaces/IRescuableAssets.sol";
+import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
+import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
@@ -319,76 +319,6 @@ contract FundsHandlerTest is TestWithHelpers {
         assertEq(fundsHandler.getAssetBalances()[0].chainId, chainId);
     }
 
-    function test_decrementChainBalanceSnapshotCallback_reverts_ifMsgSenderIsNotTheGateway(
-        address msgSender,
-        uint256 amountToDecrementRay
-    ) public {
-        uint256 chainId = 1;
-        _assumeNotProxyAdmin(msgSender, address(fundsHandler));
-        vm.assume(msgSender != address(mockGateway));
-
-        amountToDecrementRay = _boundRayAmount(amountToDecrementRay);
-
-        vm.expectRevert(Errors.OnlyGateway.selector);
-        vm.prank(msgSender);
-        fundsHandler.decrementChainBalanceSnapshotCallback(chainId, amountToDecrementRay);
-    }
-
-    function test_decrementChainBalanceSnapshotCallback_decrementsChainBalance(
-        uint256 chainId,
-        uint256 currentSnapshotBalanceRay,
-        uint256 amountToDecrementRay
-    ) public {
-        vm.assume(chainId != block.chainid);
-        currentSnapshotBalanceRay = _boundRayAmountAllowingZero(currentSnapshotBalanceRay);
-        amountToDecrementRay = _boundRayAmount(amountToDecrementRay);
-
-        assertEq(fundsHandler.getAssetBalances().length, 0);
-
-        // First use the update chain balance callback to set the snapshot balance
-        vm.prank(address(mockGateway));
-        fundsHandler.updateChainBalanceCallback(chainId, currentSnapshotBalanceRay, 0);
-
-        assertEq(fundsHandler.getAssetBalances().length, 1);
-        assertEq(fundsHandler.getAssetBalances()[0].asset, address(0));
-        assertEq(fundsHandler.getAssetBalances()[0].amountRay, currentSnapshotBalanceRay);
-        assertEq(fundsHandler.getAssetBalances()[0].chainId, chainId);
-
-        // Then use the decrement chain balance snapshot callback to decrement the snapshot balance
-        vm.expectEmit(true, true, true, true);
-        emit IFundsHandler.ChainBalanceSnapshotDecremented(chainId, amountToDecrementRay);
-        vm.prank(address(mockGateway));
-        fundsHandler.decrementChainBalanceSnapshotCallback(chainId, amountToDecrementRay);
-
-        assertEq(fundsHandler.getAssetBalances().length, 1);
-        assertEq(fundsHandler.getAssetBalances()[0].asset, address(0));
-        if (currentSnapshotBalanceRay >= amountToDecrementRay) {
-            assertEq(fundsHandler.getAssetBalances()[0].amountRay, currentSnapshotBalanceRay - amountToDecrementRay);
-        } else {
-            assertEq(fundsHandler.getAssetBalances()[0].amountRay, 0);
-        }
-        assertEq(fundsHandler.getAssetBalances()[0].chainId, chainId);
-    }
-
-    function test_decrementChainBalanceSnapshotCallback_decrementsChainBalance_currentSnapshotDoesNotExist(
-        uint256 chainId,
-        uint256 amountToDecrementRay
-    ) public {
-        // Context: check that the event ChainBalanceSnapshotDecremented is not emitted.
-        vm.assume(chainId != block.chainid);
-        amountToDecrementRay = _boundRayAmount(amountToDecrementRay);
-
-        assertEq(fundsHandler.getAssetBalances().length, 0);
-
-        vm.recordLogs();
-        vm.prank(address(mockGateway));
-        fundsHandler.decrementChainBalanceSnapshotCallback(chainId, amountToDecrementRay);
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        assertEq(logs.length, 0);
-
-        assertEq(fundsHandler.getAssetBalances().length, 0);
-    }
-
     function test_updateChainBalanceCallback_updatesChainBalanceIfChainSendsBalanceSnapshotForFirstTimeRegardlessOfNonce(
         uint256 chainId,
         uint256 snapshotBalanceRay,
@@ -522,13 +452,13 @@ contract FundsHandlerTest is TestWithHelpers {
         mockAsset.mint(address(fundsHandler), fhAssetBalance);
 
         mockAccessManager.mockRejectCall(
-            unauthorizedMsgSender, address(fundsHandler), IRescuableAssets.rescueTokens.selector
+            unauthorizedMsgSender, address(fundsHandler), IRescuableToken.rescueTokens.selector
         );
         vm.expectRevert(
             abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
         );
         vm.prank(unauthorizedMsgSender);
-        IRescuableAssets(address(fundsHandler)).rescueTokens(address(mockAsset), assetAmountToRescue);
+        IRescuableToken(address(fundsHandler)).rescueTokens(address(mockAsset), assetAmountToRescue);
     }
 
     function test_rescueTokens_getsExpectedAmountOfAssetsToMsgSender(
@@ -547,13 +477,13 @@ contract FundsHandlerTest is TestWithHelpers {
         vm.assume(mockAsset.balanceOf(msgSender) == 0);
 
         vm.prank(msgSender);
-        IRescuableAssets(address(fundsHandler)).rescueTokens(address(mockAsset), assetAmountToRescue);
+        IRescuableToken(address(fundsHandler)).rescueTokens(address(mockAsset), assetAmountToRescue);
 
         assertEq(mockAsset.balanceOf(msgSender), assetAmountToRescue);
         assertEq(mockAsset.balanceOf(address(fundsHandler)), fhAssetBalance - assetAmountToRescue);
     }
 
-    function test_rescueTokens_getExpectedAmountOfNativeAssetToMsgSender(
+    function test_rescueNative_getExpectedAmountOfNativeAssetToMsgSender(
         uint256 fhAssetBalance,
         uint256 assetAmountToRescue
     ) public {
@@ -569,13 +499,13 @@ contract FundsHandlerTest is TestWithHelpers {
         vm.assume(address(msgSender).balance == 0);
 
         vm.prank(msgSender);
-        IRescuableAssets(address(fundsHandler)).rescueTokens(address(0), assetAmountToRescue);
+        IRescuableNative(address(fundsHandler)).rescueNative(assetAmountToRescue);
 
         assertEq(address(msgSender).balance, assetAmountToRescue);
         assertEq(address(fundsHandler).balance, fhAssetBalance - assetAmountToRescue);
     }
 
-    function test_rescueTokens_reverts_ifNativeTransferFails(uint256 fhAssetBalance, uint256 assetAmountToRescue)
+    function test_rescueNative_reverts_ifNativeTransferFails(uint256 fhAssetBalance, uint256 assetAmountToRescue)
         public
     {
         fhAssetBalance = _boundNativeAmount(fhAssetBalance);
@@ -590,7 +520,7 @@ contract FundsHandlerTest is TestWithHelpers {
 
         vm.prank(msgSender);
         vm.expectRevert(abi.encodeWithSelector(Errors.NativeTransferFailed.selector));
-        IRescuableAssets(address(fundsHandler)).rescueTokens(address(0), assetAmountToRescue);
+        IRescuableNative(address(fundsHandler)).rescueNative(assetAmountToRescue);
     }
 
     function test_pushFundsToChain_reverts_ifMsgSenderIsNotAuthorized(
@@ -859,8 +789,6 @@ contract FundsHandlerTest is TestWithHelpers {
 
         mockGateway.mockToConsumeAssetFromTransferHelperInNextCall(address(mockAsset), bridgeParams_feeAmount + amount);
 
-        vm.expectEmit(true, true, true, true);
-        emit IFundsHandler.ChainBalanceSnapshotIncremented(chainId, amount.assetDecimalsToRay(address(mockAsset)));
         vm.expectCall(
             address(mockGateway),
             abi.encodeCall(
@@ -869,90 +797,9 @@ contract FundsHandlerTest is TestWithHelpers {
             )
         );
         fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, bridgeParams);
-    }
 
-    function test_pushFundsToChain_createsBalanceSnapshotIfChainWasNotPreviouslyUsed(
-        uint256 amount,
-        uint256 chainId,
-        uint256 bridgeParams_feeAmount,
-        uint256 bridgeParams_gasLimit
-    ) public {
-        vm.assume(chainId != block.chainid);
-        amount = _boundAssetAmount(address(mockAsset), amount);
-        bridgeParams_feeAmount = _boundAssetAmount(address(mockAsset), bridgeParams_feeAmount);
-        mockAsset.mint(address(this), bridgeParams_feeAmount);
-        mockAsset.forceApprove(address(fundsHandler), bridgeParams_feeAmount);
-
+        // Check that the snapshot is still empty
         assertEq(fundsHandler.getAssetBalances().length, 0);
-
-        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
-            feePayer: address(this),
-            feeToken: address(mockAsset),
-            feeAmount: bridgeParams_feeAmount,
-            feeRefundThreshold: 0,
-            gasLimit: bridgeParams_gasLimit,
-            data: ""
-        });
-
-        mockAsset.mint(address(mockAllocator), amount);
-        mockAllocator.mockToPushToTransferHelperInNextCall(address(mockAsset), amount);
-
-        mockGateway.mockToConsumeAssetFromTransferHelperInNextCall(address(mockAsset), bridgeParams_feeAmount + amount);
-
-        fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, bridgeParams);
-
-        assertEq(fundsHandler.getAssetBalances().length, 1);
-        assertEq(fundsHandler.getAssetBalances()[0].asset, address(0));
-        assertEq(fundsHandler.getAssetBalances()[0].amountRay, amount.assetDecimalsToRay(address(mockAsset)));
-        assertEq(fundsHandler.getAssetBalances()[0].chainId, chainId);
-    }
-
-    function test_pushFundsToChain_createsBalanceSnapshotIncrementingExistingChainBalance(
-        uint256 amount,
-        uint256 chainId,
-        uint256 currentChainBalanceRay,
-        uint256 nonce,
-        uint256 bridgeParams_feeAmount,
-        uint256 bridgeParams_gasLimit
-    ) public {
-        vm.assume(chainId != block.chainid);
-        currentChainBalanceRay = _boundRayAmountAllowingZero(currentChainBalanceRay);
-        amount = _boundAssetAmount(address(mockAsset), amount);
-        bridgeParams_feeAmount = _boundAssetAmount(address(mockAsset), bridgeParams_feeAmount);
-        mockAsset.mint(address(this), bridgeParams_feeAmount);
-        mockAsset.forceApprove(address(fundsHandler), bridgeParams_feeAmount);
-
-        vm.prank(address(mockGateway));
-        fundsHandler.updateChainBalanceCallback(chainId, currentChainBalanceRay, nonce);
-
-        assertEq(fundsHandler.getAssetBalances().length, 1);
-        assertEq(fundsHandler.getAssetBalances()[0].asset, address(0));
-        assertEq(fundsHandler.getAssetBalances()[0].amountRay, currentChainBalanceRay);
-        assertEq(fundsHandler.getAssetBalances()[0].chainId, chainId);
-
-        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
-            feePayer: address(this),
-            feeToken: address(mockAsset),
-            feeAmount: bridgeParams_feeAmount,
-            feeRefundThreshold: 0,
-            gasLimit: bridgeParams_gasLimit,
-            data: ""
-        });
-
-        mockAsset.mint(address(mockAllocator), amount);
-        mockAllocator.mockToPushToTransferHelperInNextCall(address(mockAsset), amount);
-
-        mockGateway.mockToConsumeAssetFromTransferHelperInNextCall(address(mockAsset), bridgeParams_feeAmount + amount);
-
-        fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, bridgeParams);
-
-        assertEq(fundsHandler.getAssetBalances().length, 1);
-        assertEq(fundsHandler.getAssetBalances()[0].asset, address(0));
-        assertEq(
-            fundsHandler.getAssetBalances()[0].amountRay,
-            currentChainBalanceRay + amount.assetDecimalsToRay(address(mockAsset))
-        );
-        assertEq(fundsHandler.getAssetBalances()[0].chainId, chainId);
     }
 
     //////////////////////////////////////////////// HELPERS ///////////////////////////////////////////////////////////

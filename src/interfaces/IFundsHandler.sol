@@ -18,17 +18,6 @@ interface IFundsHandler {
     /// @param nonce Nonce of the balance snapshot from the source chain.
     event ChainBalanceSnapshotReceived(uint256 chainId, uint256 amountRay, uint256 nonce);
 
-    /// @notice Emitted when the chain balance snapshot is updated before pushing funds to a chain.
-    /// @param chainId Chain id of the chain that funds are being pushed to.
-    /// @param deltaAmountRay Amount of the asset to increment the chain balance snapshot by in RAY.
-    event ChainBalanceSnapshotIncremented(uint256 chainId, uint256 deltaAmountRay);
-
-    /// @notice Emitted when the chain balance snapshot is decremented when ingesting funds through a bridge adapter
-    /// that is not used to communicate the total balance snapshot.
-    /// @param chainId Chain id of the chain that the funds arrived from.
-    /// @param deltaAmountRay Amount of the asset to decrement the chain balance snapshot by in RAY.
-    event ChainBalanceSnapshotDecremented(uint256 chainId, uint256 deltaAmountRay);
-
     /// @notice The representation of an asset balance.
     /// @param asset Address of the asset.
     /// @param amountRay Amount of the asset in RAY.
@@ -83,9 +72,4 @@ interface IFundsHandler {
     /// @param asset Address of the asset that arrived from the chain.
     /// @param amount Amount of the asset that arrived from the chain.
     function fundsArrivedFromChainCallback(address asset, uint256 amount) external;
-
-    /// @notice Callback function to decrement a chain balance snapshot.
-    /// @param chainId Chain id of the chain that the balance snapshot was decremented on.
-    /// @param amountRay Amount to decrement the balance snapshot by in RAY.
-    function decrementChainBalanceSnapshotCallback(uint256 chainId, uint256 amountRay) external;
 }

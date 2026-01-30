@@ -16,6 +16,7 @@ import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {Constants} from "src/types/Constants.sol";
+import {Errors} from "src/types/Errors.sol";
 
 /// @title CcipAdapter
 /// @author Aave Labs
@@ -95,13 +96,15 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
             IERC20(bridgeParams.feeToken).safeIncreaseAllowance(CCIP_ROUTER, bridgeParams.feeAmount);
         }
         ITransferHelper(TRANSFER_HELPER).pull(assetsToPull, amountsToPull);
+        address destinationChainAdapter = _destinationChainAdapterOf[destinationChainId];
+        require(destinationChainAdapter != address(0), Errors.InvalidParameter());
         Client.EVM2AnyMessage memory ccipMessage = Client.EVM2AnyMessage({
-            receiver: abi.encode(_destinationChainAdapterOf[destinationChainId]),
+            receiver: abi.encode(destinationChainAdapter),
             data: data,
             tokenAmounts: tokenAmounts,
             feeToken: bridgeParams.feeToken,
             extraArgs: Client._argsToBytes(
-                Client.GenericExtraArgsV2({gasLimit: bridgeParams.gasLimit, allowOutOfOrderExecution: false})
+                Client.GenericExtraArgsV2({gasLimit: bridgeParams.gasLimit, allowOutOfOrderExecution: true})
             )
         });
         _sendMessageWithFeePayer(
@@ -112,6 +115,10 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
             bridgeParams.feeAmount,
             bridgeParams.feeRefundThreshold
         );
+        if (bridgeParams.feeToken != Constants.NATIVE_CURRENCY) {
+            // Reset allowance to avoid any remaining allowance on the fee token to the CCIP Router.
+            IERC20(bridgeParams.feeToken).forceApprove(CCIP_ROUTER, 0);
+        }
     }
 
     /// @inheritdoc IAny2EVMMessageReceiver
@@ -122,11 +129,7 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
             // scenario where the funds are received, but the message is not processed successfully, as this can lead to
             // double-counting of funds, given that the balance snapshot will still reflect the funds that were just
             // received.
-            require(
-                abi.decode(message.sender, (address))
-                    == _destinationChainAdapterOf[_chainIdOf[message.sourceChainSelector]],
-                OnlyDestinationChainAdapter()
-            );
+            _validateMessageSource(message);
             IChainGateway(GATEWAY)
                 .receiveMessage(
                     _chainIdOf[message.sourceChainSelector], new IBridgeAdapter.BridgeAsset[](0), message.data
@@ -194,5 +197,25 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
         } else {
             IERC20(feeToken).safeTransfer(feePayer, excessFee);
         }
+    }
+
+    function _validateMessageSource(Client.Any2EVMMessage calldata message) internal view {
+        uint256 chainIdFromMessageChainSelector = _chainIdOf[message.sourceChainSelector];
+        address destinationChainAdapter = _destinationChainAdapterOf[chainIdFromMessageChainSelector];
+        require(destinationChainAdapter != address(0), Errors.InvalidParameter());
+        require(
+            message.sourceChainSelector == _chainSelectorOf[chainIdFromMessageChainSelector], Errors.InvalidParameter()
+        );
+        require(_safeAbiDecodeEvmSender(message.sender) == destinationChainAdapter, OnlyDestinationChainAdapter());
+    }
+
+    function _safeAbiDecodeEvmSender(bytes calldata abiEncodedEvmSender) internal pure returns (address) {
+        require(
+            abiEncodedEvmSender.length == Constants.ABI_ENCODED_EVM_ADDRESS_BYTE_LENGTH,
+            ICcipBridgeAdapter.UnexpectedDataLength()
+        );
+        bytes32 value = bytes32(abiEncodedEvmSender[0:Constants.ABI_ENCODED_EVM_ADDRESS_BYTE_LENGTH]);
+        require((value & Constants.ABI_ENCODED_EVM_ADDRESS_MASK) == value, Errors.InvalidParameter());
+        return abi.decode(abiEncodedEvmSender, (address));
     }
 }

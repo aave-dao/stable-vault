@@ -5,6 +5,9 @@ pragma solidity ^0.8.22;
 import {
     AccessManagedUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
+import {
+    ReentrancyGuardTransientUpgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardTransientUpgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -17,7 +20,8 @@ import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {Multicall} from "src/misc/Multicall.sol";
-import {RescuableAssets} from "src/misc/RescuableAssets.sol";
+import {RescuableNative} from "src/misc/RescuableNative.sol";
+import {RescuableToken} from "src/misc/RescuableToken.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
@@ -30,9 +34,11 @@ import {Errors} from "src/types/Errors.sol";
 /// deposit and on withdrawal execution.
 contract BasedBoostedVault is
     AccessManagedUpgradeable,
-    RescuableAssets,
+    RescuableNative,
+    RescuableToken,
     TransferHelperClient,
     Multicall,
+    ReentrancyGuardTransientUpgradeable,
     IBasedBoostedVault
 {
     using MathLib for uint256;
@@ -160,6 +166,7 @@ contract BasedBoostedVault is
     function deposit(address user, address asset, uint256 amount)
         external
         override
+        nonReentrant
         assertingTransferHelperBalanceFor(asset)
     {
         require(IAssetRegistry(ASSET_REGISTRY).isUserDepositAllowed(asset), Errors.UnsupportedAsset(asset));
@@ -294,10 +301,18 @@ contract BasedBoostedVault is
         $storage().subVaultById[subVaultId].perSecondRate = newPerSecondRate;
         $storage().subVaultIdByRate[newPerSecondRate] = subVaultId;
         emit SubVaultRateSet(subVaultId, newPerSecondRate);
+        if ($storage().defaultSubVaultId == subVaultId) {
+            emit DefaultSubVaultSet(subVaultId, newPerSecondRate);
+        }
     }
 
     /// @inheritdoc IBasedBoostedVault
-    function requestWithdrawal(address user, uint256 requestedAmountInRay) external override returns (uint256) {
+    function requestWithdrawal(address user, uint256 requestedAmountInRay)
+        external
+        override
+        nonReentrant
+        returns (uint256)
+    {
         require(user == msg.sender, OnlyUser());
 
         uint256 subVaultId = $storage().positions[user].subVaultId;
@@ -361,7 +376,7 @@ contract BasedBoostedVault is
         uint256 minAmountOut,
         uint256 iouAmountRay,
         bytes memory data
-    ) external override assertingTransferHelperBalanceFor(assetOut) {
+    ) external override nonReentrant assertingTransferHelperBalanceFor(assetOut) {
         require(user == msg.sender, OnlyUser());
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(user, iouAmountRay);
         uint256 amountOutRay = IWithdrawalPolicy(WITHDRAWAL_POLICY)
@@ -765,13 +780,18 @@ contract BasedBoostedVault is
     }
 
     function _beforeRescueTokens(
-        address, // asset
+        address, // token
         uint256 // amount
     )
         internal
         virtual
         override
     {
+        // Equivalent to adding the `restricted` modifier.
+        _checkCanCall(_msgSender(), _msgData());
+    }
+
+    function _beforeRescueNative(uint256) internal virtual override {
         // Equivalent to adding the `restricted` modifier.
         _checkCanCall(_msgSender(), _msgData());
     }

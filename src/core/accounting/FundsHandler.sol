@@ -11,14 +11,21 @@ import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
-import {RescuableAssets} from "src/misc/RescuableAssets.sol";
+import {RescuableNative} from "src/misc/RescuableNative.sol";
+import {RescuableToken} from "src/misc/RescuableToken.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
 import {Errors} from "src/types/Errors.sol";
 
 /// @title FundsHandler
 /// @author Aave Labs
 /// @notice Handles push/pull of funds across the system.
-contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, TransferHelperClient, IFundsHandler {
+contract FundsHandler is
+    AccessManagedUpgradeable,
+    RescuableNative,
+    RescuableToken,
+    TransferHelperClient,
+    IFundsHandler
+{
     using AssetLib for uint256;
 
     /// @notice The representation of an Earnings Chain's balance snapshot.
@@ -156,8 +163,6 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, TransferHelp
         // Pull funds from liquidity into the TransferHelper.
         _pullFundsFromImmediateLiquidity(asset, amount);
 
-        // Increment the chain balance snapshot for the target chain.
-        _updateChainBalanceBeforeBridging(chainId, amount.assetDecimalsToRay(asset));
         IAccountingChainGateway(GATEWAY).sendPushFundsToChainMessage(asset, amount, chainId, bridgeParams);
     }
 
@@ -170,11 +175,6 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, TransferHelp
         onlyGateway
     {
         _updateChainBalance(chainId, snapshotBalanceRay, chainBalanceSnapshotNonce);
-    }
-
-    /// @inheritdoc IFundsHandler
-    function decrementChainBalanceSnapshotCallback(uint256 chainId, uint256 amountRay) external override onlyGateway {
-        _decrementChainBalanceSnapshot(chainId, amountRay);
     }
 
     /// @inheritdoc IFundsHandler
@@ -210,42 +210,6 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, TransferHelp
         emit ChainBalanceSnapshotReceived(chainId, snapshotBalanceRay, chainBalanceSnapshotNonce);
     }
 
-    ////////////////////////////////////////////////// INTERNAL /////////////////////////////////////////////////////
-
-    /// @dev This does not update the chain balance snapshot nonce because any potential incoming snapshot data would be
-    /// ignored.
-    function _updateChainBalanceBeforeBridging(uint256 chainId, uint256 amountToIncrementRay) internal {
-        bool chainExists;
-        for (uint16 i = 0; i < $storage().chainBalances.length; i++) {
-            if ($storage().chainBalances[i].chainId == chainId) {
-                chainExists = true;
-                $storage().chainBalances[i].amountRay += amountToIncrementRay;
-            }
-        }
-        if (!chainExists) {
-            $storage().chainBalances
-                .push(ChainBalanceSnapshot({chainId: chainId, amountRay: amountToIncrementRay, nonce: 0}));
-        }
-        emit ChainBalanceSnapshotIncremented(chainId, amountToIncrementRay);
-    }
-
-    /// @dev This does not update the chain balance snapshot nonce because any potential incoming snapshot data would be
-    /// ignored.
-    function _decrementChainBalanceSnapshot(uint256 chainId, uint256 amountToDecrementRay) internal {
-        for (uint16 i = 0; i < $storage().chainBalances.length; i++) {
-            if ($storage().chainBalances[i].chainId == chainId) {
-                // It is possible for the existing snapshot to be stale and not reflect earnings on the Earning Chain.
-                // If the amount to decrement is greater than the existing snapshot, set the snapshot to 0.
-                if ($storage().chainBalances[i].amountRay >= amountToDecrementRay) {
-                    $storage().chainBalances[i].amountRay -= amountToDecrementRay;
-                } else {
-                    $storage().chainBalances[i].amountRay = 0;
-                }
-                emit ChainBalanceSnapshotDecremented(chainId, amountToDecrementRay);
-            }
-        }
-    }
-
     function _pushFundsToImmediateLiquidity(address asset, uint256 amount) internal {
         IAllocator(ALLOCATOR).deposit(asset, amount);
     }
@@ -255,13 +219,18 @@ contract FundsHandler is AccessManagedUpgradeable, RescuableAssets, TransferHelp
     }
 
     function _beforeRescueTokens(
-        address, // asset
+        address, // token
         uint256 // amount
     )
         internal
         virtual
         override
     {
+        // Equivalent to adding the `restricted` modifier.
+        _checkCanCall(_msgSender(), _msgData());
+    }
+
+    function _beforeRescueNative(uint256) internal virtual override {
         // Equivalent to adding the `restricted` modifier.
         _checkCanCall(_msgSender(), _msgData());
     }
