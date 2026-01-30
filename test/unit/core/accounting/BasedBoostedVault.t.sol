@@ -1732,7 +1732,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         vm.prank(user);
         vm.expectRevert(Errors.InvalidAmount.selector);
-        bbv.transfer(recipient, amountRay);
+        assertFalse(bbv.transfer(recipient, amountRay));
 
         // User should use transferAll() instead
         vm.prank(user);
@@ -1807,7 +1807,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         vm.expectRevert(Errors.InvalidParameter.selector);
         vm.prank(user);
-        bbv.transfer(user, amountRay);
+        assertFalse(bbv.transfer(user, amountRay));
     }
 
     function test_transfer_handlesLargeConversionRateDifferential() public {
@@ -1881,7 +1881,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         vm.prank(user);
         vm.expectRevert(Errors.InvalidAmount.selector);
-        bbv.transfer(recipient, amountRay);
+        assertFalse(bbv.transfer(recipient, amountRay));
     }
 
     function test_transfer_emitsTransferEvent(address user, address recipient, uint256 depositAmount) public {
@@ -1901,7 +1901,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         emit IBasedBoostedVault.Transfer(user, recipient, amountRay);
 
         vm.prank(user);
-        bbv.transfer(recipient, amountRay);
+        assertTrue(bbv.transfer(recipient, amountRay));
     }
 
     function test_transfer_fullBalanceViaTransfer(address user, address recipient, uint256 depositAmount) public {
