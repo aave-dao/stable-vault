@@ -1137,6 +1137,74 @@ contract CcipAdapterTest is TestWithHelpers {
         _accountingChainCcipAdapter.processReceivedFunds(new Client.EVMTokenAmount[](0));
     }
 
+    function test_ccipReceive_reverts_ifDestinationChainAdapterNotSetForSourceChain(uint64 unknownChainSelector)
+        public
+    {
+        // Use a chain selector that doesn't have a destination adapter configured
+        vm.assume(unknownChainSelector != EARNING_CHAIN_CCIP_SELECTOR);
+        vm.assume(unknownChainSelector != ACCOUNTING_CHAIN_CCIP_SELECTOR);
+        vm.assume(unknownChainSelector != 0);
+
+        bytes memory arbitraryData = abi.encode(keccak256(hex"c0ffee"));
+
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        vm.prank(address(_mockCCIPRouter));
+        _accountingChainCcipAdapter.ccipReceive(
+            Client.Any2EVMMessage({
+                messageId: 0,
+                sourceChainSelector: unknownChainSelector,
+                sender: abi.encode(makeAddr("anySender")),
+                data: arbitraryData,
+                destTokenAmounts: new Client.EVMTokenAmount[](0)
+            })
+        );
+    }
+
+    function test_ccipReceive_reverts_ifChainSelectorMismatch() public {
+        // This test covers the require that validates:
+        // message.sourceChainSelector == _chainSelectorOf[chainIdFromMessageChainSelector]
+        //
+        // Create an inconsistent state by setting a new chain selector for an existing chain ID.
+        // The old selector's reverse mapping (_chainIdOf) still points to the chain ID, but
+        // the chain ID now maps to a different selector.
+
+        uint64 staleChainSelector = 999;
+        uint64 newChainSelector = 888;
+        uint256 testChainId = 42;
+
+        // First, set up a chain with selector 999
+        vm.prank(everyRoleAccount);
+        _accountingChainCcipAdapter.setChainSelector(testChainId, staleChainSelector);
+
+        // Set a destination adapter for this chain
+        vm.prank(everyRoleAccount);
+        _accountingChainCcipAdapter.setDestinationChainAdapter(testChainId, makeAddr("someAdapter"));
+
+        // Now update the chain to use a different selector (888)
+        // This overwrites _chainSelectorOf[testChainId] = 888
+        // But _chainIdOf[999] still equals testChainId (stale mapping)
+        vm.prank(everyRoleAccount);
+        _accountingChainCcipAdapter.setChainSelector(testChainId, newChainSelector);
+
+        bytes memory arbitraryData = abi.encode(keccak256(hex"c0ffee"));
+
+        // Try to receive a message using the stale selector (999)
+        // _chainIdOf[999] = testChainId (still exists)
+        // _destinationChainAdapterOf[testChainId] = someAdapter (passes first check)
+        // _chainSelectorOf[testChainId] = 888 != 999 (fails second check)
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        vm.prank(address(_mockCCIPRouter));
+        _accountingChainCcipAdapter.ccipReceive(
+            Client.Any2EVMMessage({
+                messageId: 0,
+                sourceChainSelector: staleChainSelector,
+                sender: abi.encode(makeAddr("someAdapter")),
+                data: arbitraryData,
+                destTokenAmounts: new Client.EVMTokenAmount[](0)
+            })
+        );
+    }
+
     function test_publishMessageToChainWithFeePayer_resetsAdapterToRouterAllowanceToZero_FeeTokenNotBeingBridged(
         uint256 amountGho,
         address feePayer,
