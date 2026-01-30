@@ -195,8 +195,8 @@ contract BasedBoostedVault is
 
     /// @notice Transfers BBV balance (denominated in RAY) between users.
     /// @dev This is accounting-only (no IOUs, no assets, no WithdrawalPolicy).
-    /// @dev If the remaining sender balance after a partial transfer would be below the dust threshold, the transfer
-    /// is upgraded to a full transfer (i.e. it may transfer more than requested by < MIN_WITHDRAWABLE_AMOUNT_RAY).
+    /// @dev For full balance transfers, use transferAll() instead.
+    /// @dev Reverts if the remaining sender balance after transfer would be below dust threshold.
     function transfer(address to, uint256 amountRay) external override returns (bool) {
         address from = msg.sender;
         require(amountRay >= Constants.MIN_WITHDRAWABLE_AMOUNT_RAY, Errors.InvalidAmount());
@@ -206,43 +206,20 @@ contract BasedBoostedVault is
         uint256 fromSubVaultId = $storage().positions[from].subVaultId;
         require(fromSubVaultId != 0, NonExistentPosition());
 
-        _accrueSubVaultConversionRate(fromSubVaultId);
+        uint256 fromConversionRate = _accrueSubVaultConversionRate(fromSubVaultId);
 
-        (uint256 fullAmountRay, uint256 fullGuaranteedAmountRay, uint256 fullSharesToRedeem) =
-            _previewFullWithdrawalRequest(from);
-
-        require(amountRay <= fullAmountRay, Errors.InsufficientFunds());
-
-        uint256 guaranteedAmountRay;
-        uint256 fromUserShares;
-
-        if (amountRay == fullAmountRay) {
-            guaranteedAmountRay = fullGuaranteedAmountRay;
-            fromUserShares = fullSharesToRedeem;
-        } else {
-            uint256 conversionRate = $storage().subVaultById[fromSubVaultId].conversionRate;
-            fromUserShares = amountRay.rayDivUp(conversionRate);
-
-            // TODO: Attempting a full withdrawal here. Might not be needed as we have transferAll for this and backend
-            // should be smart enough to choose that one in case of a full withdrawal.
-            if (fromUserShares > fullSharesToRedeem) {
-                require(fullAmountRay - amountRay < Constants.MIN_WITHDRAWABLE_AMOUNT_RAY, Errors.InvalidAmount());
-                amountRay = fullAmountRay;
-                guaranteedAmountRay = fullGuaranteedAmountRay;
-                fromUserShares = fullSharesToRedeem;
-            } else if (!_areRemainingSharesRedeemable(from, fromUserShares, fromSubVaultId)) {
-                amountRay = fullAmountRay;
-                guaranteedAmountRay = fullGuaranteedAmountRay;
-                fromUserShares = fullSharesToRedeem;
-            } else {
-                // TODO: If we skip the full withdrawal above - this is the only path we need:
-                guaranteedAmountRay = _getAmountTakenFromOriginalDeposit(from, amountRay);
-            }
-        }
+        (uint256 guaranteedAmountRay, uint256 fromUserShares) =
+            _computeTransferShares(from, amountRay, fromSubVaultId, fromConversionRate);
 
         uint256 toSubVaultId = _getOrAssignUserSubVaultId(to);
-        uint256 toConversionRate = _accrueSubVaultConversionRate(toSubVaultId);
-        uint256 toUserShares = amountRay.rayDivDown(toConversionRate);
+
+        uint256 toUserShares;
+        if (toSubVaultId == fromSubVaultId) {
+            toUserShares = amountRay.rayDivDown(fromConversionRate);
+        } else {
+            uint256 toConversionRate = _accrueSubVaultConversionRate(toSubVaultId);
+            toUserShares = amountRay.rayDivDown(toConversionRate);
+        }
         require(toUserShares > 0, Errors.InvalidAmount());
 
         _moveShares({
@@ -255,8 +232,6 @@ contract BasedBoostedVault is
             guaranteedAmountRay: guaranteedAmountRay
         });
 
-        // TODO: If we allow full withdrawals above - should we have another bespoke event telling us it was a full
-        // withdrawal and `from` user was removed?
         emit Transfer(from, to, amountRay);
         return true;
     }
@@ -276,13 +251,15 @@ contract BasedBoostedVault is
             _previewFullWithdrawalRequest(from);
 
         uint256 toSubVaultId = _getOrAssignUserSubVaultId(to);
+
         uint256 toUserShares;
-        if (toSubVaultId != fromSubVaultId) {
+        if (toSubVaultId == fromSubVaultId) {
+            toUserShares = fromUserShares;
+        } else {
             uint256 toConversionRate = _accrueSubVaultConversionRate(toSubVaultId);
             toUserShares = fromUserShares.rayMulDown(fromConversionRate).rayDivDown(toConversionRate);
-        } else {
-            toUserShares = fromUserShares;
         }
+        require(toUserShares > 0, Errors.InvalidAmount());
 
         _moveShares({
             from: from,
@@ -294,7 +271,6 @@ contract BasedBoostedVault is
             guaranteedAmountRay: guaranteedAmountRay
         });
 
-        // TODO: Should we have another bespoke event telling it was a full withdrawal and `from` user was removed?
         emit Transfer(from, to, amountOfWithdrawalRay);
         return true;
     }
@@ -604,13 +580,35 @@ contract BasedBoostedVault is
         _validateAmountOfActiveSubVaults();
     }
 
-    function _getOrAssignUserSubVaultId(address user) internal returns (uint256 subVaultId) {
-        subVaultId = $storage().positions[user].subVaultId;
+    function _getOrAssignUserSubVaultId(address user) internal returns (uint256) {
+        uint256 subVaultId = $storage().positions[user].subVaultId;
         if (subVaultId == 0) {
             subVaultId = $storage().defaultSubVaultId;
             $storage().positions[user].subVaultId = subVaultId;
         }
         return subVaultId;
+    }
+
+    /// @dev Computes the shares to burn from sender and guaranteed amount for a transfer.
+    /// @dev Reverts if remaining shares would be below dust threshold - caller should use transferAll() instead.
+    function _computeTransferShares(address from, uint256 amountRay, uint256 fromSubVaultId, uint256 fromConversionRate)
+        internal
+        view
+        returns (uint256, uint256)
+    {
+        (uint256 fullAmountRay, uint256 fullGuaranteedAmountRay, uint256 fullSharesToRedeem) =
+            _previewFullWithdrawalRequest(from);
+        require(amountRay <= fullAmountRay, Errors.InsufficientFunds());
+
+        if (amountRay == fullAmountRay) {
+            return (fullGuaranteedAmountRay, fullSharesToRedeem);
+        }
+
+        uint256 fromUserShares = amountRay.rayDivUp(fromConversionRate);
+
+        require(_areRemainingSharesRedeemable(from, fromUserShares, fromSubVaultId), Errors.InvalidAmount());
+        uint256 guaranteedAmountRay = _getAmountTakenFromOriginalDeposit(from, amountRay);
+        return (guaranteedAmountRay, fromUserShares);
     }
 
     function _addSubVaultToActive(uint256 subVaultId) internal {
