@@ -765,6 +765,46 @@ contract CcipAdapterTest is TestWithHelpers {
         assertEq(address(feePayer).balance, expectedFeeRefund);
     }
 
+    function test_publishMessageToChainWithFeePayer_dataOnlyMessage_withTokenBridgeFee(uint256 feeAmount) public {
+        feeAmount = _boundAssetAmount(address(_mockGho), feeAmount);
+
+        bytes memory arbitraryData = abi.encode(keccak256(hex"c0ffee"));
+
+        // Only fee token should be pulled, not any bridged asset
+        _mockTransferHelper.mockAsset(address(_mockGho), feeAmount);
+
+        // Should create message with empty tokenAmounts array
+        Client.EVM2AnyMessage memory expectedCcipMessage = Client.EVM2AnyMessage({
+            receiver: abi.encode(_earningChainCcipAdapter),
+            data: arbitraryData,
+            tokenAmounts: new Client.EVMTokenAmount[](0),
+            feeToken: address(_mockGho),
+            extraArgs: Client._argsToBytes(
+                Client.GenericExtraArgsV2({gasLimit: DEFAULT_GAS_LIMIT, allowOutOfOrderExecution: true})
+            )
+        });
+
+        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
+            feePayer: everyRoleAccount,
+            feeToken: address(_mockGho),
+            feeAmount: feeAmount,
+            feeRefundThreshold: 0,
+            gasLimit: DEFAULT_GAS_LIMIT,
+            data: ""
+        });
+
+        vm.expectCall(
+            address(_mockCCIPRouter),
+            0,
+            abi.encodeCall(IRouterClient.ccipSend, (EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage))
+        );
+        _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, bytes32(0));
+        vm.prank(address(_mockAccountingChainGateway));
+        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
+            EARNING_CHAIN_ID, address(0), 0, arbitraryData, bridgeParams
+        );
+    }
+
     function test_publishMessageToChainWithFeePayer_reverts_ifOnlyGateway(address caller) public {
         vm.assume(caller != address(_mockAccountingChainGateway));
         vm.assume(caller != address(_mockEarningChainGateway));
@@ -790,6 +830,28 @@ contract CcipAdapterTest is TestWithHelpers {
         vm.expectRevert(Errors.OnlyGateway.selector);
         _earningChainCcipAdapter.publishMessageToChainWithFeePayer(
             ACCOUNTING_CHAIN_ID,
+            address(0),
+            0,
+            "",
+            IBridgeAdapter.BridgeParams({
+                feePayer: everyRoleAccount,
+                feeToken: address(0),
+                feeAmount: 0,
+                feeRefundThreshold: 0,
+                gasLimit: 100000,
+                data: ""
+            })
+        );
+    }
+
+    function test_publishMessageToChainWithFeePayer_reverts_ifDestinationChainAdapterNotSet(uint256 destinationChainId)
+        public
+    {
+        vm.assume(destinationChainId != EARNING_CHAIN_ID);
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        vm.prank(address(_mockAccountingChainGateway));
+        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
+            destinationChainId,
             address(0),
             0,
             "",
