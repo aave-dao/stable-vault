@@ -6,6 +6,7 @@ import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessMana
 import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 import {IAny2EVMMessageReceiver} from "@chainlink-ccip/contracts/interfaces/IAny2EVMMessageReceiver.sol";
@@ -29,6 +30,7 @@ import {MockCCIPRouter} from "test/mocks/MockCcipRouter.sol";
 import {MockEarningChainGateway} from "test/mocks/MockEarningChainGateway.sol";
 import {IMockErc20} from "test/mocks/MockErc20.sol";
 import {MockNonStandardErc20} from "test/mocks/MockNonStandardErc20.sol";
+import {MockReentrantGateway} from "test/mocks/MockReentrantGateway.sol";
 import {MockTransferHelper} from "test/mocks/MockTransferHelper.sol";
 
 contract CcipAdapterTest is TestWithHelpers {
@@ -132,6 +134,59 @@ contract CcipAdapterTest is TestWithHelpers {
     function test_getChainId_EarningChain() public view {
         assertEq(_earningChainCcipAdapter.getChainId(ACCOUNTING_CHAIN_CCIP_SELECTOR), ACCOUNTING_CHAIN_ID);
         assertEq(_earningChainCcipAdapter.getChainId(EARNING_CHAIN_CCIP_SELECTOR), 0);
+    }
+
+    function test_getRetryableMessage_returnsEmptyForNonExistentMessage() public view {
+        bytes32 nonExistentMessageId = keccak256("nonExistent");
+        Client.Any2EVMMessage memory message = _accountingChainCcipAdapter.getRetryableMessage(nonExistentMessageId);
+
+        assertEq(message.messageId, bytes32(0));
+        assertEq(message.sourceChainSelector, 0);
+        assertEq(message.sender.length, 0);
+        assertEq(message.data.length, 0);
+        assertEq(message.destTokenAmounts.length, 0);
+    }
+
+    function test_getRetryableMessage_returnsStoredMessageAfterFailure() public {
+        uint256 amountUsdt = 100 * 10 ** 6;
+
+        // Mint to adapter to mimic bridged funds
+        _mockUsdt.mint(address(_accountingChainCcipAdapter), amountUsdt);
+
+        Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
+        ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
+
+        bytes32 messageId = keccak256("failedMessageId");
+        bytes memory arbitraryData = abi.encode(keccak256(hex"c0ffee"));
+
+        // Mock gateway to revert, causing message processing to fail
+        vm.mockCallRevert(
+            address(_mockAccountingChainGateway),
+            abi.encodeCall(IChainGateway.receiveMessage, (EARNING_CHAIN_ID, address(0), 0, arbitraryData)),
+            abi.encode("gateway error")
+        );
+
+        vm.prank(address(_mockCCIPRouter));
+        _accountingChainCcipAdapter.ccipReceive(
+            Client.Any2EVMMessage({
+                messageId: messageId,
+                sourceChainSelector: EARNING_CHAIN_CCIP_SELECTOR,
+                sender: abi.encode(address(_earningChainCcipAdapter)),
+                data: arbitraryData,
+                destTokenAmounts: ccipTokenAmounts
+            })
+        );
+
+        // Verify the message is stored and retrievable
+        Client.Any2EVMMessage memory storedMessage = _accountingChainCcipAdapter.getRetryableMessage(messageId);
+
+        assertEq(storedMessage.messageId, messageId);
+        assertEq(storedMessage.sourceChainSelector, EARNING_CHAIN_CCIP_SELECTOR);
+        assertEq(storedMessage.sender, abi.encode(address(_earningChainCcipAdapter)));
+        assertEq(storedMessage.data, arbitraryData);
+        assertEq(storedMessage.destTokenAmounts.length, 1);
+        assertEq(storedMessage.destTokenAmounts[0].token, address(_mockUsdt));
+        assertEq(storedMessage.destTokenAmounts[0].amount, amountUsdt);
     }
 
     function test_supportsInterface() public view {
@@ -1134,6 +1189,85 @@ contract CcipAdapterTest is TestWithHelpers {
         );
     }
 
+    function test_ccipReceive_blocksReentrancyAndStoresAsFailedMessage() public {
+        // Deploy a malicious gateway that attempts reentrancy via ccipReceive
+        MockReentrantGateway maliciousGateway = new MockReentrantGateway(address(_mockTransferHelper));
+
+        // Deploy a new adapter with the malicious gateway
+        CcipAdapter adapterWithMaliciousGateway = _deployCcipAdapter(
+            address(_mockAccessManager),
+            address(maliciousGateway),
+            address(_mockCCIPRouter),
+            address(_mockTransferHelper)
+        );
+
+        // Set up chain selectors and destination adapters
+        vm.prank(everyRoleAccount);
+        adapterWithMaliciousGateway.setChainSelector(EARNING_CHAIN_ID, EARNING_CHAIN_CCIP_SELECTOR);
+        vm.prank(everyRoleAccount);
+        adapterWithMaliciousGateway.setDestinationChainAdapter(EARNING_CHAIN_ID, address(_earningChainCcipAdapter));
+
+        bytes32 messageId = keccak256("reentrancyTest");
+        bytes memory arbitraryData = abi.encode(keccak256(hex"c0ffee"));
+
+        Client.Any2EVMMessage memory ccipMessage = Client.Any2EVMMessage({
+            messageId: messageId,
+            sourceChainSelector: EARNING_CHAIN_CCIP_SELECTOR,
+            sender: abi.encode(address(_earningChainCcipAdapter)),
+            data: arbitraryData,
+            destTokenAmounts: new Client.EVMTokenAmount[](0)
+        });
+
+        // Configure the malicious gateway to attempt reentrancy by calling ccipReceive again
+        maliciousGateway.setReentrancyTargetCcipReceive(address(adapterWithMaliciousGateway), ccipMessage);
+
+        // The reentrancy is blocked, and the defensive pattern catches the error and stores the messageas FAILED
+        // Expect MessageFailed event with the reentrancy error
+        // 1. enter into ccipReceive
+        // 2. enter into processMessage
+        // 3. re-enter into ccipReceive
+        // 4. re-entrancy check reverts
+        // 5. revert is caught in try/catch from step 2
+        // 6. message is stored as FAILED
+        // 7. emit MessageFailed event
+        vm.expectEmit(true, false, false, false);
+        emit IBridgeAdapter.MessageFailed(
+            messageId, abi.encodeWithSelector(ReentrancyGuard.ReentrancyGuardReentrantCall.selector)
+        );
+
+        vm.prank(address(_mockCCIPRouter));
+        adapterWithMaliciousGateway.ccipReceive(ccipMessage);
+
+        // Verify the message is stored as FAILED (can be retried later)
+        Client.Any2EVMMessage memory storedMessage = adapterWithMaliciousGateway.getRetryableMessage(messageId);
+        assertEq(storedMessage.messageId, messageId, "Message should be stored after reentrancy failure");
+    }
+
+    function test_ccipReceive_reverts_ifInsufficientGas_andMessageNotStored() public {
+        bytes32 messageId = keccak256("insufficientGasTest");
+        bytes memory arbitraryData = abi.encode(keccak256(hex"c0ffee"));
+
+        Client.Any2EVMMessage memory ccipMessage = Client.Any2EVMMessage({
+            messageId: messageId,
+            sourceChainSelector: EARNING_CHAIN_CCIP_SELECTOR,
+            sender: abi.encode(address(_earningChainCcipAdapter)),
+            data: arbitraryData,
+            destTokenAmounts: new Client.EVMTokenAmount[](0)
+        });
+
+        // Call with very limited gas (less than MIN_FAILURE_HANDLING_GAS_RESERVATION = 45,000)
+        // We need enough gas to pass the initial checks but not enough for the gas reservation
+        vm.expectRevert(ICcipBridgeAdapter.CCIPDefensiveReceiverInsufficientGas.selector);
+        vm.prank(address(_mockCCIPRouter));
+        _accountingChainCcipAdapter.ccipReceive{gas: 50_000}(ccipMessage);
+
+        // Verify the message was NOT stored (since the revert happened before storage)
+        Client.Any2EVMMessage memory storedMessage = _accountingChainCcipAdapter.getRetryableMessage(messageId);
+        assertEq(
+            storedMessage.messageId, bytes32(0), "Message should not be stored when insufficient gas revert occurs"
+        );
+    }
+
     function test_publishMessageToChainWithFeePayer_resetsAdapterToRouterAllowanceToZero_FeeTokenNotBeingBridged(
         uint256 amountGho,
         address feePayer,
@@ -1469,6 +1603,202 @@ contract CcipAdapterTest is TestWithHelpers {
             stuckUsdt,
             "Stuck USDT should remain in adapter after native fee bridge"
         );
+    }
+
+    function test_retryMessage_succeedsAfterFailureIsResolved() public {
+        uint256 amountUsdt = 100 * 10 ** 6;
+
+        // Mint to adapter to mimic bridged funds
+        _mockUsdt.mint(address(_accountingChainCcipAdapter), amountUsdt);
+
+        Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
+        ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
+
+        bytes32 messageId = keccak256("failedMessageId");
+        bytes memory arbitraryData = abi.encode(keccak256(hex"c0ffee"));
+
+        // Mock gateway to revert on first call causing the message to be stored as failed
+        vm.mockCallRevert(
+            address(_mockAccountingChainGateway),
+            abi.encodeCall(IChainGateway.receiveMessage, (EARNING_CHAIN_ID, address(0), 0, arbitraryData)),
+            abi.encode("gateway error")
+        );
+
+        vm.prank(address(_mockCCIPRouter));
+        _accountingChainCcipAdapter.ccipReceive(
+            Client.Any2EVMMessage({
+                messageId: messageId,
+                sourceChainSelector: EARNING_CHAIN_CCIP_SELECTOR,
+                sender: abi.encode(address(_earningChainCcipAdapter)),
+                data: arbitraryData,
+                destTokenAmounts: ccipTokenAmounts
+            })
+        );
+
+        // Verify message is stored
+        Client.Any2EVMMessage memory storedMessage = _accountingChainCcipAdapter.getRetryableMessage(messageId);
+        assertEq(storedMessage.messageId, messageId);
+
+        // Clear the mock revert to simulate the issue being resolved
+        vm.clearMockedCalls();
+
+        // Retry the message
+        vm.expectEmit(true, true, true, true);
+        emit IBridgeAdapter.MessageSucceeded(messageId);
+
+        vm.prank(everyRoleAccount);
+        _accountingChainCcipAdapter.retryMessage(messageId);
+
+        // Verify message is cleared after successful retry
+        Client.Any2EVMMessage memory clearedMessage = _accountingChainCcipAdapter.getRetryableMessage(messageId);
+        assertEq(clearedMessage.messageId, bytes32(0));
+    }
+
+    function test_retryMessage_revertsIfMessageNotRetryable() public {
+        bytes32 nonExistentMessageId = keccak256("nonExistent");
+
+        vm.expectRevert(abi.encodeWithSelector(ICcipBridgeAdapter.MessageNotRetryable.selector, nonExistentMessageId));
+        vm.prank(everyRoleAccount);
+        _accountingChainCcipAdapter.retryMessage(nonExistentMessageId);
+    }
+
+    function test_retryMessage_revertsIfNotAuthorized(address unauthorizedCaller) public {
+        vm.assume(unauthorizedCaller != everyRoleAccount);
+        vm.assume(unauthorizedCaller != address(0));
+        _assumeNotProxyAdmin(unauthorizedCaller, address(_accountingChainCcipAdapter));
+
+        // First create a failed message
+        uint256 amountUsdt = 100 * 10 ** 6;
+        _mockUsdt.mint(address(_accountingChainCcipAdapter), amountUsdt);
+
+        Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
+        ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
+
+        bytes32 messageId = keccak256("failedMessageId");
+        bytes memory arbitraryData = abi.encode(keccak256(hex"c0ffee"));
+
+        vm.mockCallRevert(
+            address(_mockAccountingChainGateway),
+            abi.encodeCall(IChainGateway.receiveMessage, (EARNING_CHAIN_ID, address(0), 0, arbitraryData)),
+            abi.encode("gateway error")
+        );
+
+        vm.prank(address(_mockCCIPRouter));
+        _accountingChainCcipAdapter.ccipReceive(
+            Client.Any2EVMMessage({
+                messageId: messageId,
+                sourceChainSelector: EARNING_CHAIN_CCIP_SELECTOR,
+                sender: abi.encode(address(_earningChainCcipAdapter)),
+                data: arbitraryData,
+                destTokenAmounts: ccipTokenAmounts
+            })
+        );
+
+        // Mock access manager to reject the unauthorized caller
+        vm.mockCall(
+            address(_mockAccessManager),
+            abi.encodeWithSelector(
+                IAccessManager.canCall.selector,
+                unauthorizedCaller,
+                address(_accountingChainCcipAdapter),
+                ICcipBridgeAdapter.retryMessage.selector
+            ),
+            abi.encode(false)
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedCaller));
+        vm.prank(unauthorizedCaller);
+        _accountingChainCcipAdapter.retryMessage(messageId);
+    }
+
+    function test_retryMessage_revertsIfAlreadyRetried() public {
+        uint256 amountUsdt = 100 * 10 ** 6;
+        _mockUsdt.mint(address(_accountingChainCcipAdapter), amountUsdt);
+
+        Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
+        ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
+
+        bytes32 messageId = keccak256("failedMessageId");
+        bytes memory arbitraryData = abi.encode(keccak256(hex"c0ffee"));
+
+        // Create a failed message
+        vm.mockCallRevert(
+            address(_mockAccountingChainGateway),
+            abi.encodeCall(IChainGateway.receiveMessage, (EARNING_CHAIN_ID, address(0), 0, arbitraryData)),
+            abi.encode("gateway error")
+        );
+
+        vm.prank(address(_mockCCIPRouter));
+        _accountingChainCcipAdapter.ccipReceive(
+            Client.Any2EVMMessage({
+                messageId: messageId,
+                sourceChainSelector: EARNING_CHAIN_CCIP_SELECTOR,
+                sender: abi.encode(address(_earningChainCcipAdapter)),
+                data: arbitraryData,
+                destTokenAmounts: ccipTokenAmounts
+            })
+        );
+
+        // Clear mocks and retry successfully
+        vm.clearMockedCalls();
+        vm.prank(everyRoleAccount);
+        _accountingChainCcipAdapter.retryMessage(messageId);
+
+        // Try to retry again - should fail
+        vm.expectRevert(abi.encodeWithSelector(ICcipBridgeAdapter.MessageNotRetryable.selector, messageId));
+        vm.prank(everyRoleAccount);
+        _accountingChainCcipAdapter.retryMessage(messageId);
+    }
+
+    function test_retryMessage_revertsOnReentrancy() public {
+        // Deploy a malicious gateway that attempts reentrancy
+        MockReentrantGateway maliciousGateway = new MockReentrantGateway(address(_mockTransferHelper));
+
+        // Deploy a new adapter with the malicious gateway
+        CcipAdapter adapterWithMaliciousGateway = _deployCcipAdapter(
+            address(_mockAccessManager),
+            address(maliciousGateway),
+            address(_mockCCIPRouter),
+            address(_mockTransferHelper)
+        );
+
+        // Set up chain selectors and destination adapters
+        vm.prank(everyRoleAccount);
+        adapterWithMaliciousGateway.setChainSelector(EARNING_CHAIN_ID, EARNING_CHAIN_CCIP_SELECTOR);
+        vm.prank(everyRoleAccount);
+        adapterWithMaliciousGateway.setDestinationChainAdapter(EARNING_CHAIN_ID, address(_earningChainCcipAdapter));
+
+        uint256 amountUsdt = 100 * 10 ** 6;
+        _mockUsdt.mint(address(adapterWithMaliciousGateway), amountUsdt);
+
+        Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
+        ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
+
+        bytes32 messageId = keccak256("reentrancyTest");
+        bytes memory arbitraryData = abi.encode(keccak256(hex"c0ffee"));
+
+        // Configure the malicious gateway to fail on first call (to store the message)
+        maliciousGateway.setShouldRevert(true);
+
+        vm.prank(address(_mockCCIPRouter));
+        adapterWithMaliciousGateway.ccipReceive(
+            Client.Any2EVMMessage({
+                messageId: messageId,
+                sourceChainSelector: EARNING_CHAIN_CCIP_SELECTOR,
+                sender: abi.encode(address(_earningChainCcipAdapter)),
+                data: arbitraryData,
+                destTokenAmounts: ccipTokenAmounts
+            })
+        );
+
+        // Configure the malicious gateway to attempt reentrancy on retry
+        maliciousGateway.setShouldRevert(false);
+        maliciousGateway.setReentrancyTarget(address(adapterWithMaliciousGateway), messageId);
+
+        // The retry should revert due to reentrancy guard
+        vm.expectRevert(ReentrancyGuard.ReentrancyGuardReentrantCall.selector);
+        vm.prank(everyRoleAccount);
+        adapterWithMaliciousGateway.retryMessage(messageId);
     }
 
     function _expectBridgeAssetsApproval(Client.EVMTokenAmount[] memory tokens) internal {
