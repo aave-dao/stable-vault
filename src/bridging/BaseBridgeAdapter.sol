@@ -67,13 +67,6 @@ abstract contract BaseBridgeAdapter is AccessManaged, RescuableNative, TransferH
         _destinationChainAdapterOf[chainId] = destinationChainAdapter;
     }
 
-    /// @inheritdoc IBridgeAdapter
-    function replayFundsReceiving(BridgeAsset[] memory assets) external virtual override {
-        for (uint256 i = 0; i < assets.length; i++) {
-            _processReceivedFunds(assets[i].asset, assets[i].amount);
-        }
-    }
-
     function _processReceivedFunds(address asset, uint256 amount) internal assertingTransferHelperBalanceFor(asset) {
         _transferToTransferHelper(asset, amount);
         IChainGateway(GATEWAY).receiveMessage(RECEIVED_FUNDS_ONLY_SOURCE_CHAIN_ID, asset, amount, "");

@@ -32,7 +32,5 @@ contract MockBridgeAdapter is IBridgeAdapter {
 
     function setDestinationChainAdapter(uint256 chainId, address destinationChainAdapter) external override {}
 
-    function replayFundsReceiving(IBridgeAdapter.BridgeAsset[] memory assets) external override {}
-
     receive() external payable {}
 }
