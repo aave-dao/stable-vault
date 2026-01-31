@@ -1886,14 +1886,4 @@ contract EarningChainGatewayTest is TestWithHelpers {
         allocatorBalances[1] = IAllocator.AllocatorBalance({asset: address(_mockGho), amount: amountGho});
         return allocatorBalances;
     }
-
-    function _buildBridgeAssets(address asset, uint256 amount)
-        internal
-        pure
-        returns (IBridgeAdapter.BridgeAsset[] memory)
-    {
-        IBridgeAdapter.BridgeAsset[] memory bridgeAssets = new IBridgeAdapter.BridgeAsset[](1);
-        bridgeAssets[0] = IBridgeAdapter.BridgeAsset({asset: asset, amount: amount});
-        return bridgeAssets;
-    }
 }
