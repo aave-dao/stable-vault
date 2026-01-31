@@ -129,8 +129,8 @@ contract FundsHandler is
     }
 
     /// @inheritdoc IFundsHandler
-    function processDeposit(address asset, uint256 amount) external override onlyBasedBoostedVault {
-        _pushFundsToImmediateLiquidity(asset, amount);
+    function processDeposit(address asset, uint256 amount) external override onlyBasedBoostedVault returns (uint256) {
+        return _pushFundsToImmediateLiquidity(asset, amount);
     }
 
     /// @inheritdoc IFundsHandler
@@ -210,8 +210,8 @@ contract FundsHandler is
         emit ChainBalanceSnapshotReceived(chainId, snapshotBalanceRay, chainBalanceSnapshotNonce);
     }
 
-    function _pushFundsToImmediateLiquidity(address asset, uint256 amount) internal {
-        IAllocator(ALLOCATOR).deposit(asset, amount);
+    function _pushFundsToImmediateLiquidity(address asset, uint256 amount) internal returns (uint256) {
+        return IAllocator(ALLOCATOR).deposit(asset, amount);
     }
 
     function _pullFundsFromImmediateLiquidity(address asset, uint256 amount) internal {

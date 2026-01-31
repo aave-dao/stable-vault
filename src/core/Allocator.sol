@@ -8,6 +8,7 @@ import {
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import {IAllocator} from "src/interfaces/IAllocator.sol";
@@ -38,16 +39,6 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     address internal immutable WITHDRAWER;
     address internal immutable ASSET_REGISTRY;
     uint8 internal immutable MAX_STRATEGIES_PER_ASSET;
-
-    /// @notice The configuration for a strategy.
-    /// @param asset The asset that the strategy is associated with (assumes 1 asset per strategy).
-    /// @param isRegistered Boolean indicating whether the strategy is configured.
-    /// @param depositAllowed Boolean indicating whether the strategy is allowed to be deposited into.
-    struct StrategyConfig {
-        address asset;
-        bool isRegistered;
-        bool depositAllowed;
-    }
 
     /// @custom:storage-location erc7201:aave.storage.Allocator
     struct AllocatorStorage {
@@ -135,6 +126,11 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     }
 
     /// @inheritdoc IAllocator
+    function getStrategyConfig(address strategy) external view override returns (StrategyConfig memory) {
+        return $storage().strategyConfigs[strategy];
+    }
+
+    /// @inheritdoc IAllocator
     function isStrategySupportedForAsset(address asset, address strategy) external view override returns (bool) {
         return _isStrategySupportedForAsset({strategy: strategy, asset: asset});
     }
@@ -145,12 +141,15 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     }
 
     /// @inheritdoc IAllocator
-    function deposit(address asset, uint256 amount) external override onlyDepositor {
+    function deposit(address asset, uint256 amount) external override onlyDepositor returns (uint256) {
         ITransferHelper(TRANSFER_HELPER).pull(asset, amount);
         require(IAssetRegistry(ASSET_REGISTRY).isDepositToAllocatorAllowed(asset), Errors.UnsupportedAsset(asset));
+        uint256 netDepositAmount = amount;
         if ($storage().defaultStrategyByAsset[asset] != address(0)) {
-            _depositToStrategy({asset: asset, amount: amount, strategy: $storage().defaultStrategyByAsset[asset]});
+            netDepositAmount =
+                _depositToStrategy({asset: asset, amount: amount, strategy: $storage().defaultStrategyByAsset[asset]});
         }
+        return Math.min(netDepositAmount, amount);
     }
 
     /// @inheritdoc IAllocator
@@ -222,8 +221,8 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     }
 
     /// @inheritdoc IAllocator
-    function addStrategy(address asset, address strategy) external override restricted {
-        _addStrategy(asset, strategy);
+    function addStrategy(address asset, address strategy, uint8 maxSlippageAmount) external override restricted {
+        _addStrategy(asset, strategy, maxSlippageAmount);
     }
 
     /// @inheritdoc IAllocator
@@ -368,16 +367,24 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     }
 
     /// @dev Intended to be the lowest level function used to deposit into a strategy.
-    function _depositToStrategy(address asset, uint256 amount, address strategy) internal {
+    function _depositToStrategy(address asset, uint256 amount, address strategy) internal returns (uint256) {
         require(amount > 0, Errors.ZeroAmount());
         require($storage().strategyConfigs[strategy].depositAllowed, DepositsToStrategyDisabled(strategy));
         IERC20(asset).forceApprove(strategy, amount);
-        (bool callSucceeded, bytes memory data) =
-            strategy.call(abi.encodeCall(IERC4626.deposit, (amount, address(this))));
+
+        uint256 balanceBefore = _getAssetBalanceInStrategy(IERC4626(strategy));
+
+        (bool callSucceeded,) = strategy.call(abi.encodeCall(IERC4626.deposit, (amount, address(this))));
         require(callSucceeded, DepositIntoStrategyFailed(strategy));
-        uint256 sharesMinted = abi.decode(data, (uint256));
-        require(sharesMinted != 0, Errors.InsufficientAmountOut());
-        emit AssetAllocated(asset, strategy, amount);
+
+        uint256 netDepositAmount = _getAssetBalanceInStrategy(IERC4626(strategy)) - balanceBefore;
+        require(
+            netDepositAmount >= amount
+                || amount - netDepositAmount <= $storage().strategyConfigs[strategy].maxSlippageAmount,
+            Errors.InsufficientAmountOut()
+        );
+        emit AssetAllocated(asset, strategy, amount, netDepositAmount);
+        return netDepositAmount;
     }
 
     /// @dev Returns balances grouped by asset.
@@ -414,19 +421,21 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         return $storage().strategyConfigs[strategy].asset != address(0);
     }
 
-    function _addStrategy(address asset, address strategy) internal {
+    function _addStrategy(address asset, address strategy, uint8 maxSlippageAmount) internal {
         require(!_isStrategySupported(strategy), Errors.AddressAlreadyWhitelisted());
         require(IAssetRegistry(ASSET_REGISTRY).isAssetRegistered(asset), Errors.InvalidAsset(asset));
         require(asset == IERC4626(strategy).asset(), Errors.InvalidAsset(asset));
 
-        $storage().strategyConfigs[strategy] = StrategyConfig({asset: asset, isRegistered: true, depositAllowed: true});
+        $storage().strategyConfigs[strategy] = StrategyConfig({
+            asset: asset, maxSlippageAmount: maxSlippageAmount, isRegistered: true, depositAllowed: true
+        });
         $storage().assetStrategies[asset].add(strategy);
 
         require(
             $storage().assetStrategies[asset].length() <= MAX_STRATEGIES_PER_ASSET, IAllocator.TooManyStrategies(asset)
         );
 
-        emit StrategyAdded(asset, strategy);
+        emit StrategyAdded(asset, strategy, maxSlippageAmount);
     }
 
     function _removeStrategy(address strategy) internal {

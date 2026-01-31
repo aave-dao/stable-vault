@@ -179,24 +179,30 @@ contract BasedBoostedVault is
         }
 
         uint256 conversionRate = _accrueSubVaultConversionRate(subVaultId);
-        uint256 amountInRay = amount.assetDecimalsToRay(asset);
-        // Round down the division to undershoot the amount of granted shares, favoring the protocol.
-        uint256 shares = amountInRay.rayDivDown(conversionRate);
-        // Prevent deposits that result in 0 shares to avoid user getting nothing in return for their deposit.
-        require(shares > 0, Errors.InvalidAmount());
 
         if (!_isActiveSubVaultById(subVaultId)) {
             _addSubVaultToActive(subVaultId);
             _validateAmountOfActiveSubVaults();
         }
 
+        _transferToTransferHelper(msg.sender, asset, amount);
+        uint256 netDepositAmount = IFundsHandler(FUNDS_HANDLER).processDeposit(asset, amount);
+
+        // Calculate the number of shares to mint based on the full amount deposited.
+        // If (amount - netDepositAmount) > 0, then this ~amount will be treated as interest earned.
+        // Round down the division to undershoot the amount of granted shares, favoring the protocol.
+        uint256 shares = amount.assetDecimalsToRay(asset).rayDivDown(conversionRate);
+        // Prevent deposits that result in 0 shares to avoid user getting nothing in return for their deposit.
+        require(shares > 0, Errors.InvalidAmount());
+
         $storage().subVaultById[subVaultId].totalShares += shares;
         $storage().positions[user].shares += shares;
-        $storage().positions[user].originalDepositRay += amountInRay;
-        $storage().globalOriginalDepositsRay += amountInRay;
-
-        _transferToTransferHelper(msg.sender, asset, amount);
-        IFundsHandler(FUNDS_HANDLER).processDeposit(asset, amount);
+        // Increment the original deposit amount by the net deposit amount only, not the full amount.
+        // This protects against the system gauranteeing the full amount of the asset deposited in the case an
+        // underlying strategy suffers slippage.
+        uint256 netDepositAmountInRay = netDepositAmount.assetDecimalsToRay(asset);
+        $storage().positions[user].originalDepositRay += netDepositAmountInRay;
+        $storage().globalOriginalDepositsRay += netDepositAmountInRay;
 
         emit Deposit(user, asset, amount);
     }

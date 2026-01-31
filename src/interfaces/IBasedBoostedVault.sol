@@ -31,7 +31,7 @@ interface IBasedBoostedVault {
 
     event WithdrawalExecuted(address indexed user, address asset, uint256 amount);
 
-    event Deposit(address indexed user, address indexed asset, uint256 amount);
+    event Deposit(address indexed user, address indexed asset, uint256 netDepositAmount);
 
     event UserRateSet(address indexed user, uint256 indexed subVaultId, uint256 newPerSecondRate);
 

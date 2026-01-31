@@ -24,6 +24,62 @@ contract EndToEndTest is BaseTest {
         super.setUp();
     }
 
+    function testDepositSlippageBase() public {
+        USDC.mint(user, 100e6);
+
+        // User deposits directly into the strategy vault.
+        vm.startPrank(user);
+        USDC.approve(address(usdcStrategyVault_accountingChain), 1e6);
+        usdcStrategyVault_accountingChain.deposit(1e6, user);
+        vm.stopPrank();
+
+        // Inflate the funds in the strategy vault.
+        USDC.mint(address(usdcStrategyVault_accountingChain), 1e3);
+
+        // User makes a deposit of 2 wei into BBV.
+        vm.startPrank(user);
+        USDC.approve(address(vault), 2);
+        vault.deposit(user, address(USDC), 2);
+
+        uint256 userBalanceInRay = vault.getUserBalance(user);
+        uint256 vaultAssetsInRay = vault.getAggregatedBalance();
+        console.log("userBalanceInRay %e", userBalanceInRay);
+        console.log("vaultAssetsInRay %e", vaultAssetsInRay);
+        assert(userBalanceInRay > vaultAssetsInRay);
+        // The user's balance in BBV is 1 unit of USDC greater than the actual assets in the system (this is treated as
+        // interest the system owes to the user).
+        assertEq(userBalanceInRay - vaultAssetsInRay, 1e21);
+        uint256 originalDepositRay = vault.getGlobalOriginalDepositAmount();
+        // Check that the original deposit is incremented by the amount of the net deposit.
+        assertEq(originalDepositRay, vaultAssetsInRay);
+    }
+
+    function testDepositSlippageInflatedVault_reverts_ifSlippageExceeded() public {
+        USDC.mint(user, 100e6);
+
+        // User deposits directly into the strategy vault.
+        vm.startPrank(user);
+        USDC.approve(address(usdcStrategyVault_accountingChain), 1);
+        usdcStrategyVault_accountingChain.deposit(1, user);
+        vm.stopPrank();
+
+        // Inflate the funds in the strategy vault.
+        USDC.mint(address(usdcStrategyVault_accountingChain), 1e6);
+
+        // Get the user to make a deposit of the amount for maximum loss - check that the deposit reverts if a slippage
+        // tolerane is exceeded.
+        uint256 amountForMaximumLoss = usdcStrategyVault_accountingChain.previewMint(2) - 1;
+        vm.startPrank(user);
+        USDC.approve(address(vault), amountForMaximumLoss);
+        vm.expectRevert(Errors.InsufficientAmountOut.selector);
+        vault.deposit(user, address(USDC), amountForMaximumLoss);
+
+        uint256 userBalanceInRay = vault.getUserBalance(user);
+        uint256 vaultAssetsInRay = vault.getAggregatedBalance();
+        assertEq(userBalanceInRay, vaultAssetsInRay);
+        assertEq(userBalanceInRay, 0);
+    }
+
     function test_endToEnd() public {
         console.log("\nEndToEndTest");
 
