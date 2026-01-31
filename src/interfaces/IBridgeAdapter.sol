@@ -21,10 +21,6 @@ interface IBridgeAdapter {
     /// @dev The message id matches the one in the `MessagePublished` event.
     event MessageSucceeded(bytes32 indexed messageId);
 
-    /// @notice Thrown when arbitrary data is not allowed to be bridged.
-    /// @custom:selector 0x48c51a0f
-    error ArbitraryDataNotAllowed();
-
     /// @notice Address checked is not the destination chain adapter.
     /// @custom:selector 0x75503511
     error OnlyDestinationChainAdapter();
@@ -32,11 +28,6 @@ interface IBridgeAdapter {
     /// @notice Address checked is not the bridge router.
     /// @custom:selector 0x60055a30
     error OnlyBridgeRouter();
-
-    struct BridgeAsset {
-        address asset;
-        uint256 amount;
-    }
 
     /// @notice The parameters for the bridge adapter.
     /// @param feePayer Address that will pay the bridge fee (also the recipient of any refund).
