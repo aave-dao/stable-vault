@@ -68,16 +68,17 @@ contract CcipAdapter is BaseBridgeAdapter, ReentrancyGuard, ICcipBridgeAdapter, 
         return _chainIdOf[ccipChainSelector];
     }
 
+    /// @inheritdoc ICcipBridgeAdapter
     function getRetryableMessage(bytes32 messageId) external view override returns (Client.Any2EVMMessage memory) {
         return _messageOf[messageId];
     }
 
     /// @inheritdoc ICcipBridgeAdapter
     function retryMessage(bytes32 messageId) external override nonReentrant restricted {
-        Client.Any2EVMMessage memory message = _messageOf[messageId];
-        if (!_isMessageRetryable(message)) {
+        if (!_isMessageRetryable(messageId)) {
             revert MessageNotRetryable(messageId);
         }
+        Client.Any2EVMMessage memory message = _messageOf[messageId];
         _messageStatusOf[messageId] = ICcipBridgeAdapter.MessageDataStatus.PROCESSED;
         _processMessage(message);
         emit MessageSucceeded(messageId);
@@ -192,8 +193,9 @@ contract CcipAdapter is BaseBridgeAdapter, ReentrancyGuard, ICcipBridgeAdapter, 
         }
     }
 
-    function _isMessageRetryable(Client.Any2EVMMessage memory message) internal view returns (bool) {
-        return _messageStatusOf[message.messageId] == ICcipBridgeAdapter.MessageDataStatus.FAILED;
+    function _isMessageRetryable(bytes32 messageId) internal view returns (bool) {
+        return _messageStatusOf[messageId] == ICcipBridgeAdapter.MessageDataStatus.FAILED
+            && _messageOf[messageId].messageId == messageId;
     }
 
     function _sendMessageWithFeePayer(
