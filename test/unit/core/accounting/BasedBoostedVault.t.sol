@@ -1760,6 +1760,78 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         assertEq(bbv.getUserBalance(recipient), fullAmountRay);
     }
 
+    function test_transfer_reverts_ifRecipientPostStateBelowDustThreshold() public {
+        address user = makeAddr("user");
+        address recipient = makeAddr("recipient");
+        uint256 newPerSecondRate = MathLib.RAY + 1;
+
+        vm.prank(manager);
+        bbv.setDefaultSubVault(newPerSecondRate);
+
+        _deposit(user, 2_000_000);
+        vm.warp(block.timestamp + 1);
+
+        uint256 amountRay = Constants.MIN_WITHDRAWABLE_AMOUNT_RAY;
+
+        vm.expectRevert(Errors.InvalidAmount.selector);
+        vm.prank(user);
+        assertFalse(bbv.transfer(recipient, amountRay));
+    }
+
+    function test_transfer_receiverDustThresholdBoundary(uint256 amountRayDelta) public {
+        address user = makeAddr("user");
+        address recipient = makeAddr("recipient");
+        uint256 newPerSecondRate = MathLib.RAY + 1;
+
+        amountRayDelta = bound(amountRayDelta, 0, 2);
+
+        vm.prank(manager);
+        bbv.setDefaultSubVault(newPerSecondRate);
+
+        _deposit(user, 2_000_000);
+        vm.warp(block.timestamp + 1);
+
+        uint256 amountRay = Constants.MIN_WITHDRAWABLE_AMOUNT_RAY + amountRayDelta;
+
+        vm.prank(user);
+        if (amountRayDelta == 0) {
+            vm.expectRevert(Errors.InvalidAmount.selector);
+            assertFalse(bbv.transfer(recipient, amountRay));
+        } else {
+            assertTrue(bbv.transfer(recipient, amountRay));
+        }
+    }
+
+    function test_transfer_succeeds_whenRecipientHasDustAndCrossesThreshold() public {
+        address user = makeAddr("user");
+        address recipient = makeAddr("recipient");
+        IMockErc20 mockAsset18dp = IMockErc20(address(new MockNonStandardErc20("Test GHO", "tGHO", 18)));
+
+        // Create the higher-rate subVault, then return default to base rate.
+        vm.prank(manager);
+        bbv.setDefaultSubVault(MathLib.RAY);
+        vm.prank(manager);
+        bbv.setDefaultSubVault(MathLib.RAY + 1);
+        vm.prank(manager);
+        bbv.setDefaultSubVault(MathLib.RAY);
+
+        mockAsset18dp.mint(recipient, 1);
+        vm.prank(recipient);
+        mockAsset18dp.forceApprove(address(bbv), 1);
+        vm.prank(recipient);
+        bbv.deposit(recipient, address(mockAsset18dp), 1);
+
+        vm.warp(block.timestamp + 1);
+        vm.prank(manager);
+        _setUserRate(recipient, MathLib.RAY + 1);
+
+        _deposit(user, 2_000_000);
+        uint256 amountRay = Constants.MIN_WITHDRAWABLE_AMOUNT_RAY;
+
+        vm.prank(user);
+        assertTrue(bbv.transfer(recipient, amountRay));
+    }
+
     function test_transferAll_transfersFullBalanceAndKeepsOriginalDeposit(
         address user,
         address recipient,
@@ -1798,7 +1870,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         _deposit(user, 2_000_000);
         vm.warp(block.timestamp + 1);
 
-        uint256 amountRay = Constants.MIN_WITHDRAWABLE_AMOUNT_RAY;
+        uint256 amountRay = Constants.MIN_WITHDRAWABLE_AMOUNT_RAY + 1;
 
         vm.prank(user);
         assertTrue(bbv.transfer(recipient, amountRay));
@@ -2018,7 +2090,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         bbv.transferAll(recipient);
     }
 
-    function test_transferAll_reverts_ifAmountBelowMinimum() public {
+    function test_transferAll_allowsMinimumAmount() public {
         address user = makeAddr("user");
         address recipient = makeAddr("recipient");
         vm.assume(user != address(0));
@@ -2035,9 +2107,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.prank(user);
         bbv.deposit(user, address(mockAsset18dp), amount);
 
-        vm.expectRevert(Errors.InvalidAmount.selector);
         vm.prank(user);
-        bbv.transferAll(recipient);
+        assertTrue(bbv.transferAll(recipient));
     }
 
     function test_transferAll_reverts_ifRecipientGetsZeroShares() public {
@@ -2092,6 +2163,96 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.prank(user);
         vm.expectRevert(Errors.InvalidAmount.selector);
         bbv.transferAll(recipient);
+    }
+
+    function test_transferAll_reverts_ifRecipientPostStateBelowDustThreshold() public {
+        address user = makeAddr("user");
+        address recipient = makeAddr("recipient");
+        IMockErc20 mockAsset18dp = IMockErc20(address(new MockNonStandardErc20("Test GHO", "tGHO", 18)));
+
+        // Create the higher-rate subVault, then return default to base rate.
+        vm.prank(manager);
+        bbv.setDefaultSubVault(MathLib.RAY);
+        vm.prank(manager);
+        bbv.setDefaultSubVault(MathLib.RAY + 1);
+        vm.prank(manager);
+        bbv.setDefaultSubVault(MathLib.RAY);
+
+        mockAsset18dp.mint(user, 1);
+        vm.prank(user);
+        mockAsset18dp.forceApprove(address(bbv), 1);
+        vm.prank(user);
+        bbv.deposit(user, address(mockAsset18dp), 1);
+
+        vm.warp(block.timestamp + 1);
+        vm.prank(manager);
+        _setUserRate(user, MathLib.RAY + 1);
+
+        vm.expectRevert(Errors.InvalidAmount.selector);
+        vm.prank(user);
+        assertFalse(bbv.transferAll(recipient));
+    }
+
+    function test_transferAll_receiverDustThresholdBoundary(uint256 amountDelta) public {
+        address user = makeAddr("user");
+        address recipient = makeAddr("recipient");
+        IMockErc20 mockAsset18dp = IMockErc20(address(new MockNonStandardErc20("Test GHO", "tGHO", 18)));
+
+        amountDelta = bound(amountDelta, 0, 3);
+
+        vm.prank(manager);
+        bbv.setDefaultSubVault(MathLib.RAY + 1);
+        vm.warp(block.timestamp + 1);
+
+        uint256 amount = 1 + amountDelta;
+        mockAsset18dp.mint(user, amount);
+        vm.prank(user);
+        mockAsset18dp.forceApprove(address(bbv), amount);
+        vm.prank(user);
+        bbv.deposit(user, address(mockAsset18dp), amount);
+
+        vm.prank(user);
+        if (amountDelta == 0) {
+            vm.expectRevert(Errors.InvalidAmount.selector);
+            assertFalse(bbv.transferAll(recipient));
+        } else {
+            assertTrue(bbv.transferAll(recipient));
+        }
+    }
+
+    function test_transferAll_succeeds_whenDustSenderAndRecipientCombine() public {
+        address user = makeAddr("user");
+        address recipient = makeAddr("recipient");
+        IMockErc20 mockAsset18dp = IMockErc20(address(new MockNonStandardErc20("Test GHO", "tGHO", 18)));
+
+        // Create the higher-rate subVault, then return default to base rate.
+        vm.prank(manager);
+        bbv.setDefaultSubVault(MathLib.RAY);
+        vm.prank(manager);
+        bbv.setDefaultSubVault(MathLib.RAY + 1);
+        vm.prank(manager);
+        bbv.setDefaultSubVault(MathLib.RAY);
+
+        mockAsset18dp.mint(user, 1);
+        vm.prank(user);
+        mockAsset18dp.forceApprove(address(bbv), 1);
+        vm.prank(user);
+        bbv.deposit(user, address(mockAsset18dp), 1);
+
+        mockAsset18dp.mint(recipient, 1);
+        vm.prank(recipient);
+        mockAsset18dp.forceApprove(address(bbv), 1);
+        vm.prank(recipient);
+        bbv.deposit(recipient, address(mockAsset18dp), 1);
+
+        vm.warp(block.timestamp + 1);
+        vm.prank(manager);
+        _setUserRate(user, MathLib.RAY + 1);
+        vm.prank(manager);
+        _setUserRate(recipient, MathLib.RAY + 1);
+
+        vm.prank(user);
+        assertTrue(bbv.transferAll(recipient));
     }
 
     function test_transferAll_emitsTransferEvent(address user, address recipient, uint256 depositAmount) public {
@@ -2207,6 +2368,82 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         assertEq(bbv.getUserBalance(user), 0);
         // Both were in same subVault, so transfer is 1:1 in shares (converted to value)
         assertGe(bbv.getUserBalance(recipient), recipientBalanceBefore + userFullAmount);
+    }
+
+    function test_transfer_reverts_ifMaxActiveSubVaultsReachedWhenActivatingDefaultSubVault() public {
+        uint256 maxActiveSubVaults = 2;
+        bbv = _deployBasedBoostedVault(
+            address(mockAccessManager),
+            DEFAULT_MAX_PER_SECOND_RATE,
+            MathLib.RAY,
+            address(mockIouTokenManager),
+            address(mockFundsHandler),
+            address(mockAssetRegistry),
+            address(mockTransferHelper),
+            address(mockWithdrawalPolicy),
+            maxActiveSubVaults
+        );
+
+        address user1 = makeAddr("user1");
+        address user2 = makeAddr("user2");
+        address recipient = makeAddr("recipient");
+        uint256 amount = 1_000_000;
+
+        // Create two active non-default subVaults while keeping default empty/inactive.
+        _deposit(user1, amount);
+        vm.prank(manager);
+        _setUserRate(user1, MathLib.RAY + 1);
+
+        _deposit(user2, amount);
+        vm.prank(manager);
+        _setUserRate(user2, MathLib.RAY + 2);
+
+        assertEq(bbv.getActiveSubVaults().length, maxActiveSubVaults);
+
+        uint256 amountRay = Constants.MIN_WITHDRAWABLE_AMOUNT_RAY;
+        vm.expectRevert(IBasedBoostedVault.TooManyActiveSubVaults.selector);
+        vm.prank(user1);
+        assertFalse(bbv.transfer(recipient, amountRay));
+    }
+
+    function test_transferAll_reverts_ifMaxActiveSubVaultsReachedWhenActivatingDefaultSubVault() public {
+        uint256 maxActiveSubVaults = 2;
+        bbv = _deployBasedBoostedVault(
+            address(mockAccessManager),
+            DEFAULT_MAX_PER_SECOND_RATE,
+            MathLib.RAY,
+            address(mockIouTokenManager),
+            address(mockFundsHandler),
+            address(mockAssetRegistry),
+            address(mockTransferHelper),
+            address(mockWithdrawalPolicy),
+            maxActiveSubVaults
+        );
+
+        address user1 = makeAddr("user1");
+        address user2 = makeAddr("user2");
+        address user3 = makeAddr("user3");
+        address recipient = makeAddr("recipient");
+        uint256 amount = 1_000_000;
+
+        // Create two active non-default subVaults while keeping default empty/inactive.
+        _deposit(user1, amount);
+        vm.prank(manager);
+        _setUserRate(user1, MathLib.RAY + 1);
+
+        _deposit(user3, amount);
+        vm.prank(manager);
+        _setUserRate(user3, MathLib.RAY + 1);
+
+        _deposit(user2, amount);
+        vm.prank(manager);
+        _setUserRate(user2, MathLib.RAY + 2);
+
+        assertEq(bbv.getActiveSubVaults().length, maxActiveSubVaults);
+
+        vm.expectRevert(IBasedBoostedVault.TooManyActiveSubVaults.selector);
+        vm.prank(user1);
+        assertFalse(bbv.transferAll(recipient));
     }
 
     function test_transfer_partialTransferUpdatesOriginalDeposit(address user, address recipient, uint256 depositAmount)

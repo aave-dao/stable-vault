@@ -238,6 +238,7 @@ contract BasedBoostedVault is
             sharesToMint: toUserShares,
             guaranteedAmountRay: guaranteedAmountRay
         });
+        require($storage().positions[to].shares >= _minSharesToRedeemOneWei(toSubVaultId), Errors.InvalidAmount());
 
         emit Transfer(from, to, amountRay);
         return true;
@@ -256,7 +257,6 @@ contract BasedBoostedVault is
 
         (uint256 amountOfWithdrawalRay, uint256 guaranteedAmountRay, uint256 fromUserShares) =
             _previewFullWithdrawalRequest(from);
-        require(amountOfWithdrawalRay > Constants.MIN_WITHDRAWABLE_AMOUNT_RAY, Errors.InvalidAmount());
 
         uint256 toSubVaultId = _getOrAssignUserSubVaultId(to);
 
@@ -278,6 +278,7 @@ contract BasedBoostedVault is
             sharesToMint: toUserShares,
             guaranteedAmountRay: guaranteedAmountRay
         });
+        require($storage().positions[to].shares >= _minSharesToRedeemOneWei(toSubVaultId), Errors.InvalidAmount());
 
         emit Transfer(from, to, amountOfWithdrawalRay);
         return true;
@@ -623,10 +624,13 @@ contract BasedBoostedVault is
         //   rayMulDown(S * conversionRate) >= 1e9
         // which implies:
         //   S >= rayDivUp(1e9, conversionRate)
-        uint256 minSharesToRedeemOneWei =
-            Constants.MIN_WITHDRAWABLE_AMOUNT_RAY.rayDivUp($storage().subVaultById[subVaultId].conversionRate);
+        uint256 minSharesToRedeemOneWei = _minSharesToRedeemOneWei(subVaultId);
         uint256 remainingSharesAfterRedeem = $storage().positions[user].shares - redeemedShares;
         return remainingSharesAfterRedeem >= minSharesToRedeemOneWei;
+    }
+
+    function _minSharesToRedeemOneWei(uint256 subVaultId) internal view returns (uint256) {
+        return Constants.MIN_WITHDRAWABLE_AMOUNT_RAY.rayDivUp($storage().subVaultById[subVaultId].conversionRate);
     }
 
     function _addSubVaultToActive(uint256 subVaultId) internal {
