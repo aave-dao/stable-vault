@@ -175,6 +175,7 @@ contract CcipAdapter is
     ) internal {
         uint64 chainSelector = _chainSelectorOf[chainId];
         uint256 estimatedFeeAmount = IRouterClient(CCIP_ROUTER).getFee(chainSelector, message);
+        require(allocatedFeeAmount >= estimatedFeeAmount, Errors.InsufficientFunds());
         uint256 msgValue;
         if (feeToken == Constants.NATIVE_CURRENCY) {
             msgValue = estimatedFeeAmount;
