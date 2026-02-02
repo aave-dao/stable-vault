@@ -1760,7 +1760,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         assertEq(bbv.getUserBalance(recipient), fullAmountRay);
     }
 
-    function test_transfer_reverts_ifRecipientPostStateBelowDustThreshold() public {
+    function test_transfer_allowsMinimumAmount_evenWhenRoundingWouldBeBelowMinShares() public {
         address user = makeAddr("user");
         address recipient = makeAddr("recipient");
         uint256 newPerSecondRate = MathLib.RAY + 1;
@@ -1773,12 +1773,14 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         uint256 amountRay = Constants.MIN_WITHDRAWABLE_AMOUNT_RAY;
 
-        vm.expectRevert(Errors.InvalidAmount.selector);
         vm.prank(user);
-        assertFalse(bbv.transfer(recipient, amountRay));
+        assertTrue(bbv.transfer(recipient, amountRay));
+
+        // Due to rounding-down on share minting, recipient share-value can be slightly below amountRay.
+        assertLt(bbv.getUserBalance(recipient), amountRay);
     }
 
-    function test_transfer_receiverDustThresholdBoundary(uint256 amountRayDelta) public {
+    function test_transfer_allowsNearMinimumAmounts_evenWhenRoundingIsUnfavorable(uint256 amountRayDelta) public {
         address user = makeAddr("user");
         address recipient = makeAddr("recipient");
         uint256 newPerSecondRate = MathLib.RAY + 1;
@@ -1794,12 +1796,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 amountRay = Constants.MIN_WITHDRAWABLE_AMOUNT_RAY + amountRayDelta;
 
         vm.prank(user);
-        if (amountRayDelta == 0) {
-            vm.expectRevert(Errors.InvalidAmount.selector);
-            assertFalse(bbv.transfer(recipient, amountRay));
-        } else {
-            assertTrue(bbv.transfer(recipient, amountRay));
-        }
+        assertTrue(bbv.transfer(recipient, amountRay));
     }
 
     function test_transfer_succeeds_whenRecipientHasDustAndCrossesThreshold() public {
@@ -2111,6 +2108,61 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         assertTrue(bbv.transferAll(recipient));
     }
 
+    function test_transferAll_allowsFullBalanceBelowMinimum() public {
+        // Goal: create a sender whose full withdrawable amount is < MIN_WITHDRAWABLE_AMOUNT_RAY,
+        // then confirm transferAll() still succeeds.
+        //
+        // We do this by:
+        // 1) Making a donor with originalDepositRay == 0 (withdraw principal, keep only interest shares),
+        // 2) Transferring exactly MIN_WITHDRAWABLE_AMOUNT_RAY from the donor to a new user in a vault where
+        //    rayDivDown/rayMulDown produces MIN-1 value,
+        // 3) Calling transferAll() from that user and asserting it succeeds.
+
+        address donor = makeAddr("donor");
+        address dustSender = makeAddr("dustSender");
+        address recipient = makeAddr("recipient");
+        _assumeNotProxyAdmin(donor, address(bbv));
+        _assumeNotProxyAdmin(dustSender, address(bbv));
+        _assumeNotProxyAdmin(recipient, address(bbv));
+
+        uint256 depositAmount = 2_000_000;
+        uint256 depositRay = depositAmount.assetDecimalsToRay(address(mockAsset));
+
+        // Put the donor into a higher-rate vault so we can withdraw principal and still keep
+        // enough interest shares remaining (so the position is not auto-closed).
+        vm.prank(manager);
+        bbv.setDefaultSubVault(DEFAULT_MAX_PER_SECOND_RATE);
+
+        _deposit(donor, depositAmount);
+        mockFundsHandler.mockAggregatedBalance(10e27);
+        vm.warp(block.timestamp + 365 days);
+
+        // Withdraw exactly the original deposit amount, leaving only interest shares => originalDepositRay becomes 0.
+        vm.prank(donor);
+        bbv.requestWithdrawal(donor, depositRay);
+
+        // Now assign the dust receiver to a slightly-growing default subVault so we can deterministically
+        // hit the MIN-1 rounding case on `amountRay.rayDivDown(conversionRate)`.
+        vm.prank(manager);
+        bbv.setDefaultSubVault(MathLib.RAY + 1);
+        vm.warp(block.timestamp + 1);
+
+        // Transfer MIN from an interest-only donor (so guaranteedAmountRay == 0 for the receiver).
+        vm.prank(donor);
+        assertTrue(bbv.transfer(dustSender, Constants.MIN_WITHDRAWABLE_AMOUNT_RAY));
+
+        uint256 dustSenderBalanceRay = bbv.getUserBalance(dustSender);
+        assertLt(dustSenderBalanceRay, Constants.MIN_WITHDRAWABLE_AMOUNT_RAY);
+        assertEq(dustSenderBalanceRay, Constants.MIN_WITHDRAWABLE_AMOUNT_RAY - 1);
+
+        vm.prank(dustSender);
+        assertTrue(bbv.transferAll(recipient));
+
+        assertEq(bbv.getUserBalance(dustSender), 0);
+        assertEq(bbv.getUserSubVault(dustSender).id, 0);
+        assertEq(bbv.getUserBalance(recipient), dustSenderBalanceRay);
+    }
+
     function test_transferAll_reverts_ifRecipientGetsZeroShares() public {
         // Override bbv with a low default sub-vault rate (RAY = no interest)
         // and use an 18-decimal asset so 1 wei deposit = 1e9 RAY = MIN_WITHDRAWABLE_AMOUNT_RAY
@@ -2165,7 +2217,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         bbv.transferAll(recipient);
     }
 
-    function test_transferAll_reverts_ifRecipientPostStateBelowDustThreshold() public {
+    function test_transferAll_allowsMinimumAmount_evenWhenRoundingWouldBeBelowMinShares() public {
         address user = makeAddr("user");
         address recipient = makeAddr("recipient");
         IMockErc20 mockAsset18dp = IMockErc20(address(new MockNonStandardErc20("Test GHO", "tGHO", 18)));
@@ -2188,12 +2240,11 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.prank(manager);
         _setUserRate(user, MathLib.RAY + 1);
 
-        vm.expectRevert(Errors.InvalidAmount.selector);
         vm.prank(user);
-        assertFalse(bbv.transferAll(recipient));
+        assertTrue(bbv.transferAll(recipient));
     }
 
-    function test_transferAll_receiverDustThresholdBoundary(uint256 amountDelta) public {
+    function test_transferAll_allowsSmallAmounts_evenWhenRoundingIsUnfavorable(uint256 amountDelta) public {
         address user = makeAddr("user");
         address recipient = makeAddr("recipient");
         IMockErc20 mockAsset18dp = IMockErc20(address(new MockNonStandardErc20("Test GHO", "tGHO", 18)));
@@ -2212,12 +2263,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         bbv.deposit(user, address(mockAsset18dp), amount);
 
         vm.prank(user);
-        if (amountDelta == 0) {
-            vm.expectRevert(Errors.InvalidAmount.selector);
-            assertFalse(bbv.transferAll(recipient));
-        } else {
-            assertTrue(bbv.transferAll(recipient));
-        }
+        assertTrue(bbv.transferAll(recipient));
     }
 
     function test_transferAll_succeeds_whenDustSenderAndRecipientCombine() public {
