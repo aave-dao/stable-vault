@@ -205,6 +205,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         uint256 maxWithdrawable = IERC4626(strategy).maxWithdraw(address(this));
         if (maxWithdrawable == 0) {
             // If `maxWithdraw` returned 0, then try redeeming all shares from the strategy.
+            // `_redeemAllFromStrategy` avoids redeeming if the Allocator has no shares.
             withdrawnAmount = _redeemAllFromStrategy(asset, strategy);
         } else {
             withdrawnAmount = Math.min(amount, maxWithdrawable);
@@ -360,10 +361,11 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     }
 
     function _redeemAllFromStrategy(address asset, address strategy) internal returns (uint256) {
-        uint256 amount = IERC4626(strategy)
-            .redeem({
-                shares: IERC4626(strategy).balanceOf(address(this)), receiver: address(this), owner: address(this)
-            });
+        uint256 shares = IERC4626(strategy).balanceOf(address(this));
+        if (shares == 0) {
+            return 0;
+        }
+        uint256 amount = IERC4626(strategy).redeem({shares: shares, receiver: address(this), owner: address(this)});
         emit AssetDeallocated(asset, strategy, amount);
         return amount;
     }
