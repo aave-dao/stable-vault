@@ -835,37 +835,42 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.tryWithdrawFromStrategy(address(_mockUsdt), amount, address(_defaultUsdtStrategy));
     }
 
-    function test_withdraw_withdrawalRespectsDefaultStrategyMaxWithdrawWhenMaxWithdrawLessThanAmount(uint256 amount)
+    function test_withdraw_revertsWithInsufficientFundsWhenMaxWithdrawLessThanAmountAndNoOtherStrategies(uint256 amount)
         public
     {
         amount = _boundAssetAmount(address(_mockUsdt), amount);
         vm.assume(amount > 1);
 
+        // Deploy a fresh allocator with only one strategy
+        Allocator singleStrategyAllocator = _deployAllocator(
+            _mockAccessManager, address(_mockAssetRegistry), address(_mockTransferHelper), MAX_STRATEGIES_PER_ASSET
+        );
+
         MockErc4626Strategy mockStrategy = new MockErc4626Strategy(_mockUsdt);
         vm.prank(admin);
-        _allocator.addStrategy(address(_mockUsdt), address(mockStrategy));
+        singleStrategyAllocator.addStrategy(address(_mockUsdt), address(mockStrategy));
+        vm.prank(everyRoleAccount);
+        singleStrategyAllocator.setDefaultStrategy(address(_mockUsdt), address(mockStrategy));
 
         _mockUsdt.mint(depositor, amount);
         vm.prank(depositor);
         MockNonStandardErc20(address(_mockUsdt)).approve(address(mockStrategy), amount);
         vm.prank(depositor);
-        mockStrategy.deposit(amount, address(_allocator));
+        mockStrategy.deposit(amount, address(singleStrategyAllocator));
 
-        // Set maxWithdraw to return half of the amount
+        // Set maxWithdraw to return half of the amount (simulating partial liquidity)
         uint256 maxWithdrawable = amount / 2;
         mockStrategy.mockMaxWithdraw(maxWithdrawable);
 
+        // Try to withdraw full amount - should fail since only maxWithdrawable is liquid
+        // and there are no other strategies to cover the difference
         _mockAssetRegistry.mockRegisteredAsset(address(_mockUsdt));
         vm.prank(withdrawer);
-        _allocator.withdraw(address(_mockUsdt), maxWithdrawable);
-
-        // Check that only maxWithdrawable was withdrawn
-        assertEq(_mockUsdt.balanceOf(address(_mockTransferHelper)), maxWithdrawable);
-        // The rest remains in the strategy
-        assertEq(_allocator.getAssetBalanceInStrategy(address(mockStrategy)), amount - maxWithdrawable);
+        vm.expectRevert(Errors.InsufficientFunds.selector);
+        singleStrategyAllocator.withdraw(address(_mockUsdt), amount);
     }
 
-    function test_withdraw_withdrawsFullAmountFromDefaultStrategyWhenMaxWithdrawReturnsZero(uint256 amount) public {
+    function test_withdraw_redeemsAllSharesFromDefaultStrategyWhenMaxWithdrawReturnsZero(uint256 amount) public {
         amount = _boundAssetAmount(address(_mockUsdt), amount);
 
         MockErc4626Strategy mockStrategy = new MockErc4626Strategy(_mockUsdt);
@@ -878,16 +883,45 @@ contract AllocatorTest is TestWithHelpers {
         vm.prank(depositor);
         mockStrategy.deposit(amount, address(_allocator));
 
-        // Set maxWithdraw to return 0 (this should trigger fallback to use full amount)
+        // Set maxWithdraw to return 0 (this should trigger fallback to redeem all shares)
         mockStrategy.mockMaxWithdraw(0);
 
         _mockAssetRegistry.mockRegisteredAsset(address(_mockUsdt));
         vm.prank(withdrawer);
         _allocator.withdraw(address(_mockUsdt), amount);
 
-        // Check that the full amount was withdrawn
+        // Check that the full amount was withdrawn via redeemAll fallback
         assertEq(_mockUsdt.balanceOf(address(_mockTransferHelper)), amount);
         assertEq(_allocator.getAssetBalanceInStrategy(address(mockStrategy)), 0);
+    }
+
+    function test_withdraw_continuesSearchingStrategiesWhenDefaultStrategyHasNoShares(uint256 amount) public {
+        amount = _boundAssetAmount(address(_mockUsdt), amount);
+
+        MockErc4626Strategy mockDefaultStrategy = new MockErc4626Strategy(_mockUsdt);
+        vm.prank(admin);
+        _allocator.addStrategy(address(_mockUsdt), address(mockDefaultStrategy));
+        vm.prank(everyRoleAccount);
+        _allocator.setDefaultStrategy(address(_mockUsdt), address(mockDefaultStrategy));
+
+        // Do NOT deposit into the default strategy - it has no shares
+        // Only deposit into the extra non-default strategy
+        _mockUsdt.mint(depositor, amount);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(_extraUsdtStrategy), amount);
+        vm.prank(depositor);
+        _extraUsdtStrategy.deposit(amount, address(_allocator));
+
+        // Default strategy has no shares, so maxWithdraw will naturally return 0
+        // and redeemAll will return 0, then it should continue to extra strategy
+        _mockAssetRegistry.mockRegisteredAsset(address(_mockUsdt));
+        vm.prank(withdrawer);
+        _allocator.withdraw(address(_mockUsdt), amount);
+
+        // Check that funds were withdrawn from the extra strategy
+        assertEq(_mockUsdt.balanceOf(address(_mockTransferHelper)), amount);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(mockDefaultStrategy)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
     }
 
     function test_withdraw_withdrawsFullAmountFromDefaultStrategyWhenMaxWithdrawGreaterThanOrEqualToAmount(uint256 amount)
@@ -940,9 +974,10 @@ contract AllocatorTest is TestWithHelpers {
         vm.prank(depositor);
         _extraUsdtStrategy.deposit(amount, address(_allocator));
 
-        // Set maxWithdraw to 0 and make withdraw revert on the default strategy
+        // Set maxWithdraw to 0 and make redeem revert on the default strategy
+        // (when maxWithdraw is 0, the allocator falls back to redeemAll)
         mockDefaultStrategy.mockMaxWithdraw(0);
-        mockDefaultStrategy.mockWithdrawToRevert("WITHDRAWAL_DISABLED");
+        mockDefaultStrategy.mockRedeemToRevert("WITHDRAWAL_DISABLED");
 
         // Withdraw should fail on default but succeed on extra strategy
         _mockAssetRegistry.mockRegisteredAsset(address(_mockUsdt));

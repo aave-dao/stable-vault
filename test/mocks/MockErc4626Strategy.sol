@@ -15,7 +15,9 @@ contract MockErc4626Strategy is ERC4626 {
     bool private _mockMaxWithdraw;
     uint256 private _maxWithdraw;
     bool private _withdrawShouldRevert;
-    string private _revertErrorMsg;
+    string private _withdrawRevertErrorMsg;
+    bool private _redeemShouldRevert;
+    string private _redeemRevertErrorMsg;
 
     constructor(IERC20 asset) ERC4626(asset) ERC20("Mock Erc4626 Strategy", "MOCK4626") {}
 
@@ -31,7 +33,12 @@ contract MockErc4626Strategy is ERC4626 {
 
     function mockWithdrawToRevert(string memory errorMsg) external {
         _withdrawShouldRevert = true;
-        _revertErrorMsg = errorMsg;
+        _withdrawRevertErrorMsg = errorMsg;
+    }
+
+    function mockRedeemToRevert(string memory errorMsg) external {
+        _redeemShouldRevert = true;
+        _redeemRevertErrorMsg = errorMsg;
     }
 
     function maxWithdraw(address owner) public view override returns (uint256) {
@@ -45,7 +52,7 @@ contract MockErc4626Strategy is ERC4626 {
     // This simulates strategies where maxWithdraw returns 0 but withdrawal is still possible
     function withdraw(uint256 assets, address receiver, address owner) public override returns (uint256) {
         if (_withdrawShouldRevert) {
-            revert(_revertErrorMsg);
+            revert(_withdrawRevertErrorMsg);
         }
 
         // If custom maxWithdraw is set, bypass the standard maxWithdraw check
@@ -57,5 +64,13 @@ contract MockErc4626Strategy is ERC4626 {
         }
 
         return super.withdraw(assets, receiver, owner);
+    }
+
+    function redeem(uint256 shares, address receiver, address owner) public override returns (uint256) {
+        if (_redeemShouldRevert) {
+            revert(_redeemRevertErrorMsg);
+        }
+
+        return super.redeem(shares, receiver, owner);
     }
 }

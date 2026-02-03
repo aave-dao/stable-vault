@@ -195,18 +195,21 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     /// try-catch.
     /// @dev Avoids impact to searching other strategies if withdrawal from a previously searched strategy
     /// fails.
+    /// @dev The `amount` param is not taking into account nor being aware of the `strategy`'s liquidity.
     function tryWithdrawFromStrategy(address asset, uint256 amount, address strategy)
         external
         onlySelf
         returns (uint256)
     {
+        uint256 withdrawnAmount;
         uint256 maxWithdrawable = IERC4626(strategy).maxWithdraw(address(this));
         if (maxWithdrawable == 0) {
-            // If `maxWithdraw` returned 0, then try withdrawing the full amount that we initially wanted.
-            maxWithdrawable = amount;
+            // If `maxWithdraw` returned 0, then try redeeming all shares from the strategy.
+            withdrawnAmount = _redeemAllFromStrategy(asset, strategy);
+        } else {
+            withdrawnAmount = Math.min(amount, maxWithdrawable);
+            _withdrawFromStrategy(asset, withdrawnAmount, address(this), strategy);
         }
-        uint256 withdrawnAmount = Math.min(amount, maxWithdrawable);
-        _withdrawFromStrategy(asset, withdrawnAmount, address(this), strategy);
         return withdrawnAmount;
     }
 
