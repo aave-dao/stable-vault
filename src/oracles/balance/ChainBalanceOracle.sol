@@ -26,6 +26,21 @@ contract ChainBalanceOracle is AccessManagedUpgradeable, IChainBalanceOracle {
         }
     }
 
+    /// @dev Constructor.
+    constructor() {
+        _disableInitializers();
+    }
+
+    /// @dev Initializer.
+    /// @param accessManager The address of the IAccessManager contract used for handling access control.
+    function initialize(address accessManager) external virtual initializer {
+        __ChainBalanceOracle_init(accessManager);
+    }
+
+    function __ChainBalanceOracle_init(address accessManager) internal virtual onlyInitializing {
+        __AccessManaged_init(accessManager);
+    }
+
     /// @inheritdoc IChainBalanceOracle
     function getChainBalance(uint256 chainId) external view override returns (uint256) {
         IChainBalanceOracleAdapter.OracleResponse memory response =

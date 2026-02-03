@@ -34,10 +34,18 @@ contract PriceOracle is AccessManagedUpgradeable, IPriceOracle {
         }
     }
 
+    /// @dev Constructor.
+    /// @param minValidPriceRay The minimum valid price in ray units (27 decimals).
     constructor(uint256 minValidPriceRay) {
         require(minValidPriceRay <= MathLib.RAY, InvalidMinPrice());
         _disableInitializers();
         MIN_VALID_PRICE_RAY = minValidPriceRay;
+    }
+
+    /// @dev Initializer.
+    /// @param accessManager The address of the IAccessManager contract used for handling access control.
+    function initialize(address accessManager) external virtual initializer {
+        __PriceOracle_init(accessManager);
     }
 
     function __PriceOracle_init(address accessManager) internal virtual onlyInitializing {
@@ -77,6 +85,7 @@ contract PriceOracle is AccessManagedUpgradeable, IPriceOracle {
         address oracleAdapter = $storage().oracleAdapterByAsset[asset];
         if (oracleAdapter == address(0)) {
             // If no adapter is configured for the asset, be conservative and return 0.
+            // A dummy adapter can be used to default to a 1:1 price.
             return 0;
         }
         IPriceOracleAdapter.OracleResponse memory response = IPriceOracleAdapter(oracleAdapter).getPrice(asset);

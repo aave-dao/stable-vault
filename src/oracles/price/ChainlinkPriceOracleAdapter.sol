@@ -32,6 +32,9 @@ interface AggregatorV3Interface {
 contract ChainlinkPriceOracleAdapter is IPriceOracleAdapter {
     using AssetLib for uint256;
 
+    /// @dev Added to the heartbeat to account for potential publishing delays during periods of network congestion.
+    uint256 constant HEARTBEAT_BUFFER_SECONDS = 90;
+
     address immutable ASSET;
     address immutable DATA_FEED;
     uint256 immutable DECIMALS;
@@ -52,7 +55,7 @@ contract ChainlinkPriceOracleAdapter is IPriceOracleAdapter {
         // forge-lint: disable-next-line(unsafe-typecast)
         uint256 priceRay = uint256(price).convertDecimals(DECIMALS, Constants.RAY_DECIMALS);
         bool isStale = false;
-        if (updatedAt < block.timestamp && block.timestamp - updatedAt >= HEARTBEAT) {
+        if (updatedAt < block.timestamp && block.timestamp - updatedAt >= HEARTBEAT + HEARTBEAT_BUFFER_SECONDS) {
             isStale = true;
         }
         return IPriceOracleAdapter.OracleResponse(priceRay, isStale);

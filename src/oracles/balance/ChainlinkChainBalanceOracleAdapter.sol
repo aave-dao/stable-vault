@@ -31,6 +31,9 @@ interface AggregatorV3Interface {
 contract ChainlinkChainBalanceOracleAdapter is IChainBalanceOracleAdapter {
     using AssetLib for uint256;
 
+    /// @dev Added to the heartbeat to account for potential publishing delays during periods of network congestion.
+    uint256 constant HEARTBEAT_BUFFER_SECONDS = 90;
+
     address immutable DATA_FEED;
     uint256 immutable DECIMALS;
     uint256 immutable HEARTBEAT;
@@ -55,7 +58,7 @@ contract ChainlinkChainBalanceOracleAdapter is IChainBalanceOracleAdapter {
         // forge-lint: disable-next-line(unsafe-typecast)
         uint256 balanceRay = uint256(balance).convertDecimals(DECIMALS, Constants.RAY_DECIMALS);
         bool isStale = false;
-        if (updatedAt < block.timestamp && block.timestamp - updatedAt >= HEARTBEAT) {
+        if (updatedAt < block.timestamp && block.timestamp - updatedAt >= HEARTBEAT + HEARTBEAT_BUFFER_SECONDS) {
             isStale = true;
         }
         return IChainBalanceOracleAdapter.OracleResponse(balanceRay, isStale);
