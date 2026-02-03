@@ -11,6 +11,9 @@ import {IPriceOracleAdapter} from "src/interfaces/IPriceOracleAdapter.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {Errors} from "src/types/Errors.sol";
 
+/// @title PriceOracle
+/// @author Aave Labs
+/// @notice Oracle contract for fetching asset prices through an adapter to an underlying data source.
 contract PriceOracle is AccessManagedUpgradeable, IPriceOracle {
     // TODO: Instead of storing target + max deviation, just store the min valid price in ray
     // (1 * (100_00 - MAX_DEVIATION_BPS)) / 100_00;
@@ -78,7 +81,7 @@ contract PriceOracle is AccessManagedUpgradeable, IPriceOracle {
         address currentAdapter = $storage().oracleAdapterByAsset[asset];
         // Validate the adapter interface through a call to getPrice
         $storage().oracleAdapterByAsset[asset] = adapter;
-        // TODO: emit ChainBalanceAdapterSet(currentAdapter, adapter);
+        emit OracleAdapterSet(asset, currentAdapter, adapter);
     }
 
     function _getPrice(address asset) internal view returns (uint256 price) {

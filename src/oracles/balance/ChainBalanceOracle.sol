@@ -9,7 +9,11 @@ import {
 import {IChainBalanceOracle} from "src/interfaces/IChainBalanceOracle.sol";
 import {IChainBalanceOracleAdapter} from "src/interfaces/IChainBalanceOracleAdapter.sol";
 
-/// @dev This contract is only used on the Accounting Chain to inform the asset value vs. obligations calculations.
+/// @title ChainBalanceOracle
+/// @author Aave Labs
+/// @notice Oracle contract for fetching chain aggregated balance values through an adapter to an underlying data
+/// source. @dev This contract is only used on the Accounting Chain to inform the asset value vs. obligations
+/// calculations.
 contract ChainBalanceOracle is AccessManagedUpgradeable, IChainBalanceOracle {
     /// @custom:storage-location erc7201:aave.storage.PriceOracle
     struct ChainBalanceOracleStorage {
@@ -52,6 +56,6 @@ contract ChainBalanceOracle is AccessManagedUpgradeable, IChainBalanceOracle {
         address currentAdapter = $storage().oracleAdapterByChainId[chainId];
         IChainBalanceOracleAdapter(adapter).getChainBalance(chainId);
         $storage().oracleAdapterByChainId[chainId] = adapter;
-        // TODO: emit ChainBalanceAdapterSet(currentAdapter, adapter);
+        emit ChainBalanceAdapterSet(chainId, currentAdapter, adapter);
     }
 }

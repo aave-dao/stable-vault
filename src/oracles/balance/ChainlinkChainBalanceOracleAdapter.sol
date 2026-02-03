@@ -34,24 +34,25 @@ contract ChainlinkChainBalanceOracleAdapter is IChainBalanceOracleAdapter {
     /// @dev Added to the heartbeat to account for potential publishing delays during periods of network congestion.
     uint256 constant HEARTBEAT_BUFFER_SECONDS = 90;
 
+    uint256 immutable CHAIN_ID;
     address immutable DATA_FEED;
     uint256 immutable DECIMALS;
     uint256 immutable HEARTBEAT;
 
-    constructor(address dataFeed, uint256 heartbeat) {
+    constructor(uint256 chainId, address dataFeed, uint256 heartbeat) {
+        CHAIN_ID = chainId;
         DATA_FEED = dataFeed;
         DECIMALS = AggregatorV3Interface(dataFeed).decimals();
         HEARTBEAT = heartbeat;
     }
 
-    function getChainBalance(
-        uint256 /* chainId */
-    )
+    function getChainBalance(uint256 chainId)
         external
         view
         override
         returns (IChainBalanceOracleAdapter.OracleResponse memory)
     {
+        require(chainId == CHAIN_ID, InvalidChainId(chainId));
         (, int256 balance,, uint256 updatedAt,) = AggregatorV3Interface(DATA_FEED).latestRoundData();
         require(balance > 0, IChainBalanceOracleAdapter.InvalidBalance());
         // Casting to 'uint256' is safe because we checked that balance > 0.
@@ -61,6 +62,8 @@ contract ChainlinkChainBalanceOracleAdapter is IChainBalanceOracleAdapter {
         if (updatedAt < block.timestamp && block.timestamp - updatedAt >= HEARTBEAT + HEARTBEAT_BUFFER_SECONDS) {
             isStale = true;
         }
-        return IChainBalanceOracleAdapter.OracleResponse(balanceRay, isStale);
+        return IChainBalanceOracleAdapter.OracleResponse({
+            balanceRay: balanceRay, lastUpdateTimestamp: updatedAt, isStale: isStale
+        });
     }
 }

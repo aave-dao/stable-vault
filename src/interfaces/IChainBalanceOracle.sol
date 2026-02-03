@@ -6,6 +6,9 @@ pragma solidity ^0.8.22;
 /// @author Aave Labs
 /// @notice Interface for chain balance oracle functionality required on the Accounting Chain.
 interface IChainBalanceOracle {
+    /// @notice Emitted when an adapter is set for a chain.
+    event ChainBalanceAdapterSet(uint256 indexed chainId, address indexed newAdapter, address indexed previousAdapter);
+
     /// @notice Queries an oracle feed for data representing the aggregate price-adjusted balance of asset from a given
     /// Earning Chain.
     /// @param chainId Earning chain id query data for.
