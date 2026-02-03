@@ -120,6 +120,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockAsset = _deployDefaultAsset();
         mockTransferHelper = new MockTransferHelper();
         mockFundsHandler = new MockFundsHandler(address(mockTransferHelper));
+        mockPriceOracle = new MockPriceOracle();
 
         // Predict BBV proxy address after WithdrawalPolicy impl+proxy and BBV impl deployments.
         uint256 deployerNonce = vm.getNonce(address(this));
@@ -127,7 +128,6 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         mockWithdrawalPolicy =
             _deployWithdrawalPolicy(address(mockAccessManager), address(mockAssetRegistry), expectedBbvProxy);
-        mockPriceOracle = new MockPriceOracle();
         bbv = _deployBasedBoostedVault(
             address(mockAccessManager),
             DEFAULT_MAX_PER_SECOND_RATE,

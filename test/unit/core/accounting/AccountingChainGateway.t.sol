@@ -428,28 +428,6 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         _accountingChainGateway.receiveMessage(EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "");
     }
 
-    function test_receiveMessage_whenBalanceSnapshotIsReceived(uint256 totalAssetsInRay, uint256 nonce) public {
-        totalAssetsInRay = _boundRayAmount(totalAssetsInRay);
-
-        vm.expectCall(
-            address(_mockFundsHandler),
-            abi.encodeCall(IFundsHandler.updateChainBalanceCallback, (EARNING_CHAIN_ID, totalAssetsInRay, nonce))
-        );
-        // Call must come from whitelisted data bridge adapter
-        vm.prank(address(_mockBridgeAdapterData));
-        _accountingChainGateway.receiveMessage(
-            EARNING_CHAIN_ID,
-            address(0),
-            0,
-            abi.encode(
-                IChainGateway.CrossChainMessage({
-                    messageType: IChainGateway.MessageType.BALANCE_SNAPSHOT,
-                    data: abi.encode(IChainGateway.BalanceSnapshot({totalAssetsInRay: totalAssetsInRay, nonce: nonce}))
-                })
-            )
-        );
-    }
-
     function test_receiveMessage_whenBridgeIouTokenIsReceived(address iouTokenRecipient, uint256 iouTokenAmountRay)
         public
     {

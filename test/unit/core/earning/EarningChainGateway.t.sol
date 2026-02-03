@@ -315,9 +315,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 uint256 amountUsdt = 123000000000000000000;
                 uint256 amountGho = 4560000000000000;
                 IAllocator.AllocatorBalance[] memory allocatorBalances = _buildAllocatorBalances(amountUsdt, amountGho);
-
-                uint256 expectedTotalAssetsInRay =
-                    amountUsdt.assetDecimalsToRay(address(_mockUsdt)) + amountGho.assetDecimalsToRay(address(_mockGho));
                 vm.mockCall(
                     address(_mockAllocator),
                     abi.encodeWithSelector(MockAllocator.getTrustedAssetBalances.selector),
@@ -390,12 +387,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
             bytes memory data;
             {
-                uint256 amountUsdt = 123000000000000000000;
-                uint256 amountGho = 4560000000000000;
-
-                uint256 expectedTotalAssetsInRay =
-                    amountUsdt.assetDecimalsToRay(address(_mockUsdt)) + amountGho.assetDecimalsToRay(address(_mockGho));
-
                 bytes memory dataInner =
                     abi.encode(IChainGateway.BurnIouTokenMessage({iouTokenAmountBurnedRay: iouTokenAmountRay}));
                 data = abi.encode(
@@ -487,9 +478,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 abi.encodeWithSelector(MockAllocator.getTrustedAssetBalances.selector),
                 abi.encode(allocatorBalances)
             );
-
-            uint256 expectedTotalAssetsInRay =
-                amountUsdt.assetDecimalsToRay(address(_mockUsdt)) + amountGho.assetDecimalsToRay(address(_mockGho));
 
             bytes memory data = abi.encode(
                 IChainGateway.CrossChainMessage({
@@ -755,7 +743,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 (
                     ACCOUNTING_CHAIN_ID,
                     address(_mockUsdt),
-                        amountToken,
+                    amountToken,
                     "",
                     IBridgeAdapter.BridgeParams({
                         feePayer: sender,
@@ -809,7 +797,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 (
                     ACCOUNTING_CHAIN_ID,
                     address(_mockGho),
-                        amountToken,
+                    amountToken,
                     "",
                     IBridgeAdapter.BridgeParams({
                         feePayer: sender,
@@ -863,7 +851,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 (
                     ACCOUNTING_CHAIN_ID,
                     address(_mockUsdt),
-                        amountToken,
+                    amountToken,
                     "",
                     IBridgeAdapter.BridgeParams({
                         feePayer: feePayer,
