@@ -205,6 +205,9 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         uint256 maxWithdrawable = IERC4626(strategy).maxWithdraw(address(this));
         if (maxWithdrawable == 0) {
             // If `maxWithdraw` returned 0, then try redeeming all shares from the strategy.
+            // This handles the case where the strategy returns 0 as a conservative estimation
+            // (e.g. due to liquidity constraints or estimation limitations), given that ERC-4626
+            // requires `maxWithdraw` to never overestimate nor revert.
             // `_redeemAllFromStrategy` avoids redeeming if the Allocator has no shares.
             withdrawnAmount = _redeemAllFromStrategy(asset, strategy);
         } else {
