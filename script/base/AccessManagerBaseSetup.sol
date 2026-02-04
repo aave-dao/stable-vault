@@ -7,6 +7,7 @@ import {IAccessManager} from "lib/openzeppelin-contracts/contracts/access/manage
 import {Create3AddressBook} from "script/base/Create3AddressBook.sol";
 import {RolesLib} from "script/libraries/RolesLib.sol";
 import {IMulticall} from "src/interfaces/IMulticall.sol";
+import {_toSelectorArray} from "test/helpers/TypeHelpers.sol";
 
 abstract contract AccessManagerBaseSetup is Create3AddressBook {
     ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,7 +63,12 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook {
         _setupProfile__ATokenVaultRewardClaimer();
     }
 
-    function _setup_Targets(address deployer) internal virtual {}
+    function _setup_Targets(address deployer) internal virtual {
+        _setupTarget__CcipAdapter(deployer);
+        _setupTarget__Allocator(deployer);
+        _setupTarget__WithdrawalPolicy(deployer);
+        _setupTarget__AssetRegistry(deployer);
+    }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -172,11 +178,11 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook {
         role = RolesLib.getRole__disableDepositsToStrategy();
         multicallCalldata[2] = abi.encodeCall(IAccessManager.grantRole, (role.roleId, rebalancerProfile, role.delay));
 
-        // This role is only used on the Accounting Chain, but granted in both Accounting and Earning Chain setups
+        // Only used on the Accounting Chain (FundsHandler), but granted in both Accounting and Earning Chain setups
         role = RolesLib.getRole__pushFundsToChain();
         multicallCalldata[3] = abi.encodeCall(IAccessManager.grantRole, (role.roleId, rebalancerProfile, role.delay));
 
-        // This role is only used on the Earning Chain, but granted in both Accounting and Earning Chain setups
+        // Only used on the Earning Chain (EarningChainGateway), but granted in both Accounting and Earning Chain setups
         role = RolesLib.getRole__pushFundsToAccountingChain();
         multicallCalldata[4] = abi.encodeCall(IAccessManager.grantRole, (role.roleId, rebalancerProfile, role.delay));
 
@@ -219,8 +225,162 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook {
     function _setupProfile__ATokenVaultRewardClaimer() internal {
         address aTokenVaultRewardClaimer = _getProfile__ATokenVaultRewardClaimer();
 
-        RolesLib.Role memory role = RolesLib.getRole__claimSurplusInterest();
+        RolesLib.Role memory role = RolesLib.getRole__claimMerklRewards();
 
         IAccessManager(_accessManager()).grantRole(role.roleId, aTokenVaultRewardClaimer, role.delay);
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+    function _setupTarget__CcipAdapter(address deployer) internal {
+        address ccipAdapter = getCcipAdapterAddress(deployer);
+        RolesLib.Role memory role;
+        bytes[] memory multicallCalldata = new bytes[](3);
+
+        role = RolesLib.getRole__setDestinationChainAdapter();
+        multicallCalldata[0] = abi.encodeCall(
+            IAccessManager.setTargetFunctionRole, (ccipAdapter, _toSelectorArray(role.selector), role.roleId)
+        );
+
+        role = RolesLib.getRole__setChainSelector();
+        multicallCalldata[1] = abi.encodeCall(
+            IAccessManager.setTargetFunctionRole, (ccipAdapter, _toSelectorArray(role.selector), role.roleId)
+        );
+
+        role = RolesLib.getRole__rescueNative();
+        multicallCalldata[2] = abi.encodeCall(
+            IAccessManager.setTargetFunctionRole, (ccipAdapter, _toSelectorArray(role.selector), role.roleId)
+        );
+
+        IMulticall(_accessManager()).multicall(multicallCalldata);
+    }
+
+    function _setupTarget__Allocator(address deployer) internal {
+        address allocator = getAllocatorAddress(deployer);
+        RolesLib.Role memory role;
+        bytes[] memory multicallCalldata = new bytes[](6);
+
+        role = RolesLib.getRole__rebalance();
+        multicallCalldata[0] = abi.encodeCall(
+            IAccessManager.setTargetFunctionRole, (allocator, _toSelectorArray(role.selector), role.roleId)
+        );
+
+        role = RolesLib.getRole__addStrategy();
+        multicallCalldata[1] = abi.encodeCall(
+            IAccessManager.setTargetFunctionRole, (allocator, _toSelectorArray(role.selector), role.roleId)
+        );
+
+        role = RolesLib.getRole__removeStrategy();
+        multicallCalldata[2] = abi.encodeCall(
+            IAccessManager.setTargetFunctionRole, (allocator, _toSelectorArray(role.selector), role.roleId)
+        );
+
+        role = RolesLib.getRole__disableDepositsToStrategy();
+        multicallCalldata[3] = abi.encodeCall(
+            IAccessManager.setTargetFunctionRole, (allocator, _toSelectorArray(role.selector), role.roleId)
+        );
+
+        role = RolesLib.getRole__setDefaultStrategy();
+        multicallCalldata[4] = abi.encodeCall(
+            IAccessManager.setTargetFunctionRole, (allocator, _toSelectorArray(role.selector), role.roleId)
+        );
+
+        role = RolesLib.getRole__enableDepositsToStrategy();
+        multicallCalldata[5] = abi.encodeCall(
+            IAccessManager.setTargetFunctionRole, (allocator, _toSelectorArray(role.selector), role.roleId)
+        );
+
+        IMulticall(_accessManager()).multicall(multicallCalldata);
+    }
+
+    function _setupTarget__WithdrawalPolicy(address deployer) internal {
+        address withdrawalPolicy = getWithdrawalPolicyAddress(deployer);
+        RolesLib.Role memory role;
+        bytes[] memory multicallCalldata = new bytes[](3);
+
+        role = RolesLib.getRole__setAssetFeeBps();
+        multicallCalldata[0] = abi.encodeCall(
+            IAccessManager.setTargetFunctionRole, (withdrawalPolicy, _toSelectorArray(role.selector), role.roleId)
+        );
+
+        role = RolesLib.getRole__setDefaultFeeBps();
+        multicallCalldata[1] = abi.encodeCall(
+            IAccessManager.setTargetFunctionRole, (withdrawalPolicy, _toSelectorArray(role.selector), role.roleId)
+        );
+
+        role = RolesLib.getRole__setSigner();
+        multicallCalldata[2] = abi.encodeCall(
+            IAccessManager.setTargetFunctionRole, (withdrawalPolicy, _toSelectorArray(role.selector), role.roleId)
+        );
+
+        IMulticall(_accessManager()).multicall(multicallCalldata);
+    }
+
+    function _setupTarget__AssetRegistry(address deployer) internal {
+        address assetRegistry = getAssetRegistryAddress(deployer);
+        RolesLib.Role memory role;
+        bytes[] memory multicallCalldata = new bytes[](11);
+
+        role = RolesLib.getRole__setAssetConfig();
+        multicallCalldata[0] = abi.encodeCall(
+            IAccessManager.setTargetFunctionRole, (assetRegistry, _toSelectorArray(role.selector), role.roleId)
+        );
+
+        role = RolesLib.getRole__disableAllocatorDeposits();
+        multicallCalldata[1] = abi.encodeCall(
+            IAccessManager.setTargetFunctionRole, (assetRegistry, _toSelectorArray(role.selector), role.roleId)
+        );
+
+        role = RolesLib.getRole__disableSwapInput();
+        multicallCalldata[2] = abi.encodeCall(
+            IAccessManager.setTargetFunctionRole, (assetRegistry, _toSelectorArray(role.selector), role.roleId)
+        );
+
+        role = RolesLib.getRole__disableSwapOutput();
+        multicallCalldata[3] = abi.encodeCall(
+            IAccessManager.setTargetFunctionRole, (assetRegistry, _toSelectorArray(role.selector), role.roleId)
+        );
+
+        role = RolesLib.getRole__disableUserDeposits();
+        multicallCalldata[4] = abi.encodeCall(
+            IAccessManager.setTargetFunctionRole, (assetRegistry, _toSelectorArray(role.selector), role.roleId)
+        );
+
+        role = RolesLib.getRole__enableAllocatorDeposits();
+        multicallCalldata[5] = abi.encodeCall(
+            IAccessManager.setTargetFunctionRole, (assetRegistry, _toSelectorArray(role.selector), role.roleId)
+        );
+
+        role = RolesLib.getRole__enableSwapInput();
+        multicallCalldata[6] = abi.encodeCall(
+            IAccessManager.setTargetFunctionRole, (assetRegistry, _toSelectorArray(role.selector), role.roleId)
+        );
+
+        role = RolesLib.getRole__enableSwapOutput();
+        multicallCalldata[7] = abi.encodeCall(
+            IAccessManager.setTargetFunctionRole, (assetRegistry, _toSelectorArray(role.selector), role.roleId)
+        );
+
+        role = RolesLib.getRole__enableUserDeposits();
+        multicallCalldata[8] = abi.encodeCall(
+            IAccessManager.setTargetFunctionRole, (assetRegistry, _toSelectorArray(role.selector), role.roleId)
+        );
+
+        role = RolesLib.getRole__trustAsset();
+        multicallCalldata[9] = abi.encodeCall(
+            IAccessManager.setTargetFunctionRole, (assetRegistry, _toSelectorArray(role.selector), role.roleId)
+        );
+
+        role = RolesLib.getRole__distrustAsset();
+        multicallCalldata[10] = abi.encodeCall(
+            IAccessManager.setTargetFunctionRole, (assetRegistry, _toSelectorArray(role.selector), role.roleId)
+        );
+
+        IMulticall(_accessManager()).multicall(multicallCalldata);
+    }
+
+    function _setupTarget__ATokenVault(address vault) internal {
+        RolesLib.Role memory role = RolesLib.getRole__claimMerklRewards();
+        IAccessManager(_accessManager()).setTargetFunctionRole(vault, _toSelectorArray(role.selector), role.roleId);
     }
 }

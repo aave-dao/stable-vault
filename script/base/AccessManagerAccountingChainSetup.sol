@@ -67,6 +67,8 @@ abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
     function _setup_Targets(address deployer) internal virtual override {
         super._setup_Targets(deployer);
         _setupTarget__Bbv(deployer);
+        _setupTarget__FundsHandler(deployer);
+        _setupTarget__AccountingChainGateway(deployer);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -119,6 +121,62 @@ abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
         role = RolesLib.getRole__rescueTokens();
         multicallCalldata[5] =
             abi.encodeCall(IAccessManager.setTargetFunctionRole, (bbv, _toSelectorArray(role.selector), role.roleId));
+
+        IMulticall(_accessManager()).multicall(multicallCalldata);
+    }
+
+    function _setupTarget__FundsHandler(address deployer) internal {
+        address fundsHandler = getFundsHandlerAddress(deployer);
+        RolesLib.Role memory role;
+        bytes[] memory multicallCalldata = new bytes[](3);
+
+        role = RolesLib.getRole__pushFundsToChain();
+        multicallCalldata[0] = abi.encodeCall(
+            IAccessManager.setTargetFunctionRole, (fundsHandler, _toSelectorArray(role.selector), role.roleId)
+        );
+
+        role = RolesLib.getRole__rescueTokens();
+        multicallCalldata[1] = abi.encodeCall(
+            IAccessManager.setTargetFunctionRole, (fundsHandler, _toSelectorArray(role.selector), role.roleId)
+        );
+
+        role = RolesLib.getRole__rescueNative();
+        multicallCalldata[2] = abi.encodeCall(
+            IAccessManager.setTargetFunctionRole, (fundsHandler, _toSelectorArray(role.selector), role.roleId)
+        );
+
+        IMulticall(_accessManager()).multicall(multicallCalldata);
+    }
+
+    function _setupTarget__AccountingChainGateway(address deployer) internal {
+        address gateway = getGatewayAddress(deployer);
+        RolesLib.Role memory role;
+        bytes[] memory multicallCalldata = new bytes[](5);
+
+        role = RolesLib.getRole__addBridgeAdapter();
+        multicallCalldata[0] = abi.encodeCall(
+            IAccessManager.setTargetFunctionRole, (gateway, _toSelectorArray(role.selector), role.roleId)
+        );
+
+        role = RolesLib.getRole__removeBridgeAdapter();
+        multicallCalldata[1] = abi.encodeCall(
+            IAccessManager.setTargetFunctionRole, (gateway, _toSelectorArray(role.selector), role.roleId)
+        );
+
+        role = RolesLib.getRole__setDefaultBridgeAdapter();
+        multicallCalldata[2] = abi.encodeCall(
+            IAccessManager.setTargetFunctionRole, (gateway, _toSelectorArray(role.selector), role.roleId)
+        );
+
+        role = RolesLib.getRole__rescueTokens();
+        multicallCalldata[3] = abi.encodeCall(
+            IAccessManager.setTargetFunctionRole, (gateway, _toSelectorArray(role.selector), role.roleId)
+        );
+
+        role = RolesLib.getRole__rescueNative();
+        multicallCalldata[4] = abi.encodeCall(
+            IAccessManager.setTargetFunctionRole, (gateway, _toSelectorArray(role.selector), role.roleId)
+        );
 
         IMulticall(_accessManager()).multicall(multicallCalldata);
     }

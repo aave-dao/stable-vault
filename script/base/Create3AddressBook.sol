@@ -18,52 +18,51 @@ contract Create3AddressBook {
     string constant SWAPPER_SALT_SEED = "aave.based-boosted-vault.Swapper";
     string constant CCIP_ADAPTER_SALT_SEED = "aave.based-boosted-vault.CcipAdapter";
 
-    function getBasedBoostedVaultAddress(address deployer) internal pure returns (address) {
+    function getBasedBoostedVaultAddress(address deployer) internal pure virtual returns (address) {
         return Create3AddressLib.computeCreate3Address(BASED_BOOSTED_VAULT_SALT_SEED, deployer);
     }
 
-    function getTransferHelperAddress(address deployer) internal pure returns (address) {
+    function getTransferHelperAddress(address deployer) internal pure virtual returns (address) {
         return Create3AddressLib.computeCreate3Address(TRANSFER_HELPER_SALT_SEED, deployer);
     }
 
-    function getWithdrawalPolicyAddress(address deployer) internal pure returns (address) {
+    function getWithdrawalPolicyAddress(address deployer) internal pure virtual returns (address) {
         return Create3AddressLib.computeCreate3Address(WITHDRAWAL_POLICY_SALT_SEED, deployer);
     }
 
-    function getFundsHandlerAddress(address deployer) internal pure returns (address) {
+    function getFundsHandlerAddress(address deployer) internal pure virtual returns (address) {
         return Create3AddressLib.computeCreate3Address(FUNDS_HANDLER_SALT_SEED, deployer);
     }
 
-    function getAllocatorAddress(address deployer) internal pure returns (address) {
+    function getAllocatorAddress(address deployer) internal pure virtual returns (address) {
         return Create3AddressLib.computeCreate3Address(ALLOCATOR_SALT_SEED, deployer);
     }
 
-    function getGatewayAddress(address deployer) internal pure returns (address) {
+    function getGatewayAddress(address deployer) internal pure virtual returns (address) {
         return Create3AddressLib.computeCreate3Address(GATEWAY_SALT_SEED, deployer);
     }
 
-    // TODO: How many of these do we need?
-    function getAccessManagerAddress(address deployer) internal pure returns (address) {
+    function getAccessManagerAddress(address deployer) internal pure virtual returns (address) {
         return Create3AddressLib.computeCreate3Address(ACCESS_MANAGER_SALT_SEED, deployer);
     }
 
-    function getAssetRegistryAddress(address deployer) internal pure returns (address) {
+    function getAssetRegistryAddress(address deployer) internal pure virtual returns (address) {
         return Create3AddressLib.computeCreate3Address(ASSET_REGISTRY_SALT_SEED, deployer);
     }
 
-    function getIouTokenManagerAddress(address deployer) internal pure returns (address) {
+    function getIouTokenManagerAddress(address deployer) internal pure virtual returns (address) {
         return Create3AddressLib.computeCreate3Address(IOU_TOKEN_MANAGER_SALT_SEED, deployer);
     }
 
-    function getIouTokenAddress(address deployer) internal pure returns (address) {
+    function getIouTokenAddress(address deployer) internal pure virtual returns (address) {
         return Create3AddressLib.computeCreate3Address(IOU_TOKEN_SALT_SEED, deployer);
     }
 
-    function getSwapperAddress(address deployer) internal pure returns (address) {
+    function getSwapperAddress(address deployer) internal pure virtual returns (address) {
         return Create3AddressLib.computeCreate3Address(SWAPPER_SALT_SEED, deployer);
     }
 
-    function getCcipAdapterAddress(address deployer) internal pure returns (address) {
+    function getCcipAdapterAddress(address deployer) internal pure virtual returns (address) {
         return Create3AddressLib.computeCreate3Address(CCIP_ADAPTER_SALT_SEED, deployer);
     }
 }
