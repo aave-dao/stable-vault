@@ -61,7 +61,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
 
     /// @inheritdoc IChainGateway
     function receiveMessage(uint256 sourceChainId, address asset, uint256 amount, bytes memory data) external override {
-        if (asset != Constants.ASSET_FOR_DATA_ONLY_BRIDGE && amount > 0) {
+        if (asset != Constants.ASSET_FOR_DATA_ONLY_BRIDGE) {
             // Receiving of funds should not check for whitelisted adapter because we may want to recover tokens from
             // adapter even after removing the adapter. We may have to remove an adapter if we do not trust it for
             // receiving arbitrary messages.
@@ -69,6 +69,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
             _receiveFunds(asset, amount);
         }
         if (data.length > 0) {
+            _onlyAdapter(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, sourceChainId);
             _receiveData(sourceChainId, data);
         }
     }

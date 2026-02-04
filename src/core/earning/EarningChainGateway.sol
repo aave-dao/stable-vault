@@ -188,8 +188,13 @@ contract EarningChainGateway is
         IIouTokenManager(IOU_TOKEN_MANAGER).mintTokens(iouTokenBridgeMessage.recipient, iouTokenBridgeMessage.amount);
     }
 
-    function _receiveData(uint256 sourceChainId, bytes memory data) internal override {
-        _onlyAdapter(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, sourceChainId);
+    function _receiveData(
+        uint256, // sourceChainId
+        bytes memory data
+    )
+        internal
+        override
+    {
         IChainGateway.CrossChainMessage memory crossChainMessage = abi.decode(data, (IChainGateway.CrossChainMessage));
         if (crossChainMessage.messageType == IChainGateway.MessageType.BRIDGE_IOU_TOKEN) {
             _bridgeIouTokenFromAccountingChain(crossChainMessage.data);

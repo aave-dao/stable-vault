@@ -65,7 +65,6 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
     }
 
     function _receiveData(uint256 sourceChainId, bytes memory data) internal override {
-        _onlyAdapter(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, sourceChainId);
         IChainGateway.CrossChainMessage memory crossChainMessage = abi.decode(data, (IChainGateway.CrossChainMessage));
         if (crossChainMessage.messageType == IChainGateway.MessageType.BALANCE_SNAPSHOT) {
             _updateChainBalanceSnapshot(sourceChainId, crossChainMessage.data);
