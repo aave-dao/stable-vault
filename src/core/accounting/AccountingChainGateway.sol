@@ -11,7 +11,6 @@ import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
-import {Constants} from "src/types/Constants.sol";
 
 /// @title AccountingChainGateway
 /// @author Aave Labs
