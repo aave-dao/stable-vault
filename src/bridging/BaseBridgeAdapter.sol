@@ -57,7 +57,8 @@ abstract contract BaseBridgeAdapter is AccessManaged, RescuableNative, TransferH
     /// @inheritdoc IBridgeAdapter
     function publishMessageToChainWithFeePayer(
         uint256 destinationChainId,
-        IBridgeAdapter.BridgeAsset[] memory assets,
+        address asset,
+        uint256 amount,
         bytes memory data,
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) external payable virtual override;
@@ -67,20 +68,15 @@ abstract contract BaseBridgeAdapter is AccessManaged, RescuableNative, TransferH
     }
 
     /// @inheritdoc IBridgeAdapter
-    function replayFundsReceiving(IBridgeAdapter.BridgeAsset[] memory assets) external virtual override {
-        _processReceivedFunds(assets);
+    function replayFundsReceiving(BridgeAsset[] memory assets) external virtual override {
+        for (uint256 i = 0; i < assets.length; i++) {
+            _processReceivedFunds(assets[i].asset, assets[i].amount);
+        }
     }
 
-    function _processReceivedFunds(IBridgeAdapter.BridgeAsset[] memory assets)
-        internal
-        assertingTransferHelperBalanceForBridgeAssets(assets)
-    {
-        for (uint256 i = 0; i < assets.length; i++) {
-            address asset = assets[i].asset;
-            uint256 amount = assets[i].amount;
-            _transferToTransferHelper(asset, amount);
-        }
-        IChainGateway(GATEWAY).receiveMessage(RECEIVED_FUNDS_ONLY_SOURCE_CHAIN_ID, assets, "");
+    function _processReceivedFunds(address asset, uint256 amount) internal assertingTransferHelperBalanceFor(asset) {
+        _transferToTransferHelper(asset, amount);
+        IChainGateway(GATEWAY).receiveMessage(RECEIVED_FUNDS_ONLY_SOURCE_CHAIN_ID, asset, amount, "");
     }
 
     function _beforeRescueNative(uint256) internal virtual override {

@@ -5,6 +5,7 @@ pragma solidity ^0.8.22;
 import {IAccountingChainGateway} from "src/interfaces/IAccountingChainGateway.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
+import {Constants} from "src/types/Constants.sol";
 
 contract MockAccountingChainGateway is IAccountingChainGateway {
     address internal immutable TRANSFER_HELPER;
@@ -43,12 +44,10 @@ contract MockAccountingChainGateway is IAccountingChainGateway {
 
     /// @dev Called by Bridge Adapters which use the TransferHelper modifiers that assert no funds left in the
     /// TransferHelper.
-    function receiveMessage(uint256 sourceChainId, IBridgeAdapter.BridgeAsset[] memory assets, bytes memory data)
-        external
-    {
+    function receiveMessage(uint256 sourceChainId, address asset, uint256 amount, bytes memory data) external {
         (sourceChainId, data);
-        for (uint256 i = 0; i < assets.length; i++) {
-            ITransferHelper(TRANSFER_HELPER).transfer(assets[i].asset, assets[i].amount, address(this));
+        if (asset != Constants.ASSET_FOR_DATA_ONLY_BRIDGE && amount > 0) {
+            ITransferHelper(TRANSFER_HELPER).transfer(asset, amount, address(this));
         }
     }
 

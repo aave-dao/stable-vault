@@ -77,12 +77,14 @@ interface IBridgeAdapter {
 
     /// @notice Sends an arbitrary message containing instructions or data updates to a destination chain.
     /// @param destinationChainId Chain id of the chain to publish the message to.
-    /// @param assets Assets to bridge.
+    /// @param asset Asset to bridge; set to `address(0)` for data only messages.
+    /// @param amount Amount of the asset to bridge; set to 0 for data only messages.
     /// @param data Arbitrary data that would be decoded and handled by the destination chain.
     /// @param bridgeParams Parameters for the bridge adapter.
     function publishMessageToChainWithFeePayer(
         uint256 destinationChainId,
-        BridgeAsset[] memory assets,
+        address asset,
+        uint256 amount,
         bytes memory data,
         BridgeParams memory bridgeParams
     ) external payable;
