@@ -4,7 +4,7 @@ pragma solidity ^0.8.22;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 import {IAny2EVMMessageReceiver} from "@chainlink-ccip/contracts/interfaces/IAny2EVMMessageReceiver.sol";
@@ -24,7 +24,13 @@ import {Errors} from "src/types/Errors.sol";
 /// @notice Adapter for sending and receiving messages via Chainlink CCIP.
 /// @dev This adapter will not ingest user-specific tokens and data, therefore the adapter does not support
 /// returning tokens to the original sender on the source chain (original sender will be the source chain CCIP adapter).
-contract CcipAdapter is BaseBridgeAdapter, ReentrancyGuard, ICcipBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
+contract CcipAdapter is
+    BaseBridgeAdapter,
+    ReentrancyGuardTransient,
+    ICcipBridgeAdapter,
+    IAny2EVMMessageReceiver,
+    IERC165
+{
     using SafeERC20 for IERC20;
 
     /// @notice Amount of gas to reserve during ccipReceive() to properly handle processing of failed messages.

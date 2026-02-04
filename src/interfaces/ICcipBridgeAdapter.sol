@@ -22,14 +22,6 @@ interface ICcipBridgeAdapter is IBridgeAdapter {
     /// @custom:selector 0x9546c78e
     error UnexpectedDataLength();
 
-    /// @notice The status of the message data used to track the lifecycle of arbitrary data bridged.
-    /// @param PROCESSED The message data has been processed successfully; serves as replay protection.
-    /// @param FAILED The message data has failed to be processed and can be retried.
-    enum MessageDataStatus {
-        PROCESSED,
-        FAILED
-    }
-
     /// @notice Getter for the address of the Chainlink CCIP router.
     /// @return router Address of the Chainlink CCIP router.
     function getRouter() external view returns (address);
