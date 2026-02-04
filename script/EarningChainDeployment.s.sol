@@ -8,7 +8,7 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {AccessManager} from "openzeppelin-contracts/contracts/access/manager/AccessManager.sol";
 
 import {ATokenVaultDeployment} from "script/base/ATokenVaultDeployment.sol";
-import {Create3AddressBook} from "script/base/Create3AddressBook.sol";
+import {AccessManagerEarningChainSetup} from "script/base/AccessManagerEarningChainSetup.sol";
 import {Create3Deployment} from "script/base/Create3Deployment.sol";
 
 import {CcipAdapter} from "src/bridging/ccip/CcipAdapter.sol";
@@ -25,7 +25,7 @@ import {Swapper} from "src/periphery/Swapper.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 
-contract EarningChainDeployment is Create3Deployment, Create3AddressBook, ATokenVaultDeployment, Script {
+contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainSetup, ATokenVaultDeployment, Script {
     using Strings for address;
 
     // Base Chain ID
@@ -78,14 +78,14 @@ contract EarningChainDeployment is Create3Deployment, Create3AddressBook, AToken
     }
 
     function _setupContracts() internal {
-        _setupAccessManager();
         _setupBridgeAdapters();
         _setupAllocator();
         _setupAssetRegistry();
+        _setupAccessManager(DEPLOYER);
     }
 
-    function _setupAccessManager() internal {
-        // Right now we just keep the admin, we should setup more roles here.
+    function _accessManager() internal pure override returns (address) {
+        return getAccessManagerAddress(DEPLOYER);
     }
 
     function _setupBridgeAdapters() internal {
@@ -127,11 +127,13 @@ contract EarningChainDeployment is Create3Deployment, Create3AddressBook, AToken
         address usdcYieldStrategy = _deployATokenVault(USDC, poolAddressProvider, DEPLOYER);
         allocator.addStrategy(USDC, usdcYieldStrategy);
         allocator.setDefaultStrategy(USDC, usdcYieldStrategy);
+        _setupTarget__ATokenVault(usdcYieldStrategy);
         _logDeployment("USDC aTokenVault", "", usdcYieldStrategy);
 
         address usdtYieldStrategy = _deployATokenVault(USDT, poolAddressProvider, DEPLOYER);
         allocator.addStrategy(USDT, usdtYieldStrategy);
         allocator.setDefaultStrategy(USDT, usdtYieldStrategy);
+        _setupTarget__ATokenVault(usdtYieldStrategy);
         _logDeployment("USDT aTokenVault", "", usdtYieldStrategy);
     }
 

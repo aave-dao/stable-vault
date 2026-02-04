@@ -8,7 +8,7 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {AccessManager} from "openzeppelin-contracts/contracts/access/manager/AccessManager.sol";
 
 import {ATokenVaultDeployment} from "script/base/ATokenVaultDeployment.sol";
-import {Create3AddressBook} from "script/base/Create3AddressBook.sol";
+import {AccessManagerAccountingChainSetup} from "script/base/AccessManagerAccountingChainSetup.sol";
 import {Create3Deployment} from "script/base/Create3Deployment.sol";
 
 import {CcipAdapter} from "src/bridging/ccip/CcipAdapter.sol";
@@ -27,7 +27,12 @@ import {Swapper} from "src/periphery/Swapper.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 
-contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATokenVaultDeployment, Script {
+contract AccountingChainDeployment is
+    Create3Deployment,
+    AccessManagerAccountingChainSetup,
+    ATokenVaultDeployment,
+    Script
+{
     using Strings for address;
 
     address constant DEPLOYER = address(0xBB700dA5CCC9Ec5605780Fc40695f1206B090303);
@@ -81,14 +86,14 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
     }
 
     function _setupContracts() internal {
-        _setupAccessManager();
         _setupBridgeAdapters();
         _setupAllocator();
         _setupAssetRegistry();
+        _setupAccessManager(DEPLOYER);
     }
 
-    function _setupAccessManager() internal {
-        // Right now we just keep the admin, we should setup more roles here.
+    function _accessManager() internal pure override returns (address) {
+        return getAccessManagerAddress(DEPLOYER);
     }
 
     function _setupBridgeAdapters() internal {
@@ -128,11 +133,13 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
         address ghoYieldStrategy = _deployATokenVault(GHO, poolAddressProvider, DEPLOYER);
         allocator.addStrategy(GHO, ghoYieldStrategy);
         allocator.setDefaultStrategy(GHO, ghoYieldStrategy);
+        _setupTarget__ATokenVault(ghoYieldStrategy);
         _logDeployment("GHO aTokenVault", "", ghoYieldStrategy);
 
         address usdcYieldStrategy = _deployATokenVault(USDC, poolAddressProvider, DEPLOYER);
         allocator.addStrategy(USDC, usdcYieldStrategy);
         allocator.setDefaultStrategy(USDC, usdcYieldStrategy);
+        _setupTarget__ATokenVault(usdcYieldStrategy);
         _logDeployment("USDC aTokenVault", "", usdcYieldStrategy);
 
         // TODO: Add USDT yield strategy
