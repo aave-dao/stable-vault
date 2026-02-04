@@ -16,6 +16,7 @@ import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
+import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {Errors} from "src/types/Errors.sol";
 
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
@@ -24,7 +25,6 @@ import {MockAssetRegistry} from "test/mocks/MockAssetRegistry.sol";
 import {IMockErc20} from "test/mocks/MockErc20.sol";
 import {MockErc4626Strategy} from "test/mocks/MockErc4626Strategy.sol";
 import {MockNonStandardErc20} from "test/mocks/MockNonStandardErc20.sol";
-import {MockPriceOracle} from "test/mocks/MockPriceOracle.sol";
 import {MockSwapper} from "test/mocks/MockSwapper.sol";
 import {MockTransferHelper} from "test/mocks/MockTransferHelper.sol";
 import {TestErc4626} from "test/mocks/TestErc4626.sol";
@@ -56,7 +56,7 @@ contract AllocatorTest is TestWithHelpers {
     TestErc4626 internal _defaultGhoStrategy;
     TestErc4626 internal _extraGhoStrategy;
     MockSwapper internal _mockSwapper;
-    MockPriceOracle internal _mockPriceOracle;
+    PriceOracle internal _priceOracle;
     MockTransferHelper internal _mockTransferHelper;
 
     Allocator internal _allocator;
@@ -99,8 +99,14 @@ contract AllocatorTest is TestWithHelpers {
         _mockAccessManager = new MockAccessManager(admin);
 
         _mockSwapper = new MockSwapper();
-        _mockPriceOracle = new MockPriceOracle();
+        _priceOracle = _deployPriceOracle(address(_mockAccessManager));
         _mockTransferHelper = new MockTransferHelper();
+
+        // Mock prices for assets (1 RAY = 1:1 price ratio)
+        _mockAssetPrice(address(_priceOracle), address(_mockUsdt), MathLib.RAY);
+        _mockAssetPrice(address(_priceOracle), address(_mockGho), MathLib.RAY);
+        // Mock validatePrice to pass for any asset
+        _mockValidatePriceForAll(address(_priceOracle));
 
         // Set up Asset Registry
         vm.prank(admin);
@@ -127,7 +133,7 @@ contract AllocatorTest is TestWithHelpers {
         _allocator = _deployAllocator(
             _mockAccessManager,
             address(_mockAssetRegistry),
-            address(_mockPriceOracle),
+            address(_priceOracle),
             address(_mockTransferHelper),
             MAX_STRATEGIES_PER_ASSET
         );
@@ -853,7 +859,7 @@ contract AllocatorTest is TestWithHelpers {
         Allocator singleStrategyAllocator = _deployAllocator(
             _mockAccessManager,
             address(_mockAssetRegistry),
-            address(_mockPriceOracle),
+            address(_priceOracle),
             address(_mockTransferHelper),
             MAX_STRATEGIES_PER_ASSET
         );
@@ -1650,6 +1656,33 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalance(assetOut), amountAssetIn.convertAssetDecimals(assetIn, assetOut));
     }
 
+    function test_rebalance_swap_reverts_ifAssetOutPriceIsInvalid() public {
+        address assetIn = address(_mockUsdt);
+        address assetOut = address(_mockGho);
+        uint256 amountAssetIn = 100_000_000;
+
+        // Airdrop assetIn to the Allocator
+        _mockUsdt.mint(address(_allocator), amountAssetIn);
+
+        // Mint assetOut to the swapper
+        _mockGho.mint(address(_mockSwapper), amountAssetIn.convertAssetDecimals(assetIn, assetOut));
+
+        _mockInvalidPrice(address(_priceOracle), assetOut);
+
+        IAllocator.RebalanceParams[] memory rebalanceParams = _initializeRebalanceParams(1);
+        IAllocator.SwapParams[] memory swaps = _initializeSwapParams(1);
+        swaps[0] = _buildSwapParams(assetIn, amountAssetIn, assetOut, address(_mockSwapper), "");
+        rebalanceParams[0] =
+            _buildRebalanceParams(_initializeDeallocationParams(0), swaps, _initializeAllocationParams(0));
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(Errors.InvalidPrice.selector);
+        _allocator.rebalance(rebalanceParams);
+
+        // Check balances after the swap
+        assertEq(_allocator.getAssetBalance(assetIn), amountAssetIn);
+        assertEq(_allocator.getAssetBalance(assetOut), 0);
+    }
+
     function test_rebalance_entireFlow(uint256 amountIn) public {
         address assetIn = address(_mockUsdt);
         address assetOut = address(_mockGho);
@@ -1746,7 +1779,7 @@ contract AllocatorTest is TestWithHelpers {
         _allocator = _deployAllocator(
             _mockAccessManager,
             address(_mockAssetRegistry),
-            address(_mockPriceOracle),
+            address(_priceOracle),
             address(_mockTransferHelper),
             maxStrategiesPerAsset
         );

@@ -3,9 +3,13 @@
 pragma solidity ^0.8.20;
 
 import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Test} from "forge-std/Test.sol";
 
+import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
+import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
+import {Errors} from "src/types/Errors.sol";
 
 import {IMockErc20} from "test/mocks/MockErc20.sol";
 
@@ -71,5 +75,44 @@ contract TestWithHelpers is Test {
 
     function _decimalsToScaleFactor(uint256 decimals) private pure returns (uint256) {
         return 10 ** decimals;
+    }
+
+    ///////////// Price Oracle Helpers /////////////
+
+    /// @dev Deploys a PriceOracle with TransparentUpgradeableProxy
+    function _deployPriceOracle(address accessManager) internal virtual returns (PriceOracle) {
+        // Use 0 as minValidPriceRay for tests (no minimum price validation)
+        address priceOracleImpl = address(new PriceOracle(0));
+        return PriceOracle(
+            address(
+                new TransparentUpgradeableProxy(
+                    priceOracleImpl, address(this), abi.encodeCall(PriceOracle.initialize, (accessManager))
+                )
+            )
+        );
+    }
+
+    /// @dev Mocks the price for an asset on a price oracle using vm.mockCall
+    function _mockAssetPrice(address priceOracle, address asset, uint256 priceRay) internal {
+        vm.mockCall(priceOracle, abi.encodeCall(IPriceOracle.getPrice, (asset)), abi.encode(priceRay));
+    }
+
+    /// @dev Mocks validatePrice to not revert (valid price) for a specific asset
+    function _mockValidatePrice(address priceOracle, address asset) internal {
+        vm.mockCall(priceOracle, abi.encodeCall(IPriceOracle.validatePrice, (asset)), abi.encode());
+    }
+
+    /// @dev Mocks validatePrice to not revert (valid price) for ANY asset
+    function _mockValidatePriceForAll(address priceOracle) internal {
+        vm.mockCall(priceOracle, abi.encodeWithSelector(IPriceOracle.validatePrice.selector), abi.encode());
+    }
+
+    /// @dev Mocks validatePrice to revert with InvalidPrice error
+    function _mockInvalidPrice(address priceOracle, address asset) internal {
+        vm.mockCallRevert(
+            priceOracle,
+            abi.encodeCall(IPriceOracle.validatePrice, (asset)),
+            abi.encodeWithSelector(Errors.InvalidPrice.selector)
+        );
     }
 }

@@ -15,6 +15,7 @@ import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
+import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {Errors} from "src/types/Errors.sol";
 
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
@@ -25,7 +26,6 @@ import {MockChainBalanceOracle} from "test/mocks/MockChainBalanceOracle.sol";
 import {MockErc20} from "test/mocks/MockErc20.sol";
 import {IMockErc20} from "test/mocks/MockErc20.sol";
 import {MockNonStandardErc20} from "test/mocks/MockNonStandardErc20.sol";
-import {MockPriceOracle} from "test/mocks/MockPriceOracle.sol";
 import {MockTransferHelper} from "test/mocks/MockTransferHelper.sol";
 
 contract FundsHandlerTest is TestWithHelpers {
@@ -38,7 +38,7 @@ contract FundsHandlerTest is TestWithHelpers {
     address mockBbv;
     MockAccountingChainGateway mockGateway;
     MockAllocator mockAllocator;
-    MockPriceOracle mockPriceOracle;
+    PriceOracle priceOracle;
     MockChainBalanceOracle mockChainBalanceOracle;
     MockTransferHelper mockTransferHelper;
     MockAccessManager mockAccessManager;
@@ -54,13 +54,13 @@ contract FundsHandlerTest is TestWithHelpers {
         address bbv,
         address gateway,
         address allocator,
-        address priceOracle,
+        address priceOracleAddr,
         address transferHelper,
         address chainBalanceOracle,
         address accessManager
     ) internal returns (FundsHandler) {
         address fundsHandlerImpl = address(
-            new FundsHandler(bbv, gateway, allocator, priceOracle, transferHelper, chainBalanceOracle)
+            new FundsHandler(bbv, gateway, allocator, priceOracleAddr, transferHelper, chainBalanceOracle)
         );
         return FundsHandler(
             address(
@@ -77,15 +77,15 @@ contract FundsHandlerTest is TestWithHelpers {
         mockTransferHelper = new MockTransferHelper();
         mockGateway = new MockAccountingChainGateway(address(mockTransferHelper));
         mockAllocator = new MockAllocator();
-        mockPriceOracle = new MockPriceOracle();
-        mockChainBalanceOracle = new MockChainBalanceOracle();
         mockAccessManager = new MockAccessManager(ADMIN);
+        priceOracle = _deployPriceOracle(address(mockAccessManager));
+        mockChainBalanceOracle = new MockChainBalanceOracle();
         mockAsset = IMockErc20(address(new MockNonStandardErc20("Test USD", "tUSD", 6)));
         fundsHandler = _deployFundsHandler(
             mockBbv,
             address(mockGateway),
             address(mockAllocator),
-            address(mockPriceOracle),
+            address(priceOracle),
             address(mockTransferHelper),
             address(mockChainBalanceOracle),
             address(mockAccessManager)
@@ -103,9 +103,9 @@ contract FundsHandlerTest is TestWithHelpers {
         IMockErc20 mockAsset3 = IMockErc20(address(new MockNonStandardErc20("Test USDC", "tUSDC", 6)));
 
         // Set mock prices (1 RAY = 1:1 price ratio for simplicity)
-        mockPriceOracle.mockPrice(address(mockAsset1), MathLib.RAY);
-        mockPriceOracle.mockPrice(address(mockAsset2), MathLib.RAY);
-        mockPriceOracle.mockPrice(address(mockAsset3), MathLib.RAY);
+        _mockAssetPrice(address(priceOracle), address(mockAsset1), MathLib.RAY);
+        _mockAssetPrice(address(priceOracle), address(mockAsset2), MathLib.RAY);
+        _mockAssetPrice(address(priceOracle), address(mockAsset3), MathLib.RAY);
 
         accChainBalance1 = _boundAssetAmountAllowingZero(address(mockAsset1), accChainBalance1);
         accChainBalance2 = _boundAssetAmountAllowingZero(address(mockAsset2), accChainBalance2);

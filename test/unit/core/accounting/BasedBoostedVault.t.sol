@@ -19,6 +19,7 @@ import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
+import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
@@ -32,7 +33,6 @@ import {IMockErc20} from "test/mocks/MockErc20.sol";
 import {MockFundsHandler} from "test/mocks/MockFundsHandler.sol";
 import {MockIouTokenManager} from "test/mocks/MockIouTokenManager.sol";
 import {MockNonStandardErc20} from "test/mocks/MockNonStandardErc20.sol";
-import {MockPriceOracle} from "test/mocks/MockPriceOracle.sol";
 import {MockReentrantErc20} from "test/mocks/MockReentrantErc20.sol";
 import {MockTransferHelper} from "test/mocks/MockTransferHelper.sol";
 
@@ -55,7 +55,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     MockAssetRegistry mockAssetRegistry;
     MockTransferHelper mockTransferHelper;
     WithdrawalPolicy mockWithdrawalPolicy;
-    MockPriceOracle mockPriceOracle;
+    PriceOracle mockPriceOracle;
     IBasedBoostedVault bbv;
 
     function _deployDefaultAsset() internal returns (IMockErc20) {
@@ -71,7 +71,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         address assetRegistry,
         address transferHelper,
         address withdrawalFeeCalculatorAddress,
-        address priceOracle,
+        address priceOracleAddress,
         uint256 maxActiveSubVaults
     ) internal returns (IBasedBoostedVault) {
         address vaultImpl = address(
@@ -82,7 +82,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
                 fundsHandler,
                 transferHelper,
                 withdrawalFeeCalculatorAddress,
-                priceOracle,
+                priceOracleAddress,
                 maxActiveSubVaults
             )
         );
@@ -120,7 +120,12 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockAsset = _deployDefaultAsset();
         mockTransferHelper = new MockTransferHelper();
         mockFundsHandler = new MockFundsHandler(address(mockTransferHelper));
-        mockPriceOracle = new MockPriceOracle();
+
+        mockPriceOracle = _deployPriceOracle(address(mockAccessManager));
+        // Mock price for the default asset (1 RAY = 1:1 price ratio)
+        _mockAssetPrice(address(mockPriceOracle), address(mockAsset), MathLib.RAY);
+        // Mock validatePrice to pass for any asset (tests may create additional assets)
+        _mockValidatePriceForAll(address(mockPriceOracle));
 
         // Predict BBV proxy address after WithdrawalPolicy impl+proxy and BBV impl deployments.
         uint256 deployerNonce = vm.getNonce(address(this));
@@ -407,6 +412,19 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.prank(user);
         vm.expectRevert(Errors.InvalidAmount.selector);
         vault.deposit(user, address(highDecimalToken), depositAmount);
+    }
+
+    function test_deposit_reverts_ifPriceOracleRejectsPrice(uint256 amount) public {
+        address user = makeAddr("testUser");
+        _mockInvalidPrice(address(mockPriceOracle), address(mockAsset));
+        amount = _boundAssetAmount(address(mockAsset), amount);
+
+        mockAsset.mint(user, amount);
+        vm.prank(user);
+        mockAsset.forceApprove(address(bbv), amount);
+        vm.prank(user);
+        vm.expectRevert(Errors.InvalidPrice.selector);
+        bbv.deposit(user, address(mockAsset), amount);
     }
 
     function test_deposit_allowsToDepositOnBehalfOfOtherUser(address user, address msgSender, uint256 amount) public {

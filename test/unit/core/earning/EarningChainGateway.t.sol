@@ -21,6 +21,7 @@ import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
 import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
+import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 import {Errors} from "src/types/Errors.sol";
 
@@ -32,7 +33,6 @@ import {MockBridgeAdapter} from "test/mocks/MockBridgeAdapter.sol";
 import {MockDummyIouTokenManager} from "test/mocks/MockDummyIouTokenManager.sol";
 import {IMockErc20} from "test/mocks/MockErc20.sol";
 import {MockNonStandardErc20} from "test/mocks/MockNonStandardErc20.sol";
-import {MockPriceOracle} from "test/mocks/MockPriceOracle.sol";
 import {MockReentrantErc20} from "test/mocks/MockReentrantErc20.sol";
 import {MockTransferHelper} from "test/mocks/MockTransferHelper.sol";
 
@@ -56,7 +56,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     MockBridgeAdapter internal _mockBridgeAdapterData;
     MockDummyIouTokenManager internal _mockIouTokenManager;
     MockAssetRegistry internal _mockAssetRegistry;
-    MockPriceOracle internal _mockPriceOracle;
+    PriceOracle internal _priceOracle;
     MockTransferHelper internal _mockTransferHelper;
     WithdrawalPolicy internal _mockWithdrawalPolicy;
 
@@ -131,18 +131,18 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         _mockAllocator = new MockAllocator();
 
-        _mockPriceOracle = new MockPriceOracle();
+        _mockAccessManager = new MockAccessManager(admin);
+
+        _priceOracle = _deployPriceOracle(address(_mockAccessManager));
         // Set mock prices (1 RAY = 1:1 price ratio)
-        _mockPriceOracle.mockPrice(address(_mockUsdt), MathLib.RAY);
-        _mockPriceOracle.mockPrice(address(_mockGho), MathLib.RAY);
+        _mockAssetPrice(address(_priceOracle), address(_mockUsdt), MathLib.RAY);
+        _mockAssetPrice(address(_priceOracle), address(_mockGho), MathLib.RAY);
 
         _mockTransferHelper = new MockTransferHelper();
 
         _mockBridgeAdapterAssets = new MockBridgeAdapter(address(_mockTransferHelper));
 
         _mockBridgeAdapterData = new MockBridgeAdapter(address(_mockTransferHelper));
-
-        _mockAccessManager = new MockAccessManager(admin);
 
         // Predict gateway proxy address after WithdrawalPolicy impl+proxy and gateway impl deployments.
         uint256 deployerNonce = vm.getNonce(address(this));
@@ -155,7 +155,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             _mockAccessManager,
             address(_mockIouTokenManager),
             address(_mockAllocator),
-            address(_mockPriceOracle),
+            address(_priceOracle),
             address(_mockTransferHelper),
             address(_mockWithdrawalPolicy)
         );

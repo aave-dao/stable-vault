@@ -306,6 +306,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
             IAssetRegistry(ASSET_REGISTRY).isSwapOutputAllowed(swap.assetOut), Errors.UnsupportedAsset(swap.assetOut)
         );
         _validateSwapAmountIn(swap.assetIn, swap.amountIn, swap.assetOut);
+        IPriceOracle(PRICE_ORACLE).validatePrice(swap.assetOut);
 
         // Transfer assetIn to the swapper
         IERC20(swap.assetIn).safeTransfer(swap.swapper, swap.amountIn);
@@ -319,7 +320,6 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         // Pull the `assetOut` from the Swapper to the Allocator
         IERC20(swap.assetOut).safeTransferFrom(swap.swapper, address(this), amountOut);
 
-        IPriceOracle(PRICE_ORACLE).validatePrice(swap.assetOut);
         emit AssetsSwapped(swap.assetIn, swap.assetOut, swap.amountIn, amountOut);
     }
 

@@ -2,8 +2,9 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.20;
 
-import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
+
+import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {AccessManager} from "openzeppelin-contracts/contracts/access/manager/AccessManager.sol";
@@ -34,14 +35,14 @@ import {Swapper} from "src/periphery/Swapper.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 
+import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {_toSelectorArray} from "test/helpers/TypeHelpers.sol";
 import {MockCCIPRouter} from "test/mocks/MockCcipRouter.sol";
 import {MockChainBalanceOracle} from "test/mocks/MockChainBalanceOracle.sol";
 import {MockErc20} from "test/mocks/MockErc20.sol";
-import {MockPriceOracle} from "test/mocks/MockPriceOracle.sol";
 import {TestErc4626} from "test/mocks/TestErc4626.sol";
 
-contract BaseTest is Test {
+contract BaseTest is TestWithHelpers {
     using MathLib for uint256;
     using AssetLib for uint256;
 
@@ -63,7 +64,6 @@ contract BaseTest is Test {
 
     uint8 internal constant MAX_STRATEGIES_PER_ASSET = 15;
     uint256 internal constant DEFAULT_MAX_ACTIVE_SUB_VAULTS = 201;
-    uint256 internal constant DEFAULT_MAX_PER_SECOND_RATE = 1000000005781378656804591713; // ~20% APY
     uint64 internal constant ACCOUNTING_CHAIN_ID = 1;
     uint64 internal constant ACCOUNTING_CHAIN_CCIP_SELECTOR = 10;
     uint64 internal constant EARNING_CHAIN_ID = 2;
@@ -133,9 +133,9 @@ contract BaseTest is Test {
     // Mock CCIP Router
     MockCCIPRouter public mockCcipRouter;
 
-    // Mock Price Oracles
-    MockPriceOracle public priceOracle_accountingChain;
-    MockPriceOracle public priceOracle_earningChain;
+    // Price Oracles
+    PriceOracle public priceOracle_accountingChain;
+    PriceOracle public priceOracle_earningChain;
 
     // Mock Chain Balance Oracle (for tracking earning chain balances from accounting chain)
     MockChainBalanceOracle public chainBalanceOracle;
@@ -209,18 +209,6 @@ contract BaseTest is Test {
         mockCcipRouter.setSourceChainSelector(EARNING_CHAIN_CCIP_SELECTOR, ACCOUNTING_CHAIN_CCIP_SELECTOR);
         mockCcipRouter.setSourceChainSelector(ACCOUNTING_CHAIN_CCIP_SELECTOR, EARNING_CHAIN_CCIP_SELECTOR);
 
-        // price oracle mocks
-        priceOracle_accountingChain = new MockPriceOracle();
-        priceOracle_earningChain = new MockPriceOracle();
-        console.log("\tMock Price Oracle (Accounting Chain): %s", address(priceOracle_accountingChain));
-        console.log("\tMock Price Oracle (Earning Chain): %s", address(priceOracle_earningChain));
-
-        // Set mock prices (1 RAY = 1:1 price ratio for simplicity)
-        priceOracle_accountingChain.mockPrice(address(GHO), MathLib.RAY);
-        priceOracle_accountingChain.mockPrice(address(USDC), MathLib.RAY);
-        priceOracle_earningChain.mockPrice(address(GHO), MathLib.RAY);
-        priceOracle_earningChain.mockPrice(address(USDC), MathLib.RAY);
-
         // Chain balance oracle for tracking earning chain balances from accounting chain
         chainBalanceOracle = new MockChainBalanceOracle();
         console.log("\tMock Chain Balance Oracle (Earning Chain): %s", address(chainBalanceOracle));
@@ -259,6 +247,8 @@ contract BaseTest is Test {
 
         accessManager_accountingChainAddress = vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
         console.log("\tAccess Manager (Accounting Chain) Predicted Address: %s", accessManager_accountingChainAddress);
+
+        deployerNonce_accountingChain += 2; // Incrementing for Price Oracle implementation + proxy
 
         deployerNonce_accountingChain++; // Incrementing for Asset Registry implementation
         assetRegistry_accountingChainAddress = vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
@@ -312,6 +302,13 @@ contract BaseTest is Test {
             address(accessManager_accountingChain) == accessManager_accountingChainAddress,
             "Access Manager (Accounting Chain) address mismatch"
         );
+
+        // Deploy Price Oracle for Accounting Chain (with mocked prices via vm.mockCall)
+        priceOracle_accountingChain = _deployPriceOracle(accessManager_accountingChainAddress);
+        console.log("\tPrice Oracle (Accounting Chain): %s", address(priceOracle_accountingChain));
+        _mockAssetPrice(address(priceOracle_accountingChain), address(GHO), MathLib.RAY);
+        _mockAssetPrice(address(priceOracle_accountingChain), address(USDC), MathLib.RAY);
+        _mockValidatePriceForAll(address(priceOracle_accountingChain));
 
         // 2. Asset Registry
         address assetRegistry_accountingChain_impl = address(new AssetRegistry());
@@ -519,6 +516,8 @@ contract BaseTest is Test {
         accessManager_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
         console.log("\tAccess Manager (Earning Chain) Predicted Address: %s", accessManager_earningChainAddress);
 
+        deployerNonce_earningChain += 2; // Incrementing for Price Oracle implementation + proxy
+
         deployerNonce_earningChain++; // Incrementing for Asset Registry implementation
         assetRegistry_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
         console.log("\tAsset Registry (Earning Chain) Predicted Address: %s", assetRegistry_earningChainAddress);
@@ -563,6 +562,13 @@ contract BaseTest is Test {
             address(accessManager_earningChain) == accessManager_earningChainAddress,
             "Access Manager (Earning Chain) address mismatch"
         );
+
+        // Deploy Price Oracle for Earning Chain (with mocked prices via vm.mockCall)
+        priceOracle_earningChain = _deployPriceOracle(accessManager_earningChainAddress);
+        console.log("\tPrice Oracle (Earning Chain): %s", address(priceOracle_earningChain));
+        _mockAssetPrice(address(priceOracle_earningChain), address(GHO), MathLib.RAY);
+        _mockAssetPrice(address(priceOracle_earningChain), address(USDC), MathLib.RAY);
+        _mockValidatePriceForAll(address(priceOracle_earningChain));
 
         // 2. Asset Registry
         address assetRegistry_earningChain_impl = address(new AssetRegistry());
@@ -990,5 +996,18 @@ contract BaseTest is Test {
     function _setUpRole(AccessManager accessManager, uint64 roleId, address account, uint32 executionDelay) internal {
         accessManager.grantRole(roleId, account, executionDelay);
         accessManager.setRoleGuardian(roleId, GUARDIAN_ROLE);
+    }
+
+    /// @dev Deploys a PriceOracle with TransparentUpgradeableProxy (overrides TestWithHelpers to use proxyAdmin)
+    function _deployPriceOracle(address accessManager) internal override returns (PriceOracle) {
+        // Use 0 as minValidPriceRay for tests (no minimum price validation)
+        address priceOracleImpl = address(new PriceOracle(0));
+        return PriceOracle(
+            address(
+                new TransparentUpgradeableProxy(
+                    priceOracleImpl, proxyAdmin, abi.encodeCall(PriceOracle.initialize, (accessManager))
+                )
+            )
+        );
     }
 }
