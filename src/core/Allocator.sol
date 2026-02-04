@@ -155,6 +155,19 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     }
 
     /// @inheritdoc IAllocator
+    function depositAllowIdle(address asset, uint256 amount) external override onlyDepositor {
+        require(IAssetRegistry(ASSET_REGISTRY).isDepositToAllocatorAllowed(asset), Errors.UnsupportedAsset(asset));
+        ITransferHelper(TRANSFER_HELPER).pull(asset, amount);
+        if ($storage().defaultStrategyByAsset[asset] != address(0)) {
+            try this.tryDepositToStrategy(asset, amount, $storage().defaultStrategyByAsset[asset]) {
+                return;
+            } catch {
+                emit StrategyDepositFailed($storage().defaultStrategyByAsset[asset], amount);
+            }
+        }
+    }
+
+    /// @inheritdoc IAllocator
     function withdraw(address asset, uint256 amount) external override onlyWithdrawer {
         require(amount > 0, Errors.ZeroAmount());
         _validateCanWithdraw(asset);
@@ -189,6 +202,12 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
             require(amountRemaining == 0, Errors.InsufficientFunds());
         }
         _transferToTransferHelper(asset, amount);
+    }
+
+    /// @dev Implements the external and onlySelf modifier because this function is intended to be wrapped in a
+    /// try-catch.
+    function tryDepositToStrategy(address asset, uint256 amount, address strategy) external onlySelf {
+        _depositToStrategy({asset: asset, amount: amount, strategy: strategy});
     }
 
     /// @dev Implements the external and onlySelf modifier because this function is intended to be wrapped in a
