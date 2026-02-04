@@ -140,12 +140,19 @@ contract FundsHandler is
 
     ///////////////////////////////////////////// ADMIN FUNCTIONS //////////////////////////////////////////////////////
 
-    function addEarningChain(uint256 chainId) external restricted {
+    /// @inheritdoc IFundsHandler
+    function addEarningChain(uint256 chainId) external override restricted {
+        require(chainId != block.chainid, Errors.InvalidDestinationChainId());
+        require(!$storage().earningChainIds.contains(chainId), ChainIdAlreadyAdded());
         $storage().earningChainIds.add(chainId);
+        emit EarningChainAdded(chainId);
     }
 
-    function removeEarningChain(uint256 chainId) external restricted {
+    /// @inheritdoc IFundsHandler
+    function removeEarningChain(uint256 chainId) external override restricted {
+        require($storage().earningChainIds.contains(chainId), ChainIdNotAdded());
         $storage().earningChainIds.remove(chainId);
+        emit EarningChainRemoved(chainId);
     }
 
     //////////////////////////////////////////// MANAGER FUNCTIONS /////////////////////////////////////////////////////
@@ -165,7 +172,7 @@ contract FundsHandler is
         assertingTransferHelperBalanceFor(asset)
     {
         require(amount > 0, Errors.ZeroAmount());
-        require(chainId != block.chainid, Errors.InvalidDestinationChainId());
+        require($storage().earningChainIds.contains(chainId), Errors.InvalidDestinationChainId());
 
         // Transfer the bridge fee to the TransferHelper.
         _transferBridgeFeeToTransferHelper(bridgeParams);

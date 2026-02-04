@@ -33,6 +33,8 @@ contract FundsHandlerTest is TestWithHelpers {
     using AssetLib for uint256;
     using SafeERC20 for IMockErc20;
 
+    address ADMIN;
+
     address mockBbv;
     MockAccountingChainGateway mockGateway;
     MockAllocator mockAllocator;
@@ -70,13 +72,14 @@ contract FundsHandlerTest is TestWithHelpers {
     }
 
     function setUp() public {
+        ADMIN = makeAddr("admin");
         mockBbv = makeAddr("mockBbv");
         mockTransferHelper = new MockTransferHelper();
         mockGateway = new MockAccountingChainGateway(address(mockTransferHelper));
         mockAllocator = new MockAllocator();
         mockPriceOracle = new MockPriceOracle();
         mockChainBalanceOracle = new MockChainBalanceOracle();
-        mockAccessManager = new MockAccessManager(makeAddr("admin"));
+        mockAccessManager = new MockAccessManager(ADMIN);
         mockAsset = IMockErc20(address(new MockNonStandardErc20("Test USD", "tUSD", 6)));
         fundsHandler = _deployFundsHandler(
             mockBbv,
@@ -361,6 +364,8 @@ contract FundsHandlerTest is TestWithHelpers {
         });
 
         vm.assume(chainId != block.chainid);
+        vm.prank(ADMIN);
+        fundsHandler.addEarningChain(chainId);
 
         vm.assume(unauthorizedMsgSender != address(0));
         _assumeNotProxyAdmin(unauthorizedMsgSender, address(fundsHandler));
@@ -383,6 +388,8 @@ contract FundsHandlerTest is TestWithHelpers {
         uint256 bridgeParams_gasLimit
     ) public {
         vm.assume(chainId != block.chainid);
+        vm.prank(ADMIN);
+        fundsHandler.addEarningChain(chainId);
         amount = _boundAssetAmount(address(mockAsset), amount);
         mockAsset.mint(address(this), amount);
         mockAsset.forceApprove(address(fundsHandler), amount);
@@ -410,6 +417,8 @@ contract FundsHandlerTest is TestWithHelpers {
         uint256 bridgeParams_gasLimit
     ) public {
         vm.assume(chainId != block.chainid);
+        vm.prank(ADMIN);
+        fundsHandler.addEarningChain(chainId);
         amount = _boundAssetAmount(address(mockAsset), amount);
         bridgeParams_feeAmount = _boundAssetAmount(address(mockAsset), bridgeParams_feeAmount);
         mockAsset.mint(address(this), bridgeParams_feeAmount);
@@ -442,6 +451,8 @@ contract FundsHandlerTest is TestWithHelpers {
         uint256 bridgeParams_gasLimit
     ) public {
         vm.assume(chainId != block.chainid);
+        vm.prank(ADMIN);
+        fundsHandler.addEarningChain(chainId);
 
         bridgeParams_feeAmount = _boundNativeAmount(bridgeParams_feeAmount);
         vm.deal(address(this), bridgeParams_feeAmount);
@@ -466,6 +477,8 @@ contract FundsHandlerTest is TestWithHelpers {
         uint256 bridgeParams_gasLimit
     ) public {
         vm.assume(chainId != block.chainid);
+        vm.prank(ADMIN);
+        fundsHandler.addEarningChain(chainId);
         amount = _boundAssetAmount(address(mockAsset), amount);
         bridgeParams_feeAmount = _boundAssetAmount(address(mockAsset), bridgeParams_feeAmount);
         mockAsset.mint(address(this), bridgeParams_feeAmount);
@@ -501,6 +514,8 @@ contract FundsHandlerTest is TestWithHelpers {
         uint256 bridgeParams_gasLimit
     ) public {
         vm.assume(chainId != block.chainid);
+        vm.prank(ADMIN);
+        fundsHandler.addEarningChain(chainId);
         address feeToken = _deployAssetWithSalt(feeTokenSalt, feeTokenDecimals);
         amount = _boundAssetAmount(address(mockAsset), amount);
         bridgeParams_feeAmount = _boundAssetAmount(feeToken, bridgeParams_feeAmount);
@@ -535,6 +550,8 @@ contract FundsHandlerTest is TestWithHelpers {
         uint256 bridgeParams_gasLimit
     ) public {
         vm.assume(chainId != block.chainid);
+        vm.prank(ADMIN);
+        fundsHandler.addEarningChain(chainId);
         amount = _boundAssetAmount(address(mockAsset), amount);
         bridgeParams_feeAmount = _boundAssetAmount(address(mockAsset), bridgeParams_feeAmount);
         mockAsset.mint(address(this), bridgeParams_feeAmount);
@@ -558,8 +575,9 @@ contract FundsHandlerTest is TestWithHelpers {
         fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, bridgeParams);
     }
 
-    function test_pushFundsToChain_reverts_ifDestinationChainIdIsTheSameAsTheCurrentChainId(
+    function test_pushFundsToChain_reverts_ifDestinationChainIdNotAddedAsEarningChain(
         uint256 amount,
+        uint256 chainId,
         uint256 bridgeParams_feeAmount,
         uint256 bridgeParams_gasLimit
     ) public {
@@ -578,7 +596,7 @@ contract FundsHandlerTest is TestWithHelpers {
         });
 
         vm.expectRevert(abi.encodeWithSelector(Errors.InvalidDestinationChainId.selector));
-        fundsHandler.pushFundsToChain(address(mockAsset), amount, block.chainid, bridgeParams);
+        fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, bridgeParams);
     }
 
     function test_pushFundsToChain_callsGatewaySendPushFundsMessage(
@@ -588,6 +606,10 @@ contract FundsHandlerTest is TestWithHelpers {
         uint256 bridgeParams_gasLimit
     ) public {
         vm.assume(chainId != block.chainid);
+
+        vm.prank(ADMIN);
+        fundsHandler.addEarningChain(chainId);
+
         amount = _boundAssetAmount(address(mockAsset), amount);
         bridgeParams_feeAmount = _boundAssetAmount(address(mockAsset), bridgeParams_feeAmount);
         mockAsset.mint(address(this), bridgeParams_feeAmount);
@@ -616,8 +638,118 @@ contract FundsHandlerTest is TestWithHelpers {
         );
         fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, bridgeParams);
 
-        // Check that the snapshot is still empty
-        assertEq(fundsHandler.getAssetBalances().length, 0);
+        // Check that the asset balances is not updated
+        assertEq(fundsHandler.getAssetBalances().length, 1);
+        assertEq(fundsHandler.getAssetBalances()[0].amountRay, 0);
+        assertEq(fundsHandler.getAssetBalances()[0].chainId, chainId);
+        assertEq(fundsHandler.getAssetBalances()[0].asset, address(0));
+    }
+
+    function test_addEarningChain_emitsEvent() public {
+        uint256 chainId = 1234;
+        vm.expectEmit(true, true, true, true);
+        emit IFundsHandler.EarningChainAdded(chainId);
+        vm.prank(ADMIN);
+        fundsHandler.addEarningChain(chainId);
+    }
+
+    function test_removeEarningChain_emitsEvent() public {
+        uint256 chainId = 1234;
+
+        // First add the chain
+        vm.prank(ADMIN);
+        fundsHandler.addEarningChain(chainId);
+
+        // Then remove the chain
+        vm.expectEmit(true, true, true, true);
+        emit IFundsHandler.EarningChainRemoved(chainId);
+        vm.prank(ADMIN);
+        fundsHandler.removeEarningChain(chainId);
+    }
+
+    function test_addEarningChain_reverts_ifNotCalledByAdmin(address nonAdmin, uint256 chainId) public {
+        vm.assume(nonAdmin != ADMIN);
+        _assumeNotProxyAdmin(nonAdmin, address(fundsHandler));
+        mockAccessManager.mockRejectCall(nonAdmin, address(fundsHandler), IFundsHandler.addEarningChain.selector);
+        vm.prank(nonAdmin);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, nonAdmin));
+        fundsHandler.addEarningChain(chainId);
+    }
+
+    function test_removeEarningChain_excludesFromBalances(
+        uint256 chainId1,
+        uint256 chainId2,
+        uint256 chainBalance1,
+        uint256 chainBalance2
+    ) public {
+        vm.assume(chainId1 != chainId2);
+        chainBalance1 = _boundAssetAmount(address(mockAsset), chainBalance1);
+        chainBalance2 = _boundAssetAmount(address(mockAsset), chainBalance2);
+
+        vm.prank(ADMIN);
+        fundsHandler.addEarningChain(chainId1);
+
+        vm.mockCall(
+            address(mockChainBalanceOracle),
+            abi.encodeWithSelector(MockChainBalanceOracle.getChainBalance.selector, chainId1),
+            abi.encode(chainBalance1.assetDecimalsToRay(address(mockAsset)))
+        );
+
+        vm.prank(ADMIN);
+        fundsHandler.addEarningChain(chainId2);
+        vm.mockCall(
+            address(mockChainBalanceOracle),
+            abi.encodeWithSelector(MockChainBalanceOracle.getChainBalance.selector, chainId2),
+            abi.encode(chainBalance2.assetDecimalsToRay(address(mockAsset)))
+        );
+
+        assertEq(fundsHandler.getAssetBalances().length, 2);
+        assertEq(fundsHandler.getAssetBalances()[0].amountRay, chainBalance1.assetDecimalsToRay(address(mockAsset)));
+        assertEq(fundsHandler.getAssetBalances()[0].chainId, chainId1);
+        assertEq(fundsHandler.getAssetBalances()[0].asset, address(0));
+        assertEq(fundsHandler.getAssetBalances()[1].amountRay, chainBalance2.assetDecimalsToRay(address(mockAsset)));
+        assertEq(fundsHandler.getAssetBalances()[1].chainId, chainId2);
+        assertEq(fundsHandler.getAssetBalances()[1].asset, address(0));
+
+        uint256 expectedAggregatedBalance =
+            chainBalance1.assetDecimalsToRay(address(mockAsset)) + chainBalance2.assetDecimalsToRay(address(mockAsset));
+        assertEq(fundsHandler.getAggregatedBalance(), expectedAggregatedBalance);
+
+        vm.prank(ADMIN);
+        fundsHandler.removeEarningChain(chainId1);
+        assertEq(fundsHandler.getAssetBalances().length, 1);
+        assertEq(fundsHandler.getAssetBalances()[0].amountRay, chainBalance2.assetDecimalsToRay(address(mockAsset)));
+        assertEq(fundsHandler.getAssetBalances()[0].chainId, chainId2);
+        assertEq(fundsHandler.getAssetBalances()[0].asset, address(0));
+    }
+
+    function test_removeEarningChain_reverts_ifNotCalledByAdmin(address nonAdmin, uint256 chainId) public {
+        vm.assume(nonAdmin != ADMIN);
+        _assumeNotProxyAdmin(nonAdmin, address(fundsHandler));
+        mockAccessManager.mockRejectCall(nonAdmin, address(fundsHandler), IFundsHandler.removeEarningChain.selector);
+        vm.prank(nonAdmin);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, nonAdmin));
+        fundsHandler.removeEarningChain(chainId);
+    }
+
+    function test_addEarningChain_reverts_ifChainIdAlreadyAdded(uint256 chainId) public {
+        vm.prank(ADMIN);
+        fundsHandler.addEarningChain(chainId);
+        vm.prank(ADMIN);
+        vm.expectRevert(abi.encodeWithSelector(IFundsHandler.ChainIdAlreadyAdded.selector));
+        fundsHandler.addEarningChain(chainId);
+    }
+
+    function test_addEarningChain_reverts_ifChainIdIsTheSameAsTheCurrentChainId() public {
+        vm.prank(ADMIN);
+        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidDestinationChainId.selector));
+        fundsHandler.addEarningChain(block.chainid);
+    }
+
+    function test_removeEarningChain_reverts_ifChainIdNotAdded(uint256 chainId) public {
+        vm.prank(ADMIN);
+        vm.expectRevert(abi.encodeWithSelector(IFundsHandler.ChainIdNotAdded.selector));
+        fundsHandler.removeEarningChain(chainId);
     }
 
     //////////////////////////////////////////////// HELPERS ///////////////////////////////////////////////////////////

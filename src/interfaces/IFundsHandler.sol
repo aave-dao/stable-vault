@@ -12,6 +12,22 @@ interface IFundsHandler {
     /// @custom:selector 0x93ce7047
     error OnlyBasedBoostedVault();
 
+    /// @notice Thrown when the chain id is already in the Earning chain set.
+    /// @custom:selector 0x148e7b23
+    error ChainIdAlreadyAdded();
+
+    /// @notice Thrown when the chain id can not be removed because it is not in the Earning chain set.
+    /// @custom:selector 0xa80e441d
+    error ChainIdNotAdded();
+
+    /// @notice Emitted when an earning chain is added.
+    /// @param chainId Chain id of the earning chain that was added.
+    event EarningChainAdded(uint256 chainId);
+
+    /// @notice Emitted when an earning chain is removed.
+    /// @param chainId Chain id of the earning chain that was removed.
+    event EarningChainRemoved(uint256 chainId);
+
     /// @notice The representation of an asset balance.
     /// @param asset Address of the asset.
     /// @param amountRay Amount of the asset in RAY.
@@ -30,6 +46,16 @@ interface IFundsHandler {
     /// all Earning Chains.
     /// @return assetBalances Array of asset balances for all supported chains including the native chain.
     function getAssetBalances() external view returns (AssetBalance[] memory);
+
+    /// @notice Adds an earning chain to the list of supported earning chains.
+    /// @dev An Earning chain must be added to bridge funds to the chain and to obtain balances on the chain from an
+    /// oracle. @param chainId Chain id of the earning chain to add.
+    function addEarningChain(uint256 chainId) external;
+
+    /// @notice Removes an earning chain from the list of supported earning chains.
+    /// @dev An Earning chain must be removed to stop bridging funds to the chain and to stop obtaining balances on the
+    /// chain from an oracle. @param chainId Chain id of the earning chain to remove.
+    function removeEarningChain(uint256 chainId) external;
 
     /// @notice Forward a deposit to a liquidity source.
     /// @param asset Address of the asset to deposit.

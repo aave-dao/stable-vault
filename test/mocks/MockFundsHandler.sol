@@ -35,6 +35,10 @@ contract MockFundsHandler is IFundsHandler {
 
     ////
 
+    function addEarningChain(uint256 chainId) external override {}
+
+    function removeEarningChain(uint256 chainId) external override {}
+
     function getAggregatedBalance() external view override returns (uint256) {
         return _mockedAggregatedBalance;
     }

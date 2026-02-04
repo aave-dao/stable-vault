@@ -63,7 +63,14 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
         IFundsHandler(FUNDS_HANDLER).fundsArrivedFromChainCallback(asset, amount);
     }
 
-    function _receiveData(uint256 sourceChainId, bytes memory data) internal override {
+    function _receiveData(
+        uint256,
+        //sourceChainId
+        bytes memory data
+    )
+        internal
+        override
+    {
         IChainGateway.CrossChainMessage memory crossChainMessage = abi.decode(data, (IChainGateway.CrossChainMessage));
         if (crossChainMessage.messageType == IChainGateway.MessageType.BRIDGE_IOU_TOKEN) {
             _bridgeIouTokenFromEarningChain(crossChainMessage.data);

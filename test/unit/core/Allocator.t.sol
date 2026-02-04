@@ -851,7 +851,11 @@ contract AllocatorTest is TestWithHelpers {
 
         // Deploy a fresh allocator with only one strategy
         Allocator singleStrategyAllocator = _deployAllocator(
-            _mockAccessManager, address(_mockAssetRegistry), address(_mockTransferHelper), MAX_STRATEGIES_PER_ASSET
+            _mockAccessManager,
+            address(_mockAssetRegistry),
+            address(_mockPriceOracle),
+            address(_mockTransferHelper),
+            MAX_STRATEGIES_PER_ASSET
         );
 
         MockErc4626Strategy mockStrategy = new MockErc4626Strategy(_mockUsdt);
