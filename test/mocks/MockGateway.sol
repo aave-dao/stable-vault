@@ -49,6 +49,5 @@ contract MockGateway is IChainGateway {
     function addBridgeAdapter(address asset, uint256 chainId, address adapter) external {}
     function removeBridgeAdapter(address asset, uint256 chainId, address adapter) external {}
     function setDefaultBridgeAdapter(address asset, uint256 chainId, address adapter) external {}
-    function receiveMessage(uint256 sourceChainId, IBridgeAdapter.BridgeAsset[] memory assets, bytes memory data)
-        external {}
+    function receiveMessage(uint256 sourceChainId, address asset, uint256 amount, bytes memory data) external {}
 }
