@@ -191,7 +191,7 @@ contract CcipAdapterTest is TestWithHelpers {
         // Expect the gateway is approved to pull funds from the adapter
         vm.expectCall(address(_mockUsdt), abi.encodeCall(IERC20.transfer, (address(_mockTransferHelper), amountUsdt)));
         vm.expectCall(address(_mockGho), abi.encodeCall(IERC20.transfer, (address(_mockTransferHelper), amountGho)));
-        // Now receiveMessage is called once per asset
+        // receiveMessage is called once per asset
         vm.expectCall(
             address(_mockAccountingChainGateway),
             abi.encodeCall(IChainGateway.receiveMessage, (0, address(_mockUsdt), amountUsdt, ""))
@@ -220,7 +220,7 @@ contract CcipAdapterTest is TestWithHelpers {
         // Expect the gateway is approved to pull funds from the adapter
         vm.expectCall(address(_mockUsdt), abi.encodeCall(IERC20.transfer, (address(_mockTransferHelper), amountUsdt)));
         vm.expectCall(address(_mockGho), abi.encodeCall(IERC20.transfer, (address(_mockTransferHelper), amountGho)));
-        // Now receiveMessage is called once per asset
+        // receiveMessage is called once per asset
         vm.expectCall(
             address(_mockEarningChainGateway),
             abi.encodeCall(IChainGateway.receiveMessage, (0, address(_mockUsdt), amountUsdt, ""))
@@ -916,7 +916,7 @@ contract CcipAdapterTest is TestWithHelpers {
         ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
         ccipTokenAmounts[1] = Client.EVMTokenAmount({token: address(_mockGho), amount: amountGho});
 
-        // Now receiveMessage is called once per asset
+        // receiveMessage is called once per asset
         vm.expectCall(
             address(_mockAccountingChainGateway),
             abi.encodeCall(IChainGateway.receiveMessage, (0, address(_mockUsdt), amountUsdt, ""))
@@ -952,7 +952,7 @@ contract CcipAdapterTest is TestWithHelpers {
         ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
         ccipTokenAmounts[1] = Client.EVMTokenAmount({token: address(_mockGho), amount: amountGho});
 
-        // Now receiveMessage is called once per asset
+        // receiveMessage is called once per asset
         vm.expectCall(
             address(_mockAccountingChainGateway),
             abi.encodeCall(IChainGateway.receiveMessage, (0, address(_mockUsdt), amountUsdt, ""))
@@ -995,7 +995,7 @@ contract CcipAdapterTest is TestWithHelpers {
         ccipTokenAmounts[1] = Client.EVMTokenAmount({token: address(_mockGho), amount: amountGho});
 
         // Expect both assets and message data to be passed to gateway in separate calls
-        // Assets are now processed one at a time
+        // Assets are processed one at a time
         vm.expectCall(
             address(_mockAccountingChainGateway),
             abi.encodeCall(IChainGateway.receiveMessage, (0, address(_mockUsdt), amountUsdt, ""))
