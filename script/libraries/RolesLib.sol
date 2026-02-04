@@ -51,7 +51,7 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: NO_DELAY,
-            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE
         });
     }
 
