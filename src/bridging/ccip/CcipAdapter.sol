@@ -34,8 +34,7 @@ contract CcipAdapter is BaseBridgeAdapter, ReentrancyGuard, ICcipBridgeAdapter, 
 
     mapping(uint256 chainId => uint64 ccipChainSelector) internal _chainSelectorOf;
     mapping(uint64 ccipChainSelector => uint256 chainId) internal _chainIdOf;
-    mapping(bytes32 messageId => ICcipBridgeAdapter.MessageDataStatus messageDataStatus) internal _messageStatusOf;
-    mapping(bytes32 messageId => Client.Any2EVMMessage message) internal _messageOf;
+    mapping(bytes32 messageId => Client.Any2EVMMessage message) internal _messagesToRetry;
 
     modifier onlyRouter() {
         require(msg.sender == CCIP_ROUTER, OnlyBridgeRouter());
@@ -70,7 +69,7 @@ contract CcipAdapter is BaseBridgeAdapter, ReentrancyGuard, ICcipBridgeAdapter, 
 
     /// @inheritdoc ICcipBridgeAdapter
     function getRetryableMessage(bytes32 messageId) external view override returns (Client.Any2EVMMessage memory) {
-        return _messageOf[messageId];
+        return _messagesToRetry[messageId];
     }
 
     /// @inheritdoc ICcipBridgeAdapter
@@ -78,12 +77,10 @@ contract CcipAdapter is BaseBridgeAdapter, ReentrancyGuard, ICcipBridgeAdapter, 
         if (!_isMessageRetryable(messageId)) {
             revert MessageNotRetryable(messageId);
         }
-        Client.Any2EVMMessage memory message = _messageOf[messageId];
-        _messageStatusOf[messageId] = ICcipBridgeAdapter.MessageDataStatus.PROCESSED;
+        Client.Any2EVMMessage memory message = _messagesToRetry[messageId];
+        delete _messagesToRetry[messageId];
         _processMessage(message);
         emit MessageSucceeded(messageId);
-        delete _messageOf[messageId];
-        delete _messageStatusOf[messageId];
     }
 
     /// @inheritdoc ICcipBridgeAdapter
@@ -160,8 +157,7 @@ contract CcipAdapter is BaseBridgeAdapter, ReentrancyGuard, ICcipBridgeAdapter, 
         try this.processMessage(message) {
             emit MessageSucceeded(message.messageId);
         } catch (bytes memory err) {
-            _messageStatusOf[message.messageId] = ICcipBridgeAdapter.MessageDataStatus.FAILED;
-            _messageOf[message.messageId] = message;
+            _messagesToRetry[message.messageId] = message;
             emit MessageFailed(message.messageId, err);
         }
     }
@@ -178,7 +174,6 @@ contract CcipAdapter is BaseBridgeAdapter, ReentrancyGuard, ICcipBridgeAdapter, 
         // Process data first to allow any potential state modifications to take place before processing tokens.
         // Assumes if data is sent with tokens, then the data must be processed first.
         if (message.data.length > 0) {
-            _messageStatusOf[message.messageId] = ICcipBridgeAdapter.MessageDataStatus.PROCESSED;
             IChainGateway(GATEWAY)
                 .receiveMessage(
                     _chainIdOf[message.sourceChainSelector], Constants.ASSET_FOR_DATA_ONLY_BRIDGE, 0, message.data
@@ -194,8 +189,7 @@ contract CcipAdapter is BaseBridgeAdapter, ReentrancyGuard, ICcipBridgeAdapter, 
     }
 
     function _isMessageRetryable(bytes32 messageId) internal view returns (bool) {
-        return _messageStatusOf[messageId] == ICcipBridgeAdapter.MessageDataStatus.FAILED
-            && _messageOf[messageId].messageId == messageId;
+        return messageId != bytes32(0) && _messagesToRetry[messageId].messageId == messageId;
     }
 
     function _sendMessageWithFeePayer(
