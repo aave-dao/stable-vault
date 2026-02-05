@@ -921,7 +921,7 @@ contract AllocatorTest is TestWithHelpers {
 
         MockErc4626Strategy mockStrategy = new MockErc4626Strategy(_mockUsdt);
         vm.prank(admin);
-        singleStrategyAllocator.addStrategy(address(_mockUsdt), address(mockStrategy));
+        singleStrategyAllocator.addStrategy(address(_mockUsdt), address(mockStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
         vm.prank(everyRoleAccount);
         singleStrategyAllocator.setDefaultStrategy(address(_mockUsdt), address(mockStrategy));
 
@@ -948,7 +948,7 @@ contract AllocatorTest is TestWithHelpers {
 
         MockErc4626Strategy mockStrategy = new MockErc4626Strategy(_mockUsdt);
         vm.prank(admin);
-        _allocator.addStrategy(address(_mockUsdt), address(mockStrategy));
+        _allocator.addStrategy(address(_mockUsdt), address(mockStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
 
         _mockUsdt.mint(depositor, amount);
         vm.prank(depositor);
@@ -973,7 +973,7 @@ contract AllocatorTest is TestWithHelpers {
 
         MockErc4626Strategy mockDefaultStrategy = new MockErc4626Strategy(_mockUsdt);
         vm.prank(admin);
-        _allocator.addStrategy(address(_mockUsdt), address(mockDefaultStrategy));
+        _allocator.addStrategy(address(_mockUsdt), address(mockDefaultStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
         vm.prank(everyRoleAccount);
         _allocator.setDefaultStrategy(address(_mockUsdt), address(mockDefaultStrategy));
 
@@ -1004,7 +1004,7 @@ contract AllocatorTest is TestWithHelpers {
 
         MockErc4626Strategy mockStrategy = new MockErc4626Strategy(_mockUsdt);
         vm.prank(admin);
-        _allocator.addStrategy(address(_mockUsdt), address(mockStrategy));
+        _allocator.addStrategy(address(_mockUsdt), address(mockStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
 
         _mockUsdt.mint(depositor, amount);
         vm.prank(depositor);
@@ -1030,7 +1030,7 @@ contract AllocatorTest is TestWithHelpers {
 
         MockErc4626Strategy mockDefaultStrategy = new MockErc4626Strategy(_mockUsdt);
         vm.prank(admin);
-        _allocator.addStrategy(address(_mockUsdt), address(mockDefaultStrategy));
+        _allocator.addStrategy(address(_mockUsdt), address(mockDefaultStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
         vm.prank(everyRoleAccount);
         _allocator.setDefaultStrategy(address(_mockUsdt), address(mockDefaultStrategy));
 
@@ -1073,7 +1073,7 @@ contract AllocatorTest is TestWithHelpers {
 
         MockErc4626Strategy mockDefaultStrategy = new MockErc4626Strategy(_mockUsdt);
         vm.prank(admin);
-        _allocator.addStrategy(address(_mockUsdt), address(mockDefaultStrategy));
+        _allocator.addStrategy(address(_mockUsdt), address(mockDefaultStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
         vm.prank(everyRoleAccount);
         _allocator.setDefaultStrategy(address(_mockUsdt), address(mockDefaultStrategy));
 
