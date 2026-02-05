@@ -106,7 +106,7 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
                 feeToken: address(bridgeFeeToken),
                 feeAmount: bridgeFeeAmount,
                 feeRefundThreshold: 0,
-                gasLimit: 300000,
+                gasLimit: 350000,
                 data: ""
             })
         );
@@ -343,7 +343,7 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
                 feeToken: address(bridgeFeeToken),
                 feeAmount: bridgeFeeAmount,
                 feeRefundThreshold: 0,
-                gasLimit: 100000,
+                gasLimit: 150000,
                 data: ""
             })
         );
@@ -367,7 +367,7 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
                 // Use a higher gas limit to ensure the transaction is successful on Accounting Chain because the
                 // snapshot
                 // struct may be pushed to the FH storage.
-                gasLimit: 300000,
+                gasLimit: 350000,
                 data: ""
             }),
             ""

@@ -10,6 +10,8 @@ interface IAllocator {
 
     event AssetDeallocated(address indexed asset, address indexed strategy, uint256 amount);
 
+    event AssetLeftIdle(address indexed asset, uint256 amount);
+
     event AssetsSwapped(address indexed assetIn, address indexed assetOut, uint256 amountIn, uint256 amountOut);
 
     event DefaultStrategySet(address indexed asset, address indexed strategy);
@@ -138,6 +140,14 @@ interface IAllocator {
     /// @param asset Address of the asset to deposit.
     /// @param amount Amount of the asset to deposit.
     function deposit(address asset, uint256 amount) external;
+
+    /// @notice Deposits a given amount of an asset into the default strategy for the asset, allowing idle funds if the
+    /// deposit fails.
+    /// @dev This function is to allow funds being bridged to the local chain to be kept in the Allocator
+    /// even during error scenarios.
+    /// @param asset Address of the asset to deposit.
+    /// @param amount Amount of the asset to deposit.
+    function depositAllowIdle(address asset, uint256 amount) external;
 
     /// @notice Rebalances underlying assets.
     /// @dev A rebalance is an ordered combination of the following operations: deallocation of assets from strategies,

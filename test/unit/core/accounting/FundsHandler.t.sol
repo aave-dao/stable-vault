@@ -274,7 +274,9 @@ contract FundsHandlerTest is TestWithHelpers {
         address asset = _deployAssetWithSalt(assetDeploymentSalt, assetDecimals);
         amount = _boundAssetAmountAllowingZero(address(asset), amount);
 
-        vm.expectCall(address(mockAllocator), abi.encodeWithSelector(IAllocator.deposit.selector, asset, amount));
+        vm.expectCall(
+            address(mockAllocator), abi.encodeWithSelector(IAllocator.depositAllowIdle.selector, asset, amount)
+        );
 
         vm.prank(address(mockGateway));
         fundsHandler.fundsArrivedFromChainCallback(asset, amount);

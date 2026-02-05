@@ -59,21 +59,6 @@ contract TransferHelperClient {
         }
     }
 
-    modifier assertingTransferHelperBalanceForBridgeAssets(IBridgeAdapter.BridgeAsset[] memory assets) {
-        uint256[] memory balancesBefore = new uint256[](assets.length);
-        for (uint256 i = 0; i < assets.length; i++) {
-            balancesBefore[i] = IERC20(assets[i].asset).balanceOf(TRANSFER_HELPER);
-        }
-        _;
-        uint256[] memory balancesAfter = new uint256[](assets.length);
-        for (uint256 i = 0; i < assets.length; i++) {
-            balancesAfter[i] = IERC20(assets[i].asset).balanceOf(TRANSFER_HELPER);
-        }
-        for (uint256 i = 0; i < assets.length; i++) {
-            require(balancesAfter[i] <= balancesBefore[i], TransferHelperBalanceNotConsumed(assets[i].asset));
-        }
-    }
-
     /// @dev Transfers the bridge fee to the TransferHelper to be pulled by Bridge Adapter.
     function _transferBridgeFeeToTransferHelper(IBridgeAdapter.BridgeParams memory bridgeParams) internal {
         require(bridgeParams.feePayer == msg.sender, Errors.InvalidBridgeFeePayer());
