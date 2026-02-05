@@ -78,10 +78,6 @@ library Errors {
     /// @custom:selector 0x2eac42fc
     error SignatureTimestampExpired();
 
-    /// @notice Thrown when a price obtained from an oracle for an asset was updated before a threshold timestamp.
-    /// @custom:selector 0x19abf40e
-    error StalePrice();
-
     /// @notice Unsupported asset.
     /// @custom:selector 0xee84f40b
     error UnsupportedAsset(address asset);

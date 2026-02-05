@@ -9,7 +9,6 @@ import {
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {IPriceOracleAdapter} from "src/interfaces/IPriceOracleAdapter.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
-import {Errors} from "src/types/Errors.sol";
 
 /// @title PriceOracle
 /// @author Aave Labs
@@ -39,7 +38,7 @@ contract PriceOracle is AccessManagedUpgradeable, IPriceOracle {
     /// @dev Constructor.
     /// @param minValidPriceRay The minimum valid price in ray units (27 decimals).
     constructor(uint256 minValidPriceRay) {
-        require(minValidPriceRay <= MathLib.RAY, InvalidMinPrice());
+        require(minValidPriceRay <= MathLib.RAY && minValidPriceRay > 0, InvalidMinPrice());
         _disableInitializers();
         MIN_VALID_PRICE_RAY = minValidPriceRay;
     }
@@ -73,8 +72,8 @@ contract PriceOracle is AccessManagedUpgradeable, IPriceOracle {
         require($storage().oracleAdapterByAsset[asset] != address(0), OracleAdapterNotFound(asset));
         IPriceOracleAdapter.OracleResponse memory response =
             IPriceOracleAdapter($storage().oracleAdapterByAsset[asset]).getPrice(asset);
-        require(!response.isStale, Errors.StalePrice());
-        require(response.priceRay >= MIN_VALID_PRICE_RAY, Errors.InvalidPrice());
+        require(!response.isStale, IPriceOracle.StalePrice());
+        require(response.priceRay >= MIN_VALID_PRICE_RAY, IPriceOracle.InvalidPrice());
     }
 
     function setOracleAdapterForAsset(address asset, address adapter) external restricted {

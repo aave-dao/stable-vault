@@ -7,20 +7,18 @@ pragma solidity ^0.8.22;
 /// @notice Interface for the Price Oracle Adapter contract that fetches price data for a single asset from an
 /// underlying oracle.
 interface IPriceOracleAdapter {
-    // TODO: Should the interfaces be defined and taken from the IPriceOracle instead of from the adapter?
-    // It seems that IPriceOracle is our main component, and the adapters should "adapt" to it, not the other way
-    // around.
+    /// @notice The representation of the response from the oracle adapter.
+    /// @param priceRay The price of the asset in RAY units e.g. 1e27 for 1 USD, 9_995e23 for 0.9995 USD.
+    /// @param isStale Whether the price is considered stale.
     struct OracleResponse {
         uint256 priceRay;
         bool isStale;
     }
 
-    error StalePrice();
-    error InvalidPrice();
-
-    // TODO: do we need to pass in asset if the adapter is asset specific?
-    // > Yes, just in case we want to re-use the adapter for multiple assets in some impl!
+    /// @notice Fetches the price of an asset from the underlying oracle.
+    /// @dev This function does not validate the data returned by reverting, it relies on the PriceOracle contract
+    /// to validate the data and revert if it is invalid.
+    /// @param asset The asset to fetch the price for.
+    /// @return OracleResponse The response from the oracle adapter.
     function getPrice(address asset) external view returns (OracleResponse memory);
-
-    // function getPrices(address[] calldata assets) external view returns (OracleResponse[] memory);
 }

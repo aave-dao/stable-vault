@@ -99,7 +99,7 @@ contract AllocatorTest is TestWithHelpers {
         _mockAccessManager = new MockAccessManager(admin);
 
         _mockSwapper = new MockSwapper();
-        _priceOracle = _deployPriceOracle(address(_mockAccessManager));
+        _priceOracle = _deployPriceOracle(address(_mockAccessManager), 9_995e23);
         _mockTransferHelper = new MockTransferHelper();
 
         // Mock prices for assets (1 RAY = 1:1 price ratio)

@@ -121,7 +121,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockTransferHelper = new MockTransferHelper();
         mockFundsHandler = new MockFundsHandler(address(mockTransferHelper));
 
-        mockPriceOracle = _deployPriceOracle(address(mockAccessManager));
+        mockPriceOracle = _deployPriceOracle(address(mockAccessManager), 9_995e23);
         // Mock price for the default asset (1 RAY = 1:1 price ratio)
         _mockAssetPrice(address(mockPriceOracle), address(mockAsset), MathLib.RAY);
         // Mock validatePrice to pass for any asset (tests may create additional assets)

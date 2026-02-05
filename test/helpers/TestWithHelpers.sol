@@ -80,9 +80,12 @@ contract TestWithHelpers is Test {
     ///////////// Price Oracle Helpers /////////////
 
     /// @dev Deploys a PriceOracle with TransparentUpgradeableProxy
-    function _deployPriceOracle(address accessManager) internal virtual returns (PriceOracle) {
-        // Use 0 as minValidPriceRay for tests (no minimum price validation)
-        address priceOracleImpl = address(new PriceOracle(0));
+    function _deployPriceOracle(address accessManager, uint256 minValidPriceRay)
+        internal
+        virtual
+        returns (PriceOracle)
+    {
+        address priceOracleImpl = address(new PriceOracle(minValidPriceRay));
         return PriceOracle(
             address(
                 new TransparentUpgradeableProxy(

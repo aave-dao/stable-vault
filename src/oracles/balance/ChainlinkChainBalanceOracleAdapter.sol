@@ -46,6 +46,7 @@ contract ChainlinkChainBalanceOracleAdapter is IChainBalanceOracleAdapter {
         HEARTBEAT = heartbeat;
     }
 
+    /// @inheritdoc IChainBalanceOracleAdapter
     function getChainBalance(uint256 chainId)
         external
         view
@@ -54,7 +55,6 @@ contract ChainlinkChainBalanceOracleAdapter is IChainBalanceOracleAdapter {
     {
         require(chainId == CHAIN_ID, InvalidChainId(chainId));
         (, int256 balance,, uint256 updatedAt,) = AggregatorV3Interface(DATA_FEED).latestRoundData();
-        require(balance > 0, IChainBalanceOracleAdapter.InvalidBalance());
         uint256 balanceRay = _convertDecimalsToRay(balance);
         bool isStale = false;
         if (updatedAt < block.timestamp && block.timestamp - updatedAt >= HEARTBEAT + HEARTBEAT_BUFFER_SECONDS) {

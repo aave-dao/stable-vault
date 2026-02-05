@@ -304,7 +304,7 @@ contract BaseTest is TestWithHelpers {
         );
 
         // Deploy Price Oracle for Accounting Chain (with mocked prices via vm.mockCall)
-        priceOracle_accountingChain = _deployPriceOracle(accessManager_accountingChainAddress);
+        priceOracle_accountingChain = _deployPriceOracle(accessManager_accountingChainAddress, 9_995e23);
         console.log("\tPrice Oracle (Accounting Chain): %s", address(priceOracle_accountingChain));
         _mockAssetPrice(address(priceOracle_accountingChain), address(GHO), MathLib.RAY);
         _mockAssetPrice(address(priceOracle_accountingChain), address(USDC), MathLib.RAY);
@@ -564,7 +564,7 @@ contract BaseTest is TestWithHelpers {
         );
 
         // Deploy Price Oracle for Earning Chain (with mocked prices via vm.mockCall)
-        priceOracle_earningChain = _deployPriceOracle(accessManager_earningChainAddress);
+        priceOracle_earningChain = _deployPriceOracle(accessManager_earningChainAddress, 9_995e23);
         console.log("\tPrice Oracle (Earning Chain): %s", address(priceOracle_earningChain));
         _mockAssetPrice(address(priceOracle_earningChain), address(GHO), MathLib.RAY);
         _mockAssetPrice(address(priceOracle_earningChain), address(USDC), MathLib.RAY);
@@ -999,9 +999,12 @@ contract BaseTest is TestWithHelpers {
     }
 
     /// @dev Deploys a PriceOracle with TransparentUpgradeableProxy (overrides TestWithHelpers to use proxyAdmin)
-    function _deployPriceOracle(address accessManager) internal override returns (PriceOracle) {
-        // Use 0 as minValidPriceRay for tests (no minimum price validation)
-        address priceOracleImpl = address(new PriceOracle(0));
+    function _deployPriceOracle(address accessManager, uint256 minValidPriceRay)
+        internal
+        override
+        returns (PriceOracle)
+    {
+        address priceOracleImpl = address(new PriceOracle(minValidPriceRay));
         return PriceOracle(
             address(
                 new TransparentUpgradeableProxy(

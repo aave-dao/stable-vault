@@ -47,17 +47,21 @@ contract ChainlinkPriceOracleAdapter is IPriceOracleAdapter {
         HEARTBEAT = heartbeat;
     }
 
+    /// @inheritdoc IPriceOracleAdapter
     function getPrice(address asset) external view override returns (IPriceOracleAdapter.OracleResponse memory) {
         require(asset == ASSET, Errors.InvalidAsset(asset));
         (, int256 price,, uint256 updatedAt,) = AggregatorV3Interface(DATA_FEED).latestRoundData();
-        require(price > 0, IPriceOracleAdapter.InvalidPrice());
-        // Casting to 'uint256' is safe because we checked that price > 0.
-        // forge-lint: disable-next-line(unsafe-typecast)
-        uint256 priceRay = uint256(price).convertDecimals(DECIMALS, Constants.RAY_DECIMALS);
+        uint256 priceRay = _convertDecimalsToRay(price);
         bool isStale = false;
         if (updatedAt < block.timestamp && block.timestamp - updatedAt >= HEARTBEAT + HEARTBEAT_BUFFER_SECONDS) {
             isStale = true;
         }
         return IPriceOracleAdapter.OracleResponse(priceRay, isStale);
+    }
+
+    function _convertDecimalsToRay(int256 price) internal view returns (uint256) {
+        // Casting to 'uint256' is safe because we checked that price > 0.
+        // forge-lint: disable-next-line(unsafe-typecast)
+        return uint256(price).convertDecimals(DECIMALS, Constants.RAY_DECIMALS);
     }
 }

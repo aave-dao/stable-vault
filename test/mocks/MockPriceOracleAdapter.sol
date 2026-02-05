@@ -7,18 +7,20 @@ import {IPriceOracleAdapter} from "src/interfaces/IPriceOracleAdapter.sol";
 contract MockPriceOracleAdapter is IPriceOracleAdapter {
     mapping(address asset => OracleResponse) internal _responses;
     bool public shouldRevert;
+    string public revertReason;
+
+    function setShouldRevert(bool _shouldRevert, string memory errorMessage) external {
+        shouldRevert = _shouldRevert;
+        revertReason = errorMessage;
+    }
 
     function mockResponse(address asset, uint256 priceRay, bool isStale) external {
         _responses[asset] = OracleResponse({priceRay: priceRay, isStale: isStale});
     }
 
-    function setShouldRevert(bool _shouldRevert) external {
-        shouldRevert = _shouldRevert;
-    }
-
     function getPrice(address asset) external view override returns (OracleResponse memory) {
         if (shouldRevert) {
-            revert InvalidPrice();
+            revert(revertReason);
         }
         return _responses[asset];
     }

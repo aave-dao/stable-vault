@@ -7,7 +7,6 @@ import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessMana
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
-import {IPriceOracleAdapter} from "src/interfaces/IPriceOracleAdapter.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {Errors} from "src/types/Errors.sol";
@@ -19,6 +18,7 @@ import {MockPriceOracleAdapter} from "test/mocks/MockPriceOracleAdapter.sol";
 contract PriceOracleTest is TestWithHelpers {
     address admin = makeAddr("ADMIN");
     address everyRoleAccount = makeAddr("EVERY_ROLE_ACCOUNT");
+    uint256 constant MIN_VALID_PRICE_RAY = 9_995e23;
 
     address asset1 = makeAddr("asset1");
     address asset2 = makeAddr("asset2");
@@ -45,7 +45,7 @@ contract PriceOracleTest is TestWithHelpers {
     function setUp() public virtual {
         _mockAccessManager = new MockAccessManager(admin);
         // Use 0 as minValidPriceRay for most tests (no minimum price validation)
-        _priceOracle = _deployPriceOracleWithMinPrice(address(_mockAccessManager), 0);
+        _priceOracle = _deployPriceOracleWithMinPrice(address(_mockAccessManager), MIN_VALID_PRICE_RAY);
         _mockAdapter = new MockPriceOracleAdapter();
     }
 
@@ -59,7 +59,7 @@ contract PriceOracleTest is TestWithHelpers {
     }
 
     function test_constructor_disablesInitializers() public {
-        PriceOracle impl = new PriceOracle(0);
+        PriceOracle impl = new PriceOracle(MIN_VALID_PRICE_RAY);
         vm.expectRevert(Initializable.InvalidInitialization.selector);
         impl.initialize(address(_mockAccessManager));
     }
@@ -100,9 +100,9 @@ contract PriceOracleTest is TestWithHelpers {
     }
 
     function test_setOracleAdapterForAsset_reverts_ifAdapterCallFails() public {
-        _mockAdapter.setShouldRevert(true);
+        _mockAdapter.setShouldRevert(true, "reason");
 
-        vm.expectRevert(IPriceOracleAdapter.InvalidPrice.selector);
+        vm.expectRevert("reason");
         vm.prank(everyRoleAccount);
         _priceOracle.setOracleAdapterForAsset(asset1, address(_mockAdapter));
     }
@@ -204,7 +204,7 @@ contract PriceOracleTest is TestWithHelpers {
         vm.prank(everyRoleAccount);
         _priceOracle.setOracleAdapterForAsset(asset1, address(_mockAdapter));
 
-        vm.expectRevert(Errors.StalePrice.selector);
+        vm.expectRevert(IPriceOracle.StalePrice.selector);
         _priceOracle.validatePrice(asset1);
     }
 
@@ -228,6 +228,7 @@ contract PriceOracleTest is TestWithHelpers {
     }
 
     function test_validatePrice_passes_whenValidAndNotStale(uint256 priceRay) public {
+        _priceOracle = _deployPriceOracleWithMinPrice(address(_mockAccessManager), 1);
         priceRay = bound(priceRay, 1, MathLib.RAY);
         _mockAdapter.mockResponse(asset1, priceRay, false);
 

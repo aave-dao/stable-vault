@@ -78,7 +78,7 @@ contract FundsHandlerTest is TestWithHelpers {
         mockGateway = new MockAccountingChainGateway(address(mockTransferHelper));
         mockAllocator = new MockAllocator();
         mockAccessManager = new MockAccessManager(ADMIN);
-        priceOracle = _deployPriceOracle(address(mockAccessManager));
+        priceOracle = _deployPriceOracle(address(mockAccessManager), 9_995e23);
         mockChainBalanceOracle = new MockChainBalanceOracle();
         mockAsset = IMockErc20(address(new MockNonStandardErc20("Test USD", "tUSD", 6)));
         fundsHandler = _deployFundsHandler(

@@ -133,7 +133,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         _mockAccessManager = new MockAccessManager(admin);
 
-        _priceOracle = _deployPriceOracle(address(_mockAccessManager));
+        _priceOracle = _deployPriceOracle(address(_mockAccessManager), 9_995e23);
         // Set mock prices (1 RAY = 1:1 price ratio)
         _mockAssetPrice(address(_priceOracle), address(_mockUsdt), MathLib.RAY);
         _mockAssetPrice(address(_priceOracle), address(_mockGho), MathLib.RAY);
