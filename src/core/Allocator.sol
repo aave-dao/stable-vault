@@ -142,8 +142,8 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
 
     /// @inheritdoc IAllocator
     function deposit(address asset, uint256 amount) external override onlyDepositor returns (uint256) {
-        ITransferHelper(TRANSFER_HELPER).pull(asset, amount);
         require(IAssetRegistry(ASSET_REGISTRY).isDepositToAllocatorAllowed(asset), Errors.UnsupportedAsset(asset));
+        ITransferHelper(TRANSFER_HELPER).pull(asset, amount);
         uint256 netDepositAmount = amount;
         if ($storage().defaultStrategyByAsset[asset] != address(0)) {
             netDepositAmount =
@@ -193,20 +193,24 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     /// try-catch.
     /// @dev Avoids impact to searching other strategies if withdrawal from a previously searched strategy
     /// fails.
+    /// @dev The `amount` param is not taking into account nor being aware of the `strategy`'s liquidity.
     function tryWithdrawFromStrategy(address asset, uint256 amount, address strategy)
         external
         onlySelf
         returns (uint256)
     {
         uint256 withdrawnAmount;
-        uint256 balanceInStrategy = _getAssetBalanceInStrategy(IERC4626(strategy));
-        if (balanceInStrategy > 0) {
-            if (balanceInStrategy > amount) {
-                withdrawnAmount = amount;
-                _withdrawFromStrategy(asset, withdrawnAmount, address(this), strategy);
-            } else {
-                withdrawnAmount = _redeemAllFromStrategy(asset, strategy);
-            }
+        uint256 maxWithdrawable = IERC4626(strategy).maxWithdraw(address(this));
+        if (maxWithdrawable == 0) {
+            // If `maxWithdraw` returned 0, then try redeeming all shares from the strategy.
+            // This handles the case where the strategy returns 0 as a conservative estimation
+            // (e.g. due to liquidity constraints or estimation limitations), given that ERC-4626
+            // requires `maxWithdraw` to never overestimate nor revert.
+            // `_redeemAllFromStrategy` avoids redeeming if the Allocator has no shares.
+            withdrawnAmount = _redeemAllFromStrategy(asset, strategy);
+        } else {
+            withdrawnAmount = Math.min(amount, maxWithdrawable);
+            _withdrawFromStrategy(asset, withdrawnAmount, address(this), strategy);
         }
         return withdrawnAmount;
     }
@@ -358,10 +362,11 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     }
 
     function _redeemAllFromStrategy(address asset, address strategy) internal returns (uint256) {
-        uint256 amount = IERC4626(strategy)
-            .redeem({
-                shares: IERC4626(strategy).balanceOf(address(this)), receiver: address(this), owner: address(this)
-            });
+        uint256 shares = IERC4626(strategy).balanceOf(address(this));
+        if (shares == 0) {
+            return 0;
+        }
+        uint256 amount = IERC4626(strategy).redeem({shares: shares, receiver: address(this), owner: address(this)});
         emit AssetDeallocated(asset, strategy, amount);
         return amount;
     }

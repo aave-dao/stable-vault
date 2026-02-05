@@ -69,35 +69,30 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
     /// @inheritdoc IBridgeAdapter
     function publishMessageToChainWithFeePayer(
         uint256 destinationChainId,
-        BridgeAsset[] memory assets,
+        address asset,
+        uint256 amount,
         bytes memory data,
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) external payable override(BaseBridgeAdapter, IBridgeAdapter) onlyGateway {
-        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](assets.length);
-        address[] memory assetsToPull = new address[](assets.length + 1);
-        uint256[] memory amountsToPull = new uint256[](assets.length + 1);
-        if (assets.length > 0) {
-            for (uint256 i = 0; i < assets.length; i++) {
-                address asset = assets[i].asset;
-                uint256 amount = assets[i].amount;
-                tokenAmounts[i] = Client.EVMTokenAmount({token: asset, amount: amount});
+        address destinationChainAdapter = _destinationChainAdapterOf[destinationChainId];
+        require(destinationChainAdapter != address(0), Errors.InvalidParameter());
 
-                // Approve the CCIP Router to spend the funds
-                assetsToPull[i] = asset;
-                amountsToPull[i] = amount;
-                IERC20(asset).forceApprove(CCIP_ROUTER, amount);
-            }
+        Client.EVMTokenAmount[] memory tokenAmounts;
+        if (asset != Constants.ASSET_FOR_DATA_ONLY_BRIDGE) {
+            tokenAmounts = new Client.EVMTokenAmount[](1);
+            tokenAmounts[0] = Client.EVMTokenAmount({token: asset, amount: amount});
+            ITransferHelper(TRANSFER_HELPER).pull(asset, amount);
+            IERC20(asset).forceApprove(CCIP_ROUTER, amount);
+        } else {
+            tokenAmounts = new Client.EVMTokenAmount[](0);
         }
-        assetsToPull[assetsToPull.length - 1] = bridgeParams.feeToken;
-        amountsToPull[amountsToPull.length - 1] = bridgeParams.feeAmount;
 
+        ITransferHelper(TRANSFER_HELPER).pull(bridgeParams.feeToken, bridgeParams.feeAmount);
         if (bridgeParams.feeToken != Constants.NATIVE_CURRENCY) {
             // Increase allowance in case of the fee token matching an asset being bridged.
             IERC20(bridgeParams.feeToken).safeIncreaseAllowance(CCIP_ROUTER, bridgeParams.feeAmount);
         }
-        ITransferHelper(TRANSFER_HELPER).pull(assetsToPull, amountsToPull);
-        address destinationChainAdapter = _destinationChainAdapterOf[destinationChainId];
-        require(destinationChainAdapter != address(0), Errors.InvalidParameter());
+
         Client.EVM2AnyMessage memory ccipMessage = Client.EVM2AnyMessage({
             receiver: abi.encode(destinationChainAdapter),
             data: data,
@@ -132,7 +127,7 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
             _validateMessageSource(message);
             IChainGateway(GATEWAY)
                 .receiveMessage(
-                    _chainIdOf[message.sourceChainSelector], new IBridgeAdapter.BridgeAsset[](0), message.data
+                    _chainIdOf[message.sourceChainSelector], Constants.ASSET_FOR_DATA_ONLY_BRIDGE, 0, message.data
                 );
         }
         if (message.destTokenAmounts.length > 0) {
@@ -154,13 +149,11 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
     }
 
     function processReceivedFunds(Client.EVMTokenAmount[] memory assetsToProcess) external onlySelf {
-        IBridgeAdapter.BridgeAsset[] memory assets = new IBridgeAdapter.BridgeAsset[](assetsToProcess.length);
         for (uint256 i = 0; i < assetsToProcess.length; i++) {
             address asset = assetsToProcess[i].token;
             uint256 amount = assetsToProcess[i].amount;
-            assets[i] = IBridgeAdapter.BridgeAsset({asset: asset, amount: amount});
+            _processReceivedFunds(asset, amount);
         }
-        _processReceivedFunds(assets);
     }
 
     function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {

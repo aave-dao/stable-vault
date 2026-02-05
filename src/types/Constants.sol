@@ -12,7 +12,7 @@ library Constants {
     /// @dev The token address used to indicate the asset used to pay a bridge fee is the native currency.
     address public constant NATIVE_CURRENCY = address(0);
 
-    /// @dev The token address used in bridging flows when only an arbitrary message is being bridged.
+    /// @dev The token address used in bridging flows when only data is being bridged (no asset).
     address internal constant ASSET_FOR_DATA_ONLY_BRIDGE = address(0);
 
     /// @dev The number of decimals for the RAY denomination.

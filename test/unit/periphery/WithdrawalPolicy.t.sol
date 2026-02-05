@@ -123,6 +123,9 @@ contract WithdrawalPolicyTest is TestWithHelpers {
     function test_setAssetFeeBps_setsExpectedConfig(address asset, uint256 feeBps, bool isSet) public {
         feeBps = bound(feeBps, 0, FEE_CAP_BPS);
 
+        vm.expectEmit(true, true, true, true);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        emit IWithdrawalPolicy.AssetFeeBpsSet(asset, uint16(feeBps), isSet);
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
         withdrawalPolicy.setAssetFeeBps(asset, uint16(feeBps), isSet);
@@ -144,6 +147,9 @@ contract WithdrawalPolicyTest is TestWithHelpers {
     function test_setDefaultFeeBps_setsExpectedFee(uint256 feeBps) public {
         feeBps = bound(feeBps, 0, FEE_CAP_BPS);
 
+        vm.expectEmit(true, true, true, true);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        emit IWithdrawalPolicy.DefaultFeeBpsSet(uint16(feeBps));
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
         withdrawalPolicy.setDefaultFeeBps(uint16(feeBps));
@@ -414,7 +420,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
             DEFAULT_DEADLINE
         );
 
-        vm.expectRevert(WithdrawalPolicy.InvalidSignature.selector);
+        vm.expectRevert(IWithdrawalPolicy.InvalidSignature.selector);
         withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
     }
 
@@ -446,7 +452,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
             signerPk, wrongUser, assetOut, iouAmountRay, _toUint16(personalFeeBps), DEFAULT_NONCE, DEFAULT_DEADLINE
         );
 
-        vm.expectRevert(WithdrawalPolicy.InvalidSignature.selector);
+        vm.expectRevert(IWithdrawalPolicy.InvalidSignature.selector);
         withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
     }
 
@@ -478,7 +484,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
             signerPk, user, wrongAssetOut, iouAmountRay, _toUint16(personalFeeBps), DEFAULT_NONCE, DEFAULT_DEADLINE
         );
 
-        vm.expectRevert(WithdrawalPolicy.InvalidSignature.selector);
+        vm.expectRevert(IWithdrawalPolicy.InvalidSignature.selector);
         withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
     }
 
@@ -512,7 +518,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
             signerPk, user, assetOut, wrongIouAmountRay, _toUint16(personalFeeBps), DEFAULT_NONCE, DEFAULT_DEADLINE
         );
 
-        vm.expectRevert(WithdrawalPolicy.InvalidSignature.selector);
+        vm.expectRevert(IWithdrawalPolicy.InvalidSignature.selector);
         withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
     }
 
@@ -553,7 +559,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
             DEFAULT_DEADLINE
         );
 
-        vm.expectRevert(WithdrawalPolicy.InvalidSignature.selector);
+        vm.expectRevert(IWithdrawalPolicy.InvalidSignature.selector);
         withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, wrongData));
     }
 
@@ -617,10 +623,10 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         IWithdrawalPolicy.WithdrawalRequest memory request = _buildRequest(user, assetOut, iouAmountRay, data);
 
         // Both preview and apply should revert
-        vm.expectRevert(WithdrawalPolicy.DeadlineExpired.selector);
+        vm.expectRevert(IWithdrawalPolicy.DeadlineExpired.selector);
         withdrawalPolicy.previewWithdrawalPolicy(request);
 
-        vm.expectRevert(WithdrawalPolicy.DeadlineExpired.selector);
+        vm.expectRevert(IWithdrawalPolicy.DeadlineExpired.selector);
         withdrawalPolicy.applyWithdrawalPolicy(request);
     }
 
@@ -662,7 +668,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         assertTrue(withdrawalPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Nonce should be consumed by apply");
 
         // Now preview should revert because nonce is used
-        vm.expectRevert(WithdrawalPolicy.NonceAlreadyUsed.selector);
+        vm.expectRevert(IWithdrawalPolicy.NonceAlreadyUsed.selector);
         withdrawalPolicy.previewWithdrawalPolicy(request);
     }
 
@@ -694,7 +700,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         assertEq(amountOut1, iouAmountRay, "First use should return full amount (0% fee)");
 
         // Second use: Should REVERT because nonce was consumed
-        vm.expectRevert(WithdrawalPolicy.NonceAlreadyUsed.selector);
+        vm.expectRevert(IWithdrawalPolicy.NonceAlreadyUsed.selector);
         withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
     }
 
@@ -723,7 +729,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         assertFalse(withdrawalPolicy.wasNonceUsed(signer, nonce), "Nonce should not be used initially");
 
         vm.expectEmit(true, true, true, true);
-        emit WithdrawalPolicy.NonceUsed(signer, nonce);
+        emit IWithdrawalPolicy.NonceUsed(signer, nonce);
 
         vm.prank(signer);
         withdrawalPolicy.invalidateNonce(signer, nonce);
@@ -762,7 +768,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         vm.prank(signer);
         withdrawalPolicy.invalidateNonce(signer, 1);
 
-        vm.expectRevert(WithdrawalPolicy.NonceAlreadyUsed.selector);
+        vm.expectRevert(IWithdrawalPolicy.NonceAlreadyUsed.selector);
         vm.prank(signer);
         withdrawalPolicy.invalidateNonce(signer, 1);
     }
@@ -796,7 +802,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         withdrawalPolicy.invalidateNonce(signer, nonce);
 
         // Now apply should revert
-        vm.expectRevert(WithdrawalPolicy.NonceAlreadyUsed.selector);
+        vm.expectRevert(IWithdrawalPolicy.NonceAlreadyUsed.selector);
         withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
     }
 
@@ -829,7 +835,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         withdrawalPolicy.invalidateNonce(signer, nonce);
 
         // Now preview should also revert
-        vm.expectRevert(WithdrawalPolicy.NonceAlreadyUsed.selector);
+        vm.expectRevert(IWithdrawalPolicy.NonceAlreadyUsed.selector);
         withdrawalPolicy.previewWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
     }
 
@@ -1037,7 +1043,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         assertFalse(withdrawalPolicy.isSigner(signer), "Signer should be removed");
 
         // Apply should revert because signer is no longer whitelisted
-        vm.expectRevert(WithdrawalPolicy.InvalidSignature.selector);
+        vm.expectRevert(IWithdrawalPolicy.InvalidSignature.selector);
         withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
     }
 
@@ -1069,7 +1075,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         withdrawalPolicy.setSigner(signer, false);
 
         // Preview should also revert because signer is no longer whitelisted
-        vm.expectRevert(WithdrawalPolicy.InvalidSignature.selector);
+        vm.expectRevert(IWithdrawalPolicy.InvalidSignature.selector);
         withdrawalPolicy.previewWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
     }
 
@@ -1108,7 +1114,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         withdrawalPolicy.setSigner(signer, false);
 
         // Same preview should now revert
-        vm.expectRevert(WithdrawalPolicy.InvalidSignature.selector);
+        vm.expectRevert(IWithdrawalPolicy.InvalidSignature.selector);
         withdrawalPolicy.previewWithdrawalPolicy(request);
     }
 
@@ -1140,7 +1146,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         withdrawalPolicy.setSigner(signer, false);
 
         // Apply should revert
-        vm.expectRevert(WithdrawalPolicy.InvalidSignature.selector);
+        vm.expectRevert(IWithdrawalPolicy.InvalidSignature.selector);
         withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
 
         // Re-add the signer
@@ -1187,7 +1193,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         withdrawalPolicy.setSigner(signer1, false);
 
         // Signer1's signature should fail
-        vm.expectRevert(WithdrawalPolicy.InvalidSignature.selector);
+        vm.expectRevert(IWithdrawalPolicy.InvalidSignature.selector);
         withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data1));
 
         // Signer2's signature should still work

@@ -11,7 +11,6 @@ import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
-import {Constants} from "src/types/Constants.sol";
 
 /// @title AccountingChainGateway
 /// @author Aave Labs
@@ -60,14 +59,11 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
         _sendCrossChainMessage(targetChainId, adapter, asset, amount, "", bridgeParams);
     }
 
-    function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal override {
-        for (uint256 i = 0; i < assets.length; i++) {
-            IFundsHandler(FUNDS_HANDLER).fundsArrivedFromChainCallback(assets[i].asset, assets[i].amount);
-        }
+    function _receiveFunds(address asset, uint256 amount) internal override {
+        IFundsHandler(FUNDS_HANDLER).fundsArrivedFromChainCallback(asset, amount);
     }
 
     function _receiveData(uint256 sourceChainId, bytes memory data) internal override {
-        _onlyAdapter(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, sourceChainId);
         IChainGateway.CrossChainMessage memory crossChainMessage = abi.decode(data, (IChainGateway.CrossChainMessage));
         if (crossChainMessage.messageType == IChainGateway.MessageType.BALANCE_SNAPSHOT) {
             _updateChainBalanceSnapshot(sourceChainId, crossChainMessage.data);
