@@ -14,9 +14,8 @@ import {Errors} from "src/types/Errors.sol";
 /// @title PriceOracle
 /// @author Aave Labs
 /// @notice Oracle contract for fetching asset prices through an adapter to an underlying data source.
+/// @dev Assumes all configured assets have the same denomination.
 contract PriceOracle is AccessManagedUpgradeable, IPriceOracle {
-    // TODO: Instead of storing target + max deviation, just store the min valid price in ray
-    // (1 * (100_00 - MAX_DEVIATION_BPS)) / 100_00;
     uint256 immutable MIN_VALID_PRICE_RAY;
 
     uint256 immutable MAX_PRICE_RAY = MathLib.RAY;
@@ -55,21 +54,23 @@ contract PriceOracle is AccessManagedUpgradeable, IPriceOracle {
         __AccessManaged_init(accessManager);
     }
 
-    // TODO: How to handle stale prices?
-    // Alternative #1: Return 0 if the price is stale
-    // Alternative #2: Return (bubble-up) if stale or not, let the upper layer decide what to do with that
-    function getPrice(address asset) external view override returns (uint256 price) {
+    /// @inheritdoc IPriceOracle
+    function getPrice(address asset) external view override returns (uint256) {
         return _getPrice(asset);
     }
 
-    function getPrices(address[] calldata assets) external view override returns (uint256[] memory prices) {
+    /// @inheritdoc IPriceOracle
+    function getPrices(address[] calldata assets) external view override returns (uint256[] memory) {
+        uint256[] memory prices = new uint256[](assets.length);
         for (uint256 i = 0; i < assets.length; i++) {
             prices[i] = _getPrice(assets[i]);
         }
         return prices;
     }
 
+    /// @inheritdoc IPriceOracle
     function validatePrice(address asset) external view override {
+        require($storage().oracleAdapterByAsset[asset] != address(0), OracleAdapterNotFound(asset));
         IPriceOracleAdapter.OracleResponse memory response =
             IPriceOracleAdapter($storage().oracleAdapterByAsset[asset]).getPrice(asset);
         require(!response.isStale, Errors.StalePrice());
@@ -86,11 +87,7 @@ contract PriceOracle is AccessManagedUpgradeable, IPriceOracle {
 
     function _getPrice(address asset) internal view returns (uint256 price) {
         address oracleAdapter = $storage().oracleAdapterByAsset[asset];
-        if (oracleAdapter == address(0)) {
-            // If no adapter is configured for the asset, be conservative and return 0.
-            // A dummy adapter can be used to default to a 1:1 price.
-            return 0;
-        }
+        require(oracleAdapter != address(0), OracleAdapterNotFound(asset));
         IPriceOracleAdapter.OracleResponse memory response = IPriceOracleAdapter(oracleAdapter).getPrice(asset);
         return response.isStale ? 0 : _capToMaxPrice(response.priceRay);
     }

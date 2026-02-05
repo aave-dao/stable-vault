@@ -47,6 +47,7 @@ contract ChainBalanceOracle is AccessManagedUpgradeable, IChainBalanceOracle {
 
     /// @inheritdoc IChainBalanceOracle
     function getChainBalance(uint256 chainId) external view override returns (uint256) {
+        require($storage().oracleAdapterByChainId[chainId] != address(0), ChainBalanceOracleAdapterNotFound(chainId));
         IChainBalanceOracleAdapter.OracleResponse memory response =
             IChainBalanceOracleAdapter($storage().oracleAdapterByChainId[chainId]).getChainBalance(chainId);
         return response.isStale ? 0 : response.balanceRay;

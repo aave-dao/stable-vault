@@ -55,9 +55,7 @@ contract ChainlinkChainBalanceOracleAdapter is IChainBalanceOracleAdapter {
         require(chainId == CHAIN_ID, InvalidChainId(chainId));
         (, int256 balance,, uint256 updatedAt,) = AggregatorV3Interface(DATA_FEED).latestRoundData();
         require(balance > 0, IChainBalanceOracleAdapter.InvalidBalance());
-        // Casting to 'uint256' is safe because we checked that balance > 0.
-        // forge-lint: disable-next-line(unsafe-typecast)
-        uint256 balanceRay = uint256(balance).convertDecimals(DECIMALS, Constants.RAY_DECIMALS);
+        uint256 balanceRay = _convertDecimalsToRay(balance);
         bool isStale = false;
         if (updatedAt < block.timestamp && block.timestamp - updatedAt >= HEARTBEAT + HEARTBEAT_BUFFER_SECONDS) {
             isStale = true;
@@ -65,5 +63,14 @@ contract ChainlinkChainBalanceOracleAdapter is IChainBalanceOracleAdapter {
         return IChainBalanceOracleAdapter.OracleResponse({
             balanceRay: balanceRay, lastUpdateTimestamp: updatedAt, isStale: isStale
         });
+    }
+
+    /// @dev Chainlink feeds support up to 18 decimals. Because balances on an Earning Chain are normalized to RAY, we
+    /// need to convert the decimals to 27. This will slightly cause an under-estimation of the balance on the Earning
+    /// Chain which is acceptable.
+    function _convertDecimalsToRay(int256 balance) internal view returns (uint256) {
+        // Casting to 'uint256' is safe because we checked that balance > 0.
+        // forge-lint: disable-next-line(unsafe-typecast)
+        return uint256(balance).convertDecimals(DECIMALS, Constants.RAY_DECIMALS);
     }
 }
