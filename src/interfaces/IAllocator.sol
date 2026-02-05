@@ -10,6 +10,8 @@ interface IAllocator {
 
     event AssetDeallocated(address indexed asset, address indexed strategy, uint256 amount);
 
+    event AssetLeftIdle(address indexed asset, uint256 amount);
+
     event AssetsSwapped(address indexed assetIn, address indexed assetOut, uint256 amountIn, uint256 amountOut);
 
     event DefaultStrategySet(address indexed asset, address indexed strategy);

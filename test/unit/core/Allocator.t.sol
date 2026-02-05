@@ -376,6 +376,8 @@ contract AllocatorTest is TestWithHelpers {
 
         _mockTransferHelper.mockAsset(address(_mockUsdt), depositAmountUsdt);
         vm.prank(depositor);
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.AssetLeftIdle(address(_mockUsdt), depositAmountUsdt);
         _allocator.deposit(address(_mockUsdt), depositAmountUsdt);
 
         // Check that the funds are idle in the Allocator
@@ -395,6 +397,8 @@ contract AllocatorTest is TestWithHelpers {
 
         _mockTransferHelper.mockAsset(address(_mockUsdt), depositAmountUsdt);
         vm.prank(depositor);
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.AssetLeftIdle(address(_mockUsdt), depositAmountUsdt);
         _allocator.depositAllowIdle(address(_mockUsdt), depositAmountUsdt);
 
         assertEq(_allocator.getAssetBalance(address(_mockUsdt)), depositAmountUsdt);
@@ -478,7 +482,10 @@ contract AllocatorTest is TestWithHelpers {
         );
 
         vm.expectEmit(true, true, true, true);
+        emit IAllocator.AssetLeftIdle(address(_mockUsdt), depositAmountUsdt);
+        vm.expectEmit(true, true, true, true);
         emit IAllocator.StrategyDepositFailed(address(_defaultUsdtStrategy), depositAmountUsdt);
+
         vm.prank(depositor);
         _allocator.depositAllowIdle(address(_mockUsdt), depositAmountUsdt);
 

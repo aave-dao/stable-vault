@@ -149,21 +149,25 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     function deposit(address asset, uint256 amount) external override onlyDepositor {
         require(IAssetRegistry(ASSET_REGISTRY).isDepositToAllocatorAllowed(asset), Errors.UnsupportedAsset(asset));
         ITransferHelper(TRANSFER_HELPER).pull(asset, amount);
-        if ($storage().defaultStrategyByAsset[asset] != address(0)) {
-            _depositToStrategy({asset: asset, amount: amount, strategy: $storage().defaultStrategyByAsset[asset]});
+        if ($storage().defaultStrategyByAsset[asset] == address(0)) {
+            emit AssetLeftIdle(asset, amount);
+            return;
         }
+        _depositToStrategy({asset: asset, amount: amount, strategy: $storage().defaultStrategyByAsset[asset]});
     }
 
     /// @inheritdoc IAllocator
     function depositAllowIdle(address asset, uint256 amount) external override onlyDepositor {
         require(IAssetRegistry(ASSET_REGISTRY).isDepositToAllocatorAllowed(asset), Errors.UnsupportedAsset(asset));
         ITransferHelper(TRANSFER_HELPER).pull(asset, amount);
-        if ($storage().defaultStrategyByAsset[asset] != address(0)) {
-            try this.tryDepositToStrategy(asset, amount, $storage().defaultStrategyByAsset[asset]) {
-                return;
-            } catch {
-                emit StrategyDepositFailed($storage().defaultStrategyByAsset[asset], amount);
-            }
+        if ($storage().defaultStrategyByAsset[asset] == address(0)) {
+            emit AssetLeftIdle(asset, amount);
+            return;
+        }
+        try this.tryDepositToStrategy(asset, amount, $storage().defaultStrategyByAsset[asset]) {}
+        catch {
+            emit AssetLeftIdle(asset, amount);
+            emit StrategyDepositFailed($storage().defaultStrategyByAsset[asset], amount);
         }
     }
 
