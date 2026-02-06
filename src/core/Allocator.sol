@@ -147,10 +147,11 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         uint256 netDepositAmount = amount;
         if ($storage().defaultStrategyByAsset[asset] == address(0)) {
             emit AssetLeftIdle(asset, amount);
-            return;
+            return amount;
         }
-            netDepositAmount =
+        netDepositAmount =
             _depositToStrategy({asset: asset, amount: amount, strategy: $storage().defaultStrategyByAsset[asset]});
+        return Math.min(netDepositAmount, amount);
     }
 
     /// @inheritdoc IAllocator
@@ -166,7 +167,6 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
             emit AssetLeftIdle(asset, amount);
             emit StrategyDepositFailed($storage().defaultStrategyByAsset[asset], amount);
         }
-        return Math.min(netDepositAmount, amount);
     }
 
     /// @inheritdoc IAllocator

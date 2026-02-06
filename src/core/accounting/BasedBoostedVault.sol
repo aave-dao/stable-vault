@@ -204,7 +204,7 @@ contract BasedBoostedVault is
         $storage().globalOriginalDepositsRay += netDepositAmountInRay;
 
         emit Deposit(user, asset, amount);
-        emit Transfer(address(0), user, amountInRay);
+        emit Transfer(address(0), user, amount.assetDecimalsToRay(asset));
     }
 
     /// @notice Transfers BBV balance (denominated in RAY) between users.

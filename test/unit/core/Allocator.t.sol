@@ -326,7 +326,7 @@ contract AllocatorTest is TestWithHelpers {
 
         _mockTransferHelper.mockAsset(address(_mockUsdt), depositAmountUsdt);
         vm.prank(depositor);
-        _allocator.deposit(address(_mockUsdt), depositAmountUsdt);
+        uint256 netDeposit = _allocator.deposit(address(_mockUsdt), depositAmountUsdt);
 
         // Return value should equal deposit amount (no slippage in default strategy)
         assertEq(netDeposit, depositAmountUsdt);
@@ -504,13 +504,16 @@ contract AllocatorTest is TestWithHelpers {
         depositAmountUsdt = _boundAssetAmount(address(_mockUsdt), depositAmountUsdt);
 
         TestErc4626WithSlippage _strategyWithSlippage = new TestErc4626WithSlippage(_mockUsdt);
+        _strategyWithSlippage.setDepositSlippage(type(uint256).max);
 
         vm.startPrank(address(everyRoleAccount));
-        _allocator.addStrategy(address(_mockUsdt), address(_strategyWithSlippage));
+        _allocator.addStrategy(address(_mockUsdt), address(_strategyWithSlippage), STRATEGY_MAX_SLIPPAGE_AMOUNT);
         _allocator.setDefaultStrategy(address(_mockUsdt), address(_strategyWithSlippage));
         vm.stopPrank();
 
         _mockTransferHelper.mockAsset(address(_mockUsdt), depositAmountUsdt);
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.AssetLeftIdle(address(_mockUsdt), depositAmountUsdt);
         vm.expectEmit(true, true, true, true);
         emit IAllocator.StrategyDepositFailed(address(_strategyWithSlippage), depositAmountUsdt);
         vm.prank(depositor);
@@ -635,7 +638,7 @@ contract AllocatorTest is TestWithHelpers {
     function test_withdraw_reverts_givenMaxWithdrawReturnsZero() public {
         MockErc4626Strategy mockStrategy = new MockErc4626Strategy(_mockUsdt);
         vm.prank(admin);
-        _allocator.addStrategy(address(_mockUsdt), address(mockStrategy));
+        _allocator.addStrategy(address(_mockUsdt), address(mockStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
         vm.prank(everyRoleAccount);
         _allocator.setDefaultStrategy(address(_mockUsdt), address(mockStrategy));
 
