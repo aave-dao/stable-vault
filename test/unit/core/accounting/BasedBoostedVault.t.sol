@@ -25,6 +25,7 @@ import {Errors} from "src/types/Errors.sol";
 
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
 import {_toAddressArray, _toUint256Array} from "test/helpers/TypeHelpers.sol";
+import {BasedBoostedVaultHarness} from "test/mocks/BasedBoostedVaultHarness.sol";
 import {MockAccessManager} from "test/mocks/MockAccessManager.sol";
 import {MockAssetRegistry} from "test/mocks/MockAssetRegistry.sol";
 import {MockErc20} from "test/mocks/MockErc20.sol";
@@ -83,6 +84,39 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             )
         );
         return BasedBoostedVault(
+            address(
+                new TransparentUpgradeableProxy(
+                    vaultImpl,
+                    address(this),
+                    abi.encodeCall(BasedBoostedVault.initialize, (accessManager, defaultSubVaultPerSecondRate))
+                )
+            )
+        );
+    }
+
+    function _deployBasedBoostedVaultHarness(
+        address accessManager,
+        uint256 maxPerSecondRate,
+        uint256 defaultSubVaultPerSecondRate,
+        address iouTokenManager,
+        address fundsHandler,
+        address assetRegistry,
+        address transferHelper,
+        address withdrawalFeeCalculatorAddress,
+        uint256 maxActiveSubVaults
+    ) internal returns (BasedBoostedVaultHarness) {
+        address vaultImpl = address(
+            new BasedBoostedVaultHarness(
+                maxPerSecondRate,
+                assetRegistry,
+                iouTokenManager,
+                fundsHandler,
+                transferHelper,
+                withdrawalFeeCalculatorAddress,
+                maxActiveSubVaults
+            )
+        );
+        return BasedBoostedVaultHarness(
             address(
                 new TransparentUpgradeableProxy(
                     vaultImpl,
@@ -2414,6 +2448,82 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         assertEq(bbv.getUserBalance(user), 0);
         // Both were in same subVault, so transfer is 1:1 in shares (converted to value)
         assertGe(bbv.getUserBalance(recipient), recipientBalanceBefore + userFullAmount);
+    }
+
+    function test_moveShares_reverts_ifSameUserAndPositionNotFullyMigrated(uint256 partialSharesToMove) public {
+        BasedBoostedVaultHarness bbvHarness = _deployBasedBoostedVaultHarness(
+            address(mockAccessManager),
+            DEFAULT_MAX_PER_SECOND_RATE,
+            DEFAULT_PER_SECOND_RATE,
+            address(mockIouTokenManager),
+            address(mockFundsHandler),
+            address(mockAssetRegistry),
+            address(mockTransferHelper),
+            address(mockWithdrawalPolicy),
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS
+        );
+
+        address user = makeAddr("user");
+        uint256 depositAmount = 2_000_000;
+        mockAsset.mint(user, depositAmount);
+        vm.prank(user);
+        mockAsset.forceApprove(address(bbvHarness), depositAmount);
+        vm.prank(user);
+        bbvHarness.deposit(user, address(mockAsset), depositAmount);
+
+        uint256 userSubVaultId = bbvHarness.getUserSubVault(user).id;
+        uint256 fullShares = bbvHarness.previewFullWithdrawalSharesHarness(user);
+        assertGt(fullShares, 1);
+        partialSharesToMove = bound(partialSharesToMove, 1, fullShares - 1);
+
+        vm.expectRevert(Errors.InvalidAmount.selector);
+        bbvHarness.moveSharesHarness({
+            from: user,
+            to: user,
+            fromSubVaultId: userSubVaultId,
+            toSubVaultId: userSubVaultId,
+            sharesToBurn: partialSharesToMove,
+            sharesToMint: partialSharesToMove,
+            guaranteedAmountToMoveRay: 0
+        });
+    }
+
+    function test_moveShares_reverts_ifSameUserAndGuaranteedAmountIsNonZero(uint256 guaranteedAmountToMoveRay) public {
+        BasedBoostedVaultHarness bbvHarness = _deployBasedBoostedVaultHarness(
+            address(mockAccessManager),
+            DEFAULT_MAX_PER_SECOND_RATE,
+            DEFAULT_PER_SECOND_RATE,
+            address(mockIouTokenManager),
+            address(mockFundsHandler),
+            address(mockAssetRegistry),
+            address(mockTransferHelper),
+            address(mockWithdrawalPolicy),
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS
+        );
+
+        address user = makeAddr("user");
+        uint256 depositAmount = 2_000_000;
+        mockAsset.mint(user, depositAmount);
+        vm.prank(user);
+        mockAsset.forceApprove(address(bbvHarness), depositAmount);
+        vm.prank(user);
+        bbvHarness.deposit(user, address(mockAsset), depositAmount);
+
+        uint256 userSubVaultId = bbvHarness.getUserSubVault(user).id;
+        uint256 fullShares = bbvHarness.previewFullWithdrawalSharesHarness(user);
+        assertGt(fullShares, 0);
+        guaranteedAmountToMoveRay = bound(guaranteedAmountToMoveRay, 1, depositAmount);
+
+        vm.expectRevert(Errors.InvalidAmount.selector);
+        bbvHarness.moveSharesHarness({
+            from: user,
+            to: user,
+            fromSubVaultId: userSubVaultId,
+            toSubVaultId: userSubVaultId,
+            sharesToBurn: fullShares,
+            sharesToMint: fullShares,
+            guaranteedAmountToMoveRay: guaranteedAmountToMoveRay
+        });
     }
 
     function test_transfer_reverts_ifMaxActiveSubVaultsReachedWhenActivatingDefaultSubVault() public {

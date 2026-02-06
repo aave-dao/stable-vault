@@ -204,7 +204,12 @@ contract BasedBoostedVault is
     /// @dev This is accounting-only (no IOUs, no assets, no WithdrawalPolicy).
     /// @dev For full balance transfers, use transferAll() instead.
     /// @dev Reverts if the remaining sender balance after transfer would be below dust threshold.
-    function transfer(address to, uint256 amountRay) external override returns (bool) {
+    /// @dev The sender's principal (`originalDepositRay`) is decremented by up to `amountRay` and the same principal
+    /// amount is moved to the recipient. This mirrors the accounting outcome of withdraw -> transfer assets ->
+    /// recipient deposit.
+    /// @dev Principal is tracked as one aggregate balance per user (not by deposit lots), so transfers always consume
+    /// from that aggregate principal balance.
+    function transfer(address to, uint256 amountRay) external override nonReentrant returns (bool) {
         address from = msg.sender;
         require(amountRay >= Constants.MIN_WITHDRAWABLE_AMOUNT_RAY, Errors.InvalidAmount());
         require(to != address(0), Errors.InvalidParameter());
@@ -236,15 +241,16 @@ contract BasedBoostedVault is
             toSubVaultId: toSubVaultId,
             sharesToBurn: fromUserShares,
             sharesToMint: toUserShares,
-            guaranteedAmountRay: guaranteedAmountRay
+            guaranteedAmountToMoveRay: guaranteedAmountRay
         });
 
         emit Transfer(from, to, amountRay);
         return true;
     }
 
-    /// @notice Transfers the sender's full BBV balance (denominated in RAY) to another user.
-    function transferAll(address to) external override returns (bool) {
+    /// @notice Transfers the sender's full position to another user.
+    /// @dev Any remaining original deposit amount is also transferred to the recipient.
+    function transferAll(address to) external override nonReentrant returns (bool) {
         address from = msg.sender;
         require(to != address(0), Errors.InvalidParameter());
         require(to != from, Errors.InvalidParameter());
@@ -275,7 +281,7 @@ contract BasedBoostedVault is
             toSubVaultId: toSubVaultId,
             sharesToBurn: fromUserShares,
             sharesToMint: toUserShares,
-            guaranteedAmountRay: guaranteedAmountRay
+            guaranteedAmountToMoveRay: guaranteedAmountRay
         });
 
         emit Transfer(from, to, amountOfWithdrawalRay);
@@ -539,7 +545,7 @@ contract BasedBoostedVault is
             toSubVaultId: newSubVaultId,
             sharesToBurn: userOldShares,
             sharesToMint: userNewShares,
-            guaranteedAmountRay: 0
+            guaranteedAmountToMoveRay: 0
         });
     }
 
@@ -550,7 +556,7 @@ contract BasedBoostedVault is
         uint256 toSubVaultId,
         uint256 sharesToBurn,
         uint256 sharesToMint,
-        uint256 guaranteedAmountRay
+        uint256 guaranteedAmountToMoveRay
     ) internal {
         uint256 remainingShares = _burnShares(from, fromSubVaultId, sharesToBurn);
         if (fromSubVaultId != toSubVaultId) {
@@ -564,14 +570,17 @@ contract BasedBoostedVault is
         _validateAmountOfActiveSubVaults();
 
         if (from == to) {
+            // Sanity check. If the user is the same - this cannot be a partial transfer.
+            require(remainingShares == 0, Errors.InvalidAmount());
+            require(guaranteedAmountToMoveRay == 0, Errors.InvalidAmount());
             $storage().positions[to].subVaultId = toSubVaultId;
         } else {
             if (remainingShares == 0) {
                 delete $storage().positions[from];
             } else {
-                $storage().positions[from].originalDepositRay -= guaranteedAmountRay;
+                $storage().positions[from].originalDepositRay -= guaranteedAmountToMoveRay;
             }
-            $storage().positions[to].originalDepositRay += guaranteedAmountRay;
+            $storage().positions[to].originalDepositRay += guaranteedAmountToMoveRay;
         }
 
         _mintShares(to, toSubVaultId, sharesToMint);
