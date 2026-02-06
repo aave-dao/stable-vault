@@ -749,6 +749,47 @@ contract CcipAdapterTest is TestWithHelpers {
         );
     }
 
+    function test_publishMessageToChainWithFeePayer_reverts_ifNativeFeeIsBelowEstimate() public {
+        uint256 idleNativeAssetAmount = 123;
+        uint256 actualFeeAmount = 100;
+
+        // Airdrop the fee amount into the adapter to make sure it can not be used.
+        vm.deal(address(_accountingChainCcipAdapter), idleNativeAssetAmount);
+
+        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
+            feePayer: everyRoleAccount,
+            feeToken: address(0),
+            feeAmount: 0,
+            feeRefundThreshold: 0,
+            gasLimit: DEFAULT_GAS_LIMIT,
+            data: ""
+        });
+
+        Client.EVM2AnyMessage memory expectedCcipMessage = Client.EVM2AnyMessage({
+            receiver: abi.encode(_earningChainCcipAdapter),
+            data: "",
+            tokenAmounts: new Client.EVMTokenAmount[](0),
+            feeToken: address(0),
+            extraArgs: Client._argsToBytes(
+                Client.GenericExtraArgsV2({gasLimit: DEFAULT_GAS_LIMIT, allowOutOfOrderExecution: true})
+            )
+        });
+
+        // Mock call to router.getFee - return the fee amount to trigger refund flow
+        vm.mockCall(
+            address(_mockCCIPRouter),
+            abi.encodeWithSelector(IRouterClient.getFee.selector, EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage),
+            abi.encode(actualFeeAmount)
+        );
+        // Stub the call to router.ccipSend
+        _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, bytes32(0));
+
+        vm.expectRevert(Errors.InsufficientFunds.selector);
+        vm.prank(address(_mockAccountingChainGateway));
+        // Do not send any native asset with the call to try using the idle funds on the adapter.
+        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(EARNING_CHAIN_ID, address(0), 0, "", bridgeParams);
+    }
+
     function test_publishMessageToChainWithFeePayer_reverts_ifOnlyGateway(address caller) public {
         vm.assume(caller != address(_mockAccountingChainGateway));
         vm.assume(caller != address(_mockEarningChainGateway));

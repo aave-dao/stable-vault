@@ -190,8 +190,7 @@ contract BasedBoostedVault is
             _validateAmountOfActiveSubVaults();
         }
 
-        $storage().subVaultById[subVaultId].totalShares += shares;
-        $storage().positions[user].shares += shares;
+        _mintShares(user, subVaultId, shares);
         $storage().positions[user].originalDepositRay += amountInRay;
         $storage().globalOriginalDepositsRay += amountInRay;
 
@@ -199,6 +198,95 @@ contract BasedBoostedVault is
         IFundsHandler(FUNDS_HANDLER).processDeposit(asset, amount);
 
         emit Deposit(user, asset, amount);
+        emit Transfer(address(0), user, amountInRay);
+    }
+
+    /// @notice Transfers BBV balance (denominated in RAY) between users.
+    /// @dev This is accounting-only (no IOUs, no assets, no WithdrawalPolicy).
+    /// @dev For full balance transfers, use transferAll() instead.
+    /// @dev Reverts if the remaining sender balance after transfer would be below dust threshold.
+    /// @dev The sender's principal (`originalDepositRay`) is decremented by up to `amountRay` and the same principal
+    /// amount is moved to the recipient. This mirrors the accounting outcome of withdraw -> transfer assets ->
+    /// recipient deposit.
+    /// @dev Principal is tracked as one aggregate balance per user (not by deposit lots), so transfers always consume
+    /// from that aggregate principal balance.
+    function transfer(address to, uint256 amountRay) external override nonReentrant returns (bool) {
+        address from = msg.sender;
+        require(amountRay >= Constants.MIN_WITHDRAWABLE_AMOUNT_RAY, Errors.InvalidAmount());
+        require(to != address(0), Errors.InvalidParameter());
+        require(to != from, Errors.InvalidParameter());
+
+        uint256 fromSubVaultId = $storage().positions[from].subVaultId;
+        require(fromSubVaultId != 0, NonExistentPosition());
+
+        uint256 fromConversionRate = _accrueSubVaultConversionRate(fromSubVaultId);
+
+        (uint256 guaranteedAmountRay, uint256 fromUserShares) =
+            _computeTransferShares(from, amountRay, fromSubVaultId, fromConversionRate);
+
+        uint256 toSubVaultId = _getOrAssignUserSubVaultId(to);
+
+        uint256 toUserShares;
+        if (toSubVaultId == fromSubVaultId) {
+            toUserShares = amountRay.rayDivDown(fromConversionRate);
+        } else {
+            uint256 toConversionRate = _accrueSubVaultConversionRate(toSubVaultId);
+            toUserShares = amountRay.rayDivDown(toConversionRate);
+        }
+        require(toUserShares > 0, Errors.InvalidAmount());
+
+        _moveShares({
+            from: from,
+            to: to,
+            fromSubVaultId: fromSubVaultId,
+            toSubVaultId: toSubVaultId,
+            sharesToBurn: fromUserShares,
+            sharesToMint: toUserShares,
+            guaranteedAmountToMoveRay: guaranteedAmountRay
+        });
+
+        emit Transfer(from, to, amountRay);
+        return true;
+    }
+
+    /// @notice Transfers the sender's full position to another user.
+    /// @dev Any remaining original deposit amount is also transferred to the recipient.
+    function transferAll(address to) external override nonReentrant returns (bool) {
+        address from = msg.sender;
+        require(to != address(0), Errors.InvalidParameter());
+        require(to != from, Errors.InvalidParameter());
+
+        uint256 fromSubVaultId = $storage().positions[from].subVaultId;
+        require(fromSubVaultId != 0, NonExistentPosition());
+
+        uint256 fromConversionRate = _accrueSubVaultConversionRate(fromSubVaultId);
+
+        (uint256 amountOfWithdrawalRay, uint256 guaranteedAmountRay, uint256 fromUserShares) =
+            _previewFullWithdrawalRequest(from);
+
+        uint256 toSubVaultId = _getOrAssignUserSubVaultId(to);
+
+        uint256 toUserShares;
+        if (toSubVaultId == fromSubVaultId) {
+            toUserShares = fromUserShares;
+        } else {
+            uint256 toConversionRate = _accrueSubVaultConversionRate(toSubVaultId);
+            toUserShares = fromUserShares.rayMulDown(fromConversionRate).rayDivDown(toConversionRate);
+        }
+        require(toUserShares > 0, Errors.InvalidAmount());
+
+        _moveShares({
+            from: from,
+            to: to,
+            fromSubVaultId: fromSubVaultId,
+            toSubVaultId: toSubVaultId,
+            sharesToBurn: fromUserShares,
+            sharesToMint: toUserShares,
+            guaranteedAmountToMoveRay: guaranteedAmountRay
+        });
+
+        emit Transfer(from, to, amountOfWithdrawalRay);
+        return true;
     }
 
     /// @inheritdoc IBasedBoostedVault
@@ -254,7 +342,7 @@ contract BasedBoostedVault is
             }
         }
 
-        uint256 remainingShares = _burnShares(user, redeemedShares);
+        uint256 remainingShares = _burnShares(user, subVaultId, redeemedShares);
         if (remainingShares == 0) {
             delete $storage().positions[user];
         } else {
@@ -284,25 +372,8 @@ contract BasedBoostedVault is
         _mintIous(user, actualAmountInRay);
 
         emit WithdrawalRequested(user, subVaultId, actualAmountInRay, guaranteedAmountRay);
+        emit Transfer(user, address(0), actualAmountInRay);
         return actualAmountInRay;
-    }
-
-    function _areRemainingSharesRedeemable(address user, uint256 redeemedShares, uint256 subVaultId)
-        internal
-        view
-        returns (bool)
-    {
-        // We want the remainder after a partial withdrawal to be redeemable for at least 1 wei (18-dec) of value.
-        // A share balance S (in RAY units) redeems to:
-        //   valueRay = rayMulDown(S * conversionRate)
-        // and it is withdrawable iff:
-        //   rayMulDown(S * conversionRate) >= 1e9
-        // which implies:
-        //   S >= rayDivUp(1e9, conversionRate)
-        uint256 minSharesToRedeemOneWei =
-            Constants.MIN_WITHDRAWABLE_AMOUNT_RAY.rayDivUp($storage().subVaultById[subVaultId].conversionRate);
-        uint256 remainingSharesAfterRedeem = $storage().positions[user].shares - redeemedShares;
-        return remainingSharesAfterRedeem >= minSharesToRedeemOneWei;
     }
 
     /// @inheritdoc IBasedBoostedVault
@@ -383,18 +454,23 @@ contract BasedBoostedVault is
     }
 
     /// @inheritdoc IBasedBoostedVault
+    function totalSupply() external view override returns (uint256) {
+        return _getActiveSubVaultsObligations();
+    }
+
+    /// @inheritdoc IBasedBoostedVault
     function getAggregatedBalance() external view override returns (uint256) {
         return _getVaultAggregatedBalance();
     }
 
     /// @inheritdoc IBasedBoostedVault
+    function balanceOf(address account) external view override returns (uint256) {
+        return _getUserBalance(account);
+    }
+
+    /// @inheritdoc IBasedBoostedVault
     function getUserBalance(address user) external view override returns (uint256) {
-        if ($storage().positions[user].shares == 0) {
-            return 0;
-        }
-        // Round down the user balance, so that the rounding is in favor of the protocol.
-        return $storage().positions[user].shares
-            .rayMulDown(_previewSubVaultConversionRate($storage().positions[user].subVaultId));
+        return _getUserBalance(user);
     }
 
     /// @inheritdoc IBasedBoostedVault
@@ -469,21 +545,103 @@ contract BasedBoostedVault is
         // userOldShares quantity and newConversionRate is large.
         require(userNewShares > 0, Errors.InvalidAmount());
 
-        if (!_isActiveSubVaultById(newSubVaultId)) {
-            _addSubVaultToActive(newSubVaultId);
+        _moveShares({
+            from: user,
+            to: user,
+            fromSubVaultId: oldSubVaultId,
+            toSubVaultId: newSubVaultId,
+            sharesToBurn: userOldShares,
+            sharesToMint: userNewShares,
+            guaranteedAmountToMoveRay: 0
+        });
+    }
+
+    function _moveShares(
+        address from,
+        address to,
+        uint256 fromSubVaultId,
+        uint256 toSubVaultId,
+        uint256 sharesToBurn,
+        uint256 sharesToMint,
+        uint256 guaranteedAmountToMoveRay
+    ) internal {
+        uint256 remainingShares = _burnShares(from, fromSubVaultId, sharesToBurn);
+        if (fromSubVaultId != toSubVaultId) {
+            if (!_isActiveSubVaultById(fromSubVaultId)) {
+                _removeSubVaultFromActive(fromSubVaultId);
+            }
+            if (!_isActiveSubVaultById(toSubVaultId)) {
+                _addSubVaultToActive(toSubVaultId);
+            }
         }
-
-        $storage().subVaultById[oldSubVaultId].totalShares -= userOldShares;
-        $storage().subVaultById[newSubVaultId].totalShares += userNewShares;
-
-        $storage().positions[user].shares = userNewShares;
-        $storage().positions[user].subVaultId = newSubVaultId;
-
-        if (!_isActiveSubVaultById(oldSubVaultId)) {
-            _removeSubVaultFromActive(oldSubVaultId);
-        }
-
         _validateAmountOfActiveSubVaults();
+
+        if (from == to) {
+            // Sanity check. If the user is the same - this cannot be a partial transfer.
+            require(remainingShares == 0, Errors.InvalidAmount());
+            require(guaranteedAmountToMoveRay == 0, Errors.InvalidAmount());
+            $storage().positions[to].subVaultId = toSubVaultId;
+        } else {
+            if (remainingShares == 0) {
+                delete $storage().positions[from];
+            } else {
+                $storage().positions[from].originalDepositRay -= guaranteedAmountToMoveRay;
+            }
+            $storage().positions[to].originalDepositRay += guaranteedAmountToMoveRay;
+        }
+
+        _mintShares(to, toSubVaultId, sharesToMint);
+    }
+
+    /// @dev Gets the user's subVaultId or assigns a default subVaultId if the user has no position.
+    /// @dev A position is created for the user if they do not have one.
+    function _getOrAssignUserSubVaultId(address user) internal returns (uint256) {
+        uint256 subVaultId = $storage().positions[user].subVaultId;
+        if (subVaultId == 0) {
+            subVaultId = $storage().defaultSubVaultId;
+            $storage().positions[user].subVaultId = subVaultId;
+        }
+        return subVaultId;
+    }
+
+    /// @dev Computes the shares to burn from sender and guaranteed amount for a transfer.
+    /// @dev Reverts if remaining shares would be below dust threshold - caller should use transferAll() instead.
+    function _computeTransferShares(address from, uint256 amountRay, uint256 fromSubVaultId, uint256 fromConversionRate)
+        internal
+        view
+        returns (uint256, uint256)
+    {
+        (uint256 fullAmountRay, uint256 fullGuaranteedAmountRay, uint256 fullSharesToRedeem) =
+            _previewFullWithdrawalRequest(from);
+        require(amountRay <= fullAmountRay, Errors.InsufficientFunds());
+
+        if (amountRay == fullAmountRay) {
+            return (fullGuaranteedAmountRay, fullSharesToRedeem);
+        }
+
+        uint256 fromUserShares = amountRay.rayDivUp(fromConversionRate);
+
+        require(_areRemainingSharesRedeemable(from, fromUserShares, fromSubVaultId), Errors.InvalidAmount());
+        uint256 guaranteedAmountRay = _getAmountTakenFromOriginalDeposit(from, amountRay);
+        return (guaranteedAmountRay, fromUserShares);
+    }
+
+    function _areRemainingSharesRedeemable(address user, uint256 redeemedShares, uint256 subVaultId)
+        internal
+        view
+        returns (bool)
+    {
+        // We want the remainder after a partial withdrawal to be redeemable for at least 1 wei (18-dec) of value.
+        // A share balance S (in RAY units) redeems to:
+        //   valueRay = rayMulDown(S * conversionRate)
+        // and it is withdrawable iff:
+        //   rayMulDown(S * conversionRate) >= 1e9
+        // which implies:
+        //   S >= rayDivUp(1e9, conversionRate)
+        uint256 minSharesToRedeemOneWei =
+            Constants.MIN_WITHDRAWABLE_AMOUNT_RAY.rayDivUp($storage().subVaultById[subVaultId].conversionRate);
+        uint256 remainingSharesAfterRedeem = $storage().positions[user].shares - redeemedShares;
+        return remainingSharesAfterRedeem >= minSharesToRedeemOneWei;
     }
 
     function _addSubVaultToActive(uint256 subVaultId) internal {
@@ -582,22 +740,38 @@ contract BasedBoostedVault is
         return amountTakenFromOriginalDepositRay;
     }
 
-    function _burnShares(address user, uint256 sharesToBurn) internal returns (uint256) {
-        uint256 remainingShares = $storage().positions[user].shares - sharesToBurn;
-        $storage().positions[user].shares = remainingShares;
-        uint256 subVaultId = $storage().positions[user].subVaultId;
+    function _burnShares(address user, uint256 subVaultId, uint256 sharesToBurn) internal returns (uint256) {
+        $storage().positions[user].shares -= sharesToBurn;
         $storage().subVaultById[subVaultId].totalShares -= sharesToBurn;
-        return remainingShares;
+        return $storage().positions[user].shares;
     }
 
-    function _getVaultObligations() internal view returns (uint256) {
+    function _mintShares(address user, uint256 subVaultId, uint256 sharesToMint) internal {
+        $storage().positions[user].shares += sharesToMint;
+        $storage().subVaultById[subVaultId].totalShares += sharesToMint;
+    }
+
+    function _getUserBalance(address user) internal view returns (uint256) {
+        if ($storage().positions[user].shares == 0) {
+            return 0;
+        }
+        // Round down the user balance, so that the rounding is in favor of the protocol.
+        return $storage().positions[user].shares
+            .rayMulDown(_previewSubVaultConversionRate($storage().positions[user].subVaultId));
+    }
+
+    function _getActiveSubVaultsObligations() internal view returns (uint256) {
         uint256 activeSubVaultsObligations;
         for (uint256 i = 0; i < $storage().activeSubVaultsIds.length; i++) {
             // Round up the obligations, so that the rounding is in favor of the protocol.
             activeSubVaultsObligations += $storage().subVaultById[$storage().activeSubVaultsIds[i]].totalShares
                 .rayMulUp(_previewSubVaultConversionRate($storage().activeSubVaultsIds[i]));
         }
-        return activeSubVaultsObligations + _getIousInCirculation();
+        return activeSubVaultsObligations;
+    }
+
+    function _getVaultObligations() internal view returns (uint256) {
+        return _getActiveSubVaultsObligations() + _getIousInCirculation();
     }
 
     function _getVaultAggregatedBalance() internal view returns (uint256) {
