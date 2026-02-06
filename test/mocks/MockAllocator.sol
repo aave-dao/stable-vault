@@ -58,6 +58,7 @@ contract MockAllocator is IAllocator {
     function isStrategySupportedForAsset(address asset, address strategy) external view override returns (bool) {}
     function isStrategySupported(address strategy) external view override returns (bool) {}
     function deposit(address asset, uint256 amount) external override {}
+    function depositAllowIdle(address asset, uint256 amount) external override {}
     function rebalance(RebalanceParams[] memory params) external override {}
 
     function withdraw(

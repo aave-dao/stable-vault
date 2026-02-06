@@ -149,8 +149,25 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     function deposit(address asset, uint256 amount) external override onlyDepositor {
         require(IAssetRegistry(ASSET_REGISTRY).isDepositToAllocatorAllowed(asset), Errors.UnsupportedAsset(asset));
         ITransferHelper(TRANSFER_HELPER).pull(asset, amount);
-        if ($storage().defaultStrategyByAsset[asset] != address(0)) {
-            _depositToStrategy({asset: asset, amount: amount, strategy: $storage().defaultStrategyByAsset[asset]});
+        if ($storage().defaultStrategyByAsset[asset] == address(0)) {
+            emit AssetLeftIdle(asset, amount);
+            return;
+        }
+        _depositToStrategy({asset: asset, amount: amount, strategy: $storage().defaultStrategyByAsset[asset]});
+    }
+
+    /// @inheritdoc IAllocator
+    function depositAllowIdle(address asset, uint256 amount) external override onlyDepositor {
+        require(IAssetRegistry(ASSET_REGISTRY).isDepositToAllocatorAllowed(asset), Errors.UnsupportedAsset(asset));
+        ITransferHelper(TRANSFER_HELPER).pull(asset, amount);
+        if ($storage().defaultStrategyByAsset[asset] == address(0)) {
+            emit AssetLeftIdle(asset, amount);
+            return;
+        }
+        try this.tryDepositToStrategy(asset, amount, $storage().defaultStrategyByAsset[asset]) {}
+        catch {
+            emit AssetLeftIdle(asset, amount);
+            emit StrategyDepositFailed($storage().defaultStrategyByAsset[asset], amount);
         }
     }
 
@@ -189,6 +206,12 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
             require(amountRemaining == 0, Errors.InsufficientFunds());
         }
         _transferToTransferHelper(asset, amount);
+    }
+
+    /// @dev Implements the external and onlySelf modifier because this function is intended to be wrapped in a
+    /// try-catch.
+    function tryDepositToStrategy(address asset, uint256 amount, address strategy) external onlySelf {
+        _depositToStrategy({asset: asset, amount: amount, strategy: strategy});
     }
 
     /// @dev Implements the external and onlySelf modifier because this function is intended to be wrapped in a
