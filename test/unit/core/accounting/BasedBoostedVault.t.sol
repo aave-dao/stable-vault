@@ -481,6 +481,26 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         bbv.deposit(user, address(mockAsset), amount);
     }
 
+    function test_deposit_emitsTransferMintEvent() public {
+        address user = makeAddr("user");
+        _assumeNotProxyAdmin(user, address(bbv));
+
+        uint256 amount = 2_000_000;
+        uint256 amountRay = amount.assetDecimalsToRay(address(mockAsset));
+        mockAsset.mint(user, amount);
+
+        vm.prank(user);
+        mockAsset.forceApprove(address(bbv), amount);
+
+        vm.expectEmit(true, true, true, true);
+        emit IBasedBoostedVault.Deposit(user, address(mockAsset), amount);
+        vm.expectEmit(true, true, true, true);
+        emit IBasedBoostedVault.Transfer(address(0), user, amountRay);
+
+        vm.prank(user);
+        bbv.deposit(user, address(mockAsset), amount);
+    }
+
     function test_setUserRate_reverts_ifUserDoesNotHaveAPosition(address user, uint256 newPerSecondRate) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
@@ -1473,6 +1493,28 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         vm.expectEmit(true, true, true, true);
         emit IBasedBoostedVault.WithdrawalRequested(user, 1, actualWithdrawalAmount, actualWithdrawalAmount);
+
+        vm.prank(user);
+        bbv.requestWithdrawal(user, withdrawalAmountRay);
+    }
+
+    function test_requestWithdrawal_emitsTransferBurnEvent() public {
+        address user = makeAddr("user");
+        _assumeNotProxyAdmin(user, address(bbv));
+
+        uint256 depositAmount = 2_000_000;
+        uint256 withdrawalAmountRay = Constants.MIN_WITHDRAWABLE_AMOUNT_RAY;
+        _deposit(user, depositAmount);
+
+        uint256 depositAmountRay = depositAmount.assetDecimalsToRay(address(mockAsset));
+        mockFundsHandler.mockAggregatedBalance(depositAmountRay);
+
+        vm.expectEmit(true, true, true, true);
+        emit IBasedBoostedVault.WithdrawalRequested(
+            user, bbv.getUserSubVault(user).id, withdrawalAmountRay, withdrawalAmountRay
+        );
+        vm.expectEmit(true, true, true, true);
+        emit IBasedBoostedVault.Transfer(user, address(0), withdrawalAmountRay);
 
         vm.prank(user);
         bbv.requestWithdrawal(user, withdrawalAmountRay);

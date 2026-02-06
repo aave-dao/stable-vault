@@ -198,6 +198,7 @@ contract BasedBoostedVault is
         IFundsHandler(FUNDS_HANDLER).processDeposit(asset, amount);
 
         emit Deposit(user, asset, amount);
+        emit Transfer(address(0), user, amountInRay);
     }
 
     /// @notice Transfers BBV balance (denominated in RAY) between users.
@@ -371,6 +372,7 @@ contract BasedBoostedVault is
         _mintIous(user, actualAmountInRay);
 
         emit WithdrawalRequested(user, subVaultId, actualAmountInRay, guaranteedAmountRay);
+        emit Transfer(user, address(0), actualAmountInRay);
         return actualAmountInRay;
     }
 
