@@ -6,7 +6,7 @@ pragma solidity ^0.8.22;
 /// @author Aave Labs
 /// @notice Interface for the Allocator contract.
 interface IAllocator {
-    event AssetAllocated(address indexed asset, address indexed strategy, uint256 amount);
+    event AssetAllocated(address indexed asset, address indexed strategy, uint256 amount, uint256 netDepositAmount);
 
     event AssetDeallocated(address indexed asset, address indexed strategy, uint256 amount);
 
@@ -22,7 +22,7 @@ interface IAllocator {
 
     event StrategyWithdrawalFailed(address indexed strategy, address indexed asset, uint256 amount);
 
-    event StrategyAdded(address indexed asset, address indexed strategy);
+    event StrategyAdded(address indexed asset, address indexed strategy, uint8 maxSlippageAmount);
 
     event StrategyRemoved(address indexed asset, address indexed strategy);
 
@@ -105,6 +105,19 @@ interface IAllocator {
         AllocationParams[] allocations;
     }
 
+    /// @notice The configuration for a strategy.
+    /// @param asset The asset that the strategy is associated with (assumes 1 asset per strategy).
+    /// @param maxSlippageAmount The maximum amount of slippage allowed for the strategy denominated in the underlying
+    /// asset. This value is expected to be in the 1:10 wei range.
+    /// @param isRegistered Boolean indicating whether the strategy is configured.
+    /// @param depositAllowed Boolean indicating whether the strategy is allowed to be deposited into.
+    struct StrategyConfig {
+        address asset;
+        uint8 maxSlippageAmount;
+        bool isRegistered;
+        bool depositAllowed;
+    }
+
     /// @notice Getter for the balance of a given asset on the Allocator.
     /// @param asset Address of the asset to get the balance of.
     /// @return balance Balance of the asset in asset decimals in the Allocator (idle + aggregate balance in
@@ -125,6 +138,13 @@ interface IAllocator {
     /// @return strategy Address of the default strategy for the asset.
     function getDefaultStrategy(address asset) external view returns (address);
 
+    /// @notice Getter for the configuration of a given strategy.
+    /// @param strategy Address of the strategy to get the configuration for.
+    /// @dev Updating the maxSlippageAmount requires removing the strategy then re-adding it with the new
+    /// maxSlippageAmount (subject to a timelock).
+    /// @return config Configuration of the strategy.
+    function getStrategyConfig(address strategy) external view returns (StrategyConfig memory);
+
     /// @notice Getter for whether a strategy is supported for a given asset.
     /// @param asset Address of the asset to check if the strategy is supported for.
     /// @param strategy Address of the strategy to check if it is supported for the asset.
@@ -139,7 +159,8 @@ interface IAllocator {
     /// @notice Deposits a given amount of an asset into the default strategy for the asset.
     /// @param asset Address of the asset to deposit.
     /// @param amount Amount of the asset to deposit.
-    function deposit(address asset, uint256 amount) external;
+    /// @return netDepositAmount Amount of the asset deposited after accounting for slippage.
+    function deposit(address asset, uint256 amount) external returns (uint256 netDepositAmount);
 
     /// @notice Deposits a given amount of an asset into the default strategy for the asset, allowing idle funds if the
     /// deposit fails.
@@ -164,7 +185,9 @@ interface IAllocator {
     /// @notice Adds a new yield strategy to the allocator.
     /// @param asset Address of the asset to add the strategy for.
     /// @param strategy Address of the ERC-4626 strategy to add.
-    function addStrategy(address asset, address strategy) external;
+    /// @param maxSlippageAmount The maximum amount of slippage allowed for the strategy denominated in the underlying
+    /// asset.
+    function addStrategy(address asset, address strategy, uint8 maxSlippageAmount) external;
 
     /// @notice Removes a yield strategy from the allocator.
     /// @param strategy Address of the ERC-4626 strategy to remove.

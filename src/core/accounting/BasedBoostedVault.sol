@@ -179,26 +179,32 @@ contract BasedBoostedVault is
         }
 
         uint256 conversionRate = _accrueSubVaultConversionRate(subVaultId);
-        uint256 amountInRay = amount.assetDecimalsToRay(asset);
-        // Round down the division to undershoot the amount of granted shares, favoring the protocol.
-        uint256 shares = amountInRay.rayDivDown(conversionRate);
-        // Prevent deposits that result in 0 shares to avoid user getting nothing in return for their deposit.
-        require(shares > 0, Errors.InvalidAmount());
 
         if (!_isActiveSubVaultById(subVaultId)) {
             _addSubVaultToActive(subVaultId);
             _validateAmountOfActiveSubVaults();
         }
 
-        _mintShares(user, subVaultId, shares);
-        $storage().positions[user].originalDepositRay += amountInRay;
-        $storage().globalOriginalDepositsRay += amountInRay;
-
         _transferToTransferHelper(msg.sender, asset, amount);
-        IFundsHandler(FUNDS_HANDLER).processDeposit(asset, amount);
+        uint256 netDepositAmount = IFundsHandler(FUNDS_HANDLER).processDeposit(asset, amount);
+
+        // Calculate the number of shares to mint based on the full amount deposited.
+        // If (amount - netDepositAmount) > 0, then this ~amount will be treated as interest earned.
+        // Round down the division to undershoot the amount of granted shares, favoring the protocol.
+        uint256 shares = amount.assetDecimalsToRay(asset).rayDivDown(conversionRate);
+        // Prevent deposits that result in 0 shares to avoid user getting nothing in return for their deposit.
+        require(shares > 0, Errors.InvalidAmount());
+
+        _issueShares(user, subVaultId, shares);
+        // Increment the original deposit amount by the net deposit amount only, not the full amount.
+        // This protects against the system guaranteeing the full amount of the asset deposited in the case an
+        // underlying strategy suffers slippage.
+        uint256 netDepositAmountInRay = netDepositAmount.assetDecimalsToRay(asset);
+        $storage().positions[user].originalDepositRay += netDepositAmountInRay;
+        $storage().globalOriginalDepositsRay += netDepositAmountInRay;
 
         emit Deposit(user, asset, amount);
-        emit Transfer(address(0), user, amountInRay);
+        emit Transfer(address(0), user, amount.assetDecimalsToRay(asset));
     }
 
     /// @notice Transfers BBV balance (denominated in RAY) between users.
@@ -241,7 +247,7 @@ contract BasedBoostedVault is
             fromSubVaultId: fromSubVaultId,
             toSubVaultId: toSubVaultId,
             sharesToBurn: fromUserShares,
-            sharesToMint: toUserShares,
+            sharesToIssue: toUserShares,
             guaranteedAmountToMoveRay: guaranteedAmountRay
         });
 
@@ -281,7 +287,7 @@ contract BasedBoostedVault is
             fromSubVaultId: fromSubVaultId,
             toSubVaultId: toSubVaultId,
             sharesToBurn: fromUserShares,
-            sharesToMint: toUserShares,
+            sharesToIssue: toUserShares,
             guaranteedAmountToMoveRay: guaranteedAmountRay
         });
 
@@ -551,7 +557,7 @@ contract BasedBoostedVault is
             fromSubVaultId: oldSubVaultId,
             toSubVaultId: newSubVaultId,
             sharesToBurn: userOldShares,
-            sharesToMint: userNewShares,
+            sharesToIssue: userNewShares,
             guaranteedAmountToMoveRay: 0
         });
     }
@@ -562,7 +568,7 @@ contract BasedBoostedVault is
         uint256 fromSubVaultId,
         uint256 toSubVaultId,
         uint256 sharesToBurn,
-        uint256 sharesToMint,
+        uint256 sharesToIssue,
         uint256 guaranteedAmountToMoveRay
     ) internal {
         uint256 remainingShares = _burnShares(from, fromSubVaultId, sharesToBurn);
@@ -590,7 +596,7 @@ contract BasedBoostedVault is
             $storage().positions[to].originalDepositRay += guaranteedAmountToMoveRay;
         }
 
-        _mintShares(to, toSubVaultId, sharesToMint);
+        _issueShares(to, toSubVaultId, sharesToIssue);
     }
 
     /// @dev Gets the user's subVaultId or assigns a default subVaultId if the user has no position.
@@ -746,7 +752,7 @@ contract BasedBoostedVault is
         return $storage().positions[user].shares;
     }
 
-    function _mintShares(address user, uint256 subVaultId, uint256 sharesToMint) internal {
+    function _issueShares(address user, uint256 subVaultId, uint256 sharesToMint) internal {
         $storage().positions[user].shares += sharesToMint;
         $storage().subVaultById[subVaultId].totalShares += sharesToMint;
     }

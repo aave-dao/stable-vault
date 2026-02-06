@@ -31,7 +31,7 @@ interface IBasedBoostedVault {
 
     event WithdrawalExecuted(address indexed user, address asset, uint256 amount);
 
-    event Deposit(address indexed user, address indexed asset, uint256 amount);
+    event Deposit(address indexed user, address indexed asset, uint256 netDepositAmount);
 
     /// @notice Emitted on BBV balance transfers (amount is denominated in RAY).
     event Transfer(address indexed from, address indexed to, uint256 amountRay);

@@ -129,8 +129,8 @@ contract FundsHandler is
     }
 
     /// @inheritdoc IFundsHandler
-    function processDeposit(address asset, uint256 amount) external override onlyBasedBoostedVault {
-        IAllocator(ALLOCATOR).deposit(asset, amount);
+    function processDeposit(address asset, uint256 amount) external override onlyBasedBoostedVault returns (uint256) {
+        return IAllocator(ALLOCATOR).deposit(asset, amount);
     }
 
     /// @inheritdoc IFundsHandler
