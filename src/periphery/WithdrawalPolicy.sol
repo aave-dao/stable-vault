@@ -110,6 +110,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
         if (signer != address(0)) {
             _markNonceAsUsed(signer, nonce);
         }
+        emit WithdrawalPolicyApplied(request.user, request.assetOut, request.iouAmountRay, amountOutRay);
         return amountOutRay;
     }
 

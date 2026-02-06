@@ -303,6 +303,30 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         assertTrue(withdrawalPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Apply should consume nonce");
     }
 
+    function test_applyWithdrawalPolicy_emitsWithdrawalPolicyApplied(
+        address user,
+        address assetOut,
+        uint256 iouAmountRay,
+        uint256 baseFeeBps
+    ) public {
+        baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
+        iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+
+        vm.prank(admin);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
+
+        uint256 expectedFee = (iouAmountRay * baseFeeBps + Constants.MAX_BPS - 1) / Constants.MAX_BPS;
+        uint256 expectedAmountOut = iouAmountRay - expectedFee;
+
+        IWithdrawalPolicy.WithdrawalRequest memory request = _buildRequest(user, assetOut, iouAmountRay, "");
+
+        vm.expectEmit(true, true, true, true);
+        emit IWithdrawalPolicy.WithdrawalPolicyApplied(user, assetOut, iouAmountRay, expectedAmountOut);
+
+        withdrawalPolicy.applyWithdrawalPolicy(request);
+    }
+
     function test_applyWithdrawalPolicy_reverts_ifCallerIsNotApplier() public {
         address user = makeAddr("user");
         address assetOut = makeAddr("assetOut");
