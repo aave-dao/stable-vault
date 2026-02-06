@@ -33,6 +33,9 @@ interface IBasedBoostedVault {
 
     event Deposit(address indexed user, address indexed asset, uint256 amount);
 
+    /// @notice Emitted on BBV balance transfers (amount is denominated in RAY).
+    event Transfer(address indexed from, address indexed to, uint256 amountRay);
+
     event UserRateSet(address indexed user, uint256 indexed subVaultId, uint256 newPerSecondRate);
 
     event SubVaultRateSet(uint256 indexed subVaultId, uint256 newPerSecondRate);
@@ -131,6 +134,27 @@ interface IBasedBoostedVault {
     /// @param asset Address of the asset being deposited.
     /// @param amount Amount of assets being deposited.
     function deposit(address user, address asset, uint256 amount) external;
+
+    /// @notice ERC20-style total BBV position supply in RAY.
+    /// @dev Excludes IOU supply; includes only active BBV position obligations.
+    /// @return supplyRay Total BBV position supply in RAY.
+    function totalSupply() external view returns (uint256 supplyRay);
+
+    /// @notice ERC20-style BBV balance in RAY for a given account.
+    /// @param account Address of the account.
+    /// @return balanceRay Account's BBV balance in RAY.
+    function balanceOf(address account) external view returns (uint256 balanceRay);
+
+    /// @notice Transfers BBV balance (denominated in RAY) to another user.
+    /// @param to Address of the recipient.
+    /// @param amountRay Amount of BBV balance to transfer, denominated in RAY.
+    /// @return success True if the transfer was successful.
+    function transfer(address to, uint256 amountRay) external returns (bool success);
+
+    /// @notice Transfers the sender's full BBV balance (denominated in RAY) to another user.
+    /// @param to Address of the recipient.
+    /// @return success True if the transfer was successful.
+    function transferAll(address to) external returns (bool success);
 
     /// @notice Requests a withdrawal of assets from the vault.
     /// @dev User shares are burned; the amount requested to withdraw stops accruing yield.
