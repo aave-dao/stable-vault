@@ -228,9 +228,15 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         // Use maxWithdraw to account for withdrawal limits or timelocks.
         uint256 maxWithdrawable = IERC4626(strategy).maxWithdraw(address(this));
         if (maxWithdrawable == 0) {
+            // Some ERC-4626 implementations may return 0 for `maxWithdraw` to adhere to the spec rule of not reverting.
+            // Fallback to querying the balance that may not account for withdrawal limits or timelocks.
+            withdrawnAmount = Math.min(amount, _getAssetBalanceInStrategy(IERC4626(strategy)));
+        } else {
+            withdrawnAmount = Math.min(amount, maxWithdrawable);
+        }
+        if (withdrawnAmount == 0) {
             return 0;
         }
-        withdrawnAmount = Math.min(amount, maxWithdrawable);
         _withdrawFromStrategy(asset, withdrawnAmount, address(this), strategy);
         return withdrawnAmount;
     }
@@ -245,7 +251,6 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     }
 
     /// @inheritdoc IAllocator
-    /// @dev Requires that the strategy implementing `IERC4626` returns a non-zero value for `maxWithdraw`.
     function addStrategy(address asset, address strategy) external override restricted {
         _addStrategy(asset, strategy);
     }
