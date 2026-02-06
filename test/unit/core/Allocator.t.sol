@@ -294,6 +294,19 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getDefaultStrategy(address(_mockGho)), address(_defaultGhoStrategy));
     }
 
+    function test_getStrategyConfig_returnsExpectedStrategyConfig() public view {
+        assertEq(_allocator.getStrategyConfig(address(_defaultUsdtStrategy)).asset, address(_mockUsdt));
+        assertEq(
+            _allocator.getStrategyConfig(address(_defaultUsdtStrategy)).maxSlippageAmount, STRATEGY_MAX_SLIPPAGE_AMOUNT
+        );
+        assertEq(_allocator.getStrategyConfig(address(_defaultUsdtStrategy)).isRegistered, true);
+        assertEq(_allocator.getStrategyConfig(address(_defaultUsdtStrategy)).depositAllowed, true);
+        assertEq(_allocator.getStrategyConfig(address(_extraUsdtStrategy)).asset, address(_mockUsdt));
+        assertEq(
+            _allocator.getStrategyConfig(address(_extraUsdtStrategy)).maxSlippageAmount, STRATEGY_MAX_SLIPPAGE_AMOUNT
+        );
+    }
+
     function test_isStrategySupportedForAsset_returnsExpectedResult() public view {
         assertTrue(_allocator.isStrategySupportedForAsset(address(_mockUsdt), address(_defaultUsdtStrategy)));
         assertTrue(_allocator.isStrategySupportedForAsset(address(_mockUsdt), address(_extraUsdtStrategy)));
@@ -319,6 +332,16 @@ contract AllocatorTest is TestWithHelpers {
         assertTrue(_allocator.isStrategySupported(address(_defaultGhoStrategy)));
         assertTrue(_allocator.isStrategySupported(address(_extraGhoStrategy)));
         assertFalse(_allocator.isStrategySupported(makeAddr("NON_EXISTING_VAULT")));
+    }
+
+    function test_tryDepositToStrategy_reverts_onlySelf() public {
+        vm.expectRevert(Errors.OnlySelf.selector);
+        _allocator.tryDepositToStrategy(address(_mockUsdt), 100, address(_defaultUsdtStrategy));
+    }
+
+    function test_tryWithdrawFromStrategy_reverts_onlySelf() public {
+        vm.expectRevert(Errors.OnlySelf.selector);
+        _allocator.tryWithdrawFromStrategy(address(_mockUsdt), 100, address(_defaultUsdtStrategy));
     }
 
     function test_deposit_depositsFundsIntoDefaultVault(uint256 depositAmountUsdt) public {
