@@ -6,6 +6,7 @@ import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessMana
 import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 import {IAny2EVMMessageReceiver} from "@chainlink-ccip/contracts/interfaces/IAny2EVMMessageReceiver.sol";
@@ -29,6 +30,7 @@ import {MockCCIPRouter} from "test/mocks/MockCcipRouter.sol";
 import {MockEarningChainGateway} from "test/mocks/MockEarningChainGateway.sol";
 import {IMockErc20} from "test/mocks/MockErc20.sol";
 import {MockNonStandardErc20} from "test/mocks/MockNonStandardErc20.sol";
+import {MockReentrantGateway} from "test/mocks/MockReentrantGateway.sol";
 import {MockTransferHelper} from "test/mocks/MockTransferHelper.sol";
 
 contract CcipAdapterTest is TestWithHelpers {
@@ -174,64 +176,6 @@ contract CcipAdapterTest is TestWithHelpers {
 
         assertEq(address(msgSender).balance, amountToRescue);
         assertEq(address(_accountingChainCcipAdapter).balance, adapterBalance - amountToRescue);
-    }
-
-    function test_replayFundsReceiving_AccountingChain(uint256 amountUsdt, uint256 amountGho) public {
-        // Airdrop tokens into adapter to mimic bridged funds that failed to get handled
-        amountUsdt = _boundAssetAmount(address(_mockUsdt), amountUsdt);
-        amountGho = _boundAssetAmount(address(_mockGho), amountGho);
-
-        _mockUsdt.mint(address(_accountingChainCcipAdapter), amountUsdt);
-        _mockGho.mint(address(_accountingChainCcipAdapter), amountGho);
-
-        IBridgeAdapter.BridgeAsset[] memory bridgeAssets = new IBridgeAdapter.BridgeAsset[](2);
-        bridgeAssets[0] = IBridgeAdapter.BridgeAsset({asset: address(_mockUsdt), amount: amountUsdt});
-        bridgeAssets[1] = IBridgeAdapter.BridgeAsset({asset: address(_mockGho), amount: amountGho});
-
-        // Expect the gateway is approved to pull funds from the adapter
-        vm.expectCall(address(_mockUsdt), abi.encodeCall(IERC20.transfer, (address(_mockTransferHelper), amountUsdt)));
-        vm.expectCall(address(_mockGho), abi.encodeCall(IERC20.transfer, (address(_mockTransferHelper), amountGho)));
-        // receiveMessage is called once per asset
-        vm.expectCall(
-            address(_mockAccountingChainGateway),
-            abi.encodeCall(IChainGateway.receiveMessage, (0, address(_mockUsdt), amountUsdt, ""))
-        );
-        vm.expectCall(
-            address(_mockAccountingChainGateway),
-            abi.encodeCall(IChainGateway.receiveMessage, (0, address(_mockGho), amountGho, ""))
-        );
-
-        // Function is not gated - anyone can call
-        _accountingChainCcipAdapter.replayFundsReceiving(bridgeAssets);
-    }
-
-    function test_replayFundsReceiving_EarningChain(uint256 amountUsdt, uint256 amountGho) public {
-        // Airdrop tokens into adapter to mimic bridged funds that failed to get handled
-        amountUsdt = _boundAssetAmount(address(_mockUsdt), amountUsdt);
-        amountGho = _boundAssetAmount(address(_mockGho), amountGho);
-
-        _mockUsdt.mint(address(_earningChainCcipAdapter), amountUsdt);
-        _mockGho.mint(address(_earningChainCcipAdapter), amountGho);
-
-        IBridgeAdapter.BridgeAsset[] memory bridgeAssets = new IBridgeAdapter.BridgeAsset[](2);
-        bridgeAssets[0] = IBridgeAdapter.BridgeAsset({asset: address(_mockUsdt), amount: amountUsdt});
-        bridgeAssets[1] = IBridgeAdapter.BridgeAsset({asset: address(_mockGho), amount: amountGho});
-
-        // Expect the gateway is approved to pull funds from the adapter
-        vm.expectCall(address(_mockUsdt), abi.encodeCall(IERC20.transfer, (address(_mockTransferHelper), amountUsdt)));
-        vm.expectCall(address(_mockGho), abi.encodeCall(IERC20.transfer, (address(_mockTransferHelper), amountGho)));
-        // receiveMessage is called once per asset
-        vm.expectCall(
-            address(_mockEarningChainGateway),
-            abi.encodeCall(IChainGateway.receiveMessage, (0, address(_mockUsdt), amountUsdt, ""))
-        );
-        vm.expectCall(
-            address(_mockEarningChainGateway),
-            abi.encodeCall(IChainGateway.receiveMessage, (0, address(_mockGho), amountGho, ""))
-        );
-
-        // Function is not gated - anyone can call
-        _earningChainCcipAdapter.replayFundsReceiving(bridgeAssets);
     }
 
     function test_setChainSelector_reverts_ifNotAuthorized(address operator) public {
@@ -805,6 +749,47 @@ contract CcipAdapterTest is TestWithHelpers {
         );
     }
 
+    function test_publishMessageToChainWithFeePayer_reverts_ifNativeFeeIsBelowEstimate() public {
+        uint256 idleNativeAssetAmount = 123;
+        uint256 actualFeeAmount = 100;
+
+        // Airdrop the fee amount into the adapter to make sure it can not be used.
+        vm.deal(address(_accountingChainCcipAdapter), idleNativeAssetAmount);
+
+        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
+            feePayer: everyRoleAccount,
+            feeToken: address(0),
+            feeAmount: 0,
+            feeRefundThreshold: 0,
+            gasLimit: DEFAULT_GAS_LIMIT,
+            data: ""
+        });
+
+        Client.EVM2AnyMessage memory expectedCcipMessage = Client.EVM2AnyMessage({
+            receiver: abi.encode(_earningChainCcipAdapter),
+            data: "",
+            tokenAmounts: new Client.EVMTokenAmount[](0),
+            feeToken: address(0),
+            extraArgs: Client._argsToBytes(
+                Client.GenericExtraArgsV2({gasLimit: DEFAULT_GAS_LIMIT, allowOutOfOrderExecution: true})
+            )
+        });
+
+        // Mock call to router.getFee - return the fee amount to trigger refund flow
+        vm.mockCall(
+            address(_mockCCIPRouter),
+            abi.encodeWithSelector(IRouterClient.getFee.selector, EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage),
+            abi.encode(actualFeeAmount)
+        );
+        // Stub the call to router.ccipSend
+        _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, bytes32(0));
+
+        vm.expectRevert(Errors.InsufficientFunds.selector);
+        vm.prank(address(_mockAccountingChainGateway));
+        // Do not send any native asset with the call to try using the idle funds on the adapter.
+        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(EARNING_CHAIN_ID, address(0), 0, "", bridgeParams);
+    }
+
     function test_publishMessageToChainWithFeePayer_reverts_ifOnlyGateway(address caller) public {
         vm.assume(caller != address(_mockAccountingChainGateway));
         vm.assume(caller != address(_mockEarningChainGateway));
@@ -1022,7 +1007,7 @@ contract CcipAdapterTest is TestWithHelpers {
         );
     }
 
-    function test_ccipReceive_handlesFundsHandlingFailure(uint256 amountUsdt, uint256 amountGho) public {
+    function test_ccipReceive_reverts_ifFundsHandlingFails(uint256 amountUsdt, uint256 amountGho) public {
         // Context: Earning Chain -> Accounting Chain
 
         amountUsdt = _boundAssetAmount(address(_mockUsdt), amountUsdt);
@@ -1044,23 +1029,16 @@ contract CcipAdapterTest is TestWithHelpers {
             destTokenAmounts: ccipTokenAmounts
         });
 
-        vm.expectEmit(true, true, true, true);
-        emit IBridgeAdapter.TokenReceptionFailed(messageId, EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt);
-        vm.expectEmit(true, true, true, true);
-        emit IBridgeAdapter.TokenReceptionFailed(messageId, EARNING_CHAIN_ID, address(_mockGho), amountGho);
-        vm.expectEmit(true, true, true, true);
-        emit IBridgeAdapter.BridgedFundsProcessingFailed(
-            messageId, EARNING_CHAIN_ID, abi.encode(ccipMessage), abi.encode("test")
-        );
-
         // mock a revert from downstream fund handling (first asset)
+        // e.g. deposit of asset into Allocator is disabled
         vm.mockCallRevert(
             address(_mockAccountingChainGateway),
             abi.encodeCall(IChainGateway.receiveMessage, (0, address(_mockUsdt), amountUsdt, "")),
-            abi.encode("test")
+            abi.encodeWithSelector(Errors.InvalidParameter.selector, "test")
         );
 
         vm.prank(address(_mockCCIPRouter));
+        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidParameter.selector, "test"));
         _accountingChainCcipAdapter.ccipReceive(ccipMessage);
     }
 
@@ -1130,13 +1108,6 @@ contract CcipAdapterTest is TestWithHelpers {
         );
     }
 
-    function test_processReceivedFunds_reverts_ifOnlySelf(address caller) public {
-        vm.assume(caller != address(_accountingChainCcipAdapter));
-        vm.prank(caller);
-        vm.expectRevert(Errors.OnlySelf.selector);
-        _accountingChainCcipAdapter.processReceivedFunds(new Client.EVMTokenAmount[](0));
-    }
-
     function test_ccipReceive_reverts_ifDestinationChainAdapterNotSetForSourceChain(uint64 unknownChainSelector)
         public
     {
@@ -1203,6 +1174,51 @@ contract CcipAdapterTest is TestWithHelpers {
                 destTokenAmounts: new Client.EVMTokenAmount[](0)
             })
         );
+    }
+
+    function test_ccipReceive_revertsWhenReentrancyOccurs() public {
+        // Deploy a malicious gateway that attempts reentrancy via ccipReceive
+        MockReentrantGateway maliciousGateway = new MockReentrantGateway(address(_mockTransferHelper));
+
+        // Deploy a new adapter with the malicious gateway
+        CcipAdapter adapterWithMaliciousGateway = _deployCcipAdapter(
+            address(_mockAccessManager),
+            address(maliciousGateway),
+            address(_mockCCIPRouter),
+            address(_mockTransferHelper)
+        );
+
+        // Set up chain selectors and destination adapters
+        vm.prank(everyRoleAccount);
+        adapterWithMaliciousGateway.setChainSelector(EARNING_CHAIN_ID, EARNING_CHAIN_CCIP_SELECTOR);
+        vm.prank(everyRoleAccount);
+        adapterWithMaliciousGateway.setDestinationChainAdapter(EARNING_CHAIN_ID, address(_earningChainCcipAdapter));
+
+        bytes32 messageId = keccak256("reentrancyTest");
+        bytes memory arbitraryData = abi.encode(keccak256(hex"c0ffee"));
+
+        Client.Any2EVMMessage memory ccipMessage = Client.Any2EVMMessage({
+            messageId: messageId,
+            sourceChainSelector: EARNING_CHAIN_CCIP_SELECTOR,
+            sender: abi.encode(address(_earningChainCcipAdapter)),
+            data: arbitraryData,
+            destTokenAmounts: new Client.EVMTokenAmount[](0)
+        });
+
+        // Configure the malicious gateway to attempt reentrancy by calling ccipReceive again
+        maliciousGateway.setReentrancyTargetCcipReceive(address(adapterWithMaliciousGateway), ccipMessage);
+
+        // The reentrancy is blocked by the nonReentrant modifier.
+        // Flow:
+        // 1. Enter ccipReceive (sets reentrancy lock via nonReentrant)
+        // 2. Call _processMessage -> gateway.receiveMessage
+        // 3. Gateway attempts to re-enter ccipReceive (in theory this re-entrancy can be further downstream)
+        // 4. Reentrancy guard reverts with ReentrancyGuardReentrantCall
+        // 5. Revert bubbles up, entire transaction reverts
+
+        vm.expectRevert(ReentrancyGuard.ReentrancyGuardReentrantCall.selector);
+        vm.prank(address(_mockCCIPRouter));
+        adapterWithMaliciousGateway.ccipReceive(ccipMessage);
     }
 
     function test_publishMessageToChainWithFeePayer_resetsAdapterToRouterAllowanceToZero_FeeTokenNotBeingBridged(

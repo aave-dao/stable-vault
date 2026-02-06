@@ -4,6 +4,7 @@ pragma solidity ^0.8.22;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 import {IAny2EVMMessageReceiver} from "@chainlink-ccip/contracts/interfaces/IAny2EVMMessageReceiver.sol";
@@ -21,7 +22,25 @@ import {Errors} from "src/types/Errors.sol";
 /// @title CcipAdapter
 /// @author Aave Labs
 /// @notice Adapter for sending and receiving messages via Chainlink CCIP.
-contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
+/// @dev This adapter will not ingest user-specific tokens and data, therefore the adapter does not support
+/// returning tokens to the original sender on the source chain (original sender will be the source chain CCIP adapter).
+/// @dev This adapter does not implement a defensive receiver pattern because it is assumed that message ingestion will
+/// not fail downstream due to issues other than OOG or if deposits into the Allocator are disabled.
+/// @dev If a revert occurs during the processing of a message, the message will never need to be retried (through
+/// manual execution through the CCIP offramp).
+/// @dev Implementing a defensive receiver pattern would require
+/// storing the message in the contract which can consume ~300k gas; this trade-off is deemed unnecessary given
+/// that the adapter will ingest messages for tokens that are supported, from a trusted source, and contain arbitrary
+/// data that can be parsed on the local Gateway if any arbitrary data is included in a message.
+/// @dev The adapter will revert if the source chain sender is not recognized, and the message will never need to be
+/// retried (through manual execution through the CCIP offramp).
+contract CcipAdapter is
+    BaseBridgeAdapter,
+    ReentrancyGuardTransient,
+    ICcipBridgeAdapter,
+    IAny2EVMMessageReceiver,
+    IERC165
+{
     using SafeERC20 for IERC20;
 
     address internal immutable CCIP_ROUTER;
@@ -117,47 +136,33 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
     }
 
     /// @inheritdoc IAny2EVMMessageReceiver
-    function ccipReceive(Client.Any2EVMMessage calldata message) external override onlyRouter {
+    function ccipReceive(Client.Any2EVMMessage calldata message) external override nonReentrant onlyRouter {
         emit MessageReceived(message.messageId);
+        // Only process messages if the sender from the source chain is the recognized adapter.
+        _validateMessageSource(message);
+        _processMessage(message);
+    }
+
+    function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
+        return interfaceId == type(IAny2EVMMessageReceiver).interfaceId || interfaceId == type(IERC165).interfaceId;
+    }
+
+    function _processMessage(Client.Any2EVMMessage memory message) internal {
+        // Process data first to allow any potential state modifications to take place before processing tokens.
+        // Assumes if data is sent with tokens, then the data must be processed first.
         if (message.data.length > 0) {
-            // If message processing fails, the whole bridge tx processing must fail too. We do not want to allow the
-            // scenario where the funds are received, but the message is not processed successfully, as this can lead to
-            // double-counting of funds, given that the balance snapshot will still reflect the funds that were just
-            // received.
-            _validateMessageSource(message);
             IChainGateway(GATEWAY)
                 .receiveMessage(
                     _chainIdOf[message.sourceChainSelector], Constants.ASSET_FOR_DATA_ONLY_BRIDGE, 0, message.data
                 );
         }
         if (message.destTokenAmounts.length > 0) {
-            try this.processReceivedFunds(message.destTokenAmounts) {}
-            catch (bytes memory err) {
-                for (uint256 i = 0; i < message.destTokenAmounts.length; i++) {
-                    emit TokenReceptionFailed(
-                        message.messageId,
-                        _chainIdOf[message.sourceChainSelector],
-                        message.destTokenAmounts[i].token,
-                        message.destTokenAmounts[i].amount
-                    );
-                }
-                emit BridgedFundsProcessingFailed(
-                    message.messageId, _chainIdOf[message.sourceChainSelector], abi.encode(message), err
-                );
+            for (uint256 i = 0; i < message.destTokenAmounts.length; i++) {
+                address asset = message.destTokenAmounts[i].token;
+                uint256 amount = message.destTokenAmounts[i].amount;
+                _processReceivedFunds(asset, amount);
             }
         }
-    }
-
-    function processReceivedFunds(Client.EVMTokenAmount[] memory assetsToProcess) external onlySelf {
-        for (uint256 i = 0; i < assetsToProcess.length; i++) {
-            address asset = assetsToProcess[i].token;
-            uint256 amount = assetsToProcess[i].amount;
-            _processReceivedFunds(asset, amount);
-        }
-    }
-
-    function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
-        return interfaceId == type(IAny2EVMMessageReceiver).interfaceId || interfaceId == type(IERC165).interfaceId;
     }
 
     function _sendMessageWithFeePayer(
@@ -170,6 +175,7 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
     ) internal {
         uint64 chainSelector = _chainSelectorOf[chainId];
         uint256 estimatedFeeAmount = IRouterClient(CCIP_ROUTER).getFee(chainSelector, message);
+        require(allocatedFeeAmount >= estimatedFeeAmount, Errors.InsufficientFunds());
         uint256 msgValue;
         if (feeToken == Constants.NATIVE_CURRENCY) {
             msgValue = estimatedFeeAmount;
