@@ -195,9 +195,9 @@ contract BasedBoostedVault is
         // Prevent deposits that result in 0 shares to avoid user getting nothing in return for their deposit.
         require(shares > 0, Errors.InvalidAmount());
 
-        _mintShares(user, subVaultId, shares);
+        _issueShares(user, subVaultId, shares);
         // Increment the original deposit amount by the net deposit amount only, not the full amount.
-        // This protects against the system gauranteeing the full amount of the asset deposited in the case an
+        // This protects against the system guaranteeing the full amount of the asset deposited in the case an
         // underlying strategy suffers slippage.
         uint256 netDepositAmountInRay = netDepositAmount.assetDecimalsToRay(asset);
         $storage().positions[user].originalDepositRay += netDepositAmountInRay;
@@ -247,7 +247,7 @@ contract BasedBoostedVault is
             fromSubVaultId: fromSubVaultId,
             toSubVaultId: toSubVaultId,
             sharesToBurn: fromUserShares,
-            sharesToMint: toUserShares,
+            sharesToIssue: toUserShares,
             guaranteedAmountToMoveRay: guaranteedAmountRay
         });
 
@@ -287,7 +287,7 @@ contract BasedBoostedVault is
             fromSubVaultId: fromSubVaultId,
             toSubVaultId: toSubVaultId,
             sharesToBurn: fromUserShares,
-            sharesToMint: toUserShares,
+            sharesToIssue: toUserShares,
             guaranteedAmountToMoveRay: guaranteedAmountRay
         });
 
@@ -557,7 +557,7 @@ contract BasedBoostedVault is
             fromSubVaultId: oldSubVaultId,
             toSubVaultId: newSubVaultId,
             sharesToBurn: userOldShares,
-            sharesToMint: userNewShares,
+            sharesToIssue: userNewShares,
             guaranteedAmountToMoveRay: 0
         });
     }
@@ -568,7 +568,7 @@ contract BasedBoostedVault is
         uint256 fromSubVaultId,
         uint256 toSubVaultId,
         uint256 sharesToBurn,
-        uint256 sharesToMint,
+        uint256 sharesToIssue,
         uint256 guaranteedAmountToMoveRay
     ) internal {
         uint256 remainingShares = _burnShares(from, fromSubVaultId, sharesToBurn);
@@ -596,7 +596,7 @@ contract BasedBoostedVault is
             $storage().positions[to].originalDepositRay += guaranteedAmountToMoveRay;
         }
 
-        _mintShares(to, toSubVaultId, sharesToMint);
+        _issueShares(to, toSubVaultId, sharesToIssue);
     }
 
     /// @dev Gets the user's subVaultId or assigns a default subVaultId if the user has no position.
@@ -752,7 +752,7 @@ contract BasedBoostedVault is
         return $storage().positions[user].shares;
     }
 
-    function _mintShares(address user, uint256 subVaultId, uint256 sharesToMint) internal {
+    function _issueShares(address user, uint256 subVaultId, uint256 sharesToMint) internal {
         $storage().positions[user].shares += sharesToMint;
         $storage().subVaultById[subVaultId].totalShares += sharesToMint;
     }
