@@ -234,10 +234,9 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         } else {
             withdrawnAmount = Math.min(amount, maxWithdrawable);
         }
-        if (withdrawnAmount == 0) {
-            return 0;
+        if (withdrawnAmount != 0) {
+            _withdrawFromStrategy(asset, withdrawnAmount, address(this), strategy);
         }
-        _withdrawFromStrategy(asset, withdrawnAmount, address(this), strategy);
         return withdrawnAmount;
     }
 
