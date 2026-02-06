@@ -225,16 +225,16 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         returns (uint256)
     {
         uint256 withdrawnAmount;
+        // Use maxWithdraw to account for withdrawal limits or timelocks.
         uint256 maxWithdrawable = IERC4626(strategy).maxWithdraw(address(this));
         if (maxWithdrawable == 0) {
-            // If `maxWithdraw` returned 0, then try redeeming all shares from the strategy.
-            // This handles the case where the strategy returns 0 as a conservative estimation
-            // (e.g. due to liquidity constraints or estimation limitations), given that ERC-4626
-            // requires `maxWithdraw` to never overestimate nor revert.
-            // `_redeemAllFromStrategy` avoids redeeming if the Allocator has no shares.
-            withdrawnAmount = _redeemAllFromStrategy(asset, strategy);
+            // Some ERC-4626 implementations may return 0 for `maxWithdraw` to adhere to the spec rule of not reverting.
+            // Fallback to querying the balance that may not account for withdrawal limits or timelocks.
+            withdrawnAmount = Math.min(amount, _getAssetBalanceInStrategy(IERC4626(strategy)));
         } else {
             withdrawnAmount = Math.min(amount, maxWithdrawable);
+        }
+        if (withdrawnAmount != 0) {
             _withdrawFromStrategy(asset, withdrawnAmount, address(this), strategy);
         }
         return withdrawnAmount;
@@ -389,6 +389,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     function _redeemAllFromStrategy(address asset, address strategy) internal returns (uint256) {
         uint256 shares = IERC4626(strategy).balanceOf(address(this));
         if (shares == 0) {
+            // Gracefully return 0 if the strategy has no shares to avoid disrupting a multi-deallocate rebalance.
             return 0;
         }
         uint256 amount = IERC4626(strategy).redeem({shares: shares, receiver: address(this), owner: address(this)});
