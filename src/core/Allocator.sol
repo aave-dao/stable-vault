@@ -225,18 +225,13 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         returns (uint256)
     {
         uint256 withdrawnAmount;
+        // Use maxWithdraw to account for withdrawal limits or timelocks.
         uint256 maxWithdrawable = IERC4626(strategy).maxWithdraw(address(this));
         if (maxWithdrawable == 0) {
-            // If `maxWithdraw` returned 0, then try redeeming all shares from the strategy.
-            // This handles the case where the strategy returns 0 as a conservative estimation
-            // (e.g. due to liquidity constraints or estimation limitations), given that ERC-4626
-            // requires `maxWithdraw` to never overestimate nor revert.
-            // `_redeemAllFromStrategy` avoids redeeming if the Allocator has no shares.
-            withdrawnAmount = _redeemAllFromStrategy(asset, strategy);
-        } else {
-            withdrawnAmount = Math.min(amount, maxWithdrawable);
-            _withdrawFromStrategy(asset, withdrawnAmount, address(this), strategy);
+            return 0;
         }
+        withdrawnAmount = Math.min(amount, maxWithdrawable);
+        _withdrawFromStrategy(asset, withdrawnAmount, address(this), strategy);
         return withdrawnAmount;
     }
 
@@ -250,6 +245,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     }
 
     /// @inheritdoc IAllocator
+    /// @dev Requires that the strategy implementing `IERC4626` returns a non-zero value for `maxWithdraw`.
     function addStrategy(address asset, address strategy) external override restricted {
         _addStrategy(asset, strategy);
     }
@@ -389,6 +385,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     function _redeemAllFromStrategy(address asset, address strategy) internal returns (uint256) {
         uint256 shares = IERC4626(strategy).balanceOf(address(this));
         if (shares == 0) {
+            // Gracefully return 0 if the strategy has no shares to avoid disrupting a multi-deallocate rebalance.
             return 0;
         }
         uint256 amount = IERC4626(strategy).redeem({shares: shares, receiver: address(this), owner: address(this)});

@@ -559,6 +559,37 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
     }
 
+    function test_withdraw_reverts_givenMaxWithdrawReturnsZero() public {
+        MockErc4626Strategy mockStrategy = new MockErc4626Strategy(_mockUsdt);
+        vm.prank(admin);
+        _allocator.addStrategy(address(_mockUsdt), address(mockStrategy));
+        vm.prank(everyRoleAccount);
+        _allocator.setDefaultStrategy(address(_mockUsdt), address(mockStrategy));
+
+        uint256 amount = 1000;
+        amount = _boundAssetAmount(address(_mockUsdt), amount);
+        // Airdrop the assets to the TransferHelper to simulate the assets being in the Allocator.
+        _mockUsdt.mint(address(_mockTransferHelper), amount);
+        _mockAssetRegistry.mockRegisteredAsset(address(_mockUsdt));
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), amount);
+
+        mockStrategy.mockMaxWithdraw(0);
+
+        // Check that the balance in TransferHelper is the 0.
+        assertEq(_mockUsdt.balanceOf(address(_mockTransferHelper)), 0);
+        // Check that the balance in the Allocator is the amount.
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount);
+        // Check that the balance in the strategy is the amount.
+        assertEq(_allocator.getAssetBalanceInStrategy(address(mockStrategy)), amount);
+
+        // Withdraw an amount that is less than the amount in the strategy
+        uint256 amountToWithdraw = amount / 2;
+        vm.prank(withdrawer);
+        vm.expectRevert(Errors.InsufficientFunds.selector);
+        _allocator.withdraw(address(_mockUsdt), amountToWithdraw);
+    }
+
     function test_withdraw_withdrawsFromDefaultVault(uint256 amount) public {
         _mockAssetRegistry.mockRegisteredAsset(address(_mockUsdt));
         uint256 amountRemaining = 1000;
@@ -991,31 +1022,6 @@ contract AllocatorTest is TestWithHelpers {
         singleStrategyAllocator.withdraw(address(_mockUsdt), amount);
     }
 
-    function test_withdraw_redeemsAllSharesFromDefaultStrategyWhenMaxWithdrawReturnsZero(uint256 amount) public {
-        amount = _boundAssetAmount(address(_mockUsdt), amount);
-
-        MockErc4626Strategy mockStrategy = new MockErc4626Strategy(_mockUsdt);
-        vm.prank(admin);
-        _allocator.addStrategy(address(_mockUsdt), address(mockStrategy));
-
-        _mockUsdt.mint(depositor, amount);
-        vm.prank(depositor);
-        MockNonStandardErc20(address(_mockUsdt)).approve(address(mockStrategy), amount);
-        vm.prank(depositor);
-        mockStrategy.deposit(amount, address(_allocator));
-
-        // Set maxWithdraw to return 0 (this should trigger fallback to redeem all shares)
-        mockStrategy.mockMaxWithdraw(0);
-
-        _mockAssetRegistry.mockRegisteredAsset(address(_mockUsdt));
-        vm.prank(withdrawer);
-        _allocator.withdraw(address(_mockUsdt), amount);
-
-        // Check that the full amount was withdrawn via redeemAll fallback
-        assertEq(_mockUsdt.balanceOf(address(_mockTransferHelper)), amount);
-        assertEq(_allocator.getAssetBalanceInStrategy(address(mockStrategy)), 0);
-    }
-
     function test_withdraw_continuesSearchingStrategiesWhenDefaultStrategyHasNoShares(uint256 amount) public {
         amount = _boundAssetAmount(address(_mockUsdt), amount);
 
@@ -1071,7 +1077,7 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalanceInStrategy(address(mockStrategy)), 0);
     }
 
-    function test_withdraw_continuesSearchingStrategiesWhenDefaultStrategyMaxWithdrawReturnsZeroAndWithdrawFails(uint256 amount)
+    function test_withdraw_continuesSearchingStrategiesWhenDefaultStrategyMaxWithdrawReturnsZero(uint256 amount)
         public
     {
         amount = _boundAssetAmount(address(_mockUsdt), amount);
@@ -1096,14 +1102,11 @@ contract AllocatorTest is TestWithHelpers {
         _extraUsdtStrategy.deposit(amount, address(_allocator));
 
         // Set maxWithdraw to 0 and make redeem revert on the default strategy
-        // (when maxWithdraw is 0, the allocator falls back to redeemAll)
+        // (when maxWithdraw is 0, the allocator does not attempt to withdraw from the strategy)
         mockDefaultStrategy.mockMaxWithdraw(0);
-        mockDefaultStrategy.mockRedeemToRevert("WITHDRAWAL_DISABLED");
 
         // Withdraw should fail on default but succeed on extra strategy
         _mockAssetRegistry.mockRegisteredAsset(address(_mockUsdt));
-        vm.expectEmit(true, true, true, true);
-        emit IAllocator.StrategyWithdrawalFailed(address(mockDefaultStrategy), address(_mockUsdt), amount);
         vm.prank(withdrawer);
         _allocator.withdraw(address(_mockUsdt), amount);
 
@@ -1386,6 +1389,18 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
+    }
+
+    function test_rebalance_deallocate_zeroWithdawnIfShareBalanceIsZero() public {
+        IAllocator.RebalanceParams[] memory rebalanceParams = _initializeRebalanceParams(1);
+        IAllocator.DeallocationParams[] memory deallocations = _initializeDeallocationParams(1);
+        // Submit max deallocation of the asset from the default strategy.
+        deallocations[0] = _buildDeallocationParams(address(_mockUsdt), address(_defaultUsdtStrategy), 0);
+        rebalanceParams[0] =
+            _buildRebalanceParams(deallocations, _initializeSwapParams(0), _initializeAllocationParams(0));
+
+        vm.prank(address(everyRoleAccount));
+        _allocator.rebalance(rebalanceParams);
     }
 
     function test_rebalance_deallocate_specifiedAmount(uint256 depositAmountUsdt, uint256 depositAmountGho) public {
