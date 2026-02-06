@@ -454,18 +454,23 @@ contract BasedBoostedVault is
     }
 
     /// @inheritdoc IBasedBoostedVault
+    function totalSupply() external view override returns (uint256) {
+        return _getActiveSubVaultsObligations();
+    }
+
+    /// @inheritdoc IBasedBoostedVault
     function getAggregatedBalance() external view override returns (uint256) {
         return _getVaultAggregatedBalance();
     }
 
     /// @inheritdoc IBasedBoostedVault
+    function balanceOf(address account) external view override returns (uint256) {
+        return _getUserBalance(account);
+    }
+
+    /// @inheritdoc IBasedBoostedVault
     function getUserBalance(address user) external view override returns (uint256) {
-        if ($storage().positions[user].shares == 0) {
-            return 0;
-        }
-        // Round down the user balance, so that the rounding is in favor of the protocol.
-        return $storage().positions[user].shares
-            .rayMulDown(_previewSubVaultConversionRate($storage().positions[user].subVaultId));
+        return _getUserBalance(user);
     }
 
     /// @inheritdoc IBasedBoostedVault
@@ -746,14 +751,27 @@ contract BasedBoostedVault is
         $storage().subVaultById[subVaultId].totalShares += sharesToMint;
     }
 
-    function _getVaultObligations() internal view returns (uint256) {
+    function _getUserBalance(address user) internal view returns (uint256) {
+        if ($storage().positions[user].shares == 0) {
+            return 0;
+        }
+        // Round down the user balance, so that the rounding is in favor of the protocol.
+        return $storage().positions[user].shares
+            .rayMulDown(_previewSubVaultConversionRate($storage().positions[user].subVaultId));
+    }
+
+    function _getActiveSubVaultsObligations() internal view returns (uint256) {
         uint256 activeSubVaultsObligations;
         for (uint256 i = 0; i < $storage().activeSubVaultsIds.length; i++) {
             // Round up the obligations, so that the rounding is in favor of the protocol.
             activeSubVaultsObligations += $storage().subVaultById[$storage().activeSubVaultsIds[i]].totalShares
                 .rayMulUp(_previewSubVaultConversionRate($storage().activeSubVaultsIds[i]));
         }
-        return activeSubVaultsObligations + _getIousInCirculation();
+        return activeSubVaultsObligations;
+    }
+
+    function _getVaultObligations() internal view returns (uint256) {
+        return _getActiveSubVaultsObligations() + _getIousInCirculation();
     }
 
     function _getVaultAggregatedBalance() internal view returns (uint256) {

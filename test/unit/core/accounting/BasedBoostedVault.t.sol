@@ -1132,6 +1132,50 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         assertEq(bbv.getUserBalance(user), 0);
     }
 
+    function test_balanceOf_returnsZeroIfUserDoesNotHaveAPosition(address user) public view {
+        vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
+        _assumeNotProxyAdmin(user, address(bbv));
+        vm.assume(bbv.getUserSubVault(user).id == 0);
+
+        assertEq(bbv.balanceOf(user), 0);
+    }
+
+    function test_balanceOf_matchesGetUserBalance(address user, uint256 depositAmount) public {
+        vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
+        _assumeNotProxyAdmin(user, address(bbv));
+        depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
+
+        _deposit(user, depositAmount);
+
+        assertEq(bbv.balanceOf(user), bbv.getUserBalance(user));
+
+        vm.warp(block.timestamp + 73);
+        assertEq(bbv.balanceOf(user), bbv.getUserBalance(user));
+    }
+
+    function test_totalSupply_matchesVaultObligationsMinusIous(address user, uint256 depositAmount) public {
+        vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
+        _assumeNotProxyAdmin(user, address(bbv));
+        depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
+
+        _deposit(user, depositAmount);
+
+        assertEq(bbv.totalSupply(), bbv.getVaultObligations() - mockIouToken.totalSupply());
+
+        uint256 userBalance = bbv.getUserBalance(user);
+        vm.assume(userBalance >= Constants.MIN_WITHDRAWABLE_AMOUNT_RAY * 2);
+        mockFundsHandler.mockAggregatedBalance(bbv.getVaultObligations());
+
+        vm.prank(user);
+        bbv.requestWithdrawal(user, Constants.MIN_WITHDRAWABLE_AMOUNT_RAY);
+
+        assertEq(bbv.totalSupply(), bbv.getVaultObligations() - mockIouToken.totalSupply());
+        assertGt(mockIouToken.totalSupply(), 0);
+    }
+
     function test_requestWithdrawal_reverts_ifMsgSenderIsNotTheUser(
         address user,
         address msgSender,

@@ -135,6 +135,16 @@ interface IBasedBoostedVault {
     /// @param amount Amount of assets being deposited.
     function deposit(address user, address asset, uint256 amount) external;
 
+    /// @notice ERC20-style total BBV position supply in RAY.
+    /// @dev Excludes IOU supply; includes only active BBV position obligations.
+    /// @return supplyRay Total BBV position supply in RAY.
+    function totalSupply() external view returns (uint256 supplyRay);
+
+    /// @notice ERC20-style BBV balance in RAY for a given account.
+    /// @param account Address of the account.
+    /// @return balanceRay Account's BBV balance in RAY.
+    function balanceOf(address account) external view returns (uint256 balanceRay);
+
     /// @notice Transfers BBV balance (denominated in RAY) to another user.
     /// @param to Address of the recipient.
     /// @param amountRay Amount of BBV balance to transfer, denominated in RAY.
