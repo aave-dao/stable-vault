@@ -108,7 +108,8 @@ interface IAllocator {
     /// @notice The configuration for a strategy.
     /// @param asset The asset that the strategy is associated with (assumes 1 asset per strategy).
     /// @param maxSlippageAmount The maximum amount of slippage allowed for the strategy denominated in the underlying
-    /// asset. @param isRegistered Boolean indicating whether the strategy is configured.
+    /// asset. This value is expected to be in the 1:10 wei range.
+    /// @param isRegistered Boolean indicating whether the strategy is configured.
     /// @param depositAllowed Boolean indicating whether the strategy is allowed to be deposited into.
     struct StrategyConfig {
         address asset;
@@ -140,7 +141,8 @@ interface IAllocator {
     /// @notice Getter for the configuration of a given strategy.
     /// @param strategy Address of the strategy to get the configuration for.
     /// @dev Updating the maxSlippageAmount requires removing the strategy then re-adding it with the new
-    /// maxSlippageAmount (subject to a timelock). @return config Configuration of the strategy.
+    /// maxSlippageAmount (subject to a timelock).
+    /// @return config Configuration of the strategy.
     function getStrategyConfig(address strategy) external view returns (StrategyConfig memory);
 
     /// @notice Getter for whether a strategy is supported for a given asset.

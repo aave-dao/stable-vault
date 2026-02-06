@@ -36,7 +36,7 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
     uint256 constant DEFAULT_SUB_VAULT_PER_SECOND_RATE = 1000000001243680656318820313; // ~4% APY
     uint256 constant DEFAULT_MAX_ACTIVE_SUB_VAULTS = 201;
     uint8 constant MAX_STRATEGIES_PER_ASSET = 15;
-    uint8 constant STRATEGY_MAX_SLIPPAGE_AMOUNT = 10;
+    uint8 constant STRATEGY_MAX_SLIPPAGE_AMOUNT = 10; // 10 wei
 
     address constant PROXY_ADMIN = DEPLOYER;
     address constant BBV_PROXY_ADMIN = PROXY_ADMIN;
