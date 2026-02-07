@@ -50,6 +50,8 @@ contract BaseTest is TestWithHelpers {
     address admin = makeAddr("ADMIN");
     address everyRoleAccount = makeAddr("EVERY_ROLE_ACCOUNT");
 
+    uint8 constant STRATEGY_MAX_SLIPPAGE_AMOUNT = 10;
+
     // ADMIN_ROLE = 0
     uint64 internal constant ROLE_MANAGEMENT_ROLE = 1;
     uint64 internal constant GUARDIAN_ROLE = 2;
@@ -805,14 +807,22 @@ contract BaseTest is TestWithHelpers {
         assetRegistry_earningChain.setAssetConfig(address(USDC), unrestrictedAssetConfig);
 
         // Set up Allocator on Accounting chain
-        allocator_accountingChain.addStrategy(address(GHO), address(ghoStrategyVault_accountingChain));
-        allocator_accountingChain.addStrategy(address(USDC), address(usdcStrategyVault_accountingChain));
+        allocator_accountingChain.addStrategy(
+            address(GHO), address(ghoStrategyVault_accountingChain), STRATEGY_MAX_SLIPPAGE_AMOUNT
+        );
+        allocator_accountingChain.addStrategy(
+            address(USDC), address(usdcStrategyVault_accountingChain), STRATEGY_MAX_SLIPPAGE_AMOUNT
+        );
         allocator_accountingChain.setDefaultStrategy(address(GHO), address(ghoStrategyVault_accountingChain));
         allocator_accountingChain.setDefaultStrategy(address(USDC), address(usdcStrategyVault_accountingChain));
 
         // Set up Allocator on Earning chain
-        allocator_earningChain.addStrategy(address(GHO), address(ghoStrategyVault_earningChain));
-        allocator_earningChain.addStrategy(address(USDC), address(usdcStrategyVault_earningChain));
+        allocator_earningChain.addStrategy(
+            address(GHO), address(ghoStrategyVault_earningChain), STRATEGY_MAX_SLIPPAGE_AMOUNT
+        );
+        allocator_earningChain.addStrategy(
+            address(USDC), address(usdcStrategyVault_earningChain), STRATEGY_MAX_SLIPPAGE_AMOUNT
+        );
         allocator_earningChain.setDefaultStrategy(address(GHO), address(ghoStrategyVault_earningChain));
         allocator_earningChain.setDefaultStrategy(address(USDC), address(usdcStrategyVault_earningChain));
 

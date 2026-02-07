@@ -18,6 +18,8 @@ contract MockErc4626Strategy is ERC4626 {
     string private _withdrawRevertErrorMsg;
     bool private _redeemShouldRevert;
     string private _redeemRevertErrorMsg;
+    bool private _mockPreviewRedeem;
+    uint256 private _previewRedeem;
 
     constructor(IERC20 asset) ERC4626(asset) ERC20("Mock Erc4626 Strategy", "MOCK4626") {}
 
@@ -26,9 +28,19 @@ contract MockErc4626Strategy is ERC4626 {
         _maxWithdraw = maxWithdrawValue;
     }
 
+    function mockPreviewRedeem(uint256 previewRedeemValue) external {
+        _mockPreviewRedeem = true;
+        _previewRedeem = previewRedeemValue;
+    }
+
     function discardMaxWithdrawMock() external {
         _mockMaxWithdraw = false;
         _maxWithdraw = 0;
+    }
+
+    function discardPreviewRedeemMock() external {
+        _mockPreviewRedeem = false;
+        _previewRedeem = 0;
     }
 
     function mockWithdrawToRevert(string memory errorMsg) external {
@@ -46,6 +58,13 @@ contract MockErc4626Strategy is ERC4626 {
             return _maxWithdraw;
         }
         return super.maxWithdraw(owner);
+    }
+
+    function previewRedeem(uint256 shares) public view override returns (uint256) {
+        if (_mockPreviewRedeem) {
+            return _previewRedeem;
+        }
+        return super.previewRedeem(shares);
     }
 
     // Overridden to allow bypassing maxWithdraw check when custom maxWithdraw is set to 0.

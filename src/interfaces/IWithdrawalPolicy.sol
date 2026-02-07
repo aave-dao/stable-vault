@@ -19,6 +19,9 @@ interface IWithdrawalPolicy {
     /// @notice Emitted when the asset fee in basis points is set.
     event AssetFeeBpsSet(address indexed asset, uint16 assetFeeBps, bool isSet);
 
+    /// @notice Emitted when the withdrawal policy is applied and a fee is charged.
+    event WithdrawalPolicyApplied(address indexed user, address assetOut, uint256 iouAmountRay, uint256 amountOutRay);
+
     /// @notice Thrown when a recovered signer is not a whitelisted signer.
     /// @custom:selector 0x8baa579f
     error InvalidSignature();

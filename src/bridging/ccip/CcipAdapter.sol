@@ -4,7 +4,7 @@ pragma solidity ^0.8.22;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 import {IAny2EVMMessageReceiver} from "@chainlink-ccip/contracts/interfaces/IAny2EVMMessageReceiver.sol";
@@ -24,18 +24,29 @@ import {Errors} from "src/types/Errors.sol";
 /// @notice Adapter for sending and receiving messages via Chainlink CCIP.
 /// @dev This adapter will not ingest user-specific tokens and data, therefore the adapter does not support
 /// returning tokens to the original sender on the source chain (original sender will be the source chain CCIP adapter).
-contract CcipAdapter is BaseBridgeAdapter, ReentrancyGuard, ICcipBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
+/// @dev This adapter does not implement a defensive receiver pattern because it is assumed that message ingestion will
+/// not fail downstream due to issues other than OOG or if deposits into the Allocator are disabled.
+/// @dev If a revert occurs during the processing of a message, the message will never need to be retried (through
+/// manual execution through the CCIP offramp).
+/// @dev Implementing a defensive receiver pattern would require
+/// storing the message in the contract which can consume ~300k gas; this trade-off is deemed unnecessary given
+/// that the adapter will ingest messages for tokens that are supported, from a trusted source, and contain arbitrary
+/// data that can be parsed on the local Gateway if any arbitrary data is included in a message.
+/// @dev The adapter will revert if the source chain sender is not recognized, and the message will never need to be
+/// retried (through manual execution through the CCIP offramp).
+contract CcipAdapter is
+    BaseBridgeAdapter,
+    ReentrancyGuardTransient,
+    ICcipBridgeAdapter,
+    IAny2EVMMessageReceiver,
+    IERC165
+{
     using SafeERC20 for IERC20;
-
-    /// @notice Amount of gas to reserve during ccipReceive() to properly handle processing of failed messages.
-    uint256 internal constant MIN_FAILURE_HANDLING_GAS_RESERVATION = 45_000;
 
     address internal immutable CCIP_ROUTER;
 
     mapping(uint256 chainId => uint64 ccipChainSelector) internal _chainSelectorOf;
     mapping(uint64 ccipChainSelector => uint256 chainId) internal _chainIdOf;
-    mapping(bytes32 messageId => ICcipBridgeAdapter.MessageDataStatus messageDataStatus) internal _messageStatusOf;
-    mapping(bytes32 messageId => Client.Any2EVMMessage message) internal _messageOf;
 
     modifier onlyRouter() {
         require(msg.sender == CCIP_ROUTER, OnlyBridgeRouter());
@@ -66,24 +77,6 @@ contract CcipAdapter is BaseBridgeAdapter, ReentrancyGuard, ICcipBridgeAdapter, 
     /// @inheritdoc ICcipBridgeAdapter
     function getChainId(uint64 ccipChainSelector) external view override returns (uint256) {
         return _chainIdOf[ccipChainSelector];
-    }
-
-    /// @inheritdoc ICcipBridgeAdapter
-    function getRetryableMessage(bytes32 messageId) external view override returns (Client.Any2EVMMessage memory) {
-        return _messageOf[messageId];
-    }
-
-    /// @inheritdoc ICcipBridgeAdapter
-    function retryMessage(bytes32 messageId) external override nonReentrant restricted {
-        if (!_isMessageRetryable(messageId)) {
-            revert MessageNotRetryable(messageId);
-        }
-        Client.Any2EVMMessage memory message = _messageOf[messageId];
-        _messageStatusOf[messageId] = ICcipBridgeAdapter.MessageDataStatus.PROCESSED;
-        _processMessage(message);
-        emit MessageSucceeded(messageId);
-        delete _messageOf[messageId];
-        delete _messageStatusOf[messageId];
     }
 
     /// @inheritdoc ICcipBridgeAdapter
@@ -147,26 +140,6 @@ contract CcipAdapter is BaseBridgeAdapter, ReentrancyGuard, ICcipBridgeAdapter, 
         emit MessageReceived(message.messageId);
         // Only process messages if the sender from the source chain is the recognized adapter.
         _validateMessageSource(message);
-
-        // Reserve gas for failure handling.
-        uint256 gasLimit = gasleft();
-        unchecked {
-            if (gasLimit < MIN_FAILURE_HANDLING_GAS_RESERVATION) {
-                revert CCIPDefensiveReceiverInsufficientGas();
-            }
-            gasLimit -= MIN_FAILURE_HANDLING_GAS_RESERVATION;
-        }
-
-        try this.processMessage(message) {
-            emit MessageSucceeded(message.messageId);
-        } catch (bytes memory err) {
-            _messageStatusOf[message.messageId] = ICcipBridgeAdapter.MessageDataStatus.FAILED;
-            _messageOf[message.messageId] = message;
-            emit MessageFailed(message.messageId, err);
-        }
-    }
-
-    function processMessage(Client.Any2EVMMessage calldata message) external onlySelf {
         _processMessage(message);
     }
 
@@ -178,7 +151,6 @@ contract CcipAdapter is BaseBridgeAdapter, ReentrancyGuard, ICcipBridgeAdapter, 
         // Process data first to allow any potential state modifications to take place before processing tokens.
         // Assumes if data is sent with tokens, then the data must be processed first.
         if (message.data.length > 0) {
-            _messageStatusOf[message.messageId] = ICcipBridgeAdapter.MessageDataStatus.PROCESSED;
             IChainGateway(GATEWAY)
                 .receiveMessage(
                     _chainIdOf[message.sourceChainSelector], Constants.ASSET_FOR_DATA_ONLY_BRIDGE, 0, message.data
@@ -191,11 +163,6 @@ contract CcipAdapter is BaseBridgeAdapter, ReentrancyGuard, ICcipBridgeAdapter, 
                 _processReceivedFunds(asset, amount);
             }
         }
-    }
-
-    function _isMessageRetryable(bytes32 messageId) internal view returns (bool) {
-        return _messageStatusOf[messageId] == ICcipBridgeAdapter.MessageDataStatus.FAILED
-            && _messageOf[messageId].messageId == messageId;
     }
 
     function _sendMessageWithFeePayer(

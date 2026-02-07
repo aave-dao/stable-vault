@@ -52,7 +52,7 @@
     "saltSeed": "vnet-2.aave.based-boosted-vault.Allocator"
   },
   "FundsHandler::Implementation": {
-    "address": "0x4dd9a1bf44684c329b6ef95a07e53dae04babd49",
+    "address": "0x4c4df8aac57105304e9859f0a6e0aff07be40596",
     "saltSeed": ""
   },
   "FundsHandler": {

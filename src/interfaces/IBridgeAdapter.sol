@@ -6,9 +6,6 @@ pragma solidity ^0.8.22;
 /// @author Aave Labs
 /// @notice Interface for the base BridgeAdapter contract.
 interface IBridgeAdapter {
-    /// @notice Emitted when a message fails to be ingested after being attempted.
-    event MessageFailed(bytes32 indexed messageId, bytes error);
-
     /// @notice Emitted when a message is published to the bridge provider.
     /// @dev The message id matches the one in the `MessageReceived` event.
     event MessagePublished(bytes32 indexed messageId);
@@ -16,10 +13,6 @@ interface IBridgeAdapter {
     /// @notice Emitted when a message is received before being processed.
     /// @dev The message id matches the one in the `MessagePublished` event.
     event MessageReceived(bytes32 indexed messageId);
-
-    /// @notice Emitted when a message is successfully processed.
-    /// @dev The message id matches the one in the `MessagePublished` event.
-    event MessageSucceeded(bytes32 indexed messageId);
 
     /// @notice Address checked is not the destination chain adapter.
     /// @custom:selector 0x75503511

@@ -129,8 +129,8 @@ contract FundsHandler is
     }
 
     /// @inheritdoc IFundsHandler
-    function processDeposit(address asset, uint256 amount) external override onlyBasedBoostedVault {
-        _pushFundsToImmediateLiquidity(asset, amount);
+    function processDeposit(address asset, uint256 amount) external override onlyBasedBoostedVault returns (uint256) {
+        return IAllocator(ALLOCATOR).deposit(asset, amount);
     }
 
     /// @inheritdoc IFundsHandler
@@ -187,14 +187,10 @@ contract FundsHandler is
 
     /// @inheritdoc IFundsHandler
     function fundsArrivedFromChainCallback(address asset, uint256 amount) external override onlyGateway {
-        _pushFundsToImmediateLiquidity(asset, amount);
+        IAllocator(ALLOCATOR).depositAllowIdle(asset, amount);
     }
 
     ////////////////////////////////////////////////// INTERNAL ////////////////////////////////////////////////////////
-
-    function _pushFundsToImmediateLiquidity(address asset, uint256 amount) internal {
-        IAllocator(ALLOCATOR).deposit(asset, amount);
-    }
 
     function _pullFundsFromImmediateLiquidity(address asset, uint256 amount) internal {
         IAllocator(ALLOCATOR).withdraw(asset, amount);

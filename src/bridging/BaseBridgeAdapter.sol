@@ -31,13 +31,6 @@ abstract contract BaseBridgeAdapter is AccessManaged, RescuableNative, TransferH
         _;
     }
 
-    modifier onlySelf() {
-        if (msg.sender != address(this)) {
-            revert Errors.OnlySelf();
-        }
-        _;
-    }
-
     /// @dev Constructor.
     /// @param accessManager Address of the IAccessManager contract used for handling access control.
     /// @param gateway Address of the Gateway contract.

@@ -187,7 +187,7 @@ contract EarningChainGateway is
     }
 
     function _receiveFunds(address asset, uint256 amount) internal override {
-        IAllocator(ALLOCATOR).deposit(asset, amount);
+        IAllocator(ALLOCATOR).depositAllowIdle(asset, amount);
     }
 
     function _returnFundsWithBalanceSnapshot(

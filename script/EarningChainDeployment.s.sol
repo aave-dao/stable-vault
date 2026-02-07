@@ -36,6 +36,7 @@ contract EarningChainDeployment is Create3Deployment, Create3AddressBook, AToken
     address constant DEPLOYER = address(0xBB700dA5CCC9Ec5605780Fc40695f1206B090303);
 
     uint8 constant MAX_STRATEGIES_PER_ASSET = 15;
+    uint8 constant STRATEGY_MAX_SLIPPAGE_AMOUNT = 10;
 
     address constant PROXY_ADMIN = DEPLOYER;
     address constant ALLOCATOR_PROXY_ADMIN = PROXY_ADMIN;
@@ -125,12 +126,12 @@ contract EarningChainDeployment is Create3Deployment, Create3AddressBook, AToken
         // allocator.setDefaultStrategy(GHO, ghoYieldStrategy);
 
         address usdcYieldStrategy = _deployATokenVault(USDC, poolAddressProvider, DEPLOYER);
-        allocator.addStrategy(USDC, usdcYieldStrategy);
+        allocator.addStrategy(USDC, usdcYieldStrategy, STRATEGY_MAX_SLIPPAGE_AMOUNT);
         allocator.setDefaultStrategy(USDC, usdcYieldStrategy);
         _logDeployment("USDC aTokenVault", "", usdcYieldStrategy);
 
         address usdtYieldStrategy = _deployATokenVault(USDT, poolAddressProvider, DEPLOYER);
-        allocator.addStrategy(USDT, usdtYieldStrategy);
+        allocator.addStrategy(USDT, usdtYieldStrategy, STRATEGY_MAX_SLIPPAGE_AMOUNT);
         allocator.setDefaultStrategy(USDT, usdtYieldStrategy);
         _logDeployment("USDT aTokenVault", "", usdtYieldStrategy);
     }
