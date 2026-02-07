@@ -107,6 +107,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         address assetRegistry,
         address transferHelper,
         address withdrawalFeeCalculatorAddress,
+        address priceOracleAddress,
         uint256 maxActiveSubVaults
     ) internal returns (BasedBoostedVaultHarness) {
         address vaultImpl = address(
@@ -117,6 +118,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
                 fundsHandler,
                 transferHelper,
                 withdrawalFeeCalculatorAddress,
+                priceOracleAddress,
                 maxActiveSubVaults
             )
         );
@@ -2328,6 +2330,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockAssetRegistry),
             address(mockTransferHelper),
             address(mockWithdrawalPolicy),
+            address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS
         );
         mockAsset = IMockErc20(address(new MockNonStandardErc20("Test GHO", "tGHO", 18)));
@@ -2579,6 +2582,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockAssetRegistry),
             address(mockTransferHelper),
             address(mockWithdrawalPolicy),
+            address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS
         );
 
@@ -2617,6 +2621,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockAssetRegistry),
             address(mockTransferHelper),
             address(mockWithdrawalPolicy),
+            address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS
         );
 
@@ -2656,6 +2661,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockAssetRegistry),
             address(mockTransferHelper),
             address(mockWithdrawalPolicy),
+            address(mockPriceOracle),
             maxActiveSubVaults
         );
 
@@ -2692,6 +2698,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockAssetRegistry),
             address(mockTransferHelper),
             address(mockWithdrawalPolicy),
+            address(mockPriceOracle),
             maxActiveSubVaults
         );
 

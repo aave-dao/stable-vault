@@ -11,6 +11,7 @@ import {IBasedBoostedVault} from "src/interfaces/IBasedBoostedVault.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {Swapper} from "src/periphery/Swapper.sol";
+import {Errors} from "src/types/Errors.sol";
 
 import {BaseTest} from "test/BaseTest.t.sol";
 
