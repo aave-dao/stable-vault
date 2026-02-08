@@ -16,6 +16,7 @@ import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
+import {RescuableNative} from "src/misc/RescuableNative.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
@@ -37,6 +38,7 @@ import {Errors} from "src/types/Errors.sol";
 contract CcipAdapter is
     BaseBridgeAdapter,
     ReentrancyGuardTransient,
+    RescuableNative,
     ICcipBridgeAdapter,
     IAny2EVMMessageReceiver,
     IERC165
@@ -216,5 +218,10 @@ contract CcipAdapter is
         bytes32 value = bytes32(abiEncodedEvmSender[0:Constants.ABI_ENCODED_EVM_ADDRESS_BYTE_LENGTH]);
         require((value & Constants.ABI_ENCODED_EVM_ADDRESS_MASK) == value, Errors.InvalidParameter());
         return abi.decode(abiEncodedEvmSender, (address));
+    }
+
+    function _beforeRescueNative(uint256) internal virtual override {
+        // Equivalent to adding the `restricted` modifier.
+        _checkCanCall(_msgSender(), _msgData());
     }
 }
