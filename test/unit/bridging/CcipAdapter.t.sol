@@ -60,11 +60,14 @@ contract CcipAdapterTest is TestWithHelpers {
     CcipAdapter internal _accountingChainCcipAdapter;
     CcipAdapter internal _earningChainCcipAdapter;
 
-    function _deployCcipAdapter(address accessManager, address gateway, address ccipRouter, address transferHelper)
-        internal
-        returns (CcipAdapter)
-    {
-        CcipAdapter ccipAdapter = new CcipAdapter(accessManager, gateway, ccipRouter, transferHelper);
+    function _deployCcipAdapter(
+        address accessManager,
+        address gateway,
+        address ccipRouter,
+        address transferHelper
+    ) internal returns (CcipAdapter) {
+        CcipAdapter ccipAdapter =
+            new CcipAdapter(accessManager, gateway, ccipRouter, transferHelper, address(_mockAssetRegistry));
         return ccipAdapter;
     }
 
