@@ -155,6 +155,11 @@ contract CcipAdapter is
         _processMessage(message);
     }
 
+    /// @inheritdoc ICcipBridgeAdapter
+    function replayFundsReceiving(address asset, uint256 amount) external override restricted {
+        _processReceivedFunds(asset, amount);
+    }
+
     function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
         return interfaceId == type(IAny2EVMMessageReceiver).interfaceId || interfaceId == type(IERC165).interfaceId;
     }
