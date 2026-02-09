@@ -61,6 +61,7 @@ contract ChainlinkPriceOracleAdapter is IPriceOracleAdapter {
 
     function _convertDecimalsToRay(int256 price) internal view returns (uint256) {
         if (price <= 0) {
+            // Return 0 to avoid disrupting any aggregation that may take place at a higher level.
             return 0;
         }
         // Casting to 'uint256' is safe because we checked that price > 0.

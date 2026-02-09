@@ -23,6 +23,7 @@ import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
+import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
 import {_toAddressArray, _toUint256Array} from "test/helpers/TypeHelpers.sol";
@@ -459,7 +460,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.prank(user);
         mockAsset.forceApprove(address(bbv), amount);
         vm.prank(user);
-        vm.expectRevert(Errors.InvalidPrice.selector);
+        vm.expectRevert(IPriceOracle.InvalidPrice.selector);
         bbv.deposit(user, address(mockAsset), amount);
     }
 

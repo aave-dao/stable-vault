@@ -14,10 +14,12 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {Allocator} from "src/core/Allocator.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
+import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {Errors} from "src/types/Errors.sol";
+
 
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
 import {MockAccessManager} from "test/mocks/MockAccessManager.sol";
@@ -1957,7 +1959,7 @@ contract AllocatorTest is TestWithHelpers {
         rebalanceParams[0] =
             _buildRebalanceParams(_initializeDeallocationParams(0), swaps, _initializeAllocationParams(0));
         vm.prank(address(everyRoleAccount));
-        vm.expectRevert(Errors.InvalidPrice.selector);
+        vm.expectRevert(IPriceOracle.InvalidPrice.selector);
         _allocator.rebalance(rebalanceParams);
 
         // Check balances after the swap

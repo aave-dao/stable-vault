@@ -9,7 +9,6 @@ import {Test} from "forge-std/Test.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
-import {Errors} from "src/types/Errors.sol";
 
 import {IMockErc20} from "test/mocks/MockErc20.sol";
 
@@ -115,7 +114,7 @@ contract TestWithHelpers is Test {
         vm.mockCallRevert(
             priceOracle,
             abi.encodeCall(IPriceOracle.validatePrice, (asset)),
-            abi.encodeWithSelector(Errors.InvalidPrice.selector)
+            abi.encodeWithSelector(IPriceOracle.InvalidPrice.selector)
         );
     }
 }

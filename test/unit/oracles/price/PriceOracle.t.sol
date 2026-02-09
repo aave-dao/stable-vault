@@ -9,7 +9,7 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transpa
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
-import {Errors} from "src/types/Errors.sol";
+import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
 import {MockAccessManager} from "test/mocks/MockAccessManager.sol";
@@ -223,7 +223,7 @@ contract PriceOracleTest is TestWithHelpers {
         vm.prank(everyRoleAccount);
         oracleWithMinPrice.setOracleAdapterForAsset(asset1, address(_mockAdapter));
 
-        vm.expectRevert(Errors.InvalidPrice.selector);
+        vm.expectRevert(IPriceOracle.InvalidPrice.selector);
         oracleWithMinPrice.validatePrice(asset1);
     }
 

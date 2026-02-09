@@ -46,10 +46,6 @@ library Errors {
     /// @custom:selector 0x613970e0
     error InvalidParameter();
 
-    /// @notice Thrown when a price obtained from an oracle for an asset is invalid.
-    /// @custom:selector 0x00bfc921
-    error InvalidPrice();
-
     /// @notice Thrown when a recovered signer is not a whitelisted signer.
     /// @custom:selector 0x8baa579f
     error InvalidSignature();

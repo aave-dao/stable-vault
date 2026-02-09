@@ -70,6 +70,7 @@ contract ChainlinkChainBalanceOracleAdapter is IChainBalanceOracleAdapter {
     /// Chain which is acceptable.
     function _convertDecimalsToRay(int256 balance) internal view returns (uint256) {
         if (balance <= 0) {
+            // Return 0 to avoid disrupting any aggregation that may take place at a higher level.
             return 0;
         }
         // Casting to 'uint256' is safe because we checked that balance > 0.
