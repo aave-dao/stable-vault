@@ -5,12 +5,16 @@ pragma solidity ^0.8.22;
 import {Test} from "forge-std/Test.sol";
 
 import {IPriceOracleAdapter} from "src/interfaces/IPriceOracleAdapter.sol";
+import {AssetLib} from "src/libraries/AssetLib.sol";
 import {ChainlinkPriceOracleAdapter} from "src/oracles/price/ChainlinkPriceOracleAdapter.sol";
+import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
 import {MockChainlinkAggregator} from "test/mocks/MockChainlinkAggregator.sol";
 
 contract ChainlinkPriceOracleAdapterTest is Test {
+    using AssetLib for uint256;
+
     address constant ASSET = address(0xA55E7);
     uint256 constant HEARTBEAT = 3600; // 1 hour
     uint256 constant HEARTBEAT_BUFFER_SECONDS = 90;
@@ -32,15 +36,27 @@ contract ChainlinkPriceOracleAdapterTest is Test {
         assertEq(response.priceRay, 1e27);
     }
 
-    function test_getPrice_returnsPriceInRay() public {
-        // 0.5 in 8 decimals
-        int256 price = 5e7;
+    function test_getPrice_returnsPriceInRay(uint256 price) public {
+        // Provide enough room for the price to be converted to RAY without overflowing.
+        price = price / 10 ** (Constants.RAY_DECIMALS - DECIMALS);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        _aggregator.setAnswer(int256(price), block.timestamp);
+        IPriceOracleAdapter.OracleResponse memory response = _adapter.getPrice(ASSET);
+        assertEq(
+            response.priceRay,
+            price.convertDecimals(DECIMALS, Constants.RAY_DECIMALS),
+            "Price should be converted from 8 to 27 decimals"
+        );
+        assertFalse(response.isStale);
+    }
+
+    function test_getPrice_returnsZero_forAnyNegativePrice(int256 price) public {
+        price = bound(price, type(int256).min, -1);
         _aggregator.setAnswer(price, block.timestamp);
 
         IPriceOracleAdapter.OracleResponse memory response = _adapter.getPrice(ASSET);
 
-        assertEq(response.priceRay, 5e26, "Price should be converted from 8 to 27 decimals");
-        assertFalse(response.isStale);
+        assertEq(response.priceRay, 0, "Any negative price should return 0");
     }
 
     function test_getPrice_notStale_whenWithinHeartbeatPlusBuffer() public {

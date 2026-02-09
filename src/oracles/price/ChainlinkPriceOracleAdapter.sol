@@ -60,6 +60,9 @@ contract ChainlinkPriceOracleAdapter is IPriceOracleAdapter {
     }
 
     function _convertDecimalsToRay(int256 price) internal view returns (uint256) {
+        if (price <= 0) {
+            return 0;
+        }
         // Casting to 'uint256' is safe because we checked that price > 0.
         // forge-lint: disable-next-line(unsafe-typecast)
         return uint256(price).convertDecimals(DECIMALS, Constants.RAY_DECIMALS);

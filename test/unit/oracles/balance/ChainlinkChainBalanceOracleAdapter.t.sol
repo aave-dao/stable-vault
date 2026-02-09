@@ -5,11 +5,15 @@ pragma solidity ^0.8.22;
 import {Test} from "forge-std/Test.sol";
 
 import {IChainBalanceOracleAdapter} from "src/interfaces/IChainBalanceOracleAdapter.sol";
+import {AssetLib} from "src/libraries/AssetLib.sol";
 import {ChainlinkChainBalanceOracleAdapter} from "src/oracles/balance/ChainlinkChainBalanceOracleAdapter.sol";
-
+import {Constants} from "src/types/Constants.sol";
 import {MockChainlinkAggregator} from "test/mocks/MockChainlinkAggregator.sol";
 
+
 contract ChainlinkChainBalanceOracleAdapterTest is Test {
+    using AssetLib for uint256;
+
     uint256 constant CHAIN_ID = 8453;
     uint256 constant HEARTBEAT = 3600; // 1 hour
     uint256 constant HEARTBEAT_BUFFER_SECONDS = 90;
@@ -31,15 +35,26 @@ contract ChainlinkChainBalanceOracleAdapterTest is Test {
         assertEq(response.balanceRay, 1000e27);
     }
 
-    function test_getChainBalance_returnsBalanceInRay() public {
-        int256 balance = 500e18;
+    function test_getChainBalance_returnsBalanceInRay(uint256 balance) public {
+        // Provide enough room for the balance to be converted to RAY without overflowing.
+        balance = balance / 10 ** (Constants.RAY_DECIMALS - DECIMALS);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        _aggregator.setAnswer(int256(balance), block.timestamp);
+
+        IChainBalanceOracleAdapter.OracleResponse memory response = _adapter.getChainBalance(CHAIN_ID);
+
+        assertEq(response.balanceRay, balance.convertDecimals(DECIMALS, Constants.RAY_DECIMALS), "Balance should be converted from 18 to 27 decimals");
+        assertEq(response.lastUpdateTimestamp, block.timestamp);
+        assertFalse(response.isStale);
+    }
+
+    function test_getChainBalance_returnsZero_forAnyNegativeBalance(int256 balance) public {
+        balance = bound(balance, type(int256).min, -1);
         _aggregator.setAnswer(balance, block.timestamp);
 
         IChainBalanceOracleAdapter.OracleResponse memory response = _adapter.getChainBalance(CHAIN_ID);
 
-        assertEq(response.balanceRay, 500e27, "Balance should be converted from 18 to 27 decimals");
-        assertEq(response.lastUpdateTimestamp, block.timestamp);
-        assertFalse(response.isStale);
+        assertEq(response.balanceRay, 0, "Any negative balance should return 0");
     }
 
     function test_getChainBalance_returnsCorrectTimestamp() public {
