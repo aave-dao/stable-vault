@@ -61,12 +61,10 @@ contract CcipAdapterTest is TestWithHelpers {
     CcipAdapter internal _accountingChainCcipAdapter;
     CcipAdapter internal _earningChainCcipAdapter;
 
-    function _deployCcipAdapter(
-        address accessManager,
-        address gateway,
-        address ccipRouter,
-        address transferHelper
-    ) internal returns (CcipAdapter) {
+    function _deployCcipAdapter(address accessManager, address gateway, address ccipRouter, address transferHelper)
+        internal
+        returns (CcipAdapter)
+    {
         CcipAdapter ccipAdapter =
             new CcipAdapter(accessManager, gateway, ccipRouter, transferHelper, address(_mockAssetRegistry));
         return ccipAdapter;
@@ -1623,9 +1621,7 @@ contract CcipAdapterTest is TestWithHelpers {
     function test_rescueTokens_reverts_ifNotAuthorized(address unauthorizedMsgSender) public {
         vm.assume(unauthorizedMsgSender != address(0));
         _mockAccessManager.mockRejectCall(
-            unauthorizedMsgSender,
-            address(_accountingChainCcipAdapter),
-            IRescuableToken.rescueTokens.selector
+            unauthorizedMsgSender, address(_accountingChainCcipAdapter), IRescuableToken.rescueTokens.selector
         );
 
         vm.expectRevert(
