@@ -18,6 +18,7 @@ import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
+import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {Errors} from "src/types/Errors.sol";
@@ -1559,6 +1560,79 @@ contract CcipAdapterTest is TestWithHelpers {
             stuckUsdt,
             "Stuck USDT should remain in adapter after native fee bridge"
         );
+    }
+
+    function test_replayFundsReceiving_processesStuckFunds(uint256 amountUsdt) public {
+        amountUsdt = _boundAssetAmount(address(_mockUsdt), amountUsdt);
+
+        // Simulate stuck funds in adapter
+        _mockUsdt.mint(address(_accountingChainCcipAdapter), amountUsdt);
+
+        // Expect the gateway to receive the funds
+        vm.expectCall(
+            address(_mockAccountingChainGateway),
+            abi.encodeCall(IChainGateway.receiveMessage, (0, address(_mockUsdt), amountUsdt, ""))
+        );
+
+        vm.prank(everyRoleAccount);
+        _accountingChainCcipAdapter.replayFundsReceiving(address(_mockUsdt), amountUsdt);
+    }
+
+    function test_replayFundsReceiving_reverts_ifNotAuthorized(address unauthorizedMsgSender) public {
+        vm.assume(unauthorizedMsgSender != address(0));
+        _mockAccessManager.mockRejectCall(
+            unauthorizedMsgSender,
+            address(_accountingChainCcipAdapter),
+            ICcipBridgeAdapter.replayFundsReceiving.selector
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
+        );
+        vm.prank(unauthorizedMsgSender);
+        _accountingChainCcipAdapter.replayFundsReceiving(address(_mockUsdt), 100);
+    }
+
+    function test_rescueTokens_rescuesUnregisteredToken(uint256 amount) public {
+        amount = _boundAssetAmount(address(_mockUsdt), amount);
+
+        // _mockUsdt is NOT registered in the mock asset registry by default
+        _mockUsdt.mint(address(_accountingChainCcipAdapter), amount);
+
+        address msgSender = makeAddr("rescuer");
+
+        vm.prank(msgSender);
+        IRescuableToken(address(_accountingChainCcipAdapter)).rescueTokens(address(_mockUsdt), amount);
+
+        assertEq(_mockUsdt.balanceOf(msgSender), amount);
+        assertEq(_mockUsdt.balanceOf(address(_accountingChainCcipAdapter)), 0);
+    }
+
+    function test_rescueTokens_reverts_ifTokenIsRegistered(uint256 amount) public {
+        amount = _boundAssetAmount(address(_mockUsdt), amount);
+
+        // Register the asset
+        _mockAssetRegistry.mockRegisteredAsset(address(_mockUsdt));
+        _mockUsdt.mint(address(_accountingChainCcipAdapter), amount);
+
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        vm.prank(everyRoleAccount);
+        IRescuableToken(address(_accountingChainCcipAdapter)).rescueTokens(address(_mockUsdt), amount);
+    }
+
+    function test_rescueTokens_reverts_ifNotAuthorized(address unauthorizedMsgSender) public {
+        vm.assume(unauthorizedMsgSender != address(0));
+        _mockAccessManager.mockRejectCall(
+            unauthorizedMsgSender,
+            address(_accountingChainCcipAdapter),
+            IRescuableToken.rescueTokens.selector
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
+        );
+        vm.prank(unauthorizedMsgSender);
+        IRescuableToken(address(_accountingChainCcipAdapter)).rescueTokens(address(_mockUsdt), 100);
     }
 
     function _expectBridgeAssetsApproval(Client.EVMTokenAmount[] memory tokens) internal {
