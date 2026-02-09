@@ -156,7 +156,7 @@ contract CcipAdapter is
     }
 
     /// @inheritdoc ICcipBridgeAdapter
-    function replayFundsReceiving(address asset, uint256 amount) external override restricted {
+    function replayFundsReceiving(address asset, uint256 amount) external override nonReentrant restricted {
         _processReceivedFunds(asset, amount);
     }
 
