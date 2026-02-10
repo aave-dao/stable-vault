@@ -62,8 +62,10 @@ interface IChainGateway {
     /// @notice The representation of a message to burn IOU tokens on a source chain.
     /// @dev For message type `BURN_IOU_TOKEN`.
     /// @param iouTokenAmountBurnedRay Amount of IOU tokens to burn.
+    /// @param timestamp Timestamp from the source Earning Chain when the message is published.
     struct BurnIouTokenMessage {
         uint256 iouTokenAmountBurnedRay;
+        uint256 timestamp;
     }
 
     /// @notice The representation of a message to decrement the balance snapshot on a source chain.

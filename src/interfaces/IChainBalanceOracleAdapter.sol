@@ -14,10 +14,13 @@ interface IChainBalanceOracleAdapter {
     /// @notice The representation of the response from the oracle adapter.
     /// @param balanceRay The aggregated balance on a given chain in ray units.
     /// @param lastUpdateTimestamp The timestamp of the last update published to the destination chain.
+    /// @param estimatedSourceChainReadTimestamp The estimated timestamp which the source Earning Chain data was read
+    /// before it was published to the Accounting Chain.
     /// @param isStale Whether the balance is considered stale based on data source spec.
     struct OracleResponse {
         uint256 balanceRay;
         uint256 lastUpdateTimestamp;
+        uint256 estimatedSourceChainReadTimestamp;
         bool isStale;
     }
 
