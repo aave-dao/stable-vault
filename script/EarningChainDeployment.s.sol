@@ -310,7 +310,8 @@ contract EarningChainDeployment is Create3Deployment, Create3AddressBook, AToken
                     getAccessManagerAddress(DEPLOYER),
                     getGatewayAddress(DEPLOYER),
                     CCIP_ROUTER_ADDRESS,
-                    getTransferHelperAddress(DEPLOYER)
+                    getTransferHelperAddress(DEPLOYER),
+                    getAssetRegistryAddress(DEPLOYER)
                 )
             )
         });
