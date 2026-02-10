@@ -243,7 +243,9 @@ contract CcipAdapter is
     function _beforeRescueTokens(address token, uint256) internal virtual override {
         // Equivalent to adding the `restricted` modifier.
         _checkCanCall(_msgSender(), _msgData());
-        // Only allow to rescue tokens that are NOT registered.
+        // The adapter is not designed to hold the system's funds. The check to allow rescuing only tokens that are
+        // NOT registered was added as a safeguard in case registered assets accidentally end up here, to prevent
+        // taking them out of the system. Instead, they should be re-injected into the system via replayFundsReceiving.
         require(!IAssetRegistry(ASSET_REGISTRY).isAssetRegistered(token), Errors.InvalidParameter());
     }
 }
