@@ -16,7 +16,7 @@
     "saltSeed": "vnet-2.aave.based-boosted-vault.AssetRegistry"
   },
   "WithdrawalPolicy::Implementation": {
-    "address": "0x01fd5aadb3eb64bd035408f8e5056a2e57f31306",
+    "address": "0xa5aa1e026976471d5ea2b4ac6fcb1897e112a4d8",
     "saltSeed": ""
   },
   "WithdrawalPolicy": {
