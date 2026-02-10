@@ -447,7 +447,8 @@ contract BaseTest is Test {
             accessManager_accountingChainAddress,
             chainGateway_accountingChainAddress,
             address(mockCcipRouter),
-            transferHelper_accountingChainAddress
+            transferHelper_accountingChainAddress,
+            assetRegistry_accountingChainAddress
         );
         console.log("\tCCIP Adapter: %s", address(ccipAdapter_accountingChain));
         require(
@@ -575,7 +576,8 @@ contract BaseTest is Test {
             accessManager_earningChainAddress,
             chainGateway_earningChainAddress,
             address(mockCcipRouter),
-            transferHelper_earningChainAddress
+            transferHelper_earningChainAddress,
+            assetRegistry_earningChainAddress
         );
         console.log("\tCCIP Adapter: %s", address(ccipAdapter_earningChain));
         require(

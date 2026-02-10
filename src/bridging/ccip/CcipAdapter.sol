@@ -12,10 +12,13 @@ import {IRouterClient} from "@chainlink-ccip/contracts/interfaces/IRouterClient.
 import {Client} from "@chainlink-ccip/contracts/libraries/Client.sol";
 
 import {BaseBridgeAdapter} from "src/bridging/BaseBridgeAdapter.sol";
+import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
+import {RescuableNative} from "src/misc/RescuableNative.sol";
+import {RescuableToken} from "src/misc/RescuableToken.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
@@ -37,6 +40,8 @@ import {Errors} from "src/types/Errors.sol";
 contract CcipAdapter is
     BaseBridgeAdapter,
     ReentrancyGuardTransient,
+    RescuableNative,
+    RescuableToken,
     ICcipBridgeAdapter,
     IAny2EVMMessageReceiver,
     IERC165
@@ -44,6 +49,7 @@ contract CcipAdapter is
     using SafeERC20 for IERC20;
 
     address internal immutable CCIP_ROUTER;
+    address internal immutable ASSET_REGISTRY;
 
     mapping(uint256 chainId => uint64 ccipChainSelector) internal _chainSelectorOf;
     mapping(uint64 ccipChainSelector => uint256 chainId) internal _chainIdOf;
@@ -58,10 +64,16 @@ contract CcipAdapter is
     /// @param gateway Address of the Gateway contract.
     /// @param ccipRouter Address of the Chainlink CCIP router.
     /// @param transferHelper Address of the TransferHelper contract.
-    constructor(address accessManager, address gateway, address ccipRouter, address transferHelper)
-        BaseBridgeAdapter(accessManager, gateway, transferHelper)
-    {
+    /// @param assetRegistry Address of the AssetRegistry contract.
+    constructor(
+        address accessManager,
+        address gateway,
+        address ccipRouter,
+        address transferHelper,
+        address assetRegistry
+    ) BaseBridgeAdapter(accessManager, gateway, transferHelper) {
         CCIP_ROUTER = ccipRouter;
+        ASSET_REGISTRY = assetRegistry;
     }
 
     /// @inheritdoc ICcipBridgeAdapter
@@ -143,6 +155,11 @@ contract CcipAdapter is
         _processMessage(message);
     }
 
+    /// @inheritdoc ICcipBridgeAdapter
+    function replayFundsReceiving(address asset, uint256 amount) external override nonReentrant restricted {
+        _processReceivedFunds(asset, amount);
+    }
+
     function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
         return interfaceId == type(IAny2EVMMessageReceiver).interfaceId || interfaceId == type(IERC165).interfaceId;
     }
@@ -216,5 +233,19 @@ contract CcipAdapter is
         bytes32 value = bytes32(abiEncodedEvmSender[0:Constants.ABI_ENCODED_EVM_ADDRESS_BYTE_LENGTH]);
         require((value & Constants.ABI_ENCODED_EVM_ADDRESS_MASK) == value, Errors.InvalidParameter());
         return abi.decode(abiEncodedEvmSender, (address));
+    }
+
+    function _beforeRescueNative(uint256) internal virtual override {
+        // Equivalent to adding the `restricted` modifier.
+        _checkCanCall(_msgSender(), _msgData());
+    }
+
+    function _beforeRescueTokens(address token, uint256) internal virtual override {
+        // Equivalent to adding the `restricted` modifier.
+        _checkCanCall(_msgSender(), _msgData());
+        // The adapter is not designed to hold the system's funds. The check to allow rescuing only tokens that are
+        // NOT registered was added as a safeguard in case registered assets accidentally end up here, to prevent
+        // taking them out of the system. Instead, they should be re-injected into the system via replayFundsReceiving.
+        require(!IAssetRegistry(ASSET_REGISTRY).isAssetRegistered(token), Errors.InvalidParameter());
     }
 }

@@ -358,7 +358,8 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
                     getAccessManagerAddress(DEPLOYER),
                     getGatewayAddress(DEPLOYER),
                     CCIP_ROUTER_ADDRESS,
-                    getTransferHelperAddress(DEPLOYER)
+                    getTransferHelperAddress(DEPLOYER),
+                    getAssetRegistryAddress(DEPLOYER)
                 )
             )
         });
