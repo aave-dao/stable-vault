@@ -27,7 +27,6 @@ interface IChainGateway {
 
     enum MessageType {
         INVALID,
-        BALANCE_SNAPSHOT,
         BRIDGE_IOU_TOKEN,
         BURN_IOU_TOKEN,
         RETURN_FUNDS
