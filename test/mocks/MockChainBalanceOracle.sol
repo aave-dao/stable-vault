@@ -18,6 +18,8 @@ contract MockChainBalanceOracle is IChainBalanceOracle {
             balanceRay: balanceRay,
             lastUpdateTimestamp: lastUpdateTimestamp,
             sourceChainTimestamp: sourceChainTimestamp,
+            // The block number is not used in the mock, so we set it to 0.
+            sourceChainBlockNumber: 0,
             isStale: isStale
         });
     }

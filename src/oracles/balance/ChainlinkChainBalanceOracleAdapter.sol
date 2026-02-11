@@ -4,7 +4,7 @@ pragma solidity ^0.8.22;
 
 import {IChainBalanceOracle} from "src/interfaces/IChainBalanceOracle.sol";
 import {IChainBalanceOracleAdapter} from "src/interfaces/IChainBalanceOracleAdapter.sol";
-import {IChainGateway} from "src/interfaces/IChainGateway.sol";
+import {IEarningChainState} from "src/interfaces/IEarningChainState.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 
 // solhint-disable-next-line interface-starts-with-i
@@ -21,10 +21,12 @@ interface IBundleBaseAggregator {
 /// @author Aave Labs
 /// @notice Adapter for fetching a chain aggregated balance value from the Chainlink Aggregator.
 /// @dev Queries the bundle aggregator proxy for the latest bundle containing data read from
-/// EarningChainGateway::getBalanceSnapshot().
+/// IEarningChainState::getState().
 contract ChainlinkChainBalanceOracleAdapter is IChainBalanceOracleAdapter {
     using AssetLib for uint256;
 
+    /// @notice The version of the IEarningChainState struct.
+    uint256 constant EARNING_CHAIN_STATE_VERSION = 1;
     /// @dev Added to the heartbeat to account for potential publishing delays during periods of network congestion.
     uint256 constant PUBLISH_BUFFER_SECONDS = 90;
 
@@ -53,12 +55,19 @@ contract ChainlinkChainBalanceOracleAdapter is IChainBalanceOracleAdapter {
 
         // Get balance snapshot from bundle.
         bytes memory bundle = IBundleBaseAggregator(BUNDLE_AGGREGATOR_PROXY).latestBundle();
-        IChainGateway.BalanceSnapshot memory balanceSnapshot = abi.decode(bundle, (IChainGateway.BalanceSnapshot));
+        IEarningChainState.State memory state = abi.decode(bundle, (IEarningChainState.State));
+        require(
+            state.version == EARNING_CHAIN_STATE_VERSION,
+            InvalidEarningChainStateVersion(EARNING_CHAIN_STATE_VERSION, state.version)
+        );
+        IEarningChainState.BalanceSnapshot memory balanceSnapshot =
+            abi.decode(state.data, (IEarningChainState.BalanceSnapshot));
 
         return IChainBalanceOracle.ChainBalance({
-            balanceRay: balanceSnapshot.totalBalanceInRay,
+            balanceRay: balanceSnapshot.balanceRay,
             lastUpdateTimestamp: bundleTimestamp,
             sourceChainTimestamp: balanceSnapshot.timestamp,
+            sourceChainBlockNumber: balanceSnapshot.blockNumber,
             isStale: isStale
         });
     }

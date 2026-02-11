@@ -21,6 +21,7 @@ import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
 /// @title EarningChainGateway
+/// @author Aave Labs
 /// @notice Facilitates cross chain messaging with exactly one Accounting Chain.
 contract EarningChainGateway is
     BaseChainGateway,
@@ -75,15 +76,6 @@ contract EarningChainGateway is
 
     function getAccountingChainId() external view returns (uint256) {
         return ACCOUNTING_CHAIN_ID;
-    }
-
-    // TODO: remove this function and the feed contract we write queries the getAggregatedBalance()
-    function getBalanceSnapshot() external view returns (bytes memory) {
-        // TODO: let's add a feed contract that returns -> version, balance, ts, block number
-        // TODO: the custom feed contract returns abi.encode{ version: 1, snapshot: abi.encode({})}
-        return abi.encode(
-            IChainGateway.BalanceSnapshot({totalBalanceInRay: _getLocalAggregatedBalance(), timestamp: block.timestamp})
-        );
     }
 
     /// @inheritdoc IEarningChainGateway

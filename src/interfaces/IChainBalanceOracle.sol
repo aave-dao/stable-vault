@@ -17,11 +17,13 @@ interface IChainBalanceOracle {
     /// @param balanceRay The aggregated balance on a given chain in ray units.
     /// @param lastUpdateTimestamp The timestamp of the last update published to the destination chain.
     /// @param sourceChainTimestamp The timestamp at which the source Earning Chain data was read.
+    /// @param sourceChainBlockNumber The block number at which the source Earning Chain data was read.
     /// @param isStale Whether the balance is considered stale based on data source spec.
     struct ChainBalance {
         uint256 balanceRay;
         uint256 lastUpdateTimestamp;
         uint256 sourceChainTimestamp;
+        uint256 sourceChainBlockNumber;
         bool isStale;
     }
 

@@ -22,7 +22,7 @@ contract ChainlinkChainBalanceOracleAdapterTest is Test {
 
     function setUp() public {
         _bundleAggregator = new MockBundleAggregator();
-        _bundleAggregator.setAnswer(1000e18, block.timestamp);
+        _bundleAggregator.setAnswer(1, 1000e18, block.timestamp);
         _adapter = new ChainlinkChainBalanceOracleAdapter(CHAIN_ID, address(_bundleAggregator), HEARTBEAT);
         // Warp to a reasonable timestamp to avoid underflow.
         vm.warp(block.timestamp + 1 days);
@@ -35,7 +35,7 @@ contract ChainlinkChainBalanceOracleAdapterTest is Test {
     }
 
     function test_getChainBalance_returnsBalanceInRay(uint256 balance) public {
-        _bundleAggregator.setAnswer(balance, block.timestamp);
+        _bundleAggregator.setAnswer(1, balance, block.timestamp);
         IChainBalanceOracle.ChainBalance memory response = _adapter.getChainBalance(CHAIN_ID);
         assertEq(response.balanceRay, balance);
         assertEq(response.lastUpdateTimestamp, block.timestamp);
@@ -45,7 +45,7 @@ contract ChainlinkChainBalanceOracleAdapterTest is Test {
     function test_getChainBalance_returnsCorrectTimestamp() public {
         vm.warp(block.timestamp + 1 days);
         uint256 updateTime = block.timestamp - 100;
-        _bundleAggregator.setAnswer(1e18, updateTime);
+        _bundleAggregator.setAnswer(1, 1e18, updateTime);
         IChainBalanceOracle.ChainBalance memory response = _adapter.getChainBalance(CHAIN_ID);
         assertEq(response.lastUpdateTimestamp, updateTime);
     }
@@ -54,7 +54,7 @@ contract ChainlinkChainBalanceOracleAdapterTest is Test {
         vm.warp(block.timestamp + 1 days);
         // Set updatedAt to just within the heartbeat + buffer threshold
         uint256 updateTime = block.timestamp - (HEARTBEAT + HEARTBEAT_BUFFER_SECONDS - 1);
-        _bundleAggregator.setAnswer(1e18, updateTime);
+        _bundleAggregator.setAnswer(1, 1e18, updateTime);
         IChainBalanceOracle.ChainBalance memory response = _adapter.getChainBalance(CHAIN_ID);
         assertFalse(response.isStale, "Should not be stale when within heartbeat + buffer");
     }
@@ -62,7 +62,7 @@ contract ChainlinkChainBalanceOracleAdapterTest is Test {
     function test_getChainBalance_stale_whenExactlyAtHeartbeatPlusBuffer() public {
         vm.warp(block.timestamp + 1 days);
         uint256 updateTime = block.timestamp - (HEARTBEAT + HEARTBEAT_BUFFER_SECONDS);
-        _bundleAggregator.setAnswer(1e18, updateTime);
+        _bundleAggregator.setAnswer(1, 1e18, updateTime);
         IChainBalanceOracle.ChainBalance memory response = _adapter.getChainBalance(CHAIN_ID);
         assertTrue(response.isStale, "Should be stale when exactly at heartbeat + buffer");
     }
@@ -70,7 +70,7 @@ contract ChainlinkChainBalanceOracleAdapterTest is Test {
     function test_getChainBalance_stale_whenBeyondHeartbeatPlusBuffer() public {
         vm.warp(block.timestamp + 1 days);
         uint256 updateTime = block.timestamp - (HEARTBEAT + HEARTBEAT_BUFFER_SECONDS + 1000);
-        _bundleAggregator.setAnswer(1e18, updateTime);
+        _bundleAggregator.setAnswer(1, 1e18, updateTime);
 
         IChainBalanceOracle.ChainBalance memory response = _adapter.getChainBalance(CHAIN_ID);
 
@@ -78,7 +78,7 @@ contract ChainlinkChainBalanceOracleAdapterTest is Test {
     }
 
     function test_getChainBalance_notStale_whenUpdatedAtEqualsBlockTimestamp() public {
-        _bundleAggregator.setAnswer(1e18, block.timestamp);
+        _bundleAggregator.setAnswer(1, 1e18, block.timestamp);
 
         IChainBalanceOracle.ChainBalance memory response = _adapter.getChainBalance(CHAIN_ID);
 
@@ -87,7 +87,7 @@ contract ChainlinkChainBalanceOracleAdapterTest is Test {
 
     function test_getChainBalance_notStale_whenUpdatedAtIsInTheFuture() public {
         // Handle case where the update time is in the future due to clock skew.
-        _bundleAggregator.setAnswer(1e18, block.timestamp + 100);
+        _bundleAggregator.setAnswer(1, 1e18, block.timestamp + 100);
         IChainBalanceOracle.ChainBalance memory response = _adapter.getChainBalance(CHAIN_ID);
         assertFalse(response.isStale, "Should not be stale when updatedAt > block.timestamp");
     }
@@ -99,21 +99,21 @@ contract ChainlinkChainBalanceOracleAdapterTest is Test {
     }
 
     function test_getChainBalance_doesNotRevert_ifBalanceIsZero() public {
-        _bundleAggregator.setAnswer(0, block.timestamp);
+        _bundleAggregator.setAnswer(1, 0, block.timestamp);
         IChainBalanceOracle.ChainBalance memory response = _adapter.getChainBalance(CHAIN_ID);
         assertEq(response.balanceRay, 0);
     }
 
     function test_getChainBalance_convertsSmallBalance() public {
         // 1 unit in 27 decimals
-        _bundleAggregator.setAnswer(1, block.timestamp);
+        _bundleAggregator.setAnswer(1, 1, block.timestamp);
         IChainBalanceOracle.ChainBalance memory response = _adapter.getChainBalance(CHAIN_ID);
         assertEq(response.balanceRay, 1);
     }
 
     function test_getChainBalance_fuzz(uint128 rawBalance) public {
         uint256 balance = uint256(rawBalance);
-        _bundleAggregator.setAnswer(balance, block.timestamp);
+        _bundleAggregator.setAnswer(1, balance, block.timestamp);
         IChainBalanceOracle.ChainBalance memory response = _adapter.getChainBalance(CHAIN_ID);
         assertEq(response.balanceRay, balance);
     }
@@ -124,11 +124,19 @@ contract ChainlinkChainBalanceOracleAdapterTest is Test {
 
         uint256 balance = uint256(rawBalance);
         uint256 updateTime = block.timestamp - timeDelta;
-        _bundleAggregator.setAnswer(balance, updateTime);
+        _bundleAggregator.setAnswer(1, balance, updateTime);
         IChainBalanceOracle.ChainBalance memory response = _adapter.getChainBalance(CHAIN_ID);
         assertEq(
             response.isStale,
             updateTime < block.timestamp && block.timestamp - updateTime >= HEARTBEAT + HEARTBEAT_BUFFER_SECONDS
         );
+    }
+
+    function test_getChainBalance_reverts_ifVersionDoesNotMatch() public {
+        _bundleAggregator.setAnswer(2, 1e18, block.timestamp);
+        vm.expectRevert(
+            abi.encodeWithSelector(IChainBalanceOracleAdapter.InvalidEarningChainStateVersion.selector, 1, 2)
+        );
+        _adapter.getChainBalance(CHAIN_ID);
     }
 }

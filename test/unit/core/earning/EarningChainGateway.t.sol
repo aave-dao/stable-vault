@@ -173,35 +173,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
         assertEq(_earningChainGateway.getAggregatedBalance(), 0);
     }
 
-    function test_getBalanceSnapshot_returnsExpectedSnapshotWithMultipleAssets(
-        uint256 usdtBalance,
-        uint256 ghoBalance,
-        uint256 usdtPriceRay,
-        uint256 ghoPriceRay,
-        uint256 warpTime
-    ) public {
-        usdtBalance = _boundAssetAmount(address(_mockUsdt), usdtBalance);
-        ghoBalance = _boundAssetAmount(address(_mockGho), ghoBalance);
-        usdtPriceRay = bound(usdtPriceRay, 1e24, 1e30);
-        ghoPriceRay = bound(ghoPriceRay, 1e24, 1e30);
-        warpTime = bound(warpTime, 1, 365 days);
-        vm.warp(block.timestamp + warpTime);
-
-        _mockAllocator.mockAssetBalance(address(_mockUsdt), usdtBalance);
-        _mockAllocator.mockAssetBalance(address(_mockGho), ghoBalance);
-        _mockAssetPrice(address(_priceOracle), address(_mockUsdt), usdtPriceRay);
-        _mockAssetPrice(address(_priceOracle), address(_mockGho), ghoPriceRay);
-
-        uint256 expectedBalanceRay = usdtPriceRay.rayMulDown(usdtBalance.assetDecimalsToRay(address(_mockUsdt)))
-            + ghoPriceRay.rayMulDown(ghoBalance.assetDecimalsToRay(address(_mockGho)));
-
-        bytes memory snapshotData = _earningChainGateway.getBalanceSnapshot();
-        IChainGateway.BalanceSnapshot memory snapshot = abi.decode(snapshotData, (IChainGateway.BalanceSnapshot));
-
-        assertEq(snapshot.totalBalanceInRay, expectedBalanceRay, "Aggregated balance mismatch");
-        assertEq(snapshot.timestamp, block.timestamp, "Timestamp should be current block.timestamp");
-    }
-
     function test_removeBridgeAdapter_removesDefaultBridgeAdapter() public {
         vm.expectEmit(true, true, true, true);
         emit IChainGateway.DefaultBridgeAdapterSet(address(0), ACCOUNTING_CHAIN_ID, address(0));
