@@ -14,7 +14,8 @@ interface IAccountingChainGateway is IChainGateway {
     error OnlyFundsHandler();
 
     /// @notice Thrown when the Earning Chain balance snapshot timestamp from the Chain Balance Oracle is not fresh
-    /// enough. @custom:selector 0x66860102
+    /// enough.
+    /// @custom:selector 0x1a252958
     error StaleChainBalanceTimestamp();
 
     /// @notice Sends assets to an Earning Chain.

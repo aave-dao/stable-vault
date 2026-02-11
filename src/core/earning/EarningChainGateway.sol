@@ -34,21 +34,6 @@ contract EarningChainGateway is
     uint256 internal immutable ACCOUNTING_CHAIN_ID;
     address internal immutable WITHDRAWAL_POLICY;
 
-    /// @custom:storage-location erc7201:aave.storage.EarningChainGateway
-    struct EarningChainGatewayStorage {
-        uint256 balanceSnapshotNonce;
-    }
-
-    // keccak256(abi.encode(uint256(keccak256("aave.storage.EarningChainGateway")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant STORAGE_SLOT_EARNING_CHAIN_GATEWAY =
-        0x5a762c9d6afe1d5e726c4d055708c9f75f61c70b417d4c903b07b242b2457100;
-
-    function $EarningChainGateway() private pure returns (EarningChainGatewayStorage storage _storage) {
-        assembly {
-            _storage.slot := STORAGE_SLOT_EARNING_CHAIN_GATEWAY
-        }
-    }
-
     /// @dev Constructor.
     /// @param accountingChainId The Chain ID of the Accounting Chain.
     /// @param allocator Address of the Allocator contract.
@@ -148,7 +133,7 @@ contract EarningChainGateway is
         _sendBurnIouTokenMessage(iouTokenAmountRay, adapter, bridgeParams);
 
         ITransferHelper(TRANSFER_HELPER).transfer(assetOut, amountOut, receiver);
-        emit FundsOutflowed(assetOut, amountOut);
+        emit AssetOutflow(assetOut, amountOut);
 
         return amountOut;
     }
@@ -170,7 +155,7 @@ contract EarningChainGateway is
         IAllocator(ALLOCATOR).withdraw(asset, amount);
 
         _returnFunds(asset, amount, bridgeParams);
-        emit FundsOutflowed(asset, amount);
+        emit AssetOutflow(asset, amount);
     }
 
     function _bridgeIouTokenFromAccountingChain(bytes memory data) internal {

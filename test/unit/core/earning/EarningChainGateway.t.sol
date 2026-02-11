@@ -173,6 +173,35 @@ contract EarningChainGatewayTest is TestWithHelpers {
         assertEq(_earningChainGateway.getAggregatedBalance(), 0);
     }
 
+    function test_getBalanceSnapshot_returnsExpectedSnapshotWithMultipleAssets(
+        uint256 usdtBalance,
+        uint256 ghoBalance,
+        uint256 usdtPriceRay,
+        uint256 ghoPriceRay,
+        uint256 warpTime
+    ) public {
+        usdtBalance = _boundAssetAmount(address(_mockUsdt), usdtBalance);
+        ghoBalance = _boundAssetAmount(address(_mockGho), ghoBalance);
+        usdtPriceRay = bound(usdtPriceRay, 1e24, 1e30);
+        ghoPriceRay = bound(ghoPriceRay, 1e24, 1e30);
+        warpTime = bound(warpTime, 1, 365 days);
+        vm.warp(block.timestamp + warpTime);
+
+        _mockAllocator.mockAssetBalance(address(_mockUsdt), usdtBalance);
+        _mockAllocator.mockAssetBalance(address(_mockGho), ghoBalance);
+        _mockAssetPrice(address(_priceOracle), address(_mockUsdt), usdtPriceRay);
+        _mockAssetPrice(address(_priceOracle), address(_mockGho), ghoPriceRay);
+
+        uint256 expectedBalanceRay = usdtPriceRay.rayMulDown(usdtBalance.assetDecimalsToRay(address(_mockUsdt)))
+            + ghoPriceRay.rayMulDown(ghoBalance.assetDecimalsToRay(address(_mockGho)));
+
+        bytes memory snapshotData = _earningChainGateway.getBalanceSnapshot();
+        IChainGateway.BalanceSnapshot memory snapshot = abi.decode(snapshotData, (IChainGateway.BalanceSnapshot));
+
+        assertEq(snapshot.totalBalanceInRay, expectedBalanceRay, "Aggregated balance mismatch");
+        assertEq(snapshot.timestamp, block.timestamp, "Timestamp should be current block.timestamp");
+    }
+
     function test_removeBridgeAdapter_removesDefaultBridgeAdapter() public {
         vm.expectEmit(true, true, true, true);
         emit IChainGateway.DefaultBridgeAdapterSet(address(0), ACCOUNTING_CHAIN_ID, address(0));
@@ -519,6 +548,39 @@ contract EarningChainGatewayTest is TestWithHelpers {
         vm.prank(tokenOutReceiver);
         _earningChainGateway.exchangeIouTokens{value: bridgeFeeAmount}(
             iouTokenAmountRay, tokenOut, 0, tokenOutReceiver, bridgeParams, ""
+        );
+    }
+
+    function test_exchangeIouTokens_emitsAssetOutflow(uint256 iouTokenAmountRay) public {
+        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        address tokenOut = address(_mockUsdt);
+        uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(tokenOut);
+        vm.assume(amountOut > 0);
+
+        address user = makeAddr("user");
+        _assumeNotProxyAdmin(user, address(_earningChainGateway));
+
+        _mockUsdt.mint(address(_mockAllocator), amountOut);
+        _mockTransferHelper.mockAsset(address(_mockUsdt), amountOut);
+
+        vm.expectEmit(true, true, true, true);
+        emit IEarningChainGateway.AssetOutflow(tokenOut, amountOut);
+
+        vm.prank(user);
+        _earningChainGateway.exchangeIouTokens(
+            iouTokenAmountRay,
+            tokenOut,
+            0,
+            user,
+            IBridgeAdapter.BridgeParams({
+                feePayer: user,
+                feeToken: address(0),
+                feeAmount: 0,
+                feeRefundThreshold: 0,
+                gasLimit: 100000,
+                data: abi.encode(keccak256(hex"c0ffee"))
+            }),
+            ""
         );
     }
 
@@ -903,6 +965,30 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 feePayer: feePayer,
                 feeToken: bridgeFeeToken,
                 feeAmount: bridgeFeeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: 100000,
+                data: abi.encode(keccak256(hex"c0ffee"))
+            })
+        );
+    }
+
+    function test_pushFundsToAccountingChain_emitsAssetOutflow(uint256 amountToken) public {
+        amountToken = _boundAssetAmount(address(_mockUsdt), amountToken);
+        _mockTransferHelper.mockAsset(address(_mockUsdt), amountToken);
+
+        address sender = makeAddr("randomAccount");
+
+        vm.expectEmit(true, true, true, true);
+        emit IEarningChainGateway.AssetOutflow(address(_mockUsdt), amountToken);
+
+        vm.prank(sender);
+        _earningChainGateway.pushFundsToAccountingChain(
+            address(_mockUsdt),
+            amountToken,
+            IBridgeAdapter.BridgeParams({
+                feePayer: sender,
+                feeToken: address(0),
+                feeAmount: 0,
                 feeRefundThreshold: 0,
                 gasLimit: 100000,
                 data: abi.encode(keccak256(hex"c0ffee"))

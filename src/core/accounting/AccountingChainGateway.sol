@@ -13,9 +13,6 @@ import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
 
-// TODO(debug): Remove this once the issue is resolved.
-import {console} from "forge-std/console.sol";
-
 /// @title AccountingChainGateway
 /// @author Aave Labs
 /// @notice Facilitates cross chain messaging one or more Earning Chains.
@@ -100,11 +97,10 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
     function _processReturnFundsData(uint256 sourceChainId, bytes memory data) internal view {
         IChainGateway.ReturnFundsMessage memory returnFundsMessage =
             abi.decode(data, (IChainGateway.ReturnFundsMessage));
-        uint256 sourceChainTimestamp = returnFundsMessage.timestamp;
-        _validateInboundMessageTimestamp(sourceChainId, sourceChainTimestamp);
+        _validateInboundMessageTimestamp(sourceChainId, returnFundsMessage.timestamp);
     }
 
-    /// @dev Validates that the timestamp of the inbound message is not older than the latest balance snapshot from the
+    /// @dev Validates that the timestamp of the inbound message is not newer than the latest update from the
     /// Chain Balance Oracle.
     /// @param earningChainId The ID of the Earning Chain that sent the message.
     /// @param earningChainMessageTimestamp The timestamp of when the Earning Chain message was published.
@@ -114,8 +110,6 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
     {
         IChainBalanceOracle.ChainBalance memory chainBalance =
             IChainBalanceOracle(CHAIN_BALANCE_ORACLE).getChainBalance(earningChainId);
-        console.log("earningChainMessageTimestamp", earningChainMessageTimestamp);
-        console.log("chainBalance.lastUpdateTimestamp", chainBalance.lastUpdateTimestamp);
         if (earningChainMessageTimestamp > chainBalance.lastUpdateTimestamp) {
             // The funds were sent from the Earning Chain after the latest balance snapshot was taken.
             // The Chain Balance Oracle does not reflect a snapshot which captures the outflow of assets from the

@@ -41,10 +41,10 @@ interface IChainGateway {
         bytes data;
     }
 
-    /// @notice The representation of a balance snapshot from a source chain.
-    /// @dev For message type `BALANCE_SNAPSHOT`.
+    /// @notice The representation of a balance snapshot from an Earning Chain.
+    /// @dev Used by the oracle feed to decode balance data from EarningChainGateway::getBalanceSnapshot().
     /// @param totalBalanceInRay Cumulative balance of all tokens with common denomination in RAY.
-    /// @param timestamp Timestamp from the source Earning Chain when the message is published.
+    /// @param timestamp Timestamp from the source Earning Chain when the snapshot was taken.
     struct BalanceSnapshot {
         uint256 totalBalanceInRay;
         uint256 timestamp;

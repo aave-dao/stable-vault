@@ -10,7 +10,7 @@ interface IEarningChainGateway is IChainGateway {
     /// @dev Can be emitted when IOUs are exchanged for assets or funds are returned to the Accounting Chain.
     /// @param assetOut The asset that was removed.
     /// @param amountOut The amount of the asset that was removed.
-    event FundsOutflowed(address indexed assetOut, uint256 amountOut);
+    event AssetOutflow(address indexed assetOut, uint256 amountOut);
 
     /// @notice The aggregated balance of the Earning Chain.
     function getAggregatedBalance() external view returns (uint256);

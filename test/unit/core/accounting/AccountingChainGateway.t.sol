@@ -501,6 +501,97 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         );
     }
 
+    function test_receiveMessage_reverts_whenBurnIouTokenAndChainBalanceOracleIsStale(uint256 iouTokenAmountBurnedRay)
+        public
+    {
+        iouTokenAmountBurnedRay = _boundRayAmount(iouTokenAmountBurnedRay);
+
+        // Mock chain balance oracle with a lastUpdateTimestamp older than the message timestamp
+        _mockChainBalanceOracle.mockChainBalance(
+            EARNING_CHAIN_ID,
+            0,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS * 2,
+            // The check does NOT rely on if the data is stale, only if the message timestamp is newer than the last
+            // update timestamp.
+            false
+        );
+
+        vm.expectRevert(IAccountingChainGateway.StaleChainBalanceTimestamp.selector);
+        vm.prank(address(_mockBridgeAdapterData));
+        _accountingChainGateway.receiveMessage(
+            EARNING_CHAIN_ID,
+            address(0),
+            0,
+            abi.encode(
+                IChainGateway.CrossChainMessage({
+                    messageType: IChainGateway.MessageType.BURN_IOU_TOKEN,
+                    data: abi.encode(
+                        IChainGateway.BurnIouTokenMessage({
+                            iouTokenAmountBurnedRay: iouTokenAmountBurnedRay, timestamp: block.timestamp
+                        })
+                    )
+                })
+            )
+        );
+    }
+
+    function test_receiveMessage_whenReturnFundsIsReceived() public {
+        // Mock chain balance oracle to have a timestamp >= the message timestamp
+        _mockChainBalanceOracle.mockChainBalance(
+            EARNING_CHAIN_ID,
+            // Amount is not relevant for this test.
+            100_000e27,
+            block.timestamp,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            // The check does NOT rely on if the data is stale, only if the message timestamp is newer than the last
+            // update timestamp.
+            false
+        );
+
+        vm.prank(address(_mockBridgeAdapterData));
+        _accountingChainGateway.receiveMessage(
+            EARNING_CHAIN_ID,
+            // The bridge adapters separately call receiveMessage for each asset, so the asset is not relevant for this
+            // test.
+            address(0),
+            0,
+            abi.encode(
+                IChainGateway.CrossChainMessage({
+                    messageType: IChainGateway.MessageType.RETURN_FUNDS,
+                    data: abi.encode(IChainGateway.ReturnFundsMessage({timestamp: block.timestamp}))
+                })
+            )
+        );
+    }
+
+    function test_receiveMessage_reverts_whenReturnFundsAndChainBalanceOracleIsStale() public {
+        // Mock chain balance oracle with a lastUpdateTimestamp older than the message timestamp
+        _mockChainBalanceOracle.mockChainBalance(
+            EARNING_CHAIN_ID,
+            0,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS * 2,
+            // The check does NOT rely on if the data is stale, only if the message timestamp is newer than the last
+            // update timestamp.
+            false
+        );
+
+        vm.expectRevert(IAccountingChainGateway.StaleChainBalanceTimestamp.selector);
+        vm.prank(address(_mockBridgeAdapterData));
+        _accountingChainGateway.receiveMessage(
+            EARNING_CHAIN_ID,
+            address(0),
+            0,
+            abi.encode(
+                IChainGateway.CrossChainMessage({
+                    messageType: IChainGateway.MessageType.RETURN_FUNDS,
+                    data: abi.encode(IChainGateway.ReturnFundsMessage({timestamp: block.timestamp}))
+                })
+            )
+        );
+    }
+
     function test_receiveMessage_givenWhitelistedNonDefaultBridgeAdapter(uint256 iouTokenAmountBurnedRay) public {
         // Context: this should be the case for any valid message type
 
