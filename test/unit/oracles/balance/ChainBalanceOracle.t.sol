@@ -152,7 +152,7 @@ contract ChainBalanceOracleTest is TestWithHelpers {
         assertFalse(result.isStale, "Should return false when not stale");
     }
 
-    function test_getChainBalance_returnsZeroWhenStale(uint256 chainId, uint256 balanceRay) public {
+    function test_getChainBalance_returnsBalanceWithStaleFlagWhenStale(uint256 chainId, uint256 balanceRay) public {
         // Warp to a reasonable timestamp to avoid underflow
         vm.warp(block.timestamp + 10 days);
 
@@ -169,7 +169,7 @@ contract ChainBalanceOracleTest is TestWithHelpers {
         _chainBalanceOracle.setChainBalanceOracleAdapter(chainId, address(_mockAdapter));
 
         IChainBalanceOracle.ChainBalance memory result = _chainBalanceOracle.getChainBalance(chainId);
-        assertEq(result.balanceRay, 0, "Should return 0 when stale");
+        assertEq(result.balanceRay, balanceRay, "Should return actual balance from adapter");
         assertTrue(result.isStale, "Should return true when stale");
     }
 
@@ -223,6 +223,7 @@ contract ChainBalanceOracleTest is TestWithHelpers {
 
         assertEq(_chainBalanceOracle.getChainBalance(chain1).balanceRay, balance1, "Chain 1 balance mismatch");
         assertEq(_chainBalanceOracle.getChainBalance(chain2).balanceRay, balance2, "Chain 2 balance mismatch");
-        assertEq(_chainBalanceOracle.getChainBalance(chain3).balanceRay, 0, "Chain 3 should return 0 (stale)");
+        assertEq(_chainBalanceOracle.getChainBalance(chain3).balanceRay, balance3, "Chain 3 balance mismatch (stale)");
+        assertTrue(_chainBalanceOracle.getChainBalance(chain3).isStale, "Chain 3 should be stale");
     }
 }

@@ -290,6 +290,15 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
                 iouToken_earningChain.balanceOf(user1), amountIouToExchange, "User should have enough IOUs to exchange"
             );
             {
+                // Update the chain balance oracle so the AccountingChainGateway accepts the inbound
+                // BURN_IOU_TOKEN message (time has warped since the oracle was last mocked).
+                chainBalanceOracle.mockChainBalance(
+                    EARNING_CHAIN_ID,
+                    assetsOnEarningBeforeUser1ExchangeIous,
+                    block.timestamp,
+                    block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+                    false
+                );
                 _runExchangeIouTokens(earningChainGateway, user1, amountIouToExchange);
             }
 

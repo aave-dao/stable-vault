@@ -72,6 +72,8 @@ contract FundsHandlerTest is TestWithHelpers {
     }
 
     function setUp() public {
+        // Warp to a reasonable timestamp to avoid underflow.
+        vm.warp(block.timestamp + 1 days);
         ADMIN = makeAddr("admin");
         mockBbv = makeAddr("mockBbv");
         mockTransferHelper = new MockTransferHelper();
@@ -709,18 +711,22 @@ contract FundsHandlerTest is TestWithHelpers {
         vm.prank(ADMIN);
         fundsHandler.addEarningChain(chainId1);
 
-        vm.mockCall(
-            address(mockChainBalanceOracle),
-            abi.encodeWithSelector(MockChainBalanceOracle.getChainBalance.selector, chainId1),
-            abi.encode(chainBalance1.assetDecimalsToRay(address(mockAsset)))
+        mockChainBalanceOracle.mockChainBalance(
+            chainId1,
+            chainBalance1.assetDecimalsToRay(address(mockAsset)),
+            block.timestamp,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            false
         );
 
         vm.prank(ADMIN);
         fundsHandler.addEarningChain(chainId2);
-        vm.mockCall(
-            address(mockChainBalanceOracle),
-            abi.encodeWithSelector(MockChainBalanceOracle.getChainBalance.selector, chainId2),
-            abi.encode(chainBalance2.assetDecimalsToRay(address(mockAsset)))
+        mockChainBalanceOracle.mockChainBalance(
+            chainId2,
+            chainBalance2.assetDecimalsToRay(address(mockAsset)),
+            block.timestamp,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            false
         );
 
         assertEq(fundsHandler.getAssetBalances().length, 2);

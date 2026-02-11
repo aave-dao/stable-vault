@@ -1609,7 +1609,12 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         _assumeNotProxyAdmin(user, address(bbv));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
         _deposit(user, depositAmount);
-        vm.assume(withdrawalAmountRay < depositAmount.assetDecimalsToRay(address(mockAsset)));
+        uint256 userBalanceRay = depositAmount.assetDecimalsToRay(address(mockAsset));
+        vm.assume(withdrawalAmountRay < userBalanceRay);
+        // Ensure remaining shares are redeemable (not dust) to avoid full-withdrawal rounding
+        vm.assume(
+            withdrawalAmountRay == 0 || userBalanceRay - withdrawalAmountRay >= Constants.MIN_WITHDRAWABLE_AMOUNT_RAY
+        );
 
         mockFundsHandler.mockAggregatedBalance(depositAmount);
 
@@ -1632,7 +1637,12 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
         _deposit(user, depositAmount);
         uint256 userBalanceBefore = bbv.getUserBalance(user);
-        vm.assume(withdrawalAmountRay < depositAmount.assetDecimalsToRay(address(mockAsset)));
+        uint256 userBalanceRay = depositAmount.assetDecimalsToRay(address(mockAsset));
+        vm.assume(withdrawalAmountRay < userBalanceRay);
+        // Ensure remaining shares are redeemable (not dust) to avoid full-withdrawal rounding
+        vm.assume(
+            withdrawalAmountRay == 0 || userBalanceRay - withdrawalAmountRay >= Constants.MIN_WITHDRAWABLE_AMOUNT_RAY
+        );
 
         mockFundsHandler.mockAggregatedBalance(depositAmount);
 

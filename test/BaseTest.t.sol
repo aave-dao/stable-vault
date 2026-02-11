@@ -213,7 +213,7 @@ contract BaseTest is TestWithHelpers {
 
         // Chain balance oracle for tracking earning chain balances from accounting chain
         chainBalanceOracle = new MockChainBalanceOracle();
-        console.log("\tMock Chain Balance Oracle (Earning Chain): %s", address(chainBalanceOracle));
+        console.log("\tMock Chain Balance Oracle (Earning Chain Balances): %s", address(chainBalanceOracle));
 
         console.log("\nAccounting Chain:");
         // ---- Accounting Chain ----

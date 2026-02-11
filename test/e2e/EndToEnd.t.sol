@@ -279,6 +279,18 @@ contract EndToEndTest is BaseTest {
         uint256 userEarningsInGho;
         address defaultGhoVault_accountingChain = allocator_accountingChain.getDefaultStrategy(address(GHO));
         {
+            // Update the chain balance oracle to reflect the current timestamp (time has warped since step 3).
+            // The oracle must have a lastUpdateTimestamp >= the message timestamp for the AccountingChainGateway
+            // to accept the inbound RETURN_FUNDS message.
+            uint256 currentEarningChainBalanceRay = earningChainGateway.getAggregatedBalance();
+            chainBalanceOracle.mockChainBalance(
+                EARNING_CHAIN_ID,
+                currentEarningChainBalanceRay,
+                block.timestamp,
+                block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+                false
+            );
+
             userEarningsInGho = userEarningsInRay.rayToAssetDecimals(address(GHO));
             vm.prank(everyRoleAccount);
             vm.deal(everyRoleAccount, bridgeFeeAmount);
@@ -435,6 +447,16 @@ contract EndToEndTest is BaseTest {
             uint256 ghoBalanceOnVaultLeft =
                 IERC4626(defaultGhoVault_earningChain).balanceOf(address(allocator_earningChain));
             console.log("Earning chain GHO vault balance after withdrawal is now: %s GHO", ghoBalanceOnVaultLeft);
+
+            // Update oracle so the AccountingChainGateway accepts the inbound RETURN_FUNDS message
+            chainBalanceOracle.mockChainBalance(
+                EARNING_CHAIN_ID,
+                earningChainGateway.getAggregatedBalance(),
+                block.timestamp,
+                block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+                false
+            );
+
             vm.prank(everyRoleAccount);
             vm.deal(everyRoleAccount, bridgeFeeAmount);
             earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(

@@ -744,6 +744,13 @@ contract EarningChainGatewayTest is TestWithHelpers {
         vm.prank(sender);
         MockNonStandardErc20(bridgeFeeToken).approve(address(_earningChainGateway), bridgeFeeAmount);
 
+        bytes memory returnFundsMessageEncoded = abi.encode(
+            IChainGateway.CrossChainMessage({
+                messageType: IChainGateway.MessageType.RETURN_FUNDS,
+                data: abi.encode(IChainGateway.ReturnFundsMessage({timestamp: block.timestamp}))
+            })
+        );
+
         vm.expectCall(
             address(_mockBridgeAdapterAssets),
             0,
@@ -753,7 +760,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     ACCOUNTING_CHAIN_ID,
                     address(_mockUsdt),
                     amountToken,
-                    "",
+                    returnFundsMessageEncoded,
                     IBridgeAdapter.BridgeParams({
                         feePayer: sender,
                         feeToken: bridgeFeeToken,
@@ -799,6 +806,13 @@ contract EarningChainGatewayTest is TestWithHelpers {
         vm.prank(sender);
         MockNonStandardErc20(bridgeFeeToken).approve(address(_earningChainGateway), bridgeFeeAmount);
 
+        bytes memory returnFundsMessageEncoded = abi.encode(
+            IChainGateway.CrossChainMessage({
+                messageType: IChainGateway.MessageType.RETURN_FUNDS,
+                data: abi.encode(IChainGateway.ReturnFundsMessage({timestamp: block.timestamp}))
+            })
+        );
+
         vm.expectCall(
             address(_mockBridgeAdapterAssets),
             abi.encodeCall(
@@ -807,7 +821,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     ACCOUNTING_CHAIN_ID,
                     address(_mockGho),
                     amountToken,
-                    "",
+                    returnFundsMessageEncoded,
                     IBridgeAdapter.BridgeParams({
                         feePayer: sender,
                         feeToken: bridgeFeeToken,
@@ -852,6 +866,13 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         vm.deal(feePayer, bridgeFeeAmount);
 
+        bytes memory returnFundsMessageEncoded = abi.encode(
+            IChainGateway.CrossChainMessage({
+                messageType: IChainGateway.MessageType.RETURN_FUNDS,
+                data: abi.encode(IChainGateway.ReturnFundsMessage({timestamp: block.timestamp}))
+            })
+        );
+
         vm.expectCall(
             address(_mockBridgeAdapterAssets),
             0,
@@ -861,7 +882,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     ACCOUNTING_CHAIN_ID,
                     address(_mockUsdt),
                     amountToken,
-                    "",
+                    returnFundsMessageEncoded,
                     IBridgeAdapter.BridgeParams({
                         feePayer: feePayer,
                         feeToken: bridgeFeeToken,
