@@ -19,6 +19,8 @@ contract TestWithHelpers is Test {
 
     uint256 constant NATIVE_CURRENCY_DECIMALS = 18;
 
+    uint256 constant DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS = 30;
+
     function _boundAssetDecimals(uint8 assetDecimals) internal pure returns (uint8) {
         return uint8(bound(assetDecimals, 2, 18));
     }

@@ -92,6 +92,12 @@ contract EarningChainGateway is
         return ACCOUNTING_CHAIN_ID;
     }
 
+    function getBalanceSnapshot() external view returns (bytes memory) {
+        return abi.encode(
+            IChainGateway.BalanceSnapshot({totalBalanceInRay: _getLocalAggregatedBalance(), timestamp: block.timestamp})
+        );
+    }
+
     /// @inheritdoc IEarningChainGateway
     function getAggregatedBalance() external view override returns (uint256) {
         return _getLocalAggregatedBalance();
@@ -142,6 +148,7 @@ contract EarningChainGateway is
         _sendBurnIouTokenMessage(iouTokenAmountRay, adapter, bridgeParams);
 
         ITransferHelper(TRANSFER_HELPER).transfer(assetOut, amountOut, receiver);
+        emit FundsOutflowed(assetOut, amountOut);
 
         return amountOut;
     }
@@ -162,7 +169,8 @@ contract EarningChainGateway is
         // Pull funds from liquidity into the TransferHelper.
         IAllocator(ALLOCATOR).withdraw(asset, amount);
 
-        _returnFundsWithBalanceSnapshot(asset, amount, bridgeParams);
+        _returnFunds(asset, amount, bridgeParams);
+        emit FundsOutflowed(asset, amount);
     }
 
     function _bridgeIouTokenFromAccountingChain(bytes memory data) internal {
@@ -190,14 +198,21 @@ contract EarningChainGateway is
         IAllocator(ALLOCATOR).depositAllowIdle(asset, amount);
     }
 
-    function _returnFundsWithBalanceSnapshot(
-        address asset,
-        uint256 amount,
-        IBridgeAdapter.BridgeParams memory bridgeParams
-    ) internal {
+    function _returnFunds(address asset, uint256 amount, IBridgeAdapter.BridgeParams memory bridgeParams) internal {
         address bridgeAdapter = $BaseChainGateway().defaultBridgeAdapter[asset][ACCOUNTING_CHAIN_ID];
         require(bridgeAdapter != address(0), AdapterNotFound());
-        _sendCrossChainMessage(ACCOUNTING_CHAIN_ID, bridgeAdapter, asset, amount, "", bridgeParams);
+        // Include the timestamp of when the message is published to the Accounting Chain, so that the Accounting Chain
+        // can reference it to decide if Earning Chain's balance from the data feed captures the outflow of assets from
+        // the Earning Chain.
+        bytes memory returnFundsMessageEncoded = abi.encode(
+            IChainGateway.CrossChainMessage({
+                messageType: IChainGateway.MessageType.RETURN_FUNDS,
+                data: abi.encode(IChainGateway.ReturnFundsMessage({timestamp: block.timestamp}))
+            })
+        );
+        _sendCrossChainMessage(
+            ACCOUNTING_CHAIN_ID, bridgeAdapter, asset, amount, returnFundsMessageEncoded, bridgeParams
+        );
     }
 
     /// @dev This function is just needed to prevent StackTooDeep
@@ -207,10 +222,18 @@ contract EarningChainGateway is
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) internal {
         // Prepare data to synchronize the Accounting Chain's state.
+        // Include the timestamp of when the message is published to the Accounting Chain, so that the Accounting Chain
+        // can reference it to decide if Earning Chain's balance from the data feed captures the IOU exchange i.e.
+        // withdrawal of assets. This is to avoid decremening obligations by burning IOUs on the Accounting Chain while
+        // the feed reflects a balance that still includes the withdrawn assets.
         bytes memory burnIouTokenMessageEncoded = abi.encode(
             IChainGateway.CrossChainMessage({
                 messageType: IChainGateway.MessageType.BURN_IOU_TOKEN,
-                data: abi.encode(IChainGateway.BurnIouTokenMessage({iouTokenAmountBurnedRay: iouTokenAmountRay}))
+                data: abi.encode(
+                    IChainGateway.BurnIouTokenMessage({
+                        iouTokenAmountBurnedRay: iouTokenAmountRay, timestamp: block.timestamp
+                    })
+                )
             })
         );
 

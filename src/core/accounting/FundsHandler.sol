@@ -99,8 +99,7 @@ contract FundsHandler is
     function getAggregatedBalance() external view override returns (uint256) {
         uint256 totalBalanceRay = _getLocalAggregatedBalance();
         for (uint16 i = 0; i < $storage().earningChainIds.length(); i++) {
-            totalBalanceRay += IChainBalanceOracle(CHAIN_BALANCE_ORACLE)
-                .getChainBalance($storage().earningChainIds.at(i));
+            totalBalanceRay += _getAdjustedEarningChainBalanceRay($storage().earningChainIds.at(i));
         }
         return totalBalanceRay;
     }
@@ -120,9 +119,7 @@ contract FundsHandler is
         for (uint16 i = 0; i < $storage().earningChainIds.length(); i++) {
             uint256 chainId = $storage().earningChainIds.at(i);
             balances[allocatorAssets.length + i] = AssetBalance({
-                chainId: chainId,
-                asset: address(0),
-                amountRay: IChainBalanceOracle(CHAIN_BALANCE_ORACLE).getChainBalance(chainId)
+                chainId: chainId, asset: address(0), amountRay: _getAdjustedEarningChainBalanceRay(chainId)
             });
         }
         return balances;
@@ -194,6 +191,13 @@ contract FundsHandler is
 
     function _pullFundsFromImmediateLiquidity(address asset, uint256 amount) internal {
         IAllocator(ALLOCATOR).withdraw(asset, amount);
+    }
+
+    /// @dev Grossly under-estimates the balance if the chain balance is stale.
+    function _getAdjustedEarningChainBalanceRay(uint256 chainId) internal view returns (uint256) {
+        IChainBalanceOracle.ChainBalance memory chainBalance =
+            IChainBalanceOracle(CHAIN_BALANCE_ORACLE).getChainBalance(chainId);
+        return chainBalance.isStale ? 0 : chainBalance.balanceRay;
     }
 
     function _beforeRescueTokens(

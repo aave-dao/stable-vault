@@ -20,6 +20,7 @@ import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
 import {MockAccessManager} from "test/mocks/MockAccessManager.sol";
 import {MockAssetRegistry} from "test/mocks/MockAssetRegistry.sol";
 import {MockBridgeAdapter} from "test/mocks/MockBridgeAdapter.sol";
+import {MockChainBalanceOracle} from "test/mocks/MockChainBalanceOracle.sol";
 import {MockDummyIouTokenManager} from "test/mocks/MockDummyIouTokenManager.sol";
 import {IMockErc20} from "test/mocks/MockErc20.sol";
 import {MockFundsHandler} from "test/mocks/MockFundsHandler.sol";
@@ -48,15 +49,19 @@ contract AccountingChainGatewayTest is TestWithHelpers {
     MockDummyIouTokenManager internal _mockIouTokenManager;
     MockAssetRegistry internal _mockAssetRegistry;
     MockTransferHelper internal _mockTransferHelper;
+    MockChainBalanceOracle internal _mockChainBalanceOracle;
 
     AccountingChainGateway internal _accountingChainGateway;
 
     function _deployAccountingChainGateway(
         MockAccessManager mockAccessManager,
         address iouTokenManager,
-        address fundsHandler
+        address fundsHandler,
+        address chainBalanceOracle
     ) internal returns (AccountingChainGateway) {
-        address accountingChainGatewayImpl = address(new AccountingChainGateway(fundsHandler, iouTokenManager));
+        address accountingChainGatewayImpl = address(
+            new AccountingChainGateway(fundsHandler, iouTokenManager, chainBalanceOracle)
+        );
         AccountingChainGateway accountingChainGateway = AccountingChainGateway(
             address(
                 new TransparentUpgradeableProxy(
@@ -109,8 +114,13 @@ contract AccountingChainGatewayTest is TestWithHelpers {
 
         _mockAccessManager = new MockAccessManager(admin);
 
+        _mockChainBalanceOracle = new MockChainBalanceOracle();
+
         _accountingChainGateway = _deployAccountingChainGateway(
-            _mockAccessManager, address(_mockIouTokenManager), address(_mockFundsHandler)
+            _mockAccessManager,
+            address(_mockIouTokenManager),
+            address(_mockFundsHandler),
+            address(_mockChainBalanceOracle)
         );
     }
 
@@ -470,7 +480,9 @@ contract AccountingChainGatewayTest is TestWithHelpers {
                 IChainGateway.CrossChainMessage({
                     messageType: IChainGateway.MessageType.BURN_IOU_TOKEN,
                     data: abi.encode(
-                        IChainGateway.BurnIouTokenMessage({iouTokenAmountBurnedRay: iouTokenAmountBurnedRay})
+                        IChainGateway.BurnIouTokenMessage({
+                            iouTokenAmountBurnedRay: iouTokenAmountBurnedRay, timestamp: block.timestamp
+                        })
                     )
                 })
             )
@@ -499,7 +511,9 @@ contract AccountingChainGatewayTest is TestWithHelpers {
                 IChainGateway.CrossChainMessage({
                     messageType: IChainGateway.MessageType.BURN_IOU_TOKEN,
                     data: abi.encode(
-                        IChainGateway.BurnIouTokenMessage({iouTokenAmountBurnedRay: iouTokenAmountBurnedRay})
+                        IChainGateway.BurnIouTokenMessage({
+                            iouTokenAmountBurnedRay: iouTokenAmountBurnedRay, timestamp: block.timestamp
+                        })
                     )
                 })
             )
@@ -527,7 +541,9 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         bytes memory data = abi.encode(
             IChainGateway.CrossChainMessage({
                 messageType: IChainGateway.MessageType.BURN_IOU_TOKEN,
-                data: abi.encode(IChainGateway.BurnIouTokenMessage({iouTokenAmountBurnedRay: 100_000}))
+                data: abi.encode(
+                    IChainGateway.BurnIouTokenMessage({iouTokenAmountBurnedRay: 100_000, timestamp: block.timestamp})
+                )
             })
         );
 

@@ -146,6 +146,15 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
 
         // Check the user can withdraw their original deposit from the Earning Chain
         vm.deal(user1, bridgeFeeAmount);
+        // Mock the chain balance oracle to reflect the IOU exchange on the earning chain when the Accounting Chain
+        // Gateway processes the IOU burn message.
+        chainBalanceOracle.mockChainBalance(
+            EARNING_CHAIN_ID,
+            0,
+            block.timestamp,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            false
+        );
         vm.prank(user1);
         earningChainGateway.exchangeIouTokens{value: bridgeFeeAmount}(
             iouAmountRequestedRay,

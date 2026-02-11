@@ -326,7 +326,9 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
     function _deployGateway() internal returns (address) {
         address implementation = address(
             new AccountingChainGateway({
-                fundsHandler: getFundsHandlerAddress(DEPLOYER), iouTokenManager: getIouTokenManagerAddress(DEPLOYER)
+                fundsHandler: getFundsHandlerAddress(DEPLOYER),
+                iouTokenManager: getIouTokenManagerAddress(DEPLOYER),
+                chainBalanceOracle: address(0) // TODO: Deploy Chain Balance Oracle properly
             })
         );
         _logDeployment("AccountingChainGateway::Implementation", "", implementation);

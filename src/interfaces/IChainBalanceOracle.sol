@@ -13,10 +13,21 @@ interface IChainBalanceOracle {
     /// @notice Emitted when an adapter is set for a chain.
     event ChainBalanceAdapterSet(uint256 indexed chainId, address indexed newAdapter, address indexed previousAdapter);
 
+    /// @notice The representation of the response from the oracle adapter.
+    /// @param balanceRay The aggregated balance on a given chain in ray units.
+    /// @param lastUpdateTimestamp The timestamp of the last update published to the destination chain.
+    /// @param sourceChainTimestamp The timestamp at which the source Earning Chain data was read.
+    /// @param isStale Whether the balance is considered stale based on data source spec.
+    struct ChainBalance {
+        uint256 balanceRay;
+        uint256 lastUpdateTimestamp;
+        uint256 sourceChainTimestamp;
+        bool isStale;
+    }
+
     /// @notice Queries an oracle feed for data representing the aggregate price-adjusted balance of asset from a given
     /// Earning Chain.
     /// @param chainId Earning chain id query data for.
-    /// @return uint256 representing the aggregated balance of tokens on the Earning Chain adjusted by their respective
-    /// price, normalized to RAY before aggregation.
-    function getChainBalance(uint256 chainId) external view returns (uint256);
+    /// @return ChainBalance response from the oracle adapter.
+    function getChainBalance(uint256 chainId) external view returns (ChainBalance memory);
 }

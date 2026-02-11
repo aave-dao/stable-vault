@@ -445,7 +445,9 @@ contract BaseTest is TestWithHelpers {
 
         // 8. Accounting Chain Gateway
         address accountingChainGateway_impl = address(
-            new AccountingChainGateway(fundsHandler_accountingChainAddress, iouTokenManager_accountingChainAddress)
+            new AccountingChainGateway(
+                fundsHandler_accountingChainAddress, iouTokenManager_accountingChainAddress, address(chainBalanceOracle)
+            )
         );
         accountingChainGateway = AccountingChainGateway(
             address(
@@ -721,6 +723,9 @@ contract BaseTest is TestWithHelpers {
     }
 
     function setUp() public virtual {
+        // Warp to a reasonable timestamp to avoid underflow.
+        vm.warp(block.timestamp + 1 days);
+
         _deployContracts();
 
         // Set up Access Manager roles on Accounting chain

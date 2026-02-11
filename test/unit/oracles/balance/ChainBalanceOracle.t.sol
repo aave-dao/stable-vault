@@ -39,6 +39,8 @@ contract ChainBalanceOracleTest is TestWithHelpers {
         _mockAccessManager = new MockAccessManager(admin);
         _chainBalanceOracle = _deployChainBalanceOracle(address(_mockAccessManager));
         _mockAdapter = new MockChainBalanceOracleAdapter();
+        // Warp to a reasonable timestamp to avoid underflow.
+        vm.warp(block.timestamp + 1 days);
     }
 
     function test_initialize_setsAccessManager() public view {
@@ -58,7 +60,13 @@ contract ChainBalanceOracleTest is TestWithHelpers {
 
     function test_setChainBalanceOracleAdapter_setsAdapter(uint256 chainId, uint256 balanceRay) public {
         // Mock a valid response so the adapter check passes
-        _mockAdapter.mockResponse(chainId, balanceRay, block.timestamp, false);
+        _mockAdapter.mockResponse(
+            chainId,
+            balanceRay,
+            block.timestamp,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            false
+        );
 
         vm.expectEmit(true, true, true, true);
         emit IChainBalanceOracle.ChainBalanceAdapterSet(chainId, address(0), address(_mockAdapter));
@@ -70,13 +78,25 @@ contract ChainBalanceOracleTest is TestWithHelpers {
     function test_setChainBalanceOracleAdapter_emitsEventWithPreviousAdapter(uint256 chainId, uint256 balanceRay)
         public
     {
-        _mockAdapter.mockResponse(chainId, balanceRay, block.timestamp, false);
+        _mockAdapter.mockResponse(
+            chainId,
+            balanceRay,
+            block.timestamp,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            false
+        );
         vm.prank(everyRoleAccount);
         _chainBalanceOracle.setChainBalanceOracleAdapter(chainId, address(_mockAdapter));
 
         // Create new adapter
         MockChainBalanceOracleAdapter newAdapter = new MockChainBalanceOracleAdapter();
-        newAdapter.mockResponse(chainId, balanceRay, block.timestamp, false);
+        newAdapter.mockResponse(
+            chainId,
+            balanceRay,
+            block.timestamp,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            false
+        );
 
         // Setting a new adapter should emit event with previous adapter
         vm.expectEmit(true, true, true, true);
@@ -110,13 +130,26 @@ contract ChainBalanceOracleTest is TestWithHelpers {
     }
 
     function test_getChainBalance_returnsBalanceWhenNotStale(uint256 chainId, uint256 balanceRay) public {
-        _mockAdapter.mockResponse(chainId, balanceRay, block.timestamp, false);
+        _mockAdapter.mockResponse(
+            chainId,
+            balanceRay,
+            block.timestamp,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            false
+        );
 
         vm.prank(everyRoleAccount);
         _chainBalanceOracle.setChainBalanceOracleAdapter(chainId, address(_mockAdapter));
 
-        uint256 result = _chainBalanceOracle.getChainBalance(chainId);
-        assertEq(result, balanceRay, "Should return balanceRay when not stale");
+        IChainBalanceOracle.ChainBalance memory result = _chainBalanceOracle.getChainBalance(chainId);
+        assertEq(result.balanceRay, balanceRay, "Should return balanceRay when not stale");
+        assertEq(result.lastUpdateTimestamp, block.timestamp, "Should return lastUpdateTimestamp when not stale");
+        assertEq(
+            result.sourceChainTimestamp,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            "Should return sourceChainTimestamp when not stale"
+        );
+        assertFalse(result.isStale, "Should return false when not stale");
     }
 
     function test_getChainBalance_returnsZeroWhenStale(uint256 chainId, uint256 balanceRay) public {
@@ -124,13 +157,20 @@ contract ChainBalanceOracleTest is TestWithHelpers {
         vm.warp(block.timestamp + 10 days);
 
         // Mock adapter to return stale data
-        _mockAdapter.mockResponse(chainId, balanceRay, block.timestamp - 1 days, true);
+        _mockAdapter.mockResponse(
+            chainId,
+            balanceRay,
+            block.timestamp - 1 days,
+            block.timestamp - 1 days - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            true
+        );
 
         vm.prank(everyRoleAccount);
         _chainBalanceOracle.setChainBalanceOracleAdapter(chainId, address(_mockAdapter));
 
-        uint256 result = _chainBalanceOracle.getChainBalance(chainId);
-        assertEq(result, 0, "Should return 0 when stale");
+        IChainBalanceOracle.ChainBalance memory result = _chainBalanceOracle.getChainBalance(chainId);
+        assertEq(result.balanceRay, 0, "Should return 0 when stale");
+        assertTrue(result.isStale, "Should return true when stale");
     }
 
     function test_getChainBalance_reverts_ifNoAdapterSet(uint256 chainId) public {
@@ -152,10 +192,28 @@ contract ChainBalanceOracleTest is TestWithHelpers {
         MockChainBalanceOracleAdapter adapter2 = new MockChainBalanceOracleAdapter();
         MockChainBalanceOracleAdapter adapter3 = new MockChainBalanceOracleAdapter();
 
-        adapter1.mockResponse(chain1, balance1, block.timestamp, false);
-        adapter2.mockResponse(chain2, balance2, block.timestamp, false);
+        adapter1.mockResponse(
+            chain1,
+            balance1,
+            block.timestamp,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            false
+        );
+        adapter2.mockResponse(
+            chain2,
+            balance2,
+            block.timestamp,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            false
+        );
         // This one is stale
-        adapter3.mockResponse(chain3, balance3, block.timestamp, true);
+        adapter3.mockResponse(
+            chain3,
+            balance3,
+            block.timestamp,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS * 3,
+            true
+        );
 
         vm.startPrank(everyRoleAccount);
         _chainBalanceOracle.setChainBalanceOracleAdapter(chain1, address(adapter1));
@@ -163,8 +221,8 @@ contract ChainBalanceOracleTest is TestWithHelpers {
         _chainBalanceOracle.setChainBalanceOracleAdapter(chain3, address(adapter3));
         vm.stopPrank();
 
-        assertEq(_chainBalanceOracle.getChainBalance(chain1), balance1, "Chain 1 balance mismatch");
-        assertEq(_chainBalanceOracle.getChainBalance(chain2), balance2, "Chain 2 balance mismatch");
-        assertEq(_chainBalanceOracle.getChainBalance(chain3), 0, "Chain 3 should return 0 (stale)");
+        assertEq(_chainBalanceOracle.getChainBalance(chain1).balanceRay, balance1, "Chain 1 balance mismatch");
+        assertEq(_chainBalanceOracle.getChainBalance(chain2).balanceRay, balance2, "Chain 2 balance mismatch");
+        assertEq(_chainBalanceOracle.getChainBalance(chain3).balanceRay, 0, "Chain 3 should return 0 (stale)");
     }
 }

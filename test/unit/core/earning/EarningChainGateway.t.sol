@@ -325,7 +325,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     IChainGateway.CrossChainMessage({
                         messageType: IChainGateway.MessageType.BURN_IOU_TOKEN,
                         data: abi.encode(
-                            IChainGateway.BurnIouTokenMessage({iouTokenAmountBurnedRay: iouTokenAmountRay})
+                            IChainGateway.BurnIouTokenMessage({
+                                iouTokenAmountBurnedRay: iouTokenAmountRay, timestamp: block.timestamp
+                            })
                         )
                     })
                 );
@@ -387,8 +389,11 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
             bytes memory data;
             {
-                bytes memory dataInner =
-                    abi.encode(IChainGateway.BurnIouTokenMessage({iouTokenAmountBurnedRay: iouTokenAmountRay}));
+                bytes memory dataInner = abi.encode(
+                    IChainGateway.BurnIouTokenMessage({
+                        iouTokenAmountBurnedRay: iouTokenAmountRay, timestamp: block.timestamp
+                    })
+                );
                 data = abi.encode(
                     IChainGateway.CrossChainMessage({
                         messageType: IChainGateway.MessageType.BURN_IOU_TOKEN, data: dataInner
@@ -482,7 +487,11 @@ contract EarningChainGatewayTest is TestWithHelpers {
             bytes memory data = abi.encode(
                 IChainGateway.CrossChainMessage({
                     messageType: IChainGateway.MessageType.BURN_IOU_TOKEN,
-                    data: abi.encode(IChainGateway.BurnIouTokenMessage({iouTokenAmountBurnedRay: iouTokenAmountRay}))
+                    data: abi.encode(
+                        IChainGateway.BurnIouTokenMessage({
+                            iouTokenAmountBurnedRay: iouTokenAmountRay, timestamp: block.timestamp
+                        })
+                    )
                 })
             );
 
@@ -1271,10 +1280,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             0,
             abi.encode(
                 IChainGateway.CrossChainMessage({
-                    messageType: IChainGateway.MessageType.INVALID,
-                    data: abi.encode(
-                        IChainGateway.BalanceSnapshot({totalAssetsInRay: 100_000_000_000_000 * 10 ** 27, nonce: 1})
-                    )
+                    messageType: IChainGateway.MessageType.INVALID, data: abi.encode(keccak256(hex"c0ffee"))
                 })
             )
         );

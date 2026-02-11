@@ -123,7 +123,13 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
 
         // Update the chain balance oracle to reflect the funds on the earning chain
         uint256 earningChainBalanceRay = userInitialDeposit.assetDecimalsToRay(address(USDC));
-        chainBalanceOracle.mockChainBalance(EARNING_CHAIN_ID, earningChainBalanceRay);
+        chainBalanceOracle.mockChainBalance(
+            EARNING_CHAIN_ID,
+            earningChainBalanceRay,
+            block.timestamp,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            false
+        );
 
         // Verify the FundsHandler now sees the earning chain balance via the oracle
         assertEq(
@@ -320,7 +326,13 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             // Update the chain balance oracle to reflect the IOU exchange on the earning chain
             // Earning chain balance was 500 USDC worth, now decreased by 225 RAY (amountIouToExchange)
             uint256 remainingEarningChainBalanceRay = assetsOnEarningBeforeUser1ExchangeIous - amountIouToExchange;
-            chainBalanceOracle.mockChainBalance(EARNING_CHAIN_ID, remainingEarningChainBalanceRay);
+            chainBalanceOracle.mockChainBalance(
+                EARNING_CHAIN_ID,
+                remainingEarningChainBalanceRay,
+                block.timestamp,
+                block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+                false
+            );
 
             // Check the assets in the Accounting chain (cross-chain aggregated balance via oracle)
             // Local balance: User2's 500 USDC deposit = 500 * 10^27 RAY

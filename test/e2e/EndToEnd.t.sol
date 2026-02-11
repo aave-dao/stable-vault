@@ -174,7 +174,13 @@ contract EndToEndTest is BaseTest {
 
             // Update the chain balance oracle to reflect the funds on the earning chain
             uint256 earningChainBalanceRay = userInitialDeposit.assetDecimalsToRay(address(USDC));
-            chainBalanceOracle.mockChainBalance(EARNING_CHAIN_ID, earningChainBalanceRay);
+            chainBalanceOracle.mockChainBalance(
+                EARNING_CHAIN_ID,
+                earningChainBalanceRay,
+                block.timestamp,
+                block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+                false
+            );
 
             // Verify the FundsHandler now sees the earning chain balance via the oracle
             assertEq(
@@ -292,7 +298,13 @@ contract EndToEndTest is BaseTest {
             // Update the chain balance oracle to reflect that funds are now back on accounting chain
             // The earning chain balance decreases by the amount bridged back
             uint256 remainingEarningChainBalanceRay = earningChainGateway.getAggregatedBalance();
-            chainBalanceOracle.mockChainBalance(EARNING_CHAIN_ID, remainingEarningChainBalanceRay);
+            chainBalanceOracle.mockChainBalance(
+                EARNING_CHAIN_ID,
+                remainingEarningChainBalanceRay,
+                block.timestamp,
+                block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+                false
+            );
 
             // - check that the funds land on the Accounting Chain and are dropped into default liquidity vault there
             console.log("Accounting Chain default vault for GHO is: %s", defaultGhoVault_accountingChain);

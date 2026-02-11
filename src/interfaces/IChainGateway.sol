@@ -30,7 +30,7 @@ interface IChainGateway {
         BALANCE_SNAPSHOT,
         BRIDGE_IOU_TOKEN,
         BURN_IOU_TOKEN,
-        DECREMENT_BALANCE_SNAPSHOT
+        RETURN_FUNDS
     }
 
     /// @notice The representation of a cross-chain message.
@@ -43,11 +43,11 @@ interface IChainGateway {
 
     /// @notice The representation of a balance snapshot from a source chain.
     /// @dev For message type `BALANCE_SNAPSHOT`.
-    /// @param totalAssetsInRay Cumulative balance of all tokens with common denomination in RAY.
-    /// @param nonce Nonce of the balance snapshot.
+    /// @param totalBalanceInRay Cumulative balance of all tokens with common denomination in RAY.
+    /// @param timestamp Timestamp from the source Earning Chain when the message is published.
     struct BalanceSnapshot {
-        uint256 totalAssetsInRay;
-        uint256 nonce;
+        uint256 totalBalanceInRay;
+        uint256 timestamp;
     }
 
     /// @notice The representation of a message to bridge IOU tokens to a destination chain.
@@ -68,16 +68,11 @@ interface IChainGateway {
         uint256 timestamp;
     }
 
-    /// @notice The representation of a message to decrement the balance snapshot on a source chain.
-    /// @dev For message type `DECREMENT_BALANCE_SNAPSHOT`.
-    /// @dev Used when funds are bridged from an Earning Chain to an Accounting Chain, but the bridge is not used to
-    /// communicate the total balance snapshot.
-    /// @dev Decrementing the snapshot is not considered risky because at worst the total assets in the system will be
-    /// understated until an AMB is used to communicate the actual balance snapshot. This conservative logic may impact
-    /// the system's ability to estimate earned interest.
-    /// @param amountRay Amount to decrement the balance snapshot by in RAY.
-    struct DecrementBalanceSnapshotMessage {
-        uint256 amountRay;
+    /// @notice The representation of a message included when funds are returned to the Accounting Chain.
+    /// @dev For message type `RETURN_FUNDS`.
+    /// @param timestamp Timestamp from the source Earning Chain when the message is published.
+    struct ReturnFundsMessage {
+        uint256 timestamp;
     }
 
     /// @notice Gets the default bridge adapter for an asset and chain; the default adapter is used for outbound
