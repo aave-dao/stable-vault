@@ -11,6 +11,7 @@ import {AssetLib} from "src/libraries/AssetLib.sol";
 interface IBundleBaseAggregator {
     function latestBundle() external view returns (bytes memory bundle);
 
+    // Not limited to 18 decimals, could be 27?
     function bundleDecimals() external view returns (uint8[] memory);
 
     function latestBundleTimestamp() external view returns (uint256);

@@ -77,7 +77,10 @@ contract EarningChainGateway is
         return ACCOUNTING_CHAIN_ID;
     }
 
+    // TODO: remove this function and the feed contract we write queries the getAggregatedBalance()
     function getBalanceSnapshot() external view returns (bytes memory) {
+        // TODO: let's add a feed contract that returns -> version, balance, ts, block number
+        // TODO: the custom feed contract returns abi.encode{ version: 1, snapshot: abi.encode({})}
         return abi.encode(
             IChainGateway.BalanceSnapshot({totalBalanceInRay: _getLocalAggregatedBalance(), timestamp: block.timestamp})
         );

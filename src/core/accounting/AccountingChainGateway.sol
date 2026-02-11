@@ -110,6 +110,7 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
     {
         IChainBalanceOracle.ChainBalance memory chainBalance =
             IChainBalanceOracle(CHAIN_BALANCE_ORACLE).getChainBalance(earningChainId);
+        // Do not allow same ts from the Earning Chain because we are not aware of the ordering of transactions.
         if (earningChainMessageTimestamp > chainBalance.lastUpdateTimestamp) {
             // The funds were sent from the Earning Chain after the latest balance snapshot was taken.
             // The Chain Balance Oracle does not reflect a snapshot which captures the outflow of assets from the
