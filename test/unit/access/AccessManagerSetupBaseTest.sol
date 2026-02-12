@@ -57,6 +57,8 @@ abstract contract AccessManagerSetupBaseTest is Test {
     /// Replicates forge-std's `deployCodeTo` logic: etch creation code, call to run constructor
     /// (correctly setting the `_SELF` immutable), then etch the resulting runtime bytecode.
     function _deployCreateXTo(address where) internal {
+        // It's OK to use the readFile cheatcode here for the CreateX artifact.
+        // forge-lint: disable-next-line(unsafe-cheatcode)
         string memory artifact = vm.readFile("lib/createx/artifacts/src/CreateX.sol/CreateX.json");
         bytes memory creationCode = vm.parseJsonBytes(artifact, ".bytecode");
         vm.etch(where, creationCode);
@@ -628,7 +630,7 @@ abstract contract AccessManagerSetupBaseTest is Test {
         address admin = _mainAdmin();
 
         // Schedule admin-tier operation on Allocator
-        bytes memory callData = abi.encodeCall(IAllocator.addStrategy, (address(0x1), address(0x2)));
+        bytes memory callData = abi.encodeCall(IAllocator.addStrategy, (address(0x1), address(0x2), uint8(0)));
         bytes32 operationId = accessManager.hashOperation(admin, _allocator(), callData);
 
         vm.prank(admin);
@@ -650,7 +652,7 @@ abstract contract AccessManagerSetupBaseTest is Test {
         address admin = _mainAdmin();
         address secondary = _secondaryAdmin();
 
-        bytes memory callData = abi.encodeCall(IAllocator.addStrategy, (address(0x1), address(0x2)));
+        bytes memory callData = abi.encodeCall(IAllocator.addStrategy, (address(0x1), address(0x2), uint8(0)));
 
         vm.prank(admin);
         accessManager.schedule(_allocator(), callData, 0);
