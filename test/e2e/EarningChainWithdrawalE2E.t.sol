@@ -117,7 +117,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
 
         // Update the chain balance oracle to reflect the funds on the earning chain
         uint256 earningChainBalanceRay = userInitialDeposit.assetDecimalsToRay(address(USDC));
-        chainBalanceOracle.mockChainBalance(
+        _mockChainBalance(
             EARNING_CHAIN_ID,
             earningChainBalanceRay,
             block.timestamp,
@@ -326,7 +326,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         vm.deal(user1, 1000);
         // Mock the chain balance oracle to reflect the IOU exchange on the earning chain when the Accounting Chain
         // Gateway processes the IOU burn message.
-        chainBalanceOracle.mockChainBalance(
+        _mockChainBalance(
             EARNING_CHAIN_ID,
             assetsOnEarningBeforeUser1ExchangeIous - amountIouToExchange,
             block.timestamp,
@@ -380,7 +380,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         // Update the chain balance oracle to reflect the IOU exchange on the earning chain
         // Earning chain balance was 500 USDC worth, now decreased by 225 RAY (amountIouToExchange)
         uint256 remainingEarningChainBalanceRay = assetsOnEarningBeforeUser1ExchangeIous - amountIouToExchange;
-        chainBalanceOracle.mockChainBalance(
+        _mockChainBalance(
             EARNING_CHAIN_ID,
             remainingEarningChainBalanceRay,
             block.timestamp,

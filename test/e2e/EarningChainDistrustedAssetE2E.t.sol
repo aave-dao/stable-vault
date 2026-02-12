@@ -148,7 +148,7 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
         vm.deal(user1, bridgeFeeAmount);
         // Mock the chain balance oracle to reflect the IOU exchange on the earning chain when the Accounting Chain
         // Gateway processes the IOU burn message.
-        chainBalanceOracle.mockChainBalance(
+        _mockChainBalance(
             EARNING_CHAIN_ID,
             0,
             block.timestamp,

@@ -174,7 +174,7 @@ contract EndToEndTest is BaseTest {
 
             // Update the chain balance oracle to reflect the funds on the earning chain
             uint256 earningChainBalanceRay = userInitialDeposit.assetDecimalsToRay(address(USDC));
-            chainBalanceOracle.mockChainBalance(
+            _mockChainBalance(
                 EARNING_CHAIN_ID,
                 earningChainBalanceRay,
                 block.timestamp,
@@ -283,7 +283,7 @@ contract EndToEndTest is BaseTest {
             // The oracle must have a lastUpdateTimestamp >= the message timestamp for the AccountingChainGateway
             // to accept the inbound RETURN_FUNDS message.
             uint256 currentEarningChainBalanceRay = earningChainGateway.getAggregatedBalance();
-            chainBalanceOracle.mockChainBalance(
+            _mockChainBalance(
                 EARNING_CHAIN_ID,
                 currentEarningChainBalanceRay,
                 block.timestamp,
@@ -310,7 +310,7 @@ contract EndToEndTest is BaseTest {
             // Update the chain balance oracle to reflect that funds are now back on accounting chain
             // The earning chain balance decreases by the amount bridged back
             uint256 remainingEarningChainBalanceRay = earningChainGateway.getAggregatedBalance();
-            chainBalanceOracle.mockChainBalance(
+            _mockChainBalance(
                 EARNING_CHAIN_ID,
                 remainingEarningChainBalanceRay,
                 block.timestamp,
@@ -449,7 +449,7 @@ contract EndToEndTest is BaseTest {
             console.log("Earning chain GHO vault balance after withdrawal is now: %s GHO", ghoBalanceOnVaultLeft);
 
             // Update oracle so the AccountingChainGateway accepts the inbound RETURN_FUNDS message
-            chainBalanceOracle.mockChainBalance(
+            _mockChainBalance(
                 EARNING_CHAIN_ID,
                 earningChainGateway.getAggregatedBalance(),
                 block.timestamp,
