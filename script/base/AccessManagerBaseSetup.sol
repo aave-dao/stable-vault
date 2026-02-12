@@ -24,6 +24,9 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook {
         // Setup role granting delays
         _setupRoleGrantingDelays();
 
+        // Setup role admins (guardian role becomes admin for each role)
+        _setupRoleAdmins();
+
         // Setup the ADMIN_ROLE delay
         accessManager.setTargetAdminDelay(address(accessManager), RolesLib.CRITICAL_DELAY);
 
@@ -63,11 +66,14 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook {
         _setupProfile__ATokenVaultRewardClaimer();
     }
 
+    function _aTokenVaultAddresses() internal view virtual returns (address[] memory);
+
     function _setup_Targets(address deployer) internal virtual {
         _setupTarget__CcipAdapter(deployer);
         _setupTarget__Allocator(deployer);
         _setupTarget__WithdrawalPolicy(deployer);
         _setupTarget__AssetRegistry(deployer);
+        _setupTarget__ATokenVaults();
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -78,6 +84,18 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook {
         for (uint256 i = 0; i < roles.length; i++) {
             multicallCalldata[i] =
                 abi.encodeCall(IAccessManager.setRoleGuardian, (roles[i].roleId, roles[i].guardianRoleId));
+        }
+        IMulticall(_accessManager()).multicall(multicallCalldata);
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+    function _setupRoleAdmins() internal {
+        RolesLib.Role[] memory roles = RolesLib.getAllFunctionBasedRoles();
+        bytes[] memory multicallCalldata = new bytes[](roles.length);
+        for (uint256 i = 0; i < roles.length; i++) {
+            multicallCalldata[i] =
+                abi.encodeCall(IAccessManager.setRoleAdmin, (roles[i].roleId, roles[i].guardianRoleId));
         }
         IMulticall(_accessManager()).multicall(multicallCalldata);
     }
@@ -377,6 +395,13 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook {
         );
 
         IMulticall(_accessManager()).multicall(multicallCalldata);
+    }
+
+    function _setupTarget__ATokenVaults() internal {
+        address[] memory vaults = _aTokenVaultAddresses();
+        for (uint256 i = 0; i < vaults.length; i++) {
+            _setupTarget__ATokenVault(vaults[i]);
+        }
     }
 
     function _setupTarget__ATokenVault(address vault) internal {

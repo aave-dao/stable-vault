@@ -28,6 +28,8 @@ import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainSetup, ATokenVaultDeployment, Script {
     using Strings for address;
 
+    address[] internal _deployedATokenVaults;
+
     // Base Chain ID
     uint256 constant ACCOUNTING_CHAIN_ID = 8453;
     // Base CCIP Selector
@@ -37,12 +39,12 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
 
     uint8 constant MAX_STRATEGIES_PER_ASSET = 15;
 
-    address constant PROXY_ADMIN = DEPLOYER;
-    address constant ALLOCATOR_PROXY_ADMIN = PROXY_ADMIN;
-    address constant WITHDRAWAL_POLICY_PROXY_ADMIN = PROXY_ADMIN;
-    address constant ASSET_REGISTRY_PROXY_ADMIN = PROXY_ADMIN;
-    address constant GATEWAY_PROXY_ADMIN = PROXY_ADMIN;
-    address constant IOU_TOKEN_MANAGER_PROXY_ADMIN = PROXY_ADMIN;
+    address immutable PROXY_ADMIN_OWNER = getAccessManagerAddress(DEPLOYER);
+    address immutable ALLOCATOR_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
+    address immutable WITHDRAWAL_POLICY_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
+    address immutable ASSET_REGISTRY_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
+    address immutable GATEWAY_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
+    address immutable IOU_TOKEN_MANAGER_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
 
     address constant ACCESS_MANAGER_ADMIN = DEPLOYER;
 
@@ -84,7 +86,7 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
         _setupAccessManager(DEPLOYER);
     }
 
-    function _accessManager() internal pure override returns (address) {
+    function _accessManager() internal pure virtual override returns (address) {
         return getAccessManagerAddress(DEPLOYER);
     }
 
@@ -127,14 +129,18 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
         address usdcYieldStrategy = _deployATokenVault(USDC, poolAddressProvider, DEPLOYER);
         allocator.addStrategy(USDC, usdcYieldStrategy);
         allocator.setDefaultStrategy(USDC, usdcYieldStrategy);
-        _setupTarget__ATokenVault(usdcYieldStrategy);
+        _deployedATokenVaults.push(usdcYieldStrategy);
         _logDeployment("USDC aTokenVault", "", usdcYieldStrategy);
 
         address usdtYieldStrategy = _deployATokenVault(USDT, poolAddressProvider, DEPLOYER);
         allocator.addStrategy(USDT, usdtYieldStrategy);
         allocator.setDefaultStrategy(USDT, usdtYieldStrategy);
-        _setupTarget__ATokenVault(usdtYieldStrategy);
+        _deployedATokenVaults.push(usdtYieldStrategy);
         _logDeployment("USDT aTokenVault", "", usdtYieldStrategy);
+    }
+
+    function _aTokenVaultAddresses() internal view virtual override returns (address[] memory) {
+        return _deployedATokenVaults;
     }
 
     function _setupAssetRegistry() internal {
@@ -179,7 +185,7 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
             namespacedSaltSeed: ASSET_REGISTRY_SALT_SEED,
             deployer: DEPLOYER,
             implementation: implementation,
-            proxyAdmin: ASSET_REGISTRY_PROXY_ADMIN,
+            proxyAdmin: ASSET_REGISTRY_PROXY_ADMIN_OWNER,
             initCalldata: abi.encodeCall(AssetRegistry.initialize, (getAccessManagerAddress(DEPLOYER)))
         });
         require(assetRegistry == getAssetRegistryAddress(DEPLOYER), "AssetRegistry does not match expected address");
@@ -198,7 +204,7 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
             namespacedSaltSeed: WITHDRAWAL_POLICY_SALT_SEED,
             deployer: DEPLOYER,
             implementation: implementation,
-            proxyAdmin: WITHDRAWAL_POLICY_PROXY_ADMIN,
+            proxyAdmin: WITHDRAWAL_POLICY_PROXY_ADMIN_OWNER,
             initCalldata: abi.encodeCall(WithdrawalPolicy.initialize, (getAccessManagerAddress(DEPLOYER), 0))
         });
         require(
@@ -234,7 +240,7 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
             namespacedSaltSeed: IOU_TOKEN_MANAGER_SALT_SEED,
             deployer: DEPLOYER,
             implementation: implementation,
-            proxyAdmin: IOU_TOKEN_MANAGER_PROXY_ADMIN,
+            proxyAdmin: IOU_TOKEN_MANAGER_PROXY_ADMIN_OWNER,
             initCalldata: ""
         });
         require(
@@ -259,7 +265,7 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
             namespacedSaltSeed: ALLOCATOR_SALT_SEED,
             deployer: DEPLOYER,
             implementation: implementation,
-            proxyAdmin: ALLOCATOR_PROXY_ADMIN,
+            proxyAdmin: ALLOCATOR_PROXY_ADMIN_OWNER,
             initCalldata: abi.encodeCall(Allocator.initialize, (getAccessManagerAddress(DEPLOYER)))
         });
         require(allocator == getAllocatorAddress(DEPLOYER), "Allocator does not match expected address");
@@ -282,7 +288,7 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
             namespacedSaltSeed: GATEWAY_SALT_SEED,
             deployer: DEPLOYER,
             implementation: implementation,
-            proxyAdmin: GATEWAY_PROXY_ADMIN,
+            proxyAdmin: GATEWAY_PROXY_ADMIN_OWNER,
             initCalldata: abi.encodeCall(EarningChainGateway.initialize, (getAccessManagerAddress(DEPLOYER)))
         });
         require(gateway == getGatewayAddress(DEPLOYER), "Gateway does not match expected address");
@@ -320,7 +326,7 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
         return ccipAdapter;
     }
 
-    function _logDeployment(string memory name, string memory saltSeed, address addr) internal {
+    function _logDeployment(string memory name, string memory saltSeed, address addr) internal virtual {
         string memory jsonObject =
             string.concat('{ "address": "', addr.toHexString(), '", "saltSeed": "', saltSeed, '" }');
         vm.writeJson(jsonObject, "deployments/vnet/earning.json", string.concat(".", name));
