@@ -40,15 +40,6 @@ interface IChainGateway {
         bytes data;
     }
 
-    /// @notice The representation of a balance snapshot from an Earning Chain.
-    /// @dev Used by the oracle feed to decode balance data from EarningChainGateway::getBalanceSnapshot().
-    /// @param totalBalanceInRay Cumulative balance of all tokens with common denomination in RAY.
-    /// @param timestamp Timestamp from the source Earning Chain when the snapshot was taken.
-    struct BalanceSnapshot {
-        uint256 totalBalanceInRay;
-        uint256 timestamp;
-    }
-
     /// @notice The representation of a message to bridge IOU tokens to a destination chain.
     /// @dev For message type `BRIDGE_IOU_TOKEN`.
     /// @param recipient Address to send the IOU tokens to on the destination chain.
@@ -62,16 +53,20 @@ interface IChainGateway {
     /// @dev For message type `BURN_IOU_TOKEN`.
     /// @param iouTokenAmountBurnedRay Amount of IOU tokens to burn.
     /// @param timestamp Timestamp from the source Earning Chain when the message is published.
+    /// @param blockNumber Block number from the source Earning Chain when the message is published.
     struct BurnIouTokenMessage {
         uint256 iouTokenAmountBurnedRay;
         uint256 timestamp;
+        uint256 blockNumber;
     }
 
     /// @notice The representation of a message included when funds are returned to the Accounting Chain.
     /// @dev For message type `RETURN_FUNDS`.
     /// @param timestamp Timestamp from the source Earning Chain when the message is published.
+    /// @param blockNumber Block number from the source Earning Chain when the message is published.
     struct ReturnFundsMessage {
         uint256 timestamp;
+        uint256 blockNumber;
     }
 
     /// @notice Gets the default bridge adapter for an asset and chain; the default adapter is used for outbound

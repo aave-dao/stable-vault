@@ -187,7 +187,9 @@ contract EarningChainGateway is
         bytes memory returnFundsMessageEncoded = abi.encode(
             IChainGateway.CrossChainMessage({
                 messageType: IChainGateway.MessageType.RETURN_FUNDS,
-                data: abi.encode(IChainGateway.ReturnFundsMessage({timestamp: block.timestamp}))
+                data: abi.encode(
+                    IChainGateway.ReturnFundsMessage({timestamp: block.timestamp, blockNumber: block.number})
+                )
             })
         );
         _sendCrossChainMessage(
@@ -211,7 +213,9 @@ contract EarningChainGateway is
                 messageType: IChainGateway.MessageType.BURN_IOU_TOKEN,
                 data: abi.encode(
                     IChainGateway.BurnIouTokenMessage({
-                        iouTokenAmountBurnedRay: iouTokenAmountRay, timestamp: block.timestamp
+                        iouTokenAmountBurnedRay: iouTokenAmountRay,
+                        timestamp: block.timestamp,
+                        blockNumber: block.number
                     })
                 )
             })

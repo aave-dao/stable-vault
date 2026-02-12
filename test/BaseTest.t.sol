@@ -880,8 +880,8 @@ contract BaseTest is TestWithHelpers {
     function _setUpAccountingChainAccessManager(AccessManager accessManager) internal {
         vm.startPrank(admin);
 
-        // TODO: set up RoleAdmin role which can grant and revoke roles
-        // TODO: MasterAdmin needs to set grantDelay on all role
+        // AccessManager setup below is intentionally minimal for tests (single executor, zero delays).
+        // A separate test suite is used to validate the AccessManager roles and permissions.
 
         // ----- Set up Guardian -----
         accessManager.grantRole(GUARDIAN_ROLE, everyRoleAccount, 0);
@@ -981,9 +981,7 @@ contract BaseTest is TestWithHelpers {
     function _setUpEarningChainAccessManager(AccessManager accessManager) internal {
         vm.startPrank(admin);
 
-        // TODO: set up RoleAdmin role which can grant and revoke roles
-        // TODO: MasterAdmin needs to set grantDelay on all roles
-        // TODO: creater Pauser role
+        // AccessManager setup below is intentionally minimal for tests (single executor, zero delays).
 
         // ----- Set up Guardian -----
         accessManager.grantRole(GUARDIAN_ROLE, everyRoleAccount, 0);

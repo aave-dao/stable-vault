@@ -493,7 +493,9 @@ contract AccountingChainGatewayTest is TestWithHelpers {
                     messageType: IChainGateway.MessageType.BURN_IOU_TOKEN,
                     data: abi.encode(
                         IChainGateway.BurnIouTokenMessage({
-                            iouTokenAmountBurnedRay: iouTokenAmountBurnedRay, timestamp: block.timestamp
+                            iouTokenAmountBurnedRay: iouTokenAmountBurnedRay,
+                            timestamp: block.timestamp,
+                            blockNumber: block.number
                         })
                     )
                 })
@@ -528,7 +530,9 @@ contract AccountingChainGatewayTest is TestWithHelpers {
                     messageType: IChainGateway.MessageType.BURN_IOU_TOKEN,
                     data: abi.encode(
                         IChainGateway.BurnIouTokenMessage({
-                            iouTokenAmountBurnedRay: iouTokenAmountBurnedRay, timestamp: block.timestamp
+                            iouTokenAmountBurnedRay: iouTokenAmountBurnedRay,
+                            timestamp: block.timestamp,
+                            blockNumber: block.number
                         })
                     )
                 })
@@ -559,7 +563,9 @@ contract AccountingChainGatewayTest is TestWithHelpers {
             abi.encode(
                 IChainGateway.CrossChainMessage({
                     messageType: IChainGateway.MessageType.RETURN_FUNDS,
-                    data: abi.encode(IChainGateway.ReturnFundsMessage({timestamp: block.timestamp}))
+                    data: abi.encode(
+                        IChainGateway.ReturnFundsMessage({timestamp: block.timestamp, blockNumber: block.number})
+                    )
                 })
             )
         );
@@ -586,7 +592,9 @@ contract AccountingChainGatewayTest is TestWithHelpers {
             abi.encode(
                 IChainGateway.CrossChainMessage({
                     messageType: IChainGateway.MessageType.RETURN_FUNDS,
-                    data: abi.encode(IChainGateway.ReturnFundsMessage({timestamp: block.timestamp}))
+                    data: abi.encode(
+                        IChainGateway.ReturnFundsMessage({timestamp: block.timestamp, blockNumber: block.number})
+                    )
                 })
             )
         );
@@ -624,7 +632,9 @@ contract AccountingChainGatewayTest is TestWithHelpers {
                     messageType: IChainGateway.MessageType.BURN_IOU_TOKEN,
                     data: abi.encode(
                         IChainGateway.BurnIouTokenMessage({
-                            iouTokenAmountBurnedRay: iouTokenAmountBurnedRay, timestamp: block.timestamp
+                            iouTokenAmountBurnedRay: iouTokenAmountBurnedRay,
+                            timestamp: block.timestamp,
+                            blockNumber: block.number
                         })
                     )
                 })
@@ -654,7 +664,9 @@ contract AccountingChainGatewayTest is TestWithHelpers {
             IChainGateway.CrossChainMessage({
                 messageType: IChainGateway.MessageType.BURN_IOU_TOKEN,
                 data: abi.encode(
-                    IChainGateway.BurnIouTokenMessage({iouTokenAmountBurnedRay: 100_000, timestamp: block.timestamp})
+                    IChainGateway.BurnIouTokenMessage({
+                        iouTokenAmountBurnedRay: 100_000, timestamp: block.timestamp, blockNumber: block.number
+                    })
                 )
             })
         );

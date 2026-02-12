@@ -110,7 +110,7 @@ based-boosted-vaults/
 │   ├── interfaces/               # Protocol interfaces
 │   ├── libraries/                # Shared libraries (Math, Assets, etc.)
 │   ├── misc/                     # Miscellaneous utils (contracts inherited by core/periphery contracts)
-│   ├── oracles/                  # Price and chain-balance oracle contracts and adapters
+│   ├── oracles/                  # Price and chain balance oracle contracts and adapters
 │   └── periphery/                # Peripheral contracts (WithdrawalPolicy, etc.)
 ├── test/                         # Test suite
 ├── script/                       # Deployment scripts

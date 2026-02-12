@@ -51,7 +51,6 @@ interface IAllocator {
     /// @param asset Address of the asset.
     /// @param amount Amount of the asset.
     struct AllocatorBalance {
-        // TODO: consider adding value here to reflect the price adjusted value alone (keep the amount)
         address asset;
         uint256 amount;
     }

@@ -24,8 +24,10 @@ import {MockChainlinkAggregator} from "test/mocks/MockChainlinkAggregator.sol";
 
 /// @title OracleFeedE2ETest
 /// @notice End-to-end tests validating the full oracle pipeline:
-/// - Chain Balance Oracle: EarningChainState -> MockBundleFeed -> ChainlinkChainBalanceOracleAdapter -> FundsHandler
-/// - Price Oracle: PriceOracle -> LocalBalanceAggregator (inside FundsHandler & EarningChainGateway)
+/// - Chain Balance publish path: EarningChainState -> MockBundleFeed
+/// - Chain Balance read path: FundsHandler -> ChainBalanceOracle -> ChainlinkChainBalanceOracleAdapter ->
+/// MockBundleFeed - Price Oracle: MockChainlinkAggregator -> ChainlinkPriceOracleAdapter -> PriceOracle ->
+///   LocalBalanceAggregator (inside FundsHandler & EarningChainGateway)
 contract OracleFeedE2ETest is BaseTest {
     using AssetLib for uint256;
     using MathLib for uint256;
@@ -984,8 +986,8 @@ contract OracleFeedE2ETest is BaseTest {
     // Helpers
     // -----------------------------------------------------------------------
 
-    /// @dev Reads state from EarningChainState, publishes to MockBundleFeed, reads via adapter,
-    /// and exposes it through ChainBalanceOracle for FundsHandler consumption.
+    /// @dev Reads state from EarningChainState and publishes it to MockBundleFeed.
+    /// The production path (adapter -> ChainBalanceOracle -> FundsHandler) consumes this published bundle.
     function _publishAndSyncOracle() internal {
         // 1. Read live state from Earning Chain
         bytes memory stateBytes = earningChainState.getState();

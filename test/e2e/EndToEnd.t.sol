@@ -86,10 +86,7 @@ contract EndToEndTest is BaseTest {
         uint256 userInitialDeposit = 500 * (10 ** 6);
         USDC.mint(user, userInitialDeposit);
 
-        // TODO:
-        /*
-            1. Setup default liquidity vaults/strategies on both chains for every currency
-        */
+        // BaseTest setUp already configures default liquidity vaults/strategies on both chains.
 
         // // Steps: ////
         // 1. User1 deposits 500 USDC to Vault on Accounting Chain
@@ -172,7 +169,7 @@ contract EndToEndTest is BaseTest {
                 "Allocator should have shares of the vault"
             );
 
-            // Update the chain balance oracle to reflect the funds on the earning chain
+            // Publish a chain balance snapshot via MockBundleFeed so the adapter/oracle path reflects bridged funds.
             uint256 earningChainBalanceRay = userInitialDeposit.assetDecimalsToRay(address(USDC));
             _mockChainBalance(
                 EARNING_CHAIN_ID,
@@ -279,9 +276,8 @@ contract EndToEndTest is BaseTest {
         uint256 userEarningsInGho;
         address defaultGhoVault_accountingChain = allocator_accountingChain.getDefaultStrategy(address(GHO));
         {
-            // Update the chain balance oracle to reflect the current timestamp (time has warped since step 3).
-            // The oracle must have a lastUpdateTimestamp >= the message timestamp for the AccountingChainGateway
-            // to accept the inbound RETURN_FUNDS message.
+            // Publish a fresh pre-return snapshot (time has warped since step 3).
+            // AccountingChainGateway requires lastUpdateTimestamp >= RETURN_FUNDS message timestamp.
             uint256 currentEarningChainBalanceRay = earningChainGateway.getAggregatedBalance();
             _mockChainBalance(
                 EARNING_CHAIN_ID,
@@ -307,8 +303,7 @@ contract EndToEndTest is BaseTest {
                 })
             );
 
-            // Update the chain balance oracle to reflect that funds are now back on accounting chain
-            // The earning chain balance decreases by the amount bridged back
+            // Publish the post-return snapshot reflecting reduced Earning Chain balance after bridging back.
             uint256 remainingEarningChainBalanceRay = earningChainGateway.getAggregatedBalance();
             _mockChainBalance(
                 EARNING_CHAIN_ID,

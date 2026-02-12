@@ -93,10 +93,10 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         uint8 maxStrategiesPerAsset
     ) TransferHelperClient(transferHelper) {
         _disableInitializers();
+        ASSET_REGISTRY = assetRegistry;
         DEPOSITOR = depositor;
         WITHDRAWER = withdrawer;
         PRICE_ORACLE = priceOracle;
-        ASSET_REGISTRY = assetRegistry;
         MAX_STRATEGIES_PER_ASSET = maxStrategiesPerAsset;
     }
 
@@ -425,7 +425,6 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
 
     /// @dev Returns balances grouped by asset.
     function _getTrustedAssetBalances() internal view returns (IAllocator.AllocatorBalance[] memory) {
-        // TODO: adjust by oracle price? to protect against donation attack? This would impact the ECG snapshot
         address[] memory assets = IAssetRegistry(ASSET_REGISTRY).getTrustedAssets();
         IAllocator.AllocatorBalance[] memory allocatedAssets = new IAllocator.AllocatorBalance[](assets.length);
         for (uint256 i = 0; i < assets.length; i++) {

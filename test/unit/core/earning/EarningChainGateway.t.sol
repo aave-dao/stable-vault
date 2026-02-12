@@ -326,7 +326,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
                         messageType: IChainGateway.MessageType.BURN_IOU_TOKEN,
                         data: abi.encode(
                             IChainGateway.BurnIouTokenMessage({
-                                iouTokenAmountBurnedRay: iouTokenAmountRay, timestamp: block.timestamp
+                                iouTokenAmountBurnedRay: iouTokenAmountRay,
+                                timestamp: block.timestamp,
+                                blockNumber: block.number
                             })
                         )
                     })
@@ -391,7 +393,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
             {
                 bytes memory dataInner = abi.encode(
                     IChainGateway.BurnIouTokenMessage({
-                        iouTokenAmountBurnedRay: iouTokenAmountRay, timestamp: block.timestamp
+                        iouTokenAmountBurnedRay: iouTokenAmountRay,
+                        timestamp: block.timestamp,
+                        blockNumber: block.number
                     })
                 );
                 data = abi.encode(
@@ -489,7 +493,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     messageType: IChainGateway.MessageType.BURN_IOU_TOKEN,
                     data: abi.encode(
                         IChainGateway.BurnIouTokenMessage({
-                            iouTokenAmountBurnedRay: iouTokenAmountRay, timestamp: block.timestamp
+                            iouTokenAmountBurnedRay: iouTokenAmountRay,
+                            timestamp: block.timestamp,
+                            blockNumber: block.number
                         })
                     )
                 })
@@ -780,7 +786,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
         bytes memory returnFundsMessageEncoded = abi.encode(
             IChainGateway.CrossChainMessage({
                 messageType: IChainGateway.MessageType.RETURN_FUNDS,
-                data: abi.encode(IChainGateway.ReturnFundsMessage({timestamp: block.timestamp}))
+                data: abi.encode(
+                    IChainGateway.ReturnFundsMessage({timestamp: block.timestamp, blockNumber: block.number})
+                )
             })
         );
 
@@ -842,7 +850,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
         bytes memory returnFundsMessageEncoded = abi.encode(
             IChainGateway.CrossChainMessage({
                 messageType: IChainGateway.MessageType.RETURN_FUNDS,
-                data: abi.encode(IChainGateway.ReturnFundsMessage({timestamp: block.timestamp}))
+                data: abi.encode(
+                    IChainGateway.ReturnFundsMessage({timestamp: block.timestamp, blockNumber: block.number})
+                )
             })
         );
 
@@ -902,7 +912,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
         bytes memory returnFundsMessageEncoded = abi.encode(
             IChainGateway.CrossChainMessage({
                 messageType: IChainGateway.MessageType.RETURN_FUNDS,
-                data: abi.encode(IChainGateway.ReturnFundsMessage({timestamp: block.timestamp}))
+                data: abi.encode(
+                    IChainGateway.ReturnFundsMessage({timestamp: block.timestamp, blockNumber: block.number})
+                )
             })
         );
 

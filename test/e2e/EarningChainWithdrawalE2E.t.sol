@@ -115,7 +115,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             "Default USDC strategy vault on Earning Chain should have the deposited amount of USDC"
         );
 
-        // Update the chain balance oracle to reflect the funds on the earning chain
+        // Publish a chain balance snapshot via MockBundleFeed so the adapter/oracle path reflects Earning Chain funds.
         uint256 earningChainBalanceRay = userInitialDeposit.assetDecimalsToRay(address(USDC));
         _mockChainBalance(
             EARNING_CHAIN_ID,
@@ -324,8 +324,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             iouToken_earningChain.balanceOf(user1), amountIouToExchange, "User should have enough IOUs to exchange"
         );
         vm.deal(user1, 1000);
-        // Mock the chain balance oracle to reflect the IOU exchange on the earning chain when the Accounting Chain
-        // Gateway processes the IOU burn message.
+        // Publish a pre-burn chain balance snapshot so AccountingChainGateway accepts the inbound BURN_IOU_TOKEN.
         _mockChainBalance(
             EARNING_CHAIN_ID,
             assetsOnEarningBeforeUser1ExchangeIous - amountIouToExchange,
@@ -377,7 +376,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             "Assets on Earning Chain should decrease by the amount of IOUs exchanged"
         );
 
-        // Update the chain balance oracle to reflect the IOU exchange on the earning chain
+        // Publish the post-burn chain balance snapshot (after the IOU exchange) to the feed.
         // Earning chain balance was 500 USDC worth, now decreased by 225 RAY (amountIouToExchange)
         uint256 remainingEarningChainBalanceRay = assetsOnEarningBeforeUser1ExchangeIous - amountIouToExchange;
         _mockChainBalance(

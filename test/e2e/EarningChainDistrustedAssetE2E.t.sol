@@ -146,8 +146,7 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
 
         // Check the user can withdraw their original deposit from the Earning Chain
         vm.deal(user1, bridgeFeeAmount);
-        // Mock the chain balance oracle to reflect the IOU exchange on the earning chain when the Accounting Chain
-        // Gateway processes the IOU burn message.
+        // Publish a pre-burn chain balance snapshot so AccountingChainGateway accepts inbound BURN_IOU_TOKEN.
         _mockChainBalance(
             EARNING_CHAIN_ID,
             0,
