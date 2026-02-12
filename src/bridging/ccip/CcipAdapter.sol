@@ -4,6 +4,7 @@ pragma solidity ^0.8.22;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 import {IAny2EVMMessageReceiver} from "@chainlink-ccip/contracts/interfaces/IAny2EVMMessageReceiver.sol";
@@ -11,20 +12,44 @@ import {IRouterClient} from "@chainlink-ccip/contracts/interfaces/IRouterClient.
 import {Client} from "@chainlink-ccip/contracts/libraries/Client.sol";
 
 import {BaseBridgeAdapter} from "src/bridging/BaseBridgeAdapter.sol";
+import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
+import {RescuableNative} from "src/misc/RescuableNative.sol";
+import {RescuableToken} from "src/misc/RescuableToken.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
 /// @title CcipAdapter
 /// @author Aave Labs
 /// @notice Adapter for sending and receiving messages via Chainlink CCIP.
-contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageReceiver, IERC165 {
+/// @dev This adapter will not ingest user-specific tokens and data, therefore the adapter does not support
+/// returning tokens to the original sender on the source chain (original sender will be the source chain CCIP adapter).
+/// @dev This adapter does not implement a defensive receiver pattern because it is assumed that message ingestion will
+/// not fail downstream due to issues other than OOG or if deposits into the Allocator are disabled.
+/// @dev If a revert occurs during the processing of a message, the message will never need to be retried (through
+/// manual execution through the CCIP offramp).
+/// @dev Implementing a defensive receiver pattern would require
+/// storing the message in the contract which can consume ~300k gas; this trade-off is deemed unnecessary given
+/// that the adapter will ingest messages for tokens that are supported, from a trusted source, and contain arbitrary
+/// data that can be parsed on the local Gateway if any arbitrary data is included in a message.
+/// @dev The adapter will revert if the source chain sender is not recognized, and the message will never need to be
+/// retried (through manual execution through the CCIP offramp).
+contract CcipAdapter is
+    BaseBridgeAdapter,
+    ReentrancyGuardTransient,
+    RescuableNative,
+    RescuableToken,
+    ICcipBridgeAdapter,
+    IAny2EVMMessageReceiver,
+    IERC165
+{
     using SafeERC20 for IERC20;
 
     address internal immutable CCIP_ROUTER;
+    address internal immutable ASSET_REGISTRY;
 
     mapping(uint256 chainId => uint64 ccipChainSelector) internal _chainSelectorOf;
     mapping(uint64 ccipChainSelector => uint256 chainId) internal _chainIdOf;
@@ -39,10 +64,16 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
     /// @param gateway Address of the Gateway contract.
     /// @param ccipRouter Address of the Chainlink CCIP router.
     /// @param transferHelper Address of the TransferHelper contract.
-    constructor(address accessManager, address gateway, address ccipRouter, address transferHelper)
-        BaseBridgeAdapter(accessManager, gateway, transferHelper)
-    {
+    /// @param assetRegistry Address of the AssetRegistry contract.
+    constructor(
+        address accessManager,
+        address gateway,
+        address ccipRouter,
+        address transferHelper,
+        address assetRegistry
+    ) BaseBridgeAdapter(accessManager, gateway, transferHelper) {
         CCIP_ROUTER = ccipRouter;
+        ASSET_REGISTRY = assetRegistry;
     }
 
     /// @inheritdoc ICcipBridgeAdapter
@@ -69,35 +100,30 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
     /// @inheritdoc IBridgeAdapter
     function publishMessageToChainWithFeePayer(
         uint256 destinationChainId,
-        BridgeAsset[] memory assets,
+        address asset,
+        uint256 amount,
         bytes memory data,
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) external payable override(BaseBridgeAdapter, IBridgeAdapter) onlyGateway {
-        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](assets.length);
-        address[] memory assetsToPull = new address[](assets.length + 1);
-        uint256[] memory amountsToPull = new uint256[](assets.length + 1);
-        if (assets.length > 0) {
-            for (uint256 i = 0; i < assets.length; i++) {
-                address asset = assets[i].asset;
-                uint256 amount = assets[i].amount;
-                tokenAmounts[i] = Client.EVMTokenAmount({token: asset, amount: amount});
+        address destinationChainAdapter = _destinationChainAdapterOf[destinationChainId];
+        require(destinationChainAdapter != address(0), Errors.InvalidParameter());
 
-                // Approve the CCIP Router to spend the funds
-                assetsToPull[i] = asset;
-                amountsToPull[i] = amount;
-                IERC20(asset).forceApprove(CCIP_ROUTER, amount);
-            }
+        Client.EVMTokenAmount[] memory tokenAmounts;
+        if (asset != Constants.ASSET_FOR_DATA_ONLY_BRIDGE) {
+            tokenAmounts = new Client.EVMTokenAmount[](1);
+            tokenAmounts[0] = Client.EVMTokenAmount({token: asset, amount: amount});
+            ITransferHelper(TRANSFER_HELPER).pull(asset, amount);
+            IERC20(asset).forceApprove(CCIP_ROUTER, amount);
+        } else {
+            tokenAmounts = new Client.EVMTokenAmount[](0);
         }
-        assetsToPull[assetsToPull.length - 1] = bridgeParams.feeToken;
-        amountsToPull[amountsToPull.length - 1] = bridgeParams.feeAmount;
 
+        ITransferHelper(TRANSFER_HELPER).pull(bridgeParams.feeToken, bridgeParams.feeAmount);
         if (bridgeParams.feeToken != Constants.NATIVE_CURRENCY) {
             // Increase allowance in case of the fee token matching an asset being bridged.
             IERC20(bridgeParams.feeToken).safeIncreaseAllowance(CCIP_ROUTER, bridgeParams.feeAmount);
         }
-        ITransferHelper(TRANSFER_HELPER).pull(assetsToPull, amountsToPull);
-        address destinationChainAdapter = _destinationChainAdapterOf[destinationChainId];
-        require(destinationChainAdapter != address(0), Errors.InvalidParameter());
+
         Client.EVM2AnyMessage memory ccipMessage = Client.EVM2AnyMessage({
             receiver: abi.encode(destinationChainAdapter),
             data: data,
@@ -122,49 +148,38 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
     }
 
     /// @inheritdoc IAny2EVMMessageReceiver
-    function ccipReceive(Client.Any2EVMMessage calldata message) external override onlyRouter {
+    function ccipReceive(Client.Any2EVMMessage calldata message) external override nonReentrant onlyRouter {
         emit MessageReceived(message.messageId);
-        if (message.data.length > 0) {
-            // If message processing fails, the whole bridge tx processing must fail too. We do not want to allow the
-            // scenario where the funds are received, but the message is not processed successfully, as this can lead to
-            // double-counting of funds, given that the balance snapshot will still reflect the funds that were just
-            // received.
-            _validateMessageSource(message);
-            IChainGateway(GATEWAY)
-                .receiveMessage(
-                    _chainIdOf[message.sourceChainSelector], new IBridgeAdapter.BridgeAsset[](0), message.data
-                );
-        }
-        if (message.destTokenAmounts.length > 0) {
-            try this.processReceivedFunds(message.destTokenAmounts) {}
-            catch (bytes memory err) {
-                for (uint256 i = 0; i < message.destTokenAmounts.length; i++) {
-                    emit TokenReceptionFailed(
-                        message.messageId,
-                        _chainIdOf[message.sourceChainSelector],
-                        message.destTokenAmounts[i].token,
-                        message.destTokenAmounts[i].amount
-                    );
-                }
-                emit BridgedFundsProcessingFailed(
-                    message.messageId, _chainIdOf[message.sourceChainSelector], abi.encode(message), err
-                );
-            }
-        }
+        // Only process messages if the sender from the source chain is the recognized adapter.
+        _validateMessageSource(message);
+        _processMessage(message);
     }
 
-    function processReceivedFunds(Client.EVMTokenAmount[] memory assetsToProcess) external onlySelf {
-        IBridgeAdapter.BridgeAsset[] memory assets = new IBridgeAdapter.BridgeAsset[](assetsToProcess.length);
-        for (uint256 i = 0; i < assetsToProcess.length; i++) {
-            address asset = assetsToProcess[i].token;
-            uint256 amount = assetsToProcess[i].amount;
-            assets[i] = IBridgeAdapter.BridgeAsset({asset: asset, amount: amount});
-        }
-        _processReceivedFunds(assets);
+    /// @inheritdoc ICcipBridgeAdapter
+    function replayFundsReceiving(address asset, uint256 amount) external override nonReentrant restricted {
+        _processReceivedFunds(asset, amount);
     }
 
     function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
         return interfaceId == type(IAny2EVMMessageReceiver).interfaceId || interfaceId == type(IERC165).interfaceId;
+    }
+
+    function _processMessage(Client.Any2EVMMessage memory message) internal {
+        // Process data first to allow any potential state modifications to take place before processing tokens.
+        // Assumes if data is sent with tokens, then the data must be processed first.
+        if (message.data.length > 0) {
+            IChainGateway(GATEWAY)
+                .receiveMessage(
+                    _chainIdOf[message.sourceChainSelector], Constants.ASSET_FOR_DATA_ONLY_BRIDGE, 0, message.data
+                );
+        }
+        if (message.destTokenAmounts.length > 0) {
+            for (uint256 i = 0; i < message.destTokenAmounts.length; i++) {
+                address asset = message.destTokenAmounts[i].token;
+                uint256 amount = message.destTokenAmounts[i].amount;
+                _processReceivedFunds(asset, amount);
+            }
+        }
     }
 
     function _sendMessageWithFeePayer(
@@ -177,6 +192,7 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
     ) internal {
         uint64 chainSelector = _chainSelectorOf[chainId];
         uint256 estimatedFeeAmount = IRouterClient(CCIP_ROUTER).getFee(chainSelector, message);
+        require(allocatedFeeAmount >= estimatedFeeAmount, Errors.InsufficientFunds());
         uint256 msgValue;
         if (feeToken == Constants.NATIVE_CURRENCY) {
             msgValue = estimatedFeeAmount;
@@ -217,5 +233,19 @@ contract CcipAdapter is BaseBridgeAdapter, ICcipBridgeAdapter, IAny2EVMMessageRe
         bytes32 value = bytes32(abiEncodedEvmSender[0:Constants.ABI_ENCODED_EVM_ADDRESS_BYTE_LENGTH]);
         require((value & Constants.ABI_ENCODED_EVM_ADDRESS_MASK) == value, Errors.InvalidParameter());
         return abi.decode(abiEncodedEvmSender, (address));
+    }
+
+    function _beforeRescueNative(uint256) internal virtual override {
+        // Equivalent to adding the `restricted` modifier.
+        _checkCanCall(_msgSender(), _msgData());
+    }
+
+    function _beforeRescueTokens(address token, uint256) internal virtual override {
+        // Equivalent to adding the `restricted` modifier.
+        _checkCanCall(_msgSender(), _msgData());
+        // The adapter is not designed to hold the system's funds. The check to allow rescuing only tokens that are
+        // NOT registered was added as a safeguard in case registered assets accidentally end up here, to prevent
+        // taking them out of the system. Instead, they should be re-injected into the system via replayFundsReceiving.
+        require(!IAssetRegistry(ASSET_REGISTRY).isAssetRegistered(token), Errors.InvalidParameter());
     }
 }

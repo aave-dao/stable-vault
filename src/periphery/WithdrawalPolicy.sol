@@ -23,22 +23,6 @@ import {Errors} from "src/types/Errors.sol";
 /// liquidity, discourage spam, and cover protocol operational costs (e.g. bridge or swap fees).
 /// @dev The fee is capped at 5.00% and is expected to be lower in most scenarios.
 contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithdrawalPolicy {
-    /// @notice Emitted when a nonce is marked as used, either by a successful appliance of the withdrawal policy or by
-    /// a nonce invalidation.
-    event NonceUsed(address indexed signer, uint256 indexed nonce);
-
-    /// @notice Thrown when a recovered signer is not a whitelisted signer.
-    /// @custom:selector 0x8baa579f
-    error InvalidSignature();
-
-    /// @notice Thrown when a signature nonce has already been consumed.
-    /// @custom:selector 0x1fb09b80
-    error NonceAlreadyUsed();
-
-    /// @notice Thrown when the signature deadline has passed.
-    /// @custom:selector 0x1ab7da6b
-    error DeadlineExpired();
-
     // EIP-712 typeHash:
     // keccak256("FeeDiscount(address user,address assetOut,uint256 iouAmountRay,uint16 personalFeeBps,uint256
     // nonce,uint256 deadline)").
@@ -126,6 +110,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
         if (signer != address(0)) {
             _markNonceAsUsed(signer, nonce);
         }
+        emit WithdrawalPolicyApplied(request.user, request.assetOut, request.iouAmountRay, amountOutRay);
         return amountOutRay;
     }
 
@@ -176,6 +161,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
         require(newAssetFeeBps <= FEE_CAP_BPS, Errors.InvalidParameter());
         $storage().assetFeeConfigs[asset].feeBps = newAssetFeeBps;
         $storage().assetFeeConfigs[asset].isSet = isSet;
+        emit AssetFeeBpsSet(asset, newAssetFeeBps, isSet);
     }
 
     /// @notice Sets the fallback fee in basis points which is used when a personal fee or asset-specific fee is not
@@ -283,5 +269,6 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     function _setDefaultFeeBps(uint16 newDefaultFeeBps) internal {
         require(newDefaultFeeBps <= FEE_CAP_BPS, Errors.InvalidParameter());
         $storage().defaultFeeBps = newDefaultFeeBps;
+        emit DefaultFeeBpsSet(newDefaultFeeBps);
     }
 }

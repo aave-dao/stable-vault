@@ -188,8 +188,13 @@ contract EarningChainGateway is
         IIouTokenManager(IOU_TOKEN_MANAGER).mintTokens(iouTokenBridgeMessage.recipient, iouTokenBridgeMessage.amount);
     }
 
-    function _receiveData(uint256 sourceChainId, bytes memory data) internal override {
-        _onlyAdapter(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, sourceChainId);
+    function _receiveData(
+        uint256, // sourceChainId
+        bytes memory data
+    )
+        internal
+        override
+    {
         IChainGateway.CrossChainMessage memory crossChainMessage = abi.decode(data, (IChainGateway.CrossChainMessage));
         if (crossChainMessage.messageType == IChainGateway.MessageType.BRIDGE_IOU_TOKEN) {
             _bridgeIouTokenFromAccountingChain(crossChainMessage.data);
@@ -198,10 +203,8 @@ contract EarningChainGateway is
         }
     }
 
-    function _receiveFunds(IBridgeAdapter.BridgeAsset[] memory assets) internal override {
-        for (uint256 i = 0; i < assets.length; i++) {
-            IAllocator(ALLOCATOR).deposit(assets[i].asset, assets[i].amount);
-        }
+    function _receiveFunds(address asset, uint256 amount) internal override {
+        IAllocator(ALLOCATOR).depositAllowIdle(asset, amount);
     }
 
     function _returnFundsWithBalanceSnapshot(

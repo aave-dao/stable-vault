@@ -38,6 +38,7 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
     address constant DEPLOYER = address(0xBB700dA5CCC9Ec5605780Fc40695f1206B090303);
 
     uint8 constant MAX_STRATEGIES_PER_ASSET = 15;
+    uint8 constant STRATEGY_MAX_SLIPPAGE_AMOUNT = 10;
 
     address immutable PROXY_ADMIN_OWNER = getAccessManagerAddress(DEPLOYER);
     address immutable ALLOCATOR_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
@@ -127,13 +128,13 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
         // allocator.setDefaultStrategy(GHO, ghoYieldStrategy);
 
         address usdcYieldStrategy = _deployATokenVault(USDC, poolAddressProvider, DEPLOYER);
-        allocator.addStrategy(USDC, usdcYieldStrategy);
+        allocator.addStrategy(USDC, usdcYieldStrategy, STRATEGY_MAX_SLIPPAGE_AMOUNT);
         allocator.setDefaultStrategy(USDC, usdcYieldStrategy);
         _deployedATokenVaults.push(usdcYieldStrategy);
         _logDeployment("USDC aTokenVault", "", usdcYieldStrategy);
 
         address usdtYieldStrategy = _deployATokenVault(USDT, poolAddressProvider, DEPLOYER);
-        allocator.addStrategy(USDT, usdtYieldStrategy);
+        allocator.addStrategy(USDT, usdtYieldStrategy, STRATEGY_MAX_SLIPPAGE_AMOUNT);
         allocator.setDefaultStrategy(USDT, usdtYieldStrategy);
         _deployedATokenVaults.push(usdtYieldStrategy);
         _logDeployment("USDT aTokenVault", "", usdtYieldStrategy);
@@ -317,7 +318,8 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
                     getAccessManagerAddress(DEPLOYER),
                     getGatewayAddress(DEPLOYER),
                     CCIP_ROUTER_ADDRESS,
-                    getTransferHelperAddress(DEPLOYER)
+                    getTransferHelperAddress(DEPLOYER),
+                    getAssetRegistryAddress(DEPLOYER)
                 )
             )
         });

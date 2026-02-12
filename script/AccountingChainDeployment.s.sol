@@ -43,6 +43,7 @@ contract AccountingChainDeployment is
     uint256 constant DEFAULT_SUB_VAULT_PER_SECOND_RATE = 1000000001243680656318820313; // ~4% APY
     uint256 constant DEFAULT_MAX_ACTIVE_SUB_VAULTS = 201;
     uint8 constant MAX_STRATEGIES_PER_ASSET = 15;
+    uint8 constant STRATEGY_MAX_SLIPPAGE_AMOUNT = 10; // 10 wei
 
     address immutable PROXY_ADMIN_OWNER = getAccessManagerAddress(DEPLOYER);
     address immutable BBV_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
@@ -133,13 +134,13 @@ contract AccountingChainDeployment is
         address poolAddressProvider = address(0xe20fCBdBfFC4Dd138cE8b2E6FBb6CB49777ad64D);
 
         address ghoYieldStrategy = _deployATokenVault(GHO, poolAddressProvider, DEPLOYER);
-        allocator.addStrategy(GHO, ghoYieldStrategy);
+        allocator.addStrategy(GHO, ghoYieldStrategy, STRATEGY_MAX_SLIPPAGE_AMOUNT);
         allocator.setDefaultStrategy(GHO, ghoYieldStrategy);
         _deployedATokenVaults.push(ghoYieldStrategy);
         _logDeployment("GHO aTokenVault", "", ghoYieldStrategy);
 
         address usdcYieldStrategy = _deployATokenVault(USDC, poolAddressProvider, DEPLOYER);
-        allocator.addStrategy(USDC, usdcYieldStrategy);
+        allocator.addStrategy(USDC, usdcYieldStrategy, STRATEGY_MAX_SLIPPAGE_AMOUNT);
         allocator.setDefaultStrategy(USDC, usdcYieldStrategy);
         _deployedATokenVaults.push(usdcYieldStrategy);
         _logDeployment("USDC aTokenVault", "", usdcYieldStrategy);
@@ -370,7 +371,8 @@ contract AccountingChainDeployment is
                     getAccessManagerAddress(DEPLOYER),
                     getGatewayAddress(DEPLOYER),
                     CCIP_ROUTER_ADDRESS,
-                    getTransferHelperAddress(DEPLOYER)
+                    getTransferHelperAddress(DEPLOYER),
+                    getAssetRegistryAddress(DEPLOYER)
                 )
             )
         });

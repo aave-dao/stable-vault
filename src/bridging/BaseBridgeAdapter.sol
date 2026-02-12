@@ -8,14 +8,13 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
-import {RescuableNative} from "src/misc/RescuableNative.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
 import {Errors} from "src/types/Errors.sol";
 
 /// @title BaseBridgeAdapter
 /// @author Aave Labs
 /// @notice Base contract for bridge adapters.
-abstract contract BaseBridgeAdapter is AccessManaged, RescuableNative, TransferHelperClient, IBridgeAdapter {
+abstract contract BaseBridgeAdapter is AccessManaged, TransferHelperClient, IBridgeAdapter {
     using SafeERC20 for IERC20;
 
     /// @dev Funds handling does not depend on the source chain id (only data handling does).
@@ -28,13 +27,6 @@ abstract contract BaseBridgeAdapter is AccessManaged, RescuableNative, TransferH
 
     modifier onlyGateway() {
         require(msg.sender == GATEWAY, Errors.OnlyGateway());
-        _;
-    }
-
-    modifier onlySelf() {
-        if (msg.sender != address(this)) {
-            revert Errors.OnlySelf();
-        }
         _;
     }
 
@@ -57,7 +49,8 @@ abstract contract BaseBridgeAdapter is AccessManaged, RescuableNative, TransferH
     /// @inheritdoc IBridgeAdapter
     function publishMessageToChainWithFeePayer(
         uint256 destinationChainId,
-        IBridgeAdapter.BridgeAsset[] memory assets,
+        address asset,
+        uint256 amount,
         bytes memory data,
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) external payable virtual override;
@@ -66,26 +59,9 @@ abstract contract BaseBridgeAdapter is AccessManaged, RescuableNative, TransferH
         _destinationChainAdapterOf[chainId] = destinationChainAdapter;
     }
 
-    /// @inheritdoc IBridgeAdapter
-    function replayFundsReceiving(IBridgeAdapter.BridgeAsset[] memory assets) external virtual override {
-        _processReceivedFunds(assets);
-    }
-
-    function _processReceivedFunds(IBridgeAdapter.BridgeAsset[] memory assets)
-        internal
-        assertingTransferHelperBalanceForBridgeAssets(assets)
-    {
-        for (uint256 i = 0; i < assets.length; i++) {
-            address asset = assets[i].asset;
-            uint256 amount = assets[i].amount;
-            _transferToTransferHelper(asset, amount);
-        }
-        IChainGateway(GATEWAY).receiveMessage(RECEIVED_FUNDS_ONLY_SOURCE_CHAIN_ID, assets, "");
-    }
-
-    function _beforeRescueNative(uint256) internal virtual override {
-        // Equivalent to adding the `restricted` modifier.
-        _checkCanCall(_msgSender(), _msgData());
+    function _processReceivedFunds(address asset, uint256 amount) internal assertingTransferHelperBalanceFor(asset) {
+        _transferToTransferHelper(asset, amount);
+        IChainGateway(GATEWAY).receiveMessage(RECEIVED_FUNDS_ONLY_SOURCE_CHAIN_ID, asset, amount, "");
     }
 
     receive() external payable {}

@@ -102,10 +102,10 @@ interface IChainGateway {
 
     /// @notice Handle receiving of a data and funds from a source chain.
     /// @param sourceChainId The chain from which the message was sent from.
+    /// @param asset The asset bridged over from a source chain.
+    /// @param amount The amount of the asset bridged.
     /// @param data The data that was sent from a source chain.
-    /// @param assets The assets bridged over from a source chain.
-    function receiveMessage(uint256 sourceChainId, IBridgeAdapter.BridgeAsset[] memory assets, bytes memory data)
-        external;
+    function receiveMessage(uint256 sourceChainId, address asset, uint256 amount, bytes memory data) external;
 
     /// @notice Sends a message to bridge IOU tokens to a destination chain.
     /// @param destinationChainId The chain id of the chain to publish the message to.
