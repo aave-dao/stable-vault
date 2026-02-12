@@ -90,8 +90,8 @@ contract AccountingChainDeployment is
 
     function _setupContracts() internal {
         _setupBridgeAdapters();
-        _setupAllocator();
         _setupAssetRegistry();
+        _setupAllocator();
         _setupAccessManager(DEPLOYER);
     }
 
