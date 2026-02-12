@@ -34,7 +34,7 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
 
     function _aTokenVaultAddresses()
         internal
-        pure
+        view
         virtual
         override(AccountingChainDeployment, AccessManagerSetupBaseTest)
         returns (address[] memory)

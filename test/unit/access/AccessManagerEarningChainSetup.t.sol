@@ -33,7 +33,7 @@ contract AccessManagerEarningChainSetupTest is AccessManagerSetupBaseTest, Earni
 
     function _aTokenVaultAddresses()
         internal
-        pure
+        view
         virtual
         override(EarningChainDeployment, AccessManagerSetupBaseTest)
         returns (address[] memory)
