@@ -35,13 +35,25 @@ The protocol operates on a model where the Accounting Chain is the primary comma
 - **Accounting Chain**: Hosts the `BasedBoostedVault`, `FundsHandler` and `Allocator` for local yield strategies. It tracks the global state of user deposits and total system liquidity.
 - **Earning Chains**: Host `EarningChainGateway` and local `Allocator`s. Funds are bridged here to access yield opportunities not available on the Accounting Chain.
 
+**Oracle Architecture:**
+- **Price oracles (both chains)**:
+  - `PriceOracle` is the canonical price entry point for protocol contracts.
+  - Asset-specific adapters (e.g. `ChainlinkPriceOracleAdapter`) are registered on `PriceOracle`.
+  - `validatePrice` enforces staleness and minimum-valid-price checks for safety-critical flows (e.g. deposits).
+  - `getPrice` is used for aggregation and returns `0` for stale prices; prices above `1 RAY` are capped to `1 RAY`.
+- **Chain balance oracle (Accounting Chain)**:
+  - `FundsHandler` and `AccountingChainGateway` read from `ChainBalanceOracle`.
+  - `ChainBalanceOracle` delegates per-chain reads to registered adapters.
+  - `ChainlinkChainBalanceOracleAdapter` decodes snapshots published from `EarningChainState` and marks data stale using heartbeat + buffer.
+- **Snapshot source**:
+  - `EarningChainState.getState()` encodes the Earning Chain balance snapshot (`balanceRay`, source timestamp, source block number).
+  - This snapshot is published by the Chainlink network to a bundle feed consumed by `ChainlinkChainBalanceOracleAdapter`.
+
 **Manager Roles:**
 1. **Bridging Funds**:
    - Managers call `pushFundsToChain` on the `FundsHandler`. This bridges assets via the `AccountingChainGateway` to an Earning Chain.
    - Managers call `pushFundsToAccountingChain` on the `EarningChainGateway` to return funds to the Accounting Chain.
-2. **Balance Synchronization**:
-   - Managers trigger `sendBalanceUpdateWithFeePayer` on the `EarningChainGateway` to send a balance snapshot back to the Accounting Chain. This ensures the `FundsHandler` on the Accounting Chain is aware of the accrued yield and total assets on remote chains.
-3. **Strategy Management**:
+2. **Strategy Management**:
    - Managers add, remove, and set default strategies on the `Allocator` to direct funds into the most efficient yield sources.
 
 ## User Guide
@@ -97,7 +109,8 @@ based-boosted-vaults/
 │   │   └── ious/                 # IOU token management
 │   ├── interfaces/               # Protocol interfaces
 │   ├── libraries/                # Shared libraries (Math, Assets, etc.)
-│   ├── misc/                     # Miscellaneous utilities (contracts inherited by core/periphery contracts)
+│   ├── misc/                     # Miscellaneous utils (contracts inherited by core/periphery contracts)
+│   ├── oracles/                  # Price and chain-balance oracle contracts and adapters
 │   └── periphery/                # Peripheral contracts (WithdrawalPolicy, etc.)
 ├── test/                         # Test suite
 ├── script/                       # Deployment scripts
