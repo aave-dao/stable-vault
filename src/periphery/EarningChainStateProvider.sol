@@ -4,7 +4,6 @@ pragma solidity ^0.8.22;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
 import {IEarningChainStateProvider} from "src/interfaces/IEarningChainStateProvider.sol";
 import {EarningChainStateProvider_V1} from "src/periphery/EarningChainStateProvider_V1.sol";
 
@@ -18,30 +17,14 @@ import {EarningChainStateProvider_V1} from "src/periphery/EarningChainStateProvi
 /// and the block number. The version is used to determine the encoding of the data on the Accounting Chain.
 /// @dev This contract is upgradeable to allow exposing additional state in future versions.
 contract EarningChainStateProvider is Initializable, EarningChainStateProvider_V1, IEarningChainStateProvider {
-    address internal immutable EARNING_CHAIN_GATEWAY;
-
     /// @dev Constructor.
     /// @param earningChainGateway Address of the EarningChainGateway contract.
-    constructor(address earningChainGateway) {
+    constructor(address earningChainGateway) EarningChainStateProvider_V1(earningChainGateway) {
         _disableInitializers();
-        EARNING_CHAIN_GATEWAY = earningChainGateway;
     }
 
     /// @inheritdoc IEarningChainStateProvider
     function getState() external view returns (bytes memory) {
-        uint256 balance = IEarningChainGateway(EARNING_CHAIN_GATEWAY).getAggregatedBalance();
-        return abi.encode(
-            State({
-                version: VERSION,
-                data: abi.encode(
-                    BalanceSnapshot({
-                        balanceRay: balance,
-                        timestamp: block.timestamp,
-                        blockNumber: block.number,
-                        chainId: block.chainid
-                    })
-                )
-            })
-        );
+        return abi.encode(State({version: VERSION, data: _getData()}));
     }
 }
