@@ -73,7 +73,7 @@ contract EarningChainStateTest is TestWithHelpers {
         _earningChainState = EarningChainState(
             address(
                 new TransparentUpgradeableProxy(
-                    earningChainStateImpl, address(this), abi.encodeCall(EarningChainState.initialize, ())
+                    earningChainStateImpl, address(this), ""
                 )
             )
         );

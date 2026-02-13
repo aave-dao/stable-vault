@@ -15,6 +15,7 @@ import {IEarningChainState} from "src/interfaces/IEarningChainState.sol";
 /// @dev The state is published as a single bytes encoded struct which contains the version and the data.
 /// For this version, the data is encoded as a BalanceSnapshot struct which contains the balance in RAY, the timestamp
 /// and the block number. The version is used to determine the encoding of the data on the Accounting Chain.
+/// @dev This contract is upgradeable to allow exposing additional state in future versions.
 contract EarningChainState is Initializable, IEarningChainState {
     uint256 public constant VERSION = 1;
 
@@ -26,9 +27,6 @@ contract EarningChainState is Initializable, IEarningChainState {
         _disableInitializers();
         EARNING_CHAIN_GATEWAY = earningChainGateway;
     }
-
-    /// @dev Initializer.
-    function initialize() external initializer {}
 
     /// @inheritdoc IEarningChainState
     function getState() external view returns (bytes memory) {
