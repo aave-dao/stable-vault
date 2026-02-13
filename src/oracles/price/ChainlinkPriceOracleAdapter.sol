@@ -51,7 +51,7 @@ contract ChainlinkPriceOracleAdapter is IPriceOracleAdapter {
     function getPrice(address asset) external view override returns (IPriceOracleAdapter.OracleResponse memory) {
         require(asset == ASSET, Errors.InvalidAsset(asset));
         (, int256 price,, uint256 updatedAt,) = AggregatorV3Interface(DATA_FEED).latestRoundData();
-        uint256 priceRay = _convertDecimalsToRay(price);
+        uint256 priceRay = _toUint256(price).convertDecimals(DECIMALS, Constants.RAY_DECIMALS);
         bool isStale = false;
         if (updatedAt < block.timestamp && block.timestamp - updatedAt >= HEARTBEAT + HEARTBEAT_BUFFER_SECONDS) {
             isStale = true;
@@ -59,13 +59,12 @@ contract ChainlinkPriceOracleAdapter is IPriceOracleAdapter {
         return IPriceOracleAdapter.OracleResponse(priceRay, isStale);
     }
 
-    function _convertDecimalsToRay(int256 price) internal view returns (uint256) {
+    function _toUint256(int256 price) internal pure returns (uint256) {
         if (price <= 0) {
-            // Return 0 to avoid disrupting any aggregation that may take place at a higher level.
             return 0;
         }
         // Casting to 'uint256' is safe because we checked that price > 0.
         // forge-lint: disable-next-line(unsafe-typecast)
-        return uint256(price).convertDecimals(DECIMALS, Constants.RAY_DECIMALS);
+        return uint256(price);
     }
 }
