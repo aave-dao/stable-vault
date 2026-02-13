@@ -16,7 +16,6 @@ import {BasedBoostedVault} from "src/core/accounting/BasedBoostedVault.sol";
 import {BasedBoostedVault} from "src/core/accounting/BasedBoostedVault.sol";
 import {FundsHandler} from "src/core/accounting/FundsHandler.sol";
 import {EarningChainGateway} from "src/core/earning/EarningChainGateway.sol";
-import {EarningChainState} from "src/core/earning/EarningChainState.sol";
 import {IouToken} from "src/core/ious/IouToken.sol";
 import {IouTokenManager} from "src/core/ious/IouTokenManager.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
@@ -41,6 +40,7 @@ import {ChainBalanceOracle} from "src/oracles/balance/ChainBalanceOracle.sol";
 import {ChainlinkChainBalanceOracleAdapter} from "src/oracles/balance/ChainlinkChainBalanceOracleAdapter.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {_toSelectorArray} from "test/helpers/TypeHelpers.sol";
+import {EarningChainStateHarness} from "test/mocks/EarningChainStateHarness.sol";
 import {MockBundleFeed} from "test/mocks/MockBundleFeed.sol";
 import {MockCCIPRouter} from "test/mocks/MockCcipRouter.sol";
 import {MockErc20} from "test/mocks/MockErc20.sol";
@@ -147,7 +147,7 @@ contract BaseTest is TestWithHelpers {
 
     // Chain Balance Oracle + adapter/feed wiring used by E2E tests
     ChainBalanceOracle public chainBalanceOracle;
-    EarningChainState public earningChainState;
+    IEarningChainState public earningChainState;
     MockBundleFeed public mockBundleFeed;
     ChainlinkChainBalanceOracleAdapter public chainBalanceOracleAdapter;
 
@@ -859,14 +859,9 @@ contract BaseTest is TestWithHelpers {
         fundsHandler.addEarningChain(EARNING_CHAIN_ID);
 
         // Set up EarningChainState -> MockBundleFeed -> Chainlink adapter -> ChainBalanceOracle.
-        address earningChainStateImpl = address(new EarningChainState(address(earningChainGateway)));
-        earningChainState = EarningChainState(
-            address(
-                new TransparentUpgradeableProxy(
-                    earningChainStateImpl, proxyAdmin, ""
-                )
-            )
-        );
+        // Use a harness so snapshots encode the simulated Earning Chain id in single-EVM E2E tests.
+        earningChainState =
+            IEarningChainState(address(new EarningChainStateHarness(address(earningChainGateway), EARNING_CHAIN_ID)));
         mockBundleFeed = new MockBundleFeed();
         chainBalanceOracleAdapter = new ChainlinkChainBalanceOracleAdapter(
             EARNING_CHAIN_ID, address(mockBundleFeed), CHAIN_BALANCE_ORACLE_HEARTBEAT_SECONDS
@@ -1071,7 +1066,10 @@ contract BaseTest is TestWithHelpers {
                 version: 1,
                 data: abi.encode(
                     IEarningChainState.BalanceSnapshot({
-                        balanceRay: balanceRay, timestamp: sourceChainTimestamp, blockNumber: sourceChainBlockNumber
+                        balanceRay: balanceRay,
+                        timestamp: sourceChainTimestamp,
+                        blockNumber: sourceChainBlockNumber,
+                        chainId: EARNING_CHAIN_ID
                     })
                 )
             })

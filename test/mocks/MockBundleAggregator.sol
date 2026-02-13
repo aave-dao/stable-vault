@@ -9,6 +9,7 @@ contract MockBundleAggregator {
     uint256 internal _totalBalanceInRay;
     uint256 internal _timestamp;
     uint256 internal _blockNumber;
+    uint256 internal _chainId;
     uint256 internal _version;
 
     function latestBundle() external view returns (bytes memory bundle) {
@@ -18,7 +19,10 @@ contract MockBundleAggregator {
                 version: _version,
                 data: abi.encode(
                     IEarningChainState.BalanceSnapshot({
-                        balanceRay: _totalBalanceInRay, timestamp: _timestamp, blockNumber: _blockNumber
+                        balanceRay: _totalBalanceInRay,
+                        timestamp: _timestamp,
+                        blockNumber: _blockNumber,
+                        chainId: _chainId
                     })
                 )
             })
@@ -33,10 +37,11 @@ contract MockBundleAggregator {
         return _timestamp;
     }
 
-    function setAnswer(uint256 version, uint256 totalBalanceInRay, uint256 timestamp) external {
+    function setAnswer(uint256 version, uint256 totalBalanceInRay, uint256 timestamp, uint256 chainId) external {
         _version = version;
         _totalBalanceInRay = totalBalanceInRay;
         _timestamp = timestamp;
+        _chainId = chainId;
     }
 
     function setBundleDecimals(uint8[] memory decimals) external {

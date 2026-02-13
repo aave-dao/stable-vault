@@ -70,13 +70,8 @@ contract EarningChainStateTest is TestWithHelpers {
         );
 
         address earningChainStateImpl = address(new EarningChainState(address(_earningChainGateway)));
-        _earningChainState = EarningChainState(
-            address(
-                new TransparentUpgradeableProxy(
-                    earningChainStateImpl, address(this), ""
-                )
-            )
-        );
+        _earningChainState =
+            EarningChainState(address(new TransparentUpgradeableProxy(earningChainStateImpl, address(this), "")));
     }
 
     function test_getState_returnsExpectedStateWithMultipleAssets(

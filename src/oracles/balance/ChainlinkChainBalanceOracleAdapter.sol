@@ -62,6 +62,7 @@ contract ChainlinkChainBalanceOracleAdapter is IChainBalanceOracleAdapter {
         );
         IEarningChainState.BalanceSnapshot memory balanceSnapshot =
             abi.decode(state.data, (IEarningChainState.BalanceSnapshot));
+        require(balanceSnapshot.chainId == CHAIN_ID, InvalidSnapshotChainId(CHAIN_ID, balanceSnapshot.chainId));
 
         return IChainBalanceOracle.ChainBalance({
             balanceRay: balanceSnapshot.balanceRay,

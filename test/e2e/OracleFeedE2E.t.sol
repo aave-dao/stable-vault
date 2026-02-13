@@ -386,7 +386,11 @@ contract OracleFeedE2ETest is BaseTest {
     function test_oracleFeed_versionMismatch_reverts() public {
         // Construct a state with version=2 (adapter expects version=1)
         IEarningChainState.BalanceSnapshot memory snapshot = IEarningChainState.BalanceSnapshot({
-            balanceRay: 1000 * MathLib.RAY, timestamp: block.timestamp, blockNumber: block.number
+            balanceRay: 1000 * MathLib.RAY,
+            timestamp: block.timestamp,
+            blockNumber: block.number,
+            // Need to set the same chainId because the e2e test simulates 2 chains although they are the same.
+            chainId: block.chainid
         });
         bytes memory stateBytes = abi.encode(IEarningChainState.State({version: 2, data: abi.encode(snapshot)}));
 

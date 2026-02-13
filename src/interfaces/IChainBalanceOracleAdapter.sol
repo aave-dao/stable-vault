@@ -13,6 +13,10 @@ interface IChainBalanceOracleAdapter {
     /// @custom:selector 0x331003b3
     error InvalidChainId(uint256 chainId);
 
+    /// @notice Thrown when the chain id of the snapshot is not what was expected.
+    /// @custom:selector 0x7689e196
+    error InvalidSnapshotChainId(uint256 expected, uint256 actual);
+
     /// @notice Thrown when the version of the IEarningChainState struct is not what was expected.
     /// @custom:selector 0xf680bfbb
     error InvalidEarningChainStateVersion(uint256 expected, uint256 actual);

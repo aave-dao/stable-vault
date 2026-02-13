@@ -16,10 +16,12 @@ interface IEarningChainState {
     /// @param balanceRay The balance of the Earning Chain in RAY.
     /// @param timestamp The timestamp of the Balance Snapshot.
     /// @param blockNumber The block number of the Balance Snapshot.
+    /// @param chainId The chain id of the Balance Snapshot.
     struct BalanceSnapshot {
         uint256 balanceRay;
         uint256 timestamp;
         uint256 blockNumber;
+        uint256 chainId;
     }
 
     /// @notice Gets the current state of the Earning Chain.
