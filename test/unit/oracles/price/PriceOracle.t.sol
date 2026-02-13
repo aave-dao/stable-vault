@@ -74,7 +74,7 @@ contract PriceOracleTest is TestWithHelpers {
         _mockAdapter.mockResponse(asset1, priceRay, false);
 
         vm.expectEmit(true, true, true, true);
-        emit IPriceOracle.OracleAdapterSet(asset1, address(0), address(_mockAdapter));
+        emit IPriceOracle.OracleAdapterSet(asset1, address(_mockAdapter), address(0));
 
         vm.prank(everyRoleAccount);
         _priceOracle.setOracleAdapterForAsset(asset1, address(_mockAdapter));
@@ -93,7 +93,7 @@ contract PriceOracleTest is TestWithHelpers {
 
         // Setting a new adapter should emit event with previous adapter
         vm.expectEmit(true, true, true, true);
-        emit IPriceOracle.OracleAdapterSet(asset1, address(_mockAdapter), address(newAdapter));
+        emit IPriceOracle.OracleAdapterSet(asset1, address(newAdapter), address(_mockAdapter));
 
         vm.prank(everyRoleAccount);
         _priceOracle.setOracleAdapterForAsset(asset1, address(newAdapter));
