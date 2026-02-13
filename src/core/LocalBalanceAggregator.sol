@@ -25,7 +25,7 @@ contract LocalBalanceAggregator {
     function _getLocalAggregatedBalance() internal view returns (uint256) {
         IAllocator.AllocatorBalance[] memory allocatorAssets = IAllocator(ALLOCATOR).getTrustedAssetBalances();
         uint256 localBalanceRay;
-        for (uint16 i = 0; i < allocatorAssets.length; i++) {
+        for (uint256 i = 0; i < allocatorAssets.length; i++) {
             uint256 priceRay = IPriceOracle(PRICE_ORACLE).getPrice(allocatorAssets[i].asset);
             localBalanceRay += priceRay.rayMulDown(
                 allocatorAssets[i].amount.assetDecimalsToRay(allocatorAssets[i].asset)

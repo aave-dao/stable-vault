@@ -98,7 +98,7 @@ contract FundsHandler is
     /// @inheritdoc IFundsHandler
     function getAggregatedBalance() external view override returns (uint256) {
         uint256 totalBalanceRay = _getLocalAggregatedBalance();
-        for (uint16 i = 0; i < $storage().earningChainIds.length(); i++) {
+        for (uint256 i = 0; i < $storage().earningChainIds.length(); i++) {
             totalBalanceRay += _getAdjustedEarningChainBalanceRay($storage().earningChainIds.at(i));
         }
         return totalBalanceRay;
@@ -109,14 +109,14 @@ contract FundsHandler is
         IAllocator.AllocatorBalance[] memory allocatorAssets = IAllocator(ALLOCATOR).getTrustedAssetBalances();
         AssetBalance[] memory balances =
             new AssetBalance[](allocatorAssets.length + $storage().earningChainIds.length());
-        for (uint16 i = 0; i < allocatorAssets.length; i++) {
+        for (uint256 i = 0; i < allocatorAssets.length; i++) {
             balances[i] = AssetBalance({
                 chainId: block.chainid,
                 asset: allocatorAssets[i].asset,
                 amountRay: allocatorAssets[i].amount.assetDecimalsToRay(allocatorAssets[i].asset)
             });
         }
-        for (uint16 i = 0; i < $storage().earningChainIds.length(); i++) {
+        for (uint256 i = 0; i < $storage().earningChainIds.length(); i++) {
             uint256 chainId = $storage().earningChainIds.at(i);
             balances[allocatorAssets.length + i] = AssetBalance({
                 chainId: chainId, asset: address(0), amountRay: _getAdjustedEarningChainBalanceRay(chainId)
