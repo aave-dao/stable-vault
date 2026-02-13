@@ -17,7 +17,7 @@ import {MathLib} from "src/libraries/MathLib.sol";
 contract PriceOracle is AccessManagedUpgradeable, IPriceOracle {
     uint256 immutable MIN_VALID_PRICE_RAY;
 
-    uint256 immutable MAX_PRICE_RAY = MathLib.RAY;
+    uint256 constant MAX_PRICE_RAY = MathLib.RAY;
 
     /// @custom:storage-location erc7201:aave.storage.PriceOracle
     struct PriceOracleStorage {
@@ -91,7 +91,7 @@ contract PriceOracle is AccessManagedUpgradeable, IPriceOracle {
         return response.isStale ? 0 : _capToMaxPrice(response.priceRay);
     }
 
-    function _capToMaxPrice(uint256 priceRay) internal view returns (uint256) {
+    function _capToMaxPrice(uint256 priceRay) internal pure returns (uint256) {
         return priceRay > MAX_PRICE_RAY ? MAX_PRICE_RAY : priceRay;
     }
 }

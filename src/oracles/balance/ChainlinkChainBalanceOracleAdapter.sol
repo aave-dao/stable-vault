@@ -10,7 +10,7 @@ import {AssetLib} from "src/libraries/AssetLib.sol";
 // solhint-disable-next-line interface-starts-with-i
 interface IBundleBaseAggregator {
     function latestBundle() external view returns (bytes memory bundle);
-    
+
     function bundleDecimals() external view returns (uint8[] memory);
 
     function latestBundleTimestamp() external view returns (uint256);
