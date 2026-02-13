@@ -8,9 +8,9 @@ import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 interface IEarningChainGateway is IChainGateway {
     /// @notice Emitted when assets are removed from the Earning Chain.
     /// @dev Can be emitted when IOUs are exchanged for assets or funds are returned to the Accounting Chain.
-    /// @param assetOut The asset that was removed.
-    /// @param amountOut The amount of the asset that was removed.
-    event AssetOutflow(address indexed assetOut, uint256 amountOut);
+    /// @param asset The asset that was removed.
+    /// @param amount The amount of the asset that was removed.
+    event AssetOutflow(address indexed asset, uint256 amount);
 
     /// @notice The aggregated balance of the Earning Chain.
     function getAggregatedBalance() external view returns (uint256);
