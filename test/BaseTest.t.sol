@@ -1088,8 +1088,19 @@ contract BaseTest is TestWithHelpers {
         uint256 sourceChainTimestamp,
         bool isStale
     ) internal {
+        _mockChainBalance(chainId, balanceRay, lastUpdateTimestamp, sourceChainTimestamp, block.number, isStale);
+    }
+
+    function _mockChainBalance(
+        uint256 chainId,
+        uint256 balanceRay,
+        uint256 lastUpdateTimestamp,
+        uint256 sourceChainTimestamp,
+        uint256 sourceChainBlockNumber,
+        bool isStale
+    ) internal {
         require(chainId == EARNING_CHAIN_ID, "Unsupported chain id");
-        _publishChainBalanceSnapshotToBundleFeed(balanceRay, sourceChainTimestamp, block.number);
+        _publishChainBalanceSnapshotToBundleFeed(balanceRay, sourceChainTimestamp, sourceChainBlockNumber);
         if (isStale) {
             mockBundleFeed.setLatestBundleTimestamp(
                 block.timestamp - CHAIN_BALANCE_ORACLE_HEARTBEAT_SECONDS - CHAIN_BALANCE_ORACLE_PUBLISH_BUFFER_SECONDS

@@ -181,9 +181,8 @@ contract EarningChainGateway is
     function _returnFunds(address asset, uint256 amount, IBridgeAdapter.BridgeParams memory bridgeParams) internal {
         address bridgeAdapter = $BaseChainGateway().defaultBridgeAdapter[asset][ACCOUNTING_CHAIN_ID];
         require(bridgeAdapter != address(0), AdapterNotFound());
-        // Include the timestamp of when the message is published to the Accounting Chain, so that the Accounting Chain
-        // can reference it to decide if Earning Chain's balance from the data feed captures the outflow of assets from
-        // the Earning Chain.
+        // Include the message block number (and timestamp metadata) so the Accounting Chain can verify the chain
+        // balance snapshot includes this asset outflow.
         bytes memory returnFundsMessageEncoded = abi.encode(
             IChainGateway.CrossChainMessage({
                 messageType: IChainGateway.MessageType.RETURN_FUNDS,
@@ -204,10 +203,9 @@ contract EarningChainGateway is
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) internal {
         // Prepare data to synchronize the Accounting Chain's state.
-        // Include the timestamp of when the message is published to the Accounting Chain, so that the Accounting Chain
-        // can reference it to decide if Earning Chain's balance from the data feed captures the IOU exchange i.e.
-        // withdrawal of assets. This is to avoid decremening obligations by burning IOUs on the Accounting Chain while
-        // the feed reflects a balance that still includes the withdrawn assets.
+        // Include the message block number (and timestamp metadata) so the Accounting Chain can verify the chain
+        // balance snapshot includes this IOU exchange outflow. This avoids decrementing obligations by burning IOUs on
+        // the Accounting Chain while the feed still reflects pre-withdrawal balance.
         bytes memory burnIouTokenMessageEncoded = abi.encode(
             IChainGateway.CrossChainMessage({
                 messageType: IChainGateway.MessageType.BURN_IOU_TOKEN,

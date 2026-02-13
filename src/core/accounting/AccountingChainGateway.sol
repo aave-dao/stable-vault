@@ -90,28 +90,27 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
     function _burnIouToken(uint256 sourceChainId, bytes memory data) internal {
         IChainGateway.BurnIouTokenMessage memory burnIouTokenMessage =
             abi.decode(data, (IChainGateway.BurnIouTokenMessage));
-        _validateInboundMessageTimestamp(sourceChainId, burnIouTokenMessage.timestamp);
+        _validateInboundMessageBlockNumber(sourceChainId, burnIouTokenMessage.blockNumber);
         IIouTokenManager(IOU_TOKEN_MANAGER).burnLockedTokens(burnIouTokenMessage.iouTokenAmountBurnedRay);
     }
 
     function _processReturnFundsData(uint256 sourceChainId, bytes memory data) internal view {
         IChainGateway.ReturnFundsMessage memory returnFundsMessage =
             abi.decode(data, (IChainGateway.ReturnFundsMessage));
-        _validateInboundMessageTimestamp(sourceChainId, returnFundsMessage.timestamp);
+        _validateInboundMessageBlockNumber(sourceChainId, returnFundsMessage.blockNumber);
     }
 
-    /// @dev Validates that the timestamp of the inbound message is not newer than the latest update from the
+    /// @dev Validates that the block number of the inbound message is not newer than the latest update from the
     /// Chain Balance Oracle.
     /// @param earningChainId The ID of the Earning Chain that sent the message.
-    /// @param earningChainMessageTimestamp The timestamp of when the Earning Chain message was published.
-    function _validateInboundMessageTimestamp(uint256 earningChainId, uint256 earningChainMessageTimestamp)
+    /// @param earningChainMessageBlockNumber The block number of when the Earning Chain message was published.
+    function _validateInboundMessageBlockNumber(uint256 earningChainId, uint256 earningChainMessageBlockNumber)
         internal
         view
     {
         IChainBalanceOracle.ChainBalance memory chainBalance =
             IChainBalanceOracle(CHAIN_BALANCE_ORACLE).getChainBalance(earningChainId);
-        // Do not allow same ts from the Earning Chain because we are not aware of the ordering of transactions.
-        if (earningChainMessageTimestamp > chainBalance.lastUpdateTimestamp) {
+        if (earningChainMessageBlockNumber > chainBalance.sourceChainBlockNumber) {
             // The funds were sent from the Earning Chain after the latest balance snapshot was taken.
             // The Chain Balance Oracle does not reflect a snapshot which captures the outflow of assets from the
             // Earning Chain.

@@ -277,7 +277,7 @@ contract EndToEndTest is BaseTest {
         address defaultGhoVault_accountingChain = allocator_accountingChain.getDefaultStrategy(address(GHO));
         {
             // Publish a fresh pre-return snapshot (time has warped since step 3).
-            // AccountingChainGateway requires lastUpdateTimestamp >= RETURN_FUNDS message timestamp.
+            // AccountingChainGateway requires sourceChainBlockNumber >= RETURN_FUNDS message block number.
             uint256 currentEarningChainBalanceRay = earningChainGateway.getAggregatedBalance();
             _mockChainBalance(
                 EARNING_CHAIN_ID,

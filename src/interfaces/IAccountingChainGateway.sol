@@ -13,8 +13,8 @@ interface IAccountingChainGateway is IChainGateway {
     /// @custom:selector 0x77607b1a
     error OnlyFundsHandler();
 
-    /// @notice Thrown when the Earning Chain balance snapshot timestamp from the Chain Balance Oracle is not fresh
-    /// enough.
+    /// @notice Thrown when the Earning Chain balance snapshot from the Chain Balance Oracle does not include the
+    /// outbound cross-chain message block.
     /// @custom:selector 0x1a252958
     error StaleChainBalanceTimestamp();
 

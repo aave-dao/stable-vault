@@ -53,7 +53,8 @@ interface IChainGateway {
     /// @dev For message type `BURN_IOU_TOKEN`.
     /// @param iouTokenAmountBurnedRay Amount of IOU tokens to burn.
     /// @param timestamp Timestamp from the source Earning Chain when the message is published.
-    /// @param blockNumber Block number from the source Earning Chain when the message is published.
+    /// @param blockNumber Block number from the source Earning Chain when the message is published. Used to validate
+    /// message freshness against Chain Balance Oracle snapshots.
     struct BurnIouTokenMessage {
         uint256 iouTokenAmountBurnedRay;
         uint256 timestamp;
@@ -63,7 +64,8 @@ interface IChainGateway {
     /// @notice The representation of a message included when funds are returned to the Accounting Chain.
     /// @dev For message type `RETURN_FUNDS`.
     /// @param timestamp Timestamp from the source Earning Chain when the message is published.
-    /// @param blockNumber Block number from the source Earning Chain when the message is published.
+    /// @param blockNumber Block number from the source Earning Chain when the message is published. Used to validate
+    /// message freshness against Chain Balance Oracle snapshots.
     struct ReturnFundsMessage {
         uint256 timestamp;
         uint256 blockNumber;

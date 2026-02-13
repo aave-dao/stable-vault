@@ -470,7 +470,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
     function test_receiveMessage_whenBurnIouTokenIsReceived(uint256 iouTokenAmountBurnedRay) public {
         iouTokenAmountBurnedRay = _boundRayAmount(iouTokenAmountBurnedRay);
 
-        // Mock chain balance oracle to have a timestamp >= the message timestamp
+        // Mock chain balance oracle to have a source block number >= the message block number.
         _mockChainBalanceOracle.mockChainBalance(
             EARNING_CHAIN_ID,
             0,
@@ -503,19 +503,22 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         );
     }
 
-    function test_receiveMessage_reverts_whenBurnIouTokenAndChainBalanceOracleIsStale(uint256 iouTokenAmountBurnedRay)
+    function test_receiveMessage_reverts_whenBurnIouTokenAndSnapshotBlockIsOlderThanMessage(uint256 iouTokenAmountBurnedRay)
         public
     {
         iouTokenAmountBurnedRay = _boundRayAmount(iouTokenAmountBurnedRay);
 
-        // Mock chain balance oracle with a lastUpdateTimestamp older than the message timestamp
+        // Move to the next block so we can publish a snapshot with an older source block number.
+        vm.roll(block.number + 1);
+        // Mock chain balance oracle with a source block number older than the message block number.
         _mockChainBalanceOracle.mockChainBalance(
             EARNING_CHAIN_ID,
             0,
             block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
             block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS * 2,
-            // The check does NOT rely on if the data is stale, only if the message timestamp is newer than the last
-            // update timestamp.
+            block.number - 1,
+            // The check does NOT rely on the stale flag, only on whether the message block is newer than the source
+            // snapshot block.
             false
         );
 
@@ -541,15 +544,15 @@ contract AccountingChainGatewayTest is TestWithHelpers {
     }
 
     function test_receiveMessage_whenReturnFundsIsReceived() public {
-        // Mock chain balance oracle to have a timestamp >= the message timestamp
+        // Mock chain balance oracle to have a source block number >= the message block number.
         _mockChainBalanceOracle.mockChainBalance(
             EARNING_CHAIN_ID,
             // Amount is not relevant for this test.
             100_000e27,
             block.timestamp,
             block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
-            // The check does NOT rely on if the data is stale, only if the message timestamp is newer than the last
-            // update timestamp.
+            // The check does NOT rely on the stale flag, only on whether the message block is newer than the source
+            // snapshot block.
             false
         );
 
@@ -571,15 +574,18 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         );
     }
 
-    function test_receiveMessage_reverts_whenReturnFundsAndChainBalanceOracleIsStale() public {
-        // Mock chain balance oracle with a lastUpdateTimestamp older than the message timestamp
+    function test_receiveMessage_reverts_whenReturnFundsAndSnapshotBlockIsOlderThanMessage() public {
+        // Move to the next block so we can publish a snapshot with an older source block number.
+        vm.roll(block.number + 1);
+        // Mock chain balance oracle with a source block number older than the message block number.
         _mockChainBalanceOracle.mockChainBalance(
             EARNING_CHAIN_ID,
             0,
             block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
             block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS * 2,
-            // The check does NOT rely on if the data is stale, only if the message timestamp is newer than the last
-            // update timestamp.
+            block.number - 1,
+            // The check does NOT rely on the stale flag, only on whether the message block is newer than the source
+            // snapshot block.
             false
         );
 
@@ -605,7 +611,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
 
         iouTokenAmountBurnedRay = _boundRayAmount(iouTokenAmountBurnedRay);
 
-        // Mock chain balance oracle to have a timestamp >= the message timestamp
+        // Mock chain balance oracle to have a source block number >= the message block number.
         _mockChainBalanceOracle.mockChainBalance(
             EARNING_CHAIN_ID,
             0,

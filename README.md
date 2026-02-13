@@ -45,6 +45,8 @@ The protocol operates on a model where the Accounting Chain is the primary comma
   - `FundsHandler` and `AccountingChainGateway` read from `ChainBalanceOracle`.
   - `ChainBalanceOracle` delegates per-chain reads to registered adapters.
   - `ChainlinkChainBalanceOracleAdapter` decodes snapshots published from `EarningChainStateProvider` and marks data stale using heartbeat + buffer.
+  - `AccountingChainGateway` validates inbound `RETURN_FUNDS` and `BURN_IOU_TOKEN` messages using source chain block numbers
+    (message block number must be `<= sourceChainBlockNumber` from the latest snapshot).
 - **Snapshot source**:
   - `EarningChainStateProvider.getState()` encodes the Earning Chain balance snapshot (`balanceRay`, source timestamp, source block number).
   - This snapshot is published by the Chainlink network to a bundle feed consumed by `ChainlinkChainBalanceOracleAdapter`.

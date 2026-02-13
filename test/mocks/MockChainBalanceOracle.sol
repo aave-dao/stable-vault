@@ -14,12 +14,22 @@ contract MockChainBalanceOracle is IChainBalanceOracle {
         uint256 sourceChainTimestamp,
         bool isStale
     ) external {
+        mockChainBalance(chainId, balanceRay, lastUpdateTimestamp, sourceChainTimestamp, block.number, isStale);
+    }
+
+    function mockChainBalance(
+        uint256 chainId,
+        uint256 balanceRay,
+        uint256 lastUpdateTimestamp,
+        uint256 sourceChainTimestamp,
+        uint256 sourceChainBlockNumber,
+        bool isStale
+    ) public {
         _chainBalances[chainId] = IChainBalanceOracle.ChainBalance({
             balanceRay: balanceRay,
             lastUpdateTimestamp: lastUpdateTimestamp,
             sourceChainTimestamp: sourceChainTimestamp,
-            // The block number is not used in the mock, so we set it to 0.
-            sourceChainBlockNumber: 0,
+            sourceChainBlockNumber: sourceChainBlockNumber,
             isStale: isStale
         });
     }

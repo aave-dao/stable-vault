@@ -792,9 +792,9 @@ contract OracleFeedE2ETest is BaseTest {
         assertEq(snapshot.balanceRay, depositRay, "EarningChainStateProvider should report full deposit");
 
         // 4. Return funds from Earning Chain to Accounting Chain
-        // The RETURN_FUNDS message includes block.timestamp, which is validated against the oracle's
-        // lastUpdateTimestamp. The oracle must have captured a snapshot at or after this timestamp.
-        // Since we just synced the oracle at the current timestamp, the validation will pass.
+        // The RETURN_FUNDS message includes the source block number. The oracle snapshot must include a source block
+        // number at or after that message block.
+        // Since we just synced the oracle at the current block, the validation will pass.
         uint256 returnAmount = depositAmount;
         uint256 bridgeFeeAmount = 1000;
         vm.prank(everyRoleAccount);
@@ -896,8 +896,8 @@ contract OracleFeedE2ETest is BaseTest {
         assertEq(snapshot.balanceRay, remainingRay, "Earning chain should report only remaining balance");
     }
 
-    /// @notice Return funds reverts when chain balance timestamp is older than the message timestamp.
-    function test_oracleFeed_returnFunds_revertsWhenChainBalanceTimestampIsOlderThanMessage() public {
+    /// @notice Return funds reverts when chain balance source block number is older than the message block number.
+    function test_oracleFeed_returnFunds_revertsWhenChainBalanceBlockNumberIsOlderThanMessage() public {
         uint256 depositAmount = 500 * (10 ** 6);
         uint256 depositRay = depositAmount.assetDecimalsToRay(address(USDC));
 
@@ -907,12 +907,15 @@ contract OracleFeedE2ETest is BaseTest {
 
         assertEq(fundsHandler.getAggregatedBalance(), depositRay, "Baseline earning chain balance should be visible");
 
-        // Make oracle snapshot older than the outgoing RETURN_FUNDS message timestamp.
+        // Move to a new block so the message can carry a strictly newer block number than the snapshot.
+        vm.roll(block.number + 1);
+        // Make oracle snapshot older than the outgoing RETURN_FUNDS message block number.
         _mockChainBalance(
             EARNING_CHAIN_ID,
             earningChainGateway.getAggregatedBalance(),
             block.timestamp - 1,
             block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            block.number - 1,
             false
         );
 
