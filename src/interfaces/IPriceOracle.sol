@@ -6,13 +6,13 @@ pragma solidity ^0.8.22;
 /// @author Aave Labs
 /// @notice Interface for the Master Price Oracle contract.
 interface IPriceOracle {
-    /// @notice Thrown when checked minimum valid price is above 1 unit of the quote asset.
+    /// @notice Thrown when minimum valid price is out of accepted range.
     /// @custom:selector 0x6dd066fe
     error InvalidMinPrice();
 
-    /// @notice Thrown when a price obtained from an oracle for an asset is invalid.
-    /// @custom:selector 0x00bfc921
-    error InvalidPrice();
+    /// @notice Thrown when a price obtained from an oracle for an asset is below a minimum valid price.
+    /// @custom:selector 0xdbbbe822
+    error PriceTooLow();
 
     /// @notice Thrown when the adapter for an asset is not found.
     /// @custom:selector 0x2a40cc73

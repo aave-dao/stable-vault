@@ -453,14 +453,14 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
     function test_deposit_reverts_ifPriceOracleRejectsPrice(uint256 amount) public {
         address user = makeAddr("testUser");
-        _mockInvalidPrice(address(mockPriceOracle), address(mockAsset));
+        _mockPriceTooLow(address(mockPriceOracle), address(mockAsset));
         amount = _boundAssetAmount(address(mockAsset), amount);
 
         mockAsset.mint(user, amount);
         vm.prank(user);
         mockAsset.forceApprove(address(bbv), amount);
         vm.prank(user);
-        vm.expectRevert(IPriceOracle.InvalidPrice.selector);
+        vm.expectRevert(IPriceOracle.PriceTooLow.selector);
         bbv.deposit(user, address(mockAsset), amount);
     }
 

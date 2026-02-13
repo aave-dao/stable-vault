@@ -223,7 +223,7 @@ contract PriceOracleTest is TestWithHelpers {
         vm.prank(everyRoleAccount);
         oracleWithMinPrice.setOracleAdapterForAsset(asset1, address(_mockAdapter));
 
-        vm.expectRevert(IPriceOracle.InvalidPrice.selector);
+        vm.expectRevert(IPriceOracle.PriceTooLow.selector);
         oracleWithMinPrice.validatePrice(asset1);
     }
 

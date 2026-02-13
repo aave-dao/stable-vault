@@ -550,7 +550,7 @@ contract OracleFeedE2ETest is BaseTest {
         USDC.mint(user2, newDeposit);
         vm.startPrank(user2);
         USDC.approve(address(vault), newDeposit);
-        vm.expectRevert(abi.encodeWithSelector(IPriceOracle.InvalidPrice.selector));
+        vm.expectRevert(abi.encodeWithSelector(IPriceOracle.PriceTooLow.selector));
         vault.deposit(user2, address(USDC), newDeposit);
         vm.stopPrank();
     }

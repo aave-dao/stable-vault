@@ -1950,7 +1950,7 @@ contract AllocatorTest is TestWithHelpers {
         // Mint assetOut to the swapper
         _mockGho.mint(address(_mockSwapper), amountAssetIn.convertAssetDecimals(assetIn, assetOut));
 
-        _mockInvalidPrice(address(_priceOracle), assetOut);
+        _mockPriceTooLow(address(_priceOracle), assetOut);
 
         IAllocator.RebalanceParams[] memory rebalanceParams = _initializeRebalanceParams(1);
         IAllocator.SwapParams[] memory swaps = _initializeSwapParams(1);
@@ -1958,7 +1958,7 @@ contract AllocatorTest is TestWithHelpers {
         rebalanceParams[0] =
             _buildRebalanceParams(_initializeDeallocationParams(0), swaps, _initializeAllocationParams(0));
         vm.prank(address(everyRoleAccount));
-        vm.expectRevert(IPriceOracle.InvalidPrice.selector);
+        vm.expectRevert(IPriceOracle.PriceTooLow.selector);
         _allocator.rebalance(rebalanceParams);
 
         // Check balances after the swap

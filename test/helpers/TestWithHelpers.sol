@@ -111,12 +111,12 @@ contract TestWithHelpers is Test {
         vm.mockCall(priceOracle, abi.encodeWithSelector(IPriceOracle.validatePrice.selector), abi.encode());
     }
 
-    /// @dev Mocks validatePrice to revert with InvalidPrice error
-    function _mockInvalidPrice(address priceOracle, address asset) internal {
+    /// @dev Mocks validatePrice to revert with PriceTooLow error
+    function _mockPriceTooLow(address priceOracle, address asset) internal {
         vm.mockCallRevert(
             priceOracle,
             abi.encodeCall(IPriceOracle.validatePrice, (asset)),
-            abi.encodeWithSelector(IPriceOracle.InvalidPrice.selector)
+            abi.encodeWithSelector(IPriceOracle.PriceTooLow.selector)
         );
     }
 }
