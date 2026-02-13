@@ -7,6 +7,9 @@ import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 
+/// @title LocalBalanceAggregator
+/// @author Aave Labs
+/// @notice Aggregates the balance of the Allocator's assets in the local chain.
 contract LocalBalanceAggregator {
     using AssetLib for uint256;
     using MathLib for uint256;

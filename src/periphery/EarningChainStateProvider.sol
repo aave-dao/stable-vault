@@ -6,19 +6,18 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 
 import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
 import {IEarningChainStateProvider} from "src/interfaces/IEarningChainStateProvider.sol";
+import {EarningChainStateProvider_V1} from "src/periphery/EarningChainStateProvider_V1.sol";
 
 /// @title EarningChainStateProvider
 /// @author Aave Labs
 /// @notice Facilitates the publishing of the state of the Earning Chain to the Accounting Chain.
 /// @dev This contract is intended to be deployed on the Earning Chain and called by an Oracle network which publishes
 /// the state to the Accounting Chain.
-/// @dev The state is published as a single bytes encoded struct which contains the version and the data.
+/// @dev The state is published as a single ABI-encoded struct which contains the version and the data.
 /// For this version, the data is encoded as a BalanceSnapshot struct which contains the balance in RAY, the timestamp
 /// and the block number. The version is used to determine the encoding of the data on the Accounting Chain.
 /// @dev This contract is upgradeable to allow exposing additional state in future versions.
-contract EarningChainStateProvider is Initializable, IEarningChainStateProvider {
-    uint256 public constant VERSION = 1;
-
+contract EarningChainStateProvider is Initializable, EarningChainStateProvider_V1, IEarningChainStateProvider {
     address internal immutable EARNING_CHAIN_GATEWAY;
 
     /// @dev Constructor.

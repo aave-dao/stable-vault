@@ -4,12 +4,11 @@ pragma solidity ^0.8.22;
 
 import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
 import {IEarningChainStateProvider} from "src/interfaces/IEarningChainStateProvider.sol";
+import {EarningChainStateProvider_V1} from "src/periphery/EarningChainStateProvider_V1.sol";
 
 /// @notice Test-only harness that mirrors EarningChainStateProvider while allowing a logical chain id override.
 /// @dev Needed for single-chain E2E simulations where Accounting and Earning contracts share one EVM.
-contract EarningChainStateProviderHarness is IEarningChainStateProvider {
-    uint256 public constant VERSION = 1;
-
+contract EarningChainStateProviderHarness is EarningChainStateProvider_V1, IEarningChainStateProvider {
     address internal immutable EARNING_CHAIN_GATEWAY;
     uint256 internal immutable SNAPSHOT_CHAIN_ID;
 
@@ -24,7 +23,7 @@ contract EarningChainStateProviderHarness is IEarningChainStateProvider {
             State({
                 version: VERSION,
                 data: abi.encode(
-                    BalanceSnapshot({
+                    EarningChainStateProvider_V1.BalanceSnapshot({
                         balanceRay: balance,
                         timestamp: block.timestamp,
                         blockNumber: block.number,

@@ -5,7 +5,6 @@ pragma solidity ^0.8.22;
 /// @title IEarningChainStateProvider
 /// @author Aave Labs
 /// @notice Interface for the Earning Chain State Provider contract.
-
 interface IEarningChainStateProvider {
     /// @notice The representation of the Earning Chain State.
     /// @param version The version of the Earning Chain State struct.
@@ -14,18 +13,6 @@ interface IEarningChainStateProvider {
     struct State {
         uint256 version;
         bytes data;
-    }
-
-    /// @notice The representation of the Balance Snapshot.
-    /// @param balanceRay The balance of the Earning Chain in RAY.
-    /// @param timestamp The timestamp of the Balance Snapshot.
-    /// @param blockNumber The block number of the Balance Snapshot.
-    /// @param chainId The chain id of the Balance Snapshot.
-    struct BalanceSnapshot {
-        uint256 balanceRay;
-        uint256 timestamp;
-        uint256 blockNumber;
-        uint256 chainId;
     }
 
     /// @notice Gets the current state of the Earning Chain.
