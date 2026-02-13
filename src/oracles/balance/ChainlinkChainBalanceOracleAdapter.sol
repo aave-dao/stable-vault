@@ -5,7 +5,6 @@ pragma solidity ^0.8.22;
 import {IChainBalanceOracle} from "src/interfaces/IChainBalanceOracle.sol";
 import {IChainBalanceOracleAdapter} from "src/interfaces/IChainBalanceOracleAdapter.sol";
 import {IEarningChainStateProvider} from "src/interfaces/IEarningChainStateProvider.sol";
-import {AssetLib} from "src/libraries/AssetLib.sol";
 import {EarningChainStateProvider_V1} from "src/periphery/EarningChainStateProvider_V1.sol";
 
 // solhint-disable-next-line interface-starts-with-i
@@ -23,8 +22,6 @@ interface IBundleBaseAggregator {
 /// @dev Queries the bundle aggregator proxy for the latest bundle containing data read from
 /// IEarningChainStateProvider::getState().
 contract ChainlinkChainBalanceOracleAdapter is IChainBalanceOracleAdapter {
-    using AssetLib for uint256;
-
     /// @notice The version of the IEarningChainStateProvider struct.
     uint256 constant EARNING_CHAIN_STATE_VERSION = 1;
     /// @dev Added to the heartbeat to account for potential publishing delays during periods of network congestion.

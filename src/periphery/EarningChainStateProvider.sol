@@ -44,8 +44,4 @@ contract EarningChainStateProvider is Initializable, EarningChainStateProvider_V
             })
         );
     }
-
-    function getChainId() external view returns (uint256) {
-        return block.chainid;
-    }
 }
