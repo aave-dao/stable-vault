@@ -5,10 +5,10 @@ pragma solidity ^0.8.22;
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {EarningChainGateway} from "src/core/earning/EarningChainGateway.sol";
-import {EarningChainState} from "src/core/earning/EarningChainState.sol";
-import {IEarningChainState} from "src/interfaces/IEarningChainState.sol";
+import {IEarningChainStateProvider} from "src/interfaces/IEarningChainStateProvider.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
+import {EarningChainStateProvider} from "src/periphery/EarningChainStateProvider.sol";
 
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
 import {MockAccessManager} from "test/mocks/MockAccessManager.sol";
@@ -18,7 +18,7 @@ import {IMockErc20} from "test/mocks/MockErc20.sol";
 import {MockNonStandardErc20} from "test/mocks/MockNonStandardErc20.sol";
 import {MockTransferHelper} from "test/mocks/MockTransferHelper.sol";
 
-contract EarningChainStateTest is TestWithHelpers {
+contract EarningChainStateProviderTest is TestWithHelpers {
     using MathLib for uint256;
     using AssetLib for uint256;
 
@@ -32,7 +32,7 @@ contract EarningChainStateTest is TestWithHelpers {
     address internal _priceOracle;
 
     EarningChainGateway internal _earningChainGateway;
-    EarningChainState internal _earningChainState;
+    EarningChainStateProvider internal _earningChainStateProvider;
 
     function setUp() public {
         _mockUsdt = IMockErc20(address(new MockNonStandardErc20("Test USDT", "tUSDT", 6)));
@@ -69,9 +69,10 @@ contract EarningChainStateTest is TestWithHelpers {
             )
         );
 
-        address earningChainStateImpl = address(new EarningChainState(address(_earningChainGateway)));
-        _earningChainState =
-            EarningChainState(address(new TransparentUpgradeableProxy(earningChainStateImpl, address(this), "")));
+        address earningChainStateImpl = address(new EarningChainStateProvider(address(_earningChainGateway)));
+        _earningChainStateProvider = EarningChainStateProvider(
+            address(new TransparentUpgradeableProxy(earningChainStateImpl, address(this), ""))
+        );
     }
 
     function test_getState_returnsExpectedStateWithMultipleAssets(
@@ -96,11 +97,11 @@ contract EarningChainStateTest is TestWithHelpers {
         uint256 expectedBalanceRay = usdtPriceRay.rayMulDown(usdtBalance.assetDecimalsToRay(address(_mockUsdt)))
             + ghoPriceRay.rayMulDown(ghoBalance.assetDecimalsToRay(address(_mockGho)));
 
-        bytes memory stateData = _earningChainState.getState();
+        bytes memory stateData = _earningChainStateProvider.getState();
 
-        IEarningChainState.State memory state = abi.decode(stateData, (IEarningChainState.State));
-        IEarningChainState.BalanceSnapshot memory snapshot =
-            abi.decode(state.data, (IEarningChainState.BalanceSnapshot));
+        IEarningChainStateProvider.State memory state = abi.decode(stateData, (IEarningChainStateProvider.State));
+        IEarningChainStateProvider.BalanceSnapshot memory snapshot =
+            abi.decode(state.data, (IEarningChainStateProvider.BalanceSnapshot));
 
         assertEq(state.version, 1, "Version should be 1");
         assertEq(snapshot.balanceRay, expectedBalanceRay, "Aggregated balance mismatch");

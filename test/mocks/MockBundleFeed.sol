@@ -14,7 +14,7 @@ interface IBundleBaseAggregator {
 
 /// @title MockBundleFeed
 /// @notice Replaces the Chainlink Bundle Aggregator on the Accounting Chain for testing.
-/// @dev An operator manually publishes state bytes (read off-chain from EarningChainState).
+/// @dev An operator manually publishes state bytes (read off-chain from EarningChainStateProvider).
 contract MockBundleFeed is IBundleBaseAggregator {
     bytes internal _latestBundle;
     uint8[] internal _bundleDecimals;

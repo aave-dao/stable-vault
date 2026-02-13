@@ -2,7 +2,11 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.22;
 
-interface IEarningChainState {
+/// @title IEarningChainStateProvider
+/// @author Aave Labs
+/// @notice Interface for the Earning Chain State Provider contract.
+
+interface IEarningChainStateProvider {
     /// @notice The representation of the Earning Chain State.
     /// @param version The version of the Earning Chain State struct.
     /// @param data The encoded data of the Earning Chain State to be decoded on the Accounting Chain based on the

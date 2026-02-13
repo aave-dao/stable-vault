@@ -5,9 +5,9 @@ pragma solidity ^0.8.22;
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
-import {IEarningChainState} from "src/interfaces/IEarningChainState.sol";
+import {IEarningChainStateProvider} from "src/interfaces/IEarningChainStateProvider.sol";
 
-/// @title EarningChainState
+/// @title EarningChainStateProvider
 /// @author Aave Labs
 /// @notice Facilitates the publishing of the state of the Earning Chain to the Accounting Chain.
 /// @dev This contract is intended to be deployed on the Earning Chain and called by an Oracle network which publishes
@@ -16,7 +16,7 @@ import {IEarningChainState} from "src/interfaces/IEarningChainState.sol";
 /// For this version, the data is encoded as a BalanceSnapshot struct which contains the balance in RAY, the timestamp
 /// and the block number. The version is used to determine the encoding of the data on the Accounting Chain.
 /// @dev This contract is upgradeable to allow exposing additional state in future versions.
-contract EarningChainState is Initializable, IEarningChainState {
+contract EarningChainStateProvider is Initializable, IEarningChainStateProvider {
     uint256 public constant VERSION = 1;
 
     address internal immutable EARNING_CHAIN_GATEWAY;
@@ -28,7 +28,7 @@ contract EarningChainState is Initializable, IEarningChainState {
         EARNING_CHAIN_GATEWAY = earningChainGateway;
     }
 
-    /// @inheritdoc IEarningChainState
+    /// @inheritdoc IEarningChainStateProvider
     function getState() external view returns (bytes memory) {
         uint256 balance = IEarningChainGateway(EARNING_CHAIN_GATEWAY).getAggregatedBalance();
         return abi.encode(

@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.22;
 
-import {IEarningChainState} from "src/interfaces/IEarningChainState.sol";
+import {IEarningChainStateProvider} from "src/interfaces/IEarningChainStateProvider.sol";
 
 contract MockBundleAggregator {
     uint8[] internal _bundleDecimals;
@@ -15,10 +15,10 @@ contract MockBundleAggregator {
     function latestBundle() external view returns (bytes memory bundle) {
         require(_version > 0, "Earning chain state version must be set");
         return abi.encode(
-            IEarningChainState.State({
+            IEarningChainStateProvider.State({
                 version: _version,
                 data: abi.encode(
-                    IEarningChainState.BalanceSnapshot({
+                    IEarningChainStateProvider.BalanceSnapshot({
                         balanceRay: _totalBalanceInRay,
                         timestamp: _timestamp,
                         blockNumber: _blockNumber,

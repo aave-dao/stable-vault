@@ -44,9 +44,9 @@ The protocol operates on a model where the Accounting Chain is the primary comma
 - **Chain balance oracle (Accounting Chain)**:
   - `FundsHandler` and `AccountingChainGateway` read from `ChainBalanceOracle`.
   - `ChainBalanceOracle` delegates per-chain reads to registered adapters.
-  - `ChainlinkChainBalanceOracleAdapter` decodes snapshots published from `EarningChainState` and marks data stale using heartbeat + buffer.
+  - `ChainlinkChainBalanceOracleAdapter` decodes snapshots published from `EarningChainStateProvider` and marks data stale using heartbeat + buffer.
 - **Snapshot source**:
-  - `EarningChainState.getState()` encodes the Earning Chain balance snapshot (`balanceRay`, source timestamp, source block number).
+  - `EarningChainStateProvider.getState()` encodes the Earning Chain balance snapshot (`balanceRay`, source timestamp, source block number).
   - This snapshot is published by the Chainlink network to a bundle feed consumed by `ChainlinkChainBalanceOracleAdapter`.
 
 **Manager Roles:**

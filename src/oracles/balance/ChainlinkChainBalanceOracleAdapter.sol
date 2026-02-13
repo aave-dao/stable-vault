@@ -4,7 +4,7 @@ pragma solidity ^0.8.22;
 
 import {IChainBalanceOracle} from "src/interfaces/IChainBalanceOracle.sol";
 import {IChainBalanceOracleAdapter} from "src/interfaces/IChainBalanceOracleAdapter.sol";
-import {IEarningChainState} from "src/interfaces/IEarningChainState.sol";
+import {IEarningChainStateProvider} from "src/interfaces/IEarningChainStateProvider.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 
 // solhint-disable-next-line interface-starts-with-i
@@ -21,11 +21,11 @@ interface IBundleBaseAggregator {
 /// @author Aave Labs
 /// @notice Adapter for fetching a chain aggregated balance value from the Chainlink Aggregator.
 /// @dev Queries the bundle aggregator proxy for the latest bundle containing data read from
-/// IEarningChainState::getState().
+/// IEarningChainStateProvider::getState().
 contract ChainlinkChainBalanceOracleAdapter is IChainBalanceOracleAdapter {
     using AssetLib for uint256;
 
-    /// @notice The version of the IEarningChainState struct.
+    /// @notice The version of the IEarningChainStateProvider struct.
     uint256 constant EARNING_CHAIN_STATE_VERSION = 1;
     /// @dev Added to the heartbeat to account for potential publishing delays during periods of network congestion.
     uint256 constant PUBLISH_BUFFER_SECONDS = 90;
@@ -55,13 +55,13 @@ contract ChainlinkChainBalanceOracleAdapter is IChainBalanceOracleAdapter {
 
         // Get balance snapshot from bundle.
         bytes memory bundle = IBundleBaseAggregator(BUNDLE_AGGREGATOR_PROXY).latestBundle();
-        IEarningChainState.State memory state = abi.decode(bundle, (IEarningChainState.State));
+        IEarningChainStateProvider.State memory state = abi.decode(bundle, (IEarningChainStateProvider.State));
         require(
             state.version == EARNING_CHAIN_STATE_VERSION,
             InvalidEarningChainStateVersion(EARNING_CHAIN_STATE_VERSION, state.version)
         );
-        IEarningChainState.BalanceSnapshot memory balanceSnapshot =
-            abi.decode(state.data, (IEarningChainState.BalanceSnapshot));
+        IEarningChainStateProvider.BalanceSnapshot memory balanceSnapshot =
+            abi.decode(state.data, (IEarningChainStateProvider.BalanceSnapshot));
         require(balanceSnapshot.chainId == CHAIN_ID, InvalidSnapshotChainId(CHAIN_ID, balanceSnapshot.chainId));
 
         return IChainBalanceOracle.ChainBalance({
