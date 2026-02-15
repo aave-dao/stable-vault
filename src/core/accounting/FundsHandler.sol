@@ -105,27 +105,6 @@ contract FundsHandler is
     }
 
     /// @inheritdoc IFundsHandler
-    function getAssetBalances() external view override returns (AssetBalance[] memory) {
-        IAllocator.AllocatorBalance[] memory allocatorAssets = IAllocator(ALLOCATOR).getTrustedAssetBalances();
-        AssetBalance[] memory balances =
-            new AssetBalance[](allocatorAssets.length + $storage().earningChainIds.length());
-        for (uint256 i = 0; i < allocatorAssets.length; i++) {
-            balances[i] = AssetBalance({
-                chainId: block.chainid,
-                asset: allocatorAssets[i].asset,
-                amountRay: allocatorAssets[i].amount.assetDecimalsToRay(allocatorAssets[i].asset)
-            });
-        }
-        for (uint256 i = 0; i < $storage().earningChainIds.length(); i++) {
-            uint256 chainId = $storage().earningChainIds.at(i);
-            balances[allocatorAssets.length + i] = AssetBalance({
-                chainId: chainId, asset: address(0), amountRay: _getAdjustedEarningChainBalanceRay(chainId)
-            });
-        }
-        return balances;
-    }
-
-    /// @inheritdoc IFundsHandler
     function processDeposit(address asset, uint256 amount) external override onlyBasedBoostedVault returns (uint256) {
         return IAllocator(ALLOCATOR).deposit(asset, amount);
     }

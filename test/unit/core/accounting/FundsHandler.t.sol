@@ -124,49 +124,6 @@ contract FundsHandlerTest is TestWithHelpers {
         assertEq(fundsHandler.getAggregatedBalance(), expectedAggregatedBalance);
     }
 
-    function test_getAssetBalances_returnsExpectedAssetBalances(
-        uint256 accChainBalance1,
-        uint256 accChainBalance2,
-        uint256 accChainBalance3
-    ) public {
-        IFundsHandler.AssetBalance[] memory expectedAssetBalances = new IFundsHandler.AssetBalance[](3);
-
-        IMockErc20 mockAsset1 = IMockErc20(address(new MockNonStandardErc20("Test USDT", "tUSDT", 6)));
-        IMockErc20 mockAsset2 = IMockErc20(address(new MockErc20("Test GHO", "tGHO", 18)));
-        IMockErc20 mockAsset3 = IMockErc20(address(new MockNonStandardErc20("Test USDC", "tUSDC", 6)));
-
-        accChainBalance1 = _boundAssetAmountAllowingZero(address(mockAsset1), accChainBalance1);
-        mockAllocator.mockAssetBalance(address(mockAsset1), accChainBalance1);
-        accChainBalance2 = _boundAssetAmountAllowingZero(address(mockAsset2), accChainBalance2);
-        mockAllocator.mockAssetBalance(address(mockAsset2), accChainBalance2);
-        accChainBalance3 = _boundAssetAmountAllowingZero(address(mockAsset3), accChainBalance3);
-        mockAllocator.mockAssetBalance(address(mockAsset3), accChainBalance3);
-
-        expectedAssetBalances[0] = IFundsHandler.AssetBalance({
-            asset: address(mockAsset1),
-            amountRay: accChainBalance1.assetDecimalsToRay(address(mockAsset1)),
-            chainId: block.chainid
-        });
-        expectedAssetBalances[1] = IFundsHandler.AssetBalance({
-            asset: address(mockAsset2),
-            amountRay: accChainBalance2.assetDecimalsToRay(address(mockAsset2)),
-            chainId: block.chainid
-        });
-        expectedAssetBalances[2] = IFundsHandler.AssetBalance({
-            asset: address(mockAsset3),
-            amountRay: accChainBalance3.assetDecimalsToRay(address(mockAsset3)),
-            chainId: block.chainid
-        });
-
-        IFundsHandler.AssetBalance[] memory actualAssetBalances = fundsHandler.getAssetBalances();
-        assertEq(actualAssetBalances.length, expectedAssetBalances.length);
-        for (uint256 i = 0; i < actualAssetBalances.length; i++) {
-            assertEq(actualAssetBalances[i].asset, expectedAssetBalances[i].asset);
-            assertEq(actualAssetBalances[i].amountRay, expectedAssetBalances[i].amountRay);
-            assertEq(actualAssetBalances[i].chainId, expectedAssetBalances[i].chainId);
-        }
-    }
-
     function test_processDeposit_pushesFundsToAllocator(
         bytes32 assetDeploymentSalt,
         uint8 assetDecimals,
@@ -659,12 +616,6 @@ contract FundsHandlerTest is TestWithHelpers {
             )
         );
         fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, bridgeParams);
-
-        // Check that the asset balances is not updated
-        assertEq(fundsHandler.getAssetBalances().length, 1);
-        assertEq(fundsHandler.getAssetBalances()[0].amountRay, 0);
-        assertEq(fundsHandler.getAssetBalances()[0].chainId, chainId);
-        assertEq(fundsHandler.getAssetBalances()[0].asset, address(0));
     }
 
     function test_addEarningChain_emitsEvent() public {
@@ -729,24 +680,14 @@ contract FundsHandlerTest is TestWithHelpers {
             false
         );
 
-        assertEq(fundsHandler.getAssetBalances().length, 2);
-        assertEq(fundsHandler.getAssetBalances()[0].amountRay, chainBalance1.assetDecimalsToRay(address(mockAsset)));
-        assertEq(fundsHandler.getAssetBalances()[0].chainId, chainId1);
-        assertEq(fundsHandler.getAssetBalances()[0].asset, address(0));
-        assertEq(fundsHandler.getAssetBalances()[1].amountRay, chainBalance2.assetDecimalsToRay(address(mockAsset)));
-        assertEq(fundsHandler.getAssetBalances()[1].chainId, chainId2);
-        assertEq(fundsHandler.getAssetBalances()[1].asset, address(0));
-
         uint256 expectedAggregatedBalance =
             chainBalance1.assetDecimalsToRay(address(mockAsset)) + chainBalance2.assetDecimalsToRay(address(mockAsset));
         assertEq(fundsHandler.getAggregatedBalance(), expectedAggregatedBalance);
 
         vm.prank(ADMIN);
         fundsHandler.removeEarningChain(chainId1);
-        assertEq(fundsHandler.getAssetBalances().length, 1);
-        assertEq(fundsHandler.getAssetBalances()[0].amountRay, chainBalance2.assetDecimalsToRay(address(mockAsset)));
-        assertEq(fundsHandler.getAssetBalances()[0].chainId, chainId2);
-        assertEq(fundsHandler.getAssetBalances()[0].asset, address(0));
+        // Only the chainId2 balance is left
+        assertEq(fundsHandler.getAggregatedBalance(), chainBalance2.assetDecimalsToRay(address(mockAsset)));
     }
 
     function test_removeEarningChain_reverts_ifNotCalledByAdmin(address nonAdmin, uint256 chainId) public {

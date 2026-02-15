@@ -42,11 +42,6 @@ interface IFundsHandler {
     /// @return aggregatedBalance Total liquidity across all supported chains in RAY of supported asset denomination.
     function getAggregatedBalance() external view returns (uint256);
 
-    /// @notice Getter for the asset specific and chain specific balances in the local Allocator and the Allocators on
-    /// all Earning Chains.
-    /// @return assetBalances Array of asset balances for all supported chains including the native chain.
-    function getAssetBalances() external view returns (AssetBalance[] memory);
-
     /// @notice Adds an earning chain to the list of supported earning chains.
     /// @dev An Earning chain must be added to bridge funds to the chain and to obtain balances on the chain from an
     /// oracle. @param chainId Chain id of the earning chain to add.
