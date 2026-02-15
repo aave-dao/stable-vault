@@ -17,6 +17,7 @@ import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
+import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
@@ -186,12 +187,10 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     function test_constructor_setsTheExpectedValues(
         uint256 expectedMaxValidPerSecondRate,
         address expectedIouManager,
-        address expectedFundsHandler,
-        address expectedTransferHelper
+        address expectedFundsHandler
     ) public {
         vm.assume(expectedIouManager != address(0));
         vm.assume(expectedFundsHandler != address(0));
-        vm.assume(expectedTransferHelper != address(0));
         vm.assume(expectedMaxValidPerSecondRate > MathLib.RAY);
 
         BasedBoostedVault newBbv = new BasedBoostedVault(
@@ -199,7 +198,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockAssetRegistry),
             expectedIouManager,
             expectedFundsHandler,
-            expectedTransferHelper,
+            address(mockTransferHelper),
             address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS
@@ -218,6 +217,20 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockIouTokenManager),
             address(mockFundsHandler),
             address(mockTransferHelper),
+            address(mockWithdrawalPolicy),
+            address(mockPriceOracle),
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS
+        );
+    }
+
+    function test_constructor_reverts_ifInvalidTransferHelper() public {
+        vm.expectRevert();
+        new BasedBoostedVault(
+            DEFAULT_MAX_PER_SECOND_RATE,
+            address(mockAssetRegistry),
+            address(mockIouTokenManager),
+            address(mockFundsHandler),
+            address(0),
             address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS

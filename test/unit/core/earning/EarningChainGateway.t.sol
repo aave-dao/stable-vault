@@ -160,6 +160,18 @@ contract EarningChainGatewayTest is TestWithHelpers {
         );
     }
 
+    function test_constructor_reverts_ifInvalidTransferHelper() public {
+        vm.expectRevert();
+        new EarningChainGateway(
+            ACCOUNTING_CHAIN_ID,
+            address(_mockAllocator),
+            address(_priceOracle),
+            address(_mockIouTokenManager),
+            address(0),
+            address(_mockWithdrawalPolicy)
+        );
+    }
+
     function test_getIouTokenManager_returnsExpectedIouTokenManager() public view {
         assertEq(_earningChainGateway.getIouTokenManager(), address(_mockIouTokenManager));
     }
