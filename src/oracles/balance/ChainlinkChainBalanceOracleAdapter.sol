@@ -27,19 +27,19 @@ contract ChainlinkChainBalanceOracleAdapter is IChainBalanceOracleAdapter {
     /// @dev Added to the heartbeat to account for potential publishing delays during periods of network congestion.
     uint256 constant PUBLISH_BUFFER_SECONDS = 90;
 
-    uint256 immutable CHAIN_ID;
+    uint256 immutable EARNING_CHAIN_ID;
     address immutable BUNDLE_AGGREGATOR_PROXY;
     uint256 immutable HEARTBEAT;
 
-    constructor(uint256 chainId, address bundleAggregatorProxy, uint256 heartbeat) {
-        CHAIN_ID = chainId;
+    constructor(uint256 earningChainId, address bundleAggregatorProxy, uint256 heartbeat) {
+        EARNING_CHAIN_ID = earningChainId;
         BUNDLE_AGGREGATOR_PROXY = bundleAggregatorProxy;
         HEARTBEAT = heartbeat;
     }
 
     /// @inheritdoc IChainBalanceOracleAdapter
     function getChainBalance(uint256 chainId) external view override returns (IChainBalanceOracle.ChainBalance memory) {
-        require(chainId == CHAIN_ID, InvalidChainId(chainId));
+        require(chainId == EARNING_CHAIN_ID, InvalidChainId(chainId));
 
         // Check bundle is not stale.
         bool isStale = false;
@@ -59,7 +59,10 @@ contract ChainlinkChainBalanceOracleAdapter is IChainBalanceOracleAdapter {
         );
         EarningChainStateProviderV1.BalanceSnapshot memory balanceSnapshot =
             abi.decode(state.data, (EarningChainStateProviderV1.BalanceSnapshot));
-        require(balanceSnapshot.chainId == CHAIN_ID, InvalidSnapshotChainId(CHAIN_ID, balanceSnapshot.chainId));
+        require(
+            balanceSnapshot.chainId == EARNING_CHAIN_ID,
+            InvalidSnapshotChainId(EARNING_CHAIN_ID, balanceSnapshot.chainId)
+        );
 
         return IChainBalanceOracle.ChainBalance({
             balanceRay: balanceSnapshot.balanceRay,
