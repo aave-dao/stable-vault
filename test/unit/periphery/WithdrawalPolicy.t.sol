@@ -26,11 +26,11 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
     uint16 constant FEE_CAP_BPS = 5_00; // 5.00%
 
-    function _deployWithdrawalPolicy(address accessManager, address assetRegistry, address withdrawalPolicyApplier)
+    function _deployWithdrawalPolicy(address accessManager, address withdrawalPolicyApplier)
         internal
         returns (WithdrawalPolicy)
     {
-        address withdrawalPolicyImpl = address(new WithdrawalPolicy(assetRegistry, withdrawalPolicyApplier));
+        address withdrawalPolicyImpl = address(new WithdrawalPolicy(withdrawalPolicyApplier));
         return WithdrawalPolicy(
             address(
                 new TransparentUpgradeableProxy(
@@ -43,8 +43,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
     function setUp() public {
         mockAccessManager = new MockAccessManager(admin);
         mockAssetRegistry = new MockAssetRegistry();
-        withdrawalPolicy =
-            _deployWithdrawalPolicy(address(mockAccessManager), address(mockAssetRegistry), address(this));
+        withdrawalPolicy = _deployWithdrawalPolicy(address(mockAccessManager), address(this));
     }
 
     // Helper to build WithdrawalRequest

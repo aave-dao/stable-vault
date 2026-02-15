@@ -134,11 +134,11 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         );
     }
 
-    function _deployWithdrawalPolicy(address accessManager, address assetRegistry, address withdrawalPolicyApplier)
+    function _deployWithdrawalPolicy(address accessManager, address withdrawalPolicyApplier)
         internal
         returns (WithdrawalPolicy)
     {
-        address withdrawalPolicyImpl = address(new WithdrawalPolicy(assetRegistry, withdrawalPolicyApplier));
+        address withdrawalPolicyImpl = address(new WithdrawalPolicy(withdrawalPolicyApplier));
         return WithdrawalPolicy(
             address(
                 new TransparentUpgradeableProxy(
@@ -168,8 +168,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 deployerNonce = vm.getNonce(address(this));
         address expectedBbvProxy = vm.computeCreateAddress(address(this), deployerNonce + 3);
 
-        mockWithdrawalPolicy =
-            _deployWithdrawalPolicy(address(mockAccessManager), address(mockAssetRegistry), expectedBbvProxy);
+        mockWithdrawalPolicy = _deployWithdrawalPolicy(address(mockAccessManager), expectedBbvProxy);
         bbv = _deployBasedBoostedVault(
             address(mockAccessManager),
             DEFAULT_MAX_PER_SECOND_RATE,
