@@ -114,7 +114,7 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
             // The funds were sent from the Earning Chain after the latest balance snapshot was taken.
             // The Chain Balance Oracle does not reflect a snapshot which captures the outflow of assets from the
             // Earning Chain.
-            revert StaleChainBalanceTimestamp();
+            revert StaleChainBalance();
         }
     }
 }

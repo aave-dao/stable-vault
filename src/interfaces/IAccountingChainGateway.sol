@@ -15,8 +15,8 @@ interface IAccountingChainGateway is IChainGateway {
 
     /// @notice Thrown when the Earning Chain balance snapshot from the Chain Balance Oracle does not include the
     /// outbound cross-chain message block.
-    /// @custom:selector 0x1a252958
-    error StaleChainBalanceTimestamp();
+    /// @custom:selector 0xc6a06946
+    error StaleChainBalance();
 
     /// @notice Sends assets to an Earning Chain.
     /// @dev The Accounting Chain does not prescribe to the Earning Chain which strategy to push assets to.

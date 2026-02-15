@@ -522,7 +522,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
             false
         );
 
-        vm.expectRevert(IAccountingChainGateway.StaleChainBalanceTimestamp.selector);
+        vm.expectRevert(IAccountingChainGateway.StaleChainBalance.selector);
         vm.prank(address(_mockBridgeAdapterData));
         _accountingChainGateway.receiveMessage(
             EARNING_CHAIN_ID,
@@ -589,7 +589,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
             false
         );
 
-        vm.expectRevert(IAccountingChainGateway.StaleChainBalanceTimestamp.selector);
+        vm.expectRevert(IAccountingChainGateway.StaleChainBalance.selector);
         vm.prank(address(_mockBridgeAdapterData));
         _accountingChainGateway.receiveMessage(
             EARNING_CHAIN_ID,

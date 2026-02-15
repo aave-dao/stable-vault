@@ -927,7 +927,7 @@ contract OracleFeedE2ETest is BaseTest {
         vm.expectRevert(
             abi.encodeWithSelector(
                 MockCCIPRouter.ReceiverError.selector,
-                abi.encodeWithSelector(IAccountingChainGateway.StaleChainBalanceTimestamp.selector)
+                abi.encodeWithSelector(IAccountingChainGateway.StaleChainBalance.selector)
             )
         );
         earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
