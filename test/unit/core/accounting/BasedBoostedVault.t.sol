@@ -17,7 +17,6 @@ import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
-import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
