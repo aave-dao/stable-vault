@@ -101,7 +101,11 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
     }
 
     /// @dev Validates that the block number of the inbound message is not newer than the latest update from the
-    /// Chain Balance Oracle.
+    /// Chain Balance Oracle. In other words, accept the message if the snapshot is based on the same block or a more
+    /// recent block than the one which funds were pulled from the Earning Chain Allocator and bridged to the Accounting
+    /// Chain. Earning Chain blocks may be nearly as long as the period between reads of
+    /// EarningChainStateProvider::getState(), so it is very likely for reads to be from the same block which funds are
+    /// bridged to the Accounting Chain.
     /// @param earningChainId The ID of the Earning Chain that sent the message.
     /// @param earningChainMessageBlockNumber The block number of when the Earning Chain message was published.
     function _validateInboundMessageBlockNumber(uint256 earningChainId, uint256 earningChainMessageBlockNumber)
@@ -111,9 +115,11 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
         IChainBalanceOracle.ChainBalance memory chainBalance =
             IChainBalanceOracle(CHAIN_BALANCE_ORACLE).getChainBalance(earningChainId);
         if (earningChainMessageBlockNumber > chainBalance.sourceChainBlockNumber) {
-            // The funds were sent from the Earning Chain after the latest balance snapshot was taken.
+            // The funds were sent from the Earning Chain after the latest published balance snapshot was taken.
             // The Chain Balance Oracle does not reflect a snapshot which captures the outflow of assets from the
-            // Earning Chain.
+            // Earning Chain, therefore the value of funds bridged from the Earning Chain would be double counted
+            // (counted once from the local Allocator if the fund receival is successful, and once throug the stale
+            // Earning Chain balance snapshot).
             revert StaleChainBalance();
         }
     }
