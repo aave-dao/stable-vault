@@ -5,7 +5,7 @@ pragma solidity ^0.8.22;
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 import {IEarningChainStateProvider} from "src/interfaces/IEarningChainStateProvider.sol";
-import {EarningChainStateProvider_V1} from "src/periphery/EarningChainStateProvider_V1.sol";
+import {EarningChainStateProviderV1} from "src/periphery/EarningChainStateProviderV1.sol";
 
 /// @title EarningChainStateProvider
 /// @author Aave Labs
@@ -16,10 +16,10 @@ import {EarningChainStateProvider_V1} from "src/periphery/EarningChainStateProvi
 /// For this version, the data is encoded as a BalanceSnapshot struct which contains the balance in RAY, the timestamp
 /// and the block number. The version is used to determine the encoding of the data on the Accounting Chain.
 /// @dev This contract is upgradeable to allow exposing additional state in future versions.
-contract EarningChainStateProvider is Initializable, EarningChainStateProvider_V1, IEarningChainStateProvider {
+contract EarningChainStateProvider is Initializable, EarningChainStateProviderV1, IEarningChainStateProvider {
     /// @dev Constructor.
     /// @param earningChainGateway Address of the EarningChainGateway contract.
-    constructor(address earningChainGateway) EarningChainStateProvider_V1(earningChainGateway) {
+    constructor(address earningChainGateway) EarningChainStateProviderV1(earningChainGateway) {
         _disableInitializers();
     }
 

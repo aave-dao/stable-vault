@@ -4,11 +4,11 @@ pragma solidity ^0.8.22;
 
 import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
 
-/// @title EarningChainStateProvider_V1
+/// @title EarningChainStateProviderV1
 /// @author Aave Labs
 /// @notice Version 1 of the base for the Earning Chain State Provider.
 /// @dev This contract is used to define the version and the Balance Snapshot struct.
-contract EarningChainStateProvider_V1 {
+contract EarningChainStateProviderV1 {
     uint256 public constant VERSION = 1;
 
     address internal immutable EARNING_CHAIN_GATEWAY;

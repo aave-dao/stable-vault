@@ -5,7 +5,7 @@ pragma solidity ^0.8.22;
 import {IChainBalanceOracle} from "src/interfaces/IChainBalanceOracle.sol";
 import {IChainBalanceOracleAdapter} from "src/interfaces/IChainBalanceOracleAdapter.sol";
 import {IEarningChainStateProvider} from "src/interfaces/IEarningChainStateProvider.sol";
-import {EarningChainStateProvider_V1} from "src/periphery/EarningChainStateProvider_V1.sol";
+import {EarningChainStateProviderV1} from "src/periphery/EarningChainStateProviderV1.sol";
 
 // solhint-disable-next-line interface-starts-with-i
 interface IBundleBaseAggregator {
@@ -57,8 +57,8 @@ contract ChainlinkChainBalanceOracleAdapter is IChainBalanceOracleAdapter {
             state.version == EARNING_CHAIN_STATE_VERSION,
             InvalidEarningChainStateVersion(EARNING_CHAIN_STATE_VERSION, state.version)
         );
-        EarningChainStateProvider_V1.BalanceSnapshot memory balanceSnapshot =
-            abi.decode(state.data, (EarningChainStateProvider_V1.BalanceSnapshot));
+        EarningChainStateProviderV1.BalanceSnapshot memory balanceSnapshot =
+            abi.decode(state.data, (EarningChainStateProviderV1.BalanceSnapshot));
         require(balanceSnapshot.chainId == CHAIN_ID, InvalidSnapshotChainId(CHAIN_ID, balanceSnapshot.chainId));
 
         return IChainBalanceOracle.ChainBalance({

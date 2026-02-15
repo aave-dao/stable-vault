@@ -3,16 +3,14 @@
 pragma solidity ^0.8.22;
 
 import {IEarningChainStateProvider} from "src/interfaces/IEarningChainStateProvider.sol";
-import {EarningChainStateProvider_V1} from "src/periphery/EarningChainStateProvider_V1.sol";
+import {EarningChainStateProviderV1} from "src/periphery/EarningChainStateProviderV1.sol";
 
 /// @notice Test-only harness that mirrors EarningChainStateProvider while allowing a logical chain id override.
 /// @dev Needed for single-chain E2E simulations where Accounting and Earning contracts share one EVM.
-contract EarningChainStateProviderHarness is EarningChainStateProvider_V1, IEarningChainStateProvider {
+contract EarningChainStateProviderHarness is EarningChainStateProviderV1, IEarningChainStateProvider {
     uint256 internal immutable SNAPSHOT_CHAIN_ID;
 
-    constructor(address earningChainGateway, uint256 snapshotChainId)
-        EarningChainStateProvider_V1(earningChainGateway)
-    {
+    constructor(address earningChainGateway, uint256 snapshotChainId) EarningChainStateProviderV1(earningChainGateway) {
         SNAPSHOT_CHAIN_ID = snapshotChainId;
     }
 
