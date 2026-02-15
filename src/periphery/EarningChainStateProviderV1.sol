@@ -8,8 +8,8 @@ import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
 /// @author Aave Labs
 /// @notice Version 1 of the base for the Earning Chain State Provider.
 /// @dev This contract is used to define the version and the Balance Snapshot struct.
-contract EarningChainStateProviderV1 {
-    uint256 public constant VERSION = 1;
+abstract contract EarningChainStateProviderV1 {
+    uint256 private constant VERSION = 1;
 
     address internal immutable EARNING_CHAIN_GATEWAY;
 
@@ -36,5 +36,9 @@ contract EarningChainStateProviderV1 {
                 balanceRay: balanceRay, timestamp: block.timestamp, blockNumber: block.number, chainId: block.chainid
             })
         );
+    }
+
+    function _getVersion() internal pure returns (uint256) {
+        return VERSION;
     }
 }

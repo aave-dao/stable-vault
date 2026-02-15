@@ -25,6 +25,6 @@ contract EarningChainStateProvider is Initializable, EarningChainStateProviderV1
 
     /// @inheritdoc IEarningChainStateProvider
     function getState() external view returns (bytes memory) {
-        return abi.encode(State({version: VERSION, data: _getData()}));
+        return abi.encode(State({version: _getVersion(), data: _getData()}));
     }
 }

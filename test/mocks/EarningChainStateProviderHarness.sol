@@ -17,6 +17,6 @@ contract EarningChainStateProviderHarness is EarningChainStateProviderV1, IEarni
     function getState() external view returns (bytes memory) {
         BalanceSnapshot memory snapshot = abi.decode(_getData(), (BalanceSnapshot));
         snapshot.chainId = SNAPSHOT_CHAIN_ID;
-        return abi.encode(State({version: VERSION, data: abi.encode(snapshot)}));
+        return abi.encode(State({version: _getVersion(), data: abi.encode(snapshot)}));
     }
 }
