@@ -14,8 +14,10 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {Allocator} from "src/core/Allocator.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
+import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
+import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {Errors} from "src/types/Errors.sol";
 
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
@@ -57,6 +59,7 @@ contract AllocatorTest is TestWithHelpers {
     TestErc4626 internal _defaultGhoStrategy;
     TestErc4626 internal _extraGhoStrategy;
     MockSwapper internal _mockSwapper;
+    PriceOracle internal _priceOracle;
     MockTransferHelper internal _mockTransferHelper;
 
     Allocator internal _allocator;
@@ -64,11 +67,12 @@ contract AllocatorTest is TestWithHelpers {
     function _deployAllocator(
         MockAccessManager mockAccessManager,
         address assetRegistry,
+        address priceOracle,
         address transferHelper,
         uint8 maxStrategiesPerAsset
     ) internal returns (Allocator) {
         address allocatorImpl = address(
-            new Allocator(assetRegistry, depositor, withdrawer, transferHelper, maxStrategiesPerAsset)
+            new Allocator(assetRegistry, depositor, withdrawer, priceOracle, transferHelper, maxStrategiesPerAsset)
         );
         Allocator allocator = Allocator(
             address(
@@ -98,7 +102,14 @@ contract AllocatorTest is TestWithHelpers {
         _mockAccessManager = new MockAccessManager(admin);
 
         _mockSwapper = new MockSwapper();
+        _priceOracle = _deployPriceOracle(address(_mockAccessManager), 9_995e23);
         _mockTransferHelper = new MockTransferHelper();
+
+        // Mock prices for assets (1 RAY = 1:1 price ratio)
+        _mockAssetPrice(address(_priceOracle), address(_mockUsdt), MathLib.RAY);
+        _mockAssetPrice(address(_priceOracle), address(_mockGho), MathLib.RAY);
+        // Mock validatePrice to pass for any asset
+        _mockValidatePriceForAll(address(_priceOracle));
 
         // Set up Asset Registry
         vm.prank(admin);
@@ -123,7 +134,11 @@ contract AllocatorTest is TestWithHelpers {
         );
 
         _allocator = _deployAllocator(
-            _mockAccessManager, address(_mockAssetRegistry), address(_mockTransferHelper), MAX_STRATEGIES_PER_ASSET
+            _mockAccessManager,
+            address(_mockAssetRegistry),
+            address(_priceOracle),
+            address(_mockTransferHelper),
+            MAX_STRATEGIES_PER_ASSET
         );
 
         // Set up strategy vaults
@@ -140,6 +155,18 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.setDefaultStrategy(address(_mockUsdt), address(_defaultUsdtStrategy));
         vm.prank(everyRoleAccount);
         _allocator.setDefaultStrategy(address(_mockGho), address(_defaultGhoStrategy));
+    }
+
+    function test_constructor_reverts_ifInvalidTransferHelper() public {
+        vm.expectRevert();
+        new Allocator(
+            address(_mockAssetRegistry),
+            depositor,
+            withdrawer,
+            address(_priceOracle),
+            address(0),
+            MAX_STRATEGIES_PER_ASSET
+        );
     }
 
     function test_getTrustedAssetBalances_returnsExpectedAssetBalances(
@@ -1095,7 +1122,11 @@ contract AllocatorTest is TestWithHelpers {
 
         // Deploy a fresh allocator with only one strategy
         Allocator singleStrategyAllocator = _deployAllocator(
-            _mockAccessManager, address(_mockAssetRegistry), address(_mockTransferHelper), MAX_STRATEGIES_PER_ASSET
+            _mockAccessManager,
+            address(_mockAssetRegistry),
+            address(_priceOracle),
+            address(_mockTransferHelper),
+            MAX_STRATEGIES_PER_ASSET
         );
 
         MockErc4626Strategy mockStrategy = new MockErc4626Strategy(_mockUsdt);
@@ -1920,6 +1951,33 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalance(assetOut), amountAssetIn.convertAssetDecimals(assetIn, assetOut));
     }
 
+    function test_rebalance_swap_reverts_ifAssetOutPriceIsInvalid() public {
+        address assetIn = address(_mockUsdt);
+        address assetOut = address(_mockGho);
+        uint256 amountAssetIn = 100_000_000;
+
+        // Airdrop assetIn to the Allocator
+        _mockUsdt.mint(address(_allocator), amountAssetIn);
+
+        // Mint assetOut to the swapper
+        _mockGho.mint(address(_mockSwapper), amountAssetIn.convertAssetDecimals(assetIn, assetOut));
+
+        _mockPriceTooLow(address(_priceOracle), assetOut);
+
+        IAllocator.RebalanceParams[] memory rebalanceParams = _initializeRebalanceParams(1);
+        IAllocator.SwapParams[] memory swaps = _initializeSwapParams(1);
+        swaps[0] = _buildSwapParams(assetIn, amountAssetIn, assetOut, address(_mockSwapper), "");
+        rebalanceParams[0] =
+            _buildRebalanceParams(_initializeDeallocationParams(0), swaps, _initializeAllocationParams(0));
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(IPriceOracle.PriceTooLow.selector);
+        _allocator.rebalance(rebalanceParams);
+
+        // Check balances after the swap
+        assertEq(_allocator.getAssetBalance(assetIn), amountAssetIn);
+        assertEq(_allocator.getAssetBalance(assetOut), 0);
+    }
+
     function test_rebalance_entireFlow(uint256 amountIn) public {
         address assetIn = address(_mockUsdt);
         address assetOut = address(_mockGho);
@@ -2016,7 +2074,11 @@ contract AllocatorTest is TestWithHelpers {
         maxStrategiesPerAsset = uint8(bound(uint256(maxStrategiesPerAsset), 5, 20));
 
         _allocator = _deployAllocator(
-            _mockAccessManager, address(_mockAssetRegistry), address(_mockTransferHelper), maxStrategiesPerAsset
+            _mockAccessManager,
+            address(_mockAssetRegistry),
+            address(_priceOracle),
+            address(_mockTransferHelper),
+            maxStrategiesPerAsset
         );
 
         address strategy;

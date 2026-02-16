@@ -8,6 +8,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {BaseChainGateway} from "src/core/BaseChainGateway.sol";
 import {IAccountingChainGateway} from "src/interfaces/IAccountingChainGateway.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
+import {IChainBalanceOracle} from "src/interfaces/IChainBalanceOracle.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
@@ -19,6 +20,7 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
     using SafeERC20 for IERC20;
 
     address internal immutable FUNDS_HANDLER;
+    address internal immutable CHAIN_BALANCE_ORACLE;
 
     modifier onlyFundsHandler() {
         require(msg.sender == FUNDS_HANDLER, OnlyFundsHandler());
@@ -28,9 +30,12 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
     /// @dev Constructor.
     /// @param fundsHandler The address of the FundsHandler contract.
     /// @param iouTokenManager The address of the IOU token manager contract.
-    constructor(address fundsHandler, address iouTokenManager) BaseChainGateway(iouTokenManager) {
+    constructor(address fundsHandler, address iouTokenManager, address chainBalanceOracle)
+        BaseChainGateway(iouTokenManager)
+    {
         _disableInitializers();
         FUNDS_HANDLER = fundsHandler;
+        CHAIN_BALANCE_ORACLE = chainBalanceOracle;
     }
 
     /// @dev Initializer.
@@ -65,12 +70,12 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
 
     function _receiveData(uint256 sourceChainId, bytes memory data) internal override {
         IChainGateway.CrossChainMessage memory crossChainMessage = abi.decode(data, (IChainGateway.CrossChainMessage));
-        if (crossChainMessage.messageType == IChainGateway.MessageType.BALANCE_SNAPSHOT) {
-            _updateChainBalanceSnapshot(sourceChainId, crossChainMessage.data);
-        } else if (crossChainMessage.messageType == IChainGateway.MessageType.BRIDGE_IOU_TOKEN) {
+        if (crossChainMessage.messageType == IChainGateway.MessageType.BRIDGE_IOU_TOKEN) {
             _bridgeIouTokenFromEarningChain(crossChainMessage.data);
         } else if (crossChainMessage.messageType == IChainGateway.MessageType.BURN_IOU_TOKEN) {
             _burnIouToken(sourceChainId, crossChainMessage.data);
+        } else if (crossChainMessage.messageType == IChainGateway.MessageType.RETURN_FUNDS) {
+            _processReturnFundsData(sourceChainId, crossChainMessage.data);
         } else {
             revert IChainGateway.InvalidMessageType();
         }
@@ -85,18 +90,37 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
     function _burnIouToken(uint256 sourceChainId, bytes memory data) internal {
         IChainGateway.BurnIouTokenMessage memory burnIouTokenMessage =
             abi.decode(data, (IChainGateway.BurnIouTokenMessage));
+        _validateInboundMessageBlockNumber(sourceChainId, burnIouTokenMessage.blockNumber);
         IIouTokenManager(IOU_TOKEN_MANAGER).burnLockedTokens(burnIouTokenMessage.iouTokenAmountBurnedRay);
-        IFundsHandler(FUNDS_HANDLER)
-            .updateChainBalanceCallback(
-                sourceChainId,
-                burnIouTokenMessage.balanceSnapshotTotalAssetsInRay,
-                burnIouTokenMessage.chainBalanceSnapshotNonce
-            );
     }
 
-    function _updateChainBalanceSnapshot(uint256 sourceChainId, bytes memory data) internal {
-        IChainGateway.BalanceSnapshot memory balanceSnapshot = abi.decode(data, (IChainGateway.BalanceSnapshot));
-        IFundsHandler(FUNDS_HANDLER)
-            .updateChainBalanceCallback(sourceChainId, balanceSnapshot.totalAssetsInRay, balanceSnapshot.nonce);
+    function _processReturnFundsData(uint256 sourceChainId, bytes memory data) internal view {
+        IChainGateway.ReturnFundsMessage memory returnFundsMessage =
+            abi.decode(data, (IChainGateway.ReturnFundsMessage));
+        _validateInboundMessageBlockNumber(sourceChainId, returnFundsMessage.blockNumber);
+    }
+
+    /// @dev Validates that the block number of the inbound message is not newer than the latest update from the
+    /// Chain Balance Oracle. In other words, accept the message if the snapshot is based on the same block or a more
+    /// recent block than the one which funds were pulled from the Earning Chain Allocator and bridged to the Accounting
+    /// Chain. Earning Chain blocks may be nearly as long as the period between reads of
+    /// EarningChainStateProvider::getState(), so it is very likely for reads to be from the same block which funds are
+    /// bridged to the Accounting Chain.
+    /// @param earningChainId The ID of the Earning Chain that sent the message.
+    /// @param earningChainMessageBlockNumber The block number of when the Earning Chain message was published.
+    function _validateInboundMessageBlockNumber(uint256 earningChainId, uint256 earningChainMessageBlockNumber)
+        internal
+        view
+    {
+        IChainBalanceOracle.ChainBalance memory chainBalance =
+            IChainBalanceOracle(CHAIN_BALANCE_ORACLE).getChainBalance(earningChainId);
+        if (earningChainMessageBlockNumber > chainBalance.sourceChainBlockNumber) {
+            // The funds were sent from the Earning Chain after the latest published balance snapshot was taken.
+            // The Chain Balance Oracle does not reflect a snapshot which captures the outflow of assets from the
+            // Earning Chain, therefore the value of funds bridged from the Earning Chain would be double counted
+            // (counted once from the local Allocator if the fund receival is successful, and once throug the stale
+            // Earning Chain balance snapshot).
+            revert StaleChainBalance();
+        }
     }
 }

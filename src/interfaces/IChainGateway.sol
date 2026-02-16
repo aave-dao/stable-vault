@@ -27,9 +27,9 @@ interface IChainGateway {
 
     enum MessageType {
         INVALID,
-        BALANCE_SNAPSHOT,
         BRIDGE_IOU_TOKEN,
-        BURN_IOU_TOKEN
+        BURN_IOU_TOKEN,
+        RETURN_FUNDS
     }
 
     /// @notice The representation of a cross-chain message.
@@ -38,15 +38,6 @@ interface IChainGateway {
     struct CrossChainMessage {
         MessageType messageType;
         bytes data;
-    }
-
-    /// @notice The representation of a balance snapshot from a source chain.
-    /// @dev For message type `BALANCE_SNAPSHOT`.
-    /// @param totalAssetsInRay Cumulative balance of all tokens with common denomination in RAY.
-    /// @param nonce Nonce of the balance snapshot.
-    struct BalanceSnapshot {
-        uint256 totalAssetsInRay;
-        uint256 nonce;
     }
 
     /// @notice The representation of a message to bridge IOU tokens to a destination chain.
@@ -61,13 +52,23 @@ interface IChainGateway {
     /// @notice The representation of a message to burn IOU tokens on a source chain.
     /// @dev For message type `BURN_IOU_TOKEN`.
     /// @param iouTokenAmountBurnedRay Amount of IOU tokens to burn.
-    /// @param chainBalanceSnapshotNonce Nonce of the balance snapshot on the source chain.
-    /// @param balanceSnapshotTotalAssetsInRay Cumulative balance of all tokens with common denomination in RAY on the
-    /// source chain.
+    /// @param timestamp Timestamp from the source Earning Chain when the message is published.
+    /// @param blockNumber Block number from the source Earning Chain when the message is published. Used to validate
+    /// message freshness against Chain Balance Oracle snapshots.
     struct BurnIouTokenMessage {
         uint256 iouTokenAmountBurnedRay;
-        uint256 chainBalanceSnapshotNonce;
-        uint256 balanceSnapshotTotalAssetsInRay;
+        uint256 timestamp;
+        uint256 blockNumber;
+    }
+
+    /// @notice The representation of a message included when funds are returned to the Accounting Chain.
+    /// @dev For message type `RETURN_FUNDS`.
+    /// @param timestamp Timestamp from the source Earning Chain when the message is published.
+    /// @param blockNumber Block number from the source Earning Chain when the message is published. Used to validate
+    /// message freshness against Chain Balance Oracle snapshots.
+    struct ReturnFundsMessage {
+        uint256 timestamp;
+        uint256 blockNumber;
     }
 
     /// @notice Gets the default bridge adapter for an asset and chain; the default adapter is used for outbound

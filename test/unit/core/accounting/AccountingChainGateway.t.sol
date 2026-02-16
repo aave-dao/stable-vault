@@ -20,6 +20,7 @@ import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
 import {MockAccessManager} from "test/mocks/MockAccessManager.sol";
 import {MockAssetRegistry} from "test/mocks/MockAssetRegistry.sol";
 import {MockBridgeAdapter} from "test/mocks/MockBridgeAdapter.sol";
+import {MockChainBalanceOracle} from "test/mocks/MockChainBalanceOracle.sol";
 import {MockDummyIouTokenManager} from "test/mocks/MockDummyIouTokenManager.sol";
 import {IMockErc20} from "test/mocks/MockErc20.sol";
 import {MockFundsHandler} from "test/mocks/MockFundsHandler.sol";
@@ -48,15 +49,19 @@ contract AccountingChainGatewayTest is TestWithHelpers {
     MockDummyIouTokenManager internal _mockIouTokenManager;
     MockAssetRegistry internal _mockAssetRegistry;
     MockTransferHelper internal _mockTransferHelper;
+    MockChainBalanceOracle internal _mockChainBalanceOracle;
 
     AccountingChainGateway internal _accountingChainGateway;
 
     function _deployAccountingChainGateway(
         MockAccessManager mockAccessManager,
         address iouTokenManager,
-        address fundsHandler
+        address fundsHandler,
+        address chainBalanceOracle
     ) internal returns (AccountingChainGateway) {
-        address accountingChainGatewayImpl = address(new AccountingChainGateway(fundsHandler, iouTokenManager));
+        address accountingChainGatewayImpl = address(
+            new AccountingChainGateway(fundsHandler, iouTokenManager, chainBalanceOracle)
+        );
         AccountingChainGateway accountingChainGateway = AccountingChainGateway(
             address(
                 new TransparentUpgradeableProxy(
@@ -88,6 +93,9 @@ contract AccountingChainGatewayTest is TestWithHelpers {
     }
 
     function setUp() public virtual {
+        // Warp to a reasonable timestamp to avoid underflow.
+        vm.warp(block.timestamp + 1 days);
+
         _mockUsdt = IMockErc20(address(new MockNonStandardErc20("Test USDT", "tUSDT", 6)));
 
         _mockGho = IMockErc20(address(new MockNonStandardErc20("Test GHO", "tGHO", 18)));
@@ -109,8 +117,13 @@ contract AccountingChainGatewayTest is TestWithHelpers {
 
         _mockAccessManager = new MockAccessManager(admin);
 
+        _mockChainBalanceOracle = new MockChainBalanceOracle();
+
         _accountingChainGateway = _deployAccountingChainGateway(
-            _mockAccessManager, address(_mockIouTokenManager), address(_mockFundsHandler)
+            _mockAccessManager,
+            address(_mockIouTokenManager),
+            address(_mockFundsHandler),
+            address(_mockChainBalanceOracle)
         );
     }
 
@@ -428,28 +441,6 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         _accountingChainGateway.receiveMessage(EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "");
     }
 
-    function test_receiveMessage_whenBalanceSnapshotIsReceived(uint256 totalAssetsInRay, uint256 nonce) public {
-        totalAssetsInRay = _boundRayAmount(totalAssetsInRay);
-
-        vm.expectCall(
-            address(_mockFundsHandler),
-            abi.encodeCall(IFundsHandler.updateChainBalanceCallback, (EARNING_CHAIN_ID, totalAssetsInRay, nonce))
-        );
-        // Call must come from whitelisted data bridge adapter
-        vm.prank(address(_mockBridgeAdapterData));
-        _accountingChainGateway.receiveMessage(
-            EARNING_CHAIN_ID,
-            address(0),
-            0,
-            abi.encode(
-                IChainGateway.CrossChainMessage({
-                    messageType: IChainGateway.MessageType.BALANCE_SNAPSHOT,
-                    data: abi.encode(IChainGateway.BalanceSnapshot({totalAssetsInRay: totalAssetsInRay, nonce: nonce}))
-                })
-            )
-        );
-    }
-
     function test_receiveMessage_whenBridgeIouTokenIsReceived(address iouTokenRecipient, uint256 iouTokenAmountRay)
         public
     {
@@ -476,23 +467,20 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         );
     }
 
-    function test_receiveMessage_whenBurnIouTokenIsReceived(
-        uint256 iouTokenAmountBurnedRay,
-        uint256 chainBalanceSnapshotNonce,
-        uint256 balanceSnapshotTotalAssetsInRay
-    ) public {
+    function test_receiveMessage_whenBurnIouTokenIsReceived(uint256 iouTokenAmountBurnedRay) public {
         iouTokenAmountBurnedRay = _boundRayAmount(iouTokenAmountBurnedRay);
-        balanceSnapshotTotalAssetsInRay = _boundRayAmount(balanceSnapshotTotalAssetsInRay);
+
+        // Mock chain balance oracle to have a source block number >= the message block number.
+        _mockChainBalanceOracle.mockChainBalance(
+            EARNING_CHAIN_ID,
+            0,
+            block.timestamp,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            false
+        );
 
         vm.expectCall(
             address(_mockIouTokenManager), abi.encodeCall(IIouTokenManager.burnLockedTokens, (iouTokenAmountBurnedRay))
-        );
-        vm.expectCall(
-            address(_mockFundsHandler),
-            abi.encodeCall(
-                IFundsHandler.updateChainBalanceCallback,
-                (EARNING_CHAIN_ID, balanceSnapshotTotalAssetsInRay, chainBalanceSnapshotNonce)
-            )
         );
         // Call must come from whitelisted data bridge adapter
         vm.prank(address(_mockBridgeAdapterData));
@@ -506,8 +494,8 @@ contract AccountingChainGatewayTest is TestWithHelpers {
                     data: abi.encode(
                         IChainGateway.BurnIouTokenMessage({
                             iouTokenAmountBurnedRay: iouTokenAmountBurnedRay,
-                            chainBalanceSnapshotNonce: chainBalanceSnapshotNonce,
-                            balanceSnapshotTotalAssetsInRay: balanceSnapshotTotalAssetsInRay
+                            timestamp: block.timestamp,
+                            blockNumber: block.number
                         })
                     )
                 })
@@ -515,15 +503,122 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         );
     }
 
-    function test_receiveMessage_givenWhitelistedNonDefaultBridgeAdapter(
-        uint256 iouTokenAmountBurnedRay,
-        uint256 chainBalanceSnapshotNonce,
-        uint256 balanceSnapshotTotalAssetsInRay
-    ) public {
+    function test_receiveMessage_reverts_whenBurnIouTokenAndSnapshotBlockIsOlderThanMessage(uint256 iouTokenAmountBurnedRay)
+        public
+    {
+        iouTokenAmountBurnedRay = _boundRayAmount(iouTokenAmountBurnedRay);
+
+        // Move to the next block so we can publish a snapshot with an older source block number.
+        vm.roll(block.number + 1);
+        // Mock chain balance oracle with a source block number older than the message block number.
+        _mockChainBalanceOracle.mockChainBalance(
+            EARNING_CHAIN_ID,
+            0,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS * 2,
+            block.number - 1,
+            // The check does NOT rely on the stale flag, only on whether the message block is newer than the source
+            // snapshot block.
+            false
+        );
+
+        vm.expectRevert(IAccountingChainGateway.StaleChainBalance.selector);
+        vm.prank(address(_mockBridgeAdapterData));
+        _accountingChainGateway.receiveMessage(
+            EARNING_CHAIN_ID,
+            address(0),
+            0,
+            abi.encode(
+                IChainGateway.CrossChainMessage({
+                    messageType: IChainGateway.MessageType.BURN_IOU_TOKEN,
+                    data: abi.encode(
+                        IChainGateway.BurnIouTokenMessage({
+                            iouTokenAmountBurnedRay: iouTokenAmountBurnedRay,
+                            timestamp: block.timestamp,
+                            blockNumber: block.number
+                        })
+                    )
+                })
+            )
+        );
+    }
+
+    function test_receiveMessage_whenReturnFundsIsReceived() public {
+        // Mock chain balance oracle to have a source block number >= the message block number.
+        _mockChainBalanceOracle.mockChainBalance(
+            EARNING_CHAIN_ID,
+            // Amount is not relevant for this test.
+            100_000e27,
+            block.timestamp,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            // The check does NOT rely on the stale flag, only on whether the message block is newer than the source
+            // snapshot block.
+            false
+        );
+
+        vm.prank(address(_mockBridgeAdapterData));
+        _accountingChainGateway.receiveMessage(
+            EARNING_CHAIN_ID,
+            // The bridge adapters separately call receiveMessage for each asset, so the asset is not relevant for this
+            // test.
+            address(0),
+            0,
+            abi.encode(
+                IChainGateway.CrossChainMessage({
+                    messageType: IChainGateway.MessageType.RETURN_FUNDS,
+                    data: abi.encode(
+                        IChainGateway.ReturnFundsMessage({timestamp: block.timestamp, blockNumber: block.number})
+                    )
+                })
+            )
+        );
+    }
+
+    function test_receiveMessage_reverts_whenReturnFundsAndSnapshotBlockIsOlderThanMessage() public {
+        // Move to the next block so we can publish a snapshot with an older source block number.
+        vm.roll(block.number + 1);
+        // Mock chain balance oracle with a source block number older than the message block number.
+        _mockChainBalanceOracle.mockChainBalance(
+            EARNING_CHAIN_ID,
+            0,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS * 2,
+            block.number - 1,
+            // The check does NOT rely on the stale flag, only on whether the message block is newer than the source
+            // snapshot block.
+            false
+        );
+
+        vm.expectRevert(IAccountingChainGateway.StaleChainBalance.selector);
+        vm.prank(address(_mockBridgeAdapterData));
+        _accountingChainGateway.receiveMessage(
+            EARNING_CHAIN_ID,
+            address(0),
+            0,
+            abi.encode(
+                IChainGateway.CrossChainMessage({
+                    messageType: IChainGateway.MessageType.RETURN_FUNDS,
+                    data: abi.encode(
+                        IChainGateway.ReturnFundsMessage({timestamp: block.timestamp, blockNumber: block.number})
+                    )
+                })
+            )
+        );
+    }
+
+    function test_receiveMessage_givenWhitelistedNonDefaultBridgeAdapter(uint256 iouTokenAmountBurnedRay) public {
         // Context: this should be the case for any valid message type
 
         iouTokenAmountBurnedRay = _boundRayAmount(iouTokenAmountBurnedRay);
-        balanceSnapshotTotalAssetsInRay = _boundRayAmount(balanceSnapshotTotalAssetsInRay);
+
+        // Mock chain balance oracle to have a source block number >= the message block number.
+        _mockChainBalanceOracle.mockChainBalance(
+            EARNING_CHAIN_ID,
+            0,
+            block.timestamp,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            false
+        );
 
         // Add a new whitelisted bridge adapter for message bridge
         address unknownAdapter = makeAddr("unknownAdapter");
@@ -532,13 +627,6 @@ contract AccountingChainGatewayTest is TestWithHelpers {
 
         vm.expectCall(
             address(_mockIouTokenManager), abi.encodeCall(IIouTokenManager.burnLockedTokens, (iouTokenAmountBurnedRay))
-        );
-        vm.expectCall(
-            address(_mockFundsHandler),
-            abi.encodeCall(
-                IFundsHandler.updateChainBalanceCallback,
-                (EARNING_CHAIN_ID, balanceSnapshotTotalAssetsInRay, chainBalanceSnapshotNonce)
-            )
         );
         vm.prank(address(unknownAdapter));
         _accountingChainGateway.receiveMessage(
@@ -551,8 +639,8 @@ contract AccountingChainGatewayTest is TestWithHelpers {
                     data: abi.encode(
                         IChainGateway.BurnIouTokenMessage({
                             iouTokenAmountBurnedRay: iouTokenAmountBurnedRay,
-                            chainBalanceSnapshotNonce: chainBalanceSnapshotNonce,
-                            balanceSnapshotTotalAssetsInRay: balanceSnapshotTotalAssetsInRay
+                            timestamp: block.timestamp,
+                            blockNumber: block.number
                         })
                     )
                 })
@@ -577,11 +665,15 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         vm.prank(admin);
         _accountingChainGateway.removeBridgeAdapter(address(0), EARNING_CHAIN_ID, address(_mockBridgeAdapterData));
 
-        // Build a valid balance snapshot message
+        // Build a valid burn IOU token message
         bytes memory data = abi.encode(
             IChainGateway.CrossChainMessage({
-                messageType: IChainGateway.MessageType.BALANCE_SNAPSHOT,
-                data: abi.encode(IChainGateway.BalanceSnapshot({totalAssetsInRay: 100_000, nonce: 0}))
+                messageType: IChainGateway.MessageType.BURN_IOU_TOKEN,
+                data: abi.encode(
+                    IChainGateway.BurnIouTokenMessage({
+                        iouTokenAmountBurnedRay: 100_000, timestamp: block.timestamp, blockNumber: block.number
+                    })
+                )
             })
         );
 

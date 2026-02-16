@@ -12,6 +12,7 @@ contract BasedBoostedVaultHarness is BasedBoostedVault {
         address fundsHandler,
         address transferHelper,
         address withdrawalPolicy,
+        address priceOracle,
         uint256 maxActiveSubVaults
     )
         BasedBoostedVault(
@@ -21,6 +22,7 @@ contract BasedBoostedVaultHarness is BasedBoostedVault {
             fundsHandler,
             transferHelper,
             withdrawalPolicy,
+            priceOracle,
             maxActiveSubVaults
         )
     {}

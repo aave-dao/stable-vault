@@ -21,6 +21,7 @@ import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
 import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
+import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 import {Errors} from "src/types/Errors.sol";
 
@@ -55,6 +56,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     MockBridgeAdapter internal _mockBridgeAdapterData;
     MockDummyIouTokenManager internal _mockIouTokenManager;
     MockAssetRegistry internal _mockAssetRegistry;
+    PriceOracle internal _priceOracle;
     MockTransferHelper internal _mockTransferHelper;
     WithdrawalPolicy internal _mockWithdrawalPolicy;
 
@@ -64,11 +66,14 @@ contract EarningChainGatewayTest is TestWithHelpers {
         MockAccessManager mockAccessManager,
         address iouTokenManager,
         address allocator,
+        address priceOracle,
         address transferHelper,
         address withdrawalPolicy
     ) internal returns (EarningChainGateway) {
         address earningChainGatewayImpl = address(
-            new EarningChainGateway(ACCOUNTING_CHAIN_ID, allocator, iouTokenManager, transferHelper, withdrawalPolicy)
+            new EarningChainGateway(
+                ACCOUNTING_CHAIN_ID, allocator, priceOracle, iouTokenManager, transferHelper, withdrawalPolicy
+            )
         );
         EarningChainGateway earningChainGateway = EarningChainGateway(
             address(
@@ -98,11 +103,11 @@ contract EarningChainGatewayTest is TestWithHelpers {
         return earningChainGateway;
     }
 
-    function _deployWithdrawalPolicy(address accessManager, address assetRegistry, address withdrawalPolicyApplier)
+    function _deployWithdrawalPolicy(address accessManager, address withdrawalPolicyApplier)
         internal
         returns (WithdrawalPolicy)
     {
-        address withdrawalPolicyImpl = address(new WithdrawalPolicy(assetRegistry, withdrawalPolicyApplier));
+        address withdrawalPolicyImpl = address(new WithdrawalPolicy(withdrawalPolicyApplier));
         return WithdrawalPolicy(
             address(
                 new TransparentUpgradeableProxy(
@@ -126,26 +131,43 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         _mockAllocator = new MockAllocator();
 
+        _mockAccessManager = new MockAccessManager(admin);
+
+        _priceOracle = _deployPriceOracle(address(_mockAccessManager), 9_995e23);
+        // Set mock prices (1 RAY = 1:1 price ratio)
+        _mockAssetPrice(address(_priceOracle), address(_mockUsdt), MathLib.RAY);
+        _mockAssetPrice(address(_priceOracle), address(_mockGho), MathLib.RAY);
+
         _mockTransferHelper = new MockTransferHelper();
 
         _mockBridgeAdapterAssets = new MockBridgeAdapter(address(_mockTransferHelper));
 
         _mockBridgeAdapterData = new MockBridgeAdapter(address(_mockTransferHelper));
 
-        _mockAccessManager = new MockAccessManager(admin);
-
         // Predict gateway proxy address after WithdrawalPolicy impl+proxy and gateway impl deployments.
         uint256 deployerNonce = vm.getNonce(address(this));
         address expectedGatewayProxy = vm.computeCreateAddress(address(this), deployerNonce + 3);
 
-        _mockWithdrawalPolicy =
-            _deployWithdrawalPolicy(address(_mockAccessManager), address(_mockAssetRegistry), expectedGatewayProxy);
+        _mockWithdrawalPolicy = _deployWithdrawalPolicy(address(_mockAccessManager), expectedGatewayProxy);
 
         _earningChainGateway = _deployEarningChainGateway(
             _mockAccessManager,
             address(_mockIouTokenManager),
             address(_mockAllocator),
+            address(_priceOracle),
             address(_mockTransferHelper),
+            address(_mockWithdrawalPolicy)
+        );
+    }
+
+    function test_constructor_reverts_ifInvalidTransferHelper() public {
+        vm.expectRevert();
+        new EarningChainGateway(
+            ACCOUNTING_CHAIN_ID,
+            address(_mockAllocator),
+            address(_priceOracle),
+            address(_mockIouTokenManager),
+            address(0),
             address(_mockWithdrawalPolicy)
         );
     }
@@ -272,280 +294,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
         assertEq(_earningChainGateway.getAggregatedBalance(), expectedTotalAssetsInRay);
     }
 
-    function test_sendBalanceUpdateWithFeePayer_sendsBalanceUpdateWithFeePayerWithTokenBridgeFee(
-        uint256 amountUsdt,
-        uint256 amountGho,
-        uint256 bridgeFeeAmount
-    ) public {
-        amountUsdt = _boundAssetAmountAllowingZero(address(_mockUsdt), amountUsdt);
-        amountGho = _boundAssetAmountAllowingZero(address(_mockGho), amountGho);
-        address bridgeFeeToken = address(_mockGho);
-        bridgeFeeAmount = _boundAssetAmount(address(_mockGho), bridgeFeeAmount);
-
-        IAllocator.AllocatorBalance[] memory allocatorBalances = _buildAllocatorBalances(amountUsdt, amountGho);
-
-        uint256 expectedTotalAssetsInRay =
-            amountUsdt.assetDecimalsToRay(address(_mockUsdt)) + amountGho.assetDecimalsToRay(address(_mockGho));
-        vm.mockCall(
-            address(_mockAllocator),
-            abi.encodeWithSelector(MockAllocator.getTrustedAssetBalances.selector),
-            abi.encode(allocatorBalances)
-        );
-
-        address bridgeFeePayer = everyRoleAccount;
-
-        _mockGho.mint(bridgeFeePayer, bridgeFeeAmount);
-        vm.prank(bridgeFeePayer);
-        MockNonStandardErc20(bridgeFeeToken).approve(address(_earningChainGateway), bridgeFeeAmount);
-
-        vm.expectCall(
-            bridgeFeeToken,
-            abi.encodeCall(IERC20.transferFrom, (bridgeFeePayer, address(_mockTransferHelper), bridgeFeeAmount))
-        );
-        vm.expectCall(
-            address(_mockBridgeAdapterData),
-            0,
-            abi.encodeCall(
-                IBridgeAdapter.publishMessageToChainWithFeePayer,
-                (
-                    ACCOUNTING_CHAIN_ID,
-                    address(0),
-                    0,
-                    abi.encode(
-                        IChainGateway.CrossChainMessage({
-                            messageType: IChainGateway.MessageType.BALANCE_SNAPSHOT,
-                            data: abi.encode(
-                                IChainGateway.BalanceSnapshot({totalAssetsInRay: expectedTotalAssetsInRay, nonce: 1})
-                            )
-                        })
-                    ),
-                    IBridgeAdapter.BridgeParams({
-                        feePayer: bridgeFeePayer,
-                        feeToken: bridgeFeeToken,
-                        feeAmount: bridgeFeeAmount,
-                        feeRefundThreshold: 0,
-                        gasLimit: 100000,
-                        data: abi.encode(keccak256(hex"c0ffee"))
-                    })
-                )
-            )
-        );
-        vm.prank(everyRoleAccount);
-        _earningChainGateway.sendBalanceUpdateWithFeePayer(
-            IBridgeAdapter.BridgeParams({
-                feePayer: bridgeFeePayer,
-                feeToken: bridgeFeeToken,
-                feeAmount: bridgeFeeAmount,
-                feeRefundThreshold: 0,
-                gasLimit: 100000,
-                data: abi.encode(keccak256(hex"c0ffee"))
-            })
-        );
-
-        // Check when multiple snap shots are sent, the nonce is incremented
-        _mockGho.mint(bridgeFeePayer, bridgeFeeAmount);
-        vm.prank(bridgeFeePayer);
-        MockNonStandardErc20(bridgeFeeToken).approve(address(_earningChainGateway), bridgeFeeAmount);
-
-        vm.expectCall(
-            bridgeFeeToken,
-            abi.encodeCall(IERC20.transferFrom, (bridgeFeePayer, address(_mockTransferHelper), bridgeFeeAmount))
-        );
-        vm.expectCall(
-            address(_mockBridgeAdapterData),
-            0,
-            abi.encodeCall(
-                IBridgeAdapter.publishMessageToChainWithFeePayer,
-                (
-                    ACCOUNTING_CHAIN_ID,
-                    address(0),
-                    0,
-                    abi.encode(
-                        IChainGateway.CrossChainMessage({
-                            messageType: IChainGateway.MessageType.BALANCE_SNAPSHOT,
-                            data: abi.encode(
-                                IChainGateway.BalanceSnapshot({totalAssetsInRay: expectedTotalAssetsInRay, nonce: 2})
-                            )
-                        })
-                    ),
-                    IBridgeAdapter.BridgeParams({
-                        feePayer: bridgeFeePayer,
-                        feeToken: bridgeFeeToken,
-                        feeAmount: bridgeFeeAmount,
-                        feeRefundThreshold: 0,
-                        gasLimit: 100000,
-                        data: abi.encode(keccak256(hex"c0ffee"))
-                    })
-                )
-            )
-        );
-        vm.prank(everyRoleAccount);
-        _earningChainGateway.sendBalanceUpdateWithFeePayer(
-            IBridgeAdapter.BridgeParams({
-                feePayer: bridgeFeePayer,
-                feeToken: bridgeFeeToken,
-                feeAmount: bridgeFeeAmount,
-                feeRefundThreshold: 0,
-                gasLimit: 100000,
-                data: abi.encode(keccak256(hex"c0ffee"))
-            })
-        );
-    }
-
-    function test_sendBalanceUpdateWithFeePayer_sendsBalanceUpdateWithFeePayerWithNativeBridgeFee(
-        uint256 amountUsdt,
-        uint256 amountGho,
-        uint256 bridgeFeeAmount
-    ) public {
-        amountUsdt = _boundAssetAmountAllowingZero(address(_mockUsdt), amountUsdt);
-        amountGho = _boundAssetAmountAllowingZero(address(_mockGho), amountGho);
-        bridgeFeeAmount = _boundNativeAmount(bridgeFeeAmount);
-
-        address bridgeFeeToken = address(0);
-
-        IAllocator.AllocatorBalance[] memory allocatorBalances = _buildAllocatorBalances(amountUsdt, amountGho);
-
-        uint256 expectedTotalAssetsInRay =
-            amountUsdt.assetDecimalsToRay(address(_mockUsdt)) + amountGho.assetDecimalsToRay(address(_mockGho));
-        vm.mockCall(
-            address(_mockAllocator),
-            abi.encodeWithSelector(MockAllocator.getTrustedAssetBalances.selector),
-            abi.encode(allocatorBalances)
-        );
-
-        address bridgeFeePayer = makeAddr("bridgeFeePayer");
-
-        vm.deal(bridgeFeePayer, bridgeFeeAmount);
-        vm.prank(bridgeFeePayer);
-        vm.expectCall(
-            address(_mockBridgeAdapterData),
-            0,
-            abi.encodeCall(
-                IBridgeAdapter.publishMessageToChainWithFeePayer,
-                (
-                    ACCOUNTING_CHAIN_ID,
-                    address(0),
-                    0,
-                    abi.encode(
-                        IChainGateway.CrossChainMessage({
-                            messageType: IChainGateway.MessageType.BALANCE_SNAPSHOT,
-                            data: abi.encode(
-                                IChainGateway.BalanceSnapshot({totalAssetsInRay: expectedTotalAssetsInRay, nonce: 1})
-                            )
-                        })
-                    ),
-                    IBridgeAdapter.BridgeParams({
-                        feePayer: bridgeFeePayer,
-                        feeToken: bridgeFeeToken,
-                        feeAmount: bridgeFeeAmount,
-                        feeRefundThreshold: 0,
-                        gasLimit: 100000,
-                        data: abi.encode(keccak256(hex"c0ffee"))
-                    })
-                )
-            )
-        );
-        _earningChainGateway.sendBalanceUpdateWithFeePayer{value: bridgeFeeAmount}(
-            IBridgeAdapter.BridgeParams({
-                feePayer: bridgeFeePayer,
-                feeToken: bridgeFeeToken,
-                feeAmount: bridgeFeeAmount,
-                feeRefundThreshold: 0,
-                gasLimit: 100000,
-                data: abi.encode(keccak256(hex"c0ffee"))
-            })
-        );
-
-        // Check when multiple snap shots are sent, the nonce is incremented
-        vm.deal(bridgeFeePayer, bridgeFeeAmount);
-        vm.prank(bridgeFeePayer);
-        vm.expectCall(
-            address(_mockBridgeAdapterData),
-            0,
-            abi.encodeCall(
-                IBridgeAdapter.publishMessageToChainWithFeePayer,
-                (
-                    ACCOUNTING_CHAIN_ID,
-                    address(0),
-                    0,
-                    abi.encode(
-                        IChainGateway.CrossChainMessage({
-                            messageType: IChainGateway.MessageType.BALANCE_SNAPSHOT,
-                            data: abi.encode(
-                                IChainGateway.BalanceSnapshot({totalAssetsInRay: expectedTotalAssetsInRay, nonce: 2})
-                            )
-                        })
-                    ),
-                    IBridgeAdapter.BridgeParams({
-                        feePayer: bridgeFeePayer,
-                        feeToken: bridgeFeeToken,
-                        feeAmount: bridgeFeeAmount,
-                        feeRefundThreshold: 0,
-                        gasLimit: 100000,
-                        data: abi.encode(keccak256(hex"c0ffee"))
-                    })
-                )
-            )
-        );
-        _earningChainGateway.sendBalanceUpdateWithFeePayer{value: bridgeFeeAmount}(
-            IBridgeAdapter.BridgeParams({
-                feePayer: bridgeFeePayer,
-                feeToken: bridgeFeeToken,
-                feeAmount: bridgeFeeAmount,
-                feeRefundThreshold: 0,
-                gasLimit: 100000,
-                data: abi.encode(keccak256(hex"c0ffee"))
-            })
-        );
-    }
-
-    function test_sendBalanceUpdateWithFeePayer_reverts_ifNotWhitelistedBridgeAdapter() public {
-        // Unset the adapter for message bridge
-        vm.prank(admin);
-        _earningChainGateway.removeBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, address(_mockBridgeAdapterData));
-
-        vm.expectRevert(IChainGateway.AdapterNotFound.selector);
-        _earningChainGateway.sendBalanceUpdateWithFeePayer(
-            IBridgeAdapter.BridgeParams({
-                feePayer: makeAddr("bridgeFeePayer"),
-                feeToken: address(0),
-                feeAmount: 123,
-                feeRefundThreshold: 0,
-                gasLimit: 100000,
-                data: abi.encode(keccak256(hex"c0ffee"))
-            })
-        );
-    }
-
-    function test_sendBalanceUpdateWithFeePayer_reverts_ifZeroValueForNativeBridgeFee() public {
-        vm.expectRevert(Errors.InsufficientFunds.selector);
-        _earningChainGateway.sendBalanceUpdateWithFeePayer{value: 0}(
-            IBridgeAdapter.BridgeParams({
-                // msg.sender must be the fee payer
-                feePayer: address(this),
-                feeToken: address(0),
-                feeAmount: 123,
-                feeRefundThreshold: 0,
-                gasLimit: 100000,
-                data: abi.encode(keccak256(hex"c0ffee"))
-            })
-        );
-    }
-
-    function test_sendBalanceUpdateWithFeePayer_reverts_ifInvalidBridgeFeePayer() public {
-        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidBridgeFeePayer.selector));
-        _earningChainGateway.sendBalanceUpdateWithFeePayer(
-            IBridgeAdapter.BridgeParams({
-                feePayer: makeAddr("unauthorizedFeePayer"),
-                feeToken: address(0),
-                feeAmount: 123,
-                feeRefundThreshold: 0,
-                gasLimit: 100000,
-                data: abi.encode(keccak256(hex"c0ffee"))
-            })
-        );
-    }
-
     function test_exchangeIouTokens_exchangesIouTokensWithTokenBridgeFee(
         uint256 iouTokenAmountRay,
         address tokenOutReceiver,
@@ -578,9 +326,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 uint256 amountUsdt = 123000000000000000000;
                 uint256 amountGho = 4560000000000000;
                 IAllocator.AllocatorBalance[] memory allocatorBalances = _buildAllocatorBalances(amountUsdt, amountGho);
-
-                uint256 expectedTotalAssetsInRay =
-                    amountUsdt.assetDecimalsToRay(address(_mockUsdt)) + amountGho.assetDecimalsToRay(address(_mockGho));
                 vm.mockCall(
                     address(_mockAllocator),
                     abi.encodeWithSelector(MockAllocator.getTrustedAssetBalances.selector),
@@ -593,8 +338,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
                         data: abi.encode(
                             IChainGateway.BurnIouTokenMessage({
                                 iouTokenAmountBurnedRay: iouTokenAmountRay,
-                                chainBalanceSnapshotNonce: 1,
-                                balanceSnapshotTotalAssetsInRay: expectedTotalAssetsInRay
+                                timestamp: block.timestamp,
+                                blockNumber: block.number
                             })
                         )
                     })
@@ -657,17 +402,11 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
             bytes memory data;
             {
-                uint256 amountUsdt = 123000000000000000000;
-                uint256 amountGho = 4560000000000000;
-
-                uint256 expectedTotalAssetsInRay =
-                    amountUsdt.assetDecimalsToRay(address(_mockUsdt)) + amountGho.assetDecimalsToRay(address(_mockGho));
-
                 bytes memory dataInner = abi.encode(
                     IChainGateway.BurnIouTokenMessage({
                         iouTokenAmountBurnedRay: iouTokenAmountRay,
-                        chainBalanceSnapshotNonce: 2,
-                        balanceSnapshotTotalAssetsInRay: expectedTotalAssetsInRay
+                        timestamp: block.timestamp,
+                        blockNumber: block.number
                     })
                 );
                 data = abi.encode(
@@ -760,17 +499,14 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 abi.encode(allocatorBalances)
             );
 
-            uint256 expectedTotalAssetsInRay =
-                amountUsdt.assetDecimalsToRay(address(_mockUsdt)) + amountGho.assetDecimalsToRay(address(_mockGho));
-
             bytes memory data = abi.encode(
                 IChainGateway.CrossChainMessage({
                     messageType: IChainGateway.MessageType.BURN_IOU_TOKEN,
                     data: abi.encode(
                         IChainGateway.BurnIouTokenMessage({
                             iouTokenAmountBurnedRay: iouTokenAmountRay,
-                            chainBalanceSnapshotNonce: 1,
-                            balanceSnapshotTotalAssetsInRay: expectedTotalAssetsInRay
+                            timestamp: block.timestamp,
+                            blockNumber: block.number
                         })
                     )
                 })
@@ -800,6 +536,39 @@ contract EarningChainGatewayTest is TestWithHelpers {
         vm.prank(tokenOutReceiver);
         _earningChainGateway.exchangeIouTokens{value: bridgeFeeAmount}(
             iouTokenAmountRay, tokenOut, 0, tokenOutReceiver, bridgeParams, ""
+        );
+    }
+
+    function test_exchangeIouTokens_emitsAssetOutflow(uint256 iouTokenAmountRay) public {
+        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        address tokenOut = address(_mockUsdt);
+        uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(tokenOut);
+        vm.assume(amountOut > 0);
+
+        address user = makeAddr("user");
+        _assumeNotProxyAdmin(user, address(_earningChainGateway));
+
+        _mockUsdt.mint(address(_mockAllocator), amountOut);
+        _mockTransferHelper.mockAsset(address(_mockUsdt), amountOut);
+
+        vm.expectEmit(true, true, true, true);
+        emit IEarningChainGateway.AssetOutflow(tokenOut, amountOut);
+
+        vm.prank(user);
+        _earningChainGateway.exchangeIouTokens(
+            iouTokenAmountRay,
+            tokenOut,
+            0,
+            user,
+            IBridgeAdapter.BridgeParams({
+                feePayer: user,
+                feeToken: address(0),
+                feeAmount: 0,
+                feeRefundThreshold: 0,
+                gasLimit: 100000,
+                data: abi.encode(keccak256(hex"c0ffee"))
+            }),
+            ""
         );
     }
 
@@ -1008,7 +777,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         );
     }
 
-    function test_pushFundsToAccountingChain_bridgesAssetAndSnapshotWithTokenBridgeFee(
+    function test_pushFundsToAccountingChain_bridgesAssetWithTokenBridgeFee(
         uint256 amountTokenUnits,
         uint256 bridgeFeeAmount
     ) public {
@@ -1021,139 +790,58 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         address sender = makeAddr("randomAccount");
 
-        {
-            bytes memory data;
-            {
-                uint256 amountUsdt = 123000000000000000000;
-                uint256 amountGho = 4560000000000000;
-                IAllocator.AllocatorBalance[] memory allocatorBalances = _buildAllocatorBalances(amountUsdt, amountGho);
+        _mockGho.mint(sender, bridgeFeeAmount);
+        vm.prank(sender);
+        MockNonStandardErc20(bridgeFeeToken).approve(address(_earningChainGateway), bridgeFeeAmount);
 
-                vm.mockCall(
-                    address(_mockAllocator),
-                    abi.encodeWithSelector(MockAllocator.getTrustedAssetBalances.selector),
-                    abi.encode(allocatorBalances)
-                );
-
-                uint256 expectedTotalAssetsInRay =
-                    amountUsdt.assetDecimalsToRay(address(_mockUsdt)) + amountGho.assetDecimalsToRay(address(_mockGho));
-
-                data = abi.encode(
-                    IChainGateway.CrossChainMessage({
-                        messageType: IChainGateway.MessageType.BALANCE_SNAPSHOT,
-                        data: abi.encode(
-                            IChainGateway.BalanceSnapshot({totalAssetsInRay: expectedTotalAssetsInRay, nonce: 1})
-                        )
-                    })
-                );
-            }
-
-            _mockGho.mint(sender, bridgeFeeAmount);
-            vm.prank(sender);
-            MockNonStandardErc20(bridgeFeeToken).approve(address(_earningChainGateway), bridgeFeeAmount);
-
-            vm.expectCall(
-                address(_mockBridgeAdapterAssets),
-                0,
-                abi.encodeCall(
-                    IBridgeAdapter.publishMessageToChainWithFeePayer,
-                    (
-                        ACCOUNTING_CHAIN_ID,
-                        address(_mockUsdt),
-                        amountToken,
-                        data,
-                        IBridgeAdapter.BridgeParams({
-                            feePayer: sender,
-                            feeToken: bridgeFeeToken,
-                            feeAmount: bridgeFeeAmount,
-                            feeRefundThreshold: 0,
-                            gasLimit: 100000,
-                            data: abi.encode(keccak256(hex"c0ffee"))
-                        })
-                    )
+        bytes memory returnFundsMessageEncoded = abi.encode(
+            IChainGateway.CrossChainMessage({
+                messageType: IChainGateway.MessageType.RETURN_FUNDS,
+                data: abi.encode(
+                    IChainGateway.ReturnFundsMessage({timestamp: block.timestamp, blockNumber: block.number})
                 )
-            );
-            vm.expectCall(
-                address(_mockAllocator), abi.encodeCall(IAllocator.withdraw, (address(_mockUsdt), amountToken))
-            );
+            })
+        );
 
-            vm.prank(sender);
-            _earningChainGateway.pushFundsToAccountingChain(
-                address(_mockUsdt),
-                amountToken,
-                IBridgeAdapter.BridgeParams({
-                    feePayer: sender,
-                    feeToken: bridgeFeeToken,
-                    feeAmount: bridgeFeeAmount,
-                    feeRefundThreshold: 0,
-                    gasLimit: 100000,
-                    data: abi.encode(keccak256(hex"c0ffee"))
-                })
-            );
-        }
-
-        // check that the next call uses incremented nonce
-        {
-            _mockGho.mint(sender, bridgeFeeAmount);
-            vm.prank(sender);
-            MockNonStandardErc20(bridgeFeeToken).approve(address(_earningChainGateway), bridgeFeeAmount);
-            _mockTransferHelper.mockAsset(address(_mockUsdt), amountToken);
-
-            bytes memory data;
-            {
-                uint256 amountUsdt = 123000000000000000000;
-                uint256 amountGho = 4560000000000000;
-
-                uint256 expectedTotalAssetsInRay =
-                    amountUsdt.assetDecimalsToRay(address(_mockUsdt)) + amountGho.assetDecimalsToRay(address(_mockGho));
-
-                data = abi.encode(
-                    IChainGateway.CrossChainMessage({
-                        messageType: IChainGateway.MessageType.BALANCE_SNAPSHOT,
-                        data: abi.encode(
-                            IChainGateway.BalanceSnapshot({totalAssetsInRay: expectedTotalAssetsInRay, nonce: 2})
-                        )
+        vm.expectCall(
+            address(_mockBridgeAdapterAssets),
+            0,
+            abi.encodeCall(
+                IBridgeAdapter.publishMessageToChainWithFeePayer,
+                (
+                    ACCOUNTING_CHAIN_ID,
+                    address(_mockUsdt),
+                    amountToken,
+                    returnFundsMessageEncoded,
+                    IBridgeAdapter.BridgeParams({
+                        feePayer: sender,
+                        feeToken: bridgeFeeToken,
+                        feeAmount: bridgeFeeAmount,
+                        feeRefundThreshold: 0,
+                        gasLimit: 100000,
+                        data: abi.encode(keccak256(hex"c0ffee"))
                     })
-                );
-            }
-
-            vm.expectCall(
-                address(_mockBridgeAdapterAssets),
-                0,
-                abi.encodeCall(
-                    IBridgeAdapter.publishMessageToChainWithFeePayer,
-                    (
-                        ACCOUNTING_CHAIN_ID,
-                        address(_mockUsdt),
-                        amountToken,
-                        data,
-                        IBridgeAdapter.BridgeParams({
-                            feePayer: sender,
-                            feeToken: bridgeFeeToken,
-                            feeAmount: bridgeFeeAmount,
-                            feeRefundThreshold: 0,
-                            gasLimit: 100000,
-                            data: abi.encode(keccak256(hex"c0ffee"))
-                        })
-                    )
                 )
-            );
-            vm.prank(sender);
-            _earningChainGateway.pushFundsToAccountingChain(
-                address(_mockUsdt),
-                amountToken,
-                IBridgeAdapter.BridgeParams({
-                    feePayer: sender,
-                    feeToken: bridgeFeeToken,
-                    feeAmount: bridgeFeeAmount,
-                    feeRefundThreshold: 0,
-                    gasLimit: 100000,
-                    data: abi.encode(keccak256(hex"c0ffee"))
-                })
-            );
-        }
+            )
+        );
+        vm.expectCall(address(_mockAllocator), abi.encodeCall(IAllocator.withdraw, (address(_mockUsdt), amountToken)));
+
+        vm.prank(sender);
+        _earningChainGateway.pushFundsToAccountingChain(
+            address(_mockUsdt),
+            amountToken,
+            IBridgeAdapter.BridgeParams({
+                feePayer: sender,
+                feeToken: bridgeFeeToken,
+                feeAmount: bridgeFeeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: 100000,
+                data: abi.encode(keccak256(hex"c0ffee"))
+            })
+        );
     }
 
-    function test_pushFundsToAccountingChain_bridgesAssetAndSnapshotWithFeeTokenSameAsAsset(
+    function test_pushFundsToAccountingChain_bridgesAssetWithFeeTokenSameAsAsset(
         uint256 amountTokenUnits,
         uint256 bridgeFeeAmount
     ) public {
@@ -1166,141 +854,58 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         address sender = makeAddr("randomAccount");
 
-        {
-            bytes memory data;
-            {
-                uint256 amountUsdt = 123000000000000000000;
-                uint256 amountGho = 4560000000000000;
-                IAllocator.AllocatorBalance[] memory allocatorBalances = _buildAllocatorBalances(amountUsdt, amountGho);
+        _mockGho.mint(sender, bridgeFeeAmount);
+        vm.prank(sender);
+        MockNonStandardErc20(bridgeFeeToken).approve(address(_earningChainGateway), bridgeFeeAmount);
 
-                vm.mockCall(
-                    address(_mockAllocator),
-                    abi.encodeWithSelector(MockAllocator.getTrustedAssetBalances.selector),
-                    abi.encode(allocatorBalances)
-                );
-
-                uint256 expectedTotalAssetsInRay =
-                    amountUsdt.assetDecimalsToRay(address(_mockUsdt)) + amountGho.assetDecimalsToRay(address(_mockGho));
-
-                data = abi.encode(
-                    IChainGateway.CrossChainMessage({
-                        messageType: IChainGateway.MessageType.BALANCE_SNAPSHOT,
-                        data: abi.encode(
-                            IChainGateway.BalanceSnapshot({totalAssetsInRay: expectedTotalAssetsInRay, nonce: 1})
-                        )
-                    })
-                );
-            }
-
-            _mockGho.mint(sender, bridgeFeeAmount);
-            vm.prank(sender);
-            MockNonStandardErc20(bridgeFeeToken).approve(address(_earningChainGateway), bridgeFeeAmount);
-
-            vm.expectCall(
-                address(_mockBridgeAdapterAssets),
-                abi.encodeCall(
-                    IBridgeAdapter.publishMessageToChainWithFeePayer,
-                    (
-                        ACCOUNTING_CHAIN_ID,
-                        address(_mockGho),
-                        amountToken,
-                        data,
-                        IBridgeAdapter.BridgeParams({
-                            feePayer: sender,
-                            feeToken: bridgeFeeToken,
-                            feeAmount: bridgeFeeAmount,
-                            feeRefundThreshold: 0,
-                            gasLimit: 100000,
-                            data: abi.encode(keccak256(hex"c0ffee"))
-                        })
-                    )
+        bytes memory returnFundsMessageEncoded = abi.encode(
+            IChainGateway.CrossChainMessage({
+                messageType: IChainGateway.MessageType.RETURN_FUNDS,
+                data: abi.encode(
+                    IChainGateway.ReturnFundsMessage({timestamp: block.timestamp, blockNumber: block.number})
                 )
-            );
-            vm.expectCall(
-                address(_mockAllocator), abi.encodeCall(IAllocator.withdraw, (address(_mockGho), amountToken))
-            );
+            })
+        );
 
-            // Call from random account to ensure the fee payer is used
-            vm.prank(sender);
-            _earningChainGateway.pushFundsToAccountingChain(
-                address(_mockGho),
-                amountToken,
-                IBridgeAdapter.BridgeParams({
-                    feePayer: sender,
-                    feeToken: bridgeFeeToken,
-                    feeAmount: bridgeFeeAmount,
-                    feeRefundThreshold: 0,
-                    gasLimit: 100000,
-                    data: abi.encode(keccak256(hex"c0ffee"))
-                })
-            );
-        }
-
-        // check that the next call uses incremented nonce
-        {
-            _mockGho.mint(sender, bridgeFeeAmount);
-            vm.prank(sender);
-            MockNonStandardErc20(bridgeFeeToken).approve(address(_earningChainGateway), bridgeFeeAmount);
-            _mockTransferHelper.mockAsset(address(_mockGho), amountToken);
-
-            bytes memory data;
-            {
-                uint256 amountUsdt = 123000000000000000000;
-                uint256 amountGho = 4560000000000000;
-
-                uint256 expectedTotalAssetsInRay =
-                    amountUsdt.assetDecimalsToRay(address(_mockUsdt)) + amountGho.assetDecimalsToRay(address(_mockGho));
-
-                data = abi.encode(
-                    IChainGateway.CrossChainMessage({
-                        messageType: IChainGateway.MessageType.BALANCE_SNAPSHOT,
-                        data: abi.encode(
-                            IChainGateway.BalanceSnapshot({totalAssetsInRay: expectedTotalAssetsInRay, nonce: 2})
-                        )
+        vm.expectCall(
+            address(_mockBridgeAdapterAssets),
+            abi.encodeCall(
+                IBridgeAdapter.publishMessageToChainWithFeePayer,
+                (
+                    ACCOUNTING_CHAIN_ID,
+                    address(_mockGho),
+                    amountToken,
+                    returnFundsMessageEncoded,
+                    IBridgeAdapter.BridgeParams({
+                        feePayer: sender,
+                        feeToken: bridgeFeeToken,
+                        feeAmount: bridgeFeeAmount,
+                        feeRefundThreshold: 0,
+                        gasLimit: 100000,
+                        data: abi.encode(keccak256(hex"c0ffee"))
                     })
-                );
-            }
-
-            vm.expectCall(
-                address(_mockBridgeAdapterAssets),
-                abi.encodeCall(
-                    IBridgeAdapter.publishMessageToChainWithFeePayer,
-                    (
-                        ACCOUNTING_CHAIN_ID,
-                        address(_mockGho),
-                        amountToken,
-                        data,
-                        IBridgeAdapter.BridgeParams({
-                            feePayer: sender,
-                            feeToken: bridgeFeeToken,
-                            feeAmount: bridgeFeeAmount,
-                            feeRefundThreshold: 0,
-                            gasLimit: 100000,
-                            data: abi.encode(keccak256(hex"c0ffee"))
-                        })
-                    )
                 )
-            );
-            vm.expectCall(
-                address(_mockAllocator), abi.encodeCall(IAllocator.withdraw, (address(_mockGho), amountToken))
-            );
-            vm.prank(sender);
-            _earningChainGateway.pushFundsToAccountingChain(
-                address(_mockGho),
-                amountToken,
-                IBridgeAdapter.BridgeParams({
-                    feePayer: sender,
-                    feeToken: bridgeFeeToken,
-                    feeAmount: bridgeFeeAmount,
-                    feeRefundThreshold: 0,
-                    gasLimit: 100000,
-                    data: abi.encode(keccak256(hex"c0ffee"))
-                })
-            );
-        }
+            )
+        );
+        vm.expectCall(address(_mockAllocator), abi.encodeCall(IAllocator.withdraw, (address(_mockGho), amountToken)));
+
+        // Call from random account to ensure the fee payer is used
+        vm.prank(sender);
+        _earningChainGateway.pushFundsToAccountingChain(
+            address(_mockGho),
+            amountToken,
+            IBridgeAdapter.BridgeParams({
+                feePayer: sender,
+                feeToken: bridgeFeeToken,
+                feeAmount: bridgeFeeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: 100000,
+                data: abi.encode(keccak256(hex"c0ffee"))
+            })
+        );
     }
 
-    function test_pushFundsToAccountingChain_bridgesAssetAndSnapshotWithNativeBridgeFee(
+    function test_pushFundsToAccountingChain_bridgesAssetWithNativeBridgeFee(
         uint256 amountTokenUnits,
         uint256 bridgeFeeAmount
     ) public {
@@ -1313,70 +918,76 @@ contract EarningChainGatewayTest is TestWithHelpers {
         address bridgeFeeToken = address(0);
         address feePayer = makeAddr("feePayer");
 
-        {
-            bytes memory data;
-            {
-                uint256 amountUsdt = 123000000000000000000;
-                uint256 amountGho = 4560000000000000;
-                IAllocator.AllocatorBalance[] memory allocatorBalances = _buildAllocatorBalances(amountUsdt, amountGho);
+        vm.deal(feePayer, bridgeFeeAmount);
 
-                vm.mockCall(
-                    address(_mockAllocator),
-                    abi.encodeWithSelector(MockAllocator.getTrustedAssetBalances.selector),
-                    abi.encode(allocatorBalances)
-                );
-
-                uint256 expectedTotalAssetsInRay =
-                    amountUsdt.assetDecimalsToRay(address(_mockUsdt)) + amountGho.assetDecimalsToRay(address(_mockGho));
-
-                data = abi.encode(
-                    IChainGateway.CrossChainMessage({
-                        messageType: IChainGateway.MessageType.BALANCE_SNAPSHOT,
-                        data: abi.encode(
-                            IChainGateway.BalanceSnapshot({totalAssetsInRay: expectedTotalAssetsInRay, nonce: 1})
-                        )
-                    })
-                );
-            }
-
-            vm.deal(feePayer, bridgeFeeAmount);
-
-            vm.expectCall(
-                address(_mockBridgeAdapterAssets),
-                0,
-                abi.encodeCall(
-                    IBridgeAdapter.publishMessageToChainWithFeePayer,
-                    (
-                        ACCOUNTING_CHAIN_ID,
-                        address(_mockUsdt),
-                        amountToken,
-                        data,
-                        IBridgeAdapter.BridgeParams({
-                            feePayer: feePayer,
-                            feeToken: bridgeFeeToken,
-                            feeAmount: bridgeFeeAmount,
-                            feeRefundThreshold: 0,
-                            gasLimit: 100000,
-                            data: abi.encode(keccak256(hex"c0ffee"))
-                        })
-                    )
+        bytes memory returnFundsMessageEncoded = abi.encode(
+            IChainGateway.CrossChainMessage({
+                messageType: IChainGateway.MessageType.RETURN_FUNDS,
+                data: abi.encode(
+                    IChainGateway.ReturnFundsMessage({timestamp: block.timestamp, blockNumber: block.number})
                 )
-            );
+            })
+        );
 
-            vm.prank(feePayer);
-            _earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
-                address(_mockUsdt),
-                amountToken,
-                IBridgeAdapter.BridgeParams({
-                    feePayer: feePayer,
-                    feeToken: bridgeFeeToken,
-                    feeAmount: bridgeFeeAmount,
-                    feeRefundThreshold: 0,
-                    gasLimit: 100000,
-                    data: abi.encode(keccak256(hex"c0ffee"))
-                })
-            );
-        }
+        vm.expectCall(
+            address(_mockBridgeAdapterAssets),
+            0,
+            abi.encodeCall(
+                IBridgeAdapter.publishMessageToChainWithFeePayer,
+                (
+                    ACCOUNTING_CHAIN_ID,
+                    address(_mockUsdt),
+                    amountToken,
+                    returnFundsMessageEncoded,
+                    IBridgeAdapter.BridgeParams({
+                        feePayer: feePayer,
+                        feeToken: bridgeFeeToken,
+                        feeAmount: bridgeFeeAmount,
+                        feeRefundThreshold: 0,
+                        gasLimit: 100000,
+                        data: abi.encode(keccak256(hex"c0ffee"))
+                    })
+                )
+            )
+        );
+
+        vm.prank(feePayer);
+        _earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
+            address(_mockUsdt),
+            amountToken,
+            IBridgeAdapter.BridgeParams({
+                feePayer: feePayer,
+                feeToken: bridgeFeeToken,
+                feeAmount: bridgeFeeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: 100000,
+                data: abi.encode(keccak256(hex"c0ffee"))
+            })
+        );
+    }
+
+    function test_pushFundsToAccountingChain_emitsAssetOutflow(uint256 amountToken) public {
+        amountToken = _boundAssetAmount(address(_mockUsdt), amountToken);
+        _mockTransferHelper.mockAsset(address(_mockUsdt), amountToken);
+
+        address sender = makeAddr("randomAccount");
+
+        vm.expectEmit(true, true, true, true);
+        emit IEarningChainGateway.AssetOutflow(address(_mockUsdt), amountToken);
+
+        vm.prank(sender);
+        _earningChainGateway.pushFundsToAccountingChain(
+            address(_mockUsdt),
+            amountToken,
+            IBridgeAdapter.BridgeParams({
+                feePayer: sender,
+                feeToken: address(0),
+                feeAmount: 0,
+                feeRefundThreshold: 0,
+                gasLimit: 100000,
+                data: abi.encode(keccak256(hex"c0ffee"))
+            })
+        );
     }
 
     function test_pushFundsToAccountingChain_reverts_ifUnauthorized(address operator) public {
@@ -1770,10 +1381,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             0,
             abi.encode(
                 IChainGateway.CrossChainMessage({
-                    messageType: IChainGateway.MessageType.INVALID,
-                    data: abi.encode(
-                        IChainGateway.BalanceSnapshot({totalAssetsInRay: 100_000_000_000_000 * 10 ** 27, nonce: 1})
-                    )
+                    messageType: IChainGateway.MessageType.INVALID, data: abi.encode(keccak256(hex"c0ffee"))
                 })
             )
         );

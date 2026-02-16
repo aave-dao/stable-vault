@@ -12,11 +12,21 @@ interface IFundsHandler {
     /// @custom:selector 0x93ce7047
     error OnlyBasedBoostedVault();
 
-    /// @notice Emitted when the chain balance snapshot is received from a chain.
-    /// @param chainId Chain id of the chain that the snapshot (and potentially funds) arrived from.
-    /// @param amountRay Amount of total assets on the chain in RAY.
-    /// @param nonce Nonce of the balance snapshot from the source chain.
-    event ChainBalanceSnapshotReceived(uint256 chainId, uint256 amountRay, uint256 nonce);
+    /// @notice Thrown when the chain id is already present in the Earning chain set.
+    /// @custom:selector 0x148e7b23
+    error ChainIdAlreadyPresent();
+
+    /// @notice Thrown when the chain id can not be removed because it is not present in the Earning chain set.
+    /// @custom:selector 0xa80e441d
+    error ChainIdNotPresent();
+
+    /// @notice Emitted when an earning chain is added.
+    /// @param chainId Chain id of the earning chain that was added.
+    event EarningChainAdded(uint256 chainId);
+
+    /// @notice Emitted when an earning chain is removed.
+    /// @param chainId Chain id of the earning chain that was removed.
+    event EarningChainRemoved(uint256 chainId);
 
     /// @notice The representation of an asset balance.
     /// @param asset Address of the asset.
@@ -32,10 +42,15 @@ interface IFundsHandler {
     /// @return aggregatedBalance Total liquidity across all supported chains in RAY of supported asset denomination.
     function getAggregatedBalance() external view returns (uint256);
 
-    /// @notice Getter for the asset specific and chain specific balances in the local Allocator and the Allocators on
-    /// all Earning Chains.
-    /// @return assetBalances Array of asset balances for all supported chains including the native chain.
-    function getAssetBalances() external view returns (AssetBalance[] memory);
+    /// @notice Adds an earning chain to the list of supported earning chains.
+    /// @dev An Earning chain must be added to bridge funds to the chain and to obtain balances on the chain from an
+    /// oracle. @param chainId Chain id of the earning chain to add.
+    function addEarningChain(uint256 chainId) external;
+
+    /// @notice Removes an earning chain from the list of supported earning chains.
+    /// @dev An Earning chain must be removed to stop bridging funds to the chain and to stop obtaining balances on the
+    /// chain from an oracle. @param chainId Chain id of the earning chain to remove.
+    function removeEarningChain(uint256 chainId) external;
 
     /// @notice Forward a deposit to a liquidity source.
     /// @param asset Address of the asset to deposit.
@@ -61,13 +76,6 @@ interface IFundsHandler {
         uint256 chainId,
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) external payable;
-
-    /// @notice Updates the chain balance snapshot for a given chain.
-    /// @param chainId Chain id of the chain that sent the balance update.
-    /// @param snapshotBalanceRay Balance snapshot on the source chain in RAY of supported asset denomination.
-    /// @param chainBalanceSnapshotNonce Nonce of the balance snapshot from the source chain.
-    function updateChainBalanceCallback(uint256 chainId, uint256 snapshotBalanceRay, uint256 chainBalanceSnapshotNonce)
-        external;
 
     /// @notice Callback function for when funds arrive from a chain.
     /// @param asset Address of the asset that arrived from the chain.

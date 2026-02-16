@@ -108,6 +108,13 @@ contract CcipAdapterTest is TestWithHelpers {
         _earningChainCcipAdapter.setDestinationChainAdapter(ACCOUNTING_CHAIN_ID, address(_accountingChainCcipAdapter));
     }
 
+    function test_constructor_reverts_ifInvalidTransferHelper() public {
+        vm.expectRevert();
+        _deployCcipAdapter(
+            address(_mockAccessManager), address(_mockAccountingChainGateway), address(_mockCCIPRouter), address(0)
+        );
+    }
+
     function test_getRouter() public view {
         assertEq(_accountingChainCcipAdapter.getRouter(), address(_mockCCIPRouter));
         assertEq(_earningChainCcipAdapter.getRouter(), address(_mockCCIPRouter));

@@ -17,21 +17,6 @@ import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
 /// 4. > Add --broadcast to send the tx instead of simulating it.
 /// 5. > Add --slow to force foundry to execute txs sequentially.
 contract EarningChainGatewayInteractionScript is EarningChainBaseScript {
-    function sendBalanceUpdateWithFeePayer() public {
-        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
-            feePayer: address(0xC9213f6189b0f4F96Ba859c675589755178ae276),
-            feeToken: LINK,
-            feeAmount: 100000000000000000000,
-            feeRefundThreshold: 0,
-            gasLimit: 750000,
-            data: ""
-        });
-
-        vm.startBroadcast();
-        IEarningChainGateway(EARNING_CHAIN_GATEWAY).sendBalanceUpdateWithFeePayer{value: 0}(bridgeParams);
-        vm.stopBroadcast();
-    }
-
     function pushFundsToAccountingChain() public {
         address asset = USDT;
         uint256 amount = 123 * 10 ** 6;

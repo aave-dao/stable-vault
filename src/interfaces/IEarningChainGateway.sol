@@ -6,12 +6,14 @@ import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 
 interface IEarningChainGateway is IChainGateway {
+    /// @notice Emitted when assets are removed from the Earning Chain.
+    /// @dev Can be emitted when IOUs are exchanged for assets or funds are returned to the Accounting Chain.
+    /// @param asset The asset that was removed.
+    /// @param amount The amount of the asset that was removed.
+    event AssetOutflow(address indexed asset, uint256 amount);
+
     /// @notice The aggregated balance of the Earning Chain.
     function getAggregatedBalance() external view returns (uint256);
-
-    /// @notice Sends a balance update to the Accounting Chain with bridging fees taken by specified payer.
-    /// @param bridgeParams The parameters for the bridge adapter.
-    function sendBalanceUpdateWithFeePayer(IBridgeAdapter.BridgeParams memory bridgeParams) external payable;
 
     /// @notice Withdraws a specific asset from the Allocator and bridges it to the Accounting Chain.
     /// @param asset The asset to withdraw.

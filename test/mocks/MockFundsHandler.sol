@@ -35,11 +35,13 @@ contract MockFundsHandler is IFundsHandler {
 
     ////
 
+    function addEarningChain(uint256 chainId) external override {}
+
+    function removeEarningChain(uint256 chainId) external override {}
+
     function getAggregatedBalance() external view override returns (uint256) {
         return _mockedAggregatedBalance;
     }
-
-    function getAssetBalances() external view override returns (AssetBalance[] memory) {}
 
     function processDeposit(address asset, uint256 amount) external override returns (uint256) {
         ITransferHelper(_mockedTransferHelper).pull(asset, amount);
@@ -56,11 +58,6 @@ contract MockFundsHandler is IFundsHandler {
         uint256 chainId,
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) external payable override {}
-
-    function updateChainBalanceCallback(uint256 chainId, uint256 snapshotBalanceRay, uint256 snapshotTimestamp)
-        external
-        override
-    {}
 
     function fundsArrivedFromChainCallback(address asset, uint256 amount) external override {}
 }

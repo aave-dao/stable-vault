@@ -15,6 +15,7 @@ import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {IBasedBoostedVault} from "src/interfaces/IBasedBoostedVault.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
+import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
@@ -78,6 +79,8 @@ contract BasedBoostedVault is
 
     address internal immutable WITHDRAWAL_POLICY;
 
+    address internal immutable PRICE_ORACLE;
+
     uint256 internal immutable MAX_ACTIVE_SUB_VAULTS;
 
     /// @custom:storage-location erc7201:aave.storage.BasedBoostedVault
@@ -134,6 +137,7 @@ contract BasedBoostedVault is
         address fundsHandler,
         address transferHelper,
         address withdrawalPolicy,
+        address priceOracle,
         uint256 maxActiveSubVaults
     ) TransferHelperClient(transferHelper) {
         _disableInitializers();
@@ -143,6 +147,7 @@ contract BasedBoostedVault is
         IOU_TOKEN_MANAGER = iouTokenManager;
         FUNDS_HANDLER = fundsHandler;
         WITHDRAWAL_POLICY = withdrawalPolicy;
+        PRICE_ORACLE = priceOracle;
         MAX_ACTIVE_SUB_VAULTS = maxActiveSubVaults;
     }
 
@@ -171,6 +176,8 @@ contract BasedBoostedVault is
     {
         require(IAssetRegistry(ASSET_REGISTRY).isUserDepositAllowed(asset), Errors.UnsupportedAsset(asset));
         require(amount > 0, Errors.InvalidAmount());
+
+        IPriceOracle(PRICE_ORACLE).validatePrice(asset);
 
         uint256 subVaultId = $storage().positions[user].subVaultId;
         if (subVaultId == 0) {
@@ -352,7 +359,6 @@ contract BasedBoostedVault is
         if (remainingShares == 0) {
             delete $storage().positions[user];
         } else {
-            // Only needed if the user has remaining balance, otherwise the whole position is deleted.
             $storage().positions[user].originalDepositRay -= guaranteedAmountRay;
         }
 

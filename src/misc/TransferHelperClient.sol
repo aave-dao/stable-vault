@@ -6,6 +6,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
+import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
@@ -24,6 +25,7 @@ contract TransferHelperClient {
     /// @dev Constructor.
     /// @param transferHelper Address of the TransferHelper contract.
     constructor(address transferHelper) {
+        ITransferHelper(transferHelper).getBalance(Constants.NATIVE_CURRENCY);
         TRANSFER_HELPER = transferHelper;
     }
 

@@ -203,12 +203,7 @@ contract AccountingChainDeployment is
     }
 
     function _deployWithdrawalPolicy() internal returns (address) {
-        address implementation = address(
-            new WithdrawalPolicy({
-                assetRegistry: getAssetRegistryAddress(DEPLOYER),
-                withdrawalPolicyApplier: getBasedBoostedVaultAddress(DEPLOYER)
-            })
-        );
+        address implementation = address(new WithdrawalPolicy(getBasedBoostedVaultAddress(DEPLOYER)));
         _logDeployment("WithdrawalPolicy::Implementation", "", implementation);
         address withdrawalPolicy = _deployTransparentProxy_create3({
             namespacedSaltSeed: WITHDRAWAL_POLICY_SALT_SEED,
@@ -269,6 +264,7 @@ contract AccountingChainDeployment is
                 fundsHandler: getFundsHandlerAddress(DEPLOYER),
                 transferHelper: getTransferHelperAddress(DEPLOYER),
                 withdrawalPolicy: getWithdrawalPolicyAddress(DEPLOYER),
+                priceOracle: address(0), // TODO: Deploy Price Oracle properly
                 maxActiveSubVaults: DEFAULT_MAX_ACTIVE_SUB_VAULTS
             })
         );
@@ -293,6 +289,7 @@ contract AccountingChainDeployment is
                 assetRegistry: getAssetRegistryAddress(DEPLOYER),
                 depositor: ALLOCATOR_DEPOSITOR,
                 withdrawer: ALLOCATOR_WITHDRAWER,
+                priceOracle: address(0), // TODO: Deploy Price Oracle properly
                 transferHelper: getTransferHelperAddress(DEPLOYER),
                 maxStrategiesPerAsset: MAX_STRATEGIES_PER_ASSET
             })
@@ -316,7 +313,9 @@ contract AccountingChainDeployment is
                 basedBoostedVault: getBasedBoostedVaultAddress(DEPLOYER),
                 gateway: getGatewayAddress(DEPLOYER),
                 allocator: getAllocatorAddress(DEPLOYER),
-                transferHelper: getTransferHelperAddress(DEPLOYER)
+                priceOracle: address(0), // TODO: Deploy Price Oracle properly
+                transferHelper: getTransferHelperAddress(DEPLOYER),
+                chainBalanceOracle: address(0) // TODO: Deploy Chain Balance Oracle properly
             })
         );
         _logDeployment("FundsHandler::Implementation", "", implementation);
@@ -335,7 +334,9 @@ contract AccountingChainDeployment is
     function _deployGateway() internal returns (address) {
         address implementation = address(
             new AccountingChainGateway({
-                fundsHandler: getFundsHandlerAddress(DEPLOYER), iouTokenManager: getIouTokenManagerAddress(DEPLOYER)
+                fundsHandler: getFundsHandlerAddress(DEPLOYER),
+                iouTokenManager: getIouTokenManagerAddress(DEPLOYER),
+                chainBalanceOracle: address(0) // TODO: Deploy Chain Balance Oracle properly
             })
         );
         _logDeployment("AccountingChainGateway::Implementation", "", implementation);

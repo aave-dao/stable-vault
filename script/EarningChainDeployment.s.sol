@@ -195,11 +195,7 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
     }
 
     function _deployWithdrawalPolicy() internal returns (address) {
-        address implementation = address(
-            new WithdrawalPolicy({
-                assetRegistry: getAssetRegistryAddress(DEPLOYER), withdrawalPolicyApplier: getGatewayAddress(DEPLOYER)
-            })
-        );
+        address implementation = address(new WithdrawalPolicy(getGatewayAddress(DEPLOYER)));
         _logDeployment("WithdrawalPolicy::Implementation", "", implementation);
         address withdrawalPolicy = _deployTransparentProxy_create3({
             namespacedSaltSeed: WITHDRAWAL_POLICY_SALT_SEED,
@@ -257,6 +253,7 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
                 assetRegistry: getAssetRegistryAddress(DEPLOYER),
                 depositor: ALLOCATOR_DEPOSITOR,
                 withdrawer: ALLOCATOR_WITHDRAWER,
+                priceOracle: address(0), // TODO: Deploy Price Oracle properly
                 transferHelper: getTransferHelperAddress(DEPLOYER),
                 maxStrategiesPerAsset: MAX_STRATEGIES_PER_ASSET
             })
@@ -279,6 +276,7 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
             new EarningChainGateway({
                 accountingChainId: ACCOUNTING_CHAIN_ID,
                 allocator: getAllocatorAddress(DEPLOYER),
+                priceOracle: address(0), // TODO: Deploy Price Oracle properly
                 iouTokenManager: getIouTokenManagerAddress(DEPLOYER),
                 transferHelper: getTransferHelperAddress(DEPLOYER),
                 withdrawalPolicy: getWithdrawalPolicyAddress(DEPLOYER)

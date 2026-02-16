@@ -37,6 +37,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         address assetRegistry,
         address transferHelper,
         address withdrawalFeeCalculator,
+        address priceOracle,
         uint256 maxActiveSubVaults
     ) internal virtual override returns (BasedBoostedVault) {
         // Deploy a vault without restriction in the valid per-second rate
@@ -48,6 +49,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
                 fundsHandler,
                 transferHelper,
                 withdrawalFeeCalculator,
+                priceOracle,
                 maxActiveSubVaults
             )
         );
@@ -111,6 +113,23 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             IERC20(address(USDC)).balanceOf(defaultUsdcVault_earningChain),
             userInitialDeposit,
             "Default USDC strategy vault on Earning Chain should have the deposited amount of USDC"
+        );
+
+        // Publish a chain balance snapshot via MockBundleFeed so the adapter/oracle path reflects Earning Chain funds.
+        uint256 earningChainBalanceRay = userInitialDeposit.assetDecimalsToRay(address(USDC));
+        _mockChainBalance(
+            EARNING_CHAIN_ID,
+            earningChainBalanceRay,
+            block.timestamp,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            false
+        );
+
+        // Verify the FundsHandler now sees the earning chain balance via the oracle
+        assertEq(
+            fundsHandler.getAggregatedBalance(),
+            earningChainBalanceRay,
+            "FundsHandler should see the earning chain balance via the oracle"
         );
 
         // 3. Mimic time passing so that user1's balances increase.
@@ -305,6 +324,14 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             iouToken_earningChain.balanceOf(user1), amountIouToExchange, "User should have enough IOUs to exchange"
         );
         vm.deal(user1, 1000);
+        // Publish a pre-burn chain balance snapshot so AccountingChainGateway accepts the inbound BURN_IOU_TOKEN.
+        _mockChainBalance(
+            EARNING_CHAIN_ID,
+            assetsOnEarningBeforeUser1ExchangeIous - amountIouToExchange,
+            block.timestamp,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            false
+        );
         vm.prank(user1);
         earningChainGateway.exchangeIouTokens{value: 1}(
             amountIouToExchange,
@@ -348,12 +375,28 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             assetsOnEarningBeforeUser1ExchangeIous - amountIouToExchange,
             "Assets on Earning Chain should decrease by the amount of IOUs exchanged"
         );
-        // Check the assets in the Accounting chain are now the 500 deposit from user2 + the snapshot update after
-        // User1's withdrawal on Earning chain of 225 (500 + 500 - 225)
+
+        // Publish the post-burn chain balance snapshot (after the IOU exchange) to the feed.
+        // Earning chain balance was 500 USDC worth, now decreased by 225 RAY (amountIouToExchange)
+        uint256 remainingEarningChainBalanceRay = assetsOnEarningBeforeUser1ExchangeIous - amountIouToExchange;
+        _mockChainBalance(
+            EARNING_CHAIN_ID,
+            remainingEarningChainBalanceRay,
+            block.timestamp,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            false
+        );
+
+        // Check the assets in the Accounting chain (cross-chain aggregated balance via oracle)
+        // Local balance: User2's 500 USDC deposit = 500 * 10^27 RAY
+        // Earning chain balance: (500 - 225) * 10^27 RAY = 275 * 10^27 RAY
+        // Total: 775 * 10^27 RAY
+        uint256 localBalanceRay = 500000000000000000000000000000; // 500 * 10^27 RAY
+        uint256 expectedTotalBalanceRay = localBalanceRay + remainingEarningChainBalanceRay;
         assertEq(
             fundsHandler.getAggregatedBalance(),
-            775000000000000000000000000000,
-            "Assets on Accounting Chain should increase by the amount of IOUs exchanged"
+            expectedTotalBalanceRay,
+            "FundsHandler should see local balance + earning chain balance via oracle"
         );
     }
 

@@ -86,10 +86,7 @@ contract EndToEndTest is BaseTest {
         uint256 userInitialDeposit = 500 * (10 ** 6);
         USDC.mint(user, userInitialDeposit);
 
-        // TODO:
-        /*
-            1. Setup default liquidity vaults/strategies on both chains for every currency
-        */
+        // BaseTest setUp already configures default liquidity vaults/strategies on both chains.
 
         // // Steps: ////
         // 1. User1 deposits 500 USDC to Vault on Accounting Chain
@@ -170,6 +167,23 @@ contract EndToEndTest is BaseTest {
             assertTrue(
                 IERC4626(defaultUsdcVault_earningChain).balanceOf(address(allocator_earningChain)) > 0,
                 "Allocator should have shares of the vault"
+            );
+
+            // Publish a chain balance snapshot via MockBundleFeed so the adapter/oracle path reflects bridged funds.
+            uint256 earningChainBalanceRay = userInitialDeposit.assetDecimalsToRay(address(USDC));
+            _mockChainBalance(
+                EARNING_CHAIN_ID,
+                earningChainBalanceRay,
+                block.timestamp,
+                block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+                false
+            );
+
+            // Verify the FundsHandler now sees the earning chain balance via the oracle
+            assertEq(
+                fundsHandler.getAggregatedBalance(),
+                earningChainBalanceRay,
+                "FundsHandler should see the earning chain balance via the oracle"
             );
         }
 
@@ -256,58 +270,23 @@ contract EndToEndTest is BaseTest {
             IERC4626(defaultGhoVault_earningChain).balanceOf(address(allocator_earningChain))
         );
 
-        // 6. User asks for withdrawal of the whole amount of his earnings (which are $500+ - in USDC)
-        uint256 iouAmountRequestedRay;
-        {
-            console.log("User creates a WithdrawalRequest...");
-            vm.prank(user);
-            vm.expectRevert(
-                abi.encodeWithSelector(
-                    IBasedBoostedVault.InsufficientAssets.selector,
-                    user,
-                    512381782621115714946287446500,
-                    500000000000000000000000000000
-                )
-            );
-            iouAmountRequestedRay = vault.requestWithdrawal(user, 0);
-
-            // Send balance snap shot update so that Accounting chain has latest assets balances
-            vm.prank(everyRoleAccount);
-            vm.deal(everyRoleAccount, bridgeFeeAmount);
-            earningChainGateway.sendBalanceUpdateWithFeePayer{value: bridgeFeeAmount}(
-                IBridgeAdapter.BridgeParams({
-                    feePayer: everyRoleAccount,
-                    feeToken: address(0),
-                    feeAmount: bridgeFeeAmount,
-                    feeRefundThreshold: 0,
-                    gasLimit: 300000,
-                    data: ""
-                })
-            );
-
-            console.log("Total system balance: %s", fundsHandler.getAggregatedBalance());
-
-            // Try the request again
-            vm.prank(user);
-            iouAmountRequestedRay = vault.requestWithdrawal(user, iouAmountRequestedRay);
-
-            console.log("... request withdrawal minted IOU tokens: %s", iouAmountRequestedRay);
-            // Check user IOU token balance
-            assertGt(iouToken_accountingChain.balanceOf(user), 0, "User should have minted IOU tokens");
-
-            vm.prank(user);
-            vm.expectRevert(Errors.InsufficientFunds.selector);
-            vault.executeWithdrawal(user, address(USDC), 0, iouAmountRequestedRay, "");
-
-            // - check that we don't owe the user any funds
-            console.log("User balance in RAY after withdrawal request: %s", vault.getUserBalance(user));
-            assertEq(vault.getUserBalance(user), 0, "User balance should be down to 0 after full withdrawal request");
-        }
-
-        // 7. Manager brings back the money from the Earning Chain to the Accounting Chain via CCIP in GHO
+        // 6. Manager brings back the money from the Earning Chain to the Accounting Chain via CCIP in GHO
+        // NOTE: With the oracle-based balance system, funds must be on the Accounting Chain before withdrawal
+        // requests can be processed. The FundsHandler uses the chain balance oracle to track cross-chain balances.
         uint256 userEarningsInGho;
         address defaultGhoVault_accountingChain = allocator_accountingChain.getDefaultStrategy(address(GHO));
         {
+            // Publish a fresh pre-return snapshot (time has warped since step 3).
+            // AccountingChainGateway requires sourceChainBlockNumber >= RETURN_FUNDS message block number.
+            uint256 currentEarningChainBalanceRay = earningChainGateway.getAggregatedBalance();
+            _mockChainBalance(
+                EARNING_CHAIN_ID,
+                currentEarningChainBalanceRay,
+                block.timestamp,
+                block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+                false
+            );
+
             userEarningsInGho = userEarningsInRay.rayToAssetDecimals(address(GHO));
             vm.prank(everyRoleAccount);
             vm.deal(everyRoleAccount, bridgeFeeAmount);
@@ -322,6 +301,16 @@ contract EndToEndTest is BaseTest {
                     gasLimit: 300000,
                     data: ""
                 })
+            );
+
+            // Publish the post-return snapshot reflecting reduced Earning Chain balance after bridging back.
+            uint256 remainingEarningChainBalanceRay = earningChainGateway.getAggregatedBalance();
+            _mockChainBalance(
+                EARNING_CHAIN_ID,
+                remainingEarningChainBalanceRay,
+                block.timestamp,
+                block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+                false
             );
 
             // - check that the funds land on the Accounting Chain and are dropped into default liquidity vault there
@@ -342,11 +331,12 @@ contract EndToEndTest is BaseTest {
             );
         }
 
-        // 8. Manager rebalances & swaps the funds on the Accounting Chain from GHO to USDC (via Swapper)
+        // 7. Manager rebalances & swaps the funds on the Accounting Chain from GHO to USDC (via Swapper)
         uint256 userEarningsInUsdc;
         {
             userEarningsInUsdc = userEarningsInRay.rayToAssetDecimals(address(USDC));
-            USDC.mint(address(swapper_accountingChain), userEarningsInUsdc);
+            // Add 1 wei extra to cover precision loss when converting from RAY to USDC decimals
+            USDC.mint(address(swapper_accountingChain), userEarningsInUsdc + 1);
 
             address[] memory targets = new address[](1);
             targets[0] = address(GHO);
@@ -372,7 +362,7 @@ contract EndToEndTest is BaseTest {
 
             IAllocator.AllocationParams[] memory allocationParams = new IAllocator.AllocationParams[](1);
             allocationParams[0] = IAllocator.AllocationParams({
-                asset: address(USDC), strategy: defaultUsdcVault_accountingChain, amount: userEarningsInUsdc
+                asset: address(USDC), strategy: defaultUsdcVault_accountingChain, amount: userEarningsInUsdc + 1
             });
 
             IAllocator.RebalanceParams memory rebalanceParams = IAllocator.RebalanceParams({
@@ -386,14 +376,14 @@ contract EndToEndTest is BaseTest {
             vm.prank(everyRoleAccount);
             allocator_accountingChain.rebalance(rebalances);
 
-            // - check that the funds are swapped to USDC
+            // - check that the funds are swapped to USDC (includes 1 extra wei for precision)
             console.log(
                 "\tBalance of USDC in The USDC Vault is: %s",
                 IERC20(address(USDC)).balanceOf(defaultUsdcVault_accountingChain)
             );
             assertEq(
                 IERC20(address(USDC)).balanceOf(defaultUsdcVault_accountingChain),
-                userEarningsInUsdc,
+                userEarningsInUsdc + 1,
                 "Vault should have the swapped amount of USDC"
             );
             // - check that the funds land on the USDC vault
@@ -405,6 +395,26 @@ contract EndToEndTest is BaseTest {
                 IERC4626(defaultUsdcVault_accountingChain).balanceOf(address(allocator_accountingChain)) > 0,
                 "Allocator should have shares of the vault"
             );
+        }
+
+        // 8. User asks for withdrawal of the whole amount of his earnings (which are $500+ - in USDC)
+        // Now that funds are back on the Accounting Chain, the withdrawal request can be processed.
+        uint256 iouAmountRequestedRay;
+        {
+            console.log("User creates a WithdrawalRequest...");
+            console.log("Total system balance: %s", fundsHandler.getAggregatedBalance());
+
+            // Request withdrawal
+            vm.prank(user);
+            iouAmountRequestedRay = vault.requestWithdrawal(user, 0);
+
+            console.log("... request withdrawal minted IOU tokens: %s", iouAmountRequestedRay);
+            // Check user IOU token balance
+            assertGt(iouToken_accountingChain.balanceOf(user), 0, "User should have minted IOU tokens");
+
+            // - check that we don't owe the user any funds
+            console.log("User balance in RAY after withdrawal request: %s", vault.getUserBalance(user));
+            assertEq(vault.getUserBalance(user), 0, "User balance should be down to 0 after full withdrawal request");
         }
 
         // 9. User triggers the execute() withdrawal to send the funds back to the user
@@ -432,6 +442,16 @@ contract EndToEndTest is BaseTest {
             uint256 ghoBalanceOnVaultLeft =
                 IERC4626(defaultGhoVault_earningChain).balanceOf(address(allocator_earningChain));
             console.log("Earning chain GHO vault balance after withdrawal is now: %s GHO", ghoBalanceOnVaultLeft);
+
+            // Update oracle so the AccountingChainGateway accepts the inbound RETURN_FUNDS message
+            _mockChainBalance(
+                EARNING_CHAIN_ID,
+                earningChainGateway.getAggregatedBalance(),
+                block.timestamp,
+                block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+                false
+            );
+
             vm.prank(everyRoleAccount);
             vm.deal(everyRoleAccount, bridgeFeeAmount);
             earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
