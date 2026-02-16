@@ -81,6 +81,8 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     /// @param assetRegistry Address of the AssetRegistry contract used for managing asset configurations.
     /// @param withdrawalPolicyApplier Address allowed to apply the withdrawal policy.
     constructor(address assetRegistry, address withdrawalPolicyApplier) EIP712Upgradeable() {
+        require(assetRegistry != address(0), Errors.ZeroAddress());
+        require(withdrawalPolicyApplier != address(0), Errors.ZeroAddress());
         _disableInitializers();
         ASSET_REGISTRY = assetRegistry;
         WITHDRAWAL_POLICY_APPLIER = withdrawalPolicyApplier;

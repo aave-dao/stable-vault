@@ -69,4 +69,7 @@ library Errors {
     /// @notice Token amount checked is zero.
     /// @custom:selector 0x1f2a2005
     error ZeroAmount();
+
+    /// @notice Address checked is the zero address.
+    error ZeroAddress();
 }

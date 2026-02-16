@@ -79,6 +79,9 @@ contract FundsHandler is
         address transferHelper,
         address chainBalanceOracle
     ) TransferHelperClient(transferHelper) LocalBalanceAggregator(allocator, priceOracle) {
+        require(basedBoostedVault != address(0), Errors.ZeroAddress());
+        require(gateway != address(0), Errors.ZeroAddress());
+        require(chainBalanceOracle != address(0), Errors.ZeroAddress());
         _disableInitializers();
         VAULT = basedBoostedVault;
         GATEWAY = gateway;

@@ -6,6 +6,7 @@ import {IChainBalanceOracle} from "src/interfaces/IChainBalanceOracle.sol";
 import {IChainBalanceOracleAdapter} from "src/interfaces/IChainBalanceOracleAdapter.sol";
 import {IEarningChainStateProvider} from "src/interfaces/IEarningChainStateProvider.sol";
 import {EarningChainStateSchemaV1, SCHEMA_VERSION} from "src/periphery/EarningChainStateSchemaV1.sol";
+import {Errors} from "src/types/Errors.sol";
 
 // solhint-disable-next-line interface-starts-with-i
 interface IBundleBaseAggregator {
@@ -30,6 +31,9 @@ contract ChainlinkChainBalanceOracleAdapter is IChainBalanceOracleAdapter {
     uint256 immutable HEARTBEAT;
 
     constructor(uint256 earningChainId, address bundleAggregatorProxy, uint256 heartbeat) {
+        require(bundleAggregatorProxy != address(0), Errors.ZeroAddress());
+        require(earningChainId != 0 && earningChainId != block.chainid, Errors.InvalidParameter());
+        require(heartbeat > 0, Errors.InvalidParameter());
         EARNING_CHAIN_ID = earningChainId;
         BUNDLE_AGGREGATOR_PROXY = bundleAggregatorProxy;
         HEARTBEAT = heartbeat;

@@ -24,6 +24,7 @@ contract TransferHelperClient {
     /// @dev Constructor.
     /// @param transferHelper Address of the TransferHelper contract.
     constructor(address transferHelper) {
+        require(transferHelper != address(0), Errors.ZeroAddress());
         TRANSFER_HELPER = transferHelper;
     }
 

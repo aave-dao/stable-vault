@@ -55,6 +55,8 @@ contract EarningChainGateway is
         BaseChainGateway(iouTokenManager)
         LocalBalanceAggregator(allocator, priceOracle)
     {
+        require(withdrawalPolicy != address(0), Errors.ZeroAddress());
+        require(accountingChainId != 0 && accountingChainId != block.chainid, Errors.InvalidParameter());
         _disableInitializers();
         ACCOUNTING_CHAIN_ID = accountingChainId;
         WITHDRAWAL_POLICY = withdrawalPolicy;

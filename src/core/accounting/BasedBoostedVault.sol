@@ -140,14 +140,20 @@ contract BasedBoostedVault is
         address priceOracle,
         uint256 maxActiveSubVaults
     ) TransferHelperClient(transferHelper) {
-        _disableInitializers();
+        require(assetRegistry != address(0), Errors.ZeroAddress());
+        require(iouTokenManager != address(0), Errors.ZeroAddress());
+        require(fundsHandler != address(0), Errors.ZeroAddress());
+        require(withdrawalPolicy != address(0), Errors.ZeroAddress());
+        require(priceOracle != address(0), Errors.ZeroAddress());
         require(maxValidPerSecondRate > MathLib.RAY, InvalidRate());
-        MAX_VALID_PER_SECOND_RATE = maxValidPerSecondRate;
+        require(maxActiveSubVaults > 0, Errors.InvalidParameter());
+        _disableInitializers();
         ASSET_REGISTRY = assetRegistry;
         IOU_TOKEN_MANAGER = iouTokenManager;
         FUNDS_HANDLER = fundsHandler;
         WITHDRAWAL_POLICY = withdrawalPolicy;
         PRICE_ORACLE = priceOracle;
+        MAX_VALID_PER_SECOND_RATE = maxValidPerSecondRate;
         MAX_ACTIVE_SUB_VAULTS = maxActiveSubVaults;
     }
 

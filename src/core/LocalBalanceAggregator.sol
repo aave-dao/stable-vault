@@ -6,6 +6,7 @@ import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
+import {Errors} from "src/types/Errors.sol";
 
 /// @title LocalBalanceAggregator
 /// @author Aave Labs
@@ -18,6 +19,8 @@ contract LocalBalanceAggregator {
     address internal immutable PRICE_ORACLE;
 
     constructor(address allocator, address priceOracle) {
+        require(allocator != address(0), Errors.ZeroAddress());
+        require(priceOracle != address(0), Errors.ZeroAddress());
         ALLOCATOR = allocator;
         PRICE_ORACLE = priceOracle;
     }

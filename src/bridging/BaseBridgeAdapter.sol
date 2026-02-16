@@ -38,6 +38,7 @@ abstract contract BaseBridgeAdapter is AccessManaged, TransferHelperClient, IBri
         AccessManaged(accessManager)
         TransferHelperClient(transferHelper)
     {
+        require(gateway != address(0), Errors.ZeroAddress());
         GATEWAY = gateway;
     }
 

@@ -46,6 +46,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
     /// @dev Constructor.
     /// @param iouTokenManager Address of the IOU token manager.
     constructor(address iouTokenManager) {
+        require(iouTokenManager != address(0), Errors.ZeroAddress());
         _disableInitializers();
         IOU_TOKEN_MANAGER = iouTokenManager;
     }

@@ -92,6 +92,11 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         address transferHelper,
         uint8 maxStrategiesPerAsset
     ) TransferHelperClient(transferHelper) {
+        require(assetRegistry != address(0), Errors.ZeroAddress());
+        require(depositor != address(0), Errors.ZeroAddress());
+        require(withdrawer != address(0), Errors.ZeroAddress());
+        require(priceOracle != address(0), Errors.ZeroAddress());
+        require(maxStrategiesPerAsset > 0, Errors.InvalidParameter());
         _disableInitializers();
         ASSET_REGISTRY = assetRegistry;
         DEPOSITOR = depositor;

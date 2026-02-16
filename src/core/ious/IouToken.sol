@@ -8,6 +8,7 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IIouToken} from "src/interfaces/IIouToken.sol";
 import {IMintableBurnableIERC20} from "src/interfaces/IMintableBurnableIERC20.sol";
 import {Constants} from "src/types/Constants.sol";
+import {Errors} from "src/types/Errors.sol";
 
 /// @title IouToken
 /// @author Aave Labs
@@ -16,7 +17,9 @@ import {Constants} from "src/types/Constants.sol";
 contract IouToken is ERC20, Ownable, IIouToken {
     /// @dev Constructor.
     /// @param iouTokenManager Address of the IOU token manager which is the owner of the token.
-    constructor(address iouTokenManager) ERC20("IouToken", "IOU") Ownable(iouTokenManager) {}
+    constructor(address iouTokenManager) ERC20("IouToken", "IOU") Ownable(iouTokenManager) {
+        require(iouTokenManager != address(0), Errors.ZeroAddress());
+    }
 
     /// @inheritdoc IMintableBurnableIERC20
     function mint(address to, uint256 amount) external override onlyOwner {
