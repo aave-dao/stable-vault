@@ -3,8 +3,9 @@
 pragma solidity ^0.8.20;
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {console} from "forge-std/console.sol";
 import {IERC20} from "forge-std/interfaces/IERC20.sol";
+
+import {Logger} from "test/helpers/Logger.sol";
 
 import {BasedBoostedVault} from "src/core/accounting/BasedBoostedVault.sol";
 import {IBasedBoostedVault} from "src/interfaces/IBasedBoostedVault.sol";
@@ -63,7 +64,7 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
     }
 
     function test_givenSingleAssetDepegs_userCanStillWithdraw() public {
-        console.log("\nAccountingChainDistrustedAssetE2ETest: givenSingleAssetDepegs_userCanStillWithdraw");
+        Logger.log("\nAccountingChainDistrustedAssetE2ETest: givenSingleAssetDepegs_userCanStillWithdraw");
 
         uint256 userInitialDeposit = 500 * (10 ** 6);
 
@@ -141,7 +142,7 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
     }
 
     function test_givenMultipleUsersDeposit_lastUserToWithdrawHasToWithdrawDepegedAsset() public {
-        console.log(
+        Logger.log(
             "\nAccountingChainDistrustedAssetE2ETest: givenMultipleUsersDeposit_lastUserToWithdrawHasToWithdrawDepegedAsset"
         );
 
@@ -216,9 +217,7 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
     }
 
     function test_givenProfitsFromDistrustedAsset_claimSurplusInterestFails() public {
-        console.log(
-            "\nAccountingChainDistrustedAssetE2ETest: givenProfitsFromDistrustedAsset_claimSurplusInterestFails"
-        );
+        Logger.log("\nAccountingChainDistrustedAssetE2ETest: givenProfitsFromDistrustedAsset_claimSurplusInterestFails");
 
         uint256 userInitialDeposit = 500 * (10 ** 6);
 
@@ -273,7 +272,7 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
     }
 
     function test_givenDonationOfDistrustedAsset_userAttemptToWithdrawProfitsFails() public {
-        console.log(
+        Logger.log(
             "\nAccountingChainDistrustedAssetE2ETest: givenDonationOfDistrustedAsset_userAttemptToWithdrawProfitsFails"
         );
 

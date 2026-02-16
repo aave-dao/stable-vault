@@ -2,9 +2,10 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.20;
 
-import {console} from "forge-std/console.sol";
 import {IERC20} from "forge-std/interfaces/IERC20.sol";
+
 import {IERC4626} from "forge-std/interfaces/IERC4626.sol";
+import {Logger} from "test/helpers/Logger.sol";
 
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IBasedBoostedVault} from "src/interfaces/IBasedBoostedVault.sol";
@@ -43,8 +44,8 @@ contract EndToEndTest is BaseTest {
 
         uint256 userBalanceInRay = vault.getUserBalance(user);
         uint256 vaultAssetsInRay = vault.getAggregatedBalance();
-        console.log("userBalanceInRay %e", userBalanceInRay);
-        console.log("vaultAssetsInRay %e", vaultAssetsInRay);
+        Logger.log("userBalanceInRay %e", userBalanceInRay);
+        Logger.log("vaultAssetsInRay %e", vaultAssetsInRay);
         assert(userBalanceInRay > vaultAssetsInRay);
         // The user's balance in BBV is 1 unit of USDC greater than the actual assets in the system (this is treated as
         // interest the system owes to the user).
@@ -81,7 +82,7 @@ contract EndToEndTest is BaseTest {
     }
 
     function test_endToEnd() public {
-        console.log("\nEndToEndTest");
+        Logger.log("\nEndToEndTest");
 
         uint256 userInitialDeposit = 500 * (10 ** 6);
         USDC.mint(user, userInitialDeposit);
@@ -97,19 +98,17 @@ contract EndToEndTest is BaseTest {
 
         // - check that funds are dropped into default liquidity vault
         {
-            console.log("User deposited %s USDC into Vault", userInitialDeposit);
+            Logger.log("User deposited %s USDC into Vault", userInitialDeposit);
             address defaultUsdcVault_AccountingChain = allocator_accountingChain.getDefaultStrategy(address(USDC));
-            console.log("Default vault for USDC is: %s", defaultUsdcVault_AccountingChain);
-            console.log(
-                "It's balance of USDC is: %s", IERC20(address(USDC)).balanceOf(defaultUsdcVault_AccountingChain)
-            );
+            Logger.log("Default vault for USDC is: %s", defaultUsdcVault_AccountingChain);
+            Logger.log("It's balance of USDC is: %s", IERC20(address(USDC)).balanceOf(defaultUsdcVault_AccountingChain));
             // TODO: Replace with Before/After balance
             assertEq(
                 IERC20(address(USDC)).balanceOf(defaultUsdcVault_AccountingChain),
                 userInitialDeposit,
                 "Vault should have the deposited amount of USDC"
             );
-            console.log(
+            Logger.log(
                 "Allocator has %s shares of it",
                 IERC4626(defaultUsdcVault_AccountingChain).balanceOf(address(allocator_accountingChain))
             );
@@ -128,7 +127,7 @@ contract EndToEndTest is BaseTest {
             vault.setUserRate(userRateData);
 
             // - check that the % rate is set correctly
-            console.log("User's per second rate is: %s", vault.getUserSubVault(user).perSecondRate);
+            Logger.log("User's per second rate is: %s", vault.getUserSubVault(user).perSecondRate);
             assertEq(vault.getUserSubVault(user).perSecondRate, userPerSecondRate);
         }
 
@@ -153,14 +152,14 @@ contract EndToEndTest is BaseTest {
             );
 
             // - check that the funds land on Earning Chain and are dropped into default liquidity vault there
-            console.log("Earning Chain default vault for USDC is: %s", defaultUsdcVault_earningChain);
-            console.log("It's balance of USDC is: %s", IERC20(address(USDC)).balanceOf(defaultUsdcVault_earningChain));
+            Logger.log("Earning Chain default vault for USDC is: %s", defaultUsdcVault_earningChain);
+            Logger.log("It's balance of USDC is: %s", IERC20(address(USDC)).balanceOf(defaultUsdcVault_earningChain));
             assertEq(
                 IERC20(address(USDC)).balanceOf(defaultUsdcVault_earningChain),
                 userInitialDeposit,
                 "Vault should have the deposited amount of USDC"
             );
-            console.log(
+            Logger.log(
                 "Allocator has %s shares of it",
                 IERC4626(defaultUsdcVault_earningChain).balanceOf(address(allocator_earningChain))
             );
@@ -228,12 +227,12 @@ contract EndToEndTest is BaseTest {
             IAllocator.RebalanceParams[] memory rebalances = new IAllocator.RebalanceParams[](1);
             rebalances[0] = rebalanceParams;
 
-            console.log("Rebalancing by swap from USDC to GHO on the Earning chain...");
+            Logger.log("Rebalancing by swap from USDC to GHO on the Earning chain...");
             vm.prank(everyRoleAccount);
             allocator_earningChain.rebalance(rebalances);
 
             // - check that the funds are swapped to GHO
-            console.log(
+            Logger.log(
                 "\tBalance of GHO in The GHO Vault is: %s", IERC20(address(GHO)).balanceOf(defaultGhoVault_earningChain)
             );
             assertEq(
@@ -242,7 +241,7 @@ contract EndToEndTest is BaseTest {
                 "Vault should have the swapped amount of GHO"
             );
             // - check that the funds land on the GHO vault
-            console.log(
+            Logger.log(
                 "Allocator has %s shares of it",
                 IERC4626(defaultGhoVault_earningChain).balanceOf(address(allocator_earningChain))
             );
@@ -254,18 +253,18 @@ contract EndToEndTest is BaseTest {
 
         // 5. We wait for half a year
         vm.warp(block.timestamp + 183 days);
-        console.log("\nHalf a year has gone by so fast...");
+        Logger.log("\nHalf a year has gone by so fast...");
 
         // - check how much funds we owe to the user
         uint256 userEarningsInRay = vault.getUserBalance(user);
-        console.log("User balance in RAY: %s", vault.getUserBalance(user));
-        console.log("User balance in USDC: %s", userEarningsInRay.rayToAssetDecimals(address(USDC)));
-        console.log("User balance in GHO: %s", userEarningsInRay.rayToAssetDecimals(address(GHO)));
+        Logger.log("User balance in RAY: %s", vault.getUserBalance(user));
+        Logger.log("User balance in USDC: %s", userEarningsInRay.rayToAssetDecimals(address(USDC)));
+        Logger.log("User balance in GHO: %s", userEarningsInRay.rayToAssetDecimals(address(GHO)));
         assertTrue(vault.getUserBalance(user) > userInitialDeposit, "User balance didn't grow in half a year");
 
         // - mock the 8% APY earnings on the GHO vault for half a year
         GHO.mint(defaultGhoVault_earningChain, 19_615242270663188059);
-        console.log(
+        Logger.log(
             "GHO vault earned something in this time and it's balance now is: %s GHO",
             IERC4626(defaultGhoVault_earningChain).balanceOf(address(allocator_earningChain))
         );
@@ -314,14 +313,14 @@ contract EndToEndTest is BaseTest {
             );
 
             // - check that the funds land on the Accounting Chain and are dropped into default liquidity vault there
-            console.log("Accounting Chain default vault for GHO is: %s", defaultGhoVault_accountingChain);
-            console.log("It's balance of GHO is: %s", IERC20(address(GHO)).balanceOf(defaultGhoVault_accountingChain));
+            Logger.log("Accounting Chain default vault for GHO is: %s", defaultGhoVault_accountingChain);
+            Logger.log("It's balance of GHO is: %s", IERC20(address(GHO)).balanceOf(defaultGhoVault_accountingChain));
             assertEq(
                 IERC20(address(GHO)).balanceOf(defaultGhoVault_accountingChain),
                 userEarningsInGho,
                 "Vault should have the exited amount of GHO"
             );
-            console.log(
+            Logger.log(
                 "Allocator has %s shares of it",
                 IERC4626(defaultGhoVault_accountingChain).balanceOf(address(allocator_accountingChain))
             );
@@ -372,12 +371,12 @@ contract EndToEndTest is BaseTest {
             IAllocator.RebalanceParams[] memory rebalances = new IAllocator.RebalanceParams[](1);
             rebalances[0] = rebalanceParams;
 
-            console.log("Rebalancing by swap from GHO to USDC on the Accounting chain...");
+            Logger.log("Rebalancing by swap from GHO to USDC on the Accounting chain...");
             vm.prank(everyRoleAccount);
             allocator_accountingChain.rebalance(rebalances);
 
             // - check that the funds are swapped to USDC (includes 1 extra wei for precision)
-            console.log(
+            Logger.log(
                 "\tBalance of USDC in The USDC Vault is: %s",
                 IERC20(address(USDC)).balanceOf(defaultUsdcVault_accountingChain)
             );
@@ -387,7 +386,7 @@ contract EndToEndTest is BaseTest {
                 "Vault should have the swapped amount of USDC"
             );
             // - check that the funds land on the USDC vault
-            console.log(
+            Logger.log(
                 "Allocator has %s shares of it",
                 IERC4626(defaultUsdcVault_accountingChain).balanceOf(address(allocator_accountingChain))
             );
@@ -401,19 +400,19 @@ contract EndToEndTest is BaseTest {
         // Now that funds are back on the Accounting Chain, the withdrawal request can be processed.
         uint256 iouAmountRequestedRay;
         {
-            console.log("User creates a WithdrawalRequest...");
-            console.log("Total system balance: %s", fundsHandler.getAggregatedBalance());
+            Logger.log("User creates a WithdrawalRequest...");
+            Logger.log("Total system balance: %s", fundsHandler.getAggregatedBalance());
 
             // Request withdrawal
             vm.prank(user);
             iouAmountRequestedRay = vault.requestWithdrawal(user, 0);
 
-            console.log("... request withdrawal minted IOU tokens: %s", iouAmountRequestedRay);
+            Logger.log("... request withdrawal minted IOU tokens: %s", iouAmountRequestedRay);
             // Check user IOU token balance
             assertGt(iouToken_accountingChain.balanceOf(user), 0, "User should have minted IOU tokens");
 
             // - check that we don't owe the user any funds
-            console.log("User balance in RAY after withdrawal request: %s", vault.getUserBalance(user));
+            Logger.log("User balance in RAY after withdrawal request: %s", vault.getUserBalance(user));
             assertEq(vault.getUserBalance(user), 0, "User balance should be down to 0 after full withdrawal request");
         }
 
@@ -425,7 +424,7 @@ contract EndToEndTest is BaseTest {
             assertEq(iouToken_accountingChain.balanceOf(user), 0, "User should have minted IOU tokens");
 
             // - check that the funds are received by the user correctly
-            console.log("User balance in USDC after withdrawal: %s USDC", IERC20(address(USDC)).balanceOf(user));
+            Logger.log("User balance in USDC after withdrawal: %s USDC", IERC20(address(USDC)).balanceOf(user));
             assertEq(
                 IERC20(address(USDC)).balanceOf(user),
                 userEarningsInUsdc,
@@ -433,7 +432,7 @@ contract EndToEndTest is BaseTest {
             );
 
             // - check that we don't owe the user any funds
-            console.log("User balance in RAY after withdrawal request: %s", vault.getUserBalance(user));
+            Logger.log("User balance in RAY after withdrawal request: %s", vault.getUserBalance(user));
             assertEq(vault.getUserBalance(user), 0, "User balance should be down to 0 after full withdrawal request");
         }
 
@@ -441,7 +440,7 @@ contract EndToEndTest is BaseTest {
         {
             uint256 ghoBalanceOnVaultLeft =
                 IERC4626(defaultGhoVault_earningChain).balanceOf(address(allocator_earningChain));
-            console.log("Earning chain GHO vault balance after withdrawal is now: %s GHO", ghoBalanceOnVaultLeft);
+            Logger.log("Earning chain GHO vault balance after withdrawal is now: %s GHO", ghoBalanceOnVaultLeft);
 
             // Update oracle so the AccountingChainGateway accepts the inbound RETURN_FUNDS message
             _mockChainBalance(
@@ -472,13 +471,13 @@ contract EndToEndTest is BaseTest {
             assets[0] = address(GHO);
             amounts[0] = ghoBalanceOnVaultLeft;
 
-            console.log("Manager's GHO balance before claiming fees profits: %s GHO", GHO.balanceOf(everyRoleAccount));
+            Logger.log("Manager's GHO balance before claiming fees profits: %s GHO", GHO.balanceOf(everyRoleAccount));
 
             vm.prank(everyRoleAccount);
             vault.claimSurplusInterest(assets, amounts);
 
             uint256 newManagerGhoBalance = GHO.balanceOf(everyRoleAccount);
-            console.log("Manager's GHO balance after claiming fees profits: %s GHO", newManagerGhoBalance);
+            Logger.log("Manager's GHO balance after claiming fees profits: %s GHO", newManagerGhoBalance);
             assertEq(
                 newManagerGhoBalance,
                 ghoBalanceOnVaultLeft,

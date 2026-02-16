@@ -3,8 +3,9 @@
 pragma solidity ^0.8.22;
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {console} from "forge-std/console.sol";
 import {IERC20} from "forge-std/interfaces/IERC20.sol";
+
+import {Logger} from "test/helpers/Logger.sol";
 
 import {BasedBoostedVault} from "src/core/accounting/BasedBoostedVault.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
@@ -62,7 +63,7 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
     }
 
     function test_givenSingleAssetDepegs_userCanStillWithdrawFromEarningChain() public {
-        console.log("\nEarningChainDistrustedAssetE2ETest: givenSingleAssetDepegs_userCanStillWithdraw");
+        Logger.log("\nEarningChainDistrustedAssetE2ETest: givenSingleAssetDepegs_userCanStillWithdraw");
 
         uint256 userInitialDeposit = 500 * (10 ** 6);
 
