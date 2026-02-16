@@ -699,11 +699,11 @@ contract FundsHandlerTest is TestWithHelpers {
         fundsHandler.removeEarningChain(chainId);
     }
 
-    function test_addEarningChain_reverts_ifChainIdAlreadyAdded(uint256 chainId) public {
+    function test_addEarningChain_reverts_ifChainIdAlreadyPresent(uint256 chainId) public {
         vm.prank(ADMIN);
         fundsHandler.addEarningChain(chainId);
         vm.prank(ADMIN);
-        vm.expectRevert(abi.encodeWithSelector(IFundsHandler.ChainIdAlreadyAdded.selector));
+        vm.expectRevert(abi.encodeWithSelector(IFundsHandler.ChainIdAlreadyPresent.selector));
         fundsHandler.addEarningChain(chainId);
     }
 
@@ -713,9 +713,9 @@ contract FundsHandlerTest is TestWithHelpers {
         fundsHandler.addEarningChain(block.chainid);
     }
 
-    function test_removeEarningChain_reverts_ifChainIdNotAdded(uint256 chainId) public {
+    function test_removeEarningChain_reverts_ifChainIdNotPresent(uint256 chainId) public {
         vm.prank(ADMIN);
-        vm.expectRevert(abi.encodeWithSelector(IFundsHandler.ChainIdNotAdded.selector));
+        vm.expectRevert(abi.encodeWithSelector(IFundsHandler.ChainIdNotPresent.selector));
         fundsHandler.removeEarningChain(chainId);
     }
 

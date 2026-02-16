@@ -12,13 +12,13 @@ interface IFundsHandler {
     /// @custom:selector 0x93ce7047
     error OnlyBasedBoostedVault();
 
-    /// @notice Thrown when the chain id is already in the Earning chain set.
+    /// @notice Thrown when the chain id is already present in the Earning chain set.
     /// @custom:selector 0x148e7b23
-    error ChainIdAlreadyAdded();
+    error ChainIdAlreadyPresent();
 
-    /// @notice Thrown when the chain id can not be removed because it is not in the Earning chain set.
+    /// @notice Thrown when the chain id can not be removed because it is not present in the Earning chain set.
     /// @custom:selector 0xa80e441d
-    error ChainIdNotAdded();
+    error ChainIdNotPresent();
 
     /// @notice Emitted when an earning chain is added.
     /// @param chainId Chain id of the earning chain that was added.
