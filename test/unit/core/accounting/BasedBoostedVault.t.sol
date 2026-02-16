@@ -134,11 +134,11 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         );
     }
 
-    function _deployWithdrawalPolicy(address accessManager, address assetRegistry, address withdrawalPolicyApplier)
+    function _deployWithdrawalPolicy(address accessManager, address withdrawalPolicyApplier)
         internal
         returns (WithdrawalPolicy)
     {
-        address withdrawalPolicyImpl = address(new WithdrawalPolicy(assetRegistry, withdrawalPolicyApplier));
+        address withdrawalPolicyImpl = address(new WithdrawalPolicy(withdrawalPolicyApplier));
         return WithdrawalPolicy(
             address(
                 new TransparentUpgradeableProxy(
@@ -168,8 +168,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 deployerNonce = vm.getNonce(address(this));
         address expectedBbvProxy = vm.computeCreateAddress(address(this), deployerNonce + 3);
 
-        mockWithdrawalPolicy =
-            _deployWithdrawalPolicy(address(mockAccessManager), address(mockAssetRegistry), expectedBbvProxy);
+        mockWithdrawalPolicy = _deployWithdrawalPolicy(address(mockAccessManager), expectedBbvProxy);
         bbv = _deployBasedBoostedVault(
             address(mockAccessManager),
             DEFAULT_MAX_PER_SECOND_RATE,
@@ -187,12 +186,10 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     function test_constructor_setsTheExpectedValues(
         uint256 expectedMaxValidPerSecondRate,
         address expectedIouManager,
-        address expectedFundsHandler,
-        address expectedTransferHelper
+        address expectedFundsHandler
     ) public {
         vm.assume(expectedIouManager != address(0));
         vm.assume(expectedFundsHandler != address(0));
-        vm.assume(expectedTransferHelper != address(0));
         vm.assume(expectedMaxValidPerSecondRate > MathLib.RAY);
 
         BasedBoostedVault newBbv = new BasedBoostedVault(
@@ -200,7 +197,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockAssetRegistry),
             expectedIouManager,
             expectedFundsHandler,
-            expectedTransferHelper,
+            address(mockTransferHelper),
             address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS
@@ -219,6 +216,20 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockIouTokenManager),
             address(mockFundsHandler),
             address(mockTransferHelper),
+            address(mockWithdrawalPolicy),
+            address(mockPriceOracle),
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS
+        );
+    }
+
+    function test_constructor_reverts_ifInvalidTransferHelper() public {
+        vm.expectRevert();
+        new BasedBoostedVault(
+            DEFAULT_MAX_PER_SECOND_RATE,
+            address(mockAssetRegistry),
+            address(mockIouTokenManager),
+            address(mockFundsHandler),
+            address(0),
             address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS

@@ -31,7 +31,6 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     /// @dev The maximum fee in basis points that can be applied to a withdrawal. Set to 5.00%.
     uint16 internal constant FEE_CAP_BPS = 5_00;
 
-    address internal immutable ASSET_REGISTRY;
     address internal immutable WITHDRAWAL_POLICY_APPLIER;
 
     /// @notice Signed fee discount data (decoded from WithdrawalRequest.data).
@@ -78,11 +77,9 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     }
 
     /// @dev Constructor.
-    /// @param assetRegistry Address of the AssetRegistry contract used for managing asset configurations.
     /// @param withdrawalPolicyApplier Address allowed to apply the withdrawal policy.
-    constructor(address assetRegistry, address withdrawalPolicyApplier) EIP712Upgradeable() {
+    constructor(address withdrawalPolicyApplier) EIP712Upgradeable() {
         _disableInitializers();
-        ASSET_REGISTRY = assetRegistry;
         WITHDRAWAL_POLICY_APPLIER = withdrawalPolicyApplier;
     }
 

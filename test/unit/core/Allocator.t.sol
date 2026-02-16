@@ -157,6 +157,18 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.setDefaultStrategy(address(_mockGho), address(_defaultGhoStrategy));
     }
 
+    function test_constructor_reverts_ifInvalidTransferHelper() public {
+        vm.expectRevert();
+        new Allocator(
+            address(_mockAssetRegistry),
+            depositor,
+            withdrawer,
+            address(_priceOracle),
+            address(0),
+            MAX_STRATEGIES_PER_ASSET
+        );
+    }
+
     function test_getTrustedAssetBalances_returnsExpectedAssetBalances(
         uint256 depositAmountUsdt,
         uint256 depositAmountGho
