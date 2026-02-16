@@ -10,9 +10,8 @@ import {Internal} from "@chainlink-ccip/contracts/libraries/Internal.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ERC165Checker} from "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
-import {console} from "forge-std/console.sol";
-
 import {CallWithExactGas} from "test/helpers/CallWithExactGas.sol";
+import {Logger} from "test/helpers/Logger.sol";
 
 contract MockCCIPRouter is IRouter, IRouterClient {
     using SafeERC20 for IERC20;
@@ -47,10 +46,10 @@ contract MockCCIPRouter is IRouter, IRouterClient {
         uint256 gasLimit,
         address receiver
     ) internal returns (bool success, bytes memory retData, uint256 gasUsed) {
-        console.log("in _routeMessage. got the following things:");
-        console.log("\tmessage.data.length: %s", message.data.length);
-        console.log("\tgasLimit: %s", gasLimit);
-        console.log("\treceiver.code.length: %s", receiver.code.length);
+        Logger.log("in _routeMessage. got the following things:");
+        Logger.log("\tmessage.data.length: %s", message.data.length);
+        Logger.log("\tgasLimit: %s", gasLimit);
+        Logger.log("\treceiver.code.length: %s", receiver.code.length);
         // There are three cases in which we skip calling the receiver:
         // 1. If the message data is empty AND the gas limit is 0.
         // This indicates a message that only transfers tokens. It is valid to only send tokens to a contract
@@ -64,11 +63,11 @@ contract MockCCIPRouter is IRouter, IRouterClient {
             (message.data.length == 0 && gasLimit == 0) || receiver.code.length == 0
                 || !receiver.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId)
         ) {
-            console.log("didn't pass the checks:");
-            console.log("\tmessage.data.length: %s", message.data.length);
-            console.log("\tgasLimit: %s", gasLimit);
-            console.log("\treceiver.code.length: %s", receiver.code.length);
-            console.log(
+            Logger.log("didn't pass the checks:");
+            Logger.log("\tmessage.data.length: %s", message.data.length);
+            Logger.log("\tgasLimit: %s", gasLimit);
+            Logger.log("\treceiver.code.length: %s", receiver.code.length);
+            Logger.log(
                 "\treceiver.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId: %s",
                 receiver.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId)
             );
@@ -77,12 +76,12 @@ contract MockCCIPRouter is IRouter, IRouterClient {
 
         bytes memory data = abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, message);
 
-        console.log("gonna call the guy... receiver: %s", receiver);
+        Logger.log("gonna call the guy... receiver: %s", receiver);
         (success, retData, gasUsed) = CallWithExactGas._callWithExactGasSafeReturnData(
             data, receiver, gasLimit, gasForCallExactCheck, Internal.MAX_RET_BYTES
         );
-        console.log("success: %s", success);
-        console.log("gasUsed: %s", gasUsed);
+        Logger.log("success: %s", success);
+        Logger.log("gasUsed: %s", gasUsed);
 
         // Event to assist testing, does not exist on real deployments
         emit MsgExecuted(success, retData, gasUsed);
@@ -101,7 +100,7 @@ contract MockCCIPRouter is IRouter, IRouterClient {
         payable
         returns (bytes32)
     {
-        console.log("in ccipSend");
+        Logger.log("in ccipSend");
         if (message.receiver.length != 32) {
             revert InvalidAddress(message.receiver);
         }
@@ -141,10 +140,10 @@ contract MockCCIPRouter is IRouter, IRouterClient {
             IERC20(message.tokenAmounts[i].token).safeTransferFrom(msg.sender, receiver, message.tokenAmounts[i].amount);
         }
 
-        console.log("routeMessage to receiver: %s", receiver);
+        Logger.log("routeMessage to receiver: %s", receiver);
         (bool success, bytes memory retData,) =
             _routeMessage(executableMsg, GAS_FOR_CALL_EXACT_CHECK, gasLimit, receiver);
-        console.log("success: %s", success);
+        Logger.log("success: %s", success);
 
         if (!success) {
             revert ReceiverError(retData);

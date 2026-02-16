@@ -3,8 +3,9 @@
 pragma solidity ^0.8.20;
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {console} from "forge-std/console.sol";
 import {IERC20} from "forge-std/interfaces/IERC20.sol";
+
+import {Logger} from "test/helpers/Logger.sol";
 
 import {BasedBoostedVault} from "src/core/accounting/BasedBoostedVault.sol";
 import {IAccountingChainGateway} from "src/interfaces/IAccountingChainGateway.sol";
@@ -134,7 +135,7 @@ contract OracleFeedE2ETest is BaseTest {
 
     /// @notice Full withdrawal E2E flowing through the oracle feed pipeline.
     function test_oracleFeedWithdrawalE2E() public {
-        console.log("\nOracleFeedE2ETest - Withdrawal E2E");
+        Logger.log("\nOracleFeedE2ETest - Withdrawal E2E");
 
         uint256 userInitialDeposit = 500 * (10 ** 6);
 
@@ -170,7 +171,7 @@ contract OracleFeedE2ETest is BaseTest {
 
         // Move time forward to simulate interest accrual
         _warpAndRefreshPriceOracles(183 days);
-        console.log("\nHalf a year has gone by so fast...");
+        Logger.log("\nHalf a year has gone by so fast...");
 
         // Check that the user's balance in the BBV on the Accounting Chain has grown
         uint256 userBalanceWithInterest = vault.getUserBalance(user1);
