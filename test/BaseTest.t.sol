@@ -32,7 +32,7 @@ import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {AssetRegistry} from "src/periphery/AssetRegistry.sol";
-import {EarningChainStateProviderV1} from "src/periphery/EarningChainStateProviderV1.sol";
+import {EarningChainStateSchemaV1, SCHEMA_VERSION} from "src/periphery/EarningChainStateSchemaV1.sol";
 import {Swapper} from "src/periphery/Swapper.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
@@ -56,8 +56,6 @@ contract BaseTest is TestWithHelpers {
     address everyRoleAccount = makeAddr("EVERY_ROLE_ACCOUNT");
 
     uint8 constant STRATEGY_MAX_SLIPPAGE_AMOUNT = 10;
-    /// @dev Must match EarningChainStateProviderV1.VERSION (contract constant not visible on type in Solidity).
-    uint256 internal constant EARNING_CHAIN_STATE_VERSION = 1;
 
     // ADMIN_ROLE = 0
     uint64 internal constant ROLE_MANAGEMENT_ROLE = 1;
@@ -1067,9 +1065,9 @@ contract BaseTest is TestWithHelpers {
     ) internal {
         bytes memory stateBytes = abi.encode(
             IEarningChainStateProvider.State({
-                version: EARNING_CHAIN_STATE_VERSION,
+                version: SCHEMA_VERSION,
                 data: abi.encode(
-                    EarningChainStateProviderV1.BalanceSnapshot({
+                    EarningChainStateSchemaV1.BalanceSnapshot({
                         balanceRay: balanceRay,
                         timestamp: sourceChainTimestamp,
                         blockNumber: sourceChainBlockNumber,
