@@ -19,6 +19,7 @@ import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
+import {TransferHelper} from "src/periphery/TransferHelper.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 
 abstract contract AccessManagerSetupBaseTest is Test {
@@ -466,7 +467,8 @@ abstract contract AccessManagerSetupBaseTest is Test {
 
         _assertCanCall(admin, proxyAdmin, ProxyAdmin.upgradeAndCall.selector, false, RolesLib.CRITICAL_DELAY);
 
-        address newImpl = address(new Allocator(address(0), address(0), address(0), address(0), 0));
+        address newImpl =
+            address(new Allocator(address(0), address(0), address(0), address(0), address(new TransferHelper()), 0));
         bytes memory callData =
             abi.encodeCall(ProxyAdmin.upgradeAndCall, (ITransparentUpgradeableProxy(_allocator()), newImpl, ""));
         bytes32 operationId = accessManager.hashOperation(admin, proxyAdmin, callData);
