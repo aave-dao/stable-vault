@@ -3,7 +3,7 @@
 pragma solidity ^0.8.22;
 
 import {IEarningChainStateProvider} from "src/interfaces/IEarningChainStateProvider.sol";
-import {EarningChainStateProviderV1} from "src/periphery/EarningChainStateProviderV1.sol";
+import {EarningChainStateSchemaV1} from "src/periphery/EarningChainStateSchemaV1.sol";
 
 contract MockBundleAggregator {
     uint8[] internal _bundleDecimals;
@@ -19,7 +19,7 @@ contract MockBundleAggregator {
             IEarningChainStateProvider.State({
                 version: _version,
                 data: abi.encode(
-                    EarningChainStateProviderV1.BalanceSnapshot({
+                    EarningChainStateSchemaV1.BalanceSnapshot({
                         balanceRay: _totalBalanceInRay,
                         timestamp: _timestamp,
                         blockNumber: _blockNumber,

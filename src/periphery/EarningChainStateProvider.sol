@@ -4,8 +4,9 @@ pragma solidity ^0.8.22;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
+import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
 import {IEarningChainStateProvider} from "src/interfaces/IEarningChainStateProvider.sol";
-import {EarningChainStateProviderV1} from "src/periphery/EarningChainStateProviderV1.sol";
+import {EarningChainStateSchemaV1, SCHEMA_VERSION} from "src/periphery/EarningChainStateSchemaV1.sol";
 
 /// @title EarningChainStateProvider
 /// @author Aave Labs
@@ -16,15 +17,27 @@ import {EarningChainStateProviderV1} from "src/periphery/EarningChainStateProvid
 /// For this version, the data is encoded as a BalanceSnapshot struct which contains the balance in RAY, the timestamp
 /// and the block number. The version is used to determine the encoding of the data on the Accounting Chain.
 /// @dev This contract is upgradeable to allow exposing additional state in future versions.
-contract EarningChainStateProvider is Initializable, EarningChainStateProviderV1, IEarningChainStateProvider {
+contract EarningChainStateProvider is Initializable, EarningChainStateSchemaV1, IEarningChainStateProvider {
+    address internal immutable EARNING_CHAIN_GATEWAY;
+
     /// @dev Constructor.
     /// @param earningChainGateway Address of the EarningChainGateway contract.
-    constructor(address earningChainGateway) EarningChainStateProviderV1(earningChainGateway) {
+    constructor(address earningChainGateway) {
+        EARNING_CHAIN_GATEWAY = earningChainGateway;
         _disableInitializers();
     }
 
     /// @inheritdoc IEarningChainStateProvider
-    function getState() external view returns (bytes memory) {
-        return abi.encode(State({version: _getVersion(), data: _getData()}));
+    function getState() external view virtual returns (bytes memory) {
+        return abi.encode(State({version: SCHEMA_VERSION, data: _getData()}));
+    }
+
+    function _getData() internal view returns (bytes memory) {
+        uint256 balanceRay = IEarningChainGateway(EARNING_CHAIN_GATEWAY).getAggregatedBalance();
+        return abi.encode(
+            BalanceSnapshot({
+                balanceRay: balanceRay, timestamp: block.timestamp, blockNumber: block.number, chainId: block.chainid
+            })
+        );
     }
 }

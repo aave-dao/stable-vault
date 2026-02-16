@@ -9,7 +9,7 @@ import {IEarningChainStateProvider} from "src/interfaces/IEarningChainStateProvi
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {EarningChainStateProvider} from "src/periphery/EarningChainStateProvider.sol";
-import {EarningChainStateProviderV1} from "src/periphery/EarningChainStateProviderV1.sol";
+import {EarningChainStateSchemaV1} from "src/periphery/EarningChainStateSchemaV1.sol";
 
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
 import {MockAccessManager} from "test/mocks/MockAccessManager.sol";
@@ -101,8 +101,8 @@ contract EarningChainStateProviderTest is TestWithHelpers {
         bytes memory stateData = _earningChainStateProvider.getState();
 
         IEarningChainStateProvider.State memory state = abi.decode(stateData, (IEarningChainStateProvider.State));
-        EarningChainStateProviderV1.BalanceSnapshot memory snapshot =
-            abi.decode(state.data, (EarningChainStateProviderV1.BalanceSnapshot));
+        EarningChainStateSchemaV1.BalanceSnapshot memory snapshot =
+            abi.decode(state.data, (EarningChainStateSchemaV1.BalanceSnapshot));
 
         assertEq(state.version, 1, "Version should be 1");
         assertEq(snapshot.balanceRay, expectedBalanceRay, "Aggregated balance mismatch");

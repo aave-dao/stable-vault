@@ -5,7 +5,7 @@ pragma solidity ^0.8.22;
 import {IChainBalanceOracle} from "src/interfaces/IChainBalanceOracle.sol";
 import {IChainBalanceOracleAdapter} from "src/interfaces/IChainBalanceOracleAdapter.sol";
 import {IEarningChainStateProvider} from "src/interfaces/IEarningChainStateProvider.sol";
-import {EarningChainStateProviderV1} from "src/periphery/EarningChainStateProviderV1.sol";
+import {EarningChainStateSchemaV1, SCHEMA_VERSION} from "src/periphery/EarningChainStateSchemaV1.sol";
 
 // solhint-disable-next-line interface-starts-with-i
 interface IBundleBaseAggregator {
@@ -22,8 +22,6 @@ interface IBundleBaseAggregator {
 /// @dev Queries the bundle aggregator proxy for the latest bundle containing data read from
 /// IEarningChainStateProvider::getState().
 contract ChainlinkChainBalanceOracleAdapter is IChainBalanceOracleAdapter {
-    /// @notice The version of the IEarningChainStateProvider struct.
-    uint256 constant EARNING_CHAIN_STATE_VERSION = 1;
     /// @dev Added to the heartbeat to account for potential publishing delays during periods of network congestion.
     uint256 constant PUBLISH_BUFFER_SECONDS = 90;
 
@@ -53,12 +51,9 @@ contract ChainlinkChainBalanceOracleAdapter is IChainBalanceOracleAdapter {
         // Get balance snapshot from bundle.
         bytes memory bundle = IBundleBaseAggregator(BUNDLE_AGGREGATOR_PROXY).latestBundle();
         IEarningChainStateProvider.State memory state = abi.decode(bundle, (IEarningChainStateProvider.State));
-        require(
-            state.version == EARNING_CHAIN_STATE_VERSION,
-            InvalidEarningChainStateVersion(EARNING_CHAIN_STATE_VERSION, state.version)
-        );
-        EarningChainStateProviderV1.BalanceSnapshot memory balanceSnapshot =
-            abi.decode(state.data, (EarningChainStateProviderV1.BalanceSnapshot));
+        require(state.version == SCHEMA_VERSION, InvalidEarningChainStateVersion(SCHEMA_VERSION, state.version));
+        EarningChainStateSchemaV1.BalanceSnapshot memory balanceSnapshot =
+            abi.decode(state.data, (EarningChainStateSchemaV1.BalanceSnapshot));
         require(
             balanceSnapshot.chainId == EARNING_CHAIN_ID,
             InvalidSnapshotChainId(EARNING_CHAIN_ID, balanceSnapshot.chainId)

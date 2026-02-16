@@ -17,7 +17,7 @@ import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {ChainlinkPriceOracleAdapter} from "src/oracles/price/ChainlinkPriceOracleAdapter.sol";
-import {EarningChainStateProviderV1} from "src/periphery/EarningChainStateProviderV1.sol";
+import {EarningChainStateSchemaV1} from "src/periphery/EarningChainStateSchemaV1.sol";
 
 import {BaseTest} from "test/BaseTest.t.sol";
 import {MockCCIPRouter} from "test/mocks/MockCcipRouter.sol";
@@ -269,8 +269,8 @@ contract OracleFeedE2ETest is BaseTest {
         // Read state directly from EarningChainStateProvider
         bytes memory stateBytes = earningChainStateProvider.getState();
         IEarningChainStateProvider.State memory state = abi.decode(stateBytes, (IEarningChainStateProvider.State));
-        EarningChainStateProviderV1.BalanceSnapshot memory snapshot =
-            abi.decode(state.data, (EarningChainStateProviderV1.BalanceSnapshot));
+        EarningChainStateSchemaV1.BalanceSnapshot memory snapshot =
+            abi.decode(state.data, (EarningChainStateSchemaV1.BalanceSnapshot));
 
         // Publish to MockBundleFeed and read via adapter
         mockBundleFeed.publishState(stateBytes);
@@ -387,7 +387,7 @@ contract OracleFeedE2ETest is BaseTest {
     /// @notice Version mismatch in the adapter causes a revert that cascades through the system.
     function test_oracleFeed_versionMismatch_reverts() public {
         // Construct a state with version=2 (adapter expects version=1)
-        EarningChainStateProviderV1.BalanceSnapshot memory snapshot = EarningChainStateProviderV1.BalanceSnapshot({
+        EarningChainStateSchemaV1.BalanceSnapshot memory snapshot = EarningChainStateSchemaV1.BalanceSnapshot({
             balanceRay: 1000 * MathLib.RAY,
             timestamp: block.timestamp,
             blockNumber: block.number,
@@ -495,8 +495,8 @@ contract OracleFeedE2ETest is BaseTest {
         bytes memory stateBefore = earningChainStateProvider.getState();
         IEarningChainStateProvider.State memory decodedBefore =
             abi.decode(stateBefore, (IEarningChainStateProvider.State));
-        EarningChainStateProviderV1.BalanceSnapshot memory snapBefore =
-            abi.decode(decodedBefore.data, (EarningChainStateProviderV1.BalanceSnapshot));
+        EarningChainStateSchemaV1.BalanceSnapshot memory snapBefore =
+            abi.decode(decodedBefore.data, (EarningChainStateSchemaV1.BalanceSnapshot));
         assertEq(
             snapBefore.balanceRay,
             userDeposit.assetDecimalsToRay(address(USDC)),
@@ -510,8 +510,8 @@ contract OracleFeedE2ETest is BaseTest {
         bytes memory stateAfter = earningChainStateProvider.getState();
         IEarningChainStateProvider.State memory decodedAfter =
             abi.decode(stateAfter, (IEarningChainStateProvider.State));
-        EarningChainStateProviderV1.BalanceSnapshot memory snapAfter =
-            abi.decode(decodedAfter.data, (EarningChainStateProviderV1.BalanceSnapshot));
+        EarningChainStateSchemaV1.BalanceSnapshot memory snapAfter =
+            abi.decode(decodedAfter.data, (EarningChainStateSchemaV1.BalanceSnapshot));
         assertEq(snapAfter.balanceRay, 0, "Earning chain state should report zero balance with stale price");
 
         // Publish this zero-balance snapshot through the feed pipeline
@@ -728,8 +728,8 @@ contract OracleFeedE2ETest is BaseTest {
         // Direct read from EarningChainStateProvider
         bytes memory stateBytes = earningChainStateProvider.getState();
         IEarningChainStateProvider.State memory state = abi.decode(stateBytes, (IEarningChainStateProvider.State));
-        EarningChainStateProviderV1.BalanceSnapshot memory snapshot =
-            abi.decode(state.data, (EarningChainStateProviderV1.BalanceSnapshot));
+        EarningChainStateSchemaV1.BalanceSnapshot memory snapshot =
+            abi.decode(state.data, (EarningChainStateSchemaV1.BalanceSnapshot));
 
         // Round-trip through feed pipeline
         mockBundleFeed.publishState(stateBytes);
@@ -787,8 +787,8 @@ contract OracleFeedE2ETest is BaseTest {
         // Verify EarningChainStateProvider reports the correct balance
         bytes memory stateBytes = earningChainStateProvider.getState();
         IEarningChainStateProvider.State memory state = abi.decode(stateBytes, (IEarningChainStateProvider.State));
-        EarningChainStateProviderV1.BalanceSnapshot memory snapshot =
-            abi.decode(state.data, (EarningChainStateProviderV1.BalanceSnapshot));
+        EarningChainStateSchemaV1.BalanceSnapshot memory snapshot =
+            abi.decode(state.data, (EarningChainStateSchemaV1.BalanceSnapshot));
         assertEq(snapshot.balanceRay, depositRay, "EarningChainStateProvider should report full deposit");
 
         // 4. Return funds from Earning Chain to Accounting Chain
@@ -838,8 +838,8 @@ contract OracleFeedE2ETest is BaseTest {
         bytes memory finalStateBytes = earningChainStateProvider.getState();
         IEarningChainStateProvider.State memory finalState =
             abi.decode(finalStateBytes, (IEarningChainStateProvider.State));
-        EarningChainStateProviderV1.BalanceSnapshot memory finalSnapshot =
-            abi.decode(finalState.data, (EarningChainStateProviderV1.BalanceSnapshot));
+        EarningChainStateSchemaV1.BalanceSnapshot memory finalSnapshot =
+            abi.decode(finalState.data, (EarningChainStateSchemaV1.BalanceSnapshot));
         assertEq(finalSnapshot.balanceRay, 0, "Earning chain should report zero after funds returned");
     }
 
@@ -891,8 +891,8 @@ contract OracleFeedE2ETest is BaseTest {
         // Verify the Earning Chain state only reports the remaining 600 USDC
         bytes memory stateBytes = earningChainStateProvider.getState();
         IEarningChainStateProvider.State memory state = abi.decode(stateBytes, (IEarningChainStateProvider.State));
-        EarningChainStateProviderV1.BalanceSnapshot memory snapshot =
-            abi.decode(state.data, (EarningChainStateProviderV1.BalanceSnapshot));
+        EarningChainStateSchemaV1.BalanceSnapshot memory snapshot =
+            abi.decode(state.data, (EarningChainStateSchemaV1.BalanceSnapshot));
         assertEq(snapshot.balanceRay, remainingRay, "Earning chain should report only remaining balance");
     }
 
@@ -989,8 +989,8 @@ contract OracleFeedE2ETest is BaseTest {
         // Verify Earning Chain reports re-bridged amount
         bytes memory stateBytes = earningChainStateProvider.getState();
         IEarningChainStateProvider.State memory state = abi.decode(stateBytes, (IEarningChainStateProvider.State));
-        EarningChainStateProviderV1.BalanceSnapshot memory snapshot =
-            abi.decode(state.data, (EarningChainStateProviderV1.BalanceSnapshot));
+        EarningChainStateSchemaV1.BalanceSnapshot memory snapshot =
+            abi.decode(state.data, (EarningChainStateSchemaV1.BalanceSnapshot));
         assertEq(snapshot.balanceRay, reBridgeRay, "Earning chain should report re-bridged amount");
     }
 
