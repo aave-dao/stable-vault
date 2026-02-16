@@ -13,6 +13,11 @@ interface IAccountingChainGateway is IChainGateway {
     /// @custom:selector 0x77607b1a
     error OnlyFundsHandler();
 
+    /// @notice Thrown when the Earning Chain balance snapshot from the Chain Balance Oracle does not include the
+    /// outbound cross-chain message block.
+    /// @custom:selector 0xc6a06946
+    error StaleChainBalance();
+
     /// @notice Sends assets to an Earning Chain.
     /// @dev The Accounting Chain does not prescribe to the Earning Chain which strategy to push assets to.
     /// @dev One asset is pushed at a time to avoid depedencies on bridges that support multiple assets bridged

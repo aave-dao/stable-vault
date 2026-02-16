@@ -13,6 +13,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
+import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {ISwapper} from "src/interfaces/ISwapper.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
@@ -38,6 +39,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     address internal immutable DEPOSITOR;
     address internal immutable WITHDRAWER;
     address internal immutable ASSET_REGISTRY;
+    address internal immutable PRICE_ORACLE;
     uint8 internal immutable MAX_STRATEGIES_PER_ASSET;
 
     /// @custom:storage-location erc7201:aave.storage.Allocator
@@ -79,19 +81,22 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     /// @param assetRegistry The address of the AssetRegistry contract.
     /// @param depositor The address of the depositor to whitelist.
     /// @param withdrawer The address of the withdrawer to whitelist.
+    /// @param priceOracle The address of the price oracle contract.
     /// @param transferHelper The address of the contract that helps to minimize the number of transfers across flows.
     /// @param maxStrategiesPerAsset The maximum number of allowed yield strategies per asset.
     constructor(
         address assetRegistry,
         address depositor,
         address withdrawer,
+        address priceOracle,
         address transferHelper,
         uint8 maxStrategiesPerAsset
     ) TransferHelperClient(transferHelper) {
         _disableInitializers();
+        ASSET_REGISTRY = assetRegistry;
         DEPOSITOR = depositor;
         WITHDRAWER = withdrawer;
-        ASSET_REGISTRY = assetRegistry;
+        PRICE_ORACLE = priceOracle;
         MAX_STRATEGIES_PER_ASSET = maxStrategiesPerAsset;
     }
 
@@ -322,6 +327,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
             IAssetRegistry(ASSET_REGISTRY).isSwapOutputAllowed(swap.assetOut), Errors.UnsupportedAsset(swap.assetOut)
         );
         _validateSwapAmountIn(swap.assetIn, swap.amountIn, swap.assetOut);
+        IPriceOracle(PRICE_ORACLE).validatePrice(swap.assetOut);
 
         // Transfer assetIn to the swapper
         IERC20(swap.assetIn).safeTransfer(swap.swapper, swap.amountIn);
@@ -334,6 +340,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
 
         // Pull the `assetOut` from the Swapper to the Allocator
         IERC20(swap.assetOut).safeTransferFrom(swap.swapper, address(this), amountOut);
+
         emit AssetsSwapped(swap.assetIn, swap.assetOut, swap.amountIn, amountOut);
     }
 

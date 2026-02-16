@@ -15,12 +15,14 @@ import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
+import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {Errors} from "src/types/Errors.sol";
 
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
 import {MockAccessManager} from "test/mocks/MockAccessManager.sol";
 import {MockAccountingChainGateway} from "test/mocks/MockAccountingChainGateway.sol";
 import {MockAllocator} from "test/mocks/MockAllocator.sol";
+import {MockChainBalanceOracle} from "test/mocks/MockChainBalanceOracle.sol";
 import {MockErc20} from "test/mocks/MockErc20.sol";
 import {IMockErc20} from "test/mocks/MockErc20.sol";
 import {MockNonStandardErc20} from "test/mocks/MockNonStandardErc20.sol";
@@ -31,9 +33,13 @@ contract FundsHandlerTest is TestWithHelpers {
     using AssetLib for uint256;
     using SafeERC20 for IMockErc20;
 
+    address ADMIN;
+
     address mockBbv;
     MockAccountingChainGateway mockGateway;
     MockAllocator mockAllocator;
+    PriceOracle priceOracle;
+    MockChainBalanceOracle mockChainBalanceOracle;
     MockTransferHelper mockTransferHelper;
     MockAccessManager mockAccessManager;
     IMockErc20 mockAsset;
@@ -48,10 +54,14 @@ contract FundsHandlerTest is TestWithHelpers {
         address bbv,
         address gateway,
         address allocator,
+        address priceOracleAddr,
         address transferHelper,
+        address chainBalanceOracle,
         address accessManager
     ) internal returns (FundsHandler) {
-        address fundsHandlerImpl = address(new FundsHandler(bbv, gateway, allocator, transferHelper));
+        address fundsHandlerImpl = address(
+            new FundsHandler(bbv, gateway, allocator, priceOracleAddr, transferHelper, chainBalanceOracle)
+        );
         return FundsHandler(
             address(
                 new TransparentUpgradeableProxy(
@@ -62,17 +72,24 @@ contract FundsHandlerTest is TestWithHelpers {
     }
 
     function setUp() public {
+        // Warp to a reasonable timestamp to avoid underflow.
+        vm.warp(block.timestamp + 1 days);
+        ADMIN = makeAddr("admin");
         mockBbv = makeAddr("mockBbv");
         mockTransferHelper = new MockTransferHelper();
         mockGateway = new MockAccountingChainGateway(address(mockTransferHelper));
         mockAllocator = new MockAllocator();
-        mockAccessManager = new MockAccessManager(makeAddr("admin"));
+        mockAccessManager = new MockAccessManager(ADMIN);
+        priceOracle = _deployPriceOracle(address(mockAccessManager), 9_995e23);
+        mockChainBalanceOracle = new MockChainBalanceOracle();
         mockAsset = IMockErc20(address(new MockNonStandardErc20("Test USD", "tUSD", 6)));
         fundsHandler = _deployFundsHandler(
             mockBbv,
             address(mockGateway),
             address(mockAllocator),
+            address(priceOracle),
             address(mockTransferHelper),
+            address(mockChainBalanceOracle),
             address(mockAccessManager)
         );
         mockAllocator.mockTransferHelper(address(mockTransferHelper));
@@ -81,14 +98,16 @@ contract FundsHandlerTest is TestWithHelpers {
     function test_getAggregatedBalance_returnsExpectedAggregatedBalance(
         uint256 accChainBalance1,
         uint256 accChainBalance2,
-        uint256 accChainBalance3,
-        uint256 earnChainBalance1Ray,
-        uint256 earnChainBalance2Ray,
-        uint256 earnChainBalance3Ray
+        uint256 accChainBalance3
     ) public {
         IMockErc20 mockAsset1 = IMockErc20(address(new MockNonStandardErc20("Test USDT", "tUSDT", 6)));
         IMockErc20 mockAsset2 = IMockErc20(address(new MockErc20("Test GHO", "tGHO", 18)));
         IMockErc20 mockAsset3 = IMockErc20(address(new MockNonStandardErc20("Test USDC", "tUSDC", 6)));
+
+        // Set mock prices (1 RAY = 1:1 price ratio for simplicity)
+        _mockAssetPrice(address(priceOracle), address(mockAsset1), MathLib.RAY);
+        _mockAssetPrice(address(priceOracle), address(mockAsset2), MathLib.RAY);
+        _mockAssetPrice(address(priceOracle), address(mockAsset3), MathLib.RAY);
 
         accChainBalance1 = _boundAssetAmountAllowingZero(address(mockAsset1), accChainBalance1);
         accChainBalance2 = _boundAssetAmountAllowingZero(address(mockAsset2), accChainBalance2);
@@ -98,92 +117,11 @@ contract FundsHandlerTest is TestWithHelpers {
         mockAllocator.mockAssetBalance(address(mockAsset2), accChainBalance2);
         mockAllocator.mockAssetBalance(address(mockAsset3), accChainBalance3);
 
-        uint256 accChainBalanceRay = accChainBalance1.assetDecimalsToRay(address(mockAsset1))
+        uint256 expectedAggregatedBalance = accChainBalance1.assetDecimalsToRay(address(mockAsset1))
             + accChainBalance2.assetDecimalsToRay(address(mockAsset2))
             + accChainBalance3.assetDecimalsToRay(address(mockAsset3));
 
-        earnChainBalance1Ray = _boundRayAmountAllowingZero(earnChainBalance1Ray);
-        earnChainBalance2Ray = _boundRayAmountAllowingZero(earnChainBalance2Ray);
-        earnChainBalance3Ray = _boundRayAmountAllowingZero(earnChainBalance3Ray);
-
-        vm.startPrank(address(mockGateway));
-        fundsHandler.updateChainBalanceCallback(block.chainid + 1, earnChainBalance1Ray, 1);
-        fundsHandler.updateChainBalanceCallback(block.chainid + 2, earnChainBalance2Ray, 1);
-        fundsHandler.updateChainBalanceCallback(block.chainid + 3, earnChainBalance3Ray, 1);
-        vm.stopPrank();
-
-        uint256 expectedAggregatedBalance =
-            accChainBalanceRay + earnChainBalance1Ray + earnChainBalance2Ray + earnChainBalance3Ray;
-
         assertEq(fundsHandler.getAggregatedBalance(), expectedAggregatedBalance);
-    }
-
-    function test_getAssetBalances_returnsExpectedAssetBalances(
-        uint256 accChainBalance1,
-        uint256 accChainBalance2,
-        uint256 accChainBalance3,
-        uint256 earnChainBalance1Ray,
-        uint256 earnChainBalance2Ray,
-        uint256 earnChainBalance3Ray
-    ) public {
-        IFundsHandler.AssetBalance[] memory expectedAssetBalances = new IFundsHandler.AssetBalance[](6);
-
-        IMockErc20 mockAsset1 = IMockErc20(address(new MockNonStandardErc20("Test USDT", "tUSDT", 6)));
-        IMockErc20 mockAsset2 = IMockErc20(address(new MockErc20("Test GHO", "tGHO", 18)));
-        IMockErc20 mockAsset3 = IMockErc20(address(new MockNonStandardErc20("Test USDC", "tUSDC", 6)));
-
-        accChainBalance1 = _boundAssetAmountAllowingZero(address(mockAsset1), accChainBalance1);
-        mockAllocator.mockAssetBalance(address(mockAsset1), accChainBalance1);
-        accChainBalance2 = _boundAssetAmountAllowingZero(address(mockAsset2), accChainBalance2);
-        mockAllocator.mockAssetBalance(address(mockAsset2), accChainBalance2);
-        accChainBalance3 = _boundAssetAmountAllowingZero(address(mockAsset3), accChainBalance3);
-        mockAllocator.mockAssetBalance(address(mockAsset3), accChainBalance3);
-
-        // Filling these three here and the rest after because otherwise it gives stack too deep error.
-        expectedAssetBalances[0] = IFundsHandler.AssetBalance({
-            asset: address(mockAsset1),
-            amountRay: accChainBalance1.assetDecimalsToRay(address(mockAsset1)),
-            chainId: block.chainid
-        });
-        expectedAssetBalances[1] = IFundsHandler.AssetBalance({
-            asset: address(mockAsset2),
-            amountRay: accChainBalance2.assetDecimalsToRay(address(mockAsset2)),
-            chainId: block.chainid
-        });
-        expectedAssetBalances[2] = IFundsHandler.AssetBalance({
-            asset: address(mockAsset3),
-            amountRay: accChainBalance3.assetDecimalsToRay(address(mockAsset3)),
-            chainId: block.chainid
-        });
-
-        earnChainBalance1Ray = _boundRayAmountAllowingZero(earnChainBalance1Ray);
-        earnChainBalance2Ray = _boundRayAmountAllowingZero(earnChainBalance2Ray);
-        earnChainBalance3Ray = _boundRayAmountAllowingZero(earnChainBalance3Ray);
-
-        uint256 earnChainId1 = block.chainid + 1;
-        uint256 earnChainId2 = block.chainid + 2;
-        uint256 earnChainId3 = block.chainid + 3;
-
-        vm.startPrank(address(mockGateway));
-        fundsHandler.updateChainBalanceCallback(earnChainId1, earnChainBalance1Ray, 1);
-        fundsHandler.updateChainBalanceCallback(earnChainId2, earnChainBalance2Ray, 1);
-        fundsHandler.updateChainBalanceCallback(earnChainId3, earnChainBalance3Ray, 1);
-        vm.stopPrank();
-
-        expectedAssetBalances[3] =
-            IFundsHandler.AssetBalance({asset: address(0), amountRay: earnChainBalance1Ray, chainId: earnChainId1});
-        expectedAssetBalances[4] =
-            IFundsHandler.AssetBalance({asset: address(0), amountRay: earnChainBalance2Ray, chainId: earnChainId2});
-        expectedAssetBalances[5] =
-            IFundsHandler.AssetBalance({asset: address(0), amountRay: earnChainBalance3Ray, chainId: earnChainId3});
-
-        IFundsHandler.AssetBalance[] memory actualAssetBalances = fundsHandler.getAssetBalances();
-        assertEq(actualAssetBalances.length, expectedAssetBalances.length);
-        for (uint256 i = 0; i < actualAssetBalances.length; i++) {
-            assertEq(actualAssetBalances[i].asset, expectedAssetBalances[i].asset);
-            assertEq(actualAssetBalances[i].amountRay, expectedAssetBalances[i].amountRay);
-            assertEq(actualAssetBalances[i].chainId, expectedAssetBalances[i].chainId);
-        }
     }
 
     function test_processDeposit_pushesFundsToAllocator(
@@ -300,164 +238,6 @@ contract FundsHandlerTest is TestWithHelpers {
         fundsHandler.fundsArrivedFromChainCallback(asset, amount);
     }
 
-    function test_updateChainBalanceCallback_reverts_ifMsgSenderIsNotTheGateway(
-        address msgSender,
-        uint256 chainId,
-        uint256 snapshotBalanceRay,
-        uint256 chainBalanceSnapshotNonce
-    ) public {
-        _assumeNotProxyAdmin(msgSender, address(fundsHandler));
-        vm.assume(msgSender != address(mockGateway));
-        vm.assume(chainId != block.chainid);
-
-        snapshotBalanceRay = _boundRayAmountAllowingZero(snapshotBalanceRay);
-
-        vm.expectRevert(Errors.OnlyGateway.selector);
-        vm.prank(msgSender);
-        fundsHandler.updateChainBalanceCallback(chainId, snapshotBalanceRay, chainBalanceSnapshotNonce);
-    }
-
-    function test_updateChainBalanceCallback_updatesChainBalance(
-        uint256 chainId,
-        uint256 snapshotBalanceRay,
-        uint256 chainBalanceSnapshotNonce
-    ) public {
-        vm.assume(chainId != block.chainid);
-        snapshotBalanceRay = _boundRayAmountAllowingZero(snapshotBalanceRay);
-        vm.assume(chainBalanceSnapshotNonce > 0);
-
-        assertEq(fundsHandler.getAssetBalances().length, 0);
-
-        vm.expectEmit(true, true, true, true);
-        emit IFundsHandler.ChainBalanceSnapshotReceived(chainId, snapshotBalanceRay, chainBalanceSnapshotNonce);
-        vm.prank(address(mockGateway));
-        fundsHandler.updateChainBalanceCallback(chainId, snapshotBalanceRay, chainBalanceSnapshotNonce);
-
-        assertEq(fundsHandler.getAssetBalances().length, 1);
-        assertEq(fundsHandler.getAssetBalances()[0].asset, address(0));
-        assertEq(fundsHandler.getAssetBalances()[0].amountRay, snapshotBalanceRay);
-        assertEq(fundsHandler.getAssetBalances()[0].chainId, chainId);
-    }
-
-    function test_updateChainBalanceCallback_updatesChainBalanceIfChainSendsBalanceSnapshotForFirstTimeRegardlessOfNonce(
-        uint256 chainId,
-        uint256 snapshotBalanceRay,
-        uint256 chainBalanceSnapshotNonce
-    ) public {
-        vm.assume(chainId != block.chainid);
-        snapshotBalanceRay = _boundRayAmountAllowingZero(snapshotBalanceRay);
-
-        assertEq(fundsHandler.getAssetBalances().length, 0);
-
-        vm.prank(address(mockGateway));
-        fundsHandler.updateChainBalanceCallback(chainId, snapshotBalanceRay, chainBalanceSnapshotNonce);
-
-        assertEq(fundsHandler.getAssetBalances().length, 1);
-        assertEq(fundsHandler.getAssetBalances()[0].asset, address(0));
-        assertEq(fundsHandler.getAssetBalances()[0].amountRay, snapshotBalanceRay);
-        assertEq(fundsHandler.getAssetBalances()[0].chainId, chainId);
-    }
-
-    function test_updateChainBalanceCallback_doesNotUpdateChainBalanceIfNonceIsTheSameAsCurrentNonce(
-        uint256 chainId,
-        uint256 snapshotBalanceRay,
-        uint256 secondSnapshotBalanceRay,
-        uint256 chainBalanceSnapshotNonce
-    ) public {
-        vm.assume(chainId != block.chainid);
-        snapshotBalanceRay = _boundRayAmountAllowingZero(snapshotBalanceRay);
-        secondSnapshotBalanceRay = _boundRayAmountAllowingZero(secondSnapshotBalanceRay);
-        vm.assume(secondSnapshotBalanceRay != snapshotBalanceRay);
-
-        assertEq(fundsHandler.getAssetBalances().length, 0);
-
-        // First snapshot balance update
-        vm.prank(address(mockGateway));
-        fundsHandler.updateChainBalanceCallback(chainId, snapshotBalanceRay, chainBalanceSnapshotNonce);
-
-        assertEq(fundsHandler.getAssetBalances().length, 1);
-        assertEq(fundsHandler.getAssetBalances()[0].asset, address(0));
-        assertEq(fundsHandler.getAssetBalances()[0].amountRay, snapshotBalanceRay);
-        assertEq(fundsHandler.getAssetBalances()[0].chainId, chainId);
-
-        // Second snapshot balance update for the same chain and nonce
-        vm.prank(address(mockGateway));
-        fundsHandler.updateChainBalanceCallback(chainId, secondSnapshotBalanceRay, chainBalanceSnapshotNonce);
-
-        assertEq(fundsHandler.getAssetBalances().length, 1);
-        assertEq(fundsHandler.getAssetBalances()[0].asset, address(0));
-        assertEq(fundsHandler.getAssetBalances()[0].amountRay, snapshotBalanceRay); // It was not updated!
-        assertEq(fundsHandler.getAssetBalances()[0].chainId, chainId);
-    }
-
-    function test_updateChainBalanceCallback_doesNotUpdateChainBalanceIfNonceIsSmallerThanCurrentNonce(
-        uint256 chainId,
-        uint256 snapshotBalanceRay,
-        uint256 chainBalanceSnapshotNonce,
-        uint256 secondSnapshotBalanceRay,
-        uint256 secondChainBalanceSnapshotNonce
-    ) public {
-        vm.assume(chainId != block.chainid);
-        snapshotBalanceRay = _boundRayAmountAllowingZero(snapshotBalanceRay);
-        secondSnapshotBalanceRay = _boundRayAmountAllowingZero(secondSnapshotBalanceRay);
-        vm.assume(secondSnapshotBalanceRay != snapshotBalanceRay);
-        vm.assume(secondChainBalanceSnapshotNonce < chainBalanceSnapshotNonce);
-
-        assertEq(fundsHandler.getAssetBalances().length, 0);
-
-        // First snapshot balance update
-        vm.prank(address(mockGateway));
-        fundsHandler.updateChainBalanceCallback(chainId, snapshotBalanceRay, chainBalanceSnapshotNonce);
-
-        assertEq(fundsHandler.getAssetBalances().length, 1);
-        assertEq(fundsHandler.getAssetBalances()[0].asset, address(0));
-        assertEq(fundsHandler.getAssetBalances()[0].amountRay, snapshotBalanceRay);
-        assertEq(fundsHandler.getAssetBalances()[0].chainId, chainId);
-
-        // Second snapshot balance update for the same chain, with smaller nonce
-        vm.prank(address(mockGateway));
-        fundsHandler.updateChainBalanceCallback(chainId, secondSnapshotBalanceRay, secondChainBalanceSnapshotNonce);
-
-        assertEq(fundsHandler.getAssetBalances().length, 1);
-        assertEq(fundsHandler.getAssetBalances()[0].asset, address(0));
-        assertEq(fundsHandler.getAssetBalances()[0].amountRay, snapshotBalanceRay); // It was not updated!
-        assertEq(fundsHandler.getAssetBalances()[0].chainId, chainId);
-    }
-
-    function test_updateChainBalanceCallback_updatesChainBalanceIfNonceIsGreaterThanCurrentNonce(
-        uint256 chainId,
-        uint256 snapshotBalanceRay,
-        uint256 chainBalanceSnapshotNonce,
-        uint256 secondSnapshotBalanceRay,
-        uint256 secondChainBalanceSnapshotNonce
-    ) public {
-        vm.assume(chainId != block.chainid);
-        snapshotBalanceRay = _boundRayAmountAllowingZero(snapshotBalanceRay);
-        secondSnapshotBalanceRay = _boundRayAmountAllowingZero(secondSnapshotBalanceRay);
-        vm.assume(secondSnapshotBalanceRay != snapshotBalanceRay);
-        vm.assume(secondChainBalanceSnapshotNonce > chainBalanceSnapshotNonce);
-
-        assertEq(fundsHandler.getAssetBalances().length, 0);
-
-        // First snapshot balance update
-        vm.prank(address(mockGateway));
-        fundsHandler.updateChainBalanceCallback(chainId, snapshotBalanceRay, chainBalanceSnapshotNonce);
-
-        assertEq(fundsHandler.getAssetBalances().length, 1);
-        assertEq(fundsHandler.getAssetBalances()[0].asset, address(0));
-        assertEq(fundsHandler.getAssetBalances()[0].amountRay, snapshotBalanceRay);
-        assertEq(fundsHandler.getAssetBalances()[0].chainId, chainId);
-
-        // Second snapshot balance update for the same chain, with bigger nonce
-        vm.prank(address(mockGateway));
-        fundsHandler.updateChainBalanceCallback(chainId, secondSnapshotBalanceRay, secondChainBalanceSnapshotNonce);
-
-        assertEq(fundsHandler.getAssetBalances().length, 1);
-        assertEq(fundsHandler.getAssetBalances()[0].asset, address(0));
-        assertEq(fundsHandler.getAssetBalances()[0].amountRay, secondSnapshotBalanceRay); // It was updated!
-        assertEq(fundsHandler.getAssetBalances()[0].chainId, chainId);
-    }
-
     function test_rescueTokens_reverts_ifMsgSenderIsNotAuthorized(
         address unauthorizedMsgSender,
         uint256 fhAssetBalance,
@@ -563,6 +343,8 @@ contract FundsHandlerTest is TestWithHelpers {
         });
 
         vm.assume(chainId != block.chainid);
+        vm.prank(ADMIN);
+        fundsHandler.addEarningChain(chainId);
 
         vm.assume(unauthorizedMsgSender != address(0));
         _assumeNotProxyAdmin(unauthorizedMsgSender, address(fundsHandler));
@@ -585,6 +367,8 @@ contract FundsHandlerTest is TestWithHelpers {
         uint256 bridgeParams_gasLimit
     ) public {
         vm.assume(chainId != block.chainid);
+        vm.prank(ADMIN);
+        fundsHandler.addEarningChain(chainId);
         amount = _boundAssetAmount(address(mockAsset), amount);
         mockAsset.mint(address(this), amount);
         mockAsset.forceApprove(address(fundsHandler), amount);
@@ -612,6 +396,8 @@ contract FundsHandlerTest is TestWithHelpers {
         uint256 bridgeParams_gasLimit
     ) public {
         vm.assume(chainId != block.chainid);
+        vm.prank(ADMIN);
+        fundsHandler.addEarningChain(chainId);
         amount = _boundAssetAmount(address(mockAsset), amount);
         bridgeParams_feeAmount = _boundAssetAmount(address(mockAsset), bridgeParams_feeAmount);
         mockAsset.mint(address(this), bridgeParams_feeAmount);
@@ -644,6 +430,8 @@ contract FundsHandlerTest is TestWithHelpers {
         uint256 bridgeParams_gasLimit
     ) public {
         vm.assume(chainId != block.chainid);
+        vm.prank(ADMIN);
+        fundsHandler.addEarningChain(chainId);
 
         bridgeParams_feeAmount = _boundNativeAmount(bridgeParams_feeAmount);
         vm.deal(address(this), bridgeParams_feeAmount);
@@ -668,6 +456,8 @@ contract FundsHandlerTest is TestWithHelpers {
         uint256 bridgeParams_gasLimit
     ) public {
         vm.assume(chainId != block.chainid);
+        vm.prank(ADMIN);
+        fundsHandler.addEarningChain(chainId);
         amount = _boundAssetAmount(address(mockAsset), amount);
         bridgeParams_feeAmount = _boundAssetAmount(address(mockAsset), bridgeParams_feeAmount);
         mockAsset.mint(address(this), bridgeParams_feeAmount);
@@ -703,6 +493,8 @@ contract FundsHandlerTest is TestWithHelpers {
         uint256 bridgeParams_gasLimit
     ) public {
         vm.assume(chainId != block.chainid);
+        vm.prank(ADMIN);
+        fundsHandler.addEarningChain(chainId);
         address feeToken = _deployAssetWithSalt(feeTokenSalt, feeTokenDecimals);
         amount = _boundAssetAmount(address(mockAsset), amount);
         bridgeParams_feeAmount = _boundAssetAmount(feeToken, bridgeParams_feeAmount);
@@ -737,6 +529,8 @@ contract FundsHandlerTest is TestWithHelpers {
         uint256 bridgeParams_gasLimit
     ) public {
         vm.assume(chainId != block.chainid);
+        vm.prank(ADMIN);
+        fundsHandler.addEarningChain(chainId);
         amount = _boundAssetAmount(address(mockAsset), amount);
         bridgeParams_feeAmount = _boundAssetAmount(address(mockAsset), bridgeParams_feeAmount);
         mockAsset.mint(address(this), bridgeParams_feeAmount);
@@ -760,8 +554,9 @@ contract FundsHandlerTest is TestWithHelpers {
         fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, bridgeParams);
     }
 
-    function test_pushFundsToChain_reverts_ifDestinationChainIdIsTheSameAsTheCurrentChainId(
+    function test_pushFundsToChain_reverts_ifDestinationChainIdNotAddedAsEarningChain(
         uint256 amount,
+        uint256 chainId,
         uint256 bridgeParams_feeAmount,
         uint256 bridgeParams_gasLimit
     ) public {
@@ -780,7 +575,7 @@ contract FundsHandlerTest is TestWithHelpers {
         });
 
         vm.expectRevert(abi.encodeWithSelector(Errors.InvalidDestinationChainId.selector));
-        fundsHandler.pushFundsToChain(address(mockAsset), amount, block.chainid, bridgeParams);
+        fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, bridgeParams);
     }
 
     function test_pushFundsToChain_callsGatewaySendPushFundsMessage(
@@ -790,6 +585,10 @@ contract FundsHandlerTest is TestWithHelpers {
         uint256 bridgeParams_gasLimit
     ) public {
         vm.assume(chainId != block.chainid);
+
+        vm.prank(ADMIN);
+        fundsHandler.addEarningChain(chainId);
+
         amount = _boundAssetAmount(address(mockAsset), amount);
         bridgeParams_feeAmount = _boundAssetAmount(address(mockAsset), bridgeParams_feeAmount);
         mockAsset.mint(address(this), bridgeParams_feeAmount);
@@ -817,9 +616,107 @@ contract FundsHandlerTest is TestWithHelpers {
             )
         );
         fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, bridgeParams);
+    }
 
-        // Check that the snapshot is still empty
-        assertEq(fundsHandler.getAssetBalances().length, 0);
+    function test_addEarningChain_emitsEvent() public {
+        uint256 chainId = 1234;
+        vm.expectEmit(true, true, true, true);
+        emit IFundsHandler.EarningChainAdded(chainId);
+        vm.prank(ADMIN);
+        fundsHandler.addEarningChain(chainId);
+    }
+
+    function test_removeEarningChain_emitsEvent() public {
+        uint256 chainId = 1234;
+
+        // First add the chain
+        vm.prank(ADMIN);
+        fundsHandler.addEarningChain(chainId);
+
+        // Then remove the chain
+        vm.expectEmit(true, true, true, true);
+        emit IFundsHandler.EarningChainRemoved(chainId);
+        vm.prank(ADMIN);
+        fundsHandler.removeEarningChain(chainId);
+    }
+
+    function test_addEarningChain_reverts_ifNotCalledByAdmin(address nonAdmin, uint256 chainId) public {
+        vm.assume(nonAdmin != ADMIN);
+        _assumeNotProxyAdmin(nonAdmin, address(fundsHandler));
+        mockAccessManager.mockRejectCall(nonAdmin, address(fundsHandler), IFundsHandler.addEarningChain.selector);
+        vm.prank(nonAdmin);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, nonAdmin));
+        fundsHandler.addEarningChain(chainId);
+    }
+
+    function test_removeEarningChain_excludesFromBalances(
+        uint256 chainId1,
+        uint256 chainId2,
+        uint256 chainBalance1,
+        uint256 chainBalance2
+    ) public {
+        vm.assume(chainId1 != chainId2);
+        chainBalance1 = _boundAssetAmount(address(mockAsset), chainBalance1);
+        chainBalance2 = _boundAssetAmount(address(mockAsset), chainBalance2);
+
+        vm.prank(ADMIN);
+        fundsHandler.addEarningChain(chainId1);
+
+        mockChainBalanceOracle.mockChainBalance(
+            chainId1,
+            chainBalance1.assetDecimalsToRay(address(mockAsset)),
+            block.timestamp,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            false
+        );
+
+        vm.prank(ADMIN);
+        fundsHandler.addEarningChain(chainId2);
+        mockChainBalanceOracle.mockChainBalance(
+            chainId2,
+            chainBalance2.assetDecimalsToRay(address(mockAsset)),
+            block.timestamp,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            false
+        );
+
+        uint256 expectedAggregatedBalance =
+            chainBalance1.assetDecimalsToRay(address(mockAsset)) + chainBalance2.assetDecimalsToRay(address(mockAsset));
+        assertEq(fundsHandler.getAggregatedBalance(), expectedAggregatedBalance);
+
+        vm.prank(ADMIN);
+        fundsHandler.removeEarningChain(chainId1);
+        // Only the chainId2 balance is left
+        assertEq(fundsHandler.getAggregatedBalance(), chainBalance2.assetDecimalsToRay(address(mockAsset)));
+    }
+
+    function test_removeEarningChain_reverts_ifNotCalledByAdmin(address nonAdmin, uint256 chainId) public {
+        vm.assume(nonAdmin != ADMIN);
+        _assumeNotProxyAdmin(nonAdmin, address(fundsHandler));
+        mockAccessManager.mockRejectCall(nonAdmin, address(fundsHandler), IFundsHandler.removeEarningChain.selector);
+        vm.prank(nonAdmin);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, nonAdmin));
+        fundsHandler.removeEarningChain(chainId);
+    }
+
+    function test_addEarningChain_reverts_ifChainIdAlreadyPresent(uint256 chainId) public {
+        vm.prank(ADMIN);
+        fundsHandler.addEarningChain(chainId);
+        vm.prank(ADMIN);
+        vm.expectRevert(abi.encodeWithSelector(IFundsHandler.ChainIdAlreadyPresent.selector));
+        fundsHandler.addEarningChain(chainId);
+    }
+
+    function test_addEarningChain_reverts_ifChainIdIsTheSameAsTheCurrentChainId() public {
+        vm.prank(ADMIN);
+        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidDestinationChainId.selector));
+        fundsHandler.addEarningChain(block.chainid);
+    }
+
+    function test_removeEarningChain_reverts_ifChainIdNotPresent(uint256 chainId) public {
+        vm.prank(ADMIN);
+        vm.expectRevert(abi.encodeWithSelector(IFundsHandler.ChainIdNotPresent.selector));
+        fundsHandler.removeEarningChain(chainId);
     }
 
     //////////////////////////////////////////////// HELPERS ///////////////////////////////////////////////////////////

@@ -2,8 +2,9 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.20;
 
-import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
+
+import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {AccessManager} from "openzeppelin-contracts/contracts/access/manager/AccessManager.sol";
@@ -24,22 +25,29 @@ import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
+import {IEarningChainStateProvider} from "src/interfaces/IEarningChainStateProvider.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {AssetRegistry} from "src/periphery/AssetRegistry.sol";
+import {EarningChainStateSchemaV1, SCHEMA_VERSION} from "src/periphery/EarningChainStateSchemaV1.sol";
 import {Swapper} from "src/periphery/Swapper.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 
+import {ChainBalanceOracle} from "src/oracles/balance/ChainBalanceOracle.sol";
+import {ChainlinkChainBalanceOracleAdapter} from "src/oracles/balance/ChainlinkChainBalanceOracleAdapter.sol";
+import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {_toSelectorArray} from "test/helpers/TypeHelpers.sol";
+import {EarningChainStateProviderHarness} from "test/mocks/EarningChainStateProviderHarness.sol";
+import {MockBundleFeed} from "test/mocks/MockBundleFeed.sol";
 import {MockCCIPRouter} from "test/mocks/MockCcipRouter.sol";
 import {MockErc20} from "test/mocks/MockErc20.sol";
 import {TestErc4626} from "test/mocks/TestErc4626.sol";
 
-contract BaseTest is Test {
+contract BaseTest is TestWithHelpers {
     using MathLib for uint256;
     using AssetLib for uint256;
 
@@ -63,11 +71,12 @@ contract BaseTest is Test {
 
     uint8 internal constant MAX_STRATEGIES_PER_ASSET = 15;
     uint256 internal constant DEFAULT_MAX_ACTIVE_SUB_VAULTS = 201;
-    uint256 internal constant DEFAULT_MAX_PER_SECOND_RATE = 1000000005781378656804591713; // ~20% APY
     uint64 internal constant ACCOUNTING_CHAIN_ID = 1;
     uint64 internal constant ACCOUNTING_CHAIN_CCIP_SELECTOR = 10;
     uint64 internal constant EARNING_CHAIN_ID = 2;
     uint64 internal constant EARNING_CHAIN_CCIP_SELECTOR = 20;
+    uint256 internal constant CHAIN_BALANCE_ORACLE_HEARTBEAT_SECONDS = 3600;
+    uint256 internal constant CHAIN_BALANCE_ORACLE_PUBLISH_BUFFER_SECONDS = 90;
 
     // Transfer Helper
     address transferHelper_accountingChainAddress;
@@ -133,6 +142,24 @@ contract BaseTest is Test {
     // Mock CCIP Router
     MockCCIPRouter public mockCcipRouter;
 
+    // Price Oracles
+    PriceOracle public priceOracle_accountingChain;
+    PriceOracle public priceOracle_earningChain;
+
+    // Chain Balance Oracle + adapter/feed wiring used by E2E tests
+    ChainBalanceOracle public chainBalanceOracle;
+    IEarningChainStateProvider public earningChainStateProvider;
+    MockBundleFeed public mockBundleFeed;
+    ChainlinkChainBalanceOracleAdapter public chainBalanceOracleAdapter;
+
+    function _useMockedPriceOracleAccountingChain() internal view virtual returns (bool) {
+        return true;
+    }
+
+    function _useMockedPriceOracleEarningChain() internal view virtual returns (bool) {
+        return true;
+    }
+
     function _prepareTokens() internal {
         GHO.mint(address(this), 10000 ether);
         USDC.mint(address(this), 10000 * (10 ** 6));
@@ -157,6 +184,7 @@ contract BaseTest is Test {
         address assetRegistry,
         address transferHelper,
         address withdrawalFeeCalculator,
+        address priceOracle,
         uint256 maxActiveSubVaults
     ) internal virtual returns (BasedBoostedVault) {
         address vaultImpl = address(
@@ -167,6 +195,7 @@ contract BaseTest is Test {
                 fundsHandlerAddr,
                 transferHelper,
                 withdrawalFeeCalculator,
+                priceOracle,
                 maxActiveSubVaults
             )
         );
@@ -199,6 +228,9 @@ contract BaseTest is Test {
 
         mockCcipRouter.setSourceChainSelector(EARNING_CHAIN_CCIP_SELECTOR, ACCOUNTING_CHAIN_CCIP_SELECTOR);
         mockCcipRouter.setSourceChainSelector(ACCOUNTING_CHAIN_CCIP_SELECTOR, EARNING_CHAIN_CCIP_SELECTOR);
+
+        // Chain balance oracle for tracking earning chain balances from accounting chain.
+        // Deployed after the Access Manager is deployed.
 
         console.log("\nAccounting Chain:");
         // ---- Accounting Chain ----
@@ -234,6 +266,9 @@ contract BaseTest is Test {
 
         accessManager_accountingChainAddress = vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
         console.log("\tAccess Manager (Accounting Chain) Predicted Address: %s", accessManager_accountingChainAddress);
+
+        deployerNonce_accountingChain += 2; // Incrementing for Chain Balance Oracle implementation + proxy
+        deployerNonce_accountingChain += 2; // Incrementing for Price Oracle implementation + proxy
 
         deployerNonce_accountingChain++; // Incrementing for Asset Registry implementation
         assetRegistry_accountingChainAddress = vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
@@ -287,6 +322,18 @@ contract BaseTest is Test {
             address(accessManager_accountingChain) == accessManager_accountingChainAddress,
             "Access Manager (Accounting Chain) address mismatch"
         );
+
+        chainBalanceOracle = _deployChainBalanceOracle(accessManager_accountingChainAddress);
+        console.log("\tChain Balance Oracle (Accounting Chain): %s", address(chainBalanceOracle));
+
+        // Deploy Price Oracle for Accounting Chain (with mocked prices via vm.mockCall)
+        priceOracle_accountingChain = _deployPriceOracle(accessManager_accountingChainAddress, 9_995e23);
+        console.log("\tPrice Oracle (Accounting Chain): %s", address(priceOracle_accountingChain));
+        if (_useMockedPriceOracleAccountingChain()) {
+            _mockAssetPrice(address(priceOracle_accountingChain), address(GHO), MathLib.RAY);
+            _mockAssetPrice(address(priceOracle_accountingChain), address(USDC), MathLib.RAY);
+            _mockValidatePriceForAll(address(priceOracle_accountingChain));
+        }
 
         // 2. Asset Registry
         address assetRegistry_accountingChain_impl = address(new AssetRegistry());
@@ -361,6 +408,7 @@ contract BaseTest is Test {
             assetRegistry_accountingChainAddress,
             transferHelper_accountingChainAddress,
             withdrawalPolicy_accountingChainAddress,
+            address(priceOracle_accountingChain),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS
         );
         console.log("\tVault: %s", vault_accountingChainAddress);
@@ -372,6 +420,7 @@ contract BaseTest is Test {
                 assetRegistry_accountingChainAddress,
                 fundsHandler_accountingChainAddress,
                 fundsHandler_accountingChainAddress,
+                address(priceOracle_accountingChain),
                 transferHelper_accountingChainAddress,
                 MAX_STRATEGIES_PER_ASSET
             )
@@ -397,7 +446,9 @@ contract BaseTest is Test {
                 vault_accountingChainAddress,
                 chainGateway_accountingChainAddress,
                 allocator_accountingChainAddress,
-                transferHelper_accountingChainAddress
+                address(priceOracle_accountingChain),
+                transferHelper_accountingChainAddress,
+                address(chainBalanceOracle)
             )
         );
         fundsHandler = FundsHandler(
@@ -417,7 +468,9 @@ contract BaseTest is Test {
 
         // 8. Accounting Chain Gateway
         address accountingChainGateway_impl = address(
-            new AccountingChainGateway(fundsHandler_accountingChainAddress, iouTokenManager_accountingChainAddress)
+            new AccountingChainGateway(
+                fundsHandler_accountingChainAddress, iouTokenManager_accountingChainAddress, address(chainBalanceOracle)
+            )
         );
         accountingChainGateway = AccountingChainGateway(
             address(
@@ -491,6 +544,8 @@ contract BaseTest is Test {
         accessManager_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
         console.log("\tAccess Manager (Earning Chain) Predicted Address: %s", accessManager_earningChainAddress);
 
+        deployerNonce_earningChain += 2; // Incrementing for Price Oracle implementation + proxy
+
         deployerNonce_earningChain++; // Incrementing for Asset Registry implementation
         assetRegistry_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
         console.log("\tAsset Registry (Earning Chain) Predicted Address: %s", assetRegistry_earningChainAddress);
@@ -535,6 +590,15 @@ contract BaseTest is Test {
             address(accessManager_earningChain) == accessManager_earningChainAddress,
             "Access Manager (Earning Chain) address mismatch"
         );
+
+        // Deploy Price Oracle for Earning Chain (with mocked prices via vm.mockCall)
+        priceOracle_earningChain = _deployPriceOracle(accessManager_earningChainAddress, 9_995e23);
+        console.log("\tPrice Oracle (Earning Chain): %s", address(priceOracle_earningChain));
+        if (_useMockedPriceOracleEarningChain()) {
+            _mockAssetPrice(address(priceOracle_earningChain), address(GHO), MathLib.RAY);
+            _mockAssetPrice(address(priceOracle_earningChain), address(USDC), MathLib.RAY);
+            _mockValidatePriceForAll(address(priceOracle_earningChain));
+        }
 
         // 2. Asset Registry
         address assetRegistry_earningChain_impl = address(new AssetRegistry());
@@ -617,6 +681,7 @@ contract BaseTest is Test {
                 assetRegistry_earningChainAddress,
                 chainGateway_earningChainAddress,
                 chainGateway_earningChainAddress,
+                address(priceOracle_earningChain),
                 transferHelper_earningChainAddress,
                 MAX_STRATEGIES_PER_ASSET
             )
@@ -648,6 +713,7 @@ contract BaseTest is Test {
             new EarningChainGateway(
                 ACCOUNTING_CHAIN_ID,
                 allocator_earningChainAddress,
+                address(priceOracle_earningChain),
                 iouTokenManager_earningChainAddress,
                 transferHelper_earningChainAddress,
                 address(withdrawalPolicy_earningChain)
@@ -684,6 +750,9 @@ contract BaseTest is Test {
     }
 
     function setUp() public virtual {
+        // Warp to a reasonable timestamp to avoid underflow.
+        vm.warp(block.timestamp + 1 days);
+
         _deployContracts();
 
         // Set up Access Manager roles on Accounting chain
@@ -789,14 +858,29 @@ contract BaseTest is Test {
         allocator_earningChain.setDefaultStrategy(address(GHO), address(ghoStrategyVault_earningChain));
         allocator_earningChain.setDefaultStrategy(address(USDC), address(usdcStrategyVault_earningChain));
 
+        // Configure the FundsHandler to track the earning chain balance via the oracle
+        fundsHandler.addEarningChain(EARNING_CHAIN_ID);
+
+        // Set up EarningChainStateProvider -> MockBundleFeed -> Chainlink adapter -> ChainBalanceOracle.
+        // Use a harness so snapshots encode the simulated Earning Chain id in single-EVM E2E tests.
+        earningChainStateProvider = IEarningChainStateProvider(
+            address(new EarningChainStateProviderHarness(address(earningChainGateway), EARNING_CHAIN_ID))
+        );
+        mockBundleFeed = new MockBundleFeed();
+        chainBalanceOracleAdapter = new ChainlinkChainBalanceOracleAdapter(
+            EARNING_CHAIN_ID, address(mockBundleFeed), CHAIN_BALANCE_ORACLE_HEARTBEAT_SECONDS
+        );
+        _publishChainBalanceSnapshotToBundleFeed(0, block.timestamp, block.number);
+        chainBalanceOracle.setChainBalanceOracleAdapter(EARNING_CHAIN_ID, address(chainBalanceOracleAdapter));
+
         vm.stopPrank();
     }
 
     function _setUpAccountingChainAccessManager(AccessManager accessManager) internal {
         vm.startPrank(admin);
 
-        // TODO: set up RoleAdmin role which can grant and revoke roles
-        // TODO: MasterAdmin needs to set grantDelay on all role
+        // AccessManager setup below is intentionally minimal for tests (single executor, zero delays).
+        // A separate test suite is used to validate the AccessManager roles and permissions.
 
         // ----- Set up Guardian -----
         accessManager.grantRole(GUARDIAN_ROLE, everyRoleAccount, 0);
@@ -824,6 +908,11 @@ contract BaseTest is Test {
             _toSelectorArray(
                 IBridgeAdapter.setDestinationChainAdapter.selector, ICcipBridgeAdapter.setChainSelector.selector
             ),
+            APPENDER_ROLE
+        );
+        accessManager.setTargetFunctionRole(
+            address(chainBalanceOracle),
+            _toSelectorArray(ChainBalanceOracle.setChainBalanceOracleAdapter.selector),
             APPENDER_ROLE
         );
 
@@ -880,7 +969,9 @@ contract BaseTest is Test {
 
         // For FundsHandler
         accessManager.setTargetFunctionRole(
-            address(fundsHandler), _toSelectorArray(IFundsHandler.pushFundsToChain.selector), OPERATOR_ROLE
+            address(fundsHandler),
+            _toSelectorArray(IFundsHandler.pushFundsToChain.selector, FundsHandler.addEarningChain.selector),
+            OPERATOR_ROLE
         );
 
         vm.stopPrank();
@@ -889,9 +980,7 @@ contract BaseTest is Test {
     function _setUpEarningChainAccessManager(AccessManager accessManager) internal {
         vm.startPrank(admin);
 
-        // TODO: set up RoleAdmin role which can grant and revoke roles
-        // TODO: MasterAdmin needs to set grantDelay on all roles
-        // TODO: creater Pauser role
+        // AccessManager setup below is intentionally minimal for tests (single executor, zero delays).
 
         // ----- Set up Guardian -----
         accessManager.grantRole(GUARDIAN_ROLE, everyRoleAccount, 0);
@@ -964,5 +1053,87 @@ contract BaseTest is Test {
     function _setUpRole(AccessManager accessManager, uint64 roleId, address account, uint32 executionDelay) internal {
         accessManager.grantRole(roleId, account, executionDelay);
         accessManager.setRoleGuardian(roleId, GUARDIAN_ROLE);
+    }
+
+    function _publishChainBalanceFromEarningChainStateProvider() internal {
+        bytes memory stateBytes = earningChainStateProvider.getState();
+        mockBundleFeed.publishState(stateBytes);
+    }
+
+    function _publishChainBalanceSnapshotToBundleFeed(
+        uint256 balanceRay,
+        uint256 sourceChainTimestamp,
+        uint256 sourceChainBlockNumber
+    ) internal {
+        bytes memory stateBytes = abi.encode(
+            IEarningChainStateProvider.State({
+                version: SCHEMA_VERSION,
+                data: abi.encode(
+                    EarningChainStateSchemaV1.BalanceSnapshot({
+                        balanceRay: balanceRay,
+                        timestamp: sourceChainTimestamp,
+                        blockNumber: sourceChainBlockNumber,
+                        chainId: EARNING_CHAIN_ID
+                    })
+                )
+            })
+        );
+        mockBundleFeed.publishState(stateBytes);
+    }
+
+    function _mockChainBalance(
+        uint256 chainId,
+        uint256 balanceRay,
+        uint256 lastUpdateTimestamp,
+        uint256 sourceChainTimestamp,
+        bool isStale
+    ) internal {
+        _mockChainBalance(chainId, balanceRay, lastUpdateTimestamp, sourceChainTimestamp, block.number, isStale);
+    }
+
+    function _mockChainBalance(
+        uint256 chainId,
+        uint256 balanceRay,
+        uint256 lastUpdateTimestamp,
+        uint256 sourceChainTimestamp,
+        uint256 sourceChainBlockNumber,
+        bool isStale
+    ) internal {
+        require(chainId == EARNING_CHAIN_ID, "Unsupported chain id");
+        _publishChainBalanceSnapshotToBundleFeed(balanceRay, sourceChainTimestamp, sourceChainBlockNumber);
+        if (isStale) {
+            mockBundleFeed.setLatestBundleTimestamp(
+                block.timestamp - CHAIN_BALANCE_ORACLE_HEARTBEAT_SECONDS - CHAIN_BALANCE_ORACLE_PUBLISH_BUFFER_SECONDS
+            );
+        } else {
+            mockBundleFeed.setLatestBundleTimestamp(lastUpdateTimestamp);
+        }
+    }
+
+    /// @dev Deploys a PriceOracle with TransparentUpgradeableProxy (overrides TestWithHelpers to use proxyAdmin)
+    function _deployPriceOracle(address accessManager, uint256 minValidPriceRay)
+        internal
+        override
+        returns (PriceOracle)
+    {
+        address priceOracleImpl = address(new PriceOracle(minValidPriceRay));
+        return PriceOracle(
+            address(
+                new TransparentUpgradeableProxy(
+                    priceOracleImpl, proxyAdmin, abi.encodeCall(PriceOracle.initialize, (accessManager))
+                )
+            )
+        );
+    }
+
+    function _deployChainBalanceOracle(address accessManager) internal returns (ChainBalanceOracle) {
+        address chainBalanceOracleImpl = address(new ChainBalanceOracle());
+        return ChainBalanceOracle(
+            address(
+                new TransparentUpgradeableProxy(
+                    chainBalanceOracleImpl, proxyAdmin, abi.encodeCall(ChainBalanceOracle.initialize, (accessManager))
+                )
+            )
+        );
     }
 }

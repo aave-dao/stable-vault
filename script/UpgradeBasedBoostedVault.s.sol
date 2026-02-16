@@ -37,6 +37,7 @@ contract UpgradeBasedBoostedVault is Create3AddressBook, Upgrade {
                 fundsHandler: getFundsHandlerAddress(DEPLOYER),
                 transferHelper: getTransferHelperAddress(DEPLOYER),
                 withdrawalPolicy: getWithdrawalPolicyAddress(DEPLOYER),
+                priceOracle: address(0), // TODO: Deploy Price Oracle properly
                 maxActiveSubVaults: DEFAULT_MAX_ACTIVE_SUB_VAULTS
             })
         );
@@ -52,4 +53,3 @@ contract UpgradeBasedBoostedVault is Create3AddressBook, Upgrade {
         vm.writeJson(jsonObject, "deployments/vnet/accounting.json", string.concat(".", name));
     }
 }
-

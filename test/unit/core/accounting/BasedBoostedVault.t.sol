@@ -14,11 +14,13 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {BasedBoostedVault} from "src/core/accounting/BasedBoostedVault.sol";
 import {IBasedBoostedVault} from "src/interfaces/IBasedBoostedVault.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
+import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
+import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
@@ -55,6 +57,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     MockAssetRegistry mockAssetRegistry;
     MockTransferHelper mockTransferHelper;
     WithdrawalPolicy mockWithdrawalPolicy;
+    PriceOracle mockPriceOracle;
     IBasedBoostedVault bbv;
 
     function _deployDefaultAsset() internal returns (IMockErc20) {
@@ -70,6 +73,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         address assetRegistry,
         address transferHelper,
         address withdrawalFeeCalculatorAddress,
+        address priceOracleAddress,
         uint256 maxActiveSubVaults
     ) internal returns (IBasedBoostedVault) {
         address vaultImpl = address(
@@ -80,6 +84,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
                 fundsHandler,
                 transferHelper,
                 withdrawalFeeCalculatorAddress,
+                priceOracleAddress,
                 maxActiveSubVaults
             )
         );
@@ -103,6 +108,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         address assetRegistry,
         address transferHelper,
         address withdrawalFeeCalculatorAddress,
+        address priceOracleAddress,
         uint256 maxActiveSubVaults
     ) internal returns (BasedBoostedVaultHarness) {
         address vaultImpl = address(
@@ -113,6 +119,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
                 fundsHandler,
                 transferHelper,
                 withdrawalFeeCalculatorAddress,
+                priceOracleAddress,
                 maxActiveSubVaults
             )
         );
@@ -151,6 +158,12 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockTransferHelper = new MockTransferHelper();
         mockFundsHandler = new MockFundsHandler(address(mockTransferHelper));
 
+        mockPriceOracle = _deployPriceOracle(address(mockAccessManager), 9_995e23);
+        // Mock price for the default asset (1 RAY = 1:1 price ratio)
+        _mockAssetPrice(address(mockPriceOracle), address(mockAsset), MathLib.RAY);
+        // Mock validatePrice to pass for any asset (tests may create additional assets)
+        _mockValidatePriceForAll(address(mockPriceOracle));
+
         // Predict BBV proxy address after WithdrawalPolicy impl+proxy and BBV impl deployments.
         uint256 deployerNonce = vm.getNonce(address(this));
         address expectedBbvProxy = vm.computeCreateAddress(address(this), deployerNonce + 3);
@@ -166,6 +179,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockAssetRegistry),
             address(mockTransferHelper),
             address(mockWithdrawalPolicy),
+            address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS
         );
     }
@@ -188,6 +202,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             expectedFundsHandler,
             expectedTransferHelper,
             address(mockWithdrawalPolicy),
+            address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS
         );
 
@@ -205,6 +220,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockTransferHelper),
             address(mockWithdrawalPolicy),
+            address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS
         );
     }
@@ -226,6 +242,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
                 address(mockFundsHandler),
                 address(mockTransferHelper),
                 address(mockWithdrawalPolicy),
+                address(mockPriceOracle),
                 DEFAULT_MAX_ACTIVE_SUB_VAULTS
             )
         );
@@ -256,6 +273,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
                 address(mockFundsHandler),
                 address(mockTransferHelper),
                 address(mockWithdrawalPolicy),
+                address(mockPriceOracle),
                 DEFAULT_MAX_ACTIVE_SUB_VAULTS
             )
         );
@@ -407,6 +425,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockAssetRegistry),
             address(mockTransferHelper),
             address(mockWithdrawalPolicy),
+            address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS
         );
 
@@ -430,6 +449,19 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.prank(user);
         vm.expectRevert(Errors.InvalidAmount.selector);
         vault.deposit(user, address(highDecimalToken), depositAmount);
+    }
+
+    function test_deposit_reverts_ifPriceOracleRejectsPrice(uint256 amount) public {
+        address user = makeAddr("testUser");
+        _mockPriceTooLow(address(mockPriceOracle), address(mockAsset));
+        amount = _boundAssetAmount(address(mockAsset), amount);
+
+        mockAsset.mint(user, amount);
+        vm.prank(user);
+        mockAsset.forceApprove(address(bbv), amount);
+        vm.prank(user);
+        vm.expectRevert(IPriceOracle.PriceTooLow.selector);
+        bbv.deposit(user, address(mockAsset), amount);
     }
 
     function test_deposit_allowsToDepositOnBehalfOfOtherUser(address user, address msgSender, uint256 amount) public {
@@ -546,6 +578,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockAssetRegistry),
             address(mockTransferHelper),
             address(mockWithdrawalPolicy),
+            address(mockPriceOracle),
             maxActiveSubVaults
         );
 
@@ -582,6 +615,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockAssetRegistry),
             address(mockTransferHelper),
             address(mockWithdrawalPolicy),
+            address(mockPriceOracle),
             maxActiveSubVaults
         );
 
@@ -627,6 +661,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockAssetRegistry),
             address(mockTransferHelper),
             address(mockWithdrawalPolicy),
+            address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS
         );
         mockAsset = IMockErc20(address(new MockNonStandardErc20("Test GHO", "tGHO", 18)));
@@ -1574,7 +1609,12 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         _assumeNotProxyAdmin(user, address(bbv));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
         _deposit(user, depositAmount);
-        vm.assume(withdrawalAmountRay < depositAmount.assetDecimalsToRay(address(mockAsset)));
+        uint256 userBalanceRay = depositAmount.assetDecimalsToRay(address(mockAsset));
+        vm.assume(withdrawalAmountRay < userBalanceRay);
+        // Ensure remaining shares are redeemable (not dust) to avoid full-withdrawal rounding
+        vm.assume(
+            withdrawalAmountRay == 0 || userBalanceRay - withdrawalAmountRay >= Constants.MIN_WITHDRAWABLE_AMOUNT_RAY
+        );
 
         mockFundsHandler.mockAggregatedBalance(depositAmount);
 
@@ -1597,7 +1637,12 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
         _deposit(user, depositAmount);
         uint256 userBalanceBefore = bbv.getUserBalance(user);
-        vm.assume(withdrawalAmountRay < depositAmount.assetDecimalsToRay(address(mockAsset)));
+        uint256 userBalanceRay = depositAmount.assetDecimalsToRay(address(mockAsset));
+        vm.assume(withdrawalAmountRay < userBalanceRay);
+        // Ensure remaining shares are redeemable (not dust) to avoid full-withdrawal rounding
+        vm.assume(
+            withdrawalAmountRay == 0 || userBalanceRay - withdrawalAmountRay >= Constants.MIN_WITHDRAWABLE_AMOUNT_RAY
+        );
 
         mockFundsHandler.mockAggregatedBalance(depositAmount);
 
@@ -1664,6 +1709,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockAssetRegistry),
             address(mockTransferHelper),
             address(mockWithdrawalPolicy),
+            address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS
         );
 
@@ -2295,6 +2341,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockAssetRegistry),
             address(mockTransferHelper),
             address(mockWithdrawalPolicy),
+            address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS
         );
         mockAsset = IMockErc20(address(new MockNonStandardErc20("Test GHO", "tGHO", 18)));
@@ -2546,6 +2593,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockAssetRegistry),
             address(mockTransferHelper),
             address(mockWithdrawalPolicy),
+            address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS
         );
 
@@ -2584,6 +2632,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockAssetRegistry),
             address(mockTransferHelper),
             address(mockWithdrawalPolicy),
+            address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS
         );
 
@@ -2623,6 +2672,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockAssetRegistry),
             address(mockTransferHelper),
             address(mockWithdrawalPolicy),
+            address(mockPriceOracle),
             maxActiveSubVaults
         );
 
@@ -2659,6 +2709,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockAssetRegistry),
             address(mockTransferHelper),
             address(mockWithdrawalPolicy),
+            address(mockPriceOracle),
             maxActiveSubVaults
         );
 

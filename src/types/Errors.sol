@@ -14,10 +14,6 @@ library Errors {
     /// @custom:selector 0xad7acb47
     error AddressNotWhitelisted();
 
-    /// @notice Asset already supported.
-    /// @custom:selector 0x3b6566d0
-    error AssetAlreadySupported(address asset);
-
     /// @notice Insufficient amount due to slippage/fee tolerance being exceeded.
     /// @custom:selector 0xe52970aa
     error InsufficientAmountOut();
@@ -65,14 +61,6 @@ library Errors {
     /// @notice Address checked is not the contract being called.
     /// @custom:selector 0x14d4a4e8
     error OnlySelf();
-
-    /// @notice Thrown when a signature nonce has already been used.
-    /// @custom:selector 0x85127399
-    error SignatureNonceAlreadyConsumed(address signer, uint256 nonce);
-
-    /// @notice Thrown when a signature timestamp has expired.
-    /// @custom:selector 0x2eac42fc
-    error SignatureTimestampExpired();
 
     /// @notice Unsupported asset.
     /// @custom:selector 0xee84f40b
