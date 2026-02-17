@@ -118,7 +118,7 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
             // The funds were sent from the Earning Chain after the latest published balance snapshot was taken.
             // The Chain Balance Oracle does not reflect a snapshot which captures the outflow of assets from the
             // Earning Chain, therefore the value of funds bridged from the Earning Chain would be double counted
-            // (counted once from the local Allocator if the fund receival is successful, and once throug the stale
+            // (counted once from the local Allocator if the fund reception is successful, and once through the stale
             // Earning Chain balance snapshot).
             revert StaleChainBalance();
         }
