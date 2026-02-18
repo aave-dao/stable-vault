@@ -46,6 +46,8 @@ interface IBasedBoostedVault {
 
     event SurplusInterestClaimed(address[] assets, uint256[] amounts);
 
+    event TreasurySet(address indexed treasury);
+
     /// @notice Thrown when the amount requested to withdraw is greater than the amount available.
     /// @dev It is possible the system does not have enough profits i.e. balances over 'original deposits' to cover a
     /// user's withdrawal request.
@@ -84,6 +86,10 @@ interface IBasedBoostedVault {
     /// @custom:selector 0xff731b5f
     error TooManyActiveSubVaults();
 
+    /// @notice Thrown when claiming surplus interest while the treasury address is set to address(0).
+    /// @custom:selector 0xb2c4cce9
+    error TreasuryNotSet();
+
     /// @notice Sets the default sub-vault.
     /// @dev The default sub-vault is the sub-vault that is used when a depositing user does not have a specific
     /// sub-vault set.
@@ -95,6 +101,10 @@ interface IBasedBoostedVault {
     /// @param subVaultId ID of the existing sub-vault to set the rate for.
     /// @param newPerSecondRate New per-second rate for the sub-vault.
     function setSubVaultRate(uint256 subVaultId, uint256 newPerSecondRate) external;
+
+    /// @notice Sets the treasury address, where claimed surplus interest is sent to.
+    /// @param treasury Address of the treasury. If set to address(0), surplus interest claiming will revert.
+    function setTreasury(address treasury) external;
 
     /// @notice Claims surplus interest from the vault.
     /// @dev If funds requested can be covered by the system's surplus interest, the funds are pulled from downstream
@@ -116,6 +126,10 @@ interface IBasedBoostedVault {
     /// @notice Getter for the maximum rate that can be set for a sub-vault.
     /// @return maxValidPerSecondRate Maximum valid per-second rate that can be set for a sub-vault.
     function getMaxValidPerSecondRate() external view returns (uint256);
+
+    /// @notice Getter for the treasury address.
+    /// @return treasury The address of the treasury, where claimed surplus interest is sent to.
+    function getTreasury() external view returns (address);
 
     /// @notice Getter for the rate for a sub-vault.
     /// @param subVaultId ID of the sub-vault to get the rate for.

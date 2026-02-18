@@ -110,6 +110,9 @@ contract BasedBoostedVault is
 
         /// @dev User position by user address.
         mapping(address user => UserPosition position) positions;
+
+        /// @dev The address of the treasury, where claimed surplus interest is sent to.
+        address treasury;
     }
 
     // keccak256(abi.encode(uint256(keccak256("aave.storage.BasedBoostedVault")) - 1)) & ~bytes32(uint256(0xff))
@@ -153,17 +156,23 @@ contract BasedBoostedVault is
 
     /// @dev Initializer.
     /// @param accessManager Address of the IAccessManager contract used for handling access control.
+    /// @param treasury Address of the treasury, where surplus interest is sent to.
     /// @param defaultSubVaultPerSecondRate Base per-second rate, in Ray units (27 decimals).
-    function initialize(address accessManager, uint256 defaultSubVaultPerSecondRate) external virtual initializer {
-        __BasedBoostedVault_init(accessManager, defaultSubVaultPerSecondRate);
+    function initialize(address accessManager, address treasury, uint256 defaultSubVaultPerSecondRate)
+        external
+        virtual
+        initializer
+    {
+        __BasedBoostedVault_init(accessManager, treasury, defaultSubVaultPerSecondRate);
     }
 
-    function __BasedBoostedVault_init(address accessManager, uint256 defaultSubVaultPerSecondRate)
+    function __BasedBoostedVault_init(address accessManager, address treasury, uint256 defaultSubVaultPerSecondRate)
         internal
         virtual
         onlyInitializing
     {
         __AccessManaged_init(accessManager);
+        _setTreasury(treasury);
         _setDefaultSubVault(_getOrCreateSubVaultWithRate(defaultSubVaultPerSecondRate), defaultSubVaultPerSecondRate);
     }
 
@@ -438,8 +447,15 @@ contract BasedBoostedVault is
             accumulatedAmountRay += amounts[i].assetDecimalsToRay(assets[i]);
         }
         require(accumulatedAmountRay <= surplusInterest, Errors.InvalidAmount());
-        ITransferHelper(TRANSFER_HELPER).transfer(assets, amounts, msg.sender);
+        address treasury = $storage().treasury;
+        require(treasury != address(0), TreasuryNotSet());
+        ITransferHelper(TRANSFER_HELPER).transfer(assets, amounts, treasury);
         emit SurplusInterestClaimed(assets, amounts);
+    }
+
+    /// @inheritdoc IBasedBoostedVault
+    function setTreasury(address treasury) external override restricted {
+        _setTreasury(treasury);
     }
 
     ////////////////////////////////////////////////// GETTERS /////////////////////////////////////////////////////
@@ -512,6 +528,11 @@ contract BasedBoostedVault is
     /// @inheritdoc IBasedBoostedVault
     function getMaxValidPerSecondRate() external view override returns (uint256) {
         return MAX_VALID_PER_SECOND_RATE;
+    }
+
+    /// @inheritdoc IBasedBoostedVault
+    function getTreasury() external view override returns (address) {
+        return $storage().treasury;
     }
 
     ////////////////////////////////////////////////// INTERNAL /////////////////////////////////////////////////////
@@ -817,6 +838,11 @@ contract BasedBoostedVault is
         _migrateUserToSubVault(user, oldSubVaultId, newSubVaultId);
 
         emit UserRateSet(user, newSubVaultId, newPerSecondRate);
+    }
+
+    function _setTreasury(address treasury) internal {
+        $storage().treasury = treasury;
+        emit TreasurySet(treasury);
     }
 
     function _beforeRescueTokens(
