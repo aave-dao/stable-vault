@@ -46,6 +46,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     uint256 userSeed = 0;
     address admin = makeAddr("admin");
     address manager = makeAddr("manager");
+    address treasury = makeAddr("treasury");
 
     uint256 internal constant DEFAULT_MAX_ACTIVE_SUB_VAULTS = 201;
     uint256 constant DEFAULT_PER_SECOND_RATE = 1000000001243680656318820313; // ~4% APY
@@ -74,7 +75,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         address transferHelper,
         address withdrawalFeeCalculatorAddress,
         address priceOracleAddress,
-        uint256 maxActiveSubVaults
+        uint256 maxActiveSubVaults,
+        address treasuryAddress
     ) internal returns (IBasedBoostedVault) {
         address vaultImpl = address(
             new BasedBoostedVault(
@@ -93,7 +95,9 @@ contract BasedBoostedVaultTest is TestWithHelpers {
                 new TransparentUpgradeableProxy(
                     vaultImpl,
                     address(this),
-                    abi.encodeCall(BasedBoostedVault.initialize, (accessManager, defaultSubVaultPerSecondRate))
+                    abi.encodeCall(
+                        BasedBoostedVault.initialize, (accessManager, treasuryAddress, defaultSubVaultPerSecondRate)
+                    )
                 )
             )
         );
@@ -109,7 +113,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         address transferHelper,
         address withdrawalFeeCalculatorAddress,
         address priceOracleAddress,
-        uint256 maxActiveSubVaults
+        uint256 maxActiveSubVaults,
+        address treasuryAddress
     ) internal returns (BasedBoostedVaultHarness) {
         address vaultImpl = address(
             new BasedBoostedVaultHarness(
@@ -128,7 +133,9 @@ contract BasedBoostedVaultTest is TestWithHelpers {
                 new TransparentUpgradeableProxy(
                     vaultImpl,
                     address(this),
-                    abi.encodeCall(BasedBoostedVault.initialize, (accessManager, defaultSubVaultPerSecondRate))
+                    abi.encodeCall(
+                        BasedBoostedVault.initialize, (accessManager, treasuryAddress, defaultSubVaultPerSecondRate)
+                    )
                 )
             )
         );
@@ -179,7 +186,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockTransferHelper),
             address(mockWithdrawalPolicy),
             address(mockPriceOracle),
-            DEFAULT_MAX_ACTIVE_SUB_VAULTS
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+            treasury
         );
     }
 
@@ -238,6 +246,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
     function test_initialize_setsTheExpectedValues(
         address expectedAccessManager,
+        address expectedTreasury,
         uint256 expectedDefaultSubVaultRate,
         address expectedAssetRegistry
     ) public {
@@ -263,7 +272,10 @@ contract BasedBoostedVaultTest is TestWithHelpers {
                 new TransparentUpgradeableProxy(
                     bbvImpl,
                     address(this),
-                    abi.encodeCall(BasedBoostedVault.initialize, (expectedAccessManager, expectedDefaultSubVaultRate))
+                    abi.encodeCall(
+                        BasedBoostedVault.initialize,
+                        (expectedAccessManager, expectedTreasury, expectedDefaultSubVaultRate)
+                    )
                 )
             )
         );
@@ -271,6 +283,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         IBasedBoostedVault.SubVaultData memory defaultSubVault = newBbv.getDefaultSubVault();
         assertEq(defaultSubVault.perSecondRate, expectedDefaultSubVaultRate);
         assertEq(defaultSubVault.id, newBbv.getSubVaultIdByRate(expectedDefaultSubVaultRate));
+        assertEq(newBbv.getTreasury(), expectedTreasury);
     }
 
     function test_initialize_reverts_ifInvalidDefaultSubVaultRate(uint256 invalidDefaultSubVaultRate) public {
@@ -296,7 +309,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
                     bbvImpl,
                     address(this),
                     abi.encodeCall(
-                        BasedBoostedVault.initialize, (address(mockAccessManager), invalidDefaultSubVaultRate)
+                        BasedBoostedVault.initialize, (address(mockAccessManager), treasury, invalidDefaultSubVaultRate)
                     )
                 )
             )
@@ -437,7 +450,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockTransferHelper),
             address(mockWithdrawalPolicy),
             address(mockPriceOracle),
-            DEFAULT_MAX_ACTIVE_SUB_VAULTS
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+            treasury
         );
 
         // Warp just 1 second, conversionRate grows slightly above RAY
@@ -590,7 +604,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockTransferHelper),
             address(mockWithdrawalPolicy),
             address(mockPriceOracle),
-            maxActiveSubVaults
+            maxActiveSubVaults,
+            treasury
         );
 
         uint256 amountToDeposit = 10e6;
@@ -627,7 +642,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockTransferHelper),
             address(mockWithdrawalPolicy),
             address(mockPriceOracle),
-            maxActiveSubVaults
+            maxActiveSubVaults,
+            treasury
         );
 
         uint256 amountToDeposit = 10e6;
@@ -673,7 +689,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockTransferHelper),
             address(mockWithdrawalPolicy),
             address(mockPriceOracle),
-            DEFAULT_MAX_ACTIVE_SUB_VAULTS
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+            treasury
         );
         mockAsset = IMockErc20(address(new MockNonStandardErc20("Test GHO", "tGHO", 18)));
 
@@ -972,19 +989,17 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         bbv.claimSurplusInterest(_toAddressArray(address(mockAsset)), _toUint256Array(requestedAssetsToClaim));
     }
 
-    function test_claimSurplusInterest_sendsExpectedAmountOfFeesToMsgSender(
+    function test_claimSurplusInterest_sendsExpectedAmountOfFeesToTreasury(
         address msgSender,
         uint256 availableFeesToClaimRay,
         uint256 requestedAssetsToClaim
     ) public {
         vm.assume(msgSender != address(0));
-        vm.assume(msgSender != address(mockFundsHandler));
-        vm.assume(msgSender != address(mockTransferHelper));
         _assumeNotProxyAdmin(msgSender, address(bbv));
         requestedAssetsToClaim = _boundAssetAmount(address(mockAsset), requestedAssetsToClaim);
         availableFeesToClaimRay = _boundRayAmount(availableFeesToClaimRay);
         vm.assume(requestedAssetsToClaim.assetDecimalsToRay(address(mockAsset)) <= availableFeesToClaimRay);
-        vm.assume(mockAsset.balanceOf(msgSender) == 0);
+        vm.assume(mockAsset.balanceOf(treasury) == 0);
         vm.assume(mockTransferHelper.getBalance(address(mockAsset)) == 0);
 
         mockTransferHelper.mockAsset(address(mockAsset), availableFeesToClaimRay);
@@ -995,7 +1010,74 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.prank(msgSender);
         bbv.claimSurplusInterest(_toAddressArray(address(mockAsset)), _toUint256Array(requestedAssetsToClaim));
 
-        assertEq(mockAsset.balanceOf(msgSender), requestedAssetsToClaim);
+        assertEq(mockAsset.balanceOf(treasury), requestedAssetsToClaim);
+    }
+
+    function test_claimSurplusInterest_reverts_ifTreasuryIsZeroAddress(
+        uint256 availableFeesToClaimRay,
+        uint256 requestedAssetsToClaim
+    ) public {
+        requestedAssetsToClaim = _boundAssetAmount(address(mockAsset), requestedAssetsToClaim);
+        availableFeesToClaimRay = _boundRayAmount(availableFeesToClaimRay);
+        vm.assume(requestedAssetsToClaim.assetDecimalsToRay(address(mockAsset)) <= availableFeesToClaimRay);
+
+        mockTransferHelper.mockAsset(address(mockAsset), availableFeesToClaimRay);
+        mockFundsHandler.mockAggregatedBalance(availableFeesToClaimRay);
+
+        // Set treasury to address(0)
+        vm.prank(manager);
+        bbv.setTreasury(address(0));
+        assertEq(bbv.getTreasury(), address(0));
+
+        vm.prank(manager);
+        vm.expectRevert(abi.encodeWithSelector(IBasedBoostedVault.TreasuryNotSet.selector));
+        bbv.claimSurplusInterest(_toAddressArray(address(mockAsset)), _toUint256Array(requestedAssetsToClaim));
+    }
+
+    function test_setTreasury_reverts_ifMsgSenderIsNotAuthorized(address unauthorizedMsgSender, address newTreasury)
+        public
+    {
+        _assumeNotProxyAdmin(unauthorizedMsgSender, address(bbv));
+        vm.assume(unauthorizedMsgSender != manager);
+
+        mockAccessManager.mockRejectCall(unauthorizedMsgSender, address(bbv), IBasedBoostedVault.setTreasury.selector);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
+        );
+        vm.prank(unauthorizedMsgSender);
+        bbv.setTreasury(newTreasury);
+    }
+
+    function test_setTreasury_setsTheExpectedTreasury(address newTreasury) public {
+        vm.prank(manager);
+        bbv.setTreasury(newTreasury);
+
+        assertEq(bbv.getTreasury(), newTreasury);
+    }
+
+    function test_setTreasury_setsToZeroAddress(address nonZeroTreasury) public {
+        vm.assume(nonZeroTreasury != address(0));
+
+        vm.prank(manager);
+        bbv.setTreasury(nonZeroTreasury);
+        assertEq(bbv.getTreasury(), nonZeroTreasury);
+
+        vm.prank(manager);
+        bbv.setTreasury(address(0));
+        assertEq(bbv.getTreasury(), address(0));
+    }
+
+    function test_setTreasury_emitsExpectedEvent(address newTreasury) public {
+        vm.expectEmit(true, true, true, true);
+        emit IBasedBoostedVault.TreasurySet(newTreasury);
+
+        vm.prank(manager);
+        bbv.setTreasury(newTreasury);
+    }
+
+    function test_getTreasury_returnsExpectedValue() public view {
+        assertEq(bbv.getTreasury(), treasury);
     }
 
     function test_setSubVaultRate_updatesAssociationBetweenSubVaultIdAndRateProperly(
@@ -1721,7 +1803,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockTransferHelper),
             address(mockWithdrawalPolicy),
             address(mockPriceOracle),
-            DEFAULT_MAX_ACTIVE_SUB_VAULTS
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+            treasury
         );
 
         vm.warp(block.timestamp + 1);
@@ -2353,7 +2436,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockTransferHelper),
             address(mockWithdrawalPolicy),
             address(mockPriceOracle),
-            DEFAULT_MAX_ACTIVE_SUB_VAULTS
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+            treasury
         );
         mockAsset = IMockErc20(address(new MockNonStandardErc20("Test GHO", "tGHO", 18)));
 
@@ -2605,7 +2689,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockTransferHelper),
             address(mockWithdrawalPolicy),
             address(mockPriceOracle),
-            DEFAULT_MAX_ACTIVE_SUB_VAULTS
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+            treasury
         );
 
         address user = makeAddr("user");
@@ -2644,7 +2729,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockTransferHelper),
             address(mockWithdrawalPolicy),
             address(mockPriceOracle),
-            DEFAULT_MAX_ACTIVE_SUB_VAULTS
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+            treasury
         );
 
         address user = makeAddr("user");
@@ -2684,7 +2770,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockTransferHelper),
             address(mockWithdrawalPolicy),
             address(mockPriceOracle),
-            maxActiveSubVaults
+            maxActiveSubVaults,
+            treasury
         );
 
         address user1 = makeAddr("user1");
@@ -2721,7 +2808,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             address(mockTransferHelper),
             address(mockWithdrawalPolicy),
             address(mockPriceOracle),
-            maxActiveSubVaults
+            maxActiveSubVaults,
+            treasury
         );
 
         address user1 = makeAddr("user1");
