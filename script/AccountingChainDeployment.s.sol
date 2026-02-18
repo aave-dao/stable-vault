@@ -48,6 +48,7 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
     address constant FUNDS_HANDLER_PROXY_ADMIN = PROXY_ADMIN;
 
     address constant ACCESS_MANAGER_ADMIN = DEPLOYER;
+    address constant TREASURY = address(0); // TODO: Set treasury address, will be handled in PR #158
 
     address immutable ALLOCATOR_DEPOSITOR = getFundsHandlerAddress(DEPLOYER);
     address immutable ALLOCATOR_WITHDRAWER = getFundsHandlerAddress(DEPLOYER);
@@ -262,7 +263,8 @@ contract AccountingChainDeployment is Create3Deployment, Create3AddressBook, ATo
             implementation: implementation,
             proxyAdmin: BBV_PROXY_ADMIN,
             initCalldata: abi.encodeCall(
-                BasedBoostedVault.initialize, (getAccessManagerAddress(DEPLOYER), DEFAULT_SUB_VAULT_PER_SECOND_RATE)
+                BasedBoostedVault.initialize,
+                (getAccessManagerAddress(DEPLOYER), TREASURY, DEFAULT_SUB_VAULT_PER_SECOND_RATE)
             )
         });
         require(bbv == getBasedBoostedVaultAddress(DEPLOYER), "BasedBoostedVault does not match expected address");
