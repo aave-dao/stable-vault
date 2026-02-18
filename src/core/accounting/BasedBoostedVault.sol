@@ -179,6 +179,7 @@ contract BasedBoostedVault is
     /// @inheritdoc IBasedBoostedVault
     function deposit(address user, address asset, uint256 amount)
         external
+        virtual
         override
         nonReentrant
         assertingTransferHelperBalanceFor(asset)
@@ -232,7 +233,7 @@ contract BasedBoostedVault is
     /// recipient deposit.
     /// @dev Principal is tracked as one aggregate balance per user (not by deposit lots), so transfers always consume
     /// from that aggregate principal balance.
-    function transfer(address to, uint256 amountRay) external override nonReentrant returns (bool) {
+    function transfer(address to, uint256 amountRay) external virtual override nonReentrant returns (bool) {
         address from = msg.sender;
         require(amountRay >= Constants.MIN_WITHDRAWABLE_AMOUNT_RAY, Errors.InvalidAmount());
         require(to != address(0), Errors.InvalidParameter());
@@ -273,7 +274,7 @@ contract BasedBoostedVault is
 
     /// @notice Transfers the sender's full position to another user.
     /// @dev Any remaining original deposit amount is also transferred to the recipient.
-    function transferAll(address to) external override nonReentrant returns (bool) {
+    function transferAll(address to) external virtual override nonReentrant returns (bool) {
         address from = msg.sender;
         require(to != address(0), Errors.InvalidParameter());
         require(to != from, Errors.InvalidParameter());
@@ -337,6 +338,7 @@ contract BasedBoostedVault is
     /// @inheritdoc IBasedBoostedVault
     function requestWithdrawal(address user, uint256 requestedAmountInRay)
         external
+        virtual
         override
         nonReentrant
         returns (uint256)
@@ -404,7 +406,7 @@ contract BasedBoostedVault is
         uint256 minAmountOut,
         uint256 iouAmountRay,
         bytes memory data
-    ) external override nonReentrant assertingTransferHelperBalanceFor(assetOut) {
+    ) external virtual override nonReentrant assertingTransferHelperBalanceFor(assetOut) {
         require(user == msg.sender, OnlyUser());
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(user, iouAmountRay);
         uint256 amountOutRay = IWithdrawalPolicy(WITHDRAWAL_POLICY)
