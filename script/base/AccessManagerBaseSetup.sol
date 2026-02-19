@@ -185,7 +185,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook {
     function _setupProfile__Rebalancer() internal {
         address rebalancerProfile = _getProfile__Rebalancer();
 
-        bytes[] memory multicallCalldata = new bytes[](5);
+        bytes[] memory multicallCalldata = new bytes[](6);
         RolesLib.Role memory role;
 
         role = RolesLib.getRole__rebalance();
@@ -204,6 +204,9 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook {
         // Only used on the Earning Chain (EarningChainGateway), but granted in both Accounting and Earning Chain setups
         role = RolesLib.getRole__pushFundsToAccountingChain();
         multicallCalldata[4] = abi.encodeCall(IAccessManager.grantRole, (role.roleId, rebalancerProfile, role.delay));
+
+        role = RolesLib.getRole__setDefaultBridgeAdapter();
+        multicallCalldata[5] = abi.encodeCall(IAccessManager.grantRole, (role.roleId, rebalancerProfile, role.delay));
 
         IMulticall(_accessManager()).multicall(multicallCalldata);
     }
