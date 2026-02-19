@@ -163,19 +163,33 @@ abstract contract AccessManagerSetupBaseTest is Test {
     }
 
     function test_secondaryAdminProfile_hasTheExpectedRoles() public view {
-        uint64[] memory fnIds = _allFunctionBasedRoleIds();
-        uint64[] memory expected = new uint64[](1 + fnIds.length);
+        RolesLib.Role[] memory allRoles = RolesLib.getAllFunctionBasedRoles();
+
+        // Count non-critical roles
+        uint256 nonCriticalCount = 0;
+        for (uint256 i = 0; i < allRoles.length; i++) {
+            if (!allRoles[i].hasCriticalRisk) {
+                nonCriticalCount++;
+            }
+        }
+
+        uint64[] memory expected = new uint64[](1 + nonCriticalCount);
         expected[0] = RolesLib.OPERATIONAL_ROLE_GUARDIAN_ROLE;
-        for (uint256 i = 0; i < fnIds.length; i++) {
-            expected[1 + i] = fnIds[i];
+        uint256 expectedIdx = 1;
+        for (uint256 i = 0; i < allRoles.length; i++) {
+            if (!allRoles[i].hasCriticalRisk) {
+                expected[expectedIdx] = allRoles[i].roleId;
+                expectedIdx++;
+            }
         }
         _assertProfileHasExactlyTheseRoles(_secondaryAdmin(), expected);
 
         _assertProfileRoleDelay(_secondaryAdmin(), RolesLib.OPERATIONAL_ROLE_GUARDIAN_ROLE, RolesLib.NO_DELAY);
 
-        RolesLib.Role[] memory roles = RolesLib.getAllFunctionBasedRoles();
-        for (uint256 i = 0; i < roles.length; i++) {
-            _assertProfileRoleDelay(_secondaryAdmin(), roles[i].roleId, roles[i].delay);
+        for (uint256 i = 0; i < allRoles.length; i++) {
+            if (!allRoles[i].hasCriticalRisk) {
+                _assertProfileRoleDelay(_secondaryAdmin(), allRoles[i].roleId, allRoles[i].delay);
+            }
         }
     }
 
@@ -230,6 +244,49 @@ abstract contract AccessManagerSetupBaseTest is Test {
         expected[0] = RolesLib.getRole__claimMerklRewards().roleId;
         _assertProfileHasExactlyTheseRoles(_aTokenVaultRewardClaimer(), expected);
         _assertProfileRoleDelay(_aTokenVaultRewardClaimer(), expected[0], RolesLib.NO_DELAY);
+    }
+
+    ////// Critical roles exclusivity //////
+
+    function test_criticalRoles_areOnlyAssignedToMainAdmin() public view {
+        RolesLib.Role[] memory roles = RolesLib.getAllFunctionBasedRoles();
+
+        address[] memory allProfiles = _getAllProfiles();
+
+        for (uint256 i = 0; i < roles.length; i++) {
+            if (roles[i].hasCriticalRisk) {
+                for (uint256 j = 0; j < allProfiles.length; j++) {
+                    (bool has,) = _getAccessManager().hasRole(roles[i].roleId, allProfiles[j]);
+                    if (allProfiles[j] == _mainAdmin()) {
+                        assertTrue(
+                            has,
+                            string.concat("MainAdmin should have critical role ", vm.toString(uint256(roles[i].roleId)))
+                        );
+                    } else {
+                        assertFalse(
+                            has,
+                            string.concat(
+                                "Profile ",
+                                vm.toString(allProfiles[j]),
+                                " should NOT have critical role ",
+                                vm.toString(uint256(roles[i].roleId))
+                            )
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    function _getAllProfiles() internal view virtual returns (address[] memory) {
+        address[] memory profiles = new address[](6);
+        profiles[0] = _mainAdmin();
+        profiles[1] = _secondaryAdmin();
+        profiles[2] = _withdrawalPolicyManager();
+        profiles[3] = _rebalancer();
+        profiles[4] = _disabler();
+        profiles[5] = _aTokenVaultRewardClaimer();
+        return profiles;
     }
 
     ////// Role ID uniqueness //////
@@ -426,9 +483,11 @@ abstract contract AccessManagerSetupBaseTest is Test {
     function test_canCall_secondaryAdmin() public view {
         address admin = _secondaryAdmin();
 
-        // Same as MainAdmin for configured target functions
-        _assertCanCall(admin, _allocator(), IAllocator.addStrategy.selector, false, RolesLib.MED_DELAY);
+        // Non-critical function (NO_DELAY): immediate
         _assertCanCall(admin, _allocator(), IAllocator.rebalance.selector, true, 0);
+
+        // Critical function: unauthorized (not granted to SecondaryAdmin)
+        _assertCanCall(admin, _allocator(), IAllocator.addStrategy.selector, false, 0);
 
         // Unconfigured target: no ADMIN_ROLE -> unauthorized
         _assertCanCall(admin, _proxyAdmin(), ProxyAdmin.upgradeAndCall.selector, false, 0);

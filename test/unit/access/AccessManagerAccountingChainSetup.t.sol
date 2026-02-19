@@ -138,6 +138,16 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
         return getChainBalanceOracleAddress(_getDeployer());
     }
 
+    function _getAllProfiles() internal view virtual override returns (address[] memory) {
+        address[] memory baseProfiles = super._getAllProfiles();
+        address[] memory profiles = new address[](baseProfiles.length + 1);
+        for (uint256 i = 0; i < baseProfiles.length; i++) {
+            profiles[i] = baseProfiles[i];
+        }
+        profiles[baseProfiles.length] = _getProfile__BbvManager();
+        return profiles;
+    }
+
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // CHAIN-SPECIFIC TESTS
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
