@@ -77,7 +77,7 @@ abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
     function _setupProfile__BbvManager() internal {
         address bbvManager = _getProfile__BbvManager();
 
-        bytes[] memory multicallCalldata = new bytes[](3);
+        bytes[] memory multicallCalldata = new bytes[](4);
         RolesLib.Role memory role;
 
         role = RolesLib.getRole__setUserRate();
@@ -88,6 +88,9 @@ abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
 
         role = RolesLib.getRole__claimSurplusInterest();
         multicallCalldata[2] = abi.encodeCall(IAccessManager.grantRole, (role.roleId, bbvManager, role.delay));
+
+        role = RolesLib.getRole__setDefaultSubVault();
+        multicallCalldata[3] = abi.encodeCall(IAccessManager.grantRole, (role.roleId, bbvManager, role.delay));
 
         IMulticall(_accessManager()).multicall(multicallCalldata);
     }
