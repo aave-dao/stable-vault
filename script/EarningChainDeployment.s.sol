@@ -227,7 +227,7 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
             namespacedSaltSeed: ASSET_REGISTRY_SALT_SEED,
             deployer: DEPLOYER,
             implementation: implementation,
-            proxyAdmin: ASSET_REGISTRY_PROXY_ADMIN_OWNER,
+            proxyAdminOwner: ASSET_REGISTRY_PROXY_ADMIN_OWNER,
             initCalldata: abi.encodeCall(AssetRegistry.initialize, (getAccessManagerAddress(DEPLOYER)))
         });
         require(assetRegistry == getAssetRegistryAddress(DEPLOYER), "AssetRegistry does not match expected address");
@@ -242,7 +242,7 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
             namespacedSaltSeed: WITHDRAWAL_POLICY_SALT_SEED,
             deployer: DEPLOYER,
             implementation: implementation,
-            proxyAdmin: WITHDRAWAL_POLICY_PROXY_ADMIN_OWNER,
+            proxyAdminOwner: WITHDRAWAL_POLICY_PROXY_ADMIN_OWNER,
             initCalldata: abi.encodeCall(WithdrawalPolicy.initialize, (getAccessManagerAddress(DEPLOYER), 0))
         });
         require(
@@ -278,7 +278,7 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
             namespacedSaltSeed: IOU_TOKEN_MANAGER_SALT_SEED,
             deployer: DEPLOYER,
             implementation: implementation,
-            proxyAdmin: IOU_TOKEN_MANAGER_PROXY_ADMIN_OWNER,
+            proxyAdminOwner: IOU_TOKEN_MANAGER_PROXY_ADMIN_OWNER,
             initCalldata: ""
         });
         require(
@@ -304,7 +304,7 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
             namespacedSaltSeed: ALLOCATOR_SALT_SEED,
             deployer: DEPLOYER,
             implementation: implementation,
-            proxyAdmin: ALLOCATOR_PROXY_ADMIN_OWNER,
+            proxyAdminOwner: ALLOCATOR_PROXY_ADMIN_OWNER,
             initCalldata: abi.encodeCall(Allocator.initialize, (getAccessManagerAddress(DEPLOYER)))
         });
         require(allocator == getAllocatorAddress(DEPLOYER), "Allocator does not match expected address");
@@ -328,7 +328,7 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
             namespacedSaltSeed: GATEWAY_SALT_SEED,
             deployer: DEPLOYER,
             implementation: implementation,
-            proxyAdmin: GATEWAY_PROXY_ADMIN_OWNER,
+            proxyAdminOwner: GATEWAY_PROXY_ADMIN_OWNER,
             initCalldata: abi.encodeCall(EarningChainGateway.initialize, (getAccessManagerAddress(DEPLOYER)))
         });
         require(gateway == getGatewayAddress(DEPLOYER), "Gateway does not match expected address");
@@ -374,7 +374,7 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
             namespacedSaltSeed: PRICE_ORACLE_SALT_SEED,
             deployer: DEPLOYER,
             implementation: implementation,
-            proxyAdmin: PRICE_ORACLE_PROXY_ADMIN_OWNER,
+            proxyAdminOwner: PRICE_ORACLE_PROXY_ADMIN_OWNER,
             initCalldata: abi.encodeCall(PriceOracle.initialize, (getAccessManagerAddress(DEPLOYER)))
         });
         require(priceOracle == getPriceOracleAddress(DEPLOYER), "PriceOracle does not match expected address");

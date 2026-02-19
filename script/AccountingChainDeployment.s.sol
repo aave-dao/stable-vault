@@ -252,7 +252,7 @@ contract AccountingChainDeployment is
             namespacedSaltSeed: ASSET_REGISTRY_SALT_SEED,
             deployer: DEPLOYER,
             implementation: implementation,
-            proxyAdmin: ASSET_REGISTRY_PROXY_ADMIN_OWNER,
+            proxyAdminOwner: ASSET_REGISTRY_PROXY_ADMIN_OWNER,
             initCalldata: abi.encodeCall(AssetRegistry.initialize, (getAccessManagerAddress(DEPLOYER)))
         });
         require(assetRegistry == getAssetRegistryAddress(DEPLOYER), "AssetRegistry does not match expected address");
@@ -267,7 +267,7 @@ contract AccountingChainDeployment is
             namespacedSaltSeed: WITHDRAWAL_POLICY_SALT_SEED,
             deployer: DEPLOYER,
             implementation: implementation,
-            proxyAdmin: WITHDRAWAL_POLICY_PROXY_ADMIN_OWNER,
+            proxyAdminOwner: WITHDRAWAL_POLICY_PROXY_ADMIN_OWNER,
             initCalldata: abi.encodeCall(WithdrawalPolicy.initialize, (getAccessManagerAddress(DEPLOYER), 0))
         });
         require(
@@ -303,7 +303,7 @@ contract AccountingChainDeployment is
             namespacedSaltSeed: IOU_TOKEN_MANAGER_SALT_SEED,
             deployer: DEPLOYER,
             implementation: implementation,
-            proxyAdmin: IOU_TOKEN_MANAGER_PROXY_ADMIN_OWNER,
+            proxyAdminOwner: IOU_TOKEN_MANAGER_PROXY_ADMIN_OWNER,
             initCalldata: ""
         });
         require(
@@ -331,7 +331,7 @@ contract AccountingChainDeployment is
             namespacedSaltSeed: BASED_BOOSTED_VAULT_SALT_SEED,
             deployer: DEPLOYER,
             implementation: implementation,
-            proxyAdmin: BBV_PROXY_ADMIN_OWNER,
+            proxyAdminOwner: BBV_PROXY_ADMIN_OWNER,
             initCalldata: abi.encodeCall(
                 BasedBoostedVault.initialize, (getAccessManagerAddress(DEPLOYER), DEFAULT_SUB_VAULT_PER_SECOND_RATE)
             )
@@ -357,7 +357,7 @@ contract AccountingChainDeployment is
             namespacedSaltSeed: ALLOCATOR_SALT_SEED,
             deployer: DEPLOYER,
             implementation: implementation,
-            proxyAdmin: ALLOCATOR_PROXY_ADMIN_OWNER,
+            proxyAdminOwner: ALLOCATOR_PROXY_ADMIN_OWNER,
             initCalldata: abi.encodeCall(Allocator.initialize, (getAccessManagerAddress(DEPLOYER)))
         });
         require(allocator == getAllocatorAddress(DEPLOYER), "Allocator does not match expected address");
@@ -381,7 +381,7 @@ contract AccountingChainDeployment is
             namespacedSaltSeed: FUNDS_HANDLER_SALT_SEED,
             deployer: DEPLOYER,
             implementation: implementation,
-            proxyAdmin: FUNDS_HANDLER_PROXY_ADMIN_OWNER,
+            proxyAdminOwner: FUNDS_HANDLER_PROXY_ADMIN_OWNER,
             initCalldata: abi.encodeCall(FundsHandler.initialize, (getAccessManagerAddress(DEPLOYER)))
         });
         require(fundsHandler == getFundsHandlerAddress(DEPLOYER), "FundsHandler does not match expected address");
@@ -402,7 +402,7 @@ contract AccountingChainDeployment is
             namespacedSaltSeed: GATEWAY_SALT_SEED,
             deployer: DEPLOYER,
             implementation: implementation,
-            proxyAdmin: GATEWAY_PROXY_ADMIN_OWNER,
+            proxyAdminOwner: GATEWAY_PROXY_ADMIN_OWNER,
             initCalldata: abi.encodeCall(AccountingChainGateway.initialize, (getAccessManagerAddress(DEPLOYER)))
         });
         require(gateway == getGatewayAddress(DEPLOYER), "Gateway does not match expected address");
@@ -447,7 +447,7 @@ contract AccountingChainDeployment is
             namespacedSaltSeed: PRICE_ORACLE_SALT_SEED,
             deployer: DEPLOYER,
             implementation: implementation,
-            proxyAdmin: PRICE_ORACLE_PROXY_ADMIN_OWNER,
+            proxyAdminOwner: PRICE_ORACLE_PROXY_ADMIN_OWNER,
             initCalldata: abi.encodeCall(PriceOracle.initialize, (getAccessManagerAddress(DEPLOYER)))
         });
         require(priceOracle == getPriceOracleAddress(DEPLOYER), "PriceOracle does not match expected address");
@@ -462,7 +462,7 @@ contract AccountingChainDeployment is
             namespacedSaltSeed: CHAIN_BALANCE_ORACLE_SALT_SEED,
             deployer: DEPLOYER,
             implementation: implementation,
-            proxyAdmin: CHAIN_BALANCE_ORACLE_PROXY_ADMIN_OWNER,
+            proxyAdminOwner: CHAIN_BALANCE_ORACLE_PROXY_ADMIN_OWNER,
             initCalldata: abi.encodeCall(ChainBalanceOracle.initialize, (getAccessManagerAddress(DEPLOYER)))
         });
         require(
