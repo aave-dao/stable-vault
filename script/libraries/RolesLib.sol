@@ -31,6 +31,7 @@ library RolesLib {
         bytes4 selector;
         uint32 delay;
         uint64 guardianRoleId;
+        bool hasCriticalRisk;
     }
 
     /// @custom:delay Medium
@@ -41,7 +42,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: MED_DELAY,
-            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
         });
     }
 
@@ -53,7 +55,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: NO_DELAY,
-            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
         });
     }
 
@@ -65,7 +68,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: NO_DELAY,
-            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
         });
     }
 
@@ -77,7 +81,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: NO_DELAY,
-            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
         });
     }
 
@@ -89,7 +94,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: NO_DELAY,
-            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
         });
     }
 
@@ -101,7 +107,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: MED_DELAY,
-            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
         });
     }
 
@@ -113,7 +120,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: MED_DELAY,
-            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
         });
     }
 
@@ -125,7 +133,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: MED_DELAY,
-            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
         });
     }
 
@@ -137,7 +146,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: MED_DELAY,
-            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
         });
     }
 
@@ -149,7 +159,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: MED_DELAY,
-            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
         });
     }
 
@@ -161,7 +172,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: NO_DELAY,
-            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
         });
     }
 
@@ -173,7 +185,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: MED_DELAY,
-            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
         });
     }
 
@@ -185,7 +198,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: NO_DELAY,
-            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
         });
     }
 
@@ -197,7 +211,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: NO_DELAY,
-            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
         });
     }
 
@@ -209,7 +224,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: NO_DELAY,
-            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
         });
     }
 
@@ -221,7 +237,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: NO_DELAY,
-            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
         });
     }
 
@@ -233,7 +250,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: MED_DELAY,
-            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
         });
     }
 
@@ -245,7 +263,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: MED_DELAY,
-            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
         });
     }
 
@@ -257,7 +276,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: NO_DELAY,
-            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
         });
     }
 
@@ -269,7 +289,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: NO_DELAY,
-            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
         });
     }
 
@@ -281,7 +302,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: NO_DELAY,
-            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
         });
     }
 
@@ -293,7 +315,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: MED_DELAY,
-            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
         });
     }
 
@@ -305,7 +328,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: MED_DELAY,
-            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
         });
     }
 
@@ -317,7 +341,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: MED_DELAY,
-            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
         });
     }
 
@@ -329,7 +354,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: NO_DELAY,
-            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
         });
     }
 
@@ -341,7 +367,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: NO_DELAY,
-            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
         });
     }
 
@@ -353,7 +380,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: MED_DELAY,
-            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
         });
     }
 
@@ -365,7 +393,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: NO_DELAY,
-            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
         });
     }
 
@@ -377,7 +406,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: NO_DELAY,
-            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
         });
     }
 
@@ -389,7 +419,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: NO_DELAY,
-            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
         });
     }
 
@@ -401,7 +432,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: MED_DELAY,
-            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
         });
     }
 
@@ -413,7 +445,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: NO_DELAY,
-            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
         });
     }
 
@@ -425,7 +458,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: NO_DELAY,
-            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
         });
     }
 
@@ -437,7 +471,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: NO_DELAY,
-            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
         });
     }
 
@@ -449,7 +484,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: MED_DELAY,
-            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
         });
     }
 
@@ -461,7 +497,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: MED_DELAY,
-            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
         });
     }
 
@@ -473,7 +510,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: NO_DELAY,
-            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
         });
     }
 
@@ -485,7 +523,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: MED_DELAY,
-            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
         });
     }
 
@@ -497,7 +536,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: MED_DELAY,
-            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
         });
     }
 
@@ -509,7 +549,8 @@ library RolesLib {
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: NO_DELAY,
-            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
         });
     }
 

@@ -146,7 +146,16 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook {
         address secondaryAdminProfile = _getProfile__SecondaryAdmin();
 
         RolesLib.Role[] memory functionBasedRoles = RolesLib.getAllFunctionBasedRoles();
-        bytes[] memory multicallCalldata = new bytes[](functionBasedRoles.length + 1);
+
+        // Count non-critical roles
+        uint256 nonCriticalCount = 0;
+        for (uint256 i = 0; i < functionBasedRoles.length; i++) {
+            if (!functionBasedRoles[i].hasCriticalRisk) {
+                nonCriticalCount++;
+            }
+        }
+
+        bytes[] memory multicallCalldata = new bytes[](nonCriticalCount + 1);
 
         // Grant Operation-Role Guardian role
         multicallCalldata[0] = abi.encodeCall(
@@ -154,12 +163,16 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook {
             (RolesLib.OPERATIONAL_ROLE_GUARDIAN_ROLE, secondaryAdminProfile, RolesLib.NO_DELAY)
         );
 
-        // Grant All Function-Based roles
+        // Grant all non-critical function-based roles
+        uint256 multicallIdx = 1;
         for (uint256 i = 0; i < functionBasedRoles.length; i++) {
-            multicallCalldata[i + 1] = abi.encodeCall(
-                IAccessManager.grantRole,
-                (functionBasedRoles[i].roleId, secondaryAdminProfile, functionBasedRoles[i].delay)
-            );
+            if (!functionBasedRoles[i].hasCriticalRisk) {
+                multicallCalldata[multicallIdx] = abi.encodeCall(
+                    IAccessManager.grantRole,
+                    (functionBasedRoles[i].roleId, secondaryAdminProfile, functionBasedRoles[i].delay)
+                );
+                multicallIdx++;
+            }
         }
 
         IMulticall(_accessManager()).multicall(multicallCalldata);
