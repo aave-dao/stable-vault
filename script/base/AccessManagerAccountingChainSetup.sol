@@ -100,7 +100,7 @@ abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
     function _setupTarget__Bbv(address deployer) internal {
         address bbv = getBasedBoostedVaultAddress(deployer);
         RolesLib.Role memory role;
-        bytes[] memory multicallCalldata = new bytes[](6);
+        bytes[] memory multicallCalldata = new bytes[](7);
 
         role = RolesLib.getRole__setUserRate();
         multicallCalldata[0] =
@@ -118,12 +118,16 @@ abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
         multicallCalldata[3] =
             abi.encodeCall(IAccessManager.setTargetFunctionRole, (bbv, _toSelectorArray(role.selector), role.roleId));
 
-        role = RolesLib.getRole__rescueNative();
+        role = RolesLib.getRole__setTreasury();
         multicallCalldata[4] =
             abi.encodeCall(IAccessManager.setTargetFunctionRole, (bbv, _toSelectorArray(role.selector), role.roleId));
 
-        role = RolesLib.getRole__rescueTokens();
+        role = RolesLib.getRole__rescueNative();
         multicallCalldata[5] =
+            abi.encodeCall(IAccessManager.setTargetFunctionRole, (bbv, _toSelectorArray(role.selector), role.roleId));
+
+        role = RolesLib.getRole__rescueTokens();
+        multicallCalldata[6] =
             abi.encodeCall(IAccessManager.setTargetFunctionRole, (bbv, _toSelectorArray(role.selector), role.roleId));
 
         IMulticall(_accessManager()).multicall(multicallCalldata);

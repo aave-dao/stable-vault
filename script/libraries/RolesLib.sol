@@ -298,6 +298,18 @@ library RolesLib {
     }
 
     /// @custom:delay Medium
+    /// @custom:location BasedBoostedVault
+    function getRole__setTreasury() internal pure returns (Role memory) {
+        bytes4 selector = IBasedBoostedVault.setTreasury.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: MED_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE
+        });
+    }
+
+    /// @custom:delay Medium
     /// @custom:location CcipAdapter
     function getRole__setChainSelector() internal pure returns (Role memory) {
         bytes4 selector = ICcipBridgeAdapter.setChainSelector.selector;
@@ -502,7 +514,7 @@ library RolesLib {
     }
 
     function getAllFunctionBasedRoles() internal pure returns (Role[] memory) {
-        Role[] memory roles = new Role[](39);
+        Role[] memory roles = new Role[](40);
 
         // AssetRegistry
         roles[0] = getRole__setAssetConfig();
@@ -537,31 +549,32 @@ library RolesLib {
         roles[21] = getRole__setSubVaultRate();
         roles[22] = getRole__setDefaultSubVault();
         roles[23] = getRole__claimSurplusInterest();
+        roles[24] = getRole__setTreasury();
 
         // Allocator
-        roles[24] = getRole__rebalance();
-        roles[25] = getRole__addStrategy();
-        roles[26] = getRole__removeStrategy();
-        roles[27] = getRole__disableDepositsToStrategy();
-        roles[28] = getRole__setDefaultStrategy();
-        roles[29] = getRole__enableDepositsToStrategy();
+        roles[25] = getRole__rebalance();
+        roles[26] = getRole__addStrategy();
+        roles[27] = getRole__removeStrategy();
+        roles[28] = getRole__disableDepositsToStrategy();
+        roles[29] = getRole__setDefaultStrategy();
+        roles[30] = getRole__enableDepositsToStrategy();
 
         // Rescue
-        roles[30] = getRole__rescueTokens();
-        roles[31] = getRole__rescueNative();
+        roles[31] = getRole__rescueTokens();
+        roles[32] = getRole__rescueNative();
 
         // FundsHandler / EarningChainGateway
-        roles[32] = getRole__pushFundsToChain();
-        roles[33] = getRole__pushFundsToAccountingChain();
-        roles[34] = getRole__addEarningChain();
-        roles[35] = getRole__removeEarningChain();
+        roles[33] = getRole__pushFundsToChain();
+        roles[34] = getRole__pushFundsToAccountingChain();
+        roles[35] = getRole__addEarningChain();
+        roles[36] = getRole__removeEarningChain();
 
         // Oracles
-        roles[36] = getRole__setChainBalanceOracleAdapter();
-        roles[37] = getRole__setOracleAdapterForAsset();
+        roles[37] = getRole__setChainBalanceOracleAdapter();
+        roles[38] = getRole__setOracleAdapterForAsset();
 
         // External - aToken Vault
-        roles[38] = getRole__claimMerklRewards();
+        roles[39] = getRole__claimMerklRewards();
 
         return roles;
     }
