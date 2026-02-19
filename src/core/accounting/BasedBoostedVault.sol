@@ -125,6 +125,10 @@ contract BasedBoostedVault is
         }
     }
 
+    function $BasedBoostedVault() internal pure returns (BasedBoostedVaultStorage storage) {
+        return $storage();
+    }
+
     /// @dev Constructor.
     /// @param maxValidPerSecondRate The maximum valid per-second rate, in Ray units (27 decimals).
     /// @param assetRegistry The address of the contract managing the allowed assets.
