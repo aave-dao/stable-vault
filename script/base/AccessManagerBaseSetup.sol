@@ -73,6 +73,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook {
         _setupTarget__Allocator(deployer);
         _setupTarget__WithdrawalPolicy(deployer);
         _setupTarget__AssetRegistry(deployer);
+        _setupTarget__PriceOracle(deployer);
         _setupTarget__ATokenVaults();
     }
 
@@ -210,7 +211,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook {
     function _setupProfile__Disabler() internal {
         address disablerProfile = _getProfile__Disabler();
 
-        bytes[] memory multicallCalldata = new bytes[](8);
+        bytes[] memory multicallCalldata = new bytes[](9);
         RolesLib.Role memory role;
 
         role = RolesLib.getRole__rebalance();
@@ -222,20 +223,23 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook {
         role = RolesLib.getRole__rescueTokens();
         multicallCalldata[2] = abi.encodeCall(IAccessManager.grantRole, (role.roleId, disablerProfile, role.delay));
 
-        role = RolesLib.getRole__disableAllocatorDeposits();
+        role = RolesLib.getRole__rescueNative();
         multicallCalldata[3] = abi.encodeCall(IAccessManager.grantRole, (role.roleId, disablerProfile, role.delay));
 
-        role = RolesLib.getRole__disableUserDeposits();
+        role = RolesLib.getRole__disableAllocatorDeposits();
         multicallCalldata[4] = abi.encodeCall(IAccessManager.grantRole, (role.roleId, disablerProfile, role.delay));
 
-        role = RolesLib.getRole__disableSwapInput();
+        role = RolesLib.getRole__disableUserDeposits();
         multicallCalldata[5] = abi.encodeCall(IAccessManager.grantRole, (role.roleId, disablerProfile, role.delay));
 
-        role = RolesLib.getRole__disableSwapOutput();
+        role = RolesLib.getRole__disableSwapInput();
         multicallCalldata[6] = abi.encodeCall(IAccessManager.grantRole, (role.roleId, disablerProfile, role.delay));
 
-        role = RolesLib.getRole__distrustAsset();
+        role = RolesLib.getRole__disableSwapOutput();
         multicallCalldata[7] = abi.encodeCall(IAccessManager.grantRole, (role.roleId, disablerProfile, role.delay));
+
+        role = RolesLib.getRole__distrustAsset();
+        multicallCalldata[8] = abi.encodeCall(IAccessManager.grantRole, (role.roleId, disablerProfile, role.delay));
 
         IMulticall(_accessManager()).multicall(multicallCalldata);
     }
@@ -253,7 +257,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook {
     function _setupTarget__CcipAdapter(address deployer) internal {
         address ccipAdapter = getCcipAdapterAddress(deployer);
         RolesLib.Role memory role;
-        bytes[] memory multicallCalldata = new bytes[](3);
+        bytes[] memory multicallCalldata = new bytes[](5);
 
         role = RolesLib.getRole__setDestinationChainAdapter();
         multicallCalldata[0] = abi.encodeCall(
@@ -267,6 +271,16 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook {
 
         role = RolesLib.getRole__rescueNative();
         multicallCalldata[2] = abi.encodeCall(
+            IAccessManager.setTargetFunctionRole, (ccipAdapter, _toSelectorArray(role.selector), role.roleId)
+        );
+
+        role = RolesLib.getRole__replayFundsReceiving();
+        multicallCalldata[3] = abi.encodeCall(
+            IAccessManager.setTargetFunctionRole, (ccipAdapter, _toSelectorArray(role.selector), role.roleId)
+        );
+
+        role = RolesLib.getRole__rescueTokens();
+        multicallCalldata[4] = abi.encodeCall(
             IAccessManager.setTargetFunctionRole, (ccipAdapter, _toSelectorArray(role.selector), role.roleId)
         );
 
@@ -395,6 +409,13 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook {
         );
 
         IMulticall(_accessManager()).multicall(multicallCalldata);
+    }
+
+    function _setupTarget__PriceOracle(address deployer) internal {
+        address priceOracle = getPriceOracleAddress(deployer);
+        RolesLib.Role memory role = RolesLib.getRole__setOracleAdapterForAsset();
+        IAccessManager(_accessManager())
+            .setTargetFunctionRole(priceOracle, _toSelectorArray(role.selector), role.roleId);
     }
 
     function _setupTarget__ATokenVaults() internal {

@@ -69,6 +69,7 @@ abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
         _setupTarget__Bbv(deployer);
         _setupTarget__FundsHandler(deployer);
         _setupTarget__AccountingChainGateway(deployer);
+        _setupTarget__ChainBalanceOracle(deployer);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -128,7 +129,7 @@ abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
     function _setupTarget__FundsHandler(address deployer) internal {
         address fundsHandler = getFundsHandlerAddress(deployer);
         RolesLib.Role memory role;
-        bytes[] memory multicallCalldata = new bytes[](3);
+        bytes[] memory multicallCalldata = new bytes[](5);
 
         role = RolesLib.getRole__pushFundsToChain();
         multicallCalldata[0] = abi.encodeCall(
@@ -142,6 +143,16 @@ abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
 
         role = RolesLib.getRole__rescueNative();
         multicallCalldata[2] = abi.encodeCall(
+            IAccessManager.setTargetFunctionRole, (fundsHandler, _toSelectorArray(role.selector), role.roleId)
+        );
+
+        role = RolesLib.getRole__addEarningChain();
+        multicallCalldata[3] = abi.encodeCall(
+            IAccessManager.setTargetFunctionRole, (fundsHandler, _toSelectorArray(role.selector), role.roleId)
+        );
+
+        role = RolesLib.getRole__removeEarningChain();
+        multicallCalldata[4] = abi.encodeCall(
             IAccessManager.setTargetFunctionRole, (fundsHandler, _toSelectorArray(role.selector), role.roleId)
         );
 
@@ -179,5 +190,12 @@ abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
         );
 
         IMulticall(_accessManager()).multicall(multicallCalldata);
+    }
+
+    function _setupTarget__ChainBalanceOracle(address deployer) internal {
+        address chainBalanceOracle = getChainBalanceOracleAddress(deployer);
+        RolesLib.Role memory role = RolesLib.getRole__setChainBalanceOracleAdapter();
+        IAccessManager(_accessManager())
+            .setTargetFunctionRole(chainBalanceOracle, _toSelectorArray(role.selector), role.roleId);
     }
 }

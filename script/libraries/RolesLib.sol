@@ -12,6 +12,8 @@ import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
+import {ChainBalanceOracle} from "src/oracles/balance/ChainBalanceOracle.sol";
+import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 
 library RolesLib {
@@ -308,6 +310,18 @@ library RolesLib {
     }
 
     /// @custom:delay None
+    /// @custom:location CcipAdapter
+    function getRole__replayFundsReceiving() internal pure returns (Role memory) {
+        bytes4 selector = ICcipBridgeAdapter.replayFundsReceiving.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: NO_DELAY,
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE
+        });
+    }
+
+    /// @custom:delay None
     /// @custom:location Allocator
     function getRole__rebalance() internal pure returns (Role memory) {
         bytes4 selector = IAllocator.rebalance.selector;
@@ -415,6 +429,30 @@ library RolesLib {
         });
     }
 
+    /// @custom:delay Medium
+    /// @custom:location FundsHandler
+    function getRole__addEarningChain() internal pure returns (Role memory) {
+        bytes4 selector = IFundsHandler.addEarningChain.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: MED_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE
+        });
+    }
+
+    /// @custom:delay Medium
+    /// @custom:location FundsHandler
+    function getRole__removeEarningChain() internal pure returns (Role memory) {
+        bytes4 selector = IFundsHandler.removeEarningChain.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: MED_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE
+        });
+    }
+
     /// @custom:delay None
     /// @custom:location EarningChainGateway
     function getRole__pushFundsToAccountingChain() internal pure returns (Role memory) {
@@ -424,6 +462,30 @@ library RolesLib {
             selector: selector,
             delay: NO_DELAY,
             guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE
+        });
+    }
+
+    /// @custom:delay Medium
+    /// @custom:location ChainBalanceOracle
+    function getRole__setChainBalanceOracleAdapter() internal pure returns (Role memory) {
+        bytes4 selector = ChainBalanceOracle.setChainBalanceOracleAdapter.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: MED_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE
+        });
+    }
+
+    /// @custom:delay Medium
+    /// @custom:location PriceOracle
+    function getRole__setOracleAdapterForAsset() internal pure returns (Role memory) {
+        bytes4 selector = PriceOracle.setOracleAdapterForAsset.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: MED_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE
         });
     }
 
@@ -440,7 +502,7 @@ library RolesLib {
     }
 
     function getAllFunctionBasedRoles() internal pure returns (Role[] memory) {
-        Role[] memory roles = new Role[](34);
+        Role[] memory roles = new Role[](39);
 
         // AssetRegistry
         roles[0] = getRole__setAssetConfig();
@@ -468,31 +530,38 @@ library RolesLib {
         // BridgeAdapter
         roles[17] = getRole__setDestinationChainAdapter();
         roles[18] = getRole__setChainSelector();
+        roles[19] = getRole__replayFundsReceiving();
 
         // BasedBoostedVault
-        roles[19] = getRole__setUserRate();
-        roles[20] = getRole__setSubVaultRate();
-        roles[21] = getRole__setDefaultSubVault();
-        roles[22] = getRole__claimSurplusInterest();
+        roles[20] = getRole__setUserRate();
+        roles[21] = getRole__setSubVaultRate();
+        roles[22] = getRole__setDefaultSubVault();
+        roles[23] = getRole__claimSurplusInterest();
 
         // Allocator
-        roles[23] = getRole__rebalance();
-        roles[24] = getRole__addStrategy();
-        roles[25] = getRole__removeStrategy();
-        roles[26] = getRole__disableDepositsToStrategy();
-        roles[27] = getRole__setDefaultStrategy();
-        roles[28] = getRole__enableDepositsToStrategy();
+        roles[24] = getRole__rebalance();
+        roles[25] = getRole__addStrategy();
+        roles[26] = getRole__removeStrategy();
+        roles[27] = getRole__disableDepositsToStrategy();
+        roles[28] = getRole__setDefaultStrategy();
+        roles[29] = getRole__enableDepositsToStrategy();
 
         // Rescue
-        roles[29] = getRole__rescueTokens();
-        roles[30] = getRole__rescueNative();
+        roles[30] = getRole__rescueTokens();
+        roles[31] = getRole__rescueNative();
 
         // FundsHandler / EarningChainGateway
-        roles[31] = getRole__pushFundsToChain();
-        roles[32] = getRole__pushFundsToAccountingChain();
+        roles[32] = getRole__pushFundsToChain();
+        roles[33] = getRole__pushFundsToAccountingChain();
+        roles[34] = getRole__addEarningChain();
+        roles[35] = getRole__removeEarningChain();
+
+        // Oracles
+        roles[36] = getRole__setChainBalanceOracleAdapter();
+        roles[37] = getRole__setOracleAdapterForAsset();
 
         // External - aToken Vault
-        roles[33] = getRole__claimMerklRewards();
+        roles[38] = getRole__claimMerklRewards();
 
         return roles;
     }
