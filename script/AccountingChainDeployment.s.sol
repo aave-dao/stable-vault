@@ -68,7 +68,7 @@ contract AccountingChainDeployment is
     address immutable CHAIN_BALANCE_ORACLE_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
 
     address constant ACCESS_MANAGER_ADMIN = DEPLOYER;
-    address constant TREASURY = address(0); // TODO: Set treasury address, will be handled in PR #158
+    address constant TREASURY = HIGH_THRESHOLD_MULTISIG_ADMIN_PROFILE;
 
     address immutable ALLOCATOR_DEPOSITOR = getFundsHandlerAddress(DEPLOYER);
     address immutable ALLOCATOR_WITHDRAWER = getFundsHandlerAddress(DEPLOYER);
