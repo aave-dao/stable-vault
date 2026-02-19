@@ -235,6 +235,26 @@ abstract contract AccessManagerSetupBaseTest is Test {
         _assertProfileRoleDelay(_aTokenVaultRewardClaimer(), expected[0], RolesLib.NO_DELAY);
     }
 
+    ////// Role ID uniqueness //////
+
+    function test_allFunctionBasedRoles_doesNotHaveCollisions() public pure {
+        RolesLib.Role[] memory roles = RolesLib.getAllFunctionBasedRoles();
+        for (uint256 i = 0; i < roles.length; i++) {
+            for (uint256 j = i + 1; j < roles.length; j++) {
+                assertNotEq(
+                    roles[i].roleId,
+                    roles[j].roleId,
+                    string.concat(
+                        "Role ID collision between selectors ",
+                        vm.toString(bytes32(roles[i].selector)),
+                        " and ",
+                        vm.toString(bytes32(roles[j].selector))
+                    )
+                );
+            }
+        }
+    }
+
     ////// Role configuration //////
 
     function test_allRoleGuardians_matchRolesLib() public view {
