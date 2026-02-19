@@ -146,11 +146,14 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
         address bbvManager = _getProfile__BbvManager();
         address bbv = getBasedBoostedVaultAddress(_getDeployer());
 
+        // Operational (NO_DELAY): immediate
         _assertCanCall(bbvManager, bbv, IBasedBoostedVault.setUserRate.selector, true, 0);
         _assertCanCall(bbvManager, bbv, IBasedBoostedVault.setSubVaultRate.selector, true, 0);
-        _assertCanCall(bbvManager, bbv, IBasedBoostedVault.claimSurplusInterest.selector, true, 0);
         _assertCanCall(bbvManager, bbv, IBasedBoostedVault.setDefaultSubVault.selector, true, 0);
+        // Admin-tier (MED_DELAY): has role but delayed
+        _assertCanCall(bbvManager, bbv, IBasedBoostedVault.claimSurplusInterest.selector, false, RolesLib.MED_DELAY);
         // Unauthorized
+        _assertCanCall(bbvManager, bbv, IBasedBoostedVault.setTreasury.selector, false, 0);
         _assertCanCall(bbvManager, _allocator(), IAllocator.rebalance.selector, false, 0);
     }
 
@@ -162,9 +165,12 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
         expected[3] = RolesLib.getRole__setDefaultSubVault().roleId;
         _assertProfileHasExactlyTheseRoles(_getProfile__BbvManager(), expected);
 
-        for (uint256 i = 0; i < expected.length; i++) {
-            _assertProfileRoleDelay(_getProfile__BbvManager(), expected[i], RolesLib.NO_DELAY);
-        }
+        // NO_DELAY roles
+        _assertProfileRoleDelay(_getProfile__BbvManager(), expected[0], RolesLib.NO_DELAY);
+        _assertProfileRoleDelay(_getProfile__BbvManager(), expected[1], RolesLib.NO_DELAY);
+        _assertProfileRoleDelay(_getProfile__BbvManager(), expected[3], RolesLib.NO_DELAY);
+        // MED_DELAY roles
+        _assertProfileRoleDelay(_getProfile__BbvManager(), expected[2], RolesLib.MED_DELAY);
     }
 
     function test_targetSetup_bbv() public view {
@@ -180,6 +186,7 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
         _assertTargetFunctionRole(
             bbv, IBasedBoostedVault.claimSurplusInterest.selector, RolesLib.getRole__claimSurplusInterest().roleId
         );
+        _assertTargetFunctionRole(bbv, IBasedBoostedVault.setTreasury.selector, RolesLib.getRole__setTreasury().roleId);
         _assertTargetFunctionRole(bbv, IRescuableNative.rescueNative.selector, RolesLib.getRole__rescueNative().roleId);
         _assertTargetFunctionRole(bbv, IRescuableToken.rescueTokens.selector, RolesLib.getRole__rescueTokens().roleId);
     }
