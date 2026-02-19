@@ -103,7 +103,8 @@ contract OracleFeedE2ETest is BaseTest {
         address transferHelper,
         address withdrawalFeeCalculator,
         address priceOracle,
-        uint256 maxActiveSubVaults
+        uint256 maxActiveSubVaults,
+        address treasuryAddress
     ) internal virtual override returns (BasedBoostedVault) {
         // Deploy a vault without restriction in the valid per-second rate
         address vaultImpl = address(
@@ -123,7 +124,9 @@ contract OracleFeedE2ETest is BaseTest {
                 new TransparentUpgradeableProxy(
                     address(vaultImpl),
                     proxyAdmin,
-                    abi.encodeCall(BasedBoostedVault.initialize, (adminParam, defaultSubVaultPerSecondRate))
+                    abi.encodeCall(
+                        BasedBoostedVault.initialize, (adminParam, treasuryAddress, defaultSubVaultPerSecondRate)
+                    )
                 )
             )
         );

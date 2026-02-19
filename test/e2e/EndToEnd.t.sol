@@ -471,17 +471,17 @@ contract EndToEndTest is BaseTest {
             assets[0] = address(GHO);
             amounts[0] = ghoBalanceOnVaultLeft;
 
-            Logger.log("Manager's GHO balance before claiming fees profits: %s GHO", GHO.balanceOf(everyRoleAccount));
+            Logger.log("Treasury's GHO balance before claiming fees profits: %s GHO", GHO.balanceOf(treasury));
 
             vm.prank(everyRoleAccount);
             vault.claimSurplusInterest(assets, amounts);
 
-            uint256 newManagerGhoBalance = GHO.balanceOf(everyRoleAccount);
-            Logger.log("Manager's GHO balance after claiming fees profits: %s GHO", newManagerGhoBalance);
+            uint256 newTreasuryGhoBalance = GHO.balanceOf(treasury);
+            Logger.log("Treasury's GHO balance after claiming fees profits: %s GHO", newTreasuryGhoBalance);
             assertEq(
-                newManagerGhoBalance,
+                newTreasuryGhoBalance,
                 ghoBalanceOnVaultLeft,
-                "Manager should have the same amount of GHO after claiming fees profits"
+                "Treasury should have the same amount of GHO after claiming fees profits"
             );
         }
     }

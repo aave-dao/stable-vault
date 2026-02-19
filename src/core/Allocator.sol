@@ -246,7 +246,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     //////////////////////////////////////////// MANAGER FUNCTIONS /////////////////////////////////////////////////////
 
     /// @inheritdoc IAllocator
-    function rebalance(RebalanceParams[] memory params) external override restricted {
+    function rebalance(RebalanceParams[] memory params) external virtual override restricted {
         for (uint256 i = 0; i < params.length; i++) {
             _rebalance(params[i]);
         }

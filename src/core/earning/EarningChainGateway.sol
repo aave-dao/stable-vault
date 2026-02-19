@@ -94,6 +94,7 @@ contract EarningChainGateway is
     )
         external
         payable
+        virtual
         override
         nonReentrant
         assertingTransferHelperBalanceFor(bridgeParams.feeToken)

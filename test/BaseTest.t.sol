@@ -53,6 +53,7 @@ contract BaseTest is TestWithHelpers {
     address proxyAdmin = makeAddr("PROXY_ADMIN");
     address admin = makeAddr("ADMIN");
     address everyRoleAccount = makeAddr("EVERY_ROLE_ACCOUNT");
+    address treasury = makeAddr("TREASURY");
 
     uint8 constant STRATEGY_MAX_SLIPPAGE_AMOUNT = 10;
 
@@ -184,7 +185,8 @@ contract BaseTest is TestWithHelpers {
         address transferHelper,
         address withdrawalFeeCalculator,
         address priceOracle,
-        uint256 maxActiveSubVaults
+        uint256 maxActiveSubVaults,
+        address treasuryAddress
     ) internal virtual returns (BasedBoostedVault) {
         address vaultImpl = address(
             new BasedBoostedVault(
@@ -203,7 +205,9 @@ contract BaseTest is TestWithHelpers {
             new TransparentUpgradeableProxy(
                 vaultImpl,
                 address(this),
-                abi.encodeCall(BasedBoostedVault.initialize, (accessManager, defaultSubVaultPerSecondRate))
+                abi.encodeCall(
+                    BasedBoostedVault.initialize, (accessManager, treasuryAddress, defaultSubVaultPerSecondRate)
+                )
             )
         );
 
@@ -407,7 +411,8 @@ contract BaseTest is TestWithHelpers {
             transferHelper_accountingChainAddress,
             withdrawalPolicy_accountingChainAddress,
             address(priceOracle_accountingChain),
-            DEFAULT_MAX_ACTIVE_SUB_VAULTS
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+            treasury
         );
         Logger.log("\tVault: %s", vault_accountingChainAddress);
         require(address(vault) == vault_accountingChainAddress, "Vault (Accounting Chain) address mismatch");
