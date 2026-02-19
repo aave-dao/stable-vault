@@ -214,7 +214,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook {
     function _setupProfile__Disabler() internal {
         address disablerProfile = _getProfile__Disabler();
 
-        bytes[] memory multicallCalldata = new bytes[](9);
+        bytes[] memory multicallCalldata = new bytes[](12);
         RolesLib.Role memory role;
 
         role = RolesLib.getRole__rebalance();
@@ -243,6 +243,15 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook {
 
         role = RolesLib.getRole__distrustAsset();
         multicallCalldata[8] = abi.encodeCall(IAccessManager.grantRole, (role.roleId, disablerProfile, role.delay));
+
+        role = RolesLib.getRole__removeBridgeAdapter();
+        multicallCalldata[9] = abi.encodeCall(IAccessManager.grantRole, (role.roleId, disablerProfile, role.delay));
+
+        role = RolesLib.getRole__disableDepositsToStrategy();
+        multicallCalldata[10] = abi.encodeCall(IAccessManager.grantRole, (role.roleId, disablerProfile, role.delay));
+
+        role = RolesLib.getRole__setDefaultStrategy();
+        multicallCalldata[11] = abi.encodeCall(IAccessManager.grantRole, (role.roleId, disablerProfile, role.delay));
 
         IMulticall(_accessManager()).multicall(multicallCalldata);
     }
