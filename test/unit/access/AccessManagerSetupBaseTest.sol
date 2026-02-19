@@ -190,28 +190,22 @@ abstract contract AccessManagerSetupBaseTest is Test {
     }
 
     function test_rebalancerProfile_hasTheExpectedRoles() public view {
-        uint64[] memory expected = new uint64[](5);
+        uint64[] memory expected = new uint64[](6);
         expected[0] = RolesLib.getRole__rebalance().roleId;
         expected[1] = RolesLib.getRole__setDefaultStrategy().roleId;
         expected[2] = RolesLib.getRole__disableDepositsToStrategy().roleId;
         expected[3] = RolesLib.getRole__pushFundsToChain().roleId;
         expected[4] = RolesLib.getRole__pushFundsToAccountingChain().roleId;
+        expected[5] = RolesLib.getRole__setDefaultBridgeAdapter().roleId;
         _assertProfileHasExactlyTheseRoles(_rebalancer(), expected);
 
         for (uint256 i = 0; i < expected.length; i++) {
-            // All rebalancer roles are NO_DELAY except setDefaultStrategy (MED_DELAY)
-            (bool has, uint32 delay) = _getAccessManager().hasRole(expected[i], _rebalancer());
-            assertTrue(has);
-            if (expected[i] == RolesLib.getRole__setDefaultStrategy().roleId) {
-                assertEq(delay, RolesLib.MED_DELAY);
-            } else {
-                assertEq(delay, RolesLib.NO_DELAY);
-            }
+            _assertProfileRoleDelay(_rebalancer(), expected[i], RolesLib.NO_DELAY);
         }
     }
 
     function test_disablerProfile_hasTheExpectedRoles() public view {
-        uint64[] memory expected = new uint64[](9);
+        uint64[] memory expected = new uint64[](12);
         expected[0] = RolesLib.getRole__rebalance().roleId;
         expected[1] = RolesLib.getRole__removeStrategy().roleId;
         expected[2] = RolesLib.getRole__rescueTokens().roleId;
@@ -221,6 +215,9 @@ abstract contract AccessManagerSetupBaseTest is Test {
         expected[6] = RolesLib.getRole__disableSwapInput().roleId;
         expected[7] = RolesLib.getRole__disableSwapOutput().roleId;
         expected[8] = RolesLib.getRole__distrustAsset().roleId;
+        expected[9] = RolesLib.getRole__removeBridgeAdapter().roleId;
+        expected[10] = RolesLib.getRole__disableDepositsToStrategy().roleId;
+        expected[11] = RolesLib.getRole__setDefaultStrategy().roleId;
         _assertProfileHasExactlyTheseRoles(_disabler(), expected);
 
         for (uint256 i = 0; i < expected.length; i++) {
@@ -451,8 +448,10 @@ abstract contract AccessManagerSetupBaseTest is Test {
 
         _assertCanCall(disabler, _allocator(), IAllocator.rebalance.selector, true, 0);
         _assertCanCall(disabler, _assetRegistry(), IAssetRegistry.distrustAsset.selector, true, 0);
+        _assertCanCall(disabler, _allocator(), IAllocator.setDefaultStrategy.selector, true, 0);
+        _assertCanCall(disabler, _allocator(), IAllocator.disableDepositsToStrategy.selector, true, 0);
         // Unauthorized
-        _assertCanCall(disabler, _allocator(), IAllocator.setDefaultStrategy.selector, false, 0);
+        _assertCanCall(disabler, _allocator(), IAllocator.addStrategy.selector, false, 0);
     }
 
     function test_canCall_withdrawalPolicyManager() public view {

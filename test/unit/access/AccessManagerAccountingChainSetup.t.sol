@@ -149,15 +149,17 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
         _assertCanCall(bbvManager, bbv, IBasedBoostedVault.setUserRate.selector, true, 0);
         _assertCanCall(bbvManager, bbv, IBasedBoostedVault.setSubVaultRate.selector, true, 0);
         _assertCanCall(bbvManager, bbv, IBasedBoostedVault.claimSurplusInterest.selector, true, 0);
+        _assertCanCall(bbvManager, bbv, IBasedBoostedVault.setDefaultSubVault.selector, true, 0);
         // Unauthorized
         _assertCanCall(bbvManager, _allocator(), IAllocator.rebalance.selector, false, 0);
     }
 
     function test_bbvManagerProfile_hasTheExpectedRoles() public view {
-        uint64[] memory expected = new uint64[](3);
+        uint64[] memory expected = new uint64[](4);
         expected[0] = RolesLib.getRole__setUserRate().roleId;
         expected[1] = RolesLib.getRole__setSubVaultRate().roleId;
         expected[2] = RolesLib.getRole__claimSurplusInterest().roleId;
+        expected[3] = RolesLib.getRole__setDefaultSubVault().roleId;
         _assertProfileHasExactlyTheseRoles(_getProfile__BbvManager(), expected);
 
         for (uint256 i = 0; i < expected.length; i++) {
