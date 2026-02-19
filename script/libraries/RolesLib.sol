@@ -17,7 +17,7 @@ import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 
 library RolesLib {
-    uint32 constant CRITICAL_DELAY = 21 days;
+    uint32 constant CRITICAL_DELAY = 14 days;
     uint32 constant MED_DELAY = 7 days;
     uint32 constant NO_DELAY = 0;
 

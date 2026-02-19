@@ -25,7 +25,7 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
         _deployContracts();
         _setupAccessManager(DEPLOYER);
         vm.stopPrank();
-        vm.warp(block.timestamp + 21 days + 1);
+        vm.warp(block.timestamp + RolesLib.CRITICAL_DELAY + 1);
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
