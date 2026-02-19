@@ -8,11 +8,13 @@ import {AccountingChainDeployment} from "script/AccountingChainDeployment.s.sol"
 import {Create3AddressLib} from "script/libraries/Create3AddressLib.sol";
 import {RolesLib} from "script/libraries/RolesLib.sol";
 
+import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IBasedBoostedVault} from "src/interfaces/IBasedBoostedVault.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
+import {ChainBalanceOracle} from "src/oracles/balance/ChainBalanceOracle.sol";
 
 import {AccessManagerSetupBaseTest} from "test/unit/access/AccessManagerSetupBaseTest.sol";
 
@@ -128,9 +130,28 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
         return getAssetRegistryAddress(_getDeployer());
     }
 
+    function _priceOracle() internal view virtual override returns (address) {
+        return getPriceOracleAddress(_getDeployer());
+    }
+
+    function _chainBalanceOracle() internal view virtual returns (address) {
+        return getChainBalanceOracleAddress(_getDeployer());
+    }
+
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // CHAIN-SPECIFIC TESTS
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    function test_canCall_bbvManager() public view {
+        address bbvManager = _getProfile__BbvManager();
+        address bbv = getBasedBoostedVaultAddress(_getDeployer());
+
+        _assertCanCall(bbvManager, bbv, IBasedBoostedVault.setUserRate.selector, true, 0);
+        _assertCanCall(bbvManager, bbv, IBasedBoostedVault.setSubVaultRate.selector, true, 0);
+        _assertCanCall(bbvManager, bbv, IBasedBoostedVault.claimSurplusInterest.selector, true, 0);
+        // Unauthorized
+        _assertCanCall(bbvManager, _allocator(), IAllocator.rebalance.selector, false, 0);
+    }
 
     function test_bbvManagerProfile_hasTheExpectedRoles() public view {
         uint64[] memory expected = new uint64[](3);
@@ -173,6 +194,12 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
         _assertTargetFunctionRole(
             fundsHandler, IRescuableNative.rescueNative.selector, RolesLib.getRole__rescueNative().roleId
         );
+        _assertTargetFunctionRole(
+            fundsHandler, IFundsHandler.addEarningChain.selector, RolesLib.getRole__addEarningChain().roleId
+        );
+        _assertTargetFunctionRole(
+            fundsHandler, IFundsHandler.removeEarningChain.selector, RolesLib.getRole__removeEarningChain().roleId
+        );
     }
 
     function test_targetSetup_accountingChainGateway() public view {
@@ -192,6 +219,15 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
         );
         _assertTargetFunctionRole(
             gateway, IRescuableNative.rescueNative.selector, RolesLib.getRole__rescueNative().roleId
+        );
+    }
+
+    function test_targetSetup_chainBalanceOracle() public view {
+        address target = _chainBalanceOracle();
+        _assertTargetFunctionRole(
+            target,
+            ChainBalanceOracle.setChainBalanceOracleAdapter.selector,
+            RolesLib.getRole__setChainBalanceOracleAdapter().roleId
         );
     }
 }

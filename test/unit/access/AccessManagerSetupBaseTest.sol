@@ -19,6 +19,8 @@ import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
+import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
+import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 
@@ -39,6 +41,7 @@ abstract contract AccessManagerSetupBaseTest is Test {
     function _allocator() internal view virtual returns (address);
     function _withdrawalPolicyTarget() internal view virtual returns (address);
     function _assetRegistry() internal view virtual returns (address);
+    function _priceOracle() internal view virtual returns (address);
     function _aTokenVaultAddresses() internal view virtual returns (address[] memory);
 
     function _proxyAdmin() internal view virtual returns (address) {
@@ -208,15 +211,16 @@ abstract contract AccessManagerSetupBaseTest is Test {
     }
 
     function test_disablerProfile_hasTheExpectedRoles() public view {
-        uint64[] memory expected = new uint64[](8);
+        uint64[] memory expected = new uint64[](9);
         expected[0] = RolesLib.getRole__rebalance().roleId;
         expected[1] = RolesLib.getRole__removeStrategy().roleId;
         expected[2] = RolesLib.getRole__rescueTokens().roleId;
-        expected[3] = RolesLib.getRole__disableAllocatorDeposits().roleId;
-        expected[4] = RolesLib.getRole__disableUserDeposits().roleId;
-        expected[5] = RolesLib.getRole__disableSwapInput().roleId;
-        expected[6] = RolesLib.getRole__disableSwapOutput().roleId;
-        expected[7] = RolesLib.getRole__distrustAsset().roleId;
+        expected[3] = RolesLib.getRole__rescueNative().roleId;
+        expected[4] = RolesLib.getRole__disableAllocatorDeposits().roleId;
+        expected[5] = RolesLib.getRole__disableUserDeposits().roleId;
+        expected[6] = RolesLib.getRole__disableSwapInput().roleId;
+        expected[7] = RolesLib.getRole__disableSwapOutput().roleId;
+        expected[8] = RolesLib.getRole__distrustAsset().roleId;
         _assertProfileHasExactlyTheseRoles(_disabler(), expected);
 
         for (uint256 i = 0; i < expected.length; i++) {
@@ -295,6 +299,19 @@ abstract contract AccessManagerSetupBaseTest is Test {
         );
         _assertTargetFunctionRole(
             target, IRescuableNative.rescueNative.selector, RolesLib.getRole__rescueNative().roleId
+        );
+        _assertTargetFunctionRole(
+            target, ICcipBridgeAdapter.replayFundsReceiving.selector, RolesLib.getRole__replayFundsReceiving().roleId
+        );
+        _assertTargetFunctionRole(
+            target, IRescuableToken.rescueTokens.selector, RolesLib.getRole__rescueTokens().roleId
+        );
+    }
+
+    function test_targetSetup_priceOracle() public view {
+        address target = _priceOracle();
+        _assertTargetFunctionRole(
+            target, PriceOracle.setOracleAdapterForAsset.selector, RolesLib.getRole__setOracleAdapterForAsset().roleId
         );
     }
 
@@ -424,6 +441,18 @@ abstract contract AccessManagerSetupBaseTest is Test {
         _assertCanCall(wpm, _withdrawalPolicyTarget(), WithdrawalPolicy.setDefaultFeeBps.selector, true, 0);
         // Unauthorized
         _assertCanCall(wpm, _allocator(), IAllocator.rebalance.selector, false, 0);
+    }
+
+    function test_canCall_aTokenVaultRewardClaimer() public view {
+        address claimer = _aTokenVaultRewardClaimer();
+        RolesLib.Role memory role = RolesLib.getRole__claimMerklRewards();
+        address[] memory vaults = _aTokenVaultAddresses();
+
+        for (uint256 i = 0; i < vaults.length; i++) {
+            _assertCanCall(claimer, vaults[i], role.selector, true, 0);
+        }
+        // Unauthorized
+        _assertCanCall(claimer, _allocator(), IAllocator.rebalance.selector, false, 0);
     }
 
     ////// ADMIN_ROLE has critical delay as execution timelock //////

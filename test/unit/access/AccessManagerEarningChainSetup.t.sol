@@ -123,6 +123,10 @@ contract AccessManagerEarningChainSetupTest is AccessManagerSetupBaseTest, Earni
         return getAssetRegistryAddress(_getDeployer());
     }
 
+    function _priceOracle() internal view virtual override returns (address) {
+        return getPriceOracleAddress(_getDeployer());
+    }
+
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // CHAIN-SPECIFIC TESTS
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
