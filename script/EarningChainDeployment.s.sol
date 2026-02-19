@@ -11,6 +11,10 @@ import {ATokenVaultDeployment} from "script/base/ATokenVaultDeployment.sol";
 import {AccessManagerEarningChainSetup} from "script/base/AccessManagerEarningChainSetup.sol";
 import {Create3Deployment} from "script/base/Create3Deployment.sol";
 
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+import {IRouterClient} from "@chainlink-ccip/contracts/interfaces/IRouterClient.sol";
+
 import {CcipAdapter} from "src/bridging/ccip/CcipAdapter.sol";
 import {Allocator} from "src/core/Allocator.sol";
 import {EarningChainGateway} from "src/core/earning/EarningChainGateway.sol";
@@ -20,7 +24,10 @@ import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
+import {AggregatorV3Interface, ChainlinkPriceOracleAdapter} from "src/oracles/price/ChainlinkPriceOracleAdapter.sol";
+import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {AssetRegistry} from "src/periphery/AssetRegistry.sol";
+import {EarningChainStateProvider} from "src/periphery/EarningChainStateProvider.sol";
 import {Swapper} from "src/periphery/Swapper.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
@@ -46,11 +53,20 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
     address immutable ASSET_REGISTRY_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
     address immutable GATEWAY_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
     address immutable IOU_TOKEN_MANAGER_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
+    address immutable PRICE_ORACLE_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
 
     address constant ACCESS_MANAGER_ADMIN = DEPLOYER;
 
     address immutable ALLOCATOR_DEPOSITOR = getGatewayAddress(DEPLOYER);
     address immutable ALLOCATOR_WITHDRAWER = getGatewayAddress(DEPLOYER);
+
+    uint256 constant PRICE_ORACLE_MIN_VALID_PRICE_RAY = 0.99e27; // TODO: Revisit min valid price
+    uint256 constant CHAINLINK_PRICE_ORACLE_HEARTBEAT = 24 hours; // TODO: Revisit heartbeat
+
+    // TODO: Set Chainlink data feed addresses
+    address constant CHAINLINK_GHO_USD_DATA_FEED = address(0);
+    address constant CHAINLINK_USDC_USD_DATA_FEED = address(0);
+    address constant CHAINLINK_USDT_USD_DATA_FEED = address(0);
 
     // Set to Ethereum CCIP Router address
     address constant CCIP_ROUTER_ADDRESS = address(0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D);
@@ -61,10 +77,32 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
     address USDT = address(0xdAC17F958D2ee523a2206206994597C13D831ec7);
 
     function run() public {
+        _validateExternalAddresses();
         vm.startBroadcast(DEPLOYER);
         _deployContracts();
         _setupContracts();
         vm.stopBroadcast();
+    }
+
+    function _validateExternalAddresses() internal view {
+        // Validate ERC20 token addresses
+        IERC20(GHO).balanceOf(DEPLOYER);
+        IERC20(USDC).balanceOf(DEPLOYER);
+        IERC20(USDT).balanceOf(DEPLOYER);
+
+        // Validate Chainlink price feed addresses
+        require(CHAINLINK_GHO_USD_DATA_FEED != address(0), "Chainlink GHO/USD data feed not set");
+        AggregatorV3Interface(CHAINLINK_GHO_USD_DATA_FEED).latestRoundData();
+        require(CHAINLINK_USDC_USD_DATA_FEED != address(0), "Chainlink USDC/USD data feed not set");
+        AggregatorV3Interface(CHAINLINK_USDC_USD_DATA_FEED).latestRoundData();
+        require(CHAINLINK_USDT_USD_DATA_FEED != address(0), "Chainlink USDT/USD data feed not set");
+        AggregatorV3Interface(CHAINLINK_USDT_USD_DATA_FEED).latestRoundData();
+
+        // Validate CCIP router
+        require(
+            IRouterClient(CCIP_ROUTER_ADDRESS).isChainSupported(ACCOUNTING_CHAIN_CCIP_SELECTOR),
+            "CCIP Router does not support accounting chain"
+        );
     }
 
     function _deployContracts() internal {
@@ -74,10 +112,12 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
         _deployWithdrawalPolicy();
         _deployIouToken();
         _deployIouTokenManager();
+        _deployPriceOracle();
         _deployAllocator();
         _deployGateway();
         _deploySwapper();
         _deployCcipAdapter();
+        _deployEarningChainStateProvider();
     }
 
     function _setupContracts() internal {
@@ -85,6 +125,7 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
         _setupAssetRegistry();
         _setupAllocator();
         _setupAccessManager(DEPLOYER);
+        _setupPriceOracleAdapters();
     }
 
     function _accessManager() internal pure virtual override returns (address) {
@@ -253,7 +294,7 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
                 assetRegistry: getAssetRegistryAddress(DEPLOYER),
                 depositor: ALLOCATOR_DEPOSITOR,
                 withdrawer: ALLOCATOR_WITHDRAWER,
-                priceOracle: address(0), // TODO: Deploy Price Oracle properly
+                priceOracle: getPriceOracleAddress(DEPLOYER),
                 transferHelper: getTransferHelperAddress(DEPLOYER),
                 maxStrategiesPerAsset: MAX_STRATEGIES_PER_ASSET
             })
@@ -276,7 +317,7 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
             new EarningChainGateway({
                 accountingChainId: ACCOUNTING_CHAIN_ID,
                 allocator: getAllocatorAddress(DEPLOYER),
-                priceOracle: address(0), // TODO: Deploy Price Oracle properly
+                priceOracle: getPriceOracleAddress(DEPLOYER),
                 iouTokenManager: getIouTokenManagerAddress(DEPLOYER),
                 transferHelper: getTransferHelperAddress(DEPLOYER),
                 withdrawalPolicy: getWithdrawalPolicyAddress(DEPLOYER)
@@ -324,6 +365,59 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
         require(ccipAdapter == getCcipAdapterAddress(DEPLOYER), "CcipAdapter does not match expected address");
         _logDeployment("CcipAdapter", CCIP_ADAPTER_SALT_SEED, ccipAdapter);
         return ccipAdapter;
+    }
+
+    function _deployPriceOracle() internal returns (address) {
+        address implementation = address(new PriceOracle(PRICE_ORACLE_MIN_VALID_PRICE_RAY));
+        _logDeployment("PriceOracle::Implementation", "", implementation);
+        address priceOracle = _deployTransparentProxy_create3({
+            namespacedSaltSeed: PRICE_ORACLE_SALT_SEED,
+            deployer: DEPLOYER,
+            implementation: implementation,
+            proxyAdmin: PRICE_ORACLE_PROXY_ADMIN_OWNER,
+            initCalldata: abi.encodeCall(PriceOracle.initialize, (getAccessManagerAddress(DEPLOYER)))
+        });
+        require(priceOracle == getPriceOracleAddress(DEPLOYER), "PriceOracle does not match expected address");
+        _logDeployment("PriceOracle", PRICE_ORACLE_SALT_SEED, priceOracle);
+        return priceOracle;
+    }
+
+    function _deployEarningChainStateProvider() internal returns (address) {
+        address earningChainStateProvider = _deploy_create3({
+            namespacedSaltSeed: EARNING_CHAIN_STATE_PROVIDER_SALT_SEED,
+            deployer: DEPLOYER,
+            initCode: abi.encodePacked(
+                type(EarningChainStateProvider).creationCode, abi.encode(getGatewayAddress(DEPLOYER))
+            )
+        });
+        require(
+            earningChainStateProvider == getEarningChainStateProviderAddress(DEPLOYER),
+            "EarningChainStateProvider does not match expected address"
+        );
+        _logDeployment("EarningChainStateProvider", EARNING_CHAIN_STATE_PROVIDER_SALT_SEED, earningChainStateProvider);
+        return earningChainStateProvider;
+    }
+
+    function _setupPriceOracleAdapters() internal {
+        PriceOracle priceOracle = PriceOracle(getPriceOracleAddress(DEPLOYER));
+
+        address ghoAdapter = address(
+            new ChainlinkPriceOracleAdapter(GHO, CHAINLINK_GHO_USD_DATA_FEED, CHAINLINK_PRICE_ORACLE_HEARTBEAT)
+        );
+        _logDeployment("ChainlinkPriceOracleAdapter::GHO", "", ghoAdapter);
+        priceOracle.setOracleAdapterForAsset(GHO, ghoAdapter);
+
+        address usdcAdapter = address(
+            new ChainlinkPriceOracleAdapter(USDC, CHAINLINK_USDC_USD_DATA_FEED, CHAINLINK_PRICE_ORACLE_HEARTBEAT)
+        );
+        _logDeployment("ChainlinkPriceOracleAdapter::USDC", "", usdcAdapter);
+        priceOracle.setOracleAdapterForAsset(USDC, usdcAdapter);
+
+        address usdtAdapter = address(
+            new ChainlinkPriceOracleAdapter(USDT, CHAINLINK_USDT_USD_DATA_FEED, CHAINLINK_PRICE_ORACLE_HEARTBEAT)
+        );
+        _logDeployment("ChainlinkPriceOracleAdapter::USDT", "", usdtAdapter);
+        priceOracle.setOracleAdapterForAsset(USDT, usdtAdapter);
     }
 
     function _logDeployment(string memory name, string memory saltSeed, address addr) internal virtual {

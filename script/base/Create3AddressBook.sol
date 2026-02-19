@@ -17,6 +17,9 @@ contract Create3AddressBook {
     string constant IOU_TOKEN_SALT_SEED = "aave.based-boosted-vault.IouToken";
     string constant SWAPPER_SALT_SEED = "aave.based-boosted-vault.Swapper";
     string constant CCIP_ADAPTER_SALT_SEED = "aave.based-boosted-vault.CcipAdapter";
+    string constant PRICE_ORACLE_SALT_SEED = "aave.based-boosted-vault.PriceOracle";
+    string constant CHAIN_BALANCE_ORACLE_SALT_SEED = "aave.based-boosted-vault.ChainBalanceOracle";
+    string constant EARNING_CHAIN_STATE_PROVIDER_SALT_SEED = "aave.based-boosted-vault.EarningChainStateProvider";
 
     function getBasedBoostedVaultAddress(address deployer) internal pure virtual returns (address) {
         return Create3AddressLib.computeCreate3Address(BASED_BOOSTED_VAULT_SALT_SEED, deployer);
@@ -64,5 +67,17 @@ contract Create3AddressBook {
 
     function getCcipAdapterAddress(address deployer) internal pure virtual returns (address) {
         return Create3AddressLib.computeCreate3Address(CCIP_ADAPTER_SALT_SEED, deployer);
+    }
+
+    function getPriceOracleAddress(address deployer) internal pure virtual returns (address) {
+        return Create3AddressLib.computeCreate3Address(PRICE_ORACLE_SALT_SEED, deployer);
+    }
+
+    function getChainBalanceOracleAddress(address deployer) internal pure virtual returns (address) {
+        return Create3AddressLib.computeCreate3Address(CHAIN_BALANCE_ORACLE_SALT_SEED, deployer);
+    }
+
+    function getEarningChainStateProviderAddress(address deployer) internal pure virtual returns (address) {
+        return Create3AddressLib.computeCreate3Address(EARNING_CHAIN_STATE_PROVIDER_SALT_SEED, deployer);
     }
 }
