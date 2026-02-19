@@ -116,6 +116,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook {
 
     function _setupProfile__MainAdmin() internal {
         address mainAdminProfile = _getProfile__MainAdmin();
+        require(mainAdminProfile != address(0), "MainAdmin profile address not set");
 
         RolesLib.Role[] memory functionBasedRoles = RolesLib.getAllFunctionBasedRoles();
         bytes[] memory multicallCalldata = new bytes[](functionBasedRoles.length + 3);
@@ -144,6 +145,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook {
 
     function _setupProfile__SecondaryAdmin() internal {
         address secondaryAdminProfile = _getProfile__SecondaryAdmin();
+        require(secondaryAdminProfile != address(0), "SecondaryAdmin profile address not set");
 
         RolesLib.Role[] memory functionBasedRoles = RolesLib.getAllFunctionBasedRoles();
 
@@ -180,6 +182,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook {
 
     function _setupProfile__WithdrawalPolicyManager() internal {
         address withdrawalPolicyManagerProfile = _getProfile__WithdrawalPolicyManager();
+        require(withdrawalPolicyManagerProfile != address(0), "WithdrawalPolicyManager profile address not set");
 
         bytes[] memory multicallCalldata = new bytes[](2);
         RolesLib.Role memory role;
@@ -197,6 +200,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook {
 
     function _setupProfile__Rebalancer() internal {
         address rebalancerProfile = _getProfile__Rebalancer();
+        require(rebalancerProfile != address(0), "Rebalancer profile address not set");
 
         bytes[] memory multicallCalldata = new bytes[](6);
         RolesLib.Role memory role;
@@ -226,6 +230,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook {
 
     function _setupProfile__Disabler() internal {
         address disablerProfile = _getProfile__Disabler();
+        require(disablerProfile != address(0), "Disabler profile address not set");
 
         bytes[] memory multicallCalldata = new bytes[](12);
         RolesLib.Role memory role;
@@ -271,6 +276,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook {
 
     function _setupProfile__ATokenVaultRewardClaimer() internal {
         address aTokenVaultRewardClaimer = _getProfile__ATokenVaultRewardClaimer();
+        require(aTokenVaultRewardClaimer != address(0), "ATokenVaultRewardClaimer profile address not set");
 
         RolesLib.Role memory role = RolesLib.getRole__claimMerklRewards();
 

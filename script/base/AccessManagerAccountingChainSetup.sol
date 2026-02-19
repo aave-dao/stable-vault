@@ -76,6 +76,7 @@ abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
 
     function _setupProfile__BbvManager() internal {
         address bbvManager = _getProfile__BbvManager();
+        require(bbvManager != address(0), "BbvManager profile address not set");
 
         bytes[] memory multicallCalldata = new bytes[](4);
         RolesLib.Role memory role;
