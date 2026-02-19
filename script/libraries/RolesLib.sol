@@ -369,15 +369,15 @@ library RolesLib {
         });
     }
 
-    /// @custom:delay Medium
+    /// @custom:delay None
     /// @custom:location Allocator
     function getRole__setDefaultStrategy() internal pure returns (Role memory) {
         bytes4 selector = IAllocator.setDefaultStrategy.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
-            delay: MED_DELAY,
-            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE
+            delay: NO_DELAY,
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE
         });
     }
 
