@@ -285,15 +285,15 @@ library RolesLib {
         });
     }
 
-    /// @custom:delay None
+    /// @custom:delay Medium
     /// @custom:location BasedBoostedVault
     function getRole__claimSurplusInterest() internal pure returns (Role memory) {
         bytes4 selector = IBasedBoostedVault.claimSurplusInterest.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
-            delay: NO_DELAY,
-            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE
+            delay: MED_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE
         });
     }
 
