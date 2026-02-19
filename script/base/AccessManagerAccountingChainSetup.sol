@@ -2,12 +2,8 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.20;
 
-import {IAccessManager} from "lib/openzeppelin-contracts/contracts/access/manager/IAccessManager.sol";
-
 import {AccessManagerBaseSetup} from "script/base/AccessManagerBaseSetup.sol";
 import {RolesLib} from "script/libraries/RolesLib.sol";
-import {IMulticall} from "src/interfaces/IMulticall.sol";
-import {_toSelectorArray} from "test/helpers/TypeHelpers.sol";
 
 abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
     ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -78,132 +74,69 @@ abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
         address bbvManager = _getProfile__BbvManager();
         require(bbvManager != address(0), "BbvManager profile address not set");
 
-        bytes[] memory multicallCalldata = new bytes[](4);
-        RolesLib.Role memory role;
+        RolesLib.Role[] memory roles = new RolesLib.Role[](4);
 
-        role = RolesLib.getRole__setUserRate();
-        multicallCalldata[0] = abi.encodeCall(IAccessManager.grantRole, (role.roleId, bbvManager, role.delay));
+        roles[0] = RolesLib.getRole__setUserRate();
+        roles[1] = RolesLib.getRole__setSubVaultRate();
+        roles[2] = RolesLib.getRole__claimSurplusInterest();
+        roles[3] = RolesLib.getRole__setDefaultSubVault();
 
-        role = RolesLib.getRole__setSubVaultRate();
-        multicallCalldata[1] = abi.encodeCall(IAccessManager.grantRole, (role.roleId, bbvManager, role.delay));
-
-        role = RolesLib.getRole__claimSurplusInterest();
-        multicallCalldata[2] = abi.encodeCall(IAccessManager.grantRole, (role.roleId, bbvManager, role.delay));
-
-        role = RolesLib.getRole__setDefaultSubVault();
-        multicallCalldata[3] = abi.encodeCall(IAccessManager.grantRole, (role.roleId, bbvManager, role.delay));
-
-        IMulticall(_accessManager()).multicall(multicallCalldata);
+        _grantRolesToProfile(bbvManager, roles);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
     function _setupTarget__Bbv(address deployer) internal {
         address bbv = getBasedBoostedVaultAddress(deployer);
-        RolesLib.Role memory role;
-        bytes[] memory multicallCalldata = new bytes[](7);
 
-        role = RolesLib.getRole__setUserRate();
-        multicallCalldata[0] =
-            abi.encodeCall(IAccessManager.setTargetFunctionRole, (bbv, _toSelectorArray(role.selector), role.roleId));
+        RolesLib.Role[] memory roles = new RolesLib.Role[](7);
 
-        role = RolesLib.getRole__setSubVaultRate();
-        multicallCalldata[1] =
-            abi.encodeCall(IAccessManager.setTargetFunctionRole, (bbv, _toSelectorArray(role.selector), role.roleId));
+        roles[0] = RolesLib.getRole__setUserRate();
+        roles[1] = RolesLib.getRole__setSubVaultRate();
+        roles[2] = RolesLib.getRole__setDefaultSubVault();
+        roles[3] = RolesLib.getRole__claimSurplusInterest();
+        roles[4] = RolesLib.getRole__setTreasury();
+        roles[5] = RolesLib.getRole__rescueNative();
+        roles[6] = RolesLib.getRole__rescueTokens();
 
-        role = RolesLib.getRole__setDefaultSubVault();
-        multicallCalldata[2] =
-            abi.encodeCall(IAccessManager.setTargetFunctionRole, (bbv, _toSelectorArray(role.selector), role.roleId));
-
-        role = RolesLib.getRole__claimSurplusInterest();
-        multicallCalldata[3] =
-            abi.encodeCall(IAccessManager.setTargetFunctionRole, (bbv, _toSelectorArray(role.selector), role.roleId));
-
-        role = RolesLib.getRole__setTreasury();
-        multicallCalldata[4] =
-            abi.encodeCall(IAccessManager.setTargetFunctionRole, (bbv, _toSelectorArray(role.selector), role.roleId));
-
-        role = RolesLib.getRole__rescueNative();
-        multicallCalldata[5] =
-            abi.encodeCall(IAccessManager.setTargetFunctionRole, (bbv, _toSelectorArray(role.selector), role.roleId));
-
-        role = RolesLib.getRole__rescueTokens();
-        multicallCalldata[6] =
-            abi.encodeCall(IAccessManager.setTargetFunctionRole, (bbv, _toSelectorArray(role.selector), role.roleId));
-
-        IMulticall(_accessManager()).multicall(multicallCalldata);
+        _setTargetFunctionRoles(bbv, roles);
     }
 
     function _setupTarget__FundsHandler(address deployer) internal {
         address fundsHandler = getFundsHandlerAddress(deployer);
-        RolesLib.Role memory role;
-        bytes[] memory multicallCalldata = new bytes[](5);
 
-        role = RolesLib.getRole__pushFundsToChain();
-        multicallCalldata[0] = abi.encodeCall(
-            IAccessManager.setTargetFunctionRole, (fundsHandler, _toSelectorArray(role.selector), role.roleId)
-        );
+        RolesLib.Role[] memory roles = new RolesLib.Role[](5);
 
-        role = RolesLib.getRole__rescueTokens();
-        multicallCalldata[1] = abi.encodeCall(
-            IAccessManager.setTargetFunctionRole, (fundsHandler, _toSelectorArray(role.selector), role.roleId)
-        );
+        roles[0] = RolesLib.getRole__pushFundsToChain();
+        roles[1] = RolesLib.getRole__rescueTokens();
+        roles[2] = RolesLib.getRole__rescueNative();
+        roles[3] = RolesLib.getRole__addEarningChain();
+        roles[4] = RolesLib.getRole__removeEarningChain();
 
-        role = RolesLib.getRole__rescueNative();
-        multicallCalldata[2] = abi.encodeCall(
-            IAccessManager.setTargetFunctionRole, (fundsHandler, _toSelectorArray(role.selector), role.roleId)
-        );
-
-        role = RolesLib.getRole__addEarningChain();
-        multicallCalldata[3] = abi.encodeCall(
-            IAccessManager.setTargetFunctionRole, (fundsHandler, _toSelectorArray(role.selector), role.roleId)
-        );
-
-        role = RolesLib.getRole__removeEarningChain();
-        multicallCalldata[4] = abi.encodeCall(
-            IAccessManager.setTargetFunctionRole, (fundsHandler, _toSelectorArray(role.selector), role.roleId)
-        );
-
-        IMulticall(_accessManager()).multicall(multicallCalldata);
+        _setTargetFunctionRoles(fundsHandler, roles);
     }
 
     function _setupTarget__AccountingChainGateway(address deployer) internal {
         address gateway = getGatewayAddress(deployer);
-        RolesLib.Role memory role;
-        bytes[] memory multicallCalldata = new bytes[](5);
 
-        role = RolesLib.getRole__addBridgeAdapter();
-        multicallCalldata[0] = abi.encodeCall(
-            IAccessManager.setTargetFunctionRole, (gateway, _toSelectorArray(role.selector), role.roleId)
-        );
+        RolesLib.Role[] memory roles = new RolesLib.Role[](5);
 
-        role = RolesLib.getRole__removeBridgeAdapter();
-        multicallCalldata[1] = abi.encodeCall(
-            IAccessManager.setTargetFunctionRole, (gateway, _toSelectorArray(role.selector), role.roleId)
-        );
+        roles[0] = RolesLib.getRole__addBridgeAdapter();
+        roles[1] = RolesLib.getRole__removeBridgeAdapter();
+        roles[2] = RolesLib.getRole__setDefaultBridgeAdapter();
+        roles[3] = RolesLib.getRole__rescueTokens();
+        roles[4] = RolesLib.getRole__rescueNative();
 
-        role = RolesLib.getRole__setDefaultBridgeAdapter();
-        multicallCalldata[2] = abi.encodeCall(
-            IAccessManager.setTargetFunctionRole, (gateway, _toSelectorArray(role.selector), role.roleId)
-        );
-
-        role = RolesLib.getRole__rescueTokens();
-        multicallCalldata[3] = abi.encodeCall(
-            IAccessManager.setTargetFunctionRole, (gateway, _toSelectorArray(role.selector), role.roleId)
-        );
-
-        role = RolesLib.getRole__rescueNative();
-        multicallCalldata[4] = abi.encodeCall(
-            IAccessManager.setTargetFunctionRole, (gateway, _toSelectorArray(role.selector), role.roleId)
-        );
-
-        IMulticall(_accessManager()).multicall(multicallCalldata);
+        _setTargetFunctionRoles(gateway, roles);
     }
 
     function _setupTarget__ChainBalanceOracle(address deployer) internal {
         address chainBalanceOracle = getChainBalanceOracleAddress(deployer);
-        RolesLib.Role memory role = RolesLib.getRole__setChainBalanceOracleAdapter();
-        IAccessManager(_accessManager())
-            .setTargetFunctionRole(chainBalanceOracle, _toSelectorArray(role.selector), role.roleId);
+
+        RolesLib.Role[] memory roles = new RolesLib.Role[](1);
+
+        roles[0] = RolesLib.getRole__setChainBalanceOracleAdapter();
+
+        _setTargetFunctionRoles(chainBalanceOracle, roles);
     }
 }

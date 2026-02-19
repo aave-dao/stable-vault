@@ -2,12 +2,8 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.20;
 
-import {IAccessManager} from "lib/openzeppelin-contracts/contracts/access/manager/IAccessManager.sol";
-
 import {AccessManagerBaseSetup} from "script/base/AccessManagerBaseSetup.sol";
 import {RolesLib} from "script/libraries/RolesLib.sol";
-import {IMulticall} from "src/interfaces/IMulticall.sol";
-import {_toSelectorArray} from "test/helpers/TypeHelpers.sol";
 
 abstract contract AccessManagerEarningChainSetup is AccessManagerBaseSetup {
     ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -59,39 +55,16 @@ abstract contract AccessManagerEarningChainSetup is AccessManagerBaseSetup {
 
     function _setupTarget__EarningChainGateway(address deployer) internal {
         address gateway = getGatewayAddress(deployer);
-        RolesLib.Role memory role;
-        bytes[] memory multicallCalldata = new bytes[](6);
 
-        role = RolesLib.getRole__addBridgeAdapter();
-        multicallCalldata[0] = abi.encodeCall(
-            IAccessManager.setTargetFunctionRole, (gateway, _toSelectorArray(role.selector), role.roleId)
-        );
+        RolesLib.Role[] memory roles = new RolesLib.Role[](6);
 
-        role = RolesLib.getRole__removeBridgeAdapter();
-        multicallCalldata[1] = abi.encodeCall(
-            IAccessManager.setTargetFunctionRole, (gateway, _toSelectorArray(role.selector), role.roleId)
-        );
+        roles[0] = RolesLib.getRole__addBridgeAdapter();
+        roles[1] = RolesLib.getRole__removeBridgeAdapter();
+        roles[2] = RolesLib.getRole__setDefaultBridgeAdapter();
+        roles[3] = RolesLib.getRole__rescueTokens();
+        roles[4] = RolesLib.getRole__rescueNative();
+        roles[5] = RolesLib.getRole__pushFundsToAccountingChain();
 
-        role = RolesLib.getRole__setDefaultBridgeAdapter();
-        multicallCalldata[2] = abi.encodeCall(
-            IAccessManager.setTargetFunctionRole, (gateway, _toSelectorArray(role.selector), role.roleId)
-        );
-
-        role = RolesLib.getRole__rescueTokens();
-        multicallCalldata[3] = abi.encodeCall(
-            IAccessManager.setTargetFunctionRole, (gateway, _toSelectorArray(role.selector), role.roleId)
-        );
-
-        role = RolesLib.getRole__rescueNative();
-        multicallCalldata[4] = abi.encodeCall(
-            IAccessManager.setTargetFunctionRole, (gateway, _toSelectorArray(role.selector), role.roleId)
-        );
-
-        role = RolesLib.getRole__pushFundsToAccountingChain();
-        multicallCalldata[5] = abi.encodeCall(
-            IAccessManager.setTargetFunctionRole, (gateway, _toSelectorArray(role.selector), role.roleId)
-        );
-
-        IMulticall(_accessManager()).multicall(multicallCalldata);
+        _setTargetFunctionRoles(gateway, roles);
     }
 }
