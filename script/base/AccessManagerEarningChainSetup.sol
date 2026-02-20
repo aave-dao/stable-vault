@@ -9,8 +9,10 @@ abstract contract AccessManagerEarningChainSetup is AccessManagerBaseSetup {
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
     //////////////// Admin Profiles ////////////////
-    address constant HIGH_THRESHOLD_MULTISIG_ADMIN_PROFILE = address(0);
-    address constant MED_THRESHOLD_MULTISIG_ADMIN_PROFILE = address(0);
+    // TODO: Set as deployer address for VNet, but needs to be changed to the high threshold multisig later
+    address constant HIGH_THRESHOLD_MULTISIG_ADMIN_PROFILE = address(0xBB700dA5CCC9Ec5605780Fc40695f1206B090303);
+    // TODO: Set as deployer address for VNet, but needs to be changed to the medium threshold multisig later
+    address constant MED_THRESHOLD_MULTISIG_ADMIN_PROFILE = address(0xBB700dA5CCC9Ec5605780Fc40695f1206B090303);
 
     //////////////// Operational Profiles ////////////////
     address constant WITHDRAWAL_POLICY_MANAGER_PROFILE = address(0);
