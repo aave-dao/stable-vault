@@ -9,6 +9,8 @@ import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/crypt
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {EfficientHashLib} from "@solady/utils/EfficientHashLib.sol";
 
+import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
+
 import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
@@ -92,6 +94,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     }
 
     function __WithdrawalPolicy_init(address accessManager, uint16 defaultFeeBps) internal virtual onlyInitializing {
+        IAccessManager(accessManager).canCall(address(0), address(0), bytes4(0));
         __AccessManaged_init(accessManager);
         __EIP712_init("WithdrawalPolicy", "1");
         _setDefaultFeeBps(defaultFeeBps);

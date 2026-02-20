@@ -6,6 +6,8 @@ import {
     AccessManagedUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
 
+import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
+
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {IPriceOracleAdapter} from "src/interfaces/IPriceOracleAdapter.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
@@ -50,6 +52,7 @@ contract PriceOracle is AccessManagedUpgradeable, IPriceOracle {
     }
 
     function __PriceOracle_init(address accessManager) internal virtual onlyInitializing {
+        IAccessManager(accessManager).canCall(address(0), address(0), bytes4(0));
         __AccessManaged_init(accessManager);
     }
 

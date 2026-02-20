@@ -8,6 +8,7 @@ import {
 import {
     ReentrancyGuardTransientUpgradeable
 } from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardTransientUpgradeable.sol";
+import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -181,6 +182,7 @@ contract BasedBoostedVault is
         virtual
         onlyInitializing
     {
+        IAccessManager(accessManager).canCall(address(0), address(0), bytes4(0));
         __AccessManaged_init(accessManager);
         _setTreasury(treasury);
         _setDefaultSubVault(_getOrCreateSubVaultWithRate(defaultSubVaultPerSecondRate), defaultSubVaultPerSecondRate);
