@@ -66,6 +66,10 @@ library Errors {
     /// @custom:selector 0xee84f40b
     error UnsupportedAsset(address asset);
 
+    /// @notice Address checked is the zero address.
+    /// @custom:selector 0xd92e233d
+    error ZeroAddress();
+
     /// @notice Token amount checked is zero.
     /// @custom:selector 0x1f2a2005
     error ZeroAmount();

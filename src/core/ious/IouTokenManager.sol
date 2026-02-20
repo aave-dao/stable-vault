@@ -72,6 +72,11 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
     constructor(address iouToken, address chainGateway, address vault, address transferHelper, bool isAccountingChain)
         TransferHelperClient(transferHelper)
     {
+        require(iouToken != address(0), Errors.ZeroAddress());
+        require(chainGateway != address(0), Errors.ZeroAddress());
+        if (isAccountingChain) {
+            require(vault != address(0), Errors.ZeroAddress());
+        }
         IOU_TOKEN = iouToken;
         CHAIN_GATEWAY = chainGateway;
         VAULT = vault;

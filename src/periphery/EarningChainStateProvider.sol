@@ -7,6 +7,7 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
 import {IEarningChainStateProvider} from "src/interfaces/IEarningChainStateProvider.sol";
 import {EarningChainStateSchemaV1, SCHEMA_VERSION} from "src/periphery/EarningChainStateSchemaV1.sol";
+import {Errors} from "src/types/Errors.sol";
 
 /// @title EarningChainStateProvider
 /// @author Aave Labs
@@ -23,6 +24,7 @@ contract EarningChainStateProvider is Initializable, EarningChainStateSchemaV1, 
     /// @dev Constructor.
     /// @param earningChainGateway Address of the EarningChainGateway contract.
     constructor(address earningChainGateway) {
+        require(earningChainGateway != address(0), Errors.ZeroAddress());
         EARNING_CHAIN_GATEWAY = earningChainGateway;
         _disableInitializers();
     }

@@ -72,6 +72,8 @@ contract CcipAdapter is
         address transferHelper,
         address assetRegistry
     ) BaseBridgeAdapter(accessManager, gateway, transferHelper) {
+        require(ccipRouter != address(0), Errors.ZeroAddress());
+        require(assetRegistry != address(0), Errors.ZeroAddress());
         CCIP_ROUTER = ccipRouter;
         ASSET_REGISTRY = assetRegistry;
     }

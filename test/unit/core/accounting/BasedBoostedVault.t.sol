@@ -245,12 +245,14 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     }
 
     function test_initialize_setsTheExpectedValues(
-        address expectedAccessManager,
+        bytes32 expectedAccessManagerSalt,
         address expectedTreasury,
         uint256 expectedDefaultSubVaultRate,
         address expectedAssetRegistry
     ) public {
-        vm.assume(expectedAccessManager != address(0));
+        address expectedAccessManager = address(
+            new MockAccessManager{salt: expectedAccessManagerSalt}(makeAddr("accessManager"))
+        );
         vm.assume(expectedAssetRegistry != address(0));
         expectedDefaultSubVaultRate = _boundRate(expectedDefaultSubVaultRate);
 

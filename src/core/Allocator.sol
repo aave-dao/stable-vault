@@ -5,6 +5,7 @@ pragma solidity ^0.8.22;
 import {
     AccessManagedUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
+import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -92,6 +93,11 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         address transferHelper,
         uint8 maxStrategiesPerAsset
     ) TransferHelperClient(transferHelper) {
+        require(assetRegistry != address(0), Errors.ZeroAddress());
+        require(depositor != address(0), Errors.ZeroAddress());
+        require(withdrawer != address(0), Errors.ZeroAddress());
+        require(priceOracle != address(0), Errors.ZeroAddress());
+        require(maxStrategiesPerAsset > 0, Errors.InvalidParameter());
         _disableInitializers();
         ASSET_REGISTRY = assetRegistry;
         DEPOSITOR = depositor;
@@ -107,6 +113,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     }
 
     function __Allocator_init(address accessManager) internal virtual onlyInitializing {
+        IAccessManager(accessManager).canCall(address(0), address(0), bytes4(0));
         __AccessManaged_init(accessManager);
     }
 

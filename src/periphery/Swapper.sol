@@ -10,6 +10,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {ISwapper} from "src/interfaces/ISwapper.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {Constants} from "src/types/Constants.sol";
+import {Errors} from "src/types/Errors.sol";
 
 /// @title Swapper
 /// @author Aave Labs
@@ -20,7 +21,9 @@ contract Swapper is Ownable, ReentrancyGuard, ISwapper {
 
     /// @dev Constructor.
     /// @param allocator Address of the allocator which is the owner of the Swapper.
-    constructor(address allocator) Ownable(allocator) {}
+    constructor(address allocator) Ownable(allocator) {
+        require(allocator != address(0), Errors.ZeroAddress());
+    }
 
     /// @notice The parameters for the slippage tolerance.
     /// @param slippageToleranceBps The slippage tolerance in basis points.

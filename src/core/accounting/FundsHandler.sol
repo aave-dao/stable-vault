@@ -5,6 +5,7 @@ pragma solidity ^0.8.22;
 import {
     AccessManagedUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
+import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
 
 import {LocalBalanceAggregator} from "src/core/LocalBalanceAggregator.sol";
@@ -79,6 +80,9 @@ contract FundsHandler is
         address transferHelper,
         address chainBalanceOracle
     ) TransferHelperClient(transferHelper) LocalBalanceAggregator(allocator, priceOracle) {
+        require(basedBoostedVault != address(0), Errors.ZeroAddress());
+        require(gateway != address(0), Errors.ZeroAddress());
+        require(chainBalanceOracle != address(0), Errors.ZeroAddress());
         _disableInitializers();
         VAULT = basedBoostedVault;
         GATEWAY = gateway;
@@ -92,6 +96,7 @@ contract FundsHandler is
     }
 
     function __FundsHandler_init(address accessManager) internal virtual onlyInitializing {
+        IAccessManager(accessManager).canCall(address(0), address(0), bytes4(0));
         __AccessManaged_init(accessManager);
     }
 

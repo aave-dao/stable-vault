@@ -12,6 +12,7 @@ import {IChainBalanceOracle} from "src/interfaces/IChainBalanceOracle.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
+import {Errors} from "src/types/Errors.sol";
 
 /// @title AccountingChainGateway
 /// @author Aave Labs
@@ -33,6 +34,8 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
     constructor(address fundsHandler, address iouTokenManager, address chainBalanceOracle)
         BaseChainGateway(iouTokenManager)
     {
+        require(fundsHandler != address(0), Errors.ZeroAddress());
+        require(chainBalanceOracle != address(0), Errors.ZeroAddress());
         _disableInitializers();
         FUNDS_HANDLER = fundsHandler;
         CHAIN_BALANCE_ORACLE = chainBalanceOracle;

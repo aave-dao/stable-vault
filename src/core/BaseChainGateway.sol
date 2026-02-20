@@ -5,6 +5,7 @@ pragma solidity ^0.8.22;
 import {
     AccessManagedUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
+import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
@@ -46,11 +47,13 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
     /// @dev Constructor.
     /// @param iouTokenManager Address of the IOU token manager.
     constructor(address iouTokenManager) {
+        require(iouTokenManager != address(0), Errors.ZeroAddress());
         _disableInitializers();
         IOU_TOKEN_MANAGER = iouTokenManager;
     }
 
     function __BaseChainGateway_init(address accessManager) internal virtual onlyInitializing {
+        IAccessManager(accessManager).canCall(address(0), address(0), bytes4(0));
         __AccessManaged_init(accessManager);
     }
 
