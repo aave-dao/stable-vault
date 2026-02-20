@@ -74,28 +74,33 @@ contract AccountingChainDeployment is
     address immutable ALLOCATOR_DEPOSITOR = getFundsHandlerAddress(DEPLOYER);
     address immutable ALLOCATOR_WITHDRAWER = getFundsHandlerAddress(DEPLOYER);
 
-    uint256 constant PRICE_ORACLE_MIN_VALID_PRICE_RAY = 0.99e27; // TODO: Revisit min valid price
-    uint256 constant CHAINLINK_PRICE_ORACLE_HEARTBEAT = 24 hours; // TODO: Revisit heartbeat
+    // ERC20s on Arbitrum
+    address GHO = address(0x7dfF72693f6A4149b17e7C6314655f6A9F7c8B33);
+    address USDC = address(0xaf88d065e77c8cC2239327C5EDb3A432268e5831);
+    address USDT = address(0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9);
 
-    // TODO: Set Chainlink data feed addresses
-    address constant CHAINLINK_GHO_USD_DATA_FEED = address(0);
-    address constant CHAINLINK_USDC_USD_DATA_FEED = address(0);
+    // Standard
+    address constant CHAINLINK_GHO_USD_DATA_FEED = address(0x3c786e934F23375Ca345C9b8D5aD54838796E8e7);
+    // Standard
+    address constant CHAINLINK_USDC_USD_DATA_FEED = address(0x50834F3163758fcC1Df9973b6e91f0F0F0434aD3);
+    // Standard
+    address constant CHAINLINK_USDT_USD_DATA_FEED = address(0x3f3f5dF88dC9F13eac63DF89EC16ef6e7E25DdE7);
 
     // Ethereum mainnet
     uint256 constant ETHEREUM_MAINNET_CHAIN_ID = 1;
     uint64 constant ETHEREUM_MAINNET_CCIP_SELECTOR = 5009297550715157269;
 
     uint256 constant EARNING_CHAIN_ID = ETHEREUM_MAINNET_CHAIN_ID;
+
+    uint256 constant PRICE_ORACLE_MIN_VALID_PRICE_RAY = 0.99e27; // TODO: Revisit min valid price
+    uint256 constant CHAINLINK_PRICE_ORACLE_HEARTBEAT = 24 hours; // TODO: Revisit heartbeat
+
     uint256 constant CHAINLINK_CHAIN_BALANCE_ORACLE_HEARTBEAT = 24 hours; // TODO: Revisit heartbeat
     address constant CHAINLINK_CHAIN_BALANCE_BUNDLE_AGGREGATOR_PROXY = address(0); // TODO: Set Chainlink bundle
     // aggregator proxy address
 
-    // Set to Base CCIP Router address
-    address constant CCIP_ROUTER_ADDRESS = address(0x881e3A65B4d4a04dD529061dd0071cf975F58bCD);
-
-    // ERC20s on Base
-    address GHO = address(0x6Bb7a212910682DCFdbd5BCBb3e28FB4E8da10Ee);
-    address USDC = address(0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913);
+    // Set to Arbitrum CCIP Router address
+    address constant CCIP_ROUTER_ADDRESS = address(0x141fa059441E0ca23ce184B6A78bafD2A517DdE8);
 
     function run() public {
         _validateExternalAddresses();
@@ -109,12 +114,15 @@ contract AccountingChainDeployment is
         // Validate ERC20 token addresses
         IERC20(GHO).balanceOf(DEPLOYER);
         IERC20(USDC).balanceOf(DEPLOYER);
+        IERC20(USDT).balanceOf(DEPLOYER);
 
         // Validate Chainlink price feed addresses
         require(CHAINLINK_GHO_USD_DATA_FEED != address(0), "Chainlink GHO/USD data feed not set");
         AggregatorV3Interface(CHAINLINK_GHO_USD_DATA_FEED).latestRoundData();
         require(CHAINLINK_USDC_USD_DATA_FEED != address(0), "Chainlink USDC/USD data feed not set");
         AggregatorV3Interface(CHAINLINK_USDC_USD_DATA_FEED).latestRoundData();
+        require(CHAINLINK_USDT_USD_DATA_FEED != address(0), "Chainlink USDT/USD data feed not set");
+        AggregatorV3Interface(CHAINLINK_USDT_USD_DATA_FEED).latestRoundData();
 
         // Validate Chainlink bundle aggregator proxy
         require(
@@ -178,7 +186,9 @@ contract AccountingChainDeployment is
         gateway.addBridgeAdapter(USDC, mainnetChainId, localCcipAdapter);
         gateway.setDefaultBridgeAdapter(USDC, mainnetChainId, localCcipAdapter);
 
-        // TODO: Add USDT bridge adapter
+        // USDT uses CCIP Adapter
+        gateway.addBridgeAdapter(USDT, mainnetChainId, localCcipAdapter);
+        gateway.setDefaultBridgeAdapter(USDT, mainnetChainId, localCcipAdapter);
 
         // Message uses CCIP Adapter
         address messageOnly = address(0);
@@ -192,7 +202,8 @@ contract AccountingChainDeployment is
     function _setupAllocator() internal {
         IAllocator allocator = IAllocator(getAllocatorAddress(DEPLOYER));
 
-        address poolAddressProvider = address(0xe20fCBdBfFC4Dd138cE8b2E6FBb6CB49777ad64D);
+        // Aave V3 Arbitrum PoolAddressesProvider
+        address poolAddressProvider = address(0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb);
 
         address ghoYieldStrategy = _deployATokenVault(GHO, poolAddressProvider, DEPLOYER);
         allocator.addStrategy(GHO, ghoYieldStrategy, STRATEGY_MAX_SLIPPAGE_AMOUNT);
@@ -206,7 +217,11 @@ contract AccountingChainDeployment is
         _deployedATokenVaults.push(usdcYieldStrategy);
         _logDeployment("USDC aTokenVault", "", usdcYieldStrategy);
 
-        // TODO: Add USDT yield strategy
+        address usdtYieldStrategy = _deployATokenVault(USDT, poolAddressProvider, DEPLOYER);
+        allocator.addStrategy(USDT, usdtYieldStrategy, STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        allocator.setDefaultStrategy(USDT, usdtYieldStrategy);
+        _deployedATokenVaults.push(usdtYieldStrategy);
+        _logDeployment("USDT aTokenVault", "", usdtYieldStrategy);
     }
 
     function _aTokenVaultAddresses() internal view virtual override returns (address[] memory) {
@@ -228,7 +243,7 @@ contract AccountingChainDeployment is
         });
         assetRegistry.setAssetConfig(GHO, unrestrictedAssetConfig);
         assetRegistry.setAssetConfig(USDC, unrestrictedAssetConfig);
-        // TODO: Add USDT asset config
+        assetRegistry.setAssetConfig(USDT, unrestrictedAssetConfig);
     }
 
     function _deployTransferHelper() internal returns (address) {
@@ -496,6 +511,12 @@ contract AccountingChainDeployment is
         );
         _logDeployment("ChainlinkPriceOracleAdapter::USDC", "", usdcAdapter);
         priceOracle.setOracleAdapterForAsset(USDC, usdcAdapter);
+
+        address usdtAdapter = address(
+            new ChainlinkPriceOracleAdapter(USDT, CHAINLINK_USDT_USD_DATA_FEED, CHAINLINK_PRICE_ORACLE_HEARTBEAT)
+        );
+        _logDeployment("ChainlinkPriceOracleAdapter::USDT", "", usdtAdapter);
+        priceOracle.setOracleAdapterForAsset(USDT, usdtAdapter);
     }
 
     function _setupChainBalanceOracleAdapters() internal {

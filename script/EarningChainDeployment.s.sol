@@ -20,7 +20,6 @@ import {Allocator} from "src/core/Allocator.sol";
 import {EarningChainGateway} from "src/core/earning/EarningChainGateway.sol";
 import {IouToken} from "src/core/ious/IouToken.sol";
 import {IouTokenManager} from "src/core/ious/IouTokenManager.sol";
-import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
@@ -37,10 +36,10 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
 
     address[] internal _deployedATokenVaults;
 
-    // Base Chain ID
-    uint256 constant ACCOUNTING_CHAIN_ID = 8453;
-    // Base CCIP Selector
-    uint64 constant ACCOUNTING_CHAIN_CCIP_SELECTOR = 15971525489660198786;
+    // Arbitrum Chain ID
+    uint256 constant ACCOUNTING_CHAIN_ID = 42161;
+    // Arbitrum CCIP Selector
+    uint64 constant ACCOUNTING_CHAIN_CCIP_SELECTOR = 4949039107694359620;
 
     address constant DEPLOYER = address(0xBB700dA5CCC9Ec5605780Fc40695f1206B090303);
 
@@ -63,18 +62,20 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
     uint256 constant PRICE_ORACLE_MIN_VALID_PRICE_RAY = 0.99e27; // TODO: Revisit min valid price
     uint256 constant CHAINLINK_PRICE_ORACLE_HEARTBEAT = 24 hours; // TODO: Revisit heartbeat
 
-    // TODO: Set Chainlink data feed addresses
-    address constant CHAINLINK_GHO_USD_DATA_FEED = address(0);
-    address constant CHAINLINK_USDC_USD_DATA_FEED = address(0);
-    address constant CHAINLINK_USDT_USD_DATA_FEED = address(0);
-
-    // Set to Ethereum CCIP Router address
-    address constant CCIP_ROUTER_ADDRESS = address(0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D);
-
     // ERC20s on Ethereum
     address GHO = address(0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f);
     address USDC = address(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
     address USDT = address(0xdAC17F958D2ee523a2206206994597C13D831ec7);
+
+    // Standard
+    address constant CHAINLINK_GHO_USD_DATA_FEED = address(0x3f12643D3f6f874d39C2a4c9f2Cd6f2DbAC877FC);
+    // Standard - //TODO: Consider using SVR
+    address constant CHAINLINK_USDC_USD_DATA_FEED = address(0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6);
+    // Standard - //TODO: Consider using SVR
+    address constant CHAINLINK_USDT_USD_DATA_FEED = address(0x3E7d1eAB13ad0104d2750B8863b489D65364e32D);
+
+    // Set to Ethereum CCIP Router address
+    address constant CCIP_ROUTER_ADDRESS = address(0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D);
 
     function run() public {
         _validateExternalAddresses();
@@ -147,7 +148,9 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
         gateway.addBridgeAdapter(USDC, ACCOUNTING_CHAIN_ID, localCcipAdapter);
         gateway.setDefaultBridgeAdapter(USDC, ACCOUNTING_CHAIN_ID, localCcipAdapter);
 
-        // TODO: Add USDT bridge adapter
+        // USDT uses CCIP Adapter
+        gateway.addBridgeAdapter(USDT, ACCOUNTING_CHAIN_ID, localCcipAdapter);
+        gateway.setDefaultBridgeAdapter(USDT, ACCOUNTING_CHAIN_ID, localCcipAdapter);
 
         // Message uses CCIP Adapter
         address messageOnly = address(0);
@@ -159,26 +162,7 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
     }
 
     function _setupAllocator() internal {
-        IAllocator allocator = IAllocator(getAllocatorAddress(DEPLOYER));
-
-        address poolAddressProvider = address(0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e);
-
-        // TODO: Deploy GHO Yield Strategy, in mainnet it cannot be supplied so we cannot do aTokenVault for it.
-        // address ghoYieldStrategy = address(0);
-        // allocator.addStrategy(GHO, ghoYieldStrategy);
-        // allocator.setDefaultStrategy(GHO, ghoYieldStrategy);
-
-        address usdcYieldStrategy = _deployATokenVault(USDC, poolAddressProvider, DEPLOYER);
-        allocator.addStrategy(USDC, usdcYieldStrategy, STRATEGY_MAX_SLIPPAGE_AMOUNT);
-        allocator.setDefaultStrategy(USDC, usdcYieldStrategy);
-        _deployedATokenVaults.push(usdcYieldStrategy);
-        _logDeployment("USDC aTokenVault", "", usdcYieldStrategy);
-
-        address usdtYieldStrategy = _deployATokenVault(USDT, poolAddressProvider, DEPLOYER);
-        allocator.addStrategy(USDT, usdtYieldStrategy, STRATEGY_MAX_SLIPPAGE_AMOUNT);
-        allocator.setDefaultStrategy(USDT, usdtYieldStrategy);
-        _deployedATokenVaults.push(usdtYieldStrategy);
-        _logDeployment("USDT aTokenVault", "", usdtYieldStrategy);
+        // TODO: No strategies on earning chain for now, setup sGHO once available as ERC-4626 vault
     }
 
     function _aTokenVaultAddresses() internal view virtual override returns (address[] memory) {
