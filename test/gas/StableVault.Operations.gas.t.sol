@@ -5,18 +5,18 @@ pragma solidity ^0.8.22;
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Strings} from "openzeppelin-contracts/contracts/utils/Strings.sol";
 
-import {IBasedBoostedVault} from "src/interfaces/IBasedBoostedVault.sol";
+import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 
 import {BaseTest} from "test/BaseTest.t.sol";
 import {_toAddressArray, _toUint256Array} from "test/helpers/TypeHelpers.sol";
 import {IMockErc20} from "test/mocks/MockErc20.sol";
 
-contract BasedBoostedVaultOperationsGasTest is BaseTest {
+contract StableVaultOperationsGasTest is BaseTest {
     using AssetLib for uint256;
     using SafeERC20 for IMockErc20;
 
-    string internal NAMESPACE = "BasedBoostedVault.Operations";
+    string internal NAMESPACE = "StableVault.Operations";
 
     uint256 amount = 100e6;
     uint256 userSeed = 0;
@@ -82,8 +82,8 @@ contract BasedBoostedVaultOperationsGasTest is BaseTest {
         vault.deposit(user, address(USDC), amount);
 
         uint256 newRate = 1_000000001547125957863212449; // 5% APY
-        IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](1);
-        userRateData[0] = IBasedBoostedVault.UserRateData(user, newRate);
+        IStableVault.UserRateData[] memory userRateData = new IStableVault.UserRateData[](1);
+        userRateData[0] = IStableVault.UserRateData(user, newRate);
 
         vm.prank(everyRoleAccount);
         vault.setUserRate(userRateData);
@@ -93,13 +93,13 @@ contract BasedBoostedVaultOperationsGasTest is BaseTest {
     function test_setUserRate_10Users_fromDefaultSubVaultToSameNewSubVault() public {
         uint256 numberOfUsers = 10;
         uint256 newRate = 1_000000001547125957863212449; // 5% APY
-        IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](numberOfUsers);
+        IStableVault.UserRateData[] memory userRateData = new IStableVault.UserRateData[](numberOfUsers);
         for (uint256 i = 0; i < numberOfUsers; i++) {
             address user = _generateNewUser();
             _mintAndApprove(user);
             vm.prank(user);
             vault.deposit(user, address(USDC), amount);
-            userRateData[i] = IBasedBoostedVault.UserRateData(user, newRate);
+            userRateData[i] = IStableVault.UserRateData(user, newRate);
         }
 
         vm.prank(everyRoleAccount);
@@ -110,13 +110,13 @@ contract BasedBoostedVaultOperationsGasTest is BaseTest {
     function test_setUserRate_100Users_fromDefaultSubVaultToSameNewSubVault() public {
         uint256 numberOfUsers = 100;
         uint256 newRate = 1_000000001547125957863212449; // 5% APY
-        IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](numberOfUsers);
+        IStableVault.UserRateData[] memory userRateData = new IStableVault.UserRateData[](numberOfUsers);
         for (uint256 i = 0; i < numberOfUsers; i++) {
             address user = _generateNewUser();
             _mintAndApprove(user);
             vm.prank(user);
             vault.deposit(user, address(USDC), amount);
-            userRateData[i] = IBasedBoostedVault.UserRateData(user, newRate);
+            userRateData[i] = IStableVault.UserRateData(user, newRate);
         }
 
         vm.prank(everyRoleAccount);
@@ -127,13 +127,13 @@ contract BasedBoostedVaultOperationsGasTest is BaseTest {
     function test_setUserRate_1000Users_fromDefaultSubVaultToSameNewSubVault() public {
         uint256 numberOfUsers = 1000;
         uint256 newRate = 1_000000001547125957863212449; // 5% APY
-        IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](numberOfUsers);
+        IStableVault.UserRateData[] memory userRateData = new IStableVault.UserRateData[](numberOfUsers);
         for (uint256 i = 0; i < numberOfUsers; i++) {
             address user = _generateNewUser();
             _mintAndApprove(user);
             vm.prank(user);
             vault.deposit(user, address(USDC), amount);
-            userRateData[i] = IBasedBoostedVault.UserRateData(user, newRate);
+            userRateData[i] = IStableVault.UserRateData(user, newRate);
         }
 
         vm.prank(everyRoleAccount);
@@ -145,14 +145,14 @@ contract BasedBoostedVaultOperationsGasTest is BaseTest {
         uint256 newRate = 1_000000001547125957863212449;
 
         uint256 numberOfUsers = 10;
-        IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](numberOfUsers);
+        IStableVault.UserRateData[] memory userRateData = new IStableVault.UserRateData[](numberOfUsers);
         for (uint256 i = 0; i < numberOfUsers; i++) {
             address user = _generateNewUser();
             _mintAndApprove(user);
             vm.prank(user);
             vault.deposit(user, address(USDC), amount);
 
-            userRateData[i] = IBasedBoostedVault.UserRateData(user, ++newRate);
+            userRateData[i] = IStableVault.UserRateData(user, ++newRate);
         }
 
         vm.prank(everyRoleAccount);
@@ -164,14 +164,14 @@ contract BasedBoostedVaultOperationsGasTest is BaseTest {
         uint256 newRate = 1_000000001547125957863212449;
 
         uint256 numberOfUsers = 100;
-        IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](numberOfUsers);
+        IStableVault.UserRateData[] memory userRateData = new IStableVault.UserRateData[](numberOfUsers);
         for (uint256 i = 0; i < numberOfUsers; i++) {
             address user = _generateNewUser();
             _mintAndApprove(user);
             vm.prank(user);
             vault.deposit(user, address(USDC), amount);
 
-            userRateData[i] = IBasedBoostedVault.UserRateData(user, ++newRate);
+            userRateData[i] = IStableVault.UserRateData(user, ++newRate);
         }
 
         vm.prank(everyRoleAccount);
@@ -264,8 +264,8 @@ contract BasedBoostedVaultOperationsGasTest is BaseTest {
             _mintAndApprove(user, asset, amountToDeposit);
             vm.prank(user);
             vault.deposit(user, asset, amountToDeposit);
-            IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](1);
-            userRateData[0] = IBasedBoostedVault.UserRateData(user, rate);
+            IStableVault.UserRateData[] memory userRateData = new IStableVault.UserRateData[](1);
+            userRateData[0] = IStableVault.UserRateData(user, rate);
             vm.prank(everyRoleAccount);
             vault.setUserRate(userRateData);
             rate++;

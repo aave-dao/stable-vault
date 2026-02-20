@@ -7,7 +7,7 @@ import {IERC20} from "forge-std/interfaces/IERC20.sol";
 
 import {Logger} from "test/helpers/Logger.sol";
 
-import {BasedBoostedVault} from "src/core/accounting/BasedBoostedVault.sol";
+import {StableVault} from "src/core/accounting/StableVault.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 
@@ -25,7 +25,7 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
         super.setUp();
     }
 
-    function _deployBasedBoostedVault(
+    function _deployStableVault(
         address adminParam,
         uint256,
         /* maxPerSecondRate */
@@ -38,10 +38,10 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
         address priceOracle,
         uint256 maxActiveSubVaults,
         address treasuryAddress
-    ) internal virtual override returns (BasedBoostedVault) {
+    ) internal virtual override returns (StableVault) {
         // Deploy a vault without restriction in the valid per-second rate
         address vaultImpl = address(
-            new BasedBoostedVault(
+            new StableVault(
                 type(uint256).max,
                 assetRegistry,
                 iouToken,
@@ -52,14 +52,12 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
                 maxActiveSubVaults
             )
         );
-        return BasedBoostedVault(
+        return StableVault(
             address(
                 new TransparentUpgradeableProxy(
                     address(vaultImpl),
                     proxyAdmin,
-                    abi.encodeCall(
-                        BasedBoostedVault.initialize, (adminParam, treasuryAddress, defaultSubVaultPerSecondRate)
-                    )
+                    abi.encodeCall(StableVault.initialize, (adminParam, treasuryAddress, defaultSubVaultPerSecondRate))
                 )
             )
         );
@@ -70,12 +68,12 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
 
         uint256 userInitialDeposit = 500 * (10 ** 6);
 
-        // Set the default rate on BBV to 5% APY
+        // Set the default rate on Stable Vault to 5% APY
         vm.prank(everyRoleAccount);
         vault.setDefaultSubVault(1_000000001547125957863212449);
 
         // User1 deposits 500 USDC to Vault on Accounting Chain
-        _mintAndDepositUsdcToBBV(user1, userInitialDeposit);
+        _mintAndDepositUsdcToStableVault(user1, userInitialDeposit);
 
         // Bridge the assets to the Earning Chain
         vm.prank(everyRoleAccount);
@@ -181,7 +179,7 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
         assertEq(iouToken_earningChain.balanceOf(user1), 0, "User should have less IOUs after withdrawing");
     }
 
-    function _mintAndDepositUsdcToBBV(address user, uint256 amount) internal {
+    function _mintAndDepositUsdcToStableVault(address user, uint256 amount) internal {
         USDC.mint(user, amount);
         vm.startPrank(user);
         USDC.approve(address(vault), amount);

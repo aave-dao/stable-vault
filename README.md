@@ -1,6 +1,6 @@
-# Based Boosted Vaults
+# Stable Vaults
 
-Based Boosted Vaults is a semi-fixed rate vault protocol developed by Aave Labs. It allows users to deposit assets into "SubVaults" that offer a specific per-second interest rate, enabling predictable yield generation. Deposited funds are allocated to yield-generating strategies (e.g. Aave). The system tracks each user's original principal independently from accrued interest. In the event the vault cannot meet its total interest obligations, users are prioritized to withdraw at least their original deposit amount.
+Stable Vaults is a semi-fixed rate vault protocol developed by Aave Labs. It allows users to deposit assets into "SubVaults" that offer a specific per-second interest rate, enabling predictable yield generation. Deposited funds are allocated to yield-generating strategies (e.g. Aave). The system tracks each user's original principal independently from accrued interest. In the event the vault cannot meet its total interest obligations, users are prioritized to withdraw at least their original deposit amount.
 
 The protocol utilizes a modular architecture and cross-chain capabilities, separating accounting logic from earning logic.
 
@@ -16,7 +16,7 @@ The protocol utilizes a modular architecture and cross-chain capabilities, separ
 
 ## Protocol Overview
 
-The core component is the `BasedBoostedVault`, which manages user positions, sub-vaults, and interest accrual.
+The core component is the `StableVault`, which manages user positions, sub-vaults, and interest accrual.
 - **SubVaults**: Virtual vaults with a defined `perSecondRate` (interest rate). This rate determines the yield users in a given SubVault earn, effectively translating to an APY number (e.g., a higher rate per second results in a higher APY).
 - **User Positions**: Users hold shares in a specific SubVault.
 - **IOU Tokens**: Used during the withdrawal process to represent a claim on assets. An IOU token unit represents a unit of the common denomination asset (e.g. USD). IOUs can be exchanged for any asset supported by the system on the chain which the IOUs are being exchanged.
@@ -32,7 +32,7 @@ Funds deposited into the protocol are managed by `Allocator` contracts (one `All
 **Cross-Chain Flow:**
 The protocol operates on a model where the Accounting Chain is the primary command center and Earning Chains act as sources of yield. Contracts on the Earning Chain can only bridge funds back to their canonical Accounting Chain.
 
-- **Accounting Chain**: Hosts the `BasedBoostedVault`, `FundsHandler` and `Allocator` for local yield strategies. It tracks the global state of user deposits and total system liquidity.
+- **Accounting Chain**: Hosts the `StableVault`, `FundsHandler` and `Allocator` for local yield strategies. It tracks the global state of user deposits and total system liquidity.
 - **Earning Chains**: Host `EarningChainGateway` and local `Allocator`s. Funds are bridged here to access yield opportunities not available on the Accounting Chain.
 
 **Oracle Architecture:**
@@ -64,7 +64,7 @@ The protocol operates on a model where the Accounting Chain is the primary comma
 
 Users can deposit supported assets into the vault (supported assets are managed on the `AssetRegistry` contract).
 
-1. **Call `deposit`**: The user calls the `deposit(address user, address asset, uint256 amount)` function on the `BasedBoostedVault` contract.
+1. **Call `deposit`**: The user calls the `deposit(address user, address asset, uint256 amount)` function on the `StableVault` contract.
 2. **Share Calculation**: The deposited amount is converted into shares of a SubVault based on the current conversion rate.
 3. **Position Update**: The user's position is credited with the calculated shares.
 
@@ -76,7 +76,7 @@ Withdrawals are a two-step process designed to ensure liquidity management and p
    - The user calls `requestWithdrawal(address user, uint256 requestedAmountInRay)`.
    - A corresponding amount of the user's shares are burned.
    - **IOU Tokens** are minted to the user, representing their claim on the underlying assets.
-   - This action must be performed on the Accounting Chain since the `BasedBoostedVault` is the source of truth for a user's claimable balance.
+   - This action must be performed on the Accounting Chain since the `StableVault` is the source of truth for a user's claimable balance.
 
 2. **Bridging IOUs**
     - IOUs can be bridged between chains using the `IouTokenManager.bridgeTokens(...)` function.
@@ -88,7 +88,7 @@ Withdrawals are a two-step process designed to ensure liquidity management and p
    IOUs can be exchanged for assets on either the Accounting Chain or Earning Chains.
 
    - **Accounting Chain**:
-     - **Contract**: `BasedBoostedVault`
+     - **Contract**: `StableVault`
      - **Function**: `executeWithdrawal(...)`
      - **Process**: IOUs are burned via `IouTokenManager`. The `WithdrawalPolicy` enforces the protocol's policies and operational costs associated with the withdrawal. Assets are withdrawn from the local `Allocator` then transferred to the user from the `TransferHelper`.
 
@@ -100,7 +100,7 @@ Withdrawals are a two-step process designed to ensure liquidity management and p
 ## Repository Structure
 
 ```
-based-boosted-vaults/
+stable-vault/
 ├── src/                          # Main source code
 │   ├── access/                   # Access control contracts
 │   ├── bridging/                 # Adapters used by protocol to interface with cross-chain bridges
@@ -160,7 +160,7 @@ make gas-report
 
 Snapshot files generated:
 
-- `BasedBoostedVault.Operations.json`: Gas for user related BasedBoostedVault interactions.
+- `StableVault.Operations.json`: Gas for user related StableVault interactions.
 
 ### Format
 

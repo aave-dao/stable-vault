@@ -23,8 +23,8 @@ contract ATokenVaultDeployment {
             poolAddressesProvider: poolAddressProvider,
             owner: owner,
             initialFee: 0,
-            shareName: string(abi.encodePacked("BBV's ", IERC20Metadata(underlying).name())),
-            shareSymbol: string(abi.encodePacked("BBV/", IERC20Metadata(underlying).symbol())),
+            shareName: string(abi.encodePacked("StableVault's ", IERC20Metadata(underlying).name())),
+            shareSymbol: string(abi.encodePacked("StableVault/", IERC20Metadata(underlying).symbol())),
             initialLockDeposit: initialLockDeposit,
             revenueRecipients: new IATokenVaultFactory.Recipient[](0)
         });

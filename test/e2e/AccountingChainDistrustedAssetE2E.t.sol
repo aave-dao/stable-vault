@@ -7,8 +7,8 @@ import {IERC20} from "forge-std/interfaces/IERC20.sol";
 
 import {Logger} from "test/helpers/Logger.sol";
 
-import {BasedBoostedVault} from "src/core/accounting/BasedBoostedVault.sol";
-import {IBasedBoostedVault} from "src/interfaces/IBasedBoostedVault.sol";
+import {StableVault} from "src/core/accounting/StableVault.sol";
+import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {Errors} from "src/types/Errors.sol";
 
@@ -26,7 +26,7 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
         super.setUp();
     }
 
-    function _deployBasedBoostedVault(
+    function _deployStableVault(
         address adminParam,
         uint256,
         /* maxPerSecondRate */
@@ -39,10 +39,10 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
         address priceOracle,
         uint256 maxActiveSubVaults,
         address treasuryAddress
-    ) internal virtual override returns (BasedBoostedVault) {
+    ) internal virtual override returns (StableVault) {
         // Deploy a vault without restriction in the valid per-second rate
         address vaultImpl = address(
-            new BasedBoostedVault(
+            new StableVault(
                 type(uint256).max,
                 assetRegistry,
                 iouToken,
@@ -53,14 +53,12 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
                 maxActiveSubVaults
             )
         );
-        return BasedBoostedVault(
+        return StableVault(
             address(
                 new TransparentUpgradeableProxy(
                     address(vaultImpl),
                     proxyAdmin,
-                    abi.encodeCall(
-                        BasedBoostedVault.initialize, (adminParam, treasuryAddress, defaultSubVaultPerSecondRate)
-                    )
+                    abi.encodeCall(StableVault.initialize, (adminParam, treasuryAddress, defaultSubVaultPerSecondRate))
                 )
             )
         );
@@ -71,12 +69,12 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
 
         uint256 userInitialDeposit = 500 * (10 ** 6);
 
-        // Set the default rate on BBV to 5% APY
+        // Set the default rate on Stable Vault to 5% APY
         vm.prank(everyRoleAccount);
         vault.setDefaultSubVault(1_000000001547125957863212449);
 
         // User1 deposits 500 USDC to Vault on Accounting Chain
-        _mintAndDepositUsdcToBBV(user1, userInitialDeposit);
+        _mintAndDepositUsdcToStableVault(user1, userInitialDeposit);
 
         // Check the deposit was made into the default earning strategy for USDC
         address defaultUsdcVault_AccountingChain = allocator_accountingChain.getDefaultStrategy(address(USDC));
@@ -111,7 +109,7 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
         // Epect revert because system balance is zero
         vm.expectRevert(
             abi.encodeWithSelector(
-                IBasedBoostedVault.InsufficientAssets.selector,
+                IStableVault.InsufficientAssets.selector,
                 user1,
                 userBalanceAfterYear,
                 userInitialDeposit.assetDecimalsToRay(address(USDC))
@@ -152,14 +150,14 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
         uint256 user1InitialDeposit = 500 * (10 ** 6);
         uint256 user2InitialDeposit = 123 * (10 ** 18);
 
-        // Set the default rate on BBV to 5% APY
+        // Set the default rate on Stable Vault to 5% APY
         vm.prank(everyRoleAccount);
         vault.setDefaultSubVault(1_000000001547125957863212449);
 
         // User1 deposits 500 USDC to Vault on Accounting Chain
-        _mintAndDepositUsdcToBBV(user1, user1InitialDeposit);
+        _mintAndDepositUsdcToStableVault(user1, user1InitialDeposit);
         // User2 deposits 500 GHO to Vault on Accounting Chain
-        _mintAndDepositGhoToBBV(user2, user2InitialDeposit);
+        _mintAndDepositGhoToStableVault(user2, user2InitialDeposit);
 
         // Check the deposit was made into the default earning strategy for USDC
         address defaultUsdcVault_AccountingChain = allocator_accountingChain.getDefaultStrategy(address(USDC));
@@ -224,12 +222,12 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
 
         uint256 userInitialDeposit = 500 * (10 ** 6);
 
-        // Set the default rate on BBV to 5% APY
+        // Set the default rate on Stable Vault to 5% APY
         vm.prank(everyRoleAccount);
         vault.setDefaultSubVault(1_000000001547125957863212449);
 
         // User1 deposits 500 USDC to Vault on Accounting Chain
-        _mintAndDepositUsdcToBBV(user1, userInitialDeposit);
+        _mintAndDepositUsdcToStableVault(user1, userInitialDeposit);
 
         // Check the deposit was made into the default earning strategy for USDC
         address defaultUsdcVault_AccountingChain = allocator_accountingChain.getDefaultStrategy(address(USDC));
@@ -269,7 +267,7 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = profits;
 
-        vm.expectRevert(IBasedBoostedVault.NoSurplusInterestToClaim.selector);
+        vm.expectRevert(IStableVault.NoSurplusInterestToClaim.selector);
         vm.prank(everyRoleAccount);
         vault.claimSurplusInterest(assets, amounts);
     }
@@ -282,14 +280,14 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
         uint256 user1InitialDeposit = 500 * (10 ** 6);
         uint256 user2InitialDeposit = 123 * (10 ** 18);
 
-        // Set the default rate on BBV to 5% APY
+        // Set the default rate on Stable Vault to 5% APY
         vm.prank(everyRoleAccount);
         vault.setDefaultSubVault(1_000000001547125957863212449);
 
         // User1 deposits 500 USDC to Vault on Accounting Chain
-        _mintAndDepositUsdcToBBV(user1, user1InitialDeposit);
+        _mintAndDepositUsdcToStableVault(user1, user1InitialDeposit);
         // User2 deposits 500 GHO to Vault on Accounting Chain
-        _mintAndDepositGhoToBBV(user2, user2InitialDeposit);
+        _mintAndDepositGhoToStableVault(user2, user2InitialDeposit);
 
         // Check the deposit was made into the default earning strategy for USDC
         address defaultUsdcVault_AccountingChain = allocator_accountingChain.getDefaultStrategy(address(USDC));
@@ -334,7 +332,7 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                IBasedBoostedVault.InsufficientAssets.selector,
+                IStableVault.InsufficientAssets.selector,
                 user2,
                 user2BalanceAfterYear,
                 user2InitialDeposit.assetDecimalsToRay(address(GHO))
@@ -352,7 +350,7 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
         vault.executeWithdrawal(user2, address(GHO), 0, user2OriginalDepositInRay, "");
     }
 
-    function _mintAndDepositUsdcToBBV(address user, uint256 amount) internal {
+    function _mintAndDepositUsdcToStableVault(address user, uint256 amount) internal {
         USDC.mint(user, amount);
         vm.startPrank(user);
         USDC.approve(address(vault), amount);
@@ -360,7 +358,7 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
         vm.stopPrank();
     }
 
-    function _mintAndDepositGhoToBBV(address user, uint256 amount) internal {
+    function _mintAndDepositGhoToStableVault(address user, uint256 amount) internal {
         GHO.mint(user, amount);
         vm.startPrank(user);
         GHO.approve(address(vault), amount);

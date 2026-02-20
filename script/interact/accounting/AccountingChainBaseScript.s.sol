@@ -11,6 +11,6 @@ contract AccountingChainBaseScript is InteractionBaseScript {
     address constant LINK = 0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C6e196;
 
     address constant ALLOCATOR = 0x07623d7cb79B98ffceecEf180C3eC41ef0c90789;
-    address constant BASED_BOOSTED_VAULT = 0xb49bD8C7fa9d910D77eF5A356CcFdF6A4ba14602;
+    address constant STABLE_VAULT = 0xb49bD8C7fa9d910D77eF5A356CcFdF6A4ba14602;
     address constant FUNDS_HANDLER = 0xd2F851e7A5f4f43B3347376cd93824524A1b0187;
 }

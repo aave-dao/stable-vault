@@ -4,7 +4,6 @@ pragma solidity ^0.8.20;
 
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
-import {IBasedBoostedVault} from "src/interfaces/IBasedBoostedVault.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
@@ -12,6 +11,7 @@ import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
+import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {ChainBalanceOracle} from "src/oracles/balance/ChainBalanceOracle.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
@@ -269,9 +269,9 @@ library RolesLib {
     }
 
     /// @custom:delay None
-    /// @custom:location BasedBoostedVault
+    /// @custom:location StableVault
     function getRole__setUserRate() internal pure returns (Role memory) {
-        bytes4 selector = IBasedBoostedVault.setUserRate.selector;
+        bytes4 selector = IStableVault.setUserRate.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
@@ -282,9 +282,9 @@ library RolesLib {
     }
 
     /// @custom:delay None
-    /// @custom:location BasedBoostedVault
+    /// @custom:location StableVault
     function getRole__setSubVaultRate() internal pure returns (Role memory) {
-        bytes4 selector = IBasedBoostedVault.setSubVaultRate.selector;
+        bytes4 selector = IStableVault.setSubVaultRate.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
@@ -295,9 +295,9 @@ library RolesLib {
     }
 
     /// @custom:delay None
-    /// @custom:location BasedBoostedVault
+    /// @custom:location StableVault
     function getRole__setDefaultSubVault() internal pure returns (Role memory) {
-        bytes4 selector = IBasedBoostedVault.setDefaultSubVault.selector;
+        bytes4 selector = IStableVault.setDefaultSubVault.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
@@ -308,9 +308,9 @@ library RolesLib {
     }
 
     /// @custom:delay Medium
-    /// @custom:location BasedBoostedVault
+    /// @custom:location StableVault
     function getRole__claimSurplusInterest() internal pure returns (Role memory) {
-        bytes4 selector = IBasedBoostedVault.claimSurplusInterest.selector;
+        bytes4 selector = IStableVault.claimSurplusInterest.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
@@ -321,9 +321,9 @@ library RolesLib {
     }
 
     /// @custom:delay Medium
-    /// @custom:location BasedBoostedVault
+    /// @custom:location StableVault
     function getRole__setTreasury() internal pure returns (Role memory) {
-        bytes4 selector = IBasedBoostedVault.setTreasury.selector;
+        bytes4 selector = IStableVault.setTreasury.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
@@ -438,7 +438,7 @@ library RolesLib {
     }
 
     /// @custom:delay None
-    /// @custom:location FundsHandler, EarningChainGateway, BasedBoostedVault, AccountingChainGateway
+    /// @custom:location FundsHandler, EarningChainGateway, StableVault, AccountingChainGateway
     function getRole__rescueTokens() internal pure returns (Role memory) {
         bytes4 selector = IRescuableToken.rescueTokens.selector;
         return Role({
@@ -451,7 +451,7 @@ library RolesLib {
     }
 
     /// @custom:delay None
-    /// @custom:location CcipAdapter, BasedBoostedVault, AccountingChainGateway, FundsHandler, EarningChainGateway
+    /// @custom:location CcipAdapter, StableVault, AccountingChainGateway, FundsHandler, EarningChainGateway
     function getRole__rescueNative() internal pure returns (Role memory) {
         bytes4 selector = IRescuableNative.rescueNative.selector;
         return Role({
@@ -585,7 +585,7 @@ library RolesLib {
         roles[18] = getRole__setChainSelector();
         roles[19] = getRole__replayFundsReceiving();
 
-        // BasedBoostedVault
+        // StableVault
         roles[20] = getRole__setUserRate();
         roles[21] = getRole__setSubVaultRate();
         roles[22] = getRole__setDefaultSubVault();

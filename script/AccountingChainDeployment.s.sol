@@ -18,8 +18,8 @@ import {IRouterClient} from "@chainlink-ccip/contracts/interfaces/IRouterClient.
 import {CcipAdapter} from "src/bridging/ccip/CcipAdapter.sol";
 import {Allocator} from "src/core/Allocator.sol";
 import {AccountingChainGateway} from "src/core/accounting/AccountingChainGateway.sol";
-import {BasedBoostedVault} from "src/core/accounting/BasedBoostedVault.sol";
 import {FundsHandler} from "src/core/accounting/FundsHandler.sol";
+import {StableVault} from "src/core/accounting/StableVault.sol";
 import {IouToken} from "src/core/ious/IouToken.sol";
 import {IouTokenManager} from "src/core/ious/IouTokenManager.sol";
 import {IAccountingChainGateway} from "src/interfaces/IAccountingChainGateway.sol";
@@ -57,7 +57,7 @@ contract AccountingChainDeployment is
     uint8 constant STRATEGY_MAX_SLIPPAGE_AMOUNT = 10; // 10 wei
 
     address immutable PROXY_ADMIN_OWNER = getAccessManagerAddress(DEPLOYER);
-    address immutable BBV_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
+    address immutable STABLE_VAULT_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
     address immutable ALLOCATOR_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
     address immutable WITHDRAWAL_POLICY_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
     address immutable ASSET_REGISTRY_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
@@ -137,7 +137,7 @@ contract AccountingChainDeployment is
         _deployIouTokenManager();
         _deployPriceOracle();
         _deployChainBalanceOracle();
-        _deployBasedBoostedVault();
+        _deployStableVault();
         _deployAllocator();
         _deployFundsHandler();
         _deployGateway();
@@ -262,7 +262,7 @@ contract AccountingChainDeployment is
     }
 
     function _deployWithdrawalPolicy() internal returns (address) {
-        address implementation = address(new WithdrawalPolicy(getBasedBoostedVaultAddress(DEPLOYER)));
+        address implementation = address(new WithdrawalPolicy(getStableVaultAddress(DEPLOYER)));
         _logDeployment("WithdrawalPolicy::Implementation", "", implementation);
         address withdrawalPolicy = _deployTransparentProxy_create3({
             namespacedSaltSeed: WITHDRAWAL_POLICY_SALT_SEED,
@@ -294,7 +294,7 @@ contract AccountingChainDeployment is
             new IouTokenManager({
                 iouToken: getIouTokenAddress(DEPLOYER),
                 chainGateway: getGatewayAddress(DEPLOYER),
-                vault: getBasedBoostedVaultAddress(DEPLOYER),
+                vault: getStableVaultAddress(DEPLOYER),
                 transferHelper: getTransferHelperAddress(DEPLOYER),
                 isAccountingChain: true
             })
@@ -314,9 +314,9 @@ contract AccountingChainDeployment is
         return iouTokenManager;
     }
 
-    function _deployBasedBoostedVault() internal returns (address) {
+    function _deployStableVault() internal returns (address) {
         address implementation = address(
-            new BasedBoostedVault({
+            new StableVault({
                 maxValidPerSecondRate: DEFAULT_MAX_PER_SECOND_RATE,
                 assetRegistry: getAssetRegistryAddress(DEPLOYER),
                 iouTokenManager: getIouTokenManagerAddress(DEPLOYER),
@@ -327,20 +327,19 @@ contract AccountingChainDeployment is
                 maxActiveSubVaults: DEFAULT_MAX_ACTIVE_SUB_VAULTS
             })
         );
-        _logDeployment("BasedBoostedVault::Implementation", "", implementation);
-        address bbv = _deployTransparentProxy_create3({
-            namespacedSaltSeed: BASED_BOOSTED_VAULT_SALT_SEED,
+        _logDeployment("StableVault::Implementation", "", implementation);
+        address stableVault = _deployTransparentProxy_create3({
+            namespacedSaltSeed: STABLE_VAULT_SALT_SEED,
             deployer: DEPLOYER,
             implementation: implementation,
-            proxyAdminOwner: BBV_PROXY_ADMIN_OWNER,
+            proxyAdminOwner: STABLE_VAULT_PROXY_ADMIN_OWNER,
             initCalldata: abi.encodeCall(
-                BasedBoostedVault.initialize,
-                (getAccessManagerAddress(DEPLOYER), TREASURY, DEFAULT_SUB_VAULT_PER_SECOND_RATE)
+                StableVault.initialize, (getAccessManagerAddress(DEPLOYER), TREASURY, DEFAULT_SUB_VAULT_PER_SECOND_RATE)
             )
         });
-        require(bbv == getBasedBoostedVaultAddress(DEPLOYER), "BasedBoostedVault does not match expected address");
-        _logDeployment("BasedBoostedVault", BASED_BOOSTED_VAULT_SALT_SEED, bbv);
-        return bbv;
+        require(stableVault == getStableVaultAddress(DEPLOYER), "StableVault does not match expected address");
+        _logDeployment("StableVault", STABLE_VAULT_SALT_SEED, stableVault);
+        return stableVault;
     }
 
     function _deployAllocator() internal returns (address) {
@@ -370,7 +369,7 @@ contract AccountingChainDeployment is
     function _deployFundsHandler() internal returns (address) {
         address implementation = address(
             new FundsHandler({
-                basedBoostedVault: getBasedBoostedVaultAddress(DEPLOYER),
+                stableVault: getStableVaultAddress(DEPLOYER),
                 gateway: getGatewayAddress(DEPLOYER),
                 allocator: getAllocatorAddress(DEPLOYER),
                 priceOracle: getPriceOracleAddress(DEPLOYER),

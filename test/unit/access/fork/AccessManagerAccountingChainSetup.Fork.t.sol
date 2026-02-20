@@ -45,8 +45,8 @@ contract AccessManagerAccountingChainSetupForkTest is AccessManagerAccountingCha
         return ATOKEN_VAULT_REWARD_CLAIMER_PROFILE;
     }
 
-    function _getProfile__BbvManager() internal pure override returns (address) {
-        return BBV_MANAGER_PROFILE;
+    function _getProfile__StableVaultManager() internal pure override returns (address) {
+        return STABLE_VAULT_MANAGER_PROFILE;
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

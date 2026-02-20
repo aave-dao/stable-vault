@@ -11,12 +11,12 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transpa
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
-import {BasedBoostedVault} from "src/core/accounting/BasedBoostedVault.sol";
-import {IBasedBoostedVault} from "src/interfaces/IBasedBoostedVault.sol";
+import {StableVault} from "src/core/accounting/StableVault.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
+import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
@@ -27,7 +27,6 @@ import {Errors} from "src/types/Errors.sol";
 
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
 import {_toAddressArray, _toUint256Array} from "test/helpers/TypeHelpers.sol";
-import {BasedBoostedVaultHarness} from "test/mocks/BasedBoostedVaultHarness.sol";
 import {MockAccessManager} from "test/mocks/MockAccessManager.sol";
 import {MockAssetRegistry} from "test/mocks/MockAssetRegistry.sol";
 import {MockErc20} from "test/mocks/MockErc20.sol";
@@ -37,8 +36,9 @@ import {MockIouTokenManager} from "test/mocks/MockIouTokenManager.sol";
 import {MockNonStandardErc20} from "test/mocks/MockNonStandardErc20.sol";
 import {MockReentrantErc20} from "test/mocks/MockReentrantErc20.sol";
 import {MockTransferHelper} from "test/mocks/MockTransferHelper.sol";
+import {StableVaultHarness} from "test/mocks/StableVaultHarness.sol";
 
-contract BasedBoostedVaultTest is TestWithHelpers {
+contract StableVaultTest is TestWithHelpers {
     using MathLib for uint256;
     using AssetLib for uint256;
     using SafeERC20 for IMockErc20;
@@ -59,13 +59,13 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     MockTransferHelper mockTransferHelper;
     WithdrawalPolicy mockWithdrawalPolicy;
     PriceOracle mockPriceOracle;
-    IBasedBoostedVault bbv;
+    IStableVault stableVault;
 
     function _deployDefaultAsset() internal returns (IMockErc20) {
         return IMockErc20(address(new MockNonStandardErc20("Test USDT", "tUSDT", 6)));
     }
 
-    function _deployBasedBoostedVault(
+    function _deployStableVault(
         address accessManager,
         uint256 maxPerSecondRate,
         uint256 defaultSubVaultPerSecondRate,
@@ -77,9 +77,9 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         address priceOracleAddress,
         uint256 maxActiveSubVaults,
         address treasuryAddress
-    ) internal returns (IBasedBoostedVault) {
+    ) internal returns (IStableVault) {
         address vaultImpl = address(
-            new BasedBoostedVault(
+            new StableVault(
                 maxPerSecondRate,
                 assetRegistry,
                 iouTokenManager,
@@ -90,20 +90,20 @@ contract BasedBoostedVaultTest is TestWithHelpers {
                 maxActiveSubVaults
             )
         );
-        return BasedBoostedVault(
+        return StableVault(
             address(
                 new TransparentUpgradeableProxy(
                     vaultImpl,
                     address(this),
                     abi.encodeCall(
-                        BasedBoostedVault.initialize, (accessManager, treasuryAddress, defaultSubVaultPerSecondRate)
+                        StableVault.initialize, (accessManager, treasuryAddress, defaultSubVaultPerSecondRate)
                     )
                 )
             )
         );
     }
 
-    function _deployBasedBoostedVaultHarness(
+    function _deployStableVaultHarness(
         address accessManager,
         uint256 maxPerSecondRate,
         uint256 defaultSubVaultPerSecondRate,
@@ -115,9 +115,9 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         address priceOracleAddress,
         uint256 maxActiveSubVaults,
         address treasuryAddress
-    ) internal returns (BasedBoostedVaultHarness) {
+    ) internal returns (StableVaultHarness) {
         address vaultImpl = address(
-            new BasedBoostedVaultHarness(
+            new StableVaultHarness(
                 maxPerSecondRate,
                 assetRegistry,
                 iouTokenManager,
@@ -128,13 +128,13 @@ contract BasedBoostedVaultTest is TestWithHelpers {
                 maxActiveSubVaults
             )
         );
-        return BasedBoostedVaultHarness(
+        return StableVaultHarness(
             address(
                 new TransparentUpgradeableProxy(
                     vaultImpl,
                     address(this),
                     abi.encodeCall(
-                        BasedBoostedVault.initialize, (accessManager, treasuryAddress, defaultSubVaultPerSecondRate)
+                        StableVault.initialize, (accessManager, treasuryAddress, defaultSubVaultPerSecondRate)
                     )
                 )
             )
@@ -171,12 +171,12 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         // Mock validatePrice to pass for any asset (tests may create additional assets)
         _mockValidatePriceForAll(address(mockPriceOracle));
 
-        // Predict BBV proxy address after WithdrawalPolicy impl+proxy and BBV impl deployments.
+        // Predict StableVault proxy address after WithdrawalPolicy impl+proxy and StableVault impl deployments.
         uint256 deployerNonce = vm.getNonce(address(this));
-        address expectedBbvProxy = vm.computeCreateAddress(address(this), deployerNonce + 3);
+        address expectedStableVaultProxy = vm.computeCreateAddress(address(this), deployerNonce + 3);
 
-        mockWithdrawalPolicy = _deployWithdrawalPolicy(address(mockAccessManager), expectedBbvProxy);
-        bbv = _deployBasedBoostedVault(
+        mockWithdrawalPolicy = _deployWithdrawalPolicy(address(mockAccessManager), expectedStableVaultProxy);
+        stableVault = _deployStableVault(
             address(mockAccessManager),
             DEFAULT_MAX_PER_SECOND_RATE,
             DEFAULT_PER_SECOND_RATE,
@@ -200,7 +200,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(expectedFundsHandler != address(0));
         vm.assume(expectedMaxValidPerSecondRate > MathLib.RAY);
 
-        BasedBoostedVault newBbv = new BasedBoostedVault(
+        StableVault newStableVault = new StableVault(
             expectedMaxValidPerSecondRate,
             address(mockAssetRegistry),
             expectedIouManager,
@@ -211,14 +211,14 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             DEFAULT_MAX_ACTIVE_SUB_VAULTS
         );
 
-        assertEq(newBbv.getMaxValidPerSecondRate(), expectedMaxValidPerSecondRate);
+        assertEq(newStableVault.getMaxValidPerSecondRate(), expectedMaxValidPerSecondRate);
     }
 
     function test_constructor_reverts_ifInvalidMaxValidPerSecondRate(uint256 invalidMaxValidPerSecondRate) public {
         vm.assume(invalidMaxValidPerSecondRate <= MathLib.RAY);
 
-        vm.expectRevert(IBasedBoostedVault.InvalidRate.selector);
-        new BasedBoostedVault(
+        vm.expectRevert(IStableVault.InvalidRate.selector);
+        new StableVault(
             invalidMaxValidPerSecondRate,
             address(mockAssetRegistry),
             address(mockIouTokenManager),
@@ -232,7 +232,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
     function test_constructor_reverts_ifInvalidTransferHelper() public {
         vm.expectRevert();
-        new BasedBoostedVault(
+        new StableVault(
             DEFAULT_MAX_PER_SECOND_RATE,
             address(mockAssetRegistry),
             address(mockIouTokenManager),
@@ -256,8 +256,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(expectedAssetRegistry != address(0));
         expectedDefaultSubVaultRate = _boundRate(expectedDefaultSubVaultRate);
 
-        address bbvImpl = address(
-            new BasedBoostedVault(
+        address stableVaultImpl = address(
+            new StableVault(
                 DEFAULT_MAX_PER_SECOND_RATE,
                 address(mockAssetRegistry),
                 address(mockIouTokenManager),
@@ -269,30 +269,29 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             )
         );
 
-        BasedBoostedVault newBbv = BasedBoostedVault(
+        StableVault newStableVault = StableVault(
             address(
                 new TransparentUpgradeableProxy(
-                    bbvImpl,
+                    stableVaultImpl,
                     address(this),
                     abi.encodeCall(
-                        BasedBoostedVault.initialize,
-                        (expectedAccessManager, expectedTreasury, expectedDefaultSubVaultRate)
+                        StableVault.initialize, (expectedAccessManager, expectedTreasury, expectedDefaultSubVaultRate)
                     )
                 )
             )
         );
 
-        IBasedBoostedVault.SubVaultData memory defaultSubVault = newBbv.getDefaultSubVault();
+        IStableVault.SubVaultData memory defaultSubVault = newStableVault.getDefaultSubVault();
         assertEq(defaultSubVault.perSecondRate, expectedDefaultSubVaultRate);
-        assertEq(defaultSubVault.id, newBbv.getSubVaultIdByRate(expectedDefaultSubVaultRate));
-        assertEq(newBbv.getTreasury(), expectedTreasury);
+        assertEq(defaultSubVault.id, newStableVault.getSubVaultIdByRate(expectedDefaultSubVaultRate));
+        assertEq(newStableVault.getTreasury(), expectedTreasury);
     }
 
     function test_initialize_reverts_ifInvalidDefaultSubVaultRate(uint256 invalidDefaultSubVaultRate) public {
         vm.assume(invalidDefaultSubVaultRate < MathLib.RAY || invalidDefaultSubVaultRate > DEFAULT_MAX_PER_SECOND_RATE);
 
-        address bbvImpl = address(
-            new BasedBoostedVault(
+        address stableVaultImpl = address(
+            new StableVault(
                 DEFAULT_MAX_PER_SECOND_RATE,
                 address(mockAssetRegistry),
                 address(mockIouTokenManager),
@@ -304,14 +303,14 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             )
         );
 
-        vm.expectRevert(IBasedBoostedVault.InvalidRate.selector);
-        BasedBoostedVault(
+        vm.expectRevert(IStableVault.InvalidRate.selector);
+        StableVault(
             address(
                 new TransparentUpgradeableProxy(
-                    bbvImpl,
+                    stableVaultImpl,
                     address(this),
                     abi.encodeCall(
-                        BasedBoostedVault.initialize, (address(mockAccessManager), treasury, invalidDefaultSubVaultRate)
+                        StableVault.initialize, (address(mockAccessManager), treasury, invalidDefaultSubVaultRate)
                     )
                 )
             )
@@ -321,28 +320,28 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     function test_deposit_firstUserDepositGoesToDefaultSubVault(address user, uint256 amount) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
         amount = _boundAssetAmount(address(mockAsset), amount);
 
-        IBasedBoostedVault.SubVaultData memory userSubVault = bbv.getUserSubVault(user);
+        IStableVault.SubVaultData memory userSubVault = stableVault.getUserSubVault(user);
         vm.assume(userSubVault.id == 0); // no prior deposits
 
         mockAsset.mint(user, amount);
 
         vm.prank(user);
-        mockAsset.forceApprove(address(bbv), amount);
+        mockAsset.forceApprove(address(stableVault), amount);
 
         vm.prank(user);
-        bbv.deposit(user, address(mockAsset), amount);
+        stableVault.deposit(user, address(mockAsset), amount);
 
-        userSubVault = bbv.getUserSubVault(user);
+        userSubVault = stableVault.getUserSubVault(user);
         assertNotEq(userSubVault.id, 0); // subVault assigned after deposit
 
-        IBasedBoostedVault.SubVaultData memory defaultSubVault = bbv.getDefaultSubVault();
+        IStableVault.SubVaultData memory defaultSubVault = stableVault.getDefaultSubVault();
         assertEq(userSubVault.id, defaultSubVault.id);
         assertEq(userSubVault.perSecondRate, defaultSubVault.perSecondRate);
 
-        assertEq(bbv.getGlobalOriginalDepositAmount(), amount.assetDecimalsToRay(address(mockAsset)));
+        assertEq(stableVault.getGlobalOriginalDepositAmount(), amount.assetDecimalsToRay(address(mockAsset)));
     }
 
     function test_deposit_goesToCurrentUserSubVaultIfUserAlreadyHasAPosition(
@@ -353,7 +352,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     ) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
         firstDepositAmount = _boundAssetAmount(address(mockAsset), firstDepositAmount);
         secondDepositAmount = _boundAssetAmount(address(mockAsset), secondDepositAmount);
         // Assumes the sum of the two deposits does not exceed the max expected deposit amount
@@ -365,35 +364,35 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         mockAsset.mint(user, firstDepositAmount + secondDepositAmount);
 
-        vm.assume(userRate != bbv.getDefaultSubVault().perSecondRate);
-        vm.assume(bbv.getUserSubVault(user).id == 0); // no prior deposits
+        vm.assume(userRate != stableVault.getDefaultSubVault().perSecondRate);
+        vm.assume(stableVault.getUserSubVault(user).id == 0); // no prior deposits
 
         vm.prank(user);
-        mockAsset.forceApprove(address(bbv), firstDepositAmount);
+        mockAsset.forceApprove(address(stableVault), firstDepositAmount);
 
         vm.prank(user);
-        bbv.deposit(user, address(mockAsset), firstDepositAmount);
+        stableVault.deposit(user, address(mockAsset), firstDepositAmount);
 
-        assertEq(bbv.getUserSubVault(user).id, bbv.getDefaultSubVault().id);
+        assertEq(stableVault.getUserSubVault(user).id, stableVault.getDefaultSubVault().id);
 
         vm.prank(manager);
         _setUserRate(user, userRate);
 
-        IBasedBoostedVault.SubVaultData memory userVaultBeforeSecondDeposit = bbv.getUserSubVault(user);
-        assertNotEq(userVaultBeforeSecondDeposit.id, bbv.getDefaultSubVault().id);
+        IStableVault.SubVaultData memory userVaultBeforeSecondDeposit = stableVault.getUserSubVault(user);
+        assertNotEq(userVaultBeforeSecondDeposit.id, stableVault.getDefaultSubVault().id);
 
         vm.prank(user);
-        mockAsset.forceApprove(address(bbv), secondDepositAmount);
+        mockAsset.forceApprove(address(stableVault), secondDepositAmount);
 
         vm.prank(user);
-        bbv.deposit(user, address(mockAsset), secondDepositAmount);
+        stableVault.deposit(user, address(mockAsset), secondDepositAmount);
 
-        IBasedBoostedVault.SubVaultData memory userVaultAfterSecondDeposit = bbv.getUserSubVault(user);
+        IStableVault.SubVaultData memory userVaultAfterSecondDeposit = stableVault.getUserSubVault(user);
         assertEq(userVaultBeforeSecondDeposit.id, userVaultAfterSecondDeposit.id);
         assertEq(userVaultBeforeSecondDeposit.perSecondRate, userVaultAfterSecondDeposit.perSecondRate);
 
         assertEq(
-            bbv.getGlobalOriginalDepositAmount(),
+            stableVault.getGlobalOriginalDepositAmount(),
             (firstDepositAmount + secondDepositAmount).assetDecimalsToRay(address(mockAsset))
         );
     }
@@ -401,34 +400,36 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     function test_deposit_reverts_ifAmountIsZero(address user) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
 
         vm.prank(user);
         vm.expectRevert(Errors.InvalidAmount.selector);
-        bbv.deposit(user, address(mockAsset), 0);
+        stableVault.deposit(user, address(mockAsset), 0);
     }
 
-    function test_deposit_reverts_ifAssetIsNotAllowedToDepositIntoBBV(address msgSender, address user, uint256 amount)
-        public
-    {
+    function test_deposit_reverts_ifAssetIsNotAllowedToDepositIntoStableVault(
+        address msgSender,
+        address user,
+        uint256 amount
+    ) public {
         vm.assume(msgSender != address(0));
-        _assumeNotProxyAdmin(msgSender, address(bbv));
+        _assumeNotProxyAdmin(msgSender, address(stableVault));
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
         vm.assume(msgSender != user);
 
         amount = _boundAssetAmount(address(mockAsset), amount);
         mockAsset.mint(user, amount);
 
         vm.prank(user);
-        mockAsset.forceApprove(address(bbv), amount);
+        mockAsset.forceApprove(address(stableVault), amount);
 
-        mockAssetRegistry.mockToDisallowAssetDepositsIntoBBV(address(mockAsset));
+        mockAssetRegistry.mockToDisallowAssetDepositsIntoStableVault(address(mockAsset));
 
         vm.prank(user);
         vm.expectRevert(abi.encodeWithSelector(Errors.UnsupportedAsset.selector, address(mockAsset)));
-        bbv.deposit(user, address(mockAsset), amount);
+        stableVault.deposit(user, address(mockAsset), amount);
     }
 
     function test_deposit_reverts_ifUserGetsZeroShares() public {
@@ -442,7 +443,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         MockErc20 highDecimalToken = new MockErc20("HighDecimal", "HD27", 27);
 
         uint256 twentyPercentApy = 1000000005781378656804591713; // ~20% APY
-        IBasedBoostedVault vault = _deployBasedBoostedVault(
+        IStableVault vault = _deployStableVault(
             address(mockAccessManager),
             twentyPercentApy + 1,
             twentyPercentApy,
@@ -485,10 +486,10 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         mockAsset.mint(user, amount);
         vm.prank(user);
-        mockAsset.forceApprove(address(bbv), amount);
+        mockAsset.forceApprove(address(stableVault), amount);
         vm.prank(user);
         vm.expectRevert(IPriceOracle.PriceTooLow.selector);
-        bbv.deposit(user, address(mockAsset), amount);
+        stableVault.deposit(user, address(mockAsset), amount);
     }
 
     function test_deposit_allowsToDepositOnBehalfOfOtherUser(address user, address msgSender, uint256 amount) public {
@@ -496,25 +497,25 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(msgSender != address(0));
         vm.assume(user != address(mockFundsHandler));
         vm.assume(msgSender != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
-        _assumeNotProxyAdmin(msgSender, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
+        _assumeNotProxyAdmin(msgSender, address(stableVault));
         amount = _boundAssetAmount(address(mockAsset), amount);
 
-        vm.assume(bbv.getUserBalance(user) == 0);
-        vm.assume(bbv.getUserBalance(msgSender) == 0);
+        vm.assume(stableVault.getUserBalance(user) == 0);
+        vm.assume(stableVault.getUserBalance(msgSender) == 0);
 
         mockAsset.mint(msgSender, amount);
         vm.prank(msgSender);
-        mockAsset.forceApprove(address(bbv), amount);
+        mockAsset.forceApprove(address(stableVault), amount);
 
         vm.assume(mockAsset.balanceOf(user) == 0);
         vm.assume(mockAsset.balanceOf(msgSender) == amount);
 
         vm.prank(msgSender);
-        bbv.deposit(user, address(mockAsset), amount);
+        stableVault.deposit(user, address(mockAsset), amount);
 
-        assertTrue(bbv.getUserBalance(user) > 0);
-        assertTrue(bbv.getUserBalance(msgSender) == 0);
+        assertTrue(stableVault.getUserBalance(user) > 0);
+        assertTrue(stableVault.getUserBalance(msgSender) == 0);
 
         vm.assume(mockAsset.balanceOf(user) == 0);
         vm.assume(mockAsset.balanceOf(msgSender) == 0);
@@ -523,13 +524,13 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     function test_deposit_callsFundsHandlerToProcessDepositWithExpectedParams(address user, uint256 amount) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
         amount = _boundAssetAmount(address(mockAsset), amount);
 
         mockAsset.mint(user, amount);
 
         vm.prank(user);
-        mockAsset.forceApprove(address(bbv), amount);
+        mockAsset.forceApprove(address(stableVault), amount);
 
         vm.expectCall(
             address(mockFundsHandler),
@@ -537,66 +538,66 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         );
 
         vm.prank(user);
-        bbv.deposit(user, address(mockAsset), amount);
+        stableVault.deposit(user, address(mockAsset), amount);
     }
 
     function test_deposit_emitsTransferMintEvent() public {
         address user = makeAddr("user");
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
 
         uint256 amount = 2_000_000;
         uint256 amountRay = amount.assetDecimalsToRay(address(mockAsset));
         mockAsset.mint(user, amount);
 
         vm.prank(user);
-        mockAsset.forceApprove(address(bbv), amount);
+        mockAsset.forceApprove(address(stableVault), amount);
 
         vm.expectEmit(true, true, true, true);
-        emit IBasedBoostedVault.Deposit(user, address(mockAsset), amount);
+        emit IStableVault.Deposit(user, address(mockAsset), amount);
         vm.expectEmit(true, true, true, true);
-        emit IBasedBoostedVault.Transfer(address(0), user, amountRay);
+        emit IStableVault.Transfer(address(0), user, amountRay);
 
         vm.prank(user);
-        bbv.deposit(user, address(mockAsset), amount);
+        stableVault.deposit(user, address(mockAsset), amount);
     }
 
     function test_setUserRate_reverts_ifUserDoesNotHaveAPosition(address user, uint256 newPerSecondRate) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
-        vm.assume(bbv.getUserSubVault(user).id == 0); // no prior deposits
+        _assumeNotProxyAdmin(user, address(stableVault));
+        vm.assume(stableVault.getUserSubVault(user).id == 0); // no prior deposits
         newPerSecondRate = _boundRate(newPerSecondRate);
-        vm.assume(newPerSecondRate != bbv.getDefaultSubVault().perSecondRate);
+        vm.assume(newPerSecondRate != stableVault.getDefaultSubVault().perSecondRate);
 
         vm.prank(manager);
-        vm.expectRevert(IBasedBoostedVault.NonExistentPosition.selector);
+        vm.expectRevert(IStableVault.NonExistentPosition.selector);
         _setUserRate(user, DEFAULT_PER_SECOND_RATE);
     }
 
     function test_setUserRate_reverts_ifSettingTheSameRateHeAlreadyHas(address user, uint256 amount) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
         amount = _boundAssetAmount(address(mockAsset), amount);
 
         mockAsset.mint(user, amount);
 
         vm.prank(user);
-        mockAsset.forceApprove(address(bbv), amount);
+        mockAsset.forceApprove(address(stableVault), amount);
 
         vm.prank(user);
-        bbv.deposit(user, address(mockAsset), amount);
+        stableVault.deposit(user, address(mockAsset), amount);
 
-        uint256 currentRate = bbv.getUserSubVault(user).perSecondRate;
+        uint256 currentRate = stableVault.getUserSubVault(user).perSecondRate;
 
         vm.prank(manager);
-        vm.expectRevert(IBasedBoostedVault.RedundantRate.selector);
+        vm.expectRevert(IStableVault.RedundantRate.selector);
         _setUserRate(user, currentRate);
     }
 
     function test_setUserRate_reverts_ifMaxActiveSubVaultsIsReached_AtDeposit(uint256 maxActiveSubVaults) public {
         maxActiveSubVaults = bound(maxActiveSubVaults, 1, 20);
-        bbv = _deployBasedBoostedVault(
+        stableVault = _deployStableVault(
             address(mockAccessManager),
             DEFAULT_MAX_PER_SECOND_RATE,
             DEFAULT_PER_SECOND_RATE,
@@ -623,18 +624,18 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         user = _generateNewUser();
         mockAsset.mint(user, amountToDeposit);
         vm.prank(user);
-        mockAsset.forceApprove(address(bbv), amountToDeposit);
+        mockAsset.forceApprove(address(stableVault), amountToDeposit);
         vm.prank(user);
 
-        assertEq(bbv.getActiveSubVaults().length, maxActiveSubVaults);
+        assertEq(stableVault.getActiveSubVaults().length, maxActiveSubVaults);
 
-        vm.expectRevert(IBasedBoostedVault.TooManyActiveSubVaults.selector);
-        bbv.deposit(user, address(mockAsset), amountToDeposit);
+        vm.expectRevert(IStableVault.TooManyActiveSubVaults.selector);
+        stableVault.deposit(user, address(mockAsset), amountToDeposit);
     }
 
     function test_setUserRate_reverts_ifMaxActiveSubVaultsIsReached_AtSetUserRate(uint256 maxActiveSubVaults) public {
         maxActiveSubVaults = bound(maxActiveSubVaults, 1, 20);
-        bbv = _deployBasedBoostedVault(
+        stableVault = _deployStableVault(
             address(mockAccessManager),
             DEFAULT_MAX_PER_SECOND_RATE,
             DEFAULT_PER_SECOND_RATE,
@@ -657,7 +658,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         _deposit(user, amountToDeposit);
         i++;
 
-        assertEq(bbv.getActiveSubVaults().length, 1);
+        assertEq(stableVault.getActiveSubVaults().length, 1);
 
         // Create the rest of active sub-vaults
         while (i < maxActiveSubVaults) {
@@ -667,21 +668,21 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             i++;
         }
 
-        assertEq(bbv.getActiveSubVaults().length, maxActiveSubVaults);
+        assertEq(stableVault.getActiveSubVaults().length, maxActiveSubVaults);
 
         user = _generateNewUser();
         // This deposit does not reach the cap, because it overlaps with the first user's position at default sub-vault
         _deposit(user, amountToDeposit);
 
-        assertEq(bbv.getActiveSubVaults().length, maxActiveSubVaults);
+        assertEq(stableVault.getActiveSubVaults().length, maxActiveSubVaults);
 
-        vm.expectRevert(IBasedBoostedVault.TooManyActiveSubVaults.selector);
+        vm.expectRevert(IStableVault.TooManyActiveSubVaults.selector);
         _setUserRate(user, DEFAULT_PER_SECOND_RATE + i + 1);
     }
 
     function test_setUserRate_smallConversionRateToLargeConversionRate() public {
-        // Override bbv with a low default sub-vault rate
-        bbv = _deployBasedBoostedVault(
+        // Override stableVault with a low default sub-vault rate
+        stableVault = _deployStableVault(
             address(mockAccessManager),
             DEFAULT_MAX_PER_SECOND_RATE,
             MathLib.RAY,
@@ -706,15 +707,15 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockAsset.mint(user1, amount);
 
         vm.prank(user1);
-        mockAsset.forceApprove(address(bbv), amount);
+        mockAsset.forceApprove(address(stableVault), amount);
 
         vm.prank(user1);
-        bbv.deposit(user1, address(mockAsset), amount);
+        stableVault.deposit(user1, address(mockAsset), amount);
 
-        IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](1);
-        userRateData[0] = IBasedBoostedVault.UserRateData(user1, newRate);
+        IStableVault.UserRateData[] memory userRateData = new IStableVault.UserRateData[](1);
+        userRateData[0] = IStableVault.UserRateData(user1, newRate);
         vm.prank(manager);
-        bbv.setUserRate(userRateData);
+        stableVault.setUserRate(userRateData);
 
         // Warp a long time to allow the conversion rate of the new sub-vault to grow.
         vm.warp(block.timestamp + 115 * 365 days);
@@ -722,16 +723,16 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         // User 2 deposits and has their position migrated to the new sub-vault
         mockAsset.mint(user2, amount);
         vm.prank(user2);
-        mockAsset.forceApprove(address(bbv), amount);
+        mockAsset.forceApprove(address(stableVault), amount);
         vm.prank(user2);
-        bbv.deposit(user2, address(mockAsset), amount);
+        stableVault.deposit(user2, address(mockAsset), amount);
 
         vm.prank(manager);
-        userRateData = new IBasedBoostedVault.UserRateData[](1);
-        userRateData[0] = IBasedBoostedVault.UserRateData(user2, newRate);
+        userRateData = new IStableVault.UserRateData[](1);
+        userRateData[0] = IStableVault.UserRateData(user2, newRate);
         // Check this reverts because the user would end up with 0 shares in the new sub-vault.
         vm.expectRevert(Errors.InvalidAmount.selector);
-        bbv.setUserRate(userRateData);
+        stableVault.setUserRate(userRateData);
     }
 
     function test_setUserRate_twoUsersWithSameRateLandsInTheSameSubVault(
@@ -742,34 +743,34 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 newRate
     ) public {
         vm.assume(user1 != address(0));
-        _assumeNotProxyAdmin(user1, address(bbv));
+        _assumeNotProxyAdmin(user1, address(stableVault));
         vm.assume(user2 != address(0));
-        _assumeNotProxyAdmin(user2, address(bbv));
+        _assumeNotProxyAdmin(user2, address(stableVault));
         vm.assume(user1 != user2);
         amount1 = _boundAssetAmount(address(mockAsset), amount1);
         amount2 = _boundAssetAmount(address(mockAsset), amount2);
         newRate = _boundRate(newRate);
-        vm.assume(newRate != bbv.getDefaultSubVault().perSecondRate);
+        vm.assume(newRate != stableVault.getDefaultSubVault().perSecondRate);
 
         mockAsset.mint(user1, amount1);
         mockAsset.mint(user2, amount2);
 
         vm.prank(user1);
-        mockAsset.forceApprove(address(bbv), amount1);
+        mockAsset.forceApprove(address(stableVault), amount1);
         vm.prank(user1);
-        bbv.deposit(user1, address(mockAsset), amount1);
+        stableVault.deposit(user1, address(mockAsset), amount1);
 
         vm.prank(manager);
         _setUserRate(user1, newRate);
 
-        IBasedBoostedVault.SubVaultData memory user1SubVault = bbv.getUserSubVault(user1);
+        IStableVault.SubVaultData memory user1SubVault = stableVault.getUserSubVault(user1);
 
         vm.prank(user2);
-        mockAsset.forceApprove(address(bbv), amount2);
+        mockAsset.forceApprove(address(stableVault), amount2);
         vm.prank(user2);
-        bbv.deposit(user2, address(mockAsset), amount2);
+        stableVault.deposit(user2, address(mockAsset), amount2);
 
-        IBasedBoostedVault.SubVaultData memory user2SubVault = bbv.getUserSubVault(user2);
+        IStableVault.SubVaultData memory user2SubVault = stableVault.getUserSubVault(user2);
 
         // SubVaults are not the same because user2 is still at the default subVault
         assertNotEq(user2SubVault.id, user1SubVault.id);
@@ -779,7 +780,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         _setUserRate(user2, newRate);
 
         // SubVaults must match after setting the same new rate as user1 for user2
-        user2SubVault = bbv.getUserSubVault(user2);
+        user2SubVault = stableVault.getUserSubVault(user2);
         assertEq(user2SubVault.id, user1SubVault.id);
         assertEq(user2SubVault.perSecondRate, newRate);
     }
@@ -790,28 +791,28 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 newPerSecondRate
     ) public {
         newPerSecondRate = _boundRate(newPerSecondRate);
-        vm.assume(bbv.getDefaultSubVault().perSecondRate != newPerSecondRate);
+        vm.assume(stableVault.getDefaultSubVault().perSecondRate != newPerSecondRate);
 
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
         amount = _boundAssetAmount(address(mockAsset), amount);
         mockAsset.mint(user, amount);
         vm.prank(user);
-        mockAsset.forceApprove(address(bbv), amount);
+        mockAsset.forceApprove(address(stableVault), amount);
         vm.prank(user);
-        bbv.deposit(user, address(mockAsset), amount);
+        stableVault.deposit(user, address(mockAsset), amount);
 
         vm.prank(manager);
         _setUserRate(user, newPerSecondRate);
-        uint256 expectedSubVaultId = bbv.getSubVaultIdByRate(newPerSecondRate);
+        uint256 expectedSubVaultId = stableVault.getSubVaultIdByRate(newPerSecondRate);
 
         vm.prank(manager);
-        bbv.setDefaultSubVault(newPerSecondRate);
+        stableVault.setDefaultSubVault(newPerSecondRate);
 
-        assertEq(bbv.getDefaultSubVault().perSecondRate, newPerSecondRate);
-        assertEq(bbv.getSubVaultIdByRate(newPerSecondRate), expectedSubVaultId);
-        assertEq(bbv.getSubVaultRateById(expectedSubVaultId), newPerSecondRate);
+        assertEq(stableVault.getDefaultSubVault().perSecondRate, newPerSecondRate);
+        assertEq(stableVault.getSubVaultIdByRate(newPerSecondRate), expectedSubVaultId);
+        assertEq(stableVault.getSubVaultRateById(expectedSubVaultId), newPerSecondRate);
     }
 
     function test_setDefaultSubVault_settingToSameRateAsCurrentDefaultSubVaultIsAllowedAndDoesNothing(uint256 newPerSecondRate)
@@ -820,20 +821,20 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         newPerSecondRate = _boundRate(newPerSecondRate);
 
         vm.prank(manager);
-        bbv.setDefaultSubVault(newPerSecondRate);
+        stableVault.setDefaultSubVault(newPerSecondRate);
 
-        assertEq(bbv.getDefaultSubVault().perSecondRate, newPerSecondRate);
-        assertEq(bbv.getSubVaultIdByRate(newPerSecondRate), bbv.getDefaultSubVault().id);
-        assertEq(bbv.getSubVaultRateById(bbv.getDefaultSubVault().id), newPerSecondRate);
+        assertEq(stableVault.getDefaultSubVault().perSecondRate, newPerSecondRate);
+        assertEq(stableVault.getSubVaultIdByRate(newPerSecondRate), stableVault.getDefaultSubVault().id);
+        assertEq(stableVault.getSubVaultRateById(stableVault.getDefaultSubVault().id), newPerSecondRate);
 
-        uint256 sameDefaultSubVaultId = bbv.getDefaultSubVault().id;
+        uint256 sameDefaultSubVaultId = stableVault.getDefaultSubVault().id;
 
         vm.prank(manager);
-        bbv.setDefaultSubVault(newPerSecondRate);
+        stableVault.setDefaultSubVault(newPerSecondRate);
 
-        assertEq(bbv.getDefaultSubVault().perSecondRate, newPerSecondRate);
-        assertEq(bbv.getSubVaultIdByRate(newPerSecondRate), sameDefaultSubVaultId);
-        assertEq(bbv.getSubVaultRateById(sameDefaultSubVaultId), newPerSecondRate);
+        assertEq(stableVault.getDefaultSubVault().perSecondRate, newPerSecondRate);
+        assertEq(stableVault.getSubVaultIdByRate(newPerSecondRate), sameDefaultSubVaultId);
+        assertEq(stableVault.getSubVaultRateById(sameDefaultSubVaultId), newPerSecondRate);
     }
 
     function test_setDefaultSubVault_createsANewSubVaultIfNoSubVaultHasTheGivenRate(
@@ -843,29 +844,29 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         newPerSecondRate = _boundRate(newPerSecondRate);
         anotherNewPerSecondRate = _boundRate(anotherNewPerSecondRate);
         vm.assume(newPerSecondRate != anotherNewPerSecondRate);
-        vm.assume(bbv.getSubVaultIdByRate(newPerSecondRate) == 0);
-        vm.assume(bbv.getSubVaultIdByRate(anotherNewPerSecondRate) == 0);
+        vm.assume(stableVault.getSubVaultIdByRate(newPerSecondRate) == 0);
+        vm.assume(stableVault.getSubVaultIdByRate(anotherNewPerSecondRate) == 0);
 
         vm.prank(manager);
-        bbv.setDefaultSubVault(newPerSecondRate);
+        stableVault.setDefaultSubVault(newPerSecondRate);
 
-        uint256 lastId = bbv.getDefaultSubVault().id;
+        uint256 lastId = stableVault.getDefaultSubVault().id;
 
-        assertEq(bbv.getDefaultSubVault().perSecondRate, newPerSecondRate);
-        assertEq(bbv.getSubVaultIdByRate(newPerSecondRate), lastId);
-        assertEq(bbv.getSubVaultRateById(lastId), newPerSecondRate);
+        assertEq(stableVault.getDefaultSubVault().perSecondRate, newPerSecondRate);
+        assertEq(stableVault.getSubVaultIdByRate(newPerSecondRate), lastId);
+        assertEq(stableVault.getSubVaultRateById(lastId), newPerSecondRate);
 
         uint256 expectedId = lastId + 1;
 
-        assertEq(bbv.getSubVaultIdByRate(anotherNewPerSecondRate), 0);
-        assertEq(bbv.getSubVaultRateById(expectedId), 0);
+        assertEq(stableVault.getSubVaultIdByRate(anotherNewPerSecondRate), 0);
+        assertEq(stableVault.getSubVaultRateById(expectedId), 0);
 
         vm.prank(manager);
-        bbv.setDefaultSubVault(anotherNewPerSecondRate);
+        stableVault.setDefaultSubVault(anotherNewPerSecondRate);
 
-        assertEq(bbv.getDefaultSubVault().perSecondRate, anotherNewPerSecondRate);
-        assertEq(bbv.getSubVaultIdByRate(anotherNewPerSecondRate), expectedId);
-        assertEq(bbv.getSubVaultRateById(expectedId), anotherNewPerSecondRate);
+        assertEq(stableVault.getDefaultSubVault().perSecondRate, anotherNewPerSecondRate);
+        assertEq(stableVault.getSubVaultIdByRate(anotherNewPerSecondRate), expectedId);
+        assertEq(stableVault.getSubVaultRateById(expectedId), anotherNewPerSecondRate);
     }
 
     function test_setDefaultSubVault_reverts_ifMsgSenderIsNotAuthorized(
@@ -873,26 +874,26 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 newPerSecondRate
     ) public {
         vm.assume(unauthorizedMsgSender != address(0));
-        _assumeNotProxyAdmin(unauthorizedMsgSender, address(bbv));
+        _assumeNotProxyAdmin(unauthorizedMsgSender, address(stableVault));
         vm.assume(unauthorizedMsgSender != manager);
         newPerSecondRate = _boundRate(newPerSecondRate);
 
         mockAccessManager.mockRejectCall(
-            unauthorizedMsgSender, address(bbv), IBasedBoostedVault.setDefaultSubVault.selector
+            unauthorizedMsgSender, address(stableVault), IStableVault.setDefaultSubVault.selector
         );
         vm.expectRevert(
             abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
         );
         vm.prank(unauthorizedMsgSender);
-        bbv.setDefaultSubVault(newPerSecondRate);
+        stableVault.setDefaultSubVault(newPerSecondRate);
     }
 
     function test_setDefaultSubVault_reverts_ifNewRateIsInvalid(uint256 invalidPerSecondRate) public {
         vm.assume(invalidPerSecondRate < MathLib.RAY);
 
         vm.prank(manager);
-        vm.expectRevert(abi.encodeWithSelector(IBasedBoostedVault.InvalidRate.selector));
-        bbv.setDefaultSubVault(invalidPerSecondRate);
+        vm.expectRevert(abi.encodeWithSelector(IStableVault.InvalidRate.selector));
+        stableVault.setDefaultSubVault(invalidPerSecondRate);
     }
 
     function test_getAggregatedBalance_returnsExpectedValue(uint256 expectedAssets) public {
@@ -901,7 +902,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockFundsHandler.mockAggregatedBalance(expectedAssets);
         vm.expectCall(address(mockFundsHandler), abi.encodeWithSelector(IFundsHandler.getAggregatedBalance.selector));
 
-        uint256 actualAssets = bbv.getAggregatedBalance();
+        uint256 actualAssets = stableVault.getAggregatedBalance();
 
         assertEq(actualAssets, expectedAssets);
     }
@@ -910,18 +911,18 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         address unauthorizedMsgSender,
         uint256 amountToClaim
     ) public {
-        _assumeNotProxyAdmin(unauthorizedMsgSender, address(bbv));
+        _assumeNotProxyAdmin(unauthorizedMsgSender, address(stableVault));
         amountToClaim = _boundAssetAmount(address(mockAsset), amountToClaim);
 
         mockAccessManager.mockRejectCall(
-            unauthorizedMsgSender, address(bbv), IBasedBoostedVault.claimSurplusInterest.selector
+            unauthorizedMsgSender, address(stableVault), IStableVault.claimSurplusInterest.selector
         );
 
         vm.expectRevert(
             abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
         );
         vm.prank(unauthorizedMsgSender);
-        bbv.claimSurplusInterest(_toAddressArray(address(mockAsset)), _toUint256Array(amountToClaim));
+        stableVault.claimSurplusInterest(_toAddressArray(address(mockAsset)), _toUint256Array(amountToClaim));
     }
 
     function test_claimSurplusInterest_reverts_ifObligationsExceedAssets(
@@ -942,14 +943,16 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(obligationsInAssetDecimals > 0);
 
         mockAsset.mint(obligationsInAssetDecimals);
-        mockAsset.forceApprove(address(bbv), obligationsInAssetDecimals);
-        bbv.deposit(address(this), address(mockAsset), obligationsInAssetDecimals);
+        mockAsset.forceApprove(address(stableVault), obligationsInAssetDecimals);
+        stableVault.deposit(address(this), address(mockAsset), obligationsInAssetDecimals);
 
-        assertGt(bbv.getVaultObligations(), bbv.getAggregatedBalance());
+        assertGt(stableVault.getVaultObligations(), stableVault.getAggregatedBalance());
 
         vm.prank(manager);
-        vm.expectRevert(abi.encodeWithSelector(IBasedBoostedVault.NoSurplusInterestToClaim.selector));
-        bbv.claimSurplusInterest(_toAddressArray(address(mockAsset)), _toUint256Array(obligationsInAssetDecimals));
+        vm.expectRevert(abi.encodeWithSelector(IStableVault.NoSurplusInterestToClaim.selector));
+        stableVault.claimSurplusInterest(
+            _toAddressArray(address(mockAsset)), _toUint256Array(obligationsInAssetDecimals)
+        );
     }
 
     function test_claimSurplusInterest_reverts_ifPullingMoreFundsThanTheAvailableFeesToClaim(
@@ -961,13 +964,13 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(requestedAssetsToClaim.assetDecimalsToRay(address(mockAsset)) > availableFeesToClaimRay);
 
         mockAsset.mint(address(mockFundsHandler), requestedAssetsToClaim);
-        mockFundsHandler.mockApprove(address(bbv), address(mockAsset), requestedAssetsToClaim);
+        mockFundsHandler.mockApprove(address(stableVault), address(mockAsset), requestedAssetsToClaim);
 
         mockFundsHandler.mockAggregatedBalance(availableFeesToClaimRay);
 
         vm.prank(manager);
         vm.expectRevert(abi.encodeWithSelector(Errors.InvalidAmount.selector));
-        bbv.claimSurplusInterest(_toAddressArray(address(mockAsset)), _toUint256Array(requestedAssetsToClaim));
+        stableVault.claimSurplusInterest(_toAddressArray(address(mockAsset)), _toUint256Array(requestedAssetsToClaim));
     }
 
     function test_claimSurplusInterest_emitExpectedEvent(
@@ -983,12 +986,12 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockFundsHandler.mockAggregatedBalance(availableFeesToClaimRay);
 
         vm.expectEmit(true, true, true, true);
-        emit IBasedBoostedVault.SurplusInterestClaimed(
+        emit IStableVault.SurplusInterestClaimed(
             _toAddressArray(address(mockAsset)), _toUint256Array(requestedAssetsToClaim)
         );
 
         vm.prank(manager);
-        bbv.claimSurplusInterest(_toAddressArray(address(mockAsset)), _toUint256Array(requestedAssetsToClaim));
+        stableVault.claimSurplusInterest(_toAddressArray(address(mockAsset)), _toUint256Array(requestedAssetsToClaim));
     }
 
     function test_claimSurplusInterest_sendsExpectedAmountOfFeesToTreasury(
@@ -997,7 +1000,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 requestedAssetsToClaim
     ) public {
         vm.assume(msgSender != address(0));
-        _assumeNotProxyAdmin(msgSender, address(bbv));
+        _assumeNotProxyAdmin(msgSender, address(stableVault));
         requestedAssetsToClaim = _boundAssetAmount(address(mockAsset), requestedAssetsToClaim);
         availableFeesToClaimRay = _boundRayAmount(availableFeesToClaimRay);
         vm.assume(requestedAssetsToClaim.assetDecimalsToRay(address(mockAsset)) <= availableFeesToClaimRay);
@@ -1010,7 +1013,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         // The AccessManager contract we use has all calls allowed by default, only rejections needs to be explicit.
         vm.prank(msgSender);
-        bbv.claimSurplusInterest(_toAddressArray(address(mockAsset)), _toUint256Array(requestedAssetsToClaim));
+        stableVault.claimSurplusInterest(_toAddressArray(address(mockAsset)), _toUint256Array(requestedAssetsToClaim));
 
         assertEq(mockAsset.balanceOf(treasury), requestedAssetsToClaim);
     }
@@ -1028,58 +1031,58 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         // Set treasury to address(0)
         vm.prank(manager);
-        bbv.setTreasury(address(0));
-        assertEq(bbv.getTreasury(), address(0));
+        stableVault.setTreasury(address(0));
+        assertEq(stableVault.getTreasury(), address(0));
 
         vm.prank(manager);
-        vm.expectRevert(abi.encodeWithSelector(IBasedBoostedVault.TreasuryNotSet.selector));
-        bbv.claimSurplusInterest(_toAddressArray(address(mockAsset)), _toUint256Array(requestedAssetsToClaim));
+        vm.expectRevert(abi.encodeWithSelector(IStableVault.TreasuryNotSet.selector));
+        stableVault.claimSurplusInterest(_toAddressArray(address(mockAsset)), _toUint256Array(requestedAssetsToClaim));
     }
 
     function test_setTreasury_reverts_ifMsgSenderIsNotAuthorized(address unauthorizedMsgSender, address newTreasury)
         public
     {
-        _assumeNotProxyAdmin(unauthorizedMsgSender, address(bbv));
+        _assumeNotProxyAdmin(unauthorizedMsgSender, address(stableVault));
         vm.assume(unauthorizedMsgSender != manager);
 
-        mockAccessManager.mockRejectCall(unauthorizedMsgSender, address(bbv), IBasedBoostedVault.setTreasury.selector);
+        mockAccessManager.mockRejectCall(unauthorizedMsgSender, address(stableVault), IStableVault.setTreasury.selector);
 
         vm.expectRevert(
             abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
         );
         vm.prank(unauthorizedMsgSender);
-        bbv.setTreasury(newTreasury);
+        stableVault.setTreasury(newTreasury);
     }
 
     function test_setTreasury_setsTheExpectedTreasury(address newTreasury) public {
         vm.prank(manager);
-        bbv.setTreasury(newTreasury);
+        stableVault.setTreasury(newTreasury);
 
-        assertEq(bbv.getTreasury(), newTreasury);
+        assertEq(stableVault.getTreasury(), newTreasury);
     }
 
     function test_setTreasury_setsToZeroAddress(address nonZeroTreasury) public {
         vm.assume(nonZeroTreasury != address(0));
 
         vm.prank(manager);
-        bbv.setTreasury(nonZeroTreasury);
-        assertEq(bbv.getTreasury(), nonZeroTreasury);
+        stableVault.setTreasury(nonZeroTreasury);
+        assertEq(stableVault.getTreasury(), nonZeroTreasury);
 
         vm.prank(manager);
-        bbv.setTreasury(address(0));
-        assertEq(bbv.getTreasury(), address(0));
+        stableVault.setTreasury(address(0));
+        assertEq(stableVault.getTreasury(), address(0));
     }
 
     function test_setTreasury_emitsExpectedEvent(address newTreasury) public {
         vm.expectEmit(true, true, true, true);
-        emit IBasedBoostedVault.TreasurySet(newTreasury);
+        emit IStableVault.TreasurySet(newTreasury);
 
         vm.prank(manager);
-        bbv.setTreasury(newTreasury);
+        stableVault.setTreasury(newTreasury);
     }
 
     function test_getTreasury_returnsExpectedValue() public view {
-        assertEq(bbv.getTreasury(), treasury);
+        assertEq(stableVault.getTreasury(), treasury);
     }
 
     function test_setSubVaultRate_updatesAssociationBetweenSubVaultIdAndRateProperly(
@@ -1089,36 +1092,36 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         perSecondRate = _boundRate(perSecondRate);
         newPerSecondRate = _boundRate(newPerSecondRate);
         vm.assume(perSecondRate != newPerSecondRate);
-        vm.assume(bbv.getSubVaultIdByRate(perSecondRate) == 0);
-        vm.assume(bbv.getSubVaultIdByRate(newPerSecondRate) == 0);
+        vm.assume(stableVault.getSubVaultIdByRate(perSecondRate) == 0);
+        vm.assume(stableVault.getSubVaultIdByRate(newPerSecondRate) == 0);
 
         address user = makeAddr("user");
         uint256 amount = 100e6;
         mockAsset.mint(user, amount);
         vm.prank(user);
-        mockAsset.forceApprove(address(bbv), amount);
+        mockAsset.forceApprove(address(stableVault), amount);
         vm.prank(user);
-        bbv.deposit(user, address(mockAsset), amount);
-        IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](1);
-        userRateData[0] = IBasedBoostedVault.UserRateData(user, perSecondRate);
+        stableVault.deposit(user, address(mockAsset), amount);
+        IStableVault.UserRateData[] memory userRateData = new IStableVault.UserRateData[](1);
+        userRateData[0] = IStableVault.UserRateData(user, perSecondRate);
         vm.prank(manager);
-        bbv.setUserRate(userRateData);
+        stableVault.setUserRate(userRateData);
 
-        uint256 subVaultId = bbv.getUserSubVault(user).id;
+        uint256 subVaultId = stableVault.getUserSubVault(user).id;
 
         // The association between the sub-vault ID and rate was correctly set
-        assertEq(bbv.getSubVaultRateById(subVaultId), perSecondRate);
-        assertEq(bbv.getSubVaultIdByRate(perSecondRate), subVaultId);
+        assertEq(stableVault.getSubVaultRateById(subVaultId), perSecondRate);
+        assertEq(stableVault.getSubVaultIdByRate(perSecondRate), subVaultId);
 
         vm.prank(manager);
-        bbv.setSubVaultRate(subVaultId, newPerSecondRate);
+        stableVault.setSubVaultRate(subVaultId, newPerSecondRate);
 
         // The association between the sub-vault ID and rate is updated
-        assertEq(bbv.getSubVaultRateById(subVaultId), newPerSecondRate);
-        assertEq(bbv.getSubVaultIdByRate(newPerSecondRate), subVaultId);
+        assertEq(stableVault.getSubVaultRateById(subVaultId), newPerSecondRate);
+        assertEq(stableVault.getSubVaultIdByRate(newPerSecondRate), subVaultId);
 
         // The old rate is no longer associated with any sub-vault ID
-        assertEq(bbv.getSubVaultIdByRate(perSecondRate), 0);
+        assertEq(stableVault.getSubVaultIdByRate(perSecondRate), 0);
     }
 
     function test_setSubVaultRate_reverts_ifMsgSenderIsNotAuthorized(
@@ -1126,25 +1129,25 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 subVaultId,
         uint256 newPerSecondRate
     ) public {
-        _assumeNotProxyAdmin(unauthorizedMsgSender, address(bbv));
+        _assumeNotProxyAdmin(unauthorizedMsgSender, address(stableVault));
         newPerSecondRate = _boundRate(newPerSecondRate);
 
         mockAccessManager.mockRejectCall(
-            unauthorizedMsgSender, address(bbv), IBasedBoostedVault.setSubVaultRate.selector
+            unauthorizedMsgSender, address(stableVault), IStableVault.setSubVaultRate.selector
         );
 
         vm.prank(unauthorizedMsgSender);
         vm.expectRevert(
             abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
         );
-        bbv.setSubVaultRate(subVaultId, newPerSecondRate);
+        stableVault.setSubVaultRate(subVaultId, newPerSecondRate);
     }
 
     function test_setSubVaultRate_reverts_ifRateIsInvalid(uint256 subVaultId, uint256 invalidRate) public {
         vm.assume(invalidRate < MathLib.RAY || invalidRate > DEFAULT_MAX_PER_SECOND_RATE);
 
-        vm.expectRevert(IBasedBoostedVault.InvalidRate.selector);
-        bbv.setSubVaultRate(subVaultId, invalidRate);
+        vm.expectRevert(IStableVault.InvalidRate.selector);
+        stableVault.setSubVaultRate(subVaultId, invalidRate);
     }
 
     function test_setSubVaultRate_reverts_ifAlreadyExistsAVaultWithTheGivenRate(
@@ -1153,61 +1156,61 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     ) public {
         existingRate = _boundRate(existingRate);
 
-        bbv.setDefaultSubVault(existingRate);
+        stableVault.setDefaultSubVault(existingRate);
 
-        vm.expectRevert(IBasedBoostedVault.SubVaultAlreadyExists.selector);
-        bbv.setSubVaultRate(subVaultId, existingRate);
+        vm.expectRevert(IStableVault.SubVaultAlreadyExists.selector);
+        stableVault.setSubVaultRate(subVaultId, existingRate);
     }
 
     function test_setSubVaultRate_reverts_ifNoSubVaultExistsWithTheGivenId(uint256 subVaultId, uint256 perSecondRate)
         public
     {
-        vm.assume(bbv.getSubVaultRateById(subVaultId) == 0);
+        vm.assume(stableVault.getSubVaultRateById(subVaultId) == 0);
 
         perSecondRate = _boundRate(perSecondRate);
-        vm.assume(bbv.getSubVaultIdByRate(perSecondRate) == 0);
+        vm.assume(stableVault.getSubVaultIdByRate(perSecondRate) == 0);
 
-        vm.expectRevert(IBasedBoostedVault.SubVaultDoesNotExist.selector);
-        bbv.setSubVaultRate(subVaultId, perSecondRate);
+        vm.expectRevert(IStableVault.SubVaultDoesNotExist.selector);
+        stableVault.setSubVaultRate(subVaultId, perSecondRate);
     }
 
     function test_setSubVaultRate_emitsExpectedEvent(uint256 newPerSecondRate) public {
         newPerSecondRate = _boundRate(newPerSecondRate);
-        vm.assume(bbv.getSubVaultIdByRate(newPerSecondRate) == 0);
+        vm.assume(stableVault.getSubVaultIdByRate(newPerSecondRate) == 0);
 
-        uint256 subVaultId = bbv.getDefaultSubVault().id;
+        uint256 subVaultId = stableVault.getDefaultSubVault().id;
 
         vm.expectEmit(true, true, true, true);
-        emit IBasedBoostedVault.SubVaultRateSet(subVaultId, newPerSecondRate);
+        emit IStableVault.SubVaultRateSet(subVaultId, newPerSecondRate);
         vm.expectEmit(true, true, true, true);
-        emit IBasedBoostedVault.DefaultSubVaultSet(subVaultId, newPerSecondRate);
+        emit IStableVault.DefaultSubVaultSet(subVaultId, newPerSecondRate);
         vm.prank(manager);
-        bbv.setSubVaultRate(subVaultId, newPerSecondRate);
+        stableVault.setSubVaultRate(subVaultId, newPerSecondRate);
     }
 
     function test_setSubVaultRate_setsTheExpectedRate(uint256 newPerSecondRate) public {
         newPerSecondRate = _boundRate(newPerSecondRate);
-        vm.assume(bbv.getSubVaultIdByRate(newPerSecondRate) == 0);
+        vm.assume(stableVault.getSubVaultIdByRate(newPerSecondRate) == 0);
 
-        uint256 subVaultId = bbv.getDefaultSubVault().id;
-        bbv.setSubVaultRate(subVaultId, newPerSecondRate);
+        uint256 subVaultId = stableVault.getDefaultSubVault().id;
+        stableVault.setSubVaultRate(subVaultId, newPerSecondRate);
 
-        assertEq(bbv.getSubVaultRateById(subVaultId), newPerSecondRate);
-        assertEq(bbv.getSubVaultIdByRate(newPerSecondRate), subVaultId);
+        assertEq(stableVault.getSubVaultRateById(subVaultId), newPerSecondRate);
+        assertEq(stableVault.getSubVaultIdByRate(newPerSecondRate), subVaultId);
     }
 
     function test_getActiveSubVaults_activeSubVaultIsAddedUponDeposit(address user, uint256 depositAmount) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
 
-        assertEq(bbv.getActiveSubVaults().length, 0);
+        assertEq(stableVault.getActiveSubVaults().length, 0);
 
         _deposit(user, depositAmount);
 
-        assertEq(bbv.getActiveSubVaults().length, 1);
-        assertEq(bbv.getActiveSubVaults()[0].id, bbv.getDefaultSubVault().id);
+        assertEq(stableVault.getActiveSubVaults().length, 1);
+        assertEq(stableVault.getActiveSubVaults()[0].id, stableVault.getDefaultSubVault().id);
     }
 
     function test_getActiveSubVaults_activeSubVaultIsChangedUponSetUserRate(
@@ -1217,21 +1220,21 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     ) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
 
         _deposit(user, depositAmount);
 
-        assertEq(bbv.getActiveSubVaults().length, 1);
-        assertEq(bbv.getActiveSubVaults()[0].id, bbv.getDefaultSubVault().id);
+        assertEq(stableVault.getActiveSubVaults().length, 1);
+        assertEq(stableVault.getActiveSubVaults()[0].id, stableVault.getDefaultSubVault().id);
 
         newPerSecondRate = _boundRate(newPerSecondRate);
-        vm.assume(bbv.getSubVaultIdByRate(newPerSecondRate) != bbv.getDefaultSubVault().id);
+        vm.assume(stableVault.getSubVaultIdByRate(newPerSecondRate) != stableVault.getDefaultSubVault().id);
 
         _setUserRate(user, newPerSecondRate);
 
-        assertEq(bbv.getActiveSubVaults().length, 1);
-        assertEq(bbv.getActiveSubVaults()[0].id, bbv.getSubVaultIdByRate(newPerSecondRate));
+        assertEq(stableVault.getActiveSubVaults().length, 1);
+        assertEq(stableVault.getActiveSubVaults()[0].id, stableVault.getSubVaultIdByRate(newPerSecondRate));
     }
 
     function test_getActiveSubVaults_activeSubVaultIsRemovedWhenAllLiquidityIsWithdrawnFromIt(
@@ -1240,69 +1243,69 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     ) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
         _deposit(user, depositAmount);
         mockFundsHandler.mockAggregatedBalance(depositAmount);
 
-        assertEq(bbv.getActiveSubVaults().length, 1);
+        assertEq(stableVault.getActiveSubVaults().length, 1);
 
         vm.prank(user);
-        bbv.requestWithdrawal(user, 0);
+        stableVault.requestWithdrawal(user, 0);
 
-        assertEq(bbv.getActiveSubVaults().length, 0);
+        assertEq(stableVault.getActiveSubVaults().length, 0);
     }
 
     function test_getUserBalance_returnsZeroIfUserDoesNotHaveAPosition(address user) public view {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
-        vm.assume(bbv.getUserSubVault(user).id == 0);
+        _assumeNotProxyAdmin(user, address(stableVault));
+        vm.assume(stableVault.getUserSubVault(user).id == 0);
 
-        assertEq(bbv.getUserBalance(user), 0);
+        assertEq(stableVault.getUserBalance(user), 0);
     }
 
     function test_balanceOf_returnsZeroIfUserDoesNotHaveAPosition(address user) public view {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
-        vm.assume(bbv.getUserSubVault(user).id == 0);
+        _assumeNotProxyAdmin(user, address(stableVault));
+        vm.assume(stableVault.getUserSubVault(user).id == 0);
 
-        assertEq(bbv.balanceOf(user), 0);
+        assertEq(stableVault.balanceOf(user), 0);
     }
 
     function test_balanceOf_matchesGetUserBalance(address user, uint256 depositAmount) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
 
         _deposit(user, depositAmount);
 
-        assertEq(bbv.balanceOf(user), bbv.getUserBalance(user));
+        assertEq(stableVault.balanceOf(user), stableVault.getUserBalance(user));
 
         vm.warp(block.timestamp + 73);
-        assertEq(bbv.balanceOf(user), bbv.getUserBalance(user));
+        assertEq(stableVault.balanceOf(user), stableVault.getUserBalance(user));
     }
 
     function test_totalSupply_matchesVaultObligationsMinusIous(address user, uint256 depositAmount) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
 
         _deposit(user, depositAmount);
 
-        assertEq(bbv.totalSupply(), bbv.getVaultObligations() - mockIouToken.totalSupply());
+        assertEq(stableVault.totalSupply(), stableVault.getVaultObligations() - mockIouToken.totalSupply());
 
-        uint256 userBalance = bbv.getUserBalance(user);
+        uint256 userBalance = stableVault.getUserBalance(user);
         vm.assume(userBalance >= Constants.MIN_WITHDRAWABLE_AMOUNT_RAY * 2);
-        mockFundsHandler.mockAggregatedBalance(bbv.getVaultObligations());
+        mockFundsHandler.mockAggregatedBalance(stableVault.getVaultObligations());
 
         vm.prank(user);
-        bbv.requestWithdrawal(user, Constants.MIN_WITHDRAWABLE_AMOUNT_RAY);
+        stableVault.requestWithdrawal(user, Constants.MIN_WITHDRAWABLE_AMOUNT_RAY);
 
-        assertEq(bbv.totalSupply(), bbv.getVaultObligations() - mockIouToken.totalSupply());
+        assertEq(stableVault.totalSupply(), stableVault.getVaultObligations() - mockIouToken.totalSupply());
         assertGt(mockIouToken.totalSupply(), 0);
     }
 
@@ -1314,27 +1317,27 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     ) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
-        _assumeNotProxyAdmin(msgSender, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
+        _assumeNotProxyAdmin(msgSender, address(stableVault));
         vm.assume(msgSender != user);
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
         _deposit(user, depositAmount);
         withdrawalAmountRay = bound(withdrawalAmountRay, 0, depositAmount.assetDecimalsToRay(address(mockAsset)));
 
-        vm.expectRevert(IBasedBoostedVault.OnlyUser.selector);
+        vm.expectRevert(IStableVault.OnlyUser.selector);
         vm.prank(msgSender);
-        bbv.requestWithdrawal(user, withdrawalAmountRay);
+        stableVault.requestWithdrawal(user, withdrawalAmountRay);
     }
 
     function test_requestWithdrawal_reverts_userDoesNotHaveAPosition(address user, uint256 withdrawalAmountRay) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
         withdrawalAmountRay = _boundRayAmount(withdrawalAmountRay);
 
-        vm.expectRevert(IBasedBoostedVault.NonExistentPosition.selector);
+        vm.expectRevert(IStableVault.NonExistentPosition.selector);
         vm.prank(user);
-        bbv.requestWithdrawal(user, withdrawalAmountRay);
+        stableVault.requestWithdrawal(user, withdrawalAmountRay);
     }
 
     function test_requestWithdrawal_passingZeroWorksAsFullWithdrawalAmountWildcard(address user, uint256 depositAmount)
@@ -1342,14 +1345,14 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
         _deposit(user, depositAmount);
 
-        uint256 userBalanceRay = bbv.getUserBalance(user);
+        uint256 userBalanceRay = stableVault.getUserBalance(user);
 
         vm.prank(user);
-        uint256 actualWithdrawalAmountRay = bbv.requestWithdrawal(user, 0);
+        uint256 actualWithdrawalAmountRay = stableVault.requestWithdrawal(user, 0);
 
         assertEq(actualWithdrawalAmountRay, userBalanceRay);
     }
@@ -1360,7 +1363,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     function test_requestWithdrawal_DoesNotHaveRoundingLoss(address user) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
         uint256 depositAmount = 1;
 
         uint256 depositAmountInRay = depositAmount.assetDecimalsToRay(address(mockAsset));
@@ -1370,16 +1373,16 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockFundsHandler.mockAggregatedBalance(10e27);
 
         vm.prank(user);
-        bbv.requestWithdrawal(user, depositAmountInRay);
+        stableVault.requestWithdrawal(user, depositAmountInRay);
 
         vm.prank(user);
-        bbv.requestWithdrawal(user, 0);
+        stableVault.requestWithdrawal(user, 0);
     }
 
     function test_requestWithdrawal_WithReallySmallInterest(address user) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
         uint256 depositAmount = 1000000;
 
         uint256 depositAmountInRay = depositAmount.assetDecimalsToRay(address(mockAsset));
@@ -1392,13 +1395,13 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockFundsHandler.mockAggregatedBalance(10e27);
 
         vm.prank(user);
-        bbv.requestWithdrawal(user, depositAmountInRay - 1);
+        stableVault.requestWithdrawal(user, depositAmountInRay - 1);
 
         // A partial withdrawal that would leave unwithdrawable dust triggers an auto-full-withdrawal which deletes the
         // position. Only request the remainder if the position still exists.
-        if (bbv.getUserSubVault(user).id != 0) {
+        if (stableVault.getUserSubVault(user).id != 0) {
             vm.prank(user);
-            bbv.requestWithdrawal(user, 0);
+            stableVault.requestWithdrawal(user, 0);
         }
     }
 
@@ -1411,7 +1414,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     ) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
 
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
         timeElapsed = bound(timeElapsed, 1, 365 days * 50);
@@ -1419,16 +1422,16 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         // Ensure the user's position accrues at the fuzzed vault APY.
         vm.prank(manager);
-        bbv.setDefaultSubVault(perSecondRate);
+        stableVault.setDefaultSubVault(perSecondRate);
         _deposit(user, depositAmount);
         uint256 originalDepositRay = depositAmount.assetDecimalsToRay(address(mockAsset));
         // Because the deposit happens without any accrual (`conversionRate == RAY` before vm.warp), the user gets:
         // shares = depositRay / RAY = depositRay.
         uint256 userShares = originalDepositRay;
-        assertEq(bbv.getGlobalOriginalDepositAmount(), originalDepositRay);
-        assertEq(bbv.getUserBalance(user), originalDepositRay);
-        assertEq(bbv.getUserSubVault(user).perSecondRate, perSecondRate);
-        assertEq(bbv.getUserSubVault(user).id, bbv.getDefaultSubVault().id);
+        assertEq(stableVault.getGlobalOriginalDepositAmount(), originalDepositRay);
+        assertEq(stableVault.getUserBalance(user), originalDepositRay);
+        assertEq(stableVault.getUserSubVault(user).perSecondRate, perSecondRate);
+        assertEq(stableVault.getUserSubVault(user).id, stableVault.getDefaultSubVault().id);
 
         vm.warp(block.timestamp + timeElapsed);
 
@@ -1464,14 +1467,14 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockFundsHandler.mockAggregatedBalance(expectedFullWithdrawalRay);
 
         vm.prank(user);
-        uint256 actualAmountRay = bbv.requestWithdrawal(user, requestedAmountRay);
+        uint256 actualAmountRay = stableVault.requestWithdrawal(user, requestedAmountRay);
 
         assertEq(actualAmountRay, expectedFullWithdrawalRay);
         assertEq(mockIouToken.balanceOf(user), actualAmountRay);
         assertTrue(actualAmountRay > requestedAmountRay);
         assertTrue(actualAmountRay >= originalDepositRay);
-        assertEq(bbv.getUserSubVault(user).id, 0);
-        assertEq(bbv.getGlobalOriginalDepositAmount(), 0);
+        assertEq(stableVault.getUserSubVault(user).id, 0);
+        assertEq(stableVault.getGlobalOriginalDepositAmount(), 0);
     }
 
     function test_requestWithdrawal_neverLeavesRemainingSharesBelowMinSharesToRedeemOneWei(
@@ -1483,7 +1486,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     ) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
 
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
         timeElapsed = bound(timeElapsed, 1, 365 days * 50);
@@ -1491,7 +1494,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         // Ensure the user's position accrues at the fuzzed vault APY.
         vm.prank(manager);
-        bbv.setDefaultSubVault(perSecondRate);
+        stableVault.setDefaultSubVault(perSecondRate);
         _deposit(user, depositAmount);
         uint256 originalDepositRay = depositAmount.assetDecimalsToRay(address(mockAsset));
         // Because the deposit happens without any accrual (`conversionRate == RAY` before vm.warp), the user gets:
@@ -1529,39 +1532,39 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockFundsHandler.mockAggregatedBalance(maxWithdrawRay);
 
         vm.prank(user);
-        bbv.requestWithdrawal(user, requestedAmountRay);
+        stableVault.requestWithdrawal(user, requestedAmountRay);
 
         if (expectedRemainingShares == 0) {
-            assertEq(bbv.getUserSubVault(user).id, 0);
-            assertEq(bbv.getUserBalance(user), 0);
+            assertEq(stableVault.getUserSubVault(user).id, 0);
+            assertEq(stableVault.getUserBalance(user), 0);
         } else {
             // Property: if a position remains, it is never left with unwithdrawable dust shares.
             assertTrue(expectedRemainingShares >= minSharesToRedeemOneWei);
-            assertEq(bbv.getUserSubVault(user).id, bbv.getDefaultSubVault().id);
-            assertEq(bbv.getUserSubVault(user).perSecondRate, perSecondRate);
-            assertEq(bbv.getUserBalance(user), expectedRemainingShares.rayMulDown(conversionRate));
+            assertEq(stableVault.getUserSubVault(user).id, stableVault.getDefaultSubVault().id);
+            assertEq(stableVault.getUserSubVault(user).perSecondRate, perSecondRate);
+            assertEq(stableVault.getUserBalance(user), expectedRemainingShares.rayMulDown(conversionRate));
         }
     }
 
     function test_requestWithdrawal_tinyAmountWorksAsExpected(address user) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
         uint256 depositAmount = 1;
 
         IMockErc20 asset = IMockErc20(address(new MockErc20("GHO", "GHO", 18)));
         asset.mint(user, depositAmount);
         vm.prank(user);
-        asset.forceApprove(address(bbv), depositAmount);
+        asset.forceApprove(address(stableVault), depositAmount);
         vm.prank(user);
-        bbv.deposit(user, address(asset), depositAmount);
+        stableVault.deposit(user, address(asset), depositAmount);
 
         uint256 withdrawalAmountRay = depositAmount.assetDecimalsToRay(address(asset));
 
         vm.assume(asset.balanceOf(user) == 0);
 
         vm.prank(user);
-        bbv.requestWithdrawal(user, withdrawalAmountRay);
+        stableVault.requestWithdrawal(user, withdrawalAmountRay);
 
         assertEq(mockIouToken.balanceOf(user), withdrawalAmountRay);
     }
@@ -1573,7 +1576,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     ) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
         userBalance = _boundAssetAmount(address(mockAsset), userBalance);
         _deposit(user, userBalance);
         uint256 userBalanceRay = userBalance.assetDecimalsToRay(address(mockAsset));
@@ -1582,7 +1585,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         vm.expectRevert(Errors.InvalidAmount.selector);
         vm.prank(user);
-        bbv.requestWithdrawal(user, withdrawalAmountRay);
+        stableVault.requestWithdrawal(user, withdrawalAmountRay);
     }
 
     function test_requestWithdrawal_reverts_ifInterestToWithdrawIsGreaterThanAvailableInterest(
@@ -1592,27 +1595,27 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     ) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
         _deposit(user, depositAmount);
 
         timeElapsed = bound(timeElapsed, 5 minutes, 30 * 365 days);
         vm.warp(block.timestamp + timeElapsed);
 
-        uint256 withdrawalAmountRay = bbv.getUserBalance(user);
+        uint256 withdrawalAmountRay = stableVault.getUserBalance(user);
 
         mockFundsHandler.mockAggregatedBalance(depositAmount.assetDecimalsToRay(address(mockAsset)));
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                IBasedBoostedVault.InsufficientAssets.selector,
+                IStableVault.InsufficientAssets.selector,
                 user,
                 withdrawalAmountRay,
                 depositAmount.assetDecimalsToRay(address(mockAsset))
             )
         );
         vm.prank(user);
-        bbv.requestWithdrawal(user, withdrawalAmountRay);
+        stableVault.requestWithdrawal(user, withdrawalAmountRay);
     }
 
     function test_requestWithdrawal_mintsExpectedAmountOfIouTokens(
@@ -1622,7 +1625,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     ) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
         _deposit(user, depositAmount);
         vm.assume(withdrawalAmountRay < depositAmount.assetDecimalsToRay(address(mockAsset)));
@@ -1632,20 +1635,20 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         uint256 expectedIouTokens;
         if (withdrawalAmountRay == 0) {
-            expectedIouTokens = bbv.getUserBalance(user);
+            expectedIouTokens = stableVault.getUserBalance(user);
         } else {
-            uint256 remainingBalance = bbv.getUserBalance(user) - withdrawalAmountRay;
+            uint256 remainingBalance = stableVault.getUserBalance(user) - withdrawalAmountRay;
             // If remaining shares after partial withdrawal are not redeemable for at least 1 wei of 18-decimal asset,
             // a full withdrawal is performed instead, avoiding leaving non-redeemable dust shares.
             if (remainingBalance < Constants.MIN_WITHDRAWABLE_AMOUNT_RAY) {
-                expectedIouTokens = bbv.getUserBalance(user);
+                expectedIouTokens = stableVault.getUserBalance(user);
             } else {
                 expectedIouTokens = withdrawalAmountRay;
             }
         }
 
         vm.prank(user);
-        uint256 actualWithdrawalAmountRay = bbv.requestWithdrawal(user, withdrawalAmountRay);
+        uint256 actualWithdrawalAmountRay = stableVault.requestWithdrawal(user, withdrawalAmountRay);
 
         assertEq(mockIouToken.balanceOf(user), expectedIouTokens);
         assertEq(actualWithdrawalAmountRay, expectedIouTokens);
@@ -1656,25 +1659,26 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
         _deposit(user, depositAmount);
         vm.assume(withdrawalAmountRay < depositAmount.assetDecimalsToRay(address(mockAsset)));
 
         mockFundsHandler.mockAggregatedBalance(depositAmount);
 
-        uint256 actualWithdrawalAmount = withdrawalAmountRay == 0 ? bbv.getUserBalance(user) : withdrawalAmountRay;
+        uint256 actualWithdrawalAmount =
+            withdrawalAmountRay == 0 ? stableVault.getUserBalance(user) : withdrawalAmountRay;
 
         vm.expectEmit(true, true, true, true);
-        emit IBasedBoostedVault.WithdrawalRequested(user, 1, actualWithdrawalAmount, actualWithdrawalAmount);
+        emit IStableVault.WithdrawalRequested(user, 1, actualWithdrawalAmount, actualWithdrawalAmount);
 
         vm.prank(user);
-        bbv.requestWithdrawal(user, withdrawalAmountRay);
+        stableVault.requestWithdrawal(user, withdrawalAmountRay);
     }
 
     function test_requestWithdrawal_emitsTransferBurnEvent() public {
         address user = makeAddr("user");
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
 
         uint256 depositAmount = 2_000_000;
         uint256 withdrawalAmountRay = Constants.MIN_WITHDRAWABLE_AMOUNT_RAY;
@@ -1684,14 +1688,14 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockFundsHandler.mockAggregatedBalance(depositAmountRay);
 
         vm.expectEmit(true, true, true, true);
-        emit IBasedBoostedVault.WithdrawalRequested(
-            user, bbv.getUserSubVault(user).id, withdrawalAmountRay, withdrawalAmountRay
+        emit IStableVault.WithdrawalRequested(
+            user, stableVault.getUserSubVault(user).id, withdrawalAmountRay, withdrawalAmountRay
         );
         vm.expectEmit(true, true, true, true);
-        emit IBasedBoostedVault.Transfer(user, address(0), withdrawalAmountRay);
+        emit IStableVault.Transfer(user, address(0), withdrawalAmountRay);
 
         vm.prank(user);
-        bbv.requestWithdrawal(user, withdrawalAmountRay);
+        stableVault.requestWithdrawal(user, withdrawalAmountRay);
     }
 
     function test_requestWithdrawal_returnsExpectedAmount(
@@ -1701,7 +1705,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     ) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
         _deposit(user, depositAmount);
         uint256 userBalanceRay = depositAmount.assetDecimalsToRay(address(mockAsset));
@@ -1713,10 +1717,10 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         mockFundsHandler.mockAggregatedBalance(depositAmount);
 
-        uint256 expectedReturnValue = withdrawalAmountRay == 0 ? bbv.getUserBalance(user) : withdrawalAmountRay;
+        uint256 expectedReturnValue = withdrawalAmountRay == 0 ? stableVault.getUserBalance(user) : withdrawalAmountRay;
 
         vm.prank(user);
-        uint256 actualReturnValue = bbv.requestWithdrawal(user, withdrawalAmountRay);
+        uint256 actualReturnValue = stableVault.requestWithdrawal(user, withdrawalAmountRay);
 
         assertEq(actualReturnValue, expectedReturnValue);
     }
@@ -1728,10 +1732,10 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     ) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
         _deposit(user, depositAmount);
-        uint256 userBalanceBefore = bbv.getUserBalance(user);
+        uint256 userBalanceBefore = stableVault.getUserBalance(user);
         uint256 userBalanceRay = depositAmount.assetDecimalsToRay(address(mockAsset));
         vm.assume(withdrawalAmountRay < userBalanceRay);
         // Ensure remaining shares are redeemable (not dust) to avoid full-withdrawal rounding
@@ -1741,13 +1745,14 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         mockFundsHandler.mockAggregatedBalance(depositAmount);
 
-        uint256 actualWithdrawalAmountRay = withdrawalAmountRay == 0 ? bbv.getUserBalance(user) : withdrawalAmountRay;
+        uint256 actualWithdrawalAmountRay =
+            withdrawalAmountRay == 0 ? stableVault.getUserBalance(user) : withdrawalAmountRay;
 
         vm.prank(user);
-        uint256 actualReturnValue = bbv.requestWithdrawal(user, withdrawalAmountRay);
+        uint256 actualReturnValue = stableVault.requestWithdrawal(user, withdrawalAmountRay);
 
         assertEq(actualReturnValue, actualWithdrawalAmountRay);
-        assertEq(bbv.getUserBalance(user), userBalanceBefore - actualWithdrawalAmountRay);
+        assertEq(stableVault.getUserBalance(user), userBalanceBefore - actualWithdrawalAmountRay);
     }
 
     function test_requestWithdrawal_depositAndImmediatelyFullWithdraw_IOUsNeverUnderOriginalDeposit(
@@ -1762,21 +1767,21 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         // Deposit 1
         mockAsset.mint(user1, amount);
         vm.prank(user1);
-        mockAsset.forceApprove(address(bbv), amount);
+        mockAsset.forceApprove(address(stableVault), amount);
         vm.prank(user1);
-        bbv.deposit(user1, address(mockAsset), amount);
+        stableVault.deposit(user1, address(mockAsset), amount);
         vm.warp(block.timestamp + timeBetweenDeposits);
 
         // Deposit 2
         mockAsset.mint(user2, amount);
         vm.prank(user2);
-        mockAsset.forceApprove(address(bbv), amount);
+        mockAsset.forceApprove(address(stableVault), amount);
         vm.prank(user2);
-        bbv.deposit(user2, address(mockAsset), amount);
+        stableVault.deposit(user2, address(mockAsset), amount);
 
         // Request Full Withdrawal
         vm.prank(user2);
-        uint256 iouTokenAmount = bbv.requestWithdrawal(user2, 0);
+        uint256 iouTokenAmount = stableVault.requestWithdrawal(user2, 0);
 
         // After removing the assertion and replacing it with the code below from _fullWithdrawalRequest() we expect the
         // IOU quantity to be at least original deposit normalized to RAY decimals:
@@ -1795,7 +1800,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         // Using 1.5 * RAY (50% per second) for demonstration
         // This rate causes rounding when deposit amounts don't divide evenly
         uint256 highRate = (3 * MathLib.RAY) / 2; // 1.5 * RAY = 50% per second
-        IBasedBoostedVault highRateVault = _deployBasedBoostedVault(
+        IStableVault highRateVault = _deployStableVault(
             address(mockAccessManager),
             highRate + 1, // max rate slightly higher
             highRate,
@@ -1842,7 +1847,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     function test_transfer_reverts_ifRecipientIsZero(address user, uint256 depositAmount) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
 
         _deposit(user, depositAmount);
@@ -1850,7 +1855,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         vm.expectRevert(Errors.InvalidParameter.selector);
         vm.prank(user);
-        assertFalse(bbv.transfer(address(0), amountRay));
+        assertFalse(stableVault.transfer(address(0), amountRay));
     }
 
     function test_transfer_reverts_ifAmountBelowMinimum(address user, address recipient, uint256 depositAmount) public {
@@ -1858,8 +1863,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(recipient != address(0));
         vm.assume(user != recipient);
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
-        _assumeNotProxyAdmin(recipient, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
+        _assumeNotProxyAdmin(recipient, address(stableVault));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
 
         _deposit(user, depositAmount);
@@ -1867,7 +1872,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         vm.expectRevert(Errors.InvalidAmount.selector);
         vm.prank(user);
-        assertFalse(bbv.transfer(recipient, amountRay));
+        assertFalse(stableVault.transfer(recipient, amountRay));
     }
 
     function test_transfer_reverts_ifUserDoesNotHaveAPosition(address user, address recipient) public {
@@ -1875,12 +1880,12 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(recipient != address(0));
         vm.assume(user != recipient);
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
-        _assumeNotProxyAdmin(recipient, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
+        _assumeNotProxyAdmin(recipient, address(stableVault));
 
-        vm.expectRevert(IBasedBoostedVault.NonExistentPosition.selector);
+        vm.expectRevert(IStableVault.NonExistentPosition.selector);
         vm.prank(user);
-        assertFalse(bbv.transfer(recipient, Constants.MIN_WITHDRAWABLE_AMOUNT_RAY));
+        assertFalse(stableVault.transfer(recipient, Constants.MIN_WITHDRAWABLE_AMOUNT_RAY));
     }
 
     function test_transfer_reverts_ifAmountExceedsBalance(address user, address recipient, uint256 depositAmount)
@@ -1890,17 +1895,17 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(recipient != address(0));
         vm.assume(user != recipient);
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
-        _assumeNotProxyAdmin(recipient, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
+        _assumeNotProxyAdmin(recipient, address(stableVault));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
 
         _deposit(user, depositAmount);
-        uint256 fullAmountRay = bbv.getUserBalance(user);
+        uint256 fullAmountRay = stableVault.getUserBalance(user);
         uint256 amountRay = fullAmountRay + Constants.MIN_WITHDRAWABLE_AMOUNT_RAY;
 
         vm.expectRevert(Errors.InsufficientFunds.selector);
         vm.prank(user);
-        assertFalse(bbv.transfer(recipient, amountRay));
+        assertFalse(stableVault.transfer(recipient, amountRay));
     }
 
     function test_transfer_doesNotChangeGlobalOriginalDepositOrIous(
@@ -1912,23 +1917,23 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(recipient != address(0));
         vm.assume(user != recipient);
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
-        _assumeNotProxyAdmin(recipient, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
+        _assumeNotProxyAdmin(recipient, address(stableVault));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
 
         _deposit(user, depositAmount);
-        uint256 amountRay = bbv.getUserBalance(user) / 2;
+        uint256 amountRay = stableVault.getUserBalance(user) / 2;
         vm.assume(amountRay >= Constants.MIN_WITHDRAWABLE_AMOUNT_RAY);
 
-        uint256 globalOriginalBefore = bbv.getGlobalOriginalDepositAmount();
+        uint256 globalOriginalBefore = stableVault.getGlobalOriginalDepositAmount();
         uint256 iouSupplyBefore = mockIouToken.totalSupply();
         uint256 iouSenderBefore = mockIouToken.balanceOf(user);
         uint256 iouRecipientBefore = mockIouToken.balanceOf(recipient);
 
         vm.prank(user);
-        assertTrue(bbv.transfer(recipient, amountRay));
+        assertTrue(stableVault.transfer(recipient, amountRay));
 
-        assertEq(bbv.getGlobalOriginalDepositAmount(), globalOriginalBefore);
+        assertEq(stableVault.getGlobalOriginalDepositAmount(), globalOriginalBefore);
         assertEq(mockIouToken.totalSupply(), iouSupplyBefore);
         assertEq(mockIouToken.balanceOf(user), iouSenderBefore);
         assertEq(mockIouToken.balanceOf(recipient), iouRecipientBefore);
@@ -1943,24 +1948,24 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(recipient != address(0));
         vm.assume(user != recipient);
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
-        _assumeNotProxyAdmin(recipient, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
+        _assumeNotProxyAdmin(recipient, address(stableVault));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
 
         _deposit(user, depositAmount);
         uint256 amountRay = depositAmount.assetDecimalsToRay(address(mockAsset)) / 3;
         vm.assume(amountRay >= Constants.MIN_WITHDRAWABLE_AMOUNT_RAY);
 
-        uint256 senderBalanceBefore = bbv.getUserBalance(user);
-        uint256 recipientBalanceBefore = bbv.getUserBalance(recipient);
+        uint256 senderBalanceBefore = stableVault.getUserBalance(user);
+        uint256 recipientBalanceBefore = stableVault.getUserBalance(recipient);
 
         vm.prank(user);
-        assertTrue(bbv.transfer(recipient, amountRay));
+        assertTrue(stableVault.transfer(recipient, amountRay));
 
-        assertEq(bbv.getUserBalance(user), senderBalanceBefore - amountRay);
-        assertEq(bbv.getUserBalance(recipient), recipientBalanceBefore + amountRay);
-        assertEq(bbv.getUserSubVault(user).id, bbv.getDefaultSubVault().id);
-        assertEq(bbv.getUserSubVault(recipient).id, bbv.getDefaultSubVault().id);
+        assertEq(stableVault.getUserBalance(user), senderBalanceBefore - amountRay);
+        assertEq(stableVault.getUserBalance(recipient), recipientBalanceBefore + amountRay);
+        assertEq(stableVault.getUserSubVault(user).id, stableVault.getDefaultSubVault().id);
+        assertEq(stableVault.getUserSubVault(recipient).id, stableVault.getDefaultSubVault().id);
     }
 
     function test_transfer_crossSubVault_transfersExpectedBalances(
@@ -1973,30 +1978,30 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(recipient != address(0));
         vm.assume(user != recipient);
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
-        _assumeNotProxyAdmin(recipient, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
+        _assumeNotProxyAdmin(recipient, address(stableVault));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
         newPerSecondRate = _boundRate(newPerSecondRate);
-        vm.assume(newPerSecondRate != bbv.getDefaultSubVault().perSecondRate);
+        vm.assume(newPerSecondRate != stableVault.getDefaultSubVault().perSecondRate);
 
         _deposit(user, depositAmount);
         _deposit(recipient, depositAmount);
 
         _setUserRate(recipient, newPerSecondRate);
-        uint256 newSubVaultId = bbv.getSubVaultIdByRate(newPerSecondRate);
+        uint256 newSubVaultId = stableVault.getSubVaultIdByRate(newPerSecondRate);
 
-        uint256 amountRay = bbv.getUserBalance(user) / 4;
+        uint256 amountRay = stableVault.getUserBalance(user) / 4;
         vm.assume(amountRay >= Constants.MIN_WITHDRAWABLE_AMOUNT_RAY);
 
-        uint256 senderBalanceBefore = bbv.getUserBalance(user);
-        uint256 recipientBalanceBefore = bbv.getUserBalance(recipient);
+        uint256 senderBalanceBefore = stableVault.getUserBalance(user);
+        uint256 recipientBalanceBefore = stableVault.getUserBalance(recipient);
 
         vm.prank(user);
-        assertTrue(bbv.transfer(recipient, amountRay));
+        assertTrue(stableVault.transfer(recipient, amountRay));
 
-        assertEq(bbv.getUserBalance(user), senderBalanceBefore - amountRay);
-        assertEq(bbv.getUserBalance(recipient), recipientBalanceBefore + amountRay);
-        assertEq(bbv.getUserSubVault(recipient).id, newSubVaultId);
+        assertEq(stableVault.getUserBalance(user), senderBalanceBefore - amountRay);
+        assertEq(stableVault.getUserBalance(recipient), recipientBalanceBefore + amountRay);
+        assertEq(stableVault.getUserSubVault(recipient).id, newSubVaultId);
     }
 
     function test_transfer_revertsWhenDustWouldRemain() public {
@@ -2005,21 +2010,21 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 depositAmount = 1_000_000;
         _deposit(user, depositAmount);
 
-        uint256 fullAmountRay = bbv.getUserBalance(user);
+        uint256 fullAmountRay = stableVault.getUserBalance(user);
         // Trying to transfer an amount that would leave dust (< MIN_WITHDRAWABLE_AMOUNT_RAY)
         uint256 amountRay = fullAmountRay - (Constants.MIN_WITHDRAWABLE_AMOUNT_RAY - 1);
 
         vm.prank(user);
         vm.expectRevert(Errors.InvalidAmount.selector);
-        assertFalse(bbv.transfer(recipient, amountRay));
+        assertFalse(stableVault.transfer(recipient, amountRay));
 
         // User should use transferAll() instead
         vm.prank(user);
-        assertTrue(bbv.transferAll(recipient));
+        assertTrue(stableVault.transferAll(recipient));
 
-        assertEq(bbv.getUserSubVault(user).id, 0);
-        assertEq(bbv.getUserBalance(user), 0);
-        assertEq(bbv.getUserBalance(recipient), fullAmountRay);
+        assertEq(stableVault.getUserSubVault(user).id, 0);
+        assertEq(stableVault.getUserBalance(user), 0);
+        assertEq(stableVault.getUserBalance(recipient), fullAmountRay);
     }
 
     function test_transfer_allowsMinimumAmount_evenWhenRoundingWouldBeBelowMinShares() public {
@@ -2028,7 +2033,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 newPerSecondRate = MathLib.RAY + 1;
 
         vm.prank(manager);
-        bbv.setDefaultSubVault(newPerSecondRate);
+        stableVault.setDefaultSubVault(newPerSecondRate);
 
         _deposit(user, 2_000_000);
         vm.warp(block.timestamp + 1);
@@ -2036,10 +2041,10 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 amountRay = Constants.MIN_WITHDRAWABLE_AMOUNT_RAY;
 
         vm.prank(user);
-        assertTrue(bbv.transfer(recipient, amountRay));
+        assertTrue(stableVault.transfer(recipient, amountRay));
 
         // Due to rounding-down on share minting, recipient share-value can be slightly below amountRay.
-        assertLt(bbv.getUserBalance(recipient), amountRay);
+        assertLt(stableVault.getUserBalance(recipient), amountRay);
     }
 
     function test_transfer_allowsNearMinimumAmounts_evenWhenRoundingIsUnfavorable(uint256 amountRayDelta) public {
@@ -2050,7 +2055,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         amountRayDelta = bound(amountRayDelta, 0, 2);
 
         vm.prank(manager);
-        bbv.setDefaultSubVault(newPerSecondRate);
+        stableVault.setDefaultSubVault(newPerSecondRate);
 
         _deposit(user, 2_000_000);
         vm.warp(block.timestamp + 1);
@@ -2058,7 +2063,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 amountRay = Constants.MIN_WITHDRAWABLE_AMOUNT_RAY + amountRayDelta;
 
         vm.prank(user);
-        assertTrue(bbv.transfer(recipient, amountRay));
+        assertTrue(stableVault.transfer(recipient, amountRay));
     }
 
     function test_transfer_succeeds_whenRecipientHasDustAndCrossesThreshold() public {
@@ -2068,17 +2073,17 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         // Create the higher-rate subVault, then return default to base rate.
         vm.prank(manager);
-        bbv.setDefaultSubVault(MathLib.RAY);
+        stableVault.setDefaultSubVault(MathLib.RAY);
         vm.prank(manager);
-        bbv.setDefaultSubVault(MathLib.RAY + 1);
+        stableVault.setDefaultSubVault(MathLib.RAY + 1);
         vm.prank(manager);
-        bbv.setDefaultSubVault(MathLib.RAY);
+        stableVault.setDefaultSubVault(MathLib.RAY);
 
         mockAsset18dp.mint(recipient, 1);
         vm.prank(recipient);
-        mockAsset18dp.forceApprove(address(bbv), 1);
+        mockAsset18dp.forceApprove(address(stableVault), 1);
         vm.prank(recipient);
-        bbv.deposit(recipient, address(mockAsset18dp), 1);
+        stableVault.deposit(recipient, address(mockAsset18dp), 1);
 
         vm.warp(block.timestamp + 1);
         vm.prank(manager);
@@ -2088,7 +2093,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 amountRay = Constants.MIN_WITHDRAWABLE_AMOUNT_RAY;
 
         vm.prank(user);
-        assertTrue(bbv.transfer(recipient, amountRay));
+        assertTrue(stableVault.transfer(recipient, amountRay));
     }
 
     function test_transferAll_transfersFullBalanceAndKeepsOriginalDeposit(
@@ -2100,22 +2105,22 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(recipient != address(0));
         vm.assume(user != recipient);
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
-        _assumeNotProxyAdmin(recipient, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
+        _assumeNotProxyAdmin(recipient, address(stableVault));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
 
         _deposit(user, depositAmount);
-        uint256 fullAmountRay = bbv.getUserBalance(user);
-        uint256 globalOriginalBefore = bbv.getGlobalOriginalDepositAmount();
+        uint256 fullAmountRay = stableVault.getUserBalance(user);
+        uint256 globalOriginalBefore = stableVault.getGlobalOriginalDepositAmount();
         uint256 iouSupplyBefore = mockIouToken.totalSupply();
 
         vm.prank(user);
-        assertTrue(bbv.transferAll(recipient));
+        assertTrue(stableVault.transferAll(recipient));
 
-        assertEq(bbv.getGlobalOriginalDepositAmount(), globalOriginalBefore);
+        assertEq(stableVault.getGlobalOriginalDepositAmount(), globalOriginalBefore);
         assertEq(mockIouToken.totalSupply(), iouSupplyBefore);
-        assertEq(bbv.getUserBalance(user), 0);
-        assertEq(bbv.getUserBalance(recipient), fullAmountRay);
+        assertEq(stableVault.getUserBalance(user), 0);
+        assertEq(stableVault.getUserBalance(recipient), fullAmountRay);
     }
 
     function test_transfer_usesPrincipalFirstWhenRoundingDown() public {
@@ -2124,7 +2129,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 newPerSecondRate = MathLib.RAY + 1;
 
         vm.prank(manager);
-        bbv.setDefaultSubVault(newPerSecondRate);
+        stableVault.setDefaultSubVault(newPerSecondRate);
 
         _deposit(user, 2_000_000);
         vm.warp(block.timestamp + 1);
@@ -2132,13 +2137,13 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 amountRay = Constants.MIN_WITHDRAWABLE_AMOUNT_RAY + 1;
 
         vm.prank(user);
-        assertTrue(bbv.transfer(recipient, amountRay));
+        assertTrue(stableVault.transfer(recipient, amountRay));
 
-        assertLt(bbv.getUserBalance(recipient), amountRay);
+        assertLt(stableVault.getUserBalance(recipient), amountRay);
 
-        mockFundsHandler.mockAggregatedBalance(bbv.getGlobalOriginalDepositAmount());
+        mockFundsHandler.mockAggregatedBalance(stableVault.getGlobalOriginalDepositAmount());
         vm.prank(recipient);
-        uint256 withdrawnRay = bbv.requestWithdrawal(recipient, 0);
+        uint256 withdrawnRay = stableVault.requestWithdrawal(recipient, 0);
 
         assertGe(withdrawnRay, amountRay);
     }
@@ -2146,16 +2151,16 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     function test_transfer_reverts_ifRecipientIsSender(address user, uint256 depositAmount) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
 
         _deposit(user, depositAmount);
-        uint256 amountRay = bbv.getUserBalance(user) / 2;
+        uint256 amountRay = stableVault.getUserBalance(user) / 2;
         vm.assume(amountRay >= Constants.MIN_WITHDRAWABLE_AMOUNT_RAY);
 
         vm.expectRevert(Errors.InvalidParameter.selector);
         vm.prank(user);
-        assertFalse(bbv.transfer(user, amountRay));
+        assertFalse(stableVault.transfer(user, amountRay));
     }
 
     function test_transfer_handlesLargeConversionRateDifferential() public {
@@ -2167,7 +2172,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         // Use max valid rate (~20% APY) for recipient's subVault
         uint256 highRate = DEFAULT_MAX_PER_SECOND_RATE;
         vm.prank(manager);
-        bbv.setDefaultSubVault(highRate);
+        stableVault.setDefaultSubVault(highRate);
 
         // Deposit for recipient first so they get assigned to high rate subVault
         _deposit(recipient, 1_000_000);
@@ -2177,23 +2182,23 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         // Change default to base rate (1x, no interest) for sender
         vm.prank(manager);
-        bbv.setDefaultSubVault(MathLib.RAY);
+        stableVault.setDefaultSubVault(MathLib.RAY);
 
         // Deposit for sender
         _deposit(user, 1_000_000);
 
-        uint256 userBalanceBefore = bbv.getUserBalance(user);
-        uint256 recipientBalanceBefore = bbv.getUserBalance(recipient);
+        uint256 userBalanceBefore = stableVault.getUserBalance(user);
+        uint256 recipientBalanceBefore = stableVault.getUserBalance(recipient);
         uint256 amountRay = userBalanceBefore / 2;
         vm.assume(amountRay >= Constants.MIN_WITHDRAWABLE_AMOUNT_RAY);
 
         vm.prank(user);
-        assertTrue(bbv.transfer(recipient, amountRay));
+        assertTrue(stableVault.transfer(recipient, amountRay));
 
         // Recipient's balance increased
-        assertGt(bbv.getUserBalance(recipient), recipientBalanceBefore);
+        assertGt(stableVault.getUserBalance(recipient), recipientBalanceBefore);
         // User's balance decreased
-        assertLt(bbv.getUserBalance(user), userBalanceBefore);
+        assertLt(stableVault.getUserBalance(user), userBalanceBefore);
     }
 
     function test_transfer_reverts_ifRecipientGetsZeroShares() public {
@@ -2208,7 +2213,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         // Use max valid rate (~20% APY) for recipient's subVault
         uint256 highRate = DEFAULT_MAX_PER_SECOND_RATE;
         vm.prank(manager);
-        bbv.setDefaultSubVault(highRate);
+        stableVault.setDefaultSubVault(highRate);
 
         // Deposit for recipient first so they get assigned to high rate subVault
         _deposit(recipient, 1_000_000);
@@ -2219,7 +2224,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         // Change default to base rate (1x, no interest) for sender
         vm.prank(manager);
-        bbv.setDefaultSubVault(MathLib.RAY);
+        stableVault.setDefaultSubVault(MathLib.RAY);
 
         // Deposit for sender with enough to have a valid transfer amount
         _deposit(user, 100_000_000);
@@ -2229,7 +2234,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         vm.prank(user);
         vm.expectRevert(Errors.InvalidAmount.selector);
-        assertFalse(bbv.transfer(recipient, amountRay));
+        assertFalse(stableVault.transfer(recipient, amountRay));
     }
 
     function test_transfer_emitsTransferEvent(address user, address recipient, uint256 depositAmount) public {
@@ -2237,19 +2242,19 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(recipient != address(0));
         vm.assume(user != recipient);
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
-        _assumeNotProxyAdmin(recipient, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
+        _assumeNotProxyAdmin(recipient, address(stableVault));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
 
         _deposit(user, depositAmount);
-        uint256 amountRay = bbv.getUserBalance(user) / 2;
+        uint256 amountRay = stableVault.getUserBalance(user) / 2;
         vm.assume(amountRay >= Constants.MIN_WITHDRAWABLE_AMOUNT_RAY);
 
         vm.expectEmit(true, true, true, true);
-        emit IBasedBoostedVault.Transfer(user, recipient, amountRay);
+        emit IStableVault.Transfer(user, recipient, amountRay);
 
         vm.prank(user);
-        assertTrue(bbv.transfer(recipient, amountRay));
+        assertTrue(stableVault.transfer(recipient, amountRay));
     }
 
     function test_transfer_fullBalanceViaTransfer(address user, address recipient, uint256 depositAmount) public {
@@ -2257,19 +2262,19 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(recipient != address(0));
         vm.assume(user != recipient);
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
-        _assumeNotProxyAdmin(recipient, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
+        _assumeNotProxyAdmin(recipient, address(stableVault));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
 
         _deposit(user, depositAmount);
-        uint256 fullAmountRay = bbv.getUserBalance(user);
+        uint256 fullAmountRay = stableVault.getUserBalance(user);
 
         vm.prank(user);
-        assertTrue(bbv.transfer(recipient, fullAmountRay));
+        assertTrue(stableVault.transfer(recipient, fullAmountRay));
 
-        assertEq(bbv.getUserBalance(user), 0);
-        assertEq(bbv.getUserSubVault(user).id, 0);
-        assertEq(bbv.getUserBalance(recipient), fullAmountRay);
+        assertEq(stableVault.getUserBalance(user), 0);
+        assertEq(stableVault.getUserSubVault(user).id, 0);
+        assertEq(stableVault.getUserBalance(recipient), fullAmountRay);
     }
 
     function test_transfer_toRecipientWithExistingPositionInDifferentSubVault(
@@ -2283,11 +2288,11 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(user != recipient);
         vm.assume(user != address(mockFundsHandler));
         vm.assume(recipient != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
-        _assumeNotProxyAdmin(recipient, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
+        _assumeNotProxyAdmin(recipient, address(stableVault));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
         newPerSecondRate = _boundRate(newPerSecondRate);
-        vm.assume(newPerSecondRate != bbv.getDefaultSubVault().perSecondRate);
+        vm.assume(newPerSecondRate != stableVault.getDefaultSubVault().perSecondRate);
 
         // Both users deposit
         _deposit(user, depositAmount);
@@ -2295,58 +2300,58 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         // Move recipient to different subVault
         _setUserRate(recipient, newPerSecondRate);
-        uint256 recipientSubVaultId = bbv.getUserSubVault(recipient).id;
+        uint256 recipientSubVaultId = stableVault.getUserSubVault(recipient).id;
 
-        uint256 amountRay = bbv.getUserBalance(user) / 4;
+        uint256 amountRay = stableVault.getUserBalance(user) / 4;
         vm.assume(amountRay >= Constants.MIN_WITHDRAWABLE_AMOUNT_RAY);
 
-        uint256 recipientBalanceBefore = bbv.getUserBalance(recipient);
+        uint256 recipientBalanceBefore = stableVault.getUserBalance(recipient);
 
         vm.prank(user);
-        assertTrue(bbv.transfer(recipient, amountRay));
+        assertTrue(stableVault.transfer(recipient, amountRay));
 
         // Recipient stays in their original subVault
-        assertEq(bbv.getUserSubVault(recipient).id, recipientSubVaultId);
+        assertEq(stableVault.getUserSubVault(recipient).id, recipientSubVaultId);
         // Recipient's balance increased by the transfer amount
-        assertEq(bbv.getUserBalance(recipient), recipientBalanceBefore + amountRay);
+        assertEq(stableVault.getUserBalance(recipient), recipientBalanceBefore + amountRay);
     }
 
     function test_transferAll_reverts_ifRecipientIsZero(address user, uint256 depositAmount) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
 
         _deposit(user, depositAmount);
 
         vm.expectRevert(Errors.InvalidParameter.selector);
         vm.prank(user);
-        bbv.transferAll(address(0));
+        stableVault.transferAll(address(0));
     }
 
     function test_transferAll_reverts_ifRecipientIsSender(address user, uint256 depositAmount) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
 
         _deposit(user, depositAmount);
 
         vm.expectRevert(Errors.InvalidParameter.selector);
         vm.prank(user);
-        bbv.transferAll(user);
+        stableVault.transferAll(user);
     }
 
     function test_transferAll_reverts_ifUserDoesNotHaveAPosition(address user, address recipient) public {
         vm.assume(user != address(0));
         vm.assume(recipient != address(0));
         vm.assume(user != recipient);
-        _assumeNotProxyAdmin(user, address(bbv));
-        _assumeNotProxyAdmin(recipient, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
+        _assumeNotProxyAdmin(recipient, address(stableVault));
 
-        vm.expectRevert(IBasedBoostedVault.NonExistentPosition.selector);
+        vm.expectRevert(IStableVault.NonExistentPosition.selector);
         vm.prank(user);
-        bbv.transferAll(recipient);
+        stableVault.transferAll(recipient);
     }
 
     function test_transferAll_allowsMinimumAmount() public {
@@ -2355,19 +2360,19 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(user != address(0));
         vm.assume(recipient != address(0));
         vm.assume(user != recipient);
-        _assumeNotProxyAdmin(user, address(bbv));
-        _assumeNotProxyAdmin(recipient, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
+        _assumeNotProxyAdmin(recipient, address(stableVault));
 
         IMockErc20 mockAsset18dp = IMockErc20(address(new MockNonStandardErc20("Test GHO", "tGHO", 18)));
         uint256 amount = 1;
         mockAsset18dp.mint(user, amount);
         vm.prank(user);
-        mockAsset18dp.forceApprove(address(bbv), amount);
+        mockAsset18dp.forceApprove(address(stableVault), amount);
         vm.prank(user);
-        bbv.deposit(user, address(mockAsset18dp), amount);
+        stableVault.deposit(user, address(mockAsset18dp), amount);
 
         vm.prank(user);
-        assertTrue(bbv.transferAll(recipient));
+        assertTrue(stableVault.transferAll(recipient));
     }
 
     function test_transferAll_allowsFullBalanceBelowMinimum() public {
@@ -2383,9 +2388,9 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         address donor = makeAddr("donor");
         address dustSender = makeAddr("dustSender");
         address recipient = makeAddr("recipient");
-        _assumeNotProxyAdmin(donor, address(bbv));
-        _assumeNotProxyAdmin(dustSender, address(bbv));
-        _assumeNotProxyAdmin(recipient, address(bbv));
+        _assumeNotProxyAdmin(donor, address(stableVault));
+        _assumeNotProxyAdmin(dustSender, address(stableVault));
+        _assumeNotProxyAdmin(recipient, address(stableVault));
 
         uint256 depositAmount = 2_000_000;
         uint256 depositRay = depositAmount.assetDecimalsToRay(address(mockAsset));
@@ -2393,7 +2398,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         // Put the donor into a higher-rate vault so we can withdraw principal and still keep
         // enough interest shares remaining (so the position is not auto-closed).
         vm.prank(manager);
-        bbv.setDefaultSubVault(DEFAULT_MAX_PER_SECOND_RATE);
+        stableVault.setDefaultSubVault(DEFAULT_MAX_PER_SECOND_RATE);
 
         _deposit(donor, depositAmount);
         mockFundsHandler.mockAggregatedBalance(10e27);
@@ -2401,34 +2406,34 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         // Withdraw exactly the original deposit amount, leaving only interest shares => originalDepositRay becomes 0.
         vm.prank(donor);
-        bbv.requestWithdrawal(donor, depositRay);
+        stableVault.requestWithdrawal(donor, depositRay);
 
         // Now assign the dust receiver to a slightly-growing default subVault so we can deterministically
         // hit the MIN-1 rounding case on `amountRay.rayDivDown(conversionRate)`.
         vm.prank(manager);
-        bbv.setDefaultSubVault(MathLib.RAY + 1);
+        stableVault.setDefaultSubVault(MathLib.RAY + 1);
         vm.warp(block.timestamp + 1);
 
         // Transfer MIN from an interest-only donor (so guaranteedAmountRay == 0 for the receiver).
         vm.prank(donor);
-        assertTrue(bbv.transfer(dustSender, Constants.MIN_WITHDRAWABLE_AMOUNT_RAY));
+        assertTrue(stableVault.transfer(dustSender, Constants.MIN_WITHDRAWABLE_AMOUNT_RAY));
 
-        uint256 dustSenderBalanceRay = bbv.getUserBalance(dustSender);
+        uint256 dustSenderBalanceRay = stableVault.getUserBalance(dustSender);
         assertLt(dustSenderBalanceRay, Constants.MIN_WITHDRAWABLE_AMOUNT_RAY);
         assertEq(dustSenderBalanceRay, Constants.MIN_WITHDRAWABLE_AMOUNT_RAY - 1);
 
         vm.prank(dustSender);
-        assertTrue(bbv.transferAll(recipient));
+        assertTrue(stableVault.transferAll(recipient));
 
-        assertEq(bbv.getUserBalance(dustSender), 0);
-        assertEq(bbv.getUserSubVault(dustSender).id, 0);
-        assertEq(bbv.getUserBalance(recipient), dustSenderBalanceRay);
+        assertEq(stableVault.getUserBalance(dustSender), 0);
+        assertEq(stableVault.getUserSubVault(dustSender).id, 0);
+        assertEq(stableVault.getUserBalance(recipient), dustSenderBalanceRay);
     }
 
     function test_transferAll_reverts_ifRecipientGetsZeroShares() public {
-        // Override bbv with a low default sub-vault rate (RAY = no interest)
+        // Override stableVault with a low default sub-vault rate (RAY = no interest)
         // and use an 18-decimal asset so 1 wei deposit = 1e9 RAY = MIN_WITHDRAWABLE_AMOUNT_RAY
-        bbv = _deployBasedBoostedVault(
+        stableVault = _deployStableVault(
             address(mockAccessManager),
             DEFAULT_MAX_PER_SECOND_RATE,
             MathLib.RAY,
@@ -2452,14 +2457,14 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         // Deposit for recipient and move them to high rate subVault
         mockAsset.mint(recipient, amount);
         vm.prank(recipient);
-        mockAsset.forceApprove(address(bbv), amount);
+        mockAsset.forceApprove(address(stableVault), amount);
         vm.prank(recipient);
-        bbv.deposit(recipient, address(mockAsset), amount);
+        stableVault.deposit(recipient, address(mockAsset), amount);
 
-        IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](1);
-        userRateData[0] = IBasedBoostedVault.UserRateData(recipient, highRate);
+        IStableVault.UserRateData[] memory userRateData = new IStableVault.UserRateData[](1);
+        userRateData[0] = IStableVault.UserRateData(recipient, highRate);
         vm.prank(manager);
-        bbv.setUserRate(userRateData);
+        stableVault.setUserRate(userRateData);
 
         // Warp time to grow recipient's subVault conversion rate
         // At 20% APY for 115 years: 1.2^115 ≈ 1e9, so conversionRate ≈ 1e36
@@ -2468,9 +2473,9 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         // Deposit for sender at base rate (RAY)
         mockAsset.mint(user, amount);
         vm.prank(user);
-        mockAsset.forceApprove(address(bbv), amount);
+        mockAsset.forceApprove(address(stableVault), amount);
         vm.prank(user);
-        bbv.deposit(user, address(mockAsset), amount);
+        stableVault.deposit(user, address(mockAsset), amount);
 
         // User has ~1e9 shares (deposited 1e9 RAY at conversionRate = RAY)
         // Recipient's subVault has conversionRate ≈ 1e36
@@ -2478,7 +2483,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         //              = 1e9 * 1e27 / 1e27 / 1e36 = 1e9 / 1e36 ≈ 0
         vm.prank(user);
         vm.expectRevert(Errors.InvalidAmount.selector);
-        bbv.transferAll(recipient);
+        stableVault.transferAll(recipient);
     }
 
     function test_transferAll_allowsMinimumAmount_evenWhenRoundingWouldBeBelowMinShares() public {
@@ -2488,24 +2493,24 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         // Create the higher-rate subVault, then return default to base rate.
         vm.prank(manager);
-        bbv.setDefaultSubVault(MathLib.RAY);
+        stableVault.setDefaultSubVault(MathLib.RAY);
         vm.prank(manager);
-        bbv.setDefaultSubVault(MathLib.RAY + 1);
+        stableVault.setDefaultSubVault(MathLib.RAY + 1);
         vm.prank(manager);
-        bbv.setDefaultSubVault(MathLib.RAY);
+        stableVault.setDefaultSubVault(MathLib.RAY);
 
         mockAsset18dp.mint(user, 1);
         vm.prank(user);
-        mockAsset18dp.forceApprove(address(bbv), 1);
+        mockAsset18dp.forceApprove(address(stableVault), 1);
         vm.prank(user);
-        bbv.deposit(user, address(mockAsset18dp), 1);
+        stableVault.deposit(user, address(mockAsset18dp), 1);
 
         vm.warp(block.timestamp + 1);
         vm.prank(manager);
         _setUserRate(user, MathLib.RAY + 1);
 
         vm.prank(user);
-        assertTrue(bbv.transferAll(recipient));
+        assertTrue(stableVault.transferAll(recipient));
     }
 
     function test_transferAll_allowsSmallAmounts_evenWhenRoundingIsUnfavorable(uint256 amountDelta) public {
@@ -2516,18 +2521,18 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         amountDelta = bound(amountDelta, 0, 3);
 
         vm.prank(manager);
-        bbv.setDefaultSubVault(MathLib.RAY + 1);
+        stableVault.setDefaultSubVault(MathLib.RAY + 1);
         vm.warp(block.timestamp + 1);
 
         uint256 amount = 1 + amountDelta;
         mockAsset18dp.mint(user, amount);
         vm.prank(user);
-        mockAsset18dp.forceApprove(address(bbv), amount);
+        mockAsset18dp.forceApprove(address(stableVault), amount);
         vm.prank(user);
-        bbv.deposit(user, address(mockAsset18dp), amount);
+        stableVault.deposit(user, address(mockAsset18dp), amount);
 
         vm.prank(user);
-        assertTrue(bbv.transferAll(recipient));
+        assertTrue(stableVault.transferAll(recipient));
     }
 
     function test_transferAll_succeeds_whenDustSenderAndRecipientCombine() public {
@@ -2537,23 +2542,23 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         // Create the higher-rate subVault, then return default to base rate.
         vm.prank(manager);
-        bbv.setDefaultSubVault(MathLib.RAY);
+        stableVault.setDefaultSubVault(MathLib.RAY);
         vm.prank(manager);
-        bbv.setDefaultSubVault(MathLib.RAY + 1);
+        stableVault.setDefaultSubVault(MathLib.RAY + 1);
         vm.prank(manager);
-        bbv.setDefaultSubVault(MathLib.RAY);
+        stableVault.setDefaultSubVault(MathLib.RAY);
 
         mockAsset18dp.mint(user, 1);
         vm.prank(user);
-        mockAsset18dp.forceApprove(address(bbv), 1);
+        mockAsset18dp.forceApprove(address(stableVault), 1);
         vm.prank(user);
-        bbv.deposit(user, address(mockAsset18dp), 1);
+        stableVault.deposit(user, address(mockAsset18dp), 1);
 
         mockAsset18dp.mint(recipient, 1);
         vm.prank(recipient);
-        mockAsset18dp.forceApprove(address(bbv), 1);
+        mockAsset18dp.forceApprove(address(stableVault), 1);
         vm.prank(recipient);
-        bbv.deposit(recipient, address(mockAsset18dp), 1);
+        stableVault.deposit(recipient, address(mockAsset18dp), 1);
 
         vm.warp(block.timestamp + 1);
         vm.prank(manager);
@@ -2562,7 +2567,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         _setUserRate(recipient, MathLib.RAY + 1);
 
         vm.prank(user);
-        assertTrue(bbv.transferAll(recipient));
+        assertTrue(stableVault.transferAll(recipient));
     }
 
     function test_transferAll_emitsTransferEvent(address user, address recipient, uint256 depositAmount) public {
@@ -2570,18 +2575,18 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(recipient != address(0));
         vm.assume(user != recipient);
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
-        _assumeNotProxyAdmin(recipient, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
+        _assumeNotProxyAdmin(recipient, address(stableVault));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
 
         _deposit(user, depositAmount);
-        uint256 fullAmountRay = bbv.getUserBalance(user);
+        uint256 fullAmountRay = stableVault.getUserBalance(user);
 
         vm.expectEmit(true, true, true, true);
-        emit IBasedBoostedVault.Transfer(user, recipient, fullAmountRay);
+        emit IStableVault.Transfer(user, recipient, fullAmountRay);
 
         vm.prank(user);
-        bbv.transferAll(recipient);
+        stableVault.transferAll(recipient);
     }
 
     function test_transferAll_crossSubVault(
@@ -2595,11 +2600,11 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(user != recipient);
         vm.assume(user != address(mockFundsHandler));
         vm.assume(recipient != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
-        _assumeNotProxyAdmin(recipient, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
+        _assumeNotProxyAdmin(recipient, address(stableVault));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
         newPerSecondRate = _boundRate(newPerSecondRate);
-        vm.assume(newPerSecondRate != bbv.getDefaultSubVault().perSecondRate);
+        vm.assume(newPerSecondRate != stableVault.getDefaultSubVault().perSecondRate);
 
         // Deposit for both users
         _deposit(user, depositAmount);
@@ -2607,21 +2612,21 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         // Move recipient to different subVault
         _setUserRate(recipient, newPerSecondRate);
-        uint256 recipientSubVaultId = bbv.getUserSubVault(recipient).id;
+        uint256 recipientSubVaultId = stableVault.getUserSubVault(recipient).id;
 
-        uint256 userFullAmount = bbv.getUserBalance(user);
-        uint256 recipientBalanceBefore = bbv.getUserBalance(recipient);
+        uint256 userFullAmount = stableVault.getUserBalance(user);
+        uint256 recipientBalanceBefore = stableVault.getUserBalance(recipient);
 
         vm.prank(user);
-        assertTrue(bbv.transferAll(recipient));
+        assertTrue(stableVault.transferAll(recipient));
 
         // User's position is deleted
-        assertEq(bbv.getUserBalance(user), 0);
-        assertEq(bbv.getUserSubVault(user).id, 0);
+        assertEq(stableVault.getUserBalance(user), 0);
+        assertEq(stableVault.getUserSubVault(user).id, 0);
 
         // Recipient stays in their subVault with increased balance
-        assertEq(bbv.getUserSubVault(recipient).id, recipientSubVaultId);
-        assertEq(bbv.getUserBalance(recipient), recipientBalanceBefore + userFullAmount);
+        assertEq(stableVault.getUserSubVault(recipient).id, recipientSubVaultId);
+        assertEq(stableVault.getUserBalance(recipient), recipientBalanceBefore + userFullAmount);
     }
 
     function test_transferAll_toNewRecipientAssignsDefaultSubVault(
@@ -2633,22 +2638,22 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(recipient != address(0));
         vm.assume(user != recipient);
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
-        _assumeNotProxyAdmin(recipient, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
+        _assumeNotProxyAdmin(recipient, address(stableVault));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
 
         _deposit(user, depositAmount);
-        uint256 fullAmountRay = bbv.getUserBalance(user);
+        uint256 fullAmountRay = stableVault.getUserBalance(user);
 
         // Recipient has no position
-        assertEq(bbv.getUserSubVault(recipient).id, 0);
+        assertEq(stableVault.getUserSubVault(recipient).id, 0);
 
         vm.prank(user);
-        assertTrue(bbv.transferAll(recipient));
+        assertTrue(stableVault.transferAll(recipient));
 
         // Recipient is assigned the default subVault
-        assertEq(bbv.getUserSubVault(recipient).id, bbv.getDefaultSubVault().id);
-        assertEq(bbv.getUserBalance(recipient), fullAmountRay);
+        assertEq(stableVault.getUserSubVault(recipient).id, stableVault.getDefaultSubVault().id);
+        assertEq(stableVault.getUserBalance(recipient), fullAmountRay);
     }
 
     function test_transferAll_sameSubVaultOptimizesAccrual(address user, address recipient, uint256 depositAmount)
@@ -2658,30 +2663,30 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(recipient != address(0));
         vm.assume(user != recipient);
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
-        _assumeNotProxyAdmin(recipient, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
+        _assumeNotProxyAdmin(recipient, address(stableVault));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
 
         // Both users in same subVault (default)
         _deposit(user, depositAmount);
         _deposit(recipient, depositAmount);
 
-        uint256 userFullAmount = bbv.getUserBalance(user);
-        uint256 recipientBalanceBefore = bbv.getUserBalance(recipient);
+        uint256 userFullAmount = stableVault.getUserBalance(user);
+        uint256 recipientBalanceBefore = stableVault.getUserBalance(recipient);
 
         // Warp time to accumulate interest
         vm.warp(block.timestamp + 100);
 
         vm.prank(user);
-        assertTrue(bbv.transferAll(recipient));
+        assertTrue(stableVault.transferAll(recipient));
 
-        assertEq(bbv.getUserBalance(user), 0);
+        assertEq(stableVault.getUserBalance(user), 0);
         // Both were in same subVault, so transfer is 1:1 in shares (converted to value)
-        assertGe(bbv.getUserBalance(recipient), recipientBalanceBefore + userFullAmount);
+        assertGe(stableVault.getUserBalance(recipient), recipientBalanceBefore + userFullAmount);
     }
 
     function test_moveShares_reverts_ifSameUserAndPositionNotFullyMigrated(uint256 partialSharesToMove) public {
-        BasedBoostedVaultHarness bbvHarness = _deployBasedBoostedVaultHarness(
+        StableVaultHarness stableVaultHarness = _deployStableVaultHarness(
             address(mockAccessManager),
             DEFAULT_MAX_PER_SECOND_RATE,
             DEFAULT_PER_SECOND_RATE,
@@ -2699,17 +2704,17 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 depositAmount = 2_000_000;
         mockAsset.mint(user, depositAmount);
         vm.prank(user);
-        mockAsset.forceApprove(address(bbvHarness), depositAmount);
+        mockAsset.forceApprove(address(stableVaultHarness), depositAmount);
         vm.prank(user);
-        bbvHarness.deposit(user, address(mockAsset), depositAmount);
+        stableVaultHarness.deposit(user, address(mockAsset), depositAmount);
 
-        uint256 userSubVaultId = bbvHarness.getUserSubVault(user).id;
-        uint256 fullShares = bbvHarness.previewFullWithdrawalSharesHarness(user);
+        uint256 userSubVaultId = stableVaultHarness.getUserSubVault(user).id;
+        uint256 fullShares = stableVaultHarness.previewFullWithdrawalSharesHarness(user);
         assertGt(fullShares, 1);
         partialSharesToMove = bound(partialSharesToMove, 1, fullShares - 1);
 
         vm.expectRevert(Errors.InvalidAmount.selector);
-        bbvHarness.moveSharesHarness({
+        stableVaultHarness.moveSharesHarness({
             from: user,
             to: user,
             fromSubVaultId: userSubVaultId,
@@ -2721,7 +2726,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     }
 
     function test_moveShares_reverts_ifSameUserAndGuaranteedAmountIsNonZero(uint256 guaranteedAmountToMoveRay) public {
-        BasedBoostedVaultHarness bbvHarness = _deployBasedBoostedVaultHarness(
+        StableVaultHarness stableVaultHarness = _deployStableVaultHarness(
             address(mockAccessManager),
             DEFAULT_MAX_PER_SECOND_RATE,
             DEFAULT_PER_SECOND_RATE,
@@ -2739,17 +2744,17 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         uint256 depositAmount = 2_000_000;
         mockAsset.mint(user, depositAmount);
         vm.prank(user);
-        mockAsset.forceApprove(address(bbvHarness), depositAmount);
+        mockAsset.forceApprove(address(stableVaultHarness), depositAmount);
         vm.prank(user);
-        bbvHarness.deposit(user, address(mockAsset), depositAmount);
+        stableVaultHarness.deposit(user, address(mockAsset), depositAmount);
 
-        uint256 userSubVaultId = bbvHarness.getUserSubVault(user).id;
-        uint256 fullShares = bbvHarness.previewFullWithdrawalSharesHarness(user);
+        uint256 userSubVaultId = stableVaultHarness.getUserSubVault(user).id;
+        uint256 fullShares = stableVaultHarness.previewFullWithdrawalSharesHarness(user);
         assertGt(fullShares, 0);
         guaranteedAmountToMoveRay = bound(guaranteedAmountToMoveRay, 1, depositAmount);
 
         vm.expectRevert(Errors.InvalidAmount.selector);
-        bbvHarness.moveSharesHarness({
+        stableVaultHarness.moveSharesHarness({
             from: user,
             to: user,
             fromSubVaultId: userSubVaultId,
@@ -2762,7 +2767,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
     function test_transfer_reverts_ifMaxActiveSubVaultsReachedWhenActivatingDefaultSubVault() public {
         uint256 maxActiveSubVaults = 2;
-        bbv = _deployBasedBoostedVault(
+        stableVault = _deployStableVault(
             address(mockAccessManager),
             DEFAULT_MAX_PER_SECOND_RATE,
             MathLib.RAY,
@@ -2790,17 +2795,17 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.prank(manager);
         _setUserRate(user2, MathLib.RAY + 2);
 
-        assertEq(bbv.getActiveSubVaults().length, maxActiveSubVaults);
+        assertEq(stableVault.getActiveSubVaults().length, maxActiveSubVaults);
 
         uint256 amountRay = Constants.MIN_WITHDRAWABLE_AMOUNT_RAY;
-        vm.expectRevert(IBasedBoostedVault.TooManyActiveSubVaults.selector);
+        vm.expectRevert(IStableVault.TooManyActiveSubVaults.selector);
         vm.prank(user1);
-        assertFalse(bbv.transfer(recipient, amountRay));
+        assertFalse(stableVault.transfer(recipient, amountRay));
     }
 
     function test_transferAll_reverts_ifMaxActiveSubVaultsReachedWhenActivatingDefaultSubVault() public {
         uint256 maxActiveSubVaults = 2;
-        bbv = _deployBasedBoostedVault(
+        stableVault = _deployStableVault(
             address(mockAccessManager),
             DEFAULT_MAX_PER_SECOND_RATE,
             MathLib.RAY,
@@ -2833,11 +2838,11 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.prank(manager);
         _setUserRate(user2, MathLib.RAY + 2);
 
-        assertEq(bbv.getActiveSubVaults().length, maxActiveSubVaults);
+        assertEq(stableVault.getActiveSubVaults().length, maxActiveSubVaults);
 
-        vm.expectRevert(IBasedBoostedVault.TooManyActiveSubVaults.selector);
+        vm.expectRevert(IStableVault.TooManyActiveSubVaults.selector);
         vm.prank(user1);
-        assertFalse(bbv.transferAll(recipient));
+        assertFalse(stableVault.transferAll(recipient));
     }
 
     function test_transfer_partialTransferUpdatesOriginalDeposit(address user, address recipient, uint256 depositAmount)
@@ -2847,21 +2852,21 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(recipient != address(0));
         vm.assume(user != recipient);
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
-        _assumeNotProxyAdmin(recipient, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
+        _assumeNotProxyAdmin(recipient, address(stableVault));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
 
         _deposit(user, depositAmount);
-        uint256 amountRay = bbv.getUserBalance(user) / 3;
+        uint256 amountRay = stableVault.getUserBalance(user) / 3;
         vm.assume(amountRay >= Constants.MIN_WITHDRAWABLE_AMOUNT_RAY);
 
-        uint256 globalOriginalBefore = bbv.getGlobalOriginalDepositAmount();
+        uint256 globalOriginalBefore = stableVault.getGlobalOriginalDepositAmount();
 
         vm.prank(user);
-        assertTrue(bbv.transfer(recipient, amountRay));
+        assertTrue(stableVault.transfer(recipient, amountRay));
 
         // Global original deposit should remain unchanged (just moved between users)
-        assertEq(bbv.getGlobalOriginalDepositAmount(), globalOriginalBefore);
+        assertEq(stableVault.getGlobalOriginalDepositAmount(), globalOriginalBefore);
     }
 
     function test_transfer_afterTimePassedWithInterest(
@@ -2874,8 +2879,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         vm.assume(recipient != address(0));
         vm.assume(user != recipient);
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
-        _assumeNotProxyAdmin(recipient, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
+        _assumeNotProxyAdmin(recipient, address(stableVault));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
         timePassed = bound(timePassed, 1, 365 days);
 
@@ -2884,18 +2889,18 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         // Warp time to accumulate interest
         vm.warp(block.timestamp + timePassed);
 
-        uint256 userBalanceWithInterest = bbv.getUserBalance(user);
+        uint256 userBalanceWithInterest = stableVault.getUserBalance(user);
         uint256 amountRay = userBalanceWithInterest / 2;
         vm.assume(amountRay >= Constants.MIN_WITHDRAWABLE_AMOUNT_RAY);
 
-        uint256 userBalanceBefore = bbv.getUserBalance(user);
+        uint256 userBalanceBefore = stableVault.getUserBalance(user);
 
         vm.prank(user);
-        assertTrue(bbv.transfer(recipient, amountRay));
+        assertTrue(stableVault.transfer(recipient, amountRay));
 
         // User's balance decreased by approximately the transfer amount
         // Due to rounding in share calculations, the actual decrease may differ by a few wei
-        uint256 userBalanceAfter = bbv.getUserBalance(user);
+        uint256 userBalanceAfter = stableVault.getUserBalance(user);
         uint256 expectedUserBalance = userBalanceBefore - amountRay;
         assertLe(userBalanceAfter, expectedUserBalance + 2, "User balance should decrease by ~amountRay");
         assertGe(
@@ -2903,7 +2908,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         );
 
         // Recipient received approximately the transfer amount (may be slightly less due to rayDivDown rounding)
-        uint256 recipientBalance = bbv.getUserBalance(recipient);
+        uint256 recipientBalance = stableVault.getUserBalance(recipient);
         assertLe(recipientBalance, amountRay, "Recipient shouldn't receive more than requested");
         assertGe(recipientBalance, amountRay > 2 ? amountRay - 2 : 0, "Recipient received too little");
     }
@@ -2911,7 +2916,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     function test_transfer_multipleTransfersFromSameUser(address user, uint256 depositAmount) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
         vm.assume(depositAmount >= 1_000_000); // Ensure enough for multiple transfers
 
@@ -2920,23 +2925,23 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         address recipient3 = makeAddr("recipient3");
 
         _deposit(user, depositAmount);
-        uint256 initialBalance = bbv.getUserBalance(user);
+        uint256 initialBalance = stableVault.getUserBalance(user);
         uint256 transferAmount = initialBalance / 5;
         vm.assume(transferAmount >= Constants.MIN_WITHDRAWABLE_AMOUNT_RAY);
 
         vm.prank(user);
-        assertTrue(bbv.transfer(recipient1, transferAmount));
+        assertTrue(stableVault.transfer(recipient1, transferAmount));
 
         vm.prank(user);
-        assertTrue(bbv.transfer(recipient2, transferAmount));
+        assertTrue(stableVault.transfer(recipient2, transferAmount));
 
         vm.prank(user);
-        assertTrue(bbv.transfer(recipient3, transferAmount));
+        assertTrue(stableVault.transfer(recipient3, transferAmount));
 
-        assertEq(bbv.getUserBalance(recipient1), transferAmount);
-        assertEq(bbv.getUserBalance(recipient2), transferAmount);
-        assertEq(bbv.getUserBalance(recipient3), transferAmount);
-        assertEq(bbv.getUserBalance(user), initialBalance - (transferAmount * 3));
+        assertEq(stableVault.getUserBalance(recipient1), transferAmount);
+        assertEq(stableVault.getUserBalance(recipient2), transferAmount);
+        assertEq(stableVault.getUserBalance(recipient3), transferAmount);
+        assertEq(stableVault.getUserBalance(user), initialBalance - (transferAmount * 3));
     }
 
     function test_transfer_chainedTransfers(uint256 depositAmount) public {
@@ -2947,27 +2952,27 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         address charlie = makeAddr("charlie");
 
         _deposit(alice, depositAmount);
-        uint256 initialAmount = bbv.getUserBalance(alice);
+        uint256 initialAmount = stableVault.getUserBalance(alice);
 
         // Alice -> Bob (full)
         vm.prank(alice);
-        assertTrue(bbv.transferAll(bob));
+        assertTrue(stableVault.transferAll(bob));
 
-        assertEq(bbv.getUserBalance(alice), 0);
-        assertEq(bbv.getUserBalance(bob), initialAmount);
+        assertEq(stableVault.getUserBalance(alice), 0);
+        assertEq(stableVault.getUserBalance(bob), initialAmount);
 
         // Bob -> Charlie (full)
         vm.prank(bob);
-        assertTrue(bbv.transferAll(charlie));
+        assertTrue(stableVault.transferAll(charlie));
 
-        assertEq(bbv.getUserBalance(bob), 0);
-        assertEq(bbv.getUserBalance(charlie), initialAmount);
+        assertEq(stableVault.getUserBalance(bob), 0);
+        assertEq(stableVault.getUserBalance(charlie), initialAmount);
     }
 
     function test_transfer_removesSubVaultFromActiveWhenEmpty(uint256 depositAmount, uint256 newPerSecondRate) public {
         depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
         newPerSecondRate = _boundRate(newPerSecondRate);
-        vm.assume(newPerSecondRate != bbv.getDefaultSubVault().perSecondRate);
+        vm.assume(newPerSecondRate != stableVault.getDefaultSubVault().perSecondRate);
 
         address user = makeAddr("user");
         address recipient = makeAddr("recipient");
@@ -2976,10 +2981,10 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         // Move user to a new subVault
         _setUserRate(user, newPerSecondRate);
-        uint256 userSubVaultId = bbv.getUserSubVault(user).id;
+        uint256 userSubVaultId = stableVault.getUserSubVault(user).id;
 
         // Verify the subVault is active
-        IBasedBoostedVault.SubVaultData[] memory activeSubVaultsBefore = bbv.getActiveSubVaults();
+        IStableVault.SubVaultData[] memory activeSubVaultsBefore = stableVault.getActiveSubVaults();
         bool foundBefore = false;
         for (uint256 i = 0; i < activeSubVaultsBefore.length; i++) {
             if (activeSubVaultsBefore[i].id == userSubVaultId) {
@@ -2991,10 +2996,10 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         // Transfer all to recipient (who will be in default subVault)
         vm.prank(user);
-        assertTrue(bbv.transferAll(recipient));
+        assertTrue(stableVault.transferAll(recipient));
 
         // The user's original subVault should no longer be active (if it was only user)
-        IBasedBoostedVault.SubVaultData[] memory activeSubVaultsAfter = bbv.getActiveSubVaults();
+        IStableVault.SubVaultData[] memory activeSubVaultsAfter = stableVault.getActiveSubVaults();
         bool foundAfter = false;
         for (uint256 i = 0; i < activeSubVaultsAfter.length; i++) {
             if (activeSubVaultsAfter[i].id == userSubVaultId) {
@@ -3012,15 +3017,15 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     ) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
-        _assumeNotProxyAdmin(msgSender, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
+        _assumeNotProxyAdmin(msgSender, address(stableVault));
         vm.assume(msgSender != user);
         iouAmountRay = _boundRayAmount(iouAmountRay);
         mockIouToken.mint(user, iouAmountRay);
 
-        vm.expectRevert(IBasedBoostedVault.OnlyUser.selector);
+        vm.expectRevert(IStableVault.OnlyUser.selector);
         vm.prank(msgSender);
-        bbv.executeWithdrawal(user, address(mockAsset), 0, iouAmountRay, "");
+        stableVault.executeWithdrawal(user, address(mockAsset), 0, iouAmountRay, "");
     }
 
     function test_executeWithdrawal_reverts_ifAssetIsNotAllowedToWithdrawFromAllocator(
@@ -3032,8 +3037,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         // registered asset.
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
-        _assumeNotProxyAdmin(msgSender, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
+        _assumeNotProxyAdmin(msgSender, address(stableVault));
         vm.assume(msgSender != user);
         iouAmountRay = _boundRayAmount(iouAmountRay);
         vm.assume(iouAmountRay.rayToAssetDecimals(address(mockAsset)) > 0);
@@ -3057,7 +3062,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         vm.expectRevert(abi.encodeWithSelector(Errors.UnsupportedAsset.selector, address(mockAsset)));
         vm.prank(user);
-        bbv.executeWithdrawal(user, address(mockAsset), 0, iouAmountRay, "");
+        stableVault.executeWithdrawal(user, address(mockAsset), 0, iouAmountRay, "");
     }
 
     function test_executeWithdrawal_reverts_ifIouAmountIsGreaterThanUserBalance(
@@ -3067,7 +3072,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     ) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
         userIouBalance = _boundRayAmountAllowingZero(userIouBalance);
         iouAmountRay = _boundRayAmount(iouAmountRay);
         vm.assume(iouAmountRay > userIouBalance);
@@ -3077,7 +3082,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
             abi.encodeWithSelector(IERC20Errors.ERC20InsufficientBalance.selector, user, userIouBalance, iouAmountRay)
         );
         vm.prank(user);
-        bbv.executeWithdrawal(user, address(mockAsset), 0, iouAmountRay, "");
+        stableVault.executeWithdrawal(user, address(mockAsset), 0, iouAmountRay, "");
     }
 
     function test_executeWithdrawal_reverts_ifAmountOutIsLessThanMinAmountOut(
@@ -3088,7 +3093,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     ) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
         userIouBalance = _boundRayAmountAllowingZero(userIouBalance);
         iouAmountRay = _boundRayAmount(iouAmountRay);
         vm.assume(iouAmountRay <= userIouBalance);
@@ -3102,7 +3107,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         vm.prank(user);
         vm.expectRevert(Errors.InsufficientAmountOut.selector);
-        bbv.executeWithdrawal(user, address(mockAsset), minAmountOut, iouAmountRay, "");
+        stableVault.executeWithdrawal(user, address(mockAsset), minAmountOut, iouAmountRay, "");
     }
 
     function test_executeWithdrawal_reverts_ifAssetAmountIsZero_fromWithdrawalFee(
@@ -3112,7 +3117,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     ) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
         userIouBalance = _boundRayAmountAllowingZero(userIouBalance);
         iouAmountRay = _boundRayAmount(iouAmountRay);
         vm.assume(iouAmountRay <= userIouBalance);
@@ -3131,13 +3136,13 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         vm.prank(user);
         vm.expectRevert(Errors.InsufficientAmountOut.selector);
-        bbv.executeWithdrawal(user, address(mockAsset), 0, iouAmountRay, "");
+        stableVault.executeWithdrawal(user, address(mockAsset), 0, iouAmountRay, "");
     }
 
     function test_executeWithdrawal_emitsExpectedEvent(address user, uint256 iouAmountRay) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
         iouAmountRay = _boundRayAmount(iouAmountRay);
         mockIouToken.mint(user, iouAmountRay);
 
@@ -3146,10 +3151,10 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockTransferHelper.mockAsset(address(mockAsset), actualWithdrawnAssets);
 
         vm.expectEmit(true, true, true, true);
-        emit IBasedBoostedVault.WithdrawalExecuted(user, address(mockAsset), actualWithdrawnAssets);
+        emit IStableVault.WithdrawalExecuted(user, address(mockAsset), actualWithdrawnAssets);
 
         vm.prank(user);
-        bbv.executeWithdrawal(user, address(mockAsset), 0, iouAmountRay, "");
+        stableVault.executeWithdrawal(user, address(mockAsset), 0, iouAmountRay, "");
     }
 
     function test_executeWithdrawal_burnsExpectedAmountOfIouTokens(
@@ -3159,7 +3164,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     ) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
         userIouBalance = _boundRayAmountAllowingZero(userIouBalance);
         iouAmountRay = _boundRayAmount(iouAmountRay);
         vm.assume(iouAmountRay <= userIouBalance);
@@ -3171,7 +3176,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockTransferHelper.mockAsset(address(mockAsset), actualWithdrawnAssets);
 
         vm.prank(user);
-        bbv.executeWithdrawal(user, address(mockAsset), 0, iouAmountRay, "");
+        stableVault.executeWithdrawal(user, address(mockAsset), 0, iouAmountRay, "");
 
         assertEq(mockIouToken.balanceOf(user), userIouBalance - iouAmountRay);
     }
@@ -3179,7 +3184,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     function test_executeWithdrawal_transfersExpectedAmountOfAssetsToUser(address user, uint256 iouAmountRay) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
-        _assumeNotProxyAdmin(user, address(bbv));
+        _assumeNotProxyAdmin(user, address(stableVault));
         iouAmountRay = _boundRayAmount(iouAmountRay);
         mockIouToken.mint(user, iouAmountRay);
         vm.assume(iouAmountRay.rayToAssetDecimals(address(mockAsset)) > 0);
@@ -3189,52 +3194,54 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockTransferHelper.mockAsset(address(mockAsset), actualWithdrawnAssets);
 
         vm.prank(user);
-        bbv.executeWithdrawal(user, address(mockAsset), 0, iouAmountRay, "");
+        stableVault.executeWithdrawal(user, address(mockAsset), 0, iouAmountRay, "");
 
         assertEq(mockAsset.balanceOf(user), actualWithdrawnAssets);
     }
 
     function test_rescueTokens_reverts_ifMsgSenderIsNotAuthorized(
         address unauthorizedMsgSender,
-        uint256 bbvAssetBalance,
+        uint256 stableVaultAssetBalance,
         uint256 assetAmountToRescue
     ) public {
         vm.assume(unauthorizedMsgSender != address(0));
-        _assumeNotProxyAdmin(unauthorizedMsgSender, address(bbv));
+        _assumeNotProxyAdmin(unauthorizedMsgSender, address(stableVault));
         vm.assume(unauthorizedMsgSender != manager);
-        bbvAssetBalance = _boundAssetAmount(address(mockAsset), bbvAssetBalance);
+        stableVaultAssetBalance = _boundAssetAmount(address(mockAsset), stableVaultAssetBalance);
         assetAmountToRescue = _boundAssetAmount(address(mockAsset), assetAmountToRescue);
-        vm.assume(bbvAssetBalance >= assetAmountToRescue);
-        mockAsset.mint(address(bbv), bbvAssetBalance);
+        vm.assume(stableVaultAssetBalance >= assetAmountToRescue);
+        mockAsset.mint(address(stableVault), stableVaultAssetBalance);
 
-        mockAccessManager.mockRejectCall(unauthorizedMsgSender, address(bbv), IRescuableToken.rescueTokens.selector);
+        mockAccessManager.mockRejectCall(
+            unauthorizedMsgSender, address(stableVault), IRescuableToken.rescueTokens.selector
+        );
         vm.expectRevert(
             abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
         );
         vm.prank(unauthorizedMsgSender);
-        IRescuableToken(address(bbv)).rescueTokens(address(mockAsset), assetAmountToRescue);
+        IRescuableToken(address(stableVault)).rescueTokens(address(mockAsset), assetAmountToRescue);
     }
 
     function test_rescueTokens_getsExpectedAmountOfAssetsToMsgSender(
         address msgSender,
-        uint256 bbvAssetBalance,
+        uint256 stableVaultAssetBalance,
         uint256 assetAmountToRescue
     ) public {
         vm.assume(msgSender != address(0));
-        _assumeNotProxyAdmin(msgSender, address(bbv));
+        _assumeNotProxyAdmin(msgSender, address(stableVault));
 
-        bbvAssetBalance = _boundAssetAmount(address(mockAsset), bbvAssetBalance);
+        stableVaultAssetBalance = _boundAssetAmount(address(mockAsset), stableVaultAssetBalance);
         assetAmountToRescue = _boundAssetAmount(address(mockAsset), assetAmountToRescue);
-        vm.assume(bbvAssetBalance >= assetAmountToRescue);
-        mockAsset.mint(address(bbv), bbvAssetBalance);
-        assertEq(mockAsset.balanceOf(address(bbv)), bbvAssetBalance);
+        vm.assume(stableVaultAssetBalance >= assetAmountToRescue);
+        mockAsset.mint(address(stableVault), stableVaultAssetBalance);
+        assertEq(mockAsset.balanceOf(address(stableVault)), stableVaultAssetBalance);
         vm.assume(mockAsset.balanceOf(msgSender) == 0);
 
         vm.prank(msgSender);
-        IRescuableToken(address(bbv)).rescueTokens(address(mockAsset), assetAmountToRescue);
+        IRescuableToken(address(stableVault)).rescueTokens(address(mockAsset), assetAmountToRescue);
 
         assertEq(mockAsset.balanceOf(msgSender), assetAmountToRescue);
-        assertEq(mockAsset.balanceOf(address(bbv)), bbvAssetBalance - assetAmountToRescue);
+        assertEq(mockAsset.balanceOf(address(stableVault)), stableVaultAssetBalance - assetAmountToRescue);
     }
 
     function test_executeWithdrawal_reentrancyNotAllowedOnRequestWithdrawal() public {
@@ -3247,8 +3254,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         reentrantAsset.mint(attacker, depositAmount);
 
         vm.startPrank(attacker);
-        reentrantAsset.approve(address(bbv), depositAmount);
-        bbv.deposit(attacker, address(reentrantAsset), depositAmount);
+        reentrantAsset.approve(address(stableVault), depositAmount);
+        stableVault.deposit(attacker, address(reentrantAsset), depositAmount);
         vm.stopPrank();
 
         // Request withdrawal to get IOUs
@@ -3256,7 +3263,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockFundsHandler.mockAggregatedBalance(depositAmountRay);
 
         vm.prank(attacker);
-        bbv.requestWithdrawal(attacker, 0);
+        stableVault.requestWithdrawal(attacker, 0);
 
         uint256 iouBalance = mockIouToken.balanceOf(attacker);
         assertEq(iouBalance, depositAmountRay);
@@ -3268,7 +3275,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         // 3. transfer() is called on the reentrant token -> attacker re-enters requestWithdrawal
         // 4. At this point, liabilities are reduced but assets haven't left yet
         reentrantAsset.setReentrantCall(
-            address(bbv), abi.encodeCall(IBasedBoostedVault.requestWithdrawal, (attacker, 0))
+            address(stableVault), abi.encodeCall(IStableVault.requestWithdrawal, (attacker, 0))
         );
 
         // Mock the asset balance in transfer helper for the withdrawal
@@ -3277,7 +3284,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         // Execute withdrawal - should revert with ReentrancyGuardReentrantCall when trying to re-enter
         vm.prank(attacker);
         vm.expectRevert(ReentrancyGuardTransientUpgradeable.ReentrancyGuardReentrantCall.selector);
-        bbv.executeWithdrawal(attacker, address(reentrantAsset), 0, iouBalance, "");
+        stableVault.executeWithdrawal(attacker, address(reentrantAsset), 0, iouBalance, "");
     }
 
     function test_executeWithdrawal_reentrancyNotAllowedOnDeposit() public {
@@ -3290,8 +3297,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         reentrantAsset.mint(attacker, depositAmount * 2); // Extra for potential reentrant deposit
 
         vm.startPrank(attacker);
-        reentrantAsset.approve(address(bbv), type(uint256).max);
-        bbv.deposit(attacker, address(reentrantAsset), depositAmount);
+        reentrantAsset.approve(address(stableVault), type(uint256).max);
+        stableVault.deposit(attacker, address(reentrantAsset), depositAmount);
         vm.stopPrank();
 
         // Request withdrawal to get IOUs
@@ -3299,13 +3306,14 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockFundsHandler.mockAggregatedBalance(depositAmountRay);
 
         vm.prank(attacker);
-        bbv.requestWithdrawal(attacker, 0);
+        stableVault.requestWithdrawal(attacker, 0);
 
         uint256 iouBalance = mockIouToken.balanceOf(attacker);
 
         // Setup the reentrant callback to deposit during transfer
         reentrantAsset.setReentrantCall(
-            address(bbv), abi.encodeCall(IBasedBoostedVault.deposit, (attacker, address(reentrantAsset), depositAmount))
+            address(stableVault),
+            abi.encodeCall(IStableVault.deposit, (attacker, address(reentrantAsset), depositAmount))
         );
 
         // Mock the asset balance in transfer helper for the withdrawal
@@ -3314,7 +3322,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         // Execute withdrawal - should revert with ReentrancyGuardReentrantCall
         vm.prank(attacker);
         vm.expectRevert(ReentrancyGuardTransientUpgradeable.ReentrancyGuardReentrantCall.selector);
-        bbv.executeWithdrawal(attacker, address(reentrantAsset), 0, iouBalance, "");
+        stableVault.executeWithdrawal(attacker, address(reentrantAsset), 0, iouBalance, "");
     }
 
     function test_executeWithdrawal_reentrancyNotAllowedOnExecuteWithdrawal() public {
@@ -3327,8 +3335,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         reentrantAsset.mint(attacker, depositAmount);
 
         vm.startPrank(attacker);
-        reentrantAsset.approve(address(bbv), depositAmount);
-        bbv.deposit(attacker, address(reentrantAsset), depositAmount);
+        reentrantAsset.approve(address(stableVault), depositAmount);
+        stableVault.deposit(attacker, address(reentrantAsset), depositAmount);
         vm.stopPrank();
 
         // Request withdrawal to get IOUs
@@ -3336,7 +3344,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         mockFundsHandler.mockAggregatedBalance(depositAmountRay);
 
         vm.prank(attacker);
-        bbv.requestWithdrawal(attacker, 0);
+        stableVault.requestWithdrawal(attacker, 0);
 
         uint256 iouBalance = mockIouToken.balanceOf(attacker);
         uint256 halfIou = iouBalance / 2;
@@ -3346,8 +3354,8 @@ contract BasedBoostedVaultTest is TestWithHelpers {
 
         // Setup the reentrant callback to executeWithdrawal during transfer
         reentrantAsset.setReentrantCall(
-            address(bbv),
-            abi.encodeCall(IBasedBoostedVault.executeWithdrawal, (attacker, address(reentrantAsset), 0, halfIou, ""))
+            address(stableVault),
+            abi.encodeCall(IStableVault.executeWithdrawal, (attacker, address(reentrantAsset), 0, halfIou, ""))
         );
 
         // Mock the asset balance in transfer helper for the withdrawal
@@ -3356,7 +3364,7 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         // Execute withdrawal - should revert with ReentrancyGuardReentrantCall
         vm.prank(attacker);
         vm.expectRevert(ReentrancyGuardTransientUpgradeable.ReentrancyGuardReentrantCall.selector);
-        bbv.executeWithdrawal(attacker, address(reentrantAsset), 0, halfIou, "");
+        stableVault.executeWithdrawal(attacker, address(reentrantAsset), 0, halfIou, "");
     }
 
     function test_deposit_reentrancyNotAllowedOnDeposit() public {
@@ -3368,61 +3376,64 @@ contract BasedBoostedVaultTest is TestWithHelpers {
         reentrantAsset.mint(attacker, depositAmount * 2);
 
         vm.startPrank(attacker);
-        reentrantAsset.approve(address(bbv), type(uint256).max);
+        reentrantAsset.approve(address(stableVault), type(uint256).max);
         vm.stopPrank();
 
         // Setup the reentrant callback to deposit during transferFrom
         reentrantAsset.setReentrantCall(
-            address(bbv), abi.encodeCall(IBasedBoostedVault.deposit, (attacker, address(reentrantAsset), depositAmount))
+            address(stableVault),
+            abi.encodeCall(IStableVault.deposit, (attacker, address(reentrantAsset), depositAmount))
         );
         reentrantAsset.setReentrancyOnTransferFrom(true);
 
         // Deposit - should revert with ReentrancyGuardReentrantCall when trying to re-enter
         vm.prank(attacker);
         vm.expectRevert(ReentrancyGuardTransientUpgradeable.ReentrancyGuardReentrantCall.selector);
-        bbv.deposit(attacker, address(reentrantAsset), depositAmount);
+        stableVault.deposit(attacker, address(reentrantAsset), depositAmount);
     }
 
     function test_rescueNative_reverts_ifMsgSenderIsNotAuthorized(
         address unauthorizedMsgSender,
-        uint256 bbvAssetBalance,
+        uint256 stableVaultAssetBalance,
         uint256 assetAmountToRescue
     ) public {
         vm.assume(unauthorizedMsgSender != address(0));
-        _assumeNotProxyAdmin(unauthorizedMsgSender, address(bbv));
+        _assumeNotProxyAdmin(unauthorizedMsgSender, address(stableVault));
         vm.assume(unauthorizedMsgSender != manager);
-        bbvAssetBalance = _boundNativeAmount(bbvAssetBalance);
+        stableVaultAssetBalance = _boundNativeAmount(stableVaultAssetBalance);
         assetAmountToRescue = _boundNativeAmount(assetAmountToRescue);
-        vm.assume(bbvAssetBalance >= assetAmountToRescue);
-        vm.deal(address(bbv), bbvAssetBalance);
+        vm.assume(stableVaultAssetBalance >= assetAmountToRescue);
+        vm.deal(address(stableVault), stableVaultAssetBalance);
 
-        mockAccessManager.mockRejectCall(unauthorizedMsgSender, address(bbv), IRescuableNative.rescueNative.selector);
+        mockAccessManager.mockRejectCall(
+            unauthorizedMsgSender, address(stableVault), IRescuableNative.rescueNative.selector
+        );
         vm.expectRevert(
             abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
         );
         vm.prank(unauthorizedMsgSender);
-        IRescuableNative(address(bbv)).rescueNative(assetAmountToRescue);
+        IRescuableNative(address(stableVault)).rescueNative(assetAmountToRescue);
     }
 
     function test_rescueNative_getsExpectedAmountOfNativeToMsgSender(
-        uint256 bbvAssetBalance,
+        uint256 stableVaultAssetBalance,
         uint256 assetAmountToRescue
     ) public {
         // Avoid fuzzing the msgSender address to avoid .call on precompiles and zero address.
         address msgSender = makeAddr("msgSender");
 
-        bbvAssetBalance = _boundNativeAmount(bbvAssetBalance);
+        stableVaultAssetBalance = _boundNativeAmount(stableVaultAssetBalance);
         assetAmountToRescue = _boundNativeAmount(assetAmountToRescue);
-        vm.assume(bbvAssetBalance >= assetAmountToRescue);
+        vm.assume(stableVaultAssetBalance >= assetAmountToRescue);
 
-        vm.deal(address(bbv), bbvAssetBalance);
+        vm.deal(address(stableVault), stableVaultAssetBalance);
         vm.assume(address(msgSender).balance == 0);
 
         vm.prank(msgSender);
-        IRescuableNative(address(bbv)).rescueNative(assetAmountToRescue);
+        IRescuableNative(address(stableVault)).rescueNative(assetAmountToRescue);
 
         assertEq(address(msgSender).balance, assetAmountToRescue);
-        assertEq(address(bbv).balance, bbvAssetBalance - assetAmountToRescue);
+        assertEq(address(stableVault).balance, stableVaultAssetBalance - assetAmountToRescue);
     }
 
     ////////////////////////////// HELPERS ///////////////////////////////
@@ -3430,15 +3441,15 @@ contract BasedBoostedVaultTest is TestWithHelpers {
     function _deposit(address user, uint256 amount) public {
         mockAsset.mint(user, amount);
         vm.prank(user);
-        mockAsset.forceApprove(address(bbv), amount);
+        mockAsset.forceApprove(address(stableVault), amount);
         vm.prank(user);
-        bbv.deposit(user, address(mockAsset), amount);
+        stableVault.deposit(user, address(mockAsset), amount);
     }
 
     function _setUserRate(address user, uint256 newPerSecondRate) public {
-        IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](1);
-        userRateData[0] = IBasedBoostedVault.UserRateData(user, newPerSecondRate);
-        bbv.setUserRate(userRateData);
+        IStableVault.UserRateData[] memory userRateData = new IStableVault.UserRateData[](1);
+        userRateData[0] = IStableVault.UserRateData(user, newPerSecondRate);
+        stableVault.setUserRate(userRateData);
     }
 
     function _generateNewUser() internal returns (address) {

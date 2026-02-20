@@ -7,14 +7,14 @@ import {IERC20} from "forge-std/interfaces/IERC20.sol";
 
 import {Logger} from "test/helpers/Logger.sol";
 
-import {BasedBoostedVault} from "src/core/accounting/BasedBoostedVault.sol";
+import {StableVault} from "src/core/accounting/StableVault.sol";
 import {IAccountingChainGateway} from "src/interfaces/IAccountingChainGateway.sol";
-import {IBasedBoostedVault} from "src/interfaces/IBasedBoostedVault.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainBalanceOracle} from "src/interfaces/IChainBalanceOracle.sol";
 import {IChainBalanceOracleAdapter} from "src/interfaces/IChainBalanceOracleAdapter.sol";
 import {IEarningChainStateProvider} from "src/interfaces/IEarningChainStateProvider.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
+import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {ChainlinkPriceOracleAdapter} from "src/oracles/price/ChainlinkPriceOracleAdapter.sol";
@@ -93,7 +93,7 @@ contract OracleFeedE2ETest is BaseTest {
         vm.stopPrank();
     }
 
-    function _deployBasedBoostedVault(
+    function _deployStableVault(
         address adminParam,
         uint256, // maxPerSecondRate
         uint256 defaultSubVaultPerSecondRate,
@@ -105,10 +105,10 @@ contract OracleFeedE2ETest is BaseTest {
         address priceOracle,
         uint256 maxActiveSubVaults,
         address treasuryAddress
-    ) internal virtual override returns (BasedBoostedVault) {
+    ) internal virtual override returns (StableVault) {
         // Deploy a vault without restriction in the valid per-second rate
         address vaultImpl = address(
-            new BasedBoostedVault(
+            new StableVault(
                 type(uint256).max,
                 assetRegistry,
                 iouToken,
@@ -119,14 +119,12 @@ contract OracleFeedE2ETest is BaseTest {
                 maxActiveSubVaults
             )
         );
-        return BasedBoostedVault(
+        return StableVault(
             address(
                 new TransparentUpgradeableProxy(
                     address(vaultImpl),
                     proxyAdmin,
-                    abi.encodeCall(
-                        BasedBoostedVault.initialize, (adminParam, treasuryAddress, defaultSubVaultPerSecondRate)
-                    )
+                    abi.encodeCall(StableVault.initialize, (adminParam, treasuryAddress, defaultSubVaultPerSecondRate))
                 )
             )
         );
@@ -142,12 +140,12 @@ contract OracleFeedE2ETest is BaseTest {
 
         uint256 userInitialDeposit = 500 * (10 ** 6);
 
-        // 0. Set the default rate on BBV to 5% APY
+        // 0. Set the default rate on Stable Vault to 5% APY
         vm.prank(everyRoleAccount);
         vault.setDefaultSubVault(1_000000001547125957863212449);
 
         // 1. User1 deposits 500 USDC to Vault on Accounting Chain
-        _mintAndDepositUsdcToBBV(user1, userInitialDeposit);
+        _mintAndDepositUsdcToStableVault(user1, userInitialDeposit);
 
         assertEq(
             fundsHandler.getAggregatedBalance(),
@@ -176,7 +174,7 @@ contract OracleFeedE2ETest is BaseTest {
         _warpAndRefreshPriceOracles(183 days);
         Logger.log("\nHalf a year has gone by so fast...");
 
-        // Check that the user's balance in the BBV on the Accounting Chain has grown
+        // Check that the user's balance in the Stable Vault on the Accounting Chain has grown
         uint256 userBalanceWithInterest = vault.getUserBalance(user1);
         assertGt(
             userBalanceWithInterest,
@@ -187,7 +185,7 @@ contract OracleFeedE2ETest is BaseTest {
         // Check that if the user request a full withdrawal, the system will revert
         vm.expectRevert(
             abi.encodeWithSelector(
-                IBasedBoostedVault.InsufficientAssets.selector,
+                IStableVault.InsufficientAssets.selector,
                 user1,
                 userBalanceWithInterest,
                 userInitialDeposit.assetDecimalsToRay(address(USDC))
@@ -267,7 +265,7 @@ contract OracleFeedE2ETest is BaseTest {
     function test_oracleFeed_publishState_matchesEarningChainStateProvider() public {
         uint256 userDeposit = 1000 * (10 ** 6);
 
-        _mintAndDepositUsdcToBBV(user1, userDeposit);
+        _mintAndDepositUsdcToStableVault(user1, userDeposit);
         _bridgeUsdcToEarningChain(userDeposit);
 
         // Read state directly from EarningChainStateProvider
@@ -304,7 +302,7 @@ contract OracleFeedE2ETest is BaseTest {
     function test_oracleFeed_staleness() public {
         uint256 userDeposit = 100 * (10 ** 6);
 
-        _mintAndDepositUsdcToBBV(user1, userDeposit);
+        _mintAndDepositUsdcToStableVault(user1, userDeposit);
         _bridgeUsdcToEarningChain(userDeposit);
 
         // Publish state (sets _latestBundleTimestamp = block.timestamp)
@@ -332,7 +330,7 @@ contract OracleFeedE2ETest is BaseTest {
         vm.prank(everyRoleAccount);
         vault.setDefaultSubVault(1_000000001547125957863212449);
 
-        _mintAndDepositUsdcToBBV(user1, userDeposit);
+        _mintAndDepositUsdcToStableVault(user1, userDeposit);
         _bridgeUsdcToEarningChain(userDeposit);
 
         // Sync oracle -- balance is visible
@@ -357,7 +355,7 @@ contract OracleFeedE2ETest is BaseTest {
         // Attempting to withdraw the full balance (including interest) should fail with InsufficientAssets
         vm.expectRevert(
             abi.encodeWithSelector(
-                IBasedBoostedVault.InsufficientAssets.selector,
+                IStableVault.InsufficientAssets.selector,
                 user1,
                 userBalance,
                 userDeposit.assetDecimalsToRay(address(USDC))
@@ -419,7 +417,7 @@ contract OracleFeedE2ETest is BaseTest {
     /// @notice Staleness boundary: not stale at heartbeat + buffer - 1, stale at heartbeat + buffer.
     function test_oracleFeed_stalenessBoundary() public {
         uint256 userDeposit = 100 * (10 ** 6);
-        _mintAndDepositUsdcToBBV(user1, userDeposit);
+        _mintAndDepositUsdcToStableVault(user1, userDeposit);
         _bridgeUsdcToEarningChain(userDeposit);
 
         bytes memory stateBytes = earningChainStateProvider.getState();
@@ -445,7 +443,7 @@ contract OracleFeedE2ETest is BaseTest {
     function test_priceOracle_stalePriceOnAccountingChain_zerosLocalBalance() public {
         uint256 userDeposit = 500 * (10 ** 6);
 
-        _mintAndDepositUsdcToBBV(user1, userDeposit);
+        _mintAndDepositUsdcToStableVault(user1, userDeposit);
 
         // With normal 1 RAY price, balance is correct
         uint256 balanceBefore = fundsHandler.getAggregatedBalance();
@@ -472,7 +470,7 @@ contract OracleFeedE2ETest is BaseTest {
         );
     }
 
-    /// @notice When price oracle is stale, validatePrice reverts, which blocks deposits to BBV.
+    /// @notice When price oracle is stale, validatePrice reverts, which blocks deposits to Stable Vault.
     function test_priceOracle_stalePriceBlocksDeposits() public {
         // Make USDC adapter stale.
         usdcPriceFeed_accountingChain.setAnswer(PRICE_ONE, _staleUpdateTimestamp());
@@ -492,7 +490,7 @@ contract OracleFeedE2ETest is BaseTest {
     function test_priceOracle_stalePriceOnEarningChain_zerosEarningChainStateProviderBalance() public {
         uint256 userDeposit = 500 * (10 ** 6);
 
-        _mintAndDepositUsdcToBBV(user1, userDeposit);
+        _mintAndDepositUsdcToStableVault(user1, userDeposit);
         _bridgeUsdcToEarningChain(userDeposit);
 
         // With valid price on Earning Chain, EarningChainStateProvider reports full balance
@@ -535,7 +533,7 @@ contract OracleFeedE2ETest is BaseTest {
     /// but getPrice still returns the depegged price for balance calculations.
     function test_priceOracle_depeggedPrice_blocksDepositsButReportsBalance() public {
         uint256 userDeposit = 500 * (10 ** 6);
-        _mintAndDepositUsdcToBBV(user1, userDeposit);
+        _mintAndDepositUsdcToStableVault(user1, userDeposit);
 
         // Simulate a depeg: price drops to 0.90 RAY (below MIN_VALID_PRICE_RAY of 0.9995 RAY)
         uint256 depeggedPrice = 9e26; // 0.90 RAY
@@ -567,7 +565,7 @@ contract OracleFeedE2ETest is BaseTest {
         uint256 ghoDeposit = 500 ether;
 
         // Deposit USDC
-        _mintAndDepositUsdcToBBV(user1, usdcDeposit);
+        _mintAndDepositUsdcToStableVault(user1, usdcDeposit);
 
         // Deposit GHO
         GHO.mint(user2, ghoDeposit);
@@ -605,7 +603,7 @@ contract OracleFeedE2ETest is BaseTest {
         uint256 earningDeposit = 200 * (10 ** 6);
 
         // Deposit locally + bridge some to Earning Chain
-        _mintAndDepositUsdcToBBV(user1, localDeposit + earningDeposit);
+        _mintAndDepositUsdcToStableVault(user1, localDeposit + earningDeposit);
         _bridgeUsdcToEarningChain(earningDeposit);
         _publishAndSyncOracle();
 
@@ -637,7 +635,7 @@ contract OracleFeedE2ETest is BaseTest {
     /// reports whatever the feed contains (zero or non-zero).
     function test_combined_earningChainPriceStale_snapshotRecovery() public {
         uint256 userDeposit = 500 * (10 ** 6);
-        _mintAndDepositUsdcToBBV(user1, userDeposit);
+        _mintAndDepositUsdcToStableVault(user1, userDeposit);
         _bridgeUsdcToEarningChain(userDeposit);
 
         // Normal snapshot
@@ -671,7 +669,7 @@ contract OracleFeedE2ETest is BaseTest {
         vm.prank(everyRoleAccount);
         vault.setDefaultSubVault(1_000000001547125957863212449); // ~5% APY
 
-        _mintAndDepositUsdcToBBV(user1, userDeposit);
+        _mintAndDepositUsdcToStableVault(user1, userDeposit);
         _bridgeUsdcToEarningChain(userDeposit);
         _publishAndSyncOracle();
 
@@ -705,7 +703,7 @@ contract OracleFeedE2ETest is BaseTest {
     /// This means a token trading above peg doesn't inflate the aggregated balance.
     function test_priceOracle_priceAboveOneRay_capped() public {
         uint256 userDeposit = 500 * (10 ** 6);
-        _mintAndDepositUsdcToBBV(user1, userDeposit);
+        _mintAndDepositUsdcToStableVault(user1, userDeposit);
 
         // Set USDC feed to 1.5 with 8 decimals.
         usdcPriceFeed_accountingChain.setAnswer(15e7, block.timestamp);
@@ -726,7 +724,7 @@ contract OracleFeedE2ETest is BaseTest {
     function test_oracleFeed_precisionRoundTrip() public {
         // Use an odd amount to test precision
         uint256 userDeposit = 123_456_789; // 123.456789 USDC
-        _mintAndDepositUsdcToBBV(user1, userDeposit);
+        _mintAndDepositUsdcToStableVault(user1, userDeposit);
         _bridgeUsdcToEarningChain(userDeposit);
 
         // Direct read from EarningChainStateProvider
@@ -762,8 +760,8 @@ contract OracleFeedE2ETest is BaseTest {
         uint256 depositAmount = 500 * (10 ** 6);
         uint256 depositRay = depositAmount.assetDecimalsToRay(address(USDC));
 
-        // 1. Deposit USDC into BBV on Accounting Chain
-        _mintAndDepositUsdcToBBV(user1, depositAmount);
+        // 1. Deposit USDC into Stable Vault on Accounting Chain
+        _mintAndDepositUsdcToStableVault(user1, depositAmount);
         assertEq(fundsHandler.getAggregatedBalance(), depositRay, "Initial aggregated balance should match deposit");
 
         // 2. Bridge USDC to Earning Chain
@@ -857,7 +855,7 @@ contract OracleFeedE2ETest is BaseTest {
         uint256 remainingRay = depositRay - returnRay;
 
         // Deposit and bridge to Earning Chain
-        _mintAndDepositUsdcToBBV(user1, depositAmount);
+        _mintAndDepositUsdcToStableVault(user1, depositAmount);
         _bridgeUsdcToEarningChain(depositAmount);
         _publishAndSyncOracle();
 
@@ -905,7 +903,7 @@ contract OracleFeedE2ETest is BaseTest {
         uint256 depositAmount = 500 * (10 ** 6);
         uint256 depositRay = depositAmount.assetDecimalsToRay(address(USDC));
 
-        _mintAndDepositUsdcToBBV(user1, depositAmount);
+        _mintAndDepositUsdcToStableVault(user1, depositAmount);
         _bridgeUsdcToEarningChain(depositAmount);
         _publishAndSyncOracle();
 
@@ -955,7 +953,7 @@ contract OracleFeedE2ETest is BaseTest {
         uint256 depositRay = depositAmount.assetDecimalsToRay(address(USDC));
 
         // Deposit, bridge to Earning Chain, sync oracle
-        _mintAndDepositUsdcToBBV(user1, depositAmount);
+        _mintAndDepositUsdcToStableVault(user1, depositAmount);
         _bridgeUsdcToEarningChain(depositAmount);
         _publishAndSyncOracle();
         assertEq(fundsHandler.getAggregatedBalance(), depositRay, "Baseline balance on Earning Chain");
@@ -1012,7 +1010,7 @@ contract OracleFeedE2ETest is BaseTest {
         mockBundleFeed.publishState(stateBytes);
     }
 
-    function _mintAndDepositUsdcToBBV(address user, uint256 amount) internal {
+    function _mintAndDepositUsdcToStableVault(address user, uint256 amount) internal {
         USDC.mint(user, amount);
         vm.startPrank(user);
         USDC.approve(address(vault), amount);

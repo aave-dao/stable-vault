@@ -35,7 +35,7 @@ contract FundsHandlerTest is TestWithHelpers {
 
     address ADMIN;
 
-    address mockBbv;
+    address mockStableVault;
     MockAccountingChainGateway mockGateway;
     MockAllocator mockAllocator;
     PriceOracle priceOracle;
@@ -51,7 +51,7 @@ contract FundsHandlerTest is TestWithHelpers {
     }
 
     function _deployFundsHandler(
-        address bbv,
+        address stableVault,
         address gateway,
         address allocator,
         address priceOracleAddr,
@@ -60,7 +60,7 @@ contract FundsHandlerTest is TestWithHelpers {
         address accessManager
     ) internal returns (FundsHandler) {
         address fundsHandlerImpl = address(
-            new FundsHandler(bbv, gateway, allocator, priceOracleAddr, transferHelper, chainBalanceOracle)
+            new FundsHandler(stableVault, gateway, allocator, priceOracleAddr, transferHelper, chainBalanceOracle)
         );
         return FundsHandler(
             address(
@@ -75,7 +75,7 @@ contract FundsHandlerTest is TestWithHelpers {
         // Warp to a reasonable timestamp to avoid underflow.
         vm.warp(block.timestamp + 1 days);
         ADMIN = makeAddr("admin");
-        mockBbv = makeAddr("mockBbv");
+        mockStableVault = makeAddr("mockStableVault");
         mockTransferHelper = new MockTransferHelper();
         mockGateway = new MockAccountingChainGateway(address(mockTransferHelper));
         mockAllocator = new MockAllocator();
@@ -84,7 +84,7 @@ contract FundsHandlerTest is TestWithHelpers {
         mockChainBalanceOracle = new MockChainBalanceOracle();
         mockAsset = IMockErc20(address(new MockNonStandardErc20("Test USD", "tUSD", 6)));
         fundsHandler = _deployFundsHandler(
-            mockBbv,
+            mockStableVault,
             address(mockGateway),
             address(mockAllocator),
             address(priceOracle),
@@ -98,7 +98,7 @@ contract FundsHandlerTest is TestWithHelpers {
     function test_constructor_reverts_ifInvalidTransferHelper() public {
         vm.expectRevert();
         new FundsHandler(
-            mockBbv,
+            mockStableVault,
             address(mockGateway),
             address(mockAllocator),
             address(priceOracle),
@@ -146,7 +146,7 @@ contract FundsHandlerTest is TestWithHelpers {
 
         vm.expectCall(address(mockAllocator), abi.encodeWithSelector(IAllocator.deposit.selector, asset, amount));
 
-        vm.prank(address(mockBbv));
+        vm.prank(address(mockStableVault));
         uint256 netDepositAmount = fundsHandler.processDeposit(asset, amount);
         assertEq(netDepositAmount, amount);
     }
@@ -163,25 +163,25 @@ contract FundsHandlerTest is TestWithHelpers {
 
         vm.expectCall(address(mockAllocator), abi.encodeWithSelector(IAllocator.deposit.selector, asset, amount));
         mockAllocator.mockAmountOfSlippage(amountOfSlippage);
-        vm.prank(address(mockBbv));
+        vm.prank(address(mockStableVault));
         uint256 netDepositAmount = fundsHandler.processDeposit(asset, amount);
         assertEq(netDepositAmount, amount - amountOfSlippage);
     }
 
-    function test_processDeposit_reverts_ifMsgSenderIsNotTheBBV(
+    function test_processDeposit_reverts_ifMsgSenderIsNotTheStableVault(
         address msgSender,
         bytes32 assetDeploymentSalt,
         uint8 assetDecimals,
         uint256 amount
     ) public {
         _assumeNotProxyAdmin(msgSender, address(fundsHandler));
-        vm.assume(msgSender != address(mockBbv));
+        vm.assume(msgSender != address(mockStableVault));
 
         address asset = _deployAssetWithSalt(assetDeploymentSalt, assetDecimals);
 
         amount = _boundAssetAmountAllowingZero(address(asset), amount);
 
-        vm.expectRevert(IFundsHandler.OnlyBasedBoostedVault.selector);
+        vm.expectRevert(IFundsHandler.OnlyStableVault.selector);
         vm.prank(msgSender);
         fundsHandler.processDeposit(asset, amount);
     }
@@ -196,23 +196,23 @@ contract FundsHandlerTest is TestWithHelpers {
 
         vm.expectCall(address(mockAllocator), abi.encodeWithSelector(IAllocator.withdraw.selector, asset, amount));
 
-        vm.prank(address(mockBbv));
+        vm.prank(address(mockStableVault));
         fundsHandler.processWithdrawal(asset, amount);
     }
 
-    function test_processWithdrawal_reverts_ifMsgSenderIsNotTheBBV(
+    function test_processWithdrawal_reverts_ifMsgSenderIsNotTheStableVault(
         address msgSender,
         bytes32 assetDeploymentSalt,
         uint8 assetDecimals,
         uint256 amount
     ) public {
         _assumeNotProxyAdmin(msgSender, address(fundsHandler));
-        vm.assume(msgSender != address(mockBbv));
+        vm.assume(msgSender != address(mockStableVault));
 
         address asset = _deployAssetWithSalt(assetDeploymentSalt, assetDecimals);
         amount = _boundAssetAmountAllowingZero(address(asset), amount);
 
-        vm.expectRevert(IFundsHandler.OnlyBasedBoostedVault.selector);
+        vm.expectRevert(IFundsHandler.OnlyStableVault.selector);
         vm.prank(msgSender);
         fundsHandler.processWithdrawal(asset, amount);
     }
