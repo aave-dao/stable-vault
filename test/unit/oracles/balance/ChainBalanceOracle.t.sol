@@ -173,6 +173,117 @@ contract ChainBalanceOracleTest is TestWithHelpers {
         assertTrue(result.isStale, "Should return true when stale");
     }
 
+    function test_getChainBalance_returnsStaleZeroBalance_whenAdapterReverts(uint256 chainId) public {
+        _mockAdapter.mockResponse(
+            chainId,
+            1000 * 1e27,
+            block.timestamp,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            false
+        );
+        vm.prank(everyRoleAccount);
+        _chainBalanceOracle.setChainBalanceOracleAdapter(chainId, address(_mockAdapter));
+
+        _mockAdapter.setShouldRevert(true);
+
+        // getChainBalance should not revert, it should return a zero/stale fallback.
+        IChainBalanceOracle.ChainBalance memory result = _chainBalanceOracle.getChainBalance(chainId);
+        assertEq(result.balanceRay, 0, "Should return zero balance on adapter revert");
+        assertEq(result.lastUpdateTimestamp, 0, "Should return zero lastUpdateTimestamp on adapter revert");
+        assertEq(result.sourceChainTimestamp, 0, "Should return zero sourceChainTimestamp on adapter revert");
+        assertEq(result.sourceChainBlockNumber, 0, "Should return zero sourceChainBlockNumber on adapter revert");
+        assertTrue(result.isStale, "Should return isStale=true on adapter revert");
+    }
+
+    function test_getChainBalance_returnsStaleZeroBalance_whenAdapterRevertsWithoutData(uint256 chainId) public {
+        _mockAdapter.mockResponse(
+            chainId,
+            500 * 1e27,
+            block.timestamp,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            false
+        );
+        vm.prank(everyRoleAccount);
+        _chainBalanceOracle.setChainBalanceOracleAdapter(chainId, address(_mockAdapter));
+
+        // Simulate a raw revert with no data (e.g. abi.decode failure or empty bundle).
+        vm.mockCallRevert(
+            address(_mockAdapter), abi.encodeCall(IChainBalanceOracleAdapter.getChainBalance, (chainId)), ""
+        );
+
+        IChainBalanceOracle.ChainBalance memory result = _chainBalanceOracle.getChainBalance(chainId);
+        assertEq(result.balanceRay, 0, "Should return zero balance on raw revert");
+        assertTrue(result.isStale, "Should return isStale=true on raw revert");
+    }
+
+    function test_getChainBalance_returnsNormalBalance_afterAdapterRecovers(uint256 chainId, uint256 balanceRay)
+        public
+    {
+        _mockAdapter.mockResponse(
+            chainId,
+            balanceRay,
+            block.timestamp,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            false
+        );
+        vm.prank(everyRoleAccount);
+        _chainBalanceOracle.setChainBalanceOracleAdapter(chainId, address(_mockAdapter));
+
+        // Make the adapter revert.
+        _mockAdapter.setShouldRevert(true);
+        IChainBalanceOracle.ChainBalance memory staleResult = _chainBalanceOracle.getChainBalance(chainId);
+        assertTrue(staleResult.isStale, "Should be stale while reverting");
+        assertEq(staleResult.balanceRay, 0, "Should be zero while reverting");
+
+        // Recover the adapter and call again to test happy path after recovery.
+        _mockAdapter.setShouldRevert(false);
+        IChainBalanceOracle.ChainBalance memory recoveredResult = _chainBalanceOracle.getChainBalance(chainId);
+        assertEq(recoveredResult.balanceRay, balanceRay, "Should return normal balance after recovery");
+        assertFalse(recoveredResult.isStale, "Should not be stale after recovery");
+    }
+
+    function test_getChainBalance_multipleChains_oneAdapterReverts() public {
+        uint256 chain1 = 1;
+        uint256 chain2 = 42161;
+
+        uint256 balance1 = 1000 * 1e27;
+        uint256 balance2 = 2000 * 1e27;
+
+        MockChainBalanceOracleAdapter adapter1 = new MockChainBalanceOracleAdapter();
+        MockChainBalanceOracleAdapter adapter2 = new MockChainBalanceOracleAdapter();
+
+        adapter1.mockResponse(
+            chain1,
+            balance1,
+            block.timestamp,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            false
+        );
+        adapter2.mockResponse(
+            chain2,
+            balance2,
+            block.timestamp,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            false
+        );
+
+        vm.startPrank(everyRoleAccount);
+        _chainBalanceOracle.setChainBalanceOracleAdapter(chain1, address(adapter1));
+        _chainBalanceOracle.setChainBalanceOracleAdapter(chain2, address(adapter2));
+        vm.stopPrank();
+
+        // Make adapter1 revert. Adapter2 should still work.
+        adapter1.setShouldRevert(true);
+
+        IChainBalanceOracle.ChainBalance memory result1 = _chainBalanceOracle.getChainBalance(chain1);
+        assertEq(result1.balanceRay, 0, "Reverting adapter should return zero");
+        assertTrue(result1.isStale, "Reverting adapter should be stale");
+
+        IChainBalanceOracle.ChainBalance memory result2 = _chainBalanceOracle.getChainBalance(chain2);
+        assertEq(result2.balanceRay, balance2, "Non-reverting adapter should return normal balance");
+        assertFalse(result2.isStale, "Non-reverting adapter should not be stale");
+    }
+
     function test_getChainBalance_reverts_ifNoAdapterSet(uint256 chainId) public {
         vm.expectRevert(abi.encodeWithSelector(IChainBalanceOracle.ChainBalanceOracleAdapterNotFound.selector, chainId));
         _chainBalanceOracle.getChainBalance(chainId);
