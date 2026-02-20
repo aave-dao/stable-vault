@@ -49,9 +49,18 @@ contract ChainBalanceOracle is AccessManagedUpgradeable, IChainBalanceOracle {
     }
 
     /// @inheritdoc IChainBalanceOracle
+    /// @dev Wraps the adapter call in a try-catch to avoid disruption to the consumer.
     function getChainBalance(uint256 chainId) external view override returns (IChainBalanceOracle.ChainBalance memory) {
         require($storage().oracleAdapterByChainId[chainId] != address(0), ChainBalanceOracleAdapterNotFound(chainId));
-        return IChainBalanceOracleAdapter($storage().oracleAdapterByChainId[chainId]).getChainBalance(chainId);
+        try IChainBalanceOracleAdapter($storage().oracleAdapterByChainId[chainId]).getChainBalance(chainId) returns (
+            IChainBalanceOracle.ChainBalance memory chainBalance
+        ) {
+            return chainBalance;
+        } catch {
+            return IChainBalanceOracle.ChainBalance({
+                balanceRay: 0, lastUpdateTimestamp: 0, sourceChainTimestamp: 0, sourceChainBlockNumber: 0, isStale: true
+            });
+        }
     }
 
     function setChainBalanceOracleAdapter(uint256 chainId, address adapter) external restricted {
