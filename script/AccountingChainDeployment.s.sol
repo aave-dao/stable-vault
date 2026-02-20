@@ -425,6 +425,7 @@ contract AccountingChainDeployment is
             initCode: abi.encodePacked(type(Swapper).creationCode, abi.encode(getAllocatorAddress(DEPLOYER)))
         });
         require(swapper == getSwapperAddress(DEPLOYER), "Swapper does not match expected address");
+        _logDeployment("Swapper", SWAPPER_SALT_SEED, swapper);
         return swapper;
     }
 
