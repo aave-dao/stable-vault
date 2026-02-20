@@ -574,8 +574,14 @@ abstract contract AccessManagerSetupBaseTest is Test {
 
         _assertCanCall(admin, proxyAdmin, ProxyAdmin.upgradeAndCall.selector, false, RolesLib.CRITICAL_DELAY);
 
-        address newImpl =
-            address(new Allocator(address(0), address(0), address(0), address(0), address(new TransferHelper()), 0));
+        // Create addresses to avoid zero-address reverts
+        address assetRegistry = makeAddr("ASSET_REGISTRY");
+        address priceOracle = makeAddr("PRICE_ORACLE");
+        address depositor = makeAddr("DEPOSITOR");
+        address withdrawer = makeAddr("WITHDRAWER");
+        address transferHelper = address(new TransferHelper());
+
+        address newImpl = address(new Allocator(assetRegistry, depositor, withdrawer, priceOracle, transferHelper, 1));
         bytes memory callData =
             abi.encodeCall(ProxyAdmin.upgradeAndCall, (ITransparentUpgradeableProxy(_allocator()), newImpl, ""));
         bytes32 operationId = accessManager.hashOperation(admin, proxyAdmin, callData);
