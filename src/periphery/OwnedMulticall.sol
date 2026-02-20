@@ -37,6 +37,8 @@ contract OwnedMulticall is Ownable {
         bytes returnData;
     }
 
+    /// @dev Constructor
+    /// @param initialOwner address that is set as the initial owner of the contract.
     constructor(address initialOwner) Ownable(initialOwner) {}
 
     /// @dev Renouncing ownership is not allowed because it may lock tokens on the contract intended to be used as a
