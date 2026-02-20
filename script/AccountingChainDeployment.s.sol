@@ -26,6 +26,7 @@ import {IAccountingChainGateway} from "src/interfaces/IAccountingChainGateway.so
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
+import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {ChainBalanceOracle} from "src/oracles/balance/ChainBalanceOracle.sol";
 import {
     ChainlinkChainBalanceOracleAdapter,
@@ -149,6 +150,7 @@ contract AccountingChainDeployment is
         _setupBridgeAdapters();
         _setupAssetRegistry();
         _setupAllocator();
+        _setupFundsHandler();
         _setupAccessManager(DEPLOYER);
         _setupPriceOracleAdapters();
         _setupChainBalanceOracleAdapters();
@@ -209,6 +211,11 @@ contract AccountingChainDeployment is
 
     function _aTokenVaultAddresses() internal view virtual override returns (address[] memory) {
         return _deployedATokenVaults;
+    }
+
+    function _setupFundsHandler() internal {
+        IFundsHandler fundsHandler = IFundsHandler(getFundsHandlerAddress(DEPLOYER));
+        fundsHandler.addEarningChain(EARNING_CHAIN_ID);
     }
 
     function _setupAssetRegistry() internal {
