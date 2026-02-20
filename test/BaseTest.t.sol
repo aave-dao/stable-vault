@@ -2,8 +2,7 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.20;
 
-import {console} from "forge-std/console.sol";
-
+import {Logger} from "test/helpers/Logger.sol";
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -54,6 +53,7 @@ contract BaseTest is TestWithHelpers {
     address proxyAdmin = makeAddr("PROXY_ADMIN");
     address admin = makeAddr("ADMIN");
     address everyRoleAccount = makeAddr("EVERY_ROLE_ACCOUNT");
+    address treasury = makeAddr("TREASURY");
 
     uint8 constant STRATEGY_MAX_SLIPPAGE_AMOUNT = 10;
 
@@ -185,7 +185,8 @@ contract BaseTest is TestWithHelpers {
         address transferHelper,
         address withdrawalFeeCalculator,
         address priceOracle,
-        uint256 maxActiveSubVaults
+        uint256 maxActiveSubVaults,
+        address treasuryAddress
     ) internal virtual returns (BasedBoostedVault) {
         address vaultImpl = address(
             new BasedBoostedVault(
@@ -204,7 +205,9 @@ contract BaseTest is TestWithHelpers {
             new TransparentUpgradeableProxy(
                 vaultImpl,
                 address(this),
-                abi.encodeCall(BasedBoostedVault.initialize, (accessManager, defaultSubVaultPerSecondRate))
+                abi.encodeCall(
+                    BasedBoostedVault.initialize, (accessManager, treasuryAddress, defaultSubVaultPerSecondRate)
+                )
             )
         );
 
@@ -214,17 +217,17 @@ contract BaseTest is TestWithHelpers {
     }
 
     function _deployContracts() internal {
-        console.log("\n-------------------");
-        console.log("\nDeploying contracts");
-        console.log("\nEvery Role Account: %s", everyRoleAccount);
-        console.log("\tAdmin: %s", admin);
-        console.log("\tInitial Base Per Second Rate: %s", initialBasePerSecondRate);
-        console.log("\tAccounting Chain ID: %s", ACCOUNTING_CHAIN_ID);
-        console.log("\tEarning Chain ID: %s", EARNING_CHAIN_ID);
+        Logger.log("\n-------------------");
+        Logger.log("\nDeploying contracts");
+        Logger.log("\nEvery Role Account: %s", everyRoleAccount);
+        Logger.log("\tAdmin: %s", admin);
+        Logger.log("\tInitial Base Per Second Rate: %s", initialBasePerSecondRate);
+        Logger.log("\tAccounting Chain ID: %s", ACCOUNTING_CHAIN_ID);
+        Logger.log("\tEarning Chain ID: %s", EARNING_CHAIN_ID);
 
         // ccip mock
         mockCcipRouter = new MockCCIPRouter();
-        console.log("\tMock CCIP Router: %s", address(mockCcipRouter));
+        Logger.log("\tMock CCIP Router: %s", address(mockCcipRouter));
 
         mockCcipRouter.setSourceChainSelector(EARNING_CHAIN_CCIP_SELECTOR, ACCOUNTING_CHAIN_CCIP_SELECTOR);
         mockCcipRouter.setSourceChainSelector(ACCOUNTING_CHAIN_CCIP_SELECTOR, EARNING_CHAIN_CCIP_SELECTOR);
@@ -232,7 +235,7 @@ contract BaseTest is TestWithHelpers {
         // Chain balance oracle for tracking earning chain balances from accounting chain.
         // Deployed after the Access Manager is deployed.
 
-        console.log("\nAccounting Chain:");
+        Logger.log("\nAccounting Chain:");
         // ---- Accounting Chain ----
         // Accounting Chain: BBV, FH, Swapper, Allocator, Accounting Chain Gateway, CCIP Adapter, CCIP Router, Strategy,
         // Asset Registry Vault/4626
@@ -262,73 +265,73 @@ contract BaseTest is TestWithHelpers {
 
         // Pre compute addresses for contracts that are with circular dependencies
         uint256 deployerNonce_accountingChain = vm.getNonce(address(this));
-        console.log("\tDeployer Nonce (Accounting Chain): %s", deployerNonce_accountingChain);
+        Logger.log("\tDeployer Nonce (Accounting Chain): %s", deployerNonce_accountingChain);
 
         accessManager_accountingChainAddress = vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
-        console.log("\tAccess Manager (Accounting Chain) Predicted Address: %s", accessManager_accountingChainAddress);
+        Logger.log("\tAccess Manager (Accounting Chain) Predicted Address: %s", accessManager_accountingChainAddress);
 
         deployerNonce_accountingChain += 2; // Incrementing for Chain Balance Oracle implementation + proxy
         deployerNonce_accountingChain += 2; // Incrementing for Price Oracle implementation + proxy
 
         deployerNonce_accountingChain++; // Incrementing for Asset Registry implementation
         assetRegistry_accountingChainAddress = vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
-        console.log("\tAsset Registry (Accounting Chain) Predicted Address: %s", assetRegistry_accountingChainAddress);
+        Logger.log("\tAsset Registry (Accounting Chain) Predicted Address: %s", assetRegistry_accountingChainAddress);
 
         deployerNonce_accountingChain++; // Incrementing for Withdrawal Policy implementation
         withdrawalPolicy_accountingChainAddress =
             vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
-        console.log(
+        Logger.log(
             "\tWithdrawal Policy (Accounting Chain) Predicted Address: %s", withdrawalPolicy_accountingChainAddress
         );
 
         iouToken_accountingChainAddress = vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
-        console.log("\tIOU Token (Accounting Chain) Predicted Address: %s", iouToken_accountingChainAddress);
+        Logger.log("\tIOU Token (Accounting Chain) Predicted Address: %s", iouToken_accountingChainAddress);
 
         deployerNonce_accountingChain++; // Incrementing for IOU TokenManager implementation
         iouTokenManager_accountingChainAddress = vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
-        console.log(
+        Logger.log(
             "\tIOU Token Manager (Accounting Chain) Predicted Address: %s", iouTokenManager_accountingChainAddress
         );
 
         deployerNonce_accountingChain++; // Incrementing for BBV implementation
         vault_accountingChainAddress = vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
-        console.log("\tVault (Accounting Chain) Predicted Address: %s", vault_accountingChainAddress);
+        Logger.log("\tVault (Accounting Chain) Predicted Address: %s", vault_accountingChainAddress);
 
         deployerNonce_accountingChain++; // Incrementing for Allocator implementation
         allocator_accountingChainAddress = vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
-        console.log("\tAllocator (Accounting Chain) Predicted Address: %s", allocator_accountingChainAddress);
+        Logger.log("\tAllocator (Accounting Chain) Predicted Address: %s", allocator_accountingChainAddress);
 
         deployerNonce_accountingChain++; // Incrementing for FH implementation
         fundsHandler_accountingChainAddress = vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
-        console.log("\tFunds Handler (Accounting Chain) Predicted Address: %s", fundsHandler_accountingChainAddress);
+        Logger.log("\tFunds Handler (Accounting Chain) Predicted Address: %s", fundsHandler_accountingChainAddress);
         vm.label(fundsHandler_accountingChainAddress, "FundsHandler");
 
         deployerNonce_accountingChain++; // Incrementing for Gateway implementation
         chainGateway_accountingChainAddress = vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
-        console.log(
+        Logger.log(
             "\tAccounting Chain Gateway (Accounting Chain) Predicted Address: %s", chainGateway_accountingChainAddress
         );
 
         swapper_accountingChainAddress = vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
-        console.log("\tSwapper (Accounting Chain) Predicted Address: %s", swapper_accountingChainAddress);
+        Logger.log("\tSwapper (Accounting Chain) Predicted Address: %s", swapper_accountingChainAddress);
 
         ccipAdapter_accountingChainAddress = vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
-        console.log("\tCCIP Adapter (Accounting Chain) Predicted Address: %s", ccipAdapter_accountingChainAddress);
+        Logger.log("\tCCIP Adapter (Accounting Chain) Predicted Address: %s", ccipAdapter_accountingChainAddress);
 
         // 1. Access Manager
         accessManager_accountingChain = new AccessManager(admin);
-        console.log("\tAccess Manager: %s", address(accessManager_accountingChain));
+        Logger.log("\tAccess Manager: %s", address(accessManager_accountingChain));
         require(
             address(accessManager_accountingChain) == accessManager_accountingChainAddress,
             "Access Manager (Accounting Chain) address mismatch"
         );
 
         chainBalanceOracle = _deployChainBalanceOracle(accessManager_accountingChainAddress);
-        console.log("\tChain Balance Oracle (Accounting Chain): %s", address(chainBalanceOracle));
+        Logger.log("\tChain Balance Oracle (Accounting Chain): %s", address(chainBalanceOracle));
 
         // Deploy Price Oracle for Accounting Chain (with mocked prices via vm.mockCall)
         priceOracle_accountingChain = _deployPriceOracle(accessManager_accountingChainAddress, 9_995e23);
-        console.log("\tPrice Oracle (Accounting Chain): %s", address(priceOracle_accountingChain));
+        Logger.log("\tPrice Oracle (Accounting Chain): %s", address(priceOracle_accountingChain));
         if (_useMockedPriceOracleAccountingChain()) {
             _mockAssetPrice(address(priceOracle_accountingChain), address(GHO), MathLib.RAY);
             _mockAssetPrice(address(priceOracle_accountingChain), address(USDC), MathLib.RAY);
@@ -346,15 +349,14 @@ contract BaseTest is TestWithHelpers {
                 )
             )
         );
-        console.log("\tAsset Registry: %s", address(assetRegistry_accountingChain));
+        Logger.log("\tAsset Registry: %s", address(assetRegistry_accountingChain));
         require(
             address(assetRegistry_accountingChain) == assetRegistry_accountingChainAddress,
             "Asset Registry (Accounting Chain) address mismatch"
         );
 
         // 3. Withdrawal Policy
-        address withdrawalPolicy_accountingChain_impl =
-            address(new WithdrawalPolicy(assetRegistry_accountingChainAddress, vault_accountingChainAddress));
+        address withdrawalPolicy_accountingChain_impl = address(new WithdrawalPolicy(vault_accountingChainAddress));
         withdrawalPolicy_accountingChain = WithdrawalPolicy(
             address(
                 new TransparentUpgradeableProxy(
@@ -364,7 +366,7 @@ contract BaseTest is TestWithHelpers {
                 )
             )
         );
-        console.log("\tWithdrawal Policy (Accounting Chain): %s", address(withdrawalPolicy_accountingChain));
+        Logger.log("\tWithdrawal Policy (Accounting Chain): %s", address(withdrawalPolicy_accountingChain));
         require(
             address(withdrawalPolicy_accountingChain) == withdrawalPolicy_accountingChainAddress,
             "Withdrawal Policy (Accounting Chain) address mismatch"
@@ -372,7 +374,7 @@ contract BaseTest is TestWithHelpers {
 
         // 4. IOU Token
         iouToken_accountingChain = new IouToken(iouTokenManager_accountingChainAddress);
-        console.log("\tIOU Token (Accounting Chain): %s", iouToken_accountingChainAddress);
+        Logger.log("\tIOU Token (Accounting Chain): %s", iouToken_accountingChainAddress);
         require(
             address(iouToken_accountingChain) == iouToken_accountingChainAddress,
             "IOU Token (Accounting Chain) address mismatch"
@@ -391,7 +393,7 @@ contract BaseTest is TestWithHelpers {
         iouTokenManager_accountingChain = IouTokenManager(
             address(new TransparentUpgradeableProxy(iouTokenManager_accountingChain_impl, proxyAdmin, ""))
         );
-        console.log("\tIOU Token Manager (Accounting Chain): %s", address(iouTokenManager_accountingChain));
+        Logger.log("\tIOU Token Manager (Accounting Chain): %s", address(iouTokenManager_accountingChain));
         require(
             address(iouTokenManager_accountingChain) == iouTokenManager_accountingChainAddress,
             "IOU Token Manager (Accounting Chain) address mismatch"
@@ -409,9 +411,10 @@ contract BaseTest is TestWithHelpers {
             transferHelper_accountingChainAddress,
             withdrawalPolicy_accountingChainAddress,
             address(priceOracle_accountingChain),
-            DEFAULT_MAX_ACTIVE_SUB_VAULTS
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+            treasury
         );
-        console.log("\tVault: %s", vault_accountingChainAddress);
+        Logger.log("\tVault: %s", vault_accountingChainAddress);
         require(address(vault) == vault_accountingChainAddress, "Vault (Accounting Chain) address mismatch");
 
         // 6. Allocator
@@ -434,7 +437,7 @@ contract BaseTest is TestWithHelpers {
                 )
             )
         );
-        console.log("\tAllocator: %s", allocator_accountingChainAddress);
+        Logger.log("\tAllocator: %s", allocator_accountingChainAddress);
         require(
             address(allocator_accountingChain) == allocator_accountingChainAddress,
             "Allocator (Accounting Chain) address mismatch"
@@ -460,7 +463,7 @@ contract BaseTest is TestWithHelpers {
                 )
             )
         );
-        console.log("\tFunds Handler: %s", address(fundsHandler));
+        Logger.log("\tFunds Handler: %s", address(fundsHandler));
         require(
             address(fundsHandler) == fundsHandler_accountingChainAddress,
             "Funds Handler (Accounting Chain) address mismatch"
@@ -481,7 +484,7 @@ contract BaseTest is TestWithHelpers {
                 )
             )
         );
-        console.log("\tAccounting Chain Gateway: %s", address(accountingChainGateway));
+        Logger.log("\tAccounting Chain Gateway: %s", address(accountingChainGateway));
         require(
             address(accountingChainGateway) == chainGateway_accountingChainAddress,
             "Accounting Chain Gateway (Accounting Chain) address mismatch"
@@ -489,7 +492,7 @@ contract BaseTest is TestWithHelpers {
 
         // 9. Swapper
         swapper_accountingChain = new Swapper(allocator_accountingChainAddress);
-        console.log("\tSwapper: %s", address(swapper_accountingChain));
+        Logger.log("\tSwapper: %s", address(swapper_accountingChain));
         require(
             address(swapper_accountingChain) == swapper_accountingChainAddress,
             "Swapper (Accounting Chain) address mismatch"
@@ -503,7 +506,7 @@ contract BaseTest is TestWithHelpers {
             transferHelper_accountingChainAddress,
             assetRegistry_accountingChainAddress
         );
-        console.log("\tCCIP Adapter: %s", address(ccipAdapter_accountingChain));
+        Logger.log("\tCCIP Adapter: %s", address(ccipAdapter_accountingChain));
         require(
             address(ccipAdapter_accountingChain) == ccipAdapter_accountingChainAddress,
             "CCIP Adapter (Accounting Chain) address mismatch"
@@ -511,15 +514,15 @@ contract BaseTest is TestWithHelpers {
 
         // 11. Strategy Vault/4626
         ghoStrategyVault_accountingChain = new TestErc4626(GHO);
-        console.log("\tGHO Strategy Vault (Accounting Chain): %s", address(ghoStrategyVault_accountingChain));
+        Logger.log("\tGHO Strategy Vault (Accounting Chain): %s", address(ghoStrategyVault_accountingChain));
         usdcStrategyVault_accountingChain = new TestErc4626(USDC);
-        console.log("\tUSDC Strategy Vault (Accounting Chain): %s", address(usdcStrategyVault_accountingChain));
+        Logger.log("\tUSDC Strategy Vault (Accounting Chain): %s", address(usdcStrategyVault_accountingChain));
 
         // /////////////////////////////////////////////////////////////////////////////////////////////////////////////
         // Earning Chain: Access Manager, Earning Chain Gateway, CCIP Adapter, CCIP Router, Swapper, Allocator, Strategy
         // Vault/4626, Asset Registry
 
-        console.log("\nEarning Chain:");
+        Logger.log("\nEarning Chain:");
 
         // Deployment order:
         // 1. Access Manager
@@ -542,50 +545,48 @@ contract BaseTest is TestWithHelpers {
 
         uint256 deployerNonce_earningChain = vm.getNonce(address(this));
         accessManager_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
-        console.log("\tAccess Manager (Earning Chain) Predicted Address: %s", accessManager_earningChainAddress);
+        Logger.log("\tAccess Manager (Earning Chain) Predicted Address: %s", accessManager_earningChainAddress);
 
         deployerNonce_earningChain += 2; // Incrementing for Price Oracle implementation + proxy
 
         deployerNonce_earningChain++; // Incrementing for Asset Registry implementation
         assetRegistry_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
-        console.log("\tAsset Registry (Earning Chain) Predicted Address: %s", assetRegistry_earningChainAddress);
+        Logger.log("\tAsset Registry (Earning Chain) Predicted Address: %s", assetRegistry_earningChainAddress);
 
         deployerNonce_earningChain++; // Incrementing for Withdrawal Policy implementation
         withdrawalPolicy_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
-        console.log("\tWithdrawal Policy (Earning Chain) Predicted Address: %s", withdrawalPolicy_earningChainAddress);
+        Logger.log("\tWithdrawal Policy (Earning Chain) Predicted Address: %s", withdrawalPolicy_earningChainAddress);
 
         ccipAdapter_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
-        console.log("\tCCIP Adapter (Earning Chain) Predicted Address: %s", ccipAdapter_earningChainAddress);
+        Logger.log("\tCCIP Adapter (Earning Chain) Predicted Address: %s", ccipAdapter_earningChainAddress);
 
         iouToken_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
-        console.log("\tIOU Token (Earning Chain) Predicted Address: %s", iouToken_earningChainAddress);
+        Logger.log("\tIOU Token (Earning Chain) Predicted Address: %s", iouToken_earningChainAddress);
 
         deployerNonce_earningChain++; // Incrementing for IOU Token Manager implementation
         iouTokenManager_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
-        console.log("\tIOU Token Manager (Earning Chain) Predicted Address: %s", iouTokenManager_earningChainAddress);
+        Logger.log("\tIOU Token Manager (Earning Chain) Predicted Address: %s", iouTokenManager_earningChainAddress);
 
         deployerNonce_earningChain++; // Incrementing for Allocator implementation
         allocator_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
-        console.log("\tAllocator (Earning Chain) Predicted Address: %s", allocator_earningChainAddress);
+        Logger.log("\tAllocator (Earning Chain) Predicted Address: %s", allocator_earningChainAddress);
 
         swapper_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
-        console.log("\tSwapper (Earning Chain) Predicted Address: %s", swapper_earningChainAddress);
+        Logger.log("\tSwapper (Earning Chain) Predicted Address: %s", swapper_earningChainAddress);
 
         deployerNonce_earningChain++; // Incrementing for Gateway implementation
         chainGateway_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
-        console.log("\tEarning Chain Gateway (Earning Chain) Predicted Address: %s", chainGateway_earningChainAddress);
+        Logger.log("\tEarning Chain Gateway (Earning Chain) Predicted Address: %s", chainGateway_earningChainAddress);
 
         ghoStrategyVault_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
-        console.log("\tGHO Strategy Vault (Earning Chain) Predicted Address: %s", ghoStrategyVault_earningChainAddress);
+        Logger.log("\tGHO Strategy Vault (Earning Chain) Predicted Address: %s", ghoStrategyVault_earningChainAddress);
 
         usdcStrategyVault_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
-        console.log(
-            "\tUSDC Strategy Vault (Earning Chain) Predicted Address: %s", usdcStrategyVault_earningChainAddress
-        );
+        Logger.log("\tUSDC Strategy Vault (Earning Chain) Predicted Address: %s", usdcStrategyVault_earningChainAddress);
 
         // 1. Access Manager
         accessManager_earningChain = new AccessManager(admin);
-        console.log("\tAccess Manager: %s", address(accessManager_earningChain));
+        Logger.log("\tAccess Manager: %s", address(accessManager_earningChain));
         require(
             address(accessManager_earningChain) == accessManager_earningChainAddress,
             "Access Manager (Earning Chain) address mismatch"
@@ -593,7 +594,7 @@ contract BaseTest is TestWithHelpers {
 
         // Deploy Price Oracle for Earning Chain (with mocked prices via vm.mockCall)
         priceOracle_earningChain = _deployPriceOracle(accessManager_earningChainAddress, 9_995e23);
-        console.log("\tPrice Oracle (Earning Chain): %s", address(priceOracle_earningChain));
+        Logger.log("\tPrice Oracle (Earning Chain): %s", address(priceOracle_earningChain));
         if (_useMockedPriceOracleEarningChain()) {
             _mockAssetPrice(address(priceOracle_earningChain), address(GHO), MathLib.RAY);
             _mockAssetPrice(address(priceOracle_earningChain), address(USDC), MathLib.RAY);
@@ -611,15 +612,14 @@ contract BaseTest is TestWithHelpers {
                 )
             )
         );
-        console.log("\tAsset Registry: %s", address(assetRegistry_earningChain));
+        Logger.log("\tAsset Registry: %s", address(assetRegistry_earningChain));
         require(
             address(assetRegistry_earningChain) == assetRegistry_earningChainAddress,
             "Asset Registry (Earning Chain) address mismatch"
         );
 
         // 3. Withdrawal Policy
-        address withdrawalPolicy_earningChain_impl =
-            address(new WithdrawalPolicy(assetRegistry_earningChainAddress, chainGateway_earningChainAddress));
+        address withdrawalPolicy_earningChain_impl = address(new WithdrawalPolicy(chainGateway_earningChainAddress));
         withdrawalPolicy_earningChain = WithdrawalPolicy(
             address(
                 new TransparentUpgradeableProxy(
@@ -629,7 +629,7 @@ contract BaseTest is TestWithHelpers {
                 )
             )
         );
-        console.log("\tWithdrawal Policy (Earning Chain): %s", address(withdrawalPolicy_earningChain));
+        Logger.log("\tWithdrawal Policy (Earning Chain): %s", address(withdrawalPolicy_earningChain));
         require(
             address(withdrawalPolicy_earningChain) == withdrawalPolicy_earningChainAddress,
             "Withdrawal Policy (Earning Chain) address mismatch"
@@ -643,7 +643,7 @@ contract BaseTest is TestWithHelpers {
             transferHelper_earningChainAddress,
             assetRegistry_earningChainAddress
         );
-        console.log("\tCCIP Adapter: %s", address(ccipAdapter_earningChain));
+        Logger.log("\tCCIP Adapter: %s", address(ccipAdapter_earningChain));
         require(
             address(ccipAdapter_earningChain) == ccipAdapter_earningChainAddress,
             "CCIP Adapter (Earning Chain) address mismatch"
@@ -651,7 +651,7 @@ contract BaseTest is TestWithHelpers {
 
         // 5. IOU Token
         iouToken_earningChain = new IouToken(iouTokenManager_earningChainAddress);
-        console.log("\tIOU Token (Earning Chain): %s", address(iouToken_earningChain));
+        Logger.log("\tIOU Token (Earning Chain): %s", address(iouToken_earningChain));
         require(
             address(iouToken_earningChain) == iouToken_earningChainAddress, "IOU Token (Earning Chain) address mismatch"
         );
@@ -669,7 +669,7 @@ contract BaseTest is TestWithHelpers {
         iouTokenManager_earningChain = IouTokenManager(
             address(new TransparentUpgradeableProxy(iouTokenManager_earningChain_impl, proxyAdmin, ""))
         );
-        console.log("\tIOU Token Manager (Earning Chain): %s", address(iouTokenManager_earningChain));
+        Logger.log("\tIOU Token Manager (Earning Chain): %s", address(iouTokenManager_earningChain));
         require(
             address(iouTokenManager_earningChain) == iouTokenManager_earningChainAddress,
             "IOU Token Manager (Earning Chain) address mismatch"
@@ -695,7 +695,7 @@ contract BaseTest is TestWithHelpers {
                 )
             )
         );
-        console.log("\tAllocator: %s", address(allocator_earningChain));
+        Logger.log("\tAllocator: %s", address(allocator_earningChain));
         require(
             address(allocator_earningChain) == allocator_earningChainAddress,
             "Allocator (Earning Chain) address mismatch"
@@ -703,7 +703,7 @@ contract BaseTest is TestWithHelpers {
 
         // 8. Swapper
         swapper_earningChain = new Swapper(allocator_earningChainAddress);
-        console.log("\tSwapper: %s", address(swapper_earningChain));
+        Logger.log("\tSwapper: %s", address(swapper_earningChain));
         require(
             address(swapper_earningChain) == swapper_earningChainAddress, "Swapper (Earning Chain) address mismatch"
         );
@@ -728,7 +728,7 @@ contract BaseTest is TestWithHelpers {
                 )
             )
         );
-        console.log("\tEarning Chain Gateway: %s", address(earningChainGateway));
+        Logger.log("\tEarning Chain Gateway: %s", address(earningChainGateway));
         require(
             address(earningChainGateway) == chainGateway_earningChainAddress,
             "Earning Chain Gateway (Earning Chain) address mismatch"
@@ -736,9 +736,9 @@ contract BaseTest is TestWithHelpers {
 
         // 10. Strategy Vault/4626
         ghoStrategyVault_earningChain = new TestErc4626(GHO);
-        console.log("\tGHO Strategy Vault (Earning Chain): %s", address(ghoStrategyVault_earningChain));
+        Logger.log("\tGHO Strategy Vault (Earning Chain): %s", address(ghoStrategyVault_earningChain));
         usdcStrategyVault_earningChain = new TestErc4626(USDC);
-        console.log("\tUSDC Strategy Vault (Earning Chain): %s", address(usdcStrategyVault_earningChain));
+        Logger.log("\tUSDC Strategy Vault (Earning Chain): %s", address(usdcStrategyVault_earningChain));
         require(
             address(ghoStrategyVault_earningChain) == ghoStrategyVault_earningChainAddress,
             "GHO Strategy Vault (Earning Chain) address mismatch"
@@ -756,16 +756,16 @@ contract BaseTest is TestWithHelpers {
         _deployContracts();
 
         // Set up Access Manager roles on Accounting chain
-        console.log("\nSetting up Access Manager roles on Accounting chain");
+        Logger.log("\nSetting up Access Manager roles on Accounting chain");
         _setUpAccountingChainAccessManager(accessManager_accountingChain);
 
         // Set up Access Manager roles on Earning chain
-        console.log("\nSetting up Access Manager roles on Earning chain");
+        Logger.log("\nSetting up Access Manager roles on Earning chain");
         _setUpEarningChainAccessManager(accessManager_earningChain);
 
         vm.startPrank(everyRoleAccount);
 
-        console.log("\nInitializing Contracts");
+        Logger.log("\nInitializing Contracts");
 
         // Set up Accounting Chain Gateway (Accounting chain) // These should be done cross-wise cause it's destination
         // chainId
@@ -773,7 +773,7 @@ contract BaseTest is TestWithHelpers {
         accountingChainGateway.setDefaultBridgeAdapter(
             address(GHO), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain)
         );
-        console.log(
+        Logger.log(
             "\tAccountingChainGateway GHO adapter (Accounting Chain): %s",
             accountingChainGateway.getDefaultBridgeAdapter(address(GHO), EARNING_CHAIN_ID)
         );
@@ -781,7 +781,7 @@ contract BaseTest is TestWithHelpers {
         accountingChainGateway.setDefaultBridgeAdapter(
             address(USDC), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain)
         );
-        console.log(
+        Logger.log(
             "\tAccountingChainGateway USDC adapter (Accounting Chain): %s",
             accountingChainGateway.getDefaultBridgeAdapter(address(USDC), EARNING_CHAIN_ID)
         );
@@ -789,7 +789,7 @@ contract BaseTest is TestWithHelpers {
         accountingChainGateway.setDefaultBridgeAdapter(
             address(0), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain)
         );
-        console.log(
+        Logger.log(
             "\tAccountingChainGateway Message adapter (Accounting Chain): %s",
             accountingChainGateway.getDefaultBridgeAdapter(address(0), EARNING_CHAIN_ID)
         );
@@ -799,7 +799,7 @@ contract BaseTest is TestWithHelpers {
         earningChainGateway.setDefaultBridgeAdapter(
             address(GHO), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain)
         );
-        console.log(
+        Logger.log(
             "\tEarningChainGatway GHO adapter (Earning Chain): %s",
             earningChainGateway.getDefaultBridgeAdapter(address(GHO), ACCOUNTING_CHAIN_ID)
         );
@@ -807,13 +807,13 @@ contract BaseTest is TestWithHelpers {
         earningChainGateway.setDefaultBridgeAdapter(
             address(USDC), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain)
         );
-        console.log(
+        Logger.log(
             "\tEarningChainGatway USDC adapter (Earning Chain): %s",
             earningChainGateway.getDefaultBridgeAdapter(address(USDC), ACCOUNTING_CHAIN_ID)
         );
         earningChainGateway.addBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
         earningChainGateway.setDefaultBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
-        console.log(
+        Logger.log(
             "\tEarningChainGatway Messages adapter (Earning Chain): %s",
             earningChainGateway.getDefaultBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID)
         );

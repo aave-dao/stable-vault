@@ -3,8 +3,9 @@
 pragma solidity ^0.8.22;
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {console} from "forge-std/console.sol";
 import {IERC20} from "forge-std/interfaces/IERC20.sol";
+
+import {Logger} from "test/helpers/Logger.sol";
 
 import {BasedBoostedVault} from "src/core/accounting/BasedBoostedVault.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
@@ -35,7 +36,8 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
         address transferHelper,
         address withdrawalFeeCalculator,
         address priceOracle,
-        uint256 maxActiveSubVaults
+        uint256 maxActiveSubVaults,
+        address treasuryAddress
     ) internal virtual override returns (BasedBoostedVault) {
         // Deploy a vault without restriction in the valid per-second rate
         address vaultImpl = address(
@@ -55,14 +57,16 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
                 new TransparentUpgradeableProxy(
                     address(vaultImpl),
                     proxyAdmin,
-                    abi.encodeCall(BasedBoostedVault.initialize, (adminParam, defaultSubVaultPerSecondRate))
+                    abi.encodeCall(
+                        BasedBoostedVault.initialize, (adminParam, treasuryAddress, defaultSubVaultPerSecondRate)
+                    )
                 )
             )
         );
     }
 
     function test_givenSingleAssetDepegs_userCanStillWithdrawFromEarningChain() public {
-        console.log("\nEarningChainDistrustedAssetE2ETest: givenSingleAssetDepegs_userCanStillWithdraw");
+        Logger.log("\nEarningChainDistrustedAssetE2ETest: givenSingleAssetDepegs_userCanStillWithdraw");
 
         uint256 userInitialDeposit = 500 * (10 ** 6);
 

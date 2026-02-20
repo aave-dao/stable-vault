@@ -3,8 +3,9 @@
 pragma solidity ^0.8.20;
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {console} from "forge-std/console.sol";
 import {IERC20} from "forge-std/interfaces/IERC20.sol";
+
+import {Logger} from "test/helpers/Logger.sol";
 
 import {BasedBoostedVault} from "src/core/accounting/BasedBoostedVault.sol";
 import {IBasedBoostedVault} from "src/interfaces/IBasedBoostedVault.sol";
@@ -38,7 +39,8 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         address transferHelper,
         address withdrawalFeeCalculator,
         address priceOracle,
-        uint256 maxActiveSubVaults
+        uint256 maxActiveSubVaults,
+        address treasuryAddress
     ) internal virtual override returns (BasedBoostedVault) {
         // Deploy a vault without restriction in the valid per-second rate
         address vaultImpl = address(
@@ -58,14 +60,16 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
                 new TransparentUpgradeableProxy(
                     address(vaultImpl),
                     proxyAdmin,
-                    abi.encodeCall(BasedBoostedVault.initialize, (adminParam, defaultSubVaultPerSecondRate))
+                    abi.encodeCall(
+                        BasedBoostedVault.initialize, (adminParam, treasuryAddress, defaultSubVaultPerSecondRate)
+                    )
                 )
             )
         );
     }
 
     function test_earningChainWithdrawalE2E() public {
-        console.log("\nEarningChainWithE2ETest");
+        Logger.log("\nEarningChainWithE2ETest");
 
         uint256 userInitialDeposit = 500 * (10 ** 6);
 
@@ -134,7 +138,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
 
         // 3. Mimic time passing so that user1's balances increase.
         vm.warp(block.timestamp + 183 days);
-        console.log("\nHalf a year has gone by so fast...");
+        Logger.log("\nHalf a year has gone by so fast...");
 
         // Check the user's balance in the BBV on the Accounting Chain
         assertGt(
@@ -160,7 +164,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         // 5. User requests to withdrawal their original deposit
         uint256 iouAmountRequestedRay = userInitialDeposit.assetDecimalsToRay(address(USDC));
         vm.prank(user1);
-        console.log("!!! Actual requesting withdrawal for user1", user1);
+        Logger.log("!!! Actual requesting withdrawal for user1", user1);
         vault.requestWithdrawal(user1, iouAmountRequestedRay);
         // Check the IOU token balance went up (units are in RAY)
         assertEq(
@@ -214,7 +218,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         vault.setSubVaultRate(2, 1_000000021820606489223699321);
         // Mimic time passing so that user2's balances increase.
         vm.warp(block.timestamp + 365 days);
-        console.log("User2 balance after 1 years", vault.getUserBalance(user2));
+        Logger.log("User2 balance after 1 years", vault.getUserBalance(user2));
         // User1's IOUs should be considered when calc'ing withdrawal ability (use1's IOUs sitting on Earning chain
         // should be considered).
         uint256 user2BalanceAfterOneYearInRay = vault.getUserBalance(user2);
@@ -248,12 +252,12 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
 
         // 8. Check that a user bridging IOUs to/from Earning chain updates the supply on both chains properly.
         uint256 iousOnAccountBeforeUser2BridgeToEarningChain = iouToken_accountingChain.totalSupply();
-        console.log(
+        Logger.log(
             "IOUS ON ACCOUNTING CHAIN (BEFORE USER2 BRIDGE TO EARNING CHAIN) =",
             iousOnAccountBeforeUser2BridgeToEarningChain
         );
         uint256 iousOnEarningBeforeUser2BridgeToAccountingChain = iouToken_earningChain.totalSupply();
-        console.log(
+        Logger.log(
             "IOUS ON EARNING CHAIN (BEFORE USER2 BRIDGE TO ACCOUNTING CHAIN) =",
             iousOnEarningBeforeUser2BridgeToAccountingChain
         );

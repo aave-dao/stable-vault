@@ -95,6 +95,18 @@ contract FundsHandlerTest is TestWithHelpers {
         mockAllocator.mockTransferHelper(address(mockTransferHelper));
     }
 
+    function test_constructor_reverts_ifInvalidTransferHelper() public {
+        vm.expectRevert();
+        new FundsHandler(
+            mockBbv,
+            address(mockGateway),
+            address(mockAllocator),
+            address(priceOracle),
+            address(0),
+            address(mockChainBalanceOracle)
+        );
+    }
+
     function test_getAggregatedBalance_returnsExpectedAggregatedBalance(
         uint256 accChainBalance1,
         uint256 accChainBalance2,

@@ -251,7 +251,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     //////////////////////////////////////////// MANAGER FUNCTIONS /////////////////////////////////////////////////////
 
     /// @inheritdoc IAllocator
-    function rebalance(RebalanceParams[] memory params) external override restricted {
+    function rebalance(RebalanceParams[] memory params) external virtual override restricted {
         for (uint256 i = 0; i < params.length; i++) {
             _rebalance(params[i]);
         }
@@ -488,7 +488,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         // balances when fetched by consumers.
         // This function does not force max withdraw from a strategy to avoid unintended behavior e.g. incurring
         // slippage.
-        require(_getAssetBalanceInStrategy(IERC4626(strategy)) == 0, StrategyStillHasFunds(strategy));
+        require(IERC4626(strategy).balanceOf(address(this)) == 0, StrategyStillHasFunds(strategy));
         address asset = $storage().strategyConfigs[strategy].asset;
 
         $storage().assetStrategies[asset].remove(strategy);

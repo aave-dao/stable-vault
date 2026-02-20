@@ -14,13 +14,14 @@ contract Create3Deployment {
         string memory namespacedSaltSeed,
         address deployer,
         address implementation,
-        address proxyAdmin,
+        address proxyAdminOwner,
         bytes memory initCalldata
     ) internal returns (address) {
         return CREATE3_FACTORY.deployCreate3({
             salt: Create3AddressLib.computeCreate3Salt(namespacedSaltSeed, deployer),
             initCode: abi.encodePacked(
-                type(TransparentUpgradeableProxy).creationCode, abi.encode(implementation, proxyAdmin, initCalldata)
+                type(TransparentUpgradeableProxy).creationCode,
+                abi.encode(implementation, proxyAdminOwner, initCalldata)
             )
         });
     }

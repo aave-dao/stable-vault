@@ -1,0 +1,252 @@
+// SPDX-License-Identifier: UNLICENSED
+// Copyright (c) 2025 Aave Labs
+pragma solidity ^0.8.20;
+
+import {IAccessManager} from "openzeppelin-contracts/contracts/access/manager/IAccessManager.sol";
+
+import {AccountingChainDeployment} from "script/AccountingChainDeployment.s.sol";
+import {Create3AddressLib} from "script/libraries/Create3AddressLib.sol";
+import {RolesLib} from "script/libraries/RolesLib.sol";
+
+import {IAllocator} from "src/interfaces/IAllocator.sol";
+import {IBasedBoostedVault} from "src/interfaces/IBasedBoostedVault.sol";
+import {IChainGateway} from "src/interfaces/IChainGateway.sol";
+import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
+import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
+import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
+import {ChainBalanceOracle} from "src/oracles/balance/ChainBalanceOracle.sol";
+
+import {AccessManagerSetupBaseTest} from "test/unit/access/AccessManagerSetupBaseTest.sol";
+
+contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, AccountingChainDeployment {
+    function setUp() public virtual {
+        _deployCreateXTo(Create3AddressLib.CREATEX_ADDRESS);
+        vm.startPrank(DEPLOYER);
+        _deployContracts();
+        _setupAccessManager(DEPLOYER);
+        vm.stopPrank();
+        vm.warp(block.timestamp + RolesLib.CRITICAL_DELAY + 1);
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // DEPLOYMENT SCRIPT OVERRIDES
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    function _logDeployment(string memory, string memory, address) internal virtual override {}
+
+    function _aTokenVaultAddresses()
+        internal
+        view
+        virtual
+        override(AccountingChainDeployment, AccessManagerSetupBaseTest)
+        returns (address[] memory)
+    {
+        address[] memory vaults = new address[](1);
+        vaults[0] = address(uint160(uint256(keccak256("test.aTokenVault"))));
+        return vaults;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // SETUP SCRIPT OVERRIDES — profile getters
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    function _getProfile__MainAdmin() internal pure virtual override returns (address) {
+        return address(uint160(uint256(keccak256("test.mainAdmin"))));
+    }
+
+    function _getProfile__SecondaryAdmin() internal pure virtual override returns (address) {
+        return address(uint160(uint256(keccak256("test.secondaryAdmin"))));
+    }
+
+    function _getProfile__WithdrawalPolicyManager() internal pure virtual override returns (address) {
+        return address(uint160(uint256(keccak256("test.withdrawalPolicyManager"))));
+    }
+
+    function _getProfile__Rebalancer() internal pure virtual override returns (address) {
+        return address(uint160(uint256(keccak256("test.rebalancer"))));
+    }
+
+    function _getProfile__Disabler() internal pure virtual override returns (address) {
+        return address(uint160(uint256(keccak256("test.disabler"))));
+    }
+
+    function _getProfile__ATokenVaultRewardClaimer() internal pure virtual override returns (address) {
+        return address(uint160(uint256(keccak256("test.aTokenVaultRewardClaimer"))));
+    }
+
+    function _getProfile__BbvManager() internal pure virtual override returns (address) {
+        return address(uint160(uint256(keccak256("test.bbvManager"))));
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // BASE TEST OVERRIDES — abstract getters
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    function _getAccessManager() internal view virtual override returns (IAccessManager) {
+        return IAccessManager(_accessManager());
+    }
+
+    function _getDeployer() internal pure virtual override returns (address) {
+        return DEPLOYER;
+    }
+
+    function _mainAdmin() internal pure virtual override returns (address) {
+        return _getProfile__MainAdmin();
+    }
+
+    function _secondaryAdmin() internal pure virtual override returns (address) {
+        return _getProfile__SecondaryAdmin();
+    }
+
+    function _withdrawalPolicyManager() internal pure virtual override returns (address) {
+        return _getProfile__WithdrawalPolicyManager();
+    }
+
+    function _rebalancer() internal pure virtual override returns (address) {
+        return _getProfile__Rebalancer();
+    }
+
+    function _disabler() internal pure virtual override returns (address) {
+        return _getProfile__Disabler();
+    }
+
+    function _aTokenVaultRewardClaimer() internal pure virtual override returns (address) {
+        return _getProfile__ATokenVaultRewardClaimer();
+    }
+
+    function _ccipAdapter() internal view virtual override returns (address) {
+        return getCcipAdapterAddress(_getDeployer());
+    }
+
+    function _allocator() internal view virtual override returns (address) {
+        return getAllocatorAddress(_getDeployer());
+    }
+
+    function _withdrawalPolicyTarget() internal view virtual override returns (address) {
+        return getWithdrawalPolicyAddress(_getDeployer());
+    }
+
+    function _assetRegistry() internal view virtual override returns (address) {
+        return getAssetRegistryAddress(_getDeployer());
+    }
+
+    function _priceOracle() internal view virtual override returns (address) {
+        return getPriceOracleAddress(_getDeployer());
+    }
+
+    function _chainBalanceOracle() internal view virtual returns (address) {
+        return getChainBalanceOracleAddress(_getDeployer());
+    }
+
+    function _getAllProfiles() internal view virtual override returns (address[] memory) {
+        address[] memory baseProfiles = super._getAllProfiles();
+        address[] memory profiles = new address[](baseProfiles.length + 1);
+        for (uint256 i = 0; i < baseProfiles.length; i++) {
+            profiles[i] = baseProfiles[i];
+        }
+        profiles[baseProfiles.length] = _getProfile__BbvManager();
+        return profiles;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // CHAIN-SPECIFIC TESTS
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    function test_canCall_bbvManager() public view {
+        address bbvManager = _getProfile__BbvManager();
+        address bbv = getBasedBoostedVaultAddress(_getDeployer());
+
+        // Operational (NO_DELAY): immediate
+        _assertCanCall(bbvManager, bbv, IBasedBoostedVault.setUserRate.selector, true, 0);
+        _assertCanCall(bbvManager, bbv, IBasedBoostedVault.setSubVaultRate.selector, true, 0);
+        _assertCanCall(bbvManager, bbv, IBasedBoostedVault.setDefaultSubVault.selector, true, 0);
+        // Admin-tier (MED_DELAY): has role but delayed
+        _assertCanCall(bbvManager, bbv, IBasedBoostedVault.claimSurplusInterest.selector, false, RolesLib.MED_DELAY);
+        // Unauthorized
+        _assertCanCall(bbvManager, bbv, IBasedBoostedVault.setTreasury.selector, false, 0);
+        _assertCanCall(bbvManager, _allocator(), IAllocator.rebalance.selector, false, 0);
+    }
+
+    function test_bbvManagerProfile_hasTheExpectedRoles() public view {
+        uint64[] memory expected = new uint64[](4);
+        expected[0] = RolesLib.getRole__setUserRate().roleId;
+        expected[1] = RolesLib.getRole__setSubVaultRate().roleId;
+        expected[2] = RolesLib.getRole__claimSurplusInterest().roleId;
+        expected[3] = RolesLib.getRole__setDefaultSubVault().roleId;
+        _assertProfileHasExactlyTheseRoles(_getProfile__BbvManager(), expected);
+
+        // NO_DELAY roles
+        _assertProfileRoleDelay(_getProfile__BbvManager(), expected[0], RolesLib.NO_DELAY);
+        _assertProfileRoleDelay(_getProfile__BbvManager(), expected[1], RolesLib.NO_DELAY);
+        _assertProfileRoleDelay(_getProfile__BbvManager(), expected[3], RolesLib.NO_DELAY);
+        // MED_DELAY roles
+        _assertProfileRoleDelay(_getProfile__BbvManager(), expected[2], RolesLib.MED_DELAY);
+    }
+
+    function test_targetSetup_bbv() public view {
+        address bbv = getBasedBoostedVaultAddress(_getDeployer());
+
+        _assertTargetFunctionRole(bbv, IBasedBoostedVault.setUserRate.selector, RolesLib.getRole__setUserRate().roleId);
+        _assertTargetFunctionRole(
+            bbv, IBasedBoostedVault.setSubVaultRate.selector, RolesLib.getRole__setSubVaultRate().roleId
+        );
+        _assertTargetFunctionRole(
+            bbv, IBasedBoostedVault.setDefaultSubVault.selector, RolesLib.getRole__setDefaultSubVault().roleId
+        );
+        _assertTargetFunctionRole(
+            bbv, IBasedBoostedVault.claimSurplusInterest.selector, RolesLib.getRole__claimSurplusInterest().roleId
+        );
+        _assertTargetFunctionRole(bbv, IBasedBoostedVault.setTreasury.selector, RolesLib.getRole__setTreasury().roleId);
+        _assertTargetFunctionRole(bbv, IRescuableNative.rescueNative.selector, RolesLib.getRole__rescueNative().roleId);
+        _assertTargetFunctionRole(bbv, IRescuableToken.rescueTokens.selector, RolesLib.getRole__rescueTokens().roleId);
+    }
+
+    function test_targetSetup_fundsHandler() public view {
+        address fundsHandler = getFundsHandlerAddress(_getDeployer());
+
+        _assertTargetFunctionRole(
+            fundsHandler, IFundsHandler.pushFundsToChain.selector, RolesLib.getRole__pushFundsToChain().roleId
+        );
+        _assertTargetFunctionRole(
+            fundsHandler, IRescuableToken.rescueTokens.selector, RolesLib.getRole__rescueTokens().roleId
+        );
+        _assertTargetFunctionRole(
+            fundsHandler, IRescuableNative.rescueNative.selector, RolesLib.getRole__rescueNative().roleId
+        );
+        _assertTargetFunctionRole(
+            fundsHandler, IFundsHandler.addEarningChain.selector, RolesLib.getRole__addEarningChain().roleId
+        );
+        _assertTargetFunctionRole(
+            fundsHandler, IFundsHandler.removeEarningChain.selector, RolesLib.getRole__removeEarningChain().roleId
+        );
+    }
+
+    function test_targetSetup_accountingChainGateway() public view {
+        address gateway = getGatewayAddress(_getDeployer());
+
+        _assertTargetFunctionRole(
+            gateway, IChainGateway.addBridgeAdapter.selector, RolesLib.getRole__addBridgeAdapter().roleId
+        );
+        _assertTargetFunctionRole(
+            gateway, IChainGateway.removeBridgeAdapter.selector, RolesLib.getRole__removeBridgeAdapter().roleId
+        );
+        _assertTargetFunctionRole(
+            gateway, IChainGateway.setDefaultBridgeAdapter.selector, RolesLib.getRole__setDefaultBridgeAdapter().roleId
+        );
+        _assertTargetFunctionRole(
+            gateway, IRescuableToken.rescueTokens.selector, RolesLib.getRole__rescueTokens().roleId
+        );
+        _assertTargetFunctionRole(
+            gateway, IRescuableNative.rescueNative.selector, RolesLib.getRole__rescueNative().roleId
+        );
+    }
+
+    function test_targetSetup_chainBalanceOracle() public view {
+        address target = _chainBalanceOracle();
+        _assertTargetFunctionRole(
+            target,
+            ChainBalanceOracle.setChainBalanceOracleAdapter.selector,
+            RolesLib.getRole__setChainBalanceOracleAdapter().roleId
+        );
+    }
+}

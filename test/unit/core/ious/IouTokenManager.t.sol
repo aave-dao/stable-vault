@@ -41,6 +41,11 @@ contract IouTokenManagerTest_AccountingChain is Test {
         assertEq(iouTokenAddress, iouToken);
     }
 
+    function test_constructor_reverts_ifInvalidTransferHelper() public {
+        vm.expectRevert();
+        new ExtendedIouTokenManager(iouTokenAddress, chainGateway, vault, address(0), true);
+    }
+
     // Minting tokens
 
     function test_mintTokens_withGateway(address mintTo, uint256 amountToMint) public {
