@@ -7,8 +7,8 @@ import {IERC20} from "forge-std/interfaces/IERC20.sol";
 
 import {Logger} from "test/helpers/Logger.sol";
 
-import {StableVault} from "src/core/accounting/BasedBoostedVault.sol";
-import {IStableVault} from "src/interfaces/IBasedBoostedVault.sol";
+import {StableVault} from "src/core/accounting/StableVault.sol";
+import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {Errors} from "src/types/Errors.sol";
 

@@ -13,10 +13,10 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
-import {IStableVault} from "src/interfaces/IBasedBoostedVault.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
+import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";

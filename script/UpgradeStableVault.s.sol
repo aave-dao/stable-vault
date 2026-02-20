@@ -8,7 +8,7 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {Create3AddressBook} from "script/base/Create3AddressBook.sol";
 import {Upgrade} from "script/base/Upgrade.sol";
-import {StableVault} from "src/core/accounting/BasedBoostedVault.sol";
+import {StableVault} from "src/core/accounting/StableVault.sol";
 
 contract UpgradeStableVault is Create3AddressBook, Upgrade {
     using Strings for address;

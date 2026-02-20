@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.22;
 
-import {StableVault} from "src/core/accounting/BasedBoostedVault.sol";
+import {StableVault} from "src/core/accounting/StableVault.sol";
 
 contract StableVaultHarness is StableVault {
     constructor(

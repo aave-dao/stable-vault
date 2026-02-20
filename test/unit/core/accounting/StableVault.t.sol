@@ -11,12 +11,12 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transpa
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
-import {StableVault} from "src/core/accounting/BasedBoostedVault.sol";
-import {IStableVault} from "src/interfaces/IBasedBoostedVault.sol";
+import {StableVault} from "src/core/accounting/StableVault.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
+import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
@@ -27,7 +27,6 @@ import {Errors} from "src/types/Errors.sol";
 
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
 import {_toAddressArray, _toUint256Array} from "test/helpers/TypeHelpers.sol";
-import {StableVaultHarness} from "test/mocks/BasedBoostedVaultHarness.sol";
 import {MockAccessManager} from "test/mocks/MockAccessManager.sol";
 import {MockAssetRegistry} from "test/mocks/MockAssetRegistry.sol";
 import {MockErc20} from "test/mocks/MockErc20.sol";
@@ -37,6 +36,7 @@ import {MockIouTokenManager} from "test/mocks/MockIouTokenManager.sol";
 import {MockNonStandardErc20} from "test/mocks/MockNonStandardErc20.sol";
 import {MockReentrantErc20} from "test/mocks/MockReentrantErc20.sol";
 import {MockTransferHelper} from "test/mocks/MockTransferHelper.sol";
+import {StableVaultHarness} from "test/mocks/StableVaultHarness.sol";
 
 contract StableVaultTest is TestWithHelpers {
     using MathLib for uint256;

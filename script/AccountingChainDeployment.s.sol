@@ -18,8 +18,8 @@ import {IRouterClient} from "@chainlink-ccip/contracts/interfaces/IRouterClient.
 import {CcipAdapter} from "src/bridging/ccip/CcipAdapter.sol";
 import {Allocator} from "src/core/Allocator.sol";
 import {AccountingChainGateway} from "src/core/accounting/AccountingChainGateway.sol";
-import {StableVault} from "src/core/accounting/BasedBoostedVault.sol";
 import {FundsHandler} from "src/core/accounting/FundsHandler.sol";
+import {StableVault} from "src/core/accounting/StableVault.sol";
 import {IouToken} from "src/core/ious/IouToken.sol";
 import {IouTokenManager} from "src/core/ious/IouTokenManager.sol";
 import {IAccountingChainGateway} from "src/interfaces/IAccountingChainGateway.sol";

@@ -6,12 +6,12 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {AccountingChainBaseScript} from "script/interact/accounting/AccountingChainBaseScript.s.sol";
 
-import {IStableVault} from "src/interfaces/IBasedBoostedVault.sol";
+import {IStableVault} from "src/interfaces/IStableVault.sol";
 
 /// @dev See example usage below:
 /// 1. > export RPC_URL=<rpc-url>
 /// 2. > cast wallet import <account_name> --private-key 0xYOUR_PRIVATE_KEY
-/// 3. > forge script script/interact/accounting/BasedBoostedVaultInteractionScript.s.sol \
+/// 3. > forge script script/interact/accounting/StableVaultInteractionScript.s.sol \
 ///  --rpc-url $RPC_URL \
 ///  --sig "executeWithdrawal()" \
 ///  --account <account_name> \

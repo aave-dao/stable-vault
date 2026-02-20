@@ -9,11 +9,11 @@ import {Create3AddressLib} from "script/libraries/Create3AddressLib.sol";
 import {RolesLib} from "script/libraries/RolesLib.sol";
 
 import {IAllocator} from "src/interfaces/IAllocator.sol";
-import {IStableVault} from "src/interfaces/IBasedBoostedVault.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
+import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {ChainBalanceOracle} from "src/oracles/balance/ChainBalanceOracle.sol";
 
 import {AccessManagerSetupBaseTest} from "test/unit/access/AccessManagerSetupBaseTest.sol";

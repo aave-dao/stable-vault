@@ -11,15 +11,14 @@ import {AccessManager} from "openzeppelin-contracts/contracts/access/manager/Acc
 import {CcipAdapter} from "src/bridging/ccip/CcipAdapter.sol";
 import {Allocator} from "src/core/Allocator.sol";
 import {AccountingChainGateway} from "src/core/accounting/AccountingChainGateway.sol";
-import {StableVault} from "src/core/accounting/BasedBoostedVault.sol";
-import {StableVault} from "src/core/accounting/BasedBoostedVault.sol";
 import {FundsHandler} from "src/core/accounting/FundsHandler.sol";
+import {StableVault} from "src/core/accounting/StableVault.sol";
+import {StableVault} from "src/core/accounting/StableVault.sol";
 import {EarningChainGateway} from "src/core/earning/EarningChainGateway.sol";
 import {IouToken} from "src/core/ious/IouToken.sol";
 import {IouTokenManager} from "src/core/ious/IouTokenManager.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
-import {IStableVault} from "src/interfaces/IBasedBoostedVault.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
@@ -28,6 +27,7 @@ import {IEarningChainStateProvider} from "src/interfaces/IEarningChainStateProvi
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
+import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {AssetRegistry} from "src/periphery/AssetRegistry.sol";

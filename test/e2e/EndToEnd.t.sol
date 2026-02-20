@@ -8,8 +8,8 @@ import {IERC4626} from "forge-std/interfaces/IERC4626.sol";
 import {Logger} from "test/helpers/Logger.sol";
 
 import {IAllocator} from "src/interfaces/IAllocator.sol";
-import {IStableVault} from "src/interfaces/IBasedBoostedVault.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
+import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {Swapper} from "src/periphery/Swapper.sol";
 import {Errors} from "src/types/Errors.sol";

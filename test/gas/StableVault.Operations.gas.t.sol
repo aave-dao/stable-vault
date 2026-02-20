@@ -5,7 +5,7 @@ pragma solidity ^0.8.22;
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Strings} from "openzeppelin-contracts/contracts/utils/Strings.sol";
 
-import {IStableVault} from "src/interfaces/IBasedBoostedVault.sol";
+import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 
 import {BaseTest} from "test/BaseTest.t.sol";
