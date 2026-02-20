@@ -5,24 +5,24 @@ pragma solidity ^0.8.20;
 import {Create3AddressLib} from "script/libraries/Create3AddressLib.sol";
 
 contract Create3AddressBook {
-    string constant BASED_BOOSTED_VAULT_SALT_SEED = "aave.based-boosted-vault.BasedBoostedVault";
-    string constant TRANSFER_HELPER_SALT_SEED = "aave.based-boosted-vault.TransferHelper";
-    string constant WITHDRAWAL_POLICY_SALT_SEED = "aave.based-boosted-vault.WithdrawalPolicy";
-    string constant FUNDS_HANDLER_SALT_SEED = "aave.based-boosted-vault.FundsHandler";
-    string constant ALLOCATOR_SALT_SEED = "aave.based-boosted-vault.Allocator";
-    string constant GATEWAY_SALT_SEED = "aave.based-boosted-vault.Gateway";
-    string constant ACCESS_MANAGER_SALT_SEED = "aave.based-boosted-vault.AccessManager";
-    string constant ASSET_REGISTRY_SALT_SEED = "aave.based-boosted-vault.AssetRegistry";
-    string constant IOU_TOKEN_MANAGER_SALT_SEED = "aave.based-boosted-vault.IouTokenManager";
-    string constant IOU_TOKEN_SALT_SEED = "aave.based-boosted-vault.IouToken";
-    string constant SWAPPER_SALT_SEED = "aave.based-boosted-vault.Swapper";
-    string constant CCIP_ADAPTER_SALT_SEED = "aave.based-boosted-vault.CcipAdapter";
-    string constant PRICE_ORACLE_SALT_SEED = "aave.based-boosted-vault.PriceOracle";
-    string constant CHAIN_BALANCE_ORACLE_SALT_SEED = "aave.based-boosted-vault.ChainBalanceOracle";
-    string constant EARNING_CHAIN_STATE_PROVIDER_SALT_SEED = "aave.based-boosted-vault.EarningChainStateProvider";
+    string constant STABLE_VAULT_SALT_SEED = "aave.stable-vault.StableVault";
+    string constant TRANSFER_HELPER_SALT_SEED = "aave.stable-vault.TransferHelper";
+    string constant WITHDRAWAL_POLICY_SALT_SEED = "aave.stable-vault.WithdrawalPolicy";
+    string constant FUNDS_HANDLER_SALT_SEED = "aave.stable-vault.FundsHandler";
+    string constant ALLOCATOR_SALT_SEED = "aave.stable-vault.Allocator";
+    string constant GATEWAY_SALT_SEED = "aave.stable-vault.Gateway";
+    string constant ACCESS_MANAGER_SALT_SEED = "aave.stable-vault.AccessManager";
+    string constant ASSET_REGISTRY_SALT_SEED = "aave.stable-vault.AssetRegistry";
+    string constant IOU_TOKEN_MANAGER_SALT_SEED = "aave.stable-vault.IouTokenManager";
+    string constant IOU_TOKEN_SALT_SEED = "aave.stable-vault.IouToken";
+    string constant SWAPPER_SALT_SEED = "aave.stable-vault.Swapper";
+    string constant CCIP_ADAPTER_SALT_SEED = "aave.stable-vault.CcipAdapter";
+    string constant PRICE_ORACLE_SALT_SEED = "aave.stable-vault.PriceOracle";
+    string constant CHAIN_BALANCE_ORACLE_SALT_SEED = "aave.stable-vault.ChainBalanceOracle";
+    string constant EARNING_CHAIN_STATE_PROVIDER_SALT_SEED = "aave.stable-vault.EarningChainStateProvider";
 
-    function getBasedBoostedVaultAddress(address deployer) internal pure virtual returns (address) {
-        return Create3AddressLib.computeCreate3Address(BASED_BOOSTED_VAULT_SALT_SEED, deployer);
+    function getStableVaultAddress(address deployer) internal pure virtual returns (address) {
+        return Create3AddressLib.computeCreate3Address(STABLE_VAULT_SALT_SEED, deployer);
     }
 
     function getTransferHelperAddress(address deployer) internal pure virtual returns (address) {

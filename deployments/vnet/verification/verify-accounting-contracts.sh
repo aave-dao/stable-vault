@@ -69,11 +69,11 @@ verify_contract "IouTokenManager::proxy" \
     "0x14fc7c26e112ac6f7ed7e5b6adcb795562fdaf10" \
     "lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy"
 
-verify_contract "BasedBoostedVault::implementation" \
+verify_contract "StableVault::implementation" \
     "0x6da09c73d3c26c2d4a12857d1f2e1dd32fab22bd" \
-    "src/core/accounting/BasedBoostedVault.sol:BasedBoostedVault"
+    "src/core/accounting/BasedBoostedVault.sol:StableVault"
 
-verify_contract "BasedBoostedVault::proxy" \
+verify_contract "StableVault::proxy" \
     "0xb49bd8c7fa9d910d77ef5a356ccfdf6a4ba14602" \
     "lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol:TransparentUpgradeableProxy"
 

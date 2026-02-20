@@ -25,7 +25,7 @@ contract UpgradeWithdrawalPolicy is Create3AddressBook, Upgrade {
     }
 
     function _upgrade() internal {
-        address implementation = address(new WithdrawalPolicy(getBasedBoostedVaultAddress(DEPLOYER)));
+        address implementation = address(new WithdrawalPolicy(getStableVaultAddress(DEPLOYER)));
         _logDeployment("WithdrawalPolicy::Implementation", "", implementation);
         address proxyAdmin = _getAdminFromSlot(WITHDRAWAL_POLICY_PROXY);
         ProxyAdmin(proxyAdmin).upgradeAndCall(ITransparentUpgradeableProxy(WITHDRAWAL_POLICY_PROXY), implementation, "");

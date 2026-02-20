@@ -8,7 +8,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {MockErc20} from "test/mocks/MockErc20.sol";
 
 /// @notice A reentrant ERC20 that calls back to a target contract during transfer/transferFrom.
-/// @dev Used to test reentrancy protection in BasedBoostedVault.
+/// @dev Used to test reentrancy protection in StableVault.
 contract MockReentrantErc20 is MockErc20 {
     address public reentrantTarget;
     bytes public reentrantCalldata;

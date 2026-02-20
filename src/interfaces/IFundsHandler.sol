@@ -8,9 +8,9 @@ import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 /// @author Aave Labs
 /// @notice Interface for the FundsHandler contract.
 interface IFundsHandler {
-    /// @notice Thrown when the caller is not the BasedBoostedVault.
+    /// @notice Thrown when the caller is not the StableVault.
     /// @custom:selector 0x93ce7047
-    error OnlyBasedBoostedVault();
+    error OnlyStableVault();
 
     /// @notice Thrown when the chain id is already present in the Earning chain set.
     /// @custom:selector 0x148e7b23

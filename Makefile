@@ -1,7 +1,7 @@
 .PHONY: help build test clean
 
 help:
-	@echo "BasedBoostedVault Project Commands"
+	@echo "StableVault Project Commands"
 	@echo ""
 	@echo "Build & Test:"
 	@echo "  make build                     - Build contracts"

@@ -268,7 +268,7 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
             new IouTokenManager({
                 iouToken: getIouTokenAddress(DEPLOYER),
                 chainGateway: getGatewayAddress(DEPLOYER),
-                vault: getBasedBoostedVaultAddress(DEPLOYER),
+                vault: getStableVaultAddress(DEPLOYER),
                 transferHelper: getTransferHelperAddress(DEPLOYER),
                 isAccountingChain: false
             })

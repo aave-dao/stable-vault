@@ -8,12 +8,12 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {Create3AddressBook} from "script/base/Create3AddressBook.sol";
 import {Upgrade} from "script/base/Upgrade.sol";
-import {BasedBoostedVault} from "src/core/accounting/BasedBoostedVault.sol";
+import {StableVault} from "src/core/accounting/BasedBoostedVault.sol";
 
-contract UpgradeBasedBoostedVault is Create3AddressBook, Upgrade {
+contract UpgradeStableVault is Create3AddressBook, Upgrade {
     using Strings for address;
 
-    address BASED_BOOSTED_VAULT_PROXY;
+    address STABLE_VAULT_PROXY;
     address DEPLOYER = 0xBB700dA5CCC9Ec5605780Fc40695f1206B090303;
     address constant PROXY_ADMIN_OWNER = 0xBB700dA5CCC9Ec5605780Fc40695f1206B090303;
 
@@ -21,7 +21,7 @@ contract UpgradeBasedBoostedVault is Create3AddressBook, Upgrade {
     uint256 constant DEFAULT_MAX_ACTIVE_SUB_VAULTS = 201;
 
     function run() public {
-        BASED_BOOSTED_VAULT_PROXY = getBasedBoostedVaultAddress(DEPLOYER);
+        STABLE_VAULT_PROXY = getStableVaultAddress(DEPLOYER);
 
         vm.startBroadcast(DEPLOYER);
         _upgrade();
@@ -30,7 +30,7 @@ contract UpgradeBasedBoostedVault is Create3AddressBook, Upgrade {
 
     function _upgrade() internal {
         address implementation = address(
-            new BasedBoostedVault({
+            new StableVault({
                 maxValidPerSecondRate: DEFAULT_MAX_PER_SECOND_RATE,
                 assetRegistry: getAssetRegistryAddress(DEPLOYER),
                 iouTokenManager: getIouTokenManagerAddress(DEPLOYER),
@@ -41,10 +41,9 @@ contract UpgradeBasedBoostedVault is Create3AddressBook, Upgrade {
                 maxActiveSubVaults: DEFAULT_MAX_ACTIVE_SUB_VAULTS
             })
         );
-        _logDeployment("BasedBoostedVault::Implementation", "", implementation);
-        address proxyAdmin = _getAdminFromSlot(BASED_BOOSTED_VAULT_PROXY);
-        ProxyAdmin(proxyAdmin)
-            .upgradeAndCall(ITransparentUpgradeableProxy(BASED_BOOSTED_VAULT_PROXY), implementation, "");
+        _logDeployment("StableVault::Implementation", "", implementation);
+        address proxyAdmin = _getAdminFromSlot(STABLE_VAULT_PROXY);
+        ProxyAdmin(proxyAdmin).upgradeAndCall(ITransparentUpgradeableProxy(STABLE_VAULT_PROXY), implementation, "");
     }
 
     function _logDeployment(string memory name, string memory saltSeed, address addr) internal {

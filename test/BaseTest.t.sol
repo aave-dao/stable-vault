@@ -11,15 +11,15 @@ import {AccessManager} from "openzeppelin-contracts/contracts/access/manager/Acc
 import {CcipAdapter} from "src/bridging/ccip/CcipAdapter.sol";
 import {Allocator} from "src/core/Allocator.sol";
 import {AccountingChainGateway} from "src/core/accounting/AccountingChainGateway.sol";
-import {BasedBoostedVault} from "src/core/accounting/BasedBoostedVault.sol";
-import {BasedBoostedVault} from "src/core/accounting/BasedBoostedVault.sol";
+import {StableVault} from "src/core/accounting/BasedBoostedVault.sol";
+import {StableVault} from "src/core/accounting/BasedBoostedVault.sol";
 import {FundsHandler} from "src/core/accounting/FundsHandler.sol";
 import {EarningChainGateway} from "src/core/earning/EarningChainGateway.sol";
 import {IouToken} from "src/core/ious/IouToken.sol";
 import {IouTokenManager} from "src/core/ious/IouTokenManager.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
-import {IBasedBoostedVault} from "src/interfaces/IBasedBoostedVault.sol";
+import {IStableVault} from "src/interfaces/IBasedBoostedVault.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
@@ -86,8 +86,8 @@ contract BaseTest is TestWithHelpers {
     MockErc20 GHO = new MockErc20("Test GHO", "tGHO", 18);
     MockErc20 USDC = new MockErc20("Test USDC", "tUSDC", 6);
 
-    // Accounting Chain: BBV, FH, Swapper, Allocator, Accounting Chain Gateway, CCIP Adapter, CCIP Router, Strategy
-    // Vault/4626
+    // Accounting Chain: StableVault, FH, Swapper, Allocator, Accounting Chain Gateway, CCIP Adapter, CCIP Router,
+    // Strategy Vault/4626
     address accessManager_accountingChainAddress;
     address vault_accountingChainAddress;
     address iouToken_accountingChainAddress;
@@ -102,7 +102,7 @@ contract BaseTest is TestWithHelpers {
     address ghoStrategyVault_accountingChainAddress;
     address usdcStrategyVault_accountingChainAddress;
     AccessManager accessManager_accountingChain;
-    BasedBoostedVault vault;
+    StableVault vault;
     IouToken iouToken_accountingChain;
     IouTokenManager iouTokenManager_accountingChain;
     AssetRegistry assetRegistry_accountingChain;
@@ -175,7 +175,7 @@ contract BaseTest is TestWithHelpers {
         usdcStrategyVault_earningChain.deposit(1000 * (10 ** 6), address(this));
     }
 
-    function _deployBasedBoostedVault(
+    function _deployStableVault(
         address accessManager,
         uint256 maxPerSecondRate,
         uint256 defaultSubVaultPerSecondRate,
@@ -187,9 +187,9 @@ contract BaseTest is TestWithHelpers {
         address priceOracle,
         uint256 maxActiveSubVaults,
         address treasuryAddress
-    ) internal virtual returns (BasedBoostedVault) {
+    ) internal virtual returns (StableVault) {
         address vaultImpl = address(
-            new BasedBoostedVault(
+            new StableVault(
                 maxPerSecondRate,
                 assetRegistry,
                 iouTokenManager,
@@ -201,19 +201,17 @@ contract BaseTest is TestWithHelpers {
             )
         );
 
-        address bbv = address(
+        address stableVault = address(
             new TransparentUpgradeableProxy(
                 vaultImpl,
                 address(this),
-                abi.encodeCall(
-                    BasedBoostedVault.initialize, (accessManager, treasuryAddress, defaultSubVaultPerSecondRate)
-                )
+                abi.encodeCall(StableVault.initialize, (accessManager, treasuryAddress, defaultSubVaultPerSecondRate))
             )
         );
 
-        vm.label(bbv, "BBV");
+        vm.label(stableVault, "StableVault");
 
-        return BasedBoostedVault(bbv);
+        return StableVault(stableVault);
     }
 
     function _deployContracts() internal {
@@ -237,8 +235,8 @@ contract BaseTest is TestWithHelpers {
 
         Logger.log("\nAccounting Chain:");
         // ---- Accounting Chain ----
-        // Accounting Chain: BBV, FH, Swapper, Allocator, Accounting Chain Gateway, CCIP Adapter, CCIP Router, Strategy,
-        // Asset Registry Vault/4626
+        // Accounting Chain: StableVault, FH, Swapper, Allocator, Accounting Chain Gateway, CCIP Adapter, CCIP Router,
+        // Strategy, Asset Registry Vault/4626
 
         // Deployment order:
         // 1. Access Manager
@@ -249,8 +247,8 @@ contract BaseTest is TestWithHelpers {
         // 6. IOU Token
         // 7. IOU Token Manager Impl
         // 8. IOU Token Manager Proxy
-        // 9. Based Boosted Vault Impl
-        // 10. Based Boosted Vault Proxy
+        // 9. Stable Vault Impl
+        // 10. Stable Vault Proxy
         // 11. Allocator Impl
         // 12. Allocator Proxy
         // 13. Funds Handler Impl
@@ -293,7 +291,7 @@ contract BaseTest is TestWithHelpers {
             "\tIOU Token Manager (Accounting Chain) Predicted Address: %s", iouTokenManager_accountingChainAddress
         );
 
-        deployerNonce_accountingChain++; // Incrementing for BBV implementation
+        deployerNonce_accountingChain++; // Incrementing for StableVault implementation
         vault_accountingChainAddress = vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
         Logger.log("\tVault (Accounting Chain) Predicted Address: %s", vault_accountingChainAddress);
 
@@ -399,9 +397,9 @@ contract BaseTest is TestWithHelpers {
             "IOU Token Manager (Accounting Chain) address mismatch"
         );
 
-        // 6. Based Boosted Vault
-        // Impl and proxy deployed in the internal `_deployBasedBoostedVault` function
-        vault = _deployBasedBoostedVault(
+        // 6. Stable Vault
+        // Impl and proxy deployed in the internal `_deployStableVault` function
+        vault = _deployStableVault(
             accessManager_accountingChainAddress,
             DEFAULT_MAX_PER_SECOND_RATE,
             initialBasePerSecondRate,
@@ -936,7 +934,7 @@ contract BaseTest is TestWithHelpers {
         // ----- Set up Profit Taker -----
         _setUpRole(accessManager, PROFIT_TAKER_ROLE, everyRoleAccount, 0);
         accessManager.setTargetFunctionRole(
-            address(vault), _toSelectorArray(IBasedBoostedVault.claimSurplusInterest.selector), PROFIT_TAKER_ROLE
+            address(vault), _toSelectorArray(IStableVault.claimSurplusInterest.selector), PROFIT_TAKER_ROLE
         );
 
         // ----- Set up Operator -----
@@ -956,13 +954,13 @@ contract BaseTest is TestWithHelpers {
             OPERATOR_ROLE
         );
 
-        // For BasedBoostedVault
+        // For StableVault
         accessManager.setTargetFunctionRole(
             address(vault),
             _toSelectorArray(
-                IBasedBoostedVault.setUserRate.selector,
-                IBasedBoostedVault.setSubVaultRate.selector,
-                IBasedBoostedVault.setDefaultSubVault.selector
+                IStableVault.setUserRate.selector,
+                IStableVault.setSubVaultRate.selector,
+                IStableVault.setDefaultSubVault.selector
             ),
             OPERATOR_ROLE
         );

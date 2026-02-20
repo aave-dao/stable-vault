@@ -8,7 +8,7 @@ import {IERC4626} from "forge-std/interfaces/IERC4626.sol";
 import {Logger} from "test/helpers/Logger.sol";
 
 import {IAllocator} from "src/interfaces/IAllocator.sol";
-import {IBasedBoostedVault} from "src/interfaces/IBasedBoostedVault.sol";
+import {IStableVault} from "src/interfaces/IBasedBoostedVault.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {Swapper} from "src/periphery/Swapper.sol";
@@ -37,7 +37,7 @@ contract EndToEndTest is BaseTest {
         // Inflate the funds in the strategy vault.
         USDC.mint(address(usdcStrategyVault_accountingChain), 1e3);
 
-        // User makes a deposit of 2 wei into BBV.
+        // User makes a deposit of 2 wei into Stable Vault.
         vm.startPrank(user);
         USDC.approve(address(vault), 2);
         vault.deposit(user, address(USDC), 2);
@@ -47,8 +47,8 @@ contract EndToEndTest is BaseTest {
         Logger.log("userBalanceInRay %e", userBalanceInRay);
         Logger.log("vaultAssetsInRay %e", vaultAssetsInRay);
         assert(userBalanceInRay > vaultAssetsInRay);
-        // The user's balance in BBV is 1 unit of USDC greater than the actual assets in the system (this is treated as
-        // interest the system owes to the user).
+        // The user's balance in Stable Vault is 1 unit of USDC greater than the actual assets in the system (this is
+        // treated as interest the system owes to the user).
         assertEq(userBalanceInRay - vaultAssetsInRay, 1e21);
         uint256 originalDepositRay = vault.getGlobalOriginalDepositAmount();
         // Check that the original deposit is incremented by the amount of the net deposit.
@@ -122,8 +122,8 @@ contract EndToEndTest is BaseTest {
         {
             uint256 userPerSecondRate = 1_000000001547125957863212449; // 5% APY
             vm.prank(everyRoleAccount);
-            IBasedBoostedVault.UserRateData[] memory userRateData = new IBasedBoostedVault.UserRateData[](1);
-            userRateData[0] = IBasedBoostedVault.UserRateData(user, userPerSecondRate);
+            IStableVault.UserRateData[] memory userRateData = new IStableVault.UserRateData[](1);
+            userRateData[0] = IStableVault.UserRateData(user, userPerSecondRate);
             vault.setUserRate(userRateData);
 
             // - check that the % rate is set correctly

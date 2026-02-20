@@ -7,11 +7,11 @@ import {IERC20} from "forge-std/interfaces/IERC20.sol";
 
 import {Logger} from "test/helpers/Logger.sol";
 
-import {BasedBoostedVault} from "src/core/accounting/BasedBoostedVault.sol";
-import {BasedBoostedVault} from "src/core/accounting/BasedBoostedVault.sol";
+import {StableVault} from "src/core/accounting/BasedBoostedVault.sol";
+import {StableVault} from "src/core/accounting/BasedBoostedVault.sol";
 import {EarningChainGateway} from "src/core/earning/EarningChainGateway.sol";
 import {IouTokenManager} from "src/core/ious/IouTokenManager.sol";
-import {IBasedBoostedVault} from "src/interfaces/IBasedBoostedVault.sol";
+import {IStableVault} from "src/interfaces/IBasedBoostedVault.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {Errors} from "src/types/Errors.sol";
@@ -21,7 +21,8 @@ import {MockErc20} from "test/mocks/MockErc20.sol";
 
 /// @title EarningChainWithdrawalTokenFeeE2ETest
 /// @notice Test the withdrawal of funds from the Earning Chain to the Accounting Chain.
-/// @dev Deposit made to BBV on Accounting Chain, IOU tokens bridged to Earning Chain, and then used to withdraw assets.
+/// @dev Deposit made to Stable Vault on Accounting Chain, IOU tokens bridged to Earning Chain, and then used to
+/// withdraw assets.
 contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
     using AssetLib for uint256;
 
@@ -35,7 +36,7 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
         super.setUp();
     }
 
-    function _deployBasedBoostedVault(
+    function _deployStableVault(
         address adminParam,
         uint256,
         /* maxPerSecondRate */
@@ -48,10 +49,10 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
         address priceOracle,
         uint256 maxActiveSubVaults,
         address treasuryAddress
-    ) internal virtual override returns (BasedBoostedVault) {
+    ) internal virtual override returns (StableVault) {
         // Deploy a vault without restriction in the valid per-second rate
         address vaultImpl = address(
-            new BasedBoostedVault(
+            new StableVault(
                 type(uint256).max,
                 assetRegistry,
                 iouToken,
@@ -62,14 +63,12 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
                 maxActiveSubVaults
             )
         );
-        return BasedBoostedVault(
+        return StableVault(
             address(
                 new TransparentUpgradeableProxy(
                     address(vaultImpl),
                     proxyAdmin,
-                    abi.encodeCall(
-                        BasedBoostedVault.initialize, (adminParam, treasuryAddress, defaultSubVaultPerSecondRate)
-                    )
+                    abi.encodeCall(StableVault.initialize, (adminParam, treasuryAddress, defaultSubVaultPerSecondRate))
                 )
             )
         );
@@ -80,12 +79,12 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
 
         uint256 userInitialDeposit = 500 * (10 ** 6);
 
-        // 0. Set the default rate on BBV to 5% APY
+        // 0. Set the default rate on Stable Vault to 5% APY
         vm.prank(everyRoleAccount);
         vault.setDefaultSubVault(1_000000001547125957863212449);
 
         // 1. User1 deposits 500 USDC to Vault on Accounting Chain
-        _mintAndDepositUsdcToBBV(user1, userInitialDeposit);
+        _mintAndDepositUsdcToStableVault(user1, userInitialDeposit);
 
         // Check the deposit was made into the default earning strategy for USDC
         address defaultUsdcVault_AccountingChain = allocator_accountingChain.getDefaultStrategy(address(USDC));
@@ -146,7 +145,7 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
         vm.warp(block.timestamp + 183 days);
         Logger.log("\nHalf a year has gone by so fast...");
 
-        // Check the user's balance in the BBV on the Accounting Chain
+        // Check the user's balance in the Stable Vault on the Accounting Chain
         assertGt(
             vault.getUserBalance(user1),
             userInitialDeposit.assetDecimalsToRay(address(USDC)),
@@ -158,7 +157,7 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
         // request.
         vm.expectRevert(
             abi.encodeWithSelector(
-                IBasedBoostedVault.InsufficientAssets.selector,
+                IStableVault.InsufficientAssets.selector,
                 user1,
                 userBalanceAfterHalfYearInRay,
                 userInitialDeposit.assetDecimalsToRay(address(USDC))
@@ -205,7 +204,7 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
         vault.requestWithdrawal(user1, iouAmountRequestedRay);
 
         // 7. A second depositor deposits and tries to withdraw (check the iousInCirculationRay math)
-        _mintAndDepositUsdcToBBV(user2, userInitialDeposit);
+        _mintAndDepositUsdcToStableVault(user2, userInitialDeposit);
         // Set the rate to be 99%
         vm.prank(everyRoleAccount);
         vault.setSubVaultRate(2, 1_000000021820606489223699321);
@@ -217,7 +216,7 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
         uint256 user2BalanceAfterOneYearInRay = vault.getUserBalance(user2);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IBasedBoostedVault.InsufficientAssets.selector,
+                IStableVault.InsufficientAssets.selector,
                 user2,
                 user2BalanceAfterOneYearInRay,
                 userInitialDeposit.assetDecimalsToRay(address(USDC))
@@ -361,7 +360,7 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
         }
     }
 
-    function _mintAndDepositUsdcToBBV(address user, uint256 amount) internal {
+    function _mintAndDepositUsdcToStableVault(address user, uint256 amount) internal {
         USDC.mint(user, amount);
         vm.startPrank(user);
         USDC.approve(address(vault), amount);

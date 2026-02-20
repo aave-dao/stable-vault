@@ -13,7 +13,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
-import {IBasedBoostedVault} from "src/interfaces/IBasedBoostedVault.sol";
+import {IStableVault} from "src/interfaces/IBasedBoostedVault.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
@@ -28,20 +28,20 @@ import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
-/// @title BasedBoostedVault.
+/// @title StableVault.
 /// @author Aave Labs
 /// @notice Semi-fixed rate vault.
 /// @dev This contract supports batching of calls using the Multicall contract.
 /// @dev Assets balances are tracked in RAY internally; conversions from and to specific asset denomination is made on
 /// deposit and on withdrawal execution.
-contract BasedBoostedVault is
+contract StableVault is
     AccessManagedUpgradeable,
     RescuableNative,
     RescuableToken,
     TransferHelperClient,
     Multicall,
     ReentrancyGuardTransientUpgradeable,
-    IBasedBoostedVault
+    IStableVault
 {
     using MathLib for uint256;
     using AssetLib for uint256;
@@ -84,8 +84,8 @@ contract BasedBoostedVault is
 
     uint256 internal immutable MAX_ACTIVE_SUB_VAULTS;
 
-    /// @custom:storage-location erc7201:aave.storage.BasedBoostedVault
-    struct BasedBoostedVaultStorage {
+    /// @custom:storage-location erc7201:aave.storage.StableVault
+    struct StableVaultStorage {
         /// @dev Keeps track of the sum of all users' original deposits.
         /// @dev Does not overlap with circulating IOUs because original deposits are decremented when new issue IOUs
         /// are minted.
@@ -116,17 +116,17 @@ contract BasedBoostedVault is
         address treasury;
     }
 
-    // keccak256(abi.encode(uint256(keccak256("aave.storage.BasedBoostedVault")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant STORAGE_SLOT_BASED_BOOSTED_VAULT =
-        0xb8df01cf10d37fdfab5674a951575d5924fe29a8ad03fbfb69e60d893a967b00;
+    // keccak256(abi.encode(uint256(keccak256("aave.storage.StableVault")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant STORAGE_SLOT_STABLE_VAULT =
+        0x68b01cacb7d6669149a4ad1250da89e05e32d392d0489a11336faf07d474fb00;
 
-    function $storage() private pure returns (BasedBoostedVaultStorage storage _storage) {
+    function $storage() private pure returns (StableVaultStorage storage _storage) {
         assembly {
-            _storage.slot := STORAGE_SLOT_BASED_BOOSTED_VAULT
+            _storage.slot := STORAGE_SLOT_STABLE_VAULT
         }
     }
 
-    function $BasedBoostedVault() internal pure returns (BasedBoostedVaultStorage storage) {
+    function $StableVault() internal pure returns (StableVaultStorage storage) {
         return $storage();
     }
 
@@ -174,10 +174,10 @@ contract BasedBoostedVault is
         virtual
         initializer
     {
-        __BasedBoostedVault_init(accessManager, treasury, defaultSubVaultPerSecondRate);
+        __StableVault_init(accessManager, treasury, defaultSubVaultPerSecondRate);
     }
 
-    function __BasedBoostedVault_init(address accessManager, address treasury, uint256 defaultSubVaultPerSecondRate)
+    function __StableVault_init(address accessManager, address treasury, uint256 defaultSubVaultPerSecondRate)
         internal
         virtual
         onlyInitializing
@@ -188,7 +188,7 @@ contract BasedBoostedVault is
         _setDefaultSubVault(_getOrCreateSubVaultWithRate(defaultSubVaultPerSecondRate), defaultSubVaultPerSecondRate);
     }
 
-    /// @inheritdoc IBasedBoostedVault
+    /// @inheritdoc IStableVault
     function deposit(address user, address asset, uint256 amount)
         external
         virtual
@@ -236,7 +236,7 @@ contract BasedBoostedVault is
         emit Transfer(address(0), user, amount.assetDecimalsToRay(asset));
     }
 
-    /// @notice Transfers BBV balance (denominated in RAY) between users.
+    /// @notice Transfers Stable Vault balance (denominated in RAY) between users.
     /// @dev This is accounting-only (no IOUs, no assets, no WithdrawalPolicy).
     /// @dev For full balance transfers, use transferAll() instead.
     /// @dev Reverts if the remaining sender balance after transfer would be below dust threshold.
@@ -324,14 +324,14 @@ contract BasedBoostedVault is
         return true;
     }
 
-    /// @inheritdoc IBasedBoostedVault
+    /// @inheritdoc IStableVault
     function setUserRate(UserRateData[] calldata userRateData) external override restricted {
         for (uint256 i = 0; i < userRateData.length; i++) {
             _setUserRate(userRateData[i].user, userRateData[i].newPerSecondRate);
         }
     }
 
-    /// @inheritdoc IBasedBoostedVault
+    /// @inheritdoc IStableVault
     function setSubVaultRate(uint256 subVaultId, uint256 newPerSecondRate) external override restricted {
         _validateRate(newPerSecondRate);
         require(!_existsSubVaultWithRate(newPerSecondRate), SubVaultAlreadyExists());
@@ -347,7 +347,7 @@ contract BasedBoostedVault is
         }
     }
 
-    /// @inheritdoc IBasedBoostedVault
+    /// @inheritdoc IStableVault
     function requestWithdrawal(address user, uint256 requestedAmountInRay)
         external
         virtual
@@ -411,7 +411,7 @@ contract BasedBoostedVault is
         return actualAmountInRay;
     }
 
-    /// @inheritdoc IBasedBoostedVault
+    /// @inheritdoc IStableVault
     function executeWithdrawal(
         address user,
         address assetOut,
@@ -439,12 +439,12 @@ contract BasedBoostedVault is
         emit WithdrawalExecuted(user, assetOut, assetAmount);
     }
 
-    /// @inheritdoc IBasedBoostedVault
+    /// @inheritdoc IStableVault
     function setDefaultSubVault(uint256 perSecondRate) external override restricted {
         _setDefaultSubVault(_getOrCreateSubVaultWithRate(perSecondRate), perSecondRate);
     }
 
-    /// @inheritdoc IBasedBoostedVault
+    /// @inheritdoc IStableVault
     function claimSurplusInterest(address[] calldata assets, uint256[] calldata amounts)
         external
         override
@@ -467,19 +467,19 @@ contract BasedBoostedVault is
         emit SurplusInterestClaimed(assets, amounts);
     }
 
-    /// @inheritdoc IBasedBoostedVault
+    /// @inheritdoc IStableVault
     function setTreasury(address treasury) external override restricted {
         _setTreasury(treasury);
     }
 
     ////////////////////////////////////////////////// GETTERS /////////////////////////////////////////////////////
 
-    /// @inheritdoc IBasedBoostedVault
+    /// @inheritdoc IStableVault
     function getGlobalOriginalDepositAmount() external view override returns (uint256) {
         return $storage().globalOriginalDepositsRay;
     }
 
-    /// @inheritdoc IBasedBoostedVault
+    /// @inheritdoc IStableVault
     function getActiveSubVaults() external view override returns (SubVaultData[] memory) {
         SubVaultData[] memory activeSubVaults = new SubVaultData[]($storage().activeSubVaultsIds.length);
         for (uint256 i = 0; i < $storage().activeSubVaultsIds.length; i++) {
@@ -490,61 +490,61 @@ contract BasedBoostedVault is
         return activeSubVaults;
     }
 
-    /// @inheritdoc IBasedBoostedVault
+    /// @inheritdoc IStableVault
     function getVaultObligations() external view override returns (uint256) {
         return _getVaultObligations();
     }
 
-    /// @inheritdoc IBasedBoostedVault
+    /// @inheritdoc IStableVault
     function totalSupply() external view override returns (uint256) {
         return _getActiveSubVaultsObligations();
     }
 
-    /// @inheritdoc IBasedBoostedVault
+    /// @inheritdoc IStableVault
     function getAggregatedBalance() external view override returns (uint256) {
         return _getVaultAggregatedBalance();
     }
 
-    /// @inheritdoc IBasedBoostedVault
+    /// @inheritdoc IStableVault
     function balanceOf(address account) external view override returns (uint256) {
         return _getUserBalance(account);
     }
 
-    /// @inheritdoc IBasedBoostedVault
+    /// @inheritdoc IStableVault
     function getUserBalance(address user) external view override returns (uint256) {
         return _getUserBalance(user);
     }
 
-    /// @inheritdoc IBasedBoostedVault
+    /// @inheritdoc IStableVault
     function getUserSubVault(address user) external view override returns (SubVaultData memory) {
         uint256 subVaultId = $storage().positions[user].subVaultId;
         uint256 subVaultRate = $storage().subVaultById[subVaultId].perSecondRate;
         return SubVaultData({perSecondRate: subVaultRate, id: subVaultId});
     }
 
-    /// @inheritdoc IBasedBoostedVault
+    /// @inheritdoc IStableVault
     function getDefaultSubVault() external view override returns (SubVaultData memory) {
         uint256 subVaultId = $storage().defaultSubVaultId;
         uint256 subVaultRate = $storage().subVaultById[subVaultId].perSecondRate;
         return SubVaultData({perSecondRate: subVaultRate, id: subVaultId});
     }
 
-    /// @inheritdoc IBasedBoostedVault
+    /// @inheritdoc IStableVault
     function getSubVaultRateById(uint256 subVaultId) external view override returns (uint256) {
         return $storage().subVaultById[subVaultId].perSecondRate;
     }
 
-    /// @inheritdoc IBasedBoostedVault
+    /// @inheritdoc IStableVault
     function getSubVaultIdByRate(uint256 perSecondRate) external view override returns (uint256) {
         return $storage().subVaultIdByRate[perSecondRate];
     }
 
-    /// @inheritdoc IBasedBoostedVault
+    /// @inheritdoc IStableVault
     function getMaxValidPerSecondRate() external view override returns (uint256) {
         return MAX_VALID_PER_SECOND_RATE;
     }
 
-    /// @inheritdoc IBasedBoostedVault
+    /// @inheritdoc IStableVault
     function getTreasury() external view override returns (address) {
         return $storage().treasury;
     }

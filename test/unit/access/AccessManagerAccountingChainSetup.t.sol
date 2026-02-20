@@ -9,7 +9,7 @@ import {Create3AddressLib} from "script/libraries/Create3AddressLib.sol";
 import {RolesLib} from "script/libraries/RolesLib.sol";
 
 import {IAllocator} from "src/interfaces/IAllocator.sol";
-import {IBasedBoostedVault} from "src/interfaces/IBasedBoostedVault.sol";
+import {IStableVault} from "src/interfaces/IBasedBoostedVault.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
@@ -74,8 +74,8 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
         return address(uint160(uint256(keccak256("test.aTokenVaultRewardClaimer"))));
     }
 
-    function _getProfile__BbvManager() internal pure virtual override returns (address) {
-        return address(uint160(uint256(keccak256("test.bbvManager"))));
+    function _getProfile__StableVaultManager() internal pure virtual override returns (address) {
+        return address(uint160(uint256(keccak256("test.stableVaultManager"))));
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -144,7 +144,7 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
         for (uint256 i = 0; i < baseProfiles.length; i++) {
             profiles[i] = baseProfiles[i];
         }
-        profiles[baseProfiles.length] = _getProfile__BbvManager();
+        profiles[baseProfiles.length] = _getProfile__StableVaultManager();
         return profiles;
     }
 
@@ -152,53 +152,63 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
     // CHAIN-SPECIFIC TESTS
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    function test_canCall_bbvManager() public view {
-        address bbvManager = _getProfile__BbvManager();
-        address bbv = getBasedBoostedVaultAddress(_getDeployer());
+    function test_canCall_stableVaultManager() public view {
+        address stableVaultManager = _getProfile__StableVaultManager();
+        address stableVault = getStableVaultAddress(_getDeployer());
 
         // Operational (NO_DELAY): immediate
-        _assertCanCall(bbvManager, bbv, IBasedBoostedVault.setUserRate.selector, true, 0);
-        _assertCanCall(bbvManager, bbv, IBasedBoostedVault.setSubVaultRate.selector, true, 0);
-        _assertCanCall(bbvManager, bbv, IBasedBoostedVault.setDefaultSubVault.selector, true, 0);
+        _assertCanCall(stableVaultManager, stableVault, IStableVault.setUserRate.selector, true, 0);
+        _assertCanCall(stableVaultManager, stableVault, IStableVault.setSubVaultRate.selector, true, 0);
+        _assertCanCall(stableVaultManager, stableVault, IStableVault.setDefaultSubVault.selector, true, 0);
         // Admin-tier (MED_DELAY): has role but delayed
-        _assertCanCall(bbvManager, bbv, IBasedBoostedVault.claimSurplusInterest.selector, false, RolesLib.MED_DELAY);
+        _assertCanCall(
+            stableVaultManager, stableVault, IStableVault.claimSurplusInterest.selector, false, RolesLib.MED_DELAY
+        );
         // Unauthorized
-        _assertCanCall(bbvManager, bbv, IBasedBoostedVault.setTreasury.selector, false, 0);
-        _assertCanCall(bbvManager, _allocator(), IAllocator.rebalance.selector, false, 0);
+        _assertCanCall(stableVaultManager, stableVault, IStableVault.setTreasury.selector, false, 0);
+        _assertCanCall(stableVaultManager, _allocator(), IAllocator.rebalance.selector, false, 0);
     }
 
-    function test_bbvManagerProfile_hasTheExpectedRoles() public view {
+    function test_stableVaultManagerProfile_hasTheExpectedRoles() public view {
         uint64[] memory expected = new uint64[](4);
         expected[0] = RolesLib.getRole__setUserRate().roleId;
         expected[1] = RolesLib.getRole__setSubVaultRate().roleId;
         expected[2] = RolesLib.getRole__claimSurplusInterest().roleId;
         expected[3] = RolesLib.getRole__setDefaultSubVault().roleId;
-        _assertProfileHasExactlyTheseRoles(_getProfile__BbvManager(), expected);
+        _assertProfileHasExactlyTheseRoles(_getProfile__StableVaultManager(), expected);
 
         // NO_DELAY roles
-        _assertProfileRoleDelay(_getProfile__BbvManager(), expected[0], RolesLib.NO_DELAY);
-        _assertProfileRoleDelay(_getProfile__BbvManager(), expected[1], RolesLib.NO_DELAY);
-        _assertProfileRoleDelay(_getProfile__BbvManager(), expected[3], RolesLib.NO_DELAY);
+        _assertProfileRoleDelay(_getProfile__StableVaultManager(), expected[0], RolesLib.NO_DELAY);
+        _assertProfileRoleDelay(_getProfile__StableVaultManager(), expected[1], RolesLib.NO_DELAY);
+        _assertProfileRoleDelay(_getProfile__StableVaultManager(), expected[3], RolesLib.NO_DELAY);
         // MED_DELAY roles
-        _assertProfileRoleDelay(_getProfile__BbvManager(), expected[2], RolesLib.MED_DELAY);
+        _assertProfileRoleDelay(_getProfile__StableVaultManager(), expected[2], RolesLib.MED_DELAY);
     }
 
-    function test_targetSetup_bbv() public view {
-        address bbv = getBasedBoostedVaultAddress(_getDeployer());
+    function test_targetSetup_stableVault() public view {
+        address stableVault = getStableVaultAddress(_getDeployer());
 
-        _assertTargetFunctionRole(bbv, IBasedBoostedVault.setUserRate.selector, RolesLib.getRole__setUserRate().roleId);
         _assertTargetFunctionRole(
-            bbv, IBasedBoostedVault.setSubVaultRate.selector, RolesLib.getRole__setSubVaultRate().roleId
+            stableVault, IStableVault.setUserRate.selector, RolesLib.getRole__setUserRate().roleId
         );
         _assertTargetFunctionRole(
-            bbv, IBasedBoostedVault.setDefaultSubVault.selector, RolesLib.getRole__setDefaultSubVault().roleId
+            stableVault, IStableVault.setSubVaultRate.selector, RolesLib.getRole__setSubVaultRate().roleId
         );
         _assertTargetFunctionRole(
-            bbv, IBasedBoostedVault.claimSurplusInterest.selector, RolesLib.getRole__claimSurplusInterest().roleId
+            stableVault, IStableVault.setDefaultSubVault.selector, RolesLib.getRole__setDefaultSubVault().roleId
         );
-        _assertTargetFunctionRole(bbv, IBasedBoostedVault.setTreasury.selector, RolesLib.getRole__setTreasury().roleId);
-        _assertTargetFunctionRole(bbv, IRescuableNative.rescueNative.selector, RolesLib.getRole__rescueNative().roleId);
-        _assertTargetFunctionRole(bbv, IRescuableToken.rescueTokens.selector, RolesLib.getRole__rescueTokens().roleId);
+        _assertTargetFunctionRole(
+            stableVault, IStableVault.claimSurplusInterest.selector, RolesLib.getRole__claimSurplusInterest().roleId
+        );
+        _assertTargetFunctionRole(
+            stableVault, IStableVault.setTreasury.selector, RolesLib.getRole__setTreasury().roleId
+        );
+        _assertTargetFunctionRole(
+            stableVault, IRescuableNative.rescueNative.selector, RolesLib.getRole__rescueNative().roleId
+        );
+        _assertTargetFunctionRole(
+            stableVault, IRescuableToken.rescueTokens.selector, RolesLib.getRole__rescueTokens().roleId
+        );
     }
 
     function test_targetSetup_fundsHandler() public view {

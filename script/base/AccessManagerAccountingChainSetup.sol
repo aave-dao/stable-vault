@@ -14,7 +14,7 @@ abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
 
     //////////////// Operational Profiles ////////////////
     address constant WITHDRAWAL_POLICY_MANAGER_PROFILE = address(0);
-    address constant BBV_MANAGER_PROFILE = address(0);
+    address constant STABLE_VAULT_MANAGER_PROFILE = address(0);
     address constant REBALANCER_PROFILE = address(0);
     address constant DISABLER_PROFILE = address(0);
     address constant ATOKEN_VAULT_REWARD_CLAIMER_PROFILE = address(0);
@@ -47,22 +47,22 @@ abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
 
     //////////////// Special Accounting Chain Profiles
 
-    function _getProfile__BbvManager() internal pure virtual returns (address) {
-        return BBV_MANAGER_PROFILE;
+    function _getProfile__StableVaultManager() internal pure virtual returns (address) {
+        return STABLE_VAULT_MANAGER_PROFILE;
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
     function _setup_Profiles() internal virtual override {
         super._setup_Profiles();
-        _setupProfile__BbvManager();
+        _setupProfile__StableVaultManager();
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
     function _setup_Targets(address deployer) internal virtual override {
         super._setup_Targets(deployer);
-        _setupTarget__Bbv(deployer);
+        _setupTarget__StableVault(deployer);
         _setupTarget__FundsHandler(deployer);
         _setupTarget__AccountingChainGateway(deployer);
         _setupTarget__ChainBalanceOracle(deployer);
@@ -70,9 +70,9 @@ abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-    function _setupProfile__BbvManager() internal {
-        address bbvManager = _getProfile__BbvManager();
-        require(bbvManager != address(0), "BbvManager profile address not set");
+    function _setupProfile__StableVaultManager() internal {
+        address stableVaultManager = _getProfile__StableVaultManager();
+        require(stableVaultManager != address(0), "StableVaultManager profile address not set");
 
         RolesLib.Role[] memory roles = new RolesLib.Role[](4);
 
@@ -81,13 +81,13 @@ abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
         roles[2] = RolesLib.getRole__claimSurplusInterest();
         roles[3] = RolesLib.getRole__setDefaultSubVault();
 
-        _grantRolesToProfile(bbvManager, roles);
+        _grantRolesToProfile(stableVaultManager, roles);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-    function _setupTarget__Bbv(address deployer) internal {
-        address bbv = getBasedBoostedVaultAddress(deployer);
+    function _setupTarget__StableVault(address deployer) internal {
+        address stableVault = getStableVaultAddress(deployer);
 
         RolesLib.Role[] memory roles = new RolesLib.Role[](7);
 
@@ -99,7 +99,7 @@ abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
         roles[5] = RolesLib.getRole__rescueNative();
         roles[6] = RolesLib.getRole__rescueTokens();
 
-        _setTargetFunctionRoles(bbv, roles);
+        _setTargetFunctionRoles(stableVault, roles);
     }
 
     function _setupTarget__FundsHandler(address deployer) internal {

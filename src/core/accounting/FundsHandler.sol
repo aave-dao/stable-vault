@@ -55,8 +55,8 @@ contract FundsHandler is
         }
     }
 
-    modifier onlyBasedBoostedVault() {
-        require(msg.sender == VAULT, OnlyBasedBoostedVault());
+    modifier onlyStableVault() {
+        require(msg.sender == VAULT, OnlyStableVault());
         _;
     }
 
@@ -66,25 +66,25 @@ contract FundsHandler is
     }
 
     /// @dev Constructor.
-    /// @param basedBoostedVault The address of the BasedBoostedVault contract, which triggers deposits and withdrawals.
+    /// @param stableVault The address of the StableVault contract, which triggers deposits and withdrawals.
     /// @param gateway The address of the Gateway contract to use for cross-chain communication.
     /// @param allocator The address of the Allocator contract to use for immediate liquidity management.
     /// @param priceOracle The address of the PriceOracle contract to use for pricing assets.
     /// @param transferHelper The address of the TransferHelper contract to use for minimizing the number of transfers.
     /// @param chainBalanceOracle The address of the ChainBalanceOracle contract to use for cross-chain balance queries.
     constructor(
-        address basedBoostedVault,
+        address stableVault,
         address gateway,
         address allocator,
         address priceOracle,
         address transferHelper,
         address chainBalanceOracle
     ) TransferHelperClient(transferHelper) LocalBalanceAggregator(allocator, priceOracle) {
-        require(basedBoostedVault != address(0), Errors.ZeroAddress());
+        require(stableVault != address(0), Errors.ZeroAddress());
         require(gateway != address(0), Errors.ZeroAddress());
         require(chainBalanceOracle != address(0), Errors.ZeroAddress());
         _disableInitializers();
-        VAULT = basedBoostedVault;
+        VAULT = stableVault;
         GATEWAY = gateway;
         CHAIN_BALANCE_ORACLE = chainBalanceOracle;
     }
@@ -110,12 +110,12 @@ contract FundsHandler is
     }
 
     /// @inheritdoc IFundsHandler
-    function processDeposit(address asset, uint256 amount) external override onlyBasedBoostedVault returns (uint256) {
+    function processDeposit(address asset, uint256 amount) external override onlyStableVault returns (uint256) {
         return IAllocator(ALLOCATOR).deposit(asset, amount);
     }
 
     /// @inheritdoc IFundsHandler
-    function processWithdrawal(address asset, uint256 amount) external override onlyBasedBoostedVault {
+    function processWithdrawal(address asset, uint256 amount) external override onlyStableVault {
         _pullFundsFromImmediateLiquidity(asset, amount);
     }
 

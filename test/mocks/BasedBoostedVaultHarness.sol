@@ -2,9 +2,9 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.22;
 
-import {BasedBoostedVault} from "src/core/accounting/BasedBoostedVault.sol";
+import {StableVault} from "src/core/accounting/BasedBoostedVault.sol";
 
-contract BasedBoostedVaultHarness is BasedBoostedVault {
+contract StableVaultHarness is StableVault {
     constructor(
         uint256 maxValidPerSecondRate,
         address assetRegistry,
@@ -15,7 +15,7 @@ contract BasedBoostedVaultHarness is BasedBoostedVault {
         address priceOracle,
         uint256 maxActiveSubVaults
     )
-        BasedBoostedVault(
+        StableVault(
             maxValidPerSecondRate,
             assetRegistry,
             iouTokenManager,

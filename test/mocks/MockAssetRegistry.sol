@@ -44,11 +44,11 @@ contract MockAssetRegistry is IAssetRegistry {
         _trustedAssets.remove(asset);
     }
 
-    function mockToAllowAssetDepositsIntoBBV(address asset) external {
+    function mockToAllowAssetDepositsIntoStableVault(address asset) external {
         _isNotAllowedUserDeposit[asset] = false;
     }
 
-    function mockToDisallowAssetDepositsIntoBBV(address asset) external {
+    function mockToDisallowAssetDepositsIntoStableVault(address asset) external {
         _isNotAllowedUserDeposit[asset] = true;
     }
 
