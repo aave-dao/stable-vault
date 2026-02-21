@@ -28,16 +28,14 @@ import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {ChainBalanceOracle} from "src/oracles/balance/ChainBalanceOracle.sol";
-import {
-    ChainlinkChainBalanceOracleAdapter,
-    IBundleBaseAggregator
-} from "src/oracles/balance/ChainlinkChainBalanceOracleAdapter.sol";
+import {ChainlinkChainBalanceOracleAdapter} from "src/oracles/balance/ChainlinkChainBalanceOracleAdapter.sol";
 import {AggregatorV3Interface, ChainlinkPriceOracleAdapter} from "src/oracles/price/ChainlinkPriceOracleAdapter.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {AssetRegistry} from "src/periphery/AssetRegistry.sol";
 import {Swapper} from "src/periphery/Swapper.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
+import {MockBundleFeed} from "test/mocks/MockBundleFeed.sol";
 
 contract AccountingChainDeployment is
     Create3Deployment,
@@ -94,8 +92,9 @@ contract AccountingChainDeployment is
     uint256 constant CHAINLINK_PRICE_ORACLE_HEARTBEAT = 24 hours; // TODO: Revisit heartbeat
 
     uint256 constant CHAINLINK_CHAIN_BALANCE_ORACLE_HEARTBEAT = 24 hours; // TODO: Revisit heartbeat
-    address constant CHAINLINK_CHAIN_BALANCE_BUNDLE_AGGREGATOR_PROXY = address(0); // TODO: Set Chainlink bundle
-    // aggregator proxy address
+
+    // TODO: VNet only – replace with the real Chainlink Bundle Aggregator Proxy address for prod.
+    address internal _chainlinkBundleAggregatorProxy;
 
     // Set to Arbitrum CCIP Router address
     address constant CCIP_ROUTER_ADDRESS = address(0x141fa059441E0ca23ce184B6A78bafD2A517DdE8);
@@ -122,11 +121,12 @@ contract AccountingChainDeployment is
         require(CHAINLINK_USDT_USD_DATA_FEED != address(0), "Chainlink USDT/USD data feed not set");
         AggregatorV3Interface(CHAINLINK_USDT_USD_DATA_FEED).latestRoundData();
 
-        // Validate Chainlink bundle aggregator proxy
-        require(
-            CHAINLINK_CHAIN_BALANCE_BUNDLE_AGGREGATOR_PROXY != address(0), "Chainlink bundle aggregator proxy not set"
-        );
-        IBundleBaseAggregator(CHAINLINK_CHAIN_BALANCE_BUNDLE_AGGREGATOR_PROXY).latestBundle();
+        // TODO: VNet only – MockBundleFeed is deployed instead. Re-enable validation for prod with
+        // the real Chainlink Bundle Aggregator Proxy address.
+        // require(
+        //     CHAINLINK_CHAIN_BALANCE_BUNDLE_AGGREGATOR_PROXY != address(0), "Chainlink bundle aggregator proxy not
+        // set" );
+        // IBundleBaseAggregator(CHAINLINK_CHAIN_BALANCE_BUNDLE_AGGREGATOR_PROXY).latestBundle();
 
         // Validate CCIP router
         require(
@@ -136,6 +136,7 @@ contract AccountingChainDeployment is
     }
 
     function _deployContracts() internal {
+        _deployMockBundleFeed(); // TODO: VNet only – remove for prod and use real Chainlink address.
         _deployTransferHelper();
         _deployAccessManager();
         _deployAssetRegistry();
@@ -499,6 +500,12 @@ contract AccountingChainDeployment is
         return chainBalanceOracle;
     }
 
+    // TODO: VNet only – remove for prod and use the real Chainlink Bundle Aggregator Proxy address.
+    function _deployMockBundleFeed() internal {
+        _chainlinkBundleAggregatorProxy = address(new MockBundleFeed());
+        _logDeployment("MockBundleFeed", "", _chainlinkBundleAggregatorProxy);
+    }
+
     function _setupPriceOracleAdapters() internal {
         PriceOracle priceOracle = PriceOracle(getPriceOracleAddress(_deployer()));
 
@@ -525,7 +532,8 @@ contract AccountingChainDeployment is
         address adapter = address(
             new ChainlinkChainBalanceOracleAdapter(
                 EARNING_CHAIN_ID,
-                CHAINLINK_CHAIN_BALANCE_BUNDLE_AGGREGATOR_PROXY,
+                _chainlinkBundleAggregatorProxy, // TODO: VNet only – use
+                // CHAINLINK_CHAIN_BALANCE_BUNDLE_AGGREGATOR_PROXY for prod
                 CHAINLINK_CHAIN_BALANCE_ORACLE_HEARTBEAT
             )
         );
