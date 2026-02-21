@@ -88,11 +88,11 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     }
 
     function _getProfile__Rebalancer() internal view virtual returns (address) {
-        return Create3AddressLib.computeCreate3Address(REBALANCER_MULTICALL_SALT_SEED, DEPLOYER);
+        return Create3AddressLib.computeCreate3Address(REBALANCER_MULTICALL_SALT_SEED, _deployer());
     }
 
     function _getProfile__Disabler() internal view virtual returns (address) {
-        return Create3AddressLib.computeCreate3Address(DISABLER_MULTICALL_SALT_SEED, DEPLOYER);
+        return Create3AddressLib.computeCreate3Address(DISABLER_MULTICALL_SALT_SEED, _deployer());
     }
 
     function _getProfile__ATokenVaultRewardClaimer() internal view virtual returns (address) {
