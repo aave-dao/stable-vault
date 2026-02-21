@@ -2,6 +2,8 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.20;
 
+import {EarningChainDeployment} from "script/EarningChainDeployment.s.sol";
+import {AccessManagerBaseSetup} from "script/base/AccessManagerBaseSetup.sol";
 import {RolesLib} from "script/libraries/RolesLib.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 
@@ -21,8 +23,8 @@ contract AccessManagerEarningChainSetupForkTest is AccessManagerEarningChainSetu
     // OVERRIDES — address getters point to setup script constants / Create3 computations
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    function _accessManager() internal view override returns (address) {
-        return getAccessManagerAddress(_getDeployer());
+    function _accessManager() internal view override(AccessManagerBaseSetup, EarningChainDeployment) returns (address) {
+        return getAccessManagerAddress(_deployer());
     }
 
     function _aTokenVaultAddresses()
@@ -31,7 +33,7 @@ contract AccessManagerEarningChainSetupForkTest is AccessManagerEarningChainSetu
         override(AccessManagerEarningChainSetupTest)
         returns (address[] memory)
     {
-        IAllocator allocator = IAllocator(getAllocatorAddress(_getDeployer()));
+        IAllocator allocator = IAllocator(getAllocatorAddress(_deployer()));
         address[] memory vaults = new address[](2);
         vaults[0] = allocator.getDefaultStrategy(USDC);
         vaults[1] = allocator.getDefaultStrategy(USDT);

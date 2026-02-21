@@ -2,9 +2,9 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.20;
 
-import {IAccessManager} from "openzeppelin-contracts/contracts/access/manager/IAccessManager.sol";
-
 import {EarningChainDeployment} from "script/EarningChainDeployment.s.sol";
+import {AccessManagerBaseSetup} from "script/base/AccessManagerBaseSetup.sol";
+import {AccessManagerEarningChainSetup} from "script/base/AccessManagerEarningChainSetup.sol";
 import {Create3AddressLib} from "script/libraries/Create3AddressLib.sol";
 import {RolesLib} from "script/libraries/RolesLib.sol";
 
@@ -18,24 +18,28 @@ import {AccessManagerSetupBaseTest} from "test/unit/access/AccessManagerSetupBas
 contract AccessManagerEarningChainSetupTest is AccessManagerSetupBaseTest, EarningChainDeployment {
     function setUp() public virtual {
         _deployCreateXTo(Create3AddressLib.CREATEX_ADDRESS);
-        vm.startPrank(_getDeployer());
+        vm.startPrank(_deployer());
         _deployContracts();
-        _setupAccessManager(_getDeployer());
+        _setupAccessManager(_deployer());
         vm.stopPrank();
         vm.warp(block.timestamp + RolesLib.CRITICAL_DELAY + 1);
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    // DEPLOYMENT SCRIPT OVERRIDES
+    // OVERRIDES
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    function _logDeployment(string memory, string memory, address) internal virtual override {}
+    function _logDeployment(string memory, string memory, address)
+        internal
+        virtual
+        override(AccessManagerBaseSetup, EarningChainDeployment)
+    {}
 
     function _aTokenVaultAddresses()
         internal
         view
         virtual
-        override(EarningChainDeployment, AccessManagerSetupBaseTest)
+        override(AccessManagerBaseSetup, EarningChainDeployment)
         returns (address[] memory)
     {
         address[] memory vaults = new address[](1);
@@ -43,60 +47,12 @@ contract AccessManagerEarningChainSetupTest is AccessManagerSetupBaseTest, Earni
         return vaults;
     }
 
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    // BASE TEST OVERRIDES — abstract getters
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-    function _getAccessManager() internal view virtual override returns (IAccessManager) {
-        return IAccessManager(_accessManager());
-    }
-
-    function _getDeployer() internal view virtual override returns (address) {
-        return _deployer();
-    }
-
-    function _mainAdmin() internal view virtual override returns (address) {
-        return _getProfile__MainAdmin();
-    }
-
-    function _secondaryAdmin() internal view virtual override returns (address) {
-        return _getProfile__SecondaryAdmin();
-    }
-
-    function _withdrawalPolicyManager() internal view virtual override returns (address) {
-        return _getProfile__WithdrawalPolicyManager();
-    }
-
-    function _rebalancer() internal view virtual override returns (address) {
-        return _getProfile__Rebalancer();
-    }
-
-    function _disabler() internal view virtual override returns (address) {
-        return _getProfile__Disabler();
-    }
-
-    function _aTokenVaultRewardClaimer() internal view virtual override returns (address) {
-        return _getProfile__ATokenVaultRewardClaimer();
-    }
-
-    function _ccipAdapter() internal view virtual override returns (address) {
-        return getCcipAdapterAddress(_getDeployer());
-    }
-
-    function _allocator() internal view virtual override returns (address) {
-        return getAllocatorAddress(_getDeployer());
-    }
-
-    function _withdrawalPolicyTarget() internal view virtual override returns (address) {
-        return getWithdrawalPolicyAddress(_getDeployer());
-    }
-
-    function _assetRegistry() internal view virtual override returns (address) {
-        return getAssetRegistryAddress(_getDeployer());
-    }
-
-    function _priceOracle() internal view virtual override returns (address) {
-        return getPriceOracleAddress(_getDeployer());
+    function _setup_Targets(address deployer)
+        internal
+        virtual
+        override(AccessManagerBaseSetup, AccessManagerEarningChainSetup)
+    {
+        super._setup_Targets(deployer);
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -104,7 +60,7 @@ contract AccessManagerEarningChainSetupTest is AccessManagerSetupBaseTest, Earni
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     function test_targetSetup_earningChainGateway() public view {
-        address gateway = getGatewayAddress(_getDeployer());
+        address gateway = getGatewayAddress(_deployer());
 
         _assertTargetFunctionRole(
             gateway, IChainGateway.addBridgeAdapter.selector, RolesLib.getRole__addBridgeAdapter().roleId
