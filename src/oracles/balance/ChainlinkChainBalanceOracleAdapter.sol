@@ -40,7 +40,17 @@ contract ChainlinkChainBalanceOracleAdapter is IChainBalanceOracleAdapter {
     }
 
     /// @inheritdoc IChainBalanceOracleAdapter
-    function getChainBalance(uint256 chainId) external view override returns (IChainBalanceOracle.ChainBalance memory) {
+    function getChainBalance(uint256 chainId)
+        external
+        view
+        virtual
+        override
+        returns (IChainBalanceOracle.ChainBalance memory)
+    {
+        return _getChainBalance(chainId);
+    }
+
+    function _getChainBalance(uint256 chainId) internal view returns (IChainBalanceOracle.ChainBalance memory) {
         require(chainId == EARNING_CHAIN_ID, InvalidChainId(chainId));
 
         // Check bundle is not stale.

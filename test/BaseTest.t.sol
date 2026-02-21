@@ -37,13 +37,14 @@ import {TransferHelper} from "src/periphery/TransferHelper.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 
 import {ChainBalanceOracle} from "src/oracles/balance/ChainBalanceOracle.sol";
-import {ChainlinkChainBalanceOracleAdapter} from "src/oracles/balance/ChainlinkChainBalanceOracleAdapter.sol";
+import {ChainlinkL2ChainBalanceOracleAdapter} from "src/oracles/balance/ChainlinkL2ChainBalanceOracleAdapter.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {_toSelectorArray} from "test/helpers/TypeHelpers.sol";
 import {EarningChainStateProviderHarness} from "test/mocks/EarningChainStateProviderHarness.sol";
 import {MockBundleFeed} from "test/mocks/MockBundleFeed.sol";
 import {MockCCIPRouter} from "test/mocks/MockCcipRouter.sol";
 import {MockErc20} from "test/mocks/MockErc20.sol";
+import {MockSequencerUptimeFeed} from "test/mocks/MockSequencerUptimeFeed.sol";
 import {TestErc4626} from "test/mocks/TestErc4626.sol";
 
 contract BaseTest is TestWithHelpers {
@@ -150,7 +151,8 @@ contract BaseTest is TestWithHelpers {
     ChainBalanceOracle public chainBalanceOracle;
     IEarningChainStateProvider public earningChainStateProvider;
     MockBundleFeed public mockBundleFeed;
-    ChainlinkChainBalanceOracleAdapter public chainBalanceOracleAdapter;
+    MockSequencerUptimeFeed public mockSequencerUptimeFeed;
+    ChainlinkL2ChainBalanceOracleAdapter public chainBalanceOracleAdapter;
 
     function _useMockedPriceOracleAccountingChain() internal view virtual returns (bool) {
         return true;
@@ -240,24 +242,28 @@ contract BaseTest is TestWithHelpers {
 
         // Deployment order:
         // 1. Access Manager
-        // 2. Asset Registry Impl
-        // 3. Asset Registry Proxy
-        // 4. Withdrawal Policy Impl
-        // 5. Withdrawal Policy Proxy
-        // 6. IOU Token
-        // 7. IOU Token Manager Impl
-        // 8. IOU Token Manager Proxy
-        // 9. Stable Vault Impl
-        // 10. Stable Vault Proxy
-        // 11. Allocator Impl
-        // 12. Allocator Proxy
-        // 13. Funds Handler Impl
-        // 14. Funds Handler Proxy
-        // 15. Accounting Chain Gateway Impl
-        // 16. Accounting Chain Gateway Proxy
-        // 17. Swapper
-        // 18. CCIP Adapter
-        // 19. Strategy Vault/4626
+        // 2. Chain Balance Oracle Impl
+        // 3. Chain Balance Oracle Proxy
+        // 4. Price Oracle Impl
+        // 5. Price Oracle Proxy
+        // 6. Asset Registry Impl
+        // 7. Asset Registry Proxy
+        // 8. Withdrawal Policy Impl
+        // 9. Withdrawal Policy Proxy
+        // 10. IOU Token
+        // 11. IOU Token Manager Impl
+        // 12. IOU Token Manager Proxy
+        // 13. Stable Vault Impl
+        // 14. Stable Vault Proxy
+        // 15. Allocator Impl
+        // 16. Allocator Proxy
+        // 17. Funds Handler Impl
+        // 18. Funds Handler Proxy
+        // 19. Accounting Chain Gateway Impl
+        // 20. Accounting Chain Gateway Proxy
+        // 21. Swapper
+        // 22. CCIP Adapter
+        // 23-24. Strategy Vaults (GHO, USDC)
 
         transferHelper_accountingChainAddress = address(new TransferHelper());
 
@@ -324,10 +330,11 @@ contract BaseTest is TestWithHelpers {
             "Access Manager (Accounting Chain) address mismatch"
         );
 
+        // 2-3. Chain Balance Oracle (Impl + Proxy)
         chainBalanceOracle = _deployChainBalanceOracle(accessManager_accountingChainAddress);
         Logger.log("\tChain Balance Oracle (Accounting Chain): %s", address(chainBalanceOracle));
 
-        // Deploy Price Oracle for Accounting Chain (with mocked prices via vm.mockCall)
+        // 4-5. Price Oracle (Impl + Proxy) for Accounting Chain (with mocked prices via vm.mockCall)
         priceOracle_accountingChain = _deployPriceOracle(accessManager_accountingChainAddress, 9_995e23);
         Logger.log("\tPrice Oracle (Accounting Chain): %s", address(priceOracle_accountingChain));
         if (_useMockedPriceOracleAccountingChain()) {
@@ -336,7 +343,7 @@ contract BaseTest is TestWithHelpers {
             _mockValidatePriceForAll(address(priceOracle_accountingChain));
         }
 
-        // 2. Asset Registry
+        // 6-7. Asset Registry (Impl + Proxy)
         address assetRegistry_accountingChain_impl = address(new AssetRegistry());
         assetRegistry_accountingChain = AssetRegistry(
             address(
@@ -353,7 +360,7 @@ contract BaseTest is TestWithHelpers {
             "Asset Registry (Accounting Chain) address mismatch"
         );
 
-        // 3. Withdrawal Policy
+        // 8-9. Withdrawal Policy (Impl + Proxy)
         address withdrawalPolicy_accountingChain_impl = address(new WithdrawalPolicy(vault_accountingChainAddress));
         withdrawalPolicy_accountingChain = WithdrawalPolicy(
             address(
@@ -370,7 +377,7 @@ contract BaseTest is TestWithHelpers {
             "Withdrawal Policy (Accounting Chain) address mismatch"
         );
 
-        // 4. IOU Token
+        // 10. IOU Token
         iouToken_accountingChain = new IouToken(iouTokenManager_accountingChainAddress);
         Logger.log("\tIOU Token (Accounting Chain): %s", iouToken_accountingChainAddress);
         require(
@@ -378,7 +385,7 @@ contract BaseTest is TestWithHelpers {
             "IOU Token (Accounting Chain) address mismatch"
         );
 
-        // 5. IOU Token Manager
+        // 11-12. IOU Token Manager (Impl + Proxy)
         address iouTokenManager_accountingChain_impl = address(
             new IouTokenManager(
                 iouToken_accountingChainAddress,
@@ -397,7 +404,7 @@ contract BaseTest is TestWithHelpers {
             "IOU Token Manager (Accounting Chain) address mismatch"
         );
 
-        // 6. Stable Vault
+        // 13-14. Stable Vault (Impl + Proxy)
         // Impl and proxy deployed in the internal `_deployStableVault` function
         vault = _deployStableVault(
             accessManager_accountingChainAddress,
@@ -415,7 +422,7 @@ contract BaseTest is TestWithHelpers {
         Logger.log("\tVault: %s", vault_accountingChainAddress);
         require(address(vault) == vault_accountingChainAddress, "Vault (Accounting Chain) address mismatch");
 
-        // 6. Allocator
+        // 15-16. Allocator (Impl + Proxy)
         address allocator_accountingChain_impl = address(
             new Allocator(
                 assetRegistry_accountingChainAddress,
@@ -441,7 +448,7 @@ contract BaseTest is TestWithHelpers {
             "Allocator (Accounting Chain) address mismatch"
         );
 
-        // 7. Funds Handler
+        // 17-18. Funds Handler (Impl + Proxy)
         address fundsHandler_impl = address(
             new FundsHandler(
                 vault_accountingChainAddress,
@@ -467,7 +474,7 @@ contract BaseTest is TestWithHelpers {
             "Funds Handler (Accounting Chain) address mismatch"
         );
 
-        // 8. Accounting Chain Gateway
+        // 19-20. Accounting Chain Gateway (Impl + Proxy)
         address accountingChainGateway_impl = address(
             new AccountingChainGateway(
                 fundsHandler_accountingChainAddress, iouTokenManager_accountingChainAddress, address(chainBalanceOracle)
@@ -488,7 +495,7 @@ contract BaseTest is TestWithHelpers {
             "Accounting Chain Gateway (Accounting Chain) address mismatch"
         );
 
-        // 9. Swapper
+        // 21. Swapper
         swapper_accountingChain = new Swapper(allocator_accountingChainAddress);
         Logger.log("\tSwapper: %s", address(swapper_accountingChain));
         require(
@@ -496,7 +503,7 @@ contract BaseTest is TestWithHelpers {
             "Swapper (Accounting Chain) address mismatch"
         );
 
-        // 10. CCIP Adapter
+        // 22. CCIP Adapter
         ccipAdapter_accountingChain = new CcipAdapter(
             accessManager_accountingChainAddress,
             chainGateway_accountingChainAddress,
@@ -510,7 +517,7 @@ contract BaseTest is TestWithHelpers {
             "CCIP Adapter (Accounting Chain) address mismatch"
         );
 
-        // 11. Strategy Vault/4626
+        // 23-24. Strategy Vaults (GHO, USDC)
         ghoStrategyVault_accountingChain = new TestErc4626(GHO);
         Logger.log("\tGHO Strategy Vault (Accounting Chain): %s", address(ghoStrategyVault_accountingChain));
         usdcStrategyVault_accountingChain = new TestErc4626(USDC);
@@ -524,20 +531,22 @@ contract BaseTest is TestWithHelpers {
 
         // Deployment order:
         // 1. Access Manager
-        // 2. Asset Registry Impl
-        // 3. Asset Registry Proxy
-        // 4. Withdrawal Policy Impl
-        // 5. Withdrawal Policy Proxy
-        // 3. CCIP Router
-        // 6. IOU Token
-        // 7. IOU Token Manager Impl
-        // 8. IOU Token Manager Proxy
-        // 9. Allocator Impl
-        // 10. Allocator Proxy
-        // 11. Swapper
-        // 12. Earning Chain Gateway Impl
-        // 13. Earning Chain Gateway Proxy
-        // 14. Strategy Vault/4626
+        // 2. Price Oracle Impl
+        // 3. Price Oracle Proxy
+        // 4. Asset Registry Impl
+        // 5. Asset Registry Proxy
+        // 6. Withdrawal Policy Impl
+        // 7. Withdrawal Policy Proxy
+        // 8. CCIP Adapter
+        // 9. IOU Token
+        // 10. IOU Token Manager Impl
+        // 11. IOU Token Manager Proxy
+        // 12. Allocator Impl
+        // 13. Allocator Proxy
+        // 14. Swapper
+        // 15. Earning Chain Gateway Impl
+        // 16. Earning Chain Gateway Proxy
+        // 17-18. Strategy Vaults (GHO, USDC)
 
         transferHelper_earningChainAddress = address(new TransferHelper());
 
@@ -590,7 +599,7 @@ contract BaseTest is TestWithHelpers {
             "Access Manager (Earning Chain) address mismatch"
         );
 
-        // Deploy Price Oracle for Earning Chain (with mocked prices via vm.mockCall)
+        // 2-3. Price Oracle (Impl + Proxy) for Earning Chain (with mocked prices via vm.mockCall)
         priceOracle_earningChain = _deployPriceOracle(accessManager_earningChainAddress, 9_995e23);
         Logger.log("\tPrice Oracle (Earning Chain): %s", address(priceOracle_earningChain));
         if (_useMockedPriceOracleEarningChain()) {
@@ -599,7 +608,7 @@ contract BaseTest is TestWithHelpers {
             _mockValidatePriceForAll(address(priceOracle_earningChain));
         }
 
-        // 2. Asset Registry
+        // 4-5. Asset Registry (Impl + Proxy)
         address assetRegistry_earningChain_impl = address(new AssetRegistry());
         assetRegistry_earningChain = AssetRegistry(
             address(
@@ -616,7 +625,7 @@ contract BaseTest is TestWithHelpers {
             "Asset Registry (Earning Chain) address mismatch"
         );
 
-        // 3. Withdrawal Policy
+        // 6-7. Withdrawal Policy (Impl + Proxy)
         address withdrawalPolicy_earningChain_impl = address(new WithdrawalPolicy(chainGateway_earningChainAddress));
         withdrawalPolicy_earningChain = WithdrawalPolicy(
             address(
@@ -633,7 +642,7 @@ contract BaseTest is TestWithHelpers {
             "Withdrawal Policy (Earning Chain) address mismatch"
         );
 
-        // 4. CCIP Router
+        // 8. CCIP Adapter
         ccipAdapter_earningChain = new CcipAdapter(
             accessManager_earningChainAddress,
             chainGateway_earningChainAddress,
@@ -647,14 +656,14 @@ contract BaseTest is TestWithHelpers {
             "CCIP Adapter (Earning Chain) address mismatch"
         );
 
-        // 5. IOU Token
+        // 9. IOU Token
         iouToken_earningChain = new IouToken(iouTokenManager_earningChainAddress);
         Logger.log("\tIOU Token (Earning Chain): %s", address(iouToken_earningChain));
         require(
             address(iouToken_earningChain) == iouToken_earningChainAddress, "IOU Token (Earning Chain) address mismatch"
         );
 
-        // 6. IOU Token Manager
+        // 10-11. IOU Token Manager (Impl + Proxy)
         address iouTokenManager_earningChain_impl = address(
             new IouTokenManager(
                 iouToken_earningChainAddress,
@@ -673,7 +682,7 @@ contract BaseTest is TestWithHelpers {
             "IOU Token Manager (Earning Chain) address mismatch"
         );
 
-        // 7. Allocator
+        // 12-13. Allocator (Impl + Proxy)
         address allocator_earningChain_impl = address(
             new Allocator(
                 assetRegistry_earningChainAddress,
@@ -699,14 +708,14 @@ contract BaseTest is TestWithHelpers {
             "Allocator (Earning Chain) address mismatch"
         );
 
-        // 8. Swapper
+        // 14. Swapper
         swapper_earningChain = new Swapper(allocator_earningChainAddress);
         Logger.log("\tSwapper: %s", address(swapper_earningChain));
         require(
             address(swapper_earningChain) == swapper_earningChainAddress, "Swapper (Earning Chain) address mismatch"
         );
 
-        // 9. Earning Chain Gateway
+        // 15-16. Earning Chain Gateway (Impl + Proxy)
         address earningChainGateway_impl = address(
             new EarningChainGateway(
                 ACCOUNTING_CHAIN_ID,
@@ -732,7 +741,7 @@ contract BaseTest is TestWithHelpers {
             "Earning Chain Gateway (Earning Chain) address mismatch"
         );
 
-        // 10. Strategy Vault/4626
+        // 17-18. Strategy Vaults (GHO, USDC)
         ghoStrategyVault_earningChain = new TestErc4626(GHO);
         Logger.log("\tGHO Strategy Vault (Earning Chain): %s", address(ghoStrategyVault_earningChain));
         usdcStrategyVault_earningChain = new TestErc4626(USDC);
@@ -865,8 +874,14 @@ contract BaseTest is TestWithHelpers {
             address(new EarningChainStateProviderHarness(address(earningChainGateway), EARNING_CHAIN_ID))
         );
         mockBundleFeed = new MockBundleFeed();
-        chainBalanceOracleAdapter = new ChainlinkChainBalanceOracleAdapter(
-            EARNING_CHAIN_ID, address(mockBundleFeed), CHAIN_BALANCE_ORACLE_HEARTBEAT_SECONDS
+        mockSequencerUptimeFeed = new MockSequencerUptimeFeed();
+        // Default: sequencer is up (answer=0) and has been up since the beginning of time (startedAt=0).
+        mockSequencerUptimeFeed.setAnswer(0, 0);
+        chainBalanceOracleAdapter = new ChainlinkL2ChainBalanceOracleAdapter(
+            EARNING_CHAIN_ID,
+            address(mockBundleFeed),
+            CHAIN_BALANCE_ORACLE_HEARTBEAT_SECONDS,
+            address(mockSequencerUptimeFeed)
         );
         _publishChainBalanceSnapshotToBundleFeed(0, block.timestamp, block.number);
         chainBalanceOracle.setChainBalanceOracleAdapter(EARNING_CHAIN_ID, address(chainBalanceOracleAdapter));
