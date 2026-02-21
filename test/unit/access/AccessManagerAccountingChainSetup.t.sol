@@ -21,9 +21,9 @@ import {AccessManagerSetupBaseTest} from "test/unit/access/AccessManagerSetupBas
 contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, AccountingChainDeployment {
     function setUp() public virtual {
         _deployCreateXTo(Create3AddressLib.CREATEX_ADDRESS);
-        vm.startPrank(DEPLOYER);
+        vm.startPrank(_getDeployer());
         _deployContracts();
-        _setupAccessManager(DEPLOYER);
+        _setupAccessManager(_getDeployer());
         vm.stopPrank();
         vm.warp(block.timestamp + RolesLib.CRITICAL_DELAY + 1);
     }
@@ -47,38 +47,6 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    // SETUP SCRIPT OVERRIDES — profile getters
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-    function _getProfile__MainAdmin() internal pure virtual override returns (address) {
-        return address(uint160(uint256(keccak256("test.mainAdmin"))));
-    }
-
-    function _getProfile__SecondaryAdmin() internal pure virtual override returns (address) {
-        return address(uint160(uint256(keccak256("test.secondaryAdmin"))));
-    }
-
-    function _getProfile__WithdrawalPolicyManager() internal pure virtual override returns (address) {
-        return address(uint160(uint256(keccak256("test.withdrawalPolicyManager"))));
-    }
-
-    function _getProfile__Rebalancer() internal pure virtual override returns (address) {
-        return address(uint160(uint256(keccak256("test.rebalancer"))));
-    }
-
-    function _getProfile__Disabler() internal pure virtual override returns (address) {
-        return address(uint160(uint256(keccak256("test.disabler"))));
-    }
-
-    function _getProfile__ATokenVaultRewardClaimer() internal pure virtual override returns (address) {
-        return address(uint160(uint256(keccak256("test.aTokenVaultRewardClaimer"))));
-    }
-
-    function _getProfile__StableVaultManager() internal pure virtual override returns (address) {
-        return address(uint160(uint256(keccak256("test.stableVaultManager"))));
-    }
-
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // BASE TEST OVERRIDES — abstract getters
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -86,31 +54,31 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
         return IAccessManager(_accessManager());
     }
 
-    function _getDeployer() internal pure virtual override returns (address) {
-        return DEPLOYER;
+    function _getDeployer() internal view virtual override returns (address) {
+        return _deployer();
     }
 
-    function _mainAdmin() internal pure virtual override returns (address) {
+    function _mainAdmin() internal view virtual override returns (address) {
         return _getProfile__MainAdmin();
     }
 
-    function _secondaryAdmin() internal pure virtual override returns (address) {
+    function _secondaryAdmin() internal view virtual override returns (address) {
         return _getProfile__SecondaryAdmin();
     }
 
-    function _withdrawalPolicyManager() internal pure virtual override returns (address) {
+    function _withdrawalPolicyManager() internal view virtual override returns (address) {
         return _getProfile__WithdrawalPolicyManager();
     }
 
-    function _rebalancer() internal pure virtual override returns (address) {
+    function _rebalancer() internal view virtual override returns (address) {
         return _getProfile__Rebalancer();
     }
 
-    function _disabler() internal pure virtual override returns (address) {
+    function _disabler() internal view virtual override returns (address) {
         return _getProfile__Disabler();
     }
 
-    function _aTokenVaultRewardClaimer() internal pure virtual override returns (address) {
+    function _aTokenVaultRewardClaimer() internal view virtual override returns (address) {
         return _getProfile__ATokenVaultRewardClaimer();
     }
 

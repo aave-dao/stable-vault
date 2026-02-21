@@ -49,15 +49,13 @@ contract AccountingChainDeployment is
 
     address[] internal _deployedATokenVaults;
 
-    address constant DEPLOYER = address(0xBB700dA5CCC9Ec5605780Fc40695f1206B090303);
-
     uint256 constant DEFAULT_MAX_PER_SECOND_RATE = 1000000005781378656804591713; // ~20% APY
     uint256 constant DEFAULT_SUB_VAULT_PER_SECOND_RATE = 1000000001243680656318820313; // ~4% APY
     uint256 constant DEFAULT_MAX_ACTIVE_SUB_VAULTS = 201;
     uint8 constant MAX_STRATEGIES_PER_ASSET = 15;
     uint8 constant STRATEGY_MAX_SLIPPAGE_AMOUNT = 10; // 10 wei
 
-    address immutable PROXY_ADMIN_OWNER = getAccessManagerAddress(DEPLOYER);
+    address immutable PROXY_ADMIN_OWNER = getAccessManagerAddress(_deployer());
     address immutable STABLE_VAULT_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
     address immutable ALLOCATOR_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
     address immutable WITHDRAWAL_POLICY_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
@@ -68,11 +66,11 @@ contract AccountingChainDeployment is
     address immutable PRICE_ORACLE_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
     address immutable CHAIN_BALANCE_ORACLE_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
 
-    address constant ACCESS_MANAGER_ADMIN = DEPLOYER;
-    address constant TREASURY = HIGH_THRESHOLD_MULTISIG_ADMIN_PROFILE;
+    address immutable ACCESS_MANAGER_ADMIN = _deployer();
+    address immutable TREASURY = HIGH_THRESHOLD_MULTISIG_ADMIN_PROFILE;
 
-    address immutable ALLOCATOR_DEPOSITOR = getFundsHandlerAddress(DEPLOYER);
-    address immutable ALLOCATOR_WITHDRAWER = getFundsHandlerAddress(DEPLOYER);
+    address immutable ALLOCATOR_DEPOSITOR = getFundsHandlerAddress(_deployer());
+    address immutable ALLOCATOR_WITHDRAWER = getFundsHandlerAddress(_deployer());
 
     // ERC20s on Arbitrum
     address GHO = address(0x7dfF72693f6A4149b17e7C6314655f6A9F7c8B33);
@@ -104,7 +102,7 @@ contract AccountingChainDeployment is
 
     function run() public {
         _validateExternalAddresses();
-        vm.startBroadcast(DEPLOYER);
+        vm.startBroadcast(_deployer());
         _deployContracts();
         _setupContracts();
         vm.stopBroadcast();
@@ -112,9 +110,9 @@ contract AccountingChainDeployment is
 
     function _validateExternalAddresses() internal view {
         // Validate ERC20 token addresses
-        IERC20(GHO).balanceOf(DEPLOYER);
-        IERC20(USDC).balanceOf(DEPLOYER);
-        IERC20(USDT).balanceOf(DEPLOYER);
+        IERC20(GHO).balanceOf(_deployer());
+        IERC20(USDC).balanceOf(_deployer());
+        IERC20(USDT).balanceOf(_deployer());
 
         // Validate Chainlink price feed addresses
         require(CHAINLINK_GHO_USD_DATA_FEED != address(0), "Chainlink GHO/USD data feed not set");
@@ -159,21 +157,21 @@ contract AccountingChainDeployment is
         _setupAssetRegistry();
         _setupAllocator();
         _setupFundsHandler();
-        _setupAccessManager(DEPLOYER);
+        _setupAccessManager(_deployer());
         _setupPriceOracleAdapters();
         _setupChainBalanceOracleAdapters();
     }
 
-    function _accessManager() internal pure virtual override returns (address) {
-        return getAccessManagerAddress(DEPLOYER);
+    function _accessManager() internal view virtual override returns (address) {
+        return getAccessManagerAddress(_deployer());
     }
 
     function _setupBridgeAdapters() internal {
         // NOTE: This assumes adapters of same type are having the same address on all chains.
-        address localCcipAdapter = getCcipAdapterAddress(DEPLOYER);
+        address localCcipAdapter = getCcipAdapterAddress(_deployer());
         address mainnetCcipAdapter = localCcipAdapter;
 
-        IAccountingChainGateway gateway = IAccountingChainGateway(getGatewayAddress(DEPLOYER));
+        IAccountingChainGateway gateway = IAccountingChainGateway(getGatewayAddress(_deployer()));
 
         uint256 mainnetChainId = ETHEREUM_MAINNET_CHAIN_ID;
         uint64 mainnetCcipChainSelector = ETHEREUM_MAINNET_CCIP_SELECTOR;
@@ -200,24 +198,24 @@ contract AccountingChainDeployment is
     }
 
     function _setupAllocator() internal {
-        IAllocator allocator = IAllocator(getAllocatorAddress(DEPLOYER));
+        IAllocator allocator = IAllocator(getAllocatorAddress(_deployer()));
 
         // Aave V3 Arbitrum PoolAddressesProvider
         address poolAddressProvider = address(0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb);
 
-        address ghoYieldStrategy = _deployATokenVault(GHO, poolAddressProvider, DEPLOYER);
+        address ghoYieldStrategy = _deployATokenVault(GHO, poolAddressProvider, _deployer());
         allocator.addStrategy(GHO, ghoYieldStrategy, STRATEGY_MAX_SLIPPAGE_AMOUNT);
         allocator.setDefaultStrategy(GHO, ghoYieldStrategy);
         _deployedATokenVaults.push(ghoYieldStrategy);
         _logDeployment("GHO aTokenVault", "", ghoYieldStrategy);
 
-        address usdcYieldStrategy = _deployATokenVault(USDC, poolAddressProvider, DEPLOYER);
+        address usdcYieldStrategy = _deployATokenVault(USDC, poolAddressProvider, _deployer());
         allocator.addStrategy(USDC, usdcYieldStrategy, STRATEGY_MAX_SLIPPAGE_AMOUNT);
         allocator.setDefaultStrategy(USDC, usdcYieldStrategy);
         _deployedATokenVaults.push(usdcYieldStrategy);
         _logDeployment("USDC aTokenVault", "", usdcYieldStrategy);
 
-        address usdtYieldStrategy = _deployATokenVault(USDT, poolAddressProvider, DEPLOYER);
+        address usdtYieldStrategy = _deployATokenVault(USDT, poolAddressProvider, _deployer());
         allocator.addStrategy(USDT, usdtYieldStrategy, STRATEGY_MAX_SLIPPAGE_AMOUNT);
         allocator.setDefaultStrategy(USDT, usdtYieldStrategy);
         _deployedATokenVaults.push(usdtYieldStrategy);
@@ -229,12 +227,12 @@ contract AccountingChainDeployment is
     }
 
     function _setupFundsHandler() internal {
-        IFundsHandler fundsHandler = IFundsHandler(getFundsHandlerAddress(DEPLOYER));
+        IFundsHandler fundsHandler = IFundsHandler(getFundsHandlerAddress(_deployer()));
         fundsHandler.addEarningChain(EARNING_CHAIN_ID);
     }
 
     function _setupAssetRegistry() internal {
-        IAssetRegistry assetRegistry = IAssetRegistry(getAssetRegistryAddress(DEPLOYER));
+        IAssetRegistry assetRegistry = IAssetRegistry(getAssetRegistryAddress(_deployer()));
         IAssetRegistry.AssetConfig memory unrestrictedAssetConfig = IAssetRegistry.AssetConfig({
             depositFromUserAllowed: true,
             depositIntoAllocatorAllowed: true,
@@ -249,10 +247,12 @@ contract AccountingChainDeployment is
     function _deployTransferHelper() internal returns (address) {
         address transferHelper = _deploy_create3({
             namespacedSaltSeed: TRANSFER_HELPER_SALT_SEED,
-            deployer: DEPLOYER,
+            deployer: _deployer(),
             initCode: abi.encodePacked(type(TransferHelper).creationCode)
         });
-        require(transferHelper == getTransferHelperAddress(DEPLOYER), "TransferHelper does not match expected address");
+        require(
+            transferHelper == getTransferHelperAddress(_deployer()), "TransferHelper does not match expected address"
+        );
         _logDeployment("TransferHelper", TRANSFER_HELPER_SALT_SEED, transferHelper);
         return transferHelper;
     }
@@ -260,10 +260,10 @@ contract AccountingChainDeployment is
     function _deployAccessManager() internal returns (address) {
         address accessManager = _deploy_create3({
             namespacedSaltSeed: ACCESS_MANAGER_SALT_SEED,
-            deployer: DEPLOYER,
+            deployer: _deployer(),
             initCode: abi.encodePacked(type(AccessManager).creationCode, abi.encode(ACCESS_MANAGER_ADMIN))
         });
-        require(accessManager == getAccessManagerAddress(DEPLOYER), "AccessManager does not match expected address");
+        require(accessManager == getAccessManagerAddress(_deployer()), "AccessManager does not match expected address");
         _logDeployment("AccessManager", ACCESS_MANAGER_SALT_SEED, accessManager);
         return accessManager;
     }
@@ -273,28 +273,29 @@ contract AccountingChainDeployment is
         _logDeployment("AssetRegistry::Implementation", "", implementation);
         address assetRegistry = _deployTransparentProxy_create3({
             namespacedSaltSeed: ASSET_REGISTRY_SALT_SEED,
-            deployer: DEPLOYER,
+            deployer: _deployer(),
             implementation: implementation,
             proxyAdminOwner: ASSET_REGISTRY_PROXY_ADMIN_OWNER,
-            initCalldata: abi.encodeCall(AssetRegistry.initialize, (getAccessManagerAddress(DEPLOYER)))
+            initCalldata: abi.encodeCall(AssetRegistry.initialize, (getAccessManagerAddress(_deployer())))
         });
-        require(assetRegistry == getAssetRegistryAddress(DEPLOYER), "AssetRegistry does not match expected address");
+        require(assetRegistry == getAssetRegistryAddress(_deployer()), "AssetRegistry does not match expected address");
         _logDeployment("AssetRegistry", ASSET_REGISTRY_SALT_SEED, assetRegistry);
         return assetRegistry;
     }
 
     function _deployWithdrawalPolicy() internal returns (address) {
-        address implementation = address(new WithdrawalPolicy(getStableVaultAddress(DEPLOYER)));
+        address implementation = address(new WithdrawalPolicy(getStableVaultAddress(_deployer())));
         _logDeployment("WithdrawalPolicy::Implementation", "", implementation);
         address withdrawalPolicy = _deployTransparentProxy_create3({
             namespacedSaltSeed: WITHDRAWAL_POLICY_SALT_SEED,
-            deployer: DEPLOYER,
+            deployer: _deployer(),
             implementation: implementation,
             proxyAdminOwner: WITHDRAWAL_POLICY_PROXY_ADMIN_OWNER,
-            initCalldata: abi.encodeCall(WithdrawalPolicy.initialize, (getAccessManagerAddress(DEPLOYER), 0))
+            initCalldata: abi.encodeCall(WithdrawalPolicy.initialize, (getAccessManagerAddress(_deployer()), 0))
         });
         require(
-            withdrawalPolicy == getWithdrawalPolicyAddress(DEPLOYER), "WithdrawalPolicy does not match expected address"
+            withdrawalPolicy == getWithdrawalPolicyAddress(_deployer()),
+            "WithdrawalPolicy does not match expected address"
         );
         _logDeployment("WithdrawalPolicy", WITHDRAWAL_POLICY_SALT_SEED, withdrawalPolicy);
         return withdrawalPolicy;
@@ -303,10 +304,10 @@ contract AccountingChainDeployment is
     function _deployIouToken() internal returns (address) {
         address iouToken = _deploy_create3({
             namespacedSaltSeed: IOU_TOKEN_SALT_SEED,
-            deployer: DEPLOYER,
-            initCode: abi.encodePacked(type(IouToken).creationCode, abi.encode(getIouTokenManagerAddress(DEPLOYER)))
+            deployer: _deployer(),
+            initCode: abi.encodePacked(type(IouToken).creationCode, abi.encode(getIouTokenManagerAddress(_deployer())))
         });
-        require(iouToken == getIouTokenAddress(DEPLOYER), "IouToken does not match expected address");
+        require(iouToken == getIouTokenAddress(_deployer()), "IouToken does not match expected address");
         _logDeployment("IouToken", IOU_TOKEN_SALT_SEED, iouToken);
         return iouToken;
     }
@@ -314,23 +315,23 @@ contract AccountingChainDeployment is
     function _deployIouTokenManager() internal returns (address) {
         address implementation = address(
             new IouTokenManager({
-                iouToken: getIouTokenAddress(DEPLOYER),
-                chainGateway: getGatewayAddress(DEPLOYER),
-                vault: getStableVaultAddress(DEPLOYER),
-                transferHelper: getTransferHelperAddress(DEPLOYER),
+                iouToken: getIouTokenAddress(_deployer()),
+                chainGateway: getGatewayAddress(_deployer()),
+                vault: getStableVaultAddress(_deployer()),
+                transferHelper: getTransferHelperAddress(_deployer()),
                 isAccountingChain: true
             })
         );
         _logDeployment("IouTokenManager::Implementation", "", implementation);
         address iouTokenManager = _deployTransparentProxy_create3({
             namespacedSaltSeed: IOU_TOKEN_MANAGER_SALT_SEED,
-            deployer: DEPLOYER,
+            deployer: _deployer(),
             implementation: implementation,
             proxyAdminOwner: IOU_TOKEN_MANAGER_PROXY_ADMIN_OWNER,
             initCalldata: ""
         });
         require(
-            iouTokenManager == getIouTokenManagerAddress(DEPLOYER), "IouTokenManager does not match expected address"
+            iouTokenManager == getIouTokenManagerAddress(_deployer()), "IouTokenManager does not match expected address"
         );
         _logDeployment("IouTokenManager", IOU_TOKEN_MANAGER_SALT_SEED, iouTokenManager);
         return iouTokenManager;
@@ -340,26 +341,27 @@ contract AccountingChainDeployment is
         address implementation = address(
             new StableVault({
                 maxValidPerSecondRate: DEFAULT_MAX_PER_SECOND_RATE,
-                assetRegistry: getAssetRegistryAddress(DEPLOYER),
-                iouTokenManager: getIouTokenManagerAddress(DEPLOYER),
-                fundsHandler: getFundsHandlerAddress(DEPLOYER),
-                transferHelper: getTransferHelperAddress(DEPLOYER),
-                withdrawalPolicy: getWithdrawalPolicyAddress(DEPLOYER),
-                priceOracle: getPriceOracleAddress(DEPLOYER),
+                assetRegistry: getAssetRegistryAddress(_deployer()),
+                iouTokenManager: getIouTokenManagerAddress(_deployer()),
+                fundsHandler: getFundsHandlerAddress(_deployer()),
+                transferHelper: getTransferHelperAddress(_deployer()),
+                withdrawalPolicy: getWithdrawalPolicyAddress(_deployer()),
+                priceOracle: getPriceOracleAddress(_deployer()),
                 maxActiveSubVaults: DEFAULT_MAX_ACTIVE_SUB_VAULTS
             })
         );
         _logDeployment("StableVault::Implementation", "", implementation);
         address stableVault = _deployTransparentProxy_create3({
             namespacedSaltSeed: STABLE_VAULT_SALT_SEED,
-            deployer: DEPLOYER,
+            deployer: _deployer(),
             implementation: implementation,
             proxyAdminOwner: STABLE_VAULT_PROXY_ADMIN_OWNER,
             initCalldata: abi.encodeCall(
-                StableVault.initialize, (getAccessManagerAddress(DEPLOYER), TREASURY, DEFAULT_SUB_VAULT_PER_SECOND_RATE)
+                StableVault.initialize,
+                (getAccessManagerAddress(_deployer()), TREASURY, DEFAULT_SUB_VAULT_PER_SECOND_RATE)
             )
         });
-        require(stableVault == getStableVaultAddress(DEPLOYER), "StableVault does not match expected address");
+        require(stableVault == getStableVaultAddress(_deployer()), "StableVault does not match expected address");
         _logDeployment("StableVault", STABLE_VAULT_SALT_SEED, stableVault);
         return stableVault;
     }
@@ -367,23 +369,23 @@ contract AccountingChainDeployment is
     function _deployAllocator() internal returns (address) {
         address implementation = address(
             new Allocator({
-                assetRegistry: getAssetRegistryAddress(DEPLOYER),
+                assetRegistry: getAssetRegistryAddress(_deployer()),
                 depositor: ALLOCATOR_DEPOSITOR,
                 withdrawer: ALLOCATOR_WITHDRAWER,
-                priceOracle: getPriceOracleAddress(DEPLOYER),
-                transferHelper: getTransferHelperAddress(DEPLOYER),
+                priceOracle: getPriceOracleAddress(_deployer()),
+                transferHelper: getTransferHelperAddress(_deployer()),
                 maxStrategiesPerAsset: MAX_STRATEGIES_PER_ASSET
             })
         );
         _logDeployment("Allocator::Implementation", "", implementation);
         address allocator = _deployTransparentProxy_create3({
             namespacedSaltSeed: ALLOCATOR_SALT_SEED,
-            deployer: DEPLOYER,
+            deployer: _deployer(),
             implementation: implementation,
             proxyAdminOwner: ALLOCATOR_PROXY_ADMIN_OWNER,
-            initCalldata: abi.encodeCall(Allocator.initialize, (getAccessManagerAddress(DEPLOYER)))
+            initCalldata: abi.encodeCall(Allocator.initialize, (getAccessManagerAddress(_deployer())))
         });
-        require(allocator == getAllocatorAddress(DEPLOYER), "Allocator does not match expected address");
+        require(allocator == getAllocatorAddress(_deployer()), "Allocator does not match expected address");
         _logDeployment("Allocator", ALLOCATOR_SALT_SEED, allocator);
         return allocator;
     }
@@ -391,23 +393,23 @@ contract AccountingChainDeployment is
     function _deployFundsHandler() internal returns (address) {
         address implementation = address(
             new FundsHandler({
-                stableVault: getStableVaultAddress(DEPLOYER),
-                gateway: getGatewayAddress(DEPLOYER),
-                allocator: getAllocatorAddress(DEPLOYER),
-                priceOracle: getPriceOracleAddress(DEPLOYER),
-                transferHelper: getTransferHelperAddress(DEPLOYER),
-                chainBalanceOracle: getChainBalanceOracleAddress(DEPLOYER)
+                stableVault: getStableVaultAddress(_deployer()),
+                gateway: getGatewayAddress(_deployer()),
+                allocator: getAllocatorAddress(_deployer()),
+                priceOracle: getPriceOracleAddress(_deployer()),
+                transferHelper: getTransferHelperAddress(_deployer()),
+                chainBalanceOracle: getChainBalanceOracleAddress(_deployer())
             })
         );
         _logDeployment("FundsHandler::Implementation", "", implementation);
         address fundsHandler = _deployTransparentProxy_create3({
             namespacedSaltSeed: FUNDS_HANDLER_SALT_SEED,
-            deployer: DEPLOYER,
+            deployer: _deployer(),
             implementation: implementation,
             proxyAdminOwner: FUNDS_HANDLER_PROXY_ADMIN_OWNER,
-            initCalldata: abi.encodeCall(FundsHandler.initialize, (getAccessManagerAddress(DEPLOYER)))
+            initCalldata: abi.encodeCall(FundsHandler.initialize, (getAccessManagerAddress(_deployer())))
         });
-        require(fundsHandler == getFundsHandlerAddress(DEPLOYER), "FundsHandler does not match expected address");
+        require(fundsHandler == getFundsHandlerAddress(_deployer()), "FundsHandler does not match expected address");
         _logDeployment("FundsHandler", FUNDS_HANDLER_SALT_SEED, fundsHandler);
         return fundsHandler;
     }
@@ -415,20 +417,20 @@ contract AccountingChainDeployment is
     function _deployGateway() internal returns (address) {
         address implementation = address(
             new AccountingChainGateway({
-                fundsHandler: getFundsHandlerAddress(DEPLOYER),
-                iouTokenManager: getIouTokenManagerAddress(DEPLOYER),
-                chainBalanceOracle: getChainBalanceOracleAddress(DEPLOYER)
+                fundsHandler: getFundsHandlerAddress(_deployer()),
+                iouTokenManager: getIouTokenManagerAddress(_deployer()),
+                chainBalanceOracle: getChainBalanceOracleAddress(_deployer())
             })
         );
         _logDeployment("AccountingChainGateway::Implementation", "", implementation);
         address gateway = _deployTransparentProxy_create3({
             namespacedSaltSeed: GATEWAY_SALT_SEED,
-            deployer: DEPLOYER,
+            deployer: _deployer(),
             implementation: implementation,
             proxyAdminOwner: GATEWAY_PROXY_ADMIN_OWNER,
-            initCalldata: abi.encodeCall(AccountingChainGateway.initialize, (getAccessManagerAddress(DEPLOYER)))
+            initCalldata: abi.encodeCall(AccountingChainGateway.initialize, (getAccessManagerAddress(_deployer())))
         });
-        require(gateway == getGatewayAddress(DEPLOYER), "Gateway does not match expected address");
+        require(gateway == getGatewayAddress(_deployer()), "Gateway does not match expected address");
         _logDeployment("AccountingChainGateway", GATEWAY_SALT_SEED, gateway);
         return gateway;
     }
@@ -436,10 +438,10 @@ contract AccountingChainDeployment is
     function _deploySwapper() internal returns (address) {
         address swapper = _deploy_create3({
             namespacedSaltSeed: SWAPPER_SALT_SEED,
-            deployer: DEPLOYER,
-            initCode: abi.encodePacked(type(Swapper).creationCode, abi.encode(getAllocatorAddress(DEPLOYER)))
+            deployer: _deployer(),
+            initCode: abi.encodePacked(type(Swapper).creationCode, abi.encode(getAllocatorAddress(_deployer())))
         });
-        require(swapper == getSwapperAddress(DEPLOYER), "Swapper does not match expected address");
+        require(swapper == getSwapperAddress(_deployer()), "Swapper does not match expected address");
         _logDeployment("Swapper", SWAPPER_SALT_SEED, swapper);
         return swapper;
     }
@@ -447,19 +449,19 @@ contract AccountingChainDeployment is
     function _deployCcipAdapter() internal returns (address) {
         address ccipAdapter = _deploy_create3({
             namespacedSaltSeed: CCIP_ADAPTER_SALT_SEED,
-            deployer: DEPLOYER,
+            deployer: _deployer(),
             initCode: abi.encodePacked(
                 type(CcipAdapter).creationCode,
                 abi.encode(
-                    getAccessManagerAddress(DEPLOYER),
-                    getGatewayAddress(DEPLOYER),
+                    getAccessManagerAddress(_deployer()),
+                    getGatewayAddress(_deployer()),
                     CCIP_ROUTER_ADDRESS,
-                    getTransferHelperAddress(DEPLOYER),
-                    getAssetRegistryAddress(DEPLOYER)
+                    getTransferHelperAddress(_deployer()),
+                    getAssetRegistryAddress(_deployer())
                 )
             )
         });
-        require(ccipAdapter == getCcipAdapterAddress(DEPLOYER), "CcipAdapter does not match expected address");
+        require(ccipAdapter == getCcipAdapterAddress(_deployer()), "CcipAdapter does not match expected address");
         _logDeployment("CcipAdapter", CCIP_ADAPTER_SALT_SEED, ccipAdapter);
         return ccipAdapter;
     }
@@ -469,12 +471,12 @@ contract AccountingChainDeployment is
         _logDeployment("PriceOracle::Implementation", "", implementation);
         address priceOracle = _deployTransparentProxy_create3({
             namespacedSaltSeed: PRICE_ORACLE_SALT_SEED,
-            deployer: DEPLOYER,
+            deployer: _deployer(),
             implementation: implementation,
             proxyAdminOwner: PRICE_ORACLE_PROXY_ADMIN_OWNER,
-            initCalldata: abi.encodeCall(PriceOracle.initialize, (getAccessManagerAddress(DEPLOYER)))
+            initCalldata: abi.encodeCall(PriceOracle.initialize, (getAccessManagerAddress(_deployer())))
         });
-        require(priceOracle == getPriceOracleAddress(DEPLOYER), "PriceOracle does not match expected address");
+        require(priceOracle == getPriceOracleAddress(_deployer()), "PriceOracle does not match expected address");
         _logDeployment("PriceOracle", PRICE_ORACLE_SALT_SEED, priceOracle);
         return priceOracle;
     }
@@ -484,13 +486,13 @@ contract AccountingChainDeployment is
         _logDeployment("ChainBalanceOracle::Implementation", "", implementation);
         address chainBalanceOracle = _deployTransparentProxy_create3({
             namespacedSaltSeed: CHAIN_BALANCE_ORACLE_SALT_SEED,
-            deployer: DEPLOYER,
+            deployer: _deployer(),
             implementation: implementation,
             proxyAdminOwner: CHAIN_BALANCE_ORACLE_PROXY_ADMIN_OWNER,
-            initCalldata: abi.encodeCall(ChainBalanceOracle.initialize, (getAccessManagerAddress(DEPLOYER)))
+            initCalldata: abi.encodeCall(ChainBalanceOracle.initialize, (getAccessManagerAddress(_deployer())))
         });
         require(
-            chainBalanceOracle == getChainBalanceOracleAddress(DEPLOYER),
+            chainBalanceOracle == getChainBalanceOracleAddress(_deployer()),
             "ChainBalanceOracle does not match expected address"
         );
         _logDeployment("ChainBalanceOracle", CHAIN_BALANCE_ORACLE_SALT_SEED, chainBalanceOracle);
@@ -498,7 +500,7 @@ contract AccountingChainDeployment is
     }
 
     function _setupPriceOracleAdapters() internal {
-        PriceOracle priceOracle = PriceOracle(getPriceOracleAddress(DEPLOYER));
+        PriceOracle priceOracle = PriceOracle(getPriceOracleAddress(_deployer()));
 
         address ghoAdapter = address(
             new ChainlinkPriceOracleAdapter(GHO, CHAINLINK_GHO_USD_DATA_FEED, CHAINLINK_PRICE_ORACLE_HEARTBEAT)
@@ -528,11 +530,11 @@ contract AccountingChainDeployment is
             )
         );
         _logDeployment("ChainlinkChainBalanceOracleAdapter", "", adapter);
-        ChainBalanceOracle(getChainBalanceOracleAddress(DEPLOYER))
+        ChainBalanceOracle(getChainBalanceOracleAddress(_deployer()))
             .setChainBalanceOracleAdapter(EARNING_CHAIN_ID, adapter);
     }
 
-    function _logDeployment(string memory name, string memory saltSeed, address addr) internal virtual {
+    function _logDeployment(string memory name, string memory saltSeed, address addr) internal virtual override {
         string memory jsonObject =
             string.concat('{ "address": "', addr.toHexString(), '", "saltSeed": "', saltSeed, '" }');
         vm.writeJson(jsonObject, "deployments/vnet/accounting.json", string.concat(".", name));
