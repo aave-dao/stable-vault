@@ -28,14 +28,16 @@ import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {ChainBalanceOracle} from "src/oracles/balance/ChainBalanceOracle.sol";
-import {ChainlinkChainBalanceOracleAdapter} from "src/oracles/balance/ChainlinkChainBalanceOracleAdapter.sol";
-import {AggregatorV3Interface, ChainlinkPriceOracleAdapter} from "src/oracles/price/ChainlinkPriceOracleAdapter.sol";
+import {ChainlinkL2ChainBalanceOracleAdapter} from "src/oracles/balance/ChainlinkL2ChainBalanceOracleAdapter.sol";
+import {ChainlinkL2PriceOracleAdapter} from "src/oracles/price/ChainlinkL2PriceOracleAdapter.sol";
+import {AggregatorV3Interface} from "src/oracles/price/ChainlinkPriceOracleAdapter.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {AssetRegistry} from "src/periphery/AssetRegistry.sol";
 import {Swapper} from "src/periphery/Swapper.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 import {MockBundleFeed} from "test/mocks/MockBundleFeed.sol";
+import {MockSequencerUptimeFeed} from "test/mocks/MockSequencerUptimeFeed.sol";
 
 contract AccountingChainDeployment is
     Create3Deployment,
@@ -96,6 +98,9 @@ contract AccountingChainDeployment is
     // TODO: VNet only – replace with the real Chainlink Bundle Aggregator Proxy address for prod.
     address internal _chainlinkBundleAggregatorProxy;
 
+    // TODO: VNet only – replace with the real Chainlink L2 Sequencer Uptime Feed address for prod.
+    address internal _sequencerUptimeFeed;
+
     // Set to Arbitrum CCIP Router address
     address constant CCIP_ROUTER_ADDRESS = address(0x141fa059441E0ca23ce184B6A78bafD2A517DdE8);
 
@@ -137,6 +142,7 @@ contract AccountingChainDeployment is
 
     function _deployContracts() internal {
         _deployMockBundleFeed(); // TODO: VNet only – remove for prod and use real Chainlink address.
+        _deployMockSequencerUptimeFeed(); // TODO: VNet only – remove for prod and use real Chainlink address.
         _deployTransferHelper();
         _deployAccessManager();
         _deployAssetRegistry();
@@ -506,38 +512,51 @@ contract AccountingChainDeployment is
         _logDeployment("MockBundleFeed", "", _chainlinkBundleAggregatorProxy);
     }
 
+    // TODO: VNet only – remove for prod and use the real Chainlink L2 Sequencer Uptime Feed address.
+    function _deployMockSequencerUptimeFeed() internal {
+        _sequencerUptimeFeed = address(new MockSequencerUptimeFeed());
+        _logDeployment("MockSequencerUptimeFeed", "", _sequencerUptimeFeed);
+    }
+
     function _setupPriceOracleAdapters() internal {
         PriceOracle priceOracle = PriceOracle(getPriceOracleAddress(_deployer()));
 
         address ghoAdapter = address(
-            new ChainlinkPriceOracleAdapter(GHO, CHAINLINK_GHO_USD_DATA_FEED, CHAINLINK_PRICE_ORACLE_HEARTBEAT)
+            new ChainlinkL2PriceOracleAdapter(
+                GHO, CHAINLINK_GHO_USD_DATA_FEED, CHAINLINK_PRICE_ORACLE_HEARTBEAT, _sequencerUptimeFeed
+            )
         );
-        _logDeployment("ChainlinkPriceOracleAdapter::GHO", "", ghoAdapter);
+        _logDeployment("ChainlinkL2PriceOracleAdapter::GHO", "", ghoAdapter);
         priceOracle.setOracleAdapterForAsset(GHO, ghoAdapter);
 
         address usdcAdapter = address(
-            new ChainlinkPriceOracleAdapter(USDC, CHAINLINK_USDC_USD_DATA_FEED, CHAINLINK_PRICE_ORACLE_HEARTBEAT)
+            new ChainlinkL2PriceOracleAdapter(
+                USDC, CHAINLINK_USDC_USD_DATA_FEED, CHAINLINK_PRICE_ORACLE_HEARTBEAT, _sequencerUptimeFeed
+            )
         );
-        _logDeployment("ChainlinkPriceOracleAdapter::USDC", "", usdcAdapter);
+        _logDeployment("ChainlinkL2PriceOracleAdapter::USDC", "", usdcAdapter);
         priceOracle.setOracleAdapterForAsset(USDC, usdcAdapter);
 
         address usdtAdapter = address(
-            new ChainlinkPriceOracleAdapter(USDT, CHAINLINK_USDT_USD_DATA_FEED, CHAINLINK_PRICE_ORACLE_HEARTBEAT)
+            new ChainlinkL2PriceOracleAdapter(
+                USDT, CHAINLINK_USDT_USD_DATA_FEED, CHAINLINK_PRICE_ORACLE_HEARTBEAT, _sequencerUptimeFeed
+            )
         );
-        _logDeployment("ChainlinkPriceOracleAdapter::USDT", "", usdtAdapter);
+        _logDeployment("ChainlinkL2PriceOracleAdapter::USDT", "", usdtAdapter);
         priceOracle.setOracleAdapterForAsset(USDT, usdtAdapter);
     }
 
     function _setupChainBalanceOracleAdapters() internal {
         address adapter = address(
-            new ChainlinkChainBalanceOracleAdapter(
+            new ChainlinkL2ChainBalanceOracleAdapter(
                 EARNING_CHAIN_ID,
                 _chainlinkBundleAggregatorProxy, // TODO: VNet only – use
                 // CHAINLINK_CHAIN_BALANCE_BUNDLE_AGGREGATOR_PROXY for prod
-                CHAINLINK_CHAIN_BALANCE_ORACLE_HEARTBEAT
+                CHAINLINK_CHAIN_BALANCE_ORACLE_HEARTBEAT,
+                _sequencerUptimeFeed // TODO: VNet only – use real Chainlink L2 Sequencer Uptime Feed for prod
             )
         );
-        _logDeployment("ChainlinkChainBalanceOracleAdapter", "", adapter);
+        _logDeployment("ChainlinkL2ChainBalanceOracleAdapter", "", adapter);
         ChainBalanceOracle(getChainBalanceOracleAddress(_deployer()))
             .setChainBalanceOracleAdapter(EARNING_CHAIN_ID, adapter);
     }
