@@ -17,6 +17,7 @@ import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
+import {ChainlinkL2PriceOracleAdapter} from "src/oracles/price/ChainlinkL2PriceOracleAdapter.sol";
 import {ChainlinkPriceOracleAdapter} from "src/oracles/price/ChainlinkPriceOracleAdapter.sol";
 import {EarningChainStateSchemaV1} from "src/periphery/EarningChainStateSchemaV1.sol";
 
@@ -67,6 +68,8 @@ contract OracleFeedE2ETest is BaseTest {
         usdcPriceFeed_earningChain = new MockChainlinkAggregator(PRICE_FEED_DECIMALS);
         ghoPriceFeed_earningChain = new MockChainlinkAggregator(PRICE_FEED_DECIMALS);
 
+        mockSequencerUptimeFeed.setAnswer(0, 0);
+
         // Set all feeds to 1:1 and fresh
         usdcPriceFeed_accountingChain.setAnswer(PRICE_ONE, block.timestamp);
         ghoPriceFeed_accountingChain.setAnswer(PRICE_ONE, block.timestamp);
@@ -74,14 +77,24 @@ contract OracleFeedE2ETest is BaseTest {
         ghoPriceFeed_earningChain.setAnswer(PRICE_ONE, block.timestamp);
 
         vm.startPrank(admin);
+        // Accounting chain uses L2 adapters (with sequencer uptime check)
         priceOracle_accountingChain.setOracleAdapterForAsset(
             address(USDC),
-            address(new ChainlinkPriceOracleAdapter(address(USDC), address(usdcPriceFeed_accountingChain), HEARTBEAT))
+            address(
+                new ChainlinkL2PriceOracleAdapter(
+                    address(USDC), address(usdcPriceFeed_accountingChain), HEARTBEAT, address(mockSequencerUptimeFeed)
+                )
+            )
         );
         priceOracle_accountingChain.setOracleAdapterForAsset(
             address(GHO),
-            address(new ChainlinkPriceOracleAdapter(address(GHO), address(ghoPriceFeed_accountingChain), HEARTBEAT))
+            address(
+                new ChainlinkL2PriceOracleAdapter(
+                    address(GHO), address(ghoPriceFeed_accountingChain), HEARTBEAT, address(mockSequencerUptimeFeed)
+                )
+            )
         );
+        // Earning chain uses standard adapters (no sequencer uptime check)
         priceOracle_earningChain.setOracleAdapterForAsset(
             address(USDC),
             address(new ChainlinkPriceOracleAdapter(address(USDC), address(usdcPriceFeed_earningChain), HEARTBEAT))
@@ -1044,11 +1057,13 @@ contract OracleFeedE2ETest is BaseTest {
     function _warpAndRefreshPriceOracles(uint256 timeDelta) internal {
         uint256 targetTimestamp = block.timestamp + timeDelta;
         vm.warp(targetTimestamp);
-        // Avoid isStale returning true and causing the adjusted balance to be 0
+        // Avoid isStale returning true and causing the adjusted balance to be 0.
         _refreshPriceFeedTimestamp(usdcPriceFeed_accountingChain, targetTimestamp);
         _refreshPriceFeedTimestamp(ghoPriceFeed_accountingChain, targetTimestamp);
         _refreshPriceFeedTimestamp(usdcPriceFeed_earningChain, targetTimestamp);
         _refreshPriceFeedTimestamp(ghoPriceFeed_earningChain, targetTimestamp);
+        // Keep sequencer feeds healthy after warp (sequencer up, grace period elapsed).
+        mockSequencerUptimeFeed.setAnswer(0, 0);
     }
 
     function _refreshPriceFeedTimestamp(MockChainlinkAggregator feed, uint256 newTimestamp) internal {

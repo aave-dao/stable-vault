@@ -51,7 +51,18 @@ contract ChainlinkPriceOracleAdapter is IPriceOracleAdapter {
     }
 
     /// @inheritdoc IPriceOracleAdapter
-    function getPrice(address asset) external view override returns (IPriceOracleAdapter.OracleResponse memory) {
+    function getPrice(address asset)
+        external
+        view
+        virtual
+        override
+        returns (IPriceOracleAdapter.OracleResponse memory)
+    {
+        return _getPrice(asset);
+    }
+
+    /// @dev Internal implementation of getPrice that can be called by child contracts.
+    function _getPrice(address asset) internal view returns (IPriceOracleAdapter.OracleResponse memory) {
         require(asset == ASSET, Errors.InvalidAsset(asset));
         (, int256 price,, uint256 updatedAt,) = AggregatorV3Interface(DATA_FEED).latestRoundData();
         uint256 priceRay = _toUint256(price).convertDecimals(DECIMALS, Constants.RAY_DECIMALS);
