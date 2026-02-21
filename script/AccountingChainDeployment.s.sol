@@ -208,19 +208,19 @@ contract AccountingChainDeployment is
         allocator.addStrategy(GHO, ghoYieldStrategy, STRATEGY_MAX_SLIPPAGE_AMOUNT);
         allocator.setDefaultStrategy(GHO, ghoYieldStrategy);
         _deployedATokenVaults.push(ghoYieldStrategy);
-        _logDeployment("GHO aTokenVault", "", ghoYieldStrategy);
+        _logDeployment("GHO aTokenVault", "create2:keccak256(abi.encode(ghoAddress))", ghoYieldStrategy);
 
         address usdcYieldStrategy = _deployATokenVault(USDC, poolAddressProvider, _deployer());
         allocator.addStrategy(USDC, usdcYieldStrategy, STRATEGY_MAX_SLIPPAGE_AMOUNT);
         allocator.setDefaultStrategy(USDC, usdcYieldStrategy);
         _deployedATokenVaults.push(usdcYieldStrategy);
-        _logDeployment("USDC aTokenVault", "", usdcYieldStrategy);
+        _logDeployment("USDC aTokenVault", "create2:keccak256(abi.encode(usdcAddress))", usdcYieldStrategy);
 
         address usdtYieldStrategy = _deployATokenVault(USDT, poolAddressProvider, _deployer());
         allocator.addStrategy(USDT, usdtYieldStrategy, STRATEGY_MAX_SLIPPAGE_AMOUNT);
         allocator.setDefaultStrategy(USDT, usdtYieldStrategy);
         _deployedATokenVaults.push(usdtYieldStrategy);
-        _logDeployment("USDT aTokenVault", "", usdtYieldStrategy);
+        _logDeployment("USDT aTokenVault", "create2:keccak256(abi.encode(usdtAddress))", usdtYieldStrategy);
     }
 
     function _aTokenVaultAddresses() internal view virtual override returns (address[] memory) {

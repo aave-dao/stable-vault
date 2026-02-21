@@ -1,6 +1,10 @@
 @openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
 @openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/
+@openzeppelin/interfaces/=lib/Aave-Vault/lib/openzeppelin-contracts/contracts/interfaces/
+@openzeppelin-upgradeable/=lib/Aave-Vault/lib/openzeppelin-contracts-upgradeable/contracts/
 @chainlink-ccip/contracts/=lib/chainlink-ccip/chains/evm/contracts/
 @solady/=lib/solady/src/
 @pcaversaccio/createx/=lib/createx/src/
 @aave-vault/=lib/Aave-Vault/src/
+@aave-v3-core/=lib/Aave-Vault/lib/aave-v3-core/contracts/
+@aave-v3-periphery/=lib/Aave-Vault/lib/aave-v3-periphery/contracts/
