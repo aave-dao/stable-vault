@@ -3,3 +3,4 @@
 @chainlink-ccip/contracts/=lib/chainlink-ccip/chains/evm/contracts/
 @solady/=lib/solady/src/
 @pcaversaccio/createx/=lib/createx/src/
+@aave-vault/=lib/Aave-Vault/src/
