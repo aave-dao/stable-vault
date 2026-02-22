@@ -571,6 +571,6 @@ contract AccountingChainDeployment is
     function _logDeployment(string memory name, string memory saltSeed, address addr) internal virtual override {
         string memory jsonObject =
             string.concat('{ "address": "', addr.toHexString(), '", "saltSeed": "', saltSeed, '" }');
-        vm.writeJson(jsonObject, "deployments/vnet/accounting.json", string.concat(".", name));
+        vm.writeJson(jsonObject, "deployments/vnet/v0.3/accounting.json", string.concat(".", name));
     }
 }
