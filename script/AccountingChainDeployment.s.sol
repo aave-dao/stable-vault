@@ -164,6 +164,7 @@ contract AccountingChainDeployment is
         _setupAssetRegistry();
         _setupAllocator();
         _setupFundsHandler();
+        _setupWithdrawalPolicy();
         _setupAccessManager(_deployer());
         _setupPriceOracleAdapters();
         _setupChainBalanceOracleAdapters();
@@ -236,6 +237,12 @@ contract AccountingChainDeployment is
     function _setupFundsHandler() internal {
         IFundsHandler fundsHandler = IFundsHandler(getFundsHandlerAddress(_deployer()));
         fundsHandler.addEarningChain(EARNING_CHAIN_ID);
+    }
+
+    function _setupWithdrawalPolicy() internal {
+        WithdrawalPolicy withdrawalPolicy = WithdrawalPolicy(getWithdrawalPolicyAddress(_deployer()));
+        withdrawalPolicy.setDefaultFeeBps(50); // 0.5% – TODO: VNet only – reconsider default fee for prod
+        withdrawalPolicy.setSigner(address(0x8eFCe8C8cF3d1B198D95B3067EcF43Fb0A1039e2), true); // TODO: Set prod signer
     }
 
     function _setupAssetRegistry() internal {

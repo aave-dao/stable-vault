@@ -123,6 +123,7 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
         _setupBridgeAdapters();
         _setupAssetRegistry();
         _setupAllocator();
+        _setupWithdrawalPolicy();
         _setupAccessManager(_deployer());
         _setupPriceOracleAdapters();
     }
@@ -157,6 +158,12 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
 
         ICcipBridgeAdapter(localCcipAdapter).setChainSelector(ACCOUNTING_CHAIN_ID, ACCOUNTING_CHAIN_CCIP_SELECTOR);
         ICcipBridgeAdapter(localCcipAdapter).setDestinationChainAdapter(ACCOUNTING_CHAIN_ID, accountingCcipAdapter);
+    }
+
+    function _setupWithdrawalPolicy() internal {
+        WithdrawalPolicy withdrawalPolicy = WithdrawalPolicy(getWithdrawalPolicyAddress(_deployer()));
+        withdrawalPolicy.setDefaultFeeBps(50); // 0.5% – TODO: VNet only – reconsider default fee for prod
+        withdrawalPolicy.setSigner(address(0x8eFCe8C8cF3d1B198D95B3067EcF43Fb0A1039e2), true); // TODO: Set prod signer
     }
 
     function _setupAllocator() internal {
