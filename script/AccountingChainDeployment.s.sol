@@ -26,6 +26,7 @@ import {IAccountingChainGateway} from "src/interfaces/IAccountingChainGateway.so
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
+import {IEarningChainStateProvider} from "src/interfaces/IEarningChainStateProvider.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {ChainBalanceOracle} from "src/oracles/balance/ChainBalanceOracle.sol";
 import {ChainlinkL2ChainBalanceOracleAdapter} from "src/oracles/balance/ChainlinkL2ChainBalanceOracleAdapter.sol";
@@ -33,6 +34,7 @@ import {ChainlinkL2PriceOracleAdapter} from "src/oracles/price/ChainlinkL2PriceO
 import {AggregatorV3Interface} from "src/oracles/price/ChainlinkPriceOracleAdapter.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {AssetRegistry} from "src/periphery/AssetRegistry.sol";
+import {EarningChainStateSchemaV1, SCHEMA_VERSION} from "src/periphery/EarningChainStateSchemaV1.sol";
 import {Swapper} from "src/periphery/Swapper.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
@@ -42,8 +44,8 @@ import {MockSequencerUptimeFeed} from "test/mocks/MockSequencerUptimeFeed.sol";
 contract AccountingChainDeployment is
     Create3Deployment,
     AccessManagerAccountingChainSetup,
-    ATokenVaultDeployment,
-    Script
+    Script,
+    ATokenVaultDeployment
 {
     using Strings for address;
 
@@ -518,8 +520,17 @@ contract AccountingChainDeployment is
 
     // TODO: VNet only – remove for prod and use the real Chainlink Bundle Aggregator Proxy address.
     function _deployMockBundleFeed() internal {
-        _chainlinkBundleAggregatorProxy = address(new MockBundleFeed());
+        MockBundleFeed mockBundleFeed = new MockBundleFeed();
+        _chainlinkBundleAggregatorProxy = address(mockBundleFeed);
         _logDeployment("MockBundleFeed", "", _chainlinkBundleAggregatorProxy);
+
+        // Seed with valid initial state so ChainBalanceOracle adapter validation passes during setup.
+        EarningChainStateSchemaV1.BalanceSnapshot memory snapshot = EarningChainStateSchemaV1.BalanceSnapshot({
+            balanceRay: 0, timestamp: block.timestamp, blockNumber: block.number, chainId: EARNING_CHAIN_ID
+        });
+        IEarningChainStateProvider.State memory state =
+            IEarningChainStateProvider.State({version: SCHEMA_VERSION, data: abi.encode(snapshot)});
+        mockBundleFeed.publishState(abi.encode(state));
     }
 
     // TODO: VNet only – remove for prod and use the real Chainlink L2 Sequencer Uptime Feed address.
