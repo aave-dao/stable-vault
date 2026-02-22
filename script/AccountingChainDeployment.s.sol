@@ -211,19 +211,22 @@ contract AccountingChainDeployment is
         // Aave V3 Arbitrum PoolAddressesProvider
         address poolAddressProvider = address(0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb);
 
-        address ghoYieldStrategy = _deployATokenVault(GHO, poolAddressProvider, _deployer());
+        address ghoYieldStrategy =
+            _deployATokenVault(GHO, poolAddressProvider, getAccessManagerAddress(_deployer()), _deployer());
         allocator.addStrategy(GHO, ghoYieldStrategy, STRATEGY_MAX_SLIPPAGE_AMOUNT);
         allocator.setDefaultStrategy(GHO, ghoYieldStrategy);
         _deployedATokenVaults.push(ghoYieldStrategy);
         _logDeployment("GHO aTokenVault", "create2:keccak256(abi.encode(ghoAddress))", ghoYieldStrategy);
 
-        address usdcYieldStrategy = _deployATokenVault(USDC, poolAddressProvider, _deployer());
+        address usdcYieldStrategy =
+            _deployATokenVault(USDC, poolAddressProvider, getAccessManagerAddress(_deployer()), _deployer());
         allocator.addStrategy(USDC, usdcYieldStrategy, STRATEGY_MAX_SLIPPAGE_AMOUNT);
         allocator.setDefaultStrategy(USDC, usdcYieldStrategy);
         _deployedATokenVaults.push(usdcYieldStrategy);
         _logDeployment("USDC aTokenVault", "create2:keccak256(abi.encode(usdcAddress))", usdcYieldStrategy);
 
-        address usdtYieldStrategy = _deployATokenVault(USDT, poolAddressProvider, _deployer());
+        address usdtYieldStrategy =
+            _deployATokenVault(USDT, poolAddressProvider, getAccessManagerAddress(_deployer()), _deployer());
         allocator.addStrategy(USDT, usdtYieldStrategy, STRATEGY_MAX_SLIPPAGE_AMOUNT);
         allocator.setDefaultStrategy(USDT, usdtYieldStrategy);
         _deployedATokenVaults.push(usdtYieldStrategy);
