@@ -15,7 +15,7 @@ import {ATokenVaultMerklRewardClaimer} from "@aave-vault/ATokenVaultMerklRewardC
 contract ATokenVaultDeployment {
     using SafeERC20 for IERC20;
 
-    function _deployATokenVault(address underlying, address poolAddressProvider, address owner)
+    function _deployATokenVault(address underlying, address poolAddressProvider, address owner, address deployer)
         internal
         returns (address vault)
     {
@@ -42,7 +42,7 @@ contract ATokenVaultDeployment {
             type(TransparentUpgradeableProxy).creationCode, abi.encode(implementation, owner, initCalldata)
         );
 
-        vault = Create2.computeAddress(salt, keccak256(creationCode));
+        vault = Create2.computeAddress(salt, keccak256(creationCode), deployer);
         IERC20(underlying).forceApprove(vault, initialLockDeposit);
 
         new TransparentUpgradeableProxy{salt: salt}(implementation, owner, initCalldata);
