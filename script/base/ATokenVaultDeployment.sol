@@ -29,7 +29,9 @@ contract ATokenVaultDeployment {
             (
                 owner,
                 0,
+                // TODO: Consider another name for prod deployment
                 string(abi.encodePacked("StableVault's ", IERC20Metadata(underlying).name())),
+                // TODO: Consider another symbol for prod deployment
                 string(abi.encodePacked("StableVault/", IERC20Metadata(underlying).symbol())),
                 initialLockDeposit
             )
