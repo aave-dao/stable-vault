@@ -2,27 +2,34 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.20;
 
+import {Script} from "forge-std/Script.sol";
+
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {Create2} from "@openzeppelin/contracts/utils/Create2.sol";
 
 import {IPoolAddressesProvider} from "@aave-v3-core/interfaces/IPoolAddressesProvider.sol";
 import {ATokenVault} from "@aave-vault/ATokenVault.sol";
 import {ATokenVaultMerklRewardClaimer} from "@aave-vault/ATokenVaultMerklRewardClaimer.sol";
 
-contract ATokenVaultDeployment {
+contract ATokenVaultDeployment is Script {
     using SafeERC20 for IERC20;
 
     function _deployATokenVault(address underlying, address poolAddressProvider, address owner, address deployer)
         internal
-        returns (address vault)
+        returns (address)
     {
         uint256 initialLockDeposit = 10 ** IERC20Metadata(underlying).decimals();
 
         address implementation =
             address(new ATokenVaultMerklRewardClaimer(underlying, 0, IPoolAddressesProvider(poolAddressProvider)));
+
+        // Compute proxy address: approve call consumes a nonce, then proxy deploy consumes the next.
+        uint64 proxyNonce = vm.getNonce(deployer) + 1;
+        address vaultAddress = vm.computeCreateAddress(deployer, proxyNonce);
+
+        IERC20(underlying).forceApprove(vaultAddress, initialLockDeposit);
 
         bytes memory initCalldata = abi.encodeCall(
             ATokenVault.initialize,
@@ -37,14 +44,10 @@ contract ATokenVaultDeployment {
             )
         );
 
-        bytes32 salt = keccak256(abi.encode(underlying));
-        bytes memory creationCode = abi.encodePacked(
-            type(TransparentUpgradeableProxy).creationCode, abi.encode(implementation, owner, initCalldata)
-        );
+        address proxyAddress = address(new TransparentUpgradeableProxy(implementation, owner, initCalldata));
 
-        vault = Create2.computeAddress(salt, keccak256(creationCode), deployer);
-        IERC20(underlying).forceApprove(vault, initialLockDeposit);
+        require(proxyAddress == vaultAddress, "aTokenVault address does not match expected address");
 
-        new TransparentUpgradeableProxy{salt: salt}(implementation, owner, initCalldata);
+        return proxyAddress;
     }
 }
