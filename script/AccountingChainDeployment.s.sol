@@ -165,9 +165,9 @@ contract AccountingChainDeployment is
         _setupAllocator();
         _setupFundsHandler();
         _setupWithdrawalPolicy();
-        _setupAccessManager(_deployer());
         _setupPriceOracleAdapters();
         _setupChainBalanceOracleAdapters();
+        _setupAccessManager(_deployer()); // Must be last – revokes deployer's ADMIN_ROLE
     }
 
     function _accessManager() internal view virtual override returns (address) {

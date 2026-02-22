@@ -31,7 +31,7 @@ import {Swapper} from "src/periphery/Swapper.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 
-contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainSetup, ATokenVaultDeployment, Script {
+contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainSetup, Script, ATokenVaultDeployment {
     using Strings for address;
 
     address[] internal _deployedATokenVaults;
@@ -124,8 +124,8 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
         _setupAssetRegistry();
         _setupAllocator();
         _setupWithdrawalPolicy();
-        _setupAccessManager(_deployer());
         _setupPriceOracleAdapters();
+        _setupAccessManager(_deployer()); // Must be last – revokes deployer's ADMIN_ROLE
     }
 
     function _accessManager() internal view virtual override returns (address) {
