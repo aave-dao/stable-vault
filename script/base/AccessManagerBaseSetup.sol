@@ -102,6 +102,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
     function _deployOwnedMulticallForRebalancerProfile() internal virtual returns (address) {
+        require(REBALANCER_MULTICALL_OWNER != address(0), "Rebalancer Profile OwnedMulticall owner is not set");
         address rebalancerMulticall = _deploy_create3({
             namespacedSaltSeed: REBALANCER_MULTICALL_SALT_SEED,
             deployer: _deployer(),
@@ -113,6 +114,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     }
 
     function _deployOwnedMulticallForDisablerProfile() internal virtual returns (address) {
+        require(DISABLER_MULTICALL_OWNER != address(0), "Disabler Profile OwnedMulticall owner is not set");
         address disablerMulticall = _deploy_create3({
             namespacedSaltSeed: DISABLER_MULTICALL_SALT_SEED,
             deployer: _deployer(),
