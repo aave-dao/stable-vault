@@ -108,7 +108,7 @@ interface IStableVault {
 
     /// @notice Claims surplus interest from the vault.
     /// @dev If funds requested can be covered by the system's surplus interest, the funds are pulled from downstream
-    /// components and transferred to the msg.sender.
+    /// components and transferred to a Treasury address.
     /// @param assets Assets to claim surplus interest for.
     /// @param amounts Amounts of assets to claim surplus interest for in their respective asset units.
     function claimSurplusInterest(address[] calldata assets, uint256[] calldata amounts) external;
