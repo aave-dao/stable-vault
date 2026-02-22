@@ -31,7 +31,7 @@ interface IStableVault {
 
     event WithdrawalExecuted(address indexed user, address asset, uint256 amount);
 
-    event Deposit(address indexed user, address indexed asset, uint256 netDepositAmount);
+    event Deposit(address indexed user, address indexed asset, uint256 amount);
 
     /// @notice Emitted on Stable Vault balance transfers (amount is denominated in RAY).
     event Transfer(address indexed from, address indexed to, uint256 amountRay);
