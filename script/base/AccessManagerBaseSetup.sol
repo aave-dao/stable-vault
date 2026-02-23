@@ -5,11 +5,39 @@ pragma solidity ^0.8.20;
 import {IAccessManager} from "lib/openzeppelin-contracts/contracts/access/manager/IAccessManager.sol";
 
 import {Create3AddressBook} from "script/base/Create3AddressBook.sol";
+import {Create3Deployment} from "script/base/Create3Deployment.sol";
+import {Create3AddressLib} from "script/libraries/Create3AddressLib.sol";
 import {RolesLib} from "script/libraries/RolesLib.sol";
 import {IMulticall} from "src/interfaces/IMulticall.sol";
+import {OwnedMulticall} from "src/periphery/OwnedMulticall.sol";
 import {_toSelectorArray} from "test/helpers/TypeHelpers.sol";
 
-abstract contract AccessManagerBaseSetup is Create3AddressBook {
+abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deployment {
+    ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+    address private constant DEPLOYER = address(0xBB700dA5CCC9Ec5605780Fc40695f1206B090303);
+
+    //////////////// Admin Profiles ////////////////
+    // TODO: Change to prod address
+    address constant HIGH_THRESHOLD_MULTISIG_ADMIN_PROFILE = address(0xB07C4BDb69f6f661F0F09Be393be4018fCF94F29);
+    // TODO: Change to prod address
+    address constant MED_THRESHOLD_MULTISIG_ADMIN_PROFILE = address(0x9c9524feeF06E5e6fd8E769398f625e3E204837F);
+
+    //////////////// Operational Profiles Shared between Accounting and Earning Chains ////////////////
+
+    string constant REBALANCER_MULTICALL_SALT_SEED = "aave.stable-vault.OwnedMulticall.RebalancerProfile";
+    string constant DISABLER_MULTICALL_SALT_SEED = "aave.stable-vault.OwnedMulticall.DisablerProfile";
+
+    // TODO: Change to prod address
+    address constant REBALANCER_MULTICALL_OWNER = address(0x9207D805ef5e0557640b94ee36DA7Ed3bE9e235e);
+    // TODO: Change to prod address
+    address constant DISABLER_MULTICALL_OWNER = address(0xf43Ff3b0f46Cfd444905778f00587e12cC1C08c3);
+
+    // TODO: Change to prod address
+    address constant WITHDRAWAL_POLICY_MANAGER_PROFILE = address(0x43cEA7b37F81197fF60FE1700Fd97905f868A94C);
+    // TODO: Change to prod address
+    address constant ATOKEN_VAULT_REWARD_CLAIMER_PROFILE = address(0xE49D14D7157412da6145a155DaeFdD1cA069f626);
+
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
     function _setupAccessManager(address deployer) internal {
@@ -41,19 +69,61 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook {
 
     function _accessManager() internal view virtual returns (address);
 
+    function _deployer() internal view virtual returns (address) {
+        return DEPLOYER;
+    }
+
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-    function _getProfile__MainAdmin() internal pure virtual returns (address);
+    function _getProfile__MainAdmin() internal view virtual returns (address) {
+        return HIGH_THRESHOLD_MULTISIG_ADMIN_PROFILE;
+    }
 
-    function _getProfile__SecondaryAdmin() internal pure virtual returns (address);
+    function _getProfile__SecondaryAdmin() internal view virtual returns (address) {
+        return MED_THRESHOLD_MULTISIG_ADMIN_PROFILE;
+    }
 
-    function _getProfile__WithdrawalPolicyManager() internal pure virtual returns (address);
+    function _getProfile__WithdrawalPolicyManager() internal view virtual returns (address) {
+        return WITHDRAWAL_POLICY_MANAGER_PROFILE;
+    }
 
-    function _getProfile__Rebalancer() internal pure virtual returns (address);
+    function _getProfile__Rebalancer() internal view virtual returns (address) {
+        return Create3AddressLib.computeCreate3Address(REBALANCER_MULTICALL_SALT_SEED, _deployer());
+    }
 
-    function _getProfile__Disabler() internal pure virtual returns (address);
+    function _getProfile__Disabler() internal view virtual returns (address) {
+        return Create3AddressLib.computeCreate3Address(DISABLER_MULTICALL_SALT_SEED, _deployer());
+    }
 
-    function _getProfile__ATokenVaultRewardClaimer() internal pure virtual returns (address);
+    function _getProfile__ATokenVaultRewardClaimer() internal view virtual returns (address) {
+        return ATOKEN_VAULT_REWARD_CLAIMER_PROFILE;
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+    function _deployOwnedMulticallForRebalancerProfile() internal virtual returns (address) {
+        require(REBALANCER_MULTICALL_OWNER != address(0), "Rebalancer Profile OwnedMulticall owner is not set");
+        address rebalancerMulticall = _deploy_create3({
+            namespacedSaltSeed: REBALANCER_MULTICALL_SALT_SEED,
+            deployer: _deployer(),
+            initCode: abi.encodePacked(type(OwnedMulticall).creationCode, abi.encode(REBALANCER_MULTICALL_OWNER))
+        });
+        require(rebalancerMulticall == _getProfile__Rebalancer(), "RebalancerMulticall does not match expected address");
+        _logDeployment("RebalancerMulticall", REBALANCER_MULTICALL_SALT_SEED, rebalancerMulticall);
+        return rebalancerMulticall;
+    }
+
+    function _deployOwnedMulticallForDisablerProfile() internal virtual returns (address) {
+        require(DISABLER_MULTICALL_OWNER != address(0), "Disabler Profile OwnedMulticall owner is not set");
+        address disablerMulticall = _deploy_create3({
+            namespacedSaltSeed: DISABLER_MULTICALL_SALT_SEED,
+            deployer: _deployer(),
+            initCode: abi.encodePacked(type(OwnedMulticall).creationCode, abi.encode(DISABLER_MULTICALL_OWNER))
+        });
+        require(disablerMulticall == _getProfile__Disabler(), "DisablerMulticall does not match expected address");
+        _logDeployment("DisablerMulticall", DISABLER_MULTICALL_SALT_SEED, disablerMulticall);
+        return disablerMulticall;
+    }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -65,6 +135,8 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook {
         _setupProfile__Disabler();
         _setupProfile__ATokenVaultRewardClaimer();
     }
+
+    function _logDeployment(string memory, string memory, address) internal virtual {}
 
     function _aTokenVaultAddresses() internal view virtual returns (address[] memory);
 
@@ -193,6 +265,8 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook {
     }
 
     function _setupProfile__Rebalancer() internal {
+        _deployOwnedMulticallForRebalancerProfile();
+
         address rebalancerProfile = _getProfile__Rebalancer();
         require(rebalancerProfile != address(0), "Rebalancer profile address not set");
 
@@ -211,6 +285,8 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook {
     }
 
     function _setupProfile__Disabler() internal {
+        _deployOwnedMulticallForDisablerProfile();
+
         address disablerProfile = _getProfile__Disabler();
         require(disablerProfile != address(0), "Disabler profile address not set");
 

@@ -8,44 +8,8 @@ import {RolesLib} from "script/libraries/RolesLib.sol";
 abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-    //////////////// Admin Profiles ////////////////
-    address constant HIGH_THRESHOLD_MULTISIG_ADMIN_PROFILE = address(0);
-    address constant MED_THRESHOLD_MULTISIG_ADMIN_PROFILE = address(0);
-
-    //////////////// Operational Profiles ////////////////
-    address constant WITHDRAWAL_POLICY_MANAGER_PROFILE = address(0);
-    address constant STABLE_VAULT_MANAGER_PROFILE = address(0);
-    address constant REBALANCER_PROFILE = address(0);
-    address constant DISABLER_PROFILE = address(0);
-    address constant ATOKEN_VAULT_REWARD_CLAIMER_PROFILE = address(0);
-
-    ///////////////////////////////////////////////////////////////////////////////////////////////////
-
-    function _getProfile__MainAdmin() internal pure virtual override returns (address) {
-        return HIGH_THRESHOLD_MULTISIG_ADMIN_PROFILE;
-    }
-
-    function _getProfile__SecondaryAdmin() internal pure virtual override returns (address) {
-        return MED_THRESHOLD_MULTISIG_ADMIN_PROFILE;
-    }
-
-    function _getProfile__WithdrawalPolicyManager() internal pure virtual override returns (address) {
-        return WITHDRAWAL_POLICY_MANAGER_PROFILE;
-    }
-
-    function _getProfile__Rebalancer() internal pure virtual override returns (address) {
-        return REBALANCER_PROFILE;
-    }
-
-    function _getProfile__Disabler() internal pure virtual override returns (address) {
-        return DISABLER_PROFILE;
-    }
-
-    function _getProfile__ATokenVaultRewardClaimer() internal pure virtual override returns (address) {
-        return ATOKEN_VAULT_REWARD_CLAIMER_PROFILE;
-    }
-
-    //////////////// Special Accounting Chain Profiles
+    // TODO: Change to prod address
+    address constant STABLE_VAULT_MANAGER_PROFILE = address(0x4B0353F7B7122862487d22C447bd9cDc91779133);
 
     function _getProfile__StableVaultManager() internal pure virtual returns (address) {
         return STABLE_VAULT_MANAGER_PROFILE;

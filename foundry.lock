@@ -1,4 +1,10 @@
 {
+  "lib/Aave-Vault": {
+    "branch": {
+      "name": "feat/merkl-rewards",
+      "rev": "67395a8ac24422b0de53a3703b5409081b8576a3"
+    }
+  },
   "lib/chainlink-ccip": {
     "rev": "76e3647a648bd4b8cc483515ed13bc111e5fb16b"
   },

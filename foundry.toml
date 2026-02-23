@@ -9,6 +9,7 @@ fs_permissions = [
     { access = "read-write", path = "deployments" },
 ]
 cbor_metadata = true
+ignored_warnings_from = ["lib/"]
 optimizer = true
 optimizer_runs = 1_000_000
 

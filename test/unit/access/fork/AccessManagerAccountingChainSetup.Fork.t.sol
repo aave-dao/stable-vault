@@ -2,6 +2,8 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.20;
 
+import {AccountingChainDeployment} from "script/AccountingChainDeployment.s.sol";
+import {AccessManagerBaseSetup} from "script/base/AccessManagerBaseSetup.sol";
 import {RolesLib} from "script/libraries/RolesLib.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 
@@ -18,47 +20,16 @@ contract AccessManagerAccountingChainSetupForkTest is AccessManagerAccountingCha
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    // OVERRIDES — profile getters point to setup script constants
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-    function _getProfile__MainAdmin() internal pure override returns (address) {
-        return HIGH_THRESHOLD_MULTISIG_ADMIN_PROFILE;
-    }
-
-    function _getProfile__SecondaryAdmin() internal pure override returns (address) {
-        return MED_THRESHOLD_MULTISIG_ADMIN_PROFILE;
-    }
-
-    function _getProfile__WithdrawalPolicyManager() internal pure override returns (address) {
-        return WITHDRAWAL_POLICY_MANAGER_PROFILE;
-    }
-
-    function _getProfile__Rebalancer() internal pure override returns (address) {
-        return REBALANCER_PROFILE;
-    }
-
-    function _getProfile__Disabler() internal pure override returns (address) {
-        return DISABLER_PROFILE;
-    }
-
-    function _getProfile__ATokenVaultRewardClaimer() internal pure override returns (address) {
-        return ATOKEN_VAULT_REWARD_CLAIMER_PROFILE;
-    }
-
-    function _getProfile__StableVaultManager() internal pure override returns (address) {
-        return STABLE_VAULT_MANAGER_PROFILE;
-    }
-
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // OVERRIDES — address getters point to setup script constants / Create3 computations
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    function _getDeployer() internal pure override returns (address) {
-        return address(0xBB700dA5CCC9Ec5605780Fc40695f1206B090303);
-    }
-
-    function _accessManager() internal pure override returns (address) {
-        return getAccessManagerAddress(_getDeployer());
+    function _accessManager()
+        internal
+        view
+        override(AccessManagerBaseSetup, AccountingChainDeployment)
+        returns (address)
+    {
+        return getAccessManagerAddress(_deployer());
     }
 
     function _aTokenVaultAddresses()
@@ -67,7 +38,7 @@ contract AccessManagerAccountingChainSetupForkTest is AccessManagerAccountingCha
         override(AccessManagerAccountingChainSetupTest)
         returns (address[] memory)
     {
-        IAllocator allocator = IAllocator(getAllocatorAddress(_getDeployer()));
+        IAllocator allocator = IAllocator(getAllocatorAddress(_deployer()));
         address[] memory vaults = new address[](2);
         vaults[0] = allocator.getDefaultStrategy(GHO);
         vaults[1] = allocator.getDefaultStrategy(USDC);
