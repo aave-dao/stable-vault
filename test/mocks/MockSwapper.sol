@@ -19,7 +19,7 @@ contract MockSwapper is ISwapper {
     }
 
     /// @inheritdoc ISwapper
-    function executeSwap(address assetIn, address assetOut, uint256 amountIn, bytes memory)
+    function executeSwap(address assetIn, address assetOut, uint256 amountIn, address, bytes memory)
         external
         override
         returns (uint256)
