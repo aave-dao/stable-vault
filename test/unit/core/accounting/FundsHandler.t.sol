@@ -712,6 +712,7 @@ contract FundsHandlerTest is TestWithHelpers {
     }
 
     function test_addEarningChain_reverts_ifChainIdAlreadyPresent(uint256 chainId) public {
+        vm.assume(chainId != block.chainid);
         vm.prank(ADMIN);
         fundsHandler.addEarningChain(chainId);
         vm.prank(ADMIN);
@@ -726,6 +727,7 @@ contract FundsHandlerTest is TestWithHelpers {
     }
 
     function test_removeEarningChain_reverts_ifChainIdNotPresent(uint256 chainId) public {
+        vm.assume(chainId != block.chainid);
         vm.prank(ADMIN);
         vm.expectRevert(abi.encodeWithSelector(IFundsHandler.ChainIdNotPresent.selector));
         fundsHandler.removeEarningChain(chainId);
