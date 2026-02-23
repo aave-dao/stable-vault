@@ -101,15 +101,15 @@
   },
   "GHO aTokenVault": {
     "address": "0x6aa121cffa43a9ae1d8891752ab3a3ba6c710f72",
-    "saltSeed": "create2:keccak256(abi.encode(ghoAddress))"
+    "saltSeed": ""
   },
   "USDC aTokenVault": {
     "address": "0x833796582d6ab66e471f7e3bcf6f41ca5003401f",
-    "saltSeed": "create2:keccak256(abi.encode(usdcAddress))"
+    "saltSeed": ""
   },
   "USDT aTokenVault": {
     "address": "0x588f577d5a0568e53c5a90c67d66078b887a2e91",
-    "saltSeed": "create2:keccak256(abi.encode(usdtAddress))"
+    "saltSeed": ""
   },
   "ChainlinkL2PriceOracleAdapter::GHO": {
     "address": "0x8c5dc93a851e7267a7ed508c2236b2c206fe0015",
