@@ -94,6 +94,9 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
     }
 
     /// @inheritdoc IIouTokenManager
+    /// @dev IOUs should be bridged via bridges which require finalization on the source chain. If IOUs are bridged and
+    /// exchanged for assets on a destination, but the source chain reorgs, then a user would keep their IOUs and the
+    /// assets withdrawn on the destination chain.
     function bridgeTokens(
         uint256 destinationChainId,
         address iouTokenRecipient,
