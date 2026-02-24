@@ -263,7 +263,7 @@ contract StableVault is
 
         uint256 toUserShares;
         if (toSubVaultId == fromSubVaultId) {
-            toUserShares = amountRay.rayDivDown(fromConversionRate);
+            toUserShares = fromUserShares;
         } else {
             uint256 toConversionRate = _accrueSubVaultConversionRate(toSubVaultId);
             toUserShares = amountRay.rayDivDown(toConversionRate);
