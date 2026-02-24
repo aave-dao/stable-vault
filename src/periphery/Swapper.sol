@@ -35,7 +35,7 @@ contract Swapper is Ownable, ReentrancyGuard, ISwapper {
     }
 
     /// @inheritdoc ISwapper
-    /// @dev Assumes `amountIn` tokens of `assetIn` were sent from the msg.sender
+    /// @dev Assumes `amountIn` tokens of `assetIn` were sent from the `msg.sender` (i.e. the Allocator contract)
     function executeSwap(address assetIn, address assetOut, uint256 amountIn, address, bytes memory data)
         external
         override
