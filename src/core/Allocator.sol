@@ -340,7 +340,8 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         IERC20(swap.assetIn).safeTransfer(swap.swapper, swap.amountIn);
 
         // Execute the swap and require 1:1 conversion
-        uint256 amountOut = ISwapper(swap.swapper).executeSwap(swap.assetIn, swap.assetOut, swap.amountIn, swap.data);
+        uint256 amountOut =
+            ISwapper(swap.swapper).executeSwap(swap.assetIn, swap.assetOut, swap.amountIn, msg.sender, swap.data);
         require(
             amountOut >= swap.amountIn.convertAssetDecimals(swap.assetIn, swap.assetOut), Errors.InsufficientAmountOut()
         );

@@ -25,6 +25,7 @@ contract SwapperTest is TestWithHelpers {
 
     // Allocator is the owner of the Swapper
     address allocator = makeAddr("ALLOCATOR");
+    address rebalancer = makeAddr("REBALANCER");
     address slippageCoverageSource = makeAddr("SLIPPAGE_COVERAGE_SOURCE");
 
     Swapper internal _swapper;
@@ -52,7 +53,8 @@ contract SwapperTest is TestWithHelpers {
             address(_mockUsdt), address(_mockGho), amountIn, minAmountOut, slippageToleranceBps
         );
         vm.prank(allocator);
-        uint256 actualAmountOut = _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, data);
+        uint256 actualAmountOut =
+            _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
 
         assertEq(IERC20(_mockUsdt).balanceOf(address(_swapper)), 0);
         assertEq(IERC20(_mockGho).balanceOf(address(_swapper)), minAmountOut);
@@ -80,7 +82,8 @@ contract SwapperTest is TestWithHelpers {
             address(_mockGho), address(_mockUsdt), amountIn, minAmountOut, slippageToleranceBps
         );
         vm.prank(allocator);
-        uint256 actualAmountOut = _swapper.executeSwap(address(_mockGho), address(_mockUsdt), amountIn, data);
+        uint256 actualAmountOut =
+            _swapper.executeSwap(address(_mockGho), address(_mockUsdt), amountIn, rebalancer, data);
 
         assertEq(IERC20(_mockGho).balanceOf(address(_swapper)), 0);
         assertEq(IERC20(_mockUsdt).balanceOf(address(_swapper)), minAmountOut);
@@ -114,7 +117,8 @@ contract SwapperTest is TestWithHelpers {
             address(_mockUsdt), address(_mockGho), amountIn, minAmountOut, slippageToleranceBps
         );
         vm.prank(allocator);
-        uint256 actualAmountOut = _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, data);
+        uint256 actualAmountOut =
+            _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
 
         assertEq(IERC20(_mockUsdt).balanceOf(address(_swapper)), 0);
         assertEq(IERC20(_mockGho).balanceOf(address(_swapper)), amountOutIfNoSlippage);
@@ -151,7 +155,8 @@ contract SwapperTest is TestWithHelpers {
             address(_mockGho), address(_mockUsdt), amountIn, minAmountOut, slippageToleranceBps
         );
         vm.prank(allocator);
-        uint256 actualAmountOut = _swapper.executeSwap(address(_mockGho), address(_mockUsdt), amountIn, data);
+        uint256 actualAmountOut =
+            _swapper.executeSwap(address(_mockGho), address(_mockUsdt), amountIn, rebalancer, data);
 
         assertEq(IERC20(_mockGho).balanceOf(address(_swapper)), 0);
         assertEq(IERC20(_mockUsdt).balanceOf(address(_swapper)), amountOutIfNoSlippage);
@@ -190,7 +195,8 @@ contract SwapperTest is TestWithHelpers {
         bytes memory data =
             _encodeDexSwapExactInputData(address(_mockUsdt), address(_mockGho), amountIn, 0, slippageToleranceBps);
         vm.prank(allocator);
-        uint256 actualAmountOut = _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, data);
+        uint256 actualAmountOut =
+            _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
 
         // Check that the slippage coverage source has no balance left because it was used to cover slippage.
         assertEq(
@@ -217,7 +223,8 @@ contract SwapperTest is TestWithHelpers {
         bytes memory data =
             _encodeDexSwapExactInputData(address(_mockUsdt), address(_mockGho), amountIn, amountOutIfNoSlippage, 0);
         vm.prank(allocator);
-        uint256 actualAmountOutFromSwap = _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, data);
+        uint256 actualAmountOutFromSwap =
+            _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
 
         // Allocator should be able to pull the output token of actualAmountOut
         vm.prank(allocator);
@@ -244,7 +251,8 @@ contract SwapperTest is TestWithHelpers {
         bytes memory data = abi.encode(targets, callDatas, slippageParams);
 
         vm.prank(allocator);
-        uint256 actualAmountOut = _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, data);
+        uint256 actualAmountOut =
+            _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
 
         assertEq(IERC20(_mockUsdt).balanceOf(address(_swapper)), amountIn);
         assertEq(IERC20(_mockGho).balanceOf(address(_swapper)), amountOutIfNoSlippage);
@@ -276,7 +284,8 @@ contract SwapperTest is TestWithHelpers {
             address(_mockUsdt), address(_mockGho), amountIn, minAmountOut, slippageToleranceBps
         );
         vm.prank(allocator);
-        uint256 actualAmountOut = _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, data);
+        uint256 actualAmountOut =
+            _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
 
         // Check that the slippage coverage source no longer has the amount needed to cover slippage
         assertEq(_mockGho.balanceOf(address(slippageCoverageSource)), 0);
@@ -315,7 +324,7 @@ contract SwapperTest is TestWithHelpers {
         );
         vm.prank(allocator);
         vm.expectRevert(abi.encodeWithSelector(ISwapper.SlippageToleranceExceeded.selector));
-        _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, data);
+        _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
     }
 
     function test_executeSwap_reverts_18decimalsInput_6decimalsOutput_slippage(
@@ -349,7 +358,7 @@ contract SwapperTest is TestWithHelpers {
         // actual amount out (the impact of the actual slippage does is not large enough to make amountOut less than
         // what tolerated slippage allows).
         vm.expectRevert();
-        _swapper.executeSwap(address(_mockGho), address(_mockUsdt), amountIn, data);
+        _swapper.executeSwap(address(_mockGho), address(_mockUsdt), amountIn, rebalancer, data);
     }
 
     function test_executeSwap_reverts_ifCallToTargetFailed() public {
@@ -367,7 +376,7 @@ contract SwapperTest is TestWithHelpers {
 
         vm.expectRevert(abi.encodeWithSelector(ISwapper.CallToTargetFailed.selector));
         vm.prank(allocator);
-        _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, data);
+        _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
     }
 
     function test_executeSwap_reverts_ifNotOwner(address caller) public {
@@ -376,7 +385,7 @@ contract SwapperTest is TestWithHelpers {
         bytes memory data = abi.encode(keccak256("test"));
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, caller));
         vm.prank(caller);
-        _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, data);
+        _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
     }
 
     /// @dev Allocator transfer input token into the Swapper before invoking the swap
