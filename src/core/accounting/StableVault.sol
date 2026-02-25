@@ -34,6 +34,7 @@ import {Errors} from "src/types/Errors.sol";
 /// @dev This contract supports batching of calls using the Multicall contract.
 /// @dev Assets balances are tracked in RAY internally; conversions from and to specific asset denomination is made on
 /// deposit and on withdrawal execution.
+/// @custom:upgradeable
 contract StableVault is
     AccessManagedUpgradeable,
     RescuableNative,

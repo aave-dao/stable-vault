@@ -32,6 +32,7 @@ import {Errors} from "src/types/Errors.sol";
 ///      - assumes all assets in Allocator share a common denomination
 ///      - asset amounts are treated in their native decimals
 ///      - 100% of assets deposited into Allocator belong to the same entity (the Allocator does not track depositors)
+/// @custom:upgradeable
 contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall, IAllocator {
     using SafeERC20 for IERC20;
     using AssetLib for uint256;

@@ -17,6 +17,7 @@ import {Errors} from "src/types/Errors.sol";
 /// @title AccountingChainGateway
 /// @author Aave Labs
 /// @notice Facilitates cross chain messaging one or more Earning Chains.
+/// @custom:upgradeable
 contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
     using SafeERC20 for IERC20;
 

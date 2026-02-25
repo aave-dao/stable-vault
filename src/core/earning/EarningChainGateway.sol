@@ -23,6 +23,7 @@ import {Errors} from "src/types/Errors.sol";
 /// @title EarningChainGateway
 /// @author Aave Labs
 /// @notice Facilitates cross chain messaging with exactly one Accounting Chain.
+/// @custom:upgradeable
 contract EarningChainGateway is
     BaseChainGateway,
     TransferHelperClient,
