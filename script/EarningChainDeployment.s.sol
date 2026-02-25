@@ -51,6 +51,7 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
     address immutable GATEWAY_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
     address immutable IOU_TOKEN_MANAGER_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
     address immutable PRICE_ORACLE_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
+    address immutable EARNING_CHAIN_STATE_PROVIDER_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
 
     address immutable ACCESS_MANAGER_ADMIN = _deployer();
 
@@ -375,12 +376,14 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
     }
 
     function _deployEarningChainStateProvider() internal returns (address) {
-        address earningChainStateProvider = _deploy_create3({
+        address implementation = address(new EarningChainStateProvider(getGatewayAddress(_deployer())));
+        _logDeployment("EarningChainStateProvider::Implementation", "", implementation);
+        address earningChainStateProvider = _deployTransparentProxy_create3({
             namespacedSaltSeed: EARNING_CHAIN_STATE_PROVIDER_SALT_SEED,
             deployer: _deployer(),
-            initCode: abi.encodePacked(
-                type(EarningChainStateProvider).creationCode, abi.encode(getGatewayAddress(_deployer()))
-            )
+            implementation: implementation,
+            proxyAdminOwner: EARNING_CHAIN_STATE_PROVIDER_PROXY_ADMIN_OWNER,
+            initCalldata: ""
         });
         require(
             earningChainStateProvider == getEarningChainStateProviderAddress(_deployer()),
