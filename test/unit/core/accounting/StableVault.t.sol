@@ -1968,6 +1968,31 @@ contract StableVaultTest is TestWithHelpers {
         assertEq(stableVault.getUserSubVault(recipient).id, stableVault.getDefaultSubVault().id);
     }
 
+    function test_transfer_sameSubVault_doesNotChangeTotalSupply(address user, address recipient, uint256 depositAmount)
+        public
+    {
+        vm.assume(user != address(0));
+        vm.assume(recipient != address(0));
+        vm.assume(user != recipient);
+        vm.assume(user != address(mockFundsHandler));
+        _assumeNotProxyAdmin(user, address(stableVault));
+        _assumeNotProxyAdmin(recipient, address(stableVault));
+        depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
+
+        _deposit(user, depositAmount);
+        uint256 amountRay = depositAmount.assetDecimalsToRay(address(mockAsset)) / 3;
+        vm.assume(amountRay >= Constants.MIN_WITHDRAWABLE_AMOUNT_RAY);
+
+        uint256 totalSupplyBefore = stableVault.totalSupply();
+
+        vm.prank(user);
+        assertTrue(stableVault.transfer(recipient, amountRay));
+
+        // Same sub-vault transfers pass shares directly, so no shares are lost to double rounding
+        // and the total supply remains unchanged.
+        assertEq(stableVault.totalSupply(), totalSupplyBefore);
+    }
+
     function test_transfer_crossSubVault_transfersExpectedBalances(
         address user,
         address recipient,
@@ -2027,7 +2052,7 @@ contract StableVaultTest is TestWithHelpers {
         assertEq(stableVault.getUserBalance(recipient), fullAmountRay);
     }
 
-    function test_transfer_allowsMinimumAmount_evenWhenRoundingWouldBeBelowMinShares() public {
+    function test_transfer_sameSubVault_allowsMinimumAmount_noRoundingLoss() public {
         address user = makeAddr("user");
         address recipient = makeAddr("recipient");
         uint256 newPerSecondRate = MathLib.RAY + 1;
@@ -2043,7 +2068,31 @@ contract StableVaultTest is TestWithHelpers {
         vm.prank(user);
         assertTrue(stableVault.transfer(recipient, amountRay));
 
-        // Due to rounding-down on share minting, recipient share-value can be slightly below amountRay.
+        // Same sub-vault transfers pass shares directly, so no rounding loss occurs.
+        assertEq(stableVault.getUserBalance(recipient), amountRay);
+    }
+
+    function test_transfer_crossSubVault_allowsMinimumAmount_evenWhenRoundingWouldBeBelowMinShares() public {
+        address user = makeAddr("user");
+        address recipient = makeAddr("recipient");
+
+        vm.prank(manager);
+        stableVault.setDefaultSubVault(MathLib.RAY + 1);
+
+        _deposit(user, 2_000_000);
+
+        // Change default so recipient gets a different sub-vault.
+        vm.prank(manager);
+        stableVault.setDefaultSubVault(MathLib.RAY + 2);
+
+        vm.warp(block.timestamp + 1);
+
+        uint256 amountRay = Constants.MIN_WITHDRAWABLE_AMOUNT_RAY;
+
+        vm.prank(user);
+        assertTrue(stableVault.transfer(recipient, amountRay));
+
+        // Cross sub-vault transfers recalculate shares via rayDivDown, so rounding can cause slight value loss.
         assertLt(stableVault.getUserBalance(recipient), amountRay);
     }
 
@@ -2123,7 +2172,7 @@ contract StableVaultTest is TestWithHelpers {
         assertEq(stableVault.getUserBalance(recipient), fullAmountRay);
     }
 
-    function test_transfer_usesPrincipalFirstWhenRoundingDown() public {
+    function test_transfer_sameSubVault_usesPrincipalFirst_noRoundingLoss() public {
         address user = makeAddr("user");
         address recipient = makeAddr("recipient");
         uint256 newPerSecondRate = MathLib.RAY + 1;
@@ -2139,12 +2188,44 @@ contract StableVaultTest is TestWithHelpers {
         vm.prank(user);
         assertTrue(stableVault.transfer(recipient, amountRay));
 
+        // Same sub-vault transfers pass shares directly, so no rounding loss occurs.
+        assertEq(stableVault.getUserBalance(recipient), amountRay);
+
+        mockFundsHandler.mockAggregatedBalance(stableVault.getGlobalOriginalDepositAmount());
+        vm.prank(recipient);
+        uint256 withdrawnRay = stableVault.requestWithdrawal(recipient, 0);
+
+        assertGe(withdrawnRay, amountRay);
+    }
+
+    function test_transfer_crossSubVault_usesPrincipalFirstWhenRoundingDown() public {
+        address user = makeAddr("user");
+        address recipient = makeAddr("recipient");
+
+        vm.prank(manager);
+        stableVault.setDefaultSubVault(MathLib.RAY + 1);
+
+        _deposit(user, 2_000_000);
+
+        // Change default so recipient gets a different sub-vault.
+        vm.prank(manager);
+        stableVault.setDefaultSubVault(MathLib.RAY + 2);
+
+        vm.warp(block.timestamp + 1);
+
+        uint256 amountRay = Constants.MIN_WITHDRAWABLE_AMOUNT_RAY + 1;
+
+        vm.prank(user);
+        assertTrue(stableVault.transfer(recipient, amountRay));
+
+        // Cross sub-vault transfers recalculate shares via rayDivDown, so rounding can cause slight value loss.
         assertLt(stableVault.getUserBalance(recipient), amountRay);
 
         mockFundsHandler.mockAggregatedBalance(stableVault.getGlobalOriginalDepositAmount());
         vm.prank(recipient);
         uint256 withdrawnRay = stableVault.requestWithdrawal(recipient, 0);
 
+        // Principal protection still ensures the withdrawal covers at least the transferred amount.
         assertGe(withdrawnRay, amountRay);
     }
 
