@@ -24,6 +24,7 @@ import {Errors} from "src/types/Errors.sol";
 /// @title FundsHandler
 /// @author Aave Labs
 /// @notice Handles push/pull of funds across the system.
+/// @custom:upgradeable
 contract FundsHandler is
     AccessManagedUpgradeable,
     RescuableNative,

@@ -16,6 +16,7 @@ import {MathLib} from "src/libraries/MathLib.sol";
 /// @author Aave Labs
 /// @notice Oracle contract for fetching asset prices through an adapter to an underlying data source.
 /// @dev Assumes all configured assets have the same denomination.
+/// @custom:upgradeable
 contract PriceOracle is AccessManagedUpgradeable, IPriceOracle {
     uint256 immutable MIN_VALID_PRICE_RAY;
 

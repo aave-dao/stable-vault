@@ -17,6 +17,7 @@ import {Errors} from "src/types/Errors.sol";
 /// @title BaseChainGateway
 /// @author Aave Labs
 /// @notice Abstract base contract for ChainGateway contracts.
+/// @custom:upgradeable
 abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative, RescuableToken, IChainGateway {
     address internal immutable IOU_TOKEN_MANAGER;
 

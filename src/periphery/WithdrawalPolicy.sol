@@ -24,6 +24,7 @@ import {Errors} from "src/types/Errors.sol";
 /// @dev The current implementation applies a fee to: deter abuse of arbitrage opportunities through the protocol's
 /// liquidity, discourage spam, and cover protocol operational costs (e.g. bridge or swap fees).
 /// @dev The fee is capped at 5.00% and is expected to be lower in most scenarios.
+/// @custom:upgradeable
 contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithdrawalPolicy {
     // EIP-712 typeHash:
     // keccak256("FeeDiscount(address user,address assetOut,uint256 iouAmountRay,uint16 personalFeeBps,uint256

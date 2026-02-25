@@ -16,6 +16,7 @@ import {IChainBalanceOracleAdapter} from "src/interfaces/IChainBalanceOracleAdap
 /// @notice Oracle contract for fetching chain aggregated balance values through an adapter to an underlying data
 /// source. @dev This contract is only used on the Accounting Chain to inform the asset value vs. obligations
 /// calculations.
+/// @custom:upgradeable
 contract ChainBalanceOracle is AccessManagedUpgradeable, IChainBalanceOracle {
     /// @custom:storage-location erc7201:aave.storage.ChainBalanceOracle
     struct ChainBalanceOracleStorage {

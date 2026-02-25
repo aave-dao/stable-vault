@@ -18,6 +18,7 @@ import {Errors} from "src/types/Errors.sol";
 /// For this version, the data is encoded as a BalanceSnapshot struct which contains the balance in RAY, the timestamp
 /// and the block number. The version is used to determine the encoding of the data on the Accounting Chain.
 /// @dev This contract is upgradeable to allow exposing additional state in future versions.
+/// @custom:upgradeable
 contract EarningChainStateProvider is Initializable, EarningChainStateSchemaV1, IEarningChainStateProvider {
     address internal immutable EARNING_CHAIN_GATEWAY;
 

@@ -18,6 +18,7 @@ import {Errors} from "src/types/Errors.sol";
 /// @author Aave Labs
 /// @notice AssetRegistry contract for managing asset configurations.
 /// @dev Inherits from Multicall to allow disabling deposits for multiple assets in a single call.
+/// @custom:upgradeable
 contract AssetRegistry is AccessManagedUpgradeable, Multicall, IAssetRegistry {
     using EnumerableSet for EnumerableSet.AddressSet;
 

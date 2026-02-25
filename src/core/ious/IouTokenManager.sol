@@ -16,6 +16,7 @@ import {Errors} from "src/types/Errors.sol";
 /// @title IouTokenManager
 /// @author Aave Labs
 /// @notice Manages the IOU token locking, releasing, minting, burning.
+/// @custom:upgradeable
 contract IouTokenManager is TransferHelperClient, IIouTokenManager {
     using SafeERC20 for IERC20;
 
