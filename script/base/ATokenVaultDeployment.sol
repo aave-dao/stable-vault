@@ -9,9 +9,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {IPoolAddressesProvider} from "@aave-v3-core/interfaces/IPoolAddressesProvider.sol";
 import {ATokenVault} from "@aave-vault/ATokenVault.sol";
-import {ATokenVaultMerklRewardClaimer} from "@aave-vault/ATokenVaultMerklRewardClaimer.sol";
 
 contract ATokenVaultDeployment is Script {
     using SafeERC20 for IERC20;
@@ -22,8 +20,14 @@ contract ATokenVaultDeployment is Script {
     {
         uint256 initialLockDeposit = 10 ** IERC20Metadata(underlying).decimals();
 
-        address implementation =
-            address(new ATokenVaultMerklRewardClaimer(underlying, 0, IPoolAddressesProvider(poolAddressProvider)));
+        // Do not import `ATokenVaultMerklRewardClaimer` contract here, as it will force the entire set of dependencies
+        // of this contract (and any other contract using it) to be compiled with the size-optimized profile.
+        // This contract is intentionally deployed through the `vm.deployCode` cheatcode.
+        // See `CompileATokenVaultMerklRewardClaimer.sol` for more details.
+        address implementation = vm.deployCode(
+            "ATokenVaultMerklRewardClaimer.sol:ATokenVaultMerklRewardClaimer",
+            abi.encode(underlying, uint16(0), poolAddressProvider)
+        );
 
         // Compute proxy address: approve call consumes a nonce, then proxy deploy consumes the next.
         uint64 proxyNonce = vm.getNonce(deployer) + 1;
