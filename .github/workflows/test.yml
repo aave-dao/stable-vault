@@ -62,4 +62,4 @@ jobs:
         uses: foundry-rs/foundry-toolchain@v1
 
       - name: Check contract sizes
-        run: .github/scripts/check-contract-sizes.sh
+        run: forge build --sizes
