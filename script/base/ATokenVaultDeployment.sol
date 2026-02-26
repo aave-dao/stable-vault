@@ -22,12 +22,20 @@ contract ATokenVaultDeployment is Script {
 
         // Do not import `ATokenVaultMerklRewardClaimer` contract here, as it will force the entire set of dependencies
         // of this contract (and any other contract using it) to be compiled with the size-optimized profile.
-        // This contract is intentionally deployed through the `vm.deployCode` cheatcode.
+        // Instead, we deploy manually reading the bytecode from the compiled artifact.
         // See `CompileATokenVaultMerklRewardClaimer.sol` for more details.
-        address implementation = vm.deployCode(
-            "ATokenVaultMerklRewardClaimer.sol:ATokenVaultMerklRewardClaimer",
-            abi.encode(underlying, uint16(0), poolAddressProvider)
-        );
+        address implementation;
+        {
+            string memory artifact =
+                vm.readFile("out/ATokenVaultMerklRewardClaimer.sol/ATokenVaultMerklRewardClaimer.json");
+            bytes memory initCode = abi.encodePacked(
+                vm.parseJsonBytes(artifact, ".bytecode.object"), abi.encode(underlying, uint16(0), poolAddressProvider)
+            );
+            assembly {
+                implementation := create(0, add(initCode, 0x20), mload(initCode))
+            }
+            require(implementation != address(0), "ATokenVaultMerklRewardClaimer deployment failed");
+        }
 
         // Compute proxy address: approve call consumes a nonce, then proxy deploy consumes the next.
         uint64 proxyNonce = vm.getNonce(deployer) + 1;

@@ -12,7 +12,7 @@ import {ATokenVaultMerklRewardClaimer} from "@aave-vault/ATokenVaultMerklRewardC
 /// @dev Avoid importing ATokenVaultMerklRewardClaimer contract in main scripts, as otherwise that will force
 /// the entire set of dependencies used by that script to be compiled with the size-optimized profile.
 /// We import this contract here so it gets compiled, but then we do not explicitly import it
-/// in the deployment scripts, deploying through `vm.deployCode` cheatcode instead.
+/// in the deployment scripts. Instead, we deploy manually reading the bytecode from the compiled artifact.
 /// @dev `CompileATokenVaultMerklRewardClaimer` contract was created to inherit `ATokenVaultMerklRewardClaimer`
 /// instead of only doing the isolated import so we can avoid the `AST source not found` warning.
 contract CompileATokenVaultMerklRewardClaimer is ATokenVaultMerklRewardClaimer {
