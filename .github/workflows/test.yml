@@ -14,7 +14,7 @@ env:
 
 jobs:
   check:
-    name: Foundry project
+    name: Compile & Run Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,7 +35,7 @@ jobs:
 
       - name: Run Forge build
         run: |
-          forge build --deny notes
+          forge build --deny notes --sizes
         id: build
 
       - name: Run Forge tests
@@ -49,17 +49,3 @@ jobs:
             echo "::error::Gas snapshots are out of date. Please run 'forge t' locally and commit the updated snapshot files."
             exit 1
           fi
-
-  size-check:
-    name: Contract size check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-
-      - name: Check contract sizes
-        run: forge build --sizes
