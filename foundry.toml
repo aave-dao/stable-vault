@@ -21,7 +21,7 @@ additional_compiler_profiles = [
 ]
 compilation_restrictions = [
     # Use `size-optimized` compiler profile for `ATokenVaultMerklRewardClaimer` contract.
-    { paths = "lib/Aave-Vault/src/ATokenVaultMerklRewardClaimer.sol", optimizer_runs = 200 },
+    { paths = "lib/aave-vault/src/ATokenVaultMerklRewardClaimer.sol", optimizer_runs = 200 },
 ]
 
 [profile.default.fuzz]
