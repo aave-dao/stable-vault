@@ -26,8 +26,9 @@ contract ATokenVaultDeployment is Script {
         // See `CompileATokenVaultMerklRewardClaimer.sol` for more details.
         address implementation;
         {
-            string memory artifact =
-                vm.readFile("out/ATokenVaultMerklRewardClaimer.sol/ATokenVaultMerklRewardClaimer.json");
+            string memory artifactPath = "out/ATokenVaultMerklRewardClaimer.sol/ATokenVaultMerklRewardClaimer.json";
+            // forge-lint: disable-next-line(unsafe-cheatcode)
+            string memory artifact = vm.readFile(artifactPath);
             bytes memory initCode = abi.encodePacked(
                 vm.parseJsonBytes(artifact, ".bytecode.object"), abi.encode(underlying, uint16(0), poolAddressProvider)
             );
