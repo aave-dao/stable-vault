@@ -7,11 +7,22 @@ fs_permissions = [
     { access = "read", path = "test/tables" },
     { access = "read", path = "lib/createx/artifacts" },
     { access = "read-write", path = "deployments" },
+    { access = "read", path = "out" },
 ]
 cbor_metadata = true
 ignored_warnings_from = ["lib/"]
 optimizer = true
+# Default compiler profile optimizes for gas efficiency.
 optimizer_runs = 1_000_000
+
+additional_compiler_profiles = [
+    # Additional compiler profile, `size-optimized`, optimizes for bytecode size efficiency.
+    { name = "size-optimized", optimizer_runs = 200 },
+]
+compilation_restrictions = [
+    # Use `size-optimized` compiler profile for `ATokenVaultMerklRewardClaimer` contract.
+    { paths = "lib/aave-vault/src/ATokenVaultMerklRewardClaimer.sol", optimizer_runs = 200 },
+]
 
 [profile.default.fuzz]
 runs = 10_000

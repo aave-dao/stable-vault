@@ -16,7 +16,7 @@
 [submodule "lib/createx"]
 	path = lib/createx
 	url = https://github.com/pcaversaccio/createx
-[submodule "lib/Aave-Vault"]
-	path = lib/Aave-Vault
-	url = https://github.com/aave/Aave-Vault
-	branch = feat/merkl-rewards
+[submodule "lib/aave-vault"]
+	path = lib/aave-vault
+	url = https://github.com/aave/aave-vault
+	branch = 5ab52d20b07f35a8f34e6702f2fea6797a5787eb

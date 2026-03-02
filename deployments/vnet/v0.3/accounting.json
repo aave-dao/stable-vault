@@ -134,5 +134,17 @@
   "DisablerMulticall": {
     "address": "0x171c6f2ad8e626265e35af6e2d814418a5ae2bfe",
     "saltSeed": "aave.stable-vault.OwnedMulticall.DisablerProfile"
+  },
+  "GHO aTokenVault::Implementation": {
+    "address": "0x94e75750ac708f00a69d682850c959207cb59866",
+    "saltSeed": ""
+  },
+  "USDC aTokenVault::Implementation": {
+    "address": "0xd3ae9ec51846112086dc9c33b23cf38756343bfe",
+    "saltSeed": ""
+  },
+  "USDT aTokenVault::Implementation": {
+    "address": "0x45b3411578a7fba94b2741e3ba82f56733e36906",
+    "saltSeed": ""
   }
 }
