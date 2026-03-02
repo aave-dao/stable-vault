@@ -90,5 +90,13 @@
   "DisablerMulticall": {
     "address": "0x171c6f2ad8e626265e35af6e2d814418a5ae2bfe",
     "saltSeed": "aave.stable-vault.OwnedMulticall.DisablerProfile"
+  },
+  "USDC aTokenVault": {
+    "address": "0x8ea90641aeb7da0a13e1e9a29c7142b6e8a25c7e",
+    "saltSeed": ""
+  },
+  "USDT aTokenVault": {
+    "address": "0x208ea1df266f2b50acc6c69b6163a18e33627e1d",
+    "saltSeed": ""
   }
 }
