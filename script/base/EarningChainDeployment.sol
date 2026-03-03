@@ -93,6 +93,11 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
                 .isChainSupported(uint64(vm.parseUint(_configString(".earningChain.accountingChainCcipSelector")))),
             "CCIP Router does not support accounting chain"
         );
+
+        // Validate withdrawal policy signer
+        require(
+            _configAddress(".earningChain.withdrawalPolicy.signer") != address(0), "Withdrawal policy signer not set"
+        );
     }
 
     function _deployContracts() internal {

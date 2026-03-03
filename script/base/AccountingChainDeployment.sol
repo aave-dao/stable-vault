@@ -27,6 +27,7 @@ import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IEarningChainStateProvider} from "src/interfaces/IEarningChainStateProvider.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {ChainBalanceOracle} from "src/oracles/balance/ChainBalanceOracle.sol";
+import {IBundleBaseAggregator} from "src/oracles/balance/ChainlinkChainBalanceOracleAdapter.sol";
 import {ChainlinkL2ChainBalanceOracleAdapter} from "src/oracles/balance/ChainlinkL2ChainBalanceOracleAdapter.sol";
 import {ChainlinkL2PriceOracleAdapter} from "src/oracles/price/ChainlinkL2PriceOracleAdapter.sol";
 import {AggregatorV3Interface} from "src/oracles/price/ChainlinkPriceOracleAdapter.sol";
@@ -112,6 +113,29 @@ abstract contract AccountingChainDeployment is
             IRouterClient(_configAddress(".accountingChain.ccipRouterAddress"))
                 .isChainSupported(uint64(vm.parseUint(_configString(".accountingChain.earningChainCcipSelector")))),
             "CCIP Router does not support earning chain"
+        );
+
+        // Validate Chainlink bundle feed / sequencer uptime feed (when not using mocks)
+        if (!_configBool(".accountingChain.useMockBundleFeed")) {
+            address bundleFeed = _configAddress(".accountingChain.chainlinkBundleAggregatorProxy");
+            require(bundleFeed != address(0), "Chainlink bundle aggregator proxy not set");
+            IBundleBaseAggregator(bundleFeed).latestBundle();
+        }
+        if (!_configBool(".accountingChain.useMockSequencerUptimeFeed")) {
+            address sequencerFeed = _configAddress(".accountingChain.sequencerUptimeFeed");
+            require(sequencerFeed != address(0), "Sequencer uptime feed not set");
+            AggregatorV3Interface(sequencerFeed).latestRoundData();
+        }
+
+        // Validate Aave V3 pool addresses provider
+        require(
+            _configAddress(".accountingChain.aaveV3PoolAddressesProvider") != address(0),
+            "Aave V3 pool addresses provider not set"
+        );
+
+        // Validate withdrawal policy signer
+        require(
+            _configAddress(".accountingChain.withdrawalPolicy.signer") != address(0), "Withdrawal policy signer not set"
         );
     }
 
