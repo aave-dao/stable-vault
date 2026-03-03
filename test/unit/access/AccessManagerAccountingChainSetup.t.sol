@@ -25,7 +25,7 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
         _deployContracts();
         _setupAccessManager(_deployer());
         vm.stopPrank();
-        vm.warp(block.timestamp + RolesLib.CRITICAL_DELAY + 1);
+        vm.warp(block.timestamp + CRITICAL_DELAY + 1);
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -93,9 +93,7 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
         _assertCanCall(stableVaultManager, stableVault, IStableVault.setSubVaultRate.selector, true, 0);
         _assertCanCall(stableVaultManager, stableVault, IStableVault.setDefaultSubVault.selector, true, 0);
         // Admin-tier (MED_DELAY): has role but delayed
-        _assertCanCall(
-            stableVaultManager, stableVault, IStableVault.claimSurplusInterest.selector, false, RolesLib.MED_DELAY
-        );
+        _assertCanCall(stableVaultManager, stableVault, IStableVault.claimSurplusInterest.selector, false, MED_DELAY);
         // Unauthorized
         _assertCanCall(stableVaultManager, stableVault, IStableVault.setTreasury.selector, false, 0);
         _assertCanCall(stableVaultManager, getAllocatorAddress(_deployer()), IAllocator.rebalance.selector, false, 0);
@@ -114,7 +112,7 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
         _assertProfileRoleDelay(_getProfile__StableVaultManager(), expected[1], RolesLib.NO_DELAY);
         _assertProfileRoleDelay(_getProfile__StableVaultManager(), expected[3], RolesLib.NO_DELAY);
         // MED_DELAY roles
-        _assertProfileRoleDelay(_getProfile__StableVaultManager(), expected[2], RolesLib.MED_DELAY);
+        _assertProfileRoleDelay(_getProfile__StableVaultManager(), expected[2], MED_DELAY);
     }
 
     function test_targetSetup_stableVault() public view {

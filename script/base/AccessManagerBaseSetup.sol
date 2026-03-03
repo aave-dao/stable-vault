@@ -6,14 +6,13 @@ import {IAccessManager} from "lib/openzeppelin-contracts/contracts/access/manage
 
 import {Create3AddressBook} from "script/base/Create3AddressBook.sol";
 import {Create3Deployment} from "script/base/Create3Deployment.sol";
-import {DeploymentConfig} from "script/base/DeploymentConfig.sol";
 import {Create3AddressLib} from "script/libraries/Create3AddressLib.sol";
 import {RolesLib} from "script/libraries/RolesLib.sol";
 import {IMulticall} from "src/interfaces/IMulticall.sol";
 import {OwnedMulticall} from "src/periphery/OwnedMulticall.sol";
 import {_toSelectorArray} from "test/helpers/TypeHelpers.sol";
 
-abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deployment, DeploymentConfig {
+abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deployment, RolesLib {
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
     //////////////// Operational Profiles Shared between Accounting and Earning Chains ////////////////
@@ -39,7 +38,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         _setupRoleAdmins();
 
         // Setup the ADMIN_ROLE delay
-        accessManager.setTargetAdminDelay(address(accessManager), RolesLib.CRITICAL_DELAY);
+        accessManager.setTargetAdminDelay(address(accessManager), CRITICAL_DELAY);
 
         // Setup the link between target and its allowed role, with
         _setup_Targets(deployer);
@@ -188,7 +187,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
 
         // Grant ADMIN_ROLE
         multicallCalldata[0] =
-            abi.encodeCall(IAccessManager.grantRole, (RolesLib.ADMIN_ROLE, mainAdminProfile, RolesLib.CRITICAL_DELAY));
+            abi.encodeCall(IAccessManager.grantRole, (RolesLib.ADMIN_ROLE, mainAdminProfile, CRITICAL_DELAY));
 
         // Grant All Role-Guardian roles
         multicallCalldata[1] = abi.encodeCall(

@@ -36,9 +36,6 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
 
     address[] internal _deployedATokenVaults;
 
-    uint8 constant MAX_STRATEGIES_PER_ASSET = 15;
-    uint8 constant STRATEGY_MAX_SLIPPAGE_AMOUNT = 10;
-
     address immutable PROXY_ADMIN_OWNER = getAccessManagerAddress(_deployer());
     address immutable ALLOCATOR_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
     address immutable WITHDRAWAL_POLICY_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
@@ -288,7 +285,7 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
                 withdrawer: ALLOCATOR_WITHDRAWER,
                 priceOracle: getPriceOracleAddress(_deployer()),
                 transferHelper: getTransferHelperAddress(_deployer()),
-                maxStrategiesPerAsset: MAX_STRATEGIES_PER_ASSET
+                maxStrategiesPerAsset: uint8(_configUint(".earningChain.maxStrategiesPerAsset"))
             })
         );
         _logDeployment("Allocator::Implementation", "", implementation);

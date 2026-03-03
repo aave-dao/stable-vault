@@ -51,9 +51,6 @@ contract AccountingChainDeployment is
 
     address[] internal _deployedATokenVaults;
 
-    uint8 constant MAX_STRATEGIES_PER_ASSET = 15;
-    uint8 constant STRATEGY_MAX_SLIPPAGE_AMOUNT = 10; // 10 wei
-
     address immutable PROXY_ADMIN_OWNER = getAccessManagerAddress(_deployer());
     address immutable STABLE_VAULT_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
     address immutable ALLOCATOR_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
@@ -202,21 +199,27 @@ contract AccountingChainDeployment is
 
         address ghoYieldStrategy =
             _deployATokenVault(_gho(), poolAddressProvider, getAccessManagerAddress(_deployer()), _deployer());
-        allocator.addStrategy(_gho(), ghoYieldStrategy, STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        allocator.addStrategy(
+            _gho(), ghoYieldStrategy, uint8(_configUint(".accountingChain.strategyMaxSlippageAmount"))
+        );
         allocator.setDefaultStrategy(_gho(), ghoYieldStrategy);
         _deployedATokenVaults.push(ghoYieldStrategy);
         _logDeployment("GHO aTokenVault", "", ghoYieldStrategy);
 
         address usdcYieldStrategy =
             _deployATokenVault(_usdc(), poolAddressProvider, getAccessManagerAddress(_deployer()), _deployer());
-        allocator.addStrategy(_usdc(), usdcYieldStrategy, STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        allocator.addStrategy(
+            _usdc(), usdcYieldStrategy, uint8(_configUint(".accountingChain.strategyMaxSlippageAmount"))
+        );
         allocator.setDefaultStrategy(_usdc(), usdcYieldStrategy);
         _deployedATokenVaults.push(usdcYieldStrategy);
         _logDeployment("USDC aTokenVault", "", usdcYieldStrategy);
 
         address usdtYieldStrategy =
             _deployATokenVault(_usdt(), poolAddressProvider, getAccessManagerAddress(_deployer()), _deployer());
-        allocator.addStrategy(_usdt(), usdtYieldStrategy, STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        allocator.addStrategy(
+            _usdt(), usdtYieldStrategy, uint8(_configUint(".accountingChain.strategyMaxSlippageAmount"))
+        );
         allocator.setDefaultStrategy(_usdt(), usdtYieldStrategy);
         _deployedATokenVaults.push(usdtYieldStrategy);
         _logDeployment("USDT aTokenVault", "", usdtYieldStrategy);
@@ -384,7 +387,7 @@ contract AccountingChainDeployment is
                 withdrawer: ALLOCATOR_WITHDRAWER,
                 priceOracle: getPriceOracleAddress(_deployer()),
                 transferHelper: getTransferHelperAddress(_deployer()),
-                maxStrategiesPerAsset: MAX_STRATEGIES_PER_ASSET
+                maxStrategiesPerAsset: uint8(_configUint(".accountingChain.maxStrategiesPerAsset"))
             })
         );
         _logDeployment("Allocator::Implementation", "", implementation);

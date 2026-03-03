@@ -22,7 +22,7 @@ contract AccessManagerEarningChainSetupTest is AccessManagerSetupBaseTest, Earni
         _deployContracts();
         _setupAccessManager(_deployer());
         vm.stopPrank();
-        vm.warp(block.timestamp + RolesLib.CRITICAL_DELAY + 1);
+        vm.warp(block.timestamp + CRITICAL_DELAY + 1);
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

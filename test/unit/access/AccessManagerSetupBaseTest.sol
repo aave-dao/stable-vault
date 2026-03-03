@@ -53,7 +53,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         vm.etch(where, runtimeBytecode);
     }
 
-    function _getAllRoleIds() internal pure returns (uint64[] memory) {
+    function _getAllRoleIds() internal view returns (uint64[] memory) {
         RolesLib.Role[] memory functionRoles = RolesLib.getAllFunctionBasedRoles();
         uint64[] memory allIds = new uint64[](3 + functionRoles.length);
         allIds[0] = RolesLib.ADMIN_ROLE;
@@ -65,7 +65,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         return allIds;
     }
 
-    function _allFunctionBasedRoleIds() internal pure returns (uint64[] memory) {
+    function _allFunctionBasedRoleIds() internal view returns (uint64[] memory) {
         RolesLib.Role[] memory roles = RolesLib.getAllFunctionBasedRoles();
         uint64[] memory ids = new uint64[](roles.length);
         for (uint256 i = 0; i < roles.length; i++) {
@@ -134,7 +134,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         }
         _assertProfileHasExactlyTheseRoles(_getProfile__MainAdmin(), expected);
 
-        _assertProfileRoleDelay(_getProfile__MainAdmin(), RolesLib.ADMIN_ROLE, RolesLib.CRITICAL_DELAY);
+        _assertProfileRoleDelay(_getProfile__MainAdmin(), RolesLib.ADMIN_ROLE, CRITICAL_DELAY);
         _assertProfileRoleDelay(_getProfile__MainAdmin(), RolesLib.ADMIN_ROLE_GUARDIAN_ROLE, RolesLib.NO_DELAY);
         _assertProfileRoleDelay(_getProfile__MainAdmin(), RolesLib.OPERATIONAL_ROLE_GUARDIAN_ROLE, RolesLib.NO_DELAY);
 
@@ -279,7 +279,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
 
     ////// Role ID uniqueness //////
 
-    function test_allFunctionBasedRoles_doesNotHaveCollisions() public pure {
+    function test_allFunctionBasedRoles_doesNotHaveCollisions() public view {
         RolesLib.Role[] memory roles = RolesLib.getAllFunctionBasedRoles();
         for (uint256 i = 0; i < roles.length; i++) {
             for (uint256 j = i + 1; j < roles.length; j++) {
@@ -337,7 +337,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
 
     function test_accessManagerTargetAdminDelay() public view {
         uint32 delay = IAccessManager(_accessManager()).getTargetAdminDelay(address(IAccessManager(_accessManager())));
-        assertEq(delay, RolesLib.CRITICAL_DELAY);
+        assertEq(delay, CRITICAL_DELAY);
     }
 
     ////// Deployer revocation //////
@@ -459,15 +459,13 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         address admin = _getProfile__MainAdmin();
 
         // Admin-tier function (MED_DELAY): has role but delayed
-        _assertCanCall(
-            admin, getAllocatorAddress(_deployer()), IAllocator.addStrategy.selector, false, RolesLib.MED_DELAY
-        );
+        _assertCanCall(admin, getAllocatorAddress(_deployer()), IAllocator.addStrategy.selector, false, MED_DELAY);
 
         // Operational function (NO_DELAY): immediate
         _assertCanCall(admin, getAllocatorAddress(_deployer()), IAllocator.rebalance.selector, true, 0);
 
         // Unconfigured target (ProxyAdmin): ADMIN_ROLE fallback -> CRITICAL_DELAY
-        _assertCanCall(admin, _proxyAdmin(), ProxyAdmin.upgradeAndCall.selector, false, RolesLib.CRITICAL_DELAY);
+        _assertCanCall(admin, _proxyAdmin(), ProxyAdmin.upgradeAndCall.selector, false, CRITICAL_DELAY);
     }
 
     function test_canCall_secondaryAdmin() public view {
@@ -535,7 +533,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
 
         (bool hasRole, uint32 delay) = accessManager.hasRole(RolesLib.ADMIN_ROLE, admin);
         assertTrue(hasRole);
-        assertEq(delay, RolesLib.CRITICAL_DELAY);
+        assertEq(delay, CRITICAL_DELAY);
 
         // Direct call to setTargetFunctionRole reverts (needs scheduling)
         bytes memory callData = abi.encodeCall(
@@ -552,7 +550,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         accessManager.schedule(address(accessManager), callData, 0);
 
         // warp CRITICAL_DELAY
-        vm.warp(block.timestamp + RolesLib.CRITICAL_DELAY);
+        vm.warp(block.timestamp + CRITICAL_DELAY);
 
         // Execute the operation to show that it works after the critical delay elapses
         vm.prank(admin);
@@ -566,7 +564,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         address admin = _getProfile__MainAdmin();
         address proxyAdmin = _proxyAdmin();
 
-        _assertCanCall(admin, proxyAdmin, ProxyAdmin.upgradeAndCall.selector, false, RolesLib.CRITICAL_DELAY);
+        _assertCanCall(admin, proxyAdmin, ProxyAdmin.upgradeAndCall.selector, false, CRITICAL_DELAY);
 
         // Create addresses to avoid zero-address reverts
         address assetRegistry = makeAddr("ASSET_REGISTRY");
@@ -597,7 +595,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         accessManager.execute(proxyAdmin, callData);
 
         // Warp CRITICAL_DELAY
-        vm.warp(block.timestamp + RolesLib.CRITICAL_DELAY);
+        vm.warp(block.timestamp + CRITICAL_DELAY);
 
         // Execute after delay -> upgrade succeeds
         vm.prank(admin);
@@ -608,9 +606,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         address proxy = _proxyAdmin();
 
         // MainAdmin has ADMIN_ROLE, fallback with CRITICAL_DELAY
-        _assertCanCall(
-            _getProfile__MainAdmin(), proxy, ProxyAdmin.upgradeAndCall.selector, false, RolesLib.CRITICAL_DELAY
-        );
+        _assertCanCall(_getProfile__MainAdmin(), proxy, ProxyAdmin.upgradeAndCall.selector, false, CRITICAL_DELAY);
 
         // Rest of profiles do not have ADMIN_ROLE, unauthorized
         _assertCanCall(_getProfile__SecondaryAdmin(), proxy, ProxyAdmin.upgradeAndCall.selector, false, 0);
@@ -639,7 +635,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         assertFalse(hasNow, "Role should not be active yet (grant delay)");
 
         // Warp 1 second less than MED_DELAY
-        vm.warp(block.timestamp + RolesLib.MED_DELAY - 1);
+        vm.warp(block.timestamp + MED_DELAY - 1);
 
         (hasNow,) = accessManager.hasRole(role.roleId, newAddr);
         assertFalse(hasNow, "Role should not be active yet (grant delay)");
@@ -683,7 +679,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     ////// Role granting can be revoked during grant delay period //////
 
     function test_roleGrant_canBeRevokedDuringGrantDelay(uint256 secondsToElapseBeforeRevoking) public {
-        secondsToElapseBeforeRevoking = bound(secondsToElapseBeforeRevoking, 0, RolesLib.MED_DELAY - 1);
+        secondsToElapseBeforeRevoking = bound(secondsToElapseBeforeRevoking, 0, MED_DELAY - 1);
 
         IAccessManager accessManager = IAccessManager(_accessManager());
         address admin = _getProfile__MainAdmin();
@@ -710,7 +706,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         assertFalse(hasAfterRevoke, "Role should be revoked");
 
         // Even after grant delay passes, role stays revoked
-        vm.warp(grantTimestamp + RolesLib.MED_DELAY + 1);
+        vm.warp(grantTimestamp + MED_DELAY + 1);
         (bool hasAfterDelay,) = accessManager.hasRole(role.roleId, newAddr);
         assertFalse(hasAfterDelay, "Role should remain revoked after grant delay period");
     }
@@ -800,7 +796,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         accessManager.grantRole(adminTierRole.roleId, newAddr, adminTierRole.delay);
 
         // Warp past MED_DELAY -> both roles should be active
-        vm.warp(block.timestamp + RolesLib.MED_DELAY + 1);
+        vm.warp(block.timestamp + MED_DELAY + 1);
         (bool hasOperational,) = accessManager.hasRole(operationalRole.roleId, newAddr);
         assertTrue(hasOperational, "MainAdmin should be able to grant operational roles");
         (bool hasAdminTier,) = accessManager.hasRole(adminTierRole.roleId, newAddr);

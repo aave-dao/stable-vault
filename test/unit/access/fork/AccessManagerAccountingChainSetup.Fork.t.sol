@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 
 import {AccountingChainDeployment} from "script/AccountingChainDeployment.s.sol";
 import {AccessManagerBaseSetup} from "script/base/AccessManagerBaseSetup.sol";
-import {RolesLib} from "script/libraries/RolesLib.sol";
+
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 
 import {AccessManagerAccountingChainSetupTest} from "test/unit/access/AccessManagerAccountingChainSetup.t.sol";
@@ -16,7 +16,7 @@ contract AccessManagerAccountingChainSetupForkTest is AccessManagerAccountingCha
     function setUp() public override {
         vm.skip(!FORKING);
         vm.createSelectFork(vm.envString("FORK_URL"));
-        vm.warp(block.timestamp + RolesLib.CRITICAL_DELAY + 1);
+        vm.warp(block.timestamp + CRITICAL_DELAY + 1);
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
