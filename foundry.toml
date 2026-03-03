@@ -8,6 +8,7 @@ fs_permissions = [
     { access = "read", path = "lib/createx/artifacts" },
     { access = "read-write", path = "deployments" },
     { access = "read", path = "out" },
+    { access = "read", path = "config" },
 ]
 cbor_metadata = true
 ignored_warnings_from = ["lib/"]

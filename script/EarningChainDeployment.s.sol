@@ -36,11 +36,6 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
 
     address[] internal _deployedATokenVaults;
 
-    // Arbitrum Chain ID
-    uint256 constant ACCOUNTING_CHAIN_ID = 42161;
-    // Arbitrum CCIP Selector
-    uint64 constant ACCOUNTING_CHAIN_CCIP_SELECTOR = 4949039107694359620;
-
     uint8 constant MAX_STRATEGIES_PER_ASSET = 15;
     uint8 constant STRATEGY_MAX_SLIPPAGE_AMOUNT = 10;
 
@@ -58,23 +53,17 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
     address immutable ALLOCATOR_DEPOSITOR = getGatewayAddress(_deployer());
     address immutable ALLOCATOR_WITHDRAWER = getGatewayAddress(_deployer());
 
-    uint256 constant PRICE_ORACLE_MIN_VALID_PRICE_RAY = 0.99e27; // TODO: Revisit min valid price
-    uint256 constant CHAINLINK_PRICE_ORACLE_HEARTBEAT = 24 hours; // TODO: Revisit heartbeat
+    function _gho() internal view returns (address) {
+        return _configAddress(".earningChain.tokens.gho");
+    }
 
-    // ERC20s on Ethereum
-    address GHO = address(0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f);
-    address USDC = address(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
-    address USDT = address(0xdAC17F958D2ee523a2206206994597C13D831ec7);
+    function _usdc() internal view returns (address) {
+        return _configAddress(".earningChain.tokens.usdc");
+    }
 
-    // Standard
-    address constant CHAINLINK_GHO_USD_DATA_FEED = address(0x3f12643D3f6f874d39C2a4c9f2Cd6f2DbAC877FC);
-    // Standard - //TODO: Consider using SVR
-    address constant CHAINLINK_USDC_USD_DATA_FEED = address(0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6);
-    // Standard - //TODO: Consider using SVR
-    address constant CHAINLINK_USDT_USD_DATA_FEED = address(0x3E7d1eAB13ad0104d2750B8863b489D65364e32D);
-
-    // Set to Ethereum CCIP Router address
-    address constant CCIP_ROUTER_ADDRESS = address(0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D);
+    function _usdt() internal view returns (address) {
+        return _configAddress(".earningChain.tokens.usdt");
+    }
 
     function run() public {
         _validateExternalAddresses();
@@ -86,21 +75,27 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
 
     function _validateExternalAddresses() internal view {
         // Validate ERC20 token addresses
-        IERC20(GHO).balanceOf(_deployer());
-        IERC20(USDC).balanceOf(_deployer());
-        IERC20(USDT).balanceOf(_deployer());
+        IERC20(_gho()).balanceOf(_deployer());
+        IERC20(_usdc()).balanceOf(_deployer());
+        IERC20(_usdt()).balanceOf(_deployer());
 
         // Validate Chainlink price feed addresses
-        require(CHAINLINK_GHO_USD_DATA_FEED != address(0), "Chainlink GHO/USD data feed not set");
-        AggregatorV3Interface(CHAINLINK_GHO_USD_DATA_FEED).latestRoundData();
-        require(CHAINLINK_USDC_USD_DATA_FEED != address(0), "Chainlink USDC/USD data feed not set");
-        AggregatorV3Interface(CHAINLINK_USDC_USD_DATA_FEED).latestRoundData();
-        require(CHAINLINK_USDT_USD_DATA_FEED != address(0), "Chainlink USDT/USD data feed not set");
-        AggregatorV3Interface(CHAINLINK_USDT_USD_DATA_FEED).latestRoundData();
+        address ghoUsdFeed = _configAddress(".earningChain.chainlinkFeeds.ghoUsd");
+        require(ghoUsdFeed != address(0), "Chainlink GHO/USD data feed not set");
+        AggregatorV3Interface(ghoUsdFeed).latestRoundData();
+
+        address usdcUsdFeed = _configAddress(".earningChain.chainlinkFeeds.usdcUsd");
+        require(usdcUsdFeed != address(0), "Chainlink USDC/USD data feed not set");
+        AggregatorV3Interface(usdcUsdFeed).latestRoundData();
+
+        address usdtUsdFeed = _configAddress(".earningChain.chainlinkFeeds.usdtUsd");
+        require(usdtUsdFeed != address(0), "Chainlink USDT/USD data feed not set");
+        AggregatorV3Interface(usdtUsdFeed).latestRoundData();
 
         // Validate CCIP router
         require(
-            IRouterClient(CCIP_ROUTER_ADDRESS).isChainSupported(ACCOUNTING_CHAIN_CCIP_SELECTOR),
+            IRouterClient(_configAddress(".earningChain.ccipRouterAddress"))
+                .isChainSupported(uint64(vm.parseUint(_configString(".earningChain.accountingChainCcipSelector")))),
             "CCIP Router does not support accounting chain"
         );
     }
@@ -140,31 +135,35 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
 
         IEarningChainGateway gateway = IEarningChainGateway(getGatewayAddress(_deployer()));
 
+        uint256 accountingChainId = _configUint(".earningChain.accountingChainId");
+        uint64 accountingChainCcipSelector =
+            uint64(vm.parseUint(_configString(".earningChain.accountingChainCcipSelector")));
+
         // GHO uses CCIP Adapter
-        gateway.addBridgeAdapter(GHO, ACCOUNTING_CHAIN_ID, localCcipAdapter);
-        gateway.setDefaultBridgeAdapter(GHO, ACCOUNTING_CHAIN_ID, localCcipAdapter);
+        gateway.addBridgeAdapter(_gho(), accountingChainId, localCcipAdapter);
+        gateway.setDefaultBridgeAdapter(_gho(), accountingChainId, localCcipAdapter);
 
         // USDC uses CCIP Adapter
-        gateway.addBridgeAdapter(USDC, ACCOUNTING_CHAIN_ID, localCcipAdapter);
-        gateway.setDefaultBridgeAdapter(USDC, ACCOUNTING_CHAIN_ID, localCcipAdapter);
+        gateway.addBridgeAdapter(_usdc(), accountingChainId, localCcipAdapter);
+        gateway.setDefaultBridgeAdapter(_usdc(), accountingChainId, localCcipAdapter);
 
         // USDT uses CCIP Adapter
-        gateway.addBridgeAdapter(USDT, ACCOUNTING_CHAIN_ID, localCcipAdapter);
-        gateway.setDefaultBridgeAdapter(USDT, ACCOUNTING_CHAIN_ID, localCcipAdapter);
+        gateway.addBridgeAdapter(_usdt(), accountingChainId, localCcipAdapter);
+        gateway.setDefaultBridgeAdapter(_usdt(), accountingChainId, localCcipAdapter);
 
         // Message uses CCIP Adapter
         address messageOnly = address(0);
-        gateway.addBridgeAdapter(messageOnly, ACCOUNTING_CHAIN_ID, localCcipAdapter);
-        gateway.setDefaultBridgeAdapter(messageOnly, ACCOUNTING_CHAIN_ID, localCcipAdapter);
+        gateway.addBridgeAdapter(messageOnly, accountingChainId, localCcipAdapter);
+        gateway.setDefaultBridgeAdapter(messageOnly, accountingChainId, localCcipAdapter);
 
-        ICcipBridgeAdapter(localCcipAdapter).setChainSelector(ACCOUNTING_CHAIN_ID, ACCOUNTING_CHAIN_CCIP_SELECTOR);
-        ICcipBridgeAdapter(localCcipAdapter).setDestinationChainAdapter(ACCOUNTING_CHAIN_ID, accountingCcipAdapter);
+        ICcipBridgeAdapter(localCcipAdapter).setChainSelector(accountingChainId, accountingChainCcipSelector);
+        ICcipBridgeAdapter(localCcipAdapter).setDestinationChainAdapter(accountingChainId, accountingCcipAdapter);
     }
 
     function _setupWithdrawalPolicy() internal {
         WithdrawalPolicy withdrawalPolicy = WithdrawalPolicy(getWithdrawalPolicyAddress(_deployer()));
-        withdrawalPolicy.setDefaultFeeBps(50); // 0.5% – TODO: VNet only – reconsider default fee for prod
-        withdrawalPolicy.setSigner(address(0x8eFCe8C8cF3d1B198D95B3067EcF43Fb0A1039e2), true); // TODO: Set prod signer
+        withdrawalPolicy.setDefaultFeeBps(uint16(_configUint(".earningChain.withdrawalPolicy.defaultFeeBps")));
+        withdrawalPolicy.setSigner(_configAddress(".earningChain.withdrawalPolicy.signer"), true);
     }
 
     function _setupAllocator() internal {
@@ -183,9 +182,9 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
             swapInputTokenAllowed: true,
             swapOutputTokenAllowed: true
         });
-        assetRegistry.setAssetConfig(GHO, unrestrictedAssetConfig);
-        assetRegistry.setAssetConfig(USDC, unrestrictedAssetConfig);
-        assetRegistry.setAssetConfig(USDT, unrestrictedAssetConfig);
+        assetRegistry.setAssetConfig(_gho(), unrestrictedAssetConfig);
+        assetRegistry.setAssetConfig(_usdc(), unrestrictedAssetConfig);
+        assetRegistry.setAssetConfig(_usdt(), unrestrictedAssetConfig);
     }
 
     function _deployTransferHelper() internal returns (address) {
@@ -308,7 +307,7 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
     function _deployGateway() internal returns (address) {
         address implementation = address(
             new EarningChainGateway({
-                accountingChainId: ACCOUNTING_CHAIN_ID,
+                accountingChainId: _configUint(".earningChain.accountingChainId"),
                 allocator: getAllocatorAddress(_deployer()),
                 priceOracle: getPriceOracleAddress(_deployer()),
                 iouTokenManager: getIouTokenManagerAddress(_deployer()),
@@ -349,7 +348,7 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
                 abi.encode(
                     getAccessManagerAddress(_deployer()),
                     getGatewayAddress(_deployer()),
-                    CCIP_ROUTER_ADDRESS,
+                    _configAddress(".earningChain.ccipRouterAddress"),
                     getTransferHelperAddress(_deployer()),
                     getAssetRegistryAddress(_deployer())
                 )
@@ -361,7 +360,8 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
     }
 
     function _deployPriceOracle() internal returns (address) {
-        address implementation = address(new PriceOracle(PRICE_ORACLE_MIN_VALID_PRICE_RAY));
+        address implementation =
+            address(new PriceOracle(vm.parseUint(_configString(".earningChain.priceOracleMinValidPriceRay"))));
         _logDeployment("PriceOracle::Implementation", "", implementation);
         address priceOracle = _deployTransparentProxy_create3({
             namespacedSaltSeed: PRICE_ORACLE_SALT_SEED,
@@ -395,29 +395,30 @@ contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainS
 
     function _setupPriceOracleAdapters() internal {
         PriceOracle priceOracle = PriceOracle(getPriceOracleAddress(_deployer()));
+        uint256 heartbeat = _configUint(".earningChain.chainlinkPriceOracleHeartbeat");
 
         address ghoAdapter = address(
-            new ChainlinkPriceOracleAdapter(GHO, CHAINLINK_GHO_USD_DATA_FEED, CHAINLINK_PRICE_ORACLE_HEARTBEAT)
+            new ChainlinkPriceOracleAdapter(_gho(), _configAddress(".earningChain.chainlinkFeeds.ghoUsd"), heartbeat)
         );
         _logDeployment("ChainlinkPriceOracleAdapter::GHO", "", ghoAdapter);
-        priceOracle.setOracleAdapterForAsset(GHO, ghoAdapter);
+        priceOracle.setOracleAdapterForAsset(_gho(), ghoAdapter);
 
         address usdcAdapter = address(
-            new ChainlinkPriceOracleAdapter(USDC, CHAINLINK_USDC_USD_DATA_FEED, CHAINLINK_PRICE_ORACLE_HEARTBEAT)
+            new ChainlinkPriceOracleAdapter(_usdc(), _configAddress(".earningChain.chainlinkFeeds.usdcUsd"), heartbeat)
         );
         _logDeployment("ChainlinkPriceOracleAdapter::USDC", "", usdcAdapter);
-        priceOracle.setOracleAdapterForAsset(USDC, usdcAdapter);
+        priceOracle.setOracleAdapterForAsset(_usdc(), usdcAdapter);
 
         address usdtAdapter = address(
-            new ChainlinkPriceOracleAdapter(USDT, CHAINLINK_USDT_USD_DATA_FEED, CHAINLINK_PRICE_ORACLE_HEARTBEAT)
+            new ChainlinkPriceOracleAdapter(_usdt(), _configAddress(".earningChain.chainlinkFeeds.usdtUsd"), heartbeat)
         );
         _logDeployment("ChainlinkPriceOracleAdapter::USDT", "", usdtAdapter);
-        priceOracle.setOracleAdapterForAsset(USDT, usdtAdapter);
+        priceOracle.setOracleAdapterForAsset(_usdt(), usdtAdapter);
     }
 
     function _logDeployment(string memory name, string memory saltSeed, address addr) internal virtual override {
         string memory jsonObject =
             string.concat('{ "address": "', addr.toHexString(), '", "saltSeed": "', saltSeed, '" }');
-        vm.writeJson(jsonObject, "deployments/vnet/v0.3/earning.json", string.concat(".", name));
+        vm.writeJson(jsonObject, _configString(".earningChain.deploymentOutputPath"), string.concat(".", name));
     }
 }

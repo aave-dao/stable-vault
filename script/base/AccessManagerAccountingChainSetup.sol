@@ -8,11 +8,8 @@ import {RolesLib} from "script/libraries/RolesLib.sol";
 abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-    // TODO: Change to prod address
-    address constant STABLE_VAULT_MANAGER_PROFILE = address(0x4B0353F7B7122862487d22C447bd9cDc91779133);
-
-    function _getProfile__StableVaultManager() internal pure virtual returns (address) {
-        return STABLE_VAULT_MANAGER_PROFILE;
+    function _getProfile__StableVaultManager() internal view virtual returns (address) {
+        return _configAddress(".profiles.stableVaultManager");
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
