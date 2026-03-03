@@ -6,13 +6,13 @@ import {IAccessManager} from "lib/openzeppelin-contracts/contracts/access/manage
 
 import {Create3AddressBook} from "script/base/Create3AddressBook.sol";
 import {Create3Deployment} from "script/base/Create3Deployment.sol";
+import {RolesConfig} from "script/base/RolesConfig.sol";
 import {Create3AddressLib} from "script/libraries/Create3AddressLib.sol";
-import {RolesLib} from "script/libraries/RolesLib.sol";
 import {IMulticall} from "src/interfaces/IMulticall.sol";
 import {OwnedMulticall} from "src/periphery/OwnedMulticall.sol";
 import {_toSelectorArray} from "test/helpers/TypeHelpers.sol";
 
-abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deployment, RolesLib {
+abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deployment, RolesConfig {
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
     //////////////// Operational Profiles Shared between Accounting and Earning Chains ////////////////
@@ -44,7 +44,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         _setup_Targets(deployer);
 
         // Revoke deployer's access to ADMIN_ROLE
-        accessManager.revokeRole(RolesLib.ADMIN_ROLE, deployer);
+        accessManager.revokeRole(RolesConfig.ADMIN_ROLE, deployer);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -144,7 +144,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
     function _setupRoleGuardians() internal {
-        RolesLib.Role[] memory roles = RolesLib.getAllFunctionBasedRoles();
+        RolesConfig.Role[] memory roles = RolesConfig.getAllFunctionBasedRoles();
         bytes[] memory multicallCalldata = new bytes[](roles.length);
         for (uint256 i = 0; i < roles.length; i++) {
             multicallCalldata[i] =
@@ -156,7 +156,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
     function _setupRoleAdmins() internal {
-        RolesLib.Role[] memory roles = RolesLib.getAllFunctionBasedRoles();
+        RolesConfig.Role[] memory roles = RolesConfig.getAllFunctionBasedRoles();
         bytes[] memory multicallCalldata = new bytes[](roles.length);
         for (uint256 i = 0; i < roles.length; i++) {
             multicallCalldata[i] =
@@ -168,7 +168,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
     function _setupRoleGrantingDelays() internal {
-        RolesLib.Role[] memory roles = RolesLib.getAllFunctionBasedRoles();
+        RolesConfig.Role[] memory roles = RolesConfig.getAllFunctionBasedRoles();
         bytes[] memory multicallCalldata = new bytes[](roles.length);
         for (uint256 i = 0; i < roles.length; i++) {
             multicallCalldata[i] = abi.encodeCall(IAccessManager.setGrantDelay, (roles[i].roleId, roles[i].delay));
@@ -182,19 +182,20 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         address mainAdminProfile = _getProfile__MainAdmin();
         require(mainAdminProfile != address(0), "MainAdmin profile address not set");
 
-        RolesLib.Role[] memory functionBasedRoles = RolesLib.getAllFunctionBasedRoles();
+        RolesConfig.Role[] memory functionBasedRoles = RolesConfig.getAllFunctionBasedRoles();
         bytes[] memory multicallCalldata = new bytes[](functionBasedRoles.length + 3);
 
         // Grant ADMIN_ROLE
         multicallCalldata[0] =
-            abi.encodeCall(IAccessManager.grantRole, (RolesLib.ADMIN_ROLE, mainAdminProfile, CRITICAL_DELAY));
+            abi.encodeCall(IAccessManager.grantRole, (RolesConfig.ADMIN_ROLE, mainAdminProfile, CRITICAL_DELAY));
 
         // Grant All Role-Guardian roles
         multicallCalldata[1] = abi.encodeCall(
-            IAccessManager.grantRole, (RolesLib.ADMIN_ROLE_GUARDIAN_ROLE, mainAdminProfile, RolesLib.NO_DELAY)
+            IAccessManager.grantRole, (RolesConfig.ADMIN_ROLE_GUARDIAN_ROLE, mainAdminProfile, RolesConfig.NO_DELAY)
         );
         multicallCalldata[2] = abi.encodeCall(
-            IAccessManager.grantRole, (RolesLib.OPERATIONAL_ROLE_GUARDIAN_ROLE, mainAdminProfile, RolesLib.NO_DELAY)
+            IAccessManager.grantRole,
+            (RolesConfig.OPERATIONAL_ROLE_GUARDIAN_ROLE, mainAdminProfile, RolesConfig.NO_DELAY)
         );
 
         // Grant All Function-Based roles
@@ -211,7 +212,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         address secondaryAdminProfile = _getProfile__SecondaryAdmin();
         require(secondaryAdminProfile != address(0), "SecondaryAdmin profile address not set");
 
-        RolesLib.Role[] memory functionBasedRoles = RolesLib.getAllFunctionBasedRoles();
+        RolesConfig.Role[] memory functionBasedRoles = RolesConfig.getAllFunctionBasedRoles();
 
         // Count non-critical roles
         uint256 nonCriticalCount = 0;
@@ -226,7 +227,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         // Grant Operation-Role Guardian role
         multicallCalldata[0] = abi.encodeCall(
             IAccessManager.grantRole,
-            (RolesLib.OPERATIONAL_ROLE_GUARDIAN_ROLE, secondaryAdminProfile, RolesLib.NO_DELAY)
+            (RolesConfig.OPERATIONAL_ROLE_GUARDIAN_ROLE, secondaryAdminProfile, RolesConfig.NO_DELAY)
         );
 
         // Grant all non-critical function-based roles
@@ -248,10 +249,10 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         address withdrawalPolicyManagerProfile = _getProfile__WithdrawalPolicyManager();
         require(withdrawalPolicyManagerProfile != address(0), "WithdrawalPolicyManager profile address not set");
 
-        RolesLib.Role[] memory roles = new RolesLib.Role[](2);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](2);
 
-        roles[0] = RolesLib.getRole__setDefaultFeeBps();
-        roles[1] = RolesLib.getRole__setAssetFeeBps();
+        roles[0] = RolesConfig.getRole__setDefaultFeeBps();
+        roles[1] = RolesConfig.getRole__setAssetFeeBps();
 
         _grantRolesToProfile(withdrawalPolicyManagerProfile, roles);
     }
@@ -262,16 +263,16 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         address rebalancerProfile = _getProfile__Rebalancer();
         require(rebalancerProfile != address(0), "Rebalancer profile address not set");
 
-        RolesLib.Role[] memory roles = new RolesLib.Role[](6);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](6);
 
-        roles[0] = RolesLib.getRole__rebalance();
-        roles[1] = RolesLib.getRole__setDefaultStrategy();
-        roles[2] = RolesLib.getRole__disableDepositsToStrategy();
+        roles[0] = RolesConfig.getRole__rebalance();
+        roles[1] = RolesConfig.getRole__setDefaultStrategy();
+        roles[2] = RolesConfig.getRole__disableDepositsToStrategy();
         // Only used on the Accounting Chain (FundsHandler), but granted in both Accounting and Earning Chain setups
-        roles[3] = RolesLib.getRole__pushFundsToChain();
+        roles[3] = RolesConfig.getRole__pushFundsToChain();
         // Only used on the Earning Chain (EarningChainGateway), but granted in both Accounting and Earning Chain setups
-        roles[4] = RolesLib.getRole__pushFundsToAccountingChain();
-        roles[5] = RolesLib.getRole__setDefaultBridgeAdapter();
+        roles[4] = RolesConfig.getRole__pushFundsToAccountingChain();
+        roles[5] = RolesConfig.getRole__setDefaultBridgeAdapter();
 
         _grantRolesToProfile(rebalancerProfile, roles);
     }
@@ -282,20 +283,20 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         address disablerProfile = _getProfile__Disabler();
         require(disablerProfile != address(0), "Disabler profile address not set");
 
-        RolesLib.Role[] memory roles = new RolesLib.Role[](12);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](12);
 
-        roles[0] = RolesLib.getRole__rebalance();
-        roles[1] = RolesLib.getRole__removeStrategy();
-        roles[2] = RolesLib.getRole__rescueTokens();
-        roles[3] = RolesLib.getRole__rescueNative();
-        roles[4] = RolesLib.getRole__disableAllocatorDeposits();
-        roles[5] = RolesLib.getRole__disableUserDeposits();
-        roles[6] = RolesLib.getRole__disableSwapInput();
-        roles[7] = RolesLib.getRole__disableSwapOutput();
-        roles[8] = RolesLib.getRole__distrustAsset();
-        roles[9] = RolesLib.getRole__removeBridgeAdapter();
-        roles[10] = RolesLib.getRole__disableDepositsToStrategy();
-        roles[11] = RolesLib.getRole__setDefaultStrategy();
+        roles[0] = RolesConfig.getRole__rebalance();
+        roles[1] = RolesConfig.getRole__removeStrategy();
+        roles[2] = RolesConfig.getRole__rescueTokens();
+        roles[3] = RolesConfig.getRole__rescueNative();
+        roles[4] = RolesConfig.getRole__disableAllocatorDeposits();
+        roles[5] = RolesConfig.getRole__disableUserDeposits();
+        roles[6] = RolesConfig.getRole__disableSwapInput();
+        roles[7] = RolesConfig.getRole__disableSwapOutput();
+        roles[8] = RolesConfig.getRole__distrustAsset();
+        roles[9] = RolesConfig.getRole__removeBridgeAdapter();
+        roles[10] = RolesConfig.getRole__disableDepositsToStrategy();
+        roles[11] = RolesConfig.getRole__setDefaultStrategy();
 
         _grantRolesToProfile(disablerProfile, roles);
     }
@@ -304,9 +305,9 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         address aTokenVaultRewardClaimer = _getProfile__ATokenVaultRewardClaimer();
         require(aTokenVaultRewardClaimer != address(0), "ATokenVaultRewardClaimer profile address not set");
 
-        RolesLib.Role[] memory roles = new RolesLib.Role[](1);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](1);
 
-        roles[0] = RolesLib.getRole__claimMerklRewards();
+        roles[0] = RolesConfig.getRole__claimMerklRewards();
 
         _grantRolesToProfile(aTokenVaultRewardClaimer, roles);
     }
@@ -316,13 +317,13 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     function _setupTarget__CcipAdapter(address deployer) internal {
         address ccipAdapter = getCcipAdapterAddress(deployer);
 
-        RolesLib.Role[] memory roles = new RolesLib.Role[](5);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](5);
 
-        roles[0] = RolesLib.getRole__setDestinationChainAdapter();
-        roles[1] = RolesLib.getRole__setChainSelector();
-        roles[2] = RolesLib.getRole__rescueNative();
-        roles[3] = RolesLib.getRole__replayFundsReceiving();
-        roles[4] = RolesLib.getRole__rescueTokens();
+        roles[0] = RolesConfig.getRole__setDestinationChainAdapter();
+        roles[1] = RolesConfig.getRole__setChainSelector();
+        roles[2] = RolesConfig.getRole__rescueNative();
+        roles[3] = RolesConfig.getRole__replayFundsReceiving();
+        roles[4] = RolesConfig.getRole__rescueTokens();
 
         _setTargetFunctionRoles(ccipAdapter, roles);
     }
@@ -330,14 +331,14 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     function _setupTarget__Allocator(address deployer) internal {
         address allocator = getAllocatorAddress(deployer);
 
-        RolesLib.Role[] memory roles = new RolesLib.Role[](6);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](6);
 
-        roles[0] = RolesLib.getRole__rebalance();
-        roles[1] = RolesLib.getRole__addStrategy();
-        roles[2] = RolesLib.getRole__removeStrategy();
-        roles[3] = RolesLib.getRole__disableDepositsToStrategy();
-        roles[4] = RolesLib.getRole__setDefaultStrategy();
-        roles[5] = RolesLib.getRole__enableDepositsToStrategy();
+        roles[0] = RolesConfig.getRole__rebalance();
+        roles[1] = RolesConfig.getRole__addStrategy();
+        roles[2] = RolesConfig.getRole__removeStrategy();
+        roles[3] = RolesConfig.getRole__disableDepositsToStrategy();
+        roles[4] = RolesConfig.getRole__setDefaultStrategy();
+        roles[5] = RolesConfig.getRole__enableDepositsToStrategy();
 
         _setTargetFunctionRoles(allocator, roles);
     }
@@ -345,11 +346,11 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     function _setupTarget__WithdrawalPolicy(address deployer) internal {
         address withdrawalPolicy = getWithdrawalPolicyAddress(deployer);
 
-        RolesLib.Role[] memory roles = new RolesLib.Role[](3);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](3);
 
-        roles[0] = RolesLib.getRole__setAssetFeeBps();
-        roles[1] = RolesLib.getRole__setDefaultFeeBps();
-        roles[2] = RolesLib.getRole__setSigner();
+        roles[0] = RolesConfig.getRole__setAssetFeeBps();
+        roles[1] = RolesConfig.getRole__setDefaultFeeBps();
+        roles[2] = RolesConfig.getRole__setSigner();
 
         _setTargetFunctionRoles(withdrawalPolicy, roles);
     }
@@ -357,19 +358,19 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     function _setupTarget__AssetRegistry(address deployer) internal {
         address assetRegistry = getAssetRegistryAddress(deployer);
 
-        RolesLib.Role[] memory roles = new RolesLib.Role[](11);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](11);
 
-        roles[0] = RolesLib.getRole__setAssetConfig();
-        roles[1] = RolesLib.getRole__disableAllocatorDeposits();
-        roles[2] = RolesLib.getRole__disableSwapInput();
-        roles[3] = RolesLib.getRole__disableSwapOutput();
-        roles[4] = RolesLib.getRole__disableUserDeposits();
-        roles[5] = RolesLib.getRole__enableAllocatorDeposits();
-        roles[6] = RolesLib.getRole__enableSwapInput();
-        roles[7] = RolesLib.getRole__enableSwapOutput();
-        roles[8] = RolesLib.getRole__enableUserDeposits();
-        roles[9] = RolesLib.getRole__trustAsset();
-        roles[10] = RolesLib.getRole__distrustAsset();
+        roles[0] = RolesConfig.getRole__setAssetConfig();
+        roles[1] = RolesConfig.getRole__disableAllocatorDeposits();
+        roles[2] = RolesConfig.getRole__disableSwapInput();
+        roles[3] = RolesConfig.getRole__disableSwapOutput();
+        roles[4] = RolesConfig.getRole__disableUserDeposits();
+        roles[5] = RolesConfig.getRole__enableAllocatorDeposits();
+        roles[6] = RolesConfig.getRole__enableSwapInput();
+        roles[7] = RolesConfig.getRole__enableSwapOutput();
+        roles[8] = RolesConfig.getRole__enableUserDeposits();
+        roles[9] = RolesConfig.getRole__trustAsset();
+        roles[10] = RolesConfig.getRole__distrustAsset();
 
         _setTargetFunctionRoles(assetRegistry, roles);
     }
@@ -377,9 +378,9 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     function _setupTarget__PriceOracle(address deployer) internal {
         address priceOracle = getPriceOracleAddress(deployer);
 
-        RolesLib.Role[] memory roles = new RolesLib.Role[](1);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](1);
 
-        roles[0] = RolesLib.getRole__setOracleAdapterForAsset();
+        roles[0] = RolesConfig.getRole__setOracleAdapterForAsset();
 
         _setTargetFunctionRoles(priceOracle, roles);
     }
@@ -392,16 +393,16 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     }
 
     function _setupTarget__ATokenVault(address vault) internal {
-        RolesLib.Role[] memory roles = new RolesLib.Role[](1);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](1);
 
-        roles[0] = RolesLib.getRole__claimMerklRewards();
+        roles[0] = RolesConfig.getRole__claimMerklRewards();
 
         _setTargetFunctionRoles(vault, roles);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-    function _grantRolesToProfile(address profileAddress, RolesLib.Role[] memory roles) internal {
+    function _grantRolesToProfile(address profileAddress, RolesConfig.Role[] memory roles) internal {
         bytes[] memory multicallCalldata = new bytes[](roles.length);
         for (uint256 i = 0; i < roles.length; i++) {
             multicallCalldata[i] =
@@ -410,7 +411,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         IMulticall(_accessManager()).multicall(multicallCalldata);
     }
 
-    function _setTargetFunctionRoles(address target, RolesLib.Role[] memory roles) internal {
+    function _setTargetFunctionRoles(address target, RolesConfig.Role[] memory roles) internal {
         bytes[] memory multicallCalldata = new bytes[](roles.length);
         for (uint256 i = 0; i < roles.length; i++) {
             multicallCalldata[i] = abi.encodeCall(

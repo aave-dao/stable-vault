@@ -2,8 +2,6 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.20;
 
-import {Script} from "forge-std/Script.sol";
-
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {AccessManager} from "openzeppelin-contracts/contracts/access/manager/AccessManager.sol";
 
@@ -31,7 +29,7 @@ import {Swapper} from "src/periphery/Swapper.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 
-contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainSetup, Script, ATokenVaultDeployment {
+contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainSetup, ATokenVaultDeployment {
     using Strings for address;
 
     address[] internal _deployedATokenVaults;

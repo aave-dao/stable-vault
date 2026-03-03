@@ -18,7 +18,7 @@ import {ChainBalanceOracle} from "src/oracles/balance/ChainBalanceOracle.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 
-abstract contract RolesLib is DeploymentConfig {
+abstract contract RolesConfig is DeploymentConfig {
     uint32 internal immutable CRITICAL_DELAY = uint32(_configUint(".criticalDelay"));
     uint32 internal immutable MED_DELAY = uint32(_configUint(".medDelay"));
     uint32 constant NO_DELAY = 0;

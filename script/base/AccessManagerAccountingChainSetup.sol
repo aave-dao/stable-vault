@@ -3,7 +3,7 @@
 pragma solidity ^0.8.20;
 
 import {AccessManagerBaseSetup} from "script/base/AccessManagerBaseSetup.sol";
-import {RolesLib} from "script/libraries/RolesLib.sol";
+import {RolesConfig} from "script/base/RolesConfig.sol";
 
 abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
     ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -35,12 +35,12 @@ abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
         address stableVaultManager = _getProfile__StableVaultManager();
         require(stableVaultManager != address(0), "StableVaultManager profile address not set");
 
-        RolesLib.Role[] memory roles = new RolesLib.Role[](4);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](4);
 
-        roles[0] = RolesLib.getRole__setUserRate();
-        roles[1] = RolesLib.getRole__setSubVaultRate();
-        roles[2] = RolesLib.getRole__claimSurplusInterest();
-        roles[3] = RolesLib.getRole__setDefaultSubVault();
+        roles[0] = RolesConfig.getRole__setUserRate();
+        roles[1] = RolesConfig.getRole__setSubVaultRate();
+        roles[2] = RolesConfig.getRole__claimSurplusInterest();
+        roles[3] = RolesConfig.getRole__setDefaultSubVault();
 
         _grantRolesToProfile(stableVaultManager, roles);
     }
@@ -50,15 +50,15 @@ abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
     function _setupTarget__StableVault(address deployer) internal {
         address stableVault = getStableVaultAddress(deployer);
 
-        RolesLib.Role[] memory roles = new RolesLib.Role[](7);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](7);
 
-        roles[0] = RolesLib.getRole__setUserRate();
-        roles[1] = RolesLib.getRole__setSubVaultRate();
-        roles[2] = RolesLib.getRole__setDefaultSubVault();
-        roles[3] = RolesLib.getRole__claimSurplusInterest();
-        roles[4] = RolesLib.getRole__setTreasury();
-        roles[5] = RolesLib.getRole__rescueNative();
-        roles[6] = RolesLib.getRole__rescueTokens();
+        roles[0] = RolesConfig.getRole__setUserRate();
+        roles[1] = RolesConfig.getRole__setSubVaultRate();
+        roles[2] = RolesConfig.getRole__setDefaultSubVault();
+        roles[3] = RolesConfig.getRole__claimSurplusInterest();
+        roles[4] = RolesConfig.getRole__setTreasury();
+        roles[5] = RolesConfig.getRole__rescueNative();
+        roles[6] = RolesConfig.getRole__rescueTokens();
 
         _setTargetFunctionRoles(stableVault, roles);
     }
@@ -66,13 +66,13 @@ abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
     function _setupTarget__FundsHandler(address deployer) internal {
         address fundsHandler = getFundsHandlerAddress(deployer);
 
-        RolesLib.Role[] memory roles = new RolesLib.Role[](5);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](5);
 
-        roles[0] = RolesLib.getRole__pushFundsToChain();
-        roles[1] = RolesLib.getRole__rescueTokens();
-        roles[2] = RolesLib.getRole__rescueNative();
-        roles[3] = RolesLib.getRole__addEarningChain();
-        roles[4] = RolesLib.getRole__removeEarningChain();
+        roles[0] = RolesConfig.getRole__pushFundsToChain();
+        roles[1] = RolesConfig.getRole__rescueTokens();
+        roles[2] = RolesConfig.getRole__rescueNative();
+        roles[3] = RolesConfig.getRole__addEarningChain();
+        roles[4] = RolesConfig.getRole__removeEarningChain();
 
         _setTargetFunctionRoles(fundsHandler, roles);
     }
@@ -80,13 +80,13 @@ abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
     function _setupTarget__AccountingChainGateway(address deployer) internal {
         address gateway = getGatewayAddress(deployer);
 
-        RolesLib.Role[] memory roles = new RolesLib.Role[](5);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](5);
 
-        roles[0] = RolesLib.getRole__addBridgeAdapter();
-        roles[1] = RolesLib.getRole__removeBridgeAdapter();
-        roles[2] = RolesLib.getRole__setDefaultBridgeAdapter();
-        roles[3] = RolesLib.getRole__rescueTokens();
-        roles[4] = RolesLib.getRole__rescueNative();
+        roles[0] = RolesConfig.getRole__addBridgeAdapter();
+        roles[1] = RolesConfig.getRole__removeBridgeAdapter();
+        roles[2] = RolesConfig.getRole__setDefaultBridgeAdapter();
+        roles[3] = RolesConfig.getRole__rescueTokens();
+        roles[4] = RolesConfig.getRole__rescueNative();
 
         _setTargetFunctionRoles(gateway, roles);
     }
@@ -94,9 +94,9 @@ abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
     function _setupTarget__ChainBalanceOracle(address deployer) internal {
         address chainBalanceOracle = getChainBalanceOracleAddress(deployer);
 
-        RolesLib.Role[] memory roles = new RolesLib.Role[](1);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](1);
 
-        roles[0] = RolesLib.getRole__setChainBalanceOracleAdapter();
+        roles[0] = RolesConfig.getRole__setChainBalanceOracleAdapter();
 
         _setTargetFunctionRoles(chainBalanceOracle, roles);
     }

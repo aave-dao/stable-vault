@@ -2,8 +2,6 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.20;
 
-import {Script} from "forge-std/Script.sol";
-
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {AccessManager} from "openzeppelin-contracts/contracts/access/manager/AccessManager.sol";
 
@@ -41,12 +39,7 @@ import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 import {MockBundleFeed} from "test/mocks/MockBundleFeed.sol";
 import {MockSequencerUptimeFeed} from "test/mocks/MockSequencerUptimeFeed.sol";
 
-contract AccountingChainDeployment is
-    Create3Deployment,
-    AccessManagerAccountingChainSetup,
-    Script,
-    ATokenVaultDeployment
-{
+contract AccountingChainDeployment is Create3Deployment, AccessManagerAccountingChainSetup, ATokenVaultDeployment {
     using Strings for address;
 
     address[] internal _deployedATokenVaults;
