@@ -39,7 +39,11 @@ import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 import {MockBundleFeed} from "test/mocks/MockBundleFeed.sol";
 import {MockSequencerUptimeFeed} from "test/mocks/MockSequencerUptimeFeed.sol";
 
-contract AccountingChainDeployment is Create3Deployment, AccessManagerAccountingChainSetup, ATokenVaultDeployment {
+abstract contract AccountingChainDeployment is
+    Create3Deployment,
+    AccessManagerAccountingChainSetup,
+    ATokenVaultDeployment
+{
     using Strings for address;
 
     address[] internal _deployedATokenVaults;

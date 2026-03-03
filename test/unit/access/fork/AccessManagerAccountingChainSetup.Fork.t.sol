@@ -2,8 +2,8 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.20;
 
-import {AccountingChainDeployment} from "script/AccountingChainDeployment.s.sol";
 import {AccessManagerBaseSetup} from "script/base/AccessManagerBaseSetup.sol";
+import {AccountingChainDeployment} from "script/base/AccountingChainDeployment.sol";
 
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 

@@ -5,11 +5,10 @@ pragma solidity ^0.8.20;
 import {Script} from "forge-std/Script.sol";
 
 abstract contract DeploymentConfig is Script {
-    function _configPath() internal view virtual returns (string memory) {
-        return "config/deployment-config.staging.json";
-    }
+    function _configPath() internal view virtual returns (string memory);
 
     function _readConfig() internal view returns (string memory) {
+        // forge-lint: disable-next-line(unsafe-cheatcode)
         return vm.readFile(_configPath());
     }
 

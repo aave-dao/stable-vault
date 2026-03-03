@@ -1,0 +1,70 @@
+{
+  "deployer": "0x0000000000000000000000000000000000000000",
+  "criticalDelay": 1209600,
+  "medDelay": 604800,
+  "profiles": {
+    "mainAdmin": "0x0000000000000000000000000000000000000000",
+    "secondaryAdmin": "0x0000000000000000000000000000000000000000",
+    "rebalancerMulticallOwner": "0x0000000000000000000000000000000000000000",
+    "disablerMulticallOwner": "0x0000000000000000000000000000000000000000",
+    "withdrawalPolicyManager": "0x0000000000000000000000000000000000000000",
+    "aTokenVaultRewardClaimer": "0x0000000000000000000000000000000000000000",
+    "stableVaultManager": "0x0000000000000000000000000000000000000000"
+  },
+  "earningChain": {
+    "accountingChainId": 42161,
+    "accountingChainCcipSelector": "4949039107694359620",
+    "tokens": {
+      "gho": "0x0000000000000000000000000000000000000000",
+      "usdc": "0x0000000000000000000000000000000000000000",
+      "usdt": "0x0000000000000000000000000000000000000000"
+    },
+    "chainlinkFeeds": {
+      "ghoUsd": "0x0000000000000000000000000000000000000000",
+      "usdcUsd": "0x0000000000000000000000000000000000000000",
+      "usdtUsd": "0x0000000000000000000000000000000000000000"
+    },
+    "ccipRouterAddress": "0x0000000000000000000000000000000000000000",
+    "priceOracleMinValidPriceRay": "990000000000000000000000000",
+    "chainlinkPriceOracleHeartbeat": 86400,
+    "withdrawalPolicy": {
+      "defaultFeeBps": 50,
+      "signer": "0x0000000000000000000000000000000000000000"
+    },
+    "maxStrategiesPerAsset": 15,
+    "deploymentOutputPath": "deployments/vnet/v0.3/earning.json"
+  },
+  "accountingChain": {
+    "earningChainId": 1,
+    "earningChainCcipSelector": "5009297550715157269",
+    "tokens": {
+      "gho": "0x0000000000000000000000000000000000000000",
+      "usdc": "0x0000000000000000000000000000000000000000",
+      "usdt": "0x0000000000000000000000000000000000000000"
+    },
+    "chainlinkFeeds": {
+      "ghoUsd": "0x0000000000000000000000000000000000000000",
+      "usdcUsd": "0x0000000000000000000000000000000000000000",
+      "usdtUsd": "0x0000000000000000000000000000000000000000"
+    },
+    "ccipRouterAddress": "0x0000000000000000000000000000000000000000",
+    "priceOracleMinValidPriceRay": "990000000000000000000000000",
+    "chainlinkPriceOracleHeartbeat": 86400,
+    "chainlinkChainBalanceOracleHeartbeat": 86400,
+    "defaultMaxPerSecondRate": "1000000005781378656804591713",
+    "defaultSubVaultPerSecondRate": "1000000001243680656318820313",
+    "defaultMaxActiveSubVaults": 201,
+    "aaveV3PoolAddressesProvider": "0x0000000000000000000000000000000000000000",
+    "useMockBundleFeed": false,
+    "useMockSequencerUptimeFeed": false,
+    "chainlinkBundleAggregatorProxy": "0x0000000000000000000000000000000000000000",
+    "sequencerUptimeFeed": "0x0000000000000000000000000000000000000000",
+    "withdrawalPolicy": {
+      "defaultFeeBps": 50,
+      "signer": "0x0000000000000000000000000000000000000000"
+    },
+    "maxStrategiesPerAsset": 15,
+    "strategyMaxSlippageAmount": 10,
+    "deploymentOutputPath": "deployments/vnet/v0.3/accounting.json"
+  }
+}

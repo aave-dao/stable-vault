@@ -2,9 +2,9 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.20;
 
-import {AccountingChainDeployment} from "script/AccountingChainDeployment.s.sol";
 import {AccessManagerAccountingChainSetup} from "script/base/AccessManagerAccountingChainSetup.sol";
 import {AccessManagerBaseSetup} from "script/base/AccessManagerBaseSetup.sol";
+import {AccountingChainDeployment} from "script/base/AccountingChainDeployment.sol";
 import {RolesConfig} from "script/base/RolesConfig.sol";
 import {Create3AddressLib} from "script/libraries/Create3AddressLib.sol";
 
@@ -31,6 +31,10 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // OVERRIDES
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    function _configPath() internal pure override returns (string memory) {
+        return "config/deployment-config.staging.json";
+    }
 
     function _logDeployment(string memory, string memory, address)
         internal
