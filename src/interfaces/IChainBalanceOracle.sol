@@ -11,7 +11,7 @@ interface IChainBalanceOracle {
     error ChainBalanceOracleAdapterNotFound(uint256 chainId);
 
     /// @notice Emitted when an adapter is set for a chain.
-    event ChainBalanceAdapterSet(uint256 indexed chainId, address indexed newAdapter, address indexed previousAdapter);
+    event ChainBalanceAdapterSet(uint256 indexed chainId, address indexed previousAdapter, address indexed newAdapter);
 
     /// @notice The representation of the response from the oracle adapter.
     /// @param balanceRay The aggregated balance on a given chain in ray units.

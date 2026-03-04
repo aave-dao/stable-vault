@@ -9,15 +9,15 @@ import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 /// @notice Interface for the FundsHandler contract.
 interface IFundsHandler {
     /// @notice Thrown when the caller is not the StableVault.
-    /// @custom:selector 0x93ce7047
+    /// @custom:selector 0x53dad68c
     error OnlyStableVault();
 
     /// @notice Thrown when the chain id is already present in the Earning chain set.
-    /// @custom:selector 0x148e7b23
+    /// @custom:selector 0xff514c10
     error ChainIdAlreadyPresent();
 
     /// @notice Thrown when the chain id can not be removed because it is not present in the Earning chain set.
-    /// @custom:selector 0xa80e441d
+    /// @custom:selector 0x20be9c4b
     error ChainIdNotPresent();
 
     /// @notice Emitted when an earning chain is added.
