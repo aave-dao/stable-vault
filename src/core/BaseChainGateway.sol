@@ -71,6 +71,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
             // receiving arbitrary messages.
             // If someone wants to send funds to the Gateway then it will take it.
             _receiveFunds(asset, amount);
+            emit FundsReceived(asset, amount, sourceChainId);
         }
         if (data.length > 0) {
             _onlyAdapter(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, sourceChainId);
@@ -149,6 +150,9 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
             .publishMessageToChainWithFeePayer(
                 destinationChainId, assetToBridge, amountToBridge, dataToBridge, bridgeParams
             );
+        if (assetToBridge != Constants.ASSET_FOR_DATA_ONLY_BRIDGE) {
+            emit FundsSent(assetToBridge, amountToBridge, destinationChainId);
+        }
     }
 
     function _beforeRescueTokens(

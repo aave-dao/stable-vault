@@ -418,6 +418,14 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         _accountingChainGateway.receiveMessage(EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "");
     }
 
+    function test_receiveMessage_whenBridgeFundsIsReceived_emitsEvent() public {
+        uint256 amountUsdt = 1000000000000000000;
+        vm.expectEmit(true, true, true, true);
+        emit IChainGateway.FundsReceived(address(_mockUsdt), amountUsdt, EARNING_CHAIN_ID);
+        vm.prank(address(_mockBridgeAdapterAssets));
+        _accountingChainGateway.receiveMessage(EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "");
+    }
+
     function test_receiveMessage_receiveFunds_succeedsWhenUnknownAdapter(uint256 amountUsdt) public {
         // Context: non whitelisted adapter can trigger receival of funds
         amountUsdt = _boundAssetAmount(address(_mockUsdt), amountUsdt);
@@ -799,6 +807,68 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         _accountingChainGateway.sendPushFundsToChainMessage{value: bridgeFeeAmount}(
             assetToBridge, amount, EARNING_CHAIN_ID, bridgeParams
         );
+    }
+
+    function test_sendPushFundsToChainMessage_withArbitraryData_emitsEvent() public {
+        uint256 amount = 1000000000000000000;
+        uint256 bridgeFeeAmount = 2000000000000000000;
+
+        address assetToBridge = address(_mockUsdt);
+        amount = _boundAssetAmount(assetToBridge, amount);
+        // Use native asset
+        address bridgeFeeToken = address(0);
+        bridgeFeeAmount = _boundNativeAmount(bridgeFeeAmount);
+
+        // Mimic the FH pushing bridge fee to TransferHelper
+        vm.deal(address(_mockTransferHelper), bridgeFeeAmount);
+
+        // Mimic the FH pushing assets to TransferHelper
+        IMockErc20(assetToBridge).mint(address(_mockTransferHelper), amount);
+
+        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
+            feePayer: everyRoleAccount,
+            feeToken: bridgeFeeToken,
+            feeAmount: bridgeFeeAmount,
+            feeRefundThreshold: 0,
+            gasLimit: 100000,
+            data: abi.encode(keccak256(hex"c0ffee"))
+        });
+
+        vm.expectEmit(true, true, true, true);
+        emit IChainGateway.FundsSent(assetToBridge, amount, EARNING_CHAIN_ID);
+        vm.prank(address(_mockFundsHandler));
+        _accountingChainGateway.sendPushFundsToChainMessage(assetToBridge, amount, EARNING_CHAIN_ID, bridgeParams);
+    }
+
+    function test_sendPushFundsToChainMessage_withoutArbitraryData_emitsEvent() public {
+        uint256 amount = 1000000000000000000;
+        uint256 bridgeFeeAmount = 2000000000000000000;
+
+        address assetToBridge = address(_mockUsdt);
+        amount = _boundAssetAmount(assetToBridge, amount);
+        // Use native asset
+        address bridgeFeeToken = address(0);
+        bridgeFeeAmount = _boundNativeAmount(bridgeFeeAmount);
+
+        // Mimic the FH pushing bridge fee to TransferHelper
+        vm.deal(address(_mockTransferHelper), bridgeFeeAmount);
+
+        // Mimic the FH pushing assets to TransferHelper
+        IMockErc20(assetToBridge).mint(address(_mockTransferHelper), amount);
+
+        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
+            feePayer: everyRoleAccount,
+            feeToken: bridgeFeeToken,
+            feeAmount: bridgeFeeAmount,
+            feeRefundThreshold: 0,
+            gasLimit: 100000,
+            data: ""
+        });
+
+        vm.expectEmit(true, true, true, true);
+        emit IChainGateway.FundsSent(assetToBridge, amount, EARNING_CHAIN_ID);
+        vm.prank(address(_mockFundsHandler));
+        _accountingChainGateway.sendPushFundsToChainMessage(assetToBridge, amount, EARNING_CHAIN_ID, bridgeParams);
     }
 
     function test_sendPushFundsToChainMessage_reverts_ifOnlyFundsHandler() public {
