@@ -182,7 +182,7 @@ interface IAllocator {
     /// @dev This function will be used exclusively to improve the solvency of the system.
     /// @param asset Address of the asset to deposit.
     /// @param amount Amount of the asset to deposit.
-    function topup(address asset, uint256 amount) external;
+    function topUp(address asset, uint256 amount) external;
 
     /// @notice Withdraws a given amount of an asset from the default strategy for the given asset.
     /// @dev Prioritizes idle funds, default strategy, then non-default strategy(s).

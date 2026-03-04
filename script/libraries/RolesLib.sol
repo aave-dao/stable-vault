@@ -374,8 +374,8 @@ library RolesLib {
 
     /// @custom:delay None
     /// @custom:location Allocator
-    function getRole__topup() internal pure returns (Role memory) {
-        bytes4 selector = IAllocator.topup.selector;
+    function getRole__topUp() internal pure returns (Role memory) {
+        bytes4 selector = IAllocator.topUp.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
@@ -612,7 +612,7 @@ library RolesLib {
         roles[28] = getRole__disableDepositsToStrategy();
         roles[29] = getRole__setDefaultStrategy();
         roles[30] = getRole__enableDepositsToStrategy();
-        roles[31] = getRole__topup();
+        roles[31] = getRole__topUp();
 
         // Rescue
         roles[32] = getRole__rescueTokens();

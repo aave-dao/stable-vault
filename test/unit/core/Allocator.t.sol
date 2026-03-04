@@ -2433,7 +2433,7 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.enableDepositsToStrategy(address(_defaultUsdtStrategy));
     }
 
-    function test_topup_transfersFundsToAllocator(uint256 amount) public {
+    function test_topUp_transfersFundsToAllocator(uint256 amount) public {
         amount = _boundAssetAmount(address(_mockUsdt), amount);
 
         _mockUsdt.mint(everyRoleAccount, amount);
@@ -2448,14 +2448,14 @@ contract AllocatorTest is TestWithHelpers {
         emit IAllocator.AssetToppedUp(address(_mockUsdt), amount);
         vm.expectEmit(true, false, false, true);
         emit IAllocator.AssetLeftIdle(address(_mockUsdt), amount);
-        _allocator.topup(address(_mockUsdt), amount);
+        _allocator.topUp(address(_mockUsdt), amount);
         vm.stopPrank();
 
         assertEq(_mockUsdt.balanceOf(address(_allocator)), allocatorBalanceBefore + amount);
         assertEq(_mockUsdt.balanceOf(everyRoleAccount), callerBalanceBefore - amount);
     }
 
-    function test_topup_increasesTotalAssetBalance(uint256 amount) public {
+    function test_topUp_increasesTotalAssetBalance(uint256 amount) public {
         amount = _boundAssetAmount(address(_mockUsdt), amount);
 
         uint256 assetBalanceBefore = _allocator.getAssetBalance(address(_mockUsdt));
@@ -2464,13 +2464,13 @@ contract AllocatorTest is TestWithHelpers {
 
         vm.startPrank(everyRoleAccount);
         _mockUsdt.forceApprove(address(_allocator), amount);
-        _allocator.topup(address(_mockUsdt), amount);
+        _allocator.topUp(address(_mockUsdt), amount);
         vm.stopPrank();
 
         assertEq(_allocator.getAssetBalance(address(_mockUsdt)), assetBalanceBefore + amount);
     }
 
-    function test_topup_reverts_ifNotAuthorized(address operator) public {
+    function test_topUp_reverts_ifNotAuthorized(address operator) public {
         vm.assume(operator != everyRoleAccount);
         vm.assume(operator != address(0));
         _assumeNotProxyAdmin(operator, address(_allocator));
@@ -2478,38 +2478,38 @@ contract AllocatorTest is TestWithHelpers {
         vm.mockCall(
             address(_mockAccessManager),
             abi.encodeWithSelector(
-                IAccessManager.canCall.selector, operator, address(_allocator), bytes4(IAllocator.topup.selector)
+                IAccessManager.canCall.selector, operator, address(_allocator), bytes4(IAllocator.topUp.selector)
             ),
             abi.encode(false)
         );
 
         vm.prank(operator);
         vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, operator));
-        _allocator.topup(address(_mockUsdt), 1);
+        _allocator.topUp(address(_mockUsdt), 1);
     }
 
-    function test_topup_reverts_ifAssetIsNotRegistered(uint256 amount) public {
+    function test_topUp_reverts_ifAssetIsNotRegistered(uint256 amount) public {
         amount = _boundAssetAmount(address(_mockUnsupportedAsset), amount);
 
         vm.prank(everyRoleAccount);
         vm.expectRevert(abi.encodeWithSelector(Errors.UnsupportedAsset.selector, address(_mockUnsupportedAsset)));
-        _allocator.topup(address(_mockUnsupportedAsset), amount);
+        _allocator.topUp(address(_mockUnsupportedAsset), amount);
     }
 
-    function test_topup_reverts_ifAssetDepositToAllocatorNotAllowed(uint256 amount) public {
+    function test_topUp_reverts_ifAssetDepositToAllocatorNotAllowed(uint256 amount) public {
         amount = _boundAssetAmount(address(_mockUsdt), amount);
 
         _mockAssetRegistry.mockToDisallowAssetDepositsIntoAllocator(address(_mockUsdt));
 
         vm.prank(everyRoleAccount);
         vm.expectRevert(abi.encodeWithSelector(Errors.UnsupportedAsset.selector, address(_mockUsdt)));
-        _allocator.topup(address(_mockUsdt), amount);
+        _allocator.topUp(address(_mockUsdt), amount);
     }
 
-    function test_topup_reverts_ifZeroAmount() public {
+    function test_topUp_reverts_ifZeroAmount() public {
         vm.prank(everyRoleAccount);
         vm.expectRevert(abi.encodeWithSelector(Errors.ZeroAmount.selector));
-        _allocator.topup(address(_mockUsdt), 0);
+        _allocator.topUp(address(_mockUsdt), 0);
     }
 
     function _getDepositIdleFundsRebalanceParams(address asset)

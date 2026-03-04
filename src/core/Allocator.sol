@@ -261,7 +261,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     }
 
     /// @inheritdoc IAllocator
-    function topup(address asset, uint256 amount) external override restricted {
+    function topUp(address asset, uint256 amount) external override restricted {
         require(amount > 0, Errors.ZeroAmount());
         require(IAssetRegistry(ASSET_REGISTRY).isAssetRegistered(asset), Errors.UnsupportedAsset(asset));
         require(IAssetRegistry(ASSET_REGISTRY).isDepositToAllocatorAllowed(asset), Errors.UnsupportedAsset(asset));

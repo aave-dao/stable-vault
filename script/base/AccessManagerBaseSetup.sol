@@ -280,7 +280,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         // Only used on the Earning Chain (EarningChainGateway), but granted in both Accounting and Earning Chain setups
         roles[4] = RolesLib.getRole__pushFundsToAccountingChain();
         roles[5] = RolesLib.getRole__setDefaultBridgeAdapter();
-        roles[6] = RolesLib.getRole__topup();
+        roles[6] = RolesLib.getRole__topUp();
 
         _grantRolesToProfile(rebalancerProfile, roles);
     }
@@ -347,7 +347,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         roles[3] = RolesLib.getRole__disableDepositsToStrategy();
         roles[4] = RolesLib.getRole__setDefaultStrategy();
         roles[5] = RolesLib.getRole__enableDepositsToStrategy();
-        roles[6] = RolesLib.getRole__topup();
+        roles[6] = RolesLib.getRole__topUp();
 
         _setTargetFunctionRoles(allocator, roles);
     }
