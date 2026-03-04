@@ -261,6 +261,16 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     }
 
     /// @inheritdoc IAllocator
+    function topUp(address asset, uint256 amount) external override restricted {
+        require(amount > 0, Errors.ZeroAmount());
+        require(IAssetRegistry(ASSET_REGISTRY).isAssetRegistered(asset), Errors.UnsupportedAsset(asset));
+        require(IAssetRegistry(ASSET_REGISTRY).isDepositToAllocatorAllowed(asset), Errors.UnsupportedAsset(asset));
+        IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
+        emit AssetToppedUp(asset, amount);
+        emit AssetLeftIdle(asset, amount);
+    }
+
+    /// @inheritdoc IAllocator
     function addStrategy(address asset, address strategy, uint8 maxSlippageAmount) external override restricted {
         _addStrategy(asset, strategy, maxSlippageAmount);
     }

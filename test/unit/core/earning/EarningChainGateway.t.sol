@@ -990,6 +990,52 @@ contract EarningChainGatewayTest is TestWithHelpers {
         );
     }
 
+    function test_pushFundsToAccountingChain_withArbitraryData_emitsFundsSent() public {
+        uint256 amountToken = 1000000000000000000;
+        amountToken = _boundAssetAmount(address(_mockUsdt), amountToken);
+        _mockTransferHelper.mockAsset(address(_mockUsdt), amountToken);
+
+        vm.expectEmit(true, true, true, true);
+        emit IChainGateway.FundsSent(address(_mockUsdt), amountToken, ACCOUNTING_CHAIN_ID);
+
+        vm.prank(everyRoleAccount);
+        _earningChainGateway.pushFundsToAccountingChain(
+            address(_mockUsdt),
+            amountToken,
+            IBridgeAdapter.BridgeParams({
+                feePayer: everyRoleAccount,
+                feeToken: address(0),
+                feeAmount: 0,
+                feeRefundThreshold: 0,
+                gasLimit: 100000,
+                data: abi.encode(keccak256(hex"c0ffee"))
+            })
+        );
+    }
+
+    function test_pushFundsToAccountingChain_withoutArbitraryData_emitsFundsSent() public {
+        uint256 amountToken = 1000000000000000000;
+        amountToken = _boundAssetAmount(address(_mockUsdt), amountToken);
+        _mockTransferHelper.mockAsset(address(_mockUsdt), amountToken);
+
+        vm.expectEmit(true, true, true, true);
+        emit IChainGateway.FundsSent(address(_mockUsdt), amountToken, ACCOUNTING_CHAIN_ID);
+
+        vm.prank(everyRoleAccount);
+        _earningChainGateway.pushFundsToAccountingChain(
+            address(_mockUsdt),
+            amountToken,
+            IBridgeAdapter.BridgeParams({
+                feePayer: everyRoleAccount,
+                feeToken: address(0),
+                feeAmount: 0,
+                feeRefundThreshold: 0,
+                gasLimit: 100000,
+                data: ""
+            })
+        );
+    }
+
     function test_pushFundsToAccountingChain_reverts_ifUnauthorized(address operator) public {
         vm.assume(operator != everyRoleAccount);
         vm.assume(operator != address(0));
@@ -1351,6 +1397,17 @@ contract EarningChainGatewayTest is TestWithHelpers {
         vm.expectCall(
             address(_mockAllocator), abi.encodeCall(IAllocator.depositAllowIdle, (address(_mockUsdt), amountUsdt))
         );
+
+        vm.prank(address(_mockBridgeAdapterAssets));
+        _earningChainGateway.receiveMessage(ACCOUNTING_CHAIN_ID, address(_mockUsdt), amountUsdt, "");
+    }
+
+    function test_receiveMessage_whenBridgeFundsIsReceived_emitsEvent() public {
+        uint256 amountUsdt = 1000000000000000000;
+        amountUsdt = _boundAssetAmount(address(_mockUsdt), amountUsdt);
+
+        vm.expectEmit(true, true, true, true);
+        emit IChainGateway.FundsReceived(address(_mockUsdt), amountUsdt, ACCOUNTING_CHAIN_ID);
 
         vm.prank(address(_mockBridgeAdapterAssets));
         _earningChainGateway.receiveMessage(ACCOUNTING_CHAIN_ID, address(_mockUsdt), amountUsdt, "");

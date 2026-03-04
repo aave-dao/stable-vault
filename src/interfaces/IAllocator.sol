@@ -14,6 +14,8 @@ interface IAllocator {
 
     event AssetsSwapped(address indexed assetIn, address indexed assetOut, uint256 amountIn, uint256 amountOut);
 
+    event AssetToppedUp(address indexed asset, uint256 amount);
+
     event DefaultStrategySet(address indexed asset, address indexed strategy);
 
     event StrategyDepositFailed(address indexed strategy, uint256 amount);
@@ -36,7 +38,7 @@ interface IAllocator {
     error DepositIntoStrategyFailed(address strategy);
 
     /// @notice Thrown when deposits are not allowed to a strategy.
-    /// @custom:selector 0xd7b75095
+    /// @custom:selector 0xa01adeda
     error DepositsToStrategyDisabled(address strategy);
 
     /// @notice Thrown when a strategy still has assets that belong to the Allocator.
@@ -175,6 +177,12 @@ interface IAllocator {
     /// swaps between assets, and allocation of assets to strategies.
     /// @param params Array of rebalance parameters.
     function rebalance(RebalanceParams[] memory params) external;
+
+    /// @notice Deposit assets into the Allocator to increase the total value of the system.
+    /// @dev This function will be used exclusively to improve the solvency of the system.
+    /// @param asset Address of the asset to deposit.
+    /// @param amount Amount of the asset to deposit.
+    function topUp(address asset, uint256 amount) external;
 
     /// @notice Withdraws a given amount of an asset from the default strategy for the given asset.
     /// @dev Prioritizes idle funds, default strategy, then non-default strategy(s).
