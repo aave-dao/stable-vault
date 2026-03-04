@@ -192,13 +192,14 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     }
 
     function test_rebalancerProfile_hasTheExpectedRoles() public view {
-        uint64[] memory expected = new uint64[](6);
+        uint64[] memory expected = new uint64[](7);
         expected[0] = RolesLib.getRole__rebalance().roleId;
         expected[1] = RolesLib.getRole__setDefaultStrategy().roleId;
         expected[2] = RolesLib.getRole__disableDepositsToStrategy().roleId;
         expected[3] = RolesLib.getRole__pushFundsToChain().roleId;
         expected[4] = RolesLib.getRole__pushFundsToAccountingChain().roleId;
         expected[5] = RolesLib.getRole__setDefaultBridgeAdapter().roleId;
+        expected[6] = RolesLib.getRole__topup().roleId;
         _assertProfileHasExactlyTheseRoles(_getProfile__Rebalancer(), expected);
 
         for (uint256 i = 0; i < expected.length; i++) {
@@ -391,6 +392,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         _assertTargetFunctionRole(
             target, IAllocator.enableDepositsToStrategy.selector, RolesLib.getRole__enableDepositsToStrategy().roleId
         );
+        _assertTargetFunctionRole(target, IAllocator.topup.selector, RolesLib.getRole__topup().roleId);
     }
 
     function test_targetSetup_withdrawalPolicy() public view {
@@ -487,6 +489,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         address rebalancer = _getProfile__Rebalancer();
 
         _assertCanCall(rebalancer, getAllocatorAddress(_deployer()), IAllocator.rebalance.selector, true, 0);
+        _assertCanCall(rebalancer, getAllocatorAddress(_deployer()), IAllocator.topup.selector, true, 0);
         // Unauthorized functions
         _assertCanCall(rebalancer, getAllocatorAddress(_deployer()), IAllocator.removeStrategy.selector, false, 0);
         _assertCanCall(rebalancer, getAllocatorAddress(_deployer()), IAllocator.addStrategy.selector, false, 0);
@@ -503,6 +506,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         );
         // Unauthorized
         _assertCanCall(disabler, getAllocatorAddress(_deployer()), IAllocator.addStrategy.selector, false, 0);
+        _assertCanCall(disabler, getAllocatorAddress(_deployer()), IAllocator.topup.selector, false, 0);
     }
 
     function test_canCall_withdrawalPolicyManager() public view {
@@ -513,6 +517,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         );
         // Unauthorized
         _assertCanCall(wpm, getAllocatorAddress(_deployer()), IAllocator.rebalance.selector, false, 0);
+        _assertCanCall(wpm, getAllocatorAddress(_deployer()), IAllocator.topup.selector, false, 0);
     }
 
     function test_canCall_aTokenVaultRewardClaimer() public view {
@@ -525,6 +530,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         }
         // Unauthorized
         _assertCanCall(claimer, getAllocatorAddress(_deployer()), IAllocator.rebalance.selector, false, 0);
+        _assertCanCall(claimer, getAllocatorAddress(_deployer()), IAllocator.topup.selector, false, 0);
     }
 
     ////// ADMIN_ROLE has critical delay as execution timelock //////
