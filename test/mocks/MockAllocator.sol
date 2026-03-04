@@ -78,6 +78,7 @@ contract MockAllocator is IAllocator {
     }
     function depositAllowIdle(address asset, uint256 amount) external override {}
     function rebalance(RebalanceParams[] memory params) external override {}
+    function topup(address asset, uint256 amount) external override {}
 
     function withdraw(
         address, // asset
