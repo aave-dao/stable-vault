@@ -179,6 +179,7 @@ interface IAllocator {
     function rebalance(RebalanceParams[] memory params) external;
 
     /// @notice Deposit assets into the Allocator to increase the total value of the system.
+    /// @dev This function will be used exclusively to improve the solvency of the system.
     /// @param asset Address of the asset to deposit.
     /// @param amount Amount of the asset to deposit.
     function topup(address asset, uint256 amount) external;
