@@ -1,7 +1,7 @@
 {
   "deployer": "0xBB700dA5CCC9Ec5605780Fc40695f1206B090303",
-  "criticalDelay": 1209600,
-  "medDelay": 604800,
+  "criticalDelay": 7200,
+  "medDelay": 3600,
   "profiles": {
     "mainAdmin": "0xB07C4BDb69f6f661F0F09Be393be4018fCF94F29",
     "secondaryAdmin": "0x9c9524feeF06E5e6fd8E769398f625e3E204837F",
@@ -32,6 +32,8 @@
       "signer": "0x8eFCe8C8cF3d1B198D95B3067EcF43Fb0A1039e2"
     },
     "maxStrategiesPerAsset": 15,
+    "aaveV3PoolAddressesProvider": "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e",
+    "strategyMaxSlippageAmount": 10,
     "deploymentOutputPath": "deployments/vnet/v0.3/earning.json"
   },
   "accountingChain": {
