@@ -18,6 +18,7 @@ import {Allocator} from "src/core/Allocator.sol";
 import {EarningChainGateway} from "src/core/earning/EarningChainGateway.sol";
 import {IouToken} from "src/core/ious/IouToken.sol";
 import {IouTokenManager} from "src/core/ious/IouTokenManager.sol";
+import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
@@ -94,6 +95,12 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
             "CCIP Router does not support accounting chain"
         );
 
+        // Validate Aave V3 pool addresses provider
+        require(
+            _configAddress(".earningChain.aaveV3PoolAddressesProvider") != address(0),
+            "Aave V3 pool addresses provider not set"
+        );
+
         // Validate withdrawal policy signer
         require(
             _configAddress(".earningChain.withdrawalPolicy.signer") != address(0), "Withdrawal policy signer not set"
@@ -167,7 +174,22 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
     }
 
     function _setupAllocator() internal {
-        // TODO: No strategies on earning chain for now, setup sGHO once available as ERC-4626 vault
+        IAllocator allocator = IAllocator(getAllocatorAddress(_deployer()));
+        address poolAddressProvider = _configAddress(".earningChain.aaveV3PoolAddressesProvider");
+
+        address usdcYieldStrategy =
+            _deployATokenVault(_usdc(), poolAddressProvider, getAccessManagerAddress(_deployer()), _deployer());
+        allocator.addStrategy(_usdc(), usdcYieldStrategy, uint8(_configUint(".earningChain.strategyMaxSlippageAmount")));
+        allocator.setDefaultStrategy(_usdc(), usdcYieldStrategy);
+        _deployedATokenVaults.push(usdcYieldStrategy);
+        _logDeployment("USDC aTokenVault", "", usdcYieldStrategy);
+
+        address usdtYieldStrategy =
+            _deployATokenVault(_usdt(), poolAddressProvider, getAccessManagerAddress(_deployer()), _deployer());
+        allocator.addStrategy(_usdt(), usdtYieldStrategy, uint8(_configUint(".earningChain.strategyMaxSlippageAmount")));
+        allocator.setDefaultStrategy(_usdt(), usdtYieldStrategy);
+        _deployedATokenVaults.push(usdtYieldStrategy);
+        _logDeployment("USDT aTokenVault", "", usdtYieldStrategy);
     }
 
     function _aTokenVaultAddresses() internal view virtual override returns (address[] memory) {
