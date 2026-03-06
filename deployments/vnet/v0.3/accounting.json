@@ -68,7 +68,7 @@
     "saltSeed": "aave.stable-vault.StableVault"
   },
   "Allocator::Implementation": {
-    "address": "0x4b481454e8b529eeae77d0c0cdfe50df9de9222d",
+    "address": "0xfc044fe21f06a7c3edfa6a5cd1fcff556cb5faf9",
     "saltSeed": ""
   },
   "Allocator": {
@@ -84,7 +84,7 @@
     "saltSeed": "aave.stable-vault.FundsHandler"
   },
   "AccountingChainGateway::Implementation": {
-    "address": "0x4e374a8d01f547af5d30fcc7e57d4d84215aee7a",
+    "address": "0x9c2868f6b9f2fb8e72316a0fc709a4dfcf4bb02f",
     "saltSeed": ""
   },
   "AccountingChainGateway": {

@@ -11,7 +11,7 @@ import {
 } from "openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {AccessManagerBaseSetup} from "script/base/AccessManagerBaseSetup.sol";
-import {RolesLib} from "script/libraries/RolesLib.sol";
+import {RolesConfig} from "script/base/RolesConfig.sol";
 import {_toSelectorArray} from "test/helpers/TypeHelpers.sol";
 
 import {Allocator} from "src/core/Allocator.sol";
@@ -53,20 +53,20 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         vm.etch(where, runtimeBytecode);
     }
 
-    function _getAllRoleIds() internal pure returns (uint64[] memory) {
-        RolesLib.Role[] memory functionRoles = RolesLib.getAllFunctionBasedRoles();
+    function _getAllRoleIds() internal view returns (uint64[] memory) {
+        RolesConfig.Role[] memory functionRoles = RolesConfig.getAllFunctionBasedRoles();
         uint64[] memory allIds = new uint64[](3 + functionRoles.length);
-        allIds[0] = RolesLib.ADMIN_ROLE;
-        allIds[1] = RolesLib.ADMIN_ROLE_GUARDIAN_ROLE;
-        allIds[2] = RolesLib.OPERATIONAL_ROLE_GUARDIAN_ROLE;
+        allIds[0] = RolesConfig.ADMIN_ROLE;
+        allIds[1] = RolesConfig.ADMIN_ROLE_GUARDIAN_ROLE;
+        allIds[2] = RolesConfig.OPERATIONAL_ROLE_GUARDIAN_ROLE;
         for (uint256 i = 0; i < functionRoles.length; i++) {
             allIds[3 + i] = functionRoles[i].roleId;
         }
         return allIds;
     }
 
-    function _allFunctionBasedRoleIds() internal pure returns (uint64[] memory) {
-        RolesLib.Role[] memory roles = RolesLib.getAllFunctionBasedRoles();
+    function _allFunctionBasedRoleIds() internal view returns (uint64[] memory) {
+        RolesConfig.Role[] memory roles = RolesConfig.getAllFunctionBasedRoles();
         uint64[] memory ids = new uint64[](roles.length);
         for (uint256 i = 0; i < roles.length; i++) {
             ids[i] = roles[i].roleId;
@@ -126,26 +126,28 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     function test_mainAdminProfile_hasTheExpectedRoles() public view {
         uint64[] memory fnIds = _allFunctionBasedRoleIds();
         uint64[] memory expected = new uint64[](3 + fnIds.length);
-        expected[0] = RolesLib.ADMIN_ROLE;
-        expected[1] = RolesLib.ADMIN_ROLE_GUARDIAN_ROLE;
-        expected[2] = RolesLib.OPERATIONAL_ROLE_GUARDIAN_ROLE;
+        expected[0] = RolesConfig.ADMIN_ROLE;
+        expected[1] = RolesConfig.ADMIN_ROLE_GUARDIAN_ROLE;
+        expected[2] = RolesConfig.OPERATIONAL_ROLE_GUARDIAN_ROLE;
         for (uint256 i = 0; i < fnIds.length; i++) {
             expected[3 + i] = fnIds[i];
         }
         _assertProfileHasExactlyTheseRoles(_getProfile__MainAdmin(), expected);
 
-        _assertProfileRoleDelay(_getProfile__MainAdmin(), RolesLib.ADMIN_ROLE, RolesLib.CRITICAL_DELAY);
-        _assertProfileRoleDelay(_getProfile__MainAdmin(), RolesLib.ADMIN_ROLE_GUARDIAN_ROLE, RolesLib.NO_DELAY);
-        _assertProfileRoleDelay(_getProfile__MainAdmin(), RolesLib.OPERATIONAL_ROLE_GUARDIAN_ROLE, RolesLib.NO_DELAY);
+        _assertProfileRoleDelay(_getProfile__MainAdmin(), RolesConfig.ADMIN_ROLE, CRITICAL_DELAY);
+        _assertProfileRoleDelay(_getProfile__MainAdmin(), RolesConfig.ADMIN_ROLE_GUARDIAN_ROLE, RolesConfig.NO_DELAY);
+        _assertProfileRoleDelay(
+            _getProfile__MainAdmin(), RolesConfig.OPERATIONAL_ROLE_GUARDIAN_ROLE, RolesConfig.NO_DELAY
+        );
 
-        RolesLib.Role[] memory roles = RolesLib.getAllFunctionBasedRoles();
+        RolesConfig.Role[] memory roles = RolesConfig.getAllFunctionBasedRoles();
         for (uint256 i = 0; i < roles.length; i++) {
             _assertProfileRoleDelay(_getProfile__MainAdmin(), roles[i].roleId, roles[i].delay);
         }
     }
 
     function test_secondaryAdminProfile_hasTheExpectedRoles() public view {
-        RolesLib.Role[] memory allRoles = RolesLib.getAllFunctionBasedRoles();
+        RolesConfig.Role[] memory allRoles = RolesConfig.getAllFunctionBasedRoles();
 
         // Count non-critical roles
         uint256 nonCriticalCount = 0;
@@ -156,7 +158,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         }
 
         uint64[] memory expected = new uint64[](1 + nonCriticalCount);
-        expected[0] = RolesLib.OPERATIONAL_ROLE_GUARDIAN_ROLE;
+        expected[0] = RolesConfig.OPERATIONAL_ROLE_GUARDIAN_ROLE;
         uint256 expectedIdx = 1;
         for (uint256 i = 0; i < allRoles.length; i++) {
             if (!allRoles[i].hasCriticalRisk) {
@@ -167,7 +169,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         _assertProfileHasExactlyTheseRoles(_getProfile__SecondaryAdmin(), expected);
 
         _assertProfileRoleDelay(
-            _getProfile__SecondaryAdmin(), RolesLib.OPERATIONAL_ROLE_GUARDIAN_ROLE, RolesLib.NO_DELAY
+            _getProfile__SecondaryAdmin(), RolesConfig.OPERATIONAL_ROLE_GUARDIAN_ROLE, RolesConfig.NO_DELAY
         );
 
         for (uint256 i = 0; i < allRoles.length; i++) {
@@ -179,66 +181,66 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
 
     function test_withdrawalPolicyManagerProfile_hasTheExpectedRoles() public view {
         uint64[] memory expected = new uint64[](2);
-        expected[0] = RolesLib.getRole__setDefaultFeeBps().roleId;
-        expected[1] = RolesLib.getRole__setAssetFeeBps().roleId;
+        expected[0] = RolesConfig.getRole__setDefaultFeeBps().roleId;
+        expected[1] = RolesConfig.getRole__setAssetFeeBps().roleId;
         _assertProfileHasExactlyTheseRoles(_getProfile__WithdrawalPolicyManager(), expected);
 
         _assertProfileRoleDelay(
-            _getProfile__WithdrawalPolicyManager(), expected[0], RolesLib.getRole__setDefaultFeeBps().delay
+            _getProfile__WithdrawalPolicyManager(), expected[0], RolesConfig.getRole__setDefaultFeeBps().delay
         );
         _assertProfileRoleDelay(
-            _getProfile__WithdrawalPolicyManager(), expected[1], RolesLib.getRole__setAssetFeeBps().delay
+            _getProfile__WithdrawalPolicyManager(), expected[1], RolesConfig.getRole__setAssetFeeBps().delay
         );
     }
 
     function test_rebalancerProfile_hasTheExpectedRoles() public view {
         uint64[] memory expected = new uint64[](7);
-        expected[0] = RolesLib.getRole__rebalance().roleId;
-        expected[1] = RolesLib.getRole__setDefaultStrategy().roleId;
-        expected[2] = RolesLib.getRole__disableDepositsToStrategy().roleId;
-        expected[3] = RolesLib.getRole__pushFundsToChain().roleId;
-        expected[4] = RolesLib.getRole__pushFundsToAccountingChain().roleId;
-        expected[5] = RolesLib.getRole__setDefaultBridgeAdapter().roleId;
-        expected[6] = RolesLib.getRole__topUp().roleId;
+        expected[0] = RolesConfig.getRole__rebalance().roleId;
+        expected[1] = RolesConfig.getRole__setDefaultStrategy().roleId;
+        expected[2] = RolesConfig.getRole__disableDepositsToStrategy().roleId;
+        expected[3] = RolesConfig.getRole__pushFundsToChain().roleId;
+        expected[4] = RolesConfig.getRole__pushFundsToAccountingChain().roleId;
+        expected[5] = RolesConfig.getRole__setDefaultBridgeAdapter().roleId;
+        expected[6] = RolesConfig.getRole__topUp().roleId;
         _assertProfileHasExactlyTheseRoles(_getProfile__Rebalancer(), expected);
 
         for (uint256 i = 0; i < expected.length; i++) {
-            _assertProfileRoleDelay(_getProfile__Rebalancer(), expected[i], RolesLib.NO_DELAY);
+            _assertProfileRoleDelay(_getProfile__Rebalancer(), expected[i], RolesConfig.NO_DELAY);
         }
     }
 
     function test_disablerProfile_hasTheExpectedRoles() public view {
         uint64[] memory expected = new uint64[](12);
-        expected[0] = RolesLib.getRole__rebalance().roleId;
-        expected[1] = RolesLib.getRole__removeStrategy().roleId;
-        expected[2] = RolesLib.getRole__rescueTokens().roleId;
-        expected[3] = RolesLib.getRole__rescueNative().roleId;
-        expected[4] = RolesLib.getRole__disableAllocatorDeposits().roleId;
-        expected[5] = RolesLib.getRole__disableUserDeposits().roleId;
-        expected[6] = RolesLib.getRole__disableSwapInput().roleId;
-        expected[7] = RolesLib.getRole__disableSwapOutput().roleId;
-        expected[8] = RolesLib.getRole__distrustAsset().roleId;
-        expected[9] = RolesLib.getRole__removeBridgeAdapter().roleId;
-        expected[10] = RolesLib.getRole__disableDepositsToStrategy().roleId;
-        expected[11] = RolesLib.getRole__setDefaultStrategy().roleId;
+        expected[0] = RolesConfig.getRole__rebalance().roleId;
+        expected[1] = RolesConfig.getRole__removeStrategy().roleId;
+        expected[2] = RolesConfig.getRole__rescueTokens().roleId;
+        expected[3] = RolesConfig.getRole__rescueNative().roleId;
+        expected[4] = RolesConfig.getRole__disableAllocatorDeposits().roleId;
+        expected[5] = RolesConfig.getRole__disableUserDeposits().roleId;
+        expected[6] = RolesConfig.getRole__disableSwapInput().roleId;
+        expected[7] = RolesConfig.getRole__disableSwapOutput().roleId;
+        expected[8] = RolesConfig.getRole__distrustAsset().roleId;
+        expected[9] = RolesConfig.getRole__removeBridgeAdapter().roleId;
+        expected[10] = RolesConfig.getRole__disableDepositsToStrategy().roleId;
+        expected[11] = RolesConfig.getRole__setDefaultStrategy().roleId;
         _assertProfileHasExactlyTheseRoles(_getProfile__Disabler(), expected);
 
         for (uint256 i = 0; i < expected.length; i++) {
-            _assertProfileRoleDelay(_getProfile__Disabler(), expected[i], RolesLib.NO_DELAY);
+            _assertProfileRoleDelay(_getProfile__Disabler(), expected[i], RolesConfig.NO_DELAY);
         }
     }
 
     function test_aTokenVaultRewardClaimerProfile_hasTheExpectedRoles() public view {
         uint64[] memory expected = new uint64[](1);
-        expected[0] = RolesLib.getRole__claimMerklRewards().roleId;
+        expected[0] = RolesConfig.getRole__claimMerklRewards().roleId;
         _assertProfileHasExactlyTheseRoles(_getProfile__ATokenVaultRewardClaimer(), expected);
-        _assertProfileRoleDelay(_getProfile__ATokenVaultRewardClaimer(), expected[0], RolesLib.NO_DELAY);
+        _assertProfileRoleDelay(_getProfile__ATokenVaultRewardClaimer(), expected[0], RolesConfig.NO_DELAY);
     }
 
     ////// Critical roles exclusivity //////
 
     function test_criticalRoles_areOnlyAssignedToMainAdmin() public view {
-        RolesLib.Role[] memory roles = RolesLib.getAllFunctionBasedRoles();
+        RolesConfig.Role[] memory roles = RolesConfig.getAllFunctionBasedRoles();
 
         address[] memory allProfiles = _getAllProfiles();
 
@@ -280,8 +282,8 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
 
     ////// Role ID uniqueness //////
 
-    function test_allFunctionBasedRoles_doesNotHaveCollisions() public pure {
-        RolesLib.Role[] memory roles = RolesLib.getAllFunctionBasedRoles();
+    function test_allFunctionBasedRoles_doesNotHaveCollisions() public view {
+        RolesConfig.Role[] memory roles = RolesConfig.getAllFunctionBasedRoles();
         for (uint256 i = 0; i < roles.length; i++) {
             for (uint256 j = i + 1; j < roles.length; j++) {
                 assertNotEq(
@@ -300,8 +302,8 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
 
     ////// Role configuration //////
 
-    function test_allRoleGuardians_matchRolesLib() public view {
-        RolesLib.Role[] memory roles = RolesLib.getAllFunctionBasedRoles();
+    function test_allRoleGuardians_matchRolesConfig() public view {
+        RolesConfig.Role[] memory roles = RolesConfig.getAllFunctionBasedRoles();
         for (uint256 i = 0; i < roles.length; i++) {
             uint64 guardian = IAccessManager(_accessManager()).getRoleGuardian(roles[i].roleId);
             assertEq(
@@ -313,7 +315,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     }
 
     function test_allRoleAdmins_matchExpected() public view {
-        RolesLib.Role[] memory roles = RolesLib.getAllFunctionBasedRoles();
+        RolesConfig.Role[] memory roles = RolesConfig.getAllFunctionBasedRoles();
         for (uint256 i = 0; i < roles.length; i++) {
             uint64 admin = IAccessManager(_accessManager()).getRoleAdmin(roles[i].roleId);
             assertEq(
@@ -324,8 +326,8 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         }
     }
 
-    function test_allRoleGrantDelays_matchRolesLib() public view {
-        RolesLib.Role[] memory roles = RolesLib.getAllFunctionBasedRoles();
+    function test_allRoleGrantDelays_matchRolesConfig() public view {
+        RolesConfig.Role[] memory roles = RolesConfig.getAllFunctionBasedRoles();
         for (uint256 i = 0; i < roles.length; i++) {
             uint32 grantDelay = IAccessManager(_accessManager()).getRoleGrantDelay(roles[i].roleId);
             assertEq(
@@ -338,7 +340,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
 
     function test_accessManagerTargetAdminDelay() public view {
         uint32 delay = IAccessManager(_accessManager()).getTargetAdminDelay(address(IAccessManager(_accessManager())));
-        assertEq(delay, RolesLib.CRITICAL_DELAY);
+        assertEq(delay, CRITICAL_DELAY);
     }
 
     ////// Deployer revocation //////
@@ -355,96 +357,104 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         _assertTargetFunctionRole(
             target,
             IBridgeAdapter.setDestinationChainAdapter.selector,
-            RolesLib.getRole__setDestinationChainAdapter().roleId
+            RolesConfig.getRole__setDestinationChainAdapter().roleId
         );
         _assertTargetFunctionRole(
-            target, ICcipBridgeAdapter.setChainSelector.selector, RolesLib.getRole__setChainSelector().roleId
+            target, ICcipBridgeAdapter.setChainSelector.selector, RolesConfig.getRole__setChainSelector().roleId
         );
         _assertTargetFunctionRole(
-            target, IRescuableNative.rescueNative.selector, RolesLib.getRole__rescueNative().roleId
+            target, IRescuableNative.rescueNative.selector, RolesConfig.getRole__rescueNative().roleId
         );
         _assertTargetFunctionRole(
-            target, ICcipBridgeAdapter.replayFundsReceiving.selector, RolesLib.getRole__replayFundsReceiving().roleId
+            target, ICcipBridgeAdapter.replayFundsReceiving.selector, RolesConfig.getRole__replayFundsReceiving().roleId
         );
         _assertTargetFunctionRole(
-            target, IRescuableToken.rescueTokens.selector, RolesLib.getRole__rescueTokens().roleId
+            target, IRescuableToken.rescueTokens.selector, RolesConfig.getRole__rescueTokens().roleId
         );
     }
 
     function test_targetSetup_priceOracle() public view {
         address target = getPriceOracleAddress(_deployer());
         _assertTargetFunctionRole(
-            target, PriceOracle.setOracleAdapterForAsset.selector, RolesLib.getRole__setOracleAdapterForAsset().roleId
+            target,
+            PriceOracle.setOracleAdapterForAsset.selector,
+            RolesConfig.getRole__setOracleAdapterForAsset().roleId
         );
     }
 
     function test_targetSetup_allocator() public view {
         address target = getAllocatorAddress(_deployer());
-        _assertTargetFunctionRole(target, IAllocator.rebalance.selector, RolesLib.getRole__rebalance().roleId);
-        _assertTargetFunctionRole(target, IAllocator.addStrategy.selector, RolesLib.getRole__addStrategy().roleId);
-        _assertTargetFunctionRole(target, IAllocator.removeStrategy.selector, RolesLib.getRole__removeStrategy().roleId);
+        _assertTargetFunctionRole(target, IAllocator.rebalance.selector, RolesConfig.getRole__rebalance().roleId);
+        _assertTargetFunctionRole(target, IAllocator.addStrategy.selector, RolesConfig.getRole__addStrategy().roleId);
         _assertTargetFunctionRole(
-            target, IAllocator.disableDepositsToStrategy.selector, RolesLib.getRole__disableDepositsToStrategy().roleId
+            target, IAllocator.removeStrategy.selector, RolesConfig.getRole__removeStrategy().roleId
         );
         _assertTargetFunctionRole(
-            target, IAllocator.setDefaultStrategy.selector, RolesLib.getRole__setDefaultStrategy().roleId
+            target,
+            IAllocator.disableDepositsToStrategy.selector,
+            RolesConfig.getRole__disableDepositsToStrategy().roleId
         );
         _assertTargetFunctionRole(
-            target, IAllocator.enableDepositsToStrategy.selector, RolesLib.getRole__enableDepositsToStrategy().roleId
+            target, IAllocator.setDefaultStrategy.selector, RolesConfig.getRole__setDefaultStrategy().roleId
         );
-        _assertTargetFunctionRole(target, IAllocator.topUp.selector, RolesLib.getRole__topUp().roleId);
+        _assertTargetFunctionRole(
+            target, IAllocator.enableDepositsToStrategy.selector, RolesConfig.getRole__enableDepositsToStrategy().roleId
+        );
+        _assertTargetFunctionRole(target, IAllocator.topUp.selector, RolesConfig.getRole__topUp().roleId);
     }
 
     function test_targetSetup_withdrawalPolicy() public view {
         address target = getWithdrawalPolicyAddress(_deployer());
         _assertTargetFunctionRole(
-            target, WithdrawalPolicy.setAssetFeeBps.selector, RolesLib.getRole__setAssetFeeBps().roleId
+            target, WithdrawalPolicy.setAssetFeeBps.selector, RolesConfig.getRole__setAssetFeeBps().roleId
         );
         _assertTargetFunctionRole(
-            target, WithdrawalPolicy.setDefaultFeeBps.selector, RolesLib.getRole__setDefaultFeeBps().roleId
+            target, WithdrawalPolicy.setDefaultFeeBps.selector, RolesConfig.getRole__setDefaultFeeBps().roleId
         );
-        _assertTargetFunctionRole(target, WithdrawalPolicy.setSigner.selector, RolesLib.getRole__setSigner().roleId);
+        _assertTargetFunctionRole(target, WithdrawalPolicy.setSigner.selector, RolesConfig.getRole__setSigner().roleId);
     }
 
     function test_targetSetup_assetRegistry() public view {
         address target = getAssetRegistryAddress(_deployer());
         _assertTargetFunctionRole(
-            target, IAssetRegistry.setAssetConfig.selector, RolesLib.getRole__setAssetConfig().roleId
+            target, IAssetRegistry.setAssetConfig.selector, RolesConfig.getRole__setAssetConfig().roleId
         );
         _assertTargetFunctionRole(
             target,
             IAssetRegistry.disableAllocatorDeposits.selector,
-            RolesLib.getRole__disableAllocatorDeposits().roleId
+            RolesConfig.getRole__disableAllocatorDeposits().roleId
         );
         _assertTargetFunctionRole(
-            target, IAssetRegistry.disableSwapInput.selector, RolesLib.getRole__disableSwapInput().roleId
+            target, IAssetRegistry.disableSwapInput.selector, RolesConfig.getRole__disableSwapInput().roleId
         );
         _assertTargetFunctionRole(
-            target, IAssetRegistry.disableSwapOutput.selector, RolesLib.getRole__disableSwapOutput().roleId
+            target, IAssetRegistry.disableSwapOutput.selector, RolesConfig.getRole__disableSwapOutput().roleId
         );
         _assertTargetFunctionRole(
-            target, IAssetRegistry.disableUserDeposits.selector, RolesLib.getRole__disableUserDeposits().roleId
+            target, IAssetRegistry.disableUserDeposits.selector, RolesConfig.getRole__disableUserDeposits().roleId
         );
         _assertTargetFunctionRole(
-            target, IAssetRegistry.enableAllocatorDeposits.selector, RolesLib.getRole__enableAllocatorDeposits().roleId
+            target,
+            IAssetRegistry.enableAllocatorDeposits.selector,
+            RolesConfig.getRole__enableAllocatorDeposits().roleId
         );
         _assertTargetFunctionRole(
-            target, IAssetRegistry.enableSwapInput.selector, RolesLib.getRole__enableSwapInput().roleId
+            target, IAssetRegistry.enableSwapInput.selector, RolesConfig.getRole__enableSwapInput().roleId
         );
         _assertTargetFunctionRole(
-            target, IAssetRegistry.enableSwapOutput.selector, RolesLib.getRole__enableSwapOutput().roleId
+            target, IAssetRegistry.enableSwapOutput.selector, RolesConfig.getRole__enableSwapOutput().roleId
         );
         _assertTargetFunctionRole(
-            target, IAssetRegistry.enableUserDeposits.selector, RolesLib.getRole__enableUserDeposits().roleId
+            target, IAssetRegistry.enableUserDeposits.selector, RolesConfig.getRole__enableUserDeposits().roleId
         );
-        _assertTargetFunctionRole(target, IAssetRegistry.trustAsset.selector, RolesLib.getRole__trustAsset().roleId);
+        _assertTargetFunctionRole(target, IAssetRegistry.trustAsset.selector, RolesConfig.getRole__trustAsset().roleId);
         _assertTargetFunctionRole(
-            target, IAssetRegistry.distrustAsset.selector, RolesLib.getRole__distrustAsset().roleId
+            target, IAssetRegistry.distrustAsset.selector, RolesConfig.getRole__distrustAsset().roleId
         );
     }
 
     function test_targetSetup_aTokenVaultAddresses() public view {
-        RolesLib.Role memory role = RolesLib.getRole__claimMerklRewards();
+        RolesConfig.Role memory role = RolesConfig.getRole__claimMerklRewards();
         address[] memory vaults = _aTokenVaultAddresses();
         for (uint256 i = 0; i < vaults.length; i++) {
             _assertTargetFunctionRole(vaults[i], role.selector, role.roleId);
@@ -461,15 +471,13 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         address admin = _getProfile__MainAdmin();
 
         // Admin-tier function (MED_DELAY): has role but delayed
-        _assertCanCall(
-            admin, getAllocatorAddress(_deployer()), IAllocator.addStrategy.selector, false, RolesLib.MED_DELAY
-        );
+        _assertCanCall(admin, getAllocatorAddress(_deployer()), IAllocator.addStrategy.selector, false, MED_DELAY);
 
         // Operational function (NO_DELAY): immediate
         _assertCanCall(admin, getAllocatorAddress(_deployer()), IAllocator.rebalance.selector, true, 0);
 
         // Unconfigured target (ProxyAdmin): ADMIN_ROLE fallback -> CRITICAL_DELAY
-        _assertCanCall(admin, _proxyAdmin(), ProxyAdmin.upgradeAndCall.selector, false, RolesLib.CRITICAL_DELAY);
+        _assertCanCall(admin, _proxyAdmin(), ProxyAdmin.upgradeAndCall.selector, false, CRITICAL_DELAY);
     }
 
     function test_canCall_secondaryAdmin() public view {
@@ -522,7 +530,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
 
     function test_canCall_aTokenVaultRewardClaimer() public view {
         address claimer = _getProfile__ATokenVaultRewardClaimer();
-        RolesLib.Role memory role = RolesLib.getRole__claimMerklRewards();
+        RolesConfig.Role memory role = RolesConfig.getRole__claimMerklRewards();
         address[] memory vaults = _aTokenVaultAddresses();
 
         for (uint256 i = 0; i < vaults.length; i++) {
@@ -539,9 +547,9 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         IAccessManager accessManager = IAccessManager(_accessManager());
         address admin = _getProfile__MainAdmin();
 
-        (bool hasRole, uint32 delay) = accessManager.hasRole(RolesLib.ADMIN_ROLE, admin);
+        (bool hasRole, uint32 delay) = accessManager.hasRole(RolesConfig.ADMIN_ROLE, admin);
         assertTrue(hasRole);
-        assertEq(delay, RolesLib.CRITICAL_DELAY);
+        assertEq(delay, CRITICAL_DELAY);
 
         // Direct call to setTargetFunctionRole reverts (needs scheduling)
         bytes memory callData = abi.encodeCall(
@@ -558,7 +566,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         accessManager.schedule(address(accessManager), callData, 0);
 
         // warp CRITICAL_DELAY
-        vm.warp(block.timestamp + RolesLib.CRITICAL_DELAY);
+        vm.warp(block.timestamp + CRITICAL_DELAY);
 
         // Execute the operation to show that it works after the critical delay elapses
         vm.prank(admin);
@@ -572,7 +580,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         address admin = _getProfile__MainAdmin();
         address proxyAdmin = _proxyAdmin();
 
-        _assertCanCall(admin, proxyAdmin, ProxyAdmin.upgradeAndCall.selector, false, RolesLib.CRITICAL_DELAY);
+        _assertCanCall(admin, proxyAdmin, ProxyAdmin.upgradeAndCall.selector, false, CRITICAL_DELAY);
 
         // Create addresses to avoid zero-address reverts
         address assetRegistry = makeAddr("ASSET_REGISTRY");
@@ -603,7 +611,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         accessManager.execute(proxyAdmin, callData);
 
         // Warp CRITICAL_DELAY
-        vm.warp(block.timestamp + RolesLib.CRITICAL_DELAY);
+        vm.warp(block.timestamp + CRITICAL_DELAY);
 
         // Execute after delay -> upgrade succeeds
         vm.prank(admin);
@@ -614,9 +622,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         address proxy = _proxyAdmin();
 
         // MainAdmin has ADMIN_ROLE, fallback with CRITICAL_DELAY
-        _assertCanCall(
-            _getProfile__MainAdmin(), proxy, ProxyAdmin.upgradeAndCall.selector, false, RolesLib.CRITICAL_DELAY
-        );
+        _assertCanCall(_getProfile__MainAdmin(), proxy, ProxyAdmin.upgradeAndCall.selector, false, CRITICAL_DELAY);
 
         // Rest of profiles do not have ADMIN_ROLE, unauthorized
         _assertCanCall(_getProfile__SecondaryAdmin(), proxy, ProxyAdmin.upgradeAndCall.selector, false, 0);
@@ -634,7 +640,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         address newAddr = makeAddr("NEW_ADDRESS_GRANT_DELAY_TEST");
 
         // Admin-tier role (MED_DELAY grant delay)
-        RolesLib.Role memory role = RolesLib.getRole__addStrategy();
+        RolesConfig.Role memory role = RolesConfig.getRole__addStrategy();
 
         // Calls grantRole (MainAdmin holds ADMIN_ROLE_GUARDIAN_ROLE without execution delay)
         vm.prank(admin);
@@ -645,7 +651,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         assertFalse(hasNow, "Role should not be active yet (grant delay)");
 
         // Warp 1 second less than MED_DELAY
-        vm.warp(block.timestamp + RolesLib.MED_DELAY - 1);
+        vm.warp(block.timestamp + MED_DELAY - 1);
 
         (hasNow,) = accessManager.hasRole(role.roleId, newAddr);
         assertFalse(hasNow, "Role should not be active yet (grant delay)");
@@ -665,7 +671,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         address newAddr = makeAddr("GRANT_DELAY_FUZZ_TEST");
 
         // Admin-tier role (MED_DELAY grant delay)
-        RolesLib.Role memory role = RolesLib.getRole__addStrategy();
+        RolesConfig.Role memory role = RolesConfig.getRole__addStrategy();
         uint32 grantDelay = accessManager.getRoleGrantDelay(role.roleId);
 
         // Fuzz time in [0, grantDelay) -> role should NOT be active
@@ -689,14 +695,14 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     ////// Role granting can be revoked during grant delay period //////
 
     function test_roleGrant_canBeRevokedDuringGrantDelay(uint256 secondsToElapseBeforeRevoking) public {
-        secondsToElapseBeforeRevoking = bound(secondsToElapseBeforeRevoking, 0, RolesLib.MED_DELAY - 1);
+        secondsToElapseBeforeRevoking = bound(secondsToElapseBeforeRevoking, 0, MED_DELAY - 1);
 
         IAccessManager accessManager = IAccessManager(_accessManager());
         address admin = _getProfile__MainAdmin();
         address newAddr = makeAddr("REVOKE_DURING_GRANT_DELAY_TEST");
 
         // Admin-tier role (MED_DELAY grant delay)
-        RolesLib.Role memory role = RolesLib.getRole__addStrategy();
+        RolesConfig.Role memory role = RolesConfig.getRole__addStrategy();
 
         // Grant role -> pending (not active yet due to grant delay)
         vm.prank(admin);
@@ -716,7 +722,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         assertFalse(hasAfterRevoke, "Role should be revoked");
 
         // Even after grant delay passes, role stays revoked
-        vm.warp(grantTimestamp + RolesLib.MED_DELAY + 1);
+        vm.warp(grantTimestamp + MED_DELAY + 1);
         (bool hasAfterDelay,) = accessManager.hasRole(role.roleId, newAddr);
         assertFalse(hasAfterDelay, "Role should remain revoked after grant delay period");
     }
@@ -728,7 +734,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         address mainAdmin = _getProfile__MainAdmin();
         address secondaryAdmin = _getProfile__SecondaryAdmin();
 
-        RolesLib.Role memory role = RolesLib.getRole__rebalance();
+        RolesConfig.Role memory role = RolesConfig.getRole__rebalance();
 
         (bool hasBefore,) = accessManager.hasRole(role.roleId, secondaryAdmin);
         assertTrue(hasBefore, "SecondaryAdmin should have role before revocation");
@@ -796,17 +802,17 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         address newAddr = makeAddr("NEW_ADDRESS_GRANT_ANY_ROLE_TEST");
 
         // Operational role (role admin = OPERATIONAL_ROLE_GUARDIAN_ROLE)
-        RolesLib.Role memory operationalRole = RolesLib.getRole__rebalance();
+        RolesConfig.Role memory operationalRole = RolesConfig.getRole__rebalance();
         vm.prank(admin);
         accessManager.grantRole(operationalRole.roleId, newAddr, operationalRole.delay);
 
         // Admin-tier role (role admin = ADMIN_ROLE_GUARDIAN_ROLE)
-        RolesLib.Role memory adminTierRole = RolesLib.getRole__addStrategy();
+        RolesConfig.Role memory adminTierRole = RolesConfig.getRole__addStrategy();
         vm.prank(admin);
         accessManager.grantRole(adminTierRole.roleId, newAddr, adminTierRole.delay);
 
         // Warp past MED_DELAY -> both roles should be active
-        vm.warp(block.timestamp + RolesLib.MED_DELAY + 1);
+        vm.warp(block.timestamp + MED_DELAY + 1);
         (bool hasOperational,) = accessManager.hasRole(operationalRole.roleId, newAddr);
         assertTrue(hasOperational, "MainAdmin should be able to grant operational roles");
         (bool hasAdminTier,) = accessManager.hasRole(adminTierRole.roleId, newAddr);
@@ -815,7 +821,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
 
     function test_operationalProfiles_cannotGrantOrRevokeRoles() public {
         IAccessManager accessManager = IAccessManager(_accessManager());
-        RolesLib.Role memory role = RolesLib.getRole__rebalance();
+        RolesConfig.Role memory role = RolesConfig.getRole__rebalance();
         address newAddr = makeAddr("ATTACKER");
 
         // Rebalancer tries grantRole -> reverts
@@ -824,7 +830,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
             abi.encodeWithSelector(
                 IAccessManager.AccessManagerUnauthorizedAccount.selector,
                 _getProfile__Rebalancer(),
-                RolesLib.OPERATIONAL_ROLE_GUARDIAN_ROLE
+                RolesConfig.OPERATIONAL_ROLE_GUARDIAN_ROLE
             )
         );
         accessManager.grantRole(role.roleId, newAddr, 0);
@@ -835,19 +841,19 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
             abi.encodeWithSelector(
                 IAccessManager.AccessManagerUnauthorizedAccount.selector,
                 _getProfile__Disabler(),
-                RolesLib.OPERATIONAL_ROLE_GUARDIAN_ROLE
+                RolesConfig.OPERATIONAL_ROLE_GUARDIAN_ROLE
             )
         );
         accessManager.revokeRole(role.roleId, _getProfile__SecondaryAdmin());
 
         // Rebalancer tries admin-tier role -> reverts
-        RolesLib.Role memory adminTierRole = RolesLib.getRole__addStrategy();
+        RolesConfig.Role memory adminTierRole = RolesConfig.getRole__addStrategy();
         vm.prank(_getProfile__Rebalancer());
         vm.expectRevert(
             abi.encodeWithSelector(
                 IAccessManager.AccessManagerUnauthorizedAccount.selector,
                 _getProfile__Rebalancer(),
-                RolesLib.ADMIN_ROLE_GUARDIAN_ROLE
+                RolesConfig.ADMIN_ROLE_GUARDIAN_ROLE
             )
         );
         accessManager.grantRole(adminTierRole.roleId, newAddr, 0);
@@ -859,7 +865,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         address newAddr = makeAddr("SECONDARY_ADMIN_GRANT_TEST");
 
         // Operational role (NO_DELAY grant delay)
-        RolesLib.Role memory role = RolesLib.getRole__rebalance();
+        RolesConfig.Role memory role = RolesConfig.getRole__rebalance();
 
         vm.prank(secondary);
         accessManager.grantRole(role.roleId, newAddr, role.delay);
@@ -882,13 +888,15 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         address newAddr = makeAddr("SECONDARY_ADMIN_TIER_TEST");
 
         // Admin-tier role (role admin = ADMIN_ROLE_GUARDIAN_ROLE)
-        RolesLib.Role memory role = RolesLib.getRole__addStrategy();
+        RolesConfig.Role memory role = RolesConfig.getRole__addStrategy();
 
         // SecondaryAdmin tries grantRole -> reverts (no ADMIN_ROLE_GUARDIAN_ROLE)
         vm.prank(secondary);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IAccessManager.AccessManagerUnauthorizedAccount.selector, secondary, RolesLib.ADMIN_ROLE_GUARDIAN_ROLE
+                IAccessManager.AccessManagerUnauthorizedAccount.selector,
+                secondary,
+                RolesConfig.ADMIN_ROLE_GUARDIAN_ROLE
             )
         );
         accessManager.grantRole(role.roleId, newAddr, 0);
@@ -897,7 +905,9 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         vm.prank(secondary);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IAccessManager.AccessManagerUnauthorizedAccount.selector, secondary, RolesLib.ADMIN_ROLE_GUARDIAN_ROLE
+                IAccessManager.AccessManagerUnauthorizedAccount.selector,
+                secondary,
+                RolesConfig.ADMIN_ROLE_GUARDIAN_ROLE
             )
         );
         accessManager.revokeRole(role.roleId, _getProfile__MainAdmin());

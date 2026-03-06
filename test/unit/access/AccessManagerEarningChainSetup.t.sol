@@ -2,11 +2,11 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.20;
 
-import {EarningChainDeployment} from "script/EarningChainDeployment.s.sol";
 import {AccessManagerBaseSetup} from "script/base/AccessManagerBaseSetup.sol";
 import {AccessManagerEarningChainSetup} from "script/base/AccessManagerEarningChainSetup.sol";
+import {EarningChainDeployment} from "script/base/EarningChainDeployment.sol";
+import {RolesConfig} from "script/base/RolesConfig.sol";
 import {Create3AddressLib} from "script/libraries/Create3AddressLib.sol";
-import {RolesLib} from "script/libraries/RolesLib.sol";
 
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
@@ -22,12 +22,16 @@ contract AccessManagerEarningChainSetupTest is AccessManagerSetupBaseTest, Earni
         _deployContracts();
         _setupAccessManager(_deployer());
         vm.stopPrank();
-        vm.warp(block.timestamp + RolesLib.CRITICAL_DELAY + 1);
+        vm.warp(block.timestamp + CRITICAL_DELAY + 1);
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // OVERRIDES
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    function _configPath() internal pure override returns (string memory) {
+        return "config/deployment-config.test.json";
+    }
 
     function _logDeployment(string memory, string memory, address)
         internal
@@ -63,24 +67,26 @@ contract AccessManagerEarningChainSetupTest is AccessManagerSetupBaseTest, Earni
         address gateway = getGatewayAddress(_deployer());
 
         _assertTargetFunctionRole(
-            gateway, IChainGateway.addBridgeAdapter.selector, RolesLib.getRole__addBridgeAdapter().roleId
+            gateway, IChainGateway.addBridgeAdapter.selector, RolesConfig.getRole__addBridgeAdapter().roleId
         );
         _assertTargetFunctionRole(
-            gateway, IChainGateway.removeBridgeAdapter.selector, RolesLib.getRole__removeBridgeAdapter().roleId
+            gateway, IChainGateway.removeBridgeAdapter.selector, RolesConfig.getRole__removeBridgeAdapter().roleId
         );
         _assertTargetFunctionRole(
-            gateway, IChainGateway.setDefaultBridgeAdapter.selector, RolesLib.getRole__setDefaultBridgeAdapter().roleId
+            gateway,
+            IChainGateway.setDefaultBridgeAdapter.selector,
+            RolesConfig.getRole__setDefaultBridgeAdapter().roleId
         );
         _assertTargetFunctionRole(
-            gateway, IRescuableToken.rescueTokens.selector, RolesLib.getRole__rescueTokens().roleId
+            gateway, IRescuableToken.rescueTokens.selector, RolesConfig.getRole__rescueTokens().roleId
         );
         _assertTargetFunctionRole(
-            gateway, IRescuableNative.rescueNative.selector, RolesLib.getRole__rescueNative().roleId
+            gateway, IRescuableNative.rescueNative.selector, RolesConfig.getRole__rescueNative().roleId
         );
         _assertTargetFunctionRole(
             gateway,
             IEarningChainGateway.pushFundsToAccountingChain.selector,
-            RolesLib.getRole__pushFundsToAccountingChain().roleId
+            RolesConfig.getRole__pushFundsToAccountingChain().roleId
         );
     }
 }

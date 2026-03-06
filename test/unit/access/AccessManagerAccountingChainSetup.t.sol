@@ -2,11 +2,11 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.20;
 
-import {AccountingChainDeployment} from "script/AccountingChainDeployment.s.sol";
 import {AccessManagerAccountingChainSetup} from "script/base/AccessManagerAccountingChainSetup.sol";
 import {AccessManagerBaseSetup} from "script/base/AccessManagerBaseSetup.sol";
+import {AccountingChainDeployment} from "script/base/AccountingChainDeployment.sol";
+import {RolesConfig} from "script/base/RolesConfig.sol";
 import {Create3AddressLib} from "script/libraries/Create3AddressLib.sol";
-import {RolesLib} from "script/libraries/RolesLib.sol";
 
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
@@ -25,12 +25,16 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
         _deployContracts();
         _setupAccessManager(_deployer());
         vm.stopPrank();
-        vm.warp(block.timestamp + RolesLib.CRITICAL_DELAY + 1);
+        vm.warp(block.timestamp + CRITICAL_DELAY + 1);
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // OVERRIDES
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    function _configPath() internal pure override returns (string memory) {
+        return "config/deployment-config.test.json";
+    }
 
     function _logDeployment(string memory, string memory, address)
         internal
@@ -93,9 +97,7 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
         _assertCanCall(stableVaultManager, stableVault, IStableVault.setSubVaultRate.selector, true, 0);
         _assertCanCall(stableVaultManager, stableVault, IStableVault.setDefaultSubVault.selector, true, 0);
         // Admin-tier (MED_DELAY): has role but delayed
-        _assertCanCall(
-            stableVaultManager, stableVault, IStableVault.claimSurplusInterest.selector, false, RolesLib.MED_DELAY
-        );
+        _assertCanCall(stableVaultManager, stableVault, IStableVault.claimSurplusInterest.selector, false, MED_DELAY);
         // Unauthorized
         _assertCanCall(stableVaultManager, stableVault, IStableVault.setTreasury.selector, false, 0);
         _assertCanCall(stableVaultManager, getAllocatorAddress(_deployer()), IAllocator.rebalance.selector, false, 0);
@@ -103,43 +105,43 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
 
     function test_stableVaultManagerProfile_hasTheExpectedRoles() public view {
         uint64[] memory expected = new uint64[](4);
-        expected[0] = RolesLib.getRole__setUserRate().roleId;
-        expected[1] = RolesLib.getRole__setSubVaultRate().roleId;
-        expected[2] = RolesLib.getRole__claimSurplusInterest().roleId;
-        expected[3] = RolesLib.getRole__setDefaultSubVault().roleId;
+        expected[0] = RolesConfig.getRole__setUserRate().roleId;
+        expected[1] = RolesConfig.getRole__setSubVaultRate().roleId;
+        expected[2] = RolesConfig.getRole__claimSurplusInterest().roleId;
+        expected[3] = RolesConfig.getRole__setDefaultSubVault().roleId;
         _assertProfileHasExactlyTheseRoles(_getProfile__StableVaultManager(), expected);
 
         // NO_DELAY roles
-        _assertProfileRoleDelay(_getProfile__StableVaultManager(), expected[0], RolesLib.NO_DELAY);
-        _assertProfileRoleDelay(_getProfile__StableVaultManager(), expected[1], RolesLib.NO_DELAY);
-        _assertProfileRoleDelay(_getProfile__StableVaultManager(), expected[3], RolesLib.NO_DELAY);
+        _assertProfileRoleDelay(_getProfile__StableVaultManager(), expected[0], RolesConfig.NO_DELAY);
+        _assertProfileRoleDelay(_getProfile__StableVaultManager(), expected[1], RolesConfig.NO_DELAY);
+        _assertProfileRoleDelay(_getProfile__StableVaultManager(), expected[3], RolesConfig.NO_DELAY);
         // MED_DELAY roles
-        _assertProfileRoleDelay(_getProfile__StableVaultManager(), expected[2], RolesLib.MED_DELAY);
+        _assertProfileRoleDelay(_getProfile__StableVaultManager(), expected[2], MED_DELAY);
     }
 
     function test_targetSetup_stableVault() public view {
         address stableVault = getStableVaultAddress(_deployer());
 
         _assertTargetFunctionRole(
-            stableVault, IStableVault.setUserRate.selector, RolesLib.getRole__setUserRate().roleId
+            stableVault, IStableVault.setUserRate.selector, RolesConfig.getRole__setUserRate().roleId
         );
         _assertTargetFunctionRole(
-            stableVault, IStableVault.setSubVaultRate.selector, RolesLib.getRole__setSubVaultRate().roleId
+            stableVault, IStableVault.setSubVaultRate.selector, RolesConfig.getRole__setSubVaultRate().roleId
         );
         _assertTargetFunctionRole(
-            stableVault, IStableVault.setDefaultSubVault.selector, RolesLib.getRole__setDefaultSubVault().roleId
+            stableVault, IStableVault.setDefaultSubVault.selector, RolesConfig.getRole__setDefaultSubVault().roleId
         );
         _assertTargetFunctionRole(
-            stableVault, IStableVault.claimSurplusInterest.selector, RolesLib.getRole__claimSurplusInterest().roleId
+            stableVault, IStableVault.claimSurplusInterest.selector, RolesConfig.getRole__claimSurplusInterest().roleId
         );
         _assertTargetFunctionRole(
-            stableVault, IStableVault.setTreasury.selector, RolesLib.getRole__setTreasury().roleId
+            stableVault, IStableVault.setTreasury.selector, RolesConfig.getRole__setTreasury().roleId
         );
         _assertTargetFunctionRole(
-            stableVault, IRescuableNative.rescueNative.selector, RolesLib.getRole__rescueNative().roleId
+            stableVault, IRescuableNative.rescueNative.selector, RolesConfig.getRole__rescueNative().roleId
         );
         _assertTargetFunctionRole(
-            stableVault, IRescuableToken.rescueTokens.selector, RolesLib.getRole__rescueTokens().roleId
+            stableVault, IRescuableToken.rescueTokens.selector, RolesConfig.getRole__rescueTokens().roleId
         );
     }
 
@@ -147,19 +149,19 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
         address fundsHandler = getFundsHandlerAddress(_deployer());
 
         _assertTargetFunctionRole(
-            fundsHandler, IFundsHandler.pushFundsToChain.selector, RolesLib.getRole__pushFundsToChain().roleId
+            fundsHandler, IFundsHandler.pushFundsToChain.selector, RolesConfig.getRole__pushFundsToChain().roleId
         );
         _assertTargetFunctionRole(
-            fundsHandler, IRescuableToken.rescueTokens.selector, RolesLib.getRole__rescueTokens().roleId
+            fundsHandler, IRescuableToken.rescueTokens.selector, RolesConfig.getRole__rescueTokens().roleId
         );
         _assertTargetFunctionRole(
-            fundsHandler, IRescuableNative.rescueNative.selector, RolesLib.getRole__rescueNative().roleId
+            fundsHandler, IRescuableNative.rescueNative.selector, RolesConfig.getRole__rescueNative().roleId
         );
         _assertTargetFunctionRole(
-            fundsHandler, IFundsHandler.addEarningChain.selector, RolesLib.getRole__addEarningChain().roleId
+            fundsHandler, IFundsHandler.addEarningChain.selector, RolesConfig.getRole__addEarningChain().roleId
         );
         _assertTargetFunctionRole(
-            fundsHandler, IFundsHandler.removeEarningChain.selector, RolesLib.getRole__removeEarningChain().roleId
+            fundsHandler, IFundsHandler.removeEarningChain.selector, RolesConfig.getRole__removeEarningChain().roleId
         );
     }
 
@@ -167,19 +169,21 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
         address gateway = getGatewayAddress(_deployer());
 
         _assertTargetFunctionRole(
-            gateway, IChainGateway.addBridgeAdapter.selector, RolesLib.getRole__addBridgeAdapter().roleId
+            gateway, IChainGateway.addBridgeAdapter.selector, RolesConfig.getRole__addBridgeAdapter().roleId
         );
         _assertTargetFunctionRole(
-            gateway, IChainGateway.removeBridgeAdapter.selector, RolesLib.getRole__removeBridgeAdapter().roleId
+            gateway, IChainGateway.removeBridgeAdapter.selector, RolesConfig.getRole__removeBridgeAdapter().roleId
         );
         _assertTargetFunctionRole(
-            gateway, IChainGateway.setDefaultBridgeAdapter.selector, RolesLib.getRole__setDefaultBridgeAdapter().roleId
+            gateway,
+            IChainGateway.setDefaultBridgeAdapter.selector,
+            RolesConfig.getRole__setDefaultBridgeAdapter().roleId
         );
         _assertTargetFunctionRole(
-            gateway, IRescuableToken.rescueTokens.selector, RolesLib.getRole__rescueTokens().roleId
+            gateway, IRescuableToken.rescueTokens.selector, RolesConfig.getRole__rescueTokens().roleId
         );
         _assertTargetFunctionRole(
-            gateway, IRescuableNative.rescueNative.selector, RolesLib.getRole__rescueNative().roleId
+            gateway, IRescuableNative.rescueNative.selector, RolesConfig.getRole__rescueNative().roleId
         );
     }
 
@@ -188,7 +192,7 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
         _assertTargetFunctionRole(
             target,
             ChainBalanceOracle.setChainBalanceOracleAdapter.selector,
-            RolesLib.getRole__setChainBalanceOracleAdapter().roleId
+            RolesConfig.getRole__setChainBalanceOracleAdapter().roleId
         );
     }
 }

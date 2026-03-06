@@ -2,6 +2,8 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.20;
 
+import {DeploymentConfig} from "script/base/DeploymentConfig.sol";
+
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
@@ -16,9 +18,9 @@ import {ChainBalanceOracle} from "src/oracles/balance/ChainBalanceOracle.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 
-library RolesLib {
-    uint32 constant CRITICAL_DELAY = 14 days;
-    uint32 constant MED_DELAY = 7 days;
+abstract contract RolesConfig is DeploymentConfig {
+    uint32 internal immutable CRITICAL_DELAY = uint32(_configUint(".criticalDelay"));
+    uint32 internal immutable MED_DELAY = uint32(_configUint(".medDelay"));
     uint32 constant NO_DELAY = 0;
 
     // Special roles not associated with an specific selector
@@ -36,7 +38,7 @@ library RolesLib {
 
     /// @custom:delay Medium
     /// @custom:location AssetRegistry
-    function getRole__setAssetConfig() internal pure returns (Role memory) {
+    function getRole__setAssetConfig() internal view returns (Role memory) {
         bytes4 selector = IAssetRegistry.setAssetConfig.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
@@ -101,7 +103,7 @@ library RolesLib {
 
     /// @custom:delay Medium
     /// @custom:location AssetRegistry
-    function getRole__enableAllocatorDeposits() internal pure returns (Role memory) {
+    function getRole__enableAllocatorDeposits() internal view returns (Role memory) {
         bytes4 selector = IAssetRegistry.enableAllocatorDeposits.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
@@ -114,7 +116,7 @@ library RolesLib {
 
     /// @custom:delay Medium
     /// @custom:location AssetRegistry
-    function getRole__enableSwapInput() internal pure returns (Role memory) {
+    function getRole__enableSwapInput() internal view returns (Role memory) {
         bytes4 selector = IAssetRegistry.enableSwapInput.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
@@ -127,7 +129,7 @@ library RolesLib {
 
     /// @custom:delay Medium
     /// @custom:location AssetRegistry
-    function getRole__enableSwapOutput() internal pure returns (Role memory) {
+    function getRole__enableSwapOutput() internal view returns (Role memory) {
         bytes4 selector = IAssetRegistry.enableSwapOutput.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
@@ -140,7 +142,7 @@ library RolesLib {
 
     /// @custom:delay Medium
     /// @custom:location AssetRegistry
-    function getRole__enableUserDeposits() internal pure returns (Role memory) {
+    function getRole__enableUserDeposits() internal view returns (Role memory) {
         bytes4 selector = IAssetRegistry.enableUserDeposits.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
@@ -153,7 +155,7 @@ library RolesLib {
 
     /// @custom:delay Medium
     /// @custom:location AssetRegistry
-    function getRole__trustAsset() internal pure returns (Role memory) {
+    function getRole__trustAsset() internal view returns (Role memory) {
         bytes4 selector = IAssetRegistry.trustAsset.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
@@ -179,7 +181,7 @@ library RolesLib {
 
     /// @custom:delay Medium
     /// @custom:location EarningChainGateway, AccountingChainGateway
-    function getRole__addBridgeAdapter() internal pure returns (Role memory) {
+    function getRole__addBridgeAdapter() internal view returns (Role memory) {
         bytes4 selector = IChainGateway.addBridgeAdapter.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
@@ -244,7 +246,7 @@ library RolesLib {
 
     /// @custom:delay Medium
     /// @custom:location WithdrawalPolicy
-    function getRole__setSigner() internal pure returns (Role memory) {
+    function getRole__setSigner() internal view returns (Role memory) {
         bytes4 selector = WithdrawalPolicy.setSigner.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
@@ -257,7 +259,7 @@ library RolesLib {
 
     /// @custom:delay Medium
     /// @custom:location CcipAdapter
-    function getRole__setDestinationChainAdapter() internal pure returns (Role memory) {
+    function getRole__setDestinationChainAdapter() internal view returns (Role memory) {
         bytes4 selector = IBridgeAdapter.setDestinationChainAdapter.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
@@ -309,7 +311,7 @@ library RolesLib {
 
     /// @custom:delay Medium
     /// @custom:location StableVault
-    function getRole__claimSurplusInterest() internal pure returns (Role memory) {
+    function getRole__claimSurplusInterest() internal view returns (Role memory) {
         bytes4 selector = IStableVault.claimSurplusInterest.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
@@ -322,7 +324,7 @@ library RolesLib {
 
     /// @custom:delay Medium
     /// @custom:location StableVault
-    function getRole__setTreasury() internal pure returns (Role memory) {
+    function getRole__setTreasury() internal view returns (Role memory) {
         bytes4 selector = IStableVault.setTreasury.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
@@ -335,7 +337,7 @@ library RolesLib {
 
     /// @custom:delay Medium
     /// @custom:location CcipAdapter
-    function getRole__setChainSelector() internal pure returns (Role memory) {
+    function getRole__setChainSelector() internal view returns (Role memory) {
         bytes4 selector = ICcipBridgeAdapter.setChainSelector.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
@@ -387,7 +389,7 @@ library RolesLib {
 
     /// @custom:delay Medium
     /// @custom:location Allocator
-    function getRole__addStrategy() internal pure returns (Role memory) {
+    function getRole__addStrategy() internal view returns (Role memory) {
         bytes4 selector = IAllocator.addStrategy.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
@@ -439,7 +441,7 @@ library RolesLib {
 
     /// @custom:delay Medium
     /// @custom:location Allocator
-    function getRole__enableDepositsToStrategy() internal pure returns (Role memory) {
+    function getRole__enableDepositsToStrategy() internal view returns (Role memory) {
         bytes4 selector = IAllocator.enableDepositsToStrategy.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
@@ -491,7 +493,7 @@ library RolesLib {
 
     /// @custom:delay Medium
     /// @custom:location FundsHandler
-    function getRole__addEarningChain() internal pure returns (Role memory) {
+    function getRole__addEarningChain() internal view returns (Role memory) {
         bytes4 selector = IFundsHandler.addEarningChain.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
@@ -504,7 +506,7 @@ library RolesLib {
 
     /// @custom:delay Medium
     /// @custom:location FundsHandler
-    function getRole__removeEarningChain() internal pure returns (Role memory) {
+    function getRole__removeEarningChain() internal view returns (Role memory) {
         bytes4 selector = IFundsHandler.removeEarningChain.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
@@ -530,7 +532,7 @@ library RolesLib {
 
     /// @custom:delay Medium
     /// @custom:location ChainBalanceOracle
-    function getRole__setChainBalanceOracleAdapter() internal pure returns (Role memory) {
+    function getRole__setChainBalanceOracleAdapter() internal view returns (Role memory) {
         bytes4 selector = ChainBalanceOracle.setChainBalanceOracleAdapter.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
@@ -543,7 +545,7 @@ library RolesLib {
 
     /// @custom:delay Medium
     /// @custom:location PriceOracle
-    function getRole__setOracleAdapterForAsset() internal pure returns (Role memory) {
+    function getRole__setOracleAdapterForAsset() internal view returns (Role memory) {
         bytes4 selector = PriceOracle.setOracleAdapterForAsset.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
@@ -567,7 +569,7 @@ library RolesLib {
         });
     }
 
-    function getAllFunctionBasedRoles() internal pure returns (Role[] memory) {
+    function getAllFunctionBasedRoles() internal view returns (Role[] memory) {
         Role[] memory roles = new Role[](41);
 
         // AssetRegistry
