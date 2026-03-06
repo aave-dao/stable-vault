@@ -30,7 +30,7 @@ contract AccessManagerEarningChainSetupTest is AccessManagerSetupBaseTest, Earni
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     function _configPath() internal pure override returns (string memory) {
-        return "config/deployment-config.staging.json";
+        return "config/deployment-config.test.json";
     }
 
     function _logDeployment(string memory, string memory, address)
