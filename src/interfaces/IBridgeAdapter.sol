@@ -64,5 +64,5 @@ interface IBridgeAdapter {
         uint256 amount,
         bytes memory data,
         BridgeParams memory bridgeParams
-    ) external payable;
+    ) external;
 }
