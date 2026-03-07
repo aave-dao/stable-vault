@@ -60,7 +60,7 @@
     "useMockBundleFeed": false,
     "useMockSequencerUptimeFeed": false,
     "chainlinkBundleAggregatorProxy": "0x37B669dA39C79e8a0D5005b44c193f7198A19Fa2",
-    "sequencerUptimeFeed": " 0xFdB631F5EE196F0ed6FAa767959853A9F217697D",
+    "sequencerUptimeFeed": "0xFdB631F5EE196F0ed6FAa767959853A9F217697D",
     "withdrawalPolicy": {
       "defaultFeeBps": 50,
       "signer": "0x037a5B223b89222a422cfa95ee935335Ab0755AC"
