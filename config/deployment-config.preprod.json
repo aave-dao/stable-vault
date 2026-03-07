@@ -34,7 +34,7 @@
     "maxStrategiesPerAsset": 15,
     "aaveV3PoolAddressesProvider": "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e",
     "strategyMaxSlippageAmount": 10,
-    "deploymentOutputPath": "deployments/vnet/v0.3/earning.json"
+    "deploymentOutputPath": "deployments/preprod/v1/earning.json"
   },
   "accountingChain": {
     "earningChainId": 1,
@@ -67,6 +67,6 @@
     },
     "maxStrategiesPerAsset": 15,
     "strategyMaxSlippageAmount": 10,
-    "deploymentOutputPath": "deployments/vnet/v0.3/accounting.json"
+    "deploymentOutputPath": "deployments/preprod/v1/accounting.json"
   }
 }
