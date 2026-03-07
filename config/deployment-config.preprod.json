@@ -5,11 +5,11 @@
   "profiles": {
     "mainAdmin": "0xB07C4BDb69f6f661F0F09Be393be4018fCF94F29",
     "secondaryAdmin": "0x9c9524feeF06E5e6fd8E769398f625e3E204837F",
-    "rebalancerMulticallOwner": "0x9207D805ef5e0557640b94ee36DA7Ed3bE9e235e",
-    "disablerMulticallOwner": "0xf43Ff3b0f46Cfd444905778f00587e12cC1C08c3",
-    "withdrawalPolicyManager": "0x43cEA7b37F81197fF60FE1700Fd97905f868A94C",
-    "aTokenVaultRewardClaimer": "0xE49D14D7157412da6145a155DaeFdD1cA069f626",
-    "stableVaultManager": "0x4B0353F7B7122862487d22C447bd9cDc91779133"
+    "rebalancerMulticallOwner": "0x9d2c7064121B35D72670a7E78667423807f42b33",
+    "disablerMulticallOwner": "0x22B9ea794cD3A014E46a9d3E1A617cF68a69Cad7",
+    "withdrawalPolicyManager": "0xBdE1e349F4117d7202939929251eDa13c60A0639",
+    "aTokenVaultRewardClaimer": "0xE79945842036F0f3a015C8f815657523503D7037",
+    "stableVaultManager": "0xc93fb5428553de74E859b08032Be33Ebb8Fb6171"
   },
   "earningChain": {
     "accountingChainId": 42161,
@@ -29,7 +29,7 @@
     "chainlinkPriceOracleHeartbeat": 86400,
     "withdrawalPolicy": {
       "defaultFeeBps": 50,
-      "signer": "0x8eFCe8C8cF3d1B198D95B3067EcF43Fb0A1039e2"
+      "signer": "0x037a5B223b89222a422cfa95ee935335Ab0755AC"
     },
     "maxStrategiesPerAsset": 15,
     "aaveV3PoolAddressesProvider": "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e",
@@ -63,7 +63,7 @@
     "sequencerUptimeFeed": " 0xFdB631F5EE196F0ed6FAa767959853A9F217697D",
     "withdrawalPolicy": {
       "defaultFeeBps": 50,
-      "signer": "0x8eFCe8C8cF3d1B198D95B3067EcF43Fb0A1039e2"
+      "signer": "0x037a5B223b89222a422cfa95ee935335Ab0755AC"
     },
     "maxStrategiesPerAsset": 15,
     "strategyMaxSlippageAmount": 10,
