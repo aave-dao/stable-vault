@@ -8,8 +8,8 @@
   "chainlinkChainBalanceOracleHeartbeat": 86400,
   "priceOracleMinValidPriceRay": "990000000000000000000000000",
   "profiles": {
-    "mainAdmin": "0xB07C4BDb69f6f661F0F09Be393be4018fCF94F29",
-    "secondaryAdmin": "0x9c9524feeF06E5e6fd8E769398f625e3E204837F",
+    "mainAdmin": "0xD70024EE82c20C30918b30FAd3Bf8D945268e6f2",
+    "secondaryAdmin": "0x449516D402DD0f8caA229C754887555CA149AF5B",
     "rebalancerMulticallOwner": "0x9d2c7064121B35D72670a7E78667423807f42b33",
     "disablerMulticallOwner": "0x22B9ea794cD3A014E46a9d3E1A617cF68a69Cad7",
     "withdrawalPolicyManager": "0xBdE1e349F4117d7202939929251eDa13c60A0639",
@@ -34,10 +34,6 @@
       "usdtUsd": "0x3E7d1eAB13ad0104d2750B8863b489D65364e32D"
     },
     "ccipRouterAddress": "0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D",
-    "withdrawalPolicy": {
-      "defaultFeeBps": 50,
-      "signer": "0x037a5B223b89222a422cfa95ee935335Ab0755AC"
-    },
     "aaveV3PoolAddressesProvider": "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e",
     "deploymentOutputPath": "deployments/preprod/v1/earning.json"
   },
