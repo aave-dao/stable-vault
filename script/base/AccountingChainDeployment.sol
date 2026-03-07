@@ -115,14 +115,18 @@ abstract contract AccountingChainDeployment is
             "CCIP Router does not support earning chain"
         );
 
-        // Validate Chainlink bundle feed / sequencer uptime feed (when not using mocks)
-        if (!_configBool(".accountingChain.useMockBundleFeed")) {
-            address bundleFeed = _configAddress(".accountingChain.chainlinkBundleAggregatorProxy");
+        // Validate Chainlink bundle feed / sequencer uptime feed
+        address bundleFeed = _configAddress(".accountingChain.chainlinkBundleAggregatorProxy");
+        if (_configBool(".accountingChain.useMockBundleFeed")) {
+            require(bundleFeed == address(0), "Chainlink bundle aggregator proxy must not be set when using mock");
+        } else {
             require(bundleFeed != address(0), "Chainlink bundle aggregator proxy not set");
             IBundleBaseAggregator(bundleFeed).latestBundle();
         }
-        if (!_configBool(".accountingChain.useMockSequencerUptimeFeed")) {
-            address sequencerFeed = _configAddress(".accountingChain.sequencerUptimeFeed");
+        address sequencerFeed = _configAddress(".accountingChain.sequencerUptimeFeed");
+        if (_configBool(".accountingChain.useMockSequencerUptimeFeed")) {
+            require(sequencerFeed == address(0), "Sequencer uptime feed must not be set when using mock");
+        } else {
             require(sequencerFeed != address(0), "Sequencer uptime feed not set");
             AggregatorV3Interface(sequencerFeed).latestRoundData();
         }
