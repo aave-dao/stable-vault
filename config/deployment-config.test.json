@@ -2,6 +2,11 @@
   "deployer": "0xBB700dA5CCC9Ec5605780Fc40695f1206B090303",
   "criticalDelay": 604800,
   "medDelay": 259200,
+  "maxStrategiesPerAsset": 15,
+  "strategyMaxSlippageAmount": 10,
+  "chainlinkPriceOracleHeartbeat": 86400,
+  "chainlinkChainBalanceOracleHeartbeat": 86400,
+  "priceOracleMinValidPriceRay": "990000000000000000000000000",
   "profiles": {
     "mainAdmin": "0xB07C4BDb69f6f661F0F09Be393be4018fCF94F29",
     "secondaryAdmin": "0x9c9524feeF06E5e6fd8E769398f625e3E204837F",
@@ -11,10 +16,14 @@
     "aTokenVaultRewardClaimer": "0xE49D14D7157412da6145a155DaeFdD1cA069f626",
     "stableVaultManager": "0x4B0353F7B7122862487d22C447bd9cDc91779133"
   },
+  "withdrawalPolicy": {
+    "defaultFeeBps": 50,
+    "signer": "0x8eFCe8C8cF3d1B198D95B3067EcF43Fb0A1039e2"
+  },
   "earningChain": {
-    "accountingChainId": 42161,
-    "accountingChainCcipSelector": "4949039107694359620",
-    "tokens": {
+    "chainId": 1,
+    "ccipSelector": "5009297550715157269",
+    "assets": {
       "gho": "0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f",
       "usdc": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
       "usdt": "0xdAC17F958D2ee523a2206206994597C13D831ec7"
@@ -25,21 +34,17 @@
       "usdtUsd": "0x3E7d1eAB13ad0104d2750B8863b489D65364e32D"
     },
     "ccipRouterAddress": "0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D",
-    "priceOracleMinValidPriceRay": "990000000000000000000000000",
-    "chainlinkPriceOracleHeartbeat": 86400,
     "withdrawalPolicy": {
       "defaultFeeBps": 50,
       "signer": "0x8eFCe8C8cF3d1B198D95B3067EcF43Fb0A1039e2"
     },
-    "maxStrategiesPerAsset": 15,
     "aaveV3PoolAddressesProvider": "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e",
-    "strategyMaxSlippageAmount": 10,
     "deploymentOutputPath": "deployments/vnet/v0.3/earning.json"
   },
   "accountingChain": {
-    "earningChainId": 1,
-    "earningChainCcipSelector": "5009297550715157269",
-    "tokens": {
+    "chainId": 42161,
+    "ccipSelector": "4949039107694359620",
+    "assets": {
       "gho": "0x7dfF72693f6A4149b17e7C6314655f6A9F7c8B33",
       "usdc": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
       "usdt": "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9"
@@ -50,9 +55,6 @@
       "usdtUsd": "0x3f3f5dF88dC9F13eac63DF89EC16ef6e7E25DdE7"
     },
     "ccipRouterAddress": "0x141fa059441E0ca23ce184B6A78bafD2A517DdE8",
-    "priceOracleMinValidPriceRay": "990000000000000000000000000",
-    "chainlinkPriceOracleHeartbeat": 86400,
-    "chainlinkChainBalanceOracleHeartbeat": 86400,
     "defaultMaxPerSecondRate": "1000000005781378656804591713",
     "defaultSubVaultPerSecondRate": "1000000001243680656318820313",
     "defaultMaxActiveSubVaults": 201,
@@ -61,12 +63,6 @@
     "useMockSequencerUptimeFeed": true,
     "chainlinkBundleAggregatorProxy": "0x0000000000000000000000000000000000000000",
     "sequencerUptimeFeed": "0x0000000000000000000000000000000000000000",
-    "withdrawalPolicy": {
-      "defaultFeeBps": 50,
-      "signer": "0x8eFCe8C8cF3d1B198D95B3067EcF43Fb0A1039e2"
-    },
-    "maxStrategiesPerAsset": 15,
-    "strategyMaxSlippageAmount": 10,
     "deploymentOutputPath": "deployments/vnet/v0.3/accounting.json"
   }
 }
