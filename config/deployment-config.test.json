@@ -34,10 +34,6 @@
       "usdtUsd": "0x3E7d1eAB13ad0104d2750B8863b489D65364e32D"
     },
     "ccipRouterAddress": "0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D",
-    "withdrawalPolicy": {
-      "defaultFeeBps": 50,
-      "signer": "0x8eFCe8C8cF3d1B198D95B3067EcF43Fb0A1039e2"
-    },
     "aaveV3PoolAddressesProvider": "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e",
     "deploymentOutputPath": "deployments/vnet/v0.3/earning.json"
   },
