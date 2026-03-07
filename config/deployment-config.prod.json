@@ -8,17 +8,17 @@
   "chainlinkChainBalanceOracleHeartbeat": 86400,
   "priceOracleMinValidPriceRay": "990000000000000000000000000",
   "profiles": {
-    "mainAdmin": "0x0000000000000000000000000000000000000000",
-    "secondaryAdmin": "0x0000000000000000000000000000000000000000",
-    "rebalancerMulticallOwner": "0x0000000000000000000000000000000000000000",
-    "disablerMulticallOwner": "0x0000000000000000000000000000000000000000",
-    "withdrawalPolicyManager": "0x0000000000000000000000000000000000000000",
-    "aTokenVaultRewardClaimer": "0x0000000000000000000000000000000000000000",
-    "stableVaultManager": "0x0000000000000000000000000000000000000000"
+    "mainAdmin": "0xadf71875E1897c2cF176a35C60aac3398D5e9C3F",
+    "secondaryAdmin": "0x0C8F8fA4899E3E2776E4e5d163cd5bd64505CD3a",
+    "rebalancerMulticallOwner": "0x1E5788cd49Fcc89645f66B9345ceB7cC430B252e",
+    "disablerMulticallOwner": "0x5df9b2D5DA97286742e2aDC3358f0aFA1A7ECbBF",
+    "withdrawalPolicyManager": "0xFBcf8bA0aCaECbd90990A29e37B8be3F631c38F6",
+    "aTokenVaultRewardClaimer": "0x35b029C7715c668DCD6058B7a52C0377f404a4e8",
+    "stableVaultManager": "0x2A74c29e0Ee366788cc5EEa00c540264a3508fDB"
   },
   "withdrawalPolicy": {
     "defaultFeeBps": 50,
-    "signer": "0x0000000000000000000000000000000000000000"
+    "signer": "0x2F87296892feD4AEE35D02eA71B3d04A5Be151a0"
   },
   "earningChain": {
     "chainId": 1,
@@ -29,15 +29,11 @@
       "usdt": "0xdAC17F958D2ee523a2206206994597C13D831ec7"
     },
     "chainlinkFeeds": {
-      "ghoUsd": "0x0000000000000000000000000000000000000000",
-      "usdcUsd": "0x0000000000000000000000000000000000000000",
-      "usdtUsd": "0x0000000000000000000000000000000000000000"
+      "ghoUsd": "0x3f12643D3f6f874d39C2a4c9f2Cd6f2DbAC877FC",
+      "usdcUsd": "0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6",
+      "usdtUsd": "0x3E7d1eAB13ad0104d2750B8863b489D65364e32D"
     },
-    "ccipRouterAddress": "0x0000000000000000000000000000000000000000",
-    "withdrawalPolicy": {
-      "defaultFeeBps": 50,
-      "signer": "0x0000000000000000000000000000000000000000"
-    },
+    "ccipRouterAddress": "0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D",
     "aaveV3PoolAddressesProvider": "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e",
     "deploymentOutputPath": "deployments/vnet/v0.3/earning.json"
   },
@@ -50,11 +46,11 @@
       "usdt": "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9"
     },
     "chainlinkFeeds": {
-      "ghoUsd": "0x0000000000000000000000000000000000000000",
-      "usdcUsd": "0x0000000000000000000000000000000000000000",
-      "usdtUsd": "0x0000000000000000000000000000000000000000"
+      "ghoUsd": "0x3c786e934F23375Ca345C9b8D5aD54838796E8e7",
+      "usdcUsd": "0x50834F3163758fcC1Df9973b6e91f0F0F0434aD3",
+      "usdtUsd": "0x3f3f5dF88dC9F13eac63DF89EC16ef6e7E25DdE7"
     },
-    "ccipRouterAddress": "0x0000000000000000000000000000000000000000",
+    "ccipRouterAddress": "0x141fa059441E0ca23ce184B6A78bafD2A517DdE8",
     "defaultMaxPerSecondRate": "1000000005781378656804591713",
     "defaultSubVaultPerSecondRate": "1000000001243680656318820313",
     "defaultMaxActiveSubVaults": 201,
