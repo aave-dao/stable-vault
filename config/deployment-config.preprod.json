@@ -57,9 +57,9 @@
     "defaultSubVaultPerSecondRate": "1000000001243680656318820313",
     "defaultMaxActiveSubVaults": 201,
     "aaveV3PoolAddressesProvider": "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb",
-    "useMockBundleFeed": true,
-    "useMockSequencerUptimeFeed": true,
-    "chainlinkBundleAggregatorProxy": "0x0000000000000000000000000000000000000000",
+    "useMockBundleFeed": false,
+    "useMockSequencerUptimeFeed": false,
+    "chainlinkBundleAggregatorProxy": "0x37B669dA39C79e8a0D5005b44c193f7198A19Fa2",
     "sequencerUptimeFeed": "0x0000000000000000000000000000000000000000",
     "withdrawalPolicy": {
       "defaultFeeBps": 50,
