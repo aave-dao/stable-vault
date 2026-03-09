@@ -49,6 +49,10 @@ interface IAllocator {
     /// @custom:selector 0xa01adeda
     error StrategyStillHasFunds(address strategy);
 
+    /// @notice Thrown when performing an operation on a strategy that is not trusted.
+    /// @custom:selector 0x96547ce2
+    error StrategyNotTrusted(address strategy);
+
     /// @notice Thrown when the maximum number of strategies per asset is exceeded.
     /// @custom:selector 0x83864c08
     error TooManyStrategies(address asset);
@@ -217,6 +221,7 @@ interface IAllocator {
     function removeStrategy(address strategy) external;
 
     /// @notice Sets the default yield strategy for an asset.
+    /// @dev Reverts if the strategy is not trusted or has deposits disabled.
     /// @param asset Address of the asset to set the default strategy for.
     /// @param strategy Address of the ERC-4626 strategy to set as the default.
     function setDefaultStrategy(address asset, address strategy) external;
@@ -226,6 +231,7 @@ interface IAllocator {
     function disableDepositsToStrategy(address strategy) external;
 
     /// @notice Enables deposits to a given strategy.
+    /// @dev Reverts if the strategy is not trusted. The strategy must be trusted before deposits can be re-enabled.
     /// @param strategy Address of the ERC-4626 strategy to enable deposits for.
     function enableDepositsToStrategy(address strategy) external;
 
@@ -234,6 +240,9 @@ interface IAllocator {
     function trustStrategy(address strategy) external;
 
     /// @notice Distrusts a strategy, excluding its balance from the system's TVL.
+    /// @dev As a side effect, deposits into the strategy are automatically disabled if currently enabled, and the
+    /// strategy is unset as the default for its asset if it is the current default.
+    /// @dev Trusting the strategy again does NOT re-enable deposits or restore it as the default.
     /// @param strategy Address of the strategy to distrust.
     function distrustStrategy(address strategy) external;
 

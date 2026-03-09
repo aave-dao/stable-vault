@@ -2784,6 +2784,238 @@ contract AllocatorTest is TestWithHelpers {
         assertFalse(_allocator.isStrategyTrusted(makeAddr("unregistered")));
     }
 
+    function test_distrustStrategy_disablesDeposits() public {
+        assertTrue(_allocator.getStrategyConfig(address(_defaultUsdtStrategy)).depositAllowed);
+
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.StrategyDistrusted(address(_defaultUsdtStrategy));
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.StrategyDepositsToggled(address(_defaultUsdtStrategy), false);
+        vm.prank(address(everyRoleAccount));
+        _allocator.distrustStrategy(address(_defaultUsdtStrategy));
+
+        assertFalse(_allocator.getStrategyConfig(address(_defaultUsdtStrategy)).depositAllowed);
+    }
+
+    function test_distrustStrategy_unsetsDefaultStrategy() public {
+        assertEq(_allocator.getDefaultStrategy(address(_mockUsdt)), address(_defaultUsdtStrategy));
+
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.StrategyDistrusted(address(_defaultUsdtStrategy));
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.StrategyDepositsToggled(address(_defaultUsdtStrategy), false);
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.DefaultStrategySet(address(_mockUsdt), address(0));
+        vm.prank(address(everyRoleAccount));
+        _allocator.distrustStrategy(address(_defaultUsdtStrategy));
+
+        assertEq(_allocator.getDefaultStrategy(address(_mockUsdt)), address(0));
+    }
+
+    function test_distrustStrategy_doesNotRevertWhenDepositsAlreadyDisabled() public {
+        // Disable deposits first
+        vm.prank(address(everyRoleAccount));
+        _allocator.disableDepositsToStrategy(address(_defaultUsdtStrategy));
+        assertFalse(_allocator.getStrategyConfig(address(_defaultUsdtStrategy)).depositAllowed);
+
+        // Distrust should succeed even though deposits are already disabled
+        vm.prank(address(everyRoleAccount));
+        _allocator.distrustStrategy(address(_defaultUsdtStrategy));
+
+        assertFalse(_allocator.isStrategyTrusted(address(_defaultUsdtStrategy)));
+        assertFalse(_allocator.getStrategyConfig(address(_defaultUsdtStrategy)).depositAllowed);
+    }
+
+    function test_distrustStrategy_doesNotEmitDefaultStrategySetIfNotDefault() public {
+        // _extraUsdtStrategy is not the default
+        assertNotEq(_allocator.getDefaultStrategy(address(_mockUsdt)), address(_extraUsdtStrategy));
+
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.StrategyDistrusted(address(_extraUsdtStrategy));
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.StrategyDepositsToggled(address(_extraUsdtStrategy), false);
+        // No DefaultStrategySet event expected
+        vm.prank(address(everyRoleAccount));
+        _allocator.distrustStrategy(address(_extraUsdtStrategy));
+
+        // Default strategy should remain unchanged
+        assertEq(_allocator.getDefaultStrategy(address(_mockUsdt)), address(_defaultUsdtStrategy));
+    }
+
+    function test_distrustStrategy_preventsDeposits(uint256 depositAmount) public {
+        depositAmount = _boundAssetAmount(address(_mockUsdt), depositAmount);
+
+        vm.prank(address(everyRoleAccount));
+        _allocator.distrustStrategy(address(_defaultUsdtStrategy));
+
+        // Deposit should fail because default strategy is now unset and distrusted
+        _mockTransferHelper.mockAsset(address(_mockUsdt), depositAmount);
+        vm.prank(depositor);
+        // Deposits go idle since default was unset
+        _allocator.deposit(address(_mockUsdt), depositAmount);
+        // Funds should be idle, not in any strategy
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
+        assertEq(IERC20(address(_mockUsdt)).balanceOf(address(_allocator)), depositAmount);
+    }
+
+    function test_enableDepositsToStrategy_reverts_ifStrategyIsNotTrusted() public {
+        // Distrust the strategy (this also disables deposits)
+        vm.prank(address(everyRoleAccount));
+        _allocator.distrustStrategy(address(_defaultUsdtStrategy));
+
+        // Attempt to re-enable deposits while distrusted
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(abi.encodeWithSelector(IAllocator.StrategyNotTrusted.selector, address(_defaultUsdtStrategy)));
+        _allocator.enableDepositsToStrategy(address(_defaultUsdtStrategy));
+    }
+
+    function test_setDefaultStrategy_reverts_ifStrategyIsNotTrusted() public {
+        // Distrust the extra strategy
+        vm.prank(address(everyRoleAccount));
+        _allocator.distrustStrategy(address(_extraUsdtStrategy));
+
+        // Attempt to set it as default
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(abi.encodeWithSelector(IAllocator.StrategyNotTrusted.selector, address(_extraUsdtStrategy)));
+        _allocator.setDefaultStrategy(address(_mockUsdt), address(_extraUsdtStrategy));
+    }
+
+    function test_trustStrategy_doesNotReEnableDeposits() public {
+        // Distrust (auto-disables deposits)
+        vm.prank(address(everyRoleAccount));
+        _allocator.distrustStrategy(address(_extraUsdtStrategy));
+        assertFalse(_allocator.getStrategyConfig(address(_extraUsdtStrategy)).depositAllowed);
+
+        // Trusting again should NOT re-enable deposits
+        vm.prank(address(everyRoleAccount));
+        _allocator.trustStrategy(address(_extraUsdtStrategy));
+        assertTrue(_allocator.isStrategyTrusted(address(_extraUsdtStrategy)));
+        assertFalse(_allocator.getStrategyConfig(address(_extraUsdtStrategy)).depositAllowed);
+    }
+
+    function test_trustStrategy_doesNotRestoreDefault() public {
+        // Default is _defaultUsdtStrategy
+        assertEq(_allocator.getDefaultStrategy(address(_mockUsdt)), address(_defaultUsdtStrategy));
+
+        // Distrust (auto-unsets default)
+        vm.prank(address(everyRoleAccount));
+        _allocator.distrustStrategy(address(_defaultUsdtStrategy));
+        assertEq(_allocator.getDefaultStrategy(address(_mockUsdt)), address(0));
+
+        // Trusting again should NOT restore it as the default
+        vm.prank(address(everyRoleAccount));
+        _allocator.trustStrategy(address(_defaultUsdtStrategy));
+        assertEq(_allocator.getDefaultStrategy(address(_mockUsdt)), address(0));
+    }
+
+    function test_fullCycle_trustEnableDistrustTrustRequiresManualReEnable(uint256 depositAmount) public {
+        depositAmount = _boundAssetAmount(address(_mockUsdt), depositAmount);
+
+        // Strategy starts trusted with deposits enabled
+        assertTrue(_allocator.isStrategyTrusted(address(_extraUsdtStrategy)));
+        assertTrue(_allocator.getStrategyConfig(address(_extraUsdtStrategy)).depositAllowed);
+
+        // 1. Distrust (auto-disables deposits)
+        vm.prank(address(everyRoleAccount));
+        _allocator.distrustStrategy(address(_extraUsdtStrategy));
+        assertFalse(_allocator.isStrategyTrusted(address(_extraUsdtStrategy)));
+        assertFalse(_allocator.getStrategyConfig(address(_extraUsdtStrategy)).depositAllowed);
+
+        // 2. Trust again
+        vm.prank(address(everyRoleAccount));
+        _allocator.trustStrategy(address(_extraUsdtStrategy));
+        assertTrue(_allocator.isStrategyTrusted(address(_extraUsdtStrategy)));
+        // Deposits still disabled
+        assertFalse(_allocator.getStrategyConfig(address(_extraUsdtStrategy)).depositAllowed);
+
+        // 3. Manually re-enable deposits
+        vm.prank(address(everyRoleAccount));
+        _allocator.enableDepositsToStrategy(address(_extraUsdtStrategy));
+        assertTrue(_allocator.getStrategyConfig(address(_extraUsdtStrategy)).depositAllowed);
+
+        // 4. Deposit into the re-enabled strategy and verify balance
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
+
+        _mockUsdt.mint(address(_allocator), depositAmount);
+
+        IAllocator.AllocationParams[] memory allocations = new IAllocator.AllocationParams[](1);
+        allocations[0] = IAllocator.AllocationParams({
+            asset: address(_mockUsdt), strategy: address(_extraUsdtStrategy), amount: depositAmount
+        });
+        IAllocator.RebalanceParams[] memory params = new IAllocator.RebalanceParams[](1);
+        params[0] = IAllocator.RebalanceParams({
+            deallocations: new IAllocator.DeallocationParams[](0),
+            swaps: new IAllocator.SwapParams[](0),
+            allocations: allocations
+        });
+
+        vm.prank(everyRoleAccount);
+        _allocator.rebalance(params);
+
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), depositAmount);
+    }
+
+    function test_removeStrategy_reverts_ifStrategyIsNotTrusted() public {
+        // Unset default so we can attempt removal
+        vm.prank(address(everyRoleAccount));
+        _allocator.setDefaultStrategy(address(_mockUsdt), address(_extraUsdtStrategy));
+
+        // Distrust the strategy
+        vm.prank(address(everyRoleAccount));
+        _allocator.distrustStrategy(address(_defaultUsdtStrategy));
+
+        // Attempt to remove should fail because the strategy is not trusted, so calls to it are not reliable
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(abi.encodeWithSelector(IAllocator.StrategyNotTrusted.selector, address(_defaultUsdtStrategy)));
+        _allocator.removeStrategy(address(_defaultUsdtStrategy));
+    }
+
+    function test_depositToStrategy_reverts_ifStrategyIsDistrusted(uint256 depositAmount) public {
+        depositAmount = _boundAssetAmount(address(_mockUsdt), depositAmount);
+
+        // Distrust the extra strategy (not the default, so we can test rebalance allocation)
+        vm.prank(address(everyRoleAccount));
+        _allocator.distrustStrategy(address(_extraUsdtStrategy));
+
+        // Try to allocate to distrusted strategy via rebalance
+        _mockUsdt.mint(address(_allocator), depositAmount);
+
+        IAllocator.AllocationParams[] memory allocations = new IAllocator.AllocationParams[](1);
+        allocations[0] = IAllocator.AllocationParams({
+            asset: address(_mockUsdt), strategy: address(_extraUsdtStrategy), amount: depositAmount
+        });
+        IAllocator.RebalanceParams[] memory params = new IAllocator.RebalanceParams[](1);
+        params[0] = IAllocator.RebalanceParams({
+            deallocations: new IAllocator.DeallocationParams[](0),
+            swaps: new IAllocator.SwapParams[](0),
+            allocations: allocations
+        });
+
+        vm.prank(everyRoleAccount);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAllocator.DepositsToStrategyDisabled.selector, address(_extraUsdtStrategy))
+        );
+        _allocator.rebalance(params);
+    }
+
+    function test_withdrawFromStrategy_succeedsWhenStrategyIsDistrusted(uint256 depositAmount) public {
+        depositAmount = _boundAssetAmount(address(_mockUsdt), depositAmount);
+        _mockTransferHelper.mockAsset(address(_mockUsdt), depositAmount);
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), depositAmount);
+
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), depositAmount);
+
+        // Distrust the strategy
+        vm.prank(address(everyRoleAccount));
+        _allocator.distrustStrategy(address(_defaultUsdtStrategy));
+
+        // Withdrawal should still work
+        _mockTransferHelper.mockAsset(address(_mockUsdt), 0);
+        vm.prank(withdrawer);
+        _allocator.withdraw(address(_mockUsdt), depositAmount);
+    }
+
     function _initializeRebalanceParams(uint16 length) internal pure returns (IAllocator.RebalanceParams[] memory) {
         return new IAllocator.RebalanceParams[](length);
     }

@@ -290,14 +290,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
 
     /// @inheritdoc IAllocator
     function setDefaultStrategy(address asset, address strategy) external override restricted {
-        if (strategy != address(0)) {
-            // Strategy must be allowed to be set as the default strategy for the asset
-            require(strategy != $storage().defaultStrategyByAsset[asset], DefaultStrategy(strategy));
-            require(_isStrategySupportedForAsset({strategy: strategy, asset: asset}), Errors.AddressNotWhitelisted());
-            require($storage().strategyConfigs[strategy].depositAllowed, DepositsToStrategyDisabled(strategy));
-        }
-        $storage().defaultStrategyByAsset[asset] = strategy;
-        emit DefaultStrategySet(asset, strategy);
+        _setDefaultStrategy(asset, strategy);
     }
 
     /// @inheritdoc IAllocator
@@ -310,6 +303,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     /// @inheritdoc IAllocator
     function enableDepositsToStrategy(address strategy) external override restricted {
         require(_isStrategySupported(strategy), Errors.AddressNotWhitelisted());
+        require($storage().strategyConfigs[strategy].isTrusted, StrategyNotTrusted(strategy));
         $storage().strategyConfigs[strategy].depositAllowed = true;
         emit StrategyDepositsToggled(strategy, true);
     }
@@ -328,6 +322,14 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         require($storage().strategyConfigs[strategy].isTrusted, Errors.AlreadyDistrusted());
         $storage().strategyConfigs[strategy].isTrusted = false;
         emit StrategyDistrusted(strategy);
+        if ($storage().strategyConfigs[strategy].depositAllowed) {
+            $storage().strategyConfigs[strategy].depositAllowed = false;
+            emit StrategyDepositsToggled(strategy, false);
+        }
+        address asset = $storage().strategyConfigs[strategy].asset;
+        if ($storage().defaultStrategyByAsset[asset] == strategy) {
+            _setDefaultStrategy(asset, address(0));
+        }
     }
 
     /// @inheritdoc IAllocator
@@ -451,6 +453,8 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     }
 
     /// @dev Intended to be the lowest level function used to deposit into a strategy.
+    /// @dev Does not check if the strategy is trusted because to enable deposits for a strategy it must be trusted.
+    /// @dev The state of strategy distrusted, but deposits are still allowed, is not possible.
     function _depositToStrategy(address asset, uint256 amount, address strategy) internal returns (uint256) {
         require(amount > 0, Errors.ZeroAmount());
         require($storage().strategyConfigs[strategy].depositAllowed, DepositsToStrategyDisabled(strategy));
@@ -533,6 +537,8 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
 
     function _removeStrategy(address strategy) internal {
         require(_isStrategySupported(strategy), Errors.AddressNotWhitelisted());
+        // The calls to the strategy are not reliable if the strategy is not trusted.
+        require($storage().strategyConfigs[strategy].isTrusted, StrategyNotTrusted(strategy));
         require($storage().defaultStrategyByAsset[IERC4626(strategy).asset()] != strategy, DefaultStrategy(strategy));
         // This can get blocked if assets are deposited into the strategy on behalf of the Allocator.
         // This function is intended to clear storage, so if it gets DoS'd then the consequences are consumed storage.
@@ -546,5 +552,16 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         $storage().assetStrategies[asset].remove(strategy);
         delete $storage().strategyConfigs[strategy];
         emit StrategyRemoved(asset, strategy);
+    }
+
+    function _setDefaultStrategy(address asset, address strategy) internal {
+        if (strategy != address(0)) {
+            require(strategy != $storage().defaultStrategyByAsset[asset], DefaultStrategy(strategy));
+            require(_isStrategySupportedForAsset({strategy: strategy, asset: asset}), Errors.AddressNotWhitelisted());
+            require($storage().strategyConfigs[strategy].isTrusted, StrategyNotTrusted(strategy));
+            require($storage().strategyConfigs[strategy].depositAllowed, DepositsToStrategyDisabled(strategy));
+        }
+        $storage().defaultStrategyByAsset[asset] = strategy;
+        emit DefaultStrategySet(asset, strategy);
     }
 }

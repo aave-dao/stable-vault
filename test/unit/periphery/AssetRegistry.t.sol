@@ -506,6 +506,7 @@ contract AssetRegistryTest is TestWithHelpers {
     }
 
     function test_enableUserDeposits_enablesUserDeposits() public {
+        // Asset is trusted by default from setAssetConfig
         vm.prank(everyRoleAccount);
         _assetRegistry.setAssetConfig(
             address(_mockUsdt),
@@ -530,6 +531,28 @@ contract AssetRegistryTest is TestWithHelpers {
         vm.prank(everyRoleAccount);
         _assetRegistry.enableUserDeposits(address(_mockUsdt));
         assertEq(_assetRegistry.isUserDepositAllowed(address(_mockUsdt)), true);
+    }
+
+    function test_enableUserDeposits_reverts_ifAssetIsNotTrusted() public {
+        vm.prank(everyRoleAccount);
+        _assetRegistry.setAssetConfig(
+            address(_mockUsdt),
+            IAssetRegistry.AssetConfig({
+                depositFromUserAllowed: false,
+                depositIntoAllocatorAllowed: false,
+                swapInputTokenAllowed: false,
+                swapOutputTokenAllowed: false
+            })
+        );
+
+        // Distrust the asset
+        vm.prank(everyRoleAccount);
+        _assetRegistry.distrustAsset(address(_mockUsdt));
+
+        // Attempt to enable user deposits while untrusted
+        vm.prank(everyRoleAccount);
+        vm.expectRevert(abi.encodeWithSelector(IAssetRegistry.AssetNotTrusted.selector, address(_mockUsdt)));
+        _assetRegistry.enableUserDeposits(address(_mockUsdt));
     }
 
     function test_enableUserDeposits_reverts_ifUnauthorizedCaller(address unauthorizedCaller) public {
@@ -801,6 +824,28 @@ contract AssetRegistryTest is TestWithHelpers {
         _assetRegistry.enableSwapOutput(address(_mockUsdt));
     }
 
+    function test_enableSwapOutput_reverts_ifAssetIsNotTrusted() public {
+        vm.prank(everyRoleAccount);
+        _assetRegistry.setAssetConfig(
+            address(_mockUsdt),
+            IAssetRegistry.AssetConfig({
+                depositFromUserAllowed: false,
+                depositIntoAllocatorAllowed: false,
+                swapInputTokenAllowed: false,
+                swapOutputTokenAllowed: false
+            })
+        );
+
+        // Distrust the asset
+        vm.prank(everyRoleAccount);
+        _assetRegistry.distrustAsset(address(_mockUsdt));
+
+        // Attempt to enable swap output while untrusted
+        vm.prank(everyRoleAccount);
+        vm.expectRevert(abi.encodeWithSelector(IAssetRegistry.AssetNotTrusted.selector, address(_mockUsdt)));
+        _assetRegistry.enableSwapOutput(address(_mockUsdt));
+    }
+
     function test_trustAsset_trustsAsset() public {
         vm.prank(everyRoleAccount);
         _assetRegistry.setAssetConfig(
@@ -947,5 +992,155 @@ contract AssetRegistryTest is TestWithHelpers {
         vm.prank(everyRoleAccount);
         vm.expectRevert(abi.encodeWithSelector(Errors.AlreadyDistrusted.selector));
         _assetRegistry.distrustAsset(address(_mockUsdt));
+    }
+
+    function test_distrustAsset_disablesUserDepositsAndSwapOutput() public {
+        vm.prank(everyRoleAccount);
+        _assetRegistry.setAssetConfig(
+            address(_mockUsdt),
+            IAssetRegistry.AssetConfig({
+                depositFromUserAllowed: true,
+                depositIntoAllocatorAllowed: true,
+                swapInputTokenAllowed: true,
+                swapOutputTokenAllowed: true
+            })
+        );
+        assertTrue(_assetRegistry.isUserDepositAllowed(address(_mockUsdt)));
+        assertTrue(_assetRegistry.isSwapOutputAllowed(address(_mockUsdt)));
+
+        // Distrust should disable user deposits and swap output as a side effect
+        vm.expectEmit(true, true, true, true);
+        emit IAssetRegistry.AssetDistrusted(address(_mockUsdt));
+        vm.expectEmit(true, true, true, true);
+        emit IAssetRegistry.AssetConfigSet(
+            address(_mockUsdt),
+            IAssetRegistry.AssetConfig({
+                depositFromUserAllowed: false,
+                depositIntoAllocatorAllowed: true,
+                swapInputTokenAllowed: true,
+                swapOutputTokenAllowed: false
+            })
+        );
+        vm.prank(everyRoleAccount);
+        _assetRegistry.distrustAsset(address(_mockUsdt));
+
+        assertFalse(_assetRegistry.isUserDepositAllowed(address(_mockUsdt)));
+        assertFalse(_assetRegistry.isSwapOutputAllowed(address(_mockUsdt)));
+    }
+
+    function test_distrustAsset_doesNotRevertWhenDepositsAndSwapOutputAlreadyDisabled() public {
+        vm.prank(everyRoleAccount);
+        _assetRegistry.setAssetConfig(
+            address(_mockUsdt),
+            IAssetRegistry.AssetConfig({
+                depositFromUserAllowed: false,
+                depositIntoAllocatorAllowed: false,
+                swapInputTokenAllowed: false,
+                swapOutputTokenAllowed: false
+            })
+        );
+
+        // Distrust should succeed even though user deposits and swap output are already disabled
+        vm.prank(everyRoleAccount);
+        _assetRegistry.distrustAsset(address(_mockUsdt));
+
+        assertFalse(_assetRegistry.isAssetTrusted(address(_mockUsdt)));
+        assertFalse(_assetRegistry.isUserDepositAllowed(address(_mockUsdt)));
+        assertFalse(_assetRegistry.isSwapOutputAllowed(address(_mockUsdt)));
+    }
+
+    function test_distrustAsset_disablesSwapOutputOnly() public {
+        vm.prank(everyRoleAccount);
+        _assetRegistry.setAssetConfig(
+            address(_mockUsdt),
+            IAssetRegistry.AssetConfig({
+                depositFromUserAllowed: false,
+                depositIntoAllocatorAllowed: true,
+                swapInputTokenAllowed: true,
+                swapOutputTokenAllowed: true
+            })
+        );
+
+        // Only swap output is enabled, distrust should still emit AssetConfigSet
+        vm.expectEmit(true, true, true, true);
+        emit IAssetRegistry.AssetDistrusted(address(_mockUsdt));
+        vm.expectEmit(true, true, true, true);
+        emit IAssetRegistry.AssetConfigSet(
+            address(_mockUsdt),
+            IAssetRegistry.AssetConfig({
+                depositFromUserAllowed: false,
+                depositIntoAllocatorAllowed: true,
+                swapInputTokenAllowed: true,
+                swapOutputTokenAllowed: false
+            })
+        );
+        vm.prank(everyRoleAccount);
+        _assetRegistry.distrustAsset(address(_mockUsdt));
+
+        assertFalse(_assetRegistry.isSwapOutputAllowed(address(_mockUsdt)));
+    }
+
+    function test_trustAsset_doesNotReEnableUserDepositsOrSwapOutput() public {
+        vm.prank(everyRoleAccount);
+        _assetRegistry.setAssetConfig(
+            address(_mockUsdt),
+            IAssetRegistry.AssetConfig({
+                depositFromUserAllowed: true,
+                depositIntoAllocatorAllowed: true,
+                swapInputTokenAllowed: true,
+                swapOutputTokenAllowed: true
+            })
+        );
+
+        // Distrust (disables user deposits and swap output as side effect)
+        vm.prank(everyRoleAccount);
+        _assetRegistry.distrustAsset(address(_mockUsdt));
+        assertFalse(_assetRegistry.isUserDepositAllowed(address(_mockUsdt)));
+        assertFalse(_assetRegistry.isSwapOutputAllowed(address(_mockUsdt)));
+
+        // Trust again - should NOT re-enable user deposits or swap output
+        vm.prank(everyRoleAccount);
+        _assetRegistry.trustAsset(address(_mockUsdt));
+        assertTrue(_assetRegistry.isAssetTrusted(address(_mockUsdt)));
+        // Both remain disabled, must be explicitly re-enabled
+        assertFalse(_assetRegistry.isUserDepositAllowed(address(_mockUsdt)));
+        assertFalse(_assetRegistry.isSwapOutputAllowed(address(_mockUsdt)));
+    }
+
+    function test_fullCycle_trustEnableDistrustTrustRequiresManualReEnable() public {
+        // 1. Register asset (trusted by default, deposits and swap output enabled)
+        vm.prank(everyRoleAccount);
+        _assetRegistry.setAssetConfig(
+            address(_mockUsdt),
+            IAssetRegistry.AssetConfig({
+                depositFromUserAllowed: true,
+                depositIntoAllocatorAllowed: true,
+                swapInputTokenAllowed: true,
+                swapOutputTokenAllowed: true
+            })
+        );
+        assertTrue(_assetRegistry.isUserDepositAllowed(address(_mockUsdt)));
+        assertTrue(_assetRegistry.isSwapOutputAllowed(address(_mockUsdt)));
+
+        // 2. Distrust (auto-disables deposits and swap output)
+        vm.prank(everyRoleAccount);
+        _assetRegistry.distrustAsset(address(_mockUsdt));
+        assertFalse(_assetRegistry.isUserDepositAllowed(address(_mockUsdt)));
+        assertFalse(_assetRegistry.isSwapOutputAllowed(address(_mockUsdt)));
+
+        // 3. Trust again
+        vm.prank(everyRoleAccount);
+        _assetRegistry.trustAsset(address(_mockUsdt));
+        // Deposits and swap output still disabled
+        assertFalse(_assetRegistry.isUserDepositAllowed(address(_mockUsdt)));
+        assertFalse(_assetRegistry.isSwapOutputAllowed(address(_mockUsdt)));
+
+        // 4. Manually re-enable deposits and swap output
+        vm.prank(everyRoleAccount);
+        _assetRegistry.enableUserDeposits(address(_mockUsdt));
+        vm.prank(everyRoleAccount);
+        _assetRegistry.enableSwapOutput(address(_mockUsdt));
+        assertTrue(_assetRegistry.isUserDepositAllowed(address(_mockUsdt)));
+        assertTrue(_assetRegistry.isSwapOutputAllowed(address(_mockUsdt)));
     }
 }
