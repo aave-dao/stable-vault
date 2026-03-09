@@ -17,7 +17,7 @@
     "stableVaultManager": "0xc93fb5428553de74E859b08032Be33Ebb8Fb6171"
   },
   "withdrawalPolicy": {
-    "defaultFeeBps": 50,
+    "defaultFeeBps": 625,
     "signer": "0x037a5B223b89222a422cfa95ee935335Ab0755AC"
   },
   "earningChain": {
