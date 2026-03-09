@@ -43,6 +43,9 @@ jobs:
           forge test -vvv
         id: test
 
+      - name: Check Error Selectors
+        run: ./check-error-selectors.sh
+
       - name: Check Gas Snapshots are up to date
         run: |
           if ! git diff --exit-code snapshots/; then
