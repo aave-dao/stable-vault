@@ -28,6 +28,18 @@ interface IAllocator {
 
     event StrategyRemoved(address indexed asset, address indexed strategy);
 
+    event StrategyTrusted(address indexed strategy);
+
+    event StrategyDistrusted(address indexed strategy);
+
+    /// @notice Thrown when attempting to distrust a strategy that is already distrusted.
+    /// @custom:selector 0x1ed3ece1
+    error AlreadyDistrusted();
+
+    /// @notice Thrown when attempting to trust a strategy that is already trusted.
+    /// @custom:selector 0xab73bb5f
+    error AlreadyTrusted();
+
     /// @notice Thrown when setting as default a strategy that already is the default, or when removing a strategy
     /// that is currently set as the default.
     /// @custom:selector 0x13e93f82
@@ -113,11 +125,14 @@ interface IAllocator {
     /// asset. This value is expected to be in the 1:10 wei range.
     /// @param isRegistered Boolean indicating whether the strategy is configured.
     /// @param depositAllowed Boolean indicating whether the strategy is allowed to be deposited into.
+    /// @param isTrusted Boolean indicating whether the strategy is trusted or not. Strategy's balance only contributes
+    /// to the system's TVL when it is trusted.
     struct StrategyConfig {
         address asset;
         uint8 maxSlippageAmount;
         bool isRegistered;
         bool depositAllowed;
+        bool isTrusted;
     }
 
     /// @notice Getter for the balance of a given asset on the Allocator.
@@ -213,4 +228,17 @@ interface IAllocator {
     /// @notice Enables deposits to a given strategy.
     /// @param strategy Address of the ERC-4626 strategy to enable deposits for.
     function enableDepositsToStrategy(address strategy) external;
+
+    /// @notice Trusts a strategy, allowing its balance to contribute to the system's TVL.
+    /// @param strategy Address of the strategy to trust.
+    function trustStrategy(address strategy) external;
+
+    /// @notice Distrusts a strategy, excluding its balance from the system's TVL.
+    /// @param strategy Address of the strategy to distrust.
+    function distrustStrategy(address strategy) external;
+
+    /// @notice Getter for whether a strategy is trusted.
+    /// @param strategy Address of the strategy to check.
+    /// @return isTrusted Whether the strategy is trusted.
+    function isStrategyTrusted(address strategy) external view returns (bool);
 }
