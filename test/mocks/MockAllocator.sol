@@ -23,7 +23,11 @@ contract MockAllocator is IAllocator {
         _mockedAmountOfSlippage = amountOfSlippage;
     }
 
-    function getAssetBalance(address asset, bool) external view override returns (uint256) {
+    function getAssetBalance(address asset) external view override returns (uint256) {
+        return _mockedAssetBalances[asset];
+    }
+
+    function getTrustedAssetBalance(address asset) external view override returns (uint256) {
         return _mockedAssetBalances[asset];
     }
 

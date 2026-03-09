@@ -119,18 +119,26 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     }
 
     /// @inheritdoc IAllocator
-    function getAssetBalance(address asset, bool onlyTrustedStrategies) external view returns (uint256) {
-        return _getTotalAssetBalance(asset, onlyTrustedStrategies);
+    function getAssetBalance(address asset) external view override returns (uint256) {
+        return _getTotalAssetBalance(asset, false);
     }
 
     /// @inheritdoc IAllocator
-    function getAssetBalanceInStrategy(address strategy) external view returns (uint256) {
+    function getAssetBalanceInStrategy(address strategy) external view override returns (uint256) {
         return _getAssetBalanceInStrategy(IERC4626(strategy));
     }
 
     /// @inheritdoc IAllocator
     function getTrustedAssetBalances() external view override returns (IAllocator.AllocatorBalance[] memory) {
         return _getTrustedAssetBalances();
+    }
+
+    /// @inheritdoc IAllocator
+    function getTrustedAssetBalance(address asset) external view override returns (uint256) {
+        if (!IAssetRegistry(ASSET_REGISTRY).isAssetTrusted(asset)) {
+            return 0;
+        }
+        return _getTotalAssetBalance(asset, true);
     }
 
     /// @inheritdoc IAllocator

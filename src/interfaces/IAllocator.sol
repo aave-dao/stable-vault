@@ -129,10 +129,9 @@ interface IAllocator {
 
     /// @notice Getter for the balance of a given asset on the Allocator.
     /// @param asset Address of the asset to get the balance of.
-    /// @param onlyTrustedStrategies Boolean indicating whether to only include balances from trusted strategies.
     /// @return balance Balance of the asset in asset decimals in the Allocator (idle + aggregate balance in
     /// strategies).
-    function getAssetBalance(address asset, bool onlyTrustedStrategies) external view returns (uint256);
+    function getAssetBalance(address asset) external view returns (uint256);
 
     /// @notice Getter for the balance of a given strategy on the Allocator.
     /// @param strategy Address of the strategy to get the balance of.
@@ -142,6 +141,14 @@ interface IAllocator {
     /// @notice Getter for the balances on the Allocator.
     /// @return balances Array of balances where each amount is denominated in the corresponding asset's decimals.
     function getTrustedAssetBalances() external view returns (AllocatorBalance[] memory balances);
+
+    /// @notice Getter for the balance of a given asset on the Allocator.
+    /// @dev Total balance is grossly understated as zero if the asset is not trusted.
+    /// @dev Each strategy's balance is only counted if the strategy is trusted.
+    /// @param asset Address of the asset to get the balance of.
+    /// @return balance Balance of the asset in asset decimals in the Allocator (idle + aggregate balance in
+    /// strategies).
+    function getTrustedAssetBalance(address asset) external view returns (uint256);
 
     /// @notice Getter for the default strategy for a given asset.
     /// @param asset Address of the asset to get the default strategy for.
