@@ -14,6 +14,14 @@ library Errors {
     /// @custom:selector 0xad7acb47
     error AddressNotWhitelisted();
 
+    /// @notice Thrown when attempting to distrust something (e.g. asset, strategy) that is already distrusted.
+    /// @custom:selector 0x1ed3ece1
+    error AlreadyDistrusted();
+
+    /// @notice Thrown when attempting to trust something (e.g. asset, strategy) that is already trusted.
+    /// @custom:selector 0xab73bb5f
+    error AlreadyTrusted();
+
     /// @notice Insufficient amount due to slippage/fee tolerance being exceeded.
     /// @custom:selector 0xe52970aa
     error InsufficientAmountOut();

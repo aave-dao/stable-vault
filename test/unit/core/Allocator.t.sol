@@ -192,8 +192,8 @@ contract AllocatorTest is TestWithHelpers {
         }
         assertTrue(foundUsdt);
         assertTrue(foundGho);
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), 0);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
@@ -222,8 +222,8 @@ contract AllocatorTest is TestWithHelpers {
         }
         assertTrue(foundUsdt);
         assertTrue(foundGho);
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), depositAmountUsdt);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), depositAmountGho);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), depositAmountUsdt);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), depositAmountGho);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), depositAmountUsdt);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), depositAmountGho);
@@ -250,8 +250,8 @@ contract AllocatorTest is TestWithHelpers {
         }
         assertTrue(foundUsdt);
         assertTrue(foundGho);
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), depositAmountUsdt + idleFundsUsdt);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), depositAmountGho + idleFundsGho);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), depositAmountUsdt + idleFundsUsdt);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), depositAmountGho + idleFundsGho);
         // Balance in vault should not change with idle funds
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), depositAmountUsdt);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
@@ -288,8 +288,8 @@ contract AllocatorTest is TestWithHelpers {
         }
         assertTrue(foundUsdt);
         assertTrue(foundGho);
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), depositAmountUsdt * 2 + idleFundsUsdt);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), depositAmountGho * 2 + idleFundsGho);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), depositAmountUsdt * 2 + idleFundsUsdt);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), depositAmountGho * 2 + idleFundsGho);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), depositAmountUsdt);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), depositAmountUsdt);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), depositAmountGho);
@@ -380,7 +380,7 @@ contract AllocatorTest is TestWithHelpers {
 
         // Return value should equal deposit amount (no slippage in default strategy)
         assertEq(netDeposit, depositAmountUsdt);
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), depositAmountUsdt);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), depositAmountUsdt);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), depositAmountUsdt);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
@@ -394,7 +394,7 @@ contract AllocatorTest is TestWithHelpers {
         vm.prank(depositor);
         _allocator.depositAllowIdle(address(_mockUsdt), depositAmountUsdt);
 
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), depositAmountUsdt);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), depositAmountUsdt);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), depositAmountUsdt);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
@@ -414,9 +414,9 @@ contract AllocatorTest is TestWithHelpers {
         // Return value should equal deposit amount (no strategy, funds idle)
         assertEq(netDeposit, amount);
         // Check the funds are idle in the Allocator
-        assertEq(_allocator.getAssetBalance(address(_mockUnsupportedAsset)), amount);
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), 0);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockUnsupportedAsset), false), amount);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
@@ -439,7 +439,7 @@ contract AllocatorTest is TestWithHelpers {
         // Return value should equal deposit amount (no strategy, funds idle)
         assertEq(netDeposit, depositAmountUsdt);
         // Check that the funds are idle in the Allocator
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), depositAmountUsdt);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), depositAmountUsdt);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
@@ -459,7 +459,7 @@ contract AllocatorTest is TestWithHelpers {
         emit IAllocator.AssetLeftIdle(address(_mockUsdt), depositAmountUsdt);
         _allocator.depositAllowIdle(address(_mockUsdt), depositAmountUsdt);
 
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), depositAmountUsdt);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), depositAmountUsdt);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
@@ -570,7 +570,7 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.depositAllowIdle(address(_mockUsdt), depositAmountUsdt);
 
         // Check that the funds are idle in the Allocator
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), depositAmountUsdt);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), depositAmountUsdt);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
@@ -616,7 +616,7 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.depositAllowIdle(address(_mockUsdt), depositAmountUsdt);
 
         // Check that the funds are idle in the Allocator
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), depositAmountUsdt);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), depositAmountUsdt);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
@@ -678,7 +678,7 @@ contract AllocatorTest is TestWithHelpers {
     function test_depositAllowIdle_doesNotRevert_ifAmountIsZero() public {
         vm.prank(depositor);
         _allocator.depositAllowIdle(address(_mockUsdt), 0);
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
@@ -703,7 +703,7 @@ contract AllocatorTest is TestWithHelpers {
         // Check that the balance in TransferHelper is the 0.
         assertEq(_mockUsdt.balanceOf(address(_mockTransferHelper)), 0);
         // Check that the balance in the Allocator is the amount.
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), amount);
         // Check that the balance in the strategy is the amount.
         assertEq(_allocator.getAssetBalanceInStrategy(address(mockStrategy)), amount);
 
@@ -728,8 +728,8 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.deposit(address(_mockUsdt), amount);
 
         // Check balances
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), amount);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), amount);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
@@ -742,8 +742,8 @@ contract AllocatorTest is TestWithHelpers {
 
         // Check balances after partial withdrawal
         assertEq(_mockUsdt.balanceOf(address(_mockTransferHelper)), amountToWithdraw);
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amountRemaining);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), amountRemaining);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), amountRemaining);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
@@ -755,8 +755,8 @@ contract AllocatorTest is TestWithHelpers {
 
         // Check balances after full withdrawal
         assertEq(_mockUsdt.balanceOf(address(_mockTransferHelper)), amount);
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), 0);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
@@ -777,8 +777,8 @@ contract AllocatorTest is TestWithHelpers {
         _extraUsdtStrategy.deposit(amount, address(_allocator));
 
         // Check balances
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), amount);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), amount);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
@@ -791,8 +791,8 @@ contract AllocatorTest is TestWithHelpers {
 
         // Check balances after partial withdrawal
         assertEq(_mockUsdt.balanceOf(address(_mockTransferHelper)), amountToWithdraw);
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amountRemaining);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), amountRemaining);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), amountRemaining);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
@@ -804,8 +804,8 @@ contract AllocatorTest is TestWithHelpers {
 
         // Check balances after full withdrawal
         assertEq(_mockUsdt.balanceOf(address(_mockTransferHelper)), amount);
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), 0);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
@@ -832,8 +832,8 @@ contract AllocatorTest is TestWithHelpers {
         _defaultUsdtStrategy.deposit(amount, address(_allocator));
 
         // Check balances
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount * 2);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), amount * 2);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), amount);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), amount);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
@@ -854,8 +854,8 @@ contract AllocatorTest is TestWithHelpers {
 
         // Check balances after first withdrawal
         assertEq(_mockUsdt.balanceOf(address(_mockTransferHelper)), amount);
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), amount);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), amount);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
@@ -880,8 +880,8 @@ contract AllocatorTest is TestWithHelpers {
         _extraUsdtStrategy.deposit(amount, address(_allocator));
 
         // Check balances
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount * 3);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), amount * 3);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), amount);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), amount);
         assertEq(_allocator.getAssetBalanceInStrategy(address(nonDefaultStrategy)), amount);
@@ -909,8 +909,8 @@ contract AllocatorTest is TestWithHelpers {
 
         // Check balances are withdrawn from the nonDefaultStrategy
         assertEq(_mockUsdt.balanceOf(address(_mockTransferHelper)), amount * 2);
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount * 2);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), amount * 2);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), amount);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), amount);
         assertEq(_allocator.getAssetBalanceInStrategy(address(nonDefaultStrategy)), 0);
@@ -928,8 +928,8 @@ contract AllocatorTest is TestWithHelpers {
         _mockUsdt.mint(address(_allocator), amount);
 
         // Check balances
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), amount);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
@@ -943,8 +943,8 @@ contract AllocatorTest is TestWithHelpers {
 
         // Check balances after partial withdrawal
         assertEq(_mockUsdt.balanceOf(address(_mockTransferHelper)), amountToWithdraw);
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amountRemaining);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), amountRemaining);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
@@ -956,8 +956,8 @@ contract AllocatorTest is TestWithHelpers {
 
         // Check balances after full withdrawal
         assertEq(_mockUsdt.balanceOf(address(_mockTransferHelper)), amount);
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), 0);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
@@ -981,8 +981,8 @@ contract AllocatorTest is TestWithHelpers {
         _mockUsdt.mint(address(_allocator), amount);
 
         // Check balances
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), totalDeposited);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), totalDeposited);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), amount);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
@@ -995,8 +995,8 @@ contract AllocatorTest is TestWithHelpers {
 
         // Check balances after partial withdrawal (uses idle funds first)
         assertEq(_mockUsdt.balanceOf(address(_mockTransferHelper)), amountToWithdraw);
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amountRemaining);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), amountRemaining);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), amountRemaining);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
@@ -1008,8 +1008,8 @@ contract AllocatorTest is TestWithHelpers {
 
         // Check balances after full withdrawal
         assertEq(_mockUsdt.balanceOf(address(_mockTransferHelper)), totalDeposited);
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), 0);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
@@ -1366,8 +1366,8 @@ contract AllocatorTest is TestWithHelpers {
         _mockGho.mint(address(_allocator), amount);
 
         // Check balances (non should be in any strategy vaults)
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), amount);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), amount);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), amount);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
@@ -1377,8 +1377,8 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.rebalance(_getDepositIdleFundsRebalanceParams(address(_mockUsdt)));
 
         // Check balances (now all USDT should be in the default vault)
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), amount);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), amount);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), amount);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), amount);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
@@ -1388,8 +1388,8 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.rebalance(_getDepositIdleFundsRebalanceParams(address(_mockGho)));
 
         // Check balances (now all GHO should be in the default vault)
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), amount);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), amount);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), amount);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), amount);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), amount);
@@ -1456,8 +1456,8 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.rebalance(rebalanceParams);
 
         // Check balances after allocating to default strategy
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amountUsdt);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), amountGho);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), amountUsdt);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), amountGho);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), allocationAmountUsdt);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), allocationAmountGho);
@@ -1478,8 +1478,8 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.rebalance(rebalanceParams);
 
         // Check balances after allocating to default strategy
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amountUsdt * 2);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), amountGho * 2);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), amountUsdt * 2);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), amountGho * 2);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), allocationAmountUsdt);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), allocationAmountUsdt);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), allocationAmountGho);
@@ -1540,8 +1540,8 @@ contract AllocatorTest is TestWithHelpers {
         _extraGhoStrategy.deposit(depositAmountGho, address(_allocator));
 
         // Check balances before deallocation
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), depositAmountUsdt * 2);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), depositAmountGho * 2);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), depositAmountUsdt * 2);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), depositAmountGho * 2);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), depositAmountUsdt);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), depositAmountUsdt);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), depositAmountGho);
@@ -1560,8 +1560,8 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.rebalance(rebalanceParams);
 
         // Check balances after deallocating from default strategy
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), depositAmountUsdt * 2);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), depositAmountGho * 2);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), depositAmountUsdt * 2);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), depositAmountGho * 2);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
@@ -1617,8 +1617,8 @@ contract AllocatorTest is TestWithHelpers {
         _extraGhoStrategy.deposit(depositAmountGho, address(_allocator));
 
         // Check balances before deallocation
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), depositAmountUsdt * 2);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), depositAmountGho * 2);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), depositAmountUsdt * 2);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), depositAmountGho * 2);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), depositAmountUsdt);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), depositAmountUsdt);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), depositAmountGho);
@@ -1640,8 +1640,8 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.rebalance(rebalanceParams);
 
         // Check balances after deallocation
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), depositAmountUsdt * 2);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), depositAmountGho * 2);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), depositAmountUsdt * 2);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), depositAmountGho * 2);
         assertEq(
             _allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)),
             depositAmountUsdt - deallocateAmountUsdt
@@ -1763,8 +1763,8 @@ contract AllocatorTest is TestWithHelpers {
         _mockGho.mint(address(_mockSwapper), totalAmountOut);
 
         // Check balances before the swap
-        assertEq(_allocator.getAssetBalance(assetIn), amountAssetInSwapOne + amountAssetInSwapTwo);
-        assertEq(_allocator.getAssetBalance(assetOut), 0);
+        assertEq(_allocator.getAssetBalance(assetIn, false), amountAssetInSwapOne + amountAssetInSwapTwo);
+        assertEq(_allocator.getAssetBalance(assetOut, false), 0);
 
         // invoke a swap
         IAllocator.RebalanceParams[] memory rebalanceParams = _initializeRebalanceParams(1);
@@ -1781,8 +1781,8 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.rebalance(rebalanceParams);
 
         // Check balances after the swap
-        assertEq(_allocator.getAssetBalance(assetIn), 0);
-        assertEq(_allocator.getAssetBalance(assetOut), totalAmountOut);
+        assertEq(_allocator.getAssetBalance(assetIn, false), 0);
+        assertEq(_allocator.getAssetBalance(assetOut, false), totalAmountOut);
     }
 
     function test_rebalance_swap_reverts_ifNonZeroAmountTruncated(uint256 amountAssetIn) public {
@@ -1807,8 +1807,8 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.rebalance(rebalanceParams);
 
         // Check balances
-        assertEq(_allocator.getAssetBalance(assetIn), amountAssetIn);
-        assertEq(_allocator.getAssetBalance(assetOut), 0);
+        assertEq(_allocator.getAssetBalance(assetIn, false), amountAssetIn);
+        assertEq(_allocator.getAssetBalance(assetOut, false), 0);
     }
 
     function test_rebalance_swap_reverts_ifAssetOutIncursSlippage(uint256 amountAssetInSwapOne) public {
@@ -1825,8 +1825,8 @@ contract AllocatorTest is TestWithHelpers {
         _mockGho.mint(address(_mockSwapper), amountAssetOut);
 
         // Check balances before the swap
-        assertEq(_allocator.getAssetBalance(assetIn), amountAssetInSwapOne);
-        assertEq(_allocator.getAssetBalance(assetOut), 0);
+        assertEq(_allocator.getAssetBalance(assetIn, false), amountAssetInSwapOne);
+        assertEq(_allocator.getAssetBalance(assetOut, false), 0);
 
         // invoke a swap
         IAllocator.RebalanceParams[] memory rebalanceParams = _initializeRebalanceParams(1);
@@ -1843,8 +1843,8 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.rebalance(rebalanceParams);
 
         // Check balances after the swap to make sure of no change
-        assertEq(_allocator.getAssetBalance(assetIn), amountAssetInSwapOne);
-        assertEq(_allocator.getAssetBalance(assetOut), 0);
+        assertEq(_allocator.getAssetBalance(assetIn, false), amountAssetInSwapOne);
+        assertEq(_allocator.getAssetBalance(assetOut, false), 0);
     }
 
     function test_rebalance_swap_reverts_ifAssetInIsNotSupported() public {
@@ -1870,8 +1870,8 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.rebalance(rebalanceParams);
 
         // Check balances after the swap to make sure of no change
-        assertEq(_allocator.getAssetBalance(assetIn), amountAssetIn);
-        assertEq(_allocator.getAssetBalance(assetOut), 0);
+        assertEq(_allocator.getAssetBalance(assetIn, false), amountAssetIn);
+        assertEq(_allocator.getAssetBalance(assetOut, false), 0);
     }
 
     function test_rebalance_swap_reverts_ifAssetOutIsNotSupported() public {
@@ -1897,8 +1897,8 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.rebalance(rebalanceParams);
 
         // Check balances after the swap to make sure of no change
-        assertEq(_allocator.getAssetBalance(assetIn), amountAssetIn);
-        assertEq(_allocator.getAssetBalance(assetOut), 0);
+        assertEq(_allocator.getAssetBalance(assetIn, false), amountAssetIn);
+        assertEq(_allocator.getAssetBalance(assetOut, false), 0);
     }
 
     function test_rebalance_swap_reverts_ifInputAssetDustIsTruncated(uint256 amountAssetIn) public {
@@ -1947,8 +1947,8 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.rebalance(rebalanceParams);
 
         // Check balances after the swap
-        assertEq(_allocator.getAssetBalance(assetIn), 0);
-        assertEq(_allocator.getAssetBalance(assetOut), amountAssetIn.convertAssetDecimals(assetIn, assetOut));
+        assertEq(_allocator.getAssetBalance(assetIn, false), 0);
+        assertEq(_allocator.getAssetBalance(assetOut, false), amountAssetIn.convertAssetDecimals(assetIn, assetOut));
     }
 
     function test_rebalance_swap_reverts_ifAssetOutPriceIsInvalid() public {
@@ -1974,8 +1974,8 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.rebalance(rebalanceParams);
 
         // Check balances after the swap
-        assertEq(_allocator.getAssetBalance(assetIn), amountAssetIn);
-        assertEq(_allocator.getAssetBalance(assetOut), 0);
+        assertEq(_allocator.getAssetBalance(assetIn, false), amountAssetIn);
+        assertEq(_allocator.getAssetBalance(assetOut, false), 0);
     }
 
     function test_rebalance_entireFlow(uint256 amountIn) public {
@@ -1997,8 +1997,8 @@ contract AllocatorTest is TestWithHelpers {
         _mockGho.mint(address(_mockSwapper), amountOut);
 
         // Check balances before the rebalance
-        assertEq(_allocator.getAssetBalance(assetIn), amountIn);
-        assertEq(_allocator.getAssetBalance(assetOut), 0);
+        assertEq(_allocator.getAssetBalance(assetIn, false), amountIn);
+        assertEq(_allocator.getAssetBalance(assetOut, false), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), amountIn);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
 
@@ -2015,8 +2015,8 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.rebalance(rebalanceParams);
 
         // Check balances after the rebalance
-        assertEq(_allocator.getAssetBalance(assetIn), 0);
-        assertEq(_allocator.getAssetBalance(assetOut), amountOut);
+        assertEq(_allocator.getAssetBalance(assetIn, false), 0);
+        assertEq(_allocator.getAssetBalance(assetOut, false), amountOut);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), amountOut);
     }
@@ -2220,8 +2220,8 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.deposit(address(_mockUsdt), amount);
 
         // Check the balances
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), amount);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), amount);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
@@ -2334,8 +2334,8 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.deposit(address(_mockUsdt), amount);
 
         // Check the balances
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), amount);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), amount);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
@@ -2397,8 +2397,8 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.deposit(address(_mockUsdt), amount);
 
         // Check the balances
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), amount);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), amount);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
@@ -2458,7 +2458,7 @@ contract AllocatorTest is TestWithHelpers {
     function test_topUp_increasesTotalAssetBalance(uint256 amount) public {
         amount = _boundAssetAmount(address(_mockUsdt), amount);
 
-        uint256 assetBalanceBefore = _allocator.getAssetBalance(address(_mockUsdt));
+        uint256 assetBalanceBefore = _allocator.getAssetBalance(address(_mockUsdt), false);
 
         _mockUsdt.mint(everyRoleAccount, amount);
 
@@ -2467,7 +2467,7 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.topUp(address(_mockUsdt), amount);
         vm.stopPrank();
 
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), assetBalanceBefore + amount);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), assetBalanceBefore + amount);
     }
 
     function test_topUp_reverts_ifNotAuthorized(address operator) public {
@@ -2583,7 +2583,7 @@ contract AllocatorTest is TestWithHelpers {
 
     function test_trustStrategy_reverts_ifAlreadyTrusted() public {
         vm.prank(address(everyRoleAccount));
-        vm.expectRevert(IAllocator.AlreadyTrusted.selector);
+        vm.expectRevert(Errors.AlreadyTrusted.selector);
         _allocator.trustStrategy(address(_defaultUsdtStrategy));
     }
 
@@ -2634,7 +2634,7 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.distrustStrategy(address(_defaultUsdtStrategy));
 
         vm.prank(address(everyRoleAccount));
-        vm.expectRevert(IAllocator.AlreadyDistrusted.selector);
+        vm.expectRevert(Errors.AlreadyDistrusted.selector);
         _allocator.distrustStrategy(address(_defaultUsdtStrategy));
     }
 
@@ -2673,7 +2673,7 @@ contract AllocatorTest is TestWithHelpers {
         vm.prank(depositor);
         _allocator.deposit(address(_mockUsdt), depositAmount);
 
-        uint256 balanceBefore = _allocator.getAssetBalance(address(_mockUsdt));
+        uint256 balanceBefore = _allocator.getAssetBalance(address(_mockUsdt), false);
         assertEq(balanceBefore, depositAmount);
 
         // Distrust the strategy
@@ -2681,7 +2681,7 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.distrustStrategy(address(_defaultUsdtStrategy));
 
         // Balance should now exclude the distrusted strategy
-        uint256 balanceAfter = _allocator.getAssetBalance(address(_mockUsdt));
+        uint256 balanceAfter = _allocator.getAssetBalance(address(_mockUsdt), true);
         assertEq(balanceAfter, 0);
     }
 
@@ -2712,11 +2712,11 @@ contract AllocatorTest is TestWithHelpers {
         // Distrust and then trust
         vm.prank(address(everyRoleAccount));
         _allocator.distrustStrategy(address(_defaultUsdtStrategy));
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), true), 0);
 
         vm.prank(address(everyRoleAccount));
         _allocator.trustStrategy(address(_defaultUsdtStrategy));
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), depositAmount);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), true), depositAmount);
     }
 
     function test_addStrategy_setsIsTrustedToTrue() public {

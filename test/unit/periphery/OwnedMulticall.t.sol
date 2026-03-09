@@ -275,7 +275,7 @@ contract OwnedMulticallTest is TestWithHelpers {
         // Verify the rebalance moved GHO from default to extra strategy
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), depositAmount);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), depositAmount);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), depositAmount);
     }
 
     function test_rebalance_viaOwnedMulticall_swapWithSlippageCoverage(uint256 amountIn, uint16 slippageToleranceBps)
@@ -339,8 +339,8 @@ contract OwnedMulticallTest is TestWithHelpers {
         // Verify: USDT fully deallocated, GHO allocated at 1:1 (slippage covered)
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), amountOutIfNoSlippage);
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), 0);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), amountOutIfNoSlippage);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), amountOutIfNoSlippage);
         // OwnedMulticall slippage tokens should have been consumed
         assertEq(IERC20(address(_mockGho)).balanceOf(address(_ownedMulticall)), 0);
     }
@@ -371,8 +371,8 @@ contract OwnedMulticallTest is TestWithHelpers {
         _ownedMulticall.aggregate3(multicallCalls);
 
         // Verify final state
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), 0);
-        assertEq(_allocator.getAssetBalance(address(_mockGho)), amountOut);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt), false), 0);
+        assertEq(_allocator.getAssetBalance(address(_mockGho), false), amountOut);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), amountOut);
     }

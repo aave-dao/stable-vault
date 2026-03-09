@@ -36,17 +36,9 @@ interface IAssetRegistry {
     /// @custom:selector 0x005ecddb
     error AlreadyDisabled();
 
-    /// @notice Thrown when attempting to distrust an asset that is already distrusted.
-    /// @custom:selector 0x1ed3ece1
-    error AlreadyDistrusted();
-
     /// @notice Thrown when attempting to enable a feature that is already enabled.
     /// @custom:selector 0xf2a5f75a
     error AlreadyEnabled();
-
-    /// @notice Thrown when attempting to trust an asset that is already trusted.
-    /// @custom:selector 0xab73bb5f
-    error AlreadyTrusted();
 
     /// @notice Sets the configuration for an asset.
     /// @param asset Address of the asset to set the configuration for.

@@ -32,14 +32,6 @@ interface IAllocator {
 
     event StrategyDistrusted(address indexed strategy);
 
-    /// @notice Thrown when attempting to distrust a strategy that is already distrusted.
-    /// @custom:selector 0x1ed3ece1
-    error AlreadyDistrusted();
-
-    /// @notice Thrown when attempting to trust a strategy that is already trusted.
-    /// @custom:selector 0xab73bb5f
-    error AlreadyTrusted();
-
     /// @notice Thrown when setting as default a strategy that already is the default, or when removing a strategy
     /// that is currently set as the default.
     /// @custom:selector 0x13e93f82
@@ -137,9 +129,10 @@ interface IAllocator {
 
     /// @notice Getter for the balance of a given asset on the Allocator.
     /// @param asset Address of the asset to get the balance of.
+    /// @param onlyTrustedStrategies Boolean indicating whether to only include balances from trusted strategies.
     /// @return balance Balance of the asset in asset decimals in the Allocator (idle + aggregate balance in
     /// strategies).
-    function getAssetBalance(address asset) external view returns (uint256);
+    function getAssetBalance(address asset, bool onlyTrustedStrategies) external view returns (uint256);
 
     /// @notice Getter for the balance of a given strategy on the Allocator.
     /// @param strategy Address of the strategy to get the balance of.

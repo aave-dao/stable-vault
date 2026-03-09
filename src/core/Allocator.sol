@@ -119,8 +119,8 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     }
 
     /// @inheritdoc IAllocator
-    function getAssetBalance(address asset) external view returns (uint256) {
-        return _getTotalAssetBalance(asset);
+    function getAssetBalance(address asset, bool onlyTrustedStrategies) external view returns (uint256) {
+        return _getTotalAssetBalance(asset, onlyTrustedStrategies);
     }
 
     /// @inheritdoc IAllocator
@@ -309,7 +309,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     /// @inheritdoc IAllocator
     function trustStrategy(address strategy) external override restricted {
         require(_isStrategySupported(strategy), Errors.AddressNotWhitelisted());
-        require(!$storage().strategyConfigs[strategy].isTrusted, AlreadyTrusted());
+        require(!$storage().strategyConfigs[strategy].isTrusted, Errors.AlreadyTrusted());
         $storage().strategyConfigs[strategy].isTrusted = true;
         emit StrategyTrusted(strategy);
     }
@@ -317,7 +317,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     /// @inheritdoc IAllocator
     function distrustStrategy(address strategy) external override restricted {
         require(_isStrategySupported(strategy), Errors.AddressNotWhitelisted());
-        require($storage().strategyConfigs[strategy].isTrusted, AlreadyDistrusted());
+        require($storage().strategyConfigs[strategy].isTrusted, Errors.AlreadyDistrusted());
         $storage().strategyConfigs[strategy].isTrusted = false;
         emit StrategyDistrusted(strategy);
     }
@@ -469,17 +469,19 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         IAllocator.AllocatorBalance[] memory allocatedAssets = new IAllocator.AllocatorBalance[](assets.length);
         for (uint256 i = 0; i < assets.length; i++) {
             address asset = assets[i];
-            allocatedAssets[i] = IAllocator.AllocatorBalance({asset: asset, amount: _getTotalAssetBalance(asset)});
+            allocatedAssets[i] = IAllocator.AllocatorBalance({
+                asset: asset, amount: _getTotalAssetBalance({asset: asset, onlyTrustedStrategies: true})
+            });
         }
         return allocatedAssets;
     }
 
-    function _getTotalAssetBalance(address asset) internal view returns (uint256) {
+    function _getTotalAssetBalance(address asset, bool onlyTrustedStrategies) internal view returns (uint256) {
         uint256 balance = 0;
         uint256 strategiesLength = $storage().assetStrategies[asset].length();
         for (uint256 i = 0; i < strategiesLength; i++) {
             address strategy = $storage().assetStrategies[asset].at(i);
-            if ($storage().strategyConfigs[strategy].isTrusted) {
+            if (!onlyTrustedStrategies || $storage().strategyConfigs[strategy].isTrusted) {
                 balance += _getAssetBalanceInStrategy(IERC4626(strategy));
             }
         }
