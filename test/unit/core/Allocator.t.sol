@@ -2574,6 +2574,162 @@ contract AllocatorTest is TestWithHelpers {
         return IAllocator.AllocationParams({asset: asset, strategy: strategy, amount: amount});
     }
 
+    function test_trustStrategy_reverts_ifStrategyIsNotSupported() public {
+        address strategy = makeAddr("newStrategy");
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(Errors.AddressNotWhitelisted.selector);
+        _allocator.trustStrategy(strategy);
+    }
+
+    function test_trustStrategy_reverts_ifAlreadyTrusted() public {
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(IAllocator.AlreadyTrusted.selector);
+        _allocator.trustStrategy(address(_defaultUsdtStrategy));
+    }
+
+    function test_trustStrategy_reverts_ifUnauthorizedCaller(address operator) public {
+        vm.assume(operator != everyRoleAccount);
+        vm.assume(operator != address(0));
+        _assumeNotProxyAdmin(operator, address(_allocator));
+
+        vm.mockCall(
+            address(_mockAccessManager),
+            abi.encodeWithSelector(
+                IAccessManager.canCall.selector,
+                operator,
+                address(_allocator),
+                bytes4(IAllocator.trustStrategy.selector)
+            ),
+            abi.encode(false)
+        );
+
+        vm.prank(operator);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, operator));
+        _allocator.trustStrategy(address(_defaultUsdtStrategy));
+    }
+
+    function test_trustStrategy_setsIsTrustedToTrue() public {
+        // First distrust
+        vm.prank(address(everyRoleAccount));
+        _allocator.distrustStrategy(address(_defaultUsdtStrategy));
+        assertFalse(_allocator.isStrategyTrusted(address(_defaultUsdtStrategy)));
+
+        // Then trust again
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.StrategyTrusted(address(_defaultUsdtStrategy));
+        vm.prank(address(everyRoleAccount));
+        _allocator.trustStrategy(address(_defaultUsdtStrategy));
+        assertTrue(_allocator.isStrategyTrusted(address(_defaultUsdtStrategy)));
+    }
+
+    function test_distrustStrategy_reverts_ifStrategyIsNotSupported() public {
+        address strategy = makeAddr("newStrategy");
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(Errors.AddressNotWhitelisted.selector);
+        _allocator.distrustStrategy(strategy);
+    }
+
+    function test_distrustStrategy_reverts_ifAlreadyDistrusted() public {
+        vm.prank(address(everyRoleAccount));
+        _allocator.distrustStrategy(address(_defaultUsdtStrategy));
+
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(IAllocator.AlreadyDistrusted.selector);
+        _allocator.distrustStrategy(address(_defaultUsdtStrategy));
+    }
+
+    function test_distrustStrategy_reverts_ifUnauthorizedCaller(address operator) public {
+        vm.assume(operator != everyRoleAccount);
+        vm.assume(operator != address(0));
+        _assumeNotProxyAdmin(operator, address(_allocator));
+
+        vm.mockCall(
+            address(_mockAccessManager),
+            abi.encodeWithSelector(
+                IAccessManager.canCall.selector,
+                operator,
+                address(_allocator),
+                bytes4(IAllocator.distrustStrategy.selector)
+            ),
+            abi.encode(false)
+        );
+
+        vm.prank(operator);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, operator));
+        _allocator.distrustStrategy(address(_defaultUsdtStrategy));
+    }
+
+    function test_distrustStrategy_setsIsTrustedToFalse() public {
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.StrategyDistrusted(address(_defaultUsdtStrategy));
+        vm.prank(address(everyRoleAccount));
+        _allocator.distrustStrategy(address(_defaultUsdtStrategy));
+        assertFalse(_allocator.isStrategyTrusted(address(_defaultUsdtStrategy)));
+    }
+
+    function test_distrustStrategy_excludesStrategyFromTotalAssetBalance(uint256 depositAmount) public {
+        depositAmount = _boundAssetAmount(address(_mockUsdt), depositAmount);
+        _mockTransferHelper.mockAsset(address(_mockUsdt), depositAmount);
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), depositAmount);
+
+        uint256 balanceBefore = _allocator.getAssetBalance(address(_mockUsdt));
+        assertEq(balanceBefore, depositAmount);
+
+        // Distrust the strategy
+        vm.prank(address(everyRoleAccount));
+        _allocator.distrustStrategy(address(_defaultUsdtStrategy));
+
+        // Balance should now exclude the distrusted strategy
+        uint256 balanceAfter = _allocator.getAssetBalance(address(_mockUsdt));
+        assertEq(balanceAfter, 0);
+    }
+
+    function test_distrustStrategy_excludesStrategyFromTrustedAssetBalances(uint256 depositAmount) public {
+        depositAmount = _boundAssetAmount(address(_mockUsdt), depositAmount);
+        _mockTransferHelper.mockAsset(address(_mockUsdt), depositAmount);
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), depositAmount);
+
+        // Distrust the strategy
+        vm.prank(address(everyRoleAccount));
+        _allocator.distrustStrategy(address(_defaultUsdtStrategy));
+
+        IAllocator.AllocatorBalance[] memory balances = _allocator.getTrustedAssetBalances();
+        for (uint256 i = 0; i < balances.length; i++) {
+            if (balances[i].asset == address(_mockUsdt)) {
+                assertEq(balances[i].amount, 0);
+            }
+        }
+    }
+
+    function test_trustStrategy_restoresStrategyInTotalAssetBalance(uint256 depositAmount) public {
+        depositAmount = _boundAssetAmount(address(_mockUsdt), depositAmount);
+        _mockTransferHelper.mockAsset(address(_mockUsdt), depositAmount);
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), depositAmount);
+
+        // Distrust and then trust
+        vm.prank(address(everyRoleAccount));
+        _allocator.distrustStrategy(address(_defaultUsdtStrategy));
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), 0);
+
+        vm.prank(address(everyRoleAccount));
+        _allocator.trustStrategy(address(_defaultUsdtStrategy));
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), depositAmount);
+    }
+
+    function test_addStrategy_setsIsTrustedToTrue() public {
+        TestErc4626 newStrategy = new TestErc4626(_mockUsdt);
+        vm.prank(admin);
+        _allocator.addStrategy(address(_mockUsdt), address(newStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        assertTrue(_allocator.isStrategyTrusted(address(newStrategy)));
+    }
+
+    function test_isStrategyTrusted_returnsFalseForUnregisteredStrategy() public {
+        assertFalse(_allocator.isStrategyTrusted(makeAddr("unregistered")));
+    }
+
     function _initializeRebalanceParams(uint16 length) internal pure returns (IAllocator.RebalanceParams[] memory) {
         return new IAllocator.RebalanceParams[](length);
     }

@@ -95,6 +95,9 @@ contract MockAllocator is IAllocator {
     function setDefaultStrategy(address asset, address strategy) external override {}
     function disableDepositsToStrategy(address strategy) external override {}
     function enableDepositsToStrategy(address strategy) external override {}
+    function trustStrategy(address strategy) external override {}
+    function distrustStrategy(address strategy) external override {}
+    function isStrategyTrusted(address strategy) external view override returns (bool) {}
 
     function _pushToTransferHelper() internal {
         for (uint256 i = 0; i < _assetsToPushToTransferHelperInNextCall.length; i++) {
