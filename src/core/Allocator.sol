@@ -120,7 +120,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
 
     /// @inheritdoc IAllocator
     function getAssetBalance(address asset) external view override returns (uint256) {
-        return _getTotalAssetBalance(asset, false);
+        return _getTotalAssetBalance({asset: asset, onlyTrustedStrategies: false});
     }
 
     /// @inheritdoc IAllocator
@@ -138,7 +138,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         if (!IAssetRegistry(ASSET_REGISTRY).isAssetTrusted(asset)) {
             return 0;
         }
-        return _getTotalAssetBalance(asset, true);
+        return _getTotalAssetBalance({asset: asset, onlyTrustedStrategies: true});
     }
 
     /// @inheritdoc IAllocator
