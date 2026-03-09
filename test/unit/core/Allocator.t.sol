@@ -2490,6 +2490,7 @@ contract AllocatorTest is TestWithHelpers {
 
     function test_topUp_reverts_ifAssetIsNotRegistered(uint256 amount) public {
         amount = _boundAssetAmount(address(_mockUnsupportedAsset), amount);
+        _mockAssetRegistry.mockToDisallowAssetDepositsIntoAllocator(address(_mockUnsupportedAsset));
 
         vm.prank(everyRoleAccount);
         vm.expectRevert(abi.encodeWithSelector(Errors.UnsupportedAsset.selector, address(_mockUnsupportedAsset)));
@@ -2876,7 +2877,9 @@ contract AllocatorTest is TestWithHelpers {
 
         // Attempt to set it as default
         vm.prank(address(everyRoleAccount));
-        vm.expectRevert(abi.encodeWithSelector(IAllocator.StrategyNotTrusted.selector, address(_extraUsdtStrategy)));
+        vm.expectRevert(
+            abi.encodeWithSelector(IAllocator.DepositsToStrategyDisabled.selector, address(_extraUsdtStrategy))
+        );
         _allocator.setDefaultStrategy(address(_mockUsdt), address(_extraUsdtStrategy));
     }
 
