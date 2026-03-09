@@ -210,7 +210,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     }
 
     function test_disablerProfile_hasTheExpectedRoles() public view {
-        uint64[] memory expected = new uint64[](12);
+        uint64[] memory expected = new uint64[](13);
         expected[0] = RolesConfig.getRole__rebalance().roleId;
         expected[1] = RolesConfig.getRole__removeStrategy().roleId;
         expected[2] = RolesConfig.getRole__rescueTokens().roleId;
@@ -223,6 +223,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         expected[9] = RolesConfig.getRole__removeBridgeAdapter().roleId;
         expected[10] = RolesConfig.getRole__disableDepositsToStrategy().roleId;
         expected[11] = RolesConfig.getRole__setDefaultStrategy().roleId;
+        expected[12] = RolesConfig.getRole__distrustStrategy().roleId;
         _assertProfileHasExactlyTheseRoles(_getProfile__Disabler(), expected);
 
         for (uint256 i = 0; i < expected.length; i++) {
@@ -401,6 +402,12 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
             target, IAllocator.enableDepositsToStrategy.selector, RolesConfig.getRole__enableDepositsToStrategy().roleId
         );
         _assertTargetFunctionRole(target, IAllocator.topUp.selector, RolesConfig.getRole__topUp().roleId);
+        _assertTargetFunctionRole(
+            target, IAllocator.trustStrategy.selector, RolesConfig.getRole__trustStrategy().roleId
+        );
+        _assertTargetFunctionRole(
+            target, IAllocator.distrustStrategy.selector, RolesConfig.getRole__distrustStrategy().roleId
+        );
     }
 
     function test_targetSetup_withdrawalPolicy() public view {
@@ -512,9 +519,11 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         _assertCanCall(
             disabler, getAllocatorAddress(_deployer()), IAllocator.disableDepositsToStrategy.selector, true, 0
         );
+        _assertCanCall(disabler, getAllocatorAddress(_deployer()), IAllocator.distrustStrategy.selector, true, 0);
         // Unauthorized
         _assertCanCall(disabler, getAllocatorAddress(_deployer()), IAllocator.addStrategy.selector, false, 0);
         _assertCanCall(disabler, getAllocatorAddress(_deployer()), IAllocator.topUp.selector, false, 0);
+        _assertCanCall(disabler, getAllocatorAddress(_deployer()), IAllocator.trustStrategy.selector, false, 0);
     }
 
     function test_canCall_withdrawalPolicyManager() public view {

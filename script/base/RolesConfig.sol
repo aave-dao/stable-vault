@@ -452,6 +452,32 @@ abstract contract RolesConfig is DeploymentConfig {
         });
     }
 
+    /// @custom:delay Medium
+    /// @custom:location Allocator
+    function getRole__trustStrategy() internal view returns (Role memory) {
+        bytes4 selector = IAllocator.trustStrategy.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: MED_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
+        });
+    }
+
+    /// @custom:delay None
+    /// @custom:location Allocator
+    function getRole__distrustStrategy() internal pure returns (Role memory) {
+        bytes4 selector = IAllocator.distrustStrategy.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: NO_DELAY,
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
+        });
+    }
+
     /// @custom:delay None
     /// @custom:location FundsHandler, EarningChainGateway, StableVault, AccountingChainGateway
     function getRole__rescueTokens() internal pure returns (Role memory) {
@@ -570,7 +596,7 @@ abstract contract RolesConfig is DeploymentConfig {
     }
 
     function getAllFunctionBasedRoles() internal view returns (Role[] memory) {
-        Role[] memory roles = new Role[](41);
+        Role[] memory roles = new Role[](43);
 
         // AssetRegistry
         roles[0] = getRole__setAssetConfig();
@@ -615,23 +641,25 @@ abstract contract RolesConfig is DeploymentConfig {
         roles[29] = getRole__setDefaultStrategy();
         roles[30] = getRole__enableDepositsToStrategy();
         roles[31] = getRole__topUp();
+        roles[32] = getRole__trustStrategy();
+        roles[33] = getRole__distrustStrategy();
 
         // Rescue
-        roles[32] = getRole__rescueTokens();
-        roles[33] = getRole__rescueNative();
+        roles[34] = getRole__rescueTokens();
+        roles[35] = getRole__rescueNative();
 
         // FundsHandler / EarningChainGateway
-        roles[34] = getRole__pushFundsToChain();
-        roles[35] = getRole__pushFundsToAccountingChain();
-        roles[36] = getRole__addEarningChain();
-        roles[37] = getRole__removeEarningChain();
+        roles[36] = getRole__pushFundsToChain();
+        roles[37] = getRole__pushFundsToAccountingChain();
+        roles[38] = getRole__addEarningChain();
+        roles[39] = getRole__removeEarningChain();
 
         // Oracles
-        roles[38] = getRole__setChainBalanceOracleAdapter();
-        roles[39] = getRole__setOracleAdapterForAsset();
+        roles[40] = getRole__setChainBalanceOracleAdapter();
+        roles[41] = getRole__setOracleAdapterForAsset();
 
         // External - aToken Vault
-        roles[40] = getRole__claimMerklRewards();
+        roles[42] = getRole__claimMerklRewards();
 
         return roles;
     }

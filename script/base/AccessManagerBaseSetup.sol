@@ -284,7 +284,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         address disablerProfile = _getProfile__Disabler();
         require(disablerProfile != address(0), "Disabler profile address not set");
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](12);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](13);
 
         roles[0] = RolesConfig.getRole__rebalance();
         roles[1] = RolesConfig.getRole__removeStrategy();
@@ -298,6 +298,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         roles[9] = RolesConfig.getRole__removeBridgeAdapter();
         roles[10] = RolesConfig.getRole__disableDepositsToStrategy();
         roles[11] = RolesConfig.getRole__setDefaultStrategy();
+        roles[12] = RolesConfig.getRole__distrustStrategy();
 
         _grantRolesToProfile(disablerProfile, roles);
     }
@@ -332,7 +333,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     function _setupTarget__Allocator(address deployer) internal {
         address allocator = getAllocatorAddress(deployer);
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](7);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](9);
 
         roles[0] = RolesConfig.getRole__rebalance();
         roles[1] = RolesConfig.getRole__addStrategy();
@@ -341,6 +342,8 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         roles[4] = RolesConfig.getRole__setDefaultStrategy();
         roles[5] = RolesConfig.getRole__enableDepositsToStrategy();
         roles[6] = RolesConfig.getRole__topUp();
+        roles[7] = RolesConfig.getRole__trustStrategy();
+        roles[8] = RolesConfig.getRole__distrustStrategy();
 
         _setTargetFunctionRoles(allocator, roles);
     }
