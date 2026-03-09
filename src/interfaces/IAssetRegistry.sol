@@ -40,6 +40,10 @@ interface IAssetRegistry {
     /// @custom:selector 0xf2a5f75a
     error AlreadyEnabled();
 
+    /// @notice Thrown when performing an operation on an asset that is not trusted.
+    /// @custom:selector 0x6468d869
+    error AssetNotTrusted(address asset);
+
     /// @notice Sets the configuration for an asset.
     /// @param asset Address of the asset to set the configuration for.
     /// @param config Configuration for the asset.
@@ -70,10 +74,12 @@ interface IAssetRegistry {
     function enableSwapInput(address asset) external;
 
     /// @notice Enables swap output for a given asset.
+    /// @dev Reverts if the asset is not trusted. The asset must be trusted before swap output can be re-enabled.
     /// @param asset Address of the asset to enable swap output for.
     function enableSwapOutput(address asset) external;
 
     /// @notice Enables user deposits for a given asset.
+    /// @dev Reverts if the asset is not trusted. The asset must be trusted before deposits can be re-enabled.
     /// @param asset Address of the asset to enable user deposits for.
     function enableUserDeposits(address asset) external;
 
@@ -85,6 +91,8 @@ interface IAssetRegistry {
     /// @notice Distrusts an asset.
     /// @dev Distrusted assets are those that for example have depeg'ed and should not be trusted to contribute to the
     /// solvency of the system.
+    /// @dev As a side effect, user deposits and swap output are automatically disabled for the asset if currently
+    /// enabled. Trusting the asset again does NOT re-enable them.
     /// @param asset Address of the asset to distrust.
     function distrustAsset(address asset) external;
 
@@ -117,6 +125,8 @@ interface IAssetRegistry {
 
     /// @notice Getter for whether the asset is allowed to be used as swap output token from the Swapper into the
     /// Allocator.
+    /// @dev The state where an asset is distrusted but swap output is still allowed is unreachable because
+    /// `enableSwapOutput` requires trust and `distrustAsset` auto-disables swap output.
     /// @param asset Address of the asset to check if it is allowed to be used as swap output token from the
     /// Swapper into the Allocator.
     /// @return isAllowed Whether the asset is allowed to be used as swap output token from the Swapper into the
@@ -124,6 +134,8 @@ interface IAssetRegistry {
     function isSwapOutputAllowed(address asset) external view returns (bool);
 
     /// @notice Getter for whether the asset is allowed to be deposited into the system by a user.
+    /// @dev The state where an asset is distrusted but deposits are still allowed is unreachable because
+    /// `enableUserDeposits` requires trust and `distrustAsset` auto-disables deposits.
     /// @param asset Address of the asset to check if it is allowed to be deposited into the system by a user.
     /// @return isAllowed Whether the asset is allowed to be deposited into the system by a user.
     function isUserDepositAllowed(address asset) external view returns (bool);

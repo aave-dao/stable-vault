@@ -117,6 +117,7 @@ contract AssetRegistry is AccessManagedUpgradeable, Multicall, IAssetRegistry {
     /// @inheritdoc IAssetRegistry
     function enableSwapOutput(address asset) external override restricted {
         require(_isAssetRegistered(asset), Errors.UnsupportedAsset(asset));
+        require(_isAssetTrusted(asset), AssetNotTrusted(asset));
         require(!$storage().configByAsset[asset].swapOutputTokenAllowed, AlreadyEnabled());
         $storage().configByAsset[asset].swapOutputTokenAllowed = true;
         emit AssetConfigSet(asset, $storage().configByAsset[asset]);
@@ -125,6 +126,7 @@ contract AssetRegistry is AccessManagedUpgradeable, Multicall, IAssetRegistry {
     /// @inheritdoc IAssetRegistry
     function enableUserDeposits(address asset) external override restricted {
         require(_isAssetRegistered(asset), Errors.UnsupportedAsset(asset));
+        require(_isAssetTrusted(asset), AssetNotTrusted(asset));
         require(!$storage().configByAsset[asset].depositFromUserAllowed, AlreadyEnabled());
         $storage().configByAsset[asset].depositFromUserAllowed = true;
         emit AssetConfigSet(asset, $storage().configByAsset[asset]);
@@ -144,6 +146,14 @@ contract AssetRegistry is AccessManagedUpgradeable, Multicall, IAssetRegistry {
         require(_isAssetTrusted(asset), Errors.AlreadyDistrusted());
         $storage().trustedAssets.remove(asset);
         emit AssetDistrusted(asset);
+        if (
+            $storage().configByAsset[asset].depositFromUserAllowed
+                || $storage().configByAsset[asset].swapOutputTokenAllowed
+        ) {
+            $storage().configByAsset[asset].depositFromUserAllowed = false;
+            $storage().configByAsset[asset].swapOutputTokenAllowed = false;
+            emit AssetConfigSet(asset, $storage().configByAsset[asset]);
+        }
     }
 
     // ///////////////////////// GETTERS ////////////////////////////////
@@ -176,11 +186,15 @@ contract AssetRegistry is AccessManagedUpgradeable, Multicall, IAssetRegistry {
     }
 
     /// @inheritdoc IAssetRegistry
+    /// @dev Does not check if the asset is trusted because to enable swapping for an asset it must be trusted.
+    /// @dev The state of asset distrusted, but swapping is still allowed, is not possible.
     function isSwapOutputAllowed(address asset) external view override returns (bool) {
         return $storage().configByAsset[asset].swapOutputTokenAllowed;
     }
 
     /// @inheritdoc IAssetRegistry
+    /// @dev Does not check if the asset is trusted because to enable deposits for an asset it must be trusted.
+    /// @dev The state of asset distrusted, but deposits are still allowed, is not possible.
     function isUserDepositAllowed(address asset) external view override returns (bool) {
         return $storage().configByAsset[asset].depositFromUserAllowed;
     }

@@ -668,6 +668,8 @@ contract FundsHandlerTest is TestWithHelpers {
         uint256 chainBalance2
     ) public {
         vm.assume(chainId1 != chainId2);
+        vm.assume(chainId1 != block.chainid);
+        vm.assume(chainId2 != block.chainid);
         chainBalance1 = _boundAssetAmount(address(mockAsset), chainBalance1);
         chainBalance2 = _boundAssetAmount(address(mockAsset), chainBalance2);
 
