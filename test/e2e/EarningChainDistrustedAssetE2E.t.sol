@@ -114,6 +114,8 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
 
         // Check the Allocator has the USDC bridged over
         assertEq(allocator_earningChain.getAssetBalance(address(USDC)), userInitialDeposit);
+        // getTrustedAssetBalance should return 0 since USDC is distrusted
+        assertEq(allocator_earningChain.getTrustedAssetBalance(address(USDC)), 0);
 
         // User requests withdrawal of their original deposit
         uint256 iouAmountRequestedRay = userInitialDeposit.assetDecimalsToRay(address(USDC));

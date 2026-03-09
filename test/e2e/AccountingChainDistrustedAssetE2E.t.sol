@@ -212,7 +212,10 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
 
         // The Allocator should have 0 GHO and 500-123 USDC left
         assertEq(allocator_accountingChain.getAssetBalance(address(GHO)), 0);
+        assertEq(allocator_accountingChain.getTrustedAssetBalance(address(GHO)), 0);
         assertEq(allocator_accountingChain.getAssetBalance(address(USDC)), 377 * (10 ** 6));
+        // getTrustedAssetBalance should return 0 since USDC is distrusted
+        assertEq(allocator_accountingChain.getTrustedAssetBalance(address(USDC)), 0);
         // The system's aggregate balance should be 0
         assertEq(vault.getAggregatedBalance(), 0);
     }

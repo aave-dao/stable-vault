@@ -119,18 +119,26 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     }
 
     /// @inheritdoc IAllocator
-    function getAssetBalance(address asset) external view returns (uint256) {
-        return _getTotalAssetBalance(asset);
+    function getAssetBalance(address asset) external view override returns (uint256) {
+        return _getTotalAssetBalance({asset: asset, onlyTrustedStrategies: false});
     }
 
     /// @inheritdoc IAllocator
-    function getAssetBalanceInStrategy(address strategy) external view returns (uint256) {
+    function getAssetBalanceInStrategy(address strategy) external view override returns (uint256) {
         return _getAssetBalanceInStrategy(IERC4626(strategy));
     }
 
     /// @inheritdoc IAllocator
     function getTrustedAssetBalances() external view override returns (IAllocator.AllocatorBalance[] memory) {
         return _getTrustedAssetBalances();
+    }
+
+    /// @inheritdoc IAllocator
+    function getTrustedAssetBalance(address asset) external view override returns (uint256) {
+        if (!IAssetRegistry(ASSET_REGISTRY).isAssetTrusted(asset)) {
+            return 0;
+        }
+        return _getTotalAssetBalance({asset: asset, onlyTrustedStrategies: true});
     }
 
     /// @inheritdoc IAllocator
@@ -306,6 +314,27 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         emit StrategyDepositsToggled(strategy, true);
     }
 
+    /// @inheritdoc IAllocator
+    function trustStrategy(address strategy) external override restricted {
+        require(_isStrategySupported(strategy), Errors.AddressNotWhitelisted());
+        require(!$storage().strategyConfigs[strategy].isTrusted, Errors.AlreadyTrusted());
+        $storage().strategyConfigs[strategy].isTrusted = true;
+        emit StrategyTrusted(strategy);
+    }
+
+    /// @inheritdoc IAllocator
+    function distrustStrategy(address strategy) external override restricted {
+        require(_isStrategySupported(strategy), Errors.AddressNotWhitelisted());
+        require($storage().strategyConfigs[strategy].isTrusted, Errors.AlreadyDistrusted());
+        $storage().strategyConfigs[strategy].isTrusted = false;
+        emit StrategyDistrusted(strategy);
+    }
+
+    /// @inheritdoc IAllocator
+    function isStrategyTrusted(address strategy) external view override returns (bool) {
+        return $storage().strategyConfigs[strategy].isTrusted;
+    }
+
     ////////////////////////////////////////////////// INTERNAL ////////////////////////////////////////////////////////
 
     function _rebalance(RebalanceParams memory rebalanceParams) internal {
@@ -448,16 +477,21 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         IAllocator.AllocatorBalance[] memory allocatedAssets = new IAllocator.AllocatorBalance[](assets.length);
         for (uint256 i = 0; i < assets.length; i++) {
             address asset = assets[i];
-            allocatedAssets[i] = IAllocator.AllocatorBalance({asset: asset, amount: _getTotalAssetBalance(asset)});
+            allocatedAssets[i] = IAllocator.AllocatorBalance({
+                asset: asset, amount: _getTotalAssetBalance({asset: asset, onlyTrustedStrategies: true})
+            });
         }
         return allocatedAssets;
     }
 
-    function _getTotalAssetBalance(address asset) internal view returns (uint256) {
+    function _getTotalAssetBalance(address asset, bool onlyTrustedStrategies) internal view returns (uint256) {
         uint256 balance = 0;
         uint256 strategiesLength = $storage().assetStrategies[asset].length();
         for (uint256 i = 0; i < strategiesLength; i++) {
-            balance += _getAssetBalanceInStrategy(IERC4626($storage().assetStrategies[asset].at(i)));
+            address strategy = $storage().assetStrategies[asset].at(i);
+            if (!onlyTrustedStrategies || $storage().strategyConfigs[strategy].isTrusted) {
+                balance += _getAssetBalanceInStrategy(IERC4626(strategy));
+            }
         }
         balance += IERC20(asset).balanceOf(address(this));
         return balance;
@@ -482,7 +516,11 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         require(asset == IERC4626(strategy).asset(), Errors.InvalidAsset(asset));
 
         $storage().strategyConfigs[strategy] = StrategyConfig({
-            asset: asset, maxSlippageAmount: maxSlippageAmount, isRegistered: true, depositAllowed: true
+            asset: asset,
+            maxSlippageAmount: maxSlippageAmount,
+            isRegistered: true,
+            depositAllowed: true,
+            isTrusted: true
         });
         $storage().assetStrategies[asset].add(strategy);
 

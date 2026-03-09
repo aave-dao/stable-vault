@@ -133,7 +133,7 @@ contract AssetRegistry is AccessManagedUpgradeable, Multicall, IAssetRegistry {
     /// @inheritdoc IAssetRegistry
     function trustAsset(address asset) external override restricted {
         require(_isAssetRegistered(asset), Errors.UnsupportedAsset(asset));
-        require(!_isAssetTrusted(asset), AlreadyTrusted());
+        require(!_isAssetTrusted(asset), Errors.AlreadyTrusted());
         $storage().trustedAssets.add(asset);
         emit AssetTrusted(asset);
     }
@@ -141,7 +141,7 @@ contract AssetRegistry is AccessManagedUpgradeable, Multicall, IAssetRegistry {
     /// @inheritdoc IAssetRegistry
     function distrustAsset(address asset) external override restricted {
         require(_isAssetRegistered(asset), Errors.UnsupportedAsset(asset));
-        require(_isAssetTrusted(asset), AlreadyDistrusted());
+        require(_isAssetTrusted(asset), Errors.AlreadyDistrusted());
         $storage().trustedAssets.remove(asset);
         emit AssetDistrusted(asset);
     }

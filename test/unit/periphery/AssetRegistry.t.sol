@@ -872,7 +872,7 @@ contract AssetRegistryTest is TestWithHelpers {
         );
 
         vm.prank(everyRoleAccount);
-        vm.expectRevert(abi.encodeWithSelector(IAssetRegistry.AlreadyTrusted.selector));
+        vm.expectRevert(abi.encodeWithSelector(Errors.AlreadyTrusted.selector));
         _assetRegistry.trustAsset(address(_mockUsdt));
     }
 
@@ -945,7 +945,7 @@ contract AssetRegistryTest is TestWithHelpers {
         _assetRegistry.distrustAsset(address(_mockUsdt));
 
         vm.prank(everyRoleAccount);
-        vm.expectRevert(abi.encodeWithSelector(IAssetRegistry.AlreadyDistrusted.selector));
+        vm.expectRevert(abi.encodeWithSelector(Errors.AlreadyDistrusted.selector));
         _assetRegistry.distrustAsset(address(_mockUsdt));
     }
 }
