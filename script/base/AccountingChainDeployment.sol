@@ -70,15 +70,15 @@ abstract contract AccountingChainDeployment is
     address internal _sequencerUptimeFeed;
 
     function _gho() internal view returns (address) {
-        return _configAddress(".accountingChain.tokens.gho");
+        return _configAddress(".accountingChain.assets.gho");
     }
 
     function _usdc() internal view returns (address) {
-        return _configAddress(".accountingChain.tokens.usdc");
+        return _configAddress(".accountingChain.assets.usdc");
     }
 
     function _usdt() internal view returns (address) {
-        return _configAddress(".accountingChain.tokens.usdt");
+        return _configAddress(".accountingChain.assets.usdt");
     }
 
     function run() public {
@@ -111,18 +111,22 @@ abstract contract AccountingChainDeployment is
         // Validate CCIP router
         require(
             IRouterClient(_configAddress(".accountingChain.ccipRouterAddress"))
-                .isChainSupported(uint64(vm.parseUint(_configString(".accountingChain.earningChainCcipSelector")))),
+                .isChainSupported(uint64(vm.parseUint(_configString(".earningChain.ccipSelector")))),
             "CCIP Router does not support earning chain"
         );
 
-        // Validate Chainlink bundle feed / sequencer uptime feed (when not using mocks)
-        if (!_configBool(".accountingChain.useMockBundleFeed")) {
-            address bundleFeed = _configAddress(".accountingChain.chainlinkBundleAggregatorProxy");
+        // Validate Chainlink bundle feed / sequencer uptime feed
+        address bundleFeed = _configAddress(".accountingChain.chainlinkBundleAggregatorProxy");
+        if (_configBool(".accountingChain.useMockBundleFeed")) {
+            require(bundleFeed == address(0), "Chainlink bundle aggregator proxy must not be set when using mock");
+        } else {
             require(bundleFeed != address(0), "Chainlink bundle aggregator proxy not set");
             IBundleBaseAggregator(bundleFeed).latestBundle();
         }
-        if (!_configBool(".accountingChain.useMockSequencerUptimeFeed")) {
-            address sequencerFeed = _configAddress(".accountingChain.sequencerUptimeFeed");
+        address sequencerFeed = _configAddress(".accountingChain.sequencerUptimeFeed");
+        if (_configBool(".accountingChain.useMockSequencerUptimeFeed")) {
+            require(sequencerFeed == address(0), "Sequencer uptime feed must not be set when using mock");
+        } else {
             require(sequencerFeed != address(0), "Sequencer uptime feed not set");
             AggregatorV3Interface(sequencerFeed).latestRoundData();
         }
@@ -134,9 +138,7 @@ abstract contract AccountingChainDeployment is
         );
 
         // Validate withdrawal policy signer
-        require(
-            _configAddress(".accountingChain.withdrawalPolicy.signer") != address(0), "Withdrawal policy signer not set"
-        );
+        require(_configAddress(".withdrawalPolicy.signer") != address(0), "Withdrawal policy signer not set");
     }
 
     function _deployContracts() internal {
@@ -188,9 +190,8 @@ abstract contract AccountingChainDeployment is
 
         IAccountingChainGateway gateway = IAccountingChainGateway(getGatewayAddress(_deployer()));
 
-        uint256 earningChainId = _configUint(".accountingChain.earningChainId");
-        uint64 earningChainCcipSelector =
-            uint64(vm.parseUint(_configString(".accountingChain.earningChainCcipSelector")));
+        uint256 earningChainId = _configUint(".earningChain.chainId");
+        uint64 earningChainCcipSelector = uint64(vm.parseUint(_configString(".earningChain.ccipSelector")));
 
         // GHO uses CCIP Adapter
         gateway.addBridgeAdapter(_gho(), earningChainId, localCcipAdapter);
@@ -220,27 +221,21 @@ abstract contract AccountingChainDeployment is
 
         address ghoYieldStrategy =
             _deployATokenVault(_gho(), poolAddressProvider, getAccessManagerAddress(_deployer()), _deployer());
-        allocator.addStrategy(
-            _gho(), ghoYieldStrategy, uint8(_configUint(".accountingChain.strategyMaxSlippageAmount"))
-        );
+        allocator.addStrategy(_gho(), ghoYieldStrategy, uint8(_configUint(".strategyMaxSlippageAmount")));
         allocator.setDefaultStrategy(_gho(), ghoYieldStrategy);
         _deployedATokenVaults.push(ghoYieldStrategy);
         _logDeployment("GHO aTokenVault", "", ghoYieldStrategy);
 
         address usdcYieldStrategy =
             _deployATokenVault(_usdc(), poolAddressProvider, getAccessManagerAddress(_deployer()), _deployer());
-        allocator.addStrategy(
-            _usdc(), usdcYieldStrategy, uint8(_configUint(".accountingChain.strategyMaxSlippageAmount"))
-        );
+        allocator.addStrategy(_usdc(), usdcYieldStrategy, uint8(_configUint(".strategyMaxSlippageAmount")));
         allocator.setDefaultStrategy(_usdc(), usdcYieldStrategy);
         _deployedATokenVaults.push(usdcYieldStrategy);
         _logDeployment("USDC aTokenVault", "", usdcYieldStrategy);
 
         address usdtYieldStrategy =
             _deployATokenVault(_usdt(), poolAddressProvider, getAccessManagerAddress(_deployer()), _deployer());
-        allocator.addStrategy(
-            _usdt(), usdtYieldStrategy, uint8(_configUint(".accountingChain.strategyMaxSlippageAmount"))
-        );
+        allocator.addStrategy(_usdt(), usdtYieldStrategy, uint8(_configUint(".strategyMaxSlippageAmount")));
         allocator.setDefaultStrategy(_usdt(), usdtYieldStrategy);
         _deployedATokenVaults.push(usdtYieldStrategy);
         _logDeployment("USDT aTokenVault", "", usdtYieldStrategy);
@@ -252,13 +247,13 @@ abstract contract AccountingChainDeployment is
 
     function _setupFundsHandler() internal {
         IFundsHandler fundsHandler = IFundsHandler(getFundsHandlerAddress(_deployer()));
-        fundsHandler.addEarningChain(_configUint(".accountingChain.earningChainId"));
+        fundsHandler.addEarningChain(_configUint(".earningChain.chainId"));
     }
 
     function _setupWithdrawalPolicy() internal {
         WithdrawalPolicy withdrawalPolicy = WithdrawalPolicy(getWithdrawalPolicyAddress(_deployer()));
-        withdrawalPolicy.setDefaultFeeBps(uint16(_configUint(".accountingChain.withdrawalPolicy.defaultFeeBps")));
-        withdrawalPolicy.setSigner(_configAddress(".accountingChain.withdrawalPolicy.signer"), true);
+        withdrawalPolicy.setDefaultFeeBps(uint16(_configUint(".withdrawalPolicy.defaultFeeBps")));
+        withdrawalPolicy.setSigner(_configAddress(".withdrawalPolicy.signer"), true);
     }
 
     function _setupAssetRegistry() internal {
@@ -408,7 +403,7 @@ abstract contract AccountingChainDeployment is
                 withdrawer: ALLOCATOR_WITHDRAWER,
                 priceOracle: getPriceOracleAddress(_deployer()),
                 transferHelper: getTransferHelperAddress(_deployer()),
-                maxStrategiesPerAsset: uint8(_configUint(".accountingChain.maxStrategiesPerAsset"))
+                maxStrategiesPerAsset: uint8(_configUint(".maxStrategiesPerAsset"))
             })
         );
         _logDeployment("Allocator::Implementation", "", implementation);
@@ -501,8 +496,7 @@ abstract contract AccountingChainDeployment is
     }
 
     function _deployPriceOracle() internal returns (address) {
-        address implementation =
-            address(new PriceOracle(vm.parseUint(_configString(".accountingChain.priceOracleMinValidPriceRay"))));
+        address implementation = address(new PriceOracle(vm.parseUint(_configString(".priceOracleMinValidPriceRay"))));
         _logDeployment("PriceOracle::Implementation", "", implementation);
         address priceOracle = _deployTransparentProxy_create3({
             namespacedSaltSeed: PRICE_ORACLE_SALT_SEED,
@@ -535,7 +529,7 @@ abstract contract AccountingChainDeployment is
     }
 
     function _deployMockBundleFeed() internal {
-        uint256 earningChainId = _configUint(".accountingChain.earningChainId");
+        uint256 earningChainId = _configUint(".earningChain.chainId");
         MockBundleFeed mockBundleFeed = new MockBundleFeed();
         _chainlinkBundleAggregatorProxy = address(mockBundleFeed);
         _logDeployment("MockBundleFeed", "", _chainlinkBundleAggregatorProxy);
@@ -556,7 +550,7 @@ abstract contract AccountingChainDeployment is
 
     function _setupPriceOracleAdapters() internal {
         PriceOracle priceOracle = PriceOracle(getPriceOracleAddress(_deployer()));
-        uint256 heartbeat = _configUint(".accountingChain.chainlinkPriceOracleHeartbeat");
+        uint256 heartbeat = _configUint(".chainlinkPriceOracleHeartbeat");
 
         address ghoAdapter = address(
             new ChainlinkL2PriceOracleAdapter(
@@ -584,12 +578,12 @@ abstract contract AccountingChainDeployment is
     }
 
     function _setupChainBalanceOracleAdapters() internal {
-        uint256 earningChainId = _configUint(".accountingChain.earningChainId");
+        uint256 earningChainId = _configUint(".earningChain.chainId");
         address adapter = address(
             new ChainlinkL2ChainBalanceOracleAdapter(
                 earningChainId,
                 _chainlinkBundleAggregatorProxy,
-                _configUint(".accountingChain.chainlinkChainBalanceOracleHeartbeat"),
+                _configUint(".chainlinkChainBalanceOracleHeartbeat"),
                 _sequencerUptimeFeed
             )
         );
