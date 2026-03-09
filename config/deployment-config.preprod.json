@@ -6,7 +6,7 @@
   "strategyMaxSlippageAmount": 10,
   "chainlinkPriceOracleHeartbeat": 86400,
   "chainlinkChainBalanceOracleHeartbeat": 86400,
-  "priceOracleMinValidPriceRay": "990000000000000000000000000",
+  "priceOracleMinValidPriceRay": "997000000000000000000000000",
   "profiles": {
     "mainAdmin": "0xD70024EE82c20C30918b30FAd3Bf8D945268e6f2",
     "secondaryAdmin": "0x449516D402DD0f8caA229C754887555CA149AF5B",
