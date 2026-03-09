@@ -24,7 +24,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
     uint256 constant DEFAULT_NONCE = 1;
     uint256 constant DEFAULT_DEADLINE = type(uint256).max;
 
-    uint16 constant FEE_CAP_BPS = 5_00; // 5.00%
+    uint16 constant FEE_CAP_BPS = 10_00; // 10.00%
 
     function _deployWithdrawalPolicy(address accessManager, address withdrawalPolicyApplier)
         internal

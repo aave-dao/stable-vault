@@ -50,15 +50,15 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
     address immutable ALLOCATOR_WITHDRAWER = getGatewayAddress(_deployer());
 
     function _gho() internal view returns (address) {
-        return _configAddress(".earningChain.tokens.gho");
+        return _configAddress(".earningChain.assets.gho");
     }
 
     function _usdc() internal view returns (address) {
-        return _configAddress(".earningChain.tokens.usdc");
+        return _configAddress(".earningChain.assets.usdc");
     }
 
     function _usdt() internal view returns (address) {
-        return _configAddress(".earningChain.tokens.usdt");
+        return _configAddress(".earningChain.assets.usdt");
     }
 
     function run() public {
@@ -91,7 +91,7 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         // Validate CCIP router
         require(
             IRouterClient(_configAddress(".earningChain.ccipRouterAddress"))
-                .isChainSupported(uint64(vm.parseUint(_configString(".earningChain.accountingChainCcipSelector")))),
+                .isChainSupported(uint64(vm.parseUint(_configString(".accountingChain.ccipSelector")))),
             "CCIP Router does not support accounting chain"
         );
 
@@ -102,9 +102,7 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         );
 
         // Validate withdrawal policy signer
-        require(
-            _configAddress(".earningChain.withdrawalPolicy.signer") != address(0), "Withdrawal policy signer not set"
-        );
+        require(_configAddress(".withdrawalPolicy.signer") != address(0), "Withdrawal policy signer not set");
     }
 
     function _deployContracts() internal {
@@ -142,9 +140,8 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
 
         IEarningChainGateway gateway = IEarningChainGateway(getGatewayAddress(_deployer()));
 
-        uint256 accountingChainId = _configUint(".earningChain.accountingChainId");
-        uint64 accountingChainCcipSelector =
-            uint64(vm.parseUint(_configString(".earningChain.accountingChainCcipSelector")));
+        uint256 accountingChainId = _configUint(".accountingChain.chainId");
+        uint64 accountingChainCcipSelector = uint64(vm.parseUint(_configString(".accountingChain.ccipSelector")));
 
         // GHO uses CCIP Adapter
         gateway.addBridgeAdapter(_gho(), accountingChainId, localCcipAdapter);
@@ -169,8 +166,8 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
 
     function _setupWithdrawalPolicy() internal {
         WithdrawalPolicy withdrawalPolicy = WithdrawalPolicy(getWithdrawalPolicyAddress(_deployer()));
-        withdrawalPolicy.setDefaultFeeBps(uint16(_configUint(".earningChain.withdrawalPolicy.defaultFeeBps")));
-        withdrawalPolicy.setSigner(_configAddress(".earningChain.withdrawalPolicy.signer"), true);
+        withdrawalPolicy.setDefaultFeeBps(uint16(_configUint(".withdrawalPolicy.defaultFeeBps")));
+        withdrawalPolicy.setSigner(_configAddress(".withdrawalPolicy.signer"), true);
     }
 
     function _setupAllocator() internal {
@@ -179,14 +176,14 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
 
         address usdcYieldStrategy =
             _deployATokenVault(_usdc(), poolAddressProvider, getAccessManagerAddress(_deployer()), _deployer());
-        allocator.addStrategy(_usdc(), usdcYieldStrategy, uint8(_configUint(".earningChain.strategyMaxSlippageAmount")));
+        allocator.addStrategy(_usdc(), usdcYieldStrategy, uint8(_configUint(".strategyMaxSlippageAmount")));
         allocator.setDefaultStrategy(_usdc(), usdcYieldStrategy);
         _deployedATokenVaults.push(usdcYieldStrategy);
         _logDeployment("USDC aTokenVault", "", usdcYieldStrategy);
 
         address usdtYieldStrategy =
             _deployATokenVault(_usdt(), poolAddressProvider, getAccessManagerAddress(_deployer()), _deployer());
-        allocator.addStrategy(_usdt(), usdtYieldStrategy, uint8(_configUint(".earningChain.strategyMaxSlippageAmount")));
+        allocator.addStrategy(_usdt(), usdtYieldStrategy, uint8(_configUint(".strategyMaxSlippageAmount")));
         allocator.setDefaultStrategy(_usdt(), usdtYieldStrategy);
         _deployedATokenVaults.push(usdtYieldStrategy);
         _logDeployment("USDT aTokenVault", "", usdtYieldStrategy);
@@ -310,7 +307,7 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
                 withdrawer: ALLOCATOR_WITHDRAWER,
                 priceOracle: getPriceOracleAddress(_deployer()),
                 transferHelper: getTransferHelperAddress(_deployer()),
-                maxStrategiesPerAsset: uint8(_configUint(".earningChain.maxStrategiesPerAsset"))
+                maxStrategiesPerAsset: uint8(_configUint(".maxStrategiesPerAsset"))
             })
         );
         _logDeployment("Allocator::Implementation", "", implementation);
@@ -329,7 +326,7 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
     function _deployGateway() internal returns (address) {
         address implementation = address(
             new EarningChainGateway({
-                accountingChainId: _configUint(".earningChain.accountingChainId"),
+                accountingChainId: _configUint(".accountingChain.chainId"),
                 allocator: getAllocatorAddress(_deployer()),
                 priceOracle: getPriceOracleAddress(_deployer()),
                 iouTokenManager: getIouTokenManagerAddress(_deployer()),
@@ -382,8 +379,7 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
     }
 
     function _deployPriceOracle() internal returns (address) {
-        address implementation =
-            address(new PriceOracle(vm.parseUint(_configString(".earningChain.priceOracleMinValidPriceRay"))));
+        address implementation = address(new PriceOracle(vm.parseUint(_configString(".priceOracleMinValidPriceRay"))));
         _logDeployment("PriceOracle::Implementation", "", implementation);
         address priceOracle = _deployTransparentProxy_create3({
             namespacedSaltSeed: PRICE_ORACLE_SALT_SEED,
@@ -417,7 +413,7 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
 
     function _setupPriceOracleAdapters() internal {
         PriceOracle priceOracle = PriceOracle(getPriceOracleAddress(_deployer()));
-        uint256 heartbeat = _configUint(".earningChain.chainlinkPriceOracleHeartbeat");
+        uint256 heartbeat = _configUint(".chainlinkPriceOracleHeartbeat");
 
         address ghoAdapter = address(
             new ChainlinkPriceOracleAdapter(_gho(), _configAddress(".earningChain.chainlinkFeeds.ghoUsd"), heartbeat)

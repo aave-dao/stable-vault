@@ -21,7 +21,7 @@ contract MockBridgeAdapter is IBridgeAdapter {
         uint256 amount,
         bytes memory data,
         IBridgeAdapter.BridgeParams memory bridgeParams
-    ) external payable override {
+    ) external override {
         (destinationChainId, data);
         // pull assets from TH
         if (asset != Constants.ASSET_FOR_DATA_ONLY_BRIDGE && amount > 0) {

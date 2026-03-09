@@ -38,6 +38,9 @@ jobs:
           forge build --deny notes --sizes
         id: build
 
+      - name: Check Error Selectors
+        run: ./.github/workflows/check-error-selectors.sh
+
       - name: Run Forge tests
         run: |
           forge test -vvv

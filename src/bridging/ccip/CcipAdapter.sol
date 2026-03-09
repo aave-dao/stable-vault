@@ -106,7 +106,7 @@ contract CcipAdapter is
         uint256 amount,
         bytes memory data,
         IBridgeAdapter.BridgeParams memory bridgeParams
-    ) external payable override(BaseBridgeAdapter, IBridgeAdapter) onlyGateway {
+    ) external override(BaseBridgeAdapter, IBridgeAdapter) onlyGateway {
         address destinationChainAdapter = _destinationChainAdapterOf[destinationChainId];
         require(destinationChainAdapter != address(0), Errors.InvalidParameter());
 

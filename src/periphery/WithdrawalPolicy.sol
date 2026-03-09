@@ -23,7 +23,7 @@ import {Errors} from "src/types/Errors.sol";
 /// protocol's requirements.
 /// @dev The current implementation applies a fee to: deter abuse of arbitrage opportunities through the protocol's
 /// liquidity, discourage spam, and cover protocol operational costs (e.g. bridge or swap fees).
-/// @dev The fee is capped at 5.00% and is expected to be lower in most scenarios.
+/// @dev The fee is capped at 10.00% and is expected to be lower in most scenarios.
 /// @custom:upgradeable
 contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithdrawalPolicy {
     // EIP-712 typeHash:
@@ -31,8 +31,8 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     // nonce,uint256 deadline)").
     bytes32 public constant FEE_DISCOUNT_TYPEHASH = 0x646ab18e84d3d6045718daa407509f2935bc43bae73437f6cfccb5fd55c34544;
 
-    /// @dev The maximum fee in basis points that can be applied to a withdrawal. Set to 5.00%.
-    uint16 internal constant FEE_CAP_BPS = 5_00;
+    /// @dev The maximum fee in basis points that can be applied to a withdrawal. Set to 10.00%.
+    uint16 internal constant FEE_CAP_BPS = 10_00;
 
     address internal immutable WITHDRAWAL_POLICY_APPLIER;
 
