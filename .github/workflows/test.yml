@@ -38,13 +38,13 @@ jobs:
           forge build --deny notes --sizes
         id: build
 
+      - name: Check Error Selectors
+        run: ./.github/workflows/check-error-selectors.sh
+
       - name: Run Forge tests
         run: |
           forge test -vvv
         id: test
-
-      - name: Check Error Selectors
-        run: ./.github/workflows/check-error-selectors.sh
 
       - name: Check Gas Snapshots are up to date
         run: |
