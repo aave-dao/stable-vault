@@ -18,7 +18,8 @@ contract ATokenVaultDeployment is Script {
         internal
         returns (address)
     {
-        uint256 initialLockDeposit = 10 ** IERC20Metadata(underlying).decimals();
+        // One unit of the underlying asset.
+        uint256 initialLockDeposit = 1 * 10 ** IERC20Metadata(underlying).decimals();
 
         // Do not import `ATokenVaultMerklRewardClaimer` contract here, as it will force the entire set of dependencies
         // of this contract (and any other contract using it) to be compiled with the size-optimized profile.
