@@ -2,13 +2,15 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.22;
 
+import {IERC165} from "@openzeppelin/contracts/interfaces/IERC165.sol";
+
 import {IChainBalanceOracle} from "src/interfaces/IChainBalanceOracle.sol";
 
 /// @title IChainBalanceOracleAdapter
 /// @author Aave Labs
 /// @notice Interface for the Chain Balance Oracle Adapter contract that fetches chain aggregated balance value from an
 /// underlying data source.
-interface IChainBalanceOracleAdapter {
+interface IChainBalanceOracleAdapter is IERC165 {
     /// @notice Thrown when the chain id is not what was expected.
     /// @custom:selector 0x331003b3
     error InvalidChainId(uint256 chainId);
