@@ -66,7 +66,7 @@ contract ChainBalanceOracle is AccessManagedUpgradeable, IChainBalanceOracle {
 
     function setChainBalanceOracleAdapter(uint256 chainId, address adapter) external restricted {
         address currentAdapter = $storage().oracleAdapterByChainId[chainId];
-        IChainBalanceOracleAdapter(adapter).getChainBalance(chainId);
+        IChainBalanceOracleAdapter(adapter).supportsInterface(type(IChainBalanceOracleAdapter).interfaceId);
         $storage().oracleAdapterByChainId[chainId] = adapter;
         emit ChainBalanceAdapterSet(chainId, currentAdapter, adapter);
     }

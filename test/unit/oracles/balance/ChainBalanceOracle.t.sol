@@ -109,9 +109,19 @@ contract ChainBalanceOracleTest is TestWithHelpers {
     function test_setChainBalanceOracleAdapter_reverts_ifAdapterCallFails(uint256 chainId) public {
         _mockAdapter.setShouldRevert(true);
 
-        vm.expectRevert(abi.encodeWithSelector(IChainBalanceOracleAdapter.InvalidChainId.selector, chainId));
+        vm.expectRevert(abi.encodeWithSelector(MockChainBalanceOracleAdapter.SomethingWentWrong.selector));
         vm.prank(everyRoleAccount);
         _chainBalanceOracle.setChainBalanceOracleAdapter(chainId, address(_mockAdapter));
+    }
+
+    function test_setChainBalanceOracleAdapter_reverts_ifDoesNotSupportInterface(uint256 chainId) public {
+        address notAContract = makeAddr("NOT_A_CONTRACT");
+        // Expect code size to be 0
+        assertEq(notAContract.code.length, 0);
+
+        vm.expectRevert();
+        vm.prank(everyRoleAccount);
+        _chainBalanceOracle.setChainBalanceOracleAdapter(chainId, notAContract);
     }
 
     function test_setChainBalanceOracleAdapter_reverts_ifNotAuthorized(address unauthorizedCaller, uint256 chainId)
