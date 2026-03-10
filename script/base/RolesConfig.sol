@@ -4,6 +4,8 @@ pragma solidity ^0.8.20;
 
 import {DeploymentConfig} from "script/base/DeploymentConfig.sol";
 
+import {IATokenVault} from "lib/aave-vault/src/interfaces/IATokenVault.sol";
+import {IATokenVaultMerklRewardClaimer} from "lib/aave-vault/src/interfaces/IATokenVaultMerklRewardClaimer.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
@@ -585,7 +587,20 @@ abstract contract RolesConfig is DeploymentConfig {
     /// @custom:delay None
     /// @custom:location aToken Vault
     function getRole__claimMerklRewards() internal pure returns (Role memory) {
-        bytes4 selector = 0x685463c1;
+        bytes4 selector = IATokenVaultMerklRewardClaimer.claimMerklRewards.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: NO_DELAY,
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
+        });
+    }
+
+    /// @custom:delay None
+    /// @custom:location aToken Vault
+    function getRole__emergencyRescue() internal pure returns (Role memory) {
+        bytes4 selector = IATokenVault.emergencyRescue.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
@@ -596,7 +611,7 @@ abstract contract RolesConfig is DeploymentConfig {
     }
 
     function getAllFunctionBasedRoles() internal view returns (Role[] memory) {
-        Role[] memory roles = new Role[](43);
+        Role[] memory roles = new Role[](44);
 
         // AssetRegistry
         roles[0] = getRole__setAssetConfig();
@@ -660,6 +675,7 @@ abstract contract RolesConfig is DeploymentConfig {
 
         // External - aToken Vault
         roles[42] = getRole__claimMerklRewards();
+        roles[43] = getRole__emergencyRescue();
 
         return roles;
     }

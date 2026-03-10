@@ -307,9 +307,10 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         address aTokenVaultRewardClaimer = _getProfile__ATokenVaultRewardClaimer();
         require(aTokenVaultRewardClaimer != address(0), "ATokenVaultRewardClaimer profile address not set");
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](1);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](2);
 
         roles[0] = RolesConfig.getRole__claimMerklRewards();
+        roles[1] = RolesConfig.getRole__emergencyRescue();
 
         _grantRolesToProfile(aTokenVaultRewardClaimer, roles);
     }
@@ -398,9 +399,10 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     }
 
     function _setupTarget__ATokenVault(address vault) internal {
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](1);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](2);
 
         roles[0] = RolesConfig.getRole__claimMerklRewards();
+        roles[1] = RolesConfig.getRole__emergencyRescue();
 
         _setTargetFunctionRoles(vault, roles);
     }
