@@ -232,10 +232,12 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     }
 
     function test_aTokenVaultRewardClaimerProfile_hasTheExpectedRoles() public view {
-        uint64[] memory expected = new uint64[](1);
+        uint64[] memory expected = new uint64[](2);
         expected[0] = RolesConfig.getRole__claimMerklRewards().roleId;
+        expected[1] = RolesConfig.getRole__emergencyRescue().roleId;
         _assertProfileHasExactlyTheseRoles(_getProfile__ATokenVaultRewardClaimer(), expected);
         _assertProfileRoleDelay(_getProfile__ATokenVaultRewardClaimer(), expected[0], RolesConfig.NO_DELAY);
+        _assertProfileRoleDelay(_getProfile__ATokenVaultRewardClaimer(), expected[1], RolesConfig.NO_DELAY);
     }
 
     ////// Critical roles exclusivity //////
@@ -461,10 +463,12 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     }
 
     function test_targetSetup_aTokenVaultAddresses() public view {
-        RolesConfig.Role memory role = RolesConfig.getRole__claimMerklRewards();
+        RolesConfig.Role memory claimRole = RolesConfig.getRole__claimMerklRewards();
+        RolesConfig.Role memory rescueRole = RolesConfig.getRole__emergencyRescue();
         address[] memory vaults = _aTokenVaultAddresses();
         for (uint256 i = 0; i < vaults.length; i++) {
-            _assertTargetFunctionRole(vaults[i], role.selector, role.roleId);
+            _assertTargetFunctionRole(vaults[i], claimRole.selector, claimRole.roleId);
+            _assertTargetFunctionRole(vaults[i], rescueRole.selector, rescueRole.roleId);
         }
     }
 
@@ -539,11 +543,13 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
 
     function test_canCall_aTokenVaultRewardClaimer() public view {
         address claimer = _getProfile__ATokenVaultRewardClaimer();
-        RolesConfig.Role memory role = RolesConfig.getRole__claimMerklRewards();
+        RolesConfig.Role memory claimRole = RolesConfig.getRole__claimMerklRewards();
+        RolesConfig.Role memory rescueRole = RolesConfig.getRole__emergencyRescue();
         address[] memory vaults = _aTokenVaultAddresses();
 
         for (uint256 i = 0; i < vaults.length; i++) {
-            _assertCanCall(claimer, vaults[i], role.selector, true, 0);
+            _assertCanCall(claimer, vaults[i], claimRole.selector, true, 0);
+            _assertCanCall(claimer, vaults[i], rescueRole.selector, true, 0);
         }
         // Unauthorized
         _assertCanCall(claimer, getAllocatorAddress(_deployer()), IAllocator.rebalance.selector, false, 0);
