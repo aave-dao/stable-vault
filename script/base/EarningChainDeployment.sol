@@ -33,8 +33,6 @@ import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainSetup, ATokenVaultDeployment {
     using Strings for address;
 
-    address[] internal _deployedATokenVaults;
-
     address immutable PROXY_ADMIN_OWNER = getAccessManagerAddress(_deployer());
     address immutable ALLOCATOR_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
     address immutable WITHDRAWAL_POLICY_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
@@ -178,19 +176,15 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
             _deployATokenVault(_usdc(), poolAddressProvider, getAccessManagerAddress(_deployer()), _deployer());
         allocator.addStrategy(_usdc(), usdcYieldStrategy, uint8(_configUint(".strategyMaxSlippageAmount")));
         allocator.setDefaultStrategy(_usdc(), usdcYieldStrategy);
-        _deployedATokenVaults.push(usdcYieldStrategy);
-        _logDeployment("USDC aTokenVault", "", usdcYieldStrategy);
 
         address usdtYieldStrategy =
             _deployATokenVault(_usdt(), poolAddressProvider, getAccessManagerAddress(_deployer()), _deployer());
         allocator.addStrategy(_usdt(), usdtYieldStrategy, uint8(_configUint(".strategyMaxSlippageAmount")));
         allocator.setDefaultStrategy(_usdt(), usdtYieldStrategy);
-        _deployedATokenVaults.push(usdtYieldStrategy);
-        _logDeployment("USDT aTokenVault", "", usdtYieldStrategy);
     }
 
-    function _aTokenVaultAddresses() internal view virtual override returns (address[] memory) {
-        return _deployedATokenVaults;
+    function _deployedATokenVaultAddresses() internal view virtual override returns (address[] memory) {
+        return _readATokenVaultAddresses(_configString(".earningChain.deploymentOutputPath"));
     }
 
     function _setupAssetRegistry() internal {
@@ -438,5 +432,9 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         string memory jsonObject =
             string.concat('{ "address": "', addr.toHexString(), '", "saltSeed": "', saltSeed, '" }');
         vm.writeJson(jsonObject, _configString(".earningChain.deploymentOutputPath"), string.concat(".", name));
+    }
+
+    function _logATokenVaultDeployments() internal override {
+        vm.writeJson(_buildATokenVaultsJson(), _configString(".earningChain.deploymentOutputPath"), ".aTokenVaults");
     }
 }

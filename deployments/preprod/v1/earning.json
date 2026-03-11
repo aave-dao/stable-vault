@@ -75,14 +75,16 @@
     "address": "0xafdb153ba21d757952f1de76ebf84cda4e743c98",
     "saltSeed": "aave.stable-vault.EarningChainStateProvider"
   },
-  "USDC aTokenVault": {
-    "address": "0xb8a950875d513e82c2fdcaa0d9be8334fefe8bb5",
-    "saltSeed": ""
-  },
-  "USDT aTokenVault": {
-    "address": "0x4e05bf081b8d01b205011e7140a32f57febd01aa",
-    "saltSeed": ""
-  },
+  "aTokenVaults": [
+    {
+      "address": "0xb8a950875d513e82C2fdCAA0D9BE8334FeFE8bB5",
+      "assetSymbol": "USDC"
+    },
+    {
+      "address": "0x4e05bF081b8D01B205011e7140A32F57fEbD01AA",
+      "assetSymbol": "USDT"
+    }
+  ],
   "ChainlinkPriceOracleAdapter::GHO": {
     "address": "0xa5aa1e026976471d5ea2b4ac6fcb1897e112a4d8",
     "saltSeed": ""

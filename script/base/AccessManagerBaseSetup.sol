@@ -130,7 +130,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
 
     function _logDeployment(string memory, string memory, address) internal virtual {}
 
-    function _aTokenVaultAddresses() internal view virtual returns (address[] memory);
+    function _deployedATokenVaultAddresses() internal view virtual returns (address[] memory);
 
     function _setup_Targets(address deployer) internal virtual {
         _setupTarget__CcipAdapter(deployer);
@@ -392,7 +392,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     }
 
     function _setupTarget__ATokenVaults() internal {
-        address[] memory vaults = _aTokenVaultAddresses();
+        address[] memory vaults = _deployedATokenVaultAddresses();
         for (uint256 i = 0; i < vaults.length; i++) {
             _setupTarget__ATokenVault(vaults[i]);
         }
