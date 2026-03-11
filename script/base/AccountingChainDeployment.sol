@@ -233,10 +233,7 @@ abstract contract AccountingChainDeployment is
         allocator.setDefaultStrategy(_usdt(), usdtYieldStrategy);
     }
 
-    function _aTokenVaultAddresses() internal view virtual override returns (address[] memory) {
-        if (_aTokenVaultDeployedAddresses.length > 0) {
-            return _aTokenVaultDeployedAddresses;
-        }
+    function _deployedATokenVaultAddresses() internal view virtual override returns (address[] memory) {
         return _readATokenVaultAddresses(_configString(".accountingChain.deploymentOutputPath"));
     }
 
