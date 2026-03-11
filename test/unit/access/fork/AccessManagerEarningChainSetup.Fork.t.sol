@@ -27,7 +27,7 @@ contract AccessManagerEarningChainSetupForkTest is AccessManagerEarningChainSetu
         return getAccessManagerAddress(_deployer());
     }
 
-    function _aTokenVaultAddresses()
+    function _deployedATokenVaultAddresses()
         internal
         view
         override(AccessManagerEarningChainSetupTest)

@@ -32,7 +32,7 @@ contract AccessManagerAccountingChainSetupForkTest is AccessManagerAccountingCha
         return getAccessManagerAddress(_deployer());
     }
 
-    function _aTokenVaultAddresses()
+    function _deployedATokenVaultAddresses()
         internal
         view
         override(AccessManagerAccountingChainSetupTest)

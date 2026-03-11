@@ -465,7 +465,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     function test_targetSetup_aTokenVaultAddresses() public view {
         RolesConfig.Role memory claimRole = RolesConfig.getRole__claimMerklRewards();
         RolesConfig.Role memory rescueRole = RolesConfig.getRole__emergencyRescue();
-        address[] memory vaults = _aTokenVaultAddresses();
+        address[] memory vaults = _deployedATokenVaultAddresses();
         for (uint256 i = 0; i < vaults.length; i++) {
             _assertTargetFunctionRole(vaults[i], claimRole.selector, claimRole.roleId);
             _assertTargetFunctionRole(vaults[i], rescueRole.selector, rescueRole.roleId);
@@ -545,7 +545,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         address claimer = _getProfile__ATokenVaultRewardClaimer();
         RolesConfig.Role memory claimRole = RolesConfig.getRole__claimMerklRewards();
         RolesConfig.Role memory rescueRole = RolesConfig.getRole__emergencyRescue();
-        address[] memory vaults = _aTokenVaultAddresses();
+        address[] memory vaults = _deployedATokenVaultAddresses();
 
         for (uint256 i = 0; i < vaults.length; i++) {
             _assertCanCall(claimer, vaults[i], claimRole.selector, true, 0);

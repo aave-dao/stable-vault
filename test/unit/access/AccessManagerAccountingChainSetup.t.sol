@@ -42,7 +42,7 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
         override(AccessManagerBaseSetup, AccountingChainDeployment)
     {}
 
-    function _aTokenVaultAddresses()
+    function _deployedATokenVaultAddresses()
         internal
         view
         virtual

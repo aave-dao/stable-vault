@@ -108,6 +108,7 @@ contract ATokenVaultDeployment is Script {
     }
 
     function _readATokenVaultAddresses(string memory outputPath) internal view returns (address[] memory) {
+        // forge-lint: disable-next-line(unsafe-cheatcode)
         string memory json = vm.readFile(outputPath);
         bytes memory raw = vm.parseJson(json, ".aTokenVaults");
         ATokenVaultEntry[] memory entries = abi.decode(raw, (ATokenVaultEntry[]));

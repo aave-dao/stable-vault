@@ -39,7 +39,7 @@ contract AccessManagerEarningChainSetupTest is AccessManagerSetupBaseTest, Earni
         override(AccessManagerBaseSetup, EarningChainDeployment)
     {}
 
-    function _aTokenVaultAddresses()
+    function _deployedATokenVaultAddresses()
         internal
         view
         virtual
