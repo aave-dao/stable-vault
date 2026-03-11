@@ -47,8 +47,6 @@ abstract contract AccountingChainDeployment is
 {
     using Strings for address;
 
-    address[] internal _deployedATokenVaults;
-
     address immutable PROXY_ADMIN_OWNER = getAccessManagerAddress(_deployer());
     address immutable STABLE_VAULT_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
     address immutable ALLOCATOR_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
@@ -223,26 +221,23 @@ abstract contract AccountingChainDeployment is
             _deployATokenVault(_gho(), poolAddressProvider, getAccessManagerAddress(_deployer()), _deployer());
         allocator.addStrategy(_gho(), ghoYieldStrategy, uint8(_configUint(".strategyMaxSlippageAmount")));
         allocator.setDefaultStrategy(_gho(), ghoYieldStrategy);
-        _deployedATokenVaults.push(ghoYieldStrategy);
-        _logDeployment("GHO aTokenVault", "", ghoYieldStrategy);
 
         address usdcYieldStrategy =
             _deployATokenVault(_usdc(), poolAddressProvider, getAccessManagerAddress(_deployer()), _deployer());
         allocator.addStrategy(_usdc(), usdcYieldStrategy, uint8(_configUint(".strategyMaxSlippageAmount")));
         allocator.setDefaultStrategy(_usdc(), usdcYieldStrategy);
-        _deployedATokenVaults.push(usdcYieldStrategy);
-        _logDeployment("USDC aTokenVault", "", usdcYieldStrategy);
 
         address usdtYieldStrategy =
             _deployATokenVault(_usdt(), poolAddressProvider, getAccessManagerAddress(_deployer()), _deployer());
         allocator.addStrategy(_usdt(), usdtYieldStrategy, uint8(_configUint(".strategyMaxSlippageAmount")));
         allocator.setDefaultStrategy(_usdt(), usdtYieldStrategy);
-        _deployedATokenVaults.push(usdtYieldStrategy);
-        _logDeployment("USDT aTokenVault", "", usdtYieldStrategy);
     }
 
     function _aTokenVaultAddresses() internal view virtual override returns (address[] memory) {
-        return _deployedATokenVaults;
+        if (_aTokenVaultDeployedAddresses.length > 0) {
+            return _aTokenVaultDeployedAddresses;
+        }
+        return _readATokenVaultAddresses(_configString(".accountingChain.deploymentOutputPath"));
     }
 
     function _setupFundsHandler() internal {
@@ -596,5 +591,9 @@ abstract contract AccountingChainDeployment is
         string memory jsonObject =
             string.concat('{ "address": "', addr.toHexString(), '", "saltSeed": "', saltSeed, '" }');
         vm.writeJson(jsonObject, _configString(".accountingChain.deploymentOutputPath"), string.concat(".", name));
+    }
+
+    function _logATokenVaultDeployments() internal override {
+        vm.writeJson(_buildATokenVaultsJson(), _configString(".accountingChain.deploymentOutputPath"), ".aTokenVaults");
     }
 }

@@ -91,18 +91,20 @@
     "address": "0x25746c890c764c3715b5a8f86b1937da41693135",
     "saltSeed": "aave.stable-vault.CcipAdapter"
   },
-  "GHO aTokenVault": {
-    "address": "0x2fde6aa25ab3938f63b3dfd73b7f37660511df50",
-    "saltSeed": ""
-  },
-  "USDC aTokenVault": {
-    "address": "0xa68e45f5b1d1a1f277ee8b7865176e8d8e47d5d2",
-    "saltSeed": ""
-  },
-  "USDT aTokenVault": {
-    "address": "0xac468a53f3438765e4e401133215f51c60066b8d",
-    "saltSeed": ""
-  },
+  "aTokenVaults": [
+    {
+      "address": "0x2FDE6aA25aB3938f63B3dfD73B7F37660511Df50",
+      "assetSymbol": "GHO"
+    },
+    {
+      "address": "0xa68E45f5B1D1A1F277Ee8B7865176E8D8e47d5d2",
+      "assetSymbol": "USDC"
+    },
+    {
+      "address": "0xac468A53F3438765e4E401133215f51c60066b8d",
+      "assetSymbol": "USD₮0"
+    }
+  ],
   "ChainlinkL2PriceOracleAdapter::GHO": {
     "address": "0x0980f85d471778b48c083617fdb14e245995c2cf",
     "saltSeed": ""

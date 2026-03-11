@@ -8,11 +8,21 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transpa
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {ATokenVault} from "@aave-vault/ATokenVault.sol";
 
 contract ATokenVaultDeployment is Script {
     using SafeERC20 for IERC20;
+    using Strings for address;
+
+    struct ATokenVaultEntry {
+        address addr;
+        string assetSymbol;
+    }
+
+    string[] internal _aTokenVaultAssets;
+    address[] internal _aTokenVaultDeployedAddresses;
 
     function _deployATokenVault(address underlying, address poolAddressProvider, address owner, address deployer)
         internal
@@ -62,6 +72,49 @@ contract ATokenVaultDeployment is Script {
 
         require(proxyAddress == vaultAddress, "aTokenVault address does not match expected address");
 
+        string memory symbol = IERC20Metadata(underlying).symbol();
+        bool found = false;
+        for (uint256 i = 0; i < _aTokenVaultAssets.length; i++) {
+            if (keccak256(bytes(_aTokenVaultAssets[i])) == keccak256(bytes(symbol))) {
+                _aTokenVaultDeployedAddresses[i] = proxyAddress;
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            _aTokenVaultAssets.push(symbol);
+            _aTokenVaultDeployedAddresses.push(proxyAddress);
+        }
+
+        _logATokenVaultDeployments();
+
         return proxyAddress;
+    }
+
+    function _logATokenVaultDeployments() internal virtual {}
+
+    function _buildATokenVaultsJson() internal returns (string memory) {
+        string memory json = "[";
+        for (uint256 i = 0; i < _aTokenVaultDeployedAddresses.length; i++) {
+            if (i > 0) {
+                json = string.concat(json, ",");
+            }
+            string memory key = string.concat("aTokenVault", vm.toString(i));
+            vm.serializeString(key, "assetSymbol", _aTokenVaultAssets[i]);
+            string memory element = vm.serializeAddress(key, "address", _aTokenVaultDeployedAddresses[i]);
+            json = string.concat(json, element);
+        }
+        return string.concat(json, "]");
+    }
+
+    function _readATokenVaultAddresses(string memory outputPath) internal view returns (address[] memory) {
+        string memory json = vm.readFile(outputPath);
+        bytes memory raw = vm.parseJson(json, ".aTokenVaults");
+        ATokenVaultEntry[] memory entries = abi.decode(raw, (ATokenVaultEntry[]));
+        address[] memory addresses = new address[](entries.length);
+        for (uint256 i = 0; i < entries.length; i++) {
+            addresses[i] = entries[i].addr;
+        }
+        return addresses;
     }
 }
