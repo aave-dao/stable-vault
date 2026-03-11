@@ -12,7 +12,7 @@
     "prepare": "husky || true",
     "rs:bind": "rm -rf ./out/__BINDINGS__ && forge bind --bindings-path ./out/__BINDINGS__ --alloy --skip '(test|script)/**/*.sol'",
     "rs:abis": "forge build --out ./out/__FOLDER_ABIS__ --skip '(test|script)/**/*.sol' --extra-output-files abi && rm -rf ./out/__ABIS__ && mkdir -p ./out/__ABIS__ && find ./out/__FOLDER_ABIS__ -name '*.abi.json' -exec cp {} ./out/__ABIS__/ \\;",
-    "rs:generate": "npm run rs:bind && npm run rs:abis",
+    "rs:generate": "npm run rs:bind && npm run rs:abis && rm -rf ./out/__FOLDER_ABIS__",
     "setup": "git submodule update --init --recursive"
   }
 }
