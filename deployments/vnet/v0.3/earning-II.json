@@ -59,7 +59,7 @@
     "address": "0x25827c7d8df08d7eb4cab776f19718281328be87",
     "saltSeed": "aave.stable-vault.Gateway"
   },
-  "Swapper": {
+  "Swapper (Old Version)": {
     "address": "0x6a9a09dbb51246c8991aa7eb4e9598753a662b70",
     "saltSeed": "aave.stable-vault.Swapper"
   },
@@ -102,5 +102,9 @@
   "USDT aTokenVault": {
     "address": "0x94e75750ac708f00a69d682850c959207cb59866",
     "saltSeed": ""
+  },
+  "Swapper": {
+    "address": "0x18b933efb102571e8b04f6e44e09642bb4a28696",
+    "saltSeed": "aave.stable-vault.new.Swapper"
   }
 }
