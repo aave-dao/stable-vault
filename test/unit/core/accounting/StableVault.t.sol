@@ -591,7 +591,7 @@ contract StableVaultTest is TestWithHelpers {
         uint256 currentRate = stableVault.getUserSubVault(user).perSecondRate;
 
         vm.prank(manager);
-        vm.expectRevert(IStableVault.RedundantRate.selector);
+        vm.expectRevert(abi.encodeWithSelector(IStableVault.RedundantRate.selector, user, currentRate));
         _setUserRate(user, currentRate);
     }
 
