@@ -6,6 +6,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
+import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
 /// @title TransferHelper
@@ -51,7 +52,7 @@ contract TransferHelper is ITransferHelper {
 
     /// @inheritdoc ITransferHelper
     function getBalance(address asset) external view override returns (uint256) {
-        if (asset == address(0)) {
+        if (asset == Constants.NATIVE_CURRENCY) {
             return address(this).balance;
         } else {
             return IERC20(asset).balanceOf(address(this));
@@ -59,7 +60,7 @@ contract TransferHelper is ITransferHelper {
     }
 
     function _transfer(address asset, uint256 amount, address destination) internal {
-        if (asset == address(0)) {
+        if (asset == Constants.NATIVE_CURRENCY) {
             (bool callSucceeded,) = payable(destination).call{value: amount}("");
             require(callSucceeded, Errors.NativeTransferFailed());
         } else {
