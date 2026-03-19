@@ -80,6 +80,10 @@ contract PriceOracle is AccessManagedUpgradeable, IPriceOracle {
         require(response.priceRay >= MIN_VALID_PRICE_RAY, IPriceOracle.PriceTooLow());
     }
 
+    function getOracleAdapterForAsset(address asset) external view returns (address) {
+        return $storage().oracleAdapterByAsset[asset];
+    }
+
     function setOracleAdapterForAsset(address asset, address newAdapter) external restricted {
         // Validate the adapter interface through a call to getPrice
         IPriceOracleAdapter(newAdapter).getPrice(asset);

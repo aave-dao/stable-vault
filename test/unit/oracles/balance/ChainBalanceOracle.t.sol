@@ -294,6 +294,25 @@ contract ChainBalanceOracleTest is TestWithHelpers {
         assertFalse(result2.isStale, "Non-reverting adapter should not be stale");
     }
 
+    function test_getChainBalanceOracleAdapter_returnsZeroIfNotSet(uint256 chainId) public view {
+        assertEq(_chainBalanceOracle.getChainBalanceOracleAdapter(chainId), address(0));
+    }
+
+    function test_getChainBalanceOracleAdapter_returnsConfiguredAdapter(uint256 chainId, uint256 balanceRay) public {
+        _mockAdapter.mockResponse(
+            chainId,
+            balanceRay,
+            block.timestamp,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            false
+        );
+
+        vm.prank(everyRoleAccount);
+        _chainBalanceOracle.setChainBalanceOracleAdapter(chainId, address(_mockAdapter));
+
+        assertEq(_chainBalanceOracle.getChainBalanceOracleAdapter(chainId), address(_mockAdapter));
+    }
+
     function test_getChainBalance_reverts_ifNoAdapterSet(uint256 chainId) public {
         vm.expectRevert(abi.encodeWithSelector(IChainBalanceOracle.ChainBalanceOracleAdapterNotFound.selector, chainId));
         _chainBalanceOracle.getChainBalance(chainId);

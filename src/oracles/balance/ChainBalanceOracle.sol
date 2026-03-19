@@ -64,6 +64,10 @@ contract ChainBalanceOracle is AccessManagedUpgradeable, IChainBalanceOracle {
         }
     }
 
+    function getChainBalanceOracleAdapter(uint256 chainId) external view returns (address) {
+        return $storage().oracleAdapterByChainId[chainId];
+    }
+
     function setChainBalanceOracleAdapter(uint256 chainId, address adapter) external restricted {
         address currentAdapter = $storage().oracleAdapterByChainId[chainId];
         IChainBalanceOracleAdapter(adapter).supportsInterface(type(IChainBalanceOracleAdapter).interfaceId);

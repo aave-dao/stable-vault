@@ -120,6 +120,20 @@ contract PriceOracleTest is TestWithHelpers {
         _priceOracle.setOracleAdapterForAsset(asset1, address(_mockAdapter));
     }
 
+    function test_getOracleAdapterForAsset_returnsZeroIfNotSet(address asset) public view {
+        assertEq(_priceOracle.getOracleAdapterForAsset(asset), address(0));
+    }
+
+    function test_getOracleAdapterForAsset_returnsConfiguredAdapter(uint256 priceRay) public {
+        priceRay = bound(priceRay, 0, MathLib.RAY);
+        _mockAdapter.mockResponse(asset1, priceRay, false);
+
+        vm.prank(everyRoleAccount);
+        _priceOracle.setOracleAdapterForAsset(asset1, address(_mockAdapter));
+
+        assertEq(_priceOracle.getOracleAdapterForAsset(asset1), address(_mockAdapter));
+    }
+
     function test_getPrice_returnsPrice_whenNotStale(uint256 priceRay) public {
         priceRay = bound(priceRay, 0, MathLib.RAY);
         _mockAdapter.mockResponse(asset1, priceRay, false);
