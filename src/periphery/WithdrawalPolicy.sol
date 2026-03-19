@@ -179,6 +179,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     /// @param whitelistAsSigner Whether the signer is enabled for signature verification.
     function setSigner(address signer, bool whitelistAsSigner) external restricted {
         $storage().isSigner[signer] = whitelistAsSigner;
+        emit SignerSet(signer, whitelistAsSigner);
     }
 
     /// @notice Allows a whitelisted signer to invalidate their own nonce.

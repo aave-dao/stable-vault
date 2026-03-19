@@ -13,6 +13,9 @@ interface IWithdrawalPolicy {
     /// a nonce invalidation.
     event NonceUsed(address indexed signer, uint256 indexed nonce);
 
+    /// @notice Emitted when an address is added or removed from the set of whitelisted signers.
+    event SignerSet(address indexed signer, bool indexed whitelistAsSigner);
+
     /// @notice Emitted when the default fee in basis points is set.
     event DefaultFeeBpsSet(uint16 defaultFeeBps);
 
