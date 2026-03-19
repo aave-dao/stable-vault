@@ -62,10 +62,6 @@ interface IStableVault {
     /// @custom:selector 0x6668308f
     error NonExistentPosition();
 
-    /// @notice Thrown when there are no surplus interest to claim.
-    /// @custom:selector 0xc1095626
-    error NoSurplusInterestToClaim();
-
     /// @notice Thrown when checked address is not the message sender.
     /// @custom:selector 0x9b3a19e9
     error OnlyUser();
@@ -81,6 +77,10 @@ interface IStableVault {
     /// @notice Thrown when a sub-vault does not exist for a given id.
     /// @custom:selector 0xcac93e89
     error SubVaultDoesNotExist();
+
+    /// @notice Thrown when the claimed surplus would render the vault insolvent.
+    /// @custom:selector 0xca48b8ff
+    error SurplusInterestClaimLeadsToInsolvency();
 
     /// @notice Thrown when the maximum number of active sub-vaults is reached.
     /// @custom:selector 0xff731b5f
