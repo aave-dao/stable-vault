@@ -31,5 +31,5 @@ interface IAccountingChainGateway is IChainGateway {
         uint256 amount,
         uint256 targetChainId,
         IBridgeAdapter.BridgeParams memory bridgeParams
-    ) external payable;
+    ) external;
 }

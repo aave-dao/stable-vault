@@ -70,9 +70,9 @@ interface IStableVault {
     /// @custom:selector 0x9b3a19e9
     error OnlyUser();
 
-    /// @notice Thrown when checked rate is already set.
-    /// @custom:selector 0xb4a82df7
-    error RedundantRate();
+    /// @notice Thrown when the new rate equals the user's current rate.
+    /// @custom:selector 0xa58adfa8
+    error RedundantRate(address user, uint256 newPerSecondRate);
 
     /// @notice Thrown when a sub-vault already exists for a given rate.
     /// @custom:selector 0xdd81131b

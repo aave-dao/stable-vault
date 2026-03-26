@@ -31,7 +31,6 @@ contract MockAccountingChainGateway is IAccountingChainGateway {
         IBridgeAdapter.BridgeParams memory // bridgeParams
     )
         external
-        payable
     {
         _pullAssetsFromTransferHelper();
     }

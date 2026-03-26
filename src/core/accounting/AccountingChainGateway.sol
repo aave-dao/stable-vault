@@ -62,7 +62,7 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
         uint256 amount,
         uint256 targetChainId,
         IBridgeAdapter.BridgeParams memory bridgeParams
-    ) external payable override onlyFundsHandler {
+    ) external override onlyFundsHandler {
         address adapter = $BaseChainGateway().defaultBridgeAdapter[asset][targetChainId];
         require(adapter != address(0), AdapterNotFound());
         _sendCrossChainMessage(targetChainId, adapter, asset, amount, "", bridgeParams);

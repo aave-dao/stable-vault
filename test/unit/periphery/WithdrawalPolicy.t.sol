@@ -172,6 +172,18 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         assertEq(withdrawalPolicy.isSigner(signer), isSigner);
     }
 
+    function test_setSigner_emitsSignerSet(address signer) public {
+        vm.expectEmit(true, true, true, true);
+        emit IWithdrawalPolicy.SignerSet(signer, true);
+        vm.prank(admin);
+        withdrawalPolicy.setSigner(signer, true);
+
+        vm.expectEmit(true, true, true, true);
+        emit IWithdrawalPolicy.SignerSet(signer, false);
+        vm.prank(admin);
+        withdrawalPolicy.setSigner(signer, false);
+    }
+
     // Calculation tests
 
     function test_applyWithdrawalPolicy_returnsDefaultFee(
