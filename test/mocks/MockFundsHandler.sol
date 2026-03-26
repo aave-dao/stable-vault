@@ -15,6 +15,8 @@ contract MockFundsHandler is IFundsHandler {
     mapping(address asset => uint256 balanceRay) _mockedAssetBalancesRay;
     address[] _mockedAssets;
     uint256 _mockedAggregatedBalance;
+    uint256 _mockedAggregatedBalanceAfterWithdrawal;
+    bool _hasMockedPostWithdrawalBalance;
     address _mockedTransferHelper;
 
     constructor(address transferHelper) {
@@ -23,6 +25,11 @@ contract MockFundsHandler is IFundsHandler {
 
     function mockAggregatedBalance(uint256 aggregatedBalance) external {
         _mockedAggregatedBalance = aggregatedBalance;
+    }
+
+    function mockAggregatedBalanceAfterWithdrawal(uint256 aggregatedBalance) external {
+        _mockedAggregatedBalanceAfterWithdrawal = aggregatedBalance;
+        _hasMockedPostWithdrawalBalance = true;
     }
 
     function mockAssetBalance(address asset, uint256 balanceRay) external {
@@ -50,6 +57,10 @@ contract MockFundsHandler is IFundsHandler {
 
     function processWithdrawal(address asset, uint256 amount) external override {
         IERC20(asset).forceApprove(msg.sender, amount);
+        if (_hasMockedPostWithdrawalBalance) {
+            _mockedAggregatedBalance = _mockedAggregatedBalanceAfterWithdrawal;
+            _hasMockedPostWithdrawalBalance = false;
+        }
     }
 
     function pushFundsToChain(
