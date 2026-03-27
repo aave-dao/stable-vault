@@ -709,25 +709,39 @@ contract StableVault is
     }
 
     function _previewSubVaultConversionRate(uint256 subVaultId) internal view returns (uint256) {
-        uint256 secondsSinceLastAccrual = block.timestamp - $storage().subVaultById[subVaultId].lastAccrualTimestamp;
-        uint256 newConversionRate = $storage().subVaultById[subVaultId].conversionRate;
-        if (secondsSinceLastAccrual != 0) {
-            uint256 growthFactor = $storage().subVaultById[subVaultId].perSecondRate.rpow(secondsSinceLastAccrual);
-            // The conversion rate is used across different operations (e.g. converting assets to shares on deposits,
-            // converting shares to assets on withdrawals, computing total vault obligations, etc.).
-            // The conversion rate calculation rounds down to ensure a conservative and consistent value that subsequent
-            // operations can then use to apply their context-specific rounding on top with the intention of favoring
-            // the protocol.
-            newConversionRate = newConversionRate.rayMulDown(growthFactor);
+        SubVault storage subVault = $storage().subVaultById[subVaultId];
+        uint256 secondsSinceLastAccrual = block.timestamp - subVault.lastAccrualTimestamp;
+        if (secondsSinceLastAccrual == 0) {
+            return subVault.conversionRate;
         }
-        return newConversionRate;
+        return _computeSubVaultConversionRate(subVault.conversionRate, subVault.perSecondRate, secondsSinceLastAccrual);
     }
 
     function _accrueSubVaultConversionRate(uint256 subVaultId) internal returns (uint256) {
-        uint256 newConversionRate = _previewSubVaultConversionRate(subVaultId);
-        $storage().subVaultById[subVaultId].conversionRate = newConversionRate;
-        $storage().subVaultById[subVaultId].lastAccrualTimestamp = block.timestamp;
+        SubVault storage subVault = $storage().subVaultById[subVaultId];
+        uint256 secondsSinceLastAccrual = block.timestamp - subVault.lastAccrualTimestamp;
+        if (secondsSinceLastAccrual == 0) {
+            return subVault.conversionRate;
+        }
+        uint256 newConversionRate =
+            _computeSubVaultConversionRate(subVault.conversionRate, subVault.perSecondRate, secondsSinceLastAccrual);
+        subVault.conversionRate = newConversionRate;
+        subVault.lastAccrualTimestamp = block.timestamp;
         return newConversionRate;
+    }
+
+    function _computeSubVaultConversionRate(
+        uint256 conversionRate,
+        uint256 perSecondRate,
+        uint256 secondsSinceLastAccrual
+    ) internal pure returns (uint256) {
+        uint256 growthFactor = perSecondRate.rpow(secondsSinceLastAccrual);
+        // The conversion rate is used across different operations (e.g. converting assets to shares on deposits,
+        // converting shares to assets on withdrawals, computing total vault obligations, etc.).
+        // The conversion rate calculation rounds down to ensure a conservative and consistent value that subsequent
+        // operations can then use to apply their context-specific rounding on top with the intention of favoring
+        // the protocol.
+        return conversionRate.rayMulDown(growthFactor);
     }
 
     function _previewFullWithdrawalRequest(address user) internal view returns (uint256, uint256, uint256) {
