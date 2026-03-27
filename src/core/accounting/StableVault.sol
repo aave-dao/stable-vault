@@ -452,16 +452,10 @@ contract StableVault is
         restricted
         assertingTransferHelperBalanceForAssets(assets)
     {
-        uint256 vaultObligationsRay = _getVaultObligations();
-        uint256 vaultAssetsRay = _getVaultAggregatedBalance();
-        require(vaultObligationsRay <= vaultAssetsRay, NoSurplusInterestToClaim());
-        uint256 surplusInterest = vaultAssetsRay - vaultObligationsRay;
-        uint256 accumulatedAmountRay;
         for (uint256 i = 0; i < assets.length; i++) {
             IFundsHandler(FUNDS_HANDLER).processWithdrawal(assets[i], amounts[i]);
-            accumulatedAmountRay += amounts[i].assetDecimalsToRay(assets[i]);
         }
-        require(accumulatedAmountRay <= surplusInterest, Errors.InvalidAmount());
+        require(_getVaultObligations() <= _getVaultAggregatedBalance(), SurplusInterestClaimLeadsToInsolvency());
         address treasury = $storage().treasury;
         require(treasury != address(0), TreasuryNotSet());
         ITransferHelper(TRANSFER_HELPER).transfer(assets, amounts, treasury);
@@ -860,7 +854,10 @@ contract StableVault is
     function _setUserRate(address user, uint256 newPerSecondRate) internal {
         uint256 oldSubVaultId = $storage().positions[user].subVaultId;
         require(oldSubVaultId > 0, NonExistentPosition());
-        require(newPerSecondRate != $storage().subVaultById[oldSubVaultId].perSecondRate, RedundantRate());
+        require(
+            newPerSecondRate != $storage().subVaultById[oldSubVaultId].perSecondRate,
+            RedundantRate(user, newPerSecondRate)
+        );
 
         uint256 newSubVaultId = _getOrCreateSubVaultWithRate(newPerSecondRate);
 

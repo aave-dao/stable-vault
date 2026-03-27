@@ -62,17 +62,13 @@ interface IStableVault {
     /// @custom:selector 0x6668308f
     error NonExistentPosition();
 
-    /// @notice Thrown when there are no surplus interest to claim.
-    /// @custom:selector 0xc1095626
-    error NoSurplusInterestToClaim();
-
     /// @notice Thrown when checked address is not the message sender.
     /// @custom:selector 0x9b3a19e9
     error OnlyUser();
 
-    /// @notice Thrown when checked rate is already set.
-    /// @custom:selector 0xb4a82df7
-    error RedundantRate();
+    /// @notice Thrown when the new rate equals the user's current rate.
+    /// @custom:selector 0xa58adfa8
+    error RedundantRate(address user, uint256 newPerSecondRate);
 
     /// @notice Thrown when a sub-vault already exists for a given rate.
     /// @custom:selector 0xdd81131b
@@ -81,6 +77,10 @@ interface IStableVault {
     /// @notice Thrown when a sub-vault does not exist for a given id.
     /// @custom:selector 0xcac93e89
     error SubVaultDoesNotExist();
+
+    /// @notice Thrown when the claimed surplus would render the vault insolvent.
+    /// @custom:selector 0xca48b8ff
+    error SurplusInterestClaimLeadsToInsolvency();
 
     /// @notice Thrown when the maximum number of active sub-vaults is reached.
     /// @custom:selector 0xff731b5f

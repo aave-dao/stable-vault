@@ -591,7 +591,7 @@ contract StableVaultTest is TestWithHelpers {
         uint256 currentRate = stableVault.getUserSubVault(user).perSecondRate;
 
         vm.prank(manager);
-        vm.expectRevert(IStableVault.RedundantRate.selector);
+        vm.expectRevert(abi.encodeWithSelector(IStableVault.RedundantRate.selector, user, currentRate));
         _setUserRate(user, currentRate);
     }
 
@@ -949,27 +949,48 @@ contract StableVaultTest is TestWithHelpers {
         assertGt(stableVault.getVaultObligations(), stableVault.getAggregatedBalance());
 
         vm.prank(manager);
-        vm.expectRevert(abi.encodeWithSelector(IStableVault.NoSurplusInterestToClaim.selector));
+        vm.expectRevert(abi.encodeWithSelector(IStableVault.SurplusInterestClaimLeadsToInsolvency.selector));
         stableVault.claimSurplusInterest(
             _toAddressArray(address(mockAsset)), _toUint256Array(obligationsInAssetDecimals)
         );
     }
 
+    function test_claimSurplusInterest_reverts_ifPostWithdrawalBalanceDropsBelowObligations() public {
+        uint256 depositAmount = 1000e6;
+        mockAsset.mint(address(this), depositAmount);
+        mockAsset.forceApprove(address(stableVault), depositAmount);
+        stableVault.deposit(address(this), address(mockAsset), depositAmount);
+        uint256 obligations = stableVault.getVaultObligations();
+
+        // Simulate correlated strategy losses: post-withdrawal balance drops below obligations
+        mockFundsHandler.mockAggregatedBalanceAfterWithdrawal(obligations - 1);
+
+        vm.prank(manager);
+        vm.expectRevert(abi.encodeWithSelector(IStableVault.SurplusInterestClaimLeadsToInsolvency.selector));
+        stableVault.claimSurplusInterest(_toAddressArray(address(mockAsset)), _toUint256Array(1e6));
+    }
+
     function test_claimSurplusInterest_reverts_ifPullingMoreFundsThanTheAvailableFeesToClaim(
-        uint256 availableFeesToClaimRay,
+        uint256 surplusRay,
         uint256 requestedAssetsToClaim
     ) public {
         requestedAssetsToClaim = _boundAssetAmount(address(mockAsset), requestedAssetsToClaim);
-        availableFeesToClaimRay = _boundRayAmount(availableFeesToClaimRay);
-        vm.assume(requestedAssetsToClaim.assetDecimalsToRay(address(mockAsset)) > availableFeesToClaimRay);
+        surplusRay = _boundRayAmount(surplusRay);
+        vm.assume(requestedAssetsToClaim.assetDecimalsToRay(address(mockAsset)) > surplusRay);
 
-        mockAsset.mint(address(mockFundsHandler), requestedAssetsToClaim);
-        mockFundsHandler.mockApprove(address(stableVault), address(mockAsset), requestedAssetsToClaim);
+        uint256 depositAmount = 1000e6;
+        mockAsset.mint(address(this), depositAmount);
+        mockAsset.forceApprove(address(stableVault), depositAmount);
+        stableVault.deposit(address(this), address(mockAsset), depositAmount);
+        uint256 obligations = stableVault.getVaultObligations();
 
-        mockFundsHandler.mockAggregatedBalance(availableFeesToClaimRay);
+        // Post-withdrawal balance: obligations + surplus - claimed < obligations (since claimed > surplus)
+        uint256 requestedRay = requestedAssetsToClaim.assetDecimalsToRay(address(mockAsset));
+        uint256 postBalance = requestedRay <= obligations + surplusRay ? obligations + surplusRay - requestedRay : 0;
+        mockFundsHandler.mockAggregatedBalanceAfterWithdrawal(postBalance);
 
         vm.prank(manager);
-        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidAmount.selector));
+        vm.expectRevert(abi.encodeWithSelector(IStableVault.SurplusInterestClaimLeadsToInsolvency.selector));
         stableVault.claimSurplusInterest(_toAddressArray(address(mockAsset)), _toUint256Array(requestedAssetsToClaim));
     }
 

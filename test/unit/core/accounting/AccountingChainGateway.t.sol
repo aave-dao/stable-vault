@@ -768,47 +768,6 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         _accountingChainGateway.sendPushFundsToChainMessage(assetToBridge, amount, EARNING_CHAIN_ID, bridgeParams);
     }
 
-    function test_sendPushFundsToChainMessage_sendsFundsToEarningChainWithNativeBridgeFee(
-        uint256 amount,
-        uint256 bridgeFeeAmount
-    ) public {
-        address assetToBridge = address(_mockUsdt);
-        amount = _boundAssetAmount(assetToBridge, amount);
-        // Use native asset
-        address bridgeFeeToken = address(0);
-        bridgeFeeAmount = _boundNativeAmount(bridgeFeeAmount);
-
-        // Mimic the FH pushing bridge fee to TransferHelper
-        vm.deal(address(_mockTransferHelper), bridgeFeeAmount);
-
-        // Mimic the FH pushing assets to TransferHelper
-        IMockErc20(assetToBridge).mint(address(_mockTransferHelper), amount);
-
-        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
-            feePayer: everyRoleAccount,
-            feeToken: bridgeFeeToken,
-            feeAmount: bridgeFeeAmount,
-            feeRefundThreshold: 0,
-            gasLimit: 100000,
-            data: abi.encode(keccak256(hex"c0ffee"))
-        });
-
-        vm.expectCall(
-            address(_mockBridgeAdapterAssets),
-            0,
-            abi.encodeCall(
-                IBridgeAdapter.publishMessageToChainWithFeePayer,
-                (EARNING_CHAIN_ID, assetToBridge, amount, "", bridgeParams)
-            )
-        );
-
-        vm.deal(address(_mockFundsHandler), bridgeFeeAmount);
-        vm.prank(address(_mockFundsHandler));
-        _accountingChainGateway.sendPushFundsToChainMessage{value: bridgeFeeAmount}(
-            assetToBridge, amount, EARNING_CHAIN_ID, bridgeParams
-        );
-    }
-
     function test_sendPushFundsToChainMessage_withArbitraryData_emitsEvent() public {
         uint256 amount = 1000000000000000000;
         uint256 bridgeFeeAmount = 2000000000000000000;

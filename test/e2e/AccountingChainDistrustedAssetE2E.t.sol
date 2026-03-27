@@ -270,7 +270,7 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = profits;
 
-        vm.expectRevert(IStableVault.NoSurplusInterestToClaim.selector);
+        vm.expectRevert(IStableVault.SurplusInterestClaimLeadsToInsolvency.selector);
         vm.prank(everyRoleAccount);
         vault.claimSurplusInterest(assets, amounts);
     }
