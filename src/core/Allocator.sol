@@ -502,7 +502,16 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     }
 
     function _getAssetBalanceInStrategy(IERC4626 strategy) internal view returns (uint256) {
-        return strategy.previewRedeem(strategy.balanceOf(address(this)));
+        uint256 balance;
+        uint256 shares = strategy.balanceOf(address(this));
+        if (shares > 0) {
+            try strategy.previewRedeem(shares) returns (uint256 amount) {
+                balance = amount;
+            } catch {
+                balance = 0;
+            }
+        }
+        return balance;
     }
 
     function _isStrategySupportedForAsset(address strategy, address asset) internal view returns (bool) {
