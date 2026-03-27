@@ -1245,6 +1245,7 @@ contract CcipAdapterTest is TestWithHelpers {
         // Use USDT as fee token (different from bridged asset to isolate fee token allowance behavior)
         address feeToken = address(_mockUsdt);
         feeAmount = _boundAssetAmount(feeToken, feeAmount);
+        gasLimit = bound(gasLimit, 200_000, 500_000);
 
         // Airdrop tokens to the TransferHelper
         _mockTransferHelper.mockAsset(address(_mockGho), amountGho);
@@ -1259,27 +1260,9 @@ contract CcipAdapterTest is TestWithHelpers {
             data: ""
         });
 
-        Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
-        ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockGho), amount: amountGho});
-
-        Client.EVM2AnyMessage memory expectedCcipMessage = Client.EVM2AnyMessage({
-            receiver: abi.encode(_earningChainCcipAdapter),
-            data: "",
-            tokenAmounts: ccipTokenAmounts,
-            feeToken: feeToken,
-            extraArgs: Client._argsToBytes(
-                Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: true})
-            )
-        });
-
-        // Mock router.getFee to return the exact fee amount (no refund)
-        vm.mockCall(
-            address(_mockCCIPRouter),
-            abi.encodeWithSelector(IRouterClient.getFee.selector, EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage),
-            abi.encode(feeAmount)
-        );
-
-        _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, bytes32(0));
+        // Route messages back into the local test environment and use a real router fee pull.
+        _mockCCIPRouter.setSourceChainSelector(EARNING_CHAIN_CCIP_SELECTOR, ACCOUNTING_CHAIN_CCIP_SELECTOR);
+        _mockCCIPRouter.setFee(feeAmount);
 
         vm.prank(address(_mockAccountingChainGateway));
         _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
@@ -1306,6 +1289,7 @@ contract CcipAdapterTest is TestWithHelpers {
         // Use USDT as both bridged asset AND fee token
         address feeToken = address(_mockUsdt);
         feeAmount = _boundAssetAmount(feeToken, feeAmount);
+        gasLimit = bound(gasLimit, 200_000, 500_000);
 
         uint256 totalUsdtAmount = amountUsdt + feeAmount;
 
@@ -1321,27 +1305,9 @@ contract CcipAdapterTest is TestWithHelpers {
             data: ""
         });
 
-        Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
-        ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
-
-        Client.EVM2AnyMessage memory expectedCcipMessage = Client.EVM2AnyMessage({
-            receiver: abi.encode(_earningChainCcipAdapter),
-            data: "",
-            tokenAmounts: ccipTokenAmounts,
-            feeToken: feeToken,
-            extraArgs: Client._argsToBytes(
-                Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: true})
-            )
-        });
-
-        // Mock router.getFee to return the exact fee amount
-        vm.mockCall(
-            address(_mockCCIPRouter),
-            abi.encodeWithSelector(IRouterClient.getFee.selector, EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage),
-            abi.encode(feeAmount)
-        );
-
-        _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, bytes32(0));
+        // Route messages back into the local test environment and use a real router fee pull.
+        _mockCCIPRouter.setSourceChainSelector(EARNING_CHAIN_CCIP_SELECTOR, ACCOUNTING_CHAIN_CCIP_SELECTOR);
+        _mockCCIPRouter.setFee(feeAmount);
 
         vm.prank(address(_mockAccountingChainGateway));
         _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
@@ -1384,26 +1350,9 @@ contract CcipAdapterTest is TestWithHelpers {
             data: ""
         });
 
-        Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
-        ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockGho), amount: amountGho});
-
-        Client.EVM2AnyMessage memory expectedCcipMessage = Client.EVM2AnyMessage({
-            receiver: abi.encode(_earningChainCcipAdapter),
-            data: "",
-            tokenAmounts: ccipTokenAmounts,
-            feeToken: address(_mockUsdt),
-            extraArgs: Client._argsToBytes(
-                Client.GenericExtraArgsV2({gasLimit: DEFAULT_GAS_LIMIT, allowOutOfOrderExecution: true})
-            )
-        });
-
-        vm.mockCall(
-            address(_mockCCIPRouter),
-            abi.encodeWithSelector(IRouterClient.getFee.selector, EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage),
-            abi.encode(legitimateFeeAmount)
-        );
-
-        _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, bytes32(0));
+        // Route messages back into the local test environment and use a real router fee pull.
+        _mockCCIPRouter.setSourceChainSelector(EARNING_CHAIN_CCIP_SELECTOR, ACCOUNTING_CHAIN_CCIP_SELECTOR);
+        _mockCCIPRouter.setFee(legitimateFeeAmount);
 
         vm.prank(address(_mockAccountingChainGateway));
         _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
@@ -1418,10 +1367,9 @@ contract CcipAdapterTest is TestWithHelpers {
             postBridgeAllowance, 0, "Allowance should be reset to 0 after bridge - this prevents fee subsidy attack"
         );
 
-        // Verify the original stuck funds are still in the adapter.
-        // The adapter balance includes stuck funds + fee pulled from TransferHelper
+        // Verify the original stuck funds are still in the adapter and cannot be consumed by fee pull.
         uint256 adapterBalanceAfterBridge = _mockUsdt.balanceOf(address(_accountingChainCcipAdapter));
-        assertGe(
+        assertEq(
             adapterBalanceAfterBridge,
             adapterBalanceBeforeBridge,
             "Original stuck funds should not be consumed by the bridge"
@@ -1457,27 +1405,9 @@ contract CcipAdapterTest is TestWithHelpers {
             data: ""
         });
 
-        Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
-        ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockGho), amount: amountGho});
-
-        Client.EVM2AnyMessage memory expectedCcipMessage = Client.EVM2AnyMessage({
-            receiver: abi.encode(_earningChainCcipAdapter),
-            data: "",
-            tokenAmounts: ccipTokenAmounts,
-            feeToken: address(_mockUsdt),
-            extraArgs: Client._argsToBytes(
-                Client.GenericExtraArgsV2({gasLimit: DEFAULT_GAS_LIMIT, allowOutOfOrderExecution: true})
-            )
-        });
-
-        // Router returns lower fee than allocated (triggers refund)
-        vm.mockCall(
-            address(_mockCCIPRouter),
-            abi.encodeWithSelector(IRouterClient.getFee.selector, EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage),
-            abi.encode(actualFeeAmount)
-        );
-
-        _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, bytes32(0));
+        // Route messages back into the local test environment and use a real router fee pull.
+        _mockCCIPRouter.setSourceChainSelector(EARNING_CHAIN_CCIP_SELECTOR, ACCOUNTING_CHAIN_CCIP_SELECTOR);
+        _mockCCIPRouter.setFee(actualFeeAmount);
 
         vm.prank(address(_mockAccountingChainGateway));
         _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
@@ -1498,12 +1428,11 @@ contract CcipAdapterTest is TestWithHelpers {
         assertEq(_mockUsdt.balanceOf(feePayer), refundAmount, "Fee payer should receive the refund");
 
         // Verify the original stuck funds are still in the adapter (not consumed by the bridge).
-        // Even though tokens remain in the adapter, the allowance is 0, so they cannot be used to pay fees.
-        uint256 expectedAdapterBalance = adapterBalanceBeforeBridge + allocatedFeeAmount - refundAmount;
+        uint256 expectedAdapterBalance = adapterBalanceBeforeBridge;
         assertEq(
             _mockUsdt.balanceOf(address(_accountingChainCcipAdapter)),
             expectedAdapterBalance,
-            "Adapter balance should be stuck funds plus non-refunded fee (mock doesn't consume tokens)"
+            "Adapter should only retain originally stuck funds"
         );
     }
 

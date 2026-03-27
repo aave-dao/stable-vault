@@ -111,19 +111,11 @@ contract CcipAdapter is
         require(destinationChainAdapter != address(0), Errors.InvalidParameter());
 
         Client.EVMTokenAmount[] memory tokenAmounts;
-        if (asset != Constants.ASSET_FOR_DATA_ONLY_BRIDGE) {
+        if (asset == Constants.ASSET_FOR_DATA_ONLY_BRIDGE) {
+            tokenAmounts = new Client.EVMTokenAmount[](0);
+        } else {
             tokenAmounts = new Client.EVMTokenAmount[](1);
             tokenAmounts[0] = Client.EVMTokenAmount({token: asset, amount: amount});
-            ITransferHelper(TRANSFER_HELPER).pull(asset, amount);
-            IERC20(asset).forceApprove(CCIP_ROUTER, amount);
-        } else {
-            tokenAmounts = new Client.EVMTokenAmount[](0);
-        }
-
-        ITransferHelper(TRANSFER_HELPER).pull(bridgeParams.feeToken, bridgeParams.feeAmount);
-        if (bridgeParams.feeToken != Constants.NATIVE_CURRENCY) {
-            // Increase allowance in case of the fee token matching an asset being bridged.
-            IERC20(bridgeParams.feeToken).safeIncreaseAllowance(CCIP_ROUTER, bridgeParams.feeAmount);
         }
 
         Client.EVM2AnyMessage memory ccipMessage = Client.EVM2AnyMessage({
@@ -135,18 +127,24 @@ contract CcipAdapter is
                 Client.GenericExtraArgsV2({gasLimit: bridgeParams.gasLimit, allowOutOfOrderExecution: true})
             )
         });
+
+        uint64 chainSelector = _chainSelectorOf[destinationChainId];
+        uint256 estimatedFeeAmount = IRouterClient(CCIP_ROUTER).getFee(chainSelector, ccipMessage);
+        require(bridgeParams.feeAmount >= estimatedFeeAmount, Errors.InsufficientFunds());
+
+        _pullFromTransferHelperAndApproveCcipRouter(
+            asset, amount, bridgeParams.feeToken, bridgeParams.feeAmount, estimatedFeeAmount
+        );
+
         _sendMessageWithFeePayer(
-            destinationChainId,
+            chainSelector,
             ccipMessage,
             bridgeParams.feePayer,
             bridgeParams.feeToken,
             bridgeParams.feeAmount,
-            bridgeParams.feeRefundThreshold
+            bridgeParams.feeRefundThreshold,
+            estimatedFeeAmount
         );
-        if (bridgeParams.feeToken != Constants.NATIVE_CURRENCY) {
-            // Reset allowance to avoid any remaining allowance on the fee token to the CCIP Router.
-            IERC20(bridgeParams.feeToken).forceApprove(CCIP_ROUTER, 0);
-        }
     }
 
     /// @inheritdoc IAny2EVMMessageReceiver
@@ -184,17 +182,40 @@ contract CcipAdapter is
         }
     }
 
+    function _pullFromTransferHelperAndApproveCcipRouter(
+        address asset,
+        uint256 amount,
+        address feeToken,
+        uint256 allocatedFeeAmount,
+        uint256 estimatedFeeAmount
+    ) internal {
+        if (feeToken == asset && amount > 0) {
+            // Asset being bridged and fee token matching the bridged asset.
+            ITransferHelper(TRANSFER_HELPER).pull(asset, amount + allocatedFeeAmount);
+            IERC20(asset).forceApprove(CCIP_ROUTER, amount + estimatedFeeAmount);
+        } else {
+            // Either a data-only bridge or the fee token not matching the bridged asset.
+            if (amount > 0) {
+                // Asset being bridged.
+                ITransferHelper(TRANSFER_HELPER).pull(asset, amount);
+                IERC20(asset).forceApprove(CCIP_ROUTER, amount);
+            }
+            ITransferHelper(TRANSFER_HELPER).pull(feeToken, allocatedFeeAmount);
+            if (feeToken != Constants.NATIVE_CURRENCY) {
+                IERC20(feeToken).forceApprove(CCIP_ROUTER, estimatedFeeAmount);
+            }
+        }
+    }
+
     function _sendMessageWithFeePayer(
-        uint256 chainId,
+        uint64 chainSelector,
         Client.EVM2AnyMessage memory message,
         address feePayer,
         address feeToken,
         uint256 allocatedFeeAmount,
-        uint256 feeRefundThreshold
+        uint256 feeRefundThreshold,
+        uint256 estimatedFeeAmount
     ) internal {
-        uint64 chainSelector = _chainSelectorOf[chainId];
-        uint256 estimatedFeeAmount = IRouterClient(CCIP_ROUTER).getFee(chainSelector, message);
-        require(allocatedFeeAmount >= estimatedFeeAmount, Errors.InsufficientFunds());
         uint256 msgValue;
         if (feeToken == Constants.NATIVE_CURRENCY) {
             msgValue = estimatedFeeAmount;
