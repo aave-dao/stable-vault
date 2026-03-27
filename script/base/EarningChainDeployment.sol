@@ -406,6 +406,13 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
     }
 
     function _setupPriceOracleAdapters() internal {
+        // Using plain ChainlinkPriceOracleAdapter (no sequencer uptime feed check) because the
+        // Earning Chain is currently on Ethereum mainnet. If we ever deploy on an L2, we might need to use
+        // ChainlinkL2PriceOracleAdapter with sequencer uptime feed instead.
+        // This require aims to force the deployer to consider the usage of ChainlinkL2PriceOracleAdapter.
+        // If deployer decides it is not needed, the require can be commented out or removed in order to proceed.
+        require(block.chainid == 1, "Consider using ChainlinkL2PriceOracleAdapter with sequencer uptime feed");
+
         PriceOracle priceOracle = PriceOracle(getPriceOracleAddress(_deployer()));
         uint256 heartbeat = _configUint(".chainlinkPriceOracleHeartbeat");
 
