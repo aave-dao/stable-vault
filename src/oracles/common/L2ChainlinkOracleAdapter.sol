@@ -32,7 +32,7 @@ abstract contract L2ChainlinkOracleAdapter {
     address immutable SEQUENCER_UPTIME_FEED;
 
     /// @dev The grace period (in seconds) to wait after the sequencer comes back up before trusting feed data.
-    uint256 private constant GRACE_PERIOD_TIME_SECONDS = 3600;
+    uint256 private constant GRACE_PERIOD_TIME_SECONDS = 7200;
 
     /// @dev Constructor.
     /// @param sequencerUptimeFeed The Chainlink L2 Sequencer Uptime Feed address.

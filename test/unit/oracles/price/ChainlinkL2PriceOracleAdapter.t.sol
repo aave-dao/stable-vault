@@ -19,7 +19,7 @@ contract ChainlinkL2PriceOracleAdapterTest is Test {
     address constant ASSET = address(0xA55E7);
     uint256 constant HEARTBEAT = 3600;
     uint256 constant HEARTBEAT_BUFFER_SECONDS = 90;
-    uint256 constant GRACE_PERIOD_TIME_SECONDS = 3600;
+    uint256 constant GRACE_PERIOD_TIME_SECONDS = 7200;
     uint8 constant DECIMALS = 8;
 
     MockChainlinkAggregator internal _aggregator;
