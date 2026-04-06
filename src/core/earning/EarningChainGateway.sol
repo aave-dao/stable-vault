@@ -33,6 +33,13 @@ contract EarningChainGateway is
 {
     using AssetLib for uint256;
 
+    /// @notice Minimum destination gas limit required for the Accounting Chain to process a
+    /// `BURN_IOU_TOKEN` message.
+    /// @dev Set to 120_000 based on gas-snapshot tests of the full destination execution path/
+    /// The gas tests measured ~106.6k gas consumed and about 110k as the minimum exact-gas
+    /// value that succeeds under `CallWithExactGas` delivery semantics. 120k adds around 10% safety margin on top.
+    uint256 internal constant MIN_BURN_IOU_TOKEN_GAS_LIMIT = 120_000;
+
     uint256 internal immutable ACCOUNTING_CHAIN_ID;
     address internal immutable WITHDRAWAL_POLICY;
 
@@ -105,6 +112,7 @@ contract EarningChainGateway is
         returns (uint256)
     {
         require(iouTokenAmountRay > 0, Errors.ZeroAmount());
+        require(bridgeParams.gasLimit >= MIN_BURN_IOU_TOKEN_GAS_LIMIT, Errors.InvalidGasLimit());
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(msg.sender, iouTokenAmountRay);
 
         uint256 amountOutRay = IWithdrawalPolicy(WITHDRAWAL_POLICY)
