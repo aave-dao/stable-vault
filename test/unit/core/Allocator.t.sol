@@ -2,6 +2,9 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.22;
 
+import {
+    ReentrancyGuardTransientUpgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardTransientUpgradeable.sol";
 import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
@@ -26,6 +29,7 @@ import {MockAssetRegistry} from "test/mocks/MockAssetRegistry.sol";
 import {IMockErc20} from "test/mocks/MockErc20.sol";
 import {MockErc4626Strategy} from "test/mocks/MockErc4626Strategy.sol";
 import {MockNonStandardErc20} from "test/mocks/MockNonStandardErc20.sol";
+import {MockReentrantErc4626Strategy} from "test/mocks/MockReentrantErc4626Strategy.sol";
 import {MockSwapper} from "test/mocks/MockSwapper.sol";
 import {MockTransferHelper} from "test/mocks/MockTransferHelper.sol";
 import {TestErc4626} from "test/mocks/TestErc4626.sol";
@@ -3018,6 +3022,74 @@ contract AllocatorTest is TestWithHelpers {
         vm.prank(withdrawer);
         _allocator.withdraw(address(_mockUsdt), depositAmount);
     }
+
+    //////////////////////////////////////////// REENTRANCY TESTS //////////////////////////////////////////////////////
+
+    function _deployReentrantStrategy() internal returns (MockReentrantErc4626Strategy) {
+        MockReentrantErc4626Strategy strategy = new MockReentrantErc4626Strategy(_mockUsdt);
+        vm.prank(admin);
+        _allocator.addStrategy(address(_mockUsdt), address(strategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        return strategy;
+    }
+
+    function _depositToReentrantStrategy(MockReentrantErc4626Strategy strategy, uint256 amount) internal {
+        vm.prank(admin);
+        _allocator.setDefaultStrategy(address(_mockUsdt), address(strategy));
+        _mockUsdt.mint(address(_mockTransferHelper), amount);
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), amount);
+    }
+
+    function test_rebalance_reentrancyNotAllowedOnRebalanceViaWithdraw() public {
+        uint256 depositAmount = 1000e6;
+        MockReentrantErc4626Strategy reentrantStrategy = _deployReentrantStrategy();
+        _depositToReentrantStrategy(reentrantStrategy, depositAmount);
+
+        // Configure callback: during withdraw(), call Allocator.rebalance() again
+        reentrantStrategy.setReentrantCall(
+            address(_allocator), abi.encodeCall(IAllocator.rebalance, (new IAllocator.RebalanceParams[](0)))
+        );
+        reentrantStrategy.setReentrancyOnWithdraw(true);
+
+        // Deallocate from the reentrant strategy → strategy.withdraw() fires callback → reentry blocked
+        IAllocator.DeallocationParams[] memory deallocations = new IAllocator.DeallocationParams[](1);
+        deallocations[0] = IAllocator.DeallocationParams({
+            asset: address(_mockUsdt), strategy: address(reentrantStrategy), amount: depositAmount
+        });
+        IAllocator.RebalanceParams[] memory params = new IAllocator.RebalanceParams[](1);
+        params[0] =
+            _buildRebalanceParams(deallocations, new IAllocator.SwapParams[](0), new IAllocator.AllocationParams[](0));
+
+        vm.prank(admin);
+        vm.expectRevert(ReentrancyGuardTransientUpgradeable.ReentrancyGuardReentrantCall.selector);
+        _allocator.rebalance(params);
+    }
+
+    function test_rebalance_reentrancyNotAllowedOnRebalanceViaRedeem() public {
+        uint256 depositAmount = 1000e6;
+        MockReentrantErc4626Strategy reentrantStrategy = _deployReentrantStrategy();
+        _depositToReentrantStrategy(reentrantStrategy, depositAmount);
+
+        // Configure callback: during redeem(), call Allocator.rebalance() again
+        reentrantStrategy.setReentrantCall(
+            address(_allocator), abi.encodeCall(IAllocator.rebalance, (new IAllocator.RebalanceParams[](0)))
+        );
+        reentrantStrategy.setReentrancyOnRedeem(true);
+
+        // Deallocate with amount=0 triggers _redeemAllFromStrategy → strategy.redeem() fires callback
+        IAllocator.DeallocationParams[] memory deallocations = new IAllocator.DeallocationParams[](1);
+        deallocations[0] =
+            IAllocator.DeallocationParams({asset: address(_mockUsdt), strategy: address(reentrantStrategy), amount: 0});
+        IAllocator.RebalanceParams[] memory params = new IAllocator.RebalanceParams[](1);
+        params[0] =
+            _buildRebalanceParams(deallocations, new IAllocator.SwapParams[](0), new IAllocator.AllocationParams[](0));
+
+        vm.prank(admin);
+        vm.expectRevert(ReentrancyGuardTransientUpgradeable.ReentrancyGuardReentrantCall.selector);
+        _allocator.rebalance(params);
+    }
+
+    ////////////////////////////////////////////////// HELPERS /////////////////////////////////////////////////////////
 
     function _initializeRebalanceParams(uint16 length) internal pure returns (IAllocator.RebalanceParams[] memory) {
         return new IAllocator.RebalanceParams[](length);
