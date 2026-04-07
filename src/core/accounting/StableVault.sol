@@ -853,17 +853,15 @@ contract StableVault is
 
     function _setUserRate(address user, uint256 newPerSecondRate) internal {
         uint256 oldSubVaultId = $storage().positions[user].subVaultId;
-        require(oldSubVaultId > 0, NonExistentPosition());
-        require(
-            newPerSecondRate != $storage().subVaultById[oldSubVaultId].perSecondRate,
-            RedundantRate(user, newPerSecondRate)
-        );
-
-        uint256 newSubVaultId = _getOrCreateSubVaultWithRate(newPerSecondRate);
-
-        _migrateUserToSubVault(user, oldSubVaultId, newSubVaultId);
-
-        emit UserRateSet(user, newSubVaultId, newPerSecondRate);
+        if (oldSubVaultId != 0) {
+            require(
+                newPerSecondRate != $storage().subVaultById[oldSubVaultId].perSecondRate,
+                RedundantRate(user, newPerSecondRate)
+            );
+            uint256 newSubVaultId = _getOrCreateSubVaultWithRate(newPerSecondRate);
+            _migrateUserToSubVault(user, oldSubVaultId, newSubVaultId);
+            emit UserRateSet(user, newSubVaultId, newPerSecondRate);
+        }
     }
 
     function _setTreasury(address treasury) internal {
