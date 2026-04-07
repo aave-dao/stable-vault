@@ -3089,6 +3089,66 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.rebalance(params);
     }
 
+    function _configureNonRevertingReentrantCallback(MockReentrantErc4626Strategy strategy) internal {
+        strategy.setReentrantCall(
+            address(_allocator), abi.encodeCall(IAllocator.rebalance, (new IAllocator.RebalanceParams[](0)))
+        );
+        strategy.setRevertOnReentrantFailure(false);
+    }
+
+    function test_deposit_reentrancyNotAllowedOnRebalance() public {
+        uint256 depositAmount = 1000e6;
+        MockReentrantErc4626Strategy reentrantStrategy = _deployReentrantStrategy();
+
+        // Set reentrant strategy as default so deposit() routes to it
+        vm.prank(admin);
+        _allocator.setDefaultStrategy(address(_mockUsdt), address(reentrantStrategy));
+
+        // Configure non-reverting callback: during deposit(), try to call rebalance()
+        _configureNonRevertingReentrantCallback(reentrantStrategy);
+        reentrantStrategy.setReentrancyOnDeposit(true);
+
+        _mockUsdt.mint(address(_mockTransferHelper), depositAmount);
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), depositAmount);
+
+        assertFalse(reentrantStrategy.lastReentrantCallSucceeded());
+    }
+
+    function test_depositAllowIdle_reentrancyNotAllowedOnRebalance() public {
+        uint256 depositAmount = 1000e6;
+        MockReentrantErc4626Strategy reentrantStrategy = _deployReentrantStrategy();
+
+        vm.prank(admin);
+        _allocator.setDefaultStrategy(address(_mockUsdt), address(reentrantStrategy));
+
+        // Configure non-reverting callback: during deposit(), try to call rebalance()
+        _configureNonRevertingReentrantCallback(reentrantStrategy);
+        reentrantStrategy.setReentrancyOnDeposit(true);
+
+        _mockUsdt.mint(address(_mockTransferHelper), depositAmount);
+        vm.prank(depositor);
+        _allocator.depositAllowIdle(address(_mockUsdt), depositAmount);
+
+        assertFalse(reentrantStrategy.lastReentrantCallSucceeded());
+    }
+
+    function test_withdraw_reentrancyNotAllowedOnRebalance() public {
+        uint256 depositAmount = 1000e6;
+        MockReentrantErc4626Strategy reentrantStrategy = _deployReentrantStrategy();
+        _depositToReentrantStrategy(reentrantStrategy, depositAmount);
+
+        // Configure non-reverting callback: during withdraw(), try to call rebalance()
+        _configureNonRevertingReentrantCallback(reentrantStrategy);
+        reentrantStrategy.setReentrancyOnWithdraw(true);
+
+        _mockTransferHelper.mockAsset(address(_mockUsdt), 0);
+        vm.prank(withdrawer);
+        _allocator.withdraw(address(_mockUsdt), depositAmount);
+
+        assertFalse(reentrantStrategy.lastReentrantCallSucceeded());
+    }
+
     ////////////////////////////////////////////////// HELPERS /////////////////////////////////////////////////////////
 
     function _initializeRebalanceParams(uint16 length) internal pure returns (IAllocator.RebalanceParams[] memory) {
