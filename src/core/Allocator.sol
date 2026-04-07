@@ -442,12 +442,17 @@ contract Allocator is
     }
 
     /// @dev Intended to be the lowest level function used to withdraw from a strategy.
+    /// @dev Uses redeem(previewWithdraw(amount)) instead of withdraw(amount) to capture
+    /// the rounding surplus from ERC4626's ceil division on shares. Any surplus remains
+    /// as idle balance in the Allocator, rounding in favor of the protocol.
     function _withdrawFromStrategy(address asset, uint256 amount, address strategy) internal {
         uint256 balanceBefore = IERC20(asset).balanceOf(address(this));
-        IERC4626(strategy).withdraw({assets: amount, receiver: address(this), owner: address(this)});
+        uint256 shares = IERC4626(strategy).previewWithdraw(amount);
+        IERC4626(strategy).redeem({shares: shares, receiver: address(this), owner: address(this)});
         uint256 balanceAfter = IERC20(asset).balanceOf(address(this));
-        require(balanceAfter - balanceBefore >= amount, Errors.InsufficientAmountOut());
-        emit AssetDeallocated(asset, strategy, amount);
+        uint256 actualAmountWithdrawn = balanceAfter - balanceBefore;
+        require(actualAmountWithdrawn >= amount, Errors.InsufficientAmountOut());
+        emit AssetDeallocated(asset, strategy, actualAmountWithdrawn);
     }
 
     function _redeemAllFromStrategy(address asset, address strategy) internal returns (uint256) {

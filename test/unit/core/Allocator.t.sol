@@ -843,10 +843,10 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
 
-        // Mock the default strategy to fail during withdrawal
+        // Mock the default strategy to fail during withdrawal (redeem is called via _withdrawFromStrategy)
         vm.mockCallRevert(
             address(_defaultUsdtStrategy),
-            abi.encodeWithSelector(IERC4626.withdraw.selector, amount, address(_allocator), address(_allocator)),
+            abi.encodeWithSelector(IERC4626.redeem.selector, amount, address(_allocator), address(_allocator)),
             abi.encodeWithSelector(IERC20Errors.ERC20InvalidSender.selector, address(_allocator))
         );
 
@@ -895,12 +895,12 @@ contract AllocatorTest is TestWithHelpers {
         // Even if withdrawal for one non-default strategy fails, attempts to withdraw from other non-default strategies
         vm.mockCallRevert(
             address(_defaultUsdtStrategy),
-            abi.encodeWithSelector(IERC4626.withdraw.selector, amount, address(_allocator), address(_allocator)),
+            abi.encodeWithSelector(IERC4626.redeem.selector, amount, address(_allocator), address(_allocator)),
             abi.encodeWithSelector(IERC20Errors.ERC20InvalidSender.selector, address(_allocator))
         );
         vm.mockCallRevert(
             address(_extraUsdtStrategy),
-            abi.encodeWithSelector(IERC4626.withdraw.selector, amount, address(_allocator), address(_allocator)),
+            abi.encodeWithSelector(IERC4626.redeem.selector, amount, address(_allocator), address(_allocator)),
             abi.encodeWithSelector(IERC20Errors.ERC20InvalidSender.selector, address(_allocator))
         );
         vm.expectEmit(true, true, true, true);
@@ -1271,7 +1271,7 @@ contract AllocatorTest is TestWithHelpers {
         vm.expectCall(
             address(mockDefaultStrategy),
             abi.encodeWithSelector(
-                IERC4626.withdraw.selector,
+                IERC4626.redeem.selector,
                 actualFullBalanceAvailableInMockDefaultStrategy,
                 address(_allocator),
                 address(_allocator)
@@ -1720,7 +1720,7 @@ contract AllocatorTest is TestWithHelpers {
         vm.prank(address(everyRoleAccount));
         vm.expectRevert(
             abi.encodeWithSelector(
-                ERC4626.ERC4626ExceededMaxWithdraw.selector,
+                ERC4626.ERC4626ExceededMaxRedeem.selector,
                 address(_allocator),
                 deallocateAmountUsdt,
                 depositAmountUsdt
@@ -3045,13 +3045,13 @@ contract AllocatorTest is TestWithHelpers {
         MockReentrantErc4626Strategy reentrantStrategy = _deployReentrantStrategy();
         _depositToReentrantStrategy(reentrantStrategy, depositAmount);
 
-        // Configure callback: during withdraw(), call Allocator.rebalance() again
+        // Configure callback: during redeem() (called via _withdrawFromStrategy), call Allocator.rebalance() again
         reentrantStrategy.setReentrantCall(
             address(_allocator), abi.encodeCall(IAllocator.rebalance, (new IAllocator.RebalanceParams[](0)))
         );
-        reentrantStrategy.setReentrancyOnWithdraw(true);
+        reentrantStrategy.setReentrancyOnRedeem(true);
 
-        // Deallocate from the reentrant strategy → strategy.withdraw() fires callback → reentry blocked
+        // Deallocate from the reentrant strategy → strategy.redeem() fires callback → reentry blocked
         IAllocator.DeallocationParams[] memory deallocations = new IAllocator.DeallocationParams[](1);
         deallocations[0] = IAllocator.DeallocationParams({
             asset: address(_mockUsdt), strategy: address(reentrantStrategy), amount: depositAmount
@@ -3138,15 +3138,107 @@ contract AllocatorTest is TestWithHelpers {
         MockReentrantErc4626Strategy reentrantStrategy = _deployReentrantStrategy();
         _depositToReentrantStrategy(reentrantStrategy, depositAmount);
 
-        // Configure non-reverting callback: during withdraw(), try to call rebalance()
+        // Configure non-reverting callback: during redeem() (called via _withdrawFromStrategy), try to call rebalance()
         _configureNonRevertingReentrantCallback(reentrantStrategy);
-        reentrantStrategy.setReentrancyOnWithdraw(true);
+        reentrantStrategy.setReentrancyOnRedeem(true);
 
         _mockTransferHelper.mockAsset(address(_mockUsdt), 0);
         vm.prank(withdrawer);
         _allocator.withdraw(address(_mockUsdt), depositAmount);
 
         assertTrue(reentrantStrategy.lastReentrantCallReverted());
+    }
+
+    //////////////////////////////////////// ERC4626 ROUNDING LOSS (CS I-04) //////////////////////////////////////////
+
+    /// @dev Simulates yield accrual by donating tokens directly to the strategy vault,
+    /// which increases totalAssets without minting new shares, raising the share price.
+    function _simulateStrategyYield(TestErc4626 strategy, IMockErc20 asset, uint256 yieldAmount) internal {
+        asset.mint(address(strategy), yieldAmount);
+    }
+
+    function test_withdrawFromStrategy_retainsSurplusWhenSharePriceIs10x() public {
+        uint256 depositAmount = 1_000_000e6;
+        uint256 yieldAmount = 9_000_000e6; // 900% yield => sharePrice ≈ 10.0
+
+        _mockTransferHelper.mockAsset(address(_mockUsdt), depositAmount);
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), depositAmount);
+
+        _simulateStrategyYield(_defaultUsdtStrategy, _mockUsdt, yieldAmount);
+
+        // At 10x share price, withdrawing 1 wei burns 1 share worth ~9 wei (OZ +1 offset).
+        // Using redeem(previewWithdraw(1)) would give us 9 assets instead of 1.
+        uint256 sharesToBurn = _defaultUsdtStrategy.previewWithdraw(1);
+        uint256 redeemValue = _defaultUsdtStrategy.previewRedeem(sharesToBurn);
+        uint256 expectedSurplus = redeemValue - 1;
+        assertEq(sharesToBurn, 1, "Should burn 1 share for 1 wei at 10x price");
+        assertTrue(redeemValue >= 9, "1 share should be worth >= 9 wei at 10x");
+        assertTrue(expectedSurplus >= 8, "Expected surplus should be >= 8 wei");
+
+        _mockTransferHelper.mockAsset(address(_mockUsdt), 0);
+        vm.prank(withdrawer);
+        _allocator.withdraw(address(_mockUsdt), 1);
+
+        uint256 idleBalance = _mockUsdt.balanceOf(address(_allocator));
+
+        // Currently withdraw() returns exactly 1 asset and the surplus (8+ wei) stays
+        // locked inside the ERC4626 vault. After the fix, the surplus should be retained
+        // as idle balance in the Allocator.
+        assertEq(idleBalance, expectedSurplus, "Allocator should retain rounding surplus as idle balance");
+    }
+
+    function test_withdrawFromStrategy_retainsSurplusWhenSharePriceIs2x() public {
+        uint256 depositAmount = 1_000_000e6;
+        uint256 yieldAmount = 1_000_000e6; // 100% yield => sharePrice ≈ 2.0
+
+        _mockTransferHelper.mockAsset(address(_mockUsdt), depositAmount);
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), depositAmount);
+
+        _simulateStrategyYield(_defaultUsdtStrategy, _mockUsdt, yieldAmount);
+
+        // At 2x share price, withdrawing 10 wei: previewWithdraw(10) = 6 shares (ceil(10/2) with OZ offset).
+        // redeem(6) gives 11 assets → surplus of 1.
+        uint256 withdrawAmount = 10;
+        uint256 sharesToBurn = _defaultUsdtStrategy.previewWithdraw(withdrawAmount);
+        uint256 redeemValue = _defaultUsdtStrategy.previewRedeem(sharesToBurn);
+        uint256 expectedSurplus = redeemValue - withdrawAmount;
+        assertTrue(expectedSurplus > 0, "Should have positive surplus at 2x share price");
+
+        _mockTransferHelper.mockAsset(address(_mockUsdt), 0);
+        vm.prank(withdrawer);
+        _allocator.withdraw(address(_mockUsdt), withdrawAmount);
+
+        uint256 idleBalance = _mockUsdt.balanceOf(address(_allocator));
+
+        assertEq(idleBalance, expectedSurplus, "Allocator should retain surplus at 2x share price");
+    }
+
+    function test_withdrawFromStrategy_retainsSurplusAcrossSharePrices(uint256 yieldMultiplier) public {
+        yieldMultiplier = bound(yieldMultiplier, 2, 20); // 2x to 20x share price
+        uint256 depositAmount = 1_000_000e6;
+        uint256 yieldAmount = depositAmount * (yieldMultiplier - 1);
+
+        _mockTransferHelper.mockAsset(address(_mockUsdt), depositAmount);
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), depositAmount);
+
+        _simulateStrategyYield(_defaultUsdtStrategy, _mockUsdt, yieldAmount);
+
+        // At share prices >= 2x, a 1-wei withdrawal burns 1 share worth multiple wei.
+        // The surplus from redeem should be captured as idle balance.
+        uint256 sharesToBurn = _defaultUsdtStrategy.previewWithdraw(1);
+        uint256 redeemValue = _defaultUsdtStrategy.previewRedeem(sharesToBurn);
+        uint256 expectedSurplus = redeemValue - 1;
+
+        _mockTransferHelper.mockAsset(address(_mockUsdt), 0);
+        vm.prank(withdrawer);
+        _allocator.withdraw(address(_mockUsdt), 1);
+
+        uint256 idleBalance = _mockUsdt.balanceOf(address(_allocator));
+
+        assertEq(idleBalance, expectedSurplus, "Allocator should retain surplus across share prices");
     }
 
     ////////////////////////////////////////////////// HELPERS /////////////////////////////////////////////////////////
