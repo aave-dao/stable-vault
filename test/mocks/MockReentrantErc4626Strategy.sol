@@ -15,7 +15,7 @@ contract MockReentrantErc4626Strategy is ERC4626 {
     bool public reentrancyOnDeposit;
     bool public reentrancyOnRedeem;
     bool public revertOnReentrantFailure = true;
-    bool public lastReentrantCallSucceeded;
+    bool public lastReentrantCallReverted;
 
     constructor(IERC20 asset) ERC4626(asset) ERC20("Mock Reentrant Erc4626", "REENT4626") {}
 
@@ -68,7 +68,7 @@ contract MockReentrantErc4626Strategy is ERC4626 {
 
     function _executeReentrantCall() internal {
         (bool success, bytes memory returnData) = reentrantTarget.call(reentrantCalldata);
-        lastReentrantCallSucceeded = success;
+        lastReentrantCallReverted = !success;
         if (!success && revertOnReentrantFailure) {
             // Bubble up the error
             assembly {

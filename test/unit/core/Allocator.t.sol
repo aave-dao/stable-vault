@@ -3112,7 +3112,7 @@ contract AllocatorTest is TestWithHelpers {
         vm.prank(depositor);
         _allocator.deposit(address(_mockUsdt), depositAmount);
 
-        assertFalse(reentrantStrategy.lastReentrantCallSucceeded());
+        assertTrue(reentrantStrategy.lastReentrantCallReverted());
     }
 
     function test_depositAllowIdle_reentrancyNotAllowedOnRebalance() public {
@@ -3130,7 +3130,7 @@ contract AllocatorTest is TestWithHelpers {
         vm.prank(depositor);
         _allocator.depositAllowIdle(address(_mockUsdt), depositAmount);
 
-        assertFalse(reentrantStrategy.lastReentrantCallSucceeded());
+        assertTrue(reentrantStrategy.lastReentrantCallReverted());
     }
 
     function test_withdraw_reentrancyNotAllowedOnRebalance() public {
@@ -3146,7 +3146,7 @@ contract AllocatorTest is TestWithHelpers {
         vm.prank(withdrawer);
         _allocator.withdraw(address(_mockUsdt), depositAmount);
 
-        assertFalse(reentrantStrategy.lastReentrantCallSucceeded());
+        assertTrue(reentrantStrategy.lastReentrantCallReverted());
     }
 
     ////////////////////////////////////////////////// HELPERS /////////////////////////////////////////////////////////
