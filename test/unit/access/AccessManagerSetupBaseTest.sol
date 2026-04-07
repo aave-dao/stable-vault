@@ -420,7 +420,10 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         _assertTargetFunctionRole(
             target, WithdrawalPolicy.setDefaultFeeBps.selector, RolesConfig.getRole__setDefaultFeeBps().roleId
         );
-        _assertTargetFunctionRole(target, WithdrawalPolicy.setSigner.selector, RolesConfig.getRole__setSigner().roleId);
+        _assertTargetFunctionRole(target, WithdrawalPolicy.addSigner.selector, RolesConfig.getRole__addSigner().roleId);
+        _assertTargetFunctionRole(
+            target, WithdrawalPolicy.removeSigner.selector, RolesConfig.getRole__removeSigner().roleId
+        );
     }
 
     function test_targetSetup_assetRegistry() public view {

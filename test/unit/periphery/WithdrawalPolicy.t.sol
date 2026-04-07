@@ -99,22 +99,34 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         withdrawalPolicy.setDefaultFeeBps(uint16(newDefaultFeeBps));
     }
 
-    function test_setSigner_reverts_ifMsgSenderIsNotAuthorized(
-        address unauthorizedMsgSender,
-        address signer,
-        bool whitelistedSigner
-    ) public {
+    function test_addSigner_reverts_ifMsgSenderIsNotAuthorized(address unauthorizedMsgSender, address signer) public {
         vm.assume(unauthorizedMsgSender != address(0));
         _assumeNotProxyAdmin(unauthorizedMsgSender, address(withdrawalPolicy));
         mockAccessManager.mockRejectCall(
-            unauthorizedMsgSender, address(withdrawalPolicy), WithdrawalPolicy.setSigner.selector
+            unauthorizedMsgSender, address(withdrawalPolicy), WithdrawalPolicy.addSigner.selector
         );
 
         vm.expectRevert(
             abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
         );
         vm.prank(unauthorizedMsgSender);
-        withdrawalPolicy.setSigner(signer, whitelistedSigner);
+        withdrawalPolicy.addSigner(signer);
+    }
+
+    function test_removeSigner_reverts_ifMsgSenderIsNotAuthorized(address unauthorizedMsgSender, address signer)
+        public
+    {
+        vm.assume(unauthorizedMsgSender != address(0));
+        _assumeNotProxyAdmin(unauthorizedMsgSender, address(withdrawalPolicy));
+        mockAccessManager.mockRejectCall(
+            unauthorizedMsgSender, address(withdrawalPolicy), WithdrawalPolicy.removeSigner.selector
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
+        );
+        vm.prank(unauthorizedMsgSender);
+        withdrawalPolicy.removeSigner(signer);
     }
 
     // Setters & Getters tests
@@ -165,23 +177,34 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         withdrawalPolicy.setDefaultFeeBps(feeBps16);
     }
 
-    function test_setSigner_setsSignerStatus(address signer, bool isSigner) public {
+    function test_addSigner_setsSignerStatus(address signer) public {
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer, isSigner);
+        withdrawalPolicy.addSigner(signer);
 
-        assertEq(withdrawalPolicy.isSigner(signer), isSigner);
+        assertEq(withdrawalPolicy.isSigner(signer), true);
     }
 
-    function test_setSigner_emitsSignerSet(address signer) public {
+    function test_removeSigner_setsSignerStatus(address signer) public {
+        vm.prank(admin);
+        withdrawalPolicy.addSigner(signer);
+        vm.prank(admin);
+        withdrawalPolicy.removeSigner(signer);
+
+        assertEq(withdrawalPolicy.isSigner(signer), false);
+    }
+
+    function test_addSigner_emitsSignerSet(address signer) public {
         vm.expectEmit(true, true, true, true);
         emit IWithdrawalPolicy.SignerSet(signer, true);
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer, true);
+        withdrawalPolicy.addSigner(signer);
+    }
 
+    function test_removeSigner_emitsSignerSet(address signer) public {
         vm.expectEmit(true, true, true, true);
         emit IWithdrawalPolicy.SignerSet(signer, false);
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer, false);
+        withdrawalPolicy.removeSigner(signer);
     }
 
     // Calculation tests
@@ -288,7 +311,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         // Create signer wallet and whitelist it
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer, true);
+        withdrawalPolicy.addSigner(signer);
         assertTrue(withdrawalPolicy.isSigner(signer), "Signer is not whitelisted");
 
         // Build signed fee discount data
@@ -350,7 +373,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer, true);
+        withdrawalPolicy.addSigner(signer);
 
         bytes memory data = _createSignedFeeDiscountData(
             signerPk, user, assetOut, iouAmountRay, personalFeeBps, DEFAULT_NONCE, DEFAULT_DEADLINE
@@ -398,7 +421,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         // Create signer wallet and whitelist it
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer, true);
+        withdrawalPolicy.addSigner(signer);
         assertTrue(withdrawalPolicy.isSigner(signer), "Signer is not whitelisted");
 
         // Build signed fee discount data
@@ -480,7 +503,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         // Create signer wallet and whitelist it
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer, true);
+        withdrawalPolicy.addSigner(signer);
 
         // Build signed fee discount data for WRONG user
         bytes memory data = _createSignedFeeDiscountData(
@@ -512,7 +535,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         // Create signer wallet and whitelist it
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer, true);
+        withdrawalPolicy.addSigner(signer);
 
         // Build signed fee discount data for WRONG asset
         bytes memory data = _createSignedFeeDiscountData(
@@ -546,7 +569,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         // Create signer wallet and whitelist it
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer, true);
+        withdrawalPolicy.addSigner(signer);
 
         // Build signed fee discount data for WRONG amount
         bytes memory data = _createSignedFeeDiscountData(
@@ -580,7 +603,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         // Create signer wallet and whitelist it
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer, true);
+        withdrawalPolicy.addSigner(signer);
 
         // Create data with the CORRECT personalFeeBps but signature for WRONG personalFeeBps
         bytes memory wrongData = _createSignedFeeDiscountDataWithMismatch(
@@ -619,7 +642,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         // Create signer wallet and whitelist it
         (address signer,) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer, true);
+        withdrawalPolicy.addSigner(signer);
 
         // Manually encode SignedFeeDiscount with malformed signature
         bytes memory data = abi.encode(
@@ -647,7 +670,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer, true);
+        withdrawalPolicy.addSigner(signer);
 
         // Create signature with expired deadline
         uint256 expiredDeadline = block.timestamp - 1;
@@ -680,7 +703,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer, true);
+        withdrawalPolicy.addSigner(signer);
 
         bytes memory data = _createSignedFeeDiscountData(
             signerPk, user, assetOut, iouAmountRay, personalFeeBps, DEFAULT_NONCE, DEFAULT_DEADLINE
@@ -723,7 +746,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer, true);
+        withdrawalPolicy.addSigner(signer);
 
         // Create signature for personal fee waiver
         bytes memory data = _createSignedFeeDiscountData(
@@ -744,7 +767,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
     function test_invalidateNonce_allowsSignerToInvalidateOwnNonce() public {
         (address signer,) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer, true);
+        withdrawalPolicy.addSigner(signer);
 
         uint256 nonce = 42;
         assertFalse(withdrawalPolicy.wasNonceUsed(signer, nonce), "Nonce should not be used initially");
@@ -758,7 +781,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
     function test_invalidateNonce_emitsExpectedEvent(uint256 nonceSalt) public {
         (address signer,) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer, true);
+        withdrawalPolicy.addSigner(signer);
 
         uint256 nonce = uint256(keccak256(abi.encodePacked("fuzzedNonce:", nonceSalt)));
         assertFalse(withdrawalPolicy.wasNonceUsed(signer, nonce), "Nonce should not be used initially");
@@ -774,7 +797,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         address notSigner = makeAddr("notSigner");
         (address signer,) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer, true);
+        withdrawalPolicy.addSigner(signer);
 
         vm.prank(notSigner);
         vm.expectRevert(Errors.NotAuthorized.selector);
@@ -785,9 +808,9 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         (address signer1,) = makeAddrAndKey("signer1");
         (address signer2,) = makeAddrAndKey("signer2");
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer1, true);
+        withdrawalPolicy.addSigner(signer1);
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer2, true);
+        withdrawalPolicy.addSigner(signer2);
 
         // signer1 tries to invalidate signer2's nonce
         vm.prank(signer1);
@@ -798,7 +821,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
     function test_invalidateNonce_reverts_ifAlreadyInvalidated() public {
         (address signer,) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer, true);
+        withdrawalPolicy.addSigner(signer);
 
         vm.prank(signer);
         withdrawalPolicy.invalidateNonce(signer, 1);
@@ -826,7 +849,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer, true);
+        withdrawalPolicy.addSigner(signer);
 
         bytes memory data = _createSignedFeeDiscountData(
             signerPk, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), nonce, DEFAULT_DEADLINE
@@ -859,7 +882,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer, true);
+        withdrawalPolicy.addSigner(signer);
 
         bytes memory data = _createSignedFeeDiscountData(
             signerPk, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), nonce, DEFAULT_DEADLINE
@@ -888,7 +911,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer, true);
+        withdrawalPolicy.addSigner(signer);
 
         // Deadline exactly at current timestamp should work
         uint256 deadline = block.timestamp;
@@ -920,7 +943,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer, true);
+        withdrawalPolicy.addSigner(signer);
 
         // Deadline in the future should work
         uint256 deadline = block.timestamp + deadlineOffset;
@@ -957,7 +980,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer, true);
+        withdrawalPolicy.addSigner(signer);
 
         // First signature with nonce1
         bytes memory data1 = _createSignedFeeDiscountData(
@@ -993,7 +1016,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer, true);
+        withdrawalPolicy.addSigner(signer);
 
         // Nonce 0 should be valid
         uint256 nonceZero = 0;
@@ -1027,9 +1050,9 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         (address signer1, uint256 signerPk1) = makeAddrAndKey("signer1");
         (address signer2, uint256 signerPk2) = makeAddrAndKey("signer2");
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer1, true);
+        withdrawalPolicy.addSigner(signer1);
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer2, true);
+        withdrawalPolicy.addSigner(signer2);
 
         // Signer1 uses the shared nonce
         bytes memory data1 = _createSignedFeeDiscountData(
@@ -1066,7 +1089,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer, true);
+        withdrawalPolicy.addSigner(signer);
 
         bytes memory data = _createSignedFeeDiscountData(
             signerPk, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), DEFAULT_NONCE, DEFAULT_DEADLINE
@@ -1074,7 +1097,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         // Remove the signer
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer, false);
+        withdrawalPolicy.removeSigner(signer);
         assertFalse(withdrawalPolicy.isSigner(signer), "Signer should be removed");
 
         // Apply should revert because signer is no longer whitelisted
@@ -1099,7 +1122,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer, true);
+        withdrawalPolicy.addSigner(signer);
 
         bytes memory data = _createSignedFeeDiscountData(
             signerPk, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), DEFAULT_NONCE, DEFAULT_DEADLINE
@@ -1107,7 +1130,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         // Remove the signer
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer, false);
+        withdrawalPolicy.removeSigner(signer);
 
         // Preview should also revert because signer is no longer whitelisted
         vm.expectRevert(IWithdrawalPolicy.InvalidSignature.selector);
@@ -1131,7 +1154,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer, true);
+        withdrawalPolicy.addSigner(signer);
 
         bytes memory data = _createSignedFeeDiscountData(
             signerPk, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), DEFAULT_NONCE, DEFAULT_DEADLINE
@@ -1146,7 +1169,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         // Remove the signer
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer, false);
+        withdrawalPolicy.removeSigner(signer);
 
         // Same preview should now revert
         vm.expectRevert(IWithdrawalPolicy.InvalidSignature.selector);
@@ -1170,7 +1193,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer, true);
+        withdrawalPolicy.addSigner(signer);
 
         bytes memory data = _createSignedFeeDiscountData(
             signerPk, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), DEFAULT_NONCE, DEFAULT_DEADLINE
@@ -1178,7 +1201,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         // Remove the signer
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer, false);
+        withdrawalPolicy.removeSigner(signer);
 
         // Apply should revert
         vm.expectRevert(IWithdrawalPolicy.InvalidSignature.selector);
@@ -1186,7 +1209,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         // Re-add the signer
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer, true);
+        withdrawalPolicy.addSigner(signer);
 
         // Apply should now succeed
         uint256 amountOut = withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
@@ -1212,9 +1235,9 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         (address signer1, uint256 signerPk1) = makeAddrAndKey("signer1");
         (address signer2, uint256 signerPk2) = makeAddrAndKey("signer2");
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer1, true);
+        withdrawalPolicy.addSigner(signer1);
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer2, true);
+        withdrawalPolicy.addSigner(signer2);
 
         bytes memory data1 = _createSignedFeeDiscountData(
             signerPk1, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), 1, DEFAULT_DEADLINE
@@ -1225,7 +1248,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         // Remove signer1
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer1, false);
+        withdrawalPolicy.removeSigner(signer1);
 
         // Signer1's signature should fail
         vm.expectRevert(IWithdrawalPolicy.InvalidSignature.selector);
@@ -1242,7 +1265,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         (address signer,) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer, true);
+        withdrawalPolicy.addSigner(signer);
 
         // Signer can invalidate while whitelisted
         vm.prank(signer);
@@ -1251,7 +1274,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         // Remove the signer
         vm.prank(admin);
-        withdrawalPolicy.setSigner(signer, false);
+        withdrawalPolicy.removeSigner(signer);
 
         // Removed signer cannot invalidate nonces anymore
         vm.prank(signer);
