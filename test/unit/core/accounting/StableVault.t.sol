@@ -561,7 +561,7 @@ contract StableVaultTest is TestWithHelpers {
         stableVault.deposit(user, address(mockAsset), amount);
     }
 
-    function test_setUserRate_reverts_ifUserDoesNotHaveAPosition(address user, uint256 newPerSecondRate) public {
+    function test_setUserRate_skipsUserWithoutAPosition(address user, uint256 newPerSecondRate) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(stableVault));
@@ -570,8 +570,69 @@ contract StableVaultTest is TestWithHelpers {
         vm.assume(newPerSecondRate != stableVault.getDefaultSubVault().perSecondRate);
 
         vm.prank(manager);
-        vm.expectRevert(IStableVault.NonExistentPosition.selector);
         _setUserRate(user, DEFAULT_PER_SECOND_RATE);
+    }
+
+    function test_setUserRate_skipsUserAfterHeTransfersHisPosition() public {
+        address user1 = makeAddr("user1");
+        address user2 = makeAddr("user2");
+        address user3 = makeAddr("user3");
+        uint256 amount = _boundAssetAmount(address(mockAsset), 1 ether);
+        uint256 newRate = _boundRate(DEFAULT_PER_SECOND_RATE + 1);
+        vm.assume(newRate != stableVault.getDefaultSubVault().perSecondRate);
+
+        // Both users deposit
+        _deposit(user1, amount);
+        _deposit(user2, amount);
+
+        // user1 transfers their full position to user3, leaving user1 with no position
+        vm.prank(user1);
+        stableVault.transferAll(user3);
+
+        assertEq(stableVault.getUserSubVault(user1).id, 0);
+
+        // Batch setUserRate including user1 (no position) should not revert
+        IStableVault.UserRateData[] memory userRateData = new IStableVault.UserRateData[](2);
+        userRateData[0] = IStableVault.UserRateData(user1, newRate);
+        userRateData[1] = IStableVault.UserRateData(user2, newRate);
+        vm.prank(manager);
+        stableVault.setUserRate(userRateData);
+
+        // user2 should have been moved to the new rate
+        assertEq(stableVault.getUserSubVault(user2).perSecondRate, newRate);
+        // user1 should still have no position
+        assertEq(stableVault.getUserSubVault(user1).id, 0);
+    }
+
+    function test_setUserRate_skipsUserAfterHeWithdrawsHisPosition() public {
+        address user1 = makeAddr("user1");
+        address user2 = makeAddr("user2");
+        uint256 amount = _boundAssetAmount(address(mockAsset), 1 ether);
+        uint256 newRate = _boundRate(DEFAULT_PER_SECOND_RATE + 1);
+        vm.assume(newRate != stableVault.getDefaultSubVault().perSecondRate);
+
+        // Both users deposit
+        _deposit(user1, amount);
+        _deposit(user2, amount);
+
+        // user1 fully withdraws, leaving them with no position
+        mockFundsHandler.mockAggregatedBalance(amount * 2);
+        vm.prank(user1);
+        stableVault.requestWithdrawal(user1, 0);
+
+        assertEq(stableVault.getUserSubVault(user1).id, 0);
+
+        // Batch setUserRate including user1 (no position) should not revert
+        IStableVault.UserRateData[] memory userRateData = new IStableVault.UserRateData[](2);
+        userRateData[0] = IStableVault.UserRateData(user1, newRate);
+        userRateData[1] = IStableVault.UserRateData(user2, newRate);
+        vm.prank(manager);
+        stableVault.setUserRate(userRateData);
+
+        // user2 should have been moved to the new rate
+        assertEq(stableVault.getUserSubVault(user2).perSecondRate, newRate);
+        // user1 should still have no position
+        assertEq(stableVault.getUserSubVault(user1).id, 0);
     }
 
     function test_setUserRate_reverts_ifSettingTheSameRateHeAlreadyHas(address user, uint256 amount) public {
