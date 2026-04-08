@@ -574,8 +574,11 @@ contract Allocator is
     }
 
     function _beforeRescueTokens(address token, uint256) internal virtual override {
+        // Equivalent to adding the `restricted` modifier.
         _checkCanCall(_msgSender(), _msgData());
+        // Disallow rescuing registered assets, preventing the caller to take system funds through rescue function.
         require(!IAssetRegistry(ASSET_REGISTRY).isAssetRegistered(token), Errors.InvalidParameter());
+        // Disallow rescuing strategy shares, preventing the caller to take system funds through rescue function.
         require(!$storage().strategyConfigs[token].isRegistered, Errors.InvalidParameter());
     }
 }
