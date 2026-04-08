@@ -207,6 +207,38 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         _accountingChainGateway.setDefaultBridgeAdapter(address(0), EARNING_CHAIN_ID, makeAddr("adapter"));
     }
 
+    function test_isBridgeAdapterSupported_returnsTrueAfterAdd(address asset, uint256 chainId, address adapter) public {
+        vm.assume(asset != address(0) && adapter != address(0) && chainId != 0);
+
+        assertFalse(_accountingChainGateway.isBridgeAdapterSupported(asset, chainId, adapter));
+
+        vm.prank(everyRoleAccount);
+        _accountingChainGateway.addBridgeAdapter(asset, chainId, adapter);
+
+        assertTrue(_accountingChainGateway.isBridgeAdapterSupported(asset, chainId, adapter));
+    }
+
+    function test_isBridgeAdapterSupported_returnsFalseAfterRemove(address asset, uint256 chainId, address adapter)
+        public
+    {
+        vm.assume(asset != address(0) && adapter != address(0) && chainId != 0);
+
+        vm.prank(everyRoleAccount);
+        _accountingChainGateway.addBridgeAdapter(asset, chainId, adapter);
+        assertTrue(_accountingChainGateway.isBridgeAdapterSupported(asset, chainId, adapter));
+
+        vm.prank(everyRoleAccount);
+        _accountingChainGateway.removeBridgeAdapter(asset, chainId, adapter);
+        assertFalse(_accountingChainGateway.isBridgeAdapterSupported(asset, chainId, adapter));
+    }
+
+    function test_isBridgeAdapterSupported_returnsFalseForUnsetAdapter(address asset, uint256 chainId, address adapter)
+        public
+        view
+    {
+        assertFalse(_accountingChainGateway.isBridgeAdapterSupported(asset, chainId, adapter));
+    }
+
     function test_addBridgeAdapter_setsExpectedBridgeAdapter(address asset, uint256 chainId, address adapter) public {
         vm.assume(asset != address(0));
         vm.assume(chainId != 0);

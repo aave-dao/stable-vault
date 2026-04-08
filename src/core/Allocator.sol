@@ -160,6 +160,13 @@ contract Allocator is
         return $storage().strategyConfigs[strategy];
     }
 
+    /// @notice Getter for the list of strategies registered for a given asset.
+    /// @param asset The address of the asset to get strategies for.
+    /// @return The list of strategy addresses registered for the asset.
+    function getStrategiesForAsset(address asset) external view returns (address[] memory) {
+        return $storage().assetStrategies[asset].values();
+    }
+
     /// @inheritdoc IAllocator
     function isStrategySupportedForAsset(address asset, address strategy) external view override returns (bool) {
         return _isStrategySupportedForAsset({strategy: strategy, asset: asset});

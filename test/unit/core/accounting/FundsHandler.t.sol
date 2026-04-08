@@ -630,6 +630,52 @@ contract FundsHandlerTest is TestWithHelpers {
         fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, bridgeParams);
     }
 
+    function test_getEarningChainIds_returnsEmptyByDefault() public view {
+        uint256[] memory chainIds = fundsHandler.getEarningChainIds();
+        assertEq(chainIds.length, 0);
+    }
+
+    function test_getEarningChainIds_returnsAddedChains(uint256 chainId1, uint256 chainId2) public {
+        vm.assume(chainId1 != chainId2);
+        vm.assume(chainId1 != block.chainid);
+        vm.assume(chainId2 != block.chainid);
+
+        vm.prank(ADMIN);
+        fundsHandler.addEarningChain(chainId1);
+
+        uint256[] memory chainIds = fundsHandler.getEarningChainIds();
+        assertEq(chainIds.length, 1);
+        assertEq(chainIds[0], chainId1);
+
+        vm.prank(ADMIN);
+        fundsHandler.addEarningChain(chainId2);
+
+        chainIds = fundsHandler.getEarningChainIds();
+        assertEq(chainIds.length, 2);
+        assertEq(chainIds[0], chainId1);
+        assertEq(chainIds[1], chainId2);
+    }
+
+    function test_getEarningChainIds_reflectsRemoval(uint256 chainId1, uint256 chainId2) public {
+        vm.assume(chainId1 != chainId2);
+        vm.assume(chainId1 != block.chainid);
+        vm.assume(chainId2 != block.chainid);
+
+        vm.prank(ADMIN);
+        fundsHandler.addEarningChain(chainId1);
+        vm.prank(ADMIN);
+        fundsHandler.addEarningChain(chainId2);
+
+        assertEq(fundsHandler.getEarningChainIds().length, 2);
+
+        vm.prank(ADMIN);
+        fundsHandler.removeEarningChain(chainId1);
+
+        uint256[] memory chainIds = fundsHandler.getEarningChainIds();
+        assertEq(chainIds.length, 1);
+        assertEq(chainIds[0], chainId2);
+    }
+
     function test_addEarningChain_emitsEvent() public {
         uint256 chainId = 1234;
         vm.expectEmit(true, true, true, true);

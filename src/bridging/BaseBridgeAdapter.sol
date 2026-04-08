@@ -49,6 +49,13 @@ abstract contract BaseBridgeAdapter is AccessManaged, TransferHelperClient, IBri
         return GATEWAY;
     }
 
+    /// @notice Getter for the destination chain adapter for a given chain id.
+    /// @param chainId Chain id of the destination chain.
+    /// @return The address of the destination chain adapter.
+    function getDestinationChainAdapter(uint256 chainId) external view returns (address) {
+        return _destinationChainAdapterOf[chainId];
+    }
+
     /// @inheritdoc IBridgeAdapter
     function publishMessageToChainWithFeePayer(
         uint256 destinationChainId,
