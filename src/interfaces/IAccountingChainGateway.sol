@@ -18,6 +18,9 @@ interface IAccountingChainGateway is IChainGateway {
     /// @custom:selector 0xc6a06946
     error StaleChainBalance();
 
+    /// @notice Returns the address of the IOU token manager.
+    function getIouTokenManager() external view returns (address);
+
     /// @notice Sends assets to an Earning Chain.
     /// @dev The Accounting Chain does not prescribe to the Earning Chain which strategy to push assets to.
     /// @dev One asset is pushed at a time to avoid dependencies on bridges that support multiple assets bridged
@@ -26,9 +29,6 @@ interface IAccountingChainGateway is IChainGateway {
     /// @param amount The amount of the asset to send.
     /// @param targetChainId The chain id of the Earning Chain to send the assets to.
     /// @param bridgeParams The parameters for the bridge adapter.
-    /// @notice Returns the address of the IOU token manager.
-    function getIouTokenManager() external view returns (address);
-
     function sendPushFundsToChainMessage(
         address asset,
         uint256 amount,
