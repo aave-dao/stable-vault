@@ -26,6 +26,9 @@ interface IAccountingChainGateway is IChainGateway {
     /// @param amount The amount of the asset to send.
     /// @param targetChainId The chain id of the Earning Chain to send the assets to.
     /// @param bridgeParams The parameters for the bridge adapter.
+    /// @notice Returns the address of the IOU token manager.
+    function getIouTokenManager() external view returns (address);
+
     function sendPushFundsToChainMessage(
         address asset,
         uint256 amount,
