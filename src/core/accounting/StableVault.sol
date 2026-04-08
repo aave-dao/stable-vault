@@ -61,7 +61,7 @@ contract StableVault is
         uint256 totalShares;
     }
 
-    /// @notice The representation of an user's position. A single user will have at most 1 position.
+    /// @notice The representation of a user's position. A single user will have at most 1 position.
     /// @param originalDepositRay The amount deposited by the user before accruing any interest.
     /// @param subVaultId The ID of the subVault where the user's assets are.
     /// @param shares The shares of the user, scaled, normalized by subVault conversionRate.
@@ -88,7 +88,7 @@ contract StableVault is
     /// @custom:storage-location erc7201:aave.storage.StableVault
     struct StableVaultStorage {
         /// @dev Keeps track of the sum of all users' original deposits.
-        /// @dev Does not overlap with circulating IOUs because original deposits are decremented when new issue IOUs
+        /// @dev Does not overlap with circulating IOUs because original deposits are decremented when newly issued IOUs
         /// are minted.
         uint256 globalOriginalDepositsRay;
 
@@ -138,6 +138,7 @@ contract StableVault is
     /// @param fundsHandler The address of the contract that handles funds of the accounting chain.
     /// @param transferHelper The address of the contract that helps minimize the number of transfers across flows.
     /// @param withdrawalPolicy The address of the contract ensuring protocol's withdrawal requirements are met.
+    /// @param priceOracle The address of the PriceOracle contract.
     /// @param maxActiveSubVaults The maximum number of active sub-vaults allowed.
     constructor(
         uint256 maxValidPerSecondRate,
@@ -242,8 +243,8 @@ contract StableVault is
     /// @dev For full balance transfers, use transferAll() instead.
     /// @dev Reverts if the remaining sender balance after transfer would be below dust threshold.
     /// @dev The sender's principal (`originalDepositRay`) is decremented by up to `amountRay` and the same principal
-    /// amount is moved to the recipient. This mirrors the accounting outcome of withdraw -> transfer assets ->
-    /// recipient deposit.
+    /// amount is moved to the recipient. This is a simplified accounting-only operation that bypasses withdrawal fees,
+    /// oracle checks, solvency gating, and slippage.
     /// @dev Principal is tracked as one aggregate balance per user (not by deposit lots), so transfers always consume
     /// from that aggregate principal balance.
     function transfer(address to, uint256 amountRay) external virtual override nonReentrant returns (bool) {
@@ -819,7 +820,7 @@ contract StableVault is
     function _getActiveSubVaultsObligations() internal view returns (uint256) {
         uint256 activeSubVaultsObligations;
         for (uint256 i = 0; i < $storage().activeSubVaultsIds.length; i++) {
-            // Round up the obligations, so that the rounding is in favor of the protocol.
+            // Round up the obligations to avoid understating liabilities.
             activeSubVaultsObligations += $storage().subVaultById[$storage().activeSubVaultsIds[i]].totalShares
                 .rayMulUp(_previewSubVaultConversionRate($storage().activeSubVaultsIds[i]));
         }

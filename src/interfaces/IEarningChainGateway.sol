@@ -5,6 +5,9 @@ pragma solidity ^0.8.22;
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 
+/// @title IEarningChainGateway
+/// @author Aave Labs
+/// @notice Interface for gateway functionality required on the Earning Chain.
 interface IEarningChainGateway is IChainGateway {
     /// @notice Emitted when assets are removed from the Earning Chain.
     /// @dev Can be emitted when IOUs are exchanged for assets or funds are returned to the Accounting Chain.
@@ -17,7 +20,7 @@ interface IEarningChainGateway is IChainGateway {
 
     /// @notice Withdraws a specific asset from the Allocator and bridges it to the Accounting Chain.
     /// @param asset The asset to withdraw.
-    /// @param amount The `amount` must be in RAY to be token agnostic.
+    /// @param amount The amount of the asset to withdraw in the asset's native decimals.
     /// @param bridgeParams The parameters for the bridge adapter.
     function pushFundsToAccountingChain(address asset, uint256 amount, IBridgeAdapter.BridgeParams memory bridgeParams)
         external
@@ -30,7 +33,7 @@ interface IEarningChainGateway is IChainGateway {
     /// @param receiver The address to send the exchanged asset to.
     /// @param bridgeParams The parameters for the bridge adapter.
     /// @param data Additional data for the withdrawal fee calculation.
-    /// @return amountOut The amount of the exchanged asset transferred to the tokenOutReceiver.
+    /// @return amountOut The amount of the exchanged asset transferred to the receiver.
     function exchangeIouTokens(
         uint256 iouTokenAmountRay,
         address assetOut,

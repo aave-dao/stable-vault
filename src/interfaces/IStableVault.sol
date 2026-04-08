@@ -139,8 +139,7 @@ interface IStableVault {
     /// @notice Getter for the ID of a sub-vault for a given rate.
     /// @dev Only one sub-vault can have a given rate.
     /// @param perSecondRate Rate of the sub-vault to get the ID for.
-    /// @return subVaultId ID of the sub-vault for the given rate or 0 if no sub-vault does not exist for the given
-    /// rate.
+    /// @return subVaultId ID of the sub-vault for the given rate or 0 if no sub-vault exists for the given rate.
     function getSubVaultIdByRate(uint256 perSecondRate) external view returns (uint256);
 
     /// @notice Deposits assets into the vault.
@@ -192,8 +191,8 @@ interface IStableVault {
         bytes memory data
     ) external;
 
-    /// @notice Getter for the aggregated obligations owned to depositors in RAY of denomination asset.
-    /// @return obligations Aggregated obligations owned to depositors in RAY of denomination asset.
+    /// @notice Getter for the aggregated obligations owed to depositors in RAY of denomination asset.
+    /// @return obligations Aggregated obligations owed to depositors in RAY of denomination asset.
     function getVaultObligations() external view returns (uint256);
 
     /// @notice Getter for the aggregated balance on the local Allocator and the Allocator on Earning Chains.
