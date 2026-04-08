@@ -14,6 +14,8 @@ contract MockEarningChainGateway is IEarningChainGateway {
         TRANSFER_HELPER = transferHelper;
     }
 
+    function getIouTokenManager() external view returns (address) {}
+
     function getAggregatedBalance() external view returns (uint256) {}
 
     function sendBalanceUpdateWithFeePayer(IBridgeAdapter.BridgeParams memory bridgeParams) external payable {}

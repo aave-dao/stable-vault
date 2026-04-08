@@ -80,10 +80,6 @@ contract EarningChainGateway is
         __BaseChainGateway_init(accessManager);
     }
 
-    function getIouTokenManager() external view returns (address) {
-        return IOU_TOKEN_MANAGER;
-    }
-
     function getAccountingChainId() external view returns (uint256) {
         return ACCOUNTING_CHAIN_ID;
     }

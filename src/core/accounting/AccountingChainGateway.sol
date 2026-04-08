@@ -56,10 +56,6 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
         return FUNDS_HANDLER;
     }
 
-    function getIouTokenManager() external view returns (address) {
-        return IOU_TOKEN_MANAGER;
-    }
-
     /// @inheritdoc IAccountingChainGateway
     function sendPushFundsToChainMessage(
         address asset,

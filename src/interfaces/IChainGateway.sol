@@ -73,6 +73,9 @@ interface IChainGateway {
         uint256 blockNumber;
     }
 
+    /// @notice Returns the address of the IOU token manager.
+    function getIouTokenManager() external view returns (address);
+
     /// @notice Gets the default bridge adapter for an asset and chain; the default adapter is used for outbound
     /// messages.
     /// @dev The adapter must be whitelisted for the asset and chain.
