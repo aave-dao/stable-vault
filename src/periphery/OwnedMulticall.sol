@@ -47,7 +47,6 @@ contract OwnedMulticall is Ownable {
         revert RenounceOwnershipNotAllowed();
     }
 
-    /// @notice Backwards-compatible call aggregation with Multicall
     /// @param calls An array of Call structs
     /// @return blockNumber The block number where the calls were executed
     /// @return returnData An array of bytes containing the responses
