@@ -137,6 +137,14 @@ contract EarningChainGateway is
         require(adapter != address(0), AdapterNotFound());
 
         // Send data to synchronize the Accounting Chain's state.
+        // NOTE: Oracle-bridge propagation asymmetry (by design). The Earning Chain balance reduction is reflected in
+        // the next Chainlink oracle update (order of seconds via AssetOutflow event), while this BURN_IOU_TOKEN CCIP
+        // message takes longer to arrive (order of minutes). During this window, the Accounting Chain sees reduced
+        // assets but unchanged IOU obligations, temporarily lowering available surplus. This is the conservative
+        // direction: _validateInboundMessageBlockNumber() on the Accounting Chain ensures the burn message is only
+        // accepted after the oracle snapshot reflects this outflow, preventing the reverse (obligations reduced while
+        // assets are still overstated). Operators are expected to account for this transient state when scheduling
+        // claimSurplusInterest() calls.
         _sendBurnIouTokenMessage(iouTokenAmountRay, adapter, bridgeParams);
 
         ITransferHelper(TRANSFER_HELPER).transfer(assetOut, amountOut, receiver);
