@@ -447,8 +447,12 @@ contract Allocator is
     /// as idle balance in the Allocator, rounding in favor of the protocol.
     function _withdrawFromStrategy(address asset, uint256 amount, address strategy) internal {
         uint256 balanceBefore = IERC20(asset).balanceOf(address(this));
-        uint256 shares = IERC4626(strategy).previewWithdraw(amount);
-        IERC4626(strategy).redeem({shares: shares, receiver: address(this), owner: address(this)});
+        uint256 sharesBalance = IERC4626(strategy).balanceOf(address(this));
+        uint256 sharesToWithdraw = IERC4626(strategy).previewWithdraw(amount);
+        if (sharesToWithdraw > sharesBalance) {
+            sharesToWithdraw = sharesBalance;
+        }
+        IERC4626(strategy).redeem({shares: sharesToWithdraw, receiver: address(this), owner: address(this)});
         uint256 balanceAfter = IERC20(asset).balanceOf(address(this));
         uint256 actualAmountWithdrawn = balanceAfter - balanceBefore;
         require(actualAmountWithdrawn >= amount, Errors.InsufficientAmountOut());

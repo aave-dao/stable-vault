@@ -11,7 +11,6 @@ import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {Allocator} from "src/core/Allocator.sol";
@@ -1718,14 +1717,7 @@ contract AllocatorTest is TestWithHelpers {
             _buildRebalanceParams(deallocations, _initializeSwapParams(0), _initializeAllocationParams(0));
 
         vm.prank(address(everyRoleAccount));
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                ERC4626.ERC4626ExceededMaxRedeem.selector,
-                address(_allocator),
-                deallocateAmountUsdt,
-                depositAmountUsdt
-            )
-        );
+        vm.expectRevert(Errors.InsufficientAmountOut.selector);
         _allocator.rebalance(rebalanceParams);
     }
 
@@ -3167,8 +3159,6 @@ contract AllocatorTest is TestWithHelpers {
 
         _simulateStrategyYield(_defaultUsdtStrategy, _mockUsdt, yieldAmount);
 
-        // At 10x share price, withdrawing 1 wei burns 1 share worth ~9 wei (OZ +1 offset).
-        // Using redeem(previewWithdraw(1)) would give us 9 assets instead of 1.
         uint256 sharesToBurn = _defaultUsdtStrategy.previewWithdraw(1);
         uint256 redeemValue = _defaultUsdtStrategy.previewRedeem(sharesToBurn);
         uint256 expectedSurplus = redeemValue - 1;
@@ -3181,10 +3171,6 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.withdraw(address(_mockUsdt), 1);
 
         uint256 idleBalance = _mockUsdt.balanceOf(address(_allocator));
-
-        // Currently withdraw() returns exactly 1 asset and the surplus (8+ wei) stays
-        // locked inside the ERC4626 vault. After the fix, the surplus should be retained
-        // as idle balance in the Allocator.
         assertEq(idleBalance, expectedSurplus, "Allocator should retain rounding surplus as idle balance");
     }
 
@@ -3198,8 +3184,6 @@ contract AllocatorTest is TestWithHelpers {
 
         _simulateStrategyYield(_defaultUsdtStrategy, _mockUsdt, yieldAmount);
 
-        // At 2x share price, withdrawing 10 wei: previewWithdraw(10) = 6 shares (ceil(10/2) with OZ offset).
-        // redeem(6) gives 11 assets → surplus of 1.
         uint256 withdrawAmount = 10;
         uint256 sharesToBurn = _defaultUsdtStrategy.previewWithdraw(withdrawAmount);
         uint256 redeemValue = _defaultUsdtStrategy.previewRedeem(sharesToBurn);
@@ -3211,7 +3195,6 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.withdraw(address(_mockUsdt), withdrawAmount);
 
         uint256 idleBalance = _mockUsdt.balanceOf(address(_allocator));
-
         assertEq(idleBalance, expectedSurplus, "Allocator should retain surplus at 2x share price");
     }
 
@@ -3226,8 +3209,6 @@ contract AllocatorTest is TestWithHelpers {
 
         _simulateStrategyYield(_defaultUsdtStrategy, _mockUsdt, yieldAmount);
 
-        // At share prices >= 2x, a 1-wei withdrawal burns 1 share worth multiple wei.
-        // The surplus from redeem should be captured as idle balance.
         uint256 sharesToBurn = _defaultUsdtStrategy.previewWithdraw(1);
         uint256 redeemValue = _defaultUsdtStrategy.previewRedeem(sharesToBurn);
         uint256 expectedSurplus = redeemValue - 1;
@@ -3237,8 +3218,95 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.withdraw(address(_mockUsdt), 1);
 
         uint256 idleBalance = _mockUsdt.balanceOf(address(_allocator));
-
         assertEq(idleBalance, expectedSurplus, "Allocator should retain surplus across share prices");
+    }
+
+    /////////////////////////////////// SHARES CAP EDGE CASE (previewWithdraw > balanceOf) ////////////////////////////
+
+    function test_withdrawFromStrategy_capsSharesAtBalance_whenPreviewWithdrawOverestimates() public {
+        uint256 depositAmount = 1_000_000e6;
+
+        _mockTransferHelper.mockAsset(address(_mockUsdt), depositAmount);
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), depositAmount);
+
+        uint256 sharesBalance = _defaultUsdtStrategy.balanceOf(address(_allocator));
+
+        // Mock previewWithdraw to return 1 more share than the Allocator owns,
+        // simulating a non-standard ERC4626 or rounding edge case.
+        vm.mockCall(
+            address(_defaultUsdtStrategy),
+            abi.encodeWithSelector(IERC4626.previewWithdraw.selector, depositAmount),
+            abi.encode(sharesBalance + 1)
+        );
+
+        // Without the balanceOf cap, redeem(sharesBalance + 1) would revert with
+        // ERC4626ExceededMaxRedeem. With the cap, redeem(sharesBalance) succeeds.
+        _mockTransferHelper.mockAsset(address(_mockUsdt), 0);
+        vm.prank(withdrawer);
+        _allocator.withdraw(address(_mockUsdt), depositAmount);
+
+        assertEq(
+            _mockUsdt.balanceOf(address(_mockTransferHelper)),
+            depositAmount,
+            "Full amount should be transferred despite previewWithdraw overestimate"
+        );
+    }
+
+    function test_withdrawFromStrategy_capsSharesAtBalance_revertsWhenAssetsInsufficient() public {
+        uint256 depositAmount = 1_000_000e6;
+        uint256 withdrawAmount = depositAmount + 1;
+
+        _mockTransferHelper.mockAsset(address(_mockUsdt), depositAmount);
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), depositAmount);
+
+        // Try to deallocate more than deposited via rebalance (bypasses maxWithdraw check).
+        // The cap kicks in: previewWithdraw(depositAmount+1) > sharesBalance, so
+        // sharesToWithdraw = sharesBalance. redeem(sharesBalance) returns depositAmount,
+        // but the require(actualAmount >= withdrawAmount) fails.
+        IAllocator.RebalanceParams[] memory rebalanceParams = _initializeRebalanceParams(1);
+        IAllocator.DeallocationParams[] memory deallocations = _initializeDeallocationParams(1);
+        deallocations[0] = _buildDeallocationParams(address(_mockUsdt), address(_defaultUsdtStrategy), withdrawAmount);
+        rebalanceParams[0] =
+            _buildRebalanceParams(deallocations, _initializeSwapParams(0), _initializeAllocationParams(0));
+
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(Errors.InsufficientAmountOut.selector);
+        _allocator.rebalance(rebalanceParams);
+    }
+
+    function test_withdrawFromStrategy_capsSharesAtBalance_withYield() public {
+        uint256 depositAmount = 1_000_000e6;
+        uint256 yieldAmount = 1_000_000e6; // 2x share price
+
+        _mockTransferHelper.mockAsset(address(_mockUsdt), depositAmount);
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), depositAmount);
+
+        _simulateStrategyYield(_defaultUsdtStrategy, _mockUsdt, yieldAmount);
+
+        uint256 sharesBalance = _defaultUsdtStrategy.balanceOf(address(_allocator));
+        uint256 maxWithdrawable = _defaultUsdtStrategy.maxWithdraw(address(_allocator));
+
+        // Mock previewWithdraw to return sharesBalance + 1, simulating a strategy
+        // where previewWithdraw overshoots by 1 due to aggressive ceil rounding.
+        vm.mockCall(
+            address(_defaultUsdtStrategy),
+            abi.encodeWithSelector(IERC4626.previewWithdraw.selector, maxWithdrawable),
+            abi.encode(sharesBalance + 1)
+        );
+
+        // With the cap, redeem(sharesBalance) succeeds and returns all our assets
+        // (which is >= maxWithdrawable since share price > 1).
+        _mockTransferHelper.mockAsset(address(_mockUsdt), 0);
+        vm.prank(withdrawer);
+        _allocator.withdraw(address(_mockUsdt), maxWithdrawable);
+
+        uint256 transferHelperBalance = _mockUsdt.balanceOf(address(_mockTransferHelper));
+        assertGe(
+            transferHelperBalance, maxWithdrawable, "Should successfully withdraw despite previewWithdraw overestimate"
+        );
     }
 
     ////////////////////////////////////////////////// HELPERS /////////////////////////////////////////////////////////
