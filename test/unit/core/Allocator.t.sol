@@ -3195,6 +3195,8 @@ contract AllocatorTest is TestWithHelpers {
 
         _mockUnsupportedAsset.mint(address(_allocator), amount);
 
+        vm.expectEmit(true, true, true, true);
+        emit IRescuableToken.TokensRescued(address(_mockUnsupportedAsset), everyRoleAccount, amount);
         vm.prank(everyRoleAccount);
         IRescuableToken(address(_allocator)).rescueTokens(address(_mockUnsupportedAsset), amount);
 

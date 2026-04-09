@@ -12,6 +12,7 @@ import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
+import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {Errors} from "src/types/Errors.sol";
@@ -157,6 +158,8 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         assertEq(_mockUsdt.balanceOf(everyRoleAccount), 0);
         _mockUsdt.mint(address(_accountingChainGateway), amount);
         assertEq(_mockUsdt.balanceOf(address(_accountingChainGateway)), amount);
+        vm.expectEmit(true, true, true, true);
+        emit IRescuableToken.TokensRescued(asset, everyRoleAccount, amount);
         vm.prank(everyRoleAccount);
         _accountingChainGateway.rescueTokens(asset, amount);
         assertEq(_mockUsdt.balanceOf(everyRoleAccount), amount);
