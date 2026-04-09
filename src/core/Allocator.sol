@@ -22,6 +22,7 @@ import {ISwapper} from "src/interfaces/ISwapper.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {Multicall} from "src/misc/Multicall.sol";
+import {RescuableToken} from "src/misc/RescuableToken.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
 import {Errors} from "src/types/Errors.sol";
 
@@ -41,6 +42,7 @@ contract Allocator is
     TransferHelperClient,
     Multicall,
     ReentrancyGuardTransientUpgradeable,
+    RescuableToken,
     IAllocator
 {
     using SafeERC20 for IERC20;
@@ -158,6 +160,13 @@ contract Allocator is
     /// @inheritdoc IAllocator
     function getStrategyConfig(address strategy) external view override returns (StrategyConfig memory) {
         return $storage().strategyConfigs[strategy];
+    }
+
+    /// @notice Getter for the list of strategies registered for a given asset.
+    /// @param asset The address of the asset to get strategies for.
+    /// @return The list of strategy addresses registered for the asset.
+    function getStrategiesForAsset(address asset) external view returns (address[] memory) {
+        return $storage().assetStrategies[asset].values();
     }
 
     /// @inheritdoc IAllocator
@@ -581,5 +590,14 @@ contract Allocator is
         }
         $storage().defaultStrategyByAsset[asset] = strategy;
         emit DefaultStrategySet(asset, strategy);
+    }
+
+    function _beforeRescueTokens(address token, uint256) internal virtual override {
+        // Equivalent to adding the `restricted` modifier.
+        _checkCanCall(_msgSender(), _msgData());
+        // Disallow rescuing registered assets, preventing the caller to take system funds through rescue function.
+        require(!IAssetRegistry(ASSET_REGISTRY).isAssetRegistered(token), Errors.InvalidParameter());
+        // Disallow rescuing strategy shares, preventing the caller to take system funds through rescue function.
+        require(!$storage().strategyConfigs[token].isRegistered, Errors.InvalidParameter());
     }
 }

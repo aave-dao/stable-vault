@@ -17,6 +17,7 @@ import {Allocator} from "src/core/Allocator.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
+import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
@@ -335,6 +336,44 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(
             _allocator.getStrategyConfig(address(_extraUsdtStrategy)).maxSlippageAmount, STRATEGY_MAX_SLIPPAGE_AMOUNT
         );
+    }
+
+    function test_getStrategiesForAsset_returnsExpectedStrategies() public view {
+        address[] memory usdtStrategies = _allocator.getStrategiesForAsset(address(_mockUsdt));
+        assertEq(usdtStrategies.length, 2);
+        assertEq(usdtStrategies[0], address(_defaultUsdtStrategy));
+        assertEq(usdtStrategies[1], address(_extraUsdtStrategy));
+
+        address[] memory ghoStrategies = _allocator.getStrategiesForAsset(address(_mockGho));
+        assertEq(ghoStrategies.length, 2);
+        assertEq(ghoStrategies[0], address(_defaultGhoStrategy));
+        assertEq(ghoStrategies[1], address(_extraGhoStrategy));
+    }
+
+    function test_getStrategiesForAsset_reflectsAddAndRemove() public {
+        TestErc4626 newStrategy = new TestErc4626(_mockUsdt);
+
+        address[] memory before = _allocator.getStrategiesForAsset(address(_mockUsdt));
+        uint256 countBefore = before.length;
+
+        vm.prank(admin);
+        _allocator.addStrategy(address(_mockUsdt), address(newStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+
+        address[] memory after_ = _allocator.getStrategiesForAsset(address(_mockUsdt));
+        assertEq(after_.length, countBefore + 1);
+        assertEq(after_[after_.length - 1], address(newStrategy));
+
+        vm.prank(everyRoleAccount);
+        _allocator.removeStrategy(address(newStrategy));
+
+        address[] memory afterRemove = _allocator.getStrategiesForAsset(address(_mockUsdt));
+        assertEq(afterRemove.length, countBefore);
+    }
+
+    function test_getStrategiesForAsset_returnsEmptyForUnknownAsset(address unknownAsset) public view {
+        vm.assume(unknownAsset != address(_mockUsdt) && unknownAsset != address(_mockGho));
+        address[] memory strategies = _allocator.getStrategiesForAsset(unknownAsset);
+        assertEq(strategies.length, 0);
     }
 
     function test_isStrategySupportedForAsset_returnsExpectedResult() public view {
@@ -3307,6 +3346,54 @@ contract AllocatorTest is TestWithHelpers {
         assertGe(
             transferHelperBalance, maxWithdrawable, "Should successfully withdraw despite previewWithdraw overestimate"
         );
+    }
+
+    /////////////////////////////////////////////// RESCUE TOKENS //////////////////////////////////////////////////////
+
+    function test_rescueTokens_rescuesUnregisteredNonStrategyToken(uint256 amount) public {
+        amount = _boundAssetAmount(address(_mockUnsupportedAsset), amount);
+
+        _mockUnsupportedAsset.mint(address(_allocator), amount);
+
+        vm.expectEmit(true, true, true, true);
+        emit IRescuableToken.TokensRescued(address(_mockUnsupportedAsset), everyRoleAccount, amount);
+        vm.prank(everyRoleAccount);
+        IRescuableToken(address(_allocator)).rescueTokens(address(_mockUnsupportedAsset), amount);
+
+        assertEq(_mockUnsupportedAsset.balanceOf(everyRoleAccount), amount);
+        assertEq(_mockUnsupportedAsset.balanceOf(address(_allocator)), 0);
+    }
+
+    function test_rescueTokens_reverts_ifTokenIsRegistered(uint256 amount) public {
+        amount = _boundAssetAmount(address(_mockUsdt), amount);
+
+        _mockUsdt.mint(address(_allocator), amount);
+
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        vm.prank(everyRoleAccount);
+        IRescuableToken(address(_allocator)).rescueTokens(address(_mockUsdt), amount);
+    }
+
+    function test_rescueTokens_reverts_ifTokenIsStrategy() public {
+        deal(address(_defaultUsdtStrategy), address(_allocator), 1000);
+
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        vm.prank(everyRoleAccount);
+        IRescuableToken(address(_allocator)).rescueTokens(address(_defaultUsdtStrategy), 1000);
+    }
+
+    function test_rescueTokens_reverts_ifNotAuthorized(address unauthorizedMsgSender) public {
+        vm.assume(unauthorizedMsgSender != address(0));
+        _assumeNotProxyAdmin(unauthorizedMsgSender, address(_allocator));
+        _mockAccessManager.mockRejectCall(
+            unauthorizedMsgSender, address(_allocator), IRescuableToken.rescueTokens.selector
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
+        );
+        vm.prank(unauthorizedMsgSender);
+        IRescuableToken(address(_allocator)).rescueTokens(address(_mockUnsupportedAsset), 100);
     }
 
     ////////////////////////////////////////////////// HELPERS /////////////////////////////////////////////////////////

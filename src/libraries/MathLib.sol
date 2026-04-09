@@ -69,7 +69,7 @@ library MathLib {
         }
     }
 
-    /// @notice Exponentiates `x` to `y` by squaring.
+    /// @notice Exponentiates `x` to `n` by squaring.
     /// @param x The base (in RAY)
     /// @param n The exponent (integer)
     /// @return The result, x^n (in RAY)

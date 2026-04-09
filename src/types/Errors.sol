@@ -46,13 +46,13 @@ library Errors {
     /// @custom:selector 0x90eaaa70
     error InvalidDestinationChainId();
 
+    /// @notice Thrown when a provided gas limit is below the minimum required for safe execution.
+    /// @custom:selector 0x98bdb2e0
+    error InvalidGasLimit();
+
     /// @notice Thrown when input parameter contains unacceptable value.
     /// @custom:selector 0x613970e0
     error InvalidParameter();
-
-    /// @notice Thrown when a recovered signer is not a whitelisted signer.
-    /// @custom:selector 0x8baa579f
-    error InvalidSignature();
 
     /// @notice Thrown when native currency transfer failed.
     /// @custom:selector 0xf4b3b1bc

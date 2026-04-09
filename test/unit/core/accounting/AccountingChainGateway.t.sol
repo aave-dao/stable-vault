@@ -12,6 +12,7 @@ import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
+import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {Errors} from "src/types/Errors.sol";
@@ -131,6 +132,10 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         assertEq(_accountingChainGateway.getFundsHandler(), address(_mockFundsHandler));
     }
 
+    function test_getIouTokenManager_returnsExpectedIouTokenManager() public view {
+        assertEq(_accountingChainGateway.getIouTokenManager(), address(_mockIouTokenManager));
+    }
+
     function test_getDefaultBridgeAdapter_returnsExpectedDefaultBridgeAdapter() public view {
         assertEq(
             _accountingChainGateway.getDefaultBridgeAdapter(address(_mockUsdt), EARNING_CHAIN_ID),
@@ -153,6 +158,8 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         assertEq(_mockUsdt.balanceOf(everyRoleAccount), 0);
         _mockUsdt.mint(address(_accountingChainGateway), amount);
         assertEq(_mockUsdt.balanceOf(address(_accountingChainGateway)), amount);
+        vm.expectEmit(true, true, true, true);
+        emit IRescuableToken.TokensRescued(asset, everyRoleAccount, amount);
         vm.prank(everyRoleAccount);
         _accountingChainGateway.rescueTokens(asset, amount);
         assertEq(_mockUsdt.balanceOf(everyRoleAccount), amount);
@@ -205,6 +212,38 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         vm.expectRevert(Errors.AddressNotWhitelisted.selector);
         vm.prank(admin);
         _accountingChainGateway.setDefaultBridgeAdapter(address(0), EARNING_CHAIN_ID, makeAddr("adapter"));
+    }
+
+    function test_isBridgeAdapterSupported_returnsTrueAfterAdd(address asset, uint256 chainId, address adapter) public {
+        vm.assume(asset != address(0) && adapter != address(0) && chainId != 0);
+
+        assertFalse(_accountingChainGateway.isBridgeAdapterSupported(asset, chainId, adapter));
+
+        vm.prank(everyRoleAccount);
+        _accountingChainGateway.addBridgeAdapter(asset, chainId, adapter);
+
+        assertTrue(_accountingChainGateway.isBridgeAdapterSupported(asset, chainId, adapter));
+    }
+
+    function test_isBridgeAdapterSupported_returnsFalseAfterRemove(address asset, uint256 chainId, address adapter)
+        public
+    {
+        vm.assume(asset != address(0) && adapter != address(0) && chainId != 0);
+
+        vm.prank(everyRoleAccount);
+        _accountingChainGateway.addBridgeAdapter(asset, chainId, adapter);
+        assertTrue(_accountingChainGateway.isBridgeAdapterSupported(asset, chainId, adapter));
+
+        vm.prank(everyRoleAccount);
+        _accountingChainGateway.removeBridgeAdapter(asset, chainId, adapter);
+        assertFalse(_accountingChainGateway.isBridgeAdapterSupported(asset, chainId, adapter));
+    }
+
+    function test_isBridgeAdapterSupported_returnsFalseForUnsetAdapter(address asset, uint256 chainId, address adapter)
+        public
+        view
+    {
+        assertFalse(_accountingChainGateway.isBridgeAdapterSupported(asset, chainId, adapter));
     }
 
     function test_addBridgeAdapter_setsExpectedBridgeAdapter(address asset, uint256 chainId, address adapter) public {

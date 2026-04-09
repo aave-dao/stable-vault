@@ -27,9 +27,9 @@ interface IChainBalanceOracle {
         bool isStale;
     }
 
-    /// @notice Queries an oracle feed for data representing the aggregate price-adjusted balance of asset from a given
-    /// Earning Chain.
-    /// @param chainId Earning chain id query data for.
+    /// @notice Queries an oracle feed for data representing the aggregate price-adjusted balance of an asset from a
+    /// given Earning Chain.
+    /// @param chainId Earning chain id to query data for.
     /// @return ChainBalance response from the oracle adapter.
     function getChainBalance(uint256 chainId) external view returns (ChainBalance memory);
 }

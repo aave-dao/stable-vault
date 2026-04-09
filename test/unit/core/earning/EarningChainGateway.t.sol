@@ -18,6 +18,7 @@ import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
+import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
@@ -41,6 +42,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     using AssetLib for uint256;
     using SafeERC20 for IERC20;
 
+    uint256 internal constant BURN_IOU_TOKEN_GAS_LIMIT = 120_000;
     uint256 internal ACCOUNTING_CHAIN_ID = 1;
     uint256 internal EARNING_CHAIN_ID = 2;
 
@@ -241,6 +243,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
         assertEq(_mockUsdt.balanceOf(everyRoleAccount), 0);
         _mockUsdt.mint(address(_earningChainGateway), amount);
         assertEq(_mockUsdt.balanceOf(address(_earningChainGateway)), amount);
+        vm.expectEmit(true, true, true, true);
+        emit IRescuableToken.TokensRescued(asset, everyRoleAccount, amount);
         vm.prank(everyRoleAccount);
         _earningChainGateway.rescueTokens(asset, amount);
         assertEq(_mockUsdt.balanceOf(everyRoleAccount), amount);
@@ -369,7 +373,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                             feeToken: bridgeFeeToken,
                             feeAmount: bridgeFeeAmount,
                             feeRefundThreshold: 0,
-                            gasLimit: 100000,
+                            gasLimit: BURN_IOU_TOKEN_GAS_LIMIT,
                             data: abi.encode(keccak256(hex"c0ffee"))
                         })
                     )
@@ -389,7 +393,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     feeToken: bridgeFeeToken,
                     feeAmount: bridgeFeeAmount,
                     feeRefundThreshold: 0,
-                    gasLimit: 100000,
+                    gasLimit: BURN_IOU_TOKEN_GAS_LIMIT,
                     data: abi.encode(keccak256(hex"c0ffee"))
                 }),
                 ""
@@ -438,7 +442,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                             feeToken: bridgeFeeToken,
                             feeAmount: bridgeFeeAmount,
                             feeRefundThreshold: 0,
-                            gasLimit: 100000,
+                            gasLimit: BURN_IOU_TOKEN_GAS_LIMIT,
                             data: abi.encode(keccak256(hex"c0ffee"))
                         })
                     )
@@ -457,7 +461,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     feeToken: bridgeFeeToken,
                     feeAmount: bridgeFeeAmount,
                     feeRefundThreshold: 0,
-                    gasLimit: 100000,
+                    gasLimit: BURN_IOU_TOKEN_GAS_LIMIT,
                     data: abi.encode(keccak256(hex"c0ffee"))
                 }),
                 ""
@@ -518,7 +522,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 feeToken: address(0),
                 feeAmount: bridgeFeeAmount,
                 feeRefundThreshold: 0,
-                gasLimit: 100000,
+                gasLimit: BURN_IOU_TOKEN_GAS_LIMIT,
                 data: abi.encode(keccak256(hex"c0ffee"))
             });
             _mockTransferHelper.mockAsset(address(_mockUsdt), amountOut);
@@ -565,7 +569,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 feeToken: address(0),
                 feeAmount: 0,
                 feeRefundThreshold: 0,
-                gasLimit: 100000,
+                gasLimit: BURN_IOU_TOKEN_GAS_LIMIT,
                 data: abi.encode(keccak256(hex"c0ffee"))
             }),
             ""
@@ -584,7 +588,28 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 feeToken: address(0),
                 feeAmount: 0,
                 feeRefundThreshold: 0,
-                gasLimit: 100000,
+                gasLimit: BURN_IOU_TOKEN_GAS_LIMIT,
+                data: abi.encode(keccak256(hex"c0ffee"))
+            }),
+            ""
+        );
+    }
+
+    function test_exchangeIouTokens_reverts_ifBurnIouTokenGasLimitBelowMinimum(uint256 iouTokenAmountRay) public {
+        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+
+        vm.expectRevert(Errors.InvalidGasLimit.selector);
+        _earningChainGateway.exchangeIouTokens(
+            iouTokenAmountRay,
+            address(_mockUsdt),
+            0,
+            makeAddr("tokenOutReceiver"),
+            IBridgeAdapter.BridgeParams({
+                feePayer: address(this),
+                feeToken: address(0),
+                feeAmount: 0,
+                feeRefundThreshold: 0,
+                gasLimit: BURN_IOU_TOKEN_GAS_LIMIT - 1,
                 data: abi.encode(keccak256(hex"c0ffee"))
             }),
             ""
@@ -609,7 +634,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 feeToken: address(0),
                 feeAmount: 0,
                 feeRefundThreshold: 0,
-                gasLimit: 100000,
+                gasLimit: BURN_IOU_TOKEN_GAS_LIMIT,
                 data: abi.encode(keccak256(hex"c0ffee"))
             }),
             ""
@@ -637,7 +662,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 feeToken: address(0),
                 feeAmount: 0,
                 feeRefundThreshold: 0,
-                gasLimit: 100000,
+                gasLimit: BURN_IOU_TOKEN_GAS_LIMIT,
                 data: abi.encode(keccak256(hex"c0ffee"))
             }),
             ""
@@ -662,7 +687,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 feeToken: address(0),
                 feeAmount: 123,
                 feeRefundThreshold: 0,
-                gasLimit: 100000,
+                gasLimit: BURN_IOU_TOKEN_GAS_LIMIT,
                 data: abi.encode(keccak256(hex"c0ffee"))
             }),
             ""
@@ -706,7 +731,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 feeToken: address(0),
                 feeAmount: 123,
                 feeRefundThreshold: 0,
-                gasLimit: 100000,
+                gasLimit: BURN_IOU_TOKEN_GAS_LIMIT,
                 data: abi.encode(keccak256(hex"c0ffee"))
             }),
             ""
@@ -738,7 +763,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 feeToken: address(0),
                 feeAmount: bridgeFeeAmount,
                 feeRefundThreshold: 0,
-                gasLimit: 100000,
+                gasLimit: BURN_IOU_TOKEN_GAS_LIMIT,
                 data: abi.encode(keccak256(hex"c0ffee"))
             }),
             ""
@@ -770,7 +795,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 feeToken: address(0),
                 feeAmount: bridgeFeeAmount,
                 feeRefundThreshold: 0,
-                gasLimit: 100000,
+                gasLimit: BURN_IOU_TOKEN_GAS_LIMIT,
                 data: abi.encode(keccak256(hex"c0ffee"))
             }),
             ""
@@ -1513,7 +1538,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                         feeToken: address(0),
                         feeAmount: bridgeFeeAmount,
                         feeRefundThreshold: 0,
-                        gasLimit: 100000,
+                        gasLimit: BURN_IOU_TOKEN_GAS_LIMIT,
                         data: abi.encode(keccak256(hex"c0ffee"))
                     }),
                     ""
@@ -1534,7 +1559,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 feeToken: address(0),
                 feeAmount: bridgeFeeAmount,
                 feeRefundThreshold: 0,
-                gasLimit: 100000,
+                gasLimit: BURN_IOU_TOKEN_GAS_LIMIT,
                 data: abi.encode(keccak256(hex"c0ffee"))
             }),
             ""

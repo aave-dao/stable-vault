@@ -59,8 +59,22 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
     }
 
     /// @inheritdoc IChainGateway
+    function getIouTokenManager() external view override returns (address) {
+        return IOU_TOKEN_MANAGER;
+    }
+
+    /// @inheritdoc IChainGateway
     function getDefaultBridgeAdapter(address asset, uint256 chainId) external view override returns (address) {
         return $storage().defaultBridgeAdapter[asset][chainId];
+    }
+
+    /// @notice Checks whether a bridge adapter is whitelisted for a given asset and chain.
+    /// @param asset The asset to check the adapter for.
+    /// @param chainId The chain id to check the adapter for.
+    /// @param adapter The adapter to check.
+    /// @return True if the adapter is whitelisted, false otherwise.
+    function isBridgeAdapterSupported(address asset, uint256 chainId, address adapter) external view returns (bool) {
+        return $storage().supportedBridgeAdapters[asset][chainId][adapter];
     }
 
     /// @inheritdoc IChainGateway
