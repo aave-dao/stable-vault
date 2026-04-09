@@ -18,6 +18,7 @@ import {Allocator} from "src/core/Allocator.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
+import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
@@ -3185,6 +3186,52 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.withdraw(address(_mockUsdt), depositAmount);
 
         assertTrue(reentrantStrategy.lastReentrantCallReverted());
+    }
+
+    /////////////////////////////////////////////// RESCUE TOKENS //////////////////////////////////////////////////////
+
+    function test_rescueTokens_rescuesUnregisteredNonStrategyToken(uint256 amount) public {
+        amount = _boundAssetAmount(address(_mockUnsupportedAsset), amount);
+
+        _mockUnsupportedAsset.mint(address(_allocator), amount);
+
+        vm.prank(everyRoleAccount);
+        IRescuableToken(address(_allocator)).rescueTokens(address(_mockUnsupportedAsset), amount);
+
+        assertEq(_mockUnsupportedAsset.balanceOf(everyRoleAccount), amount);
+        assertEq(_mockUnsupportedAsset.balanceOf(address(_allocator)), 0);
+    }
+
+    function test_rescueTokens_reverts_ifTokenIsRegistered(uint256 amount) public {
+        amount = _boundAssetAmount(address(_mockUsdt), amount);
+
+        _mockUsdt.mint(address(_allocator), amount);
+
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        vm.prank(everyRoleAccount);
+        IRescuableToken(address(_allocator)).rescueTokens(address(_mockUsdt), amount);
+    }
+
+    function test_rescueTokens_reverts_ifTokenIsStrategy() public {
+        deal(address(_defaultUsdtStrategy), address(_allocator), 1000);
+
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        vm.prank(everyRoleAccount);
+        IRescuableToken(address(_allocator)).rescueTokens(address(_defaultUsdtStrategy), 1000);
+    }
+
+    function test_rescueTokens_reverts_ifNotAuthorized(address unauthorizedMsgSender) public {
+        vm.assume(unauthorizedMsgSender != address(0));
+        _assumeNotProxyAdmin(unauthorizedMsgSender, address(_allocator));
+        _mockAccessManager.mockRejectCall(
+            unauthorizedMsgSender, address(_allocator), IRescuableToken.rescueTokens.selector
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
+        );
+        vm.prank(unauthorizedMsgSender);
+        IRescuableToken(address(_allocator)).rescueTokens(address(_mockUnsupportedAsset), 100);
     }
 
     ////////////////////////////////////////////////// HELPERS /////////////////////////////////////////////////////////
