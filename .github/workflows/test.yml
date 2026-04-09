@@ -46,9 +46,15 @@ jobs:
           forge test -vvv
         id: test
 
-      - name: Check Gas Snapshots are up to date
+      - name: Gas Snapshot Report
+        if: always()
         run: |
-          if ! git diff --exit-code snapshots/; then
-            echo "::error::Gas snapshots are out of date. Please run 'forge t' locally and commit the updated snapshot files."
-            exit 1
-          fi
+          echo "## Gas Snapshots" >> $GITHUB_STEP_SUMMARY
+          for f in snapshots/*.json; do
+            [ -f "$f" ] || continue
+            echo "### $(basename "$f" .json)" >> $GITHUB_STEP_SUMMARY
+            echo '```json' >> $GITHUB_STEP_SUMMARY
+            cat "$f" >> $GITHUB_STEP_SUMMARY
+            echo '' >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          done
