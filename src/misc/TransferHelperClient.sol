@@ -87,12 +87,10 @@ contract TransferHelperClient {
         }
     }
 
+    /// @dev Does not support native currency, as it cannot be spent from another address. To transfer native currency,
+    /// funds must be in this contract and the overloaded function without the `from` parameter should be used instead.
     function _transferToTransferHelper(address from, address asset, uint256 amount) internal {
-        if (asset == Constants.NATIVE_CURRENCY) {
-            _transferNativeToTransferHelper(amount);
-        } else {
-            IERC20(asset).safeTransferFrom(from, TRANSFER_HELPER, amount);
-        }
+        IERC20(asset).safeTransferFrom(from, TRANSFER_HELPER, amount);
     }
 
     function _transferNativeToTransferHelper(uint256 amount) private {
