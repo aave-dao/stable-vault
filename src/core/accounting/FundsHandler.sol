@@ -101,6 +101,12 @@ contract FundsHandler is
         __AccessManaged_init(accessManager);
     }
 
+    /// @notice Getter for the list of earning chain IDs.
+    /// @return The list of earning chain IDs.
+    function getEarningChainIds() external view returns (uint256[] memory) {
+        return $storage().earningChainIds.values();
+    }
+
     /// @inheritdoc IFundsHandler
     function getAggregatedBalance() external view override returns (uint256) {
         uint256 totalBalanceRay = _getLocalAggregatedBalance();

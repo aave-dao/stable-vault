@@ -339,6 +339,44 @@ contract AllocatorTest is TestWithHelpers {
         );
     }
 
+    function test_getStrategiesForAsset_returnsExpectedStrategies() public view {
+        address[] memory usdtStrategies = _allocator.getStrategiesForAsset(address(_mockUsdt));
+        assertEq(usdtStrategies.length, 2);
+        assertEq(usdtStrategies[0], address(_defaultUsdtStrategy));
+        assertEq(usdtStrategies[1], address(_extraUsdtStrategy));
+
+        address[] memory ghoStrategies = _allocator.getStrategiesForAsset(address(_mockGho));
+        assertEq(ghoStrategies.length, 2);
+        assertEq(ghoStrategies[0], address(_defaultGhoStrategy));
+        assertEq(ghoStrategies[1], address(_extraGhoStrategy));
+    }
+
+    function test_getStrategiesForAsset_reflectsAddAndRemove() public {
+        TestErc4626 newStrategy = new TestErc4626(_mockUsdt);
+
+        address[] memory before = _allocator.getStrategiesForAsset(address(_mockUsdt));
+        uint256 countBefore = before.length;
+
+        vm.prank(admin);
+        _allocator.addStrategy(address(_mockUsdt), address(newStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+
+        address[] memory after_ = _allocator.getStrategiesForAsset(address(_mockUsdt));
+        assertEq(after_.length, countBefore + 1);
+        assertEq(after_[after_.length - 1], address(newStrategy));
+
+        vm.prank(everyRoleAccount);
+        _allocator.removeStrategy(address(newStrategy));
+
+        address[] memory afterRemove = _allocator.getStrategiesForAsset(address(_mockUsdt));
+        assertEq(afterRemove.length, countBefore);
+    }
+
+    function test_getStrategiesForAsset_returnsEmptyForUnknownAsset(address unknownAsset) public view {
+        vm.assume(unknownAsset != address(_mockUsdt) && unknownAsset != address(_mockGho));
+        address[] memory strategies = _allocator.getStrategiesForAsset(unknownAsset);
+        assertEq(strategies.length, 0);
+    }
+
     function test_isStrategySupportedForAsset_returnsExpectedResult() public view {
         assertTrue(_allocator.isStrategySupportedForAsset(address(_mockUsdt), address(_defaultUsdtStrategy)));
         assertTrue(_allocator.isStrategySupportedForAsset(address(_mockUsdt), address(_extraUsdtStrategy)));
@@ -3157,6 +3195,8 @@ contract AllocatorTest is TestWithHelpers {
 
         _mockUnsupportedAsset.mint(address(_allocator), amount);
 
+        vm.expectEmit(true, true, true, true);
+        emit IRescuableToken.TokensRescued(address(_mockUnsupportedAsset), everyRoleAccount, amount);
         vm.prank(everyRoleAccount);
         IRescuableToken(address(_allocator)).rescueTokens(address(_mockUnsupportedAsset), amount);
 
