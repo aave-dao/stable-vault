@@ -214,7 +214,7 @@ contract Allocator is
             try this.tryWithdrawFromStrategy(asset, amountRemaining, $storage().defaultStrategyByAsset[asset]) returns (
                 uint256 withdrawn
             ) {
-                amountRemaining -= withdrawn;
+                amountRemaining = withdrawn >= amountRemaining ? 0 : amountRemaining - withdrawn;
             } catch {
                 emit StrategyWithdrawalFailed($storage().defaultStrategyByAsset[asset], asset, amountRemaining);
             }
@@ -225,7 +225,7 @@ contract Allocator is
                 address strategy = $storage().assetStrategies[asset].at(i);
                 if (strategy != $storage().defaultStrategyByAsset[asset]) {
                     try this.tryWithdrawFromStrategy(asset, amountRemaining, strategy) returns (uint256 withdrawn) {
-                        amountRemaining -= withdrawn;
+                        amountRemaining = withdrawn >= amountRemaining ? 0 : amountRemaining - withdrawn;
                     } catch {
                         emit StrategyWithdrawalFailed(strategy, asset, amountRemaining);
                     }
@@ -252,18 +252,20 @@ contract Allocator is
         onlySelf
         returns (uint256)
     {
+        uint256 amountToWithdraw;
         uint256 withdrawnAmount;
         // Use maxWithdraw to account for withdrawal limits or timelocks.
         uint256 maxWithdrawable = IERC4626(strategy).maxWithdraw(address(this));
         if (maxWithdrawable == 0) {
             // Some ERC-4626 implementations may return 0 for `maxWithdraw` to adhere to the spec rule of not reverting.
             // Fallback to querying the balance that may not account for withdrawal limits or timelocks.
-            withdrawnAmount = Math.min(amount, _getAssetBalanceInStrategy(IERC4626(strategy)));
+            amountToWithdraw = Math.min(amount, _getAssetBalanceInStrategy(IERC4626(strategy)));
         } else {
-            withdrawnAmount = Math.min(amount, maxWithdrawable);
+            amountToWithdraw = Math.min(amount, maxWithdrawable);
         }
-        if (withdrawnAmount != 0) {
-            _withdrawFromStrategy(asset, withdrawnAmount, strategy);
+        if (amountToWithdraw != 0) {
+            // withdrawnAmount is either equal or greater than amountToWithdraw (depending on the 4626 shares rounding).
+            withdrawnAmount = _withdrawFromStrategy(asset, amountToWithdraw, strategy);
         }
         return withdrawnAmount;
     }
@@ -445,7 +447,7 @@ contract Allocator is
     /// @dev Uses redeem(previewWithdraw(amount)) instead of withdraw(amount) to capture
     /// the rounding surplus from ERC4626's ceil division on shares. Any surplus remains
     /// as idle balance in the Allocator, rounding in favor of the protocol.
-    function _withdrawFromStrategy(address asset, uint256 amount, address strategy) internal {
+    function _withdrawFromStrategy(address asset, uint256 amount, address strategy) internal returns (uint256) {
         uint256 balanceBefore = IERC20(asset).balanceOf(address(this));
         uint256 sharesBalance = IERC4626(strategy).balanceOf(address(this));
         uint256 sharesToWithdraw = IERC4626(strategy).previewWithdraw(amount);
@@ -457,6 +459,7 @@ contract Allocator is
         uint256 actualAmountWithdrawn = balanceAfter - balanceBefore;
         require(actualAmountWithdrawn >= amount, Errors.InsufficientAmountOut());
         emit AssetDeallocated(asset, strategy, actualAmountWithdrawn);
+        return actualAmountWithdrawn;
     }
 
     function _redeemAllFromStrategy(address asset, address strategy) internal returns (uint256) {
