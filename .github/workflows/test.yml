@@ -7,14 +7,14 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   FOUNDRY_PROFILE: ci
 
 jobs:
-  check:
-    name: Compile & Run Tests
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,37 +24,87 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
 
-      - name: Show Forge version
-        run: |
-          forge --version
-
       - name: Run Forge fmt
-        run: |
-          forge fmt --check
-        id: fmt
-
-      - name: Run Forge build
-        run: |
-          forge build --deny notes --sizes
-        id: build
+        run: forge fmt --check
 
       - name: Check Error Selectors
         run: ./.github/workflows/check-error-selectors.sh
 
-      - name: Run Forge tests
-        run: |
-          forge test -vvv
-        id: test
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-      - name: Gas Snapshot Report
-        if: always()
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Run Forge build
+        run: forge build --deny notes
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-build-cache
+          path: |
+            out/
+            cache/
+          retention-days: 1
+
+  sizes:
+    name: Sizes
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: forge-build-cache
+
+      - name: Check contract sizes
+        run: forge build --sizes
+
+  test:
+    name: Test
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          ref: ${{ github.head_ref || github.ref }}
+          token: ${{ github.token }}
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: forge-build-cache
+
+      - name: Show Forge version
+        run: forge --version
+
+      - name: Run Forge tests
+        run: forge test -vvv
+
+      - name: Auto-update gas snapshots
+        if: success()
         run: |
-          echo "## Gas Snapshots" >> $GITHUB_STEP_SUMMARY
-          for f in snapshots/*.json; do
-            [ -f "$f" ] || continue
-            echo "### $(basename "$f" .json)" >> $GITHUB_STEP_SUMMARY
-            echo '```json' >> $GITHUB_STEP_SUMMARY
-            cat "$f" >> $GITHUB_STEP_SUMMARY
-            echo '' >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-          done
+          if ! git diff --exit-code snapshots/; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add snapshots/
+            git commit -m "chore: auto-update gas snapshots"
+            git push
+          fi
