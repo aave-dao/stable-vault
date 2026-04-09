@@ -492,8 +492,10 @@ contract Allocator is
 
         uint256 balanceBefore = _getAssetBalanceInStrategy(IERC4626(strategy));
 
-        (bool callSucceeded,) = strategy.call(abi.encodeCall(IERC4626.deposit, (amount, address(this))));
-        require(callSucceeded, DepositIntoStrategyFailed(strategy));
+        try IERC4626(strategy).deposit(amount, address(this)) {}
+        catch {
+            revert DepositIntoStrategyFailed(strategy);
+        }
 
         uint256 netDepositAmount = _getAssetBalanceInStrategy(IERC4626(strategy)) - balanceBefore;
         require(
