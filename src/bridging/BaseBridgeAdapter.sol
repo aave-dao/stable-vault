@@ -60,6 +60,7 @@ abstract contract BaseBridgeAdapter is AccessManaged, TransferHelperClient, IBri
 
     function setDestinationChainAdapter(uint256 chainId, address destinationChainAdapter) external override restricted {
         _destinationChainAdapterOf[chainId] = destinationChainAdapter;
+        emit DestinationChainAdapterSet(chainId, destinationChainAdapter);
     }
 
     function _processReceivedFunds(address asset, uint256 amount) internal assertingTransferHelperBalanceFor(asset) {

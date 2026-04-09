@@ -288,6 +288,8 @@ contract FundsHandlerTest is TestWithHelpers {
         assertEq(mockAsset.balanceOf(address(fundsHandler)), fhAssetBalance);
         vm.assume(mockAsset.balanceOf(msgSender) == 0);
 
+        vm.expectEmit(true, true, true, true);
+        emit IRescuableToken.TokensRescued(address(mockAsset), msgSender, assetAmountToRescue);
         vm.prank(msgSender);
         IRescuableToken(address(fundsHandler)).rescueTokens(address(mockAsset), assetAmountToRescue);
 
@@ -310,6 +312,8 @@ contract FundsHandlerTest is TestWithHelpers {
         assertEq(address(fundsHandler).balance, fhAssetBalance);
         vm.assume(address(msgSender).balance == 0);
 
+        vm.expectEmit(true, true, true, true);
+        emit IRescuableNative.NativeRescued(msgSender, assetAmountToRescue);
         vm.prank(msgSender);
         IRescuableNative(address(fundsHandler)).rescueNative(assetAmountToRescue);
 

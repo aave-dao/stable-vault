@@ -8,6 +8,9 @@ import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 /// @author Aave Labs
 /// @notice Interface for the CcipBridgeAdapter contract.
 interface ICcipBridgeAdapter is IBridgeAdapter {
+    /// @notice Emitted when a CCIP chain selector mapping is set.
+    event ChainSelectorSet(uint256 indexed chainId, uint64 indexed ccipChainSelector);
+
     /// @notice Encoded data length does not match the expected value.
     /// @custom:selector 0x9546c78e
     error UnexpectedDataLength();
