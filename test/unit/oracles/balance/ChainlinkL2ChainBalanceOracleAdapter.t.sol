@@ -19,7 +19,7 @@ contract ChainlinkL2ChainBalanceOracleAdapterTest is Test {
     uint256 constant SNAPSHOT_CHAIN_ID = 1;
     uint256 constant HEARTBEAT = 3600;
     uint256 constant HEARTBEAT_BUFFER_SECONDS = 90;
-    uint256 constant GRACE_PERIOD_TIME_SECONDS = 3600;
+    uint256 constant GRACE_PERIOD_TIME_SECONDS = 7200;
 
     MockBundleAggregator internal _bundleAggregator;
     MockSequencerUptimeFeed internal _sequencerFeed;

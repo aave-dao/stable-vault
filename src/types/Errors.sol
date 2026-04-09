@@ -46,6 +46,10 @@ library Errors {
     /// @custom:selector 0x90eaaa70
     error InvalidDestinationChainId();
 
+    /// @notice Thrown when a provided gas limit is below the minimum required for safe execution.
+    /// @custom:selector 0x98bdb2e0
+    error InvalidGasLimit();
+
     /// @notice Thrown when input parameter contains unacceptable value.
     /// @custom:selector 0x613970e0
     error InvalidParameter();

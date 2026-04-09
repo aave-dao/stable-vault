@@ -2,6 +2,9 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.22;
 
+import {
+    ReentrancyGuardTransientUpgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardTransientUpgradeable.sol";
 import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
@@ -15,6 +18,7 @@ import {Allocator} from "src/core/Allocator.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
+import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
@@ -26,6 +30,7 @@ import {MockAssetRegistry} from "test/mocks/MockAssetRegistry.sol";
 import {IMockErc20} from "test/mocks/MockErc20.sol";
 import {MockErc4626Strategy} from "test/mocks/MockErc4626Strategy.sol";
 import {MockNonStandardErc20} from "test/mocks/MockNonStandardErc20.sol";
+import {MockReentrantErc4626Strategy} from "test/mocks/MockReentrantErc4626Strategy.sol";
 import {MockSwapper} from "test/mocks/MockSwapper.sol";
 import {MockTransferHelper} from "test/mocks/MockTransferHelper.sol";
 import {TestErc4626} from "test/mocks/TestErc4626.sol";
@@ -3122,6 +3127,180 @@ contract AllocatorTest is TestWithHelpers {
         vm.prank(withdrawer);
         _allocator.withdraw(address(_mockUsdt), depositAmount);
     }
+
+    //////////////////////////////////////////// REENTRANCY TESTS //////////////////////////////////////////////////////
+
+    function _deployReentrantStrategy() internal returns (MockReentrantErc4626Strategy) {
+        MockReentrantErc4626Strategy strategy = new MockReentrantErc4626Strategy(_mockUsdt);
+        vm.prank(admin);
+        _allocator.addStrategy(address(_mockUsdt), address(strategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        return strategy;
+    }
+
+    function _depositToReentrantStrategy(MockReentrantErc4626Strategy strategy, uint256 amount) internal {
+        vm.prank(admin);
+        _allocator.setDefaultStrategy(address(_mockUsdt), address(strategy));
+        _mockUsdt.mint(address(_mockTransferHelper), amount);
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), amount);
+    }
+
+    function test_rebalance_reentrancyNotAllowedOnRebalanceViaWithdraw() public {
+        uint256 depositAmount = 1000e6;
+        MockReentrantErc4626Strategy reentrantStrategy = _deployReentrantStrategy();
+        _depositToReentrantStrategy(reentrantStrategy, depositAmount);
+
+        // Configure callback: during withdraw(), call Allocator.rebalance() again
+        reentrantStrategy.setReentrantCall(
+            address(_allocator), abi.encodeCall(IAllocator.rebalance, (new IAllocator.RebalanceParams[](0)))
+        );
+        reentrantStrategy.setReentrancyOnWithdraw(true);
+
+        // Deallocate from the reentrant strategy → strategy.withdraw() fires callback → reentry blocked
+        IAllocator.DeallocationParams[] memory deallocations = new IAllocator.DeallocationParams[](1);
+        deallocations[0] = IAllocator.DeallocationParams({
+            asset: address(_mockUsdt), strategy: address(reentrantStrategy), amount: depositAmount
+        });
+        IAllocator.RebalanceParams[] memory params = new IAllocator.RebalanceParams[](1);
+        params[0] =
+            _buildRebalanceParams(deallocations, new IAllocator.SwapParams[](0), new IAllocator.AllocationParams[](0));
+
+        vm.prank(admin);
+        vm.expectRevert(ReentrancyGuardTransientUpgradeable.ReentrancyGuardReentrantCall.selector);
+        _allocator.rebalance(params);
+    }
+
+    function test_rebalance_reentrancyNotAllowedOnRebalanceViaRedeem() public {
+        uint256 depositAmount = 1000e6;
+        MockReentrantErc4626Strategy reentrantStrategy = _deployReentrantStrategy();
+        _depositToReentrantStrategy(reentrantStrategy, depositAmount);
+
+        // Configure callback: during redeem(), call Allocator.rebalance() again
+        reentrantStrategy.setReentrantCall(
+            address(_allocator), abi.encodeCall(IAllocator.rebalance, (new IAllocator.RebalanceParams[](0)))
+        );
+        reentrantStrategy.setReentrancyOnRedeem(true);
+
+        // Deallocate with amount=0 triggers _redeemAllFromStrategy → strategy.redeem() fires callback
+        IAllocator.DeallocationParams[] memory deallocations = new IAllocator.DeallocationParams[](1);
+        deallocations[0] =
+            IAllocator.DeallocationParams({asset: address(_mockUsdt), strategy: address(reentrantStrategy), amount: 0});
+        IAllocator.RebalanceParams[] memory params = new IAllocator.RebalanceParams[](1);
+        params[0] =
+            _buildRebalanceParams(deallocations, new IAllocator.SwapParams[](0), new IAllocator.AllocationParams[](0));
+
+        vm.prank(admin);
+        vm.expectRevert(ReentrancyGuardTransientUpgradeable.ReentrancyGuardReentrantCall.selector);
+        _allocator.rebalance(params);
+    }
+
+    function _configureNonRevertingReentrantCallback(MockReentrantErc4626Strategy strategy) internal {
+        strategy.setReentrantCall(
+            address(_allocator), abi.encodeCall(IAllocator.rebalance, (new IAllocator.RebalanceParams[](0)))
+        );
+        strategy.setRevertOnReentrantFailure(false);
+    }
+
+    function test_deposit_reentrancyNotAllowedOnRebalance() public {
+        uint256 depositAmount = 1000e6;
+        MockReentrantErc4626Strategy reentrantStrategy = _deployReentrantStrategy();
+
+        // Set reentrant strategy as default so deposit() routes to it
+        vm.prank(admin);
+        _allocator.setDefaultStrategy(address(_mockUsdt), address(reentrantStrategy));
+
+        // Configure non-reverting callback: during deposit(), try to call rebalance()
+        _configureNonRevertingReentrantCallback(reentrantStrategy);
+        reentrantStrategy.setReentrancyOnDeposit(true);
+
+        _mockUsdt.mint(address(_mockTransferHelper), depositAmount);
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), depositAmount);
+
+        assertTrue(reentrantStrategy.lastReentrantCallReverted());
+    }
+
+    function test_depositAllowIdle_reentrancyNotAllowedOnRebalance() public {
+        uint256 depositAmount = 1000e6;
+        MockReentrantErc4626Strategy reentrantStrategy = _deployReentrantStrategy();
+
+        vm.prank(admin);
+        _allocator.setDefaultStrategy(address(_mockUsdt), address(reentrantStrategy));
+
+        // Configure non-reverting callback: during deposit(), try to call rebalance()
+        _configureNonRevertingReentrantCallback(reentrantStrategy);
+        reentrantStrategy.setReentrancyOnDeposit(true);
+
+        _mockUsdt.mint(address(_mockTransferHelper), depositAmount);
+        vm.prank(depositor);
+        _allocator.depositAllowIdle(address(_mockUsdt), depositAmount);
+
+        assertTrue(reentrantStrategy.lastReentrantCallReverted());
+    }
+
+    function test_withdraw_reentrancyNotAllowedOnRebalance() public {
+        uint256 depositAmount = 1000e6;
+        MockReentrantErc4626Strategy reentrantStrategy = _deployReentrantStrategy();
+        _depositToReentrantStrategy(reentrantStrategy, depositAmount);
+
+        // Configure non-reverting callback: during withdraw(), try to call rebalance()
+        _configureNonRevertingReentrantCallback(reentrantStrategy);
+        reentrantStrategy.setReentrancyOnWithdraw(true);
+
+        _mockTransferHelper.mockAsset(address(_mockUsdt), 0);
+        vm.prank(withdrawer);
+        _allocator.withdraw(address(_mockUsdt), depositAmount);
+
+        assertTrue(reentrantStrategy.lastReentrantCallReverted());
+    }
+
+    /////////////////////////////////////////////// RESCUE TOKENS //////////////////////////////////////////////////////
+
+    function test_rescueTokens_rescuesUnregisteredNonStrategyToken(uint256 amount) public {
+        amount = _boundAssetAmount(address(_mockUnsupportedAsset), amount);
+
+        _mockUnsupportedAsset.mint(address(_allocator), amount);
+
+        vm.prank(everyRoleAccount);
+        IRescuableToken(address(_allocator)).rescueTokens(address(_mockUnsupportedAsset), amount);
+
+        assertEq(_mockUnsupportedAsset.balanceOf(everyRoleAccount), amount);
+        assertEq(_mockUnsupportedAsset.balanceOf(address(_allocator)), 0);
+    }
+
+    function test_rescueTokens_reverts_ifTokenIsRegistered(uint256 amount) public {
+        amount = _boundAssetAmount(address(_mockUsdt), amount);
+
+        _mockUsdt.mint(address(_allocator), amount);
+
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        vm.prank(everyRoleAccount);
+        IRescuableToken(address(_allocator)).rescueTokens(address(_mockUsdt), amount);
+    }
+
+    function test_rescueTokens_reverts_ifTokenIsStrategy() public {
+        deal(address(_defaultUsdtStrategy), address(_allocator), 1000);
+
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        vm.prank(everyRoleAccount);
+        IRescuableToken(address(_allocator)).rescueTokens(address(_defaultUsdtStrategy), 1000);
+    }
+
+    function test_rescueTokens_reverts_ifNotAuthorized(address unauthorizedMsgSender) public {
+        vm.assume(unauthorizedMsgSender != address(0));
+        _assumeNotProxyAdmin(unauthorizedMsgSender, address(_allocator));
+        _mockAccessManager.mockRejectCall(
+            unauthorizedMsgSender, address(_allocator), IRescuableToken.rescueTokens.selector
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
+        );
+        vm.prank(unauthorizedMsgSender);
+        IRescuableToken(address(_allocator)).rescueTokens(address(_mockUnsupportedAsset), 100);
+    }
+
+    ////////////////////////////////////////////////// HELPERS /////////////////////////////////////////////////////////
 
     function _initializeRebalanceParams(uint16 length) internal pure returns (IAllocator.RebalanceParams[] memory) {
         return new IAllocator.RebalanceParams[](length);

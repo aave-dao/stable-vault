@@ -5,6 +5,9 @@ pragma solidity ^0.8.22;
 import {
     AccessManagedUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
+import {
+    ReentrancyGuardTransientUpgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardTransientUpgradeable.sol";
 import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -19,6 +22,7 @@ import {ISwapper} from "src/interfaces/ISwapper.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {Multicall} from "src/misc/Multicall.sol";
+import {RescuableToken} from "src/misc/RescuableToken.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
 import {Errors} from "src/types/Errors.sol";
 
@@ -33,7 +37,14 @@ import {Errors} from "src/types/Errors.sol";
 ///      - asset amounts are treated in their native decimals
 ///      - 100% of assets deposited into Allocator belong to the same entity (the Allocator does not track depositors)
 /// @custom:upgradeable
-contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall, IAllocator {
+contract Allocator is
+    AccessManagedUpgradeable,
+    TransferHelperClient,
+    Multicall,
+    ReentrancyGuardTransientUpgradeable,
+    RescuableToken,
+    IAllocator
+{
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -162,7 +173,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     }
 
     /// @inheritdoc IAllocator
-    function deposit(address asset, uint256 amount) external override onlyDepositor returns (uint256) {
+    function deposit(address asset, uint256 amount) external override onlyDepositor nonReentrant returns (uint256) {
         require(IAssetRegistry(ASSET_REGISTRY).isDepositToAllocatorAllowed(asset), Errors.UnsupportedAsset(asset));
         ITransferHelper(TRANSFER_HELPER).pull(asset, amount);
         uint256 netDepositAmount = amount;
@@ -176,7 +187,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     }
 
     /// @inheritdoc IAllocator
-    function depositAllowIdle(address asset, uint256 amount) external override onlyDepositor {
+    function depositAllowIdle(address asset, uint256 amount) external override onlyDepositor nonReentrant {
         require(IAssetRegistry(ASSET_REGISTRY).isDepositToAllocatorAllowed(asset), Errors.UnsupportedAsset(asset));
         ITransferHelper(TRANSFER_HELPER).pull(asset, amount);
         if ($storage().defaultStrategyByAsset[asset] == address(0)) {
@@ -191,7 +202,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     }
 
     /// @inheritdoc IAllocator
-    function withdraw(address asset, uint256 amount) external override onlyWithdrawer {
+    function withdraw(address asset, uint256 amount) external override onlyWithdrawer nonReentrant {
         require(amount > 0, Errors.ZeroAmount());
         _validateCanWithdraw(asset);
 
@@ -262,7 +273,7 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
     //////////////////////////////////////////// MANAGER FUNCTIONS /////////////////////////////////////////////////////
 
     /// @inheritdoc IAllocator
-    function rebalance(RebalanceParams[] memory params) external virtual override restricted {
+    function rebalance(RebalanceParams[] memory params) external virtual override restricted nonReentrant {
         for (uint256 i = 0; i < params.length; i++) {
             _rebalance(params[i]);
         }
@@ -573,5 +584,14 @@ contract Allocator is AccessManagedUpgradeable, TransferHelperClient, Multicall,
         }
         $storage().defaultStrategyByAsset[asset] = strategy;
         emit DefaultStrategySet(asset, strategy);
+    }
+
+    function _beforeRescueTokens(address token, uint256) internal virtual override {
+        // Equivalent to adding the `restricted` modifier.
+        _checkCanCall(_msgSender(), _msgData());
+        // Disallow rescuing registered assets, preventing the caller to take system funds through rescue function.
+        require(!IAssetRegistry(ASSET_REGISTRY).isAssetRegistered(token), Errors.InvalidParameter());
+        // Disallow rescuing strategy shares, preventing the caller to take system funds through rescue function.
+        require(!$storage().strategyConfigs[token].isRegistered, Errors.InvalidParameter());
     }
 }
