@@ -44,6 +44,112 @@ contract AssetRegistryTest is TestWithHelpers {
         _mockGho = IMockErc20(address(new MockNonStandardErc20("Test GHO", "tGHO", 18)));
     }
 
+    function test_getRegisteredAssets_returnsEmptyByDefault() public view {
+        address[] memory assets = _assetRegistry.getRegisteredAssets();
+        assertEq(assets.length, 0);
+    }
+
+    function test_getRegisteredAssets_growsWithRegistration() public {
+        IAssetRegistry.AssetConfig memory config = IAssetRegistry.AssetConfig({
+            depositFromUserAllowed: false,
+            depositIntoAllocatorAllowed: false,
+            swapInputTokenAllowed: false,
+            swapOutputTokenAllowed: false
+        });
+
+        assertEq(_assetRegistry.getRegisteredAssets().length, 0);
+
+        vm.prank(everyRoleAccount);
+        _assetRegistry.setAssetConfig(address(_mockUsdt), config);
+
+        address[] memory afterFirst = _assetRegistry.getRegisteredAssets();
+        assertEq(afterFirst.length, 1);
+        assertEq(afterFirst[0], address(_mockUsdt));
+
+        vm.prank(everyRoleAccount);
+        _assetRegistry.setAssetConfig(address(_mockGho), config);
+
+        address[] memory afterSecond = _assetRegistry.getRegisteredAssets();
+        assertEq(afterSecond.length, 2);
+        assertEq(afterSecond[0], address(_mockUsdt));
+        assertEq(afterSecond[1], address(_mockGho));
+    }
+
+    function test_getRegisteredAssets_includesDistrustedAssets() public {
+        IAssetRegistry.AssetConfig memory config = IAssetRegistry.AssetConfig({
+            depositFromUserAllowed: false,
+            depositIntoAllocatorAllowed: false,
+            swapInputTokenAllowed: false,
+            swapOutputTokenAllowed: false
+        });
+
+        vm.prank(everyRoleAccount);
+        _assetRegistry.setAssetConfig(address(_mockUsdt), config);
+        vm.prank(everyRoleAccount);
+        _assetRegistry.setAssetConfig(address(_mockGho), config);
+
+        vm.prank(everyRoleAccount);
+        _assetRegistry.distrustAsset(address(_mockUsdt));
+
+        address[] memory trustedAssets = _assetRegistry.getTrustedAssets();
+        assertEq(trustedAssets.length, 1);
+
+        address[] memory allAssets = _assetRegistry.getRegisteredAssets();
+        assertEq(allAssets.length, 2);
+    }
+
+    function test_getAssetConfig_returnsExpectedConfig(
+        bool depositFromUserAllowed,
+        bool depositIntoAllocatorAllowed,
+        bool swapInputTokenAllowed,
+        bool swapOutputTokenAllowed
+    ) public {
+        IAssetRegistry.AssetConfig memory config = IAssetRegistry.AssetConfig({
+            depositFromUserAllowed: depositFromUserAllowed,
+            depositIntoAllocatorAllowed: depositIntoAllocatorAllowed,
+            swapInputTokenAllowed: swapInputTokenAllowed,
+            swapOutputTokenAllowed: swapOutputTokenAllowed
+        });
+
+        vm.prank(everyRoleAccount);
+        _assetRegistry.setAssetConfig(address(_mockUsdt), config);
+
+        IAssetRegistry.AssetConfig memory result = _assetRegistry.getAssetConfig(address(_mockUsdt));
+        assertEq(result.depositFromUserAllowed, depositFromUserAllowed);
+        assertEq(result.depositIntoAllocatorAllowed, depositIntoAllocatorAllowed);
+        assertEq(result.swapInputTokenAllowed, swapInputTokenAllowed);
+        assertEq(result.swapOutputTokenAllowed, swapOutputTokenAllowed);
+    }
+
+    function test_getAssetConfig_returnsDefaultForUnregisteredAsset(address asset) public view {
+        vm.assume(asset != address(_mockUsdt) && asset != address(_mockGho));
+        IAssetRegistry.AssetConfig memory result = _assetRegistry.getAssetConfig(asset);
+        assertEq(result.depositFromUserAllowed, false);
+        assertEq(result.depositIntoAllocatorAllowed, false);
+        assertEq(result.swapInputTokenAllowed, false);
+        assertEq(result.swapOutputTokenAllowed, false);
+    }
+
+    function test_getAssetConfig_reflectsConfigChanges() public {
+        IAssetRegistry.AssetConfig memory config = IAssetRegistry.AssetConfig({
+            depositFromUserAllowed: true,
+            depositIntoAllocatorAllowed: true,
+            swapInputTokenAllowed: true,
+            swapOutputTokenAllowed: true
+        });
+
+        vm.prank(everyRoleAccount);
+        _assetRegistry.setAssetConfig(address(_mockUsdt), config);
+
+        assertTrue(_assetRegistry.getAssetConfig(address(_mockUsdt)).depositFromUserAllowed);
+
+        vm.prank(everyRoleAccount);
+        _assetRegistry.disableUserDeposits(address(_mockUsdt));
+
+        assertFalse(_assetRegistry.getAssetConfig(address(_mockUsdt)).depositFromUserAllowed);
+        assertTrue(_assetRegistry.getAssetConfig(address(_mockUsdt)).depositIntoAllocatorAllowed);
+    }
+
     function test_setAssetConfig_setsAssetConfig(
         bool depositFromUserAllowed,
         bool depositIntoAllocatorAllowed,

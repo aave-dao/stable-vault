@@ -145,6 +145,39 @@ contract CcipAdapterTest is TestWithHelpers {
         assertEq(_earningChainCcipAdapter.getChainId(EARNING_CHAIN_CCIP_SELECTOR), 0);
     }
 
+    function test_getDestinationChainAdapter_returnsSetAdapter(uint256 chainId, address adapter) public {
+        vm.assume(chainId != EARNING_CHAIN_ID && chainId != ACCOUNTING_CHAIN_ID);
+        vm.assume(adapter != address(0));
+
+        assertEq(_accountingChainCcipAdapter.getDestinationChainAdapter(chainId), address(0));
+
+        vm.prank(everyRoleAccount);
+        _accountingChainCcipAdapter.setDestinationChainAdapter(chainId, adapter);
+
+        assertEq(_accountingChainCcipAdapter.getDestinationChainAdapter(chainId), adapter);
+    }
+
+    function test_getDestinationChainAdapter_reflectsUpdate(uint256 chainId, address adapter1, address adapter2)
+        public
+    {
+        vm.assume(chainId != EARNING_CHAIN_ID && chainId != ACCOUNTING_CHAIN_ID);
+        vm.assume(adapter1 != address(0) && adapter2 != address(0));
+        vm.assume(adapter1 != adapter2);
+
+        vm.prank(everyRoleAccount);
+        _accountingChainCcipAdapter.setDestinationChainAdapter(chainId, adapter1);
+        assertEq(_accountingChainCcipAdapter.getDestinationChainAdapter(chainId), adapter1);
+
+        vm.prank(everyRoleAccount);
+        _accountingChainCcipAdapter.setDestinationChainAdapter(chainId, adapter2);
+        assertEq(_accountingChainCcipAdapter.getDestinationChainAdapter(chainId), adapter2);
+    }
+
+    function test_getDestinationChainAdapter_returnsZeroForUnsetChain(uint256 chainId) public view {
+        vm.assume(chainId != EARNING_CHAIN_ID && chainId != ACCOUNTING_CHAIN_ID);
+        assertEq(_accountingChainCcipAdapter.getDestinationChainAdapter(chainId), address(0));
+    }
+
     function test_supportsInterface() public view {
         assertTrue(_accountingChainCcipAdapter.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId));
         assertTrue(_accountingChainCcipAdapter.supportsInterface(type(IERC165).interfaceId));
