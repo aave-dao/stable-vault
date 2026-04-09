@@ -59,6 +59,11 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
     }
 
     /// @inheritdoc IChainGateway
+    function getIouTokenManager() external view override returns (address) {
+        return IOU_TOKEN_MANAGER;
+    }
+
+    /// @inheritdoc IChainGateway
     function getDefaultBridgeAdapter(address asset, uint256 chainId) external view override returns (address) {
         return $storage().defaultBridgeAdapter[asset][chainId];
     }

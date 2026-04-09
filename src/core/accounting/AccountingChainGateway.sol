@@ -16,7 +16,7 @@ import {Errors} from "src/types/Errors.sol";
 
 /// @title AccountingChainGateway
 /// @author Aave Labs
-/// @notice Facilitates cross chain messaging one or more Earning Chains.
+/// @notice Facilitates cross chain messaging with one or more Earning Chains.
 /// @custom:upgradeable
 contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
     using SafeERC20 for IERC20;
@@ -32,6 +32,7 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
     /// @dev Constructor.
     /// @param fundsHandler The address of the FundsHandler contract.
     /// @param iouTokenManager The address of the IOU token manager contract.
+    /// @param chainBalanceOracle The address of the ChainBalanceOracle contract.
     constructor(address fundsHandler, address iouTokenManager, address chainBalanceOracle)
         BaseChainGateway(iouTokenManager)
     {

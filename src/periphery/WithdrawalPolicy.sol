@@ -174,12 +174,16 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
         _setDefaultFeeBps(newDefaultFeeBps);
     }
 
-    /// @notice Sets the signer to be used for signature verification.
-    /// @param signer Address of the signer to set.
-    /// @param whitelistAsSigner Whether the signer is enabled for signature verification.
-    function setSigner(address signer, bool whitelistAsSigner) external restricted {
-        $storage().isSigner[signer] = whitelistAsSigner;
-        emit SignerSet(signer, whitelistAsSigner);
+    /// @notice Adds a signer to the set of trusted signers that can sign fee discounts.
+    /// @param signer Address of the signer to add.
+    function addSigner(address signer) external restricted {
+        _setSigner({signer: signer, whitelistAsSigner: true});
+    }
+
+    /// @notice Removes a signer from the set of trusted signers that can sign fee discounts.
+    /// @param signer Address of the signer to remove.
+    function removeSigner(address signer) external restricted {
+        _setSigner({signer: signer, whitelistAsSigner: false});
     }
 
     /// @notice Allows a whitelisted signer to invalidate their own nonce.
@@ -194,6 +198,11 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     }
 
     //////////////////////////////// INTERNAL FUNCTIONS ////////////////////////////////
+
+    function _setSigner(address signer, bool whitelistAsSigner) internal {
+        $storage().isSigner[signer] = whitelistAsSigner;
+        emit SignerSet(signer, whitelistAsSigner);
+    }
 
     /// @dev Returns: (uint256 amountOutRay, address signer, uint256 nonce).
     function _previewWithdrawalPolicy(WithdrawalRequest calldata request)

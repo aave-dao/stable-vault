@@ -54,10 +54,6 @@ library Errors {
     /// @custom:selector 0x613970e0
     error InvalidParameter();
 
-    /// @notice Thrown when a recovered signer is not a whitelisted signer.
-    /// @custom:selector 0x8baa579f
-    error InvalidSignature();
-
     /// @notice Thrown when native currency transfer failed.
     /// @custom:selector 0xf4b3b1bc
     error NativeTransferFailed();
