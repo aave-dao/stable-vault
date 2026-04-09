@@ -1,14 +1,4 @@
 {
-<<<<<<< fix/chainsec-i09-low-level-call-deposit
-  "[claimSurplusInterest] 2 assets - 201 sub-vaults": "556373",
-  "[deposit] base sub-vault - user's 1st deposit": "255481",
-  "[deposit] base sub-vault - user's 2nd deposit": "114387",
-  "[deposit] base sub-vault - user's 3rd deposit": "114387",
-  "[executeWithdrawal] full withdrawal": "128495",
-  "[executeWithdrawal] partial withdrawal": "128495",
-  "[requestWithdrawal] full withdrawal": "180395",
-  "[requestWithdrawal] partial withdrawal": "179428",
-=======
   "[claimSurplusInterest] 2 assets - 201 sub-vaults": "556307",
   "[deposit] base sub-vault - user's 1st deposit": "255642",
   "[deposit] base sub-vault - user's 2nd deposit": "114548",
@@ -17,7 +7,6 @@
   "[executeWithdrawal] partial withdrawal": "128429",
   "[requestWithdrawal] full withdrawal": "180417",
   "[requestWithdrawal] partial withdrawal": "179450",
->>>>>>> master
   "[setUserRate] default sub-vault to all new different sub-vaults - 10 users": "1866442",
   "[setUserRate] default sub-vault to all new different sub-vaults - 100 users": "18430715",
   "[setUserRate] default sub-vault to new sub-vault - 1 user": "210050",
