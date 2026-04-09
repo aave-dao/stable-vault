@@ -17,6 +17,7 @@ abstract contract RescuableToken is IRescuableToken {
     function rescueTokens(address token, uint256 amount) public virtual override {
         _beforeRescueTokens(token, amount);
         IERC20(token).safeTransfer(msg.sender, amount);
+        emit TokensRescued(token, msg.sender, amount);
     }
 
     function _beforeRescueTokens(address token, uint256 amount) internal virtual;

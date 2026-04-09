@@ -3339,6 +3339,8 @@ contract StableVaultTest is TestWithHelpers {
         assertEq(mockAsset.balanceOf(address(stableVault)), stableVaultAssetBalance);
         vm.assume(mockAsset.balanceOf(msgSender) == 0);
 
+        vm.expectEmit(true, true, true, true);
+        emit IRescuableToken.TokensRescued(address(mockAsset), msgSender, assetAmountToRescue);
         vm.prank(msgSender);
         IRescuableToken(address(stableVault)).rescueTokens(address(mockAsset), assetAmountToRescue);
 
@@ -3531,6 +3533,8 @@ contract StableVaultTest is TestWithHelpers {
         vm.deal(address(stableVault), stableVaultAssetBalance);
         vm.assume(address(msgSender).balance == 0);
 
+        vm.expectEmit(true, true, true, true);
+        emit IRescuableNative.NativeRescued(msgSender, assetAmountToRescue);
         vm.prank(msgSender);
         IRescuableNative(address(stableVault)).rescueNative(assetAmountToRescue);
 

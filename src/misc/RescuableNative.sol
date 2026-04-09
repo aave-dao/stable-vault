@@ -14,6 +14,7 @@ abstract contract RescuableNative is IRescuableNative {
         _beforeRescueNative(amount);
         (bool callSucceeded,) = msg.sender.call{value: amount}("");
         require(callSucceeded, Errors.NativeTransferFailed());
+        emit NativeRescued(msg.sender, amount);
     }
 
     function _beforeRescueNative(uint256 amount) internal virtual;

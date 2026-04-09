@@ -6,7 +6,7 @@ pragma solidity ^0.8.22;
 /// @author Aave Labs
 /// @notice Library for constants shared across contracts.
 library Constants {
-    /// @dev The base number of basis points.
+    /// @dev The maximum value in basis points (100%).
     uint256 internal constant MAX_BPS = 100_00;
 
     /// @dev The token address used to indicate the asset used to pay a bridge fee is the native currency.
