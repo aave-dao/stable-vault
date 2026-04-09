@@ -592,6 +592,110 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(netDeposit, depositAmount - slippageAmount);
     }
 
+    function test_deposit_reverts_ifPreviewRedeemRevertsInStrategy() public {
+        uint256 depositAmount = 1000;
+        depositAmount = _boundAssetAmount(address(_mockUsdt), depositAmount);
+
+        MockErc4626Strategy mockStrategy = new MockErc4626Strategy(_mockUsdt);
+        vm.prank(admin);
+        _allocator.addStrategy(address(_mockUsdt), address(mockStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        vm.prank(everyRoleAccount);
+        _allocator.setDefaultStrategy(address(_mockUsdt), address(mockStrategy));
+
+        // Make previewRedeem revert — this simulates a broken strategy.
+        // The strict _getAssetBalanceInStrategy is used in _depositToStrategy,
+        // so the deposit must revert rather than silently bypassing the slippage check.
+        mockStrategy.mockPreviewRedeemToRevert("broken");
+
+        _mockTransferHelper.mockAsset(address(_mockUsdt), depositAmount);
+        vm.prank(depositor);
+        vm.expectRevert("broken");
+        _allocator.deposit(address(_mockUsdt), depositAmount);
+    }
+
+    function test_getAssetBalanceInStrategy_returnsZero_ifPreviewRedeemReverts() public {
+        uint256 depositAmount = 1000;
+        depositAmount = _boundAssetAmount(address(_mockUsdt), depositAmount);
+
+        MockErc4626Strategy mockStrategy = new MockErc4626Strategy(_mockUsdt);
+        vm.prank(admin);
+        _allocator.addStrategy(address(_mockUsdt), address(mockStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+
+        // Deposit directly into the strategy so it holds shares for the Allocator
+        _mockUsdt.mint(depositor, depositAmount);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(mockStrategy), depositAmount);
+        vm.prank(depositor);
+        mockStrategy.deposit(depositAmount, address(_allocator));
+
+        // Confirm balance is reported correctly before breaking previewRedeem
+        assertEq(_allocator.getAssetBalanceInStrategy(address(mockStrategy)), depositAmount);
+
+        // Now make previewRedeem revert — the tolerant _tryGetAssetBalanceInStrategy
+        // used by getAssetBalanceInStrategy should return 0 instead of reverting
+        mockStrategy.mockPreviewRedeemToRevert("broken");
+        assertEq(_allocator.getAssetBalanceInStrategy(address(mockStrategy)), 0);
+    }
+
+    function test_getAssetBalance_doesNotRevert_ifOneStrategyPreviewRedeemReverts() public {
+        uint256 depositAmount = 1000;
+        depositAmount = _boundAssetAmount(address(_mockUsdt), depositAmount);
+
+        MockErc4626Strategy mockStrategy = new MockErc4626Strategy(_mockUsdt);
+        vm.prank(admin);
+        _allocator.addStrategy(address(_mockUsdt), address(mockStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+
+        // Deposit into the healthy default strategy via the Allocator
+        _mockTransferHelper.mockAsset(address(_mockUsdt), depositAmount);
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), depositAmount);
+
+        // Deposit directly into the mock strategy so it holds shares for the Allocator
+        _mockUsdt.mint(depositor, depositAmount);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(mockStrategy), depositAmount);
+        vm.prank(depositor);
+        mockStrategy.deposit(depositAmount, address(_allocator));
+
+        // Total balance should include both strategies
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), depositAmount * 2);
+
+        // Break previewRedeem on the mock strategy — getAssetBalance should still
+        // return the healthy strategy's balance, skipping the broken one
+        mockStrategy.mockPreviewRedeemToRevert("broken");
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), depositAmount);
+    }
+
+    function test_tryWithdrawFromStrategy_returnsZero_ifMaxWithdrawZeroAndPreviewRedeemReverts() public {
+        uint256 depositAmount = 1000;
+        depositAmount = _boundAssetAmount(address(_mockUsdt), depositAmount);
+
+        MockErc4626Strategy mockStrategy = new MockErc4626Strategy(_mockUsdt);
+        vm.prank(admin);
+        _allocator.addStrategy(address(_mockUsdt), address(mockStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        vm.prank(everyRoleAccount);
+        _allocator.setDefaultStrategy(address(_mockUsdt), address(mockStrategy));
+
+        // Deposit into strategy
+        _mockUsdt.mint(depositor, depositAmount);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(mockStrategy), depositAmount);
+        vm.prank(depositor);
+        mockStrategy.deposit(depositAmount, address(_allocator));
+
+        // maxWithdraw returns 0 (triggers fallback to _tryGetAssetBalanceInStrategy)
+        // and previewRedeem reverts — should silently return 0, not revert
+        mockStrategy.mockMaxWithdraw(0);
+        mockStrategy.mockPreviewRedeemToRevert("broken");
+
+        _mockAssetRegistry.mockRegisteredAsset(address(_mockUsdt));
+        // Withdraw should not revert — it just can't withdraw from the broken strategy
+        // It will revert with InsufficientFunds because no funds are available anywhere
+        vm.prank(withdrawer);
+        vm.expectRevert(Errors.InsufficientFunds.selector);
+        _allocator.withdraw(address(_mockUsdt), depositAmount);
+    }
+
     function test_depositAllowIdle_doesNotRevert_ifSharesMintedIsZero() public {
         uint256 depositAmountUsdt = 1000;
         depositAmountUsdt = _boundAssetAmount(address(_mockUsdt), depositAmountUsdt);
