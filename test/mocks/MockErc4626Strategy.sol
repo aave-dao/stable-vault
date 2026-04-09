@@ -20,6 +20,8 @@ contract MockErc4626Strategy is ERC4626 {
     string private _redeemRevertErrorMsg;
     bool private _mockPreviewRedeem;
     uint256 private _previewRedeem;
+    bool private _previewRedeemShouldRevert;
+    string private _previewRedeemRevertErrorMsg;
 
     constructor(IERC20 asset) ERC4626(asset) ERC20("Mock Erc4626 Strategy", "MOCK4626") {}
 
@@ -48,6 +50,16 @@ contract MockErc4626Strategy is ERC4626 {
         _withdrawRevertErrorMsg = errorMsg;
     }
 
+    function mockPreviewRedeemToRevert(string memory errorMsg) external {
+        _previewRedeemShouldRevert = true;
+        _previewRedeemRevertErrorMsg = errorMsg;
+    }
+
+    function discardPreviewRedeemRevertMock() external {
+        _previewRedeemShouldRevert = false;
+        _previewRedeemRevertErrorMsg = "";
+    }
+
     function mockRedeemToRevert(string memory errorMsg) external {
         _redeemShouldRevert = true;
         _redeemRevertErrorMsg = errorMsg;
@@ -61,6 +73,9 @@ contract MockErc4626Strategy is ERC4626 {
     }
 
     function previewRedeem(uint256 shares) public view override returns (uint256) {
+        if (_previewRedeemShouldRevert) {
+            revert(_previewRedeemRevertErrorMsg);
+        }
         if (_mockPreviewRedeem) {
             return _previewRedeem;
         }
