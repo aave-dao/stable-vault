@@ -455,6 +455,11 @@ contract StableVault is
         for (uint256 i = 0; i < assets.length; i++) {
             IFundsHandler(FUNDS_HANDLER).processWithdrawal(assets[i], amounts[i]);
         }
+        // NOTE: Due to oracle-bridge propagation asymmetry, the aggregated balance may temporarily be lower than the
+        // actual system value after an IOU exchange on an Earning Chain (the oracle reflects the balance reduction in
+        // seconds, while the BURN_IOU_TOKEN message reducing obligations may take longer depending on the source
+        // chain). Operators should avoid calling claimSurplusInterest() during these transient windows to prevent
+        // unnecessary reverts.
         require(_getVaultObligations() <= _getVaultAggregatedBalance(), SurplusInterestClaimLeadsToInsolvency());
         address treasury = $storage().treasury;
         require(treasury != address(0), TreasuryNotSet());
