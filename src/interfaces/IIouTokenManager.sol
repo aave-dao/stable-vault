@@ -29,8 +29,8 @@ interface IIouTokenManager {
     /// @return asset Address of the IOU token.
     function getAsset() external view returns (address);
 
-    /// @notice Getter for the locked balance of the IOU token which have been bridged to Earning Chain(s).
-    /// @dev Lock IOU tokens sit in the contract until they are burned due to an asset exchange on an Earning Chain or
+    /// @notice Getter for the locked balance of the IOU token which has been bridged to Earning Chain(s).
+    /// @dev Locked IOU tokens sit in the contract until they are burned due to an asset exchange on an Earning Chain or
     /// bridged back to the Accounting Chain.
     /// @dev This function should return 0 on Earning Chains as IOU tokens are not
     /// locked on Earning Chains.
@@ -55,8 +55,7 @@ interface IIouTokenManager {
     /// @param amount Amount of tokens to mint.
     function mintTokens(address to, uint256 amount) external;
 
-    /// @notice Burns tokens and transfers them to the caller (assumes this contract has burn privileges on the IOU
-    /// token).
+    /// @notice Burns tokens from the specified address (assumes this contract has burn privileges on the IOU token).
     /// @param from Address to burn the tokens from.
     /// @param amount Amount of tokens to burn.
     function burnTokens(address from, uint256 amount) external;

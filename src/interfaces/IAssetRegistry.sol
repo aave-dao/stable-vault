@@ -16,7 +16,7 @@ interface IAssetRegistry {
     /// @param swapInputTokenAllowed Whether the asset is allowed to be used as a swap input token in the Allocator.
     /// @param swapOutputTokenAllowed Whether the asset is allowed to be used as a swap output token in the Allocator.
     /// This flag is separate from the `depositIntoAllocatorAllowed` flag to allow for more granular control. It is
-    /// possible for the `depositsToAllocatorAllowed` flag to be disabled while the `swapOutputTokenAllowed` flag is
+    /// possible for the `depositIntoAllocatorAllowed` flag to be disabled while the `swapOutputTokenAllowed` flag is
     /// enabled to allow swapping out of another asset while avoiding potentially higher exposure to the output asset
     /// from deposits.
     struct AssetConfig {

@@ -15,8 +15,8 @@ interface ISwapper {
     error CallToTargetFailed();
 
     /// @notice Executes a swap using arbitrary data which can represent a series of calls to one or more contracts.
-    /// @dev The Swapper must get `fromAmount` of `fromAsset` transferred before the `executeSwap` function is invoked.
-    /// @dev The Swapper must approve `amountOut` of `toAsset` to be pulled by msg.sender at the end of `executeSwap`
+    /// @dev The Swapper must get `amountIn` of `assetIn` transferred before the `executeSwap` function is invoked.
+    /// @dev The Swapper must approve `amountOut` of `assetOut` to be pulled by msg.sender at the end of `executeSwap`
     /// function execution.
     /// @param assetIn Address of the swap input asset, transferred to the swapper before invoking this function.
     /// @param assetOut Address of the asset in which the output of the swap is expected.

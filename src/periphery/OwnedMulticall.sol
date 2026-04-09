@@ -4,10 +4,10 @@ pragma solidity ^0.8.22;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-/// @title Multicall3
-/// @notice Aggregate results from multiple function calls
+/// @title OwnedMulticall
+/// @notice Aggregate results from multiple function calls.
 /// @notice Sourced from https://www.multicall3.com/
-/// @dev Multicall & Multicall2 backwards-compatible
+/// @dev Based on Multicall3. Not backwards-compatible with Multicall2 due to the onlyOwner modifier.
 /// @dev Aggregate methods are marked `payable` to save 24 gas per call
 contract OwnedMulticall is Ownable {
     /// @notice Thrown when renounceOwnership is called.
@@ -47,7 +47,6 @@ contract OwnedMulticall is Ownable {
         revert RenounceOwnershipNotAllowed();
     }
 
-    /// @notice Backwards-compatible call aggregation with Multicall
     /// @param calls An array of Call structs
     /// @return blockNumber The block number where the calls were executed
     /// @return returnData An array of bytes containing the responses
@@ -72,7 +71,6 @@ contract OwnedMulticall is Ownable {
         }
     }
 
-    /// @notice Backwards-compatible with Multicall2
     /// @notice Aggregate calls without requiring success
     /// @param requireSuccess If true, require all calls to succeed
     /// @param calls An array of Call structs
@@ -99,9 +97,9 @@ contract OwnedMulticall is Ownable {
         }
     }
 
-    /// @notice Backwards-compatible with Multicall2
     /// @notice Aggregate calls and allow failures using tryAggregate
     /// @dev Access control is enforced by the `onlyOwner` modifier on `tryAggregate`, which is called internally.
+    /// @param requireSuccess If true, require all calls to succeed
     /// @param calls An array of Call structs
     /// @return blockNumber The block number where the calls were executed
     /// @return blockHash The hash of the block where the calls were executed
@@ -116,7 +114,6 @@ contract OwnedMulticall is Ownable {
         returnData = tryAggregate(requireSuccess, calls);
     }
 
-    /// @notice Backwards-compatible with Multicall2
     /// @notice Aggregate calls and allow failures using tryAggregate
     /// @dev Access control is enforced by the `onlyOwner` modifier on `tryAggregate`, which is called internally.
     /// @param calls An array of Call structs

@@ -103,8 +103,8 @@ interface IChainGateway {
     /// @param adapter The adapter to set as the default.
     function setDefaultBridgeAdapter(address asset, uint256 chainId, address adapter) external;
 
-    /// @notice Handle receiving of a data and funds from a source chain.
-    /// @param sourceChainId The chain from which the message was sent from.
+    /// @notice Handle receiving of data and funds from a source chain.
+    /// @param sourceChainId The chain from which the message was sent.
     /// @param asset The asset bridged over from a source chain.
     /// @param amount The amount of the asset bridged.
     /// @param data The data that was sent from a source chain.

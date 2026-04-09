@@ -44,12 +44,14 @@ interface IFundsHandler {
 
     /// @notice Adds an earning chain to the list of supported earning chains.
     /// @dev An Earning chain must be added to bridge funds to the chain and to obtain balances on the chain from an
-    /// oracle. @param chainId Chain id of the earning chain to add.
+    /// oracle.
+    /// @param chainId Chain id of the earning chain to add.
     function addEarningChain(uint256 chainId) external;
 
     /// @notice Removes an earning chain from the list of supported earning chains.
     /// @dev An Earning chain must be removed to stop bridging funds to the chain and to stop obtaining balances on the
-    /// chain from an oracle. @param chainId Chain id of the earning chain to remove.
+    /// chain from an oracle.
+    /// @param chainId Chain id of the earning chain to remove.
     function removeEarningChain(uint256 chainId) external;
 
     /// @notice Forward a deposit to a liquidity source.
