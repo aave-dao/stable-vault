@@ -80,10 +80,6 @@ contract EarningChainGateway is
         __BaseChainGateway_init(accessManager);
     }
 
-    function getIouTokenManager() external view returns (address) {
-        return IOU_TOKEN_MANAGER;
-    }
-
     function getAccountingChainId() external view returns (uint256) {
         return ACCOUNTING_CHAIN_ID;
     }
@@ -137,6 +133,15 @@ contract EarningChainGateway is
         require(adapter != address(0), AdapterNotFound());
 
         // Send data to synchronize the Accounting Chain's state.
+        // NOTE: Oracle-bridge propagation asymmetry (by design). The Earning Chain balance reduction is reflected in
+        // the next Chainlink oracle update (order of seconds via AssetOutflow event), while this BURN_IOU_TOKEN
+        // message reducing obligations may take longer depending on the source chain. During this window, the
+        // Accounting Chain sees reduced assets but unchanged IOU obligations, temporarily lowering available surplus.
+        // This is the conservative
+        // direction: _validateInboundMessageBlockNumber() on the Accounting Chain ensures the burn message is only
+        // accepted after the oracle snapshot reflects this outflow, preventing the reverse (obligations reduced while
+        // assets are still overstated). Operators are expected to account for this transient state when scheduling
+        // claimSurplusInterest() calls.
         _sendBurnIouTokenMessage(iouTokenAmountRay, adapter, bridgeParams);
 
         ITransferHelper(TRANSFER_HELPER).transfer(assetOut, amountOut, receiver);
@@ -165,7 +170,7 @@ contract EarningChainGateway is
         emit AssetOutflow(asset, amount);
     }
 
-    function _bridgeIouTokenFromAccountingChain(bytes memory data) internal {
+    function _mintBridgedIouTokens(bytes memory data) internal {
         IChainGateway.IouTokenBridgeMessage memory iouTokenBridgeMessage =
             abi.decode(data, (IChainGateway.IouTokenBridgeMessage));
         IIouTokenManager(IOU_TOKEN_MANAGER).mintTokens(iouTokenBridgeMessage.recipient, iouTokenBridgeMessage.amount);
@@ -180,7 +185,7 @@ contract EarningChainGateway is
     {
         IChainGateway.CrossChainMessage memory crossChainMessage = abi.decode(data, (IChainGateway.CrossChainMessage));
         if (crossChainMessage.messageType == IChainGateway.MessageType.BRIDGE_IOU_TOKEN) {
-            _bridgeIouTokenFromAccountingChain(crossChainMessage.data);
+            _mintBridgedIouTokens(crossChainMessage.data);
         } else {
             revert IChainGateway.InvalidMessageType();
         }

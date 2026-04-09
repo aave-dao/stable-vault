@@ -12,6 +12,8 @@ contract MockGateway is IChainGateway {
     address internal _tokenToComsume;
     address internal _destination;
 
+    function getIouTokenManager() external view returns (address) {}
+
     function mockConsumeOnNextCall(
         address transferHelper,
         uint256 balanceToConsume,

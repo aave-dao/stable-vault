@@ -32,6 +32,10 @@ contract ChainlinkChainBalanceOracleAdapter is IChainBalanceOracleAdapter {
     address immutable BUNDLE_AGGREGATOR_PROXY;
     uint256 immutable HEARTBEAT;
 
+    /// @dev Constructor.
+    /// @param earningChainId The chain ID of the Earning Chain this adapter reads data for.
+    /// @param bundleAggregatorProxy The address of the Chainlink bundle aggregator proxy.
+    /// @param heartbeat The expected heartbeat interval in seconds for staleness checks.
     constructor(uint256 earningChainId, address bundleAggregatorProxy, uint256 heartbeat) {
         require(bundleAggregatorProxy != address(0), Errors.ZeroAddress());
         require(earningChainId != 0 && earningChainId != block.chainid, Errors.InvalidParameter());

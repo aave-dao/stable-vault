@@ -22,6 +22,8 @@ contract MockAccountingChainGateway is IAccountingChainGateway {
         _amountsToPullFromTransferHelperInNextCall.push(amount);
     }
 
+    function getIouTokenManager() external view returns (address) {}
+
     function getDefaultBridgeAdapter(address asset, uint256 chainId) external view returns (address) {}
 
     function sendPushFundsToChainMessage(

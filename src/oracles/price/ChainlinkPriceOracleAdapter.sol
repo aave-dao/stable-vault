@@ -40,6 +40,10 @@ contract ChainlinkPriceOracleAdapter is IPriceOracleAdapter {
     uint256 immutable DECIMALS;
     uint256 immutable HEARTBEAT;
 
+    /// @dev Constructor.
+    /// @param asset The address of the asset this adapter provides pricing for.
+    /// @param dataFeed The address of the Chainlink data feed.
+    /// @param heartbeat The expected heartbeat interval in seconds for staleness checks.
     constructor(address asset, address dataFeed, uint256 heartbeat) {
         require(asset != address(0), Errors.ZeroAddress());
         require(dataFeed != address(0), Errors.ZeroAddress());
