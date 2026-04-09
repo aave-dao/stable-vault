@@ -136,7 +136,7 @@ contract Allocator is
 
     /// @inheritdoc IAllocator
     function getAssetBalanceInStrategy(address strategy) external view override returns (uint256) {
-        return _getAssetBalanceInStrategy(IERC4626(strategy));
+        return _tryGetAssetBalanceInStrategy(IERC4626(strategy));
     }
 
     /// @inheritdoc IAllocator
@@ -267,7 +267,7 @@ contract Allocator is
         if (maxWithdrawable == 0) {
             // Some ERC-4626 implementations may return 0 for `maxWithdraw` to adhere to the spec rule of not reverting.
             // Fallback to querying the balance that may not account for withdrawal limits or timelocks.
-            withdrawnAmount = Math.min(amount, _getAssetBalanceInStrategy(IERC4626(strategy)));
+            withdrawnAmount = Math.min(amount, _tryGetAssetBalanceInStrategy(IERC4626(strategy)));
         } else {
             withdrawnAmount = Math.min(amount, maxWithdrawable);
         }
@@ -512,7 +512,7 @@ contract Allocator is
         for (uint256 i = 0; i < strategiesLength; i++) {
             address strategy = $storage().assetStrategies[asset].at(i);
             if (!onlyTrustedStrategies || $storage().strategyConfigs[strategy].isTrusted) {
-                balance += _getAssetBalanceInStrategy(IERC4626(strategy));
+                balance += _tryGetAssetBalanceInStrategy(IERC4626(strategy));
             }
         }
         balance += IERC20(asset).balanceOf(address(this));
@@ -521,6 +521,19 @@ contract Allocator is
 
     function _getAssetBalanceInStrategy(IERC4626 strategy) internal view returns (uint256) {
         return strategy.previewRedeem(strategy.balanceOf(address(this)));
+    }
+
+    function _tryGetAssetBalanceInStrategy(IERC4626 strategy) internal view returns (uint256) {
+        uint256 balance;
+        uint256 shares = strategy.balanceOf(address(this));
+        if (shares > 0) {
+            try strategy.previewRedeem(shares) returns (uint256 amount) {
+                balance = amount;
+            } catch {
+                balance = 0;
+            }
+        }
+        return balance;
     }
 
     function _isStrategySupportedForAsset(address strategy, address asset) internal view returns (bool) {
