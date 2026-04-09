@@ -145,6 +145,39 @@ contract CcipAdapterTest is TestWithHelpers {
         assertEq(_earningChainCcipAdapter.getChainId(EARNING_CHAIN_CCIP_SELECTOR), 0);
     }
 
+    function test_getDestinationChainAdapter_returnsSetAdapter(uint256 chainId, address adapter) public {
+        vm.assume(chainId != EARNING_CHAIN_ID && chainId != ACCOUNTING_CHAIN_ID);
+        vm.assume(adapter != address(0));
+
+        assertEq(_accountingChainCcipAdapter.getDestinationChainAdapter(chainId), address(0));
+
+        vm.prank(everyRoleAccount);
+        _accountingChainCcipAdapter.setDestinationChainAdapter(chainId, adapter);
+
+        assertEq(_accountingChainCcipAdapter.getDestinationChainAdapter(chainId), adapter);
+    }
+
+    function test_getDestinationChainAdapter_reflectsUpdate(uint256 chainId, address adapter1, address adapter2)
+        public
+    {
+        vm.assume(chainId != EARNING_CHAIN_ID && chainId != ACCOUNTING_CHAIN_ID);
+        vm.assume(adapter1 != address(0) && adapter2 != address(0));
+        vm.assume(adapter1 != adapter2);
+
+        vm.prank(everyRoleAccount);
+        _accountingChainCcipAdapter.setDestinationChainAdapter(chainId, adapter1);
+        assertEq(_accountingChainCcipAdapter.getDestinationChainAdapter(chainId), adapter1);
+
+        vm.prank(everyRoleAccount);
+        _accountingChainCcipAdapter.setDestinationChainAdapter(chainId, adapter2);
+        assertEq(_accountingChainCcipAdapter.getDestinationChainAdapter(chainId), adapter2);
+    }
+
+    function test_getDestinationChainAdapter_returnsZeroForUnsetChain(uint256 chainId) public view {
+        vm.assume(chainId != EARNING_CHAIN_ID && chainId != ACCOUNTING_CHAIN_ID);
+        assertEq(_accountingChainCcipAdapter.getDestinationChainAdapter(chainId), address(0));
+    }
+
     function test_supportsInterface() public view {
         assertTrue(_accountingChainCcipAdapter.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId));
         assertTrue(_accountingChainCcipAdapter.supportsInterface(type(IERC165).interfaceId));
@@ -180,6 +213,8 @@ contract CcipAdapterTest is TestWithHelpers {
         vm.deal(address(_accountingChainCcipAdapter), adapterBalance);
         vm.assume(address(msgSender).balance == 0);
 
+        vm.expectEmit(true, true, true, true);
+        emit IRescuableNative.NativeRescued(msgSender, amountToRescue);
         vm.prank(msgSender);
         IRescuableNative(address(_accountingChainCcipAdapter)).rescueNative(amountToRescue);
 
@@ -220,6 +255,24 @@ contract CcipAdapterTest is TestWithHelpers {
         vm.prank(operator);
         vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, operator));
         _earningChainCcipAdapter.setChainSelector(ACCOUNTING_CHAIN_ID, ACCOUNTING_CHAIN_CCIP_SELECTOR);
+    }
+
+    function test_setChainSelector_emitsChainSelectorSet(uint256 chainId, uint64 ccipChainSelector) public {
+        vm.assume(chainId != EARNING_CHAIN_ID && chainId != ACCOUNTING_CHAIN_ID);
+
+        vm.expectEmit(true, true, true, true);
+        emit ICcipBridgeAdapter.ChainSelectorSet(chainId, ccipChainSelector);
+        vm.prank(everyRoleAccount);
+        _accountingChainCcipAdapter.setChainSelector(chainId, ccipChainSelector);
+    }
+
+    function test_setDestinationChainAdapter_emitsDestinationChainAdapterSet(uint256 chainId, address adapter) public {
+        vm.assume(chainId != EARNING_CHAIN_ID && chainId != ACCOUNTING_CHAIN_ID);
+
+        vm.expectEmit(true, true, true, true);
+        emit IBridgeAdapter.DestinationChainAdapterSet(chainId, adapter);
+        vm.prank(everyRoleAccount);
+        _accountingChainCcipAdapter.setDestinationChainAdapter(chainId, adapter);
     }
 
     function test_publishMessageToChainWithFeePayer_withTokenBridgeFee(
@@ -1535,6 +1588,8 @@ contract CcipAdapterTest is TestWithHelpers {
 
         address msgSender = makeAddr("rescuer");
 
+        vm.expectEmit(true, true, true, true);
+        emit IRescuableToken.TokensRescued(address(_mockUsdt), msgSender, amount);
         vm.prank(msgSender);
         IRescuableToken(address(_accountingChainCcipAdapter)).rescueTokens(address(_mockUsdt), amount);
 

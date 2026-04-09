@@ -68,6 +68,15 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         return $storage().defaultBridgeAdapter[asset][chainId];
     }
 
+    /// @notice Checks whether a bridge adapter is whitelisted for a given asset and chain.
+    /// @param asset The asset to check the adapter for.
+    /// @param chainId The chain id to check the adapter for.
+    /// @param adapter The adapter to check.
+    /// @return True if the adapter is whitelisted, false otherwise.
+    function isBridgeAdapterSupported(address asset, uint256 chainId, address adapter) external view returns (bool) {
+        return $storage().supportedBridgeAdapters[asset][chainId][adapter];
+    }
+
     /// @inheritdoc IChainGateway
     function receiveMessage(uint256 sourceChainId, address asset, uint256 amount, bytes memory data) external override {
         if (asset != Constants.ASSET_FOR_DATA_ONLY_BRIDGE) {
