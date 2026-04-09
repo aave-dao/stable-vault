@@ -80,10 +80,6 @@ contract EarningChainGateway is
         __BaseChainGateway_init(accessManager);
     }
 
-    function getIouTokenManager() external view returns (address) {
-        return IOU_TOKEN_MANAGER;
-    }
-
     function getAccountingChainId() external view returns (uint256) {
         return ACCOUNTING_CHAIN_ID;
     }
@@ -174,7 +170,7 @@ contract EarningChainGateway is
         emit AssetOutflow(asset, amount);
     }
 
-    function _bridgeIouTokenFromAccountingChain(bytes memory data) internal {
+    function _mintBridgedIouTokens(bytes memory data) internal {
         IChainGateway.IouTokenBridgeMessage memory iouTokenBridgeMessage =
             abi.decode(data, (IChainGateway.IouTokenBridgeMessage));
         IIouTokenManager(IOU_TOKEN_MANAGER).mintTokens(iouTokenBridgeMessage.recipient, iouTokenBridgeMessage.amount);
@@ -189,7 +185,7 @@ contract EarningChainGateway is
     {
         IChainGateway.CrossChainMessage memory crossChainMessage = abi.decode(data, (IChainGateway.CrossChainMessage));
         if (crossChainMessage.messageType == IChainGateway.MessageType.BRIDGE_IOU_TOKEN) {
-            _bridgeIouTokenFromAccountingChain(crossChainMessage.data);
+            _mintBridgedIouTokens(crossChainMessage.data);
         } else {
             revert IChainGateway.InvalidMessageType();
         }

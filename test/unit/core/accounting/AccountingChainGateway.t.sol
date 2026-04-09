@@ -131,6 +131,10 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         assertEq(_accountingChainGateway.getFundsHandler(), address(_mockFundsHandler));
     }
 
+    function test_getIouTokenManager_returnsExpectedIouTokenManager() public view {
+        assertEq(_accountingChainGateway.getIouTokenManager(), address(_mockIouTokenManager));
+    }
+
     function test_getDefaultBridgeAdapter_returnsExpectedDefaultBridgeAdapter() public view {
         assertEq(
             _accountingChainGateway.getDefaultBridgeAdapter(address(_mockUsdt), EARNING_CHAIN_ID),
