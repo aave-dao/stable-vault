@@ -165,7 +165,7 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
     function _setupWithdrawalPolicy() internal {
         WithdrawalPolicy withdrawalPolicy = WithdrawalPolicy(getWithdrawalPolicyAddress(_deployer()));
         withdrawalPolicy.setDefaultFeeBps(uint16(_configUint(".withdrawalPolicy.defaultFeeBps")));
-        withdrawalPolicy.setSigner(_configAddress(".withdrawalPolicy.signer"), true);
+        withdrawalPolicy.addSigner(_configAddress(".withdrawalPolicy.signer"));
     }
 
     function _setupAllocator() internal {

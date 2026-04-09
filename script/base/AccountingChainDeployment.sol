@@ -245,7 +245,7 @@ abstract contract AccountingChainDeployment is
     function _setupWithdrawalPolicy() internal {
         WithdrawalPolicy withdrawalPolicy = WithdrawalPolicy(getWithdrawalPolicyAddress(_deployer()));
         withdrawalPolicy.setDefaultFeeBps(uint16(_configUint(".withdrawalPolicy.defaultFeeBps")));
-        withdrawalPolicy.setSigner(_configAddress(".withdrawalPolicy.signer"), true);
+        withdrawalPolicy.addSigner(_configAddress(".withdrawalPolicy.signer"));
     }
 
     function _setupAssetRegistry() internal {

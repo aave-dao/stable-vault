@@ -158,6 +158,19 @@ contract AssetRegistry is AccessManagedUpgradeable, Multicall, IAssetRegistry {
 
     // ///////////////////////// GETTERS ////////////////////////////////
 
+    /// @notice Getter for all registered assets (including distrusted).
+    /// @return The list of all registered asset addresses.
+    function getRegisteredAssets() external view returns (address[] memory) {
+        return $storage().assets.values();
+    }
+
+    /// @notice Getter for the full configuration of an asset.
+    /// @param asset Address of the asset to get the configuration for.
+    /// @return The asset configuration struct.
+    function getAssetConfig(address asset) external view returns (AssetConfig memory) {
+        return $storage().configByAsset[asset];
+    }
+
     /// @inheritdoc IAssetRegistry
     function getTrustedAssets() external view override returns (address[] memory) {
         return $storage().trustedAssets.values();

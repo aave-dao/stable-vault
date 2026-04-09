@@ -352,11 +352,12 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     function _setupTarget__WithdrawalPolicy(address deployer) internal {
         address withdrawalPolicy = getWithdrawalPolicyAddress(deployer);
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](3);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](4);
 
         roles[0] = RolesConfig.getRole__setAssetFeeBps();
         roles[1] = RolesConfig.getRole__setDefaultFeeBps();
-        roles[2] = RolesConfig.getRole__setSigner();
+        roles[2] = RolesConfig.getRole__addSigner();
+        roles[3] = RolesConfig.getRole__removeSigner();
 
         _setTargetFunctionRoles(withdrawalPolicy, roles);
     }

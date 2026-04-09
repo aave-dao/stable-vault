@@ -14,6 +14,9 @@ interface IBridgeAdapter {
     /// @dev The message id matches the one in the `MessagePublished` event.
     event MessageReceived(bytes32 indexed messageId);
 
+    /// @notice Emitted when the destination chain adapter is set.
+    event DestinationChainAdapterSet(uint256 indexed chainId, address indexed destinationChainAdapter);
+
     /// @notice Address checked is not the destination chain adapter.
     /// @custom:selector 0x75503511
     error OnlyDestinationChainAdapter();
