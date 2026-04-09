@@ -312,6 +312,63 @@ contract IouTokenManagerTest_AccountingChain is Test {
         );
     }
 
+    function test_bridgeTokens_nonNativeFeeToken_msgValueDoesNotLeaveStealableNativeOnTransferHelper(
+        uint256 iouTokenAmountRay,
+        uint256 feeAmount,
+        uint256 accidentalMsgValue
+    ) public {
+        address from = makeAddr("from");
+        address attacker = makeAddr("attacker");
+        uint256 destinationChainId = block.chainid + 1;
+        address iouTokenRecipient = makeAddr("iouTokenRecipient");
+        address feeToken = address(new MockErc20("Test USD", "TUSD", 6));
+
+        iouTokenAmountRay = bound(iouTokenAmountRay, 1, 1e36);
+        feeAmount = bound(feeAmount, 1, 1e18);
+        accidentalMsgValue = bound(accidentalMsgValue, 1, 100 ether);
+
+        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
+            feePayer: from,
+            feeToken: feeToken,
+            feeAmount: feeAmount,
+            feeRefundThreshold: 0,
+            gasLimit: 0,
+            data: ""
+        });
+
+        MockErc20(feeToken).mint(from, feeAmount);
+        vm.prank(from);
+        IERC20(feeToken).approve(address(iouTokenManager), feeAmount);
+
+        vm.prank(iouTokenManagerAddress);
+        MockErc20(iouToken).mint(from, iouTokenAmountRay);
+        vm.prank(from);
+        IERC20(iouToken).approve(address(iouTokenManager), iouTokenAmountRay);
+
+        address feeRecipient = makeAddr("bridgeAdapter");
+        MockGateway(chainGateway).mockConsumeOnNextCall(transferHelper, feeAmount, feeToken, feeRecipient);
+
+        vm.deal(from, accidentalMsgValue);
+        vm.prank(from);
+        iouTokenManager.bridgeTokens{value: accidentalMsgValue}(
+            destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeParams
+        );
+
+        assertEq(
+            IERC20(feeToken).balanceOf(address(transferHelper)),
+            0,
+            "Token fee should have been fully consumed from TransferHelper"
+        );
+        assertEq(IERC20(feeToken).balanceOf(feeRecipient), feeAmount, "Token fee not properly transferred");
+
+        uint256 stealableNativeBalance = transferHelper.balance;
+        vm.prank(attacker);
+        MockTransferHelper(payable(transferHelper)).pull(address(0), stealableNativeBalance);
+
+        assertEq(attacker.balance, 0, "Attacker should not be able to steal native from TransferHelper");
+        assertEq(transferHelper.balance, 0, "TransferHelper should not retain native after bridging");
+    }
+
     function test_bridgeTokens_bridgeParams_ClientTransfersNativeFeeToken(
         address from,
         uint256 destinationChainId,
