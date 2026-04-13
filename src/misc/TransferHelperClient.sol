@@ -30,35 +30,29 @@ contract TransferHelperClient {
     }
 
     modifier assertingTransferHelperBalanceFor(address asset) {
-        uint256 balanceBefore;
-        if (asset == Constants.NATIVE_CURRENCY) {
-            balanceBefore = TRANSFER_HELPER.balance;
-        } else {
-            balanceBefore = IERC20(asset).balanceOf(TRANSFER_HELPER);
-        }
+        uint256 balanceBefore = _transferHelperBalance(asset);
         _;
-        uint256 balanceAfter;
-        if (asset == Constants.NATIVE_CURRENCY) {
-            balanceAfter = TRANSFER_HELPER.balance;
-        } else {
-            balanceAfter = IERC20(asset).balanceOf(TRANSFER_HELPER);
-        }
+        uint256 balanceAfter = _transferHelperBalance(asset);
         require(balanceAfter <= balanceBefore, TransferHelperBalanceNotConsumed(asset));
     }
 
     modifier assertingTransferHelperBalanceForAssets(address[] memory assets) {
         uint256[] memory balancesBefore = new uint256[](assets.length);
         for (uint256 i = 0; i < assets.length; i++) {
-            balancesBefore[i] = IERC20(assets[i]).balanceOf(TRANSFER_HELPER);
+            balancesBefore[i] = _transferHelperBalance(assets[i]);
         }
         _;
-        uint256[] memory balancesAfter = new uint256[](assets.length);
         for (uint256 i = 0; i < assets.length; i++) {
-            balancesAfter[i] = IERC20(assets[i]).balanceOf(TRANSFER_HELPER);
+            uint256 balanceAfter = _transferHelperBalance(assets[i]);
+            require(balanceAfter <= balancesBefore[i], TransferHelperBalanceNotConsumed(assets[i]));
         }
-        for (uint256 i = 0; i < assets.length; i++) {
-            require(balancesAfter[i] <= balancesBefore[i], TransferHelperBalanceNotConsumed(assets[i]));
+    }
+
+    function _transferHelperBalance(address asset) private view returns (uint256) {
+        if (asset == Constants.NATIVE_CURRENCY) {
+            return TRANSFER_HELPER.balance;
         }
+        return IERC20(asset).balanceOf(TRANSFER_HELPER);
     }
 
     /// @dev Transfers the bridge fee to the TransferHelper to be pulled by Bridge Adapter.
