@@ -11,7 +11,7 @@ import {Errors} from "src/types/Errors.sol";
 /// @title LocalBalanceAggregator
 /// @author Aave Labs
 /// @notice Aggregates the balance of the Allocator's assets in the local chain.
-contract LocalBalanceAggregator {
+abstract contract LocalBalanceAggregator {
     using AssetLib for uint256;
     using MathLib for uint256;
 
