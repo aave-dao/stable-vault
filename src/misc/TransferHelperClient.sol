@@ -15,7 +15,7 @@ import {Errors} from "src/types/Errors.sol";
 /// @notice Client for components that push assets into the TransferHelper or expect assets to be pushed into the
 /// TransferHelper.
 /// @dev This contract is used to assert that the TransferHelper has consumed the assets it is expected to consume.
-contract TransferHelperClient {
+abstract contract TransferHelperClient {
     using SafeERC20 for IERC20;
 
     error TransferHelperBalanceNotConsumed(address asset);
