@@ -161,6 +161,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
         // We don't check for new asset fee being less than the default fee because maybe we want some specific asset to
         // have a higher fee than the default fee.
         require(newAssetFeeBps <= FEE_CAP_BPS, Errors.InvalidParameter());
+        require(isSet || newAssetFeeBps == 0, Errors.InvalidParameter());
         $storage().assetFeeConfigs[asset].feeBps = newAssetFeeBps;
         $storage().assetFeeConfigs[asset].isSet = isSet;
         emit AssetFeeBpsSet(asset, newAssetFeeBps, isSet);

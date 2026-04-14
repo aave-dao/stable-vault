@@ -121,6 +121,8 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
 
     /// @inheritdoc IChainGateway
     function addBridgeAdapter(address asset, uint256 chainId, address adapter) external override restricted {
+        require(adapter != address(0), Errors.ZeroAddress());
+        require(chainId != block.chainid, Errors.InvalidParameter());
         require(!$storage().supportedBridgeAdapters[asset][chainId][adapter], Errors.AddressAlreadyWhitelisted());
         $storage().supportedBridgeAdapters[asset][chainId][adapter] = true;
         emit BridgeAdapterAdded(asset, chainId, adapter);
