@@ -281,6 +281,7 @@ contract StableVault is
             sharesToIssue: toUserShares,
             guaranteedAmountToMoveRay: guaranteedAmountRay
         });
+        _validateAmountOfActiveSubVaults();
 
         emit Transfer(from, to, amountRay);
         return true;
@@ -321,6 +322,7 @@ contract StableVault is
             sharesToIssue: toUserShares,
             guaranteedAmountToMoveRay: guaranteedAmountRay
         });
+        _validateAmountOfActiveSubVaults();
 
         emit Transfer(from, to, amountOfWithdrawalRay);
         return true;
@@ -331,6 +333,7 @@ contract StableVault is
         for (uint256 i = 0; i < userRateData.length; i++) {
             _setUserRate(userRateData[i].user, userRateData[i].newPerSecondRate);
         }
+        _validateAmountOfActiveSubVaults();
     }
 
     /// @inheritdoc IStableVault
@@ -622,7 +625,6 @@ contract StableVault is
                 _addSubVaultToActive(toSubVaultId);
             }
         }
-        _validateAmountOfActiveSubVaults();
 
         if (from == to) {
             // Sanity check. If the user is the same - this cannot be a partial transfer.
