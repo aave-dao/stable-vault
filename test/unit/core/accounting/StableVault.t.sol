@@ -819,7 +819,8 @@ contract StableVaultTest is TestWithHelpers {
         // After batch: subvault 1 still has no remaining users BUT User A is still in subvault 2.
         // Wait — User A is in subvault 2, Users B+C move to subvault 3.
         // Default subvault 1 still has... no one (all 3 moved out? No, only B and C were in subvault 1).
-        // Final: subvault 1 empty (deactivated), subvault 2 has A (active), subvault 3 has B+C (active) = 2 active. Fits.
+        // Final: subvault 1 empty (deactivated), subvault 2 has A (active), subvault 3 has B+C (active) = 2 active.
+        // Fits.
 
         // Instead, let's create a scenario where the final state truly exceeds.
         // Move User B to rate 3 (creates subvault 3). Now: sub1 has C, sub2 has A, sub3 has B = 3 active.
