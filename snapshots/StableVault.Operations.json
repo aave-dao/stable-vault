@@ -7,10 +7,10 @@
   "[executeWithdrawal] partial withdrawal": "130047",
   "[requestWithdrawal] full withdrawal": "173846",
   "[requestWithdrawal] partial withdrawal": "172879",
-  "[setUserRate] default sub-vault to all new different sub-vaults - 10 users": "1866462",
-  "[setUserRate] default sub-vault to all new different sub-vaults - 100 users": "18430915",
+  "[setUserRate] default sub-vault to all new different sub-vaults - 10 users": "1865112",
+  "[setUserRate] default sub-vault to all new different sub-vaults - 100 users": "18416065",
   "[setUserRate] default sub-vault to new sub-vault - 1 user": "210052",
-  "[setUserRate] default sub-vault to same new sub-vault - 10 users": "452108",
-  "[setUserRate] default sub-vault to same new sub-vault - 100 users": "2872737",
-  "[setUserRate] default sub-vault to same new sub-vault - 1000 users": "27085992"
+  "[setUserRate] default sub-vault to same new sub-vault - 10 users": "450758",
+  "[setUserRate] default sub-vault to same new sub-vault - 100 users": "2857887",
+  "[setUserRate] default sub-vault to same new sub-vault - 1000 users": "26936142"
 }
