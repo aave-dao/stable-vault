@@ -39,6 +39,9 @@ interface IFundsHandler {
     }
 
     /// @notice Getter for the total assets in the local Allocator and the Allocators on all Earning Chains.
+    /// @dev Only includes trusted assets; distrusted assets contribute 0 to the balance.
+    /// @dev Earning chain balances are sourced from an oracle and may be stale. Stale balances contribute 0
+    /// (conservative). The staleness window is bounded by the oracle heartbeat + publish buffer.
     /// @return aggregatedBalance Total liquidity across all supported chains in RAY of supported asset denomination.
     function getAggregatedBalance() external view returns (uint256);
 
