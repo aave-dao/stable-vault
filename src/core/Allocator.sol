@@ -221,9 +221,7 @@ contract Allocator is
             // Consume from default strategy (skip if unset to avoid false StrategyWithdrawalFailed events)
             address defaultStrategy = $storage().defaultStrategyByAsset[asset];
             if (defaultStrategy != address(0)) {
-                try this.tryWithdrawFromStrategy(asset, amountRemaining, defaultStrategy) returns (
-                    uint256 withdrawn
-                ) {
+                try this.tryWithdrawFromStrategy(asset, amountRemaining, defaultStrategy) returns (uint256 withdrawn) {
                     amountRemaining = withdrawn >= amountRemaining ? 0 : amountRemaining - withdrawn;
                 } catch {
                     emit StrategyWithdrawalFailed(defaultStrategy, asset, amountRemaining);
