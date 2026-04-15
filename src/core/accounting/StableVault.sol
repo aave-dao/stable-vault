@@ -814,12 +814,12 @@ contract StableVault is
     }
 
     function _getUserBalance(address user) internal view returns (uint256) {
-        if ($storage().positions[user].shares == 0) {
+        uint256 shares = $storage().positions[user].shares;
+        if (shares == 0) {
             return 0;
         }
         // Round down the user balance, so that the rounding is in favor of the protocol.
-        return $storage().positions[user].shares
-            .rayMulDown(_previewSubVaultConversionRate($storage().positions[user].subVaultId));
+        return shares.rayMulDown(_previewSubVaultConversionRate($storage().positions[user].subVaultId));
     }
 
     function _getActiveSubVaultsObligations() internal view returns (uint256) {
