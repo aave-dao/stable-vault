@@ -974,6 +974,12 @@ contract StableVaultTest is TestWithHelpers {
         assertEq(actualAssets, expectedAssets);
     }
 
+    function test_claimSurplusInterest_reverts_ifAmountIsZero() public {
+        vm.expectRevert(Errors.ZeroAmount.selector);
+        vm.prank(manager);
+        stableVault.claimSurplusInterest(_toAddressArray(address(mockAsset)), _toUint256Array(0));
+    }
+
     function test_claimSurplusInterest_reverts_ifMsgSenderIsNotAuthorized(
         address unauthorizedMsgSender,
         uint256 amountToClaim
@@ -3177,6 +3183,16 @@ contract StableVaultTest is TestWithHelpers {
             }
         }
         assertFalse(foundAfter, "SubVault should be inactive after transferring all funds out");
+    }
+
+    function test_executeWithdrawal_reverts_ifIouAmountIsZero(address user) public {
+        vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
+        _assumeNotProxyAdmin(user, address(stableVault));
+
+        vm.expectRevert(Errors.ZeroAmount.selector);
+        vm.prank(user);
+        stableVault.executeWithdrawal(user, address(mockAsset), 0, 0, "");
     }
 
     function test_executeWithdrawal_reverts_ifMsgSenderIsNotTheUser(

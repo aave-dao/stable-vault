@@ -101,6 +101,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) external override {
         require(msg.sender == IOU_TOKEN_MANAGER, OnlyIouTokenManager());
+        require(iouTokenAmountRay > 0, Errors.ZeroAmount());
 
         address adapter = $storage().defaultBridgeAdapter[Constants.ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId];
         require(adapter != address(0), AdapterNotFound());

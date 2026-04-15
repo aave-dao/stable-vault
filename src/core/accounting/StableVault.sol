@@ -422,6 +422,7 @@ contract StableVault is
         bytes memory data
     ) external virtual override nonReentrant assertingTransferHelperBalanceFor(assetOut) {
         require(user == msg.sender, OnlyUser());
+        require(iouAmountRay > 0, Errors.ZeroAmount());
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(user, iouAmountRay);
         uint256 amountOutRay = IWithdrawalPolicy(WITHDRAWAL_POLICY)
             .applyWithdrawalPolicy(
@@ -454,6 +455,7 @@ contract StableVault is
         assertingTransferHelperBalanceForAssets(assets)
     {
         for (uint256 i = 0; i < assets.length; i++) {
+            require(amounts[i] > 0, Errors.ZeroAmount());
             IFundsHandler(FUNDS_HANDLER).processWithdrawal(assets[i], amounts[i]);
         }
         // NOTE: Due to oracle-bridge propagation asymmetry, the aggregated balance may temporarily be lower than the
