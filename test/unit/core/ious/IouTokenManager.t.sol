@@ -328,12 +328,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
         accidentalMsgValue = bound(accidentalMsgValue, 1, 100 ether);
 
         IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
-            feePayer: from,
-            feeToken: feeToken,
-            feeAmount: feeAmount,
-            feeRefundThreshold: 0,
-            gasLimit: 0,
-            data: ""
+            feePayer: from, feeToken: feeToken, feeAmount: feeAmount, feeRefundThreshold: 0, gasLimit: 0, data: ""
         });
 
         MockErc20(feeToken).mint(from, feeAmount);
