@@ -482,8 +482,9 @@ contract StableVault is
 
     /// @inheritdoc IStableVault
     function getActiveSubVaults() external view override returns (SubVaultData[] memory) {
-        SubVaultData[] memory activeSubVaults = new SubVaultData[]($storage().activeSubVaultsIds.length);
-        for (uint256 i = 0; i < $storage().activeSubVaultsIds.length; i++) {
+        uint256 activeSubVaultsCount = $storage().activeSubVaultsIds.length;
+        SubVaultData[] memory activeSubVaults = new SubVaultData[](activeSubVaultsCount);
+        for (uint256 i = 0; i < activeSubVaultsCount; i++) {
             uint256 subVaultId = $storage().activeSubVaultsIds[i];
             uint256 perSecondRate = $storage().subVaultById[subVaultId].perSecondRate;
             activeSubVaults[i] = SubVaultData({perSecondRate: perSecondRate, id: subVaultId});
@@ -824,7 +825,8 @@ contract StableVault is
 
     function _getActiveSubVaultsObligations() internal view returns (uint256) {
         uint256 activeSubVaultsObligations;
-        for (uint256 i = 0; i < $storage().activeSubVaultsIds.length; i++) {
+        uint256 activeSubVaultsIdsCount = $storage().activeSubVaultsIds.length;
+        for (uint256 i = 0; i < activeSubVaultsIdsCount; i++) {
             // Round up the obligations to avoid understating liabilities.
             activeSubVaultsObligations += $storage().subVaultById[$storage().activeSubVaultsIds[i]].totalShares
                 .rayMulUp(_previewSubVaultConversionRate($storage().activeSubVaultsIds[i]));

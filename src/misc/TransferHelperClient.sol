@@ -47,16 +47,17 @@ contract TransferHelperClient {
     }
 
     modifier assertingTransferHelperBalanceForAssets(address[] memory assets) {
-        uint256[] memory balancesBefore = new uint256[](assets.length);
-        for (uint256 i = 0; i < assets.length; i++) {
+        uint256 assetsCount = assets.length;
+        uint256[] memory balancesBefore = new uint256[](assetsCount);
+        for (uint256 i = 0; i < assetsCount; i++) {
             balancesBefore[i] = IERC20(assets[i]).balanceOf(TRANSFER_HELPER);
         }
         _;
-        uint256[] memory balancesAfter = new uint256[](assets.length);
-        for (uint256 i = 0; i < assets.length; i++) {
+        uint256[] memory balancesAfter = new uint256[](assetsCount);
+        for (uint256 i = 0; i < assetsCount; i++) {
             balancesAfter[i] = IERC20(assets[i]).balanceOf(TRANSFER_HELPER);
         }
-        for (uint256 i = 0; i < assets.length; i++) {
+        for (uint256 i = 0; i < assetsCount; i++) {
             require(balancesAfter[i] <= balancesBefore[i], TransferHelperBalanceNotConsumed(assets[i]));
         }
     }

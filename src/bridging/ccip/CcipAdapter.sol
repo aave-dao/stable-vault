@@ -174,12 +174,11 @@ contract CcipAdapter is
                     _chainIdOf[message.sourceChainSelector], Constants.ASSET_FOR_DATA_ONLY_BRIDGE, 0, message.data
                 );
         }
-        if (message.destTokenAmounts.length > 0) {
-            for (uint256 i = 0; i < message.destTokenAmounts.length; i++) {
-                address asset = message.destTokenAmounts[i].token;
-                uint256 amount = message.destTokenAmounts[i].amount;
-                _processReceivedFunds(asset, amount);
-            }
+        uint256 tokenCount = message.destTokenAmounts.length;
+        for (uint256 i = 0; i < tokenCount; i++) {
+            address asset = message.destTokenAmounts[i].token;
+            uint256 amount = message.destTokenAmounts[i].amount;
+            _processReceivedFunds(asset, amount);
         }
     }
 

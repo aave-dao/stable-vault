@@ -18,7 +18,8 @@ contract TransferHelper is ITransferHelper {
 
     /// @inheritdoc ITransferHelper
     function pull(address[] memory assets, uint256[] memory amounts) external override {
-        for (uint256 i = 0; i < assets.length; i++) {
+        uint256 assetsCount = assets.length;
+        for (uint256 i = 0; i < assetsCount; i++) {
             _transfer(assets[i], amounts[i], msg.sender);
         }
     }
@@ -30,7 +31,8 @@ contract TransferHelper is ITransferHelper {
 
     /// @inheritdoc ITransferHelper
     function transfer(address[] memory assets, uint256[] memory amounts, address destination) external override {
-        for (uint256 i = 0; i < assets.length; i++) {
+        uint256 assetsCount = assets.length;
+        for (uint256 i = 0; i < assetsCount; i++) {
             _transfer(assets[i], amounts[i], destination);
         }
     }
@@ -40,7 +42,8 @@ contract TransferHelper is ITransferHelper {
         external
         override
     {
-        for (uint256 i = 0; i < assets.length; i++) {
+        uint256 assetsCount = assets.length;
+        for (uint256 i = 0; i < assetsCount; i++) {
             _transfer(assets[i], amounts[i], destinations[i]);
         }
     }
