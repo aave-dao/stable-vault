@@ -97,8 +97,8 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
         _assertCanCall(stableVaultManager, stableVault, IStableVault.setDefaultSubVault.selector, true, 0);
         // Admin-tier (LOW_DELAY): has role but delayed
         _assertCanCall(stableVaultManager, stableVault, IStableVault.setSubVaultRate.selector, false, LOW_DELAY);
-        // Admin-tier (MED_DELAY): has role but delayed
-        _assertCanCall(stableVaultManager, stableVault, IStableVault.claimSurplusInterest.selector, false, MED_DELAY);
+        // Admin-tier (HIGH_DELAY): has role but delayed
+        _assertCanCall(stableVaultManager, stableVault, IStableVault.claimSurplusInterest.selector, false, HIGH_DELAY);
         // Unauthorized
         _assertCanCall(stableVaultManager, stableVault, IStableVault.setTreasury.selector, false, 0);
         _assertCanCall(stableVaultManager, getAllocatorAddress(_deployer()), IAllocator.rebalance.selector, false, 0);
@@ -117,8 +117,8 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
         _assertProfileRoleDelay(_getProfile__StableVaultManager(), expected[3], RolesConfig.NO_DELAY);
         // LOW_DELAY roles
         _assertProfileRoleDelay(_getProfile__StableVaultManager(), expected[1], LOW_DELAY);
-        // MED_DELAY roles
-        _assertProfileRoleDelay(_getProfile__StableVaultManager(), expected[2], MED_DELAY);
+        // HIGH_DELAY roles
+        _assertProfileRoleDelay(_getProfile__StableVaultManager(), expected[2], HIGH_DELAY);
     }
 
     function test_targetSetup_stableVault() public view {

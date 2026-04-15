@@ -21,10 +21,11 @@ import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 
 abstract contract RolesConfig is DeploymentConfig {
-    uint32 internal immutable CRITICAL_DELAY = uint32(_configUint(".criticalDelay"));
-    uint32 internal immutable MED_DELAY = uint32(_configUint(".medDelay"));
+    uint32 internal constant NO_DELAY = 0;
     uint32 internal immutable LOW_DELAY = uint32(_configUint(".lowDelay"));
-    uint32 constant NO_DELAY = 0;
+    uint32 internal immutable MEDIUM_DELAY = uint32(_configUint(".mediumDelay"));
+    uint32 internal immutable HIGH_DELAY = uint32(_configUint(".highDelay"));
+    uint32 internal immutable CRITICAL_DELAY = uint32(_configUint(".criticalDelay"));
 
     // Special roles not associated with an specific selector
     uint64 constant ADMIN_ROLE = uint64(0);
@@ -39,14 +40,14 @@ abstract contract RolesConfig is DeploymentConfig {
         bool hasCriticalRisk;
     }
 
-    /// @custom:delay Medium
+    /// @custom:delay High
     /// @custom:location AssetRegistry
     function getRole__setAssetConfig() internal view returns (Role memory) {
         bytes4 selector = IAssetRegistry.setAssetConfig.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
-            delay: MED_DELAY,
+            delay: HIGH_DELAY,
             guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
             hasCriticalRisk: true
         });
@@ -104,66 +105,66 @@ abstract contract RolesConfig is DeploymentConfig {
         });
     }
 
-    /// @custom:delay Medium
+    /// @custom:delay High
     /// @custom:location AssetRegistry
     function getRole__enableAllocatorDeposits() internal view returns (Role memory) {
         bytes4 selector = IAssetRegistry.enableAllocatorDeposits.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
-            delay: MED_DELAY,
+            delay: HIGH_DELAY,
             guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
             hasCriticalRisk: false
         });
     }
 
-    /// @custom:delay Medium
+    /// @custom:delay High
     /// @custom:location AssetRegistry
     function getRole__enableSwapInput() internal view returns (Role memory) {
         bytes4 selector = IAssetRegistry.enableSwapInput.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
-            delay: MED_DELAY,
+            delay: HIGH_DELAY,
             guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
             hasCriticalRisk: false
         });
     }
 
-    /// @custom:delay Medium
+    /// @custom:delay High
     /// @custom:location AssetRegistry
     function getRole__enableSwapOutput() internal view returns (Role memory) {
         bytes4 selector = IAssetRegistry.enableSwapOutput.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
-            delay: MED_DELAY,
+            delay: HIGH_DELAY,
             guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
             hasCriticalRisk: false
         });
     }
 
-    /// @custom:delay Medium
+    /// @custom:delay High
     /// @custom:location AssetRegistry
     function getRole__enableUserDeposits() internal view returns (Role memory) {
         bytes4 selector = IAssetRegistry.enableUserDeposits.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
-            delay: MED_DELAY,
+            delay: HIGH_DELAY,
             guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
             hasCriticalRisk: false
         });
     }
 
-    /// @custom:delay Medium
+    /// @custom:delay High
     /// @custom:location AssetRegistry
     function getRole__trustAsset() internal view returns (Role memory) {
         bytes4 selector = IAssetRegistry.trustAsset.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
-            delay: MED_DELAY,
+            delay: HIGH_DELAY,
             guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
             hasCriticalRisk: false
         });
@@ -182,14 +183,14 @@ abstract contract RolesConfig is DeploymentConfig {
         });
     }
 
-    /// @custom:delay Medium
+    /// @custom:delay High
     /// @custom:location EarningChainGateway, AccountingChainGateway
     function getRole__addBridgeAdapter() internal view returns (Role memory) {
         bytes4 selector = IChainGateway.addBridgeAdapter.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
-            delay: MED_DELAY,
+            delay: HIGH_DELAY,
             guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
             hasCriticalRisk: true
         });
@@ -247,14 +248,14 @@ abstract contract RolesConfig is DeploymentConfig {
         });
     }
 
-    /// @custom:delay Medium
+    /// @custom:delay High
     /// @custom:location WithdrawalPolicy
     function getRole__addSigner() internal view returns (Role memory) {
         bytes4 selector = WithdrawalPolicy.addSigner.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
-            delay: MED_DELAY,
+            delay: HIGH_DELAY,
             guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
             hasCriticalRisk: false
         });
@@ -273,14 +274,14 @@ abstract contract RolesConfig is DeploymentConfig {
         });
     }
 
-    /// @custom:delay Medium
+    /// @custom:delay High
     /// @custom:location CcipAdapter
     function getRole__setDestinationChainAdapter() internal view returns (Role memory) {
         bytes4 selector = IBridgeAdapter.setDestinationChainAdapter.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
-            delay: MED_DELAY,
+            delay: HIGH_DELAY,
             guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
             hasCriticalRisk: true
         });
@@ -325,40 +326,40 @@ abstract contract RolesConfig is DeploymentConfig {
         });
     }
 
-    /// @custom:delay Medium
+    /// @custom:delay High
     /// @custom:location StableVault
     function getRole__claimSurplusInterest() internal view returns (Role memory) {
         bytes4 selector = IStableVault.claimSurplusInterest.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
-            delay: MED_DELAY,
+            delay: HIGH_DELAY,
             guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
             hasCriticalRisk: false
         });
     }
 
-    /// @custom:delay Medium
+    /// @custom:delay High
     /// @custom:location StableVault
     function getRole__setTreasury() internal view returns (Role memory) {
         bytes4 selector = IStableVault.setTreasury.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
-            delay: MED_DELAY,
+            delay: HIGH_DELAY,
             guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
             hasCriticalRisk: true
         });
     }
 
-    /// @custom:delay Medium
+    /// @custom:delay High
     /// @custom:location CcipAdapter
     function getRole__setChainSelector() internal view returns (Role memory) {
         bytes4 selector = ICcipBridgeAdapter.setChainSelector.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
-            delay: MED_DELAY,
+            delay: HIGH_DELAY,
             guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
             hasCriticalRisk: true
         });
@@ -403,14 +404,14 @@ abstract contract RolesConfig is DeploymentConfig {
         });
     }
 
-    /// @custom:delay Medium
+    /// @custom:delay High
     /// @custom:location Allocator
     function getRole__addStrategy() internal view returns (Role memory) {
         bytes4 selector = IAllocator.addStrategy.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
-            delay: MED_DELAY,
+            delay: HIGH_DELAY,
             guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
             hasCriticalRisk: true
         });
@@ -455,27 +456,27 @@ abstract contract RolesConfig is DeploymentConfig {
         });
     }
 
-    /// @custom:delay Medium
+    /// @custom:delay High
     /// @custom:location Allocator
     function getRole__enableDepositsToStrategy() internal view returns (Role memory) {
         bytes4 selector = IAllocator.enableDepositsToStrategy.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
-            delay: MED_DELAY,
+            delay: HIGH_DELAY,
             guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
             hasCriticalRisk: false
         });
     }
 
-    /// @custom:delay Medium
+    /// @custom:delay High
     /// @custom:location Allocator
     function getRole__trustStrategy() internal view returns (Role memory) {
         bytes4 selector = IAllocator.trustStrategy.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
-            delay: MED_DELAY,
+            delay: HIGH_DELAY,
             guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
             hasCriticalRisk: false
         });
@@ -533,27 +534,27 @@ abstract contract RolesConfig is DeploymentConfig {
         });
     }
 
-    /// @custom:delay Medium
+    /// @custom:delay High
     /// @custom:location FundsHandler
     function getRole__addEarningChain() internal view returns (Role memory) {
         bytes4 selector = IFundsHandler.addEarningChain.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
-            delay: MED_DELAY,
+            delay: HIGH_DELAY,
             guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
             hasCriticalRisk: false
         });
     }
 
-    /// @custom:delay Medium
+    /// @custom:delay High
     /// @custom:location FundsHandler
     function getRole__removeEarningChain() internal view returns (Role memory) {
         bytes4 selector = IFundsHandler.removeEarningChain.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
-            delay: MED_DELAY,
+            delay: HIGH_DELAY,
             guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
             hasCriticalRisk: false
         });
@@ -572,27 +573,27 @@ abstract contract RolesConfig is DeploymentConfig {
         });
     }
 
-    /// @custom:delay Medium
+    /// @custom:delay High
     /// @custom:location ChainBalanceOracle
     function getRole__setChainBalanceOracleAdapter() internal view returns (Role memory) {
         bytes4 selector = ChainBalanceOracle.setChainBalanceOracleAdapter.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
-            delay: MED_DELAY,
+            delay: HIGH_DELAY,
             guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
             hasCriticalRisk: true
         });
     }
 
-    /// @custom:delay Medium
+    /// @custom:delay High
     /// @custom:location PriceOracle
     function getRole__setOracleAdapterForAsset() internal view returns (Role memory) {
         bytes4 selector = PriceOracle.setOracleAdapterForAsset.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
-            delay: MED_DELAY,
+            delay: HIGH_DELAY,
             guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
             hasCriticalRisk: false
         });
