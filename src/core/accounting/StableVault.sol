@@ -858,6 +858,7 @@ contract StableVault is
     }
 
     function _setUserRate(address user, uint256 newPerSecondRate) internal {
+        require(user != address(0), Errors.ZeroAddress());
         uint256 oldSubVaultId = $storage().positions[user].subVaultId;
         // Skip users without a position (e.g., withdrew or transferred out between batch
         // preparation and execution) to avoid reverting the entire batch.

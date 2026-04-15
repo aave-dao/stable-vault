@@ -635,6 +635,12 @@ contract StableVaultTest is TestWithHelpers {
         assertEq(stableVault.getUserSubVault(user1).id, 0);
     }
 
+    function test_setUserRate_reverts_ifUserIsZeroAddress() public {
+        vm.expectRevert(Errors.ZeroAddress.selector);
+        vm.prank(manager);
+        _setUserRate(address(0), DEFAULT_PER_SECOND_RATE);
+    }
+
     function test_setUserRate_reverts_ifSettingTheSameRateHeAlreadyHas(address user, uint256 amount) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
