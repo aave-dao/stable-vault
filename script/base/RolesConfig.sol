@@ -23,6 +23,7 @@ import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 abstract contract RolesConfig is DeploymentConfig {
     uint32 internal immutable CRITICAL_DELAY = uint32(_configUint(".criticalDelay"));
     uint32 internal immutable MED_DELAY = uint32(_configUint(".medDelay"));
+    uint32 internal immutable LOW_DELAY = uint32(_configUint(".lowDelay"));
     uint32 constant NO_DELAY = 0;
 
     // Special roles not associated with an specific selector
@@ -298,15 +299,15 @@ abstract contract RolesConfig is DeploymentConfig {
         });
     }
 
-    /// @custom:delay None
+    /// @custom:delay Low
     /// @custom:location StableVault
-    function getRole__setSubVaultRate() internal pure returns (Role memory) {
+    function getRole__setSubVaultRate() internal view returns (Role memory) {
         bytes4 selector = IStableVault.setSubVaultRate.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
-            delay: NO_DELAY,
-            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            delay: LOW_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
             hasCriticalRisk: false
         });
     }
