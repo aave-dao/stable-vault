@@ -313,15 +313,15 @@ abstract contract RolesConfig is DeploymentConfig {
         });
     }
 
-    /// @custom:delay None
+    /// @custom:delay Medium
     /// @custom:location StableVault
-    function getRole__setDefaultSubVault() internal pure returns (Role memory) {
+    function getRole__setDefaultSubVault() internal view returns (Role memory) {
         bytes4 selector = IStableVault.setDefaultSubVault.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
-            delay: NO_DELAY,
-            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            delay: MEDIUM_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
             hasCriticalRisk: false
         });
     }
