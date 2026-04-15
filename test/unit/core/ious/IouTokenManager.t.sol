@@ -350,23 +350,19 @@ contract IouTokenManagerTest_AccountingChain is Test {
 
         vm.deal(from, accidentalMsgValue);
         vm.prank(from);
+        vm.expectRevert(Errors.InvalidParameter.selector);
         iouTokenManager.bridgeTokens{value: accidentalMsgValue}(
             destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeParams
         );
 
-        assertEq(
-            IERC20(feeToken).balanceOf(address(transferHelper)),
-            0,
-            "Token fee should have been fully consumed from TransferHelper"
-        );
-        assertEq(IERC20(feeToken).balanceOf(feeRecipient), feeAmount, "Token fee not properly transferred");
+        assertEq(from.balance, accidentalMsgValue, "Caller's native balance should be fully preserved after revert");
+        assertEq(address(transferHelper).balance, 0, "No native should have leaked to TransferHelper");
+        assertEq(IERC20(iouToken).balanceOf(from), iouTokenAmountRay, "IOU tokens should not have been consumed");
+        assertEq(IERC20(feeToken).balanceOf(from), feeAmount, "Fee tokens should not have been consumed");
 
-        uint256 stealableNativeBalance = transferHelper.balance;
         vm.prank(attacker);
-        MockTransferHelper(payable(transferHelper)).pull(address(0), stealableNativeBalance);
-
+        MockTransferHelper(payable(transferHelper)).pull(address(0), 0);
         assertEq(attacker.balance, 0, "Attacker should not be able to steal native from TransferHelper");
-        assertEq(transferHelper.balance, 0, "TransferHelper should not retain native after bridging");
     }
 
     function test_bridgeTokens_bridgeParams_ClientTransfersNativeFeeToken(
