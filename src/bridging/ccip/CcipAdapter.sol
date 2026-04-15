@@ -233,7 +233,8 @@ contract CcipAdapter is
 
     function _triggerFeeRefund(address feePayer, address feeToken, uint256 excessFee) internal {
         if (feeToken == Constants.NATIVE_CURRENCY) {
-            payable(feePayer).transfer(excessFee);
+            (bool success,) = payable(feePayer).call{value: excessFee}("");
+            require(success, Errors.NativeTransferFailed());
         } else {
             IERC20(feeToken).safeTransfer(feePayer, excessFee);
         }
