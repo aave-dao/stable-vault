@@ -1,16 +1,16 @@
 {
-  "[claimSurplusInterest] 2 assets - 201 sub-vaults": "556405",
-  "[deposit] base sub-vault - user's 1st deposit": "255480",
-  "[deposit] base sub-vault - user's 2nd deposit": "114386",
-  "[deposit] base sub-vault - user's 3rd deposit": "114386",
+  "[claimSurplusInterest] 2 assets - 201 sub-vaults": "556427",
+  "[deposit] base sub-vault - user's 1st deposit": "255458",
+  "[deposit] base sub-vault - user's 2nd deposit": "114364",
+  "[deposit] base sub-vault - user's 3rd deposit": "114364",
   "[executeWithdrawal] full withdrawal": "130047",
   "[executeWithdrawal] partial withdrawal": "130047",
   "[requestWithdrawal] full withdrawal": "173846",
   "[requestWithdrawal] partial withdrawal": "172879",
-  "[setUserRate] default sub-vault to all new different sub-vaults - 10 users": "1866462",
-  "[setUserRate] default sub-vault to all new different sub-vaults - 100 users": "18430915",
-  "[setUserRate] default sub-vault to new sub-vault - 1 user": "210052",
-  "[setUserRate] default sub-vault to same new sub-vault - 10 users": "452108",
-  "[setUserRate] default sub-vault to same new sub-vault - 100 users": "2872737",
-  "[setUserRate] default sub-vault to same new sub-vault - 1000 users": "27085992"
+  "[setUserRate] default sub-vault to all new different sub-vaults - 10 users": "1866440",
+  "[setUserRate] default sub-vault to all new different sub-vaults - 100 users": "18430893",
+  "[setUserRate] default sub-vault to new sub-vault - 1 user": "210030",
+  "[setUserRate] default sub-vault to same new sub-vault - 10 users": "452086",
+  "[setUserRate] default sub-vault to same new sub-vault - 100 users": "2872715",
+  "[setUserRate] default sub-vault to same new sub-vault - 1000 users": "27085970"
 }
