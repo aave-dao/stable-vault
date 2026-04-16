@@ -373,7 +373,7 @@ contract FundsHandlerTest is TestWithHelpers {
             abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
         );
         vm.prank(unauthorizedMsgSender);
-        fundsHandler.pushFundsToChain(asset, amount, chainId, bridgeParams);
+        fundsHandler.pushFundsToChain(asset, amount, chainId, makeAddr("adapter"), bridgeParams);
     }
 
     function test_pushFundsToChain_reverts_ifTransferHelperBalanceIsNotFullyConsumed_bridgeParamNativeFee(
@@ -402,7 +402,9 @@ contract FundsHandlerTest is TestWithHelpers {
         vm.expectRevert(
             abi.encodeWithSelector(TransferHelperClient.TransferHelperBalanceNotConsumed.selector, address(0))
         );
-        fundsHandler.pushFundsToChain{value: bridgeParams_feeAmount}(address(mockAsset), amount, chainId, bridgeParams);
+        fundsHandler.pushFundsToChain{value: bridgeParams_feeAmount}(
+            address(mockAsset), amount, chainId, makeAddr("adapter"), bridgeParams
+        );
     }
 
     function test_pushFundsToChain_reverts_ifTransferHelperBalanceIsNotFullyConsumed_bridgeParamTokenFee(
@@ -437,7 +439,7 @@ contract FundsHandlerTest is TestWithHelpers {
         vm.expectRevert(
             abi.encodeWithSelector(TransferHelperClient.TransferHelperBalanceNotConsumed.selector, address(mockAsset))
         );
-        fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, bridgeParams);
+        fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, makeAddr("adapter"), bridgeParams);
     }
 
     function test_pushFundsToChain_reverts_ifAmountIsZero(
@@ -462,7 +464,9 @@ contract FundsHandlerTest is TestWithHelpers {
         });
 
         vm.expectRevert(abi.encodeWithSelector(Errors.ZeroAmount.selector));
-        fundsHandler.pushFundsToChain{value: bridgeParams_feeAmount}(address(mockAsset), 0, chainId, bridgeParams);
+        fundsHandler.pushFundsToChain{value: bridgeParams_feeAmount}(
+            address(mockAsset), 0, chainId, makeAddr("adapter"), bridgeParams
+        );
     }
 
     function test_pushFundsToChain_reverts_ifTransferHelperBalanceIsNotFullyConsumed_amountAssetSameAsFeeToken(
@@ -497,7 +501,7 @@ contract FundsHandlerTest is TestWithHelpers {
         vm.expectRevert(
             abi.encodeWithSelector(TransferHelperClient.TransferHelperBalanceNotConsumed.selector, address(mockAsset))
         );
-        fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, bridgeParams);
+        fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, makeAddr("adapter"), bridgeParams);
     }
 
     function test_pushFundsToChain_reverts_ifTransferHelperBalanceIsNotFullyConsumed_amountAssetDiffThanFeeToken(
@@ -535,7 +539,7 @@ contract FundsHandlerTest is TestWithHelpers {
         vm.expectRevert(
             abi.encodeWithSelector(TransferHelperClient.TransferHelperBalanceNotConsumed.selector, address(mockAsset))
         );
-        fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, bridgeParams);
+        fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, makeAddr("adapter"), bridgeParams);
     }
 
     function test_pushFundsToChain_reverts_ifBridgeFeePayerIsNotTheCaller(
@@ -567,7 +571,7 @@ contract FundsHandlerTest is TestWithHelpers {
         mockGateway.mockToConsumeAssetFromTransferHelperInNextCall(address(mockAsset), bridgeParams_feeAmount + amount);
 
         vm.expectRevert(abi.encodeWithSelector(Errors.InvalidBridgeFeePayer.selector));
-        fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, bridgeParams);
+        fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, makeAddr("adapter"), bridgeParams);
     }
 
     function test_pushFundsToChain_reverts_ifDestinationChainIdNotAddedAsEarningChain(
@@ -591,7 +595,7 @@ contract FundsHandlerTest is TestWithHelpers {
         });
 
         vm.expectRevert(abi.encodeWithSelector(Errors.InvalidDestinationChainId.selector));
-        fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, bridgeParams);
+        fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, makeAddr("adapter"), bridgeParams);
     }
 
     function test_pushFundsToChain_callsGatewaySendPushFundsMessage(
@@ -624,14 +628,15 @@ contract FundsHandlerTest is TestWithHelpers {
 
         mockGateway.mockToConsumeAssetFromTransferHelperInNextCall(address(mockAsset), bridgeParams_feeAmount + amount);
 
+        address adapter = makeAddr("adapter");
         vm.expectCall(
             address(mockGateway),
             abi.encodeCall(
                 MockAccountingChainGateway.sendPushFundsToChainMessage,
-                (address(mockAsset), amount, chainId, bridgeParams)
+                (address(mockAsset), amount, chainId, adapter, bridgeParams)
             )
         );
-        fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, bridgeParams);
+        fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, adapter, bridgeParams);
     }
 
     function test_getEarningChainIds_returnsEmptyByDefault() public view {

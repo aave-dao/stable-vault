@@ -148,6 +148,7 @@ contract FundsHandler is
         address asset,
         uint256 amount,
         uint256 chainId,
+        address adapter,
         IBridgeAdapter.BridgeParams memory bridgeParams
     )
         external
@@ -166,7 +167,7 @@ contract FundsHandler is
         // Pull funds from liquidity into the TransferHelper.
         _pullFundsFromImmediateLiquidity(asset, amount);
 
-        IAccountingChainGateway(GATEWAY).sendPushFundsToChainMessage(asset, amount, chainId, bridgeParams);
+        IAccountingChainGateway(GATEWAY).sendPushFundsToChainMessage(asset, amount, chainId, adapter, bridgeParams);
     }
 
     // Gateway Functions

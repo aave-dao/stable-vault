@@ -263,7 +263,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         address rebalancerProfile = _getProfile__Rebalancer();
         require(rebalancerProfile != address(0), "Rebalancer profile address not set");
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](7);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](6);
 
         roles[0] = RolesConfig.getRole__rebalance();
         roles[1] = RolesConfig.getRole__setDefaultStrategy();
@@ -272,8 +272,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         roles[3] = RolesConfig.getRole__pushFundsToChain();
         // Only used on the Earning Chain (EarningChainGateway), but granted in both Accounting and Earning Chain setups
         roles[4] = RolesConfig.getRole__pushFundsToAccountingChain();
-        roles[5] = RolesConfig.getRole__setDefaultBridgeAdapter();
-        roles[6] = RolesConfig.getRole__topUp();
+        roles[5] = RolesConfig.getRole__topUp();
 
         _grantRolesToProfile(rebalancerProfile, roles);
     }

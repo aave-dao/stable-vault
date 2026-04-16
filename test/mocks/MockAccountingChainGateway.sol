@@ -24,12 +24,11 @@ contract MockAccountingChainGateway is IAccountingChainGateway {
 
     function getIouTokenManager() external view returns (address) {}
 
-    function getDefaultBridgeAdapter(address asset, uint256 chainId) external view returns (address) {}
-
     function sendPushFundsToChainMessage(
         address, // asset
         uint256, // amount
         uint256, // targetChainId
+        address, // adapter
         IBridgeAdapter.BridgeParams memory // bridgeParams
     )
         external
@@ -40,8 +39,6 @@ contract MockAccountingChainGateway is IAccountingChainGateway {
     function addBridgeAdapter(address asset, uint256 chainId, address adapter) external {}
 
     function removeBridgeAdapter(address asset, uint256 chainId, address adapter) external {}
-
-    function setDefaultBridgeAdapter(address asset, uint256 chainId, address adapter) external {}
 
     /// @dev Called by Bridge Adapters which use the TransferHelper modifiers that assert no funds left in the
     /// TransferHelper.
@@ -56,6 +53,7 @@ contract MockAccountingChainGateway is IAccountingChainGateway {
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
+        address adapter,
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) external {}
 

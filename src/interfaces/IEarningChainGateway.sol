@@ -21,16 +21,21 @@ interface IEarningChainGateway is IChainGateway {
     /// @notice Withdraws a specific asset from the Allocator and bridges it to the Accounting Chain.
     /// @param asset The asset to withdraw.
     /// @param amount The amount of the asset to withdraw in the asset's native decimals.
+    /// @param adapter The whitelisted bridge adapter to use for bridging the asset.
     /// @param bridgeParams The parameters for the bridge adapter.
-    function pushFundsToAccountingChain(address asset, uint256 amount, IBridgeAdapter.BridgeParams memory bridgeParams)
-        external
-        payable;
+    function pushFundsToAccountingChain(
+        address asset,
+        uint256 amount,
+        address adapter,
+        IBridgeAdapter.BridgeParams memory bridgeParams
+    ) external payable;
 
     /// @notice Exchanges IOU tokens for a specific asset and bridges data back to the Accounting Chain.
     /// @param iouTokenAmountRay The amount of IOU tokens to exchange.
     /// @param assetOut The asset to exchange the IOU tokens for.
     /// @param minAmountOut The minimum amount of `assetOut` to receive for `iouTokenAmountRay` of IOU tokens.
     /// @param receiver The address to send the exchanged asset to.
+    /// @param adapter The whitelisted bridge adapter to use for the data-only message.
     /// @param bridgeParams The parameters for the bridge adapter.
     /// @param data Additional data for the withdrawal fee calculation.
     /// @return amountOut The amount of the exchanged asset transferred to the receiver.
@@ -39,6 +44,7 @@ interface IEarningChainGateway is IChainGateway {
         address assetOut,
         uint256 minAmountOut,
         address receiver,
+        address adapter,
         IBridgeAdapter.BridgeParams memory bridgeParams,
         bytes memory data
     ) external payable returns (uint256);

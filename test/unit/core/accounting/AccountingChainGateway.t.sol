@@ -76,19 +76,9 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         vm.prank(admin);
         accountingChainGateway.addBridgeAdapter(address(0), EARNING_CHAIN_ID, address(_mockBridgeAdapterData));
         vm.prank(admin);
-        accountingChainGateway.setDefaultBridgeAdapter(address(0), EARNING_CHAIN_ID, address(_mockBridgeAdapterData));
-        vm.prank(admin);
         accountingChainGateway.addBridgeAdapter(address(_mockUsdt), EARNING_CHAIN_ID, address(_mockBridgeAdapterAssets));
         vm.prank(admin);
-        accountingChainGateway.setDefaultBridgeAdapter(
-            address(_mockUsdt), EARNING_CHAIN_ID, address(_mockBridgeAdapterAssets)
-        );
-        vm.prank(admin);
         accountingChainGateway.addBridgeAdapter(address(_mockGho), EARNING_CHAIN_ID, address(_mockBridgeAdapterAssets));
-        vm.prank(admin);
-        accountingChainGateway.setDefaultBridgeAdapter(
-            address(_mockGho), EARNING_CHAIN_ID, address(_mockBridgeAdapterAssets)
-        );
 
         return accountingChainGateway;
     }
@@ -136,21 +126,6 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         assertEq(_accountingChainGateway.getIouTokenManager(), address(_mockIouTokenManager));
     }
 
-    function test_getDefaultBridgeAdapter_returnsExpectedDefaultBridgeAdapter() public view {
-        assertEq(
-            _accountingChainGateway.getDefaultBridgeAdapter(address(_mockUsdt), EARNING_CHAIN_ID),
-            address(_mockBridgeAdapterAssets)
-        );
-        assertEq(
-            _accountingChainGateway.getDefaultBridgeAdapter(address(_mockGho), EARNING_CHAIN_ID),
-            address(_mockBridgeAdapterAssets)
-        );
-        assertEq(
-            _accountingChainGateway.getDefaultBridgeAdapter(address(0), EARNING_CHAIN_ID),
-            address(_mockBridgeAdapterData)
-        );
-    }
-
     function test_rescueTokens_transfersIdleFundsToMsgSender() public {
         address asset = address(_mockUsdt);
         uint256 amount = 1000000000000000000;
@@ -166,52 +141,17 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         assertEq(_mockUsdt.balanceOf(address(_accountingChainGateway)), 0);
     }
 
-    function test_removeBridgeAdapter_removesDefaultBridgeAdapter() public {
-        vm.expectEmit(true, true, true, true);
-        emit IChainGateway.DefaultBridgeAdapterSet(address(0), EARNING_CHAIN_ID, address(0));
-        vm.expectEmit(true, true, true, true);
-        emit IChainGateway.BridgeAdapterRemoved(address(0), EARNING_CHAIN_ID, address(_mockBridgeAdapterData));
-        vm.prank(admin);
-        _accountingChainGateway.removeBridgeAdapter(address(0), EARNING_CHAIN_ID, address(_mockBridgeAdapterData));
-        assertEq(_accountingChainGateway.getDefaultBridgeAdapter(address(0), EARNING_CHAIN_ID), address(0));
-    }
-
-    function test_removeBridgeAdapter_forAssetRemovesDefaultBridgeAdapter() public {
-        vm.expectEmit(true, true, true, true);
-        emit IChainGateway.DefaultBridgeAdapterSet(address(_mockUsdt), EARNING_CHAIN_ID, address(0));
-        vm.expectEmit(true, true, true, true);
-        emit IChainGateway.BridgeAdapterRemoved(address(_mockUsdt), EARNING_CHAIN_ID, address(_mockBridgeAdapterAssets));
-        vm.prank(admin);
-        _accountingChainGateway.removeBridgeAdapter(
-            address(_mockUsdt), EARNING_CHAIN_ID, address(_mockBridgeAdapterAssets)
-        );
-        assertEq(_accountingChainGateway.getDefaultBridgeAdapter(address(_mockUsdt), EARNING_CHAIN_ID), address(0));
-    }
-
     function test_removeBridgeAdapter_removesBridgeAdapter() public {
-        // Add a new adapter and set it as the default
-        address adapter = makeAddr("adapter");
-        vm.prank(admin);
-        _accountingChainGateway.addBridgeAdapter(address(0), EARNING_CHAIN_ID, adapter);
-        vm.prank(admin);
-        _accountingChainGateway.setDefaultBridgeAdapter(address(0), EARNING_CHAIN_ID, adapter);
         vm.expectEmit(true, true, true, true);
         emit IChainGateway.BridgeAdapterRemoved(address(0), EARNING_CHAIN_ID, address(_mockBridgeAdapterData));
         vm.prank(admin);
         _accountingChainGateway.removeBridgeAdapter(address(0), EARNING_CHAIN_ID, address(_mockBridgeAdapterData));
-        assertEq(_accountingChainGateway.getDefaultBridgeAdapter(address(0), EARNING_CHAIN_ID), adapter);
     }
 
     function test_removeBridgeAdapter_reverts_ifNotWhitelisted() public {
         vm.expectRevert(Errors.AddressNotWhitelisted.selector);
         vm.prank(admin);
         _accountingChainGateway.removeBridgeAdapter(address(0), EARNING_CHAIN_ID, makeAddr("adapter"));
-    }
-
-    function test_setDefaultBridgeAdapter_reverts_ifNotWhitelisted() public {
-        vm.expectRevert(Errors.AddressNotWhitelisted.selector);
-        vm.prank(admin);
-        _accountingChainGateway.setDefaultBridgeAdapter(address(0), EARNING_CHAIN_ID, makeAddr("adapter"));
     }
 
     function test_isBridgeAdapterSupported_returnsTrueAfterAdd(address asset, uint256 chainId, address adapter) public {
@@ -252,9 +192,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         vm.assume(adapter != address(0));
         vm.prank(admin);
         _accountingChainGateway.addBridgeAdapter(asset, chainId, adapter);
-        vm.prank(everyRoleAccount);
-        _accountingChainGateway.setDefaultBridgeAdapter(asset, chainId, adapter);
-        assertEq(_accountingChainGateway.getDefaultBridgeAdapter(asset, chainId), adapter);
+        assertTrue(_accountingChainGateway.isBridgeAdapterSupported(asset, chainId, adapter));
     }
 
     function test_addBridgeAdapter_reverts_ifAlreadyAdded() public {
@@ -266,15 +204,6 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         vm.expectRevert(Errors.AddressAlreadyWhitelisted.selector);
         vm.prank(everyRoleAccount);
         _accountingChainGateway.addBridgeAdapter(asset, EARNING_CHAIN_ID, adapter);
-    }
-
-    function test_setDefaultBridgeAdatper_reverts_ifNotWhitelisted() public {
-        address adapter = makeAddr("adapter");
-        address asset = address(_mockUsdt);
-
-        vm.expectRevert(Errors.AddressNotWhitelisted.selector);
-        vm.prank(everyRoleAccount);
-        _accountingChainGateway.setDefaultBridgeAdapter(asset, EARNING_CHAIN_ID, adapter);
     }
 
     function test_sendBridgeIouTokenMessageWithFeePayer_withTokenBridgeFee(
@@ -328,6 +257,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
             EARNING_CHAIN_ID,
             iouTokenRecipient,
             iouTokenAmountRay,
+            address(_mockBridgeAdapterData),
             IBridgeAdapter.BridgeParams({
                 feePayer: bridgeFeePayer,
                 feeToken: bridgeFeeToken,
@@ -388,6 +318,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
             EARNING_CHAIN_ID,
             iouTokenRecipient,
             iouTokenAmountRay,
+            address(_mockBridgeAdapterData),
             IBridgeAdapter.BridgeParams({
                 feePayer: bridgeFeePayer,
                 feeToken: address(0),
@@ -405,6 +336,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
             EARNING_CHAIN_ID,
             makeAddr("iouTokenRecipient"),
             100_000,
+            address(_mockBridgeAdapterData),
             IBridgeAdapter.BridgeParams({
                 feePayer: makeAddr("bridgeFeePayer"),
                 feeToken: address(_mockUsdt),
@@ -427,6 +359,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
             EARNING_CHAIN_ID,
             makeAddr("iouTokenRecipient"),
             100_000,
+            address(_mockBridgeAdapterData),
             IBridgeAdapter.BridgeParams({
                 feePayer: makeAddr("bridgeFeePayer"),
                 feeToken: address(_mockUsdt),
@@ -766,7 +699,9 @@ contract AccountingChainGatewayTest is TestWithHelpers {
             )
         );
         vm.prank(address(_mockFundsHandler));
-        _accountingChainGateway.sendPushFundsToChainMessage(assetToBridge, amount, EARNING_CHAIN_ID, bridgeParams);
+        _accountingChainGateway.sendPushFundsToChainMessage(
+            assetToBridge, amount, EARNING_CHAIN_ID, address(_mockBridgeAdapterAssets), bridgeParams
+        );
     }
 
     function test_sendPushFundsToChainMessage_sendsFundsToEarningChainWithDifferentTokenBridgeFee(
@@ -804,7 +739,9 @@ contract AccountingChainGatewayTest is TestWithHelpers {
             )
         );
         vm.prank(address(_mockFundsHandler));
-        _accountingChainGateway.sendPushFundsToChainMessage(assetToBridge, amount, EARNING_CHAIN_ID, bridgeParams);
+        _accountingChainGateway.sendPushFundsToChainMessage(
+            assetToBridge, amount, EARNING_CHAIN_ID, address(_mockBridgeAdapterAssets), bridgeParams
+        );
     }
 
     function test_sendPushFundsToChainMessage_withArbitraryData_emitsEvent() public {
@@ -835,7 +772,9 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         vm.expectEmit(true, true, true, true);
         emit IChainGateway.FundsSent(assetToBridge, amount, EARNING_CHAIN_ID);
         vm.prank(address(_mockFundsHandler));
-        _accountingChainGateway.sendPushFundsToChainMessage(assetToBridge, amount, EARNING_CHAIN_ID, bridgeParams);
+        _accountingChainGateway.sendPushFundsToChainMessage(
+            assetToBridge, amount, EARNING_CHAIN_ID, address(_mockBridgeAdapterAssets), bridgeParams
+        );
     }
 
     function test_sendPushFundsToChainMessage_withoutArbitraryData_emitsEvent() public {
@@ -866,7 +805,9 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         vm.expectEmit(true, true, true, true);
         emit IChainGateway.FundsSent(assetToBridge, amount, EARNING_CHAIN_ID);
         vm.prank(address(_mockFundsHandler));
-        _accountingChainGateway.sendPushFundsToChainMessage(assetToBridge, amount, EARNING_CHAIN_ID, bridgeParams);
+        _accountingChainGateway.sendPushFundsToChainMessage(
+            assetToBridge, amount, EARNING_CHAIN_ID, address(_mockBridgeAdapterAssets), bridgeParams
+        );
     }
 
     function test_sendPushFundsToChainMessage_reverts_ifOnlyFundsHandler() public {
@@ -875,6 +816,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
             address(_mockUsdt),
             100_000_000_000_000 * 10 ** 6,
             EARNING_CHAIN_ID,
+            address(_mockBridgeAdapterAssets),
             IBridgeAdapter.BridgeParams({
                 feePayer: everyRoleAccount,
                 feeToken: address(0),
@@ -904,7 +846,29 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         vm.expectRevert(IChainGateway.AdapterNotFound.selector);
         vm.prank(address(_mockFundsHandler));
         _accountingChainGateway.sendPushFundsToChainMessage(
-            assetToBridge, 100_000_000_000_000 * 10 ** 6, EARNING_CHAIN_ID, bridgeParams
+            assetToBridge,
+            100_000_000_000_000 * 10 ** 6,
+            EARNING_CHAIN_ID,
+            address(_mockBridgeAdapterAssets),
+            bridgeParams
+        );
+    }
+
+    function test_sendPushFundsToChainMessage_reverts_ifAdapterNeverWhitelisted() public {
+        address bogusAdapter = makeAddr("bogusAdapter");
+        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
+            feePayer: everyRoleAccount,
+            feeToken: address(0),
+            feeAmount: 0,
+            feeRefundThreshold: 0,
+            gasLimit: 100000,
+            data: ""
+        });
+
+        vm.expectRevert(IChainGateway.AdapterNotFound.selector);
+        vm.prank(address(_mockFundsHandler));
+        _accountingChainGateway.sendPushFundsToChainMessage(
+            address(_mockUsdt), 100e6, EARNING_CHAIN_ID, bogusAdapter, bridgeParams
         );
     }
 }

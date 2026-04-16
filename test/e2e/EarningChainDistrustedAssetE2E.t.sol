@@ -83,6 +83,7 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
             address(USDC),
             userInitialDeposit,
             EARNING_CHAIN_ID,
+            address(ccipAdapter_accountingChain),
             IBridgeAdapter.BridgeParams({
                 feePayer: everyRoleAccount,
                 feeToken: address(0),
@@ -131,6 +132,7 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
             EARNING_CHAIN_ID,
             user1,
             iouAmountRequestedRay,
+            address(ccipAdapter_accountingChain),
             IBridgeAdapter.BridgeParams({
                 feePayer: user1,
                 feeToken: address(0),
@@ -164,6 +166,7 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
             address(USDC),
             0,
             user1,
+            address(ccipAdapter_earningChain),
             IBridgeAdapter.BridgeParams({
                 feePayer: user1,
                 feeToken: address(0),

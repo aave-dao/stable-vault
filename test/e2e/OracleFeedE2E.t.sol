@@ -230,6 +230,7 @@ contract OracleFeedE2ETest is BaseTest {
             EARNING_CHAIN_ID,
             user1,
             userBalanceWithInterest,
+            address(ccipAdapter_accountingChain),
             IBridgeAdapter.BridgeParams({
                 feePayer: user1,
                 feeToken: address(0),
@@ -262,6 +263,7 @@ contract OracleFeedE2ETest is BaseTest {
             address(USDC),
             0,
             user1,
+            address(ccipAdapter_earningChain),
             IBridgeAdapter.BridgeParams({
                 feePayer: user1, feeToken: address(0), feeAmount: 1, feeRefundThreshold: 0, gasLimit: 300000, data: ""
             }),
@@ -817,6 +819,7 @@ contract OracleFeedE2ETest is BaseTest {
         earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
             address(USDC),
             returnAmount,
+            address(ccipAdapter_earningChain),
             IBridgeAdapter.BridgeParams({
                 feePayer: everyRoleAccount,
                 feeToken: address(0),
@@ -881,6 +884,7 @@ contract OracleFeedE2ETest is BaseTest {
         earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
             address(USDC),
             returnAmount,
+            address(ccipAdapter_earningChain),
             IBridgeAdapter.BridgeParams({
                 feePayer: everyRoleAccount,
                 feeToken: address(0),
@@ -948,6 +952,7 @@ contract OracleFeedE2ETest is BaseTest {
         earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
             address(USDC),
             depositAmount,
+            address(ccipAdapter_earningChain),
             IBridgeAdapter.BridgeParams({
                 feePayer: everyRoleAccount,
                 feeToken: address(0),
@@ -978,6 +983,7 @@ contract OracleFeedE2ETest is BaseTest {
         earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
             address(USDC),
             depositAmount,
+            address(ccipAdapter_earningChain),
             IBridgeAdapter.BridgeParams({
                 feePayer: everyRoleAccount,
                 feeToken: address(0),
@@ -1039,6 +1045,7 @@ contract OracleFeedE2ETest is BaseTest {
             address(USDC),
             amount,
             EARNING_CHAIN_ID,
+            address(ccipAdapter_accountingChain),
             IBridgeAdapter.BridgeParams({
                 feePayer: everyRoleAccount,
                 feeToken: address(0),

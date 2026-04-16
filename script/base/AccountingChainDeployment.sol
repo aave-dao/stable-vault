@@ -193,20 +193,16 @@ abstract contract AccountingChainDeployment is
 
         // GHO uses CCIP Adapter
         gateway.addBridgeAdapter(_gho(), earningChainId, localCcipAdapter);
-        gateway.setDefaultBridgeAdapter(_gho(), earningChainId, localCcipAdapter);
 
         // USDC uses CCIP Adapter
         gateway.addBridgeAdapter(_usdc(), earningChainId, localCcipAdapter);
-        gateway.setDefaultBridgeAdapter(_usdc(), earningChainId, localCcipAdapter);
 
         // USDT uses CCIP Adapter
         gateway.addBridgeAdapter(_usdt(), earningChainId, localCcipAdapter);
-        gateway.setDefaultBridgeAdapter(_usdt(), earningChainId, localCcipAdapter);
 
         // Message uses CCIP Adapter
         address messageOnly = address(0);
         gateway.addBridgeAdapter(messageOnly, earningChainId, localCcipAdapter);
-        gateway.setDefaultBridgeAdapter(messageOnly, earningChainId, localCcipAdapter);
 
         ICcipBridgeAdapter(localCcipAdapter).setChainSelector(earningChainId, earningChainCcipSelector);
         ICcipBridgeAdapter(localCcipAdapter).setDestinationChainAdapter(earningChainId, earningChainCcipAdapter);

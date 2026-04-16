@@ -73,11 +73,6 @@ contract AccessManagerEarningChainSetupTest is AccessManagerSetupBaseTest, Earni
             gateway, IChainGateway.removeBridgeAdapter.selector, RolesConfig.getRole__removeBridgeAdapter().roleId
         );
         _assertTargetFunctionRole(
-            gateway,
-            IChainGateway.setDefaultBridgeAdapter.selector,
-            RolesConfig.getRole__setDefaultBridgeAdapter().roleId
-        );
-        _assertTargetFunctionRole(
             gateway, IRescuableToken.rescueTokens.selector, RolesConfig.getRole__rescueTokens().roleId
         );
         _assertTargetFunctionRole(

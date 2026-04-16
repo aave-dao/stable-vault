@@ -26,9 +26,6 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         /// @dev Set of adapters whitelisted for usage.
         /// @dev asset == address(0) for data-only bridging.
         mapping(address asset => mapping(uint256 chainId => mapping(address adapter => bool))) supportedBridgeAdapters;
-
-        /// @dev The adapter used to send assets/messages to a destination chain.
-        mapping(address asset => mapping(uint256 chainId => address defaultAdapter)) defaultBridgeAdapter;
     }
 
     // keccak256(abi.encode(uint256(keccak256("aave.storage.BaseChainGateway")) - 1)) & ~bytes32(uint256(0xff))
@@ -63,11 +60,6 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         return IOU_TOKEN_MANAGER;
     }
 
-    /// @inheritdoc IChainGateway
-    function getDefaultBridgeAdapter(address asset, uint256 chainId) external view override returns (address) {
-        return $storage().defaultBridgeAdapter[asset][chainId];
-    }
-
     /// @notice Checks whether a bridge adapter is whitelisted for a given asset and chain.
     /// @param asset The asset to check the adapter for.
     /// @param chainId The chain id to check the adapter for.
@@ -98,12 +90,11 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
+        address adapter,
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) external override {
         require(msg.sender == IOU_TOKEN_MANAGER, OnlyIouTokenManager());
-
-        address adapter = $storage().defaultBridgeAdapter[Constants.ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId];
-        require(adapter != address(0), AdapterNotFound());
+        _validateOutboundAdapter(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, destinationChainId, adapter);
 
         bytes memory bridgeIouTokenMessageEncoded = abi.encode(
             IChainGateway.CrossChainMessage({
@@ -130,19 +121,12 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
     function removeBridgeAdapter(address asset, uint256 chainId, address adapter) external override restricted {
         require($storage().supportedBridgeAdapters[asset][chainId][adapter], Errors.AddressNotWhitelisted());
         delete $storage().supportedBridgeAdapters[asset][chainId][adapter];
-        // Remove it from the default adapter if it is the default adapter.
-        if ($storage().defaultBridgeAdapter[asset][chainId] == adapter) {
-            delete $storage().defaultBridgeAdapter[asset][chainId];
-            emit DefaultBridgeAdapterSet(asset, chainId, address(0));
-        }
         emit BridgeAdapterRemoved(asset, chainId, adapter);
     }
 
-    /// @inheritdoc IChainGateway
-    function setDefaultBridgeAdapter(address asset, uint256 chainId, address adapter) external override restricted {
-        require($storage().supportedBridgeAdapters[asset][chainId][adapter], Errors.AddressNotWhitelisted());
-        $storage().defaultBridgeAdapter[asset][chainId] = adapter;
-        emit DefaultBridgeAdapterSet(asset, chainId, adapter);
+    /// @dev Validates that the adapter is whitelisted for the given asset and chain.
+    function _validateOutboundAdapter(address asset, uint256 chainId, address adapter) internal view {
+        require($storage().supportedBridgeAdapters[asset][chainId][adapter], AdapterNotFound());
     }
 
     /// @dev Checks full set of adapters as opposed to the default adapter in case an adapter is swapped out but a

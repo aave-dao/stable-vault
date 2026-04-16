@@ -32,7 +32,8 @@ contract FundsHandlerInteractionScript is AccountingChainBaseScript {
 
         uint256 key = vm.envUint("ADMIN_PRIVATE_KEY");
         vm.startBroadcast(key);
-        IFundsHandler(FUNDS_HANDLER).pushFundsToChain(token, amount, chainId, bridgeParams);
+        address adapter = address(0); // TODO: Set the whitelisted bridge adapter address.
+        IFundsHandler(FUNDS_HANDLER).pushFundsToChain(token, amount, chainId, adapter, bridgeParams);
         vm.stopBroadcast();
     }
 }
