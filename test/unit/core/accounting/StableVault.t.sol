@@ -2682,6 +2682,174 @@ contract StableVaultTest is TestWithHelpers {
         assertEq(stableVault.getUserBalance(recipient), fullAmountRay);
     }
 
+    function test_transfer_revertsWithInvalidAmount_whenPartialTransferFallsIntoGuaranteedPrincipalDeadZone() public {
+        address user = makeAddr("user");
+        address recipient = makeAddr("recipient");
+        MockErc20 ghoToken = new MockErc20("GHO", "GHO", 18);
+
+        uint256 highRate = 3 * MathLib.RAY;
+        IStableVault highRateVault = _deployStableVault(
+            address(mockAccessManager),
+            highRate + 1,
+            highRate,
+            address(mockIouTokenManager),
+            address(mockFundsHandler),
+            address(mockAssetRegistry),
+            address(mockTransferHelper),
+            address(mockWithdrawalPolicy),
+            address(mockPriceOracle),
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+            treasury
+        );
+
+        vm.warp(block.timestamp + 1);
+
+        uint256 depositAmount = 5;
+        uint256 fullTransferAmountRay = depositAmount.assetDecimalsToRay(address(ghoToken));
+        uint256 partialTransferAmountRay = fullTransferAmountRay - 1;
+
+        ghoToken.mint(user, depositAmount);
+        vm.prank(user);
+        ghoToken.approve(address(highRateVault), depositAmount);
+        vm.prank(user);
+        highRateVault.deposit(user, address(ghoToken), depositAmount);
+
+        uint256 shareBackedBalanceRay = highRateVault.getUserBalance(user);
+        assertEq(shareBackedBalanceRay, fullTransferAmountRay - 2);
+        assertLt(shareBackedBalanceRay, partialTransferAmountRay);
+
+        vm.prank(user);
+        vm.expectRevert(Errors.InvalidAmount.selector);
+        assertFalse(highRateVault.transfer(recipient, partialTransferAmountRay));
+    }
+
+    function test_transfer_allowsLargestPartialTransfer_beforeGuaranteedPrincipalDeadZone() public {
+        address user = makeAddr("user");
+        address recipient = makeAddr("recipient");
+        MockErc20 ghoToken = new MockErc20("GHO", "GHO", 18);
+
+        uint256 highRate = 3 * MathLib.RAY;
+        IStableVault highRateVault = _deployStableVault(
+            address(mockAccessManager),
+            highRate + 1,
+            highRate,
+            address(mockIouTokenManager),
+            address(mockFundsHandler),
+            address(mockAssetRegistry),
+            address(mockTransferHelper),
+            address(mockWithdrawalPolicy),
+            address(mockPriceOracle),
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+            treasury
+        );
+
+        vm.warp(block.timestamp + 1);
+
+        uint256 depositAmount = 5;
+        uint256 fullTransferAmountRay = depositAmount.assetDecimalsToRay(address(ghoToken));
+        uint256 shares = fullTransferAmountRay.rayDivDown(highRate);
+        uint256 minSharesToRedeemOneWei = Constants.MIN_WITHDRAWABLE_AMOUNT_RAY.rayDivUp(highRate);
+        uint256 maxPartialTransferAmountRay = (shares - minSharesToRedeemOneWei).rayMulDown(highRate);
+
+        ghoToken.mint(user, depositAmount);
+        vm.prank(user);
+        ghoToken.approve(address(highRateVault), depositAmount);
+        vm.prank(user);
+        highRateVault.deposit(user, address(ghoToken), depositAmount);
+
+        vm.prank(user);
+        assertTrue(highRateVault.transfer(recipient, maxPartialTransferAmountRay));
+
+        assertEq(highRateVault.getUserBalance(recipient), maxPartialTransferAmountRay);
+        assertEq(highRateVault.getUserBalance(user), minSharesToRedeemOneWei.rayMulDown(highRate));
+    }
+
+    function test_transfer_revertsWithInvalidAmount_atFirstAmountInsideGuaranteedPrincipalDeadZone() public {
+        address user = makeAddr("user");
+        address recipient = makeAddr("recipient");
+        MockErc20 ghoToken = new MockErc20("GHO", "GHO", 18);
+
+        uint256 highRate = 3 * MathLib.RAY;
+        IStableVault highRateVault = _deployStableVault(
+            address(mockAccessManager),
+            highRate + 1,
+            highRate,
+            address(mockIouTokenManager),
+            address(mockFundsHandler),
+            address(mockAssetRegistry),
+            address(mockTransferHelper),
+            address(mockWithdrawalPolicy),
+            address(mockPriceOracle),
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+            treasury
+        );
+
+        vm.warp(block.timestamp + 1);
+
+        uint256 depositAmount = 5;
+        uint256 fullTransferAmountRay = depositAmount.assetDecimalsToRay(address(ghoToken));
+        uint256 shares = fullTransferAmountRay.rayDivDown(highRate);
+        uint256 minSharesToRedeemOneWei = Constants.MIN_WITHDRAWABLE_AMOUNT_RAY.rayDivUp(highRate);
+        uint256 firstInvalidPartialTransferAmountRay = (shares - minSharesToRedeemOneWei).rayMulDown(highRate) + 1;
+
+        ghoToken.mint(user, depositAmount);
+        vm.prank(user);
+        ghoToken.approve(address(highRateVault), depositAmount);
+        vm.prank(user);
+        highRateVault.deposit(user, address(ghoToken), depositAmount);
+
+        vm.prank(user);
+        vm.expectRevert(Errors.InvalidAmount.selector);
+        assertFalse(highRateVault.transfer(recipient, firstInvalidPartialTransferAmountRay));
+    }
+
+    function test_transfer_fullAmountPreservesGuaranteedPrincipal_whenShareBackedBalanceIsLower() public {
+        address user = makeAddr("user");
+        address recipient = makeAddr("recipient");
+        MockErc20 ghoToken = new MockErc20("GHO", "GHO", 18);
+
+        uint256 highRate = 3 * MathLib.RAY;
+        IStableVault highRateVault = _deployStableVault(
+            address(mockAccessManager),
+            highRate + 1,
+            highRate,
+            address(mockIouTokenManager),
+            address(mockFundsHandler),
+            address(mockAssetRegistry),
+            address(mockTransferHelper),
+            address(mockWithdrawalPolicy),
+            address(mockPriceOracle),
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+            treasury
+        );
+
+        vm.warp(block.timestamp + 1);
+
+        uint256 depositAmount = 5;
+        uint256 fullTransferAmountRay = depositAmount.assetDecimalsToRay(address(ghoToken));
+
+        ghoToken.mint(user, depositAmount);
+        vm.prank(user);
+        ghoToken.approve(address(highRateVault), depositAmount);
+        vm.prank(user);
+        highRateVault.deposit(user, address(ghoToken), depositAmount);
+
+        uint256 senderShareBackedBalanceRay = highRateVault.getUserBalance(user);
+        assertEq(senderShareBackedBalanceRay, fullTransferAmountRay - 2);
+
+        vm.prank(user);
+        assertTrue(highRateVault.transfer(recipient, fullTransferAmountRay));
+
+        assertEq(highRateVault.getUserBalance(user), 0);
+        assertLt(highRateVault.getUserBalance(recipient), fullTransferAmountRay);
+
+        mockFundsHandler.mockAggregatedBalance(fullTransferAmountRay);
+
+        vm.prank(recipient);
+        uint256 iouTokenAmount = highRateVault.requestWithdrawal(recipient, 0);
+        assertEq(iouTokenAmount, fullTransferAmountRay);
+    }
+
     function test_transfer_toRecipientWithExistingPositionInDifferentSubVault(
         address user,
         address recipient,

@@ -742,9 +742,13 @@ contract StableVault is
         //   rayMulDown(S * conversionRate) >= 1e9
         // which implies:
         //   S >= rayDivUp(1e9, conversionRate)
+        uint256 userShares = $storage().positions[user].shares;
+        if (redeemedShares > userShares) {
+            return false;
+        }
         uint256 minSharesToRedeemOneWei =
             Constants.MIN_WITHDRAWABLE_AMOUNT_RAY.rayDivUp($storage().subVaultById[subVaultId].conversionRate);
-        uint256 remainingSharesAfterRedeem = $storage().positions[user].shares - redeemedShares;
+        uint256 remainingSharesAfterRedeem = userShares - redeemedShares;
         return remainingSharesAfterRedeem >= minSharesToRedeemOneWei;
     }
 
