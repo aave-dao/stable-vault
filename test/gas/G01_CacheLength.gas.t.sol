@@ -3,25 +3,20 @@
 pragma solidity ^0.8.22;
 
 import {Client} from "@chainlink-ccip/contracts/libraries/Client.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
-import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IChainBalanceOracle} from "src/interfaces/IChainBalanceOracle.sol";
-import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IPriceOracleAdapter} from "src/interfaces/IPriceOracleAdapter.sol";
 import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
-import {TransferHelper} from "src/periphery/TransferHelper.sol";
 
 import {BaseTest} from "test/BaseTest.t.sol";
 import {_toAddressArray, _toUint256Array} from "test/helpers/TypeHelpers.sol";
 import {IMockErc20} from "test/mocks/MockErc20.sol";
 import {MockErc20} from "test/mocks/MockErc20.sol";
-import {MockNonStandardErc20} from "test/mocks/MockNonStandardErc20.sol";
 
 contract G01CacheLengthGasTest is BaseTest {
     using AssetLib for uint256;
@@ -57,7 +52,8 @@ contract G01CacheLengthGasTest is BaseTest {
         emit log_named_uint("GAS_getActiveSubVaults", gasUsed);
     }
 
-    // ==================== StableVault.sol:827 — _getActiveSubVaultsObligations via getVaultObligations (STORAGE) ======
+    // ==================== StableVault.sol:827 — _getActiveSubVaultsObligations via getVaultObligations (STORAGE)
+    // ======
     function test_gas_getVaultObligations() public {
         _createSubVaults(5);
         uint256 gasBefore = gasleft();
@@ -269,7 +265,8 @@ contract G01CacheLengthGasTest is BaseTest {
         emit log_named_uint("GAS_getPrices", gasUsed);
     }
 
-    // ==================== LocalBalanceAggregator.sol:31 — _getLocalAggregatedBalance (MEMORY, via getAggregatedBalance) ==
+    // ==================== LocalBalanceAggregator.sol:31 — _getLocalAggregatedBalance (MEMORY, via
+    // getAggregatedBalance) ==
     function test_gas_localAggregatedBalance() public {
         uint256 gasBefore = gasleft();
         fundsHandler.getAggregatedBalance();
@@ -333,9 +330,7 @@ contract G01CacheLengthGasTest is BaseTest {
         amounts = new uint256[](count);
         for (uint256 i = 0; i < count; i++) {
             MockErc20 token = new MockErc20(
-                string.concat("TH_Token", Strings.toString(i)),
-                string.concat("TH", Strings.toString(i)),
-                18
+                string.concat("TH_Token", Strings.toString(i)), string.concat("TH", Strings.toString(i)), 18
             );
             token.mint(th, 100e18);
             assets[i] = address(token);

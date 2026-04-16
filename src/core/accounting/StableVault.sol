@@ -622,8 +622,8 @@ contract StableVault is
             if (!_isActiveSubVaultById(toSubVaultId)) {
                 _addSubVaultToActive(toSubVaultId);
             }
+            _validateAmountOfActiveSubVaults();
         }
-        _validateAmountOfActiveSubVaults();
 
         if (from == to) {
             // Sanity check. If the user is the same - this cannot be a partial transfer.
@@ -804,9 +804,10 @@ contract StableVault is
     }
 
     function _burnShares(address user, uint256 subVaultId, uint256 sharesToBurn) internal returns (uint256) {
-        $storage().positions[user].shares -= sharesToBurn;
+        uint256 remainingShares = $storage().positions[user].shares - sharesToBurn;
+        $storage().positions[user].shares = remainingShares;
         $storage().subVaultById[subVaultId].totalShares -= sharesToBurn;
-        return $storage().positions[user].shares;
+        return remainingShares;
     }
 
     function _issueShares(address user, uint256 subVaultId, uint256 sharesToMint) internal {
@@ -827,9 +828,10 @@ contract StableVault is
         uint256 activeSubVaultsObligations;
         uint256 activeSubVaultsIdsCount = $storage().activeSubVaultsIds.length;
         for (uint256 i = 0; i < activeSubVaultsIdsCount; i++) {
+            uint256 subVaultId = $storage().activeSubVaultsIds[i];
             // Round up the obligations to avoid understating liabilities.
-            activeSubVaultsObligations += $storage().subVaultById[$storage().activeSubVaultsIds[i]].totalShares
-                .rayMulUp(_previewSubVaultConversionRate($storage().activeSubVaultsIds[i]));
+            activeSubVaultsObligations += $storage().subVaultById[subVaultId].totalShares
+            .rayMulUp(_previewSubVaultConversionRate(subVaultId));
         }
         return activeSubVaultsObligations;
     }

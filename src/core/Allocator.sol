@@ -217,22 +217,21 @@ contract Allocator is
         if (idleBalance < amount) {
             // Consume from idle balance first
             uint256 amountRemaining = amount - idleBalance;
+            address defaultStrategy = $storage().defaultStrategyByAsset[asset];
 
             // Consume from default strategy
             // Wrap in a try-catch to avoid impact to searching other strategies
-            try this.tryWithdrawFromStrategy(asset, amountRemaining, $storage().defaultStrategyByAsset[asset]) returns (
-                uint256 withdrawn
-            ) {
+            try this.tryWithdrawFromStrategy(asset, amountRemaining, defaultStrategy) returns (uint256 withdrawn) {
                 amountRemaining = withdrawn >= amountRemaining ? 0 : amountRemaining - withdrawn;
             } catch {
-                emit StrategyWithdrawalFailed($storage().defaultStrategyByAsset[asset], asset, amountRemaining);
+                emit StrategyWithdrawalFailed(defaultStrategy, asset, amountRemaining);
             }
 
             // If necessary, pull from remaining strategies
             uint256 length = $storage().assetStrategies[asset].length();
             for (uint256 i = 0; amountRemaining > 0 && i < length; i++) {
                 address strategy = $storage().assetStrategies[asset].at(i);
-                if (strategy != $storage().defaultStrategyByAsset[asset]) {
+                if (strategy != defaultStrategy) {
                     try this.tryWithdrawFromStrategy(asset, amountRemaining, strategy) returns (uint256 withdrawn) {
                         amountRemaining = withdrawn >= amountRemaining ? 0 : amountRemaining - withdrawn;
                     } catch {
