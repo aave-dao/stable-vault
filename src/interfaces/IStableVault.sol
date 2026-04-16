@@ -48,6 +48,10 @@ interface IStableVault {
 
     event TreasurySet(address indexed treasury);
 
+    event SubVaultActivated(uint256 indexed subVaultId);
+
+    event SubVaultDeactivated(uint256 indexed subVaultId);
+
     /// @notice Thrown when the amount requested to withdraw is greater than the amount available.
     /// @dev It is possible the system does not have enough profits i.e. balances over 'original deposits' to cover a
     /// user's withdrawal request.

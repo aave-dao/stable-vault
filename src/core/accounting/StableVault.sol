@@ -207,6 +207,7 @@ contract StableVault is
         if (subVaultId == 0) {
             subVaultId = $storage().defaultSubVaultId;
             $storage().positions[user].subVaultId = subVaultId;
+            emit UserRateSet(user, subVaultId, $storage().subVaultById[subVaultId].perSecondRate);
         }
 
         uint256 conversionRate = _accrueSubVaultConversionRate(subVaultId);
@@ -695,6 +696,7 @@ contract StableVault is
     function _addSubVaultToActive(uint256 subVaultId) internal {
         $storage().activeSubVaultsIds.push(subVaultId);
         $storage().activeSubVaultIndexById[subVaultId] = $storage().activeSubVaultsIds.length - 1;
+        emit SubVaultActivated(subVaultId);
     }
 
     // Assumes that if it is called then `subVaultId` is indeed active, thus `$storage().activeSubVaultsIds.length > 0`
@@ -708,6 +710,7 @@ contract StableVault is
         }
         $storage().activeSubVaultsIds.pop();
         delete $storage().activeSubVaultIndexById[subVaultId];
+        emit SubVaultDeactivated(subVaultId);
     }
 
     function _validateAmountOfActiveSubVaults() internal view {

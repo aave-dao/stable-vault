@@ -243,6 +243,30 @@ contract IouTokenManagerTest_AccountingChain is Test {
         iouTokenManager.bridgeTokens(destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeParams);
     }
 
+    function test_bridgeTokens_emitsTokensLocked_onAccountingChain() public virtual {
+        address from = makeAddr("lockUser");
+        uint256 destinationChainId = block.chainid + 1;
+        address iouTokenRecipient = makeAddr("iouRecipient");
+        uint256 iouTokenAmountRay = 1_000_000e27;
+
+        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
+            feePayer: from, feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 0, data: ""
+        });
+
+        // Mint IOU tokens to the user and approve the manager
+        vm.prank(iouTokenManagerAddress);
+        MockErc20(iouToken).mint(from, iouTokenAmountRay);
+        vm.prank(from);
+        IERC20(iouToken).approve(address(iouTokenManager), iouTokenAmountRay);
+
+        // TokensLocked has 1 indexed param: from
+        vm.expectEmit(true, false, false, true);
+        emit IIouTokenManager.TokensLocked(from, iouTokenAmountRay);
+
+        vm.prank(from);
+        iouTokenManager.bridgeTokens(destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeParams);
+    }
+
     function test_bridgeTokens_reverts_if_invalidDestinationChainId(
         address from,
         address iouTokenRecipient,
@@ -433,6 +457,9 @@ contract IouTokenManagerTest_EarningChain is IouTokenManagerTest_AccountingChain
         assertEq(iouTokenManagerAddress, address(iouTokenManager));
         assertEq(iouTokenAddress, iouToken);
     }
+
+    // Skip TokensLocked test on non-Accounting chain (earning chain burns instead of locking).
+    function test_bridgeTokens_emitsTokensLocked_onAccountingChain() public override {}
 
     // Skip Release Tokens tests on non-Accounting chain.
     function test_releaseTokens_withGateway(uint256 lockedBalance, uint256 amountToRelease) public override {}

@@ -6,6 +6,9 @@ pragma solidity ^0.8.22;
 /// @author Aave Labs
 /// @notice Interface for the Swapper contract.
 interface ISwapper {
+    /// @notice Emitted when slippage coverage source covers the shortfall from a swap.
+    event SlippageCovered(address indexed slippageCoverageSource, address indexed assetOut, uint256 amount);
+
     /// @notice Thrown when the amount of `assetOut` received is less than the minimum amount out expected after a swap.
     /// @custom:selector 0x6728a9f6
     error SlippageToleranceExceeded();

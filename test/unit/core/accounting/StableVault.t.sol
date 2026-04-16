@@ -25,6 +25,7 @@ import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
+import {Vm} from "forge-std/Vm.sol";
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
 import {_toAddressArray, _toUint256Array} from "test/helpers/TypeHelpers.sol";
 import {MockAccessManager} from "test/mocks/MockAccessManager.sol";
@@ -559,6 +560,86 @@ contract StableVaultTest is TestWithHelpers {
 
         vm.prank(user);
         stableVault.deposit(user, address(mockAsset), amount);
+    }
+
+    function test_deposit_emitsSubVaultActivated_onFirstDeposit() public {
+        address user = makeAddr("activationUser");
+        _assumeNotProxyAdmin(user, address(stableVault));
+
+        uint256 amount = 2_000_000;
+        mockAsset.mint(user, amount);
+
+        vm.prank(user);
+        mockAsset.forceApprove(address(stableVault), amount);
+
+        IStableVault.SubVaultData memory defaultSubVault = stableVault.getDefaultSubVault();
+
+        // SubVaultActivated has 1 indexed param: subVaultId
+        vm.expectEmit(true, false, false, true);
+        emit IStableVault.SubVaultActivated(defaultSubVault.id);
+
+        vm.prank(user);
+        stableVault.deposit(user, address(mockAsset), amount);
+    }
+
+    function test_transfer_emitsSubVaultDeactivated_whenSubVaultBecomesEmpty() public {
+        address user = makeAddr("deactivationUser");
+        address recipient = makeAddr("deactivationRecipient");
+        uint256 depositAmount = _boundAssetAmount(address(mockAsset), 1 ether);
+        uint256 newPerSecondRate = _boundRate(DEFAULT_PER_SECOND_RATE + 1);
+        vm.assume(newPerSecondRate != stableVault.getDefaultSubVault().perSecondRate);
+
+        // Deposit and move user to a new subVault
+        _deposit(user, depositAmount);
+        _setUserRate(user, newPerSecondRate);
+
+        uint256 userSubVaultId = stableVault.getUserSubVault(user).id;
+
+        // Transfer all to recipient (who will be assigned to default subVault).
+        // Since fromSubVaultId != toSubVaultId and user was the only occupant,
+        // the user's subVault should become empty and SubVaultDeactivated should emit.
+        vm.expectEmit(true, false, false, true);
+        emit IStableVault.SubVaultDeactivated(userSubVaultId);
+
+        vm.prank(user);
+        stableVault.transferAll(recipient);
+    }
+
+    function test_deposit_emitsUserRateSet_onFirstDeposit() public {
+        address user = makeAddr("userRateUser");
+        _assumeNotProxyAdmin(user, address(stableVault));
+
+        uint256 amount = 2_000_000;
+        mockAsset.mint(user, amount * 2);
+
+        IStableVault.SubVaultData memory defaultSubVault = stableVault.getDefaultSubVault();
+
+        // First deposit: expect UserRateSet to fire
+        vm.prank(user);
+        mockAsset.forceApprove(address(stableVault), amount * 2);
+
+        // UserRateSet has 2 indexed params: user, subVaultId
+        vm.expectEmit(true, true, false, true);
+        emit IStableVault.UserRateSet(user, defaultSubVault.id, defaultSubVault.perSecondRate);
+
+        vm.prank(user);
+        stableVault.deposit(user, address(mockAsset), amount);
+
+        // Second deposit: UserRateSet should NOT fire (user already has a subVaultId)
+        vm.recordLogs();
+        vm.prank(user);
+        stableVault.deposit(user, address(mockAsset), amount);
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 userRateSetTopic = keccak256("UserRateSet(address,uint256,uint256)");
+        bool foundUserRateSet = false;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics.length > 0 && logs[i].topics[0] == userRateSetTopic) {
+                foundUserRateSet = true;
+                break;
+            }
+        }
+        assertFalse(foundUserRateSet, "UserRateSet should not emit on second deposit");
     }
 
     function test_setUserRate_skipsUserWithoutAPosition(address user, uint256 newPerSecondRate) public {
