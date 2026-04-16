@@ -58,18 +58,18 @@ abstract contract TransferHelperClient {
     /// @dev Transfers the bridge fee to the TransferHelper to be pulled by Bridge Adapter.
     function _transferBridgeFeeToTransferHelper(IBridgeAdapter.BridgeParams memory bridgeParams) internal {
         require(bridgeParams.feePayer == msg.sender, Errors.InvalidBridgeFeePayer());
-        if (msg.value > 0) {
-            // If there is some msg.value, we transfer it to the TransferHelper, regardless of the fee token.
-            // There might be scenarios where the bridge implementation requires some native assets to operate in
-            // addition to the ERC-20 fee token.
-            _transferNativeToTransferHelper(msg.value);
-        }
         if (bridgeParams.feeToken == Constants.NATIVE_CURRENCY) {
-            // We already transferred all the msg.value above. Here we just check that it covers the fee amount.
             require(msg.value >= bridgeParams.feeAmount, Errors.InsufficientFunds());
-        } else if (bridgeParams.feeAmount > 0) {
-            IERC20(bridgeParams.feeToken)
-                .safeTransferFrom(bridgeParams.feePayer, TRANSFER_HELPER, bridgeParams.feeAmount);
+            _transferNativeToTransferHelper(msg.value);
+        } else {
+            // No known bridge requires both native and ERC-20 fees (CCIP and LayerZero use one or the other).
+            // Rejecting msg.value prevents accidental native loss (which would otherwise remain in this client
+            // contract).
+            require(msg.value == 0, Errors.InvalidParameter());
+            if (bridgeParams.feeAmount > 0) {
+                IERC20(bridgeParams.feeToken)
+                    .safeTransferFrom(bridgeParams.feePayer, TRANSFER_HELPER, bridgeParams.feeAmount);
+            }
         }
     }
 
