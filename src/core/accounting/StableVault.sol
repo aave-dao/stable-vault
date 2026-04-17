@@ -116,10 +116,10 @@ contract StableVault is
         /// @dev The address of the treasury, where claimed surplus interest is sent to.
         address treasury;
 
-        /// @dev ERC20-style name of the Stable Vault position token. Set once at initialization (VA-99).
+        /// @dev ERC20-style name of the Stable Vault position token.
         string name;
 
-        /// @dev ERC20-style symbol of the Stable Vault position token. Set once at initialization (VA-99).
+        /// @dev ERC20-style symbol of the Stable Vault position token.
         string symbol;
     }
 
