@@ -158,11 +158,11 @@ interface IStableVault {
     /// @return balanceRay Account's Stable Vault balance in RAY.
     function balanceOf(address account) external view returns (uint256 balanceRay);
 
-    /// @notice ERC20-style name of the Stable Vault position token, set at initialization.
+    /// @notice ERC20-style name of the Stable Vault position token.
     /// @return name Human-readable name (e.g. "Aave USD Stable Vault").
     function name() external view returns (string memory);
 
-    /// @notice ERC20-style symbol of the Stable Vault position token, set at initialization.
+    /// @notice ERC20-style symbol of the Stable Vault position token.
     /// @return symbol Short ticker (e.g. "ASV-USD").
     function symbol() external view returns (string memory);
 
