@@ -24,8 +24,6 @@ contract IouToken is ERC20, Ownable, IIouToken {
         Ownable(iouTokenManager)
     {
         require(iouTokenManager != address(0), Errors.ZeroAddress());
-        // Empty name/symbol would render as blank in explorers and wallets — reject up front to catch deployment
-        // mistakes early (VA-98). ERC20 metadata is set once at deployment and immutable thereafter.
         require(bytes(name_).length > 0, Errors.InvalidParameter());
         require(bytes(symbol_).length > 0, Errors.InvalidParameter());
     }
