@@ -17,8 +17,8 @@ import {Errors} from "src/types/Errors.sol";
 contract IouToken is ERC20, Ownable, IIouToken {
     /// @dev Constructor.
     /// @param iouTokenManager Address of the IOU token manager which is the owner of the token.
-    /// @param name_ ERC20 name for this IOU token (e.g. "IOU: Aave USD Stable Vault"). Set once at deployment.
-    /// @param symbol_ ERC20 symbol for this IOU token (e.g. "IOU-USD"). Set once at deployment.
+    /// @param name_ ERC20 name for this IOU token (e.g. "IOU: Aave USD Stable Vault").
+    /// @param symbol_ ERC20 symbol for this IOU token (e.g. "IOU-USD").
     constructor(address iouTokenManager, string memory name_, string memory symbol_)
         ERC20(name_, symbol_)
         Ownable(iouTokenManager)
