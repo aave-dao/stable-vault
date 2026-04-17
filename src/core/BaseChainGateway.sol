@@ -161,7 +161,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) internal {
         if (assetToBridge == Constants.ASSET_FOR_DATA_ONLY_BRIDGE) {
-            require(amountToBridge == 0), Errors.InvalidParameter());
+            require(amountToBridge == 0, Errors.InvalidParameter());
         }
         IBridgeAdapter(adapter)
             .publishMessageToChainWithFeePayer(
