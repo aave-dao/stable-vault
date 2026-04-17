@@ -1,7 +1,9 @@
 {
   "deployer": "0xBB700dA5CCC9Ec5605780Fc40695f1206B090303",
+  "lowDelay": 14400,
+  "mediumDelay": 86400,
+  "highDelay": 259200,
   "criticalDelay": 604800,
-  "medDelay": 259200,
   "maxStrategiesPerAsset": 15,
   "strategyMaxSlippageAmount": 10,
   "chainlinkPriceOracleHeartbeat": 86400,
