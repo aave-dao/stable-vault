@@ -260,6 +260,8 @@ contract CcipAdapter is
         return abi.decode(abiEncodedEvmSender, (address));
     }
 
+    receive() external payable {}
+
     function _beforeRescueNative(uint256) internal virtual override {
         // Equivalent to adding the `restricted` modifier.
         _checkCanCall(_msgSender(), _msgData());
