@@ -54,6 +54,8 @@
     "defaultMaxPerSecondRate": "1000000005781378656804591713",
     "defaultSubVaultPerSecondRate": "1000000001243680656318820313",
     "defaultMaxActiveSubVaults": 201,
+    "stableVaultName": "Aave USD Stable Vault",
+    "stableVaultSymbol": "ASV-USD",
     "aaveV3PoolAddressesProvider": "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb",
     "useMockBundleFeed": true,
     "useMockSequencerUptimeFeed": true,
