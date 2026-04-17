@@ -17,8 +17,17 @@ import {Errors} from "src/types/Errors.sol";
 contract IouToken is ERC20, Ownable, IIouToken {
     /// @dev Constructor.
     /// @param iouTokenManager Address of the IOU token manager which is the owner of the token.
-    constructor(address iouTokenManager) ERC20("IouToken", "IOU") Ownable(iouTokenManager) {
+    /// @param name_ ERC20 name for this IOU token (e.g. "IOU: Aave USD Stable Vault"). Set once at deployment.
+    /// @param symbol_ ERC20 symbol for this IOU token (e.g. "IOU-USD"). Set once at deployment.
+    constructor(address iouTokenManager, string memory name_, string memory symbol_)
+        ERC20(name_, symbol_)
+        Ownable(iouTokenManager)
+    {
         require(iouTokenManager != address(0), Errors.ZeroAddress());
+        // Empty name/symbol would render as blank in explorers and wallets — reject up front to catch deployment
+        // mistakes early (VA-98). ERC20 metadata is set once at deployment and immutable thereafter.
+        require(bytes(name_).length > 0, Errors.InvalidParameter());
+        require(bytes(symbol_).length > 0, Errors.InvalidParameter());
     }
 
     /// @inheritdoc IMintableBurnableIERC20

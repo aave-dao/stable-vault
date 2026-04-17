@@ -322,7 +322,14 @@ abstract contract AccountingChainDeployment is
         address iouToken = _deploy_create3({
             namespacedSaltSeed: IOU_TOKEN_SALT_SEED,
             deployer: _deployer(),
-            initCode: abi.encodePacked(type(IouToken).creationCode, abi.encode(getIouTokenManagerAddress(_deployer())))
+            initCode: abi.encodePacked(
+                type(IouToken).creationCode,
+                abi.encode(
+                    getIouTokenManagerAddress(_deployer()),
+                    _configString(".iouTokenName"),
+                    _configString(".iouTokenSymbol")
+                )
+            )
         });
         require(iouToken == getIouTokenAddress(_deployer()), "IouToken does not match expected address");
         _logDeployment("IouToken", IOU_TOKEN_SALT_SEED, iouToken);
