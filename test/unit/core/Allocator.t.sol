@@ -2157,6 +2157,21 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalance(assetOut), 0);
     }
 
+    function test_rebalance_swap_reverts_ifAssetInEqualsAssetOut() public {
+        address asset = address(_mockUsdt);
+        uint256 amountAssetIn = 100_000_000;
+        _mockUsdt.mint(address(_allocator), amountAssetIn);
+
+        IAllocator.RebalanceParams[] memory rebalanceParams = _initializeRebalanceParams(1);
+        IAllocator.SwapParams[] memory swaps = _initializeSwapParams(1);
+        swaps[0] = _buildSwapParams(asset, amountAssetIn, asset, address(_mockSwapper), "");
+        rebalanceParams[0] =
+            _buildRebalanceParams(_initializeDeallocationParams(0), swaps, _initializeAllocationParams(0));
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        _allocator.rebalance(rebalanceParams);
+    }
+
     function test_rebalance_entireFlow(uint256 amountIn) public {
         address assetIn = address(_mockUsdt);
         address assetOut = address(_mockGho);
@@ -3060,6 +3075,13 @@ contract AllocatorTest is TestWithHelpers {
             abi.encodeWithSelector(IAllocator.DepositsToStrategyDisabled.selector, address(_extraUsdtStrategy))
         );
         _allocator.setDefaultStrategy(address(_mockUsdt), address(_extraUsdtStrategy));
+    }
+
+    function test_setDefaultStrategy_reverts_ifClearingDefaultForUnregisteredAsset() public {
+        address unregisteredAsset = makeAddr("unregistered");
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidAsset.selector, unregisteredAsset));
+        _allocator.setDefaultStrategy(unregisteredAsset, address(0));
     }
 
     function test_trustStrategy_doesNotReEnableDeposits() public {

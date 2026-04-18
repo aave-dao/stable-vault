@@ -148,6 +148,7 @@ contract CcipAdapterTest is TestWithHelpers {
 
     function test_getDestinationChainAdapter_returnsSetAdapter(uint256 chainId, address adapter) public {
         vm.assume(chainId != EARNING_CHAIN_ID && chainId != ACCOUNTING_CHAIN_ID);
+        vm.assume(chainId != 0 && chainId != block.chainid);
         vm.assume(adapter != address(0));
 
         assertEq(_accountingChainCcipAdapter.getDestinationChainAdapter(chainId), address(0));
@@ -162,6 +163,7 @@ contract CcipAdapterTest is TestWithHelpers {
         public
     {
         vm.assume(chainId != EARNING_CHAIN_ID && chainId != ACCOUNTING_CHAIN_ID);
+        vm.assume(chainId != 0 && chainId != block.chainid);
         vm.assume(adapter1 != address(0) && adapter2 != address(0));
         vm.assume(adapter1 != adapter2);
 
@@ -269,11 +271,24 @@ contract CcipAdapterTest is TestWithHelpers {
 
     function test_setDestinationChainAdapter_emitsDestinationChainAdapterSet(uint256 chainId, address adapter) public {
         vm.assume(chainId != EARNING_CHAIN_ID && chainId != ACCOUNTING_CHAIN_ID);
+        vm.assume(chainId != 0 && chainId != block.chainid);
 
         vm.expectEmit(true, true, true, true);
         emit IBridgeAdapter.DestinationChainAdapterSet(chainId, adapter);
         vm.prank(everyRoleAccount);
         _accountingChainCcipAdapter.setDestinationChainAdapter(chainId, adapter);
+    }
+
+    function test_setDestinationChainAdapter_reverts_ifChainIdIsZero() public {
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        vm.prank(everyRoleAccount);
+        _accountingChainCcipAdapter.setDestinationChainAdapter(0, makeAddr("adapter"));
+    }
+
+    function test_setDestinationChainAdapter_reverts_ifChainIdIsSelf() public {
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        vm.prank(everyRoleAccount);
+        _accountingChainCcipAdapter.setDestinationChainAdapter(block.chainid, makeAddr("adapter"));
     }
 
     function test_publishMessageToChainWithFeePayer_withTokenBridgeFee(

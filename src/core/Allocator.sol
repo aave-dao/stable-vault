@@ -391,6 +391,7 @@ contract Allocator is
     }
 
     function _swap(SwapParams memory swap) internal {
+        require(swap.assetIn != swap.assetOut, Errors.InvalidParameter());
         require(IAssetRegistry(ASSET_REGISTRY).isSwapInputAllowed(swap.assetIn), Errors.UnsupportedAsset(swap.assetIn));
         require(
             IAssetRegistry(ASSET_REGISTRY).isSwapOutputAllowed(swap.assetOut), Errors.UnsupportedAsset(swap.assetOut)
@@ -602,6 +603,8 @@ contract Allocator is
             require(strategy != $storage().defaultStrategyByAsset[asset], DefaultStrategy(strategy));
             require(_isStrategySupportedForAsset({strategy: strategy, asset: asset}), Errors.AddressNotWhitelisted());
             require($storage().strategyConfigs[strategy].depositAllowed, DepositsToStrategyDisabled(strategy));
+        } else {
+            require(IAssetRegistry(ASSET_REGISTRY).isAssetRegistered(asset), Errors.InvalidAsset(asset));
         }
         $storage().defaultStrategyByAsset[asset] = strategy;
         emit DefaultStrategySet(asset, strategy);
