@@ -233,7 +233,8 @@ contract CcipAdapter is
 
     function _triggerFeeRefund(address feePayer, address feeToken, uint256 excessFee) internal {
         if (feeToken == Constants.NATIVE_CURRENCY) {
-            payable(feePayer).transfer(excessFee);
+            (bool callSucceeded,) = payable(feePayer).call{value: excessFee}("");
+            require(callSucceeded, Errors.NativeTransferFailed());
         } else {
             IERC20(feeToken).safeTransfer(feePayer, excessFee);
         }
@@ -258,6 +259,8 @@ contract CcipAdapter is
         require((value & Constants.ABI_ENCODED_EVM_ADDRESS_MASK) == value, Errors.InvalidParameter());
         return abi.decode(abiEncodedEvmSender, (address));
     }
+
+    receive() external payable {}
 
     function _beforeRescueNative(uint256) internal virtual override {
         // Equivalent to adding the `restricted` modifier.

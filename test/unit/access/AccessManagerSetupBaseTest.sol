@@ -210,7 +210,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     }
 
     function test_disablerProfile_hasTheExpectedRoles() public view {
-        uint64[] memory expected = new uint64[](13);
+        uint64[] memory expected = new uint64[](14);
         expected[0] = RolesConfig.getRole__rebalance().roleId;
         expected[1] = RolesConfig.getRole__removeStrategy().roleId;
         expected[2] = RolesConfig.getRole__rescueTokens().roleId;
@@ -224,6 +224,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         expected[10] = RolesConfig.getRole__disableDepositsToStrategy().roleId;
         expected[11] = RolesConfig.getRole__setDefaultStrategy().roleId;
         expected[12] = RolesConfig.getRole__distrustStrategy().roleId;
+        expected[13] = RolesConfig.getRole__removeSigner().roleId;
         _assertProfileHasExactlyTheseRoles(_getProfile__Disabler(), expected);
 
         for (uint256 i = 0; i < expected.length; i++) {
@@ -344,6 +345,13 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     function test_accessManagerTargetAdminDelay() public view {
         uint32 delay = IAccessManager(_accessManager()).getTargetAdminDelay(address(IAccessManager(_accessManager())));
         assertEq(delay, CRITICAL_DELAY);
+    }
+
+    function test_delayTiers_areStrictlyAscending() public view {
+        assertLt(RolesConfig.NO_DELAY, LOW_DELAY, "NO_DELAY must be less than LOW_DELAY");
+        assertLt(LOW_DELAY, MEDIUM_DELAY, "LOW_DELAY must be less than MEDIUM_DELAY");
+        assertLt(MEDIUM_DELAY, HIGH_DELAY, "MEDIUM_DELAY must be less than HIGH_DELAY");
+        assertLt(HIGH_DELAY, CRITICAL_DELAY, "HIGH_DELAY must be less than CRITICAL_DELAY");
     }
 
     ////// Deployer revocation //////
@@ -484,8 +492,8 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     function test_canCall_mainAdmin() public view {
         address admin = _getProfile__MainAdmin();
 
-        // Admin-tier function (MED_DELAY): has role but delayed
-        _assertCanCall(admin, getAllocatorAddress(_deployer()), IAllocator.addStrategy.selector, false, MED_DELAY);
+        // Admin-tier function (HIGH_DELAY): has role but delayed
+        _assertCanCall(admin, getAllocatorAddress(_deployer()), IAllocator.addStrategy.selector, false, HIGH_DELAY);
 
         // Operational function (NO_DELAY): immediate
         _assertCanCall(admin, getAllocatorAddress(_deployer()), IAllocator.rebalance.selector, true, 0);
@@ -657,24 +665,24 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         address admin = _getProfile__MainAdmin();
         address newAddr = makeAddr("NEW_ADDRESS_GRANT_DELAY_TEST");
 
-        // Admin-tier role (MED_DELAY grant delay)
+        // Admin-tier role (HIGH_DELAY grant delay)
         RolesConfig.Role memory role = RolesConfig.getRole__addStrategy();
 
         // Calls grantRole (MainAdmin holds ADMIN_ROLE_GUARDIAN_ROLE without execution delay)
         vm.prank(admin);
         accessManager.grantRole(role.roleId, newAddr, uint32(0));
 
-        // Grant delay (MED_DELAY) blocks activation
+        // Grant delay (HIGH_DELAY) blocks activation
         (bool hasNow,) = accessManager.hasRole(role.roleId, newAddr);
         assertFalse(hasNow, "Role should not be active yet (grant delay)");
 
-        // Warp 1 second less than MED_DELAY
-        vm.warp(block.timestamp + MED_DELAY - 1);
+        // Warp 1 second less than HIGH_DELAY
+        vm.warp(block.timestamp + HIGH_DELAY - 1);
 
         (hasNow,) = accessManager.hasRole(role.roleId, newAddr);
         assertFalse(hasNow, "Role should not be active yet (grant delay)");
 
-        // Warp one more second to make MED_DELAY fully elapse
+        // Warp one more second to make HIGH_DELAY fully elapse
         vm.warp(block.timestamp + 1);
 
         (bool hasAfter,) = accessManager.hasRole(role.roleId, newAddr);
@@ -688,7 +696,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         address admin = _getProfile__MainAdmin();
         address newAddr = makeAddr("GRANT_DELAY_FUZZ_TEST");
 
-        // Admin-tier role (MED_DELAY grant delay)
+        // Admin-tier role (HIGH_DELAY grant delay)
         RolesConfig.Role memory role = RolesConfig.getRole__addStrategy();
         uint32 grantDelay = accessManager.getRoleGrantDelay(role.roleId);
 
@@ -713,13 +721,13 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     ////// Role granting can be revoked during grant delay period //////
 
     function test_roleGrant_canBeRevokedDuringGrantDelay(uint256 secondsToElapseBeforeRevoking) public {
-        secondsToElapseBeforeRevoking = bound(secondsToElapseBeforeRevoking, 0, MED_DELAY - 1);
+        secondsToElapseBeforeRevoking = bound(secondsToElapseBeforeRevoking, 0, HIGH_DELAY - 1);
 
         IAccessManager accessManager = IAccessManager(_accessManager());
         address admin = _getProfile__MainAdmin();
         address newAddr = makeAddr("REVOKE_DURING_GRANT_DELAY_TEST");
 
-        // Admin-tier role (MED_DELAY grant delay)
+        // Admin-tier role (HIGH_DELAY grant delay)
         RolesConfig.Role memory role = RolesConfig.getRole__addStrategy();
 
         // Grant role -> pending (not active yet due to grant delay)
@@ -740,7 +748,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         assertFalse(hasAfterRevoke, "Role should be revoked");
 
         // Even after grant delay passes, role stays revoked
-        vm.warp(grantTimestamp + MED_DELAY + 1);
+        vm.warp(grantTimestamp + HIGH_DELAY + 1);
         (bool hasAfterDelay,) = accessManager.hasRole(role.roleId, newAddr);
         assertFalse(hasAfterDelay, "Role should remain revoked after grant delay period");
     }
@@ -829,8 +837,8 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         vm.prank(admin);
         accessManager.grantRole(adminTierRole.roleId, newAddr, adminTierRole.delay);
 
-        // Warp past MED_DELAY -> both roles should be active
-        vm.warp(block.timestamp + MED_DELAY + 1);
+        // Warp past HIGH_DELAY -> both roles should be active
+        vm.warp(block.timestamp + HIGH_DELAY + 1);
         (bool hasOperational,) = accessManager.hasRole(operationalRole.roleId, newAddr);
         assertTrue(hasOperational, "MainAdmin should be able to grant operational roles");
         (bool hasAdminTier,) = accessManager.hasRole(adminTierRole.roleId, newAddr);

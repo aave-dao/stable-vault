@@ -5,7 +5,7 @@ pragma solidity ^0.8.20;
 import {IouToken} from "src/core/ious/IouToken.sol";
 
 contract MockIouToken is IouToken {
-    constructor(address owner) IouToken(owner) {}
+    constructor(address owner) IouToken(owner, "Mock IOU", "mIOU") {}
 
     function mockMint(address to, uint256 amount) external {
         _mint(to, amount);
