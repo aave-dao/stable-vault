@@ -151,7 +151,6 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         require($storage().supportedBridgeAdapters[asset][sourceChainId][msg.sender], AdapterNotFound());
     }
 
-    /// @dev The Gateway must have ownership of the assets being bridged as it allows the adapter as a spender.
     function _sendCrossChainMessage(
         uint256 destinationChainId,
         address adapter,
