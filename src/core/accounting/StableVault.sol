@@ -605,6 +605,9 @@ contract StableVault is
             sharesToIssue: userNewShares,
             guaranteedAmountToMoveRay: 0
         });
+        // `_validateAmountOfActiveSubVaults()` is intentionally not called here: this function runs inside the
+        // `setUserRate` batch loop, where intermediate states may transiently exceed the limit before settling
+        // to a valid final state. Validation is performed upstream in `setUserRate` after the loop completes.
     }
 
     function _moveShares(
@@ -872,6 +875,8 @@ contract StableVault is
             _migrateUserToSubVault(user, oldSubVaultId, newSubVaultId);
             emit UserRateSet(user, newSubVaultId, newPerSecondRate);
         }
+        // `_validateAmountOfActiveSubVaults()` is intentionally not called here: this is invoked per-user inside
+        // the `setUserRate` batch loop. Validation is performed upstream in `setUserRate` after the loop.
     }
 
     function _setTreasury(address treasury) internal {
