@@ -610,6 +610,10 @@ contract StableVault is
         // to a valid final state. Validation is performed upstream in `setUserRate` after the loop completes.
     }
 
+    /// @dev Callers must invoke `_validateAmountOfActiveSubVaults()` after their logical operation
+    /// completes (per-call for single-user actions; post-batch for batched actions). The check is
+    /// deliberately not performed here because batch callers may transiently exceed the limit
+    /// before settling to a valid final state.
     function _moveShares(
         address from,
         address to,
