@@ -197,9 +197,8 @@ interface IStableVault {
     function getVaultObligations() external view returns (uint256);
 
     /// @notice Getter for the aggregated balance on the local Allocator and the Allocator on Earning Chains.
-    /// @dev Only includes trusted assets; distrusted assets contribute 0 to the balance.
-    /// @dev Earning chain balances are sourced from an oracle and may be stale. Stale balances contribute 0
-    /// (conservative). The staleness window is bounded by the oracle heartbeat + publish buffer.
+    /// @dev May underestimate when trust or freshness guarantees cannot be satisfied for a given contribution
+    /// (conservative by design). See the implementation for specific policies.
     /// @return aggregatedBalance Aggregated balance of the vault in RAY of denomination asset.
     function getAggregatedBalance() external view returns (uint256);
 
