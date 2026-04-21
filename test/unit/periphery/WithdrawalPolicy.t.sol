@@ -168,6 +168,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
     }
 
     function test_setAssetFeeBps_reverts_ifNotSetWithNonZeroFee(address asset, uint256 feeBps) public {
+        vm.assume(asset != address(0));
         // forge-lint: disable-next-line(unsafe-typecast)
         uint16 feeBps16 = uint16(bound(feeBps, 1, FEE_CAP_BPS));
 
