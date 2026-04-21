@@ -501,6 +501,18 @@ contract StableVault is
     }
 
     /// @inheritdoc IStableVault
+    function getClaimableSurplusInterest() external view override returns (uint256) {
+        uint256 obligations = _getVaultObligations();
+        uint256 assets = _getVaultAggregatedBalance();
+        return assets > obligations ? assets - obligations : 0;
+    }
+
+    /// @inheritdoc IStableVault
+    function getSubVaultConversionRate(uint256 subVaultId) external view override returns (uint256) {
+        return _previewSubVaultConversionRate(subVaultId);
+    }
+
+    /// @inheritdoc IStableVault
     function getActiveSubVaults() external view override returns (SubVaultData[] memory) {
         SubVaultData[] memory activeSubVaults = new SubVaultData[]($storage().activeSubVaultsIds.length);
         for (uint256 i = 0; i < $storage().activeSubVaultsIds.length; i++) {
