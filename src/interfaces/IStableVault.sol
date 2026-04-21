@@ -192,10 +192,13 @@ interface IStableVault {
     ) external;
 
     /// @notice Getter for the aggregated obligations owed to depositors in RAY of denomination asset.
+    /// @dev Includes the total supply of IOU tokens across all chains (circulating + locked for bridging).
     /// @return obligations Aggregated obligations owed to depositors in RAY of denomination asset.
     function getVaultObligations() external view returns (uint256);
 
     /// @notice Getter for the aggregated balance on the local Allocator and the Allocator on Earning Chains.
+    /// @dev May underestimate when trust or freshness guarantees cannot be satisfied for a given contribution
+    /// (conservative by design). See the implementation for specific policies.
     /// @return aggregatedBalance Aggregated balance of the vault in RAY of denomination asset.
     function getAggregatedBalance() external view returns (uint256);
 
