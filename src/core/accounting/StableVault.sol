@@ -299,6 +299,7 @@ contract StableVault is
             sharesToIssue: toUserShares,
             guaranteedAmountToMoveRay: guaranteedAmountRay
         });
+        _validateAmountOfActiveSubVaults();
 
         emit Transfer(from, to, amountRay);
         return true;
@@ -339,6 +340,7 @@ contract StableVault is
             sharesToIssue: toUserShares,
             guaranteedAmountToMoveRay: guaranteedAmountRay
         });
+        _validateAmountOfActiveSubVaults();
 
         emit Transfer(from, to, amountOfWithdrawalRay);
         return true;
@@ -349,6 +351,7 @@ contract StableVault is
         for (uint256 i = 0; i < userRateData.length; i++) {
             _setUserRate(userRateData[i].user, userRateData[i].newPerSecondRate);
         }
+        _validateAmountOfActiveSubVaults();
     }
 
     /// @inheritdoc IStableVault
@@ -440,6 +443,7 @@ contract StableVault is
         bytes memory data
     ) external virtual override nonReentrant assertingTransferHelperBalanceFor(assetOut) {
         require(user == msg.sender, OnlyUser());
+        require(iouAmountRay > 0, Errors.ZeroAmount());
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(user, iouAmountRay);
         uint256 amountOutRay = IWithdrawalPolicy(WITHDRAWAL_POLICY)
             .applyWithdrawalPolicy(
@@ -472,6 +476,7 @@ contract StableVault is
         assertingTransferHelperBalanceForAssets(assets)
     {
         for (uint256 i = 0; i < assets.length; i++) {
+            require(amounts[i] > 0, Errors.ZeroAmount());
             IFundsHandler(FUNDS_HANDLER).processWithdrawal(assets[i], amounts[i]);
         }
         // NOTE: Due to oracle-bridge propagation asymmetry, the aggregated balance may temporarily be lower than the
@@ -496,6 +501,18 @@ contract StableVault is
     /// @inheritdoc IStableVault
     function getGlobalOriginalDepositAmount() external view override returns (uint256) {
         return $storage().globalOriginalDepositsRay;
+    }
+
+    /// @inheritdoc IStableVault
+    function getClaimableSurplusInterest() external view override returns (uint256) {
+        uint256 obligations = _getVaultObligations();
+        uint256 assets = _getVaultAggregatedBalance();
+        return assets > obligations ? assets - obligations : 0;
+    }
+
+    /// @inheritdoc IStableVault
+    function getSubVaultConversionRate(uint256 subVaultId) external view override returns (uint256) {
+        return _previewSubVaultConversionRate(subVaultId);
     }
 
     /// @inheritdoc IStableVault
@@ -636,8 +653,15 @@ contract StableVault is
             sharesToIssue: userNewShares,
             guaranteedAmountToMoveRay: 0
         });
+        // `_validateAmountOfActiveSubVaults()` is intentionally not called here: this function runs inside the
+        // `setUserRate` batch loop, where intermediate states may transiently exceed the limit before settling
+        // to a valid final state. Validation is performed upstream in `setUserRate` after the loop completes.
     }
 
+    /// @dev Callers must invoke `_validateAmountOfActiveSubVaults()` after their logical operation
+    /// completes (per-call for single-user actions; post-batch for batched actions). The check is
+    /// deliberately not performed here because batch callers may transiently exceed the limit
+    /// before settling to a valid final state.
     function _moveShares(
         address from,
         address to,
@@ -895,6 +919,7 @@ contract StableVault is
     }
 
     function _setUserRate(address user, uint256 newPerSecondRate) internal {
+        require(user != address(0), Errors.ZeroAddress());
         uint256 oldSubVaultId = $storage().positions[user].subVaultId;
         // Skip users without a position (e.g., withdrew or transferred out between batch
         // preparation and execution) to avoid reverting the entire batch.
@@ -907,6 +932,8 @@ contract StableVault is
             _migrateUserToSubVault(user, oldSubVaultId, newSubVaultId);
             emit UserRateSet(user, newSubVaultId, newPerSecondRate);
         }
+        // `_validateAmountOfActiveSubVaults()` is intentionally not called here: this is invoked per-user inside
+        // the `setUserRate` batch loop. Validation is performed upstream in `setUserRate` after the loop.
     }
 
     function _setTreasury(address treasury) internal {

@@ -11,6 +11,7 @@ import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessMana
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {IPriceOracleAdapter} from "src/interfaces/IPriceOracleAdapter.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
+import {Errors} from "src/types/Errors.sol";
 
 /// @title PriceOracle
 /// @author Aave Labs
@@ -85,6 +86,7 @@ contract PriceOracle is AccessManagedUpgradeable, IPriceOracle {
     }
 
     function setOracleAdapterForAsset(address asset, address newAdapter) external restricted {
+        require(asset != address(0), Errors.ZeroAddress());
         // Validate the adapter interface through a call to getPrice
         IPriceOracleAdapter(newAdapter).getPrice(asset);
         address previousAdapter = $storage().oracleAdapterByAsset[asset];

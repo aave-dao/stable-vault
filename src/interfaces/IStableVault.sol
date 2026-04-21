@@ -233,4 +233,14 @@ interface IStableVault {
     /// @dev Original deposits are the invested principal from users (not including accrued interest).
     /// @return globalOriginalDepositAmount Global original deposit amount in RAY of denomination asset.
     function getGlobalOriginalDepositAmount() external view returns (uint256 globalOriginalDepositAmount);
+
+    /// @notice Getter for the surplus interest that can be claimed in RAY of denomination asset.
+    /// @dev Returns 0 if the system is underfunded (obligations >= assets).
+    /// @return surplusInterestRay The claimable surplus in RAY.
+    function getClaimableSurplusInterest() external view returns (uint256 surplusInterestRay);
+
+    /// @notice Getter for the accrued conversion rate of a sub-vault, computed to the current block timestamp.
+    /// @param subVaultId ID of the sub-vault.
+    /// @return conversionRate The conversion rate in RAY, reflecting interest accrued up to now.
+    function getSubVaultConversionRate(uint256 subVaultId) external view returns (uint256 conversionRate);
 }

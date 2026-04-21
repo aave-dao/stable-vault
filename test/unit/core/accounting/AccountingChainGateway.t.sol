@@ -450,6 +450,24 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         );
     }
 
+    function test_sendBridgeIouTokenMessageWithFeePayer_reverts_ifIouTokenAmountIsZero() public {
+        vm.expectRevert(Errors.ZeroAmount.selector);
+        vm.prank(address(_mockIouTokenManager));
+        _accountingChainGateway.sendBridgeIouTokenMessageWithFeePayer(
+            EARNING_CHAIN_ID,
+            makeAddr("iouTokenRecipient"),
+            0,
+            IBridgeAdapter.BridgeParams({
+                feePayer: makeAddr("bridgeFeePayer"),
+                feeToken: address(_mockUsdt),
+                feeAmount: 100_000,
+                feeRefundThreshold: 0,
+                gasLimit: 100000,
+                data: ""
+            })
+        );
+    }
+
     function test_receiveMessage_whenBridgeFundsIsReceived(uint256 amountUsdt) public {
         amountUsdt = _boundAssetAmount(address(_mockUsdt), amountUsdt);
 

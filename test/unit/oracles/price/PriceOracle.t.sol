@@ -10,6 +10,7 @@ import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
+import {Errors} from "src/types/Errors.sol";
 
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
 import {MockAccessManager} from "test/mocks/MockAccessManager.sol";
@@ -97,6 +98,12 @@ contract PriceOracleTest is TestWithHelpers {
 
         vm.prank(everyRoleAccount);
         _priceOracle.setOracleAdapterForAsset(asset1, address(newAdapter));
+    }
+
+    function test_setOracleAdapterForAsset_reverts_ifAssetIsZeroAddress() public {
+        vm.expectRevert(Errors.ZeroAddress.selector);
+        vm.prank(everyRoleAccount);
+        _priceOracle.setOracleAdapterForAsset(address(0), address(_mockAdapter));
     }
 
     function test_setOracleAdapterForAsset_reverts_ifAdapterCallFails() public {

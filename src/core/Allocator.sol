@@ -181,6 +181,7 @@ contract Allocator is
 
     /// @inheritdoc IAllocator
     function deposit(address asset, uint256 amount) external override onlyDepositor nonReentrant returns (uint256) {
+        require(amount > 0, Errors.ZeroAmount());
         require(IAssetRegistry(ASSET_REGISTRY).isDepositToAllocatorAllowed(asset), Errors.UnsupportedAsset(asset));
         ITransferHelper(TRANSFER_HELPER).pull(asset, amount);
         uint256 netDepositAmount = amount;
@@ -195,6 +196,8 @@ contract Allocator is
 
     /// @inheritdoc IAllocator
     function depositAllowIdle(address asset, uint256 amount) external override onlyDepositor nonReentrant {
+        // We don't check amount for zero here because this function is called from bridge callbacks, where reverting
+        // could jam the bridge. A zero amount is a harmless no-op.
         require(IAssetRegistry(ASSET_REGISTRY).isDepositToAllocatorAllowed(asset), Errors.UnsupportedAsset(asset));
         ITransferHelper(TRANSFER_HELPER).pull(asset, amount);
         if ($storage().defaultStrategyByAsset[asset] == address(0)) {

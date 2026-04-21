@@ -119,11 +119,13 @@ contract FundsHandler is
 
     /// @inheritdoc IFundsHandler
     function processDeposit(address asset, uint256 amount) external override onlyStableVault returns (uint256) {
+        require(amount > 0, Errors.ZeroAmount());
         return IAllocator(ALLOCATOR).deposit(asset, amount);
     }
 
     /// @inheritdoc IFundsHandler
     function processWithdrawal(address asset, uint256 amount) external override onlyStableVault {
+        require(amount > 0, Errors.ZeroAmount());
         _pullFundsFromImmediateLiquidity(asset, amount);
     }
 
