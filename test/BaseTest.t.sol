@@ -378,7 +378,8 @@ contract BaseTest is TestWithHelpers {
         );
 
         // 10. IOU Token
-        iouToken_accountingChain = new IouToken(iouTokenManager_accountingChainAddress);
+        iouToken_accountingChain =
+            new IouToken(iouTokenManager_accountingChainAddress, "IOU: Aave USD Stable Vault", "IOU-USD");
         Logger.log("\tIOU Token (Accounting Chain): %s", iouToken_accountingChainAddress);
         require(
             address(iouToken_accountingChain) == iouToken_accountingChainAddress,
@@ -657,7 +658,8 @@ contract BaseTest is TestWithHelpers {
         );
 
         // 9. IOU Token
-        iouToken_earningChain = new IouToken(iouTokenManager_earningChainAddress);
+        iouToken_earningChain =
+            new IouToken(iouTokenManager_earningChainAddress, "IOU: Aave USD Stable Vault", "IOU-USD");
         Logger.log("\tIOU Token (Earning Chain): %s", address(iouToken_earningChain));
         require(
             address(iouToken_earningChain) == iouToken_earningChainAddress, "IOU Token (Earning Chain) address mismatch"

@@ -9,6 +9,8 @@
   "chainlinkPriceOracleHeartbeat": 86400,
   "chainlinkChainBalanceOracleHeartbeat": 86400,
   "priceOracleMinValidPriceRay": "997000000000000000000000000",
+  "iouTokenName": "IOU: Aave USD Stable Vault",
+  "iouTokenSymbol": "IOU-USD",
   "profiles": {
     "mainAdmin": "0xadf71875E1897c2cF176a35C60aac3398D5e9C3F",
     "secondaryAdmin": "0x0C8F8fA4899E3E2776E4e5d163cd5bd64505CD3a",
