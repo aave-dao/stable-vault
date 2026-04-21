@@ -158,9 +158,13 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     /// @param newAssetFeeBps The fee in basis points applied to the IOU quantity being exchanged for the asset.
     /// @param isSet Whether the fee is set (used for lookups).
     function setAssetFeeBps(address asset, uint16 newAssetFeeBps, bool isSet) external restricted {
+        require(asset != address(0), Errors.ZeroAddress());
         // We don't check for new asset fee being less than the default fee because maybe we want some specific asset to
         // have a higher fee than the default fee.
         require(newAssetFeeBps <= FEE_CAP_BPS, Errors.InvalidParameter());
+        if (!isSet) {
+            require(newAssetFeeBps == 0, Errors.InvalidParameter());
+        }
         $storage().assetFeeConfigs[asset].feeBps = newAssetFeeBps;
         $storage().assetFeeConfigs[asset].isSet = isSet;
         emit AssetFeeBpsSet(asset, newAssetFeeBps, isSet);

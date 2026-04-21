@@ -50,6 +50,8 @@ contract StableVaultTest is TestWithHelpers {
 
     uint256 internal constant DEFAULT_MAX_ACTIVE_SUB_VAULTS = 201;
     uint256 constant DEFAULT_PER_SECOND_RATE = 1000000001243680656318820313; // ~4% APY
+    string internal constant TEST_VAULT_NAME = "Test Aave USD Stable Vault";
+    string internal constant TEST_VAULT_SYMBOL = "test-ASV-USD";
     MockAccessManager mockAccessManager;
     IMockErc20 mockAsset;
     MockFundsHandler mockFundsHandler;
@@ -96,7 +98,14 @@ contract StableVaultTest is TestWithHelpers {
                     vaultImpl,
                     address(this),
                     abi.encodeCall(
-                        StableVault.initialize, (accessManager, treasuryAddress, defaultSubVaultPerSecondRate)
+                        StableVault.initialize,
+                        (
+                            accessManager,
+                            treasuryAddress,
+                            defaultSubVaultPerSecondRate,
+                            TEST_VAULT_NAME,
+                            TEST_VAULT_SYMBOL
+                        )
                     )
                 )
             )
@@ -134,7 +143,14 @@ contract StableVaultTest is TestWithHelpers {
                     vaultImpl,
                     address(this),
                     abi.encodeCall(
-                        StableVault.initialize, (accessManager, treasuryAddress, defaultSubVaultPerSecondRate)
+                        StableVault.initialize,
+                        (
+                            accessManager,
+                            treasuryAddress,
+                            defaultSubVaultPerSecondRate,
+                            TEST_VAULT_NAME,
+                            TEST_VAULT_SYMBOL
+                        )
                     )
                 )
             )
@@ -275,7 +291,14 @@ contract StableVaultTest is TestWithHelpers {
                     stableVaultImpl,
                     address(this),
                     abi.encodeCall(
-                        StableVault.initialize, (expectedAccessManager, expectedTreasury, expectedDefaultSubVaultRate)
+                        StableVault.initialize,
+                        (
+                            expectedAccessManager,
+                            expectedTreasury,
+                            expectedDefaultSubVaultRate,
+                            TEST_VAULT_NAME,
+                            TEST_VAULT_SYMBOL
+                        )
                     )
                 )
             )
@@ -310,9 +333,119 @@ contract StableVaultTest is TestWithHelpers {
                     stableVaultImpl,
                     address(this),
                     abi.encodeCall(
-                        StableVault.initialize, (address(mockAccessManager), treasury, invalidDefaultSubVaultRate)
+                        StableVault.initialize,
+                        (
+                            address(mockAccessManager),
+                            treasury,
+                            invalidDefaultSubVaultRate,
+                            TEST_VAULT_NAME,
+                            TEST_VAULT_SYMBOL
+                        )
                     )
                 )
+            )
+        );
+    }
+
+    /// @dev VA-75: `decimals()` must return RAY_DECIMALS (27) so Etherscan and wallets display StableVault balances
+    /// (which are denominated in RAY) with the correct decimal alignment.
+    function test_decimals_returnsRayDecimals() public view {
+        assertEq(stableVault.decimals(), Constants.RAY_DECIMALS);
+        assertEq(stableVault.decimals(), 27);
+    }
+
+    /// @dev VA-99: `name()` returns the value passed to the initializer, allowing each StableVault deployment
+    /// (USD, EUR, etc.) to set its own ERC20 metadata for off-chain display.
+    function test_name_returnsValuePassedToInitializer() public view {
+        assertEq(stableVault.name(), TEST_VAULT_NAME);
+    }
+
+    /// @dev VA-99: `symbol()` returns the value passed to the initializer.
+    function test_symbol_returnsValuePassedToInitializer() public view {
+        assertEq(stableVault.symbol(), TEST_VAULT_SYMBOL);
+    }
+
+    function test_initialize_setsCustomNameAndSymbol(string memory customName, string memory customSymbol) public {
+        vm.assume(bytes(customName).length > 0);
+        vm.assume(bytes(customSymbol).length > 0);
+
+        address stableVaultImpl = address(
+            new StableVault(
+                DEFAULT_MAX_PER_SECOND_RATE,
+                address(mockAssetRegistry),
+                address(mockIouTokenManager),
+                address(mockFundsHandler),
+                address(mockTransferHelper),
+                address(mockWithdrawalPolicy),
+                address(mockPriceOracle),
+                DEFAULT_MAX_ACTIVE_SUB_VAULTS
+            )
+        );
+
+        StableVault newStableVault = StableVault(
+            address(
+                new TransparentUpgradeableProxy(
+                    stableVaultImpl,
+                    address(this),
+                    abi.encodeCall(
+                        StableVault.initialize,
+                        (address(mockAccessManager), treasury, DEFAULT_PER_SECOND_RATE, customName, customSymbol)
+                    )
+                )
+            )
+        );
+
+        assertEq(newStableVault.name(), customName);
+        assertEq(newStableVault.symbol(), customSymbol);
+        assertEq(newStableVault.decimals(), Constants.RAY_DECIMALS);
+    }
+
+    function test_initialize_reverts_ifNameIsEmpty() public {
+        address stableVaultImpl = address(
+            new StableVault(
+                DEFAULT_MAX_PER_SECOND_RATE,
+                address(mockAssetRegistry),
+                address(mockIouTokenManager),
+                address(mockFundsHandler),
+                address(mockTransferHelper),
+                address(mockWithdrawalPolicy),
+                address(mockPriceOracle),
+                DEFAULT_MAX_ACTIVE_SUB_VAULTS
+            )
+        );
+
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        new TransparentUpgradeableProxy(
+            stableVaultImpl,
+            address(this),
+            abi.encodeCall(
+                StableVault.initialize,
+                (address(mockAccessManager), treasury, DEFAULT_PER_SECOND_RATE, "", TEST_VAULT_SYMBOL)
+            )
+        );
+    }
+
+    function test_initialize_reverts_ifSymbolIsEmpty() public {
+        address stableVaultImpl = address(
+            new StableVault(
+                DEFAULT_MAX_PER_SECOND_RATE,
+                address(mockAssetRegistry),
+                address(mockIouTokenManager),
+                address(mockFundsHandler),
+                address(mockTransferHelper),
+                address(mockWithdrawalPolicy),
+                address(mockPriceOracle),
+                DEFAULT_MAX_ACTIVE_SUB_VAULTS
+            )
+        );
+
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        new TransparentUpgradeableProxy(
+            stableVaultImpl,
+            address(this),
+            abi.encodeCall(
+                StableVault.initialize,
+                (address(mockAccessManager), treasury, DEFAULT_PER_SECOND_RATE, TEST_VAULT_NAME, "")
             )
         );
     }
@@ -633,6 +766,12 @@ contract StableVaultTest is TestWithHelpers {
         assertEq(stableVault.getUserSubVault(user2).perSecondRate, newRate);
         // user1 should still have no position
         assertEq(stableVault.getUserSubVault(user1).id, 0);
+    }
+
+    function test_setUserRate_reverts_ifUserIsZeroAddress() public {
+        vm.expectRevert(Errors.ZeroAddress.selector);
+        vm.prank(manager);
+        _setUserRate(address(0), DEFAULT_PER_SECOND_RATE);
     }
 
     function test_setUserRate_reverts_ifSettingTheSameRateHeAlreadyHas(address user, uint256 amount) public {
@@ -966,6 +1105,12 @@ contract StableVaultTest is TestWithHelpers {
         uint256 actualAssets = stableVault.getAggregatedBalance();
 
         assertEq(actualAssets, expectedAssets);
+    }
+
+    function test_claimSurplusInterest_reverts_ifAmountIsZero() public {
+        vm.expectRevert(Errors.ZeroAmount.selector);
+        vm.prank(manager);
+        stableVault.claimSurplusInterest(_toAddressArray(address(mockAsset)), _toUint256Array(0));
     }
 
     function test_claimSurplusInterest_reverts_ifMsgSenderIsNotAuthorized(
@@ -3171,6 +3316,16 @@ contract StableVaultTest is TestWithHelpers {
             }
         }
         assertFalse(foundAfter, "SubVault should be inactive after transferring all funds out");
+    }
+
+    function test_executeWithdrawal_reverts_ifIouAmountIsZero(address user) public {
+        vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
+        _assumeNotProxyAdmin(user, address(stableVault));
+
+        vm.expectRevert(Errors.ZeroAmount.selector);
+        vm.prank(user);
+        stableVault.executeWithdrawal(user, address(mockAsset), 0, 0, "");
     }
 
     function test_executeWithdrawal_reverts_ifMsgSenderIsNotTheUser(

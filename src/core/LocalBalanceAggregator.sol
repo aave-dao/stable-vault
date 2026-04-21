@@ -25,6 +25,8 @@ abstract contract LocalBalanceAggregator {
         PRICE_ORACLE = priceOracle;
     }
 
+    /// @dev Sums only the Allocator's trusted assets priced through the PriceOracle. Distrusted assets
+    /// contribute 0, intentionally underestimating the balance to stay conservative.
     function _getLocalAggregatedBalance() internal view returns (uint256) {
         IAllocator.AllocatorBalance[] memory allocatorAssets = IAllocator(ALLOCATOR).getTrustedAssetBalances();
         uint256 localBalanceRay;

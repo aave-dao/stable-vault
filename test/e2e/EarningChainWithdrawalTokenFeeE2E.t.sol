@@ -68,7 +68,10 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
                 new TransparentUpgradeableProxy(
                     address(vaultImpl),
                     proxyAdmin,
-                    abi.encodeCall(StableVault.initialize, (adminParam, treasuryAddress, defaultSubVaultPerSecondRate))
+                    abi.encodeCall(
+                        StableVault.initialize,
+                        (adminParam, treasuryAddress, defaultSubVaultPerSecondRate, "Aave USD Stable Vault", "ASV-USD")
+                    )
                 )
             )
         );

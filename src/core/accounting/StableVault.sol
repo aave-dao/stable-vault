@@ -115,6 +115,12 @@ contract StableVault is
 
         /// @dev The address of the treasury, where claimed surplus interest is sent to.
         address treasury;
+
+        /// @dev ERC20-style name of the Stable Vault position token.
+        string name;
+
+        /// @dev ERC20-style symbol of the Stable Vault position token.
+        string symbol;
     }
 
     // keccak256(abi.encode(uint256(keccak256("aave.storage.StableVault")) - 1)) & ~bytes32(uint256(0xff))
@@ -171,23 +177,35 @@ contract StableVault is
     /// @param accessManager Address of the IAccessManager contract used for handling access control.
     /// @param treasury Address of the treasury, where surplus interest is sent to.
     /// @param defaultSubVaultPerSecondRate Base per-second rate, in Ray units (27 decimals).
-    function initialize(address accessManager, address treasury, uint256 defaultSubVaultPerSecondRate)
-        external
-        virtual
-        initializer
-    {
-        __StableVault_init(accessManager, treasury, defaultSubVaultPerSecondRate);
+    /// @param name_ ERC20-style name of the Stable Vault position token (e.g. "Aave USD Stable Vault").
+    /// @param symbol_ ERC20-style symbol of the Stable Vault position token (e.g. "ASV-USD").
+    function initialize(
+        address accessManager,
+        address treasury,
+        uint256 defaultSubVaultPerSecondRate,
+        string memory name_,
+        string memory symbol_
+    ) external virtual initializer {
+        __StableVault_init(accessManager, treasury, defaultSubVaultPerSecondRate, name_, symbol_);
     }
 
-    function __StableVault_init(address accessManager, address treasury, uint256 defaultSubVaultPerSecondRate)
-        internal
-        virtual
-        onlyInitializing
-    {
+    function __StableVault_init(
+        address accessManager,
+        address treasury,
+        uint256 defaultSubVaultPerSecondRate,
+        string memory name_,
+        string memory symbol_
+    ) internal virtual onlyInitializing {
+        // Empty name/symbol would render as blank in explorers and wallets — reject up front to catch deployment
+        // mistakes early. ERC20 metadata is set once and immutable thereafter.
+        require(bytes(name_).length > 0, Errors.InvalidParameter());
+        require(bytes(symbol_).length > 0, Errors.InvalidParameter());
         IAccessManager(accessManager).canCall(address(0), address(0), bytes4(0));
         __AccessManaged_init(accessManager);
         _setTreasury(treasury);
         _setDefaultSubVault(_getOrCreateSubVaultWithRate(defaultSubVaultPerSecondRate), defaultSubVaultPerSecondRate);
+        $storage().name = name_;
+        $storage().symbol = symbol_;
     }
 
     /// @inheritdoc IStableVault
@@ -422,6 +440,7 @@ contract StableVault is
         bytes memory data
     ) external virtual override nonReentrant assertingTransferHelperBalanceFor(assetOut) {
         require(user == msg.sender, OnlyUser());
+        require(iouAmountRay > 0, Errors.ZeroAmount());
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(user, iouAmountRay);
         uint256 amountOutRay = IWithdrawalPolicy(WITHDRAWAL_POLICY)
             .applyWithdrawalPolicy(
@@ -454,6 +473,7 @@ contract StableVault is
         assertingTransferHelperBalanceForAssets(assets)
     {
         for (uint256 i = 0; i < assets.length; i++) {
+            require(amounts[i] > 0, Errors.ZeroAmount());
             IFundsHandler(FUNDS_HANDLER).processWithdrawal(assets[i], amounts[i]);
         }
         // NOTE: Due to oracle-bridge propagation asymmetry, the aggregated balance may temporarily be lower than the
@@ -509,6 +529,21 @@ contract StableVault is
     /// @inheritdoc IStableVault
     function balanceOf(address account) external view override returns (uint256) {
         return _getUserBalance(account);
+    }
+
+    /// @inheritdoc IStableVault
+    function name() external view override returns (string memory) {
+        return $storage().name;
+    }
+
+    /// @inheritdoc IStableVault
+    function symbol() external view override returns (string memory) {
+        return $storage().symbol;
+    }
+
+    /// @inheritdoc IStableVault
+    function decimals() external pure override returns (uint8) {
+        return Constants.RAY_DECIMALS;
     }
 
     /// @inheritdoc IStableVault
@@ -814,12 +849,12 @@ contract StableVault is
     }
 
     function _getUserBalance(address user) internal view returns (uint256) {
-        if ($storage().positions[user].shares == 0) {
+        uint256 shares = $storage().positions[user].shares;
+        if (shares == 0) {
             return 0;
         }
         // Round down the user balance, so that the rounding is in favor of the protocol.
-        return $storage().positions[user].shares
-            .rayMulDown(_previewSubVaultConversionRate($storage().positions[user].subVaultId));
+        return shares.rayMulDown(_previewSubVaultConversionRate($storage().positions[user].subVaultId));
     }
 
     function _getActiveSubVaultsObligations() internal view returns (uint256) {
@@ -858,6 +893,7 @@ contract StableVault is
     }
 
     function _setUserRate(address user, uint256 newPerSecondRate) internal {
+        require(user != address(0), Errors.ZeroAddress());
         uint256 oldSubVaultId = $storage().positions[user].subVaultId;
         // Skip users without a position (e.g., withdrew or transferred out between batch
         // preparation and execution) to avoid reverting the entire batch.

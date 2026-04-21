@@ -181,6 +181,7 @@ contract Allocator is
 
     /// @inheritdoc IAllocator
     function deposit(address asset, uint256 amount) external override onlyDepositor nonReentrant returns (uint256) {
+        require(amount > 0, Errors.ZeroAmount());
         require(IAssetRegistry(ASSET_REGISTRY).isDepositToAllocatorAllowed(asset), Errors.UnsupportedAsset(asset));
         ITransferHelper(TRANSFER_HELPER).pull(asset, amount);
         uint256 netDepositAmount = amount;
@@ -195,6 +196,8 @@ contract Allocator is
 
     /// @inheritdoc IAllocator
     function depositAllowIdle(address asset, uint256 amount) external override onlyDepositor nonReentrant {
+        // We don't check amount for zero here because this function is called from bridge callbacks, where reverting
+        // could jam the bridge. A zero amount is a harmless no-op.
         require(IAssetRegistry(ASSET_REGISTRY).isDepositToAllocatorAllowed(asset), Errors.UnsupportedAsset(asset));
         ITransferHelper(TRANSFER_HELPER).pull(asset, amount);
         if ($storage().defaultStrategyByAsset[asset] == address(0)) {
@@ -218,21 +221,21 @@ contract Allocator is
             // Consume from idle balance first
             uint256 amountRemaining = amount - idleBalance;
 
-            // Consume from default strategy
-            // Wrap in a try-catch to avoid impact to searching other strategies
-            try this.tryWithdrawFromStrategy(asset, amountRemaining, $storage().defaultStrategyByAsset[asset]) returns (
-                uint256 withdrawn
-            ) {
-                amountRemaining = withdrawn >= amountRemaining ? 0 : amountRemaining - withdrawn;
-            } catch {
-                emit StrategyWithdrawalFailed($storage().defaultStrategyByAsset[asset], asset, amountRemaining);
+            // Consume from default strategy (skip if unset to avoid false StrategyWithdrawalFailed events)
+            address defaultStrategy = $storage().defaultStrategyByAsset[asset];
+            if (defaultStrategy != address(0)) {
+                try this.tryWithdrawFromStrategy(asset, amountRemaining, defaultStrategy) returns (uint256 withdrawn) {
+                    amountRemaining = withdrawn >= amountRemaining ? 0 : amountRemaining - withdrawn;
+                } catch {
+                    emit StrategyWithdrawalFailed(defaultStrategy, asset, amountRemaining);
+                }
             }
 
             // If necessary, pull from remaining strategies
             uint256 length = $storage().assetStrategies[asset].length();
             for (uint256 i = 0; amountRemaining > 0 && i < length; i++) {
                 address strategy = $storage().assetStrategies[asset].at(i);
-                if (strategy != $storage().defaultStrategyByAsset[asset]) {
+                if (strategy != defaultStrategy) {
                     try this.tryWithdrawFromStrategy(asset, amountRemaining, strategy) returns (uint256 withdrawn) {
                         amountRemaining = withdrawn >= amountRemaining ? 0 : amountRemaining - withdrawn;
                     } catch {
@@ -391,6 +394,7 @@ contract Allocator is
     }
 
     function _swap(SwapParams memory swap) internal {
+        require(swap.assetIn != swap.assetOut, Errors.InvalidParameter());
         require(IAssetRegistry(ASSET_REGISTRY).isSwapInputAllowed(swap.assetIn), Errors.UnsupportedAsset(swap.assetIn));
         require(
             IAssetRegistry(ASSET_REGISTRY).isSwapOutputAllowed(swap.assetOut), Errors.UnsupportedAsset(swap.assetOut)
@@ -602,6 +606,8 @@ contract Allocator is
             require(strategy != $storage().defaultStrategyByAsset[asset], DefaultStrategy(strategy));
             require(_isStrategySupportedForAsset({strategy: strategy, asset: asset}), Errors.AddressNotWhitelisted());
             require($storage().strategyConfigs[strategy].depositAllowed, DepositsToStrategyDisabled(strategy));
+        } else {
+            require(IAssetRegistry(ASSET_REGISTRY).isAssetRegistered(asset), Errors.InvalidAsset(asset));
         }
         $storage().defaultStrategyByAsset[asset] = strategy;
         emit DefaultStrategySet(asset, strategy);

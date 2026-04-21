@@ -35,7 +35,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
         iouTokenAddress = vm.computeCreateAddress(address(this), deployerNonce + 1);
 
         iouTokenManager = new ExtendedIouTokenManager(iouTokenAddress, chainGateway, vault, transferHelper, true);
-        iouToken = address(new IouToken(iouTokenManagerAddress));
+        iouToken = address(new IouToken(iouTokenManagerAddress, "IOU: Aave USD Stable Vault", "IOU-USD"));
 
         assertEq(iouTokenManagerAddress, address(iouTokenManager));
         assertEq(iouTokenAddress, iouToken);
@@ -476,7 +476,7 @@ contract IouTokenManagerTest_EarningChain is IouTokenManagerTest_AccountingChain
         iouTokenAddress = vm.computeCreateAddress(address(this), deployerNonce + 1);
 
         iouTokenManager = new ExtendedIouTokenManager(iouTokenAddress, chainGateway, vault, transferHelper, false);
-        iouToken = address(new IouToken(iouTokenManagerAddress));
+        iouToken = address(new IouToken(iouTokenManagerAddress, "IOU: Aave USD Stable Vault", "IOU-USD"));
 
         assertEq(iouTokenManagerAddress, address(iouTokenManager));
         assertEq(iouTokenAddress, iouToken);

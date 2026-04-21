@@ -268,6 +268,18 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         _accountingChainGateway.addBridgeAdapter(asset, EARNING_CHAIN_ID, adapter);
     }
 
+    function test_addBridgeAdapter_reverts_ifAdapterIsZeroAddress() public {
+        vm.expectRevert(Errors.ZeroAddress.selector);
+        vm.prank(everyRoleAccount);
+        _accountingChainGateway.addBridgeAdapter(address(_mockUsdt), EARNING_CHAIN_ID, address(0));
+    }
+
+    function test_addBridgeAdapter_reverts_ifChainIdIsSelf() public {
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        vm.prank(everyRoleAccount);
+        _accountingChainGateway.addBridgeAdapter(address(_mockUsdt), block.chainid, makeAddr("adapter"));
+    }
+
     function test_setDefaultBridgeAdatper_reverts_ifNotWhitelisted() public {
         address adapter = makeAddr("adapter");
         address asset = address(_mockUsdt);
@@ -434,6 +446,24 @@ contract AccountingChainGatewayTest is TestWithHelpers {
                 feeRefundThreshold: 0,
                 gasLimit: 100000,
                 data: abi.encode(keccak256(hex"c0ffee"))
+            })
+        );
+    }
+
+    function test_sendBridgeIouTokenMessageWithFeePayer_reverts_ifIouTokenAmountIsZero() public {
+        vm.expectRevert(Errors.ZeroAmount.selector);
+        vm.prank(address(_mockIouTokenManager));
+        _accountingChainGateway.sendBridgeIouTokenMessageWithFeePayer(
+            EARNING_CHAIN_ID,
+            makeAddr("iouTokenRecipient"),
+            0,
+            IBridgeAdapter.BridgeParams({
+                feePayer: makeAddr("bridgeFeePayer"),
+                feeToken: address(_mockUsdt),
+                feeAmount: 100_000,
+                feeRefundThreshold: 0,
+                gasLimit: 100000,
+                data: ""
             })
         );
     }
