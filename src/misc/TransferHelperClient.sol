@@ -15,7 +15,7 @@ import {Errors} from "src/types/Errors.sol";
 /// @notice Client for components that push assets into the TransferHelper or expect assets to be pushed into the
 /// TransferHelper.
 /// @dev This contract is used to assert that the TransferHelper has consumed the assets it is expected to consume.
-contract TransferHelperClient {
+abstract contract TransferHelperClient {
     using SafeERC20 for IERC20;
 
     error TransferHelperBalanceNotConsumed(address asset);
@@ -30,19 +30,9 @@ contract TransferHelperClient {
     }
 
     modifier assertingTransferHelperBalanceFor(address asset) {
-        uint256 balanceBefore;
-        if (asset == Constants.NATIVE_CURRENCY) {
-            balanceBefore = TRANSFER_HELPER.balance;
-        } else {
-            balanceBefore = IERC20(asset).balanceOf(TRANSFER_HELPER);
-        }
+        uint256 balanceBefore = _transferHelperBalance(asset);
         _;
-        uint256 balanceAfter;
-        if (asset == Constants.NATIVE_CURRENCY) {
-            balanceAfter = TRANSFER_HELPER.balance;
-        } else {
-            balanceAfter = IERC20(asset).balanceOf(TRANSFER_HELPER);
-        }
+        uint256 balanceAfter = _transferHelperBalance(asset);
         require(balanceAfter <= balanceBefore, TransferHelperBalanceNotConsumed(asset));
     }
 
@@ -50,33 +40,37 @@ contract TransferHelperClient {
         uint256 assetsCount = assets.length;
         uint256[] memory balancesBefore = new uint256[](assetsCount);
         for (uint256 i = 0; i < assetsCount; i++) {
-            balancesBefore[i] = IERC20(assets[i]).balanceOf(TRANSFER_HELPER);
+            balancesBefore[i] = _transferHelperBalance(assets[i]);
         }
         _;
-        uint256[] memory balancesAfter = new uint256[](assetsCount);
         for (uint256 i = 0; i < assetsCount; i++) {
-            balancesAfter[i] = IERC20(assets[i]).balanceOf(TRANSFER_HELPER);
+            uint256 balanceAfter = _transferHelperBalance(assets[i]);
+            require(balanceAfter <= balancesBefore[i], TransferHelperBalanceNotConsumed(assets[i]));
         }
-        for (uint256 i = 0; i < assetsCount; i++) {
-            require(balancesAfter[i] <= balancesBefore[i], TransferHelperBalanceNotConsumed(assets[i]));
+    }
+
+    function _transferHelperBalance(address asset) private view returns (uint256) {
+        if (asset == Constants.NATIVE_CURRENCY) {
+            return TRANSFER_HELPER.balance;
         }
+        return IERC20(asset).balanceOf(TRANSFER_HELPER);
     }
 
     /// @dev Transfers the bridge fee to the TransferHelper to be pulled by Bridge Adapter.
     function _transferBridgeFeeToTransferHelper(IBridgeAdapter.BridgeParams memory bridgeParams) internal {
         require(bridgeParams.feePayer == msg.sender, Errors.InvalidBridgeFeePayer());
-        if (msg.value > 0) {
-            // If there is some msg.value, we transfer it to the TransferHelper, regardless of the fee token.
-            // There might be scenarios where the bridge implementation requires some native assets to operate in
-            // addition to the ERC-20 fee token.
-            _transferNativeToTransferHelper(msg.value);
-        }
         if (bridgeParams.feeToken == Constants.NATIVE_CURRENCY) {
-            // We already transferred all the msg.value above. Here we just check that it covers the fee amount.
             require(msg.value >= bridgeParams.feeAmount, Errors.InsufficientFunds());
-        } else if (bridgeParams.feeAmount > 0) {
-            IERC20(bridgeParams.feeToken)
-                .safeTransferFrom(bridgeParams.feePayer, TRANSFER_HELPER, bridgeParams.feeAmount);
+            _transferNativeToTransferHelper(msg.value);
+        } else {
+            // No known bridge requires both native and ERC-20 fees (CCIP and LayerZero use one or the other).
+            // Rejecting msg.value prevents accidental native loss (which would otherwise remain in this client
+            // contract).
+            require(msg.value == 0, Errors.InvalidParameter());
+            if (bridgeParams.feeAmount > 0) {
+                IERC20(bridgeParams.feeToken)
+                    .safeTransferFrom(bridgeParams.feePayer, TRANSFER_HELPER, bridgeParams.feeAmount);
+            }
         }
     }
 

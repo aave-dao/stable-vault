@@ -183,7 +183,8 @@ contract FundsHandler is
         IAllocator(ALLOCATOR).withdraw(asset, amount);
     }
 
-    /// @dev Grossly under-estimates the balance if the chain balance is stale.
+    /// @dev Returns 0 when the chain balance is stale, grossly underestimating the balance.
+    /// The staleness window is bounded by the oracle heartbeat + publish buffer.
     function _getAdjustedEarningChainBalanceRay(uint256 chainId) internal view returns (uint256) {
         IChainBalanceOracle.ChainBalance memory chainBalance =
             IChainBalanceOracle(CHAIN_BALANCE_ORACLE).getChainBalance(chainId);

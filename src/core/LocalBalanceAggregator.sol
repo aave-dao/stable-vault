@@ -11,7 +11,7 @@ import {Errors} from "src/types/Errors.sol";
 /// @title LocalBalanceAggregator
 /// @author Aave Labs
 /// @notice Aggregates the balance of the Allocator's assets in the local chain.
-contract LocalBalanceAggregator {
+abstract contract LocalBalanceAggregator {
     using AssetLib for uint256;
     using MathLib for uint256;
 
@@ -25,6 +25,8 @@ contract LocalBalanceAggregator {
         PRICE_ORACLE = priceOracle;
     }
 
+    /// @dev Sums only the Allocator's trusted assets priced through the PriceOracle. Distrusted assets
+    /// contribute 0, intentionally underestimating the balance to stay conservative.
     function _getLocalAggregatedBalance() internal view returns (uint256) {
         IAllocator.AllocatorBalance[] memory allocatorAssets = IAllocator(ALLOCATOR).getTrustedAssetBalances();
         uint256 localBalanceRay;
