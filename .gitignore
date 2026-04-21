@@ -146,3 +146,6 @@ deployment-zk/*
 cache_forge/solidity-files-cache.json
 
 lcov.info
+
+# Forge gas snapshots — generated at test time, baseline is uploaded as a CI artifact
+snapshots/
