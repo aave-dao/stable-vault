@@ -134,6 +134,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
     function test_setAssetFeeBps_setsExpectedConfig(address asset, uint256 feeBps, bool isSet) public {
         vm.assume(asset != address(0));
         feeBps = bound(feeBps, 0, FEE_CAP_BPS);
+        vm.assume(isSet || feeBps == 0);
 
         vm.expectEmit(true, true, true, true);
         // forge-lint: disable-next-line(unsafe-typecast)
@@ -164,6 +165,15 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         vm.expectRevert(Errors.InvalidParameter.selector);
         vm.prank(admin);
         withdrawalPolicy.setAssetFeeBps(asset, feeBps16, isSet);
+    }
+
+    function test_setAssetFeeBps_reverts_ifNotSetWithNonZeroFee(address asset, uint256 feeBps) public {
+        // forge-lint: disable-next-line(unsafe-typecast)
+        uint16 feeBps16 = uint16(bound(feeBps, 1, FEE_CAP_BPS));
+
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        vm.prank(admin);
+        withdrawalPolicy.setAssetFeeBps(asset, feeBps16, false);
     }
 
     function test_setDefaultFeeBps_setsExpectedFee(uint256 feeBps) public {

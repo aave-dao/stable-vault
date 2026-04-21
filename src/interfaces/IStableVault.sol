@@ -158,6 +158,19 @@ interface IStableVault {
     /// @return balanceRay Account's Stable Vault balance in RAY.
     function balanceOf(address account) external view returns (uint256 balanceRay);
 
+    /// @notice ERC20-style name of the Stable Vault position token.
+    /// @return name Human-readable name (e.g. "Aave USD Stable Vault").
+    function name() external view returns (string memory);
+
+    /// @notice ERC20-style symbol of the Stable Vault position token.
+    /// @return symbol Short ticker (e.g. "ASV-USD").
+    function symbol() external view returns (string memory);
+
+    /// @notice ERC20-style decimals for the Stable Vault position token.
+    /// @dev Exposing this lets explorers and wallets display balances with correct decimal alignment.
+    /// @return decimals Number of decimals.
+    function decimals() external pure returns (uint8);
+
     /// @notice Transfers Stable Vault balance (denominated in RAY) to another user.
     /// @param to Address of the recipient.
     /// @param amountRay Amount of Stable Vault balance to transfer, denominated in RAY.
@@ -192,10 +205,13 @@ interface IStableVault {
     ) external;
 
     /// @notice Getter for the aggregated obligations owed to depositors in RAY of denomination asset.
+    /// @dev Includes the total supply of IOU tokens across all chains (circulating + locked for bridging).
     /// @return obligations Aggregated obligations owed to depositors in RAY of denomination asset.
     function getVaultObligations() external view returns (uint256);
 
     /// @notice Getter for the aggregated balance on the local Allocator and the Allocator on Earning Chains.
+    /// @dev May underestimate when trust or freshness guarantees cannot be satisfied for a given contribution
+    /// (conservative by design). See the implementation for specific policies.
     /// @return aggregatedBalance Aggregated balance of the vault in RAY of denomination asset.
     function getAggregatedBalance() external view returns (uint256);
 

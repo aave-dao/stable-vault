@@ -132,12 +132,16 @@ interface IAllocator {
     }
 
     /// @notice Getter for the balance of a given asset on the Allocator.
+    /// @dev Returns the balance regardless of whether the asset is registered or trusted. For solvency
+    /// calculations use `getTrustedAssetBalance()` which returns 0 for distrusted assets.
     /// @param asset Address of the asset to get the balance of.
     /// @return balance Balance of the asset in asset decimals in the Allocator (idle + aggregate balance in
     /// strategies).
     function getAssetBalance(address asset) external view returns (uint256);
 
     /// @notice Getter for the balance of a given strategy on the Allocator.
+    /// @dev Returns the balance regardless of whether the strategy or asset is registered or trusted.
+    /// Useful for admin/rescue operations.
     /// @param strategy Address of the strategy to get the balance of.
     /// @return balance Balance of tokens in the strategy in asset decimals (assumes one asset per strategy).
     function getAssetBalanceInStrategy(address strategy) external view returns (uint256);

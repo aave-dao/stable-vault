@@ -12,6 +12,7 @@ import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.so
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Vm} from "forge-std/Vm.sol";
 
 import {Allocator} from "src/core/Allocator.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
@@ -909,6 +910,45 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
+    }
+
+    function test_withdraw_skipsDefaultStrategyWhenUnset(uint256 amount) public {
+        _mockAssetRegistry.mockRegisteredAsset(address(_mockUsdt));
+        amount = _boundAssetAmount(address(_mockUsdt), amount);
+        vm.assume(amount > 0);
+
+        // Seed only the non-default strategy; default will be unset below.
+        _mockUsdt.mint(depositor, amount);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(_extraUsdtStrategy), amount);
+        vm.prank(depositor);
+        _extraUsdtStrategy.deposit(amount, address(_allocator));
+
+        // Unset the default strategy for USDT.
+        vm.prank(address(everyRoleAccount));
+        _allocator.setDefaultStrategy(address(_mockUsdt), address(0));
+
+        // Record logs so we can assert the spurious StrategyWithdrawalFailed(address(0), ...) is NOT emitted.
+        vm.recordLogs();
+        vm.prank(withdrawer);
+        _allocator.withdraw(address(_mockUsdt), amount);
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 failedSig = IAllocator.StrategyWithdrawalFailed.selector;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == failedSig) {
+                assertTrue(
+                    address(uint160(uint256(logs[i].topics[1]))) != address(0),
+                    "must not emit StrategyWithdrawalFailed for address(0)"
+                );
+            }
+        }
+
+        // Withdrawal was serviced by _extraUsdtStrategy.
+        assertEq(_mockUsdt.balanceOf(address(_mockTransferHelper)), amount);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
     }
 
     function test_withdraw_withdrawsFromMultipleStrategies(uint256 amount) public {
@@ -2119,6 +2159,21 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalance(assetOut), 0);
     }
 
+    function test_rebalance_swap_reverts_ifAssetInEqualsAssetOut() public {
+        address asset = address(_mockUsdt);
+        uint256 amountAssetIn = 100_000_000;
+        _mockUsdt.mint(address(_allocator), amountAssetIn);
+
+        IAllocator.RebalanceParams[] memory rebalanceParams = _initializeRebalanceParams(1);
+        IAllocator.SwapParams[] memory swaps = _initializeSwapParams(1);
+        swaps[0] = _buildSwapParams(asset, amountAssetIn, asset, address(_mockSwapper), "");
+        rebalanceParams[0] =
+            _buildRebalanceParams(_initializeDeallocationParams(0), swaps, _initializeAllocationParams(0));
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        _allocator.rebalance(rebalanceParams);
+    }
+
     function test_rebalance_entireFlow(uint256 amountIn) public {
         address assetIn = address(_mockUsdt);
         address assetOut = address(_mockGho);
@@ -3022,6 +3077,13 @@ contract AllocatorTest is TestWithHelpers {
             abi.encodeWithSelector(IAllocator.DepositsToStrategyDisabled.selector, address(_extraUsdtStrategy))
         );
         _allocator.setDefaultStrategy(address(_mockUsdt), address(_extraUsdtStrategy));
+    }
+
+    function test_setDefaultStrategy_reverts_ifClearingDefaultForUnregisteredAsset() public {
+        address unregisteredAsset = makeAddr("unregistered");
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidAsset.selector, unregisteredAsset));
+        _allocator.setDefaultStrategy(unregisteredAsset, address(0));
     }
 
     function test_trustStrategy_doesNotReEnableDeposits() public {
