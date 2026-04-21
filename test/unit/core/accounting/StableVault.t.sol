@@ -880,6 +880,103 @@ contract StableVaultTest is TestWithHelpers {
         _setUserRate(user, DEFAULT_PER_SECOND_RATE + i + 1);
     }
 
+    function test_setUserRate_batchMigration_succeedsWhenTransientlyOverLimit() public {
+        // Deploy with maxActiveSubVaults = 2
+        stableVault = _deployStableVault(
+            address(mockAccessManager),
+            DEFAULT_MAX_PER_SECOND_RATE,
+            DEFAULT_PER_SECOND_RATE,
+            address(mockIouTokenManager),
+            address(mockFundsHandler),
+            address(mockAssetRegistry),
+            address(mockTransferHelper),
+            address(mockWithdrawalPolicy),
+            address(mockPriceOracle),
+            2, // MAX_ACTIVE_SUB_VAULTS
+            treasury
+        );
+
+        // Users A, B and C all deposit into the default subvault (subvault 1).
+        // A and B will co-locate in sub1 so that A's source sub-vault retains a user
+        // during the over-limit iteration below.
+        address userA = _generateNewUser();
+        address userB = _generateNewUser();
+        address userC = _generateNewUser();
+        _deposit(userA, 10e6);
+        _deposit(userB, 10e6);
+        _deposit(userC, 10e6);
+
+        assertEq(stableVault.getActiveSubVaults().length, 1);
+
+        // Move User C alone to a new rate -> creates subvault 2, now at max (2 active).
+        // Layout: sub1 (A, B), sub2 (C).
+        uint256 newRate = DEFAULT_PER_SECOND_RATE + 1;
+        _setUserRate(userC, newRate);
+        assertEq(stableVault.getActiveSubVaults().length, 2);
+
+        // Batch-migrate A and C to a third rate. With MAX = 2:
+        //   Iter 1 (A, sub1 -> sub3): sub1 retains B -> NOT removed; sub3 added.
+        //     Active = [sub1, sub2, sub3] (3 — transiently over the limit).
+        //   Iter 2 (C, sub2 -> sub3): sub2 empties -> removed; sub3 already active.
+        //     Active = [sub1, sub3] (2 — final state within the limit).
+        // Before the fix, iter 1 reverted because _validateAmountOfActiveSubVaults()
+        // ran inside _moveShares.
+        uint256 thirdRate = DEFAULT_PER_SECOND_RATE + 2;
+        IStableVault.UserRateData[] memory batch = new IStableVault.UserRateData[](2);
+        batch[0] = IStableVault.UserRateData(userA, thirdRate);
+        batch[1] = IStableVault.UserRateData(userC, thirdRate);
+        stableVault.setUserRate(batch);
+
+        // Final state: sub1 still has B, sub2 empty (deactivated), sub3 has A+C.
+        assertEq(stableVault.getActiveSubVaults().length, 2);
+    }
+
+    function test_setUserRate_batchMigration_stillRevertsWhenFinalStateExceedsLimit() public {
+        // Deploy with maxActiveSubVaults = 2
+        stableVault = _deployStableVault(
+            address(mockAccessManager),
+            DEFAULT_MAX_PER_SECOND_RATE,
+            DEFAULT_PER_SECOND_RATE,
+            address(mockIouTokenManager),
+            address(mockFundsHandler),
+            address(mockAssetRegistry),
+            address(mockTransferHelper),
+            address(mockWithdrawalPolicy),
+            address(mockPriceOracle),
+            2, // MAX_ACTIVE_SUB_VAULTS
+            treasury
+        );
+
+        // 3 users deposit into default subvault
+        address userA = _generateNewUser();
+        address userB = _generateNewUser();
+        address userC = _generateNewUser();
+        _deposit(userA, 10e6);
+        _deposit(userB, 10e6);
+        _deposit(userC, 10e6);
+
+        assertEq(stableVault.getActiveSubVaults().length, 1);
+
+        // Move User A to rate 2 -> 2 active subvaults (at max)
+        _setUserRate(userA, DEFAULT_PER_SECOND_RATE + 1);
+        assertEq(stableVault.getActiveSubVaults().length, 2);
+
+        // Batch: move User B to rate 3 and User C to rate 3.
+        // After batch: subvault 1 still has no remaining users BUT User A is still in subvault 2.
+        // Wait — User A is in subvault 2, Users B+C move to subvault 3.
+        // Default subvault 1 still has... no one (all 3 moved out? No, only B and C were in subvault 1).
+        // Final: subvault 1 empty (deactivated), subvault 2 has A (active), subvault 3 has B+C (active) = 2 active.
+        // Fits.
+
+        // Instead, let's create a scenario where the final state truly exceeds.
+        // Move User B to rate 3 (creates subvault 3). Now: sub1 has C, sub2 has A, sub3 has B = 3 active.
+        // This genuinely exceeds max=2 in final state.
+        IStableVault.UserRateData[] memory batch = new IStableVault.UserRateData[](1);
+        batch[0] = IStableVault.UserRateData(userB, DEFAULT_PER_SECOND_RATE + 2);
+        vm.expectRevert(IStableVault.TooManyActiveSubVaults.selector);
+        stableVault.setUserRate(batch);
+    }
+
     function test_setUserRate_smallConversionRateToLargeConversionRate() public {
         // Override stableVault with a low default sub-vault rate
         stableVault = _deployStableVault(

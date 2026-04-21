@@ -299,6 +299,7 @@ contract StableVault is
             sharesToIssue: toUserShares,
             guaranteedAmountToMoveRay: guaranteedAmountRay
         });
+        _validateAmountOfActiveSubVaults();
 
         emit Transfer(from, to, amountRay);
         return true;
@@ -339,6 +340,7 @@ contract StableVault is
             sharesToIssue: toUserShares,
             guaranteedAmountToMoveRay: guaranteedAmountRay
         });
+        _validateAmountOfActiveSubVaults();
 
         emit Transfer(from, to, amountOfWithdrawalRay);
         return true;
@@ -349,6 +351,7 @@ contract StableVault is
         for (uint256 i = 0; i < userRateData.length; i++) {
             _setUserRate(userRateData[i].user, userRateData[i].newPerSecondRate);
         }
+        _validateAmountOfActiveSubVaults();
     }
 
     /// @inheritdoc IStableVault
@@ -649,8 +652,15 @@ contract StableVault is
             sharesToIssue: userNewShares,
             guaranteedAmountToMoveRay: 0
         });
+        // `_validateAmountOfActiveSubVaults()` is intentionally not called here: this function runs inside the
+        // `setUserRate` batch loop, where intermediate states may transiently exceed the limit before settling
+        // to a valid final state. Validation is performed upstream in `setUserRate` after the loop completes.
     }
 
+    /// @dev Callers must invoke `_validateAmountOfActiveSubVaults()` after their logical operation
+    /// completes (per-call for single-user actions; post-batch for batched actions). The check is
+    /// deliberately not performed here because batch callers may transiently exceed the limit
+    /// before settling to a valid final state.
     function _moveShares(
         address from,
         address to,
@@ -669,7 +679,6 @@ contract StableVault is
                 _addSubVaultToActive(toSubVaultId);
             }
         }
-        _validateAmountOfActiveSubVaults();
 
         if (from == to) {
             // Sanity check. If the user is the same - this cannot be a partial transfer.
@@ -918,6 +927,8 @@ contract StableVault is
             _migrateUserToSubVault(user, oldSubVaultId, newSubVaultId);
             emit UserRateSet(user, newSubVaultId, newPerSecondRate);
         }
+        // `_validateAmountOfActiveSubVaults()` is intentionally not called here: this is invoked per-user inside
+        // the `setUserRate` batch loop. Validation is performed upstream in `setUserRate` after the loop.
     }
 
     function _setTreasury(address treasury) internal {
