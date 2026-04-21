@@ -207,7 +207,10 @@ contract BaseTest is TestWithHelpers {
             new TransparentUpgradeableProxy(
                 vaultImpl,
                 address(this),
-                abi.encodeCall(StableVault.initialize, (accessManager, treasuryAddress, defaultSubVaultPerSecondRate))
+                abi.encodeCall(
+                    StableVault.initialize,
+                    (accessManager, treasuryAddress, defaultSubVaultPerSecondRate, "Aave USD Stable Vault", "ASV-USD")
+                )
             )
         );
 

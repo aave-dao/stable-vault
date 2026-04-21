@@ -385,7 +385,9 @@ abstract contract AccountingChainDeployment is
                 (
                     getAccessManagerAddress(_deployer()),
                     TREASURY,
-                    vm.parseUint(_configString(".accountingChain.defaultSubVaultPerSecondRate"))
+                    vm.parseUint(_configString(".accountingChain.defaultSubVaultPerSecondRate")),
+                    _configString(".accountingChain.stableVaultName"),
+                    _configString(".accountingChain.stableVaultSymbol")
                 )
             )
         });
