@@ -132,6 +132,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
     // Setters & Getters tests
 
     function test_setAssetFeeBps_setsExpectedConfig(address asset, uint256 feeBps, bool isSet) public {
+        vm.assume(asset != address(0));
         feeBps = bound(feeBps, 0, FEE_CAP_BPS);
         vm.assume(isSet || feeBps == 0);
 
@@ -147,7 +148,17 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         assertEq(config.isSet, isSet);
     }
 
+    function test_setAssetFeeBps_reverts_ifAssetIsZeroAddress(uint256 feeBps, bool isSet) public {
+        // forge-lint: disable-next-line(unsafe-typecast)
+        uint16 feeBps16 = uint16(bound(feeBps, 0, FEE_CAP_BPS));
+
+        vm.expectRevert(Errors.ZeroAddress.selector);
+        vm.prank(admin);
+        withdrawalPolicy.setAssetFeeBps(address(0), feeBps16, isSet);
+    }
+
     function test_setAssetFeeBps_reverts_ifFeeBpsIsInvalid(address asset, uint256 feeBps, bool isSet) public {
+        vm.assume(asset != address(0));
         // forge-lint: disable-next-line(unsafe-typecast)
         uint16 feeBps16 = uint16(bound(feeBps, 10_001, type(uint16).max));
 
@@ -256,6 +267,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         uint256 assetFeeBps,
         uint256 baseFeeBps
     ) public {
+        vm.assume(assetOut != address(0));
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
         assetFeeBps = bound(assetFeeBps, 0, FEE_CAP_BPS);
         // Bound to prevent overflow in fee calculation: iouAmountRay * feeBps + MAX_BPS - 1
@@ -297,6 +309,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         uint256 assetFeeBps,
         uint256 baseFeeBps
     ) public {
+        vm.assume(assetOut != address(0));
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
         assetFeeBps = bound(assetFeeBps, 0, FEE_CAP_BPS);
         if (isAssetFeeSet) {
@@ -410,6 +423,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         uint256 assetFeeBps,
         uint256 baseFeeBps
     ) public {
+        vm.assume(assetOut != address(0));
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
         assetFeeBps = bound(assetFeeBps, 0, FEE_CAP_BPS);
         uint256 fallbackFeeBps = isAssetFeeSet ? assetFeeBps : baseFeeBps;

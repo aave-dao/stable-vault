@@ -79,7 +79,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
 
     /// @inheritdoc IChainGateway
     function receiveMessage(uint256 sourceChainId, address asset, uint256 amount, bytes memory data) external override {
-        if (asset != Constants.ASSET_FOR_DATA_ONLY_BRIDGE) {
+        if (asset != Constants.ASSET_FOR_DATA_ONLY_BRIDGE && amount > 0) {
             // Receiving of funds should not check for whitelisted adapter because we may want to recover tokens from
             // adapter even after removing the adapter. We may have to remove an adapter if we do not trust it for
             // receiving arbitrary messages.
@@ -101,6 +101,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) external override {
         require(msg.sender == IOU_TOKEN_MANAGER, OnlyIouTokenManager());
+        require(iouTokenAmountRay > 0, Errors.ZeroAmount());
 
         address adapter = $storage().defaultBridgeAdapter[Constants.ASSET_FOR_DATA_ONLY_BRIDGE][destinationChainId];
         require(adapter != address(0), AdapterNotFound());
