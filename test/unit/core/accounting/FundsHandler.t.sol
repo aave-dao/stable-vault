@@ -142,7 +142,7 @@ contract FundsHandlerTest is TestWithHelpers {
         uint256 amount
     ) public {
         address asset = _deployAssetWithSalt(assetDeploymentSalt, assetDecimals);
-        amount = _boundAssetAmountAllowingZero(asset, amount);
+        amount = _boundAssetAmount(asset, amount);
 
         vm.expectCall(address(mockAllocator), abi.encodeWithSelector(IAllocator.deposit.selector, asset, amount));
 
@@ -166,6 +166,14 @@ contract FundsHandlerTest is TestWithHelpers {
         vm.prank(address(mockStableVault));
         uint256 netDepositAmount = fundsHandler.processDeposit(asset, amount);
         assertEq(netDepositAmount, amount - amountOfSlippage);
+    }
+
+    function test_processDeposit_reverts_ifAmountIsZero(bytes32 assetDeploymentSalt, uint8 assetDecimals) public {
+        address asset = _deployAssetWithSalt(assetDeploymentSalt, assetDecimals);
+
+        vm.expectRevert(Errors.ZeroAmount.selector);
+        vm.prank(address(mockStableVault));
+        fundsHandler.processDeposit(asset, 0);
     }
 
     function test_processDeposit_reverts_ifMsgSenderIsNotTheStableVault(
@@ -192,12 +200,20 @@ contract FundsHandlerTest is TestWithHelpers {
         uint256 amount
     ) public {
         address asset = _deployAssetWithSalt(assetDeploymentSalt, assetDecimals);
-        amount = _boundAssetAmountAllowingZero(address(asset), amount);
+        amount = _boundAssetAmount(address(asset), amount);
 
         vm.expectCall(address(mockAllocator), abi.encodeWithSelector(IAllocator.withdraw.selector, asset, amount));
 
         vm.prank(address(mockStableVault));
         fundsHandler.processWithdrawal(asset, amount);
+    }
+
+    function test_processWithdrawal_reverts_ifAmountIsZero(bytes32 assetDeploymentSalt, uint8 assetDecimals) public {
+        address asset = _deployAssetWithSalt(assetDeploymentSalt, assetDecimals);
+
+        vm.expectRevert(Errors.ZeroAmount.selector);
+        vm.prank(address(mockStableVault));
+        fundsHandler.processWithdrawal(asset, 0);
     }
 
     function test_processWithdrawal_reverts_ifMsgSenderIsNotTheStableVault(

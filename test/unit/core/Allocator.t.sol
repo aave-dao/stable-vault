@@ -822,6 +822,8 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.deposit(address(_mockUsdt), 0);
     }
 
+    // Zero-amount depositAllowIdle is intentionally allowed: this path is used by bridge callbacks
+    // (fundsArrivedFromChainCallback), where reverting could jam the bridge infrastructure.
     function test_depositAllowIdle_doesNotRevert_ifAmountIsZero() public {
         vm.prank(depositor);
         _allocator.depositAllowIdle(address(_mockUsdt), 0);

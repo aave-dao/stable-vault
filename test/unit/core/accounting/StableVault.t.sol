@@ -768,6 +768,12 @@ contract StableVaultTest is TestWithHelpers {
         assertEq(stableVault.getUserSubVault(user1).id, 0);
     }
 
+    function test_setUserRate_reverts_ifUserIsZeroAddress() public {
+        vm.expectRevert(Errors.ZeroAddress.selector);
+        vm.prank(manager);
+        _setUserRate(address(0), DEFAULT_PER_SECOND_RATE);
+    }
+
     function test_setUserRate_reverts_ifSettingTheSameRateHeAlreadyHas(address user, uint256 amount) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
@@ -1099,6 +1105,12 @@ contract StableVaultTest is TestWithHelpers {
         uint256 actualAssets = stableVault.getAggregatedBalance();
 
         assertEq(actualAssets, expectedAssets);
+    }
+
+    function test_claimSurplusInterest_reverts_ifAmountIsZero() public {
+        vm.expectRevert(Errors.ZeroAmount.selector);
+        vm.prank(manager);
+        stableVault.claimSurplusInterest(_toAddressArray(address(mockAsset)), _toUint256Array(0));
     }
 
     function test_claimSurplusInterest_reverts_ifMsgSenderIsNotAuthorized(
@@ -3304,6 +3316,16 @@ contract StableVaultTest is TestWithHelpers {
             }
         }
         assertFalse(foundAfter, "SubVault should be inactive after transferring all funds out");
+    }
+
+    function test_executeWithdrawal_reverts_ifIouAmountIsZero(address user) public {
+        vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
+        _assumeNotProxyAdmin(user, address(stableVault));
+
+        vm.expectRevert(Errors.ZeroAmount.selector);
+        vm.prank(user);
+        stableVault.executeWithdrawal(user, address(mockAsset), 0, 0, "");
     }
 
     function test_executeWithdrawal_reverts_ifMsgSenderIsNotTheUser(

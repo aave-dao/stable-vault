@@ -440,6 +440,7 @@ contract StableVault is
         bytes memory data
     ) external virtual override nonReentrant assertingTransferHelperBalanceFor(assetOut) {
         require(user == msg.sender, OnlyUser());
+        require(iouAmountRay > 0, Errors.ZeroAmount());
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(user, iouAmountRay);
         uint256 amountOutRay = IWithdrawalPolicy(WITHDRAWAL_POLICY)
             .applyWithdrawalPolicy(
@@ -472,6 +473,7 @@ contract StableVault is
         assertingTransferHelperBalanceForAssets(assets)
     {
         for (uint256 i = 0; i < assets.length; i++) {
+            require(amounts[i] > 0, Errors.ZeroAmount());
             IFundsHandler(FUNDS_HANDLER).processWithdrawal(assets[i], amounts[i]);
         }
         // NOTE: Due to oracle-bridge propagation asymmetry, the aggregated balance may temporarily be lower than the
@@ -903,6 +905,7 @@ contract StableVault is
     }
 
     function _setUserRate(address user, uint256 newPerSecondRate) internal {
+        require(user != address(0), Errors.ZeroAddress());
         uint256 oldSubVaultId = $storage().positions[user].subVaultId;
         // Skip users without a position (e.g., withdrew or transferred out between batch
         // preparation and execution) to avoid reverting the entire batch.
