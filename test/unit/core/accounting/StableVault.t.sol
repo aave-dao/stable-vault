@@ -757,32 +757,39 @@ contract StableVaultTest is TestWithHelpers {
             treasury
         );
 
-        // User A and User B both deposit into the default subvault (subvault 1)
+        // Users A, B and C all deposit into the default subvault (subvault 1).
+        // A and B will co-locate in sub1 so that A's source sub-vault retains a user
+        // during the over-limit iteration below.
         address userA = _generateNewUser();
         address userB = _generateNewUser();
+        address userC = _generateNewUser();
         _deposit(userA, 10e6);
         _deposit(userB, 10e6);
+        _deposit(userC, 10e6);
 
         assertEq(stableVault.getActiveSubVaults().length, 1);
 
-        // Move User A to a new rate -> creates subvault 2, now at max (2 active)
+        // Move User C alone to a new rate -> creates subvault 2, now at max (2 active).
+        // Layout: sub1 (A, B), sub2 (C).
         uint256 newRate = DEFAULT_PER_SECOND_RATE + 1;
-        _setUserRate(userA, newRate);
+        _setUserRate(userC, newRate);
         assertEq(stableVault.getActiveSubVaults().length, 2);
 
-        // Now batch-migrate BOTH users to a third rate. This creates subvault 3.
-        // Per-iteration: subvault 3 activates (3 active, over limit).
-        // But after both users leave their old subvaults, one deactivates (back to 2).
-        // Before the fix, this would revert on the first iteration.
+        // Batch-migrate A and C to a third rate. With MAX = 2:
+        //   Iter 1 (A, sub1 -> sub3): sub1 retains B -> NOT removed; sub3 added.
+        //     Active = [sub1, sub2, sub3] (3 — transiently over the limit).
+        //   Iter 2 (C, sub2 -> sub3): sub2 empties -> removed; sub3 already active.
+        //     Active = [sub1, sub3] (2 — final state within the limit).
+        // Before the fix, iter 1 reverted because _validateAmountOfActiveSubVaults()
+        // ran inside _moveShares.
         uint256 thirdRate = DEFAULT_PER_SECOND_RATE + 2;
         IStableVault.UserRateData[] memory batch = new IStableVault.UserRateData[](2);
         batch[0] = IStableVault.UserRateData(userA, thirdRate);
-        batch[1] = IStableVault.UserRateData(userB, thirdRate);
+        batch[1] = IStableVault.UserRateData(userC, thirdRate);
         stableVault.setUserRate(batch);
 
-        // Final state: subvault 1 is empty (deactivated), subvault 2 is empty (deactivated),
-        // subvault 3 has both users (active). 1 active subvault, well within limit.
-        assertEq(stableVault.getActiveSubVaults().length, 1);
+        // Final state: sub1 still has B, sub2 empty (deactivated), sub3 has A+C.
+        assertEq(stableVault.getActiveSubVaults().length, 2);
     }
 
     function test_setUserRate_batchMigration_stillRevertsWhenFinalStateExceedsLimit() public {
