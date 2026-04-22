@@ -882,8 +882,8 @@ contract StableVault is
 
     function _getActiveSubVaultsObligations() internal view returns (uint256) {
         uint256 activeSubVaultsObligations;
-        uint256 activeSubVaultsIdsCount = $storage().activeSubVaultsIds.length;
-        for (uint256 i = 0; i < activeSubVaultsIdsCount; i++) {
+        uint256 activeSubVaultsCount = $storage().activeSubVaultsIds.length;
+        for (uint256 i = 0; i < activeSubVaultsCount; i++) {
             uint256 subVaultId = $storage().activeSubVaultsIds[i];
             // Round up the obligations to avoid understating liabilities.
             activeSubVaultsObligations += $storage().subVaultById[subVaultId].totalShares
