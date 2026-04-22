@@ -5,7 +5,6 @@
   "highDelay": 259200,
   "criticalDelay": 604800,
   "maxStrategiesPerAsset": 15,
-  "strategyMaxSlippageAmount": 10,
   "chainlinkPriceOracleHeartbeat": 86400,
   "chainlinkChainBalanceOracleHeartbeat": 86400,
   "priceOracleMinValidPriceRay": "997000000000000000000000000",
