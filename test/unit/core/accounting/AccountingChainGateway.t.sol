@@ -268,6 +268,18 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         _accountingChainGateway.addBridgeAdapter(asset, EARNING_CHAIN_ID, adapter);
     }
 
+    function test_addBridgeAdapter_reverts_ifAdapterIsZeroAddress() public {
+        vm.expectRevert(Errors.ZeroAddress.selector);
+        vm.prank(everyRoleAccount);
+        _accountingChainGateway.addBridgeAdapter(address(_mockUsdt), EARNING_CHAIN_ID, address(0));
+    }
+
+    function test_addBridgeAdapter_reverts_ifChainIdIsSelf() public {
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        vm.prank(everyRoleAccount);
+        _accountingChainGateway.addBridgeAdapter(address(_mockUsdt), block.chainid, makeAddr("adapter"));
+    }
+
     function test_setDefaultBridgeAdatper_reverts_ifNotWhitelisted() public {
         address adapter = makeAddr("adapter");
         address asset = address(_mockUsdt);
@@ -434,6 +446,24 @@ contract AccountingChainGatewayTest is TestWithHelpers {
                 feeRefundThreshold: 0,
                 gasLimit: 100000,
                 data: abi.encode(keccak256(hex"c0ffee"))
+            })
+        );
+    }
+
+    function test_sendBridgeIouTokenMessageWithFeePayer_reverts_ifIouTokenAmountIsZero() public {
+        vm.expectRevert(Errors.ZeroAmount.selector);
+        vm.prank(address(_mockIouTokenManager));
+        _accountingChainGateway.sendBridgeIouTokenMessageWithFeePayer(
+            EARNING_CHAIN_ID,
+            makeAddr("iouTokenRecipient"),
+            0,
+            IBridgeAdapter.BridgeParams({
+                feePayer: makeAddr("bridgeFeePayer"),
+                feeToken: address(_mockUsdt),
+                feeAmount: 100_000,
+                feeRefundThreshold: 0,
+                gasLimit: 100000,
+                data: ""
             })
         );
     }
@@ -884,6 +914,73 @@ contract AccountingChainGatewayTest is TestWithHelpers {
                 data: abi.encode(keccak256(hex"c0ffee"))
             })
         );
+    }
+
+    function test_sendPushFundsToChainMessage_reverts_ifTargetChainBalanceIsStale() public {
+        address assetToBridge = address(_mockUsdt);
+        uint256 amount = 1_000e6;
+
+        // Mimic the FH pushing assets to TransferHelper.
+        IMockErc20(assetToBridge).mint(address(_mockTransferHelper), amount);
+
+        // Mock a stale chain balance snapshot for the target chain.
+        _mockChainBalanceOracle.mockChainBalance(
+            EARNING_CHAIN_ID,
+            0,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS * 2,
+            true
+        );
+
+        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
+            feePayer: everyRoleAccount,
+            feeToken: address(0),
+            feeAmount: 0,
+            feeRefundThreshold: 0,
+            gasLimit: 100000,
+            data: ""
+        });
+
+        vm.expectRevert(IAccountingChainGateway.StaleChainBalance.selector);
+        vm.prank(address(_mockFundsHandler));
+        _accountingChainGateway.sendPushFundsToChainMessage(assetToBridge, amount, EARNING_CHAIN_ID, bridgeParams);
+    }
+
+    function test_sendPushFundsToChainMessage_succeeds_ifTargetChainBalanceIsFresh() public {
+        address assetToBridge = address(_mockUsdt);
+        uint256 amount = 1_000e6;
+
+        // Mimic the FH pushing assets to TransferHelper.
+        IMockErc20(assetToBridge).mint(address(_mockTransferHelper), amount);
+
+        // Mock a fresh chain balance snapshot for the target chain.
+        _mockChainBalanceOracle.mockChainBalance(
+            EARNING_CHAIN_ID,
+            0,
+            block.timestamp,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            false
+        );
+
+        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
+            feePayer: everyRoleAccount,
+            feeToken: address(0),
+            feeAmount: 0,
+            feeRefundThreshold: 0,
+            gasLimit: 100000,
+            data: ""
+        });
+
+        vm.expectCall(
+            address(_mockBridgeAdapterAssets),
+            0,
+            abi.encodeCall(
+                IBridgeAdapter.publishMessageToChainWithFeePayer,
+                (EARNING_CHAIN_ID, assetToBridge, amount, "", bridgeParams)
+            )
+        );
+        vm.prank(address(_mockFundsHandler));
+        _accountingChainGateway.sendPushFundsToChainMessage(assetToBridge, amount, EARNING_CHAIN_ID, bridgeParams);
     }
 
     function test_sendPushFundsToChainMessage_reverts_ifUnsupportedAdapter() public {

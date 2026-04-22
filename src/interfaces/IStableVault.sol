@@ -162,6 +162,19 @@ interface IStableVault {
     /// @return balanceRay Account's Stable Vault balance in RAY.
     function balanceOf(address account) external view returns (uint256 balanceRay);
 
+    /// @notice ERC20-style name of the Stable Vault position token.
+    /// @return name Human-readable name (e.g. "Aave USD Stable Vault").
+    function name() external view returns (string memory);
+
+    /// @notice ERC20-style symbol of the Stable Vault position token.
+    /// @return symbol Short ticker (e.g. "ASV-USD").
+    function symbol() external view returns (string memory);
+
+    /// @notice ERC20-style decimals for the Stable Vault position token.
+    /// @dev Exposing this lets explorers and wallets display balances with correct decimal alignment.
+    /// @return decimals Number of decimals.
+    function decimals() external pure returns (uint8);
+
     /// @notice Transfers Stable Vault balance (denominated in RAY) to another user.
     /// @param to Address of the recipient.
     /// @param amountRay Amount of Stable Vault balance to transfer, denominated in RAY.
@@ -196,10 +209,13 @@ interface IStableVault {
     ) external;
 
     /// @notice Getter for the aggregated obligations owed to depositors in RAY of denomination asset.
+    /// @dev Includes the total supply of IOU tokens across all chains (circulating + locked for bridging).
     /// @return obligations Aggregated obligations owed to depositors in RAY of denomination asset.
     function getVaultObligations() external view returns (uint256);
 
     /// @notice Getter for the aggregated balance on the local Allocator and the Allocator on Earning Chains.
+    /// @dev May underestimate when trust or freshness guarantees cannot be satisfied for a given contribution
+    /// (conservative by design). See the implementation for specific policies.
     /// @return aggregatedBalance Aggregated balance of the vault in RAY of denomination asset.
     function getAggregatedBalance() external view returns (uint256);
 
@@ -221,4 +237,14 @@ interface IStableVault {
     /// @dev Original deposits are the invested principal from users (not including accrued interest).
     /// @return globalOriginalDepositAmount Global original deposit amount in RAY of denomination asset.
     function getGlobalOriginalDepositAmount() external view returns (uint256 globalOriginalDepositAmount);
+
+    /// @notice Getter for the surplus interest that can be claimed in RAY of denomination asset.
+    /// @dev Returns 0 if the system is underfunded (obligations >= assets).
+    /// @return surplusInterestRay The claimable surplus in RAY.
+    function getClaimableSurplusInterest() external view returns (uint256 surplusInterestRay);
+
+    /// @notice Getter for the accrued conversion rate of a sub-vault, computed to the current block timestamp.
+    /// @param subVaultId ID of the sub-vault.
+    /// @return conversionRate The conversion rate in RAY, reflecting interest accrued up to now.
+    function getSubVaultConversionRate(uint256 subVaultId) external view returns (uint256 conversionRate);
 }

@@ -7,13 +7,17 @@ import {Test} from "forge-std/Test.sol";
 
 import {IouToken} from "src/core/ious/IouToken.sol";
 import {Constants} from "src/types/Constants.sol";
+import {Errors} from "src/types/Errors.sol";
 
 contract IouTokenTest is Test {
+    string internal constant TEST_IOU_NAME = "Test IOU: Aave USD Stable Vault";
+    string internal constant TEST_IOU_SYMBOL = "test-IOU-USD";
+
     address public iouToken;
     address public owner = makeAddr("OWNER");
 
     function setUp() public {
-        iouToken = address(new IouToken(owner));
+        iouToken = address(new IouToken(owner, TEST_IOU_NAME, TEST_IOU_SYMBOL));
     }
 
     function test_mint_withOwner(address to, uint256 amount) public {
@@ -45,12 +49,36 @@ contract IouTokenTest is Test {
         assertEq(IouToken(iouToken).decimals(), Constants.RAY_DECIMALS, "decimals mismatch");
     }
 
-    function test_name() public view {
-        assertEq(IouToken(iouToken).name(), "IouToken", "name mismatch");
+    /// @dev VA-98: `name()` returns the value passed to the constructor, allowing each IouToken deployment
+    /// (USD, EUR, etc.) to set its own ERC20 metadata for off-chain display.
+    function test_name_returnsValuePassedToConstructor() public view {
+        assertEq(IouToken(iouToken).name(), TEST_IOU_NAME, "name mismatch");
     }
 
-    function test_symbol() public view {
-        assertEq(IouToken(iouToken).symbol(), "IOU", "symbol mismatch");
+    /// @dev VA-98: `symbol()` returns the value passed to the constructor.
+    function test_symbol_returnsValuePassedToConstructor() public view {
+        assertEq(IouToken(iouToken).symbol(), TEST_IOU_SYMBOL, "symbol mismatch");
+    }
+
+    function test_constructor_setsCustomNameAndSymbol(string memory customName, string memory customSymbol) public {
+        vm.assume(bytes(customName).length > 0);
+        vm.assume(bytes(customSymbol).length > 0);
+
+        IouToken newIouToken = new IouToken(owner, customName, customSymbol);
+
+        assertEq(newIouToken.name(), customName);
+        assertEq(newIouToken.symbol(), customSymbol);
+        assertEq(newIouToken.decimals(), Constants.RAY_DECIMALS);
+    }
+
+    function test_constructor_reverts_ifNameIsEmpty() public {
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        new IouToken(owner, "", TEST_IOU_SYMBOL);
+    }
+
+    function test_constructor_reverts_ifSymbolIsEmpty() public {
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        new IouToken(owner, TEST_IOU_NAME, "");
     }
 
     function test_mint_reverts_if_not_owner(address nonOwner, address to, uint256 amount) public {
