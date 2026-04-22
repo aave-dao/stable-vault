@@ -916,6 +916,73 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         );
     }
 
+    function test_sendPushFundsToChainMessage_reverts_ifTargetChainBalanceIsStale() public {
+        address assetToBridge = address(_mockUsdt);
+        uint256 amount = 1_000e6;
+
+        // Mimic the FH pushing assets to TransferHelper.
+        IMockErc20(assetToBridge).mint(address(_mockTransferHelper), amount);
+
+        // Mock a stale chain balance snapshot for the target chain.
+        _mockChainBalanceOracle.mockChainBalance(
+            EARNING_CHAIN_ID,
+            0,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS * 2,
+            true
+        );
+
+        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
+            feePayer: everyRoleAccount,
+            feeToken: address(0),
+            feeAmount: 0,
+            feeRefundThreshold: 0,
+            gasLimit: 100000,
+            data: ""
+        });
+
+        vm.expectRevert(IAccountingChainGateway.StaleChainBalance.selector);
+        vm.prank(address(_mockFundsHandler));
+        _accountingChainGateway.sendPushFundsToChainMessage(assetToBridge, amount, EARNING_CHAIN_ID, bridgeParams);
+    }
+
+    function test_sendPushFundsToChainMessage_succeeds_ifTargetChainBalanceIsFresh() public {
+        address assetToBridge = address(_mockUsdt);
+        uint256 amount = 1_000e6;
+
+        // Mimic the FH pushing assets to TransferHelper.
+        IMockErc20(assetToBridge).mint(address(_mockTransferHelper), amount);
+
+        // Mock a fresh chain balance snapshot for the target chain.
+        _mockChainBalanceOracle.mockChainBalance(
+            EARNING_CHAIN_ID,
+            0,
+            block.timestamp,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            false
+        );
+
+        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
+            feePayer: everyRoleAccount,
+            feeToken: address(0),
+            feeAmount: 0,
+            feeRefundThreshold: 0,
+            gasLimit: 100000,
+            data: ""
+        });
+
+        vm.expectCall(
+            address(_mockBridgeAdapterAssets),
+            0,
+            abi.encodeCall(
+                IBridgeAdapter.publishMessageToChainWithFeePayer,
+                (EARNING_CHAIN_ID, assetToBridge, amount, "", bridgeParams)
+            )
+        );
+        vm.prank(address(_mockFundsHandler));
+        _accountingChainGateway.sendPushFundsToChainMessage(assetToBridge, amount, EARNING_CHAIN_ID, bridgeParams);
+    }
+
     function test_sendPushFundsToChainMessage_reverts_ifUnsupportedAdapter() public {
         // Unset the adapter for asset bridging
         address assetToBridge = address(_mockUsdt);
