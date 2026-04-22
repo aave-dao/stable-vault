@@ -709,7 +709,7 @@ contract StableVault is
     }
 
     /// @dev Computes the shares to burn from sender and guaranteed amount for a transfer.
-    /// @dev Reverts if remaining shares would be below dust threshold - caller should use transferAll() instead.
+    /// @dev Reverts with InvalidAmount() if remaining shares would be below dust threshold (use transferAll() instead).
     function _computeTransferShares(address from, uint256 amountRay, uint256 fromSubVaultId, uint256 fromConversionRate)
         internal
         view
@@ -742,9 +742,13 @@ contract StableVault is
         //   rayMulDown(S * conversionRate) >= 1e9
         // which implies:
         //   S >= rayDivUp(1e9, conversionRate)
+        uint256 userShares = $storage().positions[user].shares;
+        if (redeemedShares > userShares) {
+            return false;
+        }
         uint256 minSharesToRedeemOneWei =
             Constants.MIN_WITHDRAWABLE_AMOUNT_RAY.rayDivUp($storage().subVaultById[subVaultId].conversionRate);
-        uint256 remainingSharesAfterRedeem = $storage().positions[user].shares - redeemedShares;
+        uint256 remainingSharesAfterRedeem = userShares - redeemedShares;
         return remainingSharesAfterRedeem >= minSharesToRedeemOneWei;
     }
 
