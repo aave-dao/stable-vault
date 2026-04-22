@@ -221,12 +221,7 @@ contract StableVault is
 
         IPriceOracle(PRICE_ORACLE).validatePrice(asset);
 
-        uint256 subVaultId = $storage().positions[user].subVaultId;
-        if (subVaultId == 0) {
-            subVaultId = $storage().defaultSubVaultId;
-            $storage().positions[user].subVaultId = subVaultId;
-            emit UserRateSet(user, subVaultId, $storage().subVaultById[subVaultId].perSecondRate);
-        }
+        uint256 subVaultId = _getOrAssignUserSubVaultId(user);
 
         uint256 conversionRate = _accrueSubVaultConversionRate(subVaultId);
 
@@ -705,6 +700,7 @@ contract StableVault is
         if (subVaultId == 0) {
             subVaultId = $storage().defaultSubVaultId;
             $storage().positions[user].subVaultId = subVaultId;
+            emit UserRateSet(user, subVaultId, $storage().subVaultById[subVaultId].perSecondRate);
         }
         return subVaultId;
     }
