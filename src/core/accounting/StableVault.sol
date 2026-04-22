@@ -221,11 +221,7 @@ contract StableVault is
 
         IPriceOracle(PRICE_ORACLE).validatePrice(asset);
 
-        uint256 subVaultId = $storage().positions[user].subVaultId;
-        if (subVaultId == 0) {
-            subVaultId = $storage().defaultSubVaultId;
-            $storage().positions[user].subVaultId = subVaultId;
-        }
+        uint256 subVaultId = _getOrAssignUserSubVaultId(user);
 
         uint256 conversionRate = _accrueSubVaultConversionRate(subVaultId);
 
@@ -705,6 +701,7 @@ contract StableVault is
         if (subVaultId == 0) {
             subVaultId = $storage().defaultSubVaultId;
             $storage().positions[user].subVaultId = subVaultId;
+            emit UserRateSet(user, subVaultId, $storage().subVaultById[subVaultId].perSecondRate);
         }
         return subVaultId;
     }
@@ -756,6 +753,7 @@ contract StableVault is
     function _addSubVaultToActive(uint256 subVaultId) internal {
         $storage().activeSubVaultsIds.push(subVaultId);
         $storage().activeSubVaultIndexById[subVaultId] = $storage().activeSubVaultsIds.length - 1;
+        emit SubVaultActivated(subVaultId);
     }
 
     // Assumes that if it is called then `subVaultId` is indeed active, thus `$storage().activeSubVaultsIds.length > 0`
@@ -769,6 +767,7 @@ contract StableVault is
         }
         $storage().activeSubVaultsIds.pop();
         delete $storage().activeSubVaultIndexById[subVaultId];
+        emit SubVaultDeactivated(subVaultId);
     }
 
     function _validateAmountOfActiveSubVaults() internal view {
@@ -932,8 +931,8 @@ contract StableVault is
                 RedundantRate(user, newPerSecondRate)
             );
             uint256 newSubVaultId = _getOrCreateSubVaultWithRate(newPerSecondRate);
-            _migrateUserToSubVault(user, oldSubVaultId, newSubVaultId);
             emit UserRateSet(user, newSubVaultId, newPerSecondRate);
+            _migrateUserToSubVault(user, oldSubVaultId, newSubVaultId);
         }
         // `_validateAmountOfActiveSubVaults()` is intentionally not called here: this is invoked per-user inside
         // the `setUserRate` batch loop. Validation is performed upstream in `setUserRate` after the loop.

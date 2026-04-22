@@ -1743,6 +1743,65 @@ contract CcipAdapterTest is TestWithHelpers {
         IRescuableToken(address(_accountingChainCcipAdapter)).rescueTokens(address(_mockUsdt), 100);
     }
 
+    function test_publishMessageToChainWithFeePayer_emitsFeeRefunded_whenExcessFeeExceedsThreshold() public {
+        // Context: Accounting Chain -> Earning Chain
+
+        address feePayer = makeAddr("feePayer");
+        uint256 amountUsdt = 100_000000; // 100 USDT
+        address feeToken = address(_mockGho);
+
+        uint256 feeAmount = 10 ether; // fee allocated by the user
+        uint256 actualFeeAmount = 7 ether; // fee estimated by the router
+        uint256 feeRefundThreshold = 1 ether; // refund threshold
+        // excessFee = 3 ether, which is > feeRefundThreshold (1 ether), so FeeRefunded should emit
+
+        // Airdrop tokens to the TransferHelper
+        _mockTransferHelper.mockAsset(address(_mockUsdt), amountUsdt);
+        _mockTransferHelper.mockAsset(address(_mockGho), feeAmount);
+
+        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
+            feePayer: feePayer,
+            feeToken: feeToken,
+            feeAmount: feeAmount,
+            feeRefundThreshold: feeRefundThreshold,
+            gasLimit: DEFAULT_GAS_LIMIT,
+            data: ""
+        });
+
+        Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
+        ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
+
+        Client.EVM2AnyMessage memory expectedCcipMessage = Client.EVM2AnyMessage({
+            receiver: abi.encode(_earningChainCcipAdapter),
+            data: "",
+            tokenAmounts: ccipTokenAmounts,
+            feeToken: feeToken,
+            extraArgs: Client._argsToBytes(
+                Client.GenericExtraArgsV2({gasLimit: DEFAULT_GAS_LIMIT, allowOutOfOrderExecution: true})
+            )
+        });
+
+        // Mock call to router.getFee - return actualFeeAmount so there is excess
+        vm.mockCall(
+            address(_mockCCIPRouter),
+            abi.encodeWithSelector(IRouterClient.getFee.selector, EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage),
+            abi.encode(actualFeeAmount)
+        );
+
+        _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, bytes32(0));
+
+        uint256 expectedRefundAmount = feeAmount - actualFeeAmount; // 3 ether
+
+        // Expect FeeRefunded event: feePayer (indexed), feeToken (indexed), amount
+        vm.expectEmit(true, true, false, true);
+        emit ICcipBridgeAdapter.FeeRefunded(feePayer, feeToken, expectedRefundAmount);
+
+        vm.prank(address(_mockAccountingChainGateway));
+        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
+            EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "", bridgeParams
+        );
+    }
+
     function _expectBridgeAssetsApproval(Client.EVMTokenAmount[] memory tokens) internal {
         for (uint256 i = 0; i < tokens.length; i++) {
             address asset = tokens[i].token;

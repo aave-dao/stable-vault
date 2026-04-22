@@ -11,6 +11,9 @@ interface ICcipBridgeAdapter is IBridgeAdapter {
     /// @notice Emitted when a CCIP chain selector mapping is set.
     event ChainSelectorSet(uint256 indexed chainId, uint64 indexed ccipChainSelector);
 
+    /// @notice Emitted when excess bridge fees are refunded to the fee payer.
+    event FeeRefunded(address indexed feePayer, address indexed feeToken, uint256 amount);
+
     /// @notice Encoded data length does not match the expected value.
     /// @custom:selector 0x9546c78e
     error UnexpectedDataLength();

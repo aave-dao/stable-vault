@@ -296,6 +296,31 @@ contract SwapperTest is TestWithHelpers {
         assertEq(IERC20(_mockGho).balanceOf(address(_swapper)), 0);
     }
 
+    function test_executeSwap_emitsSlippageCovered_whenSlippageOccurs() public {
+        uint16 slippageToleranceBps = 500; // 5% tolerance
+        uint256 amountIn = 1_000_000; // 1M units of 6-decimal token (e.g. 1 USDT)
+        uint256 amountOutIfNoSlippage = amountIn.convertAssetDecimals(address(_mockUsdt), address(_mockGho));
+        uint256 minAmountOut = amountOutIfNoSlippage * (10_000 - slippageToleranceBps) / 10_000;
+
+        uint256 slippageAmount = amountOutIfNoSlippage - minAmountOut;
+
+        _mockTransferIntoSwapper(_mockUsdt, amountIn);
+        _seedOutputToken(_mockGho, minAmountOut);
+        _setSlippageBps(slippageToleranceBps);
+        _prepareSlippageAndFeeCoverage(_mockGho, slippageAmount);
+
+        bytes memory data = _encodeDexSwapExactInputData(
+            address(_mockUsdt), address(_mockGho), amountIn, minAmountOut, slippageToleranceBps
+        );
+
+        // SlippageCovered has 2 indexed params: slippageCoverageSource, assetOut
+        vm.expectEmit(true, true, false, true);
+        emit ISwapper.SlippageCovered(slippageCoverageSource, address(_mockGho), slippageAmount);
+
+        vm.prank(allocator);
+        _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
+    }
+
     function test_executeSwap_reverts_6decimalsInput_18decimalsOutput_slippage(
         uint256 amountIn,
         uint16 slippageToleranceBps

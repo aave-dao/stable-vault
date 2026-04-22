@@ -16,6 +16,8 @@ interface IIouTokenManager {
 
     event LockedTokensBurned(address indexed from, uint256 amountRay);
 
+    event TokensLocked(address indexed from, uint256 amountRay);
+
     /// @notice Thrown when the amount of locked tokens is insufficient to burn or release.
     /// @custom:selector 0xb646ec7b
     error InsufficientLockedBalance();

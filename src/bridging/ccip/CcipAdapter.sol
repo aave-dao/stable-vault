@@ -237,6 +237,7 @@ contract CcipAdapter is
         } else {
             IERC20(feeToken).safeTransfer(feePayer, excessFee);
         }
+        emit FeeRefunded(feePayer, feeToken, excessFee);
     }
 
     function _validateMessageSource(Client.Any2EVMMessage calldata message) internal view {
