@@ -679,7 +679,6 @@ contract StableVault is
             if (!_isActiveSubVaultById(toSubVaultId)) {
                 _addSubVaultToActive(toSubVaultId);
             }
-            _validateAmountOfActiveSubVaults();
         }
 
         if (from == to) {
