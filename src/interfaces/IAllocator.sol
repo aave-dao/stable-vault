@@ -24,7 +24,7 @@ interface IAllocator {
 
     event StrategyWithdrawalFailed(address indexed strategy, address indexed asset, uint256 amount);
 
-    event StrategyAdded(address indexed asset, address indexed strategy, uint8 maxSlippageAmount);
+    event StrategyAdded(address indexed asset, address indexed strategy);
 
     event StrategyRemoved(address indexed asset, address indexed strategy);
 
@@ -117,15 +117,12 @@ interface IAllocator {
 
     /// @notice The configuration for a strategy.
     /// @param asset The asset that the strategy is associated with (assumes 1 asset per strategy).
-    /// @param maxSlippageAmount The maximum amount of slippage allowed for the strategy denominated in the underlying
-    /// asset. This value is expected to be in the 1:10 wei range.
     /// @param isRegistered Boolean indicating whether the strategy is configured.
     /// @param depositAllowed Boolean indicating whether the strategy is allowed to be deposited into.
     /// @param isTrusted Boolean indicating whether the strategy is trusted or not. Strategy's balance only contributes
     /// to the system's TVL when it is trusted.
     struct StrategyConfig {
         address asset;
-        uint8 maxSlippageAmount;
         bool isRegistered;
         bool depositAllowed;
         bool isTrusted;
@@ -165,8 +162,6 @@ interface IAllocator {
 
     /// @notice Getter for the configuration of a given strategy.
     /// @param strategy Address of the strategy to get the configuration for.
-    /// @dev Updating the maxSlippageAmount requires removing the strategy then re-adding it with the new
-    /// maxSlippageAmount (subject to a timelock).
     /// @return config Configuration of the strategy.
     function getStrategyConfig(address strategy) external view returns (StrategyConfig memory);
 
@@ -216,9 +211,7 @@ interface IAllocator {
     /// @notice Adds a new yield strategy to the allocator.
     /// @param asset Address of the asset to add the strategy for.
     /// @param strategy Address of the ERC-4626 strategy to add.
-    /// @param maxSlippageAmount The maximum amount of slippage allowed for the strategy denominated in the underlying
-    /// asset.
-    function addStrategy(address asset, address strategy, uint8 maxSlippageAmount) external;
+    function addStrategy(address asset, address strategy) external;
 
     /// @notice Removes a yield strategy from the allocator.
     /// @param strategy Address of the ERC-4626 strategy to remove.
