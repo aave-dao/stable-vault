@@ -31,8 +31,6 @@ contract OwnedMulticallTest is TestWithHelpers {
     using AssetLib for uint256;
     using SafeERC20 for IERC20;
 
-    uint8 constant STRATEGY_MAX_SLIPPAGE_AMOUNT = 10;
-
     address admin = makeAddr("ADMIN");
     address everyRoleAccount = makeAddr("EVERY_ROLE_ACCOUNT");
     address depositor = makeAddr("DEPOSITOR");
@@ -117,13 +115,13 @@ contract OwnedMulticallTest is TestWithHelpers {
 
         // Set up strategy vaults
         vm.prank(admin);
-        _allocator.addStrategy(address(_mockUsdt), address(_defaultUsdtStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        _allocator.addStrategy(address(_mockUsdt), address(_defaultUsdtStrategy));
         vm.prank(admin);
-        _allocator.addStrategy(address(_mockUsdt), address(_extraUsdtStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        _allocator.addStrategy(address(_mockUsdt), address(_extraUsdtStrategy));
         vm.prank(admin);
-        _allocator.addStrategy(address(_mockGho), address(_defaultGhoStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        _allocator.addStrategy(address(_mockGho), address(_defaultGhoStrategy));
         vm.prank(admin);
-        _allocator.addStrategy(address(_mockGho), address(_extraGhoStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        _allocator.addStrategy(address(_mockGho), address(_extraGhoStrategy));
 
         vm.prank(everyRoleAccount);
         _allocator.setDefaultStrategy(address(_mockUsdt), address(_defaultUsdtStrategy));
