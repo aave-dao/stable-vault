@@ -923,8 +923,8 @@ contract StableVault is
                 RedundantRate(user, newPerSecondRate)
             );
             uint256 newSubVaultId = _getOrCreateSubVaultWithRate(newPerSecondRate);
-            _migrateUserToSubVault(user, oldSubVaultId, newSubVaultId);
             emit UserRateSet(user, newSubVaultId, newPerSecondRate);
+            _migrateUserToSubVault(user, oldSubVaultId, newSubVaultId);
         }
         // `_validateAmountOfActiveSubVaults()` is intentionally not called here: this is invoked per-user inside
         // the `setUserRate` batch loop. Validation is performed upstream in `setUserRate` after the loop.
