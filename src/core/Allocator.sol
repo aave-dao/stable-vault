@@ -55,6 +55,10 @@ contract Allocator is
     address internal immutable PRICE_ORACLE;
     uint8 internal immutable MAX_STRATEGIES_PER_ASSET;
 
+    /// @dev Maximum slippage, denominated in asset units, tolerated to account for rounding errors when depositing
+    /// to ERC-4626 yield strategies.
+    uint8 internal constant STRATEGY_DEPOSIT_SLIPPAGE_TOLERANCE = 10;
+
     /// @custom:storage-location erc7201:aave.storage.Allocator
     struct AllocatorStorage {
         mapping(address asset => address strategy) defaultStrategyByAsset;
@@ -302,8 +306,8 @@ contract Allocator is
     }
 
     /// @inheritdoc IAllocator
-    function addStrategy(address asset, address strategy, uint8 maxSlippageAmount) external override restricted {
-        _addStrategy(asset, strategy, maxSlippageAmount);
+    function addStrategy(address asset, address strategy) external override restricted {
+        _addStrategy(asset, strategy);
     }
 
     /// @inheritdoc IAllocator
@@ -504,8 +508,7 @@ contract Allocator is
 
         uint256 netDepositAmount = _getAssetBalanceInStrategy(IERC4626(strategy)) - balanceBefore;
         require(
-            netDepositAmount >= amount
-                || amount - netDepositAmount <= $storage().strategyConfigs[strategy].maxSlippageAmount,
+            netDepositAmount >= amount || amount - netDepositAmount <= STRATEGY_DEPOSIT_SLIPPAGE_TOLERANCE,
             Errors.InsufficientAmountOut()
         );
         emit AssetAllocated(asset, strategy, amount, netDepositAmount);
@@ -563,25 +566,20 @@ contract Allocator is
         return $storage().strategyConfigs[strategy].asset != address(0);
     }
 
-    function _addStrategy(address asset, address strategy, uint8 maxSlippageAmount) internal {
+    function _addStrategy(address asset, address strategy) internal {
         require(!_isStrategySupported(strategy), Errors.AddressAlreadyWhitelisted());
         require(IAssetRegistry(ASSET_REGISTRY).isAssetRegistered(asset), Errors.InvalidAsset(asset));
         require(asset == IERC4626(strategy).asset(), Errors.InvalidAsset(asset));
 
-        $storage().strategyConfigs[strategy] = StrategyConfig({
-            asset: asset,
-            maxSlippageAmount: maxSlippageAmount,
-            isRegistered: true,
-            depositAllowed: true,
-            isTrusted: true
-        });
+        $storage().strategyConfigs[strategy] =
+            StrategyConfig({asset: asset, isRegistered: true, depositAllowed: true, isTrusted: true});
         $storage().assetStrategies[asset].add(strategy);
 
         require(
             $storage().assetStrategies[asset].length() <= MAX_STRATEGIES_PER_ASSET, IAllocator.TooManyStrategies(asset)
         );
 
-        emit StrategyAdded(asset, strategy, maxSlippageAmount);
+        emit StrategyAdded(asset, strategy);
     }
 
     function _removeStrategy(address strategy) internal {

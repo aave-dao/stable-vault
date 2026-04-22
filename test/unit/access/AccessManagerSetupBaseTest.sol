@@ -780,7 +780,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         address admin = _getProfile__MainAdmin();
 
         // Schedule admin-tier operation on Allocator
-        bytes memory callData = abi.encodeCall(IAllocator.addStrategy, (address(0x1), address(0x2), uint8(0)));
+        bytes memory callData = abi.encodeCall(IAllocator.addStrategy, (address(0x1), address(0x2)));
         bytes32 operationId = accessManager.hashOperation(admin, getAllocatorAddress(_deployer()), callData);
 
         vm.prank(admin);
@@ -802,7 +802,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         address admin = _getProfile__MainAdmin();
         address secondary = _getProfile__SecondaryAdmin();
 
-        bytes memory callData = abi.encodeCall(IAllocator.addStrategy, (address(0x1), address(0x2), uint8(0)));
+        bytes memory callData = abi.encodeCall(IAllocator.addStrategy, (address(0x1), address(0x2)));
 
         vm.prank(admin);
         accessManager.schedule(getAllocatorAddress(_deployer()), callData, 0);
