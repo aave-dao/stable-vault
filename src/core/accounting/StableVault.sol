@@ -709,7 +709,7 @@ contract StableVault is
     }
 
     /// @dev Computes the shares to burn from sender and guaranteed amount for a transfer.
-    /// @dev Reverts if remaining shares would be below dust threshold - caller should use transferAll() instead.
+    /// @dev Reverts with InvalidAmount() if remaining shares would be below dust threshold (use transferAll() instead).
     function _computeTransferShares(address from, uint256 amountRay, uint256 fromSubVaultId, uint256 fromConversionRate)
         internal
         view
