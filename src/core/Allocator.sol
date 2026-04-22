@@ -221,9 +221,10 @@ contract Allocator is
             // Consume from idle balance first
             uint256 amountRemaining = amount - idleBalance;
 
-            // Consume from default strategy (skip if unset to avoid false StrategyWithdrawalFailed events)
             address defaultStrategy = $storage().defaultStrategyByAsset[asset];
+            // Consume from default strategy (skip if unset to avoid false StrategyWithdrawalFailed events)
             if (defaultStrategy != address(0)) {
+                // Wrap in a try-catch to avoid impact to searching other strategies
                 try this.tryWithdrawFromStrategy(asset, amountRemaining, defaultStrategy) returns (uint256 withdrawn) {
                     amountRemaining = withdrawn >= amountRemaining ? 0 : amountRemaining - withdrawn;
                 } catch {

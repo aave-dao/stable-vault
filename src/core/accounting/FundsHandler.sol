@@ -110,7 +110,8 @@ contract FundsHandler is
     /// @inheritdoc IFundsHandler
     function getAggregatedBalance() external view override returns (uint256) {
         uint256 totalBalanceRay = _getLocalAggregatedBalance();
-        for (uint256 i = 0; i < $storage().earningChainIds.length(); i++) {
+        uint256 earningChainCount = $storage().earningChainIds.length();
+        for (uint256 i = 0; i < earningChainCount; i++) {
             totalBalanceRay += _getAdjustedEarningChainBalanceRay($storage().earningChainIds.at(i));
         }
         return totalBalanceRay;

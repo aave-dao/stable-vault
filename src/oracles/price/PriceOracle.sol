@@ -74,9 +74,9 @@ contract PriceOracle is AccessManagedUpgradeable, IPriceOracle {
 
     /// @inheritdoc IPriceOracle
     function validatePrice(address asset) external view override {
-        require($storage().oracleAdapterByAsset[asset] != address(0), OracleAdapterNotFound(asset));
-        IPriceOracleAdapter.OracleResponse memory response =
-            IPriceOracleAdapter($storage().oracleAdapterByAsset[asset]).getPrice(asset);
+        address oracleAdapter = $storage().oracleAdapterByAsset[asset];
+        require(oracleAdapter != address(0), OracleAdapterNotFound(asset));
+        IPriceOracleAdapter.OracleResponse memory response = IPriceOracleAdapter(oracleAdapter).getPrice(asset);
         require(!response.isStale, IPriceOracle.StalePrice());
         require(response.priceRay >= MIN_VALID_PRICE_RAY, IPriceOracle.PriceTooLow());
     }
