@@ -30,4 +30,8 @@ contract MathLibWrapper {
     function rpow(uint256 x, uint256 n) public pure returns (uint256) {
         return MathLib.rpow(x, n);
     }
+
+    function satSub(uint256 a, uint256 b) public pure returns (uint256) {
+        return MathLib.satSub(a, b);
+    }
 }

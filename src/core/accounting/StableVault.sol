@@ -409,8 +409,7 @@ contract StableVault is
         // There is no overlap between original deposits and circulating IOUs because original deposits are decremented
         // when new issue IOUs are minted.
         uint256 guaranteedObligationsRay = _getIousInCirculation() + $storage().globalOriginalDepositsRay;
-        uint256 globalWithdrawableInterestRay =
-            totalAssetsRay > guaranteedObligationsRay ? totalAssetsRay - guaranteedObligationsRay : 0;
+        uint256 globalWithdrawableInterestRay = totalAssetsRay.satSub(guaranteedObligationsRay);
         uint256 withdrawalRequestInterestRay = actualAmountInRay - guaranteedAmountRay;
         require(
             withdrawalRequestInterestRay <= globalWithdrawableInterestRay,
@@ -503,7 +502,7 @@ contract StableVault is
     function getClaimableSurplusInterest() external view override returns (uint256) {
         uint256 obligations = _getVaultObligations();
         uint256 assets = _getVaultAggregatedBalance();
-        return assets > obligations ? assets - obligations : 0;
+        return assets.satSub(obligations);
     }
 
     /// @inheritdoc IStableVault

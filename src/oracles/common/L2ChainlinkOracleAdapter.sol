@@ -2,6 +2,8 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.22;
 
+import {MathLib} from "src/libraries/MathLib.sol";
+
 // solhint-disable-next-line interface-starts-with-i
 interface AggregatorV3Interface {
     function latestRoundData()
@@ -24,6 +26,8 @@ interface AggregatorV3Interface {
 /// (`sequencerStatus != 0`), the response is marked as stale. Additionally, a configurable grace period is enforced
 /// after the sequencer spins back up, giving oracle nodes time to push fresh data before the data is trusted again.
 abstract contract L2ChainlinkOracleAdapter {
+    using MathLib for uint256;
+
     enum SequencerUptime {
         UP,
         DOWN
@@ -47,7 +51,7 @@ abstract contract L2ChainlinkOracleAdapter {
     function _getSequencerUptimeData() internal view returns (SequencerUptime, bool) {
         (, int256 sequencerStatus, uint256 startedAt,,) = AggregatorV3Interface(SEQUENCER_UPTIME_FEED).latestRoundData();
         // Ensure the grace period has elapsed since the sequencer came back up.
-        uint256 timeSinceUp = block.timestamp > startedAt ? block.timestamp - startedAt : 0;
+        uint256 timeSinceUp = block.timestamp.satSub(startedAt);
         bool uptimeElapsedGracePeriod = timeSinceUp >= GRACE_PERIOD_TIME_SECONDS;
         return (sequencerStatus == 0 ? SequencerUptime.UP : SequencerUptime.DOWN, uptimeElapsedGracePeriod);
     }

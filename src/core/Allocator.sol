@@ -21,6 +21,7 @@ import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {ISwapper} from "src/interfaces/ISwapper.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
+import {MathLib} from "src/libraries/MathLib.sol";
 import {Multicall} from "src/misc/Multicall.sol";
 import {RescuableToken} from "src/misc/RescuableToken.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
@@ -47,6 +48,7 @@ contract Allocator is
 {
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
+    using MathLib for uint256;
     using EnumerableSet for EnumerableSet.AddressSet;
 
     address internal immutable DEPOSITOR;
@@ -230,7 +232,7 @@ contract Allocator is
             if (defaultStrategy != address(0)) {
                 // Wrap in a try-catch to avoid impact to searching other strategies
                 try this.tryWithdrawFromStrategy(asset, amountRemaining, defaultStrategy) returns (uint256 withdrawn) {
-                    amountRemaining = withdrawn >= amountRemaining ? 0 : amountRemaining - withdrawn;
+                    amountRemaining = amountRemaining.satSub(withdrawn);
                 } catch {
                     emit StrategyWithdrawalFailed(defaultStrategy, asset, amountRemaining);
                 }
@@ -242,7 +244,7 @@ contract Allocator is
                 address strategy = $storage().assetStrategies[asset].at(i);
                 if (strategy != defaultStrategy) {
                     try this.tryWithdrawFromStrategy(asset, amountRemaining, strategy) returns (uint256 withdrawn) {
-                        amountRemaining = withdrawn >= amountRemaining ? 0 : amountRemaining - withdrawn;
+                        amountRemaining = amountRemaining.satSub(withdrawn);
                     } catch {
                         emit StrategyWithdrawalFailed(strategy, asset, amountRemaining);
                     }
@@ -507,10 +509,7 @@ contract Allocator is
         }
 
         uint256 netDepositAmount = _getAssetBalanceInStrategy(IERC4626(strategy)) - balanceBefore;
-        require(
-            netDepositAmount >= amount || amount - netDepositAmount <= STRATEGY_DEPOSIT_SLIPPAGE_TOLERANCE,
-            Errors.InsufficientAmountOut()
-        );
+        require(amount.satSub(netDepositAmount) <= STRATEGY_DEPOSIT_SLIPPAGE_TOLERANCE, Errors.InsufficientAmountOut());
         emit AssetAllocated(asset, strategy, amount, netDepositAmount);
         return netDepositAmount;
     }

@@ -76,4 +76,13 @@ library MathLib {
     function rpow(uint256 x, uint256 n) internal pure returns (uint256) {
         return FixedPointMathLib.rpow(x, n, RAY);
     }
+
+    /// @notice Unsigned integer saturating subtraction; floors at zero instead of reverting on underflow.
+    /// @dev Returns `a - b` if `a > b`, otherwise `0`.
+    /// @param a The minuend
+    /// @param b The subtrahend
+    /// @return The saturated difference between `a` and `b`, floored at zero.
+    function satSub(uint256 a, uint256 b) internal pure returns (uint256) {
+        return a > b ? a - b : 0;
+    }
 }
