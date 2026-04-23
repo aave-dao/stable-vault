@@ -70,9 +70,9 @@ interface IFundsHandler {
 
     /// @notice Retrieves funds from liquidity source on native chain before pushing funds to another chain through the
     /// Gateway contract.
-    /// @param asset Address of the asset to push to the Accounting Chain.
-    /// @param amount Amount of the asset to push to the Accounting Chain.
-    /// @param chainId Chain id of the Accounting Chain.
+    /// @param asset Address of the asset to push to the destination chain.
+    /// @param amount Amount of the asset to push to the destination chain.
+    /// @param chainId Chain id of the destination chain.
     /// @param bridgeParams The parameters for the bridge adapter.
     function pushFundsToChain(
         address asset,

@@ -119,8 +119,6 @@ interface IStableVault {
 
     /// @notice Sets the rate for a batch of users.
     /// @param userRateData Batch of user rates to set.
-    /// @param userRateData.user Address of the user.
-    /// @param userRateData.newPerSecondRate New per-second rate for the user.
     function setUserRate(UserRateData[] calldata userRateData) external;
 
     /// @notice Getter for the default sub-vault.

@@ -259,8 +259,9 @@ contract StableVault is
     /// @dev The sender's principal (`originalDepositRay`) is decremented by up to `amountRay` and the same principal
     /// amount is moved to the recipient. This is a simplified accounting-only operation that bypasses withdrawal fees,
     /// oracle checks, solvency gating, and slippage.
-    /// @dev Principal is tracked as one aggregate balance per user (not by deposit lots), so transfers always consume
-    /// from that aggregate principal balance.
+    /// @dev Principal is tracked as one aggregate balance per user (not by deposit lots). The principal moved to the
+    /// recipient is capped at the sender's remaining `originalDepositRay`; any excess of `amountRay` above that is
+    /// treated as interest and does not contribute to the recipient's principal.
     function transfer(address to, uint256 amountRay) external virtual override nonReentrant returns (bool) {
         address from = msg.sender;
         require(amountRay >= Constants.MIN_WITHDRAWABLE_AMOUNT_RAY, Errors.InvalidAmount());
