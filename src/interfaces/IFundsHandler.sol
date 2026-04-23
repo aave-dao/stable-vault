@@ -28,16 +28,6 @@ interface IFundsHandler {
     /// @param chainId Chain id of the earning chain that was removed.
     event EarningChainRemoved(uint256 chainId);
 
-    /// @notice The representation of an asset balance.
-    /// @param asset Address of the asset.
-    /// @param amountRay Amount of the asset in RAY.
-    /// @param chainId Chain id of the chain that the balance is on.
-    struct AssetBalance {
-        address asset;
-        uint256 amountRay;
-        uint256 chainId;
-    }
-
     /// @notice Getter for the total assets in the local Allocator and the Allocators on all Earning Chains.
     /// @dev May underestimate when trust or freshness guarantees cannot be satisfied for a given contribution
     /// (conservative by design). See the implementation for specific policies.
