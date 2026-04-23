@@ -32,8 +32,8 @@ import {Errors} from "src/types/Errors.sol";
 /// @author Aave Labs
 /// @notice Semi-fixed rate vault.
 /// @dev This contract supports batching of calls using the Multicall contract.
-/// @dev Assets balances are tracked in RAY internally; conversions from and to specific asset denomination is made on
-/// deposit and on withdrawal execution.
+/// @dev Asset balances are tracked in RAY (in the denominating currency) internally; conversions between RAY and each
+/// asset's native units are made on deposit and on withdrawal execution.
 /// @custom:upgradeable
 contract StableVault is
     AccessManagedUpgradeable,
