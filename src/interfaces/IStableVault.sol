@@ -119,8 +119,6 @@ interface IStableVault {
 
     /// @notice Sets the rate for a batch of users.
     /// @param userRateData Batch of user rates to set.
-    /// @param userRateData.user Address of the user.
-    /// @param userRateData.newPerSecondRate New per-second rate for the user.
     function setUserRate(UserRateData[] calldata userRateData) external;
 
     /// @notice Getter for the default sub-vault.
@@ -208,20 +206,20 @@ interface IStableVault {
         bytes memory data
     ) external;
 
-    /// @notice Getter for the aggregated obligations owed to depositors in RAY of denomination asset.
+    /// @notice Getter for the aggregated obligations owed to depositors in RAY of the denominating currency.
     /// @dev Includes the total supply of IOU tokens across all chains (circulating + locked for bridging).
-    /// @return obligations Aggregated obligations owed to depositors in RAY of denomination asset.
+    /// @return obligations Aggregated obligations owed to depositors in RAY of the denominating currency.
     function getVaultObligations() external view returns (uint256);
 
     /// @notice Getter for the aggregated balance on the local Allocator and the Allocator on Earning Chains.
     /// @dev May underestimate when trust or freshness guarantees cannot be satisfied for a given contribution
     /// (conservative by design). See the implementation for specific policies.
-    /// @return aggregatedBalance Aggregated balance of the vault in RAY of denomination asset.
+    /// @return aggregatedBalance Aggregated balance of the vault in RAY of the denominating currency.
     function getAggregatedBalance() external view returns (uint256);
 
-    /// @notice Getter for the balance of a user in RAY of denomination asset including accrued interest.
+    /// @notice Getter for the balance of a user in RAY of the denominating currency including accrued interest.
     /// @param user Address of the user.
-    /// @return balance Balance of the user in RAY of denomination asset.
+    /// @return balance Balance of the user in RAY of the denominating currency.
     function getUserBalance(address user) external view returns (uint256);
 
     /// @notice Getter for the sub-vaults that have user positions.
@@ -233,12 +231,12 @@ interface IStableVault {
     /// @return subVaultData Sub-vault data for the user.
     function getUserSubVault(address user) external view returns (SubVaultData memory subVaultData);
 
-    /// @notice Getter for the global original deposit amount in RAY of denomination asset.
+    /// @notice Getter for the global original deposit amount in RAY of the denominating currency.
     /// @dev Original deposits are the invested principal from users (not including accrued interest).
-    /// @return globalOriginalDepositAmount Global original deposit amount in RAY of denomination asset.
+    /// @return globalOriginalDepositAmount Global original deposit amount in RAY of the denominating currency.
     function getGlobalOriginalDepositAmount() external view returns (uint256 globalOriginalDepositAmount);
 
-    /// @notice Getter for the surplus interest that can be claimed in RAY of denomination asset.
+    /// @notice Getter for the surplus interest that can be claimed in RAY of the denominating currency.
     /// @dev Returns 0 if the system is underfunded (obligations >= assets).
     /// @return surplusInterestRay The claimable surplus in RAY.
     function getClaimableSurplusInterest() external view returns (uint256 surplusInterestRay);

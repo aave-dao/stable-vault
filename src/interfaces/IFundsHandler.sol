@@ -28,20 +28,10 @@ interface IFundsHandler {
     /// @param chainId Chain id of the earning chain that was removed.
     event EarningChainRemoved(uint256 chainId);
 
-    /// @notice The representation of an asset balance.
-    /// @param asset Address of the asset.
-    /// @param amountRay Amount of the asset in RAY.
-    /// @param chainId Chain id of the chain that the balance is on.
-    struct AssetBalance {
-        address asset;
-        uint256 amountRay;
-        uint256 chainId;
-    }
-
     /// @notice Getter for the total assets in the local Allocator and the Allocators on all Earning Chains.
     /// @dev May underestimate when trust or freshness guarantees cannot be satisfied for a given contribution
     /// (conservative by design). See the implementation for specific policies.
-    /// @return aggregatedBalance Total liquidity across all supported chains in RAY of supported asset denomination.
+    /// @return aggregatedBalance Total liquidity across all supported chains in RAY of the denominating currency.
     function getAggregatedBalance() external view returns (uint256);
 
     /// @notice Adds an earning chain to the list of supported earning chains.
@@ -70,9 +60,9 @@ interface IFundsHandler {
 
     /// @notice Retrieves funds from liquidity source on native chain before pushing funds to another chain through the
     /// Gateway contract.
-    /// @param asset Address of the asset to push to the Accounting Chain.
-    /// @param amount Amount of the asset to push to the Accounting Chain.
-    /// @param chainId Chain id of the Accounting Chain.
+    /// @param asset Address of the asset to push to the destination chain.
+    /// @param amount Amount of the asset to push to the destination chain.
+    /// @param chainId Chain id of the destination chain.
     /// @param bridgeAdapter The whitelisted bridge adapter to use for bridging the asset.
     /// @param bridgeParams The parameters for the bridge adapter.
     function pushFundsToChain(
