@@ -11,6 +11,7 @@ import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessMana
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {IPriceOracleAdapter} from "src/interfaces/IPriceOracleAdapter.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
+import {Errors} from "src/types/Errors.sol";
 
 /// @title PriceOracle
 /// @author Aave Labs
@@ -73,9 +74,9 @@ contract PriceOracle is AccessManagedUpgradeable, IPriceOracle {
 
     /// @inheritdoc IPriceOracle
     function validatePrice(address asset) external view override {
-        require($storage().oracleAdapterByAsset[asset] != address(0), OracleAdapterNotFound(asset));
-        IPriceOracleAdapter.OracleResponse memory response =
-            IPriceOracleAdapter($storage().oracleAdapterByAsset[asset]).getPrice(asset);
+        address oracleAdapter = $storage().oracleAdapterByAsset[asset];
+        require(oracleAdapter != address(0), OracleAdapterNotFound(asset));
+        IPriceOracleAdapter.OracleResponse memory response = IPriceOracleAdapter(oracleAdapter).getPrice(asset);
         require(!response.isStale, IPriceOracle.StalePrice());
         require(response.priceRay >= MIN_VALID_PRICE_RAY, IPriceOracle.PriceTooLow());
     }
@@ -85,6 +86,7 @@ contract PriceOracle is AccessManagedUpgradeable, IPriceOracle {
     }
 
     function setOracleAdapterForAsset(address asset, address newAdapter) external restricted {
+        require(asset != address(0), Errors.ZeroAddress());
         // Validate the adapter interface through a call to getPrice
         IPriceOracleAdapter(newAdapter).getPrice(asset);
         address previousAdapter = $storage().oracleAdapterByAsset[asset];

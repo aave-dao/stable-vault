@@ -12,6 +12,7 @@ import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.so
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Vm} from "forge-std/Vm.sol";
 
 import {Allocator} from "src/core/Allocator.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
@@ -147,13 +148,13 @@ contract AllocatorTest is TestWithHelpers {
 
         // Set up strategy vaults
         vm.prank(admin);
-        _allocator.addStrategy(address(_mockUsdt), address(_defaultUsdtStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        _allocator.addStrategy(address(_mockUsdt), address(_defaultUsdtStrategy));
         vm.prank(admin);
-        _allocator.addStrategy(address(_mockUsdt), address(_extraUsdtStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        _allocator.addStrategy(address(_mockUsdt), address(_extraUsdtStrategy));
         vm.prank(admin);
-        _allocator.addStrategy(address(_mockGho), address(_defaultGhoStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        _allocator.addStrategy(address(_mockGho), address(_defaultGhoStrategy));
         vm.prank(admin);
-        _allocator.addStrategy(address(_mockGho), address(_extraGhoStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        _allocator.addStrategy(address(_mockGho), address(_extraGhoStrategy));
 
         vm.prank(everyRoleAccount);
         _allocator.setDefaultStrategy(address(_mockUsdt), address(_defaultUsdtStrategy));
@@ -327,15 +328,9 @@ contract AllocatorTest is TestWithHelpers {
 
     function test_getStrategyConfig_returnsExpectedStrategyConfig() public view {
         assertEq(_allocator.getStrategyConfig(address(_defaultUsdtStrategy)).asset, address(_mockUsdt));
-        assertEq(
-            _allocator.getStrategyConfig(address(_defaultUsdtStrategy)).maxSlippageAmount, STRATEGY_MAX_SLIPPAGE_AMOUNT
-        );
         assertEq(_allocator.getStrategyConfig(address(_defaultUsdtStrategy)).isRegistered, true);
         assertEq(_allocator.getStrategyConfig(address(_defaultUsdtStrategy)).depositAllowed, true);
         assertEq(_allocator.getStrategyConfig(address(_extraUsdtStrategy)).asset, address(_mockUsdt));
-        assertEq(
-            _allocator.getStrategyConfig(address(_extraUsdtStrategy)).maxSlippageAmount, STRATEGY_MAX_SLIPPAGE_AMOUNT
-        );
     }
 
     function test_getStrategiesForAsset_returnsExpectedStrategies() public view {
@@ -357,7 +352,7 @@ contract AllocatorTest is TestWithHelpers {
         uint256 countBefore = before.length;
 
         vm.prank(admin);
-        _allocator.addStrategy(address(_mockUsdt), address(newStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        _allocator.addStrategy(address(_mockUsdt), address(newStrategy));
 
         address[] memory after_ = _allocator.getStrategiesForAsset(address(_mockUsdt));
         assertEq(after_.length, countBefore + 1);
@@ -517,7 +512,7 @@ contract AllocatorTest is TestWithHelpers {
         _strategyWithSlippage.setDepositSlippage(type(uint256).max);
 
         vm.startPrank(address(everyRoleAccount));
-        _allocator.addStrategy(address(_mockUsdt), address(_strategyWithSlippage), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        _allocator.addStrategy(address(_mockUsdt), address(_strategyWithSlippage));
         _allocator.setDefaultStrategy(address(_mockUsdt), address(_strategyWithSlippage));
         vm.stopPrank();
 
@@ -536,7 +531,7 @@ contract AllocatorTest is TestWithHelpers {
         _strategyWithBonus.setDepositBonus(bonusAmount);
 
         vm.startPrank(address(everyRoleAccount));
-        _allocator.addStrategy(address(_mockUsdt), address(_strategyWithBonus), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        _allocator.addStrategy(address(_mockUsdt), address(_strategyWithBonus));
         _allocator.setDefaultStrategy(address(_mockUsdt), address(_strategyWithBonus));
         vm.stopPrank();
 
@@ -556,11 +551,11 @@ contract AllocatorTest is TestWithHelpers {
         uint256 slippageAmount = STRATEGY_MAX_SLIPPAGE_AMOUNT + 1; // 11, exceeds threshold of 10
 
         TestErc4626WithSlippage _strategyWithSlippage = new TestErc4626WithSlippage(_mockUsdt);
-        // Set slippage to exceed the configured maxSlippageAmount
+        // Set slippage to exceed the constant SLIPPAGE_ROUNDING_TOLERANCE
         _strategyWithSlippage.setDepositSlippage(slippageAmount);
 
         vm.startPrank(address(everyRoleAccount));
-        _allocator.addStrategy(address(_mockUsdt), address(_strategyWithSlippage), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        _allocator.addStrategy(address(_mockUsdt), address(_strategyWithSlippage));
         _allocator.setDefaultStrategy(address(_mockUsdt), address(_strategyWithSlippage));
         vm.stopPrank();
 
@@ -575,11 +570,11 @@ contract AllocatorTest is TestWithHelpers {
         uint256 slippageAmount = STRATEGY_MAX_SLIPPAGE_AMOUNT;
 
         TestErc4626WithSlippage _strategyWithSlippage = new TestErc4626WithSlippage(_mockUsdt);
-        // Set slippage exactly at the configured maxSlippageAmount
+        // Set slippage exactly at the constant SLIPPAGE_ROUNDING_TOLERANCE
         _strategyWithSlippage.setDepositSlippage(slippageAmount);
 
         vm.startPrank(address(everyRoleAccount));
-        _allocator.addStrategy(address(_mockUsdt), address(_strategyWithSlippage), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        _allocator.addStrategy(address(_mockUsdt), address(_strategyWithSlippage));
         _allocator.setDefaultStrategy(address(_mockUsdt), address(_strategyWithSlippage));
         vm.stopPrank();
 
@@ -597,7 +592,7 @@ contract AllocatorTest is TestWithHelpers {
 
         MockErc4626Strategy mockStrategy = new MockErc4626Strategy(_mockUsdt);
         vm.prank(admin);
-        _allocator.addStrategy(address(_mockUsdt), address(mockStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        _allocator.addStrategy(address(_mockUsdt), address(mockStrategy));
         vm.prank(everyRoleAccount);
         _allocator.setDefaultStrategy(address(_mockUsdt), address(mockStrategy));
 
@@ -618,7 +613,7 @@ contract AllocatorTest is TestWithHelpers {
 
         MockErc4626Strategy mockStrategy = new MockErc4626Strategy(_mockUsdt);
         vm.prank(admin);
-        _allocator.addStrategy(address(_mockUsdt), address(mockStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        _allocator.addStrategy(address(_mockUsdt), address(mockStrategy));
 
         // Deposit directly into the strategy so it holds shares for the Allocator
         _mockUsdt.mint(depositor, depositAmount);
@@ -642,7 +637,7 @@ contract AllocatorTest is TestWithHelpers {
 
         MockErc4626Strategy mockStrategy = new MockErc4626Strategy(_mockUsdt);
         vm.prank(admin);
-        _allocator.addStrategy(address(_mockUsdt), address(mockStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        _allocator.addStrategy(address(_mockUsdt), address(mockStrategy));
 
         // Deposit into the healthy default strategy via the Allocator
         _mockTransferHelper.mockAsset(address(_mockUsdt), depositAmount);
@@ -671,7 +666,7 @@ contract AllocatorTest is TestWithHelpers {
 
         MockErc4626Strategy mockStrategy = new MockErc4626Strategy(_mockUsdt);
         vm.prank(admin);
-        _allocator.addStrategy(address(_mockUsdt), address(mockStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        _allocator.addStrategy(address(_mockUsdt), address(mockStrategy));
         vm.prank(everyRoleAccount);
         _allocator.setDefaultStrategy(address(_mockUsdt), address(mockStrategy));
 
@@ -703,7 +698,7 @@ contract AllocatorTest is TestWithHelpers {
         _strategyWithSlippage.setDepositSlippage(type(uint256).max);
 
         vm.startPrank(address(everyRoleAccount));
-        _allocator.addStrategy(address(_mockUsdt), address(_strategyWithSlippage), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        _allocator.addStrategy(address(_mockUsdt), address(_strategyWithSlippage));
         _allocator.setDefaultStrategy(address(_mockUsdt), address(_strategyWithSlippage));
         vm.stopPrank();
 
@@ -821,6 +816,8 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.deposit(address(_mockUsdt), 0);
     }
 
+    // Zero-amount depositAllowIdle is intentionally allowed: this path is used by bridge callbacks
+    // (fundsArrivedFromChainCallback), where reverting could jam the bridge infrastructure.
     function test_depositAllowIdle_doesNotRevert_ifAmountIsZero() public {
         vm.prank(depositor);
         _allocator.depositAllowIdle(address(_mockUsdt), 0);
@@ -834,7 +831,7 @@ contract AllocatorTest is TestWithHelpers {
     function test_withdraw_reverts_givenMaxWithdrawReturnsZero() public {
         MockErc4626Strategy mockStrategy = new MockErc4626Strategy(_mockUsdt);
         vm.prank(admin);
-        _allocator.addStrategy(address(_mockUsdt), address(mockStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        _allocator.addStrategy(address(_mockUsdt), address(mockStrategy));
         vm.prank(everyRoleAccount);
         _allocator.setDefaultStrategy(address(_mockUsdt), address(mockStrategy));
 
@@ -907,6 +904,45 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
+    }
+
+    function test_withdraw_skipsDefaultStrategyWhenUnset(uint256 amount) public {
+        _mockAssetRegistry.mockRegisteredAsset(address(_mockUsdt));
+        amount = _boundAssetAmount(address(_mockUsdt), amount);
+        vm.assume(amount > 0);
+
+        // Seed only the non-default strategy; default will be unset below.
+        _mockUsdt.mint(depositor, amount);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(_extraUsdtStrategy), amount);
+        vm.prank(depositor);
+        _extraUsdtStrategy.deposit(amount, address(_allocator));
+
+        // Unset the default strategy for USDT.
+        vm.prank(address(everyRoleAccount));
+        _allocator.setDefaultStrategy(address(_mockUsdt), address(0));
+
+        // Record logs so we can assert the spurious StrategyWithdrawalFailed(address(0), ...) is NOT emitted.
+        vm.recordLogs();
+        vm.prank(withdrawer);
+        _allocator.withdraw(address(_mockUsdt), amount);
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 failedSig = IAllocator.StrategyWithdrawalFailed.selector;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == failedSig) {
+                assertTrue(
+                    address(uint160(uint256(logs[i].topics[1]))) != address(0),
+                    "must not emit StrategyWithdrawalFailed for address(0)"
+                );
+            }
+        }
+
+        // Withdrawal was serviced by _extraUsdtStrategy.
+        assertEq(_mockUsdt.balanceOf(address(_mockTransferHelper)), amount);
+        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
     }
 
     function test_withdraw_withdrawsFromMultipleStrategies(uint256 amount) public {
@@ -1010,7 +1046,7 @@ contract AllocatorTest is TestWithHelpers {
         // Check that attempts to withdraw from non-default strategy is also wrapped in a try-catch
         TestErc4626 nonDefaultStrategy = new TestErc4626(_mockUsdt);
         vm.prank(admin);
-        _allocator.addStrategy(address(_mockUsdt), address(nonDefaultStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        _allocator.addStrategy(address(_mockUsdt), address(nonDefaultStrategy));
 
         // Deposit into the non-default strategies
         _mockUsdt.mint(depositor, amount);
@@ -1277,7 +1313,7 @@ contract AllocatorTest is TestWithHelpers {
 
         MockErc4626Strategy mockStrategy = new MockErc4626Strategy(_mockUsdt);
         vm.prank(admin);
-        singleStrategyAllocator.addStrategy(address(_mockUsdt), address(mockStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        singleStrategyAllocator.addStrategy(address(_mockUsdt), address(mockStrategy));
         vm.prank(everyRoleAccount);
         singleStrategyAllocator.setDefaultStrategy(address(_mockUsdt), address(mockStrategy));
 
@@ -1304,7 +1340,7 @@ contract AllocatorTest is TestWithHelpers {
 
         MockErc4626Strategy mockStrategy = new MockErc4626Strategy(_mockUsdt);
         vm.prank(admin);
-        _allocator.addStrategy(address(_mockUsdt), address(mockStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        _allocator.addStrategy(address(_mockUsdt), address(mockStrategy));
 
         _mockUsdt.mint(depositor, amount);
         vm.prank(depositor);
@@ -1329,7 +1365,7 @@ contract AllocatorTest is TestWithHelpers {
 
         MockErc4626Strategy mockDefaultStrategy = new MockErc4626Strategy(_mockUsdt);
         vm.prank(admin);
-        _allocator.addStrategy(address(_mockUsdt), address(mockDefaultStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        _allocator.addStrategy(address(_mockUsdt), address(mockDefaultStrategy));
         vm.prank(everyRoleAccount);
         _allocator.setDefaultStrategy(address(_mockUsdt), address(mockDefaultStrategy));
 
@@ -1360,7 +1396,7 @@ contract AllocatorTest is TestWithHelpers {
 
         MockErc4626Strategy mockStrategy = new MockErc4626Strategy(_mockUsdt);
         vm.prank(admin);
-        _allocator.addStrategy(address(_mockUsdt), address(mockStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        _allocator.addStrategy(address(_mockUsdt), address(mockStrategy));
 
         _mockUsdt.mint(depositor, amount);
         vm.prank(depositor);
@@ -1387,7 +1423,7 @@ contract AllocatorTest is TestWithHelpers {
 
         MockErc4626Strategy mockDefaultStrategy = new MockErc4626Strategy(_mockUsdt);
         vm.prank(admin);
-        _allocator.addStrategy(address(_mockUsdt), address(mockDefaultStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        _allocator.addStrategy(address(_mockUsdt), address(mockDefaultStrategy));
         vm.prank(everyRoleAccount);
         _allocator.setDefaultStrategy(address(_mockUsdt), address(mockDefaultStrategy));
 
@@ -1447,7 +1483,7 @@ contract AllocatorTest is TestWithHelpers {
 
         MockErc4626Strategy mockDefaultStrategy = new MockErc4626Strategy(_mockUsdt);
         vm.prank(admin);
-        _allocator.addStrategy(address(_mockUsdt), address(mockDefaultStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        _allocator.addStrategy(address(_mockUsdt), address(mockDefaultStrategy));
         vm.prank(everyRoleAccount);
         _allocator.setDefaultStrategy(address(_mockUsdt), address(mockDefaultStrategy));
 
@@ -1815,7 +1851,7 @@ contract AllocatorTest is TestWithHelpers {
         TestErc4626WithSlippage _strategyWithSlippage = new TestErc4626WithSlippage(_mockUsdt);
 
         vm.prank(admin);
-        _allocator.addStrategy(address(_mockUsdt), address(_strategyWithSlippage), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        _allocator.addStrategy(address(_mockUsdt), address(_strategyWithSlippage));
 
         // Deposit funds into the strategy vault on behalf of the Allocator
         _mockUsdt.mint(depositor, depositAmountUsdt);
@@ -2117,6 +2153,21 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalance(assetOut), 0);
     }
 
+    function test_rebalance_swap_reverts_ifAssetInEqualsAssetOut() public {
+        address asset = address(_mockUsdt);
+        uint256 amountAssetIn = 100_000_000;
+        _mockUsdt.mint(address(_allocator), amountAssetIn);
+
+        IAllocator.RebalanceParams[] memory rebalanceParams = _initializeRebalanceParams(1);
+        IAllocator.SwapParams[] memory swaps = _initializeSwapParams(1);
+        swaps[0] = _buildSwapParams(asset, amountAssetIn, asset, address(_mockSwapper), "");
+        rebalanceParams[0] =
+            _buildRebalanceParams(_initializeDeallocationParams(0), swaps, _initializeAllocationParams(0));
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        _allocator.rebalance(rebalanceParams);
+    }
+
     function test_rebalance_entireFlow(uint256 amountIn) public {
         address assetIn = address(_mockUsdt);
         address assetOut = address(_mockGho);
@@ -2175,22 +2226,20 @@ contract AllocatorTest is TestWithHelpers {
 
         vm.prank(operator);
         vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, operator));
-        _allocator.addStrategy(address(_mockUsdt), address(_defaultUsdtStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        _allocator.addStrategy(address(_mockUsdt), address(_defaultUsdtStrategy));
     }
 
     function test_addStrategy_reverts_ifStrategyIsAlreadyAdded() public {
         vm.prank(address(everyRoleAccount));
         vm.expectRevert(Errors.AddressAlreadyWhitelisted.selector);
-        _allocator.addStrategy(address(_mockUsdt), address(_defaultUsdtStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        _allocator.addStrategy(address(_mockUsdt), address(_defaultUsdtStrategy));
     }
 
     function test_addStrategy_reverts_ifAssetIsNotRegistered() public {
         address unsupportedStrategy = address(new TestErc4626(_mockUnsupportedAsset));
         vm.prank(address(everyRoleAccount));
         vm.expectRevert(abi.encodeWithSelector(Errors.InvalidAsset.selector, address(_mockUnsupportedAsset)));
-        _allocator.addStrategy(
-            address(_mockUnsupportedAsset), address(unsupportedStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT
-        );
+        _allocator.addStrategy(address(_mockUnsupportedAsset), address(unsupportedStrategy));
     }
 
     function test_addStrategy_reverts_ifStrategyIsNotSupportedForAsset() public {
@@ -2202,11 +2251,11 @@ contract AllocatorTest is TestWithHelpers {
 
         vm.prank(address(everyRoleAccount));
         vm.expectRevert(abi.encodeWithSelector(Errors.InvalidAsset.selector, address(_mockUsdt)));
-        _allocator.addStrategy(address(_mockUsdt), address(_extraGhoStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        _allocator.addStrategy(address(_mockUsdt), address(_extraGhoStrategy));
 
         vm.prank(address(everyRoleAccount));
         vm.expectRevert(abi.encodeWithSelector(Errors.InvalidAsset.selector, address(_mockGho)));
-        _allocator.addStrategy(address(_mockGho), address(_extraUsdtStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        _allocator.addStrategy(address(_mockGho), address(_extraUsdtStrategy));
     }
 
     function test_addStrategy_reverts_ifMaxStrategiesPerAssetIsExceeded(uint8 maxStrategiesPerAsset) public {
@@ -2224,13 +2273,13 @@ contract AllocatorTest is TestWithHelpers {
         for (uint256 i = 0; i < maxStrategiesPerAsset; i++) {
             strategy = address(new TestErc4626(_mockUsdt));
             vm.prank(address(everyRoleAccount));
-            _allocator.addStrategy(address(_mockUsdt), address(strategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+            _allocator.addStrategy(address(_mockUsdt), address(strategy));
         }
 
         strategy = address(new TestErc4626(_mockUsdt));
         vm.prank(address(everyRoleAccount));
         vm.expectRevert(abi.encodeWithSelector(IAllocator.TooManyStrategies.selector, address(_mockUsdt)));
-        _allocator.addStrategy(address(_mockUsdt), address(strategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        _allocator.addStrategy(address(_mockUsdt), address(strategy));
     }
 
     function test_setDefaultStrategy_reverts_ifUnauthorizedCaller(address operator) public {
@@ -2342,8 +2391,8 @@ contract AllocatorTest is TestWithHelpers {
         // Add back a strategy and make it the default
         vm.prank(address(everyRoleAccount));
         vm.expectEmit(true, true, true, true);
-        emit IAllocator.StrategyAdded(address(_mockUsdt), address(_extraUsdtStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
-        _allocator.addStrategy(address(_mockUsdt), address(_extraUsdtStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        emit IAllocator.StrategyAdded(address(_mockUsdt), address(_extraUsdtStrategy));
+        _allocator.addStrategy(address(_mockUsdt), address(_extraUsdtStrategy));
         vm.prank(address(everyRoleAccount));
         vm.expectEmit(true, true, true, true);
         emit IAllocator.DefaultStrategySet(address(_mockUsdt), address(_extraUsdtStrategy));
@@ -2916,7 +2965,7 @@ contract AllocatorTest is TestWithHelpers {
     function test_addStrategy_setsIsTrustedToTrue() public {
         TestErc4626 newStrategy = new TestErc4626(_mockUsdt);
         vm.prank(admin);
-        _allocator.addStrategy(address(_mockUsdt), address(newStrategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        _allocator.addStrategy(address(_mockUsdt), address(newStrategy));
         assertTrue(_allocator.isStrategyTrusted(address(newStrategy)));
     }
 
@@ -3020,6 +3069,13 @@ contract AllocatorTest is TestWithHelpers {
             abi.encodeWithSelector(IAllocator.DepositsToStrategyDisabled.selector, address(_extraUsdtStrategy))
         );
         _allocator.setDefaultStrategy(address(_mockUsdt), address(_extraUsdtStrategy));
+    }
+
+    function test_setDefaultStrategy_reverts_ifClearingDefaultForUnregisteredAsset() public {
+        address unregisteredAsset = makeAddr("unregistered");
+        vm.prank(address(everyRoleAccount));
+        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidAsset.selector, unregisteredAsset));
+        _allocator.setDefaultStrategy(unregisteredAsset, address(0));
     }
 
     function test_trustStrategy_doesNotReEnableDeposits() public {
@@ -3163,7 +3219,7 @@ contract AllocatorTest is TestWithHelpers {
     function _deployReentrantStrategy() internal returns (MockReentrantErc4626Strategy) {
         MockReentrantErc4626Strategy strategy = new MockReentrantErc4626Strategy(_mockUsdt);
         vm.prank(admin);
-        _allocator.addStrategy(address(_mockUsdt), address(strategy), STRATEGY_MAX_SLIPPAGE_AMOUNT);
+        _allocator.addStrategy(address(_mockUsdt), address(strategy));
         return strategy;
     }
 

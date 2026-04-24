@@ -94,7 +94,7 @@ contract MockAllocator is IAllocator {
         _pushToTransferHelper();
     }
 
-    function addStrategy(address asset, address strategy, uint8 maxSlippageAmount) external override {}
+    function addStrategy(address asset, address strategy) external override {}
     function removeStrategy(address strategy) external override {}
     function setDefaultStrategy(address asset, address strategy) external override {}
     function disableDepositsToStrategy(address strategy) external override {}

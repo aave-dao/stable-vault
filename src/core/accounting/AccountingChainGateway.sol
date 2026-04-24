@@ -66,6 +66,10 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) external override onlyFundsHandler {
         _validateOutboundAdapter(asset, targetChainId, adapter);
+        // Block pushing funds to a chain whose balance oracle is stale, as the target chain's state is unknown and
+        // may be unhealthy (e.g. chain or oracle infrastructure is down). Sending funds there risks locking assets or
+        // DoSing withdrawals due to a lack of aggregated liquidity until the oracle staleness is resolved.
+        require(!IChainBalanceOracle(CHAIN_BALANCE_ORACLE).getChainBalance(targetChainId).isStale, StaleChainBalance());
         _sendCrossChainMessage(targetChainId, adapter, asset, amount, "", bridgeParams);
     }
 

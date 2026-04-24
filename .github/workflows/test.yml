@@ -7,8 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  checks: write
+  contents: read
 
 env:
   FOUNDRY_PROFILE: ci
@@ -82,8 +81,6 @@ jobs:
     name: Test
     needs: build
     runs-on: ubuntu-latest
-    outputs:
-      snapshots_changed: ${{ steps.snapshots.outputs.changed }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -103,104 +100,94 @@ jobs:
       - name: Run Forge tests
         run: forge test -vvv
 
-      - name: Capture updated gas snapshots
-        id: snapshots
-        if: success() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-        shell: bash
-        run: |
-          if git diff --quiet -- snapshots/; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          mkdir -p "$RUNNER_TEMP/gas-snapshots"
-          cp snapshots/*.json "$RUNNER_TEMP/gas-snapshots/"
-          echo "changed=true" >> "$GITHUB_OUTPUT"
-
-      - name: Upload updated gas snapshots
-        if: steps.snapshots.outputs.changed == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: updated-gas-snapshots
-          path: ${{ runner.temp }}/gas-snapshots/*.json
-          retention-days: 1
-
-  snapshot-update:
-    name: Snapshot Update
-    needs: [lint, sizes, test]
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && needs.test.outputs.snapshots_changed == 'true'
+  gas-diff:
+    name: Gas Diff
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      actions: read
+    env:
+      FOUNDRY_PROFILE: gas
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.ref }}
-          token: ${{ github.token }}
-          fetch-depth: 0
 
-      - name: Download updated gas snapshots
-        uses: actions/download-artifact@v4
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Run gas tests
+        run: forge test
+
+      - name: Upload baseline (master push only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: actions/upload-artifact@v4
         with:
-          name: updated-gas-snapshots
-          path: snapshots
+          name: gas-baseline
+          path: snapshots/
+          retention-days: 90
+          if-no-files-found: error
 
-      - name: Commit updated gas snapshots
-        id: snapshot_commit
-        shell: bash
+      - name: Download baseline (PR only)
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
         run: |
-          if git diff --quiet -- snapshots/; then
-            echo "committed=false" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          mkdir -p baseline
+          artifact_id=$(gh api \
+            "repos/$REPO/actions/artifacts?name=gas-baseline&per_page=100" \
+            --jq '[.artifacts[] | select(.expired == false and .workflow_run.head_branch == "master")][0].id // empty')
+
+          if [[ -z "$artifact_id" ]]; then
+            echo "::warning::No baseline artifact found yet. PR comment will show current values only."
             exit 0
           fi
 
-          old_sha="$(git rev-parse HEAD)"
+          echo "Downloading baseline artifact id=$artifact_id"
+          gh api -H "Accept: application/vnd.github+json" \
+            "repos/$REPO/actions/artifacts/$artifact_id/zip" \
+            > baseline.zip
+          unzip -q baseline.zip -d baseline/
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add snapshots/
-          git commit -m "chore: auto-update gas snapshots"
-
-          new_sha="$(git rev-parse HEAD)"
-          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
-
-          echo "committed=true" >> "$GITHUB_OUTPUT"
-          echo "old_sha=$old_sha" >> "$GITHUB_OUTPUT"
-          echo "new_sha=$new_sha" >> "$GITHUB_OUTPUT"
-
-      - name: Mark inherited checks on snapshot-only commit
-        if: steps.snapshot_commit.outputs.committed == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          REPO="${{ github.repository }}"
-          OLD_SHA="${{ steps.snapshot_commit.outputs.old_sha }}"
-          NEW_SHA="${{ steps.snapshot_commit.outputs.new_sha }}"
-          DETAILS_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          SUMMARY="Snapshot-only auto-update generated from passing CI on ${OLD_SHA:0:7}. No source files changed."
-
-          dependency_review_conclusion="$(gh api "repos/$REPO/commits/$OLD_SHA/check-runs" --jq '.check_runs[] | select(.name == "dependency-review") | .conclusion' | head -n 1 || true)"
-          if [ -z "$dependency_review_conclusion" ]; then
-            dependency_review_conclusion="success"
+          base_sha=$(gh api "repos/$REPO/actions/artifacts/$artifact_id" \
+            --jq '.workflow_run.head_sha // empty')
+          if [[ -n "$base_sha" ]]; then
+            echo "BASE_SHA=$base_sha" >> "$GITHUB_ENV"
           fi
 
-          create_check_run() {
-            local name="$1"
-            local conclusion="$2"
-            gh api "repos/$REPO/check-runs" \
-              --method POST \
-              -f name="$name" \
-              -f head_sha="$NEW_SHA" \
-              -f status="completed" \
-              -f conclusion="$conclusion" \
-              -f details_url="$DETAILS_URL" \
-              -f output[title]="Inherited result after snapshot auto-update" \
-              -f output[summary]="$SUMMARY" >/dev/null
-          }
+      - name: Generate diff comment (PR only)
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        id: diff
+        env:
+          COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          comment=$(./.github/workflows/gas-diff.sh baseline snapshots || true)
+          if [[ -n "$comment" ]]; then
+            {
+              echo 'comment<<GAS_DIFF_EOF'
+              printf "%s\n" "$comment"
+              echo 'GAS_DIFF_EOF'
+              echo "has_diff=true"
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "has_diff=false" >> "$GITHUB_OUTPUT"
+          fi
 
-          create_check_run "Build" "success"
-          create_check_run "Lint" "success"
-          create_check_run "Sizes" "success"
-          create_check_run "Test" "success"
-          create_check_run "dependency-review" "$dependency_review_conclusion"
+      - name: Post / update sticky comment
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.diff.outputs.has_diff == 'true'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: gas-diff
+          message: ${{ steps.diff.outputs.comment }}
+
+      - name: Delete sticky comment if no diff
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.diff.outputs.has_diff == 'false'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: gas-diff
+          delete: true

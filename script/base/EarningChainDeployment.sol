@@ -170,12 +170,12 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
 
         address usdcYieldStrategy =
             _deployATokenVault(_usdc(), poolAddressProvider, getAccessManagerAddress(_deployer()), _deployer());
-        allocator.addStrategy(_usdc(), usdcYieldStrategy, uint8(_configUint(".strategyMaxSlippageAmount")));
+        allocator.addStrategy(_usdc(), usdcYieldStrategy);
         allocator.setDefaultStrategy(_usdc(), usdcYieldStrategy);
 
         address usdtYieldStrategy =
             _deployATokenVault(_usdt(), poolAddressProvider, getAccessManagerAddress(_deployer()), _deployer());
-        allocator.addStrategy(_usdt(), usdtYieldStrategy, uint8(_configUint(".strategyMaxSlippageAmount")));
+        allocator.addStrategy(_usdt(), usdtYieldStrategy);
         allocator.setDefaultStrategy(_usdt(), usdtYieldStrategy);
     }
 
@@ -257,7 +257,14 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         address iouToken = _deploy_create3({
             namespacedSaltSeed: IOU_TOKEN_SALT_SEED,
             deployer: _deployer(),
-            initCode: abi.encodePacked(type(IouToken).creationCode, abi.encode(getIouTokenManagerAddress(_deployer())))
+            initCode: abi.encodePacked(
+                type(IouToken).creationCode,
+                abi.encode(
+                    getIouTokenManagerAddress(_deployer()),
+                    _configString(".iouTokenName"),
+                    _configString(".iouTokenSymbol")
+                )
+            )
         });
         require(iouToken == getIouTokenAddress(_deployer()), "IouToken does not match expected address");
         _logDeployment("IouToken", IOU_TOKEN_SALT_SEED, iouToken);

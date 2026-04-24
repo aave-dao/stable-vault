@@ -56,8 +56,6 @@ contract BaseTest is TestWithHelpers {
     address everyRoleAccount = makeAddr("EVERY_ROLE_ACCOUNT");
     address treasury = makeAddr("TREASURY");
 
-    uint8 constant STRATEGY_MAX_SLIPPAGE_AMOUNT = 10;
-
     // ADMIN_ROLE = 0
     uint64 internal constant ROLE_MANAGEMENT_ROLE = 1;
     uint64 internal constant GUARDIAN_ROLE = 2;
@@ -207,7 +205,10 @@ contract BaseTest is TestWithHelpers {
             new TransparentUpgradeableProxy(
                 vaultImpl,
                 address(this),
-                abi.encodeCall(StableVault.initialize, (accessManager, treasuryAddress, defaultSubVaultPerSecondRate))
+                abi.encodeCall(
+                    StableVault.initialize,
+                    (accessManager, treasuryAddress, defaultSubVaultPerSecondRate, "Aave USD Stable Vault", "ASV-USD")
+                )
             )
         );
 
@@ -378,7 +379,8 @@ contract BaseTest is TestWithHelpers {
         );
 
         // 10. IOU Token
-        iouToken_accountingChain = new IouToken(iouTokenManager_accountingChainAddress);
+        iouToken_accountingChain =
+            new IouToken(iouTokenManager_accountingChainAddress, "IOU: Aave USD Stable Vault", "IOU-USD");
         Logger.log("\tIOU Token (Accounting Chain): %s", iouToken_accountingChainAddress);
         require(
             address(iouToken_accountingChain) == iouToken_accountingChainAddress,
@@ -657,7 +659,8 @@ contract BaseTest is TestWithHelpers {
         );
 
         // 9. IOU Token
-        iouToken_earningChain = new IouToken(iouTokenManager_earningChainAddress);
+        iouToken_earningChain =
+            new IouToken(iouTokenManager_earningChainAddress, "IOU: Aave USD Stable Vault", "IOU-USD");
         Logger.log("\tIOU Token (Earning Chain): %s", address(iouToken_earningChain));
         require(
             address(iouToken_earningChain) == iouToken_earningChainAddress, "IOU Token (Earning Chain) address mismatch"
@@ -806,22 +809,14 @@ contract BaseTest is TestWithHelpers {
         assetRegistry_earningChain.setAssetConfig(address(USDC), unrestrictedAssetConfig);
 
         // Set up Allocator on Accounting chain
-        allocator_accountingChain.addStrategy(
-            address(GHO), address(ghoStrategyVault_accountingChain), STRATEGY_MAX_SLIPPAGE_AMOUNT
-        );
-        allocator_accountingChain.addStrategy(
-            address(USDC), address(usdcStrategyVault_accountingChain), STRATEGY_MAX_SLIPPAGE_AMOUNT
-        );
+        allocator_accountingChain.addStrategy(address(GHO), address(ghoStrategyVault_accountingChain));
+        allocator_accountingChain.addStrategy(address(USDC), address(usdcStrategyVault_accountingChain));
         allocator_accountingChain.setDefaultStrategy(address(GHO), address(ghoStrategyVault_accountingChain));
         allocator_accountingChain.setDefaultStrategy(address(USDC), address(usdcStrategyVault_accountingChain));
 
         // Set up Allocator on Earning chain
-        allocator_earningChain.addStrategy(
-            address(GHO), address(ghoStrategyVault_earningChain), STRATEGY_MAX_SLIPPAGE_AMOUNT
-        );
-        allocator_earningChain.addStrategy(
-            address(USDC), address(usdcStrategyVault_earningChain), STRATEGY_MAX_SLIPPAGE_AMOUNT
-        );
+        allocator_earningChain.addStrategy(address(GHO), address(ghoStrategyVault_earningChain));
+        allocator_earningChain.addStrategy(address(USDC), address(usdcStrategyVault_earningChain));
         allocator_earningChain.setDefaultStrategy(address(GHO), address(ghoStrategyVault_earningChain));
         allocator_earningChain.setDefaultStrategy(address(USDC), address(usdcStrategyVault_earningChain));
 

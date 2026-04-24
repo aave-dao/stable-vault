@@ -153,6 +153,7 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
     function _lockTokens(address from, uint256 amount) internal {
         $storage().lockedBalance += amount;
         IIouToken(IOU_TOKEN).lock(from, amount);
+        emit TokensLocked(from, amount);
     }
 
     function _burnTokens(address from, uint256 amount) internal {

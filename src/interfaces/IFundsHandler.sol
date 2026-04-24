@@ -39,6 +39,8 @@ interface IFundsHandler {
     }
 
     /// @notice Getter for the total assets in the local Allocator and the Allocators on all Earning Chains.
+    /// @dev May underestimate when trust or freshness guarantees cannot be satisfied for a given contribution
+    /// (conservative by design). See the implementation for specific policies.
     /// @return aggregatedBalance Total liquidity across all supported chains in RAY of supported asset denomination.
     function getAggregatedBalance() external view returns (uint256);
 

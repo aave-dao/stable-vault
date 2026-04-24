@@ -25,6 +25,7 @@ import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
+import {Vm} from "forge-std/Vm.sol";
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
 import {_toAddressArray, _toUint256Array} from "test/helpers/TypeHelpers.sol";
 import {MockAccessManager} from "test/mocks/MockAccessManager.sol";
@@ -50,6 +51,8 @@ contract StableVaultTest is TestWithHelpers {
 
     uint256 internal constant DEFAULT_MAX_ACTIVE_SUB_VAULTS = 201;
     uint256 constant DEFAULT_PER_SECOND_RATE = 1000000001243680656318820313; // ~4% APY
+    string internal constant TEST_VAULT_NAME = "Test Aave USD Stable Vault";
+    string internal constant TEST_VAULT_SYMBOL = "test-ASV-USD";
     MockAccessManager mockAccessManager;
     IMockErc20 mockAsset;
     MockFundsHandler mockFundsHandler;
@@ -96,7 +99,14 @@ contract StableVaultTest is TestWithHelpers {
                     vaultImpl,
                     address(this),
                     abi.encodeCall(
-                        StableVault.initialize, (accessManager, treasuryAddress, defaultSubVaultPerSecondRate)
+                        StableVault.initialize,
+                        (
+                            accessManager,
+                            treasuryAddress,
+                            defaultSubVaultPerSecondRate,
+                            TEST_VAULT_NAME,
+                            TEST_VAULT_SYMBOL
+                        )
                     )
                 )
             )
@@ -134,7 +144,14 @@ contract StableVaultTest is TestWithHelpers {
                     vaultImpl,
                     address(this),
                     abi.encodeCall(
-                        StableVault.initialize, (accessManager, treasuryAddress, defaultSubVaultPerSecondRate)
+                        StableVault.initialize,
+                        (
+                            accessManager,
+                            treasuryAddress,
+                            defaultSubVaultPerSecondRate,
+                            TEST_VAULT_NAME,
+                            TEST_VAULT_SYMBOL
+                        )
                     )
                 )
             )
@@ -275,7 +292,14 @@ contract StableVaultTest is TestWithHelpers {
                     stableVaultImpl,
                     address(this),
                     abi.encodeCall(
-                        StableVault.initialize, (expectedAccessManager, expectedTreasury, expectedDefaultSubVaultRate)
+                        StableVault.initialize,
+                        (
+                            expectedAccessManager,
+                            expectedTreasury,
+                            expectedDefaultSubVaultRate,
+                            TEST_VAULT_NAME,
+                            TEST_VAULT_SYMBOL
+                        )
                     )
                 )
             )
@@ -310,9 +334,119 @@ contract StableVaultTest is TestWithHelpers {
                     stableVaultImpl,
                     address(this),
                     abi.encodeCall(
-                        StableVault.initialize, (address(mockAccessManager), treasury, invalidDefaultSubVaultRate)
+                        StableVault.initialize,
+                        (
+                            address(mockAccessManager),
+                            treasury,
+                            invalidDefaultSubVaultRate,
+                            TEST_VAULT_NAME,
+                            TEST_VAULT_SYMBOL
+                        )
                     )
                 )
+            )
+        );
+    }
+
+    /// @dev VA-75: `decimals()` must return RAY_DECIMALS (27) so Etherscan and wallets display StableVault balances
+    /// (which are denominated in RAY) with the correct decimal alignment.
+    function test_decimals_returnsRayDecimals() public view {
+        assertEq(stableVault.decimals(), Constants.RAY_DECIMALS);
+        assertEq(stableVault.decimals(), 27);
+    }
+
+    /// @dev VA-99: `name()` returns the value passed to the initializer, allowing each StableVault deployment
+    /// (USD, EUR, etc.) to set its own ERC20 metadata for off-chain display.
+    function test_name_returnsValuePassedToInitializer() public view {
+        assertEq(stableVault.name(), TEST_VAULT_NAME);
+    }
+
+    /// @dev VA-99: `symbol()` returns the value passed to the initializer.
+    function test_symbol_returnsValuePassedToInitializer() public view {
+        assertEq(stableVault.symbol(), TEST_VAULT_SYMBOL);
+    }
+
+    function test_initialize_setsCustomNameAndSymbol(string memory customName, string memory customSymbol) public {
+        vm.assume(bytes(customName).length > 0);
+        vm.assume(bytes(customSymbol).length > 0);
+
+        address stableVaultImpl = address(
+            new StableVault(
+                DEFAULT_MAX_PER_SECOND_RATE,
+                address(mockAssetRegistry),
+                address(mockIouTokenManager),
+                address(mockFundsHandler),
+                address(mockTransferHelper),
+                address(mockWithdrawalPolicy),
+                address(mockPriceOracle),
+                DEFAULT_MAX_ACTIVE_SUB_VAULTS
+            )
+        );
+
+        StableVault newStableVault = StableVault(
+            address(
+                new TransparentUpgradeableProxy(
+                    stableVaultImpl,
+                    address(this),
+                    abi.encodeCall(
+                        StableVault.initialize,
+                        (address(mockAccessManager), treasury, DEFAULT_PER_SECOND_RATE, customName, customSymbol)
+                    )
+                )
+            )
+        );
+
+        assertEq(newStableVault.name(), customName);
+        assertEq(newStableVault.symbol(), customSymbol);
+        assertEq(newStableVault.decimals(), Constants.RAY_DECIMALS);
+    }
+
+    function test_initialize_reverts_ifNameIsEmpty() public {
+        address stableVaultImpl = address(
+            new StableVault(
+                DEFAULT_MAX_PER_SECOND_RATE,
+                address(mockAssetRegistry),
+                address(mockIouTokenManager),
+                address(mockFundsHandler),
+                address(mockTransferHelper),
+                address(mockWithdrawalPolicy),
+                address(mockPriceOracle),
+                DEFAULT_MAX_ACTIVE_SUB_VAULTS
+            )
+        );
+
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        new TransparentUpgradeableProxy(
+            stableVaultImpl,
+            address(this),
+            abi.encodeCall(
+                StableVault.initialize,
+                (address(mockAccessManager), treasury, DEFAULT_PER_SECOND_RATE, "", TEST_VAULT_SYMBOL)
+            )
+        );
+    }
+
+    function test_initialize_reverts_ifSymbolIsEmpty() public {
+        address stableVaultImpl = address(
+            new StableVault(
+                DEFAULT_MAX_PER_SECOND_RATE,
+                address(mockAssetRegistry),
+                address(mockIouTokenManager),
+                address(mockFundsHandler),
+                address(mockTransferHelper),
+                address(mockWithdrawalPolicy),
+                address(mockPriceOracle),
+                DEFAULT_MAX_ACTIVE_SUB_VAULTS
+            )
+        );
+
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        new TransparentUpgradeableProxy(
+            stableVaultImpl,
+            address(this),
+            abi.encodeCall(
+                StableVault.initialize,
+                (address(mockAccessManager), treasury, DEFAULT_PER_SECOND_RATE, TEST_VAULT_NAME, "")
             )
         );
     }
@@ -561,6 +695,86 @@ contract StableVaultTest is TestWithHelpers {
         stableVault.deposit(user, address(mockAsset), amount);
     }
 
+    function test_deposit_emitsSubVaultActivated_onFirstDeposit() public {
+        address user = makeAddr("activationUser");
+        _assumeNotProxyAdmin(user, address(stableVault));
+
+        uint256 amount = 2_000_000;
+        mockAsset.mint(user, amount);
+
+        vm.prank(user);
+        mockAsset.forceApprove(address(stableVault), amount);
+
+        IStableVault.SubVaultData memory defaultSubVault = stableVault.getDefaultSubVault();
+
+        // SubVaultActivated has 1 indexed param: subVaultId
+        vm.expectEmit(true, false, false, true);
+        emit IStableVault.SubVaultActivated(defaultSubVault.id);
+
+        vm.prank(user);
+        stableVault.deposit(user, address(mockAsset), amount);
+    }
+
+    function test_transfer_emitsSubVaultDeactivated_whenSubVaultBecomesEmpty() public {
+        address user = makeAddr("deactivationUser");
+        address recipient = makeAddr("deactivationRecipient");
+        uint256 depositAmount = _boundAssetAmount(address(mockAsset), 1 ether);
+        uint256 newPerSecondRate = _boundRate(DEFAULT_PER_SECOND_RATE + 1);
+        vm.assume(newPerSecondRate != stableVault.getDefaultSubVault().perSecondRate);
+
+        // Deposit and move user to a new subVault
+        _deposit(user, depositAmount);
+        _setUserRate(user, newPerSecondRate);
+
+        uint256 userSubVaultId = stableVault.getUserSubVault(user).id;
+
+        // Transfer all to recipient (who will be assigned to default subVault).
+        // Since fromSubVaultId != toSubVaultId and user was the only occupant,
+        // the user's subVault should become empty and SubVaultDeactivated should emit.
+        vm.expectEmit(true, false, false, true);
+        emit IStableVault.SubVaultDeactivated(userSubVaultId);
+
+        vm.prank(user);
+        stableVault.transferAll(recipient);
+    }
+
+    function test_deposit_emitsUserRateSet_onFirstDeposit() public {
+        address user = makeAddr("userRateUser");
+        _assumeNotProxyAdmin(user, address(stableVault));
+
+        uint256 amount = 2_000_000;
+        mockAsset.mint(user, amount * 2);
+
+        IStableVault.SubVaultData memory defaultSubVault = stableVault.getDefaultSubVault();
+
+        // First deposit: expect UserRateSet to fire
+        vm.prank(user);
+        mockAsset.forceApprove(address(stableVault), amount * 2);
+
+        // UserRateSet has 2 indexed params: user, subVaultId
+        vm.expectEmit(true, true, false, true);
+        emit IStableVault.UserRateSet(user, defaultSubVault.id, defaultSubVault.perSecondRate);
+
+        vm.prank(user);
+        stableVault.deposit(user, address(mockAsset), amount);
+
+        // Second deposit: UserRateSet should NOT fire (user already has a subVaultId)
+        vm.recordLogs();
+        vm.prank(user);
+        stableVault.deposit(user, address(mockAsset), amount);
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 userRateSetTopic = keccak256("UserRateSet(address,uint256,uint256)");
+        bool foundUserRateSet = false;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics.length > 0 && logs[i].topics[0] == userRateSetTopic) {
+                foundUserRateSet = true;
+                break;
+            }
+        }
+        assertFalse(foundUserRateSet, "UserRateSet should not emit on second deposit");
+    }
+
     function test_setUserRate_skipsUserWithoutAPosition(address user, uint256 newPerSecondRate) public {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
@@ -633,6 +847,12 @@ contract StableVaultTest is TestWithHelpers {
         assertEq(stableVault.getUserSubVault(user2).perSecondRate, newRate);
         // user1 should still have no position
         assertEq(stableVault.getUserSubVault(user1).id, 0);
+    }
+
+    function test_setUserRate_reverts_ifUserIsZeroAddress() public {
+        vm.expectRevert(Errors.ZeroAddress.selector);
+        vm.prank(manager);
+        _setUserRate(address(0), DEFAULT_PER_SECOND_RATE);
     }
 
     function test_setUserRate_reverts_ifSettingTheSameRateHeAlreadyHas(address user, uint256 amount) public {
@@ -739,6 +959,103 @@ contract StableVaultTest is TestWithHelpers {
 
         vm.expectRevert(IStableVault.TooManyActiveSubVaults.selector);
         _setUserRate(user, DEFAULT_PER_SECOND_RATE + i + 1);
+    }
+
+    function test_setUserRate_batchMigration_succeedsWhenTransientlyOverLimit() public {
+        // Deploy with maxActiveSubVaults = 2
+        stableVault = _deployStableVault(
+            address(mockAccessManager),
+            DEFAULT_MAX_PER_SECOND_RATE,
+            DEFAULT_PER_SECOND_RATE,
+            address(mockIouTokenManager),
+            address(mockFundsHandler),
+            address(mockAssetRegistry),
+            address(mockTransferHelper),
+            address(mockWithdrawalPolicy),
+            address(mockPriceOracle),
+            2, // MAX_ACTIVE_SUB_VAULTS
+            treasury
+        );
+
+        // Users A, B and C all deposit into the default subvault (subvault 1).
+        // A and B will co-locate in sub1 so that A's source sub-vault retains a user
+        // during the over-limit iteration below.
+        address userA = _generateNewUser();
+        address userB = _generateNewUser();
+        address userC = _generateNewUser();
+        _deposit(userA, 10e6);
+        _deposit(userB, 10e6);
+        _deposit(userC, 10e6);
+
+        assertEq(stableVault.getActiveSubVaults().length, 1);
+
+        // Move User C alone to a new rate -> creates subvault 2, now at max (2 active).
+        // Layout: sub1 (A, B), sub2 (C).
+        uint256 newRate = DEFAULT_PER_SECOND_RATE + 1;
+        _setUserRate(userC, newRate);
+        assertEq(stableVault.getActiveSubVaults().length, 2);
+
+        // Batch-migrate A and C to a third rate. With MAX = 2:
+        //   Iter 1 (A, sub1 -> sub3): sub1 retains B -> NOT removed; sub3 added.
+        //     Active = [sub1, sub2, sub3] (3 — transiently over the limit).
+        //   Iter 2 (C, sub2 -> sub3): sub2 empties -> removed; sub3 already active.
+        //     Active = [sub1, sub3] (2 — final state within the limit).
+        // Before the fix, iter 1 reverted because _validateAmountOfActiveSubVaults()
+        // ran inside _moveShares.
+        uint256 thirdRate = DEFAULT_PER_SECOND_RATE + 2;
+        IStableVault.UserRateData[] memory batch = new IStableVault.UserRateData[](2);
+        batch[0] = IStableVault.UserRateData(userA, thirdRate);
+        batch[1] = IStableVault.UserRateData(userC, thirdRate);
+        stableVault.setUserRate(batch);
+
+        // Final state: sub1 still has B, sub2 empty (deactivated), sub3 has A+C.
+        assertEq(stableVault.getActiveSubVaults().length, 2);
+    }
+
+    function test_setUserRate_batchMigration_stillRevertsWhenFinalStateExceedsLimit() public {
+        // Deploy with maxActiveSubVaults = 2
+        stableVault = _deployStableVault(
+            address(mockAccessManager),
+            DEFAULT_MAX_PER_SECOND_RATE,
+            DEFAULT_PER_SECOND_RATE,
+            address(mockIouTokenManager),
+            address(mockFundsHandler),
+            address(mockAssetRegistry),
+            address(mockTransferHelper),
+            address(mockWithdrawalPolicy),
+            address(mockPriceOracle),
+            2, // MAX_ACTIVE_SUB_VAULTS
+            treasury
+        );
+
+        // 3 users deposit into default subvault
+        address userA = _generateNewUser();
+        address userB = _generateNewUser();
+        address userC = _generateNewUser();
+        _deposit(userA, 10e6);
+        _deposit(userB, 10e6);
+        _deposit(userC, 10e6);
+
+        assertEq(stableVault.getActiveSubVaults().length, 1);
+
+        // Move User A to rate 2 -> 2 active subvaults (at max)
+        _setUserRate(userA, DEFAULT_PER_SECOND_RATE + 1);
+        assertEq(stableVault.getActiveSubVaults().length, 2);
+
+        // Batch: move User B to rate 3 and User C to rate 3.
+        // After batch: subvault 1 still has no remaining users BUT User A is still in subvault 2.
+        // Wait — User A is in subvault 2, Users B+C move to subvault 3.
+        // Default subvault 1 still has... no one (all 3 moved out? No, only B and C were in subvault 1).
+        // Final: subvault 1 empty (deactivated), subvault 2 has A (active), subvault 3 has B+C (active) = 2 active.
+        // Fits.
+
+        // Instead, let's create a scenario where the final state truly exceeds.
+        // Move User B to rate 3 (creates subvault 3). Now: sub1 has C, sub2 has A, sub3 has B = 3 active.
+        // This genuinely exceeds max=2 in final state.
+        IStableVault.UserRateData[] memory batch = new IStableVault.UserRateData[](1);
+        batch[0] = IStableVault.UserRateData(userB, DEFAULT_PER_SECOND_RATE + 2);
+        vm.expectRevert(IStableVault.TooManyActiveSubVaults.selector);
+        stableVault.setUserRate(batch);
     }
 
     function test_setUserRate_smallConversionRateToLargeConversionRate() public {
@@ -966,6 +1283,12 @@ contract StableVaultTest is TestWithHelpers {
         uint256 actualAssets = stableVault.getAggregatedBalance();
 
         assertEq(actualAssets, expectedAssets);
+    }
+
+    function test_claimSurplusInterest_reverts_ifAmountIsZero() public {
+        vm.expectRevert(Errors.ZeroAmount.selector);
+        vm.prank(manager);
+        stableVault.claimSurplusInterest(_toAddressArray(address(mockAsset)), _toUint256Array(0));
     }
 
     function test_claimSurplusInterest_reverts_ifMsgSenderIsNotAuthorized(
@@ -2440,6 +2763,174 @@ contract StableVaultTest is TestWithHelpers {
         assertEq(stableVault.getUserBalance(recipient), fullAmountRay);
     }
 
+    function test_transfer_revertsWithInvalidAmount_whenPartialTransferFallsIntoGuaranteedPrincipalDeadZone() public {
+        address user = makeAddr("user");
+        address recipient = makeAddr("recipient");
+        MockErc20 ghoToken = new MockErc20("GHO", "GHO", 18);
+
+        uint256 highRate = 3 * MathLib.RAY;
+        IStableVault highRateVault = _deployStableVault(
+            address(mockAccessManager),
+            highRate + 1,
+            highRate,
+            address(mockIouTokenManager),
+            address(mockFundsHandler),
+            address(mockAssetRegistry),
+            address(mockTransferHelper),
+            address(mockWithdrawalPolicy),
+            address(mockPriceOracle),
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+            treasury
+        );
+
+        vm.warp(block.timestamp + 1);
+
+        uint256 depositAmount = 5;
+        uint256 fullTransferAmountRay = depositAmount.assetDecimalsToRay(address(ghoToken));
+        uint256 partialTransferAmountRay = fullTransferAmountRay - 1;
+
+        ghoToken.mint(user, depositAmount);
+        vm.prank(user);
+        ghoToken.approve(address(highRateVault), depositAmount);
+        vm.prank(user);
+        highRateVault.deposit(user, address(ghoToken), depositAmount);
+
+        uint256 shareBackedBalanceRay = highRateVault.getUserBalance(user);
+        assertEq(shareBackedBalanceRay, fullTransferAmountRay - 2);
+        assertLt(shareBackedBalanceRay, partialTransferAmountRay);
+
+        vm.prank(user);
+        vm.expectRevert(Errors.InvalidAmount.selector);
+        assertFalse(highRateVault.transfer(recipient, partialTransferAmountRay));
+    }
+
+    function test_transfer_allowsLargestPartialTransfer_beforeGuaranteedPrincipalDeadZone() public {
+        address user = makeAddr("user");
+        address recipient = makeAddr("recipient");
+        MockErc20 ghoToken = new MockErc20("GHO", "GHO", 18);
+
+        uint256 highRate = 3 * MathLib.RAY;
+        IStableVault highRateVault = _deployStableVault(
+            address(mockAccessManager),
+            highRate + 1,
+            highRate,
+            address(mockIouTokenManager),
+            address(mockFundsHandler),
+            address(mockAssetRegistry),
+            address(mockTransferHelper),
+            address(mockWithdrawalPolicy),
+            address(mockPriceOracle),
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+            treasury
+        );
+
+        vm.warp(block.timestamp + 1);
+
+        uint256 depositAmount = 5;
+        uint256 fullTransferAmountRay = depositAmount.assetDecimalsToRay(address(ghoToken));
+        uint256 shares = fullTransferAmountRay.rayDivDown(highRate);
+        uint256 minSharesToRedeemOneWei = Constants.MIN_WITHDRAWABLE_AMOUNT_RAY.rayDivUp(highRate);
+        uint256 maxPartialTransferAmountRay = (shares - minSharesToRedeemOneWei).rayMulDown(highRate);
+
+        ghoToken.mint(user, depositAmount);
+        vm.prank(user);
+        ghoToken.approve(address(highRateVault), depositAmount);
+        vm.prank(user);
+        highRateVault.deposit(user, address(ghoToken), depositAmount);
+
+        vm.prank(user);
+        assertTrue(highRateVault.transfer(recipient, maxPartialTransferAmountRay));
+
+        assertEq(highRateVault.getUserBalance(recipient), maxPartialTransferAmountRay);
+        assertEq(highRateVault.getUserBalance(user), minSharesToRedeemOneWei.rayMulDown(highRate));
+    }
+
+    function test_transfer_revertsWithInvalidAmount_atFirstAmountInsideGuaranteedPrincipalDeadZone() public {
+        address user = makeAddr("user");
+        address recipient = makeAddr("recipient");
+        MockErc20 ghoToken = new MockErc20("GHO", "GHO", 18);
+
+        uint256 highRate = 3 * MathLib.RAY;
+        IStableVault highRateVault = _deployStableVault(
+            address(mockAccessManager),
+            highRate + 1,
+            highRate,
+            address(mockIouTokenManager),
+            address(mockFundsHandler),
+            address(mockAssetRegistry),
+            address(mockTransferHelper),
+            address(mockWithdrawalPolicy),
+            address(mockPriceOracle),
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+            treasury
+        );
+
+        vm.warp(block.timestamp + 1);
+
+        uint256 depositAmount = 5;
+        uint256 fullTransferAmountRay = depositAmount.assetDecimalsToRay(address(ghoToken));
+        uint256 shares = fullTransferAmountRay.rayDivDown(highRate);
+        uint256 minSharesToRedeemOneWei = Constants.MIN_WITHDRAWABLE_AMOUNT_RAY.rayDivUp(highRate);
+        uint256 firstInvalidPartialTransferAmountRay = (shares - minSharesToRedeemOneWei).rayMulDown(highRate) + 1;
+
+        ghoToken.mint(user, depositAmount);
+        vm.prank(user);
+        ghoToken.approve(address(highRateVault), depositAmount);
+        vm.prank(user);
+        highRateVault.deposit(user, address(ghoToken), depositAmount);
+
+        vm.prank(user);
+        vm.expectRevert(Errors.InvalidAmount.selector);
+        assertFalse(highRateVault.transfer(recipient, firstInvalidPartialTransferAmountRay));
+    }
+
+    function test_transfer_fullAmountPreservesGuaranteedPrincipal_whenShareBackedBalanceIsLower() public {
+        address user = makeAddr("user");
+        address recipient = makeAddr("recipient");
+        MockErc20 ghoToken = new MockErc20("GHO", "GHO", 18);
+
+        uint256 highRate = 3 * MathLib.RAY;
+        IStableVault highRateVault = _deployStableVault(
+            address(mockAccessManager),
+            highRate + 1,
+            highRate,
+            address(mockIouTokenManager),
+            address(mockFundsHandler),
+            address(mockAssetRegistry),
+            address(mockTransferHelper),
+            address(mockWithdrawalPolicy),
+            address(mockPriceOracle),
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+            treasury
+        );
+
+        vm.warp(block.timestamp + 1);
+
+        uint256 depositAmount = 5;
+        uint256 fullTransferAmountRay = depositAmount.assetDecimalsToRay(address(ghoToken));
+
+        ghoToken.mint(user, depositAmount);
+        vm.prank(user);
+        ghoToken.approve(address(highRateVault), depositAmount);
+        vm.prank(user);
+        highRateVault.deposit(user, address(ghoToken), depositAmount);
+
+        uint256 senderShareBackedBalanceRay = highRateVault.getUserBalance(user);
+        assertEq(senderShareBackedBalanceRay, fullTransferAmountRay - 2);
+
+        vm.prank(user);
+        assertTrue(highRateVault.transfer(recipient, fullTransferAmountRay));
+
+        assertEq(highRateVault.getUserBalance(user), 0);
+        assertLt(highRateVault.getUserBalance(recipient), fullTransferAmountRay);
+
+        mockFundsHandler.mockAggregatedBalance(fullTransferAmountRay);
+
+        vm.prank(recipient);
+        uint256 iouTokenAmount = highRateVault.requestWithdrawal(recipient, 0);
+        assertEq(iouTokenAmount, fullTransferAmountRay);
+    }
+
     function test_transfer_toRecipientWithExistingPositionInDifferentSubVault(
         address user,
         address recipient,
@@ -3171,6 +3662,16 @@ contract StableVaultTest is TestWithHelpers {
             }
         }
         assertFalse(foundAfter, "SubVault should be inactive after transferring all funds out");
+    }
+
+    function test_executeWithdrawal_reverts_ifIouAmountIsZero(address user) public {
+        vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
+        _assumeNotProxyAdmin(user, address(stableVault));
+
+        vm.expectRevert(Errors.ZeroAmount.selector);
+        vm.prank(user);
+        stableVault.executeWithdrawal(user, address(mockAsset), 0, 0, "");
     }
 
     function test_executeWithdrawal_reverts_ifMsgSenderIsNotTheUser(

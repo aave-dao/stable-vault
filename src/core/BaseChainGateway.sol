@@ -71,7 +71,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
 
     /// @inheritdoc IChainGateway
     function receiveMessage(uint256 sourceChainId, address asset, uint256 amount, bytes memory data) external override {
-        if (asset != Constants.ASSET_FOR_DATA_ONLY_BRIDGE) {
+        if (asset != Constants.ASSET_FOR_DATA_ONLY_BRIDGE && amount > 0) {
             // Receiving of funds should not check for whitelisted adapter because we may want to recover tokens from
             // adapter even after removing the adapter. We may have to remove an adapter if we do not trust it for
             // receiving arbitrary messages.
@@ -94,6 +94,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) external override {
         require(msg.sender == IOU_TOKEN_MANAGER, OnlyIouTokenManager());
+        require(iouTokenAmountRay > 0, Errors.ZeroAmount());
         _validateOutboundAdapter(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, destinationChainId, adapter);
 
         bytes memory bridgeIouTokenMessageEncoded = abi.encode(
@@ -112,6 +113,8 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
 
     /// @inheritdoc IChainGateway
     function addBridgeAdapter(address asset, uint256 chainId, address adapter) external override restricted {
+        require(adapter != address(0), Errors.ZeroAddress());
+        require(chainId != block.chainid, Errors.InvalidParameter());
         require(!$storage().supportedBridgeAdapters[asset][chainId][adapter], Errors.AddressAlreadyWhitelisted());
         $storage().supportedBridgeAdapters[asset][chainId][adapter] = true;
         emit BridgeAdapterAdded(asset, chainId, adapter);
@@ -135,7 +138,6 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         require($storage().supportedBridgeAdapters[asset][sourceChainId][msg.sender], AdapterNotFound());
     }
 
-    /// @dev The Gateway must have ownership of the assets being bridged as it allows the adapter as a spender.
     function _sendCrossChainMessage(
         uint256 destinationChainId,
         address adapter,
@@ -144,6 +146,9 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         bytes memory dataToBridge,
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) internal {
+        if (assetToBridge == Constants.ASSET_FOR_DATA_ONLY_BRIDGE) {
+            require(amountToBridge == 0, Errors.InvalidParameter());
+        }
         IBridgeAdapter(adapter)
             .publishMessageToChainWithFeePayer(
                 destinationChainId, assetToBridge, amountToBridge, dataToBridge, bridgeParams

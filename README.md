@@ -152,15 +152,18 @@ forge test
 
 ### Gas Snapshots
 
-Gas snapshots are automatically generated and stored in the `snapshots/` directory. To update snapshots:
+Gas-cost regression checks live under `test/gas/`. They run on every PR via the `gas-diff` CI job, which compares the new measurements against a baseline uploaded from the latest `master` build and posts a sticky PR comment with the diff. Generated snapshot files (`snapshots/`) are gitignored — the baseline lives only as a CI artifact.
+
+To preview the same numbers locally, use the `gas` profile (which enables `isolate = true` for accurate per-call measurement):
 
 ```bash
-make gas-report
+FOUNDRY_PROFILE=gas forge test
 ```
 
-Snapshot files generated:
+Generated files in `snapshots/`:
 
-- `StableVault.Operations.json`: Gas for user related StableVault interactions.
+- `StableVault.Operations.json` — user-facing StableVault interactions
+- `BurnIouToken.json` — CCIP `BURN_IOU_TOKEN` message processing (used to size the minimum CCIP `gasLimit`)
 
 ### Format
 

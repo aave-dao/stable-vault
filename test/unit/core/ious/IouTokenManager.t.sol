@@ -35,7 +35,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
         iouTokenAddress = vm.computeCreateAddress(address(this), deployerNonce + 1);
 
         iouTokenManager = new ExtendedIouTokenManager(iouTokenAddress, chainGateway, vault, transferHelper, true);
-        iouToken = address(new IouToken(iouTokenManagerAddress));
+        iouToken = address(new IouToken(iouTokenManagerAddress, "IOU: Aave USD Stable Vault", "IOU-USD"));
 
         assertEq(iouTokenManagerAddress, address(iouTokenManager));
         assertEq(iouTokenAddress, iouToken);
@@ -245,6 +245,30 @@ contract IouTokenManagerTest_AccountingChain is Test {
         iouTokenManager.bridgeTokens(destinationChainId, iouTokenRecipient, iouTokenAmountRay, adapter, bridgeParams);
     }
 
+    function test_bridgeTokens_emitsTokensLocked_onAccountingChain() public virtual {
+        address from = makeAddr("lockUser");
+        uint256 destinationChainId = block.chainid + 1;
+        address iouTokenRecipient = makeAddr("iouRecipient");
+        uint256 iouTokenAmountRay = 1_000_000e27;
+
+        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
+            feePayer: from, feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 0, data: ""
+        });
+
+        // Mint IOU tokens to the user and approve the manager
+        vm.prank(iouTokenManagerAddress);
+        MockErc20(iouToken).mint(from, iouTokenAmountRay);
+        vm.prank(from);
+        IERC20(iouToken).approve(address(iouTokenManager), iouTokenAmountRay);
+
+        // TokensLocked has 1 indexed param: from
+        vm.expectEmit(true, false, false, true);
+        emit IIouTokenManager.TokensLocked(from, iouTokenAmountRay);
+
+        vm.prank(from);
+        iouTokenManager.bridgeTokens(destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeParams);
+    }
+
     function test_bridgeTokens_reverts_if_invalidDestinationChainId(
         address from,
         address iouTokenRecipient,
@@ -316,6 +340,54 @@ contract IouTokenManagerTest_AccountingChain is Test {
         assertEq(
             IERC20(feeToken).balanceOf(feeRecipient), feeAmount, "Token fee not properly transferred to bridge adapter"
         );
+    }
+
+    function test_bridgeTokens_nonNativeFeeToken_msgValueDoesNotLeaveStealableNativeOnTransferHelper(
+        uint256 iouTokenAmountRay,
+        uint256 feeAmount,
+        uint256 accidentalMsgValue
+    ) public {
+        address from = makeAddr("from");
+        address attacker = makeAddr("attacker");
+        uint256 destinationChainId = block.chainid + 1;
+        address iouTokenRecipient = makeAddr("iouTokenRecipient");
+        address feeToken = address(new MockErc20("Test USD", "TUSD", 6));
+
+        iouTokenAmountRay = bound(iouTokenAmountRay, 1, 1e36);
+        feeAmount = bound(feeAmount, 1, 1e18);
+        accidentalMsgValue = bound(accidentalMsgValue, 1, 100 ether);
+
+        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
+            feePayer: from, feeToken: feeToken, feeAmount: feeAmount, feeRefundThreshold: 0, gasLimit: 0, data: ""
+        });
+
+        MockErc20(feeToken).mint(from, feeAmount);
+        vm.prank(from);
+        IERC20(feeToken).approve(address(iouTokenManager), feeAmount);
+
+        vm.prank(iouTokenManagerAddress);
+        MockErc20(iouToken).mint(from, iouTokenAmountRay);
+        vm.prank(from);
+        IERC20(iouToken).approve(address(iouTokenManager), iouTokenAmountRay);
+
+        address feeRecipient = makeAddr("bridgeAdapter");
+        MockGateway(chainGateway).mockConsumeOnNextCall(transferHelper, feeAmount, feeToken, feeRecipient);
+
+        vm.deal(from, accidentalMsgValue);
+        vm.prank(from);
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        iouTokenManager.bridgeTokens{value: accidentalMsgValue}(
+            destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeParams
+        );
+
+        assertEq(from.balance, accidentalMsgValue, "Caller's native balance should be fully preserved after revert");
+        assertEq(address(transferHelper).balance, 0, "No native should have leaked to TransferHelper");
+        assertEq(IERC20(iouToken).balanceOf(from), iouTokenAmountRay, "IOU tokens should not have been consumed");
+        assertEq(IERC20(feeToken).balanceOf(from), feeAmount, "Fee tokens should not have been consumed");
+
+        vm.prank(attacker);
+        MockTransferHelper(payable(transferHelper)).pull(address(0), 0);
+        assertEq(attacker.balance, 0, "Attacker should not be able to steal native from TransferHelper");
     }
 
     function test_bridgeTokens_bridgeParams_ClientTransfersNativeFeeToken(
@@ -438,11 +510,14 @@ contract IouTokenManagerTest_EarningChain is IouTokenManagerTest_AccountingChain
         iouTokenAddress = vm.computeCreateAddress(address(this), deployerNonce + 1);
 
         iouTokenManager = new ExtendedIouTokenManager(iouTokenAddress, chainGateway, vault, transferHelper, false);
-        iouToken = address(new IouToken(iouTokenManagerAddress));
+        iouToken = address(new IouToken(iouTokenManagerAddress, "IOU: Aave USD Stable Vault", "IOU-USD"));
 
         assertEq(iouTokenManagerAddress, address(iouTokenManager));
         assertEq(iouTokenAddress, iouToken);
     }
+
+    // Skip TokensLocked test on non-Accounting chain (earning chain burns instead of locking).
+    function test_bridgeTokens_emitsTokensLocked_onAccountingChain() public override {}
 
     // Skip Release Tokens tests on non-Accounting chain.
     function test_releaseTokens_withGateway(uint256 lockedBalance, uint256 amountToRelease) public override {}

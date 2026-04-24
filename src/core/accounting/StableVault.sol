@@ -115,6 +115,12 @@ contract StableVault is
 
         /// @dev The address of the treasury, where claimed surplus interest is sent to.
         address treasury;
+
+        /// @dev ERC20-style name of the Stable Vault position token.
+        string name;
+
+        /// @dev ERC20-style symbol of the Stable Vault position token.
+        string symbol;
     }
 
     // keccak256(abi.encode(uint256(keccak256("aave.storage.StableVault")) - 1)) & ~bytes32(uint256(0xff))
@@ -171,23 +177,35 @@ contract StableVault is
     /// @param accessManager Address of the IAccessManager contract used for handling access control.
     /// @param treasury Address of the treasury, where surplus interest is sent to.
     /// @param defaultSubVaultPerSecondRate Base per-second rate, in Ray units (27 decimals).
-    function initialize(address accessManager, address treasury, uint256 defaultSubVaultPerSecondRate)
-        external
-        virtual
-        initializer
-    {
-        __StableVault_init(accessManager, treasury, defaultSubVaultPerSecondRate);
+    /// @param name_ ERC20-style name of the Stable Vault position token (e.g. "Aave USD Stable Vault").
+    /// @param symbol_ ERC20-style symbol of the Stable Vault position token (e.g. "ASV-USD").
+    function initialize(
+        address accessManager,
+        address treasury,
+        uint256 defaultSubVaultPerSecondRate,
+        string memory name_,
+        string memory symbol_
+    ) external virtual initializer {
+        __StableVault_init(accessManager, treasury, defaultSubVaultPerSecondRate, name_, symbol_);
     }
 
-    function __StableVault_init(address accessManager, address treasury, uint256 defaultSubVaultPerSecondRate)
-        internal
-        virtual
-        onlyInitializing
-    {
+    function __StableVault_init(
+        address accessManager,
+        address treasury,
+        uint256 defaultSubVaultPerSecondRate,
+        string memory name_,
+        string memory symbol_
+    ) internal virtual onlyInitializing {
+        // Empty name/symbol would render as blank in explorers and wallets — reject up front to catch deployment
+        // mistakes early. ERC20 metadata is set once and immutable thereafter.
+        require(bytes(name_).length > 0, Errors.InvalidParameter());
+        require(bytes(symbol_).length > 0, Errors.InvalidParameter());
         IAccessManager(accessManager).canCall(address(0), address(0), bytes4(0));
         __AccessManaged_init(accessManager);
         _setTreasury(treasury);
         _setDefaultSubVault(_getOrCreateSubVaultWithRate(defaultSubVaultPerSecondRate), defaultSubVaultPerSecondRate);
+        $storage().name = name_;
+        $storage().symbol = symbol_;
     }
 
     /// @inheritdoc IStableVault
@@ -203,11 +221,7 @@ contract StableVault is
 
         IPriceOracle(PRICE_ORACLE).validatePrice(asset);
 
-        uint256 subVaultId = $storage().positions[user].subVaultId;
-        if (subVaultId == 0) {
-            subVaultId = $storage().defaultSubVaultId;
-            $storage().positions[user].subVaultId = subVaultId;
-        }
+        uint256 subVaultId = _getOrAssignUserSubVaultId(user);
 
         uint256 conversionRate = _accrueSubVaultConversionRate(subVaultId);
 
@@ -281,6 +295,7 @@ contract StableVault is
             sharesToIssue: toUserShares,
             guaranteedAmountToMoveRay: guaranteedAmountRay
         });
+        _validateAmountOfActiveSubVaults();
 
         emit Transfer(from, to, amountRay);
         return true;
@@ -321,6 +336,7 @@ contract StableVault is
             sharesToIssue: toUserShares,
             guaranteedAmountToMoveRay: guaranteedAmountRay
         });
+        _validateAmountOfActiveSubVaults();
 
         emit Transfer(from, to, amountOfWithdrawalRay);
         return true;
@@ -331,6 +347,7 @@ contract StableVault is
         for (uint256 i = 0; i < userRateData.length; i++) {
             _setUserRate(userRateData[i].user, userRateData[i].newPerSecondRate);
         }
+        _validateAmountOfActiveSubVaults();
     }
 
     /// @inheritdoc IStableVault
@@ -392,8 +409,7 @@ contract StableVault is
         // There is no overlap between original deposits and circulating IOUs because original deposits are decremented
         // when new issue IOUs are minted.
         uint256 guaranteedObligationsRay = _getIousInCirculation() + $storage().globalOriginalDepositsRay;
-        uint256 globalWithdrawableInterestRay =
-            totalAssetsRay > guaranteedObligationsRay ? totalAssetsRay - guaranteedObligationsRay : 0;
+        uint256 globalWithdrawableInterestRay = totalAssetsRay.satSub(guaranteedObligationsRay);
         uint256 withdrawalRequestInterestRay = actualAmountInRay - guaranteedAmountRay;
         require(
             withdrawalRequestInterestRay <= globalWithdrawableInterestRay,
@@ -422,6 +438,7 @@ contract StableVault is
         bytes memory data
     ) external virtual override nonReentrant assertingTransferHelperBalanceFor(assetOut) {
         require(user == msg.sender, OnlyUser());
+        require(iouAmountRay > 0, Errors.ZeroAmount());
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(user, iouAmountRay);
         uint256 amountOutRay = IWithdrawalPolicy(WITHDRAWAL_POLICY)
             .applyWithdrawalPolicy(
@@ -454,6 +471,7 @@ contract StableVault is
         assertingTransferHelperBalanceForAssets(assets)
     {
         for (uint256 i = 0; i < assets.length; i++) {
+            require(amounts[i] > 0, Errors.ZeroAmount());
             IFundsHandler(FUNDS_HANDLER).processWithdrawal(assets[i], amounts[i]);
         }
         // NOTE: Due to oracle-bridge propagation asymmetry, the aggregated balance may temporarily be lower than the
@@ -481,9 +499,22 @@ contract StableVault is
     }
 
     /// @inheritdoc IStableVault
+    function getClaimableSurplusInterest() external view override returns (uint256) {
+        uint256 obligations = _getVaultObligations();
+        uint256 assets = _getVaultAggregatedBalance();
+        return assets.satSub(obligations);
+    }
+
+    /// @inheritdoc IStableVault
+    function getSubVaultConversionRate(uint256 subVaultId) external view override returns (uint256) {
+        return _previewSubVaultConversionRate(subVaultId);
+    }
+
+    /// @inheritdoc IStableVault
     function getActiveSubVaults() external view override returns (SubVaultData[] memory) {
-        SubVaultData[] memory activeSubVaults = new SubVaultData[]($storage().activeSubVaultsIds.length);
-        for (uint256 i = 0; i < $storage().activeSubVaultsIds.length; i++) {
+        uint256 activeSubVaultsCount = $storage().activeSubVaultsIds.length;
+        SubVaultData[] memory activeSubVaults = new SubVaultData[](activeSubVaultsCount);
+        for (uint256 i = 0; i < activeSubVaultsCount; i++) {
             uint256 subVaultId = $storage().activeSubVaultsIds[i];
             uint256 perSecondRate = $storage().subVaultById[subVaultId].perSecondRate;
             activeSubVaults[i] = SubVaultData({perSecondRate: perSecondRate, id: subVaultId});
@@ -509,6 +540,21 @@ contract StableVault is
     /// @inheritdoc IStableVault
     function balanceOf(address account) external view override returns (uint256) {
         return _getUserBalance(account);
+    }
+
+    /// @inheritdoc IStableVault
+    function name() external view override returns (string memory) {
+        return $storage().name;
+    }
+
+    /// @inheritdoc IStableVault
+    function symbol() external view override returns (string memory) {
+        return $storage().symbol;
+    }
+
+    /// @inheritdoc IStableVault
+    function decimals() external pure override returns (uint8) {
+        return Constants.RAY_DECIMALS;
     }
 
     /// @inheritdoc IStableVault
@@ -602,8 +648,15 @@ contract StableVault is
             sharesToIssue: userNewShares,
             guaranteedAmountToMoveRay: 0
         });
+        // `_validateAmountOfActiveSubVaults()` is intentionally not called here: this function runs inside the
+        // `setUserRate` batch loop, where intermediate states may transiently exceed the limit before settling
+        // to a valid final state. Validation is performed upstream in `setUserRate` after the loop completes.
     }
 
+    /// @dev Callers must invoke `_validateAmountOfActiveSubVaults()` after their logical operation
+    /// completes (per-call for single-user actions; post-batch for batched actions). The check is
+    /// deliberately not performed here because batch callers may transiently exceed the limit
+    /// before settling to a valid final state.
     function _moveShares(
         address from,
         address to,
@@ -622,7 +675,6 @@ contract StableVault is
                 _addSubVaultToActive(toSubVaultId);
             }
         }
-        _validateAmountOfActiveSubVaults();
 
         if (from == to) {
             // Sanity check. If the user is the same - this cannot be a partial transfer.
@@ -648,12 +700,13 @@ contract StableVault is
         if (subVaultId == 0) {
             subVaultId = $storage().defaultSubVaultId;
             $storage().positions[user].subVaultId = subVaultId;
+            emit UserRateSet(user, subVaultId, $storage().subVaultById[subVaultId].perSecondRate);
         }
         return subVaultId;
     }
 
     /// @dev Computes the shares to burn from sender and guaranteed amount for a transfer.
-    /// @dev Reverts if remaining shares would be below dust threshold - caller should use transferAll() instead.
+    /// @dev Reverts with InvalidAmount() if remaining shares would be below dust threshold (use transferAll() instead).
     function _computeTransferShares(address from, uint256 amountRay, uint256 fromSubVaultId, uint256 fromConversionRate)
         internal
         view
@@ -686,15 +739,20 @@ contract StableVault is
         //   rayMulDown(S * conversionRate) >= 1e9
         // which implies:
         //   S >= rayDivUp(1e9, conversionRate)
+        uint256 userShares = $storage().positions[user].shares;
+        if (redeemedShares > userShares) {
+            return false;
+        }
         uint256 minSharesToRedeemOneWei =
             Constants.MIN_WITHDRAWABLE_AMOUNT_RAY.rayDivUp($storage().subVaultById[subVaultId].conversionRate);
-        uint256 remainingSharesAfterRedeem = $storage().positions[user].shares - redeemedShares;
+        uint256 remainingSharesAfterRedeem = userShares - redeemedShares;
         return remainingSharesAfterRedeem >= minSharesToRedeemOneWei;
     }
 
     function _addSubVaultToActive(uint256 subVaultId) internal {
         $storage().activeSubVaultsIds.push(subVaultId);
         $storage().activeSubVaultIndexById[subVaultId] = $storage().activeSubVaultsIds.length - 1;
+        emit SubVaultActivated(subVaultId);
     }
 
     // Assumes that if it is called then `subVaultId` is indeed active, thus `$storage().activeSubVaultsIds.length > 0`
@@ -708,6 +766,7 @@ contract StableVault is
         }
         $storage().activeSubVaultsIds.pop();
         delete $storage().activeSubVaultIndexById[subVaultId];
+        emit SubVaultDeactivated(subVaultId);
     }
 
     function _validateAmountOfActiveSubVaults() internal view {
@@ -803,9 +862,10 @@ contract StableVault is
     }
 
     function _burnShares(address user, uint256 subVaultId, uint256 sharesToBurn) internal returns (uint256) {
-        $storage().positions[user].shares -= sharesToBurn;
+        uint256 remainingShares = $storage().positions[user].shares - sharesToBurn;
+        $storage().positions[user].shares = remainingShares;
         $storage().subVaultById[subVaultId].totalShares -= sharesToBurn;
-        return $storage().positions[user].shares;
+        return remainingShares;
     }
 
     function _issueShares(address user, uint256 subVaultId, uint256 sharesToMint) internal {
@@ -814,20 +874,22 @@ contract StableVault is
     }
 
     function _getUserBalance(address user) internal view returns (uint256) {
-        if ($storage().positions[user].shares == 0) {
+        uint256 shares = $storage().positions[user].shares;
+        if (shares == 0) {
             return 0;
         }
         // Round down the user balance, so that the rounding is in favor of the protocol.
-        return $storage().positions[user].shares
-            .rayMulDown(_previewSubVaultConversionRate($storage().positions[user].subVaultId));
+        return shares.rayMulDown(_previewSubVaultConversionRate($storage().positions[user].subVaultId));
     }
 
     function _getActiveSubVaultsObligations() internal view returns (uint256) {
         uint256 activeSubVaultsObligations;
-        for (uint256 i = 0; i < $storage().activeSubVaultsIds.length; i++) {
+        uint256 activeSubVaultsCount = $storage().activeSubVaultsIds.length;
+        for (uint256 i = 0; i < activeSubVaultsCount; i++) {
+            uint256 subVaultId = $storage().activeSubVaultsIds[i];
             // Round up the obligations to avoid understating liabilities.
-            activeSubVaultsObligations += $storage().subVaultById[$storage().activeSubVaultsIds[i]].totalShares
-                .rayMulUp(_previewSubVaultConversionRate($storage().activeSubVaultsIds[i]));
+            activeSubVaultsObligations += $storage().subVaultById[subVaultId].totalShares
+            .rayMulUp(_previewSubVaultConversionRate(subVaultId));
         }
         return activeSubVaultsObligations;
     }
@@ -858,6 +920,7 @@ contract StableVault is
     }
 
     function _setUserRate(address user, uint256 newPerSecondRate) internal {
+        require(user != address(0), Errors.ZeroAddress());
         uint256 oldSubVaultId = $storage().positions[user].subVaultId;
         // Skip users without a position (e.g., withdrew or transferred out between batch
         // preparation and execution) to avoid reverting the entire batch.
@@ -867,9 +930,11 @@ contract StableVault is
                 RedundantRate(user, newPerSecondRate)
             );
             uint256 newSubVaultId = _getOrCreateSubVaultWithRate(newPerSecondRate);
-            _migrateUserToSubVault(user, oldSubVaultId, newSubVaultId);
             emit UserRateSet(user, newSubVaultId, newPerSecondRate);
+            _migrateUserToSubVault(user, oldSubVaultId, newSubVaultId);
         }
+        // `_validateAmountOfActiveSubVaults()` is intentionally not called here: this is invoked per-user inside
+        // the `setUserRate` batch loop. Validation is performed upstream in `setUserRate` after the loop.
     }
 
     function _setTreasury(address treasury) internal {

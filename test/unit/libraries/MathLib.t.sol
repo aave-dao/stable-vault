@@ -117,6 +117,36 @@ contract MathLibDifferentialTests is Test {
         w.rpow(type(uint128).max, 3);
     }
 
+    function test_satSub_aGreaterThanB(uint256 a, uint256 b) public view {
+        a = bound(a, 1, type(uint256).max);
+        b = bound(b, 0, a - 1);
+        assertEq(w.satSub(a, b), a - b);
+    }
+
+    function test_satSub_aLessThanB(uint256 a, uint256 b) public view {
+        a = bound(a, 0, type(uint256).max - 1);
+        b = bound(b, a + 1, type(uint256).max);
+        assertEq(w.satSub(a, b), 0);
+    }
+
+    function test_satSub_aEqualsB(uint256 a) public view {
+        assertEq(w.satSub(a, a), 0);
+    }
+
+    function test_satSub() public view {
+        assertEq(w.satSub(0, 0), 0);
+        assertEq(w.satSub(1, 0), 1);
+        assertEq(w.satSub(0, 1), 0);
+        assertEq(w.satSub(5, 3), 2);
+        assertEq(w.satSub(3, 5), 0);
+        assertEq(w.satSub(100, 100), 0);
+        assertEq(w.satSub(type(uint256).max, 0), type(uint256).max);
+        assertEq(w.satSub(0, type(uint256).max), 0);
+        assertEq(w.satSub(type(uint256).max, type(uint256).max), 0);
+        assertEq(w.satSub(type(uint256).max, 1), type(uint256).max - 1);
+        assertEq(w.satSub(1, type(uint256).max), 0);
+    }
+
     // The tests below were taken from Spark Vaults v2 repo:
     // https://github.com/sparkdotfi/spark-vaults-v2/blob/dev/test/Math.t.sol
 

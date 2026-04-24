@@ -63,6 +63,7 @@ contract Swapper is Ownable, ReentrancyGuard, ISwapper {
             );
             uint256 slippageAmount = expectedAmountOut - amountOut;
             IERC20(assetOut).safeTransferFrom(slippageParams.slippageCoverageSource, address(this), slippageAmount);
+            emit ISwapper.SlippageCovered(slippageParams.slippageCoverageSource, assetOut, slippageAmount);
             amountOut = expectedAmountOut;
         }
 

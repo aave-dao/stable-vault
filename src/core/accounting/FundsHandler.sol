@@ -110,7 +110,8 @@ contract FundsHandler is
     /// @inheritdoc IFundsHandler
     function getAggregatedBalance() external view override returns (uint256) {
         uint256 totalBalanceRay = _getLocalAggregatedBalance();
-        for (uint256 i = 0; i < $storage().earningChainIds.length(); i++) {
+        uint256 earningChainCount = $storage().earningChainIds.length();
+        for (uint256 i = 0; i < earningChainCount; i++) {
             totalBalanceRay += _getAdjustedEarningChainBalanceRay($storage().earningChainIds.at(i));
         }
         return totalBalanceRay;
@@ -118,11 +119,13 @@ contract FundsHandler is
 
     /// @inheritdoc IFundsHandler
     function processDeposit(address asset, uint256 amount) external override onlyStableVault returns (uint256) {
+        require(amount > 0, Errors.ZeroAmount());
         return IAllocator(ALLOCATOR).deposit(asset, amount);
     }
 
     /// @inheritdoc IFundsHandler
     function processWithdrawal(address asset, uint256 amount) external override onlyStableVault {
+        require(amount > 0, Errors.ZeroAmount());
         _pullFundsFromImmediateLiquidity(asset, amount);
     }
 
@@ -183,7 +186,8 @@ contract FundsHandler is
         IAllocator(ALLOCATOR).withdraw(asset, amount);
     }
 
-    /// @dev Grossly under-estimates the balance if the chain balance is stale.
+    /// @dev Returns 0 when the chain balance is stale, grossly underestimating the balance.
+    /// The staleness window is bounded by the oracle heartbeat + publish buffer.
     function _getAdjustedEarningChainBalanceRay(uint256 chainId) internal view returns (uint256) {
         IChainBalanceOracle.ChainBalance memory chainBalance =
             IChainBalanceOracle(CHAIN_BALANCE_ORACLE).getChainBalance(chainId);

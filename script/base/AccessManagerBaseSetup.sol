@@ -283,7 +283,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         address disablerProfile = _getProfile__Disabler();
         require(disablerProfile != address(0), "Disabler profile address not set");
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](13);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](14);
 
         roles[0] = RolesConfig.getRole__rebalance();
         roles[1] = RolesConfig.getRole__removeStrategy();
@@ -298,6 +298,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         roles[10] = RolesConfig.getRole__disableDepositsToStrategy();
         roles[11] = RolesConfig.getRole__setDefaultStrategy();
         roles[12] = RolesConfig.getRole__distrustStrategy();
+        roles[13] = RolesConfig.getRole__removeSigner();
 
         _grantRolesToProfile(disablerProfile, roles);
     }
