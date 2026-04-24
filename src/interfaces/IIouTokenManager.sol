@@ -43,13 +43,13 @@ interface IIouTokenManager {
     /// @param destinationChainId The chain id of the chain to publish the message to.
     /// @param iouTokenRecipient The address to send the IOU tokens to on the destination chain.
     /// @param iouTokenAmountRay The amount of IOU tokens to bridge.
-    /// @param adapter The whitelisted bridge adapter to use for the message.
+    /// @param bridgeAdapter The whitelisted bridge adapter to use for the message.
     /// @param bridgeParams The parameters for the bridge adapter.
     function bridgeTokens(
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
-        address adapter,
+        address bridgeAdapter,
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) external payable;
 

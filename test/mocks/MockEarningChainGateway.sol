@@ -23,7 +23,7 @@ contract MockEarningChainGateway is IEarningChainGateway {
     function pushFundsToAccountingChain(
         address asset,
         uint256 amount,
-        address adapter,
+        address bridgeAdapter,
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) external payable {}
 
@@ -32,7 +32,7 @@ contract MockEarningChainGateway is IEarningChainGateway {
         address assetOut,
         uint256 minAmountOut,
         address receiver,
-        address adapter,
+        address bridgeAdapter,
         IBridgeAdapter.BridgeParams memory bridgeParams,
         bytes memory data
     ) external payable returns (uint256) {}
@@ -41,13 +41,13 @@ contract MockEarningChainGateway is IEarningChainGateway {
         address asset,
         uint256 amount,
         uint256 targetChainId,
-        address adapter,
+        address bridgeAdapter,
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) external payable {}
 
-    function addBridgeAdapter(address asset, uint256 chainId, address adapter) external {}
+    function addBridgeAdapter(address asset, uint256 chainId, address bridgeAdapter) external {}
 
-    function removeBridgeAdapter(address asset, uint256 chainId, address adapter) external {}
+    function removeBridgeAdapter(address asset, uint256 chainId, address bridgeAdapter) external {}
 
     /// @dev Called by Bridge Adapters which use the TransferHelper modifiers that assert no funds left in the
     /// TransferHelper.
@@ -62,7 +62,7 @@ contract MockEarningChainGateway is IEarningChainGateway {
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
-        address adapter,
+        address bridgeAdapter,
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) external {}
 }

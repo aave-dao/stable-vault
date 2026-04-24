@@ -25,7 +25,8 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
     struct BaseChainGatewayStorage {
         /// @dev Set of adapters whitelisted for usage.
         /// @dev asset == address(0) for data-only bridging.
-        mapping(address asset => mapping(uint256 chainId => mapping(address adapter => bool))) supportedBridgeAdapters;
+        mapping(address asset => mapping(uint256 chainId => mapping(address bridgeAdapter => bool)))
+            supportedBridgeAdapters;
     }
 
     // keccak256(abi.encode(uint256(keccak256("aave.storage.BaseChainGateway")) - 1)) & ~bytes32(uint256(0xff))
@@ -61,12 +62,16 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
     }
 
     /// @notice Checks whether a bridge adapter is whitelisted for a given asset and chain.
-    /// @param asset The asset to check the adapter for.
-    /// @param chainId The chain id to check the adapter for.
-    /// @param adapter The adapter to check.
-    /// @return True if the adapter is whitelisted, false otherwise.
-    function isBridgeAdapterSupported(address asset, uint256 chainId, address adapter) external view returns (bool) {
-        return $storage().supportedBridgeAdapters[asset][chainId][adapter];
+    /// @param asset The asset to check the bridge adapter for.
+    /// @param chainId The chain id to check the bridge adapter for.
+    /// @param bridgeAdapter The bridge adapter to check.
+    /// @return True if the bridge adapter is whitelisted, false otherwise.
+    function isBridgeAdapterSupported(address asset, uint256 chainId, address bridgeAdapter)
+        external
+        view
+        returns (bool)
+    {
+        return $storage().supportedBridgeAdapters[asset][chainId][bridgeAdapter];
     }
 
     /// @inheritdoc IChainGateway
@@ -90,12 +95,12 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
-        address adapter,
+        address bridgeAdapter,
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) external override {
         require(msg.sender == IOU_TOKEN_MANAGER, OnlyIouTokenManager());
         require(iouTokenAmountRay > 0, Errors.ZeroAmount());
-        _validateOutboundAdapter(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, destinationChainId, adapter);
+        _validateOutboundAdapter(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, destinationChainId, bridgeAdapter);
 
         bytes memory bridgeIouTokenMessageEncoded = abi.encode(
             IChainGateway.CrossChainMessage({
@@ -105,31 +110,31 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
                 )
             })
         );
-        IBridgeAdapter(adapter)
+        IBridgeAdapter(bridgeAdapter)
             .publishMessageToChainWithFeePayer(
                 destinationChainId, Constants.ASSET_FOR_DATA_ONLY_BRIDGE, 0, bridgeIouTokenMessageEncoded, bridgeParams
             );
     }
 
     /// @inheritdoc IChainGateway
-    function addBridgeAdapter(address asset, uint256 chainId, address adapter) external override restricted {
-        require(adapter != address(0), Errors.ZeroAddress());
+    function addBridgeAdapter(address asset, uint256 chainId, address bridgeAdapter) external override restricted {
+        require(bridgeAdapter != address(0), Errors.ZeroAddress());
         require(chainId != block.chainid, Errors.InvalidParameter());
-        require(!$storage().supportedBridgeAdapters[asset][chainId][adapter], Errors.AddressAlreadyWhitelisted());
-        $storage().supportedBridgeAdapters[asset][chainId][adapter] = true;
-        emit BridgeAdapterAdded(asset, chainId, adapter);
+        require(!$storage().supportedBridgeAdapters[asset][chainId][bridgeAdapter], Errors.AddressAlreadyWhitelisted());
+        $storage().supportedBridgeAdapters[asset][chainId][bridgeAdapter] = true;
+        emit BridgeAdapterAdded(asset, chainId, bridgeAdapter);
     }
 
     /// @inheritdoc IChainGateway
-    function removeBridgeAdapter(address asset, uint256 chainId, address adapter) external override restricted {
-        require($storage().supportedBridgeAdapters[asset][chainId][adapter], Errors.AddressNotWhitelisted());
-        delete $storage().supportedBridgeAdapters[asset][chainId][adapter];
-        emit BridgeAdapterRemoved(asset, chainId, adapter);
+    function removeBridgeAdapter(address asset, uint256 chainId, address bridgeAdapter) external override restricted {
+        require($storage().supportedBridgeAdapters[asset][chainId][bridgeAdapter], Errors.AddressNotWhitelisted());
+        delete $storage().supportedBridgeAdapters[asset][chainId][bridgeAdapter];
+        emit BridgeAdapterRemoved(asset, chainId, bridgeAdapter);
     }
 
-    /// @dev Validates that the adapter is whitelisted for the given asset and chain.
-    function _validateOutboundAdapter(address asset, uint256 chainId, address adapter) internal view {
-        require($storage().supportedBridgeAdapters[asset][chainId][adapter], AdapterNotFound());
+    /// @dev Validates that the bridge adapter is whitelisted for the given asset and chain.
+    function _validateOutboundAdapter(address asset, uint256 chainId, address bridgeAdapter) internal view {
+        require($storage().supportedBridgeAdapters[asset][chainId][bridgeAdapter], AdapterNotFound());
     }
 
     /// @dev Checks full set of adapters as opposed to the default adapter in case an adapter is swapped out but a
@@ -140,7 +145,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
 
     function _sendCrossChainMessage(
         uint256 destinationChainId,
-        address adapter,
+        address bridgeAdapter,
         address assetToBridge,
         uint256 amountToBridge,
         bytes memory dataToBridge,
@@ -149,7 +154,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         if (assetToBridge == Constants.ASSET_FOR_DATA_ONLY_BRIDGE) {
             require(amountToBridge == 0, Errors.InvalidParameter());
         }
-        IBridgeAdapter(adapter)
+        IBridgeAdapter(bridgeAdapter)
             .publishMessageToChainWithFeePayer(
                 destinationChainId, assetToBridge, amountToBridge, dataToBridge, bridgeParams
             );

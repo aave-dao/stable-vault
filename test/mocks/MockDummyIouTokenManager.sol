@@ -14,7 +14,7 @@ contract MockDummyIouTokenManager is IIouTokenManager {
         uint256, // destinationChainId
         address, // iouTokenRecipient
         uint256 iouTokenAmountRay,
-        address, // adapter
+        address, // bridgeAdapter
         IBridgeAdapter.BridgeParams memory bridgeParams // bridgeParams
     ) external payable override {}
 

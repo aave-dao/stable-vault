@@ -186,7 +186,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     function test_removeBridgeAdapter_reverts_ifNotWhitelisted() public {
         vm.expectRevert(Errors.AddressNotWhitelisted.selector);
         vm.prank(admin);
-        _earningChainGateway.removeBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, makeAddr("adapter"));
+        _earningChainGateway.removeBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, makeAddr("bridgeAdapter"));
     }
 
     function test_rescueTokens_transfersIdleFundsToMsgSender() public {
@@ -204,24 +204,26 @@ contract EarningChainGatewayTest is TestWithHelpers {
         assertEq(_mockUsdt.balanceOf(address(_earningChainGateway)), 0);
     }
 
-    function test_addBridgeAdapter_setsExpectedBridgeAdapter(address asset, uint256 chainId, address adapter) public {
+    function test_addBridgeAdapter_setsExpectedBridgeAdapter(address asset, uint256 chainId, address bridgeAdapter)
+        public
+    {
         vm.assume(asset != address(0));
         vm.assume(chainId != 0);
-        vm.assume(adapter != address(0));
+        vm.assume(bridgeAdapter != address(0));
         vm.prank(admin);
-        _earningChainGateway.addBridgeAdapter(asset, chainId, adapter);
-        assertTrue(_earningChainGateway.isBridgeAdapterSupported(asset, chainId, adapter));
+        _earningChainGateway.addBridgeAdapter(asset, chainId, bridgeAdapter);
+        assertTrue(_earningChainGateway.isBridgeAdapterSupported(asset, chainId, bridgeAdapter));
     }
 
     function test_addBridgeAdapter_reverts_ifAlreadyAdded() public {
-        address adapter = makeAddr("adapter");
+        address bridgeAdapter = makeAddr("bridgeAdapter");
         address asset = address(_mockUsdt);
 
         vm.prank(everyRoleAccount);
-        _earningChainGateway.addBridgeAdapter(asset, ACCOUNTING_CHAIN_ID, adapter);
+        _earningChainGateway.addBridgeAdapter(asset, ACCOUNTING_CHAIN_ID, bridgeAdapter);
         vm.expectRevert(Errors.AddressAlreadyWhitelisted.selector);
         vm.prank(everyRoleAccount);
-        _earningChainGateway.addBridgeAdapter(asset, ACCOUNTING_CHAIN_ID, adapter);
+        _earningChainGateway.addBridgeAdapter(asset, ACCOUNTING_CHAIN_ID, bridgeAdapter);
     }
 
     function test_getAggregatedBalance_returnsExpectedBalance(uint256 amountUsdt, uint256 amountGho) public {
@@ -292,7 +294,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 );
             }
 
-            // Check the bridge adapter is called with expected parameters
+            // Check the bridge bridge adapter is called with expected parameters
             _mockGho.mint(bridgeFeePayer, bridgeFeeAmount);
             vm.prank(bridgeFeePayer);
             MockNonStandardErc20(bridgeFeeToken).approve(address(_earningChainGateway), bridgeFeeAmount);
@@ -690,7 +692,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     }
 
     function test_exchangeIouTokens_reverts_ifNotWhitelistedBridgeAdapter() public {
-        // Unset the adapter for message bridge
+        // Unset the bridge adapter for message bridge
         vm.prank(admin);
         _earningChainGateway.removeBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, address(_mockBridgeAdapterData));
 
@@ -1124,7 +1126,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         address bridgeFeeToken = address(_mockGho);
         bridgeFeeAmount = _boundAssetAmount(address(_mockGho), bridgeFeeAmount);
 
-        // Remove the adapter for the asset being bridged
+        // Remove the bridge adapter for the asset being bridged
         vm.prank(admin);
         _earningChainGateway.removeBridgeAdapter(
             address(_mockUsdt), ACCOUNTING_CHAIN_ID, address(_mockBridgeAdapterAssets)
@@ -1354,7 +1356,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     }
 
     function test_sendBridgeIouTokenMessageWithFeePayer_reverts_ifAdapterNotFound() public {
-        // Remove the adapter for message bridge
+        // Remove the bridge adapter for message bridge
         vm.prank(admin);
         _earningChainGateway.removeBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, address(_mockBridgeAdapterData));
 
@@ -1383,7 +1385,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             ACCOUNTING_CHAIN_ID,
             makeAddr("iouTokenRecipient"),
             0,
-            makeAddr("adapter"),
+            makeAddr("bridgeAdapter"),
             IBridgeAdapter.BridgeParams({
                 feePayer: makeAddr("bridgeFeePayer"),
                 feeToken: address(_mockUsdt),
@@ -1426,7 +1428,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
 
-        // Add a new whitelisted bridge adapter for message bridge
+        // Add a new whitelisted bridge bridge adapter for message bridge
         address unknownAdapter = makeAddr("unknownAdapter");
         vm.prank(admin);
         _earningChainGateway.addBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, unknownAdapter);
@@ -1472,17 +1474,17 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
     function test_receiveMessage_receiveFunds_succeedsWhenUnknownAdapter(uint256 amountUsdt) public {
         amountUsdt = _boundAssetAmount(address(_mockUsdt), amountUsdt);
-        address adapter = makeAddr("adapter");
-        MockNonStandardErc20(address(_mockUsdt)).mint(address(adapter), amountUsdt);
+        address bridgeAdapter = makeAddr("bridgeAdapter");
+        MockNonStandardErc20(address(_mockUsdt)).mint(address(bridgeAdapter), amountUsdt);
 
-        // Mimic usdt is transferred to the TransferHelper from the adapter
+        // Mimic usdt is transferred to the TransferHelper from the bridge adapter
         _mockUsdt.mint(address(_mockTransferHelper), amountUsdt);
 
-        vm.prank(adapter);
+        vm.prank(bridgeAdapter);
         _earningChainGateway.receiveMessage(ACCOUNTING_CHAIN_ID, address(_mockUsdt), amountUsdt, "");
 
         // Check balance of TransferHelper is amountUsdt as it would not have been pulled down by mock Allocator
-        // Funds are transferred to the TransferHelper from the adapter
+        // Funds are transferred to the TransferHelper from the bridge adapter
         assertEq(IERC20(address(_mockUsdt)).balanceOf(address(_mockTransferHelper)), amountUsdt);
     }
 
@@ -1524,7 +1526,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         MockReentrantErc20 reentrantAsset = new MockReentrantErc20("Reentrant Token", "REENT", 18);
 
-        // Add bridge adapter for the reentrant asset
+        // Add bridge bridge adapter for the reentrant asset
         MockBridgeAdapter reentrantBridgeAdapter = new MockBridgeAdapter(address(_mockTransferHelper));
         vm.prank(admin);
         _earningChainGateway.addBridgeAdapter(

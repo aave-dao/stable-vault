@@ -40,13 +40,13 @@ contract MockGateway is IChainGateway {
         uint256,
         /*iouTokenAmountRay*/
         address,
-        /*adapter*/
+        /*bridgeAdapter*/
         IBridgeAdapter.BridgeParams memory /*bridgeParams*/
     ) external override {
         _mockConsume();
     }
 
-    function addBridgeAdapter(address asset, uint256 chainId, address adapter) external {}
-    function removeBridgeAdapter(address asset, uint256 chainId, address adapter) external {}
+    function addBridgeAdapter(address asset, uint256 chainId, address bridgeAdapter) external {}
+    function removeBridgeAdapter(address asset, uint256 chainId, address bridgeAdapter) external {}
     function receiveMessage(uint256 sourceChainId, address asset, uint256 amount, bytes memory data) external {}
 }

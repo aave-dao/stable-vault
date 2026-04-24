@@ -95,7 +95,7 @@ contract EarningChainGateway is
         address assetOut,
         uint256 minAmountOut,
         address receiver,
-        address adapter,
+        address bridgeAdapter,
         IBridgeAdapter.BridgeParams memory bridgeParams,
         bytes memory data
     )
@@ -110,7 +110,7 @@ contract EarningChainGateway is
     {
         require(iouTokenAmountRay > 0, Errors.ZeroAmount());
         require(bridgeParams.gasLimit >= MIN_BURN_IOU_TOKEN_GAS_LIMIT, Errors.InvalidGasLimit());
-        _validateOutboundAdapter(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ACCOUNTING_CHAIN_ID, adapter);
+        _validateOutboundAdapter(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ACCOUNTING_CHAIN_ID, bridgeAdapter);
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(msg.sender, iouTokenAmountRay);
 
         uint256 amountOut = _getWithdrawalAmountOut(iouTokenAmountRay, assetOut, minAmountOut, data);
@@ -128,7 +128,7 @@ contract EarningChainGateway is
         // accepted after the oracle snapshot reflects this outflow, preventing the reverse (obligations reduced while
         // assets are still overstated). Operators are expected to account for this transient state when scheduling
         // claimSurplusInterest() calls.
-        _sendBurnIouTokenMessage(iouTokenAmountRay, adapter, bridgeParams);
+        _sendBurnIouTokenMessage(iouTokenAmountRay, bridgeAdapter, bridgeParams);
 
         ITransferHelper(TRANSFER_HELPER).transfer(assetOut, amountOut, receiver);
         emit AssetOutflow(assetOut, amountOut);
@@ -140,7 +140,7 @@ contract EarningChainGateway is
     function pushFundsToAccountingChain(
         address asset,
         uint256 amount,
-        address adapter,
+        address bridgeAdapter,
         IBridgeAdapter.BridgeParams memory bridgeParams
     )
         external
@@ -157,7 +157,7 @@ contract EarningChainGateway is
         // Pull funds from liquidity into the TransferHelper.
         IAllocator(ALLOCATOR).withdraw(asset, amount);
 
-        _returnFunds(asset, amount, adapter, bridgeParams);
+        _returnFunds(asset, amount, bridgeAdapter, bridgeParams);
         emit AssetOutflow(asset, amount);
     }
 
@@ -189,10 +189,10 @@ contract EarningChainGateway is
     function _returnFunds(
         address asset,
         uint256 amount,
-        address adapter,
+        address bridgeAdapter,
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) internal {
-        _validateOutboundAdapter(asset, ACCOUNTING_CHAIN_ID, adapter);
+        _validateOutboundAdapter(asset, ACCOUNTING_CHAIN_ID, bridgeAdapter);
         // Include the message block number (and timestamp metadata) so the Accounting Chain can verify the chain
         // balance snapshot includes this asset outflow.
         bytes memory returnFundsMessageEncoded = abi.encode(
@@ -203,7 +203,9 @@ contract EarningChainGateway is
                 )
             })
         );
-        _sendCrossChainMessage(ACCOUNTING_CHAIN_ID, adapter, asset, amount, returnFundsMessageEncoded, bridgeParams);
+        _sendCrossChainMessage(
+            ACCOUNTING_CHAIN_ID, bridgeAdapter, asset, amount, returnFundsMessageEncoded, bridgeParams
+        );
     }
 
     /// @dev This function is just needed to prevent StackTooDeep
@@ -232,7 +234,7 @@ contract EarningChainGateway is
     /// @dev This function is just needed to prevent StackTooDeep
     function _sendBurnIouTokenMessage(
         uint256 iouTokenAmountRay,
-        address adapter,
+        address bridgeAdapter,
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) internal {
         // Prepare data to synchronize the Accounting Chain's state.
@@ -254,7 +256,7 @@ contract EarningChainGateway is
 
         _sendCrossChainMessage(
             ACCOUNTING_CHAIN_ID,
-            adapter,
+            bridgeAdapter,
             Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
             0,
             burnIouTokenMessageEncoded,

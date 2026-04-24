@@ -73,13 +73,13 @@ interface IFundsHandler {
     /// @param asset Address of the asset to push to the Accounting Chain.
     /// @param amount Amount of the asset to push to the Accounting Chain.
     /// @param chainId Chain id of the Accounting Chain.
-    /// @param adapter The whitelisted bridge adapter to use for bridging the asset.
+    /// @param bridgeAdapter The whitelisted bridge adapter to use for bridging the asset.
     /// @param bridgeParams The parameters for the bridge adapter.
     function pushFundsToChain(
         address asset,
         uint256 amount,
         uint256 chainId,
-        address adapter,
+        address bridgeAdapter,
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) external payable;
 
