@@ -23,26 +23,29 @@ import {Errors} from "src/types/Errors.sol";
 /// protocol's requirements.
 /// @dev The current implementation applies a fee to: deter abuse of arbitrage opportunities through the protocol's
 /// liquidity, discourage spam, and cover protocol operational costs (e.g. bridge or swap fees).
-/// @dev The fee is capped at 10.00% and is expected to be lower in most scenarios.
+/// @dev The fee is capped per-asset at a basis-point limit (itself bounded at 10.00%). A whitelisted signer can sign
+/// a personal fee denominated in RAY to charge an exact amount; this signed amount is clamped to the asset's bp cap
+/// and the final fee is always rounded up in favor of the protocol.
 /// @custom:upgradeable
 contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithdrawalPolicy {
     // EIP-712 typeHash:
-    // keccak256("FeeDiscount(address user,address assetOut,uint256 iouAmountRay,uint16 personalFeeBps,uint256
+    // keccak256("SignedFee(address user,address assetOut,uint256 iouAmountRay,uint256 personalFeeAmountRay,uint256
     // nonce,uint256 deadline)").
-    bytes32 public constant FEE_DISCOUNT_TYPEHASH = 0x646ab18e84d3d6045718daa407509f2935bc43bae73437f6cfccb5fd55c34544;
+    bytes32 public constant SIGNED_FEE_TYPEHASH = 0x48a45dffc693559aeb550fa1a83c6ef4cd8fdc3d24f3678f575959a279c212e3;
 
     /// @dev The maximum fee in basis points that can be applied to a withdrawal. Set to 10.00%.
     uint16 internal constant FEE_CAP_BPS = 10_00;
 
     address internal immutable WITHDRAWAL_POLICY_APPLIER;
 
-    /// @notice Signed fee discount data (decoded from WithdrawalRequest.data).
-    /// @param personalFeeBps The personal fee in basis points signed by a whitelisted signer.
+    /// @notice Signed personal fee data (decoded from WithdrawalRequest.data).
+    /// @param personalFeeAmountRay The personal fee amount in RAY signed by a whitelisted signer. Used directly as
+    /// the fee charged, capped by the asset-specific bp limit.
     /// @param nonce Unique nonce to prevent signature replay.
     /// @param deadline Timestamp after which the signature is no longer valid.
     /// @param signature The EIP-712 signature from a whitelisted signer.
-    struct SignedFeeDiscount {
-        uint16 personalFeeBps;
+    struct SignedFee {
+        uint256 personalFeeAmountRay;
         uint256 nonce;
         uint256 deadline;
         bytes signature;
@@ -178,20 +181,20 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
         _setDefaultFeeBps(newDefaultFeeBps);
     }
 
-    /// @notice Adds a signer to the set of trusted signers that can sign fee discounts.
+    /// @notice Adds a signer to the set of trusted signers that can sign personal fees.
     /// @param signer Address of the signer to add.
     function addSigner(address signer) external restricted {
         _setSigner({signer: signer, whitelistAsSigner: true});
     }
 
-    /// @notice Removes a signer from the set of trusted signers that can sign fee discounts.
+    /// @notice Removes a signer from the set of trusted signers that can sign personal fees.
     /// @param signer Address of the signer to remove.
     function removeSigner(address signer) external restricted {
         _setSigner({signer: signer, whitelistAsSigner: false});
     }
 
     /// @notice Allows a whitelisted signer to invalidate their own nonce.
-    /// @dev Useful for cancelling a signed fee discount before it's used.
+    /// @dev Useful for cancelling a signed personal fee before it's used.
     /// @param signer The signer whose nonce to invalidate (must be msg.sender).
     /// @param nonce The nonce to invalidate.
     function invalidateNonce(address signer, uint256 nonce) external {
@@ -209,6 +212,9 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     }
 
     /// @dev Returns: (uint256 amountOutRay, address signer, uint256 nonce).
+    /// @dev The fee charged is the signed `personalFeeAmountRay` when provided, capped at the asset-specific bp limit
+    /// applied to `iouAmountRay` (rounded up in favor of the protocol). When no signed data is supplied, the capped
+    /// amount itself is charged.
     function _previewWithdrawalPolicy(WithdrawalRequest calldata request)
         internal
         view
@@ -217,15 +223,15 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
         address signer;
         uint256 nonce;
         uint16 feeBps = _getAssetFeeBps(request.assetOut);
+        uint256 feeAmountToChargeRay = (request.iouAmountRay * feeBps + Constants.MAX_BPS - 1) / Constants.MAX_BPS;
         if (request.data.length > 0) {
-            uint16 personalFeeBps;
-            (signer, nonce, personalFeeBps) = _verifySignedDiscount(request);
-            if (personalFeeBps < feeBps) {
-                feeBps = personalFeeBps;
+            uint256 personalFeeAmountRay;
+            (signer, nonce, personalFeeAmountRay) = _verifySignedFee(request);
+            if (personalFeeAmountRay < feeAmountToChargeRay) {
+                feeAmountToChargeRay = personalFeeAmountRay;
             }
         }
-        uint256 feeAmountRay = (request.iouAmountRay * feeBps + Constants.MAX_BPS - 1) / Constants.MAX_BPS;
-        return (request.iouAmountRay - feeAmountRay, signer, nonce);
+        return (request.iouAmountRay - feeAmountToChargeRay, signer, nonce);
     }
 
     function _markNonceAsUsed(address signer, uint256 nonce) internal {
@@ -233,44 +239,44 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
         emit NonceUsed(signer, nonce);
     }
 
-    /// @dev Verifies a signed fee discount and returns the signer, nonce, and personal fee.
-    /// @return signer The address that signed the discount.
-    /// @return nonce The nonce from the signed discount.
-    /// @return personalFeeBps The personal fee from the signed discount.
-    function _verifySignedDiscount(WithdrawalRequest calldata request)
+    /// @dev Verifies a signed personal fee and returns the signer, nonce, and personal fee amount.
+    /// @return signer The address that signed the personal fee.
+    /// @return nonce The nonce from the signed personal fee.
+    /// @return personalFeeAmountRay The personal fee amount (in RAY) from the signed data.
+    function _verifySignedFee(WithdrawalRequest calldata request)
         internal
         view
-        returns (address signer, uint256 nonce, uint16 personalFeeBps)
+        returns (address signer, uint256 nonce, uint256 personalFeeAmountRay)
     {
-        SignedFeeDiscount memory discount = abi.decode(request.data, (SignedFeeDiscount));
+        SignedFee memory signedFee = abi.decode(request.data, (SignedFee));
 
-        require(discount.deadline >= block.timestamp, DeadlineExpired());
+        require(signedFee.deadline >= block.timestamp, DeadlineExpired());
 
-        signer = _recoverSigner(request, discount);
+        signer = _recoverSigner(request, signedFee);
         require($storage().isSigner[signer], InvalidSignature());
-        require(!$storage().wasNonceUsed[signer][discount.nonce], NonceAlreadyUsed());
+        require(!$storage().wasNonceUsed[signer][signedFee.nonce], NonceAlreadyUsed());
 
-        return (signer, discount.nonce, discount.personalFeeBps);
+        return (signer, signedFee.nonce, signedFee.personalFeeAmountRay);
     }
 
     /// @dev Recovers the signer address from the EIP-712 signature.
-    function _recoverSigner(WithdrawalRequest calldata request, SignedFeeDiscount memory discount)
+    function _recoverSigner(WithdrawalRequest calldata request, SignedFee memory signedFee)
         internal
         view
         returns (address)
     {
         bytes32 structHash = EfficientHashLib.hash(
             abi.encode(
-                FEE_DISCOUNT_TYPEHASH,
+                SIGNED_FEE_TYPEHASH,
                 request.user,
                 request.assetOut,
                 request.iouAmountRay,
-                discount.personalFeeBps,
-                discount.nonce,
-                discount.deadline
+                signedFee.personalFeeAmountRay,
+                signedFee.nonce,
+                signedFee.deadline
             )
         );
-        return ECDSA.recover(_hashTypedDataV4(structHash), discount.signature);
+        return ECDSA.recover(_hashTypedDataV4(structHash), signedFee.signature);
     }
 
     /// @dev Returns the fee for an asset (asset-specific or default fallback).
