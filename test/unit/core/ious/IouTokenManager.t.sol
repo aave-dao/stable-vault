@@ -266,7 +266,9 @@ contract IouTokenManagerTest_AccountingChain is Test {
         emit IIouTokenManager.TokensLocked(from, iouTokenAmountRay);
 
         vm.prank(from);
-        iouTokenManager.bridgeTokens(destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeParams);
+        iouTokenManager.bridgeTokens(
+            destinationChainId, iouTokenRecipient, iouTokenAmountRay, makeAddr("adapter"), bridgeParams
+        );
     }
 
     function test_bridgeTokens_reverts_if_invalidDestinationChainId(
@@ -377,7 +379,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
         vm.prank(from);
         vm.expectRevert(Errors.InvalidParameter.selector);
         iouTokenManager.bridgeTokens{value: accidentalMsgValue}(
-            destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeParams
+            destinationChainId, iouTokenRecipient, iouTokenAmountRay, makeAddr("adapter"), bridgeParams
         );
 
         assertEq(from.balance, accidentalMsgValue, "Caller's native balance should be fully preserved after revert");
