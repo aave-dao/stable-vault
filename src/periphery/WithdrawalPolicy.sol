@@ -211,17 +211,18 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
         emit SignerSet(signer, whitelistAsSigner);
     }
 
-    /// @dev Returns: (uint256 amountOutRay, address signer, uint256 nonce).
     /// @dev The fee charged is the signed `personalFeeAmountRay` when provided, capped at the asset-specific bp limit
     /// applied to `iouAmountRay` (rounded up in favor of the protocol). When no signed data is supplied, the capped
     /// amount itself is charged.
+    /// @param request The withdrawal request parameters.
+    /// @return amountOutRay The amount of assets the user would receive (in RAY) after the fee is applied.
+    /// @return signer The address that signed the personal fee, or `address(0)` when no signed data was supplied.
+    /// @return nonce The nonce from the signed personal fee (only meaningful when `signer != address(0)`).
     function _previewWithdrawalPolicy(WithdrawalRequest calldata request)
         internal
         view
-        returns (uint256, address, uint256)
+        returns (uint256 amountOutRay, address signer, uint256 nonce)
     {
-        address signer;
-        uint256 nonce;
         uint16 feeBps = _getAssetFeeBps(request.assetOut);
         uint256 feeAmountToChargeRay = (request.iouAmountRay * feeBps + Constants.MAX_BPS - 1) / Constants.MAX_BPS;
         if (request.data.length > 0) {
@@ -231,7 +232,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
                 feeAmountToChargeRay = personalFeeAmountRay;
             }
         }
-        return (request.iouAmountRay - feeAmountToChargeRay, signer, nonce);
+        amountOutRay = request.iouAmountRay - feeAmountToChargeRay;
     }
 
     function _markNonceAsUsed(address signer, uint256 nonce) internal {
