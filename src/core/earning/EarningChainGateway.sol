@@ -35,7 +35,7 @@ contract EarningChainGateway is
 
     /// @notice Minimum destination gas limit required for the Accounting Chain to process a
     /// `BURN_IOU_TOKEN` message.
-    /// @dev Set to 120_000 based on gas-snapshot tests of the full destination execution path.
+    /// @dev Set to 120k gas units based on gas-snapshot tests of the full destination execution path.
     /// The gas tests measured ~106.6k gas consumed and about 110k as the minimum exact-gas
     /// value that succeeds under `CallWithExactGas` delivery semantics. 120k adds around 10% safety margin on top.
     uint256 internal constant MIN_BURN_IOU_TOKEN_GAS_LIMIT = 120_000;
