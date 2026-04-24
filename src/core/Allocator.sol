@@ -265,7 +265,8 @@ contract Allocator is
     /// try-catch.
     /// @dev Avoids impact to searching other strategies if withdrawal from a previously searched strategy
     /// fails.
-    /// @dev The `amount` param is not taking into account nor being aware of the `strategy`'s liquidity.
+    /// @dev The `amount` param is clamped to the `strategy`'s available liquidity via `maxWithdraw` (with a balance
+    /// fallback when `maxWithdraw` returns 0).
     function tryWithdrawFromStrategy(address asset, uint256 amount, address strategy)
         external
         onlySelf

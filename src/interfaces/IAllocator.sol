@@ -202,7 +202,8 @@ interface IAllocator {
     /// @param amount Amount of the asset to deposit.
     function topUp(address asset, uint256 amount) external;
 
-    /// @notice Withdraws a given amount of an asset from the default strategy for the given asset.
+    /// @notice Withdraws a given amount of an asset, sourcing from idle funds, the default strategy, then
+    /// non-default strategies as needed.
     /// @dev Prioritizes idle funds, default strategy, then non-default strategy(s).
     /// @param asset Address of the asset to withdraw.
     /// @param amount Amount of the asset to withdraw.

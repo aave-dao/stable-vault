@@ -63,7 +63,7 @@ abstract contract TransferHelperClient {
             require(msg.value >= bridgeParams.feeAmount, Errors.InsufficientFunds());
             _transferNativeToTransferHelper(msg.value);
         } else {
-            // No known bridge requires both native and ERC-20 fees (CCIP and LayerZero use one or the other).
+            // Assumes bridges will not require both native and ERC-20 fees.
             // Rejecting msg.value prevents accidental native loss (which would otherwise remain in this client
             // contract).
             require(msg.value == 0, Errors.InvalidParameter());
