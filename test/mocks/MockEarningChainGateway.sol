@@ -2,7 +2,6 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.22;
 
-import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {Constants} from "src/types/Constants.sol";
@@ -18,13 +17,13 @@ contract MockEarningChainGateway is IEarningChainGateway {
 
     function getAggregatedBalance() external view returns (uint256) {}
 
-    function sendBalanceUpdateWithFeePayer(IBridgeAdapter.BridgeParams memory bridgeParams) external payable {}
+    function sendBalanceUpdateWithFeePayer(bytes calldata bridgeParamsEncoded) external payable {}
 
     function pushFundsToAccountingChain(
         address asset,
         uint256 amount,
         address adapter,
-        IBridgeAdapter.BridgeParams memory bridgeParams
+        bytes calldata bridgeParamsEncoded
     ) external payable {}
 
     function exchangeIouTokens(
@@ -33,7 +32,7 @@ contract MockEarningChainGateway is IEarningChainGateway {
         uint256 minAmountOut,
         address receiver,
         address adapter,
-        IBridgeAdapter.BridgeParams memory bridgeParams,
+        bytes calldata bridgeParamsEncoded,
         bytes memory data
     ) external payable returns (uint256) {}
 
@@ -42,7 +41,7 @@ contract MockEarningChainGateway is IEarningChainGateway {
         uint256 amount,
         uint256 targetChainId,
         address adapter,
-        IBridgeAdapter.BridgeParams memory bridgeParams
+        bytes calldata bridgeParamsEncoded
     ) external payable {}
 
     function addBridgeAdapter(address asset, uint256 chainId, address adapter) external {}
@@ -63,6 +62,6 @@ contract MockEarningChainGateway is IEarningChainGateway {
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
         address adapter,
-        IBridgeAdapter.BridgeParams memory bridgeParams
-    ) external {}
+        bytes calldata bridgeParamsEncoded
+    ) external payable {}
 }

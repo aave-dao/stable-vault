@@ -8,6 +8,7 @@ import {IERC20} from "forge-std/interfaces/IERC20.sol";
 import {Logger} from "test/helpers/Logger.sol";
 
 import {StableVault} from "src/core/accounting/StableVault.sol";
+import {BridgeParamsCodec} from "src/bridging/BridgeParamsCodec.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
@@ -104,14 +105,14 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             userInitialDeposit,
             EARNING_CHAIN_ID,
             address(ccipAdapter_accountingChain),
-            IBridgeAdapter.BridgeParams({
+            BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
                 feePayer: everyRoleAccount,
                 feeToken: address(0),
                 feeAmount: bridgeFeeAmount,
                 feeRefundThreshold: 0,
                 gasLimit: 300000,
                 data: ""
-            })
+            }))
         );
 
         // Check the funds were bridged to the Earning Chain
@@ -186,14 +187,14 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             user1,
             iouAmountRequestedRay,
             address(ccipAdapter_accountingChain),
-            IBridgeAdapter.BridgeParams({
+            BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
                 feePayer: user1,
                 feeToken: address(0),
                 feeAmount: bridgeFeeAmount,
                 feeRefundThreshold: 0,
                 gasLimit: 300000,
                 data: ""
-            })
+            }))
         );
         // Check the IOU token balance on Accounting Chain went down
         assertEq(iouToken_accountingChain.balanceOf(user1), 0, "User should have bridged IOU tokens");
@@ -270,14 +271,14 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         vm.prank(user2);
         vm.deal(user2, bridgeFeeAmount);
         {
-            IBridgeAdapter.BridgeParams memory bp = IBridgeAdapter.BridgeParams({
+            bytes memory bp = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
                 feePayer: user2,
                 feeToken: address(0),
                 feeAmount: bridgeFeeAmount,
                 feeRefundThreshold: 0,
                 gasLimit: 100000,
                 data: ""
-            });
+            }));
             iouTokenManager_accountingChain.bridgeTokens{value: bridgeFeeAmount}(
                 EARNING_CHAIN_ID, user2, iouAmountRequestedRay, address(ccipAdapter_accountingChain), bp
             );
@@ -296,14 +297,14 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         vm.deal(user2, bridgeFeeAmount);
         vm.prank(user2);
         {
-            IBridgeAdapter.BridgeParams memory bp = IBridgeAdapter.BridgeParams({
+            bytes memory bp = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
                 feePayer: user2,
                 feeToken: address(0),
                 feeAmount: bridgeFeeAmount,
                 feeRefundThreshold: 0,
                 gasLimit: 100000,
                 data: ""
-            });
+            }));
             iouTokenManager_earningChain.bridgeTokens{value: bridgeFeeAmount}(
                 ACCOUNTING_CHAIN_ID, user2, iouAmountRequestedRay, address(ccipAdapter_earningChain), bp
             );
@@ -349,9 +350,9 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             address(ccipAdapter_earningChain),
             // Use a higher gas limit to ensure the transaction is successful on Accounting Chain because the snapshot
             // struct will be pushed to the FH storage.
-            IBridgeAdapter.BridgeParams({
+            BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
                 feePayer: user1, feeToken: address(0), feeAmount: 1, feeRefundThreshold: 0, gasLimit: 300000, data: ""
-            }),
+            })),
             ""
         );
 

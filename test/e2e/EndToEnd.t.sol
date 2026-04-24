@@ -8,6 +8,7 @@ import {IERC4626} from "forge-std/interfaces/IERC4626.sol";
 import {Logger} from "test/helpers/Logger.sol";
 
 import {IAllocator} from "src/interfaces/IAllocator.sol";
+import {BridgeParamsCodec} from "src/bridging/BridgeParamsCodec.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
@@ -142,14 +143,14 @@ contract EndToEndTest is BaseTest {
                 userInitialDeposit,
                 EARNING_CHAIN_ID,
                 address(ccipAdapter_accountingChain),
-                IBridgeAdapter.BridgeParams({
+                BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
                     feePayer: everyRoleAccount,
                     feeToken: address(0),
                     feeAmount: bridgeFeeAmount,
                     feeRefundThreshold: 0,
                     gasLimit: 300000,
                     data: ""
-                })
+                }))
             );
 
             // - check that the funds land on Earning Chain and are dropped into default liquidity vault there
@@ -294,14 +295,14 @@ contract EndToEndTest is BaseTest {
                 address(GHO),
                 userEarningsInGho,
                 address(ccipAdapter_earningChain),
-                IBridgeAdapter.BridgeParams({
+                BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
                     feePayer: everyRoleAccount,
                     feeToken: address(0),
                     feeAmount: bridgeFeeAmount,
                     feeRefundThreshold: 0,
                     gasLimit: 300000,
                     data: ""
-                })
+                }))
             );
 
             // Publish the post-return snapshot reflecting reduced Earning Chain balance after bridging back.
@@ -456,14 +457,14 @@ contract EndToEndTest is BaseTest {
             vm.prank(everyRoleAccount);
             vm.deal(everyRoleAccount, bridgeFeeAmount);
             {
-                IBridgeAdapter.BridgeParams memory bp = IBridgeAdapter.BridgeParams({
+                bytes memory bp = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
                     feePayer: everyRoleAccount,
                     feeToken: address(0),
                     feeAmount: bridgeFeeAmount,
                     feeRefundThreshold: 0,
                     gasLimit: 300000,
                     data: ""
-                });
+                }));
                 earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
                     address(GHO), ghoBalanceOnVaultLeft, address(ccipAdapter_earningChain), bp
                 );

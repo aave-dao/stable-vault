@@ -11,6 +11,7 @@ import {StableVault} from "src/core/accounting/StableVault.sol";
 import {StableVault} from "src/core/accounting/StableVault.sol";
 import {EarningChainGateway} from "src/core/earning/EarningChainGateway.sol";
 import {IouTokenManager} from "src/core/ious/IouTokenManager.sol";
+import {BridgeParamsCodec} from "src/bridging/BridgeParamsCodec.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
@@ -102,22 +103,23 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             "Funds handler should have the deposited amount of USDC"
         );
 
-        // 2. Bridge the assets to the Earning Chain
-        _mintAndApproveBridgeFeeToken(everyRoleAccount, address(fundsHandler));
+        // 2. Bridge the assets to the Earning Chain — approval targets the adapter under the
+        // opaque-bytes shape (adapter owns the safeTransferFrom for the fee token).
+        _mintAndApproveBridgeFeeToken(everyRoleAccount, address(ccipAdapter_accountingChain));
         vm.prank(everyRoleAccount);
         fundsHandler.pushFundsToChain(
             address(bridgeFeeToken),
             userInitialDeposit,
             EARNING_CHAIN_ID,
             address(ccipAdapter_accountingChain),
-            IBridgeAdapter.BridgeParams({
+            BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
                 feePayer: everyRoleAccount,
                 feeToken: address(bridgeFeeToken),
                 feeAmount: bridgeFeeAmount,
                 feeRefundThreshold: 0,
                 gasLimit: 350000,
                 data: ""
-            })
+            }))
         );
 
         // Check the funds were bridged to the Earning Chain
@@ -183,9 +185,8 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
         );
 
         // 6. Bridge user1 IOUs to Earning chain and check supplies are expected
-        // The user will use native asset to pay for bridge fees
-        // User must approve the IOU token manager to spend the IOU tokens
-        _mintAndApproveBridgeFeeToken(user1, address(iouTokenManager_accountingChain));
+        // Approval targets the adapter under the opaque-bytes shape.
+        _mintAndApproveBridgeFeeToken(user1, address(ccipAdapter_accountingChain));
         _runIouTokenBridge(iouTokenManager_accountingChain, user1, iouAmountRequestedRay, EARNING_CHAIN_ID);
         // Check the IOU token balance on Accounting Chain went down
         assertEq(iouToken_accountingChain.balanceOf(user1), 0, "User should have bridged IOU tokens");
@@ -257,7 +258,7 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             "IOUS ON EARNING CHAIN (BEFORE USER2 BRIDGE TO ACCOUNTING CHAIN) =",
             iousOnEarningBeforeUser2BridgeToAccountingChain
         );
-        _mintAndApproveBridgeFeeToken(user2, address(iouTokenManager_accountingChain));
+        _mintAndApproveBridgeFeeToken(user2, address(ccipAdapter_accountingChain));
         _runIouTokenBridge(iouTokenManager_accountingChain, user2, iouAmountRequestedRay, EARNING_CHAIN_ID);
         require(
             iouToken_accountingChain.totalSupply() == iousOnAccountBeforeUser2BridgeToEarningChain,
@@ -270,7 +271,7 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
         );
 
         // Bridge the tokens back to Accounting chain and check the supply on both chains is expected
-        _mintAndApproveBridgeFeeToken(user2, address(iouTokenManager_earningChain));
+        _mintAndApproveBridgeFeeToken(user2, address(ccipAdapter_earningChain));
         _runIouTokenBridge(iouTokenManager_earningChain, user2, iouAmountRequestedRay, ACCOUNTING_CHAIN_ID);
         require(
             iouToken_accountingChain.totalSupply() == iousOnAccountBeforeUser2BridgeToEarningChain,
@@ -394,21 +395,21 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             user,
             iouAmountRequestedRay,
             adapter,
-            IBridgeAdapter.BridgeParams({
+            BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
                 feePayer: user,
                 feeToken: address(bridgeFeeToken),
                 feeAmount: bridgeFeeAmount,
                 feeRefundThreshold: 0,
                 gasLimit: 150000,
                 data: ""
-            })
+            }))
         );
     }
 
     function _runExchangeIouTokens(EarningChainGateway earningChainGateway, address user, uint256 iouAmountRequestedRay)
         internal
     {
-        _mintAndApproveBridgeFeeToken(user1, address(earningChainGateway));
+        _mintAndApproveBridgeFeeToken(user1, address(ccipAdapter_earningChain));
         vm.prank(user);
         earningChainGateway.exchangeIouTokens(
             iouAmountRequestedRay,
@@ -416,7 +417,7 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             0,
             user,
             address(ccipAdapter_earningChain),
-            IBridgeAdapter.BridgeParams({
+            BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
                 feePayer: user,
                 feeToken: address(bridgeFeeToken),
                 feeAmount: bridgeFeeAmount,
@@ -426,7 +427,7 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
                 // struct may be pushed to the FH storage.
                 gasLimit: 350000,
                 data: ""
-            }),
+            })),
             ""
         );
     }

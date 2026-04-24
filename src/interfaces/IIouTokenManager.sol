@@ -2,8 +2,6 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.22;
 
-import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
-
 /// @title IIouTokenManager
 /// @author Aave Labs
 /// @notice Interface for the IOU token manager.
@@ -40,17 +38,19 @@ interface IIouTokenManager {
     function getLockedBalance() external view returns (uint256);
 
     /// @notice Entry point for IOU token owners to bridge tokens to a destination chain.
+    /// @dev `bridgeParamsEncoded` is `BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams)`. This contract
+    /// forwards the blob opaquely to the Gateway; only the adapter decodes.
     /// @param destinationChainId The chain id of the chain to publish the message to.
     /// @param iouTokenRecipient The address to send the IOU tokens to on the destination chain.
     /// @param iouTokenAmountRay The amount of IOU tokens to bridge.
     /// @param adapter The whitelisted bridge adapter to use for the message.
-    /// @param bridgeParams The parameters for the bridge adapter.
+    /// @param bridgeParamsEncoded Opaque `BridgeParams` blob consumed by the adapter.
     function bridgeTokens(
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
         address adapter,
-        IBridgeAdapter.BridgeParams memory bridgeParams
+        bytes calldata bridgeParamsEncoded
     ) external payable;
 
     /// @notice Mints tokens and transfers them to the caller (assumes this contract has mint privileges on the IOU

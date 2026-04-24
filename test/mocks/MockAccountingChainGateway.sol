@@ -2,12 +2,19 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.22;
 
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+import {BridgeParamsCodec} from "src/bridging/BridgeParamsCodec.sol";
 import {IAccountingChainGateway} from "src/interfaces/IAccountingChainGateway.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {Constants} from "src/types/Constants.sol";
+import {Errors} from "src/types/Errors.sol";
 
 contract MockAccountingChainGateway is IAccountingChainGateway {
+    using SafeERC20 for IERC20;
+
     address internal immutable TRANSFER_HELPER;
 
     constructor(address transferHelper) {
@@ -24,15 +31,19 @@ contract MockAccountingChainGateway is IAccountingChainGateway {
 
     function getIouTokenManager() external view returns (address) {}
 
+    /// @dev Simulates adapter-owned fee staging: decodes bridge params, pulls feeToken from feePayer
+    /// (or accepts native via msg.value) into TransferHelper, then simulates asset+fee consumption.
     function sendPushFundsToChainMessage(
         address, // asset
         uint256, // amount
         uint256, // targetChainId
         address, // adapter
-        IBridgeAdapter.BridgeParams memory // bridgeParams
+        bytes calldata bridgeParamsEncoded
     )
         external
+        payable
     {
+        _stageBridgeFee(bridgeParamsEncoded);
         _pullAssetsFromTransferHelper();
     }
 
@@ -54,8 +65,25 @@ contract MockAccountingChainGateway is IAccountingChainGateway {
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
         address adapter,
-        IBridgeAdapter.BridgeParams memory bridgeParams
-    ) external {}
+        bytes calldata bridgeParamsEncoded
+    ) external payable {}
+
+    function _stageBridgeFee(bytes calldata bridgeParamsEncoded) internal {
+        IBridgeAdapter.BridgeParams memory bridgeParams = BridgeParamsCodec.decode(bridgeParamsEncoded);
+        if (bridgeParams.feeToken == Constants.NATIVE_CURRENCY) {
+            require(msg.value >= bridgeParams.feeAmount, Errors.InsufficientFunds());
+            if (msg.value > 0) {
+                (bool ok,) = TRANSFER_HELPER.call{value: msg.value}("");
+                require(ok, Errors.NativeTransferFailed());
+            }
+        } else {
+            require(msg.value == 0, Errors.InvalidParameter());
+            if (bridgeParams.feeAmount > 0) {
+                IERC20(bridgeParams.feeToken)
+                    .safeTransferFrom(bridgeParams.feePayer, TRANSFER_HELPER, bridgeParams.feeAmount);
+            }
+        }
+    }
 
     function _pullAssetsFromTransferHelper() internal {
         if (_assetsToPullFromTransferHelperInNextCall.length > 0) {

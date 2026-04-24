@@ -4,6 +4,7 @@ pragma solidity ^0.8.22;
 
 import {AccountingChainBaseScript} from "script/interact/accounting/AccountingChainBaseScript.s.sol";
 
+import {BridgeParamsCodec} from "src/bridging/BridgeParamsCodec.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 
@@ -33,7 +34,9 @@ contract FundsHandlerInteractionScript is AccountingChainBaseScript {
         uint256 key = vm.envUint("ADMIN_PRIVATE_KEY");
         vm.startBroadcast(key);
         address adapter = address(0); // TODO: Set the whitelisted bridge adapter address.
-        IFundsHandler(FUNDS_HANDLER).pushFundsToChain(token, amount, chainId, adapter, bridgeParams);
+        IFundsHandler(FUNDS_HANDLER).pushFundsToChain(
+            token, amount, chainId, adapter, BridgeParamsCodec.encode(bridgeParams)
+        );
         vm.stopBroadcast();
     }
 }

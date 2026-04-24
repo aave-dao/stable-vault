@@ -2,8 +2,6 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.22;
 
-import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
-
 /// @title IChainGateway
 /// @author Aave Labs
 /// @notice Interface for handling the communication between chains for bridging assets and data.
@@ -96,16 +94,19 @@ interface IChainGateway {
     function receiveMessage(uint256 sourceChainId, address asset, uint256 amount, bytes memory data) external;
 
     /// @notice Sends a message to bridge IOU tokens to a destination chain.
+    /// @dev `bridgeParamsEncoded` is `BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams)`. The Gateway
+    /// validates `adapter` against the whitelist and forwards both opaquely to the adapter. Only the
+    /// adapter decodes the blob and stages the bridge fee.
     /// @param destinationChainId The chain id of the chain to publish the message to.
     /// @param iouTokenRecipient The address to send the IOU tokens to on the destination chain.
     /// @param iouTokenAmountRay The amount of IOU tokens to bridge.
     /// @param adapter The whitelisted bridge adapter to use for the message.
-    /// @param bridgeParams The parameters for the bridge adapter.
+    /// @param bridgeParamsEncoded Opaque `BridgeParams` blob consumed by the adapter.
     function sendBridgeIouTokenMessageWithFeePayer(
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
         address adapter,
-        IBridgeAdapter.BridgeParams memory bridgeParams
-    ) external;
+        bytes calldata bridgeParamsEncoded
+    ) external payable;
 }

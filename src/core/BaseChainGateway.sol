@@ -91,8 +91,8 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
         address adapter,
-        IBridgeAdapter.BridgeParams memory bridgeParams
-    ) external override {
+        bytes calldata bridgeParamsEncoded
+    ) external payable override {
         require(msg.sender == IOU_TOKEN_MANAGER, OnlyIouTokenManager());
         require(iouTokenAmountRay > 0, Errors.ZeroAmount());
         _validateOutboundAdapter(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, destinationChainId, adapter);
@@ -105,10 +105,14 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
                 )
             })
         );
-        IBridgeAdapter(adapter)
-            .publishMessageToChainWithFeePayer(
-                destinationChainId, Constants.ASSET_FOR_DATA_ONLY_BRIDGE, 0, bridgeIouTokenMessageEncoded, bridgeParams
-            );
+        _sendCrossChainMessage(
+            destinationChainId,
+            adapter,
+            Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
+            0,
+            bridgeIouTokenMessageEncoded,
+            bridgeParamsEncoded
+        );
     }
 
     /// @inheritdoc IChainGateway
@@ -138,20 +142,23 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         require($storage().supportedBridgeAdapters[asset][sourceChainId][msg.sender], AdapterNotFound());
     }
 
+    /// @dev Forwards an outbound cross-chain message to a validated bridge adapter. `bridgeParamsEncoded`
+    /// is opaque at this layer — only the adapter's `publishMessageToChainWithFeePayer` decodes it. All
+    /// unconsumed `msg.value` is forwarded so the adapter can use it for native bridge fees when applicable.
     function _sendCrossChainMessage(
         uint256 destinationChainId,
         address adapter,
         address assetToBridge,
         uint256 amountToBridge,
         bytes memory dataToBridge,
-        IBridgeAdapter.BridgeParams memory bridgeParams
+        bytes memory bridgeParamsEncoded
     ) internal {
         if (assetToBridge == Constants.ASSET_FOR_DATA_ONLY_BRIDGE) {
             require(amountToBridge == 0, Errors.InvalidParameter());
         }
         IBridgeAdapter(adapter)
-            .publishMessageToChainWithFeePayer(
-                destinationChainId, assetToBridge, amountToBridge, dataToBridge, bridgeParams
+            .publishMessageToChainWithFeePayer{value: msg.value}(
+                destinationChainId, assetToBridge, amountToBridge, dataToBridge, bridgeParamsEncoded
             );
         if (assetToBridge != Constants.ASSET_FOR_DATA_ONLY_BRIDGE) {
             emit FundsSent(assetToBridge, amountToBridge, destinationChainId);

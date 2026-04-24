@@ -49,7 +49,7 @@ abstract contract TransferHelperClient {
         }
     }
 
-    function _transferHelperBalance(address asset) private view returns (uint256) {
+    function _transferHelperBalance(address asset) internal view returns (uint256) {
         if (asset == Constants.NATIVE_CURRENCY) {
             return TRANSFER_HELPER.balance;
         }
@@ -57,8 +57,13 @@ abstract contract TransferHelperClient {
     }
 
     /// @dev Transfers the bridge fee to the TransferHelper to be pulled by Bridge Adapter.
+    /// @dev The legacy `feePayer == msg.sender` check was removed when fee-staging moved from caller
+    /// contracts (IouTokenManager / FundsHandler) into the adapter under the opaque-bytes dispatch shape.
+    /// Under adapter-level staging, `msg.sender` is the Gateway, not the original user — the check would
+    /// reject every legitimate flow. ERC20 approval semantics already provide the required protection:
+    /// `safeTransferFrom(feePayer, ...)` reverts unless `feePayer` has approved this contract, so a forged
+    /// `feePayer` in the decoded params cannot move tokens.
     function _transferBridgeFeeToTransferHelper(IBridgeAdapter.BridgeParams memory bridgeParams) internal {
-        require(bridgeParams.feePayer == msg.sender, Errors.InvalidBridgeFeePayer());
         if (bridgeParams.feeToken == Constants.NATIVE_CURRENCY) {
             require(msg.value >= bridgeParams.feeAmount, Errors.InsufficientFunds());
             _transferNativeToTransferHelper(msg.value);

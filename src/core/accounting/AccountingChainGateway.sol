@@ -7,7 +7,6 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {BaseChainGateway} from "src/core/BaseChainGateway.sol";
 import {IAccountingChainGateway} from "src/interfaces/IAccountingChainGateway.sol";
-import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainBalanceOracle} from "src/interfaces/IChainBalanceOracle.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
@@ -63,14 +62,14 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
         uint256 amount,
         uint256 targetChainId,
         address adapter,
-        IBridgeAdapter.BridgeParams memory bridgeParams
-    ) external override onlyFundsHandler {
+        bytes calldata bridgeParamsEncoded
+    ) external payable override onlyFundsHandler {
         _validateOutboundAdapter(asset, targetChainId, adapter);
         // Block pushing funds to a chain whose balance oracle is stale, as the target chain's state is unknown and
         // may be unhealthy (e.g. chain or oracle infrastructure is down). Sending funds there risks locking assets or
         // DoSing withdrawals due to a lack of aggregated liquidity until the oracle staleness is resolved.
         require(!IChainBalanceOracle(CHAIN_BALANCE_ORACLE).getChainBalance(targetChainId).isStale, StaleChainBalance());
-        _sendCrossChainMessage(targetChainId, adapter, asset, amount, "", bridgeParams);
+        _sendCrossChainMessage(targetChainId, adapter, asset, amount, "", bridgeParamsEncoded);
     }
 
     function _receiveFunds(address asset, uint256 amount) internal override {

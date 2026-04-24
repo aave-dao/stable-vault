@@ -11,7 +11,6 @@ import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/
 import {LocalBalanceAggregator} from "src/core/LocalBalanceAggregator.sol";
 import {IAccountingChainGateway} from "src/interfaces/IAccountingChainGateway.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
-import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainBalanceOracle} from "src/interfaces/IChainBalanceOracle.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
@@ -147,30 +146,31 @@ contract FundsHandler is
     //////////////////////////////////////////// MANAGER FUNCTIONS /////////////////////////////////////////////////////
 
     /// @inheritdoc IFundsHandler
+    /// @dev Pure forwarder under the opaque-bytes dispatch shape: no longer decodes `BridgeParams`, no
+    /// longer stages bridge fees, no longer asserts TransferHelper balance for `feeToken`. The adapter
+    /// owns fee handling post-decode.
     function pushFundsToChain(
         address asset,
         uint256 amount,
         uint256 chainId,
         address adapter,
-        IBridgeAdapter.BridgeParams memory bridgeParams
+        bytes calldata bridgeParamsEncoded
     )
         external
         payable
         override
         restricted
-        assertingTransferHelperBalanceFor(bridgeParams.feeToken)
         assertingTransferHelperBalanceFor(asset)
     {
         require(amount > 0, Errors.ZeroAmount());
         require($storage().earningChainIds.contains(chainId), Errors.InvalidDestinationChainId());
 
-        // Transfer the bridge fee to the TransferHelper.
-        _transferBridgeFeeToTransferHelper(bridgeParams);
-
-        // Pull funds from liquidity into the TransferHelper.
+        // Pull funds from liquidity into the TransferHelper. Bridge-fee staging lives inside the adapter.
         _pullFundsFromImmediateLiquidity(asset, amount);
 
-        IAccountingChainGateway(GATEWAY).sendPushFundsToChainMessage(asset, amount, chainId, adapter, bridgeParams);
+        IAccountingChainGateway(GATEWAY).sendPushFundsToChainMessage{value: msg.value}(
+            asset, amount, chainId, adapter, bridgeParamsEncoded
+        );
     }
 
     // Gateway Functions

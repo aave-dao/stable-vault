@@ -2,7 +2,6 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.22;
 
-import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
 
 contract MockDummyIouTokenManager is IIouTokenManager {
@@ -15,7 +14,7 @@ contract MockDummyIouTokenManager is IIouTokenManager {
         address, // iouTokenRecipient
         uint256 iouTokenAmountRay,
         address, // adapter
-        IBridgeAdapter.BridgeParams memory bridgeParams // bridgeParams
+        bytes calldata // bridgeParamsEncoded
     ) external payable override {}
 
     function mintTokens(address to, uint256 amount) external override {}

@@ -5,7 +5,6 @@ pragma solidity ^0.8.22;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
 import {IMintableBurnableIERC20} from "src/interfaces/IMintableBurnableIERC20.sol";
 
@@ -49,7 +48,7 @@ contract MockIouTokenManager is IIouTokenManager {
         address, // iouTokenRecipient
         uint256 iouTokenAmountRay,
         address, // adapter
-        IBridgeAdapter.BridgeParams memory // bridgeParams
+        bytes calldata // bridgeParamsEncoded
     )
         external
         payable

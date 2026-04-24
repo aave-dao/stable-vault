@@ -4,6 +4,7 @@ pragma solidity ^0.8.22;
 
 import {EarningChainBaseScript} from "script/interact/earning/EarningChainBaseScript.s.sol";
 
+import {BridgeParamsCodec} from "src/bridging/BridgeParamsCodec.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
 
@@ -31,7 +32,9 @@ contract EarningChainGatewayInteractionScript is EarningChainBaseScript {
 
         vm.startBroadcast(vm.envUint("ADMIN_PRIVATE_KEY"));
         address adapter = address(0); // TODO: Set the whitelisted bridge adapter address.
-        IEarningChainGateway(EARNING_CHAIN_GATEWAY).pushFundsToAccountingChain(asset, amount, adapter, bridgeParams);
+        IEarningChainGateway(EARNING_CHAIN_GATEWAY).pushFundsToAccountingChain(
+            asset, amount, adapter, BridgeParamsCodec.encode(bridgeParams)
+        );
         vm.stopBroadcast();
     }
 

@@ -5,7 +5,6 @@ pragma solidity ^0.8.22;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IIouToken} from "src/interfaces/IIouToken.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
@@ -98,13 +97,17 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
     /// @dev IOUs should be bridged via bridges which require finalization on the source chain. If IOUs are bridged and
     /// exchanged for assets on a destination, but the source chain reorgs, then a user would keep their IOUs and the
     /// assets withdrawn on the destination chain.
+    /// @dev Pure forwarder under the opaque-bytes dispatch shape: this contract no longer decodes
+    /// `BridgeParams`, no longer stages the bridge fee, and no longer asserts TransferHelper balance for
+    /// `feeToken`. The adapter owns all of that post-decode. The caller's `msg.value` is forwarded so the
+    /// adapter can use it for native bridge fees.
     function bridgeTokens(
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
         address adapter,
-        IBridgeAdapter.BridgeParams memory bridgeParams
-    ) external payable override assertingTransferHelperBalanceFor(bridgeParams.feeToken) {
+        bytes calldata bridgeParamsEncoded
+    ) external payable override {
         require(destinationChainId != block.chainid, Errors.InvalidDestinationChainId());
         require(iouTokenRecipient != address(0), Errors.InvalidParameter());
         require(iouTokenAmountRay > 0, Errors.ZeroAmount());
@@ -113,11 +116,10 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
         } else {
             _burnTokens(msg.sender, iouTokenAmountRay);
         }
-        _transferBridgeFeeToTransferHelper(bridgeParams);
 
         IChainGateway(CHAIN_GATEWAY)
-            .sendBridgeIouTokenMessageWithFeePayer(
-                destinationChainId, iouTokenRecipient, iouTokenAmountRay, adapter, bridgeParams
+            .sendBridgeIouTokenMessageWithFeePayer{value: msg.value}(
+                destinationChainId, iouTokenRecipient, iouTokenAmountRay, adapter, bridgeParamsEncoded
             );
 
         emit TokensBridged(destinationChainId, iouTokenRecipient, iouTokenAmountRay);

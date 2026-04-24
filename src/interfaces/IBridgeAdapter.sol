@@ -56,16 +56,20 @@ interface IBridgeAdapter {
     function setDestinationChainAdapter(uint256 chainId, address destinationChainAdapter) external;
 
     /// @notice Sends an arbitrary message containing instructions or data updates to a destination chain.
+    /// @dev `bridgeParamsEncoded` is `BridgeParamsCodec.encode(BridgeParams)`. The adapter is the sole
+    /// decoder — Gateway and intermediate layers forward the blob opaquely. The adapter also owns bridge-
+    /// fee staging (pulls from `feePayer` via TransferHelper, spends on the underlying router, refunds
+    /// excess per `feeRefundThreshold`).
     /// @param destinationChainId Chain id of the chain to publish the message to.
     /// @param asset Asset to bridge; set to `address(0)` for data only messages.
     /// @param amount Amount of the asset to bridge; set to 0 for data only messages.
     /// @param data Arbitrary data that would be decoded and handled by the destination chain.
-    /// @param bridgeParams Parameters for the bridge adapter.
+    /// @param bridgeParamsEncoded ABI-encoded `BridgeParams` blob; decoded inside the adapter.
     function publishMessageToChainWithFeePayer(
         uint256 destinationChainId,
         address asset,
         uint256 amount,
         bytes memory data,
-        BridgeParams memory bridgeParams
-    ) external;
+        bytes memory bridgeParamsEncoded
+    ) external payable;
 }

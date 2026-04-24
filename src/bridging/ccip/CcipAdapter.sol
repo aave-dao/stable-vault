@@ -12,6 +12,7 @@ import {IRouterClient} from "@chainlink-ccip/contracts/interfaces/IRouterClient.
 import {Client} from "@chainlink-ccip/contracts/libraries/Client.sol";
 
 import {BaseBridgeAdapter} from "src/bridging/BaseBridgeAdapter.sol";
+import {BridgeParamsCodec} from "src/bridging/BridgeParamsCodec.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
@@ -101,13 +102,22 @@ contract CcipAdapter is
     }
 
     /// @inheritdoc IBridgeAdapter
+    /// @dev Sole decoder for `bridgeParamsEncoded`. Owns bridge-fee staging: pulls `feeAmount` of
+    /// `feeToken` from `feePayer` into TransferHelper (via `_transferBridgeFeeToTransferHelper`), then
+    /// into itself, spends the router fee, refunds the excess per `feeRefundThreshold`. The inline
+    /// balance-leak check (adapter-scope) replaces the caller-level
+    /// `assertingTransferHelperBalanceFor(feeToken)` modifier that lived on IouTokenManager / FundsHandler
+    /// prior to the opaque-bytes refactor.
     function publishMessageToChainWithFeePayer(
         uint256 destinationChainId,
         address asset,
         uint256 amount,
         bytes memory data,
-        IBridgeAdapter.BridgeParams memory bridgeParams
-    ) external override(BaseBridgeAdapter, IBridgeAdapter) onlyGateway {
+        bytes memory bridgeParamsEncoded
+    ) external payable override(BaseBridgeAdapter, IBridgeAdapter) onlyGateway {
+        IBridgeAdapter.BridgeParams memory bridgeParams = BridgeParamsCodec.decode(bridgeParamsEncoded);
+        uint256 balanceBefore = _transferHelperBalance(bridgeParams.feeToken);
+
         address destinationChainAdapter = _destinationChainAdapterOf[destinationChainId];
         require(destinationChainAdapter != address(0), Errors.InvalidParameter());
 
@@ -133,6 +143,8 @@ contract CcipAdapter is
         uint256 estimatedFeeAmount = IRouterClient(CCIP_ROUTER).getFee(chainSelector, ccipMessage);
         require(bridgeParams.feeAmount >= estimatedFeeAmount, Errors.InsufficientFunds());
 
+        _transferBridgeFeeToTransferHelper(bridgeParams);
+
         _pullFromTransferHelperAndApproveCcipRouter(
             asset, amount, bridgeParams.feeToken, bridgeParams.feeAmount, estimatedFeeAmount
         );
@@ -146,6 +158,9 @@ contract CcipAdapter is
             bridgeParams.feeRefundThreshold,
             estimatedFeeAmount
         );
+
+        uint256 balanceAfter = _transferHelperBalance(bridgeParams.feeToken);
+        require(balanceAfter <= balanceBefore, TransferHelperBalanceNotConsumed(bridgeParams.feeToken));
     }
 
     /// @inheritdoc IAny2EVMMessageReceiver

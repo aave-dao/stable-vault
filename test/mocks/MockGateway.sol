@@ -2,11 +2,19 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.20;
 
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+import {BridgeParamsCodec} from "src/bridging/BridgeParamsCodec.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
+import {Constants} from "src/types/Constants.sol";
+import {Errors} from "src/types/Errors.sol";
 
 contract MockGateway is IChainGateway {
+    using SafeERC20 for IERC20;
+
     address internal _transferHelper;
     uint256 internal _balanceToConsume;
     address internal _tokenToComsume;
@@ -32,17 +40,29 @@ contract MockGateway is IChainGateway {
         }
     }
 
+    /// @dev Simulates adapter-owned fee staging: decodes bridge params, pulls feeToken from feePayer
+    /// (or accepts native via msg.value) into TransferHelper, then simulates fee consumption.
     function sendBridgeIouTokenMessageWithFeePayer(
-        uint256,
-        /*destinationChainId*/
-        address,
-        /*iouTokenRecipient*/
-        uint256,
-        /*iouTokenAmountRay*/
-        address,
-        /*adapter*/
-        IBridgeAdapter.BridgeParams memory /*bridgeParams*/
-    ) external override {
+        uint256, /*destinationChainId*/
+        address, /*iouTokenRecipient*/
+        uint256, /*iouTokenAmountRay*/
+        address, /*adapter*/
+        bytes calldata bridgeParamsEncoded
+    ) external payable override {
+        IBridgeAdapter.BridgeParams memory bridgeParams = BridgeParamsCodec.decode(bridgeParamsEncoded);
+        if (bridgeParams.feeToken == Constants.NATIVE_CURRENCY) {
+            require(msg.value >= bridgeParams.feeAmount, Errors.InsufficientFunds());
+            if (msg.value > 0) {
+                (bool ok,) = _transferHelper.call{value: msg.value}("");
+                require(ok, Errors.NativeTransferFailed());
+            }
+        } else {
+            require(msg.value == 0, Errors.InvalidParameter());
+            if (bridgeParams.feeAmount > 0) {
+                IERC20(bridgeParams.feeToken)
+                    .safeTransferFrom(bridgeParams.feePayer, _transferHelper, bridgeParams.feeAmount);
+            }
+        }
         _mockConsume();
     }
 
