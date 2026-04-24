@@ -110,7 +110,7 @@ contract EarningChainGateway is
     {
         require(iouTokenAmountRay > 0, Errors.ZeroAmount());
         require(bridgeParams.gasLimit >= MIN_BURN_IOU_TOKEN_GAS_LIMIT, Errors.InvalidGasLimit());
-        _validateOutboundAdapter(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ACCOUNTING_CHAIN_ID, bridgeAdapter);
+        _validateBridgeAdapterIsSupported(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ACCOUNTING_CHAIN_ID, bridgeAdapter);
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(msg.sender, iouTokenAmountRay);
 
         uint256 amountOut = _getWithdrawalAmountOut(iouTokenAmountRay, assetOut, minAmountOut, data);
@@ -192,7 +192,7 @@ contract EarningChainGateway is
         address bridgeAdapter,
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) internal {
-        _validateOutboundAdapter(asset, ACCOUNTING_CHAIN_ID, bridgeAdapter);
+        _validateBridgeAdapterIsSupported(asset, ACCOUNTING_CHAIN_ID, bridgeAdapter);
         // Include the message block number (and timestamp metadata) so the Accounting Chain can verify the chain
         // balance snapshot includes this asset outflow.
         bytes memory returnFundsMessageEncoded = abi.encode(

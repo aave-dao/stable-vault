@@ -85,7 +85,9 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
             emit FundsReceived(asset, amount, sourceChainId);
         }
         if (data.length > 0) {
-            _onlyAdapter(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, sourceChainId);
+            _validateBridgeAdapterIsSupported({
+                asset: Constants.ASSET_FOR_DATA_ONLY_BRIDGE, chainId: sourceChainId, bridgeAdapter: msg.sender
+            });
             _receiveData(sourceChainId, data);
         }
     }
@@ -100,7 +102,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
     ) external override {
         require(msg.sender == IOU_TOKEN_MANAGER, OnlyIouTokenManager());
         require(iouTokenAmountRay > 0, Errors.ZeroAmount());
-        _validateOutboundAdapter(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, destinationChainId, bridgeAdapter);
+        _validateBridgeAdapterIsSupported(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, destinationChainId, bridgeAdapter);
 
         bytes memory bridgeIouTokenMessageEncoded = abi.encode(
             IChainGateway.CrossChainMessage({
@@ -133,14 +135,8 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
     }
 
     /// @dev Validates that the bridge adapter is whitelisted for the given asset and chain.
-    function _validateOutboundAdapter(address asset, uint256 chainId, address bridgeAdapter) internal view {
+    function _validateBridgeAdapterIsSupported(address asset, uint256 chainId, address bridgeAdapter) internal view {
         require($storage().supportedBridgeAdapters[asset][chainId][bridgeAdapter], AdapterNotFound());
-    }
-
-    /// @dev Checks full set of adapters as opposed to the default adapter in case an adapter is swapped out but a
-    /// pending message needs to be ingested.
-    function _onlyAdapter(address asset, uint256 sourceChainId) internal view {
-        require($storage().supportedBridgeAdapters[asset][sourceChainId][msg.sender], AdapterNotFound());
     }
 
     function _sendCrossChainMessage(
