@@ -208,7 +208,6 @@ contract EarningChainGateway is
         );
     }
 
-    /// @dev This function is just needed to prevent StackTooDeep
     function _getWithdrawalAmountOut(
         uint256 iouTokenAmountRay,
         address assetOut,
@@ -231,7 +230,6 @@ contract EarningChainGateway is
         return amountOut;
     }
 
-    /// @dev This function is just needed to prevent StackTooDeep
     function _sendBurnIouTokenMessage(
         uint256 iouTokenAmountRay,
         address bridgeAdapter,
