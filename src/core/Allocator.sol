@@ -489,7 +489,18 @@ contract Allocator is
             // Gracefully return 0 if the strategy has no shares to avoid disrupting a multi-deallocate rebalance.
             return 0;
         }
-        uint256 amount = IERC4626(strategy).redeem({shares: shares, receiver: address(this), owner: address(this)});
+        uint256 amount;
+        uint256 maxRedeemable = IERC4626(strategy).maxRedeem(address(this));
+        if (maxRedeemable == 0) {
+            try IERC4626(strategy).redeem({shares: shares, receiver: address(this), owner: address(this)}) returns (
+                uint256 amountWithdrawn
+            ) {
+                amount = amountWithdrawn;
+            } catch {}
+        } else {
+            amount = IERC4626(strategy)
+                .redeem({shares: Math.min(shares, maxRedeemable), receiver: address(this), owner: address(this)});
+        }
         emit AssetDeallocated(asset, strategy, amount);
         return amount;
     }

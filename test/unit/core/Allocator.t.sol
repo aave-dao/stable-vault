@@ -1750,6 +1750,178 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
     }
 
+    function test_rebalance_deallocate_maxAmount_redeemsOnlyMaxRedeemableShares(
+        uint256 depositAmountUsdt,
+        uint256 maxRedeemableShares,
+        uint256 yieldAmountUsdt
+    ) public {
+        depositAmountUsdt = _boundAssetAmount(address(_mockUsdt), depositAmountUsdt);
+        vm.assume(depositAmountUsdt > 1);
+        yieldAmountUsdt = bound(yieldAmountUsdt, 1, depositAmountUsdt * 20);
+
+        MockErc4626Strategy mockStrategy = new MockErc4626Strategy(_mockUsdt);
+        vm.prank(admin);
+        _allocator.addStrategy(address(_mockUsdt), address(mockStrategy));
+
+        _mockUsdt.mint(depositor, depositAmountUsdt);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(mockStrategy), depositAmountUsdt);
+        vm.prank(depositor);
+        mockStrategy.deposit(depositAmountUsdt, address(_allocator));
+
+        _mockUsdt.mint(address(mockStrategy), yieldAmountUsdt);
+
+        uint256 sharesBalance = mockStrategy.balanceOf(address(_allocator));
+        maxRedeemableShares = bound(maxRedeemableShares, 1, sharesBalance - 1);
+        uint256 expectedRedeemedAssets = mockStrategy.previewRedeem(maxRedeemableShares);
+        uint256 expectedRemainingAssets = depositAmountUsdt + yieldAmountUsdt - expectedRedeemedAssets;
+        mockStrategy.mockMaxRedeem(maxRedeemableShares);
+
+        IAllocator.RebalanceParams[] memory rebalanceParams = _initializeRebalanceParams(1);
+        IAllocator.DeallocationParams[] memory deallocations = _initializeDeallocationParams(1);
+        deallocations[0] = _buildDeallocationParams(address(_mockUsdt), address(mockStrategy), 0);
+        rebalanceParams[0] =
+            _buildRebalanceParams(deallocations, _initializeSwapParams(0), _initializeAllocationParams(0));
+
+        vm.prank(address(everyRoleAccount));
+        _allocator.rebalance(rebalanceParams);
+
+        assertEq(_mockUsdt.balanceOf(address(_allocator)), expectedRedeemedAssets);
+        assertEq(_mockUsdt.balanceOf(address(mockStrategy)), expectedRemainingAssets);
+        assertEq(mockStrategy.balanceOf(address(_allocator)), sharesBalance - maxRedeemableShares);
+    }
+
+    function test_rebalance_deallocate_maxAmount_redeemsAllIfMaxRedeemReturnsZero(uint256 depositAmountUsdt) public {
+        depositAmountUsdt = _boundAssetAmount(address(_mockUsdt), depositAmountUsdt);
+        vm.assume(depositAmountUsdt > 0);
+
+        MockErc4626Strategy mockStrategy = new MockErc4626Strategy(_mockUsdt);
+        vm.prank(admin);
+        _allocator.addStrategy(address(_mockUsdt), address(mockStrategy));
+
+        _mockUsdt.mint(depositor, depositAmountUsdt);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(mockStrategy), depositAmountUsdt);
+        vm.prank(depositor);
+        mockStrategy.deposit(depositAmountUsdt, address(_allocator));
+
+        mockStrategy.mockMaxRedeem(0);
+
+        IAllocator.RebalanceParams[] memory rebalanceParams = _initializeRebalanceParams(1);
+        IAllocator.DeallocationParams[] memory deallocations = _initializeDeallocationParams(1);
+        deallocations[0] = _buildDeallocationParams(address(_mockUsdt), address(mockStrategy), 0);
+        rebalanceParams[0] =
+            _buildRebalanceParams(deallocations, _initializeSwapParams(0), _initializeAllocationParams(0));
+
+        vm.prank(address(everyRoleAccount));
+        _allocator.rebalance(rebalanceParams);
+
+        assertEq(_mockUsdt.balanceOf(address(_allocator)), depositAmountUsdt);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(mockStrategy)), 0);
+    }
+
+    function test_rebalance_deallocate_maxAmount_returnsZeroIfMaxRedeemReturnsZeroAndRedeemReverts(uint256 depositAmountUsdt)
+        public
+    {
+        depositAmountUsdt = _boundAssetAmount(address(_mockUsdt), depositAmountUsdt);
+
+        MockErc4626Strategy mockStrategy = new MockErc4626Strategy(_mockUsdt);
+        vm.prank(admin);
+        _allocator.addStrategy(address(_mockUsdt), address(mockStrategy));
+
+        _mockUsdt.mint(depositor, depositAmountUsdt);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(mockStrategy), depositAmountUsdt);
+        vm.prank(depositor);
+        mockStrategy.deposit(depositAmountUsdt, address(_allocator));
+
+        mockStrategy.mockMaxRedeem(0);
+        mockStrategy.mockRedeemToRevert("no liquidity");
+
+        IAllocator.RebalanceParams[] memory rebalanceParams = _initializeRebalanceParams(1);
+        IAllocator.DeallocationParams[] memory deallocations = _initializeDeallocationParams(1);
+        deallocations[0] = _buildDeallocationParams(address(_mockUsdt), address(mockStrategy), 0);
+        rebalanceParams[0] =
+            _buildRebalanceParams(deallocations, _initializeSwapParams(0), _initializeAllocationParams(0));
+
+        vm.prank(address(everyRoleAccount));
+        _allocator.rebalance(rebalanceParams);
+
+        assertEq(_mockUsdt.balanceOf(address(_allocator)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(mockStrategy)), depositAmountUsdt);
+    }
+
+    function test_rebalance_deallocate_maxAmount_continuesAfterIlliquidStrategy(
+        uint256 illiquidDepositAmountUsdt,
+        uint256 liquidDepositAmountUsdt
+    ) public {
+        illiquidDepositAmountUsdt = _boundAssetAmount(address(_mockUsdt), illiquidDepositAmountUsdt);
+        liquidDepositAmountUsdt = _boundAssetAmount(address(_mockUsdt), liquidDepositAmountUsdt);
+
+        MockErc4626Strategy illiquidStrategy = new MockErc4626Strategy(_mockUsdt);
+        vm.prank(admin);
+        _allocator.addStrategy(address(_mockUsdt), address(illiquidStrategy));
+
+        _mockUsdt.mint(depositor, illiquidDepositAmountUsdt);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(illiquidStrategy), illiquidDepositAmountUsdt);
+        vm.prank(depositor);
+        illiquidStrategy.deposit(illiquidDepositAmountUsdt, address(_allocator));
+
+        _mockUsdt.mint(depositor, liquidDepositAmountUsdt);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(_extraUsdtStrategy), liquidDepositAmountUsdt);
+        vm.prank(depositor);
+        _extraUsdtStrategy.deposit(liquidDepositAmountUsdt, address(_allocator));
+
+        illiquidStrategy.mockMaxRedeem(0);
+        illiquidStrategy.mockRedeemToRevert("no liquidity");
+
+        IAllocator.RebalanceParams[] memory rebalanceParams = _initializeRebalanceParams(1);
+        IAllocator.DeallocationParams[] memory deallocations = _initializeDeallocationParams(2);
+        deallocations[0] = _buildDeallocationParams(address(_mockUsdt), address(illiquidStrategy), 0);
+        deallocations[1] = _buildDeallocationParams(address(_mockUsdt), address(_extraUsdtStrategy), 0);
+        rebalanceParams[0] =
+            _buildRebalanceParams(deallocations, _initializeSwapParams(0), _initializeAllocationParams(0));
+
+        vm.prank(address(everyRoleAccount));
+        _allocator.rebalance(rebalanceParams);
+
+        assertEq(_mockUsdt.balanceOf(address(_allocator)), liquidDepositAmountUsdt);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(illiquidStrategy)), illiquidDepositAmountUsdt);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
+    }
+
+    function test_rebalance_deallocate_maxAmount_redeemsAllIfMaxRedeemEqualsShareBalance(uint256 depositAmountUsdt)
+        public
+    {
+        depositAmountUsdt = _boundAssetAmount(address(_mockUsdt), depositAmountUsdt);
+
+        MockErc4626Strategy mockStrategy = new MockErc4626Strategy(_mockUsdt);
+        vm.prank(admin);
+        _allocator.addStrategy(address(_mockUsdt), address(mockStrategy));
+
+        _mockUsdt.mint(depositor, depositAmountUsdt);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(mockStrategy), depositAmountUsdt);
+        vm.prank(depositor);
+        mockStrategy.deposit(depositAmountUsdt, address(_allocator));
+
+        mockStrategy.mockMaxRedeem(mockStrategy.balanceOf(address(_allocator)));
+
+        IAllocator.RebalanceParams[] memory rebalanceParams = _initializeRebalanceParams(1);
+        IAllocator.DeallocationParams[] memory deallocations = _initializeDeallocationParams(1);
+        deallocations[0] = _buildDeallocationParams(address(_mockUsdt), address(mockStrategy), 0);
+        rebalanceParams[0] =
+            _buildRebalanceParams(deallocations, _initializeSwapParams(0), _initializeAllocationParams(0));
+
+        vm.prank(address(everyRoleAccount));
+        _allocator.rebalance(rebalanceParams);
+
+        assertEq(_mockUsdt.balanceOf(address(_allocator)), depositAmountUsdt);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(mockStrategy)), 0);
+    }
+
     function test_rebalance_deallocate_zeroWithdawnIfShareBalanceIsZero() public {
         IAllocator.RebalanceParams[] memory rebalanceParams = _initializeRebalanceParams(1);
         IAllocator.DeallocationParams[] memory deallocations = _initializeDeallocationParams(1);

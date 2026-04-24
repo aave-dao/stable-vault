@@ -14,6 +14,8 @@ contract MockErc4626Strategy is ERC4626 {
 
     bool private _mockMaxWithdraw;
     uint256 private _maxWithdraw;
+    bool private _mockMaxRedeem;
+    uint256 private _maxRedeem;
     bool private _withdrawShouldRevert;
     string private _withdrawRevertErrorMsg;
     bool private _redeemShouldRevert;
@@ -30,6 +32,11 @@ contract MockErc4626Strategy is ERC4626 {
         _maxWithdraw = maxWithdrawValue;
     }
 
+    function mockMaxRedeem(uint256 maxRedeemValue) external {
+        _mockMaxRedeem = true;
+        _maxRedeem = maxRedeemValue;
+    }
+
     function mockPreviewRedeem(uint256 previewRedeemValue) external {
         _mockPreviewRedeem = true;
         _previewRedeem = previewRedeemValue;
@@ -38,6 +45,11 @@ contract MockErc4626Strategy is ERC4626 {
     function discardMaxWithdrawMock() external {
         _mockMaxWithdraw = false;
         _maxWithdraw = 0;
+    }
+
+    function discardMaxRedeemMock() external {
+        _mockMaxRedeem = false;
+        _maxRedeem = 0;
     }
 
     function discardPreviewRedeemMock() external {
@@ -72,6 +84,13 @@ contract MockErc4626Strategy is ERC4626 {
         return super.maxWithdraw(owner);
     }
 
+    function maxRedeem(address owner) public view override returns (uint256) {
+        if (_mockMaxRedeem) {
+            return _maxRedeem;
+        }
+        return super.maxRedeem(owner);
+    }
+
     function previewRedeem(uint256 shares) public view override returns (uint256) {
         if (_previewRedeemShouldRevert) {
             revert(_previewRedeemRevertErrorMsg);
@@ -103,6 +122,13 @@ contract MockErc4626Strategy is ERC4626 {
     function redeem(uint256 shares, address receiver, address owner) public override returns (uint256) {
         if (_redeemShouldRevert) {
             revert(_redeemRevertErrorMsg);
+        }
+
+        // Allow bypassing maxRedeem checks when mocked so tests can assert callers respect the value themselves.
+        if (_mockMaxRedeem) {
+            uint256 assets = previewRedeem(shares);
+            _withdraw(_msgSender(), receiver, owner, assets, shares);
+            return assets;
         }
 
         return super.redeem(shares, receiver, owner);
