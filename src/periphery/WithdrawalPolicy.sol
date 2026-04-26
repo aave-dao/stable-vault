@@ -24,8 +24,8 @@ import {Errors} from "src/types/Errors.sol";
 /// @dev The current implementation applies a fee to: deter abuse of arbitrage opportunities through the protocol's
 /// liquidity, discourage spam, and cover protocol operational costs (e.g. bridge or swap fees).
 /// @dev The fee is capped per-asset at a basis-point limit (itself bounded at 10.00%). A whitelisted signer can sign
-/// a personal fee denominated in RAY to charge an exact amount; this signed amount is clamped to the asset's bp cap
-/// and the final fee is always rounded up in favor of the protocol.
+/// a personal fee denominated in RAY to charge an exact amount; this signed amount is clamped to the asset's bp cap,
+/// with the cap amount rounded up in favor of the protocol.
 /// @custom:upgradeable
 contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithdrawalPolicy {
     // EIP-712 typeHash:
