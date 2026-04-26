@@ -9,7 +9,7 @@ import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 /// @notice Interface for handling the communication between chains for bridging assets and data.
 /// @dev Assumes bridged assets and bridged data can be handled independently of each other.
 interface IChainGateway {
-    /// @notice Thrown when an adapter is not found for a given asset and chain.
+    /// @notice Thrown when a bridge adapter is not found for a given asset and chain.
     /// @custom:selector 0xf7b1bf8e
     error AdapterNotFound();
 
@@ -21,9 +21,8 @@ interface IChainGateway {
     /// @custom:selector 0x4084b1f2
     error OnlyIouTokenManager();
 
-    event BridgeAdapterAdded(address asset, uint256 chainId, address adapter);
-    event BridgeAdapterRemoved(address asset, uint256 chainId, address adapter);
-    event DefaultBridgeAdapterSet(address asset, uint256 chainId, address adapter);
+    event BridgeAdapterAdded(address asset, uint256 chainId, address bridgeAdapter);
+    event BridgeAdapterRemoved(address asset, uint256 chainId, address bridgeAdapter);
     event FundsReceived(address asset, uint256 amount, uint256 sourceChainId);
     event FundsSent(address asset, uint256 amount, uint256 destinationChainId);
 
@@ -76,35 +75,18 @@ interface IChainGateway {
     /// @notice Returns the address of the IOU token manager.
     function getIouTokenManager() external view returns (address);
 
-    /// @notice Gets the default bridge adapter for an asset and chain; the default adapter is used for outbound
-    /// messages.
-    /// @dev The adapter must be whitelisted for the asset and chain.
-    /// @param asset The asset to get the default adapter for.
-    /// @param chainId The chain id to get the default adapter for.
-    /// @return The default adapter for the asset and chain.
-    function getDefaultBridgeAdapter(address asset, uint256 chainId) external view returns (address);
-
     /// @notice Adds a bridge adapter to the gateway's set of whitelisted adapters.
-    /// @dev The adapter must not be already whitelisted for the asset and chain.
-    /// @param asset The asset to add the adapter for.
-    /// @param chainId The chain id to add the adapter for.
-    /// @param adapter The adapter to add.
-    function addBridgeAdapter(address asset, uint256 chainId, address adapter) external;
+    /// @dev The bridge adapter must not be already whitelisted for the asset and chain.
+    /// @param asset The asset to add the bridge adapter for.
+    /// @param chainId The chain id to add the bridge adapter for.
+    /// @param bridgeAdapter The bridge adapter to add.
+    function addBridgeAdapter(address asset, uint256 chainId, address bridgeAdapter) external;
 
     /// @notice Removes a bridge adapter from the gateway's set of whitelisted adapters.
-    /// @dev If the adapter is the default adapter for the asset and chain, the default adapter is unset.
-    /// @param asset The asset to remove the adapter for.
-    /// @param chainId The chain id to remove the adapter for.
-    /// @param adapter The adapter to remove.
-    function removeBridgeAdapter(address asset, uint256 chainId, address adapter) external;
-
-    /// @notice Sets the default bridge adapter for an asset and chain; the default adapter is used for outbound
-    /// messages.
-    /// @dev The adapter must be whitelisted for the asset and chain.
-    /// @param asset The asset to set the default adapter for.
-    /// @param chainId The chain id to set the default adapter for.
-    /// @param adapter The adapter to set as the default.
-    function setDefaultBridgeAdapter(address asset, uint256 chainId, address adapter) external;
+    /// @param asset The asset to remove the bridge adapter for.
+    /// @param chainId The chain id to remove the bridge adapter for.
+    /// @param bridgeAdapter The bridge adapter to remove.
+    function removeBridgeAdapter(address asset, uint256 chainId, address bridgeAdapter) external;
 
     /// @notice Handle receiving of data and funds from a source chain.
     /// @param sourceChainId The chain from which the message was sent.
@@ -117,11 +99,13 @@ interface IChainGateway {
     /// @param destinationChainId The chain id of the chain to publish the message to.
     /// @param iouTokenRecipient The address to send the IOU tokens to on the destination chain.
     /// @param iouTokenAmountRay The amount of IOU tokens to bridge.
+    /// @param bridgeAdapter The whitelisted bridge adapter to use for the message.
     /// @param bridgeParams The parameters for the bridge adapter.
     function sendBridgeIouTokenMessageWithFeePayer(
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
+        address bridgeAdapter,
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) external;
 }

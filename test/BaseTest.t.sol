@@ -780,53 +780,13 @@ contract BaseTest is TestWithHelpers {
         // Set up Accounting Chain Gateway (Accounting chain) // These should be done cross-wise cause it's destination
         // chainId
         accountingChainGateway.addBridgeAdapter(address(GHO), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain));
-        accountingChainGateway.setDefaultBridgeAdapter(
-            address(GHO), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain)
-        );
-        Logger.log(
-            "\tAccountingChainGateway GHO adapter (Accounting Chain): %s",
-            accountingChainGateway.getDefaultBridgeAdapter(address(GHO), EARNING_CHAIN_ID)
-        );
         accountingChainGateway.addBridgeAdapter(address(USDC), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain));
-        accountingChainGateway.setDefaultBridgeAdapter(
-            address(USDC), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain)
-        );
-        Logger.log(
-            "\tAccountingChainGateway USDC adapter (Accounting Chain): %s",
-            accountingChainGateway.getDefaultBridgeAdapter(address(USDC), EARNING_CHAIN_ID)
-        );
         accountingChainGateway.addBridgeAdapter(address(0), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain));
-        accountingChainGateway.setDefaultBridgeAdapter(
-            address(0), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain)
-        );
-        Logger.log(
-            "\tAccountingChainGateway Message adapter (Accounting Chain): %s",
-            accountingChainGateway.getDefaultBridgeAdapter(address(0), EARNING_CHAIN_ID)
-        );
 
         // Set up Earning Chain Gateway (Earning chain)
         earningChainGateway.addBridgeAdapter(address(GHO), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
-        earningChainGateway.setDefaultBridgeAdapter(
-            address(GHO), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain)
-        );
-        Logger.log(
-            "\tEarningChainGatway GHO adapter (Earning Chain): %s",
-            earningChainGateway.getDefaultBridgeAdapter(address(GHO), ACCOUNTING_CHAIN_ID)
-        );
         earningChainGateway.addBridgeAdapter(address(USDC), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
-        earningChainGateway.setDefaultBridgeAdapter(
-            address(USDC), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain)
-        );
-        Logger.log(
-            "\tEarningChainGatway USDC adapter (Earning Chain): %s",
-            earningChainGateway.getDefaultBridgeAdapter(address(USDC), ACCOUNTING_CHAIN_ID)
-        );
         earningChainGateway.addBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
-        earningChainGateway.setDefaultBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
-        Logger.log(
-            "\tEarningChainGatway Messages adapter (Earning Chain): %s",
-            earningChainGateway.getDefaultBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID)
-        );
 
         ccipAdapter_accountingChain.setChainSelector(EARNING_CHAIN_ID, EARNING_CHAIN_CCIP_SELECTOR);
         ccipAdapter_accountingChain.setDestinationChainAdapter(EARNING_CHAIN_ID, address(ccipAdapter_earningChain));
@@ -957,13 +917,6 @@ contract BaseTest is TestWithHelpers {
             OPERATOR_ROLE
         );
 
-        // For Accounting Chain Gateway
-        accessManager.setTargetFunctionRole(
-            address(accountingChainGateway),
-            _toSelectorArray(IChainGateway.setDefaultBridgeAdapter.selector),
-            OPERATOR_ROLE
-        );
-
         // For StableVault
         accessManager.setTargetFunctionRole(
             address(vault),
@@ -1049,9 +1002,7 @@ contract BaseTest is TestWithHelpers {
         // For Earning Chain Gateway
         accessManager.setTargetFunctionRole(
             address(earningChainGateway),
-            _toSelectorArray(
-                IChainGateway.setDefaultBridgeAdapter.selector, IEarningChainGateway.pushFundsToAccountingChain.selector
-            ),
+            _toSelectorArray(IEarningChainGateway.pushFundsToAccountingChain.selector),
             OPERATOR_ROLE
         );
 

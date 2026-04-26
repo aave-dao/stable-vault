@@ -229,6 +229,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
         MockErc20(iouToken).mint(from, iouTokenAmountRay);
         vm.prank(from);
         IERC20(iouToken).approve(address(iouTokenManager), iouTokenAmountRay);
+        address bridgeAdapter = makeAddr("bridgeAdapter");
         vm.expectCall(
             chainGateway,
             abi.encodeWithSelector(
@@ -236,11 +237,14 @@ contract IouTokenManagerTest_AccountingChain is Test {
                 destinationChainId,
                 iouTokenRecipient,
                 iouTokenAmountRay,
+                bridgeAdapter,
                 bridgeParams
             )
         );
         vm.prank(from);
-        iouTokenManager.bridgeTokens(destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeParams);
+        iouTokenManager.bridgeTokens(
+            destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeAdapter, bridgeParams
+        );
     }
 
     function test_bridgeTokens_emitsTokensLocked_onAccountingChain() public virtual {
@@ -264,7 +268,9 @@ contract IouTokenManagerTest_AccountingChain is Test {
         emit IIouTokenManager.TokensLocked(from, iouTokenAmountRay);
 
         vm.prank(from);
-        iouTokenManager.bridgeTokens(destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeParams);
+        iouTokenManager.bridgeTokens(
+            destinationChainId, iouTokenRecipient, iouTokenAmountRay, makeAddr("bridgeAdapter"), bridgeParams
+        );
     }
 
     function test_bridgeTokens_reverts_if_invalidDestinationChainId(
@@ -280,7 +286,9 @@ contract IouTokenManagerTest_AccountingChain is Test {
         });
         vm.expectRevert(Errors.InvalidDestinationChainId.selector);
         vm.prank(from);
-        iouTokenManager.bridgeTokens(destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeParams);
+        iouTokenManager.bridgeTokens(
+            destinationChainId, iouTokenRecipient, iouTokenAmountRay, makeAddr("bridgeAdapter"), bridgeParams
+        );
     }
 
     function test_bridgeTokens_bridgeParams_ClientTransfersNonNativeFeeToken(
@@ -325,7 +333,9 @@ contract IouTokenManagerTest_AccountingChain is Test {
             );
         }
         vm.prank(from);
-        iouTokenManager.bridgeTokens(destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeParams);
+        iouTokenManager.bridgeTokens(
+            destinationChainId, iouTokenRecipient, iouTokenAmountRay, makeAddr("bridgeAdapter"), bridgeParams
+        );
         assertEq(
             IERC20(feeToken).balanceOf(address(transferHelper)),
             0,
@@ -371,7 +381,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
         vm.prank(from);
         vm.expectRevert(Errors.InvalidParameter.selector);
         iouTokenManager.bridgeTokens{value: accidentalMsgValue}(
-            destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeParams
+            destinationChainId, iouTokenRecipient, iouTokenAmountRay, makeAddr("bridgeAdapter"), bridgeParams
         );
 
         assertEq(from.balance, accidentalMsgValue, "Caller's native balance should be fully preserved after revert");
@@ -419,7 +429,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
         }
         vm.prank(from);
         iouTokenManager.bridgeTokens{value: feeAmount}(
-            destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeParams
+            destinationChainId, iouTokenRecipient, iouTokenAmountRay, makeAddr("bridgeAdapter"), bridgeParams
         );
         assertEq(transferHelper.balance, 0, "Native fee not properly transferred out of TransferHelper");
         assertEq(feeRecipient.balance, feeAmount, "Native fee not properly transferred to bridge adapter");
@@ -450,7 +460,9 @@ contract IouTokenManagerTest_AccountingChain is Test {
 
         vm.expectRevert(abi.encodeWithSelector(Errors.InvalidBridgeFeePayer.selector));
         vm.prank(from);
-        iouTokenManager.bridgeTokens(destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeParams);
+        iouTokenManager.bridgeTokens(
+            destinationChainId, iouTokenRecipient, iouTokenAmountRay, makeAddr("bridgeAdapter"), bridgeParams
+        );
     }
 
     function test_bridgeTokens_reverts_if_invalidIouTokenRecipient() public {
@@ -463,7 +475,9 @@ contract IouTokenManagerTest_AccountingChain is Test {
         });
         vm.expectRevert(Errors.InvalidParameter.selector);
         vm.prank(from);
-        iouTokenManager.bridgeTokens(destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeParams);
+        iouTokenManager.bridgeTokens(
+            destinationChainId, iouTokenRecipient, iouTokenAmountRay, makeAddr("bridgeAdapter"), bridgeParams
+        );
     }
 
     function test_bridgeTokens_reverts_if_zeroAmount(address from, uint256 destinationChainId) public {
@@ -475,7 +489,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
         });
         vm.expectRevert(Errors.ZeroAmount.selector);
         vm.prank(from);
-        iouTokenManager.bridgeTokens(destinationChainId, iouTokenRecipient, 0, bridgeParams);
+        iouTokenManager.bridgeTokens(destinationChainId, iouTokenRecipient, 0, makeAddr("bridgeAdapter"), bridgeParams);
     }
 
     // Getters

@@ -143,20 +143,16 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
 
         // GHO uses CCIP Adapter
         gateway.addBridgeAdapter(_gho(), accountingChainId, localCcipAdapter);
-        gateway.setDefaultBridgeAdapter(_gho(), accountingChainId, localCcipAdapter);
 
         // USDC uses CCIP Adapter
         gateway.addBridgeAdapter(_usdc(), accountingChainId, localCcipAdapter);
-        gateway.setDefaultBridgeAdapter(_usdc(), accountingChainId, localCcipAdapter);
 
         // USDT uses CCIP Adapter
         gateway.addBridgeAdapter(_usdt(), accountingChainId, localCcipAdapter);
-        gateway.setDefaultBridgeAdapter(_usdt(), accountingChainId, localCcipAdapter);
 
         // Message uses CCIP Adapter
         address messageOnly = address(0);
         gateway.addBridgeAdapter(messageOnly, accountingChainId, localCcipAdapter);
-        gateway.setDefaultBridgeAdapter(messageOnly, accountingChainId, localCcipAdapter);
 
         ICcipBridgeAdapter(localCcipAdapter).setChainSelector(accountingChainId, accountingChainCcipSelector);
         ICcipBridgeAdapter(localCcipAdapter).setDestinationChainAdapter(accountingChainId, accountingCcipAdapter);

@@ -109,6 +109,7 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             address(bridgeFeeToken),
             userInitialDeposit,
             EARNING_CHAIN_ID,
+            address(ccipAdapter_accountingChain),
             IBridgeAdapter.BridgeParams({
                 feePayer: everyRoleAccount,
                 feeToken: address(bridgeFeeToken),
@@ -383,11 +384,16 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
         uint256 iouAmountRequestedRay,
         uint256 destinationChainId
     ) internal {
+        // Determine the right bridge adapter based on which chain is the source
+        address bridgeAdapter = destinationChainId == EARNING_CHAIN_ID
+            ? address(ccipAdapter_accountingChain)
+            : address(ccipAdapter_earningChain);
         vm.prank(user);
         iouTokenManager.bridgeTokens(
             destinationChainId,
             user,
             iouAmountRequestedRay,
+            bridgeAdapter,
             IBridgeAdapter.BridgeParams({
                 feePayer: user,
                 feeToken: address(bridgeFeeToken),
@@ -409,6 +415,7 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             address(USDC),
             0,
             user,
+            address(ccipAdapter_earningChain),
             IBridgeAdapter.BridgeParams({
                 feePayer: user,
                 feeToken: address(bridgeFeeToken),

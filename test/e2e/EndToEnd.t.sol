@@ -141,6 +141,7 @@ contract EndToEndTest is BaseTest {
                 address(USDC),
                 userInitialDeposit,
                 EARNING_CHAIN_ID,
+                address(ccipAdapter_accountingChain),
                 IBridgeAdapter.BridgeParams({
                     feePayer: everyRoleAccount,
                     feeToken: address(0),
@@ -292,6 +293,7 @@ contract EndToEndTest is BaseTest {
             earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
                 address(GHO),
                 userEarningsInGho,
+                address(ccipAdapter_earningChain),
                 IBridgeAdapter.BridgeParams({
                     feePayer: everyRoleAccount,
                     feeToken: address(0),
@@ -453,18 +455,19 @@ contract EndToEndTest is BaseTest {
 
             vm.prank(everyRoleAccount);
             vm.deal(everyRoleAccount, bridgeFeeAmount);
-            earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
-                address(GHO),
-                ghoBalanceOnVaultLeft,
-                IBridgeAdapter.BridgeParams({
+            {
+                IBridgeAdapter.BridgeParams memory bp = IBridgeAdapter.BridgeParams({
                     feePayer: everyRoleAccount,
                     feeToken: address(0),
                     feeAmount: bridgeFeeAmount,
                     feeRefundThreshold: 0,
                     gasLimit: 300000,
                     data: ""
-                })
-            );
+                });
+                earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
+                    address(GHO), ghoBalanceOnVaultLeft, address(ccipAdapter_earningChain), bp
+                );
+            }
 
             address[] memory assets = new address[](1);
             uint256[] memory amounts = new uint256[](1);

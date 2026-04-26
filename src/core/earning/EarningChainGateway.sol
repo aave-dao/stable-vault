@@ -95,6 +95,7 @@ contract EarningChainGateway is
         address assetOut,
         uint256 minAmountOut,
         address receiver,
+        address bridgeAdapter,
         IBridgeAdapter.BridgeParams memory bridgeParams,
         bytes memory data
     )
@@ -109,28 +110,13 @@ contract EarningChainGateway is
     {
         require(iouTokenAmountRay > 0, Errors.ZeroAmount());
         require(bridgeParams.gasLimit >= MIN_BURN_IOU_TOKEN_GAS_LIMIT, Errors.InvalidGasLimit());
+        _validateBridgeAdapterIsSupported(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ACCOUNTING_CHAIN_ID, bridgeAdapter);
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(msg.sender, iouTokenAmountRay);
 
-        uint256 amountOutRay = IWithdrawalPolicy(WITHDRAWAL_POLICY)
-            .applyWithdrawalPolicy(
-                IWithdrawalPolicy.WithdrawalRequest({
-                    user: msg.sender, assetOut: assetOut, iouAmountRay: iouTokenAmountRay, data: data
-                })
-            );
-        // Note: The rayToAssetDecimals conversion truncates, so the user may burn slightly more IOUs than the
-        // exact RAY-equivalent of the assets received. This "dust" loss is at most 10^(27-decimals)-1 RAY per
-        // withdrawal, which is economically negligible (e.g., <$0.000001 for 6-decimal stablecoins; it would take
-        // >1,000,000 withdrawals to accumulate $1 of loss). The gas cost of preventing this (~1,600 gas for an extra
-        // conversion) exceeds the value of the dust, so we accept this minor rounding in favor of the protocol.
-        uint256 amountOut = amountOutRay.rayToAssetDecimals(assetOut);
-        require(amountOut != 0 && amountOut >= minAmountOut, Errors.InsufficientAmountOut());
+        uint256 amountOut = _getWithdrawalAmountOut(iouTokenAmountRay, assetOut, minAmountOut, data);
         IAllocator(ALLOCATOR).withdraw(assetOut, amountOut);
 
         _transferBridgeFeeToTransferHelper(bridgeParams);
-
-        address adapter =
-            $BaseChainGateway().defaultBridgeAdapter[Constants.ASSET_FOR_DATA_ONLY_BRIDGE][ACCOUNTING_CHAIN_ID];
-        require(adapter != address(0), AdapterNotFound());
 
         // Send data to synchronize the Accounting Chain's state.
         // NOTE: Oracle-bridge propagation asymmetry (by design). The Earning Chain balance reduction is reflected in
@@ -142,7 +128,7 @@ contract EarningChainGateway is
         // accepted after the oracle snapshot reflects this outflow, preventing the reverse (obligations reduced while
         // assets are still overstated). Operators are expected to account for this transient state when scheduling
         // claimSurplusInterest() calls.
-        _sendBurnIouTokenMessage(iouTokenAmountRay, adapter, bridgeParams);
+        _sendBurnIouTokenMessage(iouTokenAmountRay, bridgeAdapter, bridgeParams);
 
         ITransferHelper(TRANSFER_HELPER).transfer(assetOut, amountOut, receiver);
         emit AssetOutflow(assetOut, amountOut);
@@ -151,7 +137,12 @@ contract EarningChainGateway is
     }
 
     /// @inheritdoc IEarningChainGateway
-    function pushFundsToAccountingChain(address asset, uint256 amount, IBridgeAdapter.BridgeParams memory bridgeParams)
+    function pushFundsToAccountingChain(
+        address asset,
+        uint256 amount,
+        address bridgeAdapter,
+        IBridgeAdapter.BridgeParams memory bridgeParams
+    )
         external
         payable
         override
@@ -166,7 +157,7 @@ contract EarningChainGateway is
         // Pull funds from liquidity into the TransferHelper.
         IAllocator(ALLOCATOR).withdraw(asset, amount);
 
-        _returnFunds(asset, amount, bridgeParams);
+        _returnFunds(asset, amount, bridgeAdapter, bridgeParams);
         emit AssetOutflow(asset, amount);
     }
 
@@ -195,9 +186,13 @@ contract EarningChainGateway is
         IAllocator(ALLOCATOR).depositAllowIdle(asset, amount);
     }
 
-    function _returnFunds(address asset, uint256 amount, IBridgeAdapter.BridgeParams memory bridgeParams) internal {
-        address bridgeAdapter = $BaseChainGateway().defaultBridgeAdapter[asset][ACCOUNTING_CHAIN_ID];
-        require(bridgeAdapter != address(0), AdapterNotFound());
+    function _returnFunds(
+        address asset,
+        uint256 amount,
+        address bridgeAdapter,
+        IBridgeAdapter.BridgeParams memory bridgeParams
+    ) internal {
+        _validateBridgeAdapterIsSupported(asset, ACCOUNTING_CHAIN_ID, bridgeAdapter);
         // Include the message block number (and timestamp metadata) so the Accounting Chain can verify the chain
         // balance snapshot includes this asset outflow.
         bytes memory returnFundsMessageEncoded = abi.encode(
@@ -213,10 +208,31 @@ contract EarningChainGateway is
         );
     }
 
-    /// @dev This function is just needed to prevent StackTooDeep
+    function _getWithdrawalAmountOut(
+        uint256 iouTokenAmountRay,
+        address assetOut,
+        uint256 minAmountOut,
+        bytes memory data
+    ) internal returns (uint256) {
+        uint256 amountOutRay = IWithdrawalPolicy(WITHDRAWAL_POLICY)
+            .applyWithdrawalPolicy(
+                IWithdrawalPolicy.WithdrawalRequest({
+                    user: msg.sender, assetOut: assetOut, iouAmountRay: iouTokenAmountRay, data: data
+                })
+            );
+        // Note: The rayToAssetDecimals conversion truncates, so the user may burn slightly more IOUs than the
+        // exact RAY-equivalent of the assets received. This "dust" loss is at most 10^(27-decimals)-1 RAY per
+        // withdrawal, which is economically negligible (e.g., <$0.000001 for 6-decimal stablecoins; it would take
+        // >1,000,000 withdrawals to accumulate $1 of loss). The gas cost of preventing this (~1,600 gas for an extra
+        // conversion) exceeds the value of the dust, so we accept this minor rounding in favor of the protocol.
+        uint256 amountOut = amountOutRay.rayToAssetDecimals(assetOut);
+        require(amountOut != 0 && amountOut >= minAmountOut, Errors.InsufficientAmountOut());
+        return amountOut;
+    }
+
     function _sendBurnIouTokenMessage(
         uint256 iouTokenAmountRay,
-        address adapter,
+        address bridgeAdapter,
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) internal {
         // Prepare data to synchronize the Accounting Chain's state.
@@ -238,7 +254,7 @@ contract EarningChainGateway is
 
         _sendCrossChainMessage(
             ACCOUNTING_CHAIN_ID,
-            adapter,
+            bridgeAdapter,
             Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
             0,
             burnIouTokenMessageEncoded,

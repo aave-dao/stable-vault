@@ -103,6 +103,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             address(USDC),
             userInitialDeposit,
             EARNING_CHAIN_ID,
+            address(ccipAdapter_accountingChain),
             IBridgeAdapter.BridgeParams({
                 feePayer: everyRoleAccount,
                 feeToken: address(0),
@@ -184,6 +185,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             EARNING_CHAIN_ID,
             user1,
             iouAmountRequestedRay,
+            address(ccipAdapter_accountingChain),
             IBridgeAdapter.BridgeParams({
                 feePayer: user1,
                 feeToken: address(0),
@@ -267,19 +269,19 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         iouToken_accountingChain.approve(address(iouTokenManager_accountingChain), iouAmountRequestedRay);
         vm.prank(user2);
         vm.deal(user2, bridgeFeeAmount);
-        iouTokenManager_accountingChain.bridgeTokens{value: bridgeFeeAmount}(
-            EARNING_CHAIN_ID,
-            user2,
-            iouAmountRequestedRay,
-            IBridgeAdapter.BridgeParams({
+        {
+            IBridgeAdapter.BridgeParams memory bp = IBridgeAdapter.BridgeParams({
                 feePayer: user2,
                 feeToken: address(0),
                 feeAmount: bridgeFeeAmount,
                 feeRefundThreshold: 0,
                 gasLimit: 100000,
                 data: ""
-            })
-        );
+            });
+            iouTokenManager_accountingChain.bridgeTokens{value: bridgeFeeAmount}(
+                EARNING_CHAIN_ID, user2, iouAmountRequestedRay, address(ccipAdapter_accountingChain), bp
+            );
+        }
         require(
             iouToken_accountingChain.totalSupply() == iousOnAccountBeforeUser2BridgeToEarningChain,
             "Supply on Accounting Chain should NOT have decreased by the amount of IOUs bridged"
@@ -293,19 +295,19 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         // Bridge the tokens back to Accounting chain and check the supply on both chains is expected
         vm.deal(user2, bridgeFeeAmount);
         vm.prank(user2);
-        iouTokenManager_earningChain.bridgeTokens{value: bridgeFeeAmount}(
-            ACCOUNTING_CHAIN_ID,
-            user2,
-            iouAmountRequestedRay,
-            IBridgeAdapter.BridgeParams({
+        {
+            IBridgeAdapter.BridgeParams memory bp = IBridgeAdapter.BridgeParams({
                 feePayer: user2,
                 feeToken: address(0),
                 feeAmount: bridgeFeeAmount,
                 feeRefundThreshold: 0,
                 gasLimit: 100000,
                 data: ""
-            })
-        );
+            });
+            iouTokenManager_earningChain.bridgeTokens{value: bridgeFeeAmount}(
+                ACCOUNTING_CHAIN_ID, user2, iouAmountRequestedRay, address(ccipAdapter_earningChain), bp
+            );
+        }
         require(
             iouToken_accountingChain.totalSupply() == iousOnAccountBeforeUser2BridgeToEarningChain,
             "Supply on Accounting Chain should increase by the amount of IOUs bridged"
@@ -344,6 +346,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             address(USDC),
             0,
             user1,
+            address(ccipAdapter_earningChain),
             // Use a higher gas limit to ensure the transaction is successful on Accounting Chain because the snapshot
             // struct will be pushed to the FH storage.
             IBridgeAdapter.BridgeParams({

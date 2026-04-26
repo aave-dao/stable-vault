@@ -20,33 +20,34 @@ contract MockEarningChainGateway is IEarningChainGateway {
 
     function sendBalanceUpdateWithFeePayer(IBridgeAdapter.BridgeParams memory bridgeParams) external payable {}
 
-    function pushFundsToAccountingChain(address asset, uint256 amount, IBridgeAdapter.BridgeParams memory bridgeParams)
-        external
-        payable {}
+    function pushFundsToAccountingChain(
+        address asset,
+        uint256 amount,
+        address bridgeAdapter,
+        IBridgeAdapter.BridgeParams memory bridgeParams
+    ) external payable {}
 
     function exchangeIouTokens(
         uint256 iouTokenAmountRay,
         address assetOut,
         uint256 minAmountOut,
         address receiver,
+        address bridgeAdapter,
         IBridgeAdapter.BridgeParams memory bridgeParams,
         bytes memory data
     ) external payable returns (uint256) {}
-
-    function getDefaultBridgeAdapter(address asset, uint256 chainId) external view returns (address) {}
 
     function sendPushFundsToChainMessage(
         address asset,
         uint256 amount,
         uint256 targetChainId,
+        address bridgeAdapter,
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) external payable {}
 
-    function addBridgeAdapter(address asset, uint256 chainId, address adapter) external {}
+    function addBridgeAdapter(address asset, uint256 chainId, address bridgeAdapter) external {}
 
-    function removeBridgeAdapter(address asset, uint256 chainId, address adapter) external {}
-
-    function setDefaultBridgeAdapter(address asset, uint256 chainId, address adapter) external {}
+    function removeBridgeAdapter(address asset, uint256 chainId, address bridgeAdapter) external {}
 
     /// @dev Called by Bridge Adapters which use the TransferHelper modifiers that assert no funds left in the
     /// TransferHelper.
@@ -61,6 +62,7 @@ contract MockEarningChainGateway is IEarningChainGateway {
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
+        address bridgeAdapter,
         IBridgeAdapter.BridgeParams memory bridgeParams
     ) external {}
 }

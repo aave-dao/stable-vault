@@ -48,6 +48,7 @@ contract MockIouTokenManager is IIouTokenManager {
         uint256, // destinationChainId
         address, // iouTokenRecipient
         uint256 iouTokenAmountRay,
+        address, // bridgeAdapter
         IBridgeAdapter.BridgeParams memory // bridgeParams
     )
         external
