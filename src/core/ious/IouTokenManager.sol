@@ -117,10 +117,9 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
             _burnTokens(msg.sender, iouTokenAmountRay);
         }
 
-        IChainGateway(CHAIN_GATEWAY)
-            .sendBridgeIouTokenMessageWithFeePayer{value: msg.value}(
-                destinationChainId, iouTokenRecipient, iouTokenAmountRay, adapter, bridgeParamsEncoded
-            );
+        IChainGateway(CHAIN_GATEWAY).sendBridgeIouTokenMessageWithFeePayer{value: msg.value}(
+            destinationChainId, iouTokenRecipient, iouTokenAmountRay, adapter, bridgeParamsEncoded
+        );
 
         emit TokensBridged(destinationChainId, iouTokenRecipient, iouTokenAmountRay);
     }

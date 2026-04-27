@@ -5,8 +5,8 @@ pragma solidity ^0.8.20;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Test} from "forge-std/Test.sol";
 
-import {IouToken} from "src/core/ious/IouToken.sol";
 import {BridgeParamsCodec} from "src/bridging/BridgeParamsCodec.sol";
+import {IouToken} from "src/core/ious/IouToken.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
@@ -223,9 +223,11 @@ contract IouTokenManagerTest_AccountingChain is Test {
         vm.assume(iouTokenRecipient != address(0));
         vm.assume(iouTokenAmountRay > 0);
 
-        bytes memory bridgeParams = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-            feePayer: from, feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 0, data: ""
-        }));
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feePayer: from, feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 0, data: ""
+            })
+        );
         vm.prank(iouTokenManagerAddress);
         MockErc20(iouToken).mint(from, iouTokenAmountRay);
         vm.prank(from);
@@ -252,9 +254,11 @@ contract IouTokenManagerTest_AccountingChain is Test {
         address iouTokenRecipient = makeAddr("iouRecipient");
         uint256 iouTokenAmountRay = 1_000_000e27;
 
-        bytes memory bridgeParams = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-            feePayer: from, feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 0, data: ""
-        }));
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feePayer: from, feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 0, data: ""
+            })
+        );
 
         // Mint IOU tokens to the user and approve the manager
         vm.prank(iouTokenManagerAddress);
@@ -280,9 +284,11 @@ contract IouTokenManagerTest_AccountingChain is Test {
         vm.assume(iouTokenRecipient != address(0));
         vm.assume(iouTokenAmountRay > 0);
         uint256 destinationChainId = block.chainid;
-        bytes memory bridgeParams = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-            feePayer: address(0), feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 0, data: ""
-        }));
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feePayer: address(0), feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 0, data: ""
+            })
+        );
         vm.expectRevert(Errors.InvalidDestinationChainId.selector);
         vm.prank(from);
         iouTokenManager.bridgeTokens(
@@ -304,14 +310,16 @@ contract IouTokenManagerTest_AccountingChain is Test {
         vm.assume(destinationChainId != block.chainid);
         vm.assume(iouTokenAmountRay > 0);
         address feeToken = address(new MockErc20("Test USD", "TUSD", 6));
-        bytes memory bridgeParams = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-            feePayer: from,
-            feeToken: feeToken,
-            feeAmount: feeAmount,
-            feeRefundThreshold: 0,
-            gasLimit: gasLimit,
-            data: data
-        }));
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feePayer: from,
+                feeToken: feeToken,
+                feeAmount: feeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: gasLimit,
+                data: data
+            })
+        );
         if (feeAmount > 0) {
             MockErc20(feeToken).mint(from, feeAmount);
             vm.prank(from);
@@ -362,9 +370,11 @@ contract IouTokenManagerTest_AccountingChain is Test {
         feeAmount = bound(feeAmount, 1, 1e18);
         accidentalMsgValue = bound(accidentalMsgValue, 1, 100 ether);
 
-        bytes memory bridgeParams = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-            feePayer: from, feeToken: feeToken, feeAmount: feeAmount, feeRefundThreshold: 0, gasLimit: 0, data: ""
-        }));
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feePayer: from, feeToken: feeToken, feeAmount: feeAmount, feeRefundThreshold: 0, gasLimit: 0, data: ""
+            })
+        );
 
         MockErc20(feeToken).mint(from, feeAmount);
         vm.prank(from);
@@ -409,14 +419,16 @@ contract IouTokenManagerTest_AccountingChain is Test {
         vm.assume(from != address(0));
         vm.assume(iouTokenRecipient != address(0));
         vm.assume(iouTokenAmountRay > 0);
-        bytes memory bridgeParams = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-            feePayer: from,
-            feeToken: address(0),
-            feeAmount: feeAmount,
-            feeRefundThreshold: 0,
-            gasLimit: gasLimit,
-            data: data
-        }));
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feePayer: from,
+                feeToken: address(0),
+                feeAmount: feeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: gasLimit,
+                data: data
+            })
+        );
         address feeRecipient = makeAddr("bridgeAdapter");
         if (feeAmount > 0) {
             vm.deal(from, feeAmount);
@@ -456,14 +468,16 @@ contract IouTokenManagerTest_AccountingChain is Test {
         vm.assume(iouTokenAmountRay > 0);
         uint256 feeAmount = 1000;
         address feeToken = address(new MockErc20("Test USD", "TUSD", 6));
-        bytes memory bridgeParams = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-            feePayer: forgedFeePayer,
-            feeToken: feeToken,
-            feeAmount: feeAmount,
-            feeRefundThreshold: 0,
-            gasLimit: 0,
-            data: ""
-        }));
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feePayer: forgedFeePayer,
+                feeToken: feeToken,
+                feeAmount: feeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: 0,
+                data: ""
+            })
+        );
         MockErc20(feeToken).mint(forgedFeePayer, feeAmount);
 
         vm.prank(iouTokenManagerAddress);
@@ -484,9 +498,11 @@ contract IouTokenManagerTest_AccountingChain is Test {
         uint256 iouTokenAmountRay = 100_000;
         uint256 destinationChainId = block.chainid + 1;
         address iouTokenRecipient = address(0);
-        bytes memory bridgeParams = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-            feePayer: from, feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 0, data: ""
-        }));
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feePayer: from, feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 0, data: ""
+            })
+        );
         vm.expectRevert(Errors.InvalidParameter.selector);
         vm.prank(from);
         iouTokenManager.bridgeTokens(
@@ -498,9 +514,11 @@ contract IouTokenManagerTest_AccountingChain is Test {
         vm.assume(from != address(0));
         vm.assume(destinationChainId != block.chainid);
         address iouTokenRecipient = makeAddr("iouTokenRecipient");
-        bytes memory bridgeParams = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-            feePayer: from, feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 0, data: ""
-        }));
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feePayer: from, feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 0, data: ""
+            })
+        );
         vm.expectRevert(Errors.ZeroAmount.selector);
         vm.prank(from);
         iouTokenManager.bridgeTokens(destinationChainId, iouTokenRecipient, 0, makeAddr("adapter"), bridgeParams);

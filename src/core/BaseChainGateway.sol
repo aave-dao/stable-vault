@@ -156,10 +156,9 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         if (assetToBridge == Constants.ASSET_FOR_DATA_ONLY_BRIDGE) {
             require(amountToBridge == 0, Errors.InvalidParameter());
         }
-        IBridgeAdapter(adapter)
-            .publishMessageToChainWithFeePayer{value: msg.value}(
-                destinationChainId, assetToBridge, amountToBridge, dataToBridge, bridgeParamsEncoded
-            );
+        IBridgeAdapter(adapter).publishMessageToChainWithFeePayer{value: msg.value}(
+            destinationChainId, assetToBridge, amountToBridge, dataToBridge, bridgeParamsEncoded
+        );
         if (assetToBridge != Constants.ASSET_FOR_DATA_ONLY_BRIDGE) {
             emit FundsSent(assetToBridge, amountToBridge, destinationChainId);
         }

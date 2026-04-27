@@ -32,9 +32,8 @@ contract EarningChainGatewayInteractionScript is EarningChainBaseScript {
 
         vm.startBroadcast(vm.envUint("ADMIN_PRIVATE_KEY"));
         address adapter = address(0); // TODO: Set the whitelisted bridge adapter address.
-        IEarningChainGateway(EARNING_CHAIN_GATEWAY).pushFundsToAccountingChain(
-            asset, amount, adapter, BridgeParamsCodec.encode(bridgeParams)
-        );
+        IEarningChainGateway(EARNING_CHAIN_GATEWAY)
+            .pushFundsToAccountingChain(asset, amount, adapter, BridgeParamsCodec.encode(bridgeParams));
         vm.stopBroadcast();
     }
 

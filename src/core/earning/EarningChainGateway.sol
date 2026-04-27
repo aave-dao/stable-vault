@@ -99,15 +99,7 @@ contract EarningChainGateway is
         address adapter,
         bytes calldata bridgeParamsEncoded,
         bytes memory data
-    )
-        external
-        payable
-        virtual
-        override
-        nonReentrant
-        assertingTransferHelperBalanceFor(assetOut)
-        returns (uint256)
-    {
+    ) external payable virtual override nonReentrant assertingTransferHelperBalanceFor(assetOut) returns (uint256) {
         require(iouTokenAmountRay > 0, Errors.ZeroAmount());
         // Partial inspection of the opaque params for a load-bearing safety invariant: the destination
         // gas limit must meet the minimum needed to successfully process a BURN_IOU_TOKEN message on the
@@ -150,13 +142,7 @@ contract EarningChainGateway is
         uint256 amount,
         address adapter,
         bytes calldata bridgeParamsEncoded
-    )
-        external
-        payable
-        override
-        restricted
-        assertingTransferHelperBalanceFor(asset)
-    {
+    ) external payable override restricted assertingTransferHelperBalanceFor(asset) {
         require(amount > 0, Errors.ZeroAmount());
         // Pull funds from liquidity into the TransferHelper. Fee staging lives inside the adapter under
         // the opaque-bytes dispatch shape.
@@ -190,12 +176,7 @@ contract EarningChainGateway is
         IAllocator(ALLOCATOR).depositAllowIdle(asset, amount);
     }
 
-    function _returnFunds(
-        address asset,
-        uint256 amount,
-        address adapter,
-        bytes calldata bridgeParamsEncoded
-    ) internal {
+    function _returnFunds(address asset, uint256 amount, address adapter, bytes calldata bridgeParamsEncoded) internal {
         _validateOutboundAdapter(asset, ACCOUNTING_CHAIN_ID, adapter);
         // Include the message block number (and timestamp metadata) so the Accounting Chain can verify the chain
         // balance snapshot includes this asset outflow.
@@ -236,11 +217,9 @@ contract EarningChainGateway is
     }
 
     /// @dev This function is just needed to prevent StackTooDeep
-    function _sendBurnIouTokenMessage(
-        uint256 iouTokenAmountRay,
-        address adapter,
-        bytes calldata bridgeParamsEncoded
-    ) internal {
+    function _sendBurnIouTokenMessage(uint256 iouTokenAmountRay, address adapter, bytes calldata bridgeParamsEncoded)
+        internal
+    {
         // Prepare data to synchronize the Accounting Chain's state.
         // Include the message block number (and timestamp metadata) so the Accounting Chain can verify the chain
         // balance snapshot includes this IOU exchange outflow. This avoids decrementing obligations by burning IOUs on

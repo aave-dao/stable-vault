@@ -155,13 +155,7 @@ contract FundsHandler is
         uint256 chainId,
         address adapter,
         bytes calldata bridgeParamsEncoded
-    )
-        external
-        payable
-        override
-        restricted
-        assertingTransferHelperBalanceFor(asset)
-    {
+    ) external payable override restricted assertingTransferHelperBalanceFor(asset) {
         require(amount > 0, Errors.ZeroAmount());
         require($storage().earningChainIds.contains(chainId), Errors.InvalidDestinationChainId());
 

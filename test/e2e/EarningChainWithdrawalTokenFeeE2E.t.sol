@@ -7,11 +7,11 @@ import {IERC20} from "forge-std/interfaces/IERC20.sol";
 
 import {Logger} from "test/helpers/Logger.sol";
 
+import {BridgeParamsCodec} from "src/bridging/BridgeParamsCodec.sol";
 import {StableVault} from "src/core/accounting/StableVault.sol";
 import {StableVault} from "src/core/accounting/StableVault.sol";
 import {EarningChainGateway} from "src/core/earning/EarningChainGateway.sol";
 import {IouTokenManager} from "src/core/ious/IouTokenManager.sol";
-import {BridgeParamsCodec} from "src/bridging/BridgeParamsCodec.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
@@ -112,14 +112,16 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             userInitialDeposit,
             EARNING_CHAIN_ID,
             address(ccipAdapter_accountingChain),
-            BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-                feePayer: everyRoleAccount,
-                feeToken: address(bridgeFeeToken),
-                feeAmount: bridgeFeeAmount,
-                feeRefundThreshold: 0,
-                gasLimit: 350000,
-                data: ""
-            }))
+            BridgeParamsCodec.encode(
+                IBridgeAdapter.BridgeParams({
+                    feePayer: everyRoleAccount,
+                    feeToken: address(bridgeFeeToken),
+                    feeAmount: bridgeFeeAmount,
+                    feeRefundThreshold: 0,
+                    gasLimit: 350000,
+                    data: ""
+                })
+            )
         );
 
         // Check the funds were bridged to the Earning Chain
@@ -395,14 +397,16 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             user,
             iouAmountRequestedRay,
             adapter,
-            BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-                feePayer: user,
-                feeToken: address(bridgeFeeToken),
-                feeAmount: bridgeFeeAmount,
-                feeRefundThreshold: 0,
-                gasLimit: 150000,
-                data: ""
-            }))
+            BridgeParamsCodec.encode(
+                IBridgeAdapter.BridgeParams({
+                    feePayer: user,
+                    feeToken: address(bridgeFeeToken),
+                    feeAmount: bridgeFeeAmount,
+                    feeRefundThreshold: 0,
+                    gasLimit: 150000,
+                    data: ""
+                })
+            )
         );
     }
 
@@ -417,17 +421,19 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             0,
             user,
             address(ccipAdapter_earningChain),
-            BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-                feePayer: user,
-                feeToken: address(bridgeFeeToken),
-                feeAmount: bridgeFeeAmount,
-                feeRefundThreshold: 0,
-                // Use a higher gas limit to ensure the transaction is successful on Accounting Chain because the
-                // snapshot
-                // struct may be pushed to the FH storage.
-                gasLimit: 350000,
-                data: ""
-            })),
+            BridgeParamsCodec.encode(
+                IBridgeAdapter.BridgeParams({
+                    feePayer: user,
+                    feeToken: address(bridgeFeeToken),
+                    feeAmount: bridgeFeeAmount,
+                    feeRefundThreshold: 0,
+                    // Use a higher gas limit to ensure the transaction is successful on Accounting Chain because the
+                    // snapshot
+                    // struct may be pushed to the FH storage.
+                    gasLimit: 350000,
+                    data: ""
+                })
+            ),
             ""
         );
     }

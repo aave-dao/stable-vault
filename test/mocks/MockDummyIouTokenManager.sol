@@ -15,7 +15,11 @@ contract MockDummyIouTokenManager is IIouTokenManager {
         uint256 iouTokenAmountRay,
         address, // adapter
         bytes calldata // bridgeParamsEncoded
-    ) external payable override {}
+    )
+        external
+        payable
+        override
+    {}
 
     function mintTokens(address to, uint256 amount) external override {}
 

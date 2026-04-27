@@ -21,11 +21,7 @@ library BridgeParamsCodec {
 
     /// @notice Decodes the opaque bytes produced by `encode` back into a `BridgeParams` struct.
     /// @dev Reverts on malformed / truncated input via Solidity's built-in decoder checks.
-    function decode(bytes memory bridgeParamsEncoded)
-        internal
-        pure
-        returns (IBridgeAdapter.BridgeParams memory)
-    {
+    function decode(bytes memory bridgeParamsEncoded) internal pure returns (IBridgeAdapter.BridgeParams memory) {
         return abi.decode(bridgeParamsEncoded, (IBridgeAdapter.BridgeParams));
     }
 }

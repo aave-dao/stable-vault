@@ -7,8 +7,8 @@ import {IERC20} from "forge-std/interfaces/IERC20.sol";
 
 import {Logger} from "test/helpers/Logger.sol";
 
-import {StableVault} from "src/core/accounting/StableVault.sol";
 import {BridgeParamsCodec} from "src/bridging/BridgeParamsCodec.sol";
+import {StableVault} from "src/core/accounting/StableVault.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 
@@ -88,14 +88,16 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
             userInitialDeposit,
             EARNING_CHAIN_ID,
             address(ccipAdapter_accountingChain),
-            BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-                feePayer: everyRoleAccount,
-                feeToken: address(0),
-                feeAmount: bridgeFeeAmount,
-                feeRefundThreshold: 0,
-                gasLimit: 300000,
-                data: ""
-            }))
+            BridgeParamsCodec.encode(
+                IBridgeAdapter.BridgeParams({
+                    feePayer: everyRoleAccount,
+                    feeToken: address(0),
+                    feeAmount: bridgeFeeAmount,
+                    feeRefundThreshold: 0,
+                    gasLimit: 300000,
+                    data: ""
+                })
+            )
         );
 
         // Check the funds were bridged to the Earning Chain
@@ -137,14 +139,16 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
             user1,
             iouAmountRequestedRay,
             address(ccipAdapter_accountingChain),
-            BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-                feePayer: user1,
-                feeToken: address(0),
-                feeAmount: bridgeFeeAmount,
-                feeRefundThreshold: 0,
-                gasLimit: 300000,
-                data: ""
-            }))
+            BridgeParamsCodec.encode(
+                IBridgeAdapter.BridgeParams({
+                    feePayer: user1,
+                    feeToken: address(0),
+                    feeAmount: bridgeFeeAmount,
+                    feeRefundThreshold: 0,
+                    gasLimit: 300000,
+                    data: ""
+                })
+            )
         );
 
         // Check the IOU token balance on Accounting Chain went down
@@ -171,14 +175,16 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
             0,
             user1,
             address(ccipAdapter_earningChain),
-            BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-                feePayer: user1,
-                feeToken: address(0),
-                feeAmount: bridgeFeeAmount,
-                feeRefundThreshold: 0,
-                gasLimit: 300000,
-                data: ""
-            })),
+            BridgeParamsCodec.encode(
+                IBridgeAdapter.BridgeParams({
+                    feePayer: user1,
+                    feeToken: address(0),
+                    feeAmount: bridgeFeeAmount,
+                    feeRefundThreshold: 0,
+                    gasLimit: 300000,
+                    data: ""
+                })
+            ),
             ""
         );
 

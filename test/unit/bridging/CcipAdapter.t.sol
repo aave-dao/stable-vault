@@ -13,8 +13,8 @@ import {IAny2EVMMessageReceiver} from "@chainlink-ccip/contracts/interfaces/IAny
 import {IRouterClient} from "@chainlink-ccip/contracts/interfaces/IRouterClient.sol";
 import {Client} from "@chainlink-ccip/contracts/libraries/Client.sol";
 
-import {CcipAdapter} from "src/bridging/ccip/CcipAdapter.sol";
 import {BridgeParamsCodec} from "src/bridging/BridgeParamsCodec.sol";
+import {CcipAdapter} from "src/bridging/ccip/CcipAdapter.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
@@ -328,14 +328,16 @@ contract CcipAdapterTest is TestWithHelpers {
         _mockTransferHelper.mockAsset(address(_mockUsdt), amountUsdt);
         _stageTokenFeeFromPayer(address(_accountingChainCcipAdapter), feePayer, _mockGho, feeAmount);
 
-        bytes memory bridgeParams = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-            feePayer: feePayer,
-            feeToken: feeToken,
-            feeAmount: feeAmount,
-            feeRefundThreshold: 0,
-            gasLimit: gasLimit,
-            data: extraParamsData
-        }));
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feePayer: feePayer,
+                feeToken: feeToken,
+                feeAmount: feeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: gasLimit,
+                data: extraParamsData
+            })
+        );
 
         Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
         ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
@@ -405,14 +407,16 @@ contract CcipAdapterTest is TestWithHelpers {
         _mockTransferHelper.mockAsset(address(_mockUsdt), amountUsdt);
         vm.deal(address(_mockAccountingChainGateway), feeAmount);
 
-        bytes memory bridgeParams = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-            feePayer: feePayer,
-            feeToken: feeToken,
-            feeAmount: feeAmount,
-            feeRefundThreshold: 0,
-            gasLimit: gasLimit,
-            data: extraParamsData
-        }));
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feePayer: feePayer,
+                feeToken: feeToken,
+                feeAmount: feeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: gasLimit,
+                data: extraParamsData
+            })
+        );
 
         Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
         ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
@@ -486,14 +490,16 @@ contract CcipAdapterTest is TestWithHelpers {
         _mockTransferHelper.mockAsset(address(_mockUsdt), amountUsdt);
         _stageTokenFeeFromPayer(address(_accountingChainCcipAdapter), feePayer, _mockGho, feeAmount);
 
-        bytes memory bridgeParams = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-            feePayer: feePayer,
-            feeToken: feeToken,
-            feeAmount: feeAmount,
-            feeRefundThreshold: 0,
-            gasLimit: gasLimit,
-            data: extraParamsData
-        }));
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feePayer: feePayer,
+                feeToken: feeToken,
+                feeAmount: feeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: gasLimit,
+                data: extraParamsData
+            })
+        );
 
         Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
         ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
@@ -567,14 +573,16 @@ contract CcipAdapterTest is TestWithHelpers {
         _mockTransferHelper.mockAsset(address(_mockUsdt), amountUsdt);
         vm.deal(address(_mockAccountingChainGateway), feeAmount);
 
-        bytes memory bridgeParams = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-            feePayer: feePayer,
-            feeToken: address(0),
-            feeAmount: feeAmount,
-            feeRefundThreshold: 0,
-            gasLimit: gasLimit,
-            data: ""
-        }));
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feePayer: feePayer,
+                feeToken: address(0),
+                feeAmount: feeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: gasLimit,
+                data: ""
+            })
+        );
 
         Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
         ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
@@ -632,14 +640,16 @@ contract CcipAdapterTest is TestWithHelpers {
         _mockTransferHelper.mockAsset(address(_mockUsdt), amountUsdt);
         vm.deal(address(_mockAccountingChainGateway), allocatedFeeAmount);
 
-        bytes memory bridgeParams = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-            feePayer: feePayer,
-            feeToken: address(0),
-            feeAmount: allocatedFeeAmount,
-            feeRefundThreshold: 0,
-            gasLimit: DEFAULT_GAS_LIMIT,
-            data: ""
-        }));
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feePayer: feePayer,
+                feeToken: address(0),
+                feeAmount: allocatedFeeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: DEFAULT_GAS_LIMIT,
+                data: ""
+            })
+        );
 
         Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
         ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
@@ -684,14 +694,16 @@ contract CcipAdapterTest is TestWithHelpers {
         _mockTransferHelper.mockAsset(address(_mockUsdt), amountUsdt);
         vm.deal(address(_mockAccountingChainGateway), allocatedFeeAmount);
 
-        bytes memory bridgeParams = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-            feePayer: address(gasHeavyFeePayer),
-            feeToken: address(0),
-            feeAmount: allocatedFeeAmount,
-            feeRefundThreshold: 0,
-            gasLimit: DEFAULT_GAS_LIMIT,
-            data: ""
-        }));
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feePayer: address(gasHeavyFeePayer),
+                feeToken: address(0),
+                feeAmount: allocatedFeeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: DEFAULT_GAS_LIMIT,
+                data: ""
+            })
+        );
 
         Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
         ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
@@ -748,14 +760,16 @@ contract CcipAdapterTest is TestWithHelpers {
         _mockTransferHelper.mockAsset(address(_mockUsdt), amountUsdt);
         _stageTokenFeeFromPayer(address(_accountingChainCcipAdapter), feePayer, _mockGho, feeAmount);
 
-        bytes memory bridgeParams = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-            feePayer: feePayer,
-            feeToken: feeToken,
-            feeAmount: feeAmount,
-            feeRefundThreshold: feeRefundThreshold,
-            gasLimit: DEFAULT_GAS_LIMIT,
-            data: ""
-        }));
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feePayer: feePayer,
+                feeToken: feeToken,
+                feeAmount: feeAmount,
+                feeRefundThreshold: feeRefundThreshold,
+                gasLimit: DEFAULT_GAS_LIMIT,
+                data: ""
+            })
+        );
 
         Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
         ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
@@ -845,14 +859,16 @@ contract CcipAdapterTest is TestWithHelpers {
         _mockTransferHelper.mockAsset(address(_mockUsdt), amountUsdt);
         vm.deal(address(_mockAccountingChainGateway), feeAmount);
 
-        bytes memory bridgeParams = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-            feePayer: feePayer,
-            feeToken: feeToken,
-            feeAmount: feeAmount,
-            feeRefundThreshold: feeRefundThreshold,
-            gasLimit: DEFAULT_GAS_LIMIT,
-            data: ""
-        }));
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feePayer: feePayer,
+                feeToken: feeToken,
+                feeAmount: feeAmount,
+                feeRefundThreshold: feeRefundThreshold,
+                gasLimit: DEFAULT_GAS_LIMIT,
+                data: ""
+            })
+        );
 
         Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
         ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
@@ -928,14 +944,16 @@ contract CcipAdapterTest is TestWithHelpers {
             )
         });
 
-        bytes memory bridgeParams = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-            feePayer: everyRoleAccount,
-            feeToken: address(_mockGho),
-            feeAmount: feeAmount,
-            feeRefundThreshold: 0,
-            gasLimit: DEFAULT_GAS_LIMIT,
-            data: ""
-        }));
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feePayer: everyRoleAccount,
+                feeToken: address(_mockGho),
+                feeAmount: feeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: DEFAULT_GAS_LIMIT,
+                data: ""
+            })
+        );
 
         vm.expectCall(
             address(_mockCCIPRouter),
@@ -956,14 +974,16 @@ contract CcipAdapterTest is TestWithHelpers {
         // Airdrop the fee amount into the adapter to make sure it can not be used.
         vm.deal(address(_accountingChainCcipAdapter), idleNativeAssetAmount);
 
-        bytes memory bridgeParams = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-            feePayer: everyRoleAccount,
-            feeToken: address(0),
-            feeAmount: 0,
-            feeRefundThreshold: 0,
-            gasLimit: DEFAULT_GAS_LIMIT,
-            data: ""
-        }));
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feePayer: everyRoleAccount,
+                feeToken: address(0),
+                feeAmount: 0,
+                feeRefundThreshold: 0,
+                gasLimit: DEFAULT_GAS_LIMIT,
+                data: ""
+            })
+        );
 
         Client.EVM2AnyMessage memory expectedCcipMessage = Client.EVM2AnyMessage({
             receiver: abi.encode(_earningChainCcipAdapter),
@@ -1001,14 +1021,16 @@ contract CcipAdapterTest is TestWithHelpers {
             address(0),
             0,
             "",
-            BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-                feePayer: everyRoleAccount,
-                feeToken: address(0),
-                feeAmount: 0,
-                feeRefundThreshold: 0,
-                gasLimit: 100000,
-                data: ""
-            }))
+            BridgeParamsCodec.encode(
+                IBridgeAdapter.BridgeParams({
+                    feePayer: everyRoleAccount,
+                    feeToken: address(0),
+                    feeAmount: 0,
+                    feeRefundThreshold: 0,
+                    gasLimit: 100000,
+                    data: ""
+                })
+            )
         );
 
         vm.prank(caller);
@@ -1018,14 +1040,16 @@ contract CcipAdapterTest is TestWithHelpers {
             address(0),
             0,
             "",
-            BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-                feePayer: everyRoleAccount,
-                feeToken: address(0),
-                feeAmount: 0,
-                feeRefundThreshold: 0,
-                gasLimit: 100000,
-                data: ""
-            }))
+            BridgeParamsCodec.encode(
+                IBridgeAdapter.BridgeParams({
+                    feePayer: everyRoleAccount,
+                    feeToken: address(0),
+                    feeAmount: 0,
+                    feeRefundThreshold: 0,
+                    gasLimit: 100000,
+                    data: ""
+                })
+            )
         );
     }
 
@@ -1040,14 +1064,16 @@ contract CcipAdapterTest is TestWithHelpers {
             address(0),
             0,
             "",
-            BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-                feePayer: everyRoleAccount,
-                feeToken: address(0),
-                feeAmount: 0,
-                feeRefundThreshold: 0,
-                gasLimit: 100000,
-                data: ""
-            }))
+            BridgeParamsCodec.encode(
+                IBridgeAdapter.BridgeParams({
+                    feePayer: everyRoleAccount,
+                    feeToken: address(0),
+                    feeAmount: 0,
+                    feeRefundThreshold: 0,
+                    gasLimit: 100000,
+                    data: ""
+                })
+            )
         );
     }
 
@@ -1441,14 +1467,16 @@ contract CcipAdapterTest is TestWithHelpers {
         _mockTransferHelper.mockAsset(address(_mockGho), amountGho);
         _stageTokenFeeFromPayer(address(_accountingChainCcipAdapter), feePayer, _mockUsdt, feeAmount);
 
-        bytes memory bridgeParams = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-            feePayer: feePayer,
-            feeToken: feeToken,
-            feeAmount: feeAmount,
-            feeRefundThreshold: 0,
-            gasLimit: gasLimit,
-            data: ""
-        }));
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feePayer: feePayer,
+                feeToken: feeToken,
+                feeAmount: feeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: gasLimit,
+                data: ""
+            })
+        );
 
         // Route messages back into the local test environment and use a real router fee pull.
         _mockCCIPRouter.setSourceChainSelector(EARNING_CHAIN_CCIP_SELECTOR, ACCOUNTING_CHAIN_CCIP_SELECTOR);
@@ -1485,14 +1513,16 @@ contract CcipAdapterTest is TestWithHelpers {
         _mockTransferHelper.mockAsset(address(_mockUsdt), amountUsdt);
         _stageTokenFeeFromPayer(address(_accountingChainCcipAdapter), feePayer, _mockUsdt, feeAmount);
 
-        bytes memory bridgeParams = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-            feePayer: feePayer,
-            feeToken: feeToken,
-            feeAmount: feeAmount,
-            feeRefundThreshold: 0,
-            gasLimit: gasLimit,
-            data: ""
-        }));
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feePayer: feePayer,
+                feeToken: feeToken,
+                feeAmount: feeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: gasLimit,
+                data: ""
+            })
+        );
 
         // Route messages back into the local test environment and use a real router fee pull.
         _mockCCIPRouter.setSourceChainSelector(EARNING_CHAIN_CCIP_SELECTOR, ACCOUNTING_CHAIN_CCIP_SELECTOR);
@@ -1530,14 +1560,16 @@ contract CcipAdapterTest is TestWithHelpers {
 
         uint256 adapterBalanceBeforeBridge = _mockUsdt.balanceOf(address(_accountingChainCcipAdapter));
 
-        bytes memory bridgeParams = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-            feePayer: attacker,
-            feeToken: address(_mockUsdt),
-            feeAmount: legitimateFeeAmount,
-            feeRefundThreshold: 0,
-            gasLimit: DEFAULT_GAS_LIMIT,
-            data: ""
-        }));
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feePayer: attacker,
+                feeToken: address(_mockUsdt),
+                feeAmount: legitimateFeeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: DEFAULT_GAS_LIMIT,
+                data: ""
+            })
+        );
 
         // Route messages back into the local test environment and use a real router fee pull.
         _mockCCIPRouter.setSourceChainSelector(EARNING_CHAIN_CCIP_SELECTOR, ACCOUNTING_CHAIN_CCIP_SELECTOR);
@@ -1585,14 +1617,16 @@ contract CcipAdapterTest is TestWithHelpers {
         _mockTransferHelper.mockAsset(address(_mockGho), amountGho);
         _stageTokenFeeFromPayer(address(_accountingChainCcipAdapter), feePayer, _mockUsdt, allocatedFeeAmount);
 
-        bytes memory bridgeParams = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-            feePayer: feePayer,
-            feeToken: address(_mockUsdt),
-            feeAmount: allocatedFeeAmount,
-            feeRefundThreshold: 0, // Refund any excess
-            gasLimit: DEFAULT_GAS_LIMIT,
-            data: ""
-        }));
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feePayer: feePayer,
+                feeToken: address(_mockUsdt),
+                feeAmount: allocatedFeeAmount,
+                feeRefundThreshold: 0, // Refund any excess
+                gasLimit: DEFAULT_GAS_LIMIT,
+                data: ""
+            })
+        );
 
         // Route messages back into the local test environment and use a real router fee pull.
         _mockCCIPRouter.setSourceChainSelector(EARNING_CHAIN_CCIP_SELECTOR, ACCOUNTING_CHAIN_CCIP_SELECTOR);
@@ -1638,14 +1672,16 @@ contract CcipAdapterTest is TestWithHelpers {
         _mockTransferHelper.mockAsset(address(_mockGho), amountGho);
         vm.deal(address(_mockAccountingChainGateway), nativeFeeAmount);
 
-        bytes memory bridgeParams = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-            feePayer: feePayer,
-            feeToken: address(0), // Native currency
-            feeAmount: nativeFeeAmount,
-            feeRefundThreshold: 0,
-            gasLimit: DEFAULT_GAS_LIMIT,
-            data: ""
-        }));
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feePayer: feePayer,
+                feeToken: address(0), // Native currency
+                feeAmount: nativeFeeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: DEFAULT_GAS_LIMIT,
+                data: ""
+            })
+        );
 
         Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
         ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockGho), amount: amountGho});
@@ -1773,14 +1809,16 @@ contract CcipAdapterTest is TestWithHelpers {
         _mockTransferHelper.mockAsset(address(_mockUsdt), amountUsdt);
         _stageTokenFeeFromPayer(address(_accountingChainCcipAdapter), feePayer, _mockGho, feeAmount);
 
-        bytes memory bridgeParams = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-            feePayer: feePayer,
-            feeToken: feeToken,
-            feeAmount: feeAmount,
-            feeRefundThreshold: feeRefundThreshold,
-            gasLimit: DEFAULT_GAS_LIMIT,
-            data: ""
-        }));
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feePayer: feePayer,
+                feeToken: feeToken,
+                feeAmount: feeAmount,
+                feeRefundThreshold: feeRefundThreshold,
+                gasLimit: DEFAULT_GAS_LIMIT,
+                data: ""
+            })
+        );
 
         Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
         ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});

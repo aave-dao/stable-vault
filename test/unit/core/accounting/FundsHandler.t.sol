@@ -6,9 +6,9 @@ import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessMana
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+import {BridgeParamsCodec} from "src/bridging/BridgeParamsCodec.sol";
 import {FundsHandler} from "src/core/accounting/FundsHandler.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
-import {BridgeParamsCodec} from "src/bridging/BridgeParamsCodec.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
@@ -366,14 +366,16 @@ contract FundsHandlerTest is TestWithHelpers {
     ) public {
         bridgeParams_feeAmount = _boundNativeAmount(bridgeParams_feeAmount);
         vm.deal(address(unauthorizedMsgSender), bridgeParams_feeAmount);
-        bytes memory bridgeParams = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-            feePayer: address(unauthorizedMsgSender),
-            feeToken: address(0),
-            feeAmount: bridgeParams_feeAmount,
-            feeRefundThreshold: 0,
-            gasLimit: bridgeParams_gasLimit,
-            data: ""
-        }));
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feePayer: address(unauthorizedMsgSender),
+                feeToken: address(0),
+                feeAmount: bridgeParams_feeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: bridgeParams_gasLimit,
+                data: ""
+            })
+        );
 
         vm.assume(chainId != block.chainid);
         vm.prank(ADMIN);
@@ -413,14 +415,16 @@ contract FundsHandlerTest is TestWithHelpers {
         mockAsset.mint(address(this), bridgeParams_feeAmount);
         mockAsset.forceApprove(address(mockGateway), bridgeParams_feeAmount);
 
-        bytes memory bridgeParams = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-            feePayer: address(this),
-            feeToken: address(mockAsset),
-            feeAmount: bridgeParams_feeAmount,
-            feeRefundThreshold: 0,
-            gasLimit: bridgeParams_gasLimit,
-            data: ""
-        }));
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feePayer: address(this),
+                feeToken: address(mockAsset),
+                feeAmount: bridgeParams_feeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: bridgeParams_gasLimit,
+                data: ""
+            })
+        );
 
         mockAsset.mint(address(mockAllocator), amount);
         mockAllocator.mockToPushToTransferHelperInNextCall(address(mockAsset), amount);
@@ -446,14 +450,16 @@ contract FundsHandlerTest is TestWithHelpers {
         bridgeParams_feeAmount = _boundNativeAmount(bridgeParams_feeAmount);
         vm.deal(address(this), bridgeParams_feeAmount);
 
-        bytes memory bridgeParams = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-            feePayer: address(this),
-            feeToken: address(0),
-            feeAmount: bridgeParams_feeAmount,
-            feeRefundThreshold: 0,
-            gasLimit: bridgeParams_gasLimit,
-            data: ""
-        }));
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feePayer: address(this),
+                feeToken: address(0),
+                feeAmount: bridgeParams_feeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: bridgeParams_gasLimit,
+                data: ""
+            })
+        );
 
         vm.expectRevert(abi.encodeWithSelector(Errors.ZeroAmount.selector));
         fundsHandler.pushFundsToChain{value: bridgeParams_feeAmount}(
@@ -475,14 +481,16 @@ contract FundsHandlerTest is TestWithHelpers {
         mockAsset.mint(address(this), bridgeParams_feeAmount);
         mockAsset.forceApprove(address(mockGateway), bridgeParams_feeAmount);
 
-        bytes memory bridgeParams = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-            feePayer: address(this),
-            feeToken: address(mockAsset),
-            feeAmount: bridgeParams_feeAmount,
-            feeRefundThreshold: 0,
-            gasLimit: bridgeParams_gasLimit,
-            data: ""
-        }));
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feePayer: address(this),
+                feeToken: address(mockAsset),
+                feeAmount: bridgeParams_feeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: bridgeParams_gasLimit,
+                data: ""
+            })
+        );
 
         mockAsset.mint(address(mockAllocator), amount);
         mockAllocator.mockToPushToTransferHelperInNextCall(address(mockAsset), amount);
@@ -513,14 +521,16 @@ contract FundsHandlerTest is TestWithHelpers {
         IMockErc20(feeToken).mint(address(this), bridgeParams_feeAmount);
         IMockErc20(feeToken).forceApprove(address(mockGateway), bridgeParams_feeAmount);
 
-        bytes memory bridgeParams = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-            feePayer: address(this),
-            feeToken: feeToken,
-            feeAmount: bridgeParams_feeAmount,
-            feeRefundThreshold: 0,
-            gasLimit: bridgeParams_gasLimit,
-            data: ""
-        }));
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feePayer: address(this),
+                feeToken: feeToken,
+                feeAmount: bridgeParams_feeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: bridgeParams_gasLimit,
+                data: ""
+            })
+        );
 
         mockAsset.mint(address(mockAllocator), amount);
         mockAllocator.mockToPushToTransferHelperInNextCall(address(mockAsset), amount);
@@ -553,14 +563,16 @@ contract FundsHandlerTest is TestWithHelpers {
         address unauthorizedFeePayer = makeAddr("unauthorizedFeePayer");
         mockAsset.mint(unauthorizedFeePayer, bridgeParams_feeAmount);
 
-        bytes memory bridgeParams = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-            feePayer: unauthorizedFeePayer,
-            feeToken: address(mockAsset),
-            feeAmount: bridgeParams_feeAmount,
-            feeRefundThreshold: 0,
-            gasLimit: bridgeParams_gasLimit,
-            data: ""
-        }));
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feePayer: unauthorizedFeePayer,
+                feeToken: address(mockAsset),
+                feeAmount: bridgeParams_feeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: bridgeParams_gasLimit,
+                data: ""
+            })
+        );
 
         mockAsset.mint(address(mockAllocator), amount);
         mockAllocator.mockToPushToTransferHelperInNextCall(address(mockAsset), amount);
@@ -581,14 +593,16 @@ contract FundsHandlerTest is TestWithHelpers {
         mockAsset.mint(address(this), bridgeParams_feeAmount);
         mockAsset.forceApprove(address(mockGateway), bridgeParams_feeAmount);
 
-        bytes memory bridgeParams = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-            feePayer: address(this),
-            feeToken: address(mockAsset),
-            feeAmount: bridgeParams_feeAmount,
-            feeRefundThreshold: 0,
-            gasLimit: bridgeParams_gasLimit,
-            data: ""
-        }));
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feePayer: address(this),
+                feeToken: address(mockAsset),
+                feeAmount: bridgeParams_feeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: bridgeParams_gasLimit,
+                data: ""
+            })
+        );
 
         vm.expectRevert(abi.encodeWithSelector(Errors.InvalidDestinationChainId.selector));
         fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, makeAddr("adapter"), bridgeParams);
@@ -610,14 +624,16 @@ contract FundsHandlerTest is TestWithHelpers {
         mockAsset.mint(address(this), bridgeParams_feeAmount);
         mockAsset.forceApprove(address(mockGateway), bridgeParams_feeAmount);
 
-        bytes memory bridgeParams = BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-            feePayer: address(this),
-            feeToken: address(mockAsset),
-            feeAmount: bridgeParams_feeAmount,
-            feeRefundThreshold: 0,
-            gasLimit: bridgeParams_gasLimit,
-            data: ""
-        }));
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feePayer: address(this),
+                feeToken: address(mockAsset),
+                feeAmount: bridgeParams_feeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: bridgeParams_gasLimit,
+                data: ""
+            })
+        );
 
         mockAsset.mint(address(mockAllocator), amount);
         mockAllocator.mockToPushToTransferHelperInNextCall(address(mockAsset), amount);

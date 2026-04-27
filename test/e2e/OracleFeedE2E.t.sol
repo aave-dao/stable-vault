@@ -7,9 +7,9 @@ import {IERC20} from "forge-std/interfaces/IERC20.sol";
 
 import {Logger} from "test/helpers/Logger.sol";
 
+import {BridgeParamsCodec} from "src/bridging/BridgeParamsCodec.sol";
 import {StableVault} from "src/core/accounting/StableVault.sol";
 import {IAccountingChainGateway} from "src/interfaces/IAccountingChainGateway.sol";
-import {BridgeParamsCodec} from "src/bridging/BridgeParamsCodec.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainBalanceOracle} from "src/interfaces/IChainBalanceOracle.sol";
 import {IChainBalanceOracleAdapter} from "src/interfaces/IChainBalanceOracleAdapter.sol";
@@ -235,14 +235,16 @@ contract OracleFeedE2ETest is BaseTest {
             user1,
             userBalanceWithInterest,
             address(ccipAdapter_accountingChain),
-            BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-                feePayer: user1,
-                feeToken: address(0),
-                feeAmount: bridgeFeeAmount,
-                feeRefundThreshold: 0,
-                gasLimit: 300000,
-                data: ""
-            }))
+            BridgeParamsCodec.encode(
+                IBridgeAdapter.BridgeParams({
+                    feePayer: user1,
+                    feeToken: address(0),
+                    feeAmount: bridgeFeeAmount,
+                    feeRefundThreshold: 0,
+                    gasLimit: 300000,
+                    data: ""
+                })
+            )
         );
         assertEq(iouToken_accountingChain.balanceOf(user1), 0, "User should have bridged IOU tokens");
 
@@ -268,9 +270,16 @@ contract OracleFeedE2ETest is BaseTest {
             0,
             user1,
             address(ccipAdapter_earningChain),
-            BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-                feePayer: user1, feeToken: address(0), feeAmount: 1, feeRefundThreshold: 0, gasLimit: 300000, data: ""
-            })),
+            BridgeParamsCodec.encode(
+                IBridgeAdapter.BridgeParams({
+                    feePayer: user1,
+                    feeToken: address(0),
+                    feeAmount: 1,
+                    feeRefundThreshold: 0,
+                    gasLimit: 300000,
+                    data: ""
+                })
+            ),
             ""
         );
 
@@ -824,14 +833,16 @@ contract OracleFeedE2ETest is BaseTest {
             address(USDC),
             returnAmount,
             address(ccipAdapter_earningChain),
-            BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-                feePayer: everyRoleAccount,
-                feeToken: address(0),
-                feeAmount: bridgeFeeAmount,
-                feeRefundThreshold: 0,
-                gasLimit: 300000,
-                data: ""
-            }))
+            BridgeParamsCodec.encode(
+                IBridgeAdapter.BridgeParams({
+                    feePayer: everyRoleAccount,
+                    feeToken: address(0),
+                    feeAmount: bridgeFeeAmount,
+                    feeRefundThreshold: 0,
+                    gasLimit: 300000,
+                    data: ""
+                })
+            )
         );
 
         // 5. Verify funds arrived back on Accounting Chain
@@ -889,14 +900,16 @@ contract OracleFeedE2ETest is BaseTest {
             address(USDC),
             returnAmount,
             address(ccipAdapter_earningChain),
-            BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-                feePayer: everyRoleAccount,
-                feeToken: address(0),
-                feeAmount: bridgeFeeAmount,
-                feeRefundThreshold: 0,
-                gasLimit: 300000,
-                data: ""
-            }))
+            BridgeParamsCodec.encode(
+                IBridgeAdapter.BridgeParams({
+                    feePayer: everyRoleAccount,
+                    feeToken: address(0),
+                    feeAmount: bridgeFeeAmount,
+                    feeRefundThreshold: 0,
+                    gasLimit: 300000,
+                    data: ""
+                })
+            )
         );
 
         // Re-sync oracle to reflect the remaining Earning Chain balance
@@ -957,14 +970,16 @@ contract OracleFeedE2ETest is BaseTest {
             address(USDC),
             depositAmount,
             address(ccipAdapter_earningChain),
-            BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-                feePayer: everyRoleAccount,
-                feeToken: address(0),
-                feeAmount: bridgeFeeAmount,
-                feeRefundThreshold: 0,
-                gasLimit: 300000,
-                data: ""
-            }))
+            BridgeParamsCodec.encode(
+                IBridgeAdapter.BridgeParams({
+                    feePayer: everyRoleAccount,
+                    feeToken: address(0),
+                    feeAmount: bridgeFeeAmount,
+                    feeRefundThreshold: 0,
+                    gasLimit: 300000,
+                    data: ""
+                })
+            )
         );
     }
 
@@ -988,14 +1003,16 @@ contract OracleFeedE2ETest is BaseTest {
             address(USDC),
             depositAmount,
             address(ccipAdapter_earningChain),
-            BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-                feePayer: everyRoleAccount,
-                feeToken: address(0),
-                feeAmount: bridgeFeeAmount,
-                feeRefundThreshold: 0,
-                gasLimit: 300000,
-                data: ""
-            }))
+            BridgeParamsCodec.encode(
+                IBridgeAdapter.BridgeParams({
+                    feePayer: everyRoleAccount,
+                    feeToken: address(0),
+                    feeAmount: bridgeFeeAmount,
+                    feeRefundThreshold: 0,
+                    gasLimit: 300000,
+                    data: ""
+                })
+            )
         );
         _publishAndSyncOracle();
 
@@ -1050,14 +1067,16 @@ contract OracleFeedE2ETest is BaseTest {
             amount,
             EARNING_CHAIN_ID,
             address(ccipAdapter_accountingChain),
-            BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams({
-                feePayer: everyRoleAccount,
-                feeToken: address(0),
-                feeAmount: bridgeFeeAmount,
-                feeRefundThreshold: 0,
-                gasLimit: 300000,
-                data: ""
-            }))
+            BridgeParamsCodec.encode(
+                IBridgeAdapter.BridgeParams({
+                    feePayer: everyRoleAccount,
+                    feeToken: address(0),
+                    feeAmount: bridgeFeeAmount,
+                    feeRefundThreshold: 0,
+                    gasLimit: 300000,
+                    data: ""
+                })
+            )
         );
     }
 
