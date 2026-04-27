@@ -43,18 +43,17 @@ interface IIouTokenManager {
     /// @param destinationChainId The chain id of the chain to publish the message to.
     /// @param iouTokenRecipient The address to send the IOU tokens to on the destination chain.
     /// @param iouTokenAmountRay The amount of IOU tokens to bridge.
-    /// @param adapter The whitelisted bridge adapter to use for the message.
+    /// @param bridgeAdapter The whitelisted bridge adapter to use for the message.
     /// @param bridgeParamsEncoded Opaque `BridgeParams` blob consumed by the adapter.
     function bridgeTokens(
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
-        address adapter,
+        address bridgeAdapter,
         bytes calldata bridgeParamsEncoded
     ) external payable;
 
-    /// @notice Mints tokens and transfers them to the caller (assumes this contract has mint privileges on the IOU
-    /// token).
+    /// @notice Mints tokens to the specified address (assumes this contract has mint privileges on the IOU token).
     /// @param to Address to mint the tokens to.
     /// @param amount Amount of tokens to mint.
     function mintTokens(address to, uint256 amount) external;
@@ -69,7 +68,7 @@ interface IIouTokenManager {
     /// @param amount Amount of locked tokens to burn.
     function burnLockedTokens(uint256 amount) external;
 
-    /// @notice Unlocks tokens and transfers them to the caller.
+    /// @notice Unlocks tokens and transfers them to the specified address.
     /// @dev This is used if IOU tokens are bridged back to the Accounting chain.
     /// @param to Address to send the unlocked IOU tokens to.
     /// @param amount Amount of IOU tokens to release.

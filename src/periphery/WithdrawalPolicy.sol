@@ -172,8 +172,8 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
 
     /// @notice Sets the fallback fee in basis points which is used when a personal fee or asset-specific fee is not
     /// available.
-    /// @param newDefaultFeeBps The fee in basis points applied to the IOU quantity being exchanged for the
-    /// asset.
+    /// @param newDefaultFeeBps The fallback fee in basis points applied to the IOU quantity being exchanged when no
+    /// personal or asset-specific fee is configured.
     function setDefaultFeeBps(uint16 newDefaultFeeBps) external restricted {
         _setDefaultFeeBps(newDefaultFeeBps);
     }

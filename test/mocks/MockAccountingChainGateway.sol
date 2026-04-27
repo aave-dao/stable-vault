@@ -37,7 +37,7 @@ contract MockAccountingChainGateway is IAccountingChainGateway {
         address, // asset
         uint256, // amount
         uint256, // targetChainId
-        address, // adapter
+        address, // bridgeAdapter
         bytes calldata bridgeParamsEncoded
     )
         external
@@ -47,9 +47,9 @@ contract MockAccountingChainGateway is IAccountingChainGateway {
         _pullAssetsFromTransferHelper();
     }
 
-    function addBridgeAdapter(address asset, uint256 chainId, address adapter) external {}
+    function addBridgeAdapter(address asset, uint256 chainId, address bridgeAdapter) external {}
 
-    function removeBridgeAdapter(address asset, uint256 chainId, address adapter) external {}
+    function removeBridgeAdapter(address asset, uint256 chainId, address bridgeAdapter) external {}
 
     /// @dev Called by Bridge Adapters which use the TransferHelper modifiers that assert no funds left in the
     /// TransferHelper.
@@ -64,7 +64,7 @@ contract MockAccountingChainGateway is IAccountingChainGateway {
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
-        address adapter,
+        address bridgeAdapter,
         bytes calldata bridgeParamsEncoded
     ) external payable {}
 

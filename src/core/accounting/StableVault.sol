@@ -32,8 +32,8 @@ import {Errors} from "src/types/Errors.sol";
 /// @author Aave Labs
 /// @notice Semi-fixed rate vault.
 /// @dev This contract supports batching of calls using the Multicall contract.
-/// @dev Assets balances are tracked in RAY internally; conversions from and to specific asset denomination is made on
-/// deposit and on withdrawal execution.
+/// @dev Asset balances are tracked in RAY (in the denominating currency) internally; conversions between RAY and each
+/// asset's native units are made on deposit and on withdrawal execution.
 /// @custom:upgradeable
 contract StableVault is
     AccessManagedUpgradeable,
@@ -259,8 +259,9 @@ contract StableVault is
     /// @dev The sender's principal (`originalDepositRay`) is decremented by up to `amountRay` and the same principal
     /// amount is moved to the recipient. This is a simplified accounting-only operation that bypasses withdrawal fees,
     /// oracle checks, solvency gating, and slippage.
-    /// @dev Principal is tracked as one aggregate balance per user (not by deposit lots), so transfers always consume
-    /// from that aggregate principal balance.
+    /// @dev Principal is tracked as one aggregate balance per user (not by deposit lots). The principal moved to the
+    /// recipient is capped at the sender's remaining `originalDepositRay`; any excess of `amountRay` above that is
+    /// treated as interest and does not contribute to the recipient's principal.
     function transfer(address to, uint256 amountRay) external virtual override nonReentrant returns (bool) {
         address from = msg.sender;
         require(amountRay >= Constants.MIN_WITHDRAWABLE_AMOUNT_RAY, Errors.InvalidAmount());

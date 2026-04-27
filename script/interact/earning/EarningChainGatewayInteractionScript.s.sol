@@ -31,19 +31,20 @@ contract EarningChainGatewayInteractionScript is EarningChainBaseScript {
         });
 
         vm.startBroadcast(vm.envUint("ADMIN_PRIVATE_KEY"));
-        address adapter = address(0); // TODO: Set the whitelisted bridge adapter address.
-        IEarningChainGateway(EARNING_CHAIN_GATEWAY)
-            .pushFundsToAccountingChain(asset, amount, adapter, BridgeParamsCodec.encode(bridgeParams));
+        address bridgeAdapter = address(0); // TODO: Set the whitelisted bridge adapter address.
+        IEarningChainGateway(EARNING_CHAIN_GATEWAY).pushFundsToAccountingChain(
+            asset, amount, bridgeAdapter, BridgeParamsCodec.encode(bridgeParams)
+        );
         vm.stopBroadcast();
     }
 
     function addBridgeAdapter() public {
         address asset = USDT;
         uint256 chainId = 8453;
-        address adapter = 0x18b2b16456162B546AA8F3227C5d15B5aDd4ba41;
+        address bridgeAdapter = 0x18b2b16456162B546AA8F3227C5d15B5aDd4ba41;
 
         vm.startBroadcast(vm.envUint("ADMIN_PRIVATE_KEY"));
-        IEarningChainGateway(EARNING_CHAIN_GATEWAY).addBridgeAdapter(asset, chainId, adapter);
+        IEarningChainGateway(EARNING_CHAIN_GATEWAY).addBridgeAdapter(asset, chainId, bridgeAdapter);
         vm.stopBroadcast();
     }
 

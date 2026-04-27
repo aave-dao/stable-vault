@@ -387,8 +387,8 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
         uint256 iouAmountRequestedRay,
         uint256 destinationChainId
     ) internal {
-        // Determine the right adapter based on which chain is the source
-        address adapter = destinationChainId == EARNING_CHAIN_ID
+        // Determine the right bridge adapter based on which chain is the source
+        address bridgeAdapter = destinationChainId == EARNING_CHAIN_ID
             ? address(ccipAdapter_accountingChain)
             : address(ccipAdapter_earningChain);
         vm.prank(user);
@@ -396,7 +396,7 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             destinationChainId,
             user,
             iouAmountRequestedRay,
-            adapter,
+            bridgeAdapter,
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
                     feePayer: user,

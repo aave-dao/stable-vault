@@ -36,7 +36,7 @@ contract EarningChainGateway is
 
     /// @notice Minimum destination gas limit required for the Accounting Chain to process a
     /// `BURN_IOU_TOKEN` message.
-    /// @dev Set to 120_000 based on gas-snapshot tests of the full destination execution path/
+    /// @dev Set to 120k gas units based on gas-snapshot tests of the full destination execution path.
     /// The gas tests measured ~106.6k gas consumed and about 110k as the minimum exact-gas
     /// value that succeeds under `CallWithExactGas` delivery semantics. 120k adds around 10% safety margin on top.
     uint256 internal constant MIN_BURN_IOU_TOKEN_GAS_LIMIT = 120_000;
@@ -96,7 +96,7 @@ contract EarningChainGateway is
         address assetOut,
         uint256 minAmountOut,
         address receiver,
-        address adapter,
+        address bridgeAdapter,
         bytes calldata bridgeParamsEncoded,
         bytes memory data
     ) external payable virtual override nonReentrant assertingTransferHelperBalanceFor(assetOut) returns (uint256) {
@@ -112,7 +112,7 @@ contract EarningChainGateway is
             BridgeParamsCodec.decode(bridgeParamsEncoded).gasLimit >= MIN_BURN_IOU_TOKEN_GAS_LIMIT,
             Errors.InvalidGasLimit()
         );
-        _validateOutboundAdapter(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ACCOUNTING_CHAIN_ID, adapter);
+        _validateBridgeAdapterIsSupported(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ACCOUNTING_CHAIN_ID, bridgeAdapter);
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(msg.sender, iouTokenAmountRay);
 
         uint256 amountOut = _getWithdrawalAmountOut(iouTokenAmountRay, assetOut, minAmountOut, data);
@@ -128,7 +128,7 @@ contract EarningChainGateway is
         // accepted after the oracle snapshot reflects this outflow, preventing the reverse (obligations reduced while
         // assets are still overstated). Operators are expected to account for this transient state when scheduling
         // claimSurplusInterest() calls.
-        _sendBurnIouTokenMessage(iouTokenAmountRay, adapter, bridgeParamsEncoded);
+        _sendBurnIouTokenMessage(iouTokenAmountRay, bridgeAdapter, bridgeParamsEncoded);
 
         ITransferHelper(TRANSFER_HELPER).transfer(assetOut, amountOut, receiver);
         emit AssetOutflow(assetOut, amountOut);
@@ -140,14 +140,14 @@ contract EarningChainGateway is
     function pushFundsToAccountingChain(
         address asset,
         uint256 amount,
-        address adapter,
+        address bridgeAdapter,
         bytes calldata bridgeParamsEncoded
     ) external payable override restricted assertingTransferHelperBalanceFor(asset) {
         require(amount > 0, Errors.ZeroAmount());
         // Pull funds from liquidity into the TransferHelper. Fee staging lives inside the adapter under
         // the opaque-bytes dispatch shape.
         IAllocator(ALLOCATOR).withdraw(asset, amount);
-        _returnFunds(asset, amount, adapter, bridgeParamsEncoded);
+        _returnFunds(asset, amount, bridgeAdapter, bridgeParamsEncoded);
         emit AssetOutflow(asset, amount);
     }
 
@@ -176,8 +176,10 @@ contract EarningChainGateway is
         IAllocator(ALLOCATOR).depositAllowIdle(asset, amount);
     }
 
-    function _returnFunds(address asset, uint256 amount, address adapter, bytes calldata bridgeParamsEncoded) internal {
-        _validateOutboundAdapter(asset, ACCOUNTING_CHAIN_ID, adapter);
+    function _returnFunds(address asset, uint256 amount, address bridgeAdapter, bytes calldata bridgeParamsEncoded)
+        internal
+    {
+        _validateBridgeAdapterIsSupported(asset, ACCOUNTING_CHAIN_ID, bridgeAdapter);
         // Include the message block number (and timestamp metadata) so the Accounting Chain can verify the chain
         // balance snapshot includes this asset outflow.
         bytes memory returnFundsMessageEncoded = abi.encode(
@@ -189,11 +191,10 @@ contract EarningChainGateway is
             })
         );
         _sendCrossChainMessage(
-            ACCOUNTING_CHAIN_ID, adapter, asset, amount, returnFundsMessageEncoded, bridgeParamsEncoded
+            ACCOUNTING_CHAIN_ID, bridgeAdapter, asset, amount, returnFundsMessageEncoded, bridgeParamsEncoded
         );
     }
 
-    /// @dev This function is just needed to prevent StackTooDeep
     function _getWithdrawalAmountOut(
         uint256 iouTokenAmountRay,
         address assetOut,
@@ -217,9 +218,11 @@ contract EarningChainGateway is
     }
 
     /// @dev This function is just needed to prevent StackTooDeep
-    function _sendBurnIouTokenMessage(uint256 iouTokenAmountRay, address adapter, bytes calldata bridgeParamsEncoded)
-        internal
-    {
+    function _sendBurnIouTokenMessage(
+        uint256 iouTokenAmountRay,
+        address bridgeAdapter,
+        bytes calldata bridgeParamsEncoded
+    ) internal {
         // Prepare data to synchronize the Accounting Chain's state.
         // Include the message block number (and timestamp metadata) so the Accounting Chain can verify the chain
         // balance snapshot includes this IOU exchange outflow. This avoids decrementing obligations by burning IOUs on
@@ -239,7 +242,7 @@ contract EarningChainGateway is
 
         _sendCrossChainMessage(
             ACCOUNTING_CHAIN_ID,
-            adapter,
+            bridgeAdapter,
             Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
             0,
             burnIouTokenMessageEncoded,
