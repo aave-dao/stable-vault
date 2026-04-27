@@ -312,7 +312,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
             vm.expectCall(
                 bridgeFeeToken,
-                abi.encodeCall(IERC20.transferFrom, (bridgeFeePayer, address(_mockTransferHelper), bridgeFeeAmount))
+                abi.encodeCall(IERC20.transferFrom, (bridgeFeePayer, address(_mockBridgeAdapterData), bridgeFeeAmount))
             );
             vm.expectCall(
                 address(_mockBridgeAdapterData),
@@ -366,7 +366,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
             vm.expectCall(
                 bridgeFeeToken,
-                abi.encodeCall(IERC20.transferFrom, (bridgeFeePayer, address(_mockTransferHelper), bridgeFeeAmount))
+                abi.encodeCall(IERC20.transferFrom, (bridgeFeePayer, address(_mockBridgeAdapterData), bridgeFeeAmount))
             );
             vm.expectCall(
                 address(_mockBridgeAdapterData),

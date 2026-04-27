@@ -11,9 +11,9 @@ import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
-/// @dev Mirrors the opaque-bytes shape of IBridgeAdapter and simulates the same adapter-owned
-/// bridge-fee staging as CcipAdapter: decode params, pull feeToken from feePayer (or accept native
-/// via msg.value), and pull bridged amount from TransferHelper.
+/// @dev Mirrors the opaque-bytes shape of IBridgeAdapter and the adapter-owned bridge-fee staging in
+/// CcipAdapter: pulls feeToken directly from feePayer (or accepts native via msg.value) into itself,
+/// then pulls the bridged amount from TransferHelper. The fee never enters the TransferHelper.
 contract MockBridgeAdapter is IBridgeAdapter {
     using SafeERC20 for IERC20;
 
@@ -36,26 +36,19 @@ contract MockBridgeAdapter is IBridgeAdapter {
         (destinationChainId, data);
         IBridgeAdapter.BridgeParams memory bridgeParams = BridgeParamsCodec.decode(bridgeParamsEncoded);
 
-        // Mirror CcipAdapter / TransferHelperClient._transferBridgeFeeToTransferHelper:
-        // adapter itself stages fees into TransferHelper.
+        // Mirror CcipAdapter: adapter pulls fee directly from feePayer (no TransferHelper round-trip).
         if (bridgeParams.feeToken == Constants.NATIVE_CURRENCY) {
             require(msg.value >= bridgeParams.feeAmount, Errors.InsufficientFunds());
-            if (msg.value > 0) {
-                (bool callSucceeded,) = TRANSFER_HELPER.call{value: msg.value}("");
-                require(callSucceeded, Errors.NativeTransferFailed());
-            }
         } else {
             require(msg.value == 0, Errors.InvalidParameter());
             if (bridgeParams.feeAmount > 0) {
-                IERC20(bridgeParams.feeToken).safeTransferFrom(feePayer, TRANSFER_HELPER, bridgeParams.feeAmount);
+                IERC20(bridgeParams.feeToken).safeTransferFrom(feePayer, address(this), bridgeParams.feeAmount);
             }
         }
 
-        // pull assets from TH
         if (asset != Constants.ASSET_FOR_DATA_ONLY_BRIDGE && amount > 0) {
             ITransferHelper(TRANSFER_HELPER).pull(asset, amount);
         }
-        ITransferHelper(TRANSFER_HELPER).pull(bridgeParams.feeToken, bridgeParams.feeAmount);
     }
 
     function setDestinationChainAdapter(uint256 chainId, address destinationChainAdapter) external override {}

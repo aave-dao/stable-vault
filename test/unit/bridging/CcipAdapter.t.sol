@@ -463,6 +463,105 @@ contract CcipAdapterTest is TestWithHelpers {
         assertEq(_mockTransferHelper.getBalance(address(_mockUsdt)), 0);
     }
 
+    function test_publishMessageToChainWithFeePayer_pullsErc20FeeDirectlyFromFeePayer() public {
+        // Regression: post round-trip removal, ERC-20 fee must move feePayer -> adapter via
+        // safeTransferFrom, never through the TransferHelper.
+        address feePayer = makeAddr("feePayerDirectPull");
+        uint256 amountUsdt = 50_000000;
+        uint256 feeAmount = 10 * 10 ** 18;
+
+        _mockTransferHelper.mockAsset(address(_mockUsdt), amountUsdt);
+        _stageTokenFeeFromPayer(address(_accountingChainCcipAdapter), feePayer, _mockGho, feeAmount);
+
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feeToken: address(_mockGho),
+                feeAmount: feeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: DEFAULT_GAS_LIMIT,
+                data: ""
+            })
+        );
+
+        Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
+        ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
+        Client.EVM2AnyMessage memory expectedCcipMessage = Client.EVM2AnyMessage({
+            receiver: abi.encode(_earningChainCcipAdapter),
+            data: "",
+            tokenAmounts: ccipTokenAmounts,
+            feeToken: address(_mockGho),
+            extraArgs: Client._argsToBytes(
+                Client.GenericExtraArgsV2({gasLimit: DEFAULT_GAS_LIMIT, allowOutOfOrderExecution: true})
+            )
+        });
+        vm.mockCall(
+            address(_mockCCIPRouter),
+            abi.encodeWithSelector(IRouterClient.getFee.selector, EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage),
+            abi.encode(feeAmount)
+        );
+        _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, bytes32(uint256(1)));
+
+        // Direct pull: feePayer -> adapter (NOT feePayer -> TransferHelper).
+        vm.expectCall(
+            address(_mockGho),
+            abi.encodeCall(IERC20.transferFrom, (feePayer, address(_accountingChainCcipAdapter), feeAmount))
+        );
+
+        vm.prank(address(_mockAccountingChainGateway));
+        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
+            EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "", feePayer, bridgeParams
+        );
+
+        // Fee never enters TransferHelper.
+        assertEq(_mockTransferHelper.getBalance(address(_mockGho)), 0);
+    }
+
+    function test_publishMessageToChainWithFeePayer_nativeFeeNeverEntersTransferHelper() public {
+        address payable feePayer = payable(makeAddr("feePayerNativeDirect"));
+        uint256 amountUsdt = 100_000000;
+        uint256 feeAmount = 1 ether;
+
+        _mockTransferHelper.mockAsset(address(_mockUsdt), amountUsdt);
+        vm.deal(address(_mockAccountingChainGateway), feeAmount);
+        uint256 thNativeBefore = address(_mockTransferHelper).balance;
+
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feeToken: address(0),
+                feeAmount: feeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: DEFAULT_GAS_LIMIT,
+                data: ""
+            })
+        );
+
+        Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
+        ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
+        Client.EVM2AnyMessage memory expectedCcipMessage = Client.EVM2AnyMessage({
+            receiver: abi.encode(_earningChainCcipAdapter),
+            data: "",
+            tokenAmounts: ccipTokenAmounts,
+            feeToken: address(0),
+            extraArgs: Client._argsToBytes(
+                Client.GenericExtraArgsV2({gasLimit: DEFAULT_GAS_LIMIT, allowOutOfOrderExecution: true})
+            )
+        });
+        vm.mockCall(
+            address(_mockCCIPRouter),
+            abi.encodeWithSelector(IRouterClient.getFee.selector, EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage),
+            abi.encode(feeAmount)
+        );
+        _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, bytes32(uint256(2)));
+
+        vm.prank(address(_mockAccountingChainGateway));
+        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer{value: feeAmount}(
+            EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "", feePayer, bridgeParams
+        );
+
+        // TH native balance unchanged — fee never routed through the helper.
+        assertEq(address(_mockTransferHelper).balance, thNativeBefore, "TH native balance changed");
+    }
+
     function test_publishMessageToChainWithFeePayer_withTokenBridgeFeeAndRefund(
         uint256 amountUsdt,
         address feePayer,

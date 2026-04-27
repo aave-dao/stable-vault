@@ -102,10 +102,12 @@ contract CcipAdapter is
     }
 
     /// @inheritdoc IBridgeAdapter
-    /// @dev Sole decoder for `bridgeParamsEncoded`. Owns bridge-fee staging end-to-end: decodes the blob,
-    /// pulls `feeAmount` of `feeToken` from `feePayer` into the TransferHelper (via
-    /// `_transferBridgeFeeToTransferHelper`), then into itself, spends the router fee, refunds the excess
-    /// per `feeRefundThreshold`, and asserts no fee-token balance leaks via the inline balance-leak check.
+    /// @dev Sole decoder for `bridgeParamsEncoded`. Owns bridge-fee staging end-to-end: pulls `feeAmount`
+    /// of `feeToken` directly from `feePayer` (ERC-20 via `safeTransferFrom`, native via `msg.value`),
+    /// pulls the bridged asset (if any) from the TransferHelper, approves the CCIP router for
+    /// `estimatedFeeAmount` (combined with the asset approval when `feeToken == asset`), spends the
+    /// router fee, and refunds the unused excess per `feeRefundThreshold`. ERC-20 fee tokens require
+    /// `feePayer` to have approved this adapter (NOT the TransferHelper) for at least `feeAmount`.
     /// @dev `feePayer` is a trusted gateway-propagated identity (the original caller's `msg.sender`),
     /// supplied as an explicit calldata parameter and not decoded from the opaque blob. See
     /// `IBridgeAdapter.BridgeParams` NatSpec for why identity is kept outside the blob.
@@ -118,7 +120,6 @@ contract CcipAdapter is
         bytes memory bridgeParamsEncoded
     ) external payable override(BaseBridgeAdapter, IBridgeAdapter) onlyGateway {
         IBridgeAdapter.BridgeParams memory bridgeParams = BridgeParamsCodec.decode(bridgeParamsEncoded);
-        uint256 balanceBefore = _transferHelperBalance(bridgeParams.feeToken);
 
         address destinationChainAdapter = _destinationChainAdapterOf[destinationChainId];
         require(destinationChainAdapter != address(0), Errors.InvalidParameter());
@@ -145,11 +146,21 @@ contract CcipAdapter is
         uint256 estimatedFeeAmount = IRouterClient(CCIP_ROUTER).getFee(chainSelector, ccipMessage);
         require(bridgeParams.feeAmount >= estimatedFeeAmount, Errors.InsufficientFunds());
 
-        _transferBridgeFeeToTransferHelper(feePayer, bridgeParams);
+        // Stage the bridge fee directly in this adapter (no TransferHelper round-trip).
+        // Native: msg.value already lands here; just validate the amount.
+        // ERC-20: pull from feePayer via safeTransferFrom (caller must approve this adapter).
+        if (bridgeParams.feeToken == Constants.NATIVE_CURRENCY) {
+            require(msg.value >= bridgeParams.feeAmount, Errors.InsufficientFunds());
+        } else {
+            // Reject msg.value to prevent accidental native loss; bridges are not expected to require
+            // both native and ERC-20 fees simultaneously.
+            require(msg.value == 0, Errors.InvalidParameter());
+            if (bridgeParams.feeAmount > 0) {
+                IERC20(bridgeParams.feeToken).safeTransferFrom(feePayer, address(this), bridgeParams.feeAmount);
+            }
+        }
 
-        _pullFromTransferHelperAndApproveCcipRouter(
-            asset, amount, bridgeParams.feeToken, bridgeParams.feeAmount, estimatedFeeAmount
-        );
+        _pullAssetFromTransferHelperAndApproveCcipRouter(asset, amount, bridgeParams.feeToken, estimatedFeeAmount);
 
         _sendMessageWithFeePayer(
             chainSelector,
@@ -160,9 +171,6 @@ contract CcipAdapter is
             bridgeParams.feeRefundThreshold,
             estimatedFeeAmount
         );
-
-        uint256 balanceAfter = _transferHelperBalance(bridgeParams.feeToken);
-        require(balanceAfter <= balanceBefore, TransferHelperBalanceNotConsumed(bridgeParams.feeToken));
     }
 
     /// @inheritdoc IAny2EVMMessageReceiver
@@ -199,25 +207,21 @@ contract CcipAdapter is
         }
     }
 
-    function _pullFromTransferHelperAndApproveCcipRouter(
+    function _pullAssetFromTransferHelperAndApproveCcipRouter(
         address asset,
         uint256 amount,
         address feeToken,
-        uint256 allocatedFeeAmount,
         uint256 estimatedFeeAmount
     ) internal {
         if (feeToken == asset && amount > 0) {
-            // Asset being bridged and fee token matching the bridged asset.
-            ITransferHelper(TRANSFER_HELPER).pull(asset, amount + allocatedFeeAmount);
+            // Bridged asset and fee share the same ERC-20: a single allowance covers both legs.
+            ITransferHelper(TRANSFER_HELPER).pull(asset, amount);
             IERC20(asset).forceApprove(CCIP_ROUTER, amount + estimatedFeeAmount);
         } else {
-            // Either a data-only bridge or the fee token not matching the bridged asset.
             if (amount > 0) {
-                // Asset being bridged.
                 ITransferHelper(TRANSFER_HELPER).pull(asset, amount);
                 IERC20(asset).forceApprove(CCIP_ROUTER, amount);
             }
-            ITransferHelper(TRANSFER_HELPER).pull(feeToken, allocatedFeeAmount);
             if (feeToken != Constants.NATIVE_CURRENCY) {
                 IERC20(feeToken).forceApprove(CCIP_ROUTER, estimatedFeeAmount);
             }

@@ -62,8 +62,11 @@ interface IBridgeAdapter {
     /// @notice Sends an arbitrary message containing instructions or data updates to a destination chain.
     /// @dev `bridgeParamsEncoded` is `BridgeParamsCodec.encode(BridgeParams)`. The adapter is the sole
     /// decoder — Gateway and intermediate layers forward the blob opaquely. The adapter also owns bridge-
-    /// fee staging (pulls from `feePayer` via TransferHelper, spends on the underlying router, refunds
-    /// excess per `feeRefundThreshold`).
+    /// fee staging: it pulls fees DIRECTLY from `feePayer` (ERC-20 via `transferFrom`, native via
+    /// `msg.value`), spends them on the underlying router, and refunds excess per `feeRefundThreshold`.
+    /// @dev ERC-20 fee tokens require `feePayer` to have approved the bridge adapter contract (NOT the
+    /// TransferHelper) for at least `feeAmount` prior to invocation. Native fees must be supplied via
+    /// `msg.value`.
     /// @dev `feePayer` is forwarded by the gateway as an explicit calldata parameter, not decoded from
     /// the blob — see `BridgeParams` NatSpec for rationale.
     /// @param destinationChainId Chain id of the chain to publish the message to.
