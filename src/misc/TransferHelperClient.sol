@@ -58,7 +58,7 @@ abstract contract TransferHelperClient {
 
     /// @dev Transfers the bridge fee to the TransferHelper to be pulled by Bridge Adapter.
     /// @dev `feePayer` is the trusted, gateway-propagated user identity — set by the entry-point contract
-    /// (IouTokenManager / FundsHandler / EarningChainGateway) to its own `msg.sender` and forwarded
+    /// (`EarningChainGateway` / `IouTokenManager` / `FundsHandler`) to its own `msg.sender` and forwarded
     /// through the gateway as an explicit calldata parameter. Identity binding lives at the entry point;
     /// this helper trusts the propagated value. See `IBridgeAdapter.BridgeParams` NatSpec for the rationale
     /// of keeping `feePayer` outside the opaque blob.
