@@ -389,7 +389,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
         address tokenOutReceiver,
         uint256 bridgeFeeAmount
     ) public {
-        address bridgeFeePayer = tokenOutReceiver;
         iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
         bridgeFeeAmount = _boundNativeAmount(bridgeFeeAmount);
         vm.assume(tokenOutReceiver != address(0));

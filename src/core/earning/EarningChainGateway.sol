@@ -10,7 +10,6 @@ import {BridgeParamsCodec} from "src/bridging/BridgeParamsCodec.sol";
 import {BaseChainGateway} from "src/core/BaseChainGateway.sol";
 import {LocalBalanceAggregator} from "src/core/LocalBalanceAggregator.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
-import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
