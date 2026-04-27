@@ -100,13 +100,12 @@ contract EarningChainGateway is
         bytes memory data
     ) external payable virtual override nonReentrant assertingTransferHelperBalanceFor(assetOut) returns (uint256) {
         require(iouTokenAmountRay > 0, Errors.ZeroAmount());
-        // Partial inspection of the opaque params for a load-bearing safety invariant: the destination
-        // gas limit must meet the minimum needed to successfully process a BURN_IOU_TOKEN message on the
-        // Accounting Chain. Under the opaque-bytes dispatch shape the gateway is otherwise blind to
-        // params, but dropping this check would let callers trigger silent IOU loss — insufficient
-        // gasLimit causes a destination revert, the CCIP message is dropped, and the IOUs are already
-        // burned locally with no compensating effect on the Accounting Chain's obligation accounting.
-        // This is the one narrow gateway-side decode; the adapter still owns all fee handling.
+        // Narrow gateway-side decode for one load-bearing safety invariant: the destination gas limit
+        // must meet the minimum needed to successfully process a BURN_IOU_TOKEN message on the
+        // Accounting Chain. Insufficient gasLimit would cause a destination revert with the CCIP
+        // message dropped while IOUs are already burned locally — silent IOU loss with no compensating
+        // effect on the Accounting Chain's obligation accounting. The adapter owns all fee handling;
+        // this is the only gateway-side `BridgeParams` field read.
         require(
             BridgeParamsCodec.decode(bridgeParamsEncoded).gasLimit >= MIN_BURN_IOU_TOKEN_GAS_LIMIT,
             Errors.InvalidGasLimit()
@@ -143,8 +142,7 @@ contract EarningChainGateway is
         bytes calldata bridgeParamsEncoded
     ) external payable override restricted assertingTransferHelperBalanceFor(asset) {
         require(amount > 0, Errors.ZeroAmount());
-        // Pull funds from liquidity into the TransferHelper. Fee staging lives inside the adapter under
-        // the opaque-bytes dispatch shape.
+        // Pull funds from liquidity into the TransferHelper. Bridge-fee staging is owned by the adapter.
         IAllocator(ALLOCATOR).withdraw(asset, amount);
         _returnFunds(asset, amount, bridgeAdapter, msg.sender, bridgeParamsEncoded);
         emit AssetOutflow(asset, amount);

@@ -146,9 +146,8 @@ contract FundsHandler is
     //////////////////////////////////////////// MANAGER FUNCTIONS /////////////////////////////////////////////////////
 
     /// @inheritdoc IFundsHandler
-    /// @dev Pure forwarder under the opaque-bytes dispatch shape: no longer decodes `BridgeParams`, no
-    /// longer stages bridge fees, no longer asserts TransferHelper balance for `feeToken`. The adapter
-    /// owns fee handling post-decode.
+    /// @dev Forwards `bridgeParamsEncoded` opaquely to the gateway and on to the adapter. The adapter
+    /// is the sole decoder and owns bridge-fee staging.
     function pushFundsToChain(
         address asset,
         uint256 amount,
@@ -159,7 +158,7 @@ contract FundsHandler is
         require(amount > 0, Errors.ZeroAmount());
         require($storage().earningChainIds.contains(chainId), Errors.InvalidDestinationChainId());
 
-        // Pull funds from liquidity into the TransferHelper. Bridge-fee staging lives inside the adapter.
+        // Pull funds from liquidity into the TransferHelper. Bridge-fee staging is owned by the adapter.
         _pullFundsFromImmediateLiquidity(asset, amount);
 
         IAccountingChainGateway(GATEWAY).sendPushFundsToChainMessage{value: msg.value}(

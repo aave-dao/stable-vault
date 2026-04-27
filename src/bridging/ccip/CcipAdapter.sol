@@ -102,16 +102,13 @@ contract CcipAdapter is
     }
 
     /// @inheritdoc IBridgeAdapter
-    /// @dev Sole decoder for `bridgeParamsEncoded`. Owns bridge-fee staging: pulls `feeAmount` of
-    /// `feeToken` from the gateway-propagated `feePayer` into TransferHelper (via
+    /// @dev Sole decoder for `bridgeParamsEncoded`. Owns bridge-fee staging end-to-end: decodes the blob,
+    /// pulls `feeAmount` of `feeToken` from `feePayer` into the TransferHelper (via
     /// `_transferBridgeFeeToTransferHelper`), then into itself, spends the router fee, refunds the excess
-    /// per `feeRefundThreshold`. The inline balance-leak check (adapter-scope) replaces the caller-level
-    /// `assertingTransferHelperBalanceFor(feeToken)` modifier that lived on IouTokenManager / FundsHandler
-    /// prior to the opaque-bytes refactor.
-    /// @dev `feePayer` is an explicit calldata parameter (NOT decoded from the blob). It is set by the
-    /// trusted entry-point to the original caller's `msg.sender` and forwarded by the gateway. This binds
-    /// fee-payer identity to the entry-point's caller — preventing cross-flow approval theft where a
-    /// blob-supplied `feePayer` would otherwise let any caller spend any approval to this adapter.
+    /// per `feeRefundThreshold`, and asserts no fee-token balance leaks via the inline balance-leak check.
+    /// @dev `feePayer` is a trusted gateway-propagated identity (the original caller's `msg.sender`),
+    /// supplied as an explicit calldata parameter and not decoded from the opaque blob. See
+    /// `IBridgeAdapter.BridgeParams` NatSpec for why identity is kept outside the blob.
     function publishMessageToChainWithFeePayer(
         uint256 destinationChainId,
         address asset,
