@@ -527,11 +527,7 @@ contract CcipAdapterTest is TestWithHelpers {
 
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
-                feeToken: address(0),
-                feeAmount: feeAmount,
-                feeRefundThreshold: 0,
-                gasLimit: DEFAULT_GAS_LIMIT,
-                data: ""
+                feeToken: address(0), feeAmount: feeAmount, feeRefundThreshold: 0, gasLimit: DEFAULT_GAS_LIMIT, data: ""
             })
         );
 
