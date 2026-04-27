@@ -90,12 +90,7 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
             address(ccipAdapter_accountingChain),
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: everyRoleAccount,
-                    feeToken: address(0),
-                    feeAmount: bridgeFeeAmount,
-                    feeRefundThreshold: 0,
-                    gasLimit: 300000,
-                    data: ""
+                    feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, gasLimit: 300000, data: ""
                 })
             )
         );
@@ -141,12 +136,7 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
             address(ccipAdapter_accountingChain),
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: user1,
-                    feeToken: address(0),
-                    feeAmount: bridgeFeeAmount,
-                    feeRefundThreshold: 0,
-                    gasLimit: 300000,
-                    data: ""
+                    feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, gasLimit: 300000, data: ""
                 })
             )
         );
@@ -177,12 +167,7 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
             address(ccipAdapter_earningChain),
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: user1,
-                    feeToken: address(0),
-                    feeAmount: bridgeFeeAmount,
-                    feeRefundThreshold: 0,
-                    gasLimit: 300000,
-                    data: ""
+                    feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, gasLimit: 300000, data: ""
                 })
             ),
             ""

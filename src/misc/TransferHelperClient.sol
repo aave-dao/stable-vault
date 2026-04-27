@@ -57,13 +57,14 @@ abstract contract TransferHelperClient {
     }
 
     /// @dev Transfers the bridge fee to the TransferHelper to be pulled by Bridge Adapter.
-    /// @dev The legacy `feePayer == msg.sender` check was removed when fee-staging moved from caller
-    /// contracts (IouTokenManager / FundsHandler) into the adapter under the opaque-bytes dispatch shape.
-    /// Under adapter-level staging, `msg.sender` is the Gateway, not the original user — the check would
-    /// reject every legitimate flow. ERC20 approval semantics already provide the required protection:
-    /// `safeTransferFrom(feePayer, ...)` reverts unless `feePayer` has approved this contract, so a forged
-    /// `feePayer` in the decoded params cannot move tokens.
-    function _transferBridgeFeeToTransferHelper(IBridgeAdapter.BridgeParams memory bridgeParams) internal {
+    /// @dev `feePayer` is the trusted, gateway-propagated user identity — set by the entry-point contract
+    /// (IouTokenManager / FundsHandler / EarningChainGateway) to its own `msg.sender` and forwarded
+    /// through the gateway as an explicit calldata parameter. Identity binding lives at the entry point;
+    /// this helper trusts the propagated value. See `IBridgeAdapter.BridgeParams` NatSpec for the rationale
+    /// of keeping `feePayer` outside the opaque blob.
+    function _transferBridgeFeeToTransferHelper(address feePayer, IBridgeAdapter.BridgeParams memory bridgeParams)
+        internal
+    {
         if (bridgeParams.feeToken == Constants.NATIVE_CURRENCY) {
             require(msg.value >= bridgeParams.feeAmount, Errors.InsufficientFunds());
             _transferNativeToTransferHelper(msg.value);
@@ -73,8 +74,7 @@ abstract contract TransferHelperClient {
             // contract).
             require(msg.value == 0, Errors.InvalidParameter());
             if (bridgeParams.feeAmount > 0) {
-                IERC20(bridgeParams.feeToken)
-                    .safeTransferFrom(bridgeParams.feePayer, TRANSFER_HELPER, bridgeParams.feeAmount);
+                IERC20(bridgeParams.feeToken).safeTransferFrom(feePayer, TRANSFER_HELPER, bridgeParams.feeAmount);
             }
         }
     }

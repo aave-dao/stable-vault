@@ -97,16 +97,21 @@ interface IChainGateway {
     /// @dev `bridgeParamsEncoded` is `BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams)`. The Gateway
     /// validates `bridgeAdapter` against the whitelist and forwards both opaquely to the adapter. Only the
     /// adapter decodes the blob and stages the bridge fee.
+    /// @dev `feePayer` is propagated as an explicit calldata parameter — set by the IOU token manager to
+    /// the user's `msg.sender` so a non-zero ERC20 approval to the adapter cannot be consumed by a third
+    /// party calling a different bridge flow. See `IBridgeAdapter.BridgeParams` NatSpec.
     /// @param destinationChainId The chain id of the chain to publish the message to.
     /// @param iouTokenRecipient The address to send the IOU tokens to on the destination chain.
     /// @param iouTokenAmountRay The amount of IOU tokens to bridge.
     /// @param bridgeAdapter The whitelisted bridge adapter to use for the message.
+    /// @param feePayer Address that will pay the bridge fee.
     /// @param bridgeParamsEncoded Opaque `BridgeParams` blob consumed by the adapter.
     function sendBridgeIouTokenMessageWithFeePayer(
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
         address bridgeAdapter,
+        address feePayer,
         bytes calldata bridgeParamsEncoded
     ) external payable;
 }

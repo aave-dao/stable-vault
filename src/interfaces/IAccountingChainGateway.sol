@@ -24,16 +24,19 @@ interface IAccountingChainGateway is IChainGateway {
     /// @dev `bridgeParamsEncoded` is `BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams)`. The Gateway
     /// validates `bridgeAdapter` against the whitelist and the target chain's oracle freshness, then forwards
     /// the blob opaquely to the adapter.
+    /// @dev `feePayer` is propagated as an explicit calldata parameter; see `IBridgeAdapter.BridgeParams`.
     /// @param asset The asset to send.
     /// @param amount The amount of the asset to send.
     /// @param targetChainId The chain id of the Earning Chain to send the assets to.
     /// @param bridgeAdapter The whitelisted bridge adapter to use for bridging the asset.
+    /// @param feePayer Address that will pay the bridge fee.
     /// @param bridgeParamsEncoded Opaque `BridgeParams` blob consumed by the adapter.
     function sendPushFundsToChainMessage(
         address asset,
         uint256 amount,
         uint256 targetChainId,
         address bridgeAdapter,
+        address feePayer,
         bytes calldata bridgeParamsEncoded
     ) external payable;
 }

@@ -128,7 +128,7 @@ contract EarningChainGateway is
         // accepted after the oracle snapshot reflects this outflow, preventing the reverse (obligations reduced while
         // assets are still overstated). Operators are expected to account for this transient state when scheduling
         // claimSurplusInterest() calls.
-        _sendBurnIouTokenMessage(iouTokenAmountRay, bridgeAdapter, bridgeParamsEncoded);
+        _sendBurnIouTokenMessage(iouTokenAmountRay, bridgeAdapter, msg.sender, bridgeParamsEncoded);
 
         ITransferHelper(TRANSFER_HELPER).transfer(assetOut, amountOut, receiver);
         emit AssetOutflow(assetOut, amountOut);
@@ -147,7 +147,7 @@ contract EarningChainGateway is
         // Pull funds from liquidity into the TransferHelper. Fee staging lives inside the adapter under
         // the opaque-bytes dispatch shape.
         IAllocator(ALLOCATOR).withdraw(asset, amount);
-        _returnFunds(asset, amount, bridgeAdapter, bridgeParamsEncoded);
+        _returnFunds(asset, amount, bridgeAdapter, msg.sender, bridgeParamsEncoded);
         emit AssetOutflow(asset, amount);
     }
 
@@ -176,9 +176,13 @@ contract EarningChainGateway is
         IAllocator(ALLOCATOR).depositAllowIdle(asset, amount);
     }
 
-    function _returnFunds(address asset, uint256 amount, address bridgeAdapter, bytes calldata bridgeParamsEncoded)
-        internal
-    {
+    function _returnFunds(
+        address asset,
+        uint256 amount,
+        address bridgeAdapter,
+        address feePayer,
+        bytes calldata bridgeParamsEncoded
+    ) internal {
         _validateBridgeAdapterIsSupported(asset, ACCOUNTING_CHAIN_ID, bridgeAdapter);
         // Include the message block number (and timestamp metadata) so the Accounting Chain can verify the chain
         // balance snapshot includes this asset outflow.
@@ -191,7 +195,7 @@ contract EarningChainGateway is
             })
         );
         _sendCrossChainMessage(
-            ACCOUNTING_CHAIN_ID, bridgeAdapter, asset, amount, returnFundsMessageEncoded, bridgeParamsEncoded
+            ACCOUNTING_CHAIN_ID, bridgeAdapter, asset, amount, returnFundsMessageEncoded, feePayer, bridgeParamsEncoded
         );
     }
 
@@ -221,6 +225,7 @@ contract EarningChainGateway is
     function _sendBurnIouTokenMessage(
         uint256 iouTokenAmountRay,
         address bridgeAdapter,
+        address feePayer,
         bytes calldata bridgeParamsEncoded
     ) internal {
         // Prepare data to synchronize the Accounting Chain's state.
@@ -246,6 +251,7 @@ contract EarningChainGateway is
             Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
             0,
             burnIouTokenMessageEncoded,
+            feePayer,
             bridgeParamsEncoded
         );
     }

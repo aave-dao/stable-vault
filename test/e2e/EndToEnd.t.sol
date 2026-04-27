@@ -145,7 +145,6 @@ contract EndToEndTest is BaseTest {
                 address(ccipAdapter_accountingChain),
                 BridgeParamsCodec.encode(
                     IBridgeAdapter.BridgeParams({
-                        feePayer: everyRoleAccount,
                         feeToken: address(0),
                         feeAmount: bridgeFeeAmount,
                         feeRefundThreshold: 0,
@@ -299,7 +298,6 @@ contract EndToEndTest is BaseTest {
                 address(ccipAdapter_earningChain),
                 BridgeParamsCodec.encode(
                     IBridgeAdapter.BridgeParams({
-                        feePayer: everyRoleAccount,
                         feeToken: address(0),
                         feeAmount: bridgeFeeAmount,
                         feeRefundThreshold: 0,
@@ -463,7 +461,6 @@ contract EndToEndTest is BaseTest {
             {
                 bytes memory bp = BridgeParamsCodec.encode(
                     IBridgeAdapter.BridgeParams({
-                        feePayer: everyRoleAccount,
                         feeToken: address(0),
                         feeAmount: bridgeFeeAmount,
                         feeRefundThreshold: 0,

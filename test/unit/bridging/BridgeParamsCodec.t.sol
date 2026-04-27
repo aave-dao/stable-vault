@@ -14,7 +14,6 @@ import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 /// are load-bearing invariants.
 contract BridgeParamsCodecTest is Test {
     function test_encodeDecodeRoundTrip(
-        address feePayer,
         address feeToken,
         uint256 feeAmount,
         uint256 feeRefundThreshold,
@@ -22,7 +21,6 @@ contract BridgeParamsCodecTest is Test {
         bytes memory data
     ) public pure {
         IBridgeAdapter.BridgeParams memory original = IBridgeAdapter.BridgeParams({
-            feePayer: feePayer,
             feeToken: feeToken,
             feeAmount: feeAmount,
             feeRefundThreshold: feeRefundThreshold,
@@ -33,7 +31,6 @@ contract BridgeParamsCodecTest is Test {
         bytes memory encoded = BridgeParamsCodec.encode(original);
         IBridgeAdapter.BridgeParams memory decoded = BridgeParamsCodec.decode(encoded);
 
-        assertEq(decoded.feePayer, original.feePayer);
         assertEq(decoded.feeToken, original.feeToken);
         assertEq(decoded.feeAmount, original.feeAmount);
         assertEq(decoded.feeRefundThreshold, original.feeRefundThreshold);
@@ -48,7 +45,7 @@ contract BridgeParamsCodecTest is Test {
     }
 
     function test_decodeMalformedBytes_reverts_onTruncated() public {
-        // A valid encoding is 6 * 32 bytes (static fields) + dynamic `data` offset + length + bytes.
+        // A valid encoding is 5 * 32 bytes (static fields) + dynamic `data` offset + length + bytes.
         // 64 bytes is well below the minimum — Solidity's abi.decode must revert.
         bytes memory truncated = new bytes(64);
         vm.expectRevert();
@@ -59,7 +56,6 @@ contract BridgeParamsCodecTest is Test {
         // Construct bytes that look the right size but encode an invalid dynamic-offset pointer
         // for the trailing `bytes data` field — triggers the Solidity decoder's bounds check.
         bytes memory garbage = abi.encode(
-            address(0),
             address(0),
             uint256(0),
             uint256(0),

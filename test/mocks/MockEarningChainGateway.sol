@@ -41,6 +41,7 @@ contract MockEarningChainGateway is IEarningChainGateway {
         uint256 amount,
         uint256 targetChainId,
         address bridgeAdapter,
+        address feePayer,
         bytes calldata bridgeParamsEncoded
     ) external payable {}
 
@@ -62,6 +63,7 @@ contract MockEarningChainGateway is IEarningChainGateway {
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
         address bridgeAdapter,
+        address feePayer,
         bytes calldata bridgeParamsEncoded
     ) external payable {}
 }

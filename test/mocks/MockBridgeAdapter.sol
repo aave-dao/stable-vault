@@ -30,6 +30,7 @@ contract MockBridgeAdapter is IBridgeAdapter {
         address asset,
         uint256 amount,
         bytes memory data,
+        address feePayer,
         bytes memory bridgeParamsEncoded
     ) external payable override {
         (destinationChainId, data);
@@ -46,8 +47,7 @@ contract MockBridgeAdapter is IBridgeAdapter {
         } else {
             require(msg.value == 0, Errors.InvalidParameter());
             if (bridgeParams.feeAmount > 0) {
-                IERC20(bridgeParams.feeToken)
-                    .safeTransferFrom(bridgeParams.feePayer, TRANSFER_HELPER, bridgeParams.feeAmount);
+                IERC20(bridgeParams.feeToken).safeTransferFrom(feePayer, TRANSFER_HELPER, bridgeParams.feeAmount);
             }
         }
 

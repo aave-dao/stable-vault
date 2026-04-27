@@ -300,6 +300,16 @@ contract EarningChainGatewayTest is TestWithHelpers {
             vm.prank(bridgeFeePayer);
             MockNonStandardErc20(bridgeFeeToken).approve(address(_mockBridgeAdapterData), bridgeFeeAmount);
 
+            bytes memory bridgeParams = BridgeParamsCodec.encode(
+                IBridgeAdapter.BridgeParams({
+                    feeToken: bridgeFeeToken,
+                    feeAmount: bridgeFeeAmount,
+                    feeRefundThreshold: 0,
+                    gasLimit: BURN_IOU_TOKEN_GAS_LIMIT,
+                    data: abi.encode(keccak256(hex"c0ffee"))
+                })
+            );
+
             vm.expectCall(
                 bridgeFeeToken,
                 abi.encodeCall(IERC20.transferFrom, (bridgeFeePayer, address(_mockTransferHelper), bridgeFeeAmount))
@@ -308,22 +318,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 address(_mockBridgeAdapterData),
                 abi.encodeCall(
                     IBridgeAdapter.publishMessageToChainWithFeePayer,
-                    (
-                        ACCOUNTING_CHAIN_ID,
-                        address(0),
-                        0,
-                        data,
-                        BridgeParamsCodec.encode(
-                            IBridgeAdapter.BridgeParams({
-                                feePayer: bridgeFeePayer,
-                                feeToken: bridgeFeeToken,
-                                feeAmount: bridgeFeeAmount,
-                                feeRefundThreshold: 0,
-                                gasLimit: BURN_IOU_TOKEN_GAS_LIMIT,
-                                data: abi.encode(keccak256(hex"c0ffee"))
-                            })
-                        )
-                    )
+                    (ACCOUNTING_CHAIN_ID, address(0), 0, data, bridgeFeePayer, bridgeParams)
                 )
             );
             _mockTransferHelper.mockAsset(address(_mockUsdt), amountOut);
@@ -331,22 +326,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
             vm.prank(tokenOutReceiver);
             _earningChainGateway.exchangeIouTokens(
-                iouTokenAmountRay,
-                tokenOut,
-                0,
-                tokenOutReceiver,
-                address(_mockBridgeAdapterData),
-                BridgeParamsCodec.encode(
-                    IBridgeAdapter.BridgeParams({
-                        feePayer: bridgeFeePayer,
-                        feeToken: bridgeFeeToken,
-                        feeAmount: bridgeFeeAmount,
-                        feeRefundThreshold: 0,
-                        gasLimit: BURN_IOU_TOKEN_GAS_LIMIT,
-                        data: abi.encode(keccak256(hex"c0ffee"))
-                    })
-                ),
-                ""
+                iouTokenAmountRay, tokenOut, 0, tokenOutReceiver, address(_mockBridgeAdapterData), bridgeParams, ""
             );
         }
 
@@ -374,6 +354,16 @@ contract EarningChainGatewayTest is TestWithHelpers {
             vm.prank(bridgeFeePayer);
             MockNonStandardErc20(bridgeFeeToken).approve(address(_mockBridgeAdapterData), bridgeFeeAmount);
 
+            bytes memory bridgeParams = BridgeParamsCodec.encode(
+                IBridgeAdapter.BridgeParams({
+                    feeToken: bridgeFeeToken,
+                    feeAmount: bridgeFeeAmount,
+                    feeRefundThreshold: 0,
+                    gasLimit: BURN_IOU_TOKEN_GAS_LIMIT,
+                    data: abi.encode(keccak256(hex"c0ffee"))
+                })
+            );
+
             vm.expectCall(
                 bridgeFeeToken,
                 abi.encodeCall(IERC20.transferFrom, (bridgeFeePayer, address(_mockTransferHelper), bridgeFeeAmount))
@@ -382,44 +372,14 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 address(_mockBridgeAdapterData),
                 abi.encodeCall(
                     IBridgeAdapter.publishMessageToChainWithFeePayer,
-                    (
-                        ACCOUNTING_CHAIN_ID,
-                        address(0),
-                        0,
-                        data,
-                        BridgeParamsCodec.encode(
-                            IBridgeAdapter.BridgeParams({
-                                feePayer: bridgeFeePayer,
-                                feeToken: bridgeFeeToken,
-                                feeAmount: bridgeFeeAmount,
-                                feeRefundThreshold: 0,
-                                gasLimit: BURN_IOU_TOKEN_GAS_LIMIT,
-                                data: abi.encode(keccak256(hex"c0ffee"))
-                            })
-                        )
-                    )
+                    (ACCOUNTING_CHAIN_ID, address(0), 0, data, bridgeFeePayer, bridgeParams)
                 )
             );
             _mockTransferHelper.mockAsset(address(_mockUsdt), amountOut);
             vm.expectCall(address(_mockUsdt), abi.encodeCall(IERC20.transfer, (tokenOutReceiver, amountOut)));
             vm.prank(tokenOutReceiver);
             _earningChainGateway.exchangeIouTokens(
-                iouTokenAmountRay,
-                tokenOut,
-                0,
-                tokenOutReceiver,
-                address(_mockBridgeAdapterData),
-                BridgeParamsCodec.encode(
-                    IBridgeAdapter.BridgeParams({
-                        feePayer: bridgeFeePayer,
-                        feeToken: bridgeFeeToken,
-                        feeAmount: bridgeFeeAmount,
-                        feeRefundThreshold: 0,
-                        gasLimit: BURN_IOU_TOKEN_GAS_LIMIT,
-                        data: abi.encode(keccak256(hex"c0ffee"))
-                    })
-                ),
-                ""
+                iouTokenAmountRay, tokenOut, 0, tokenOutReceiver, address(_mockBridgeAdapterData), bridgeParams, ""
             );
         }
     }
@@ -458,23 +418,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 abi.encode(allocatorBalances)
             );
 
-            bytes memory data = abi.encode(
-                IChainGateway.CrossChainMessage({
-                    messageType: IChainGateway.MessageType.BURN_IOU_TOKEN,
-                    data: abi.encode(
-                        IChainGateway.BurnIouTokenMessage({
-                            iouTokenAmountBurnedRay: iouTokenAmountRay,
-                            timestamp: block.timestamp,
-                            blockNumber: block.number
-                        })
-                    )
-                })
-            );
-
-            uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(tokenOut);
             bridgeParams = BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: bridgeFeePayer,
                     feeToken: address(0),
                     feeAmount: bridgeFeeAmount,
                     feeRefundThreshold: 0,
@@ -482,14 +427,13 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     data: abi.encode(keccak256(hex"c0ffee"))
                 })
             );
+
+            uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(tokenOut);
             _mockTransferHelper.mockAsset(address(_mockUsdt), amountOut);
             vm.expectCall(address(_mockUsdt), abi.encodeCall(IERC20.transfer, (tokenOutReceiver, amountOut)));
             vm.expectCall(
                 address(_mockBridgeAdapterData),
-                abi.encodeCall(
-                    IBridgeAdapter.publishMessageToChainWithFeePayer,
-                    (ACCOUNTING_CHAIN_ID, address(0), 0, data, bridgeParams)
-                )
+                _expectedBurnIouCalldata(iouTokenAmountRay, tokenOutReceiver, bridgeParams)
             );
         }
 
@@ -524,7 +468,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockBridgeAdapterData),
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: user,
                     feeToken: address(0),
                     feeAmount: 0,
                     feeRefundThreshold: 0,
@@ -546,7 +489,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockBridgeAdapterData),
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: makeAddr("bridgeFeePayer"),
                     feeToken: address(0),
                     feeAmount: 0,
                     feeRefundThreshold: 0,
@@ -570,7 +512,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockBridgeAdapterData),
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: address(this),
                     feeToken: address(0),
                     feeAmount: 0,
                     feeRefundThreshold: 0,
@@ -598,7 +539,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockBridgeAdapterData),
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: makeAddr("bridgeFeePayer"),
                     feeToken: address(0),
                     feeAmount: 0,
                     feeRefundThreshold: 0,
@@ -629,7 +569,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockBridgeAdapterData),
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: makeAddr("bridgeFeePayer"),
                     feeToken: address(0),
                     feeAmount: 0,
                     feeRefundThreshold: 0,
@@ -657,7 +596,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockBridgeAdapterData),
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: address(this),
                     feeToken: address(0),
                     feeAmount: 123,
                     feeRefundThreshold: 0,
@@ -704,7 +642,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockBridgeAdapterData),
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: address(this),
                     feeToken: address(0),
                     feeAmount: 123,
                     feeRefundThreshold: 0,
@@ -739,7 +676,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockBridgeAdapterData),
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: tokenOutReceiver,
                     feeToken: address(0),
                     feeAmount: bridgeFeeAmount,
                     feeRefundThreshold: 0,
@@ -766,7 +702,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
             bogusAdapter,
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: tokenOutReceiver,
                     feeToken: address(0),
                     feeAmount: bridgeFeeAmount,
                     feeRefundThreshold: 0,
@@ -801,7 +736,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockBridgeAdapterData),
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: tokenOutReceiver,
                     feeToken: address(0),
                     feeAmount: bridgeFeeAmount,
                     feeRefundThreshold: 0,
@@ -839,46 +773,29 @@ contract EarningChainGatewayTest is TestWithHelpers {
             })
         );
 
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feeToken: bridgeFeeToken,
+                feeAmount: bridgeFeeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: 100000,
+                data: abi.encode(keccak256(hex"c0ffee"))
+            })
+        );
+
         vm.expectCall(
             address(_mockBridgeAdapterAssets),
             0,
             abi.encodeCall(
                 IBridgeAdapter.publishMessageToChainWithFeePayer,
-                (
-                    ACCOUNTING_CHAIN_ID,
-                    address(_mockUsdt),
-                    amountToken,
-                    returnFundsMessageEncoded,
-                    BridgeParamsCodec.encode(
-                        IBridgeAdapter.BridgeParams({
-                            feePayer: sender,
-                            feeToken: bridgeFeeToken,
-                            feeAmount: bridgeFeeAmount,
-                            feeRefundThreshold: 0,
-                            gasLimit: 100000,
-                            data: abi.encode(keccak256(hex"c0ffee"))
-                        })
-                    )
-                )
+                (ACCOUNTING_CHAIN_ID, address(_mockUsdt), amountToken, returnFundsMessageEncoded, sender, bridgeParams)
             )
         );
         vm.expectCall(address(_mockAllocator), abi.encodeCall(IAllocator.withdraw, (address(_mockUsdt), amountToken)));
 
         vm.prank(sender);
         _earningChainGateway.pushFundsToAccountingChain(
-            address(_mockUsdt),
-            amountToken,
-            address(_mockBridgeAdapterAssets),
-            BridgeParamsCodec.encode(
-                IBridgeAdapter.BridgeParams({
-                    feePayer: sender,
-                    feeToken: bridgeFeeToken,
-                    feeAmount: bridgeFeeAmount,
-                    feeRefundThreshold: 0,
-                    gasLimit: 100000,
-                    data: abi.encode(keccak256(hex"c0ffee"))
-                })
-            )
+            address(_mockUsdt), amountToken, address(_mockBridgeAdapterAssets), bridgeParams
         );
     }
 
@@ -917,9 +834,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     address(_mockGho),
                     amountToken,
                     returnFundsMessageEncoded,
+                    sender,
                     BridgeParamsCodec.encode(
                         IBridgeAdapter.BridgeParams({
-                            feePayer: sender,
                             feeToken: bridgeFeeToken,
                             feeAmount: bridgeFeeAmount,
                             feeRefundThreshold: 0,
@@ -940,7 +857,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockBridgeAdapterAssets),
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: sender,
                     feeToken: bridgeFeeToken,
                     feeAmount: bridgeFeeAmount,
                     feeRefundThreshold: 0,
@@ -975,6 +891,16 @@ contract EarningChainGatewayTest is TestWithHelpers {
             })
         );
 
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feeToken: bridgeFeeToken,
+                feeAmount: bridgeFeeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: 100000,
+                data: abi.encode(keccak256(hex"c0ffee"))
+            })
+        );
+
         vm.expectCall(
             address(_mockBridgeAdapterAssets),
             bridgeFeeAmount,
@@ -985,35 +911,15 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     address(_mockUsdt),
                     amountToken,
                     returnFundsMessageEncoded,
-                    BridgeParamsCodec.encode(
-                        IBridgeAdapter.BridgeParams({
-                            feePayer: feePayer,
-                            feeToken: bridgeFeeToken,
-                            feeAmount: bridgeFeeAmount,
-                            feeRefundThreshold: 0,
-                            gasLimit: 100000,
-                            data: abi.encode(keccak256(hex"c0ffee"))
-                        })
-                    )
+                    feePayer,
+                    bridgeParams
                 )
             )
         );
 
         vm.prank(feePayer);
         _earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
-            address(_mockUsdt),
-            amountToken,
-            address(_mockBridgeAdapterAssets),
-            BridgeParamsCodec.encode(
-                IBridgeAdapter.BridgeParams({
-                    feePayer: feePayer,
-                    feeToken: bridgeFeeToken,
-                    feeAmount: bridgeFeeAmount,
-                    feeRefundThreshold: 0,
-                    gasLimit: 100000,
-                    data: abi.encode(keccak256(hex"c0ffee"))
-                })
-            )
+            address(_mockUsdt), amountToken, address(_mockBridgeAdapterAssets), bridgeParams
         );
     }
 
@@ -1033,7 +939,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockBridgeAdapterAssets),
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: sender,
                     feeToken: address(0),
                     feeAmount: 0,
                     feeRefundThreshold: 0,
@@ -1059,7 +964,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockBridgeAdapterAssets),
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: everyRoleAccount,
                     feeToken: address(0),
                     feeAmount: 0,
                     feeRefundThreshold: 0,
@@ -1085,12 +989,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockBridgeAdapterAssets),
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: everyRoleAccount,
-                    feeToken: address(0),
-                    feeAmount: 0,
-                    feeRefundThreshold: 0,
-                    gasLimit: 100000,
-                    data: ""
+                    feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 100000, data: ""
                 })
             )
         );
@@ -1120,7 +1019,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockBridgeAdapterAssets),
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: everyRoleAccount,
                     feeToken: address(0),
                     feeAmount: 0,
                     feeRefundThreshold: 0,
@@ -1140,7 +1038,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockBridgeAdapterAssets),
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: everyRoleAccount,
                     feeToken: address(0),
                     feeAmount: 0,
                     feeRefundThreshold: 0,
@@ -1164,7 +1061,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockBridgeAdapterAssets),
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: everyRoleAccount,
                     feeToken: address(0),
                     feeAmount: 123,
                     feeRefundThreshold: 0,
@@ -1203,7 +1099,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockBridgeAdapterAssets),
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: bridgeFeePayer,
                     feeToken: bridgeFeeToken,
                     feeAmount: bridgeFeeAmount,
                     feeRefundThreshold: 0,
@@ -1224,12 +1119,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             bogusAdapter,
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: everyRoleAccount,
-                    feeToken: address(0),
-                    feeAmount: 0,
-                    feeRefundThreshold: 0,
-                    gasLimit: 100000,
-                    data: ""
+                    feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 100000, data: ""
                 })
             )
         );
@@ -1246,7 +1136,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockBridgeAdapterAssets),
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: everyRoleAccount,
                     feeToken: address(0),
                     feeAmount: 0,
                     feeRefundThreshold: 0,
@@ -1299,9 +1188,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
                             )
                         })
                     ),
+                    bridgeFeePayer,
                     BridgeParamsCodec.encode(
                         IBridgeAdapter.BridgeParams({
-                            feePayer: bridgeFeePayer,
                             feeToken: feeToken,
                             feeAmount: feeAmount,
                             feeRefundThreshold: 0,
@@ -1319,9 +1208,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
             iouTokenRecipient,
             iouTokenAmountRay,
             address(_mockBridgeAdapterData),
+            bridgeFeePayer,
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: bridgeFeePayer,
                     feeToken: address(_mockGho),
                     feeAmount: feeAmount,
                     feeRefundThreshold: 0,
@@ -1364,9 +1253,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
                             )
                         })
                     ),
+                    bridgeFeePayer,
                     BridgeParamsCodec.encode(
                         IBridgeAdapter.BridgeParams({
-                            feePayer: bridgeFeePayer,
                             feeToken: address(0),
                             feeAmount: bridgeFeeAmount,
                             feeRefundThreshold: 0,
@@ -1384,9 +1273,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
             iouTokenRecipient,
             iouTokenAmountRay,
             address(_mockBridgeAdapterData),
+            bridgeFeePayer,
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: bridgeFeePayer,
                     feeToken: address(0),
                     feeAmount: bridgeFeeAmount,
                     feeRefundThreshold: 0,
@@ -1405,9 +1294,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
             makeAddr("iouTokenRecipient"),
             100_000,
             address(_mockBridgeAdapterData),
+            address(this),
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: makeAddr("bridgeFeePayer"),
                     feeToken: address(_mockUsdt),
                     feeAmount: 100_000,
                     feeRefundThreshold: 0,
@@ -1430,9 +1319,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
             makeAddr("iouTokenRecipient"),
             100_000,
             address(_mockBridgeAdapterData),
+            address(this),
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: makeAddr("bridgeFeePayer"),
                     feeToken: address(_mockUsdt),
                     feeAmount: 100_000,
                     feeRefundThreshold: 0,
@@ -1451,14 +1340,10 @@ contract EarningChainGatewayTest is TestWithHelpers {
             makeAddr("iouTokenRecipient"),
             0,
             makeAddr("bridgeAdapter"),
+            address(this),
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: makeAddr("bridgeFeePayer"),
-                    feeToken: address(_mockUsdt),
-                    feeAmount: 100_000,
-                    feeRefundThreshold: 0,
-                    gasLimit: 100000,
-                    data: ""
+                    feeToken: address(_mockUsdt), feeAmount: 100_000, feeRefundThreshold: 0, gasLimit: 100000, data: ""
                 })
             )
         );
@@ -1623,7 +1508,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
         vm.deal(attacker, bridgeFeeAmount * 2);
         bytes memory reentrantBridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
-                feePayer: attacker,
                 feeToken: address(0),
                 feeAmount: bridgeFeeAmount,
                 feeRefundThreshold: 0,
@@ -1672,5 +1556,32 @@ contract EarningChainGatewayTest is TestWithHelpers {
         allocatorBalances[0] = IAllocator.AllocatorBalance({asset: address(_mockUsdt), amount: amountUsdt});
         allocatorBalances[1] = IAllocator.AllocatorBalance({asset: address(_mockGho), amount: amountGho});
         return allocatorBalances;
+    }
+
+    /// @dev Composes the canonical BURN_IOU_TOKEN cross-chain payload + the adapter publish-call selector.
+    /// Lives behind a helper so the deeply-nested struct construction doesn't compete for stack frame
+    /// slots with the test body's locals (Solidity stack-too-deep avoidance under explicit feePayer
+    /// propagation).
+    function _expectedBurnIouCalldata(uint256 iouTokenAmountRay, address feePayer, bytes memory bridgeParams)
+        internal
+        view
+        returns (bytes memory)
+    {
+        bytes memory data = abi.encode(
+            IChainGateway.CrossChainMessage({
+                messageType: IChainGateway.MessageType.BURN_IOU_TOKEN,
+                data: abi.encode(
+                    IChainGateway.BurnIouTokenMessage({
+                        iouTokenAmountBurnedRay: iouTokenAmountRay,
+                        timestamp: block.timestamp,
+                        blockNumber: block.number
+                    })
+                )
+            })
+        );
+        return abi.encodeCall(
+            IBridgeAdapter.publishMessageToChainWithFeePayer,
+            (ACCOUNTING_CHAIN_ID, address(0), 0, data, feePayer, bridgeParams)
+        );
     }
 }

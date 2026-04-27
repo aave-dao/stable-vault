@@ -103,16 +103,21 @@ contract CcipAdapter is
 
     /// @inheritdoc IBridgeAdapter
     /// @dev Sole decoder for `bridgeParamsEncoded`. Owns bridge-fee staging: pulls `feeAmount` of
-    /// `feeToken` from `feePayer` into TransferHelper (via `_transferBridgeFeeToTransferHelper`), then
-    /// into itself, spends the router fee, refunds the excess per `feeRefundThreshold`. The inline
-    /// balance-leak check (adapter-scope) replaces the caller-level
+    /// `feeToken` from the gateway-propagated `feePayer` into TransferHelper (via
+    /// `_transferBridgeFeeToTransferHelper`), then into itself, spends the router fee, refunds the excess
+    /// per `feeRefundThreshold`. The inline balance-leak check (adapter-scope) replaces the caller-level
     /// `assertingTransferHelperBalanceFor(feeToken)` modifier that lived on IouTokenManager / FundsHandler
     /// prior to the opaque-bytes refactor.
+    /// @dev `feePayer` is an explicit calldata parameter (NOT decoded from the blob). It is set by the
+    /// trusted entry-point to the original caller's `msg.sender` and forwarded by the gateway. This binds
+    /// fee-payer identity to the entry-point's caller — preventing cross-flow approval theft where a
+    /// blob-supplied `feePayer` would otherwise let any caller spend any approval to this adapter.
     function publishMessageToChainWithFeePayer(
         uint256 destinationChainId,
         address asset,
         uint256 amount,
         bytes memory data,
+        address feePayer,
         bytes memory bridgeParamsEncoded
     ) external payable override(BaseBridgeAdapter, IBridgeAdapter) onlyGateway {
         IBridgeAdapter.BridgeParams memory bridgeParams = BridgeParamsCodec.decode(bridgeParamsEncoded);
@@ -143,7 +148,7 @@ contract CcipAdapter is
         uint256 estimatedFeeAmount = IRouterClient(CCIP_ROUTER).getFee(chainSelector, ccipMessage);
         require(bridgeParams.feeAmount >= estimatedFeeAmount, Errors.InsufficientFunds());
 
-        _transferBridgeFeeToTransferHelper(bridgeParams);
+        _transferBridgeFeeToTransferHelper(feePayer, bridgeParams);
 
         _pullFromTransferHelperAndApproveCcipRouter(
             asset, amount, bridgeParams.feeToken, bridgeParams.feeAmount, estimatedFeeAmount
@@ -152,7 +157,7 @@ contract CcipAdapter is
         _sendMessageWithFeePayer(
             chainSelector,
             ccipMessage,
-            bridgeParams.feePayer,
+            feePayer,
             bridgeParams.feeToken,
             bridgeParams.feeAmount,
             bridgeParams.feeRefundThreshold,

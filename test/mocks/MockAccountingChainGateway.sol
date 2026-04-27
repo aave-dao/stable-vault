@@ -38,12 +38,10 @@ contract MockAccountingChainGateway is IAccountingChainGateway {
         uint256, // amount
         uint256, // targetChainId
         address, // bridgeAdapter
+        address feePayer,
         bytes calldata bridgeParamsEncoded
-    )
-        external
-        payable
-    {
-        _stageBridgeFee(bridgeParamsEncoded);
+    ) external payable {
+        _stageBridgeFee(feePayer, bridgeParamsEncoded);
         _pullAssetsFromTransferHelper();
     }
 
@@ -65,10 +63,11 @@ contract MockAccountingChainGateway is IAccountingChainGateway {
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
         address bridgeAdapter,
+        address feePayer,
         bytes calldata bridgeParamsEncoded
     ) external payable {}
 
-    function _stageBridgeFee(bytes calldata bridgeParamsEncoded) internal {
+    function _stageBridgeFee(address feePayer, bytes calldata bridgeParamsEncoded) internal {
         IBridgeAdapter.BridgeParams memory bridgeParams = BridgeParamsCodec.decode(bridgeParamsEncoded);
         if (bridgeParams.feeToken == Constants.NATIVE_CURRENCY) {
             require(msg.value >= bridgeParams.feeAmount, Errors.InsufficientFunds());
@@ -79,8 +78,7 @@ contract MockAccountingChainGateway is IAccountingChainGateway {
         } else {
             require(msg.value == 0, Errors.InvalidParameter());
             if (bridgeParams.feeAmount > 0) {
-                IERC20(bridgeParams.feeToken)
-                    .safeTransferFrom(bridgeParams.feePayer, TRANSFER_HELPER, bridgeParams.feeAmount);
+                IERC20(bridgeParams.feeToken).safeTransferFrom(feePayer, TRANSFER_HELPER, bridgeParams.feeAmount);
             }
         }
     }

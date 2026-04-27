@@ -98,6 +98,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
         address bridgeAdapter,
+        address feePayer,
         bytes calldata bridgeParamsEncoded
     ) external payable override {
         require(msg.sender == IOU_TOKEN_MANAGER, OnlyIouTokenManager());
@@ -118,6 +119,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
             Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
             0,
             bridgeIouTokenMessageEncoded,
+            feePayer,
             bridgeParamsEncoded
         );
     }
@@ -144,21 +146,24 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
     }
 
     /// @dev Forwards an outbound cross-chain message to a validated bridge adapter. `bridgeParamsEncoded`
-    /// is opaque at this layer — only the adapter's `publishMessageToChainWithFeePayer` decodes it. All
-    /// unconsumed `msg.value` is forwarded so the adapter can use it for native bridge fees when applicable.
+    /// is opaque at this layer — only the adapter's `publishMessageToChainWithFeePayer` decodes it.
+    /// `feePayer` is forwarded as an explicit calldata parameter (not part of the opaque blob) so the
+    /// adapter pulls fees from a caller-bound identity, not a blob-supplied one. All unconsumed `msg.value`
+    /// is forwarded so the adapter can use it for native bridge fees when applicable.
     function _sendCrossChainMessage(
         uint256 destinationChainId,
         address bridgeAdapter,
         address assetToBridge,
         uint256 amountToBridge,
         bytes memory dataToBridge,
+        address feePayer,
         bytes memory bridgeParamsEncoded
     ) internal {
         if (assetToBridge == Constants.ASSET_FOR_DATA_ONLY_BRIDGE) {
             require(amountToBridge == 0, Errors.InvalidParameter());
         }
         IBridgeAdapter(bridgeAdapter).publishMessageToChainWithFeePayer{value: msg.value}(
-            destinationChainId, assetToBridge, amountToBridge, dataToBridge, bridgeParamsEncoded
+            destinationChainId, assetToBridge, amountToBridge, dataToBridge, feePayer, bridgeParamsEncoded
         );
         if (assetToBridge != Constants.ASSET_FOR_DATA_ONLY_BRIDGE) {
             emit FundsSent(assetToBridge, amountToBridge, destinationChainId);

@@ -47,6 +47,7 @@ contract MockGateway is IChainGateway {
         address, /*iouTokenRecipient*/
         uint256, /*iouTokenAmountRay*/
         address, /*bridgeAdapter*/
+        address feePayer,
         bytes calldata bridgeParamsEncoded
     ) external payable override {
         IBridgeAdapter.BridgeParams memory bridgeParams = BridgeParamsCodec.decode(bridgeParamsEncoded);
@@ -59,8 +60,7 @@ contract MockGateway is IChainGateway {
         } else {
             require(msg.value == 0, Errors.InvalidParameter());
             if (bridgeParams.feeAmount > 0) {
-                IERC20(bridgeParams.feeToken)
-                    .safeTransferFrom(bridgeParams.feePayer, _transferHelper, bridgeParams.feeAmount);
+                IERC20(bridgeParams.feeToken).safeTransferFrom(feePayer, _transferHelper, bridgeParams.feeAmount);
             }
         }
         _mockConsume();

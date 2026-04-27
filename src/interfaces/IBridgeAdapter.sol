@@ -26,7 +26,12 @@ interface IBridgeAdapter {
     error OnlyBridgeRouter();
 
     /// @notice The parameters for the bridge adapter.
-    /// @param feePayer Address that will pay the bridge fee (also the recipient of any refund).
+    /// @dev `feePayer` is intentionally NOT part of this struct. It is propagated as an explicit calldata
+    /// parameter through every layer (entry → gateway → adapter), set to the entry-point's `msg.sender`.
+    /// Putting it inside the opaque blob would make any non-zero ERC20 approval to the adapter consumable
+    /// by ANY caller of ANY bridge entry-point — a forged blob `feePayer` would `safeTransferFrom` from the
+    /// approval owner regardless of who triggered the bridge. Keeping `feePayer` outside the blob lets the
+    /// trusted entry-point bind it to caller identity.
     /// @param feeToken Token to pay the bridge fee in.
     /// @param feeAmount Amount of `feeToken` approved by `feePayer` to spend on fees.
     /// @param feeRefundThreshold Minimum amount of `feeToken` that must remain unused in order to trigger a refund to
@@ -35,7 +40,6 @@ interface IBridgeAdapter {
     /// processed on the destination chain (including round trips).
     /// @param data Arbitrary data that may be required by the bridge adapter to operate.
     struct BridgeParams {
-        address feePayer;
         address feeToken;
         uint256 feeAmount;
         uint256 feeRefundThreshold;
@@ -60,16 +64,21 @@ interface IBridgeAdapter {
     /// decoder — Gateway and intermediate layers forward the blob opaquely. The adapter also owns bridge-
     /// fee staging (pulls from `feePayer` via TransferHelper, spends on the underlying router, refunds
     /// excess per `feeRefundThreshold`).
+    /// @dev `feePayer` is forwarded by the gateway as an explicit calldata parameter, not decoded from
+    /// the blob — see `BridgeParams` NatSpec for rationale.
     /// @param destinationChainId Chain id of the chain to publish the message to.
     /// @param asset Asset to bridge; set to `address(0)` for data only messages.
     /// @param amount Amount of the asset to bridge; set to 0 for data only messages.
     /// @param data Arbitrary data that would be decoded and handled by the destination chain.
+    /// @param feePayer Address that will pay the bridge fee (also the recipient of any refund). Set by the
+    /// trusted entry-point to the original caller's `msg.sender`.
     /// @param bridgeParamsEncoded ABI-encoded `BridgeParams` blob; decoded inside the adapter.
     function publishMessageToChainWithFeePayer(
         uint256 destinationChainId,
         address asset,
         uint256 amount,
         bytes memory data,
+        address feePayer,
         bytes memory bridgeParamsEncoded
     ) external payable;
 }

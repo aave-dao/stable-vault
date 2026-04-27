@@ -107,12 +107,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             address(ccipAdapter_accountingChain),
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: everyRoleAccount,
-                    feeToken: address(0),
-                    feeAmount: bridgeFeeAmount,
-                    feeRefundThreshold: 0,
-                    gasLimit: 300000,
-                    data: ""
+                    feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, gasLimit: 300000, data: ""
                 })
             )
         );
@@ -191,12 +186,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             address(ccipAdapter_accountingChain),
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: user1,
-                    feeToken: address(0),
-                    feeAmount: bridgeFeeAmount,
-                    feeRefundThreshold: 0,
-                    gasLimit: 300000,
-                    data: ""
+                    feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, gasLimit: 300000, data: ""
                 })
             )
         );
@@ -277,12 +267,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         {
             bytes memory bp = BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: user2,
-                    feeToken: address(0),
-                    feeAmount: bridgeFeeAmount,
-                    feeRefundThreshold: 0,
-                    gasLimit: 100000,
-                    data: ""
+                    feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, gasLimit: 100000, data: ""
                 })
             );
             iouTokenManager_accountingChain.bridgeTokens{value: bridgeFeeAmount}(
@@ -305,12 +290,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         {
             bytes memory bp = BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: user2,
-                    feeToken: address(0),
-                    feeAmount: bridgeFeeAmount,
-                    feeRefundThreshold: 0,
-                    gasLimit: 100000,
-                    data: ""
+                    feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, gasLimit: 100000, data: ""
                 })
             );
             iouTokenManager_earningChain.bridgeTokens{value: bridgeFeeAmount}(
@@ -360,12 +340,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             // struct will be pushed to the FH storage.
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: user1,
-                    feeToken: address(0),
-                    feeAmount: 1,
-                    feeRefundThreshold: 0,
-                    gasLimit: 300000,
-                    data: ""
+                    feeToken: address(0), feeAmount: 1, feeRefundThreshold: 0, gasLimit: 300000, data: ""
                 })
             ),
             ""

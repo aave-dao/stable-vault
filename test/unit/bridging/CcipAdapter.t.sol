@@ -330,7 +330,6 @@ contract CcipAdapterTest is TestWithHelpers {
 
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
-                feePayer: feePayer,
                 feeToken: feeToken,
                 feeAmount: feeAmount,
                 feeRefundThreshold: 0,
@@ -377,7 +376,7 @@ contract CcipAdapterTest is TestWithHelpers {
         emit IBridgeAdapter.MessagePublished(messageId);
         vm.prank(address(_mockAccountingChainGateway));
         _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
-            EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, bridgedData, bridgeParams
+            EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, bridgedData, feePayer, bridgeParams
         );
 
         // Check that the TransferHelper no longer holds the assets
@@ -409,7 +408,6 @@ contract CcipAdapterTest is TestWithHelpers {
 
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
-                feePayer: feePayer,
                 feeToken: feeToken,
                 feeAmount: feeAmount,
                 feeRefundThreshold: 0,
@@ -450,13 +448,15 @@ contract CcipAdapterTest is TestWithHelpers {
             );
         }
 
-        bytes32 messageId = keccak256("messageId");
-        _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, messageId);
-        vm.expectEmit(true, true, true, true);
-        emit IBridgeAdapter.MessagePublished(messageId);
+        {
+            bytes32 messageId = keccak256("messageId");
+            _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, messageId);
+            vm.expectEmit(true, true, true, true);
+            emit IBridgeAdapter.MessagePublished(messageId);
+        }
         vm.prank(address(_mockAccountingChainGateway));
         _accountingChainCcipAdapter.publishMessageToChainWithFeePayer{value: feeAmount}(
-            EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, bridgedData, bridgeParams
+            EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, bridgedData, feePayer, bridgeParams
         );
 
         // Check that the TransferHelper no longer holds the assets
@@ -483,7 +483,6 @@ contract CcipAdapterTest is TestWithHelpers {
         feeAmount = _boundAssetAmount(feeToken, feeAmount);
         vm.assume(feeAmount > 1);
         uint256 expectedFeeRefund = 1;
-        uint256 actualFeeAmount = feeAmount - expectedFeeRefund;
 
         // Airdrop bridged asset to the TransferHelper (pushed there by the Allocator); fee is
         // staged by the adapter via safeTransferFrom under the opaque-bytes dispatch shape.
@@ -492,7 +491,6 @@ contract CcipAdapterTest is TestWithHelpers {
 
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
-                feePayer: feePayer,
                 feeToken: feeToken,
                 feeAmount: feeAmount,
                 feeRefundThreshold: 0,
@@ -519,7 +517,7 @@ contract CcipAdapterTest is TestWithHelpers {
             vm.mockCall(
                 address(_mockCCIPRouter),
                 abi.encodeWithSelector(IRouterClient.getFee.selector, EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage),
-                abi.encode(actualFeeAmount)
+                abi.encode(feeAmount - expectedFeeRefund)
             );
 
             // Expect a call to router to approve the bridged assets
@@ -536,7 +534,7 @@ contract CcipAdapterTest is TestWithHelpers {
         _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, bytes32(0));
         vm.prank(address(_mockAccountingChainGateway));
         _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
-            EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, bridgedData, bridgeParams
+            EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, bridgedData, feePayer, bridgeParams
         );
 
         // Check that the TransferHelper no longer holds the assets
@@ -575,12 +573,7 @@ contract CcipAdapterTest is TestWithHelpers {
 
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
-                feePayer: feePayer,
-                feeToken: address(0),
-                feeAmount: feeAmount,
-                feeRefundThreshold: 0,
-                gasLimit: gasLimit,
-                data: ""
+                feeToken: address(0), feeAmount: feeAmount, feeRefundThreshold: 0, gasLimit: gasLimit, data: ""
             })
         );
 
@@ -619,7 +612,7 @@ contract CcipAdapterTest is TestWithHelpers {
         _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, bytes32(0));
         vm.prank(address(_mockAccountingChainGateway));
         _accountingChainCcipAdapter.publishMessageToChainWithFeePayer{value: feeAmount}(
-            EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "", bridgeParams
+            EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "", feePayer, bridgeParams
         );
 
         // Check that the TransferHelper no longer holds the assets
@@ -642,7 +635,6 @@ contract CcipAdapterTest is TestWithHelpers {
 
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
-                feePayer: feePayer,
                 feeToken: address(0),
                 feeAmount: allocatedFeeAmount,
                 feeRefundThreshold: 0,
@@ -674,7 +666,7 @@ contract CcipAdapterTest is TestWithHelpers {
 
         vm.prank(address(_mockAccountingChainGateway));
         _accountingChainCcipAdapter.publishMessageToChainWithFeePayer{value: allocatedFeeAmount}(
-            EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "", bridgeParams
+            EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "", feePayer, bridgeParams
         );
 
         assertEq(address(feePayer).balance, feePayerBalance + excessFee);
@@ -696,7 +688,6 @@ contract CcipAdapterTest is TestWithHelpers {
 
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
-                feePayer: address(gasHeavyFeePayer),
                 feeToken: address(0),
                 feeAmount: allocatedFeeAmount,
                 feeRefundThreshold: 0,
@@ -728,7 +719,7 @@ contract CcipAdapterTest is TestWithHelpers {
 
         vm.prank(address(_mockAccountingChainGateway));
         _accountingChainCcipAdapter.publishMessageToChainWithFeePayer{value: allocatedFeeAmount}(
-            EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "", bridgeParams
+            EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "", address(gasHeavyFeePayer), bridgeParams
         );
 
         assertEq(address(gasHeavyFeePayer).balance, excessFee);
@@ -762,7 +753,6 @@ contract CcipAdapterTest is TestWithHelpers {
 
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
-                feePayer: feePayer,
                 feeToken: feeToken,
                 feeAmount: feeAmount,
                 feeRefundThreshold: feeRefundThreshold,
@@ -806,7 +796,7 @@ contract CcipAdapterTest is TestWithHelpers {
         _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, bytes32(0));
         vm.prank(address(_mockAccountingChainGateway));
         _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
-            EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "", bridgeParams
+            EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "", feePayer, bridgeParams
         );
 
         // Check that the TransferHelper no longer holds the assets
@@ -861,7 +851,6 @@ contract CcipAdapterTest is TestWithHelpers {
 
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
-                feePayer: feePayer,
                 feeToken: feeToken,
                 feeAmount: feeAmount,
                 feeRefundThreshold: feeRefundThreshold,
@@ -905,7 +894,7 @@ contract CcipAdapterTest is TestWithHelpers {
         _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, bytes32(0));
         vm.prank(address(_mockAccountingChainGateway));
         _accountingChainCcipAdapter.publishMessageToChainWithFeePayer{value: feeAmount}(
-            EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "", bridgeParams
+            EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "", feePayer, bridgeParams
         );
 
         // Check that the TransferHelper no longer holds the assets
@@ -946,7 +935,6 @@ contract CcipAdapterTest is TestWithHelpers {
 
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
-                feePayer: everyRoleAccount,
                 feeToken: address(_mockGho),
                 feeAmount: feeAmount,
                 feeRefundThreshold: 0,
@@ -963,7 +951,7 @@ contract CcipAdapterTest is TestWithHelpers {
         _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, bytes32(0));
         vm.prank(address(_mockAccountingChainGateway));
         _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
-            EARNING_CHAIN_ID, address(0), 0, arbitraryData, bridgeParams
+            EARNING_CHAIN_ID, address(0), 0, arbitraryData, everyRoleAccount, bridgeParams
         );
     }
 
@@ -976,12 +964,7 @@ contract CcipAdapterTest is TestWithHelpers {
 
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
-                feePayer: everyRoleAccount,
-                feeToken: address(0),
-                feeAmount: 0,
-                feeRefundThreshold: 0,
-                gasLimit: DEFAULT_GAS_LIMIT,
-                data: ""
+                feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: DEFAULT_GAS_LIMIT, data: ""
             })
         );
 
@@ -1007,7 +990,9 @@ contract CcipAdapterTest is TestWithHelpers {
         vm.expectRevert(Errors.InsufficientFunds.selector);
         vm.prank(address(_mockAccountingChainGateway));
         // Do not send any native asset with the call to try using the idle funds on the adapter.
-        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(EARNING_CHAIN_ID, address(0), 0, "", bridgeParams);
+        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
+            EARNING_CHAIN_ID, address(0), 0, "", address(this), bridgeParams
+        );
     }
 
     function test_publishMessageToChainWithFeePayer_reverts_ifOnlyGateway(address caller) public {
@@ -1021,14 +1006,10 @@ contract CcipAdapterTest is TestWithHelpers {
             address(0),
             0,
             "",
+            address(this),
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: everyRoleAccount,
-                    feeToken: address(0),
-                    feeAmount: 0,
-                    feeRefundThreshold: 0,
-                    gasLimit: 100000,
-                    data: ""
+                    feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 100000, data: ""
                 })
             )
         );
@@ -1040,14 +1021,10 @@ contract CcipAdapterTest is TestWithHelpers {
             address(0),
             0,
             "",
+            address(this),
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: everyRoleAccount,
-                    feeToken: address(0),
-                    feeAmount: 0,
-                    feeRefundThreshold: 0,
-                    gasLimit: 100000,
-                    data: ""
+                    feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 100000, data: ""
                 })
             )
         );
@@ -1064,14 +1041,10 @@ contract CcipAdapterTest is TestWithHelpers {
             address(0),
             0,
             "",
+            address(this),
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: everyRoleAccount,
-                    feeToken: address(0),
-                    feeAmount: 0,
-                    feeRefundThreshold: 0,
-                    gasLimit: 100000,
-                    data: ""
+                    feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 100000, data: ""
                 })
             )
         );
@@ -1469,12 +1442,7 @@ contract CcipAdapterTest is TestWithHelpers {
 
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
-                feePayer: feePayer,
-                feeToken: feeToken,
-                feeAmount: feeAmount,
-                feeRefundThreshold: 0,
-                gasLimit: gasLimit,
-                data: ""
+                feeToken: feeToken, feeAmount: feeAmount, feeRefundThreshold: 0, gasLimit: gasLimit, data: ""
             })
         );
 
@@ -1484,7 +1452,7 @@ contract CcipAdapterTest is TestWithHelpers {
 
         vm.prank(address(_mockAccountingChainGateway));
         _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
-            EARNING_CHAIN_ID, address(_mockGho), amountGho, "", bridgeParams
+            EARNING_CHAIN_ID, address(_mockGho), amountGho, "", feePayer, bridgeParams
         );
 
         // Verify allowance is reset to 0 after the send
@@ -1515,12 +1483,7 @@ contract CcipAdapterTest is TestWithHelpers {
 
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
-                feePayer: feePayer,
-                feeToken: feeToken,
-                feeAmount: feeAmount,
-                feeRefundThreshold: 0,
-                gasLimit: gasLimit,
-                data: ""
+                feeToken: feeToken, feeAmount: feeAmount, feeRefundThreshold: 0, gasLimit: gasLimit, data: ""
             })
         );
 
@@ -1530,7 +1493,7 @@ contract CcipAdapterTest is TestWithHelpers {
 
         vm.prank(address(_mockAccountingChainGateway));
         _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
-            EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "", bridgeParams
+            EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "", feePayer, bridgeParams
         );
 
         // Verify allowance is reset to 0 after the send (even when fee token matches bridged asset)
@@ -1562,7 +1525,6 @@ contract CcipAdapterTest is TestWithHelpers {
 
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
-                feePayer: attacker,
                 feeToken: address(_mockUsdt),
                 feeAmount: legitimateFeeAmount,
                 feeRefundThreshold: 0,
@@ -1577,7 +1539,7 @@ contract CcipAdapterTest is TestWithHelpers {
 
         vm.prank(address(_mockAccountingChainGateway));
         _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
-            EARNING_CHAIN_ID, address(_mockGho), amountGho, "", bridgeParams
+            EARNING_CHAIN_ID, address(_mockGho), amountGho, "", attacker, bridgeParams
         );
 
         // Verify allowance is 0 after the bridge. This prevents the attack where stuck funds could be used via leftover
@@ -1619,7 +1581,6 @@ contract CcipAdapterTest is TestWithHelpers {
 
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
-                feePayer: feePayer,
                 feeToken: address(_mockUsdt),
                 feeAmount: allocatedFeeAmount,
                 feeRefundThreshold: 0, // Refund any excess
@@ -1634,7 +1595,7 @@ contract CcipAdapterTest is TestWithHelpers {
 
         vm.prank(address(_mockAccountingChainGateway));
         _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
-            EARNING_CHAIN_ID, address(_mockGho), amountGho, "", bridgeParams
+            EARNING_CHAIN_ID, address(_mockGho), amountGho, "", feePayer, bridgeParams
         );
 
         // Allowance should be 0, otherwise the allowance would remain at allocatedFeeAmount, allowing an attacker
@@ -1674,7 +1635,6 @@ contract CcipAdapterTest is TestWithHelpers {
 
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
-                feePayer: feePayer,
                 feeToken: address(0), // Native currency
                 feeAmount: nativeFeeAmount,
                 feeRefundThreshold: 0,
@@ -1706,7 +1666,7 @@ contract CcipAdapterTest is TestWithHelpers {
 
         vm.prank(address(_mockAccountingChainGateway));
         _accountingChainCcipAdapter.publishMessageToChainWithFeePayer{value: nativeFeeAmount}(
-            EARNING_CHAIN_ID, address(_mockGho), amountGho, "", bridgeParams
+            EARNING_CHAIN_ID, address(_mockGho), amountGho, "", feePayer, bridgeParams
         );
 
         // Verify no USDT allowance was created (native fees shouldn't affect ERC20 allowances)
@@ -1811,7 +1771,6 @@ contract CcipAdapterTest is TestWithHelpers {
 
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
-                feePayer: feePayer,
                 feeToken: feeToken,
                 feeAmount: feeAmount,
                 feeRefundThreshold: feeRefundThreshold,
@@ -1850,7 +1809,7 @@ contract CcipAdapterTest is TestWithHelpers {
 
         vm.prank(address(_mockAccountingChainGateway));
         _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
-            EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "", bridgeParams
+            EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "", feePayer, bridgeParams
         );
     }
 

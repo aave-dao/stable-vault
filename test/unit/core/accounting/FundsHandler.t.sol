@@ -368,7 +368,6 @@ contract FundsHandlerTest is TestWithHelpers {
         vm.deal(address(unauthorizedMsgSender), bridgeParams_feeAmount);
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
-                feePayer: address(unauthorizedMsgSender),
                 feeToken: address(0),
                 feeAmount: bridgeParams_feeAmount,
                 feeRefundThreshold: 0,
@@ -417,7 +416,6 @@ contract FundsHandlerTest is TestWithHelpers {
 
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
-                feePayer: address(this),
                 feeToken: address(mockAsset),
                 feeAmount: bridgeParams_feeAmount,
                 feeRefundThreshold: 0,
@@ -452,7 +450,6 @@ contract FundsHandlerTest is TestWithHelpers {
 
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
-                feePayer: address(this),
                 feeToken: address(0),
                 feeAmount: bridgeParams_feeAmount,
                 feeRefundThreshold: 0,
@@ -483,7 +480,6 @@ contract FundsHandlerTest is TestWithHelpers {
 
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
-                feePayer: address(this),
                 feeToken: address(mockAsset),
                 feeAmount: bridgeParams_feeAmount,
                 feeRefundThreshold: 0,
@@ -523,7 +519,6 @@ contract FundsHandlerTest is TestWithHelpers {
 
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
-                feePayer: address(this),
                 feeToken: feeToken,
                 feeAmount: bridgeParams_feeAmount,
                 feeRefundThreshold: 0,
@@ -565,7 +560,6 @@ contract FundsHandlerTest is TestWithHelpers {
 
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
-                feePayer: unauthorizedFeePayer,
                 feeToken: address(mockAsset),
                 feeAmount: bridgeParams_feeAmount,
                 feeRefundThreshold: 0,
@@ -595,7 +589,6 @@ contract FundsHandlerTest is TestWithHelpers {
 
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
-                feePayer: address(this),
                 feeToken: address(mockAsset),
                 feeAmount: bridgeParams_feeAmount,
                 feeRefundThreshold: 0,
@@ -626,7 +619,6 @@ contract FundsHandlerTest is TestWithHelpers {
 
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
-                feePayer: address(this),
                 feeToken: address(mockAsset),
                 feeAmount: bridgeParams_feeAmount,
                 feeRefundThreshold: 0,
@@ -645,7 +637,7 @@ contract FundsHandlerTest is TestWithHelpers {
             address(mockGateway),
             abi.encodeCall(
                 MockAccountingChainGateway.sendPushFundsToChainMessage,
-                (address(mockAsset), amount, chainId, bridgeAdapter, bridgeParams)
+                (address(mockAsset), amount, chainId, bridgeAdapter, address(this), bridgeParams)
             )
         );
         fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, bridgeAdapter, bridgeParams);

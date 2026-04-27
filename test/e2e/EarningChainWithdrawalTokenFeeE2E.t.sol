@@ -114,7 +114,6 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             address(ccipAdapter_accountingChain),
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: everyRoleAccount,
                     feeToken: address(bridgeFeeToken),
                     feeAmount: bridgeFeeAmount,
                     feeRefundThreshold: 0,
@@ -399,7 +398,6 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             bridgeAdapter,
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: user,
                     feeToken: address(bridgeFeeToken),
                     feeAmount: bridgeFeeAmount,
                     feeRefundThreshold: 0,
@@ -423,7 +421,6 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             address(ccipAdapter_earningChain),
             BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
-                    feePayer: user,
                     feeToken: address(bridgeFeeToken),
                     feeAmount: bridgeFeeAmount,
                     feeRefundThreshold: 0,

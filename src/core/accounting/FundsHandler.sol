@@ -163,7 +163,7 @@ contract FundsHandler is
         _pullFundsFromImmediateLiquidity(asset, amount);
 
         IAccountingChainGateway(GATEWAY).sendPushFundsToChainMessage{value: msg.value}(
-            asset, amount, chainId, bridgeAdapter, bridgeParamsEncoded
+            asset, amount, chainId, bridgeAdapter, msg.sender, bridgeParamsEncoded
         );
     }
 

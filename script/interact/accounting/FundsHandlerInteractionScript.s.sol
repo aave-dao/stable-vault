@@ -23,20 +23,14 @@ contract FundsHandlerInteractionScript is AccountingChainBaseScript {
         uint256 amount = 234 * 10 ** 18;
         uint256 chainId = 1;
         IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
-            feePayer: address(0xC9213f6189b0f4F96Ba859c675589755178ae276),
-            feeToken: LINK,
-            feeAmount: 100000000000000000000,
-            feeRefundThreshold: 0,
-            gasLimit: 750000,
-            data: ""
+            feeToken: LINK, feeAmount: 100000000000000000000, feeRefundThreshold: 0, gasLimit: 750000, data: ""
         });
 
         uint256 key = vm.envUint("ADMIN_PRIVATE_KEY");
         vm.startBroadcast(key);
         address bridgeAdapter = address(0); // TODO: Set the whitelisted bridge adapter address.
-        IFundsHandler(FUNDS_HANDLER).pushFundsToChain(
-            token, amount, chainId, bridgeAdapter, BridgeParamsCodec.encode(bridgeParams)
-        );
+        IFundsHandler(FUNDS_HANDLER)
+            .pushFundsToChain(token, amount, chainId, bridgeAdapter, BridgeParamsCodec.encode(bridgeParams));
         vm.stopBroadcast();
     }
 }

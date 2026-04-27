@@ -225,7 +225,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
 
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
-                feePayer: from, feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 0, data: ""
+                feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 0, data: ""
             })
         );
         vm.prank(iouTokenManagerAddress);
@@ -241,6 +241,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
                 iouTokenRecipient,
                 iouTokenAmountRay,
                 bridgeAdapter,
+                from,
                 bridgeParams
             )
         );
@@ -258,7 +259,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
 
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
-                feePayer: from, feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 0, data: ""
+                feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 0, data: ""
             })
         );
 
@@ -288,7 +289,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
         uint256 destinationChainId = block.chainid;
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
-                feePayer: address(0), feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 0, data: ""
+                feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 0, data: ""
             })
         );
         vm.expectRevert(Errors.InvalidDestinationChainId.selector);
@@ -314,12 +315,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
         address feeToken = address(new MockErc20("Test USD", "TUSD", 6));
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
-                feePayer: from,
-                feeToken: feeToken,
-                feeAmount: feeAmount,
-                feeRefundThreshold: 0,
-                gasLimit: gasLimit,
-                data: data
+                feeToken: feeToken, feeAmount: feeAmount, feeRefundThreshold: 0, gasLimit: gasLimit, data: data
             })
         );
         if (feeAmount > 0) {
@@ -374,7 +370,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
 
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
-                feePayer: from, feeToken: feeToken, feeAmount: feeAmount, feeRefundThreshold: 0, gasLimit: 0, data: ""
+                feeToken: feeToken, feeAmount: feeAmount, feeRefundThreshold: 0, gasLimit: 0, data: ""
             })
         );
 
@@ -423,12 +419,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
         vm.assume(iouTokenAmountRay > 0);
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
-                feePayer: from,
-                feeToken: address(0),
-                feeAmount: feeAmount,
-                feeRefundThreshold: 0,
-                gasLimit: gasLimit,
-                data: data
+                feeToken: address(0), feeAmount: feeAmount, feeRefundThreshold: 0, gasLimit: gasLimit, data: data
             })
         );
         address feeRecipient = makeAddr("bridgeAdapter");
@@ -472,12 +463,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
         address feeToken = address(new MockErc20("Test USD", "TUSD", 6));
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
-                feePayer: forgedFeePayer,
-                feeToken: feeToken,
-                feeAmount: feeAmount,
-                feeRefundThreshold: 0,
-                gasLimit: 0,
-                data: ""
+                feeToken: feeToken, feeAmount: feeAmount, feeRefundThreshold: 0, gasLimit: 0, data: ""
             })
         );
         MockErc20(feeToken).mint(forgedFeePayer, feeAmount);
@@ -502,7 +488,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
         address iouTokenRecipient = address(0);
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
-                feePayer: from, feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 0, data: ""
+                feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 0, data: ""
             })
         );
         vm.expectRevert(Errors.InvalidParameter.selector);
@@ -518,12 +504,59 @@ contract IouTokenManagerTest_AccountingChain is Test {
         address iouTokenRecipient = makeAddr("iouTokenRecipient");
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
-                feePayer: from, feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 0, data: ""
+                feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 0, data: ""
             })
         );
         vm.expectRevert(Errors.ZeroAmount.selector);
         vm.prank(from);
         iouTokenManager.bridgeTokens(destinationChainId, iouTokenRecipient, 0, makeAddr("bridgeAdapter"), bridgeParams);
+    }
+
+    /// @notice Regression test for the cross-flow approval-theft surface that aa-eyup flagged in
+    /// `#discussion_r3144045362`. Pre-Step-1, `feePayer` was a field of the opaque `BridgeParams`
+    /// blob — any caller of any bridge entry-point could put a victim's address there and the adapter
+    /// would `safeTransferFrom(victim, ...)` against an approval the victim had given for an
+    /// unrelated bridge action. After Step 1 `feePayer` is hardcoded by the entry-point to its
+    /// `msg.sender`; the blob-supplied identity vector is structurally gone. This test pins that
+    /// property in: Eve cannot consume Alice's approval by calling `bridgeTokens` herself.
+    function test_bridgeTokens_approvalIsBoundToCaller() public {
+        address alice = makeAddr("alice");
+        address eve = makeAddr("eve");
+        address bridgeAdapter = address(MockGateway(payable(chainGateway)));
+        uint256 feeAmount = 100;
+
+        // Alice approves an ERC20 fee token to the adapter, intending to bridge later.
+        MockErc20 feeToken = new MockErc20("Fee", "F", 18);
+        feeToken.mint(alice, feeAmount);
+        vm.prank(alice);
+        IERC20(address(feeToken)).approve(bridgeAdapter, feeAmount);
+
+        // Eve mints herself enough IOU dust to have something to bridge, but does NOT approve the
+        // adapter for the fee token.
+        uint256 iouTokenAmountRay = 1;
+        vm.prank(iouTokenManagerAddress);
+        MockErc20(iouToken).mint(eve, iouTokenAmountRay);
+        vm.prank(eve);
+        IERC20(iouToken).approve(address(iouTokenManager), iouTokenAmountRay);
+
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feeToken: address(feeToken), feeAmount: feeAmount, feeRefundThreshold: 0, gasLimit: 0, data: ""
+            })
+        );
+
+        // Eve calls bridgeTokens. The entry-point hardcodes feePayer = msg.sender = Eve. The adapter
+        // does `safeTransferFrom(Eve, ...)` — Eve hasn't approved, so this reverts. Alice's approval
+        // is untouched.
+        vm.prank(eve);
+        vm.expectRevert();
+        iouTokenManager.bridgeTokens(
+            block.chainid + 1, makeAddr("recipient"), iouTokenAmountRay, bridgeAdapter, bridgeParams
+        );
+
+        // Alice's approval is still intact.
+        assertEq(IERC20(address(feeToken)).allowance(alice, bridgeAdapter), feeAmount);
+        assertEq(IERC20(address(feeToken)).balanceOf(alice), feeAmount);
     }
 
     // Getters
