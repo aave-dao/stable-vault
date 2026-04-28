@@ -102,6 +102,7 @@ contract EarningChainGateway is
         require(iouTokenAmountRay > 0, Errors.ZeroAmount());
         // An insufficient destination gasLimit would cause the BURN_IOU_TOKEN message to be dropped while
         // IOUs are already burned locally — silent IOU loss with no compensating obligation reduction.
+        // TODO: This decoding should be removed from here and should only happen at bridge adapter level
         require(
             BridgeParamsCodec.decode(bridgeParamsEncoded).gasLimit >= MIN_BURN_IOU_TOKEN_GAS_LIMIT,
             Errors.InvalidGasLimit()
