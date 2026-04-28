@@ -1,10 +1,4 @@
 {
-  "lib/Aave-Vault": {
-    "branch": {
-      "name": "feat/merkl-rewards",
-      "rev": "67395a8ac24422b0de53a3703b5409081b8576a3"
-    }
-  },
   "lib/aave-vault": {
     "branch": {
       "name": "5ab52d20b07f35a8f34e6702f2fea6797a5787eb",
