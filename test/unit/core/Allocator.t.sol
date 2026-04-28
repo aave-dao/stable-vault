@@ -3406,7 +3406,7 @@ contract AllocatorTest is TestWithHelpers {
         );
         reentrantStrategy.setReentrancyOnRedeem(true);
 
-        // Deallocate with amount=0 triggers _redeemAllFromStrategy → strategy.redeem() fires callback
+        // Deallocate with amount=0 triggers _redeemAllAvailableFromStrategy → strategy.redeem() fires callback
         IAllocator.DeallocationParams[] memory deallocations = new IAllocator.DeallocationParams[](1);
         deallocations[0] =
             IAllocator.DeallocationParams({asset: address(_mockUsdt), strategy: address(reentrantStrategy), amount: 0});

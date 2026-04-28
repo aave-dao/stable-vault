@@ -395,7 +395,7 @@ contract Allocator is
             Errors.AddressNotWhitelisted()
         );
         if (deallocation.amount == 0) {
-            _redeemAllFromStrategy(deallocation.asset, deallocation.strategy);
+            _redeemAllAvailableFromStrategy(deallocation.asset, deallocation.strategy);
         } else {
             _withdrawFromStrategy(deallocation.asset, deallocation.amount, deallocation.strategy);
         }
@@ -485,7 +485,7 @@ contract Allocator is
 
     /// @dev Intended to be the lowest level function used to redeem all shares from a strategy.
     /// @dev Not intended to be used for withdrawals from the Allocator unless higher-level function handles reverts.
-    function _redeemAllFromStrategy(address asset, address strategy) internal returns (uint256) {
+    function _redeemAllAvailableFromStrategy(address asset, address strategy) internal returns (uint256) {
         uint256 shares = IERC4626(strategy).balanceOf(address(this));
         require(shares > 0, ZeroShareBalance(strategy));
         uint256 maxRedeemable = IERC4626(strategy).maxRedeem(address(this));
