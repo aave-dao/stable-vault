@@ -27,6 +27,8 @@ jobs:
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
 
       - name: Run Forge fmt
         run: forge fmt --check
@@ -44,6 +46,8 @@ jobs:
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
 
       - name: Run Forge build
         run: forge build --deny notes
@@ -68,6 +72,8 @@ jobs:
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
 
       - name: Download build artifacts
         uses: actions/download-artifact@v4
@@ -88,6 +94,8 @@ jobs:
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
 
       - name: Download build artifacts
         uses: actions/download-artifact@v4
@@ -116,6 +124,8 @@ jobs:
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
 
       - name: Run gas tests
         run: forge test
