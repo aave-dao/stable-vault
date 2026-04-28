@@ -202,8 +202,8 @@ contract EarningChainGateway is
         uint256 amountOutRay = IWithdrawalPolicy(WITHDRAWAL_POLICY)
             .applyWithdrawalPolicy(
                 IWithdrawalPolicy.WithdrawalRequest({
-                    user: msg.sender, assetOut: assetOut, iouAmountRay: iouTokenAmountRay, data: data
-                })
+                user: msg.sender, assetOut: assetOut, iouAmountRay: iouTokenAmountRay, data: data
+            })
             );
         // Note: The rayToAssetDecimals conversion truncates, so the user may burn slightly more IOUs than the
         // exact RAY-equivalent of the assets received. This "dust" loss is at most 10^(27-decimals)-1 RAY per
