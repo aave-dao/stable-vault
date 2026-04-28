@@ -57,6 +57,10 @@ interface IAllocator {
     /// @custom:selector 0x83864c08
     error TooManyStrategies(address asset);
 
+    /// @notice Thrown when a strategy has no shares to redeem.
+    /// @custom:selector 0xdf4ff092
+    error ZeroShareBalance(address strategy);
+
     /// @notice The representation of an asset balance.
     /// @param asset Address of the asset.
     /// @param amount Amount of the asset.

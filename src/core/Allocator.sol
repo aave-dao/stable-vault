@@ -395,7 +395,7 @@ contract Allocator is
             Errors.AddressNotWhitelisted()
         );
         if (deallocation.amount == 0) {
-            _redeemAllFromStrategy(deallocation.asset, deallocation.strategy);
+            _redeemAllAvailableFromStrategy(deallocation.asset, deallocation.strategy);
         } else {
             _withdrawFromStrategy(deallocation.asset, deallocation.amount, deallocation.strategy);
         }
@@ -483,13 +483,21 @@ contract Allocator is
         return actualAmountWithdrawn;
     }
 
-    function _redeemAllFromStrategy(address asset, address strategy) internal returns (uint256) {
+    /// @dev Intended to be the lowest level function used to redeem all shares from a strategy.
+    /// @dev Not intended to be used for withdrawals from the Allocator unless higher-level function handles reverts.
+    function _redeemAllAvailableFromStrategy(address asset, address strategy) internal returns (uint256) {
         uint256 shares = IERC4626(strategy).balanceOf(address(this));
-        if (shares == 0) {
-            // Gracefully return 0 if the strategy has no shares to avoid disrupting a multi-deallocate rebalance.
-            return 0;
+        require(shares > 0, ZeroShareBalance(strategy));
+        uint256 maxRedeemable = IERC4626(strategy).maxRedeem(address(this));
+        uint256 amount;
+        if (maxRedeemable == 0) {
+            // Some ERC-4626 implementations may return 0 for `maxRedeem` to adhere to the spec rule of not reverting.
+            // Attempt to redeem all shares because the actual quantity of redeemable shares is unknown.
+            amount = IERC4626(strategy).redeem({shares: shares, receiver: address(this), owner: address(this)});
+        } else {
+            amount = IERC4626(strategy)
+                .redeem({shares: Math.min(shares, maxRedeemable), receiver: address(this), owner: address(this)});
         }
-        uint256 amount = IERC4626(strategy).redeem({shares: shares, receiver: address(this), owner: address(this)});
         emit AssetDeallocated(asset, strategy, amount);
         return amount;
     }

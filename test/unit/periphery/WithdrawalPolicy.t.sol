@@ -57,6 +57,13 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         });
     }
 
+    // Constructor tests
+
+    function test_constructor_reverts_ifWithdrawalPolicyApplierIsZeroAddress() public {
+        vm.expectRevert(Errors.ZeroAddress.selector);
+        new WithdrawalPolicy(address(0));
+    }
+
     // Restricted functions access control tests
 
     function test_setAssetFeeBps_reverts_ifMsgSenderIsNotAuthorized(
@@ -305,7 +312,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         address user,
         address assetOut,
         uint256 iouAmountRay,
-        uint256 personalFeeBps,
+        uint256 personalFeeAmountRay,
         bool isAssetFeeSet,
         uint256 assetFeeBps,
         uint256 baseFeeBps
@@ -313,12 +320,11 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         vm.assume(assetOut != address(0));
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
         assetFeeBps = bound(assetFeeBps, 0, FEE_CAP_BPS);
-        if (isAssetFeeSet) {
-            personalFeeBps = bound(personalFeeBps, 0, assetFeeBps);
-        } else {
-            personalFeeBps = bound(personalFeeBps, 0, baseFeeBps);
-        }
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        uint256 activeFeeBps = isAssetFeeSet ? assetFeeBps : baseFeeBps;
+        uint256 capRay = _capRay(iouAmountRay, activeFeeBps);
+        // Bound the signed fee at-or-below the cap so it's applied verbatim.
+        personalFeeAmountRay = bound(personalFeeAmountRay, 0, capRay);
 
         // Setup base fee
         vm.prank(admin);
@@ -338,14 +344,13 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         withdrawalPolicy.addSigner(signer);
         assertTrue(withdrawalPolicy.isSigner(signer), "Signer is not whitelisted");
 
-        // Build signed fee discount data
-        bytes memory data = _createSignedFeeDiscountData(
-            signerPk, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), DEFAULT_NONCE, DEFAULT_DEADLINE
+        // Build signed personal-fee data
+        bytes memory data = _createSignedFeeData(
+            signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, DEFAULT_DEADLINE
         );
 
-        // Fee rounds up, so expectedAmountOut rounds down
-        uint256 expectedFee = (iouAmountRay * personalFeeBps + Constants.MAX_BPS - 1) / Constants.MAX_BPS;
-        uint256 expectedAmountOut = iouAmountRay - expectedFee;
+        // Signed fee is used directly (no rounding) as long as it's at-or-below the cap.
+        uint256 expectedAmountOut = iouAmountRay - personalFeeAmountRay;
 
         IWithdrawalPolicy.WithdrawalRequest memory request = _buildRequest(user, assetOut, iouAmountRay, data);
 
@@ -389,7 +394,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         address user = makeAddr("user");
         address assetOut = makeAddr("assetOut");
         uint256 iouAmountRay = 1000e27;
-        uint16 personalFeeBps = 0;
+        uint256 personalFeeAmountRay = 0;
         uint16 baseFeeBps = 5_00;
 
         vm.prank(admin);
@@ -399,8 +404,8 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         vm.prank(admin);
         withdrawalPolicy.addSigner(signer);
 
-        bytes memory data = _createSignedFeeDiscountData(
-            signerPk, user, assetOut, iouAmountRay, personalFeeBps, DEFAULT_NONCE, DEFAULT_DEADLINE
+        bytes memory data = _createSignedFeeData(
+            signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, DEFAULT_DEADLINE
         );
         IWithdrawalPolicy.WithdrawalRequest memory request = _buildRequest(user, assetOut, iouAmountRay, data);
 
@@ -415,11 +420,11 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         assertTrue(withdrawalPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Apply should consume nonce");
     }
 
-    function test_applyWithdrawalPolicy_usesLowerFeeWhenPersonalFeeExceedsOtherFees(
+    function test_applyWithdrawalPolicy_clampsSignedFeeToAssetCap(
         address user,
         address assetOut,
         uint256 iouAmountRay,
-        uint256 personalFeeBps,
+        uint256 personalFeeAmountRay,
         bool isAssetFeeSet,
         uint256 assetFeeBps,
         uint256 baseFeeBps
@@ -427,9 +432,11 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         vm.assume(assetOut != address(0));
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
         assetFeeBps = bound(assetFeeBps, 0, FEE_CAP_BPS);
-        uint256 fallbackFeeBps = isAssetFeeSet ? assetFeeBps : baseFeeBps;
-        uint16 personalFeeBps16 = uint16(bound(personalFeeBps, fallbackFeeBps + 1, type(uint16).max));
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        uint256 activeFeeBps = isAssetFeeSet ? assetFeeBps : baseFeeBps;
+        uint256 capRay = _capRay(iouAmountRay, activeFeeBps);
+        // Bound the signed fee strictly above the cap so the contract must clamp it.
+        personalFeeAmountRay = bound(personalFeeAmountRay, capRay + 1, type(uint256).max);
 
         // Setup base fee
         vm.prank(admin);
@@ -449,23 +456,21 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         withdrawalPolicy.addSigner(signer);
         assertTrue(withdrawalPolicy.isSigner(signer), "Signer is not whitelisted");
 
-        // Build signed fee discount data
-        bytes memory data = _createSignedFeeDiscountData(
-            signerPk, user, assetOut, iouAmountRay, personalFeeBps16, DEFAULT_NONCE, DEFAULT_DEADLINE
+        bytes memory data = _createSignedFeeData(
+            signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, DEFAULT_DEADLINE
         );
 
-        uint256 expectedFee = (iouAmountRay * fallbackFeeBps + Constants.MAX_BPS - 1) / Constants.MAX_BPS;
-        uint256 expectedAmountOut = iouAmountRay - expectedFee;
+        uint256 expectedAmountOut = iouAmountRay - capRay;
 
         IWithdrawalPolicy.WithdrawalRequest memory request = _buildRequest(user, assetOut, iouAmountRay, data);
 
         assertFalse(withdrawalPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Nonce should not be used before preview");
         uint256 previewAmountOut = withdrawalPolicy.previewWithdrawalPolicy(request);
-        assertEq(previewAmountOut, expectedAmountOut, "Preview should apply lower fee");
+        assertEq(previewAmountOut, expectedAmountOut, "Preview should clamp to asset cap");
         assertFalse(withdrawalPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Preview should NOT consume nonce");
 
         uint256 actualAmountOut = withdrawalPolicy.applyWithdrawalPolicy(request);
-        assertEq(actualAmountOut, expectedAmountOut, "Apply should apply lower fee");
+        assertEq(actualAmountOut, expectedAmountOut, "Apply should clamp to asset cap");
         assertTrue(withdrawalPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Apply should consume nonce");
     }
 
@@ -473,7 +478,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         address user,
         address assetOut,
         uint256 iouAmountRay,
-        uint256 personalFeeBps,
+        uint256 personalFeeAmountRay,
         uint256 baseFeeBps,
         uint256 nonWhitelistedSignerPk
     ) public {
@@ -484,23 +489,17 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         vm.assume(withdrawalPolicy.isSigner(nonWhitelistedSigner) == false);
 
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
-        personalFeeBps = bound(personalFeeBps, 0, baseFeeBps);
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        personalFeeAmountRay = bound(personalFeeAmountRay, 0, _capRay(iouAmountRay, baseFeeBps));
 
         // Setup base fee
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
         withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
-        // Build signed fee discount data with non-whitelisted signer
-        bytes memory data = _createSignedFeeDiscountData(
-            nonWhitelistedSignerPk,
-            user,
-            assetOut,
-            iouAmountRay,
-            _toUint16(personalFeeBps),
-            DEFAULT_NONCE,
-            DEFAULT_DEADLINE
+        // Build signed personal-fee data with non-whitelisted signer
+        bytes memory data = _createSignedFeeData(
+            nonWhitelistedSignerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, DEFAULT_DEADLINE
         );
 
         vm.expectRevert(IWithdrawalPolicy.InvalidSignature.selector);
@@ -512,13 +511,13 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         address wrongUser,
         address assetOut,
         uint256 iouAmountRay,
-        uint256 personalFeeBps,
+        uint256 personalFeeAmountRay,
         uint256 baseFeeBps
     ) public {
         vm.assume(user != wrongUser);
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
-        personalFeeBps = bound(personalFeeBps, 0, baseFeeBps);
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        personalFeeAmountRay = bound(personalFeeAmountRay, 0, _capRay(iouAmountRay, baseFeeBps));
 
         // Setup base fee
         vm.prank(admin);
@@ -530,9 +529,9 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         vm.prank(admin);
         withdrawalPolicy.addSigner(signer);
 
-        // Build signed fee discount data for WRONG user
-        bytes memory data = _createSignedFeeDiscountData(
-            signerPk, wrongUser, assetOut, iouAmountRay, _toUint16(personalFeeBps), DEFAULT_NONCE, DEFAULT_DEADLINE
+        // Build signed personal-fee data for WRONG user
+        bytes memory data = _createSignedFeeData(
+            signerPk, wrongUser, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, DEFAULT_DEADLINE
         );
 
         vm.expectRevert(IWithdrawalPolicy.InvalidSignature.selector);
@@ -544,13 +543,13 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         address assetOut,
         address wrongAssetOut,
         uint256 iouAmountRay,
-        uint256 personalFeeBps,
+        uint256 personalFeeAmountRay,
         uint256 baseFeeBps
     ) public {
         vm.assume(assetOut != wrongAssetOut);
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
-        personalFeeBps = bound(personalFeeBps, 0, baseFeeBps);
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        personalFeeAmountRay = bound(personalFeeAmountRay, 0, _capRay(iouAmountRay, baseFeeBps));
 
         // Setup base fee
         vm.prank(admin);
@@ -562,9 +561,9 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         vm.prank(admin);
         withdrawalPolicy.addSigner(signer);
 
-        // Build signed fee discount data for WRONG asset
-        bytes memory data = _createSignedFeeDiscountData(
-            signerPk, user, wrongAssetOut, iouAmountRay, _toUint16(personalFeeBps), DEFAULT_NONCE, DEFAULT_DEADLINE
+        // Build signed personal-fee data for WRONG asset
+        bytes memory data = _createSignedFeeData(
+            signerPk, user, wrongAssetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, DEFAULT_DEADLINE
         );
 
         vm.expectRevert(IWithdrawalPolicy.InvalidSignature.selector);
@@ -576,15 +575,15 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         address assetOut,
         uint256 iouAmountRay,
         uint256 wrongIouAmountRay,
-        uint256 personalFeeBps,
+        uint256 personalFeeAmountRay,
         uint256 baseFeeBps
     ) public {
         vm.assume(iouAmountRay != wrongIouAmountRay);
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
-        personalFeeBps = bound(personalFeeBps, 0, baseFeeBps);
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
         wrongIouAmountRay = bound(wrongIouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
         vm.assume(iouAmountRay != wrongIouAmountRay);
+        personalFeeAmountRay = bound(personalFeeAmountRay, 0, _capRay(iouAmountRay, baseFeeBps));
 
         // Setup base fee
         vm.prank(admin);
@@ -596,9 +595,9 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         vm.prank(admin);
         withdrawalPolicy.addSigner(signer);
 
-        // Build signed fee discount data for WRONG amount
-        bytes memory data = _createSignedFeeDiscountData(
-            signerPk, user, assetOut, wrongIouAmountRay, _toUint16(personalFeeBps), DEFAULT_NONCE, DEFAULT_DEADLINE
+        // Build signed personal-fee data for WRONG amount
+        bytes memory data = _createSignedFeeData(
+            signerPk, user, assetOut, wrongIouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, DEFAULT_DEADLINE
         );
 
         vm.expectRevert(IWithdrawalPolicy.InvalidSignature.selector);
@@ -609,16 +608,16 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         address user,
         address assetOut,
         uint256 iouAmountRay,
-        uint256 personalFeeBps,
-        uint256 wrongPersonalFeeBps,
+        uint256 personalFeeAmountRay,
+        uint256 wrongPersonalFeeAmountRay,
         uint256 baseFeeBps
     ) public {
-        vm.assume(personalFeeBps != wrongPersonalFeeBps);
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
-        personalFeeBps = bound(personalFeeBps, 0, baseFeeBps);
-        wrongPersonalFeeBps = bound(wrongPersonalFeeBps, 0, baseFeeBps);
-        vm.assume(personalFeeBps != wrongPersonalFeeBps);
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        uint256 capRay = _capRay(iouAmountRay, baseFeeBps);
+        personalFeeAmountRay = bound(personalFeeAmountRay, 0, capRay);
+        wrongPersonalFeeAmountRay = bound(wrongPersonalFeeAmountRay, 0, capRay);
+        vm.assume(personalFeeAmountRay != wrongPersonalFeeAmountRay);
 
         // Setup base fee
         vm.prank(admin);
@@ -630,14 +629,14 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         vm.prank(admin);
         withdrawalPolicy.addSigner(signer);
 
-        // Create data with the CORRECT personalFeeBps but signature for WRONG personalFeeBps
-        bytes memory wrongData = _createSignedFeeDiscountDataWithMismatch(
+        // Create data with the CORRECT personalFeeAmountRay claimed but signature for a different ray amount
+        bytes memory wrongData = _createSignedFeeDataWithMismatch(
             signerPk,
             user,
             assetOut,
             iouAmountRay,
-            _toUint16(personalFeeBps), // claimed in data
-            _toUint16(wrongPersonalFeeBps), // signed
+            personalFeeAmountRay, // claimed in data
+            wrongPersonalFeeAmountRay, // signed
             DEFAULT_NONCE,
             DEFAULT_DEADLINE
         );
@@ -650,14 +649,14 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         address user,
         address assetOut,
         uint256 iouAmountRay,
-        uint256 personalFeeBps,
+        uint256 personalFeeAmountRay,
         uint256 baseFeeBps,
         bytes memory malformedSignature
     ) public {
         vm.assume(malformedSignature.length != 65);
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
-        personalFeeBps = bound(personalFeeBps, 0, baseFeeBps);
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        personalFeeAmountRay = bound(personalFeeAmountRay, 0, _capRay(iouAmountRay, baseFeeBps));
 
         // Setup base fee
         vm.prank(admin);
@@ -669,10 +668,10 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         vm.prank(admin);
         withdrawalPolicy.addSigner(signer);
 
-        // Manually encode SignedFeeDiscount with malformed signature
+        // Manually encode SignedFee with malformed signature
         bytes memory data = abi.encode(
-            WithdrawalPolicy.SignedFeeDiscount({
-                personalFeeBps: _toUint16(personalFeeBps),
+            WithdrawalPolicy.SignedFee({
+                personalFeeAmountRay: personalFeeAmountRay,
                 nonce: DEFAULT_NONCE,
                 deadline: DEFAULT_DEADLINE,
                 signature: malformedSignature
@@ -687,7 +686,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         address user = makeAddr("user");
         address assetOut = makeAddr("assetOut");
         uint256 iouAmountRay = 1000e27;
-        uint16 personalFeeBps = 0;
+        uint256 personalFeeAmountRay = 0;
         uint16 baseFeeBps = 5_00;
 
         vm.prank(admin);
@@ -699,8 +698,8 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         // Create signature with expired deadline
         uint256 expiredDeadline = block.timestamp - 1;
-        bytes memory data = _createSignedFeeDiscountData(
-            signerPk, user, assetOut, iouAmountRay, personalFeeBps, DEFAULT_NONCE, expiredDeadline
+        bytes memory data = _createSignedFeeData(
+            signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, expiredDeadline
         );
 
         IWithdrawalPolicy.WithdrawalRequest memory request = _buildRequest(user, assetOut, iouAmountRay, data);
@@ -720,7 +719,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         address user = makeAddr("user");
         address assetOut = makeAddr("assetOut");
         uint256 iouAmountRay = 1000e27;
-        uint16 personalFeeBps = 2_50; // 2.5% fee
+        uint256 personalFeeAmountRay = 25e27; // 2.5% of iouAmountRay, within 5% base-fee cap
         uint16 baseFeeBps = 5_00; // 5% base fee
 
         vm.prank(admin);
@@ -730,8 +729,8 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         vm.prank(admin);
         withdrawalPolicy.addSigner(signer);
 
-        bytes memory data = _createSignedFeeDiscountData(
-            signerPk, user, assetOut, iouAmountRay, personalFeeBps, DEFAULT_NONCE, DEFAULT_DEADLINE
+        bytes memory data = _createSignedFeeData(
+            signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, DEFAULT_DEADLINE
         );
 
         IWithdrawalPolicy.WithdrawalRequest memory request = _buildRequest(user, assetOut, iouAmountRay, data);
@@ -762,7 +761,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         address user = makeAddr("user");
         address assetOut = makeAddr("assetOut");
         uint256 iouAmountRay = 1000e27; // 1000 tokens in RAY
-        uint16 personalFeeBps = 0; // 0% fee (waiver)
+        uint256 personalFeeAmountRay = 0; // 0 fee (waiver)
         uint16 baseFeeBps = 5_00; // 5% base fee
 
         // Setup: Configure base fee and whitelist signer
@@ -774,8 +773,8 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         withdrawalPolicy.addSigner(signer);
 
         // Create signature for personal fee waiver
-        bytes memory data = _createSignedFeeDiscountData(
-            signerPk, user, assetOut, iouAmountRay, personalFeeBps, DEFAULT_NONCE, DEFAULT_DEADLINE
+        bytes memory data = _createSignedFeeData(
+            signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, DEFAULT_DEADLINE
         );
 
         // First use: Should succeed and return full amount (0% fee)
@@ -860,13 +859,13 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         address user,
         address assetOut,
         uint256 iouAmountRay,
-        uint256 personalFeeBps,
+        uint256 personalFeeAmountRay,
         uint256 baseFeeBps,
         uint256 nonce
     ) public {
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
-        personalFeeBps = bound(personalFeeBps, 0, baseFeeBps);
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        personalFeeAmountRay = bound(personalFeeAmountRay, 0, _capRay(iouAmountRay, baseFeeBps));
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
@@ -876,9 +875,8 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         vm.prank(admin);
         withdrawalPolicy.addSigner(signer);
 
-        bytes memory data = _createSignedFeeDiscountData(
-            signerPk, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), nonce, DEFAULT_DEADLINE
-        );
+        bytes memory data =
+            _createSignedFeeData(signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, nonce, DEFAULT_DEADLINE);
 
         // Signer invalidates the nonce before it's used
         vm.prank(signer);
@@ -893,13 +891,13 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         address user,
         address assetOut,
         uint256 iouAmountRay,
-        uint256 personalFeeBps,
+        uint256 personalFeeAmountRay,
         uint256 baseFeeBps,
         uint256 nonce
     ) public {
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
-        personalFeeBps = bound(personalFeeBps, 0, baseFeeBps);
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        personalFeeAmountRay = bound(personalFeeAmountRay, 0, _capRay(iouAmountRay, baseFeeBps));
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
@@ -909,9 +907,8 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         vm.prank(admin);
         withdrawalPolicy.addSigner(signer);
 
-        bytes memory data = _createSignedFeeDiscountData(
-            signerPk, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), nonce, DEFAULT_DEADLINE
-        );
+        bytes memory data =
+            _createSignedFeeData(signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, nonce, DEFAULT_DEADLINE);
 
         // Signer invalidates the nonce before it's used
         vm.prank(signer);
@@ -928,7 +925,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         address user = makeAddr("user");
         address assetOut = makeAddr("assetOut");
         uint256 iouAmountRay = 1000e27;
-        uint16 personalFeeBps = 2_50;
+        uint256 personalFeeAmountRay = 25e27; // 2.5% of iou, within 5% base-fee cap
         uint16 baseFeeBps = 5_00;
 
         vm.prank(admin);
@@ -940,9 +937,8 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         // Deadline exactly at current timestamp should work
         uint256 deadline = block.timestamp;
-        bytes memory data = _createSignedFeeDiscountData(
-            signerPk, user, assetOut, iouAmountRay, personalFeeBps, DEFAULT_NONCE, deadline
-        );
+        bytes memory data =
+            _createSignedFeeData(signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, deadline);
 
         // Should succeed
         uint256 amountOut = withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
@@ -953,13 +949,13 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         address user,
         address assetOut,
         uint256 iouAmountRay,
-        uint256 personalFeeBps,
+        uint256 personalFeeAmountRay,
         uint256 baseFeeBps,
         uint256 deadlineOffset
     ) public {
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
-        personalFeeBps = bound(personalFeeBps, 0, baseFeeBps);
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        personalFeeAmountRay = bound(personalFeeAmountRay, 0, _capRay(iouAmountRay, baseFeeBps));
         deadlineOffset = bound(deadlineOffset, 1, 365 days);
 
         vm.prank(admin);
@@ -972,14 +968,12 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         // Deadline in the future should work
         uint256 deadline = block.timestamp + deadlineOffset;
-        bytes memory data = _createSignedFeeDiscountData(
-            signerPk, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), DEFAULT_NONCE, deadline
-        );
+        bytes memory data =
+            _createSignedFeeData(signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, deadline);
 
-        // Should succeed
+        // Should succeed — signed fee is at-or-below cap so it's charged verbatim.
         uint256 amountOut = withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
-        uint256 expectedFee = (iouAmountRay * personalFeeBps + Constants.MAX_BPS - 1) / Constants.MAX_BPS;
-        assertEq(amountOut, iouAmountRay - expectedFee, "Should return correct amount");
+        assertEq(amountOut, iouAmountRay - personalFeeAmountRay, "Should return correct amount");
     }
 
     // Nonce Tests
@@ -988,15 +982,15 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         address user,
         address assetOut,
         uint256 iouAmountRay,
-        uint256 personalFeeBps,
+        uint256 personalFeeAmountRay,
         uint256 baseFeeBps,
         uint256 nonce1,
         uint256 nonce2,
         uint256 nonce3
     ) public {
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
-        personalFeeBps = bound(personalFeeBps, 0, baseFeeBps);
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        personalFeeAmountRay = bound(personalFeeAmountRay, 0, _capRay(iouAmountRay, baseFeeBps));
         vm.assume(nonce1 != nonce2 && nonce2 != nonce3 && nonce1 != nonce3);
 
         vm.prank(admin);
@@ -1008,22 +1002,22 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         withdrawalPolicy.addSigner(signer);
 
         // First signature with nonce1
-        bytes memory data1 = _createSignedFeeDiscountData(
-            signerPk, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), nonce1, DEFAULT_DEADLINE
+        bytes memory data1 = _createSignedFeeData(
+            signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, nonce1, DEFAULT_DEADLINE
         );
         withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data1));
         assertTrue(withdrawalPolicy.wasNonceUsed(signer, nonce1), "Nonce1 should be used");
 
         // Second signature with nonce2 should also work
-        bytes memory data2 = _createSignedFeeDiscountData(
-            signerPk, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), nonce2, DEFAULT_DEADLINE
+        bytes memory data2 = _createSignedFeeData(
+            signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, nonce2, DEFAULT_DEADLINE
         );
         withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data2));
         assertTrue(withdrawalPolicy.wasNonceUsed(signer, nonce2), "Nonce2 should be used");
 
         // Third signature with nonce3 should also work
-        bytes memory data3 = _createSignedFeeDiscountData(
-            signerPk, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), nonce3, DEFAULT_DEADLINE
+        bytes memory data3 = _createSignedFeeData(
+            signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, nonce3, DEFAULT_DEADLINE
         );
         withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data3));
         assertTrue(withdrawalPolicy.wasNonceUsed(signer, nonce3), "Nonce3 should be used");
@@ -1033,7 +1027,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         address user = makeAddr("user");
         address assetOut = makeAddr("assetOut");
         uint256 iouAmountRay = 1000e27;
-        uint16 personalFeeBps = 2_50;
+        uint256 personalFeeAmountRay = 25e27; // within 5% base-fee cap
         uint16 baseFeeBps = 5_00;
 
         vm.prank(admin);
@@ -1045,8 +1039,8 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         // Nonce 0 should be valid
         uint256 nonceZero = 0;
-        bytes memory data = _createSignedFeeDiscountData(
-            signerPk, user, assetOut, iouAmountRay, personalFeeBps, nonceZero, DEFAULT_DEADLINE
+        bytes memory data = _createSignedFeeData(
+            signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, nonceZero, DEFAULT_DEADLINE
         );
 
         assertFalse(withdrawalPolicy.wasNonceUsed(signer, nonceZero), "Nonce 0 should not be used initially");
@@ -1060,13 +1054,13 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         address user,
         address assetOut,
         uint256 iouAmountRay,
-        uint256 personalFeeBps,
+        uint256 personalFeeAmountRay,
         uint256 baseFeeBps,
         uint256 sharedNonce
     ) public {
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
-        personalFeeBps = bound(personalFeeBps, 0, baseFeeBps);
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        personalFeeAmountRay = bound(personalFeeAmountRay, 0, _capRay(iouAmountRay, baseFeeBps));
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
@@ -1080,16 +1074,16 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         withdrawalPolicy.addSigner(signer2);
 
         // Signer1 uses the shared nonce
-        bytes memory data1 = _createSignedFeeDiscountData(
-            signerPk1, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), sharedNonce, DEFAULT_DEADLINE
+        bytes memory data1 = _createSignedFeeData(
+            signerPk1, user, assetOut, iouAmountRay, personalFeeAmountRay, sharedNonce, DEFAULT_DEADLINE
         );
         withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data1));
         assertTrue(withdrawalPolicy.wasNonceUsed(signer1, sharedNonce), "Signer1 nonce should be used");
         assertFalse(withdrawalPolicy.wasNonceUsed(signer2, sharedNonce), "Signer2 nonce should not be used yet");
 
         // Signer2 can also use the same nonce
-        bytes memory data2 = _createSignedFeeDiscountData(
-            signerPk2, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), sharedNonce, DEFAULT_DEADLINE
+        bytes memory data2 = _createSignedFeeData(
+            signerPk2, user, assetOut, iouAmountRay, personalFeeAmountRay, sharedNonce, DEFAULT_DEADLINE
         );
         withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data2));
         assertTrue(withdrawalPolicy.wasNonceUsed(signer2, sharedNonce), "Signer2 nonce should now be used");
@@ -1101,12 +1095,12 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         address user,
         address assetOut,
         uint256 iouAmountRay,
-        uint256 personalFeeBps,
+        uint256 personalFeeAmountRay,
         uint256 baseFeeBps
     ) public {
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
-        personalFeeBps = bound(personalFeeBps, 0, baseFeeBps);
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        personalFeeAmountRay = bound(personalFeeAmountRay, 0, _capRay(iouAmountRay, baseFeeBps));
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
@@ -1116,8 +1110,8 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         vm.prank(admin);
         withdrawalPolicy.addSigner(signer);
 
-        bytes memory data = _createSignedFeeDiscountData(
-            signerPk, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), DEFAULT_NONCE, DEFAULT_DEADLINE
+        bytes memory data = _createSignedFeeData(
+            signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, DEFAULT_DEADLINE
         );
 
         // Remove the signer
@@ -1134,12 +1128,12 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         address user,
         address assetOut,
         uint256 iouAmountRay,
-        uint256 personalFeeBps,
+        uint256 personalFeeAmountRay,
         uint256 baseFeeBps
     ) public {
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
-        personalFeeBps = bound(personalFeeBps, 0, baseFeeBps);
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        personalFeeAmountRay = bound(personalFeeAmountRay, 0, _capRay(iouAmountRay, baseFeeBps));
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
@@ -1149,8 +1143,8 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         vm.prank(admin);
         withdrawalPolicy.addSigner(signer);
 
-        bytes memory data = _createSignedFeeDiscountData(
-            signerPk, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), DEFAULT_NONCE, DEFAULT_DEADLINE
+        bytes memory data = _createSignedFeeData(
+            signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, DEFAULT_DEADLINE
         );
 
         // Remove the signer
@@ -1166,12 +1160,12 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         address user,
         address assetOut,
         uint256 iouAmountRay,
-        uint256 personalFeeBps,
+        uint256 personalFeeAmountRay,
         uint256 baseFeeBps
     ) public {
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
-        personalFeeBps = bound(personalFeeBps, 0, baseFeeBps);
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        personalFeeAmountRay = bound(personalFeeAmountRay, 0, _capRay(iouAmountRay, baseFeeBps));
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
@@ -1181,16 +1175,15 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         vm.prank(admin);
         withdrawalPolicy.addSigner(signer);
 
-        bytes memory data = _createSignedFeeDiscountData(
-            signerPk, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), DEFAULT_NONCE, DEFAULT_DEADLINE
+        bytes memory data = _createSignedFeeData(
+            signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, DEFAULT_DEADLINE
         );
 
         IWithdrawalPolicy.WithdrawalRequest memory request = _buildRequest(user, assetOut, iouAmountRay, data);
 
-        // Preview works while signer is whitelisted
+        // Preview works while signer is whitelisted — signed fee at-or-below cap is charged verbatim.
         uint256 previewAmount = withdrawalPolicy.previewWithdrawalPolicy(request);
-        uint256 expectedFee = (iouAmountRay * personalFeeBps + Constants.MAX_BPS - 1) / Constants.MAX_BPS;
-        assertEq(previewAmount, iouAmountRay - expectedFee, "Preview should return correct amount");
+        assertEq(previewAmount, iouAmountRay - personalFeeAmountRay, "Preview should return correct amount");
 
         // Remove the signer
         vm.prank(admin);
@@ -1205,12 +1198,12 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         address user,
         address assetOut,
         uint256 iouAmountRay,
-        uint256 personalFeeBps,
+        uint256 personalFeeAmountRay,
         uint256 baseFeeBps
     ) public {
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
-        personalFeeBps = bound(personalFeeBps, 0, baseFeeBps);
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        personalFeeAmountRay = bound(personalFeeAmountRay, 0, _capRay(iouAmountRay, baseFeeBps));
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
@@ -1220,8 +1213,8 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         vm.prank(admin);
         withdrawalPolicy.addSigner(signer);
 
-        bytes memory data = _createSignedFeeDiscountData(
-            signerPk, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), DEFAULT_NONCE, DEFAULT_DEADLINE
+        bytes memory data = _createSignedFeeData(
+            signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, DEFAULT_DEADLINE
         );
 
         // Remove the signer
@@ -1238,20 +1231,19 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         // Apply should now succeed
         uint256 amountOut = withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
-        uint256 expectedFee = (iouAmountRay * personalFeeBps + Constants.MAX_BPS - 1) / Constants.MAX_BPS;
-        assertEq(amountOut, iouAmountRay - expectedFee, "Should return correct amount after signer re-added");
+        assertEq(amountOut, iouAmountRay - personalFeeAmountRay, "Should return correct amount after signer re-added");
     }
 
     function test_applyWithdrawalPolicy_otherSignersUnaffectedWhenOneRemoved(
         address user,
         address assetOut,
         uint256 iouAmountRay,
-        uint256 personalFeeBps,
+        uint256 personalFeeAmountRay,
         uint256 baseFeeBps
     ) public {
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
-        personalFeeBps = bound(personalFeeBps, 0, baseFeeBps);
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        personalFeeAmountRay = bound(personalFeeAmountRay, 0, _capRay(iouAmountRay, baseFeeBps));
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
@@ -1264,12 +1256,10 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         vm.prank(admin);
         withdrawalPolicy.addSigner(signer2);
 
-        bytes memory data1 = _createSignedFeeDiscountData(
-            signerPk1, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), 1, DEFAULT_DEADLINE
-        );
-        bytes memory data2 = _createSignedFeeDiscountData(
-            signerPk2, user, assetOut, iouAmountRay, _toUint16(personalFeeBps), 1, DEFAULT_DEADLINE
-        );
+        bytes memory data1 =
+            _createSignedFeeData(signerPk1, user, assetOut, iouAmountRay, personalFeeAmountRay, 1, DEFAULT_DEADLINE);
+        bytes memory data2 =
+            _createSignedFeeData(signerPk2, user, assetOut, iouAmountRay, personalFeeAmountRay, 1, DEFAULT_DEADLINE);
 
         // Remove signer1
         vm.prank(admin);
@@ -1281,8 +1271,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         // Signer2's signature should still work
         uint256 amountOut = withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data2));
-        uint256 expectedFee = (iouAmountRay * personalFeeBps + Constants.MAX_BPS - 1) / Constants.MAX_BPS;
-        assertEq(amountOut, iouAmountRay - expectedFee, "Signer2 signature should still work");
+        assertEq(amountOut, iouAmountRay - personalFeeAmountRay, "Signer2 signature should still work");
     }
 
     function test_invalidateNonce_reverts_ifSignerWasRemoved(uint256 nonce1, uint256 nonce2) public {
@@ -1307,82 +1296,226 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         withdrawalPolicy.invalidateNonce(signer, nonce2);
     }
 
-    // Helper to safely cast personalFeeBps to uint16 (safe because it's always bounded to MAX_BPS = 10000)
-    function _toUint16(uint256 value) internal pure returns (uint16) {
+    /// @notice Invariant: the fee charged to the user is never more than the asset-bp cap applied to iouAmountRay
+    /// (rounded up). Holds for any signed ray amount, including values far above the cap.
+    function test_chargedFeeNeverExceedsAssetCap(
+        address user,
+        address assetOut,
+        uint256 iouAmountRay,
+        uint256 personalFeeAmountRay,
+        uint256 assetFeeBps
+    ) public {
+        vm.assume(assetOut != address(0));
+        assetFeeBps = bound(assetFeeBps, 0, FEE_CAP_BPS);
+        iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+
+        vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        return uint16(value);
+        withdrawalPolicy.setAssetFeeBps(assetOut, uint16(assetFeeBps), true);
+
+        (address signer, uint256 signerPk) = makeAddrAndKey("signer");
+        vm.prank(admin);
+        withdrawalPolicy.addSigner(signer);
+
+        bytes memory data = _createSignedFeeData(
+            signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, DEFAULT_DEADLINE
+        );
+
+        uint256 amountOut = withdrawalPolicy.previewWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
+        uint256 chargedFee = iouAmountRay - amountOut;
+
+        assertLe(chargedFee, _capRay(iouAmountRay, assetFeeBps), "Charged fee must not exceed asset-bp cap");
     }
 
-    // Helper to create signed fee discount data
-    function _createSignedFeeDiscountData(
+    function test_chargedFeeAtCapMatchesLegacyBpsRounding(
+        address user,
+        address assetOut,
+        uint256 iouAmountRay,
+        uint256 signedBps,
+        uint256 assetFeeBps
+    ) public {
+        vm.assume(assetOut != address(0));
+        assetFeeBps = bound(assetFeeBps, 0, FEE_CAP_BPS);
+        signedBps = bound(signedBps, 0, assetFeeBps);
+        iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+
+        vm.prank(admin);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        withdrawalPolicy.setAssetFeeBps(assetOut, uint16(assetFeeBps), true);
+
+        (address signer, uint256 signerPk) = makeAddrAndKey("signer");
+        vm.prank(admin);
+        withdrawalPolicy.addSigner(signer);
+
+        uint256 personalFeeAmountRay = _capRay(iouAmountRay, signedBps);
+        bytes memory data = _createSignedFeeData(
+            signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, DEFAULT_DEADLINE
+        );
+
+        uint256 amountOut = withdrawalPolicy.previewWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
+        assertEq(
+            iouAmountRay - amountOut,
+            _capRay(iouAmountRay, signedBps),
+            "Charged fee must match legacy bps-based rounding"
+        );
+    }
+
+    /// @notice When the asset bp limit is 0, any signed ray amount must be clamped to 0 (no fee charged).
+    function test_zeroAssetFeeClampsSignedAmountToZero(
+        address user,
+        address assetOut,
+        uint256 iouAmountRay,
+        uint256 personalFeeAmountRay
+    ) public {
+        vm.assume(assetOut != address(0));
+        iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+
+        vm.prank(admin);
+        withdrawalPolicy.setDefaultFeeBps(0);
+        vm.prank(admin);
+        withdrawalPolicy.setAssetFeeBps(assetOut, 0, true);
+
+        (address signer, uint256 signerPk) = makeAddrAndKey("signer");
+        vm.prank(admin);
+        withdrawalPolicy.addSigner(signer);
+
+        bytes memory data = _createSignedFeeData(
+            signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, DEFAULT_DEADLINE
+        );
+
+        uint256 amountOut = withdrawalPolicy.previewWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
+        assertEq(amountOut, iouAmountRay, "No fee may be charged when asset bp is 0");
+    }
+
+    function test_oneWeiAboveCapIsClampedToCap(
+        address user,
+        address assetOut,
+        uint256 iouAmountRay,
+        uint256 assetFeeBps
+    ) public {
+        vm.assume(assetOut != address(0));
+        assetFeeBps = bound(assetFeeBps, 0, FEE_CAP_BPS);
+        iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        uint256 capRay = _capRay(iouAmountRay, assetFeeBps);
+        vm.assume(capRay < type(uint256).max);
+
+        vm.prank(admin);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        withdrawalPolicy.setAssetFeeBps(assetOut, uint16(assetFeeBps), true);
+
+        (address signer, uint256 signerPk) = makeAddrAndKey("signer");
+        vm.prank(admin);
+        withdrawalPolicy.addSigner(signer);
+
+        bytes memory data =
+            _createSignedFeeData(signerPk, user, assetOut, iouAmountRay, capRay + 1, DEFAULT_NONCE, DEFAULT_DEADLINE);
+
+        uint256 amountOut = withdrawalPolicy.previewWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
+        assertEq(amountOut, iouAmountRay - capRay, "One wei above cap must clamp to cap");
+    }
+
+    /// @notice Rounding direction: the asset cap is always the ceil of (iou * feeBps / MAX_BPS), so the protocol is
+    /// never short-changed even when the division is not exact. No signed data is supplied, exercising the fallback.
+    function test_fuzz_capRoundsUpInFavorOfProtocol(
+        address user,
+        address assetOut,
+        uint256 iouAmountRay,
+        uint256 assetFeeBps
+    ) public {
+        vm.assume(assetOut != address(0));
+        assetFeeBps = bound(assetFeeBps, 1, FEE_CAP_BPS);
+        iouAmountRay = bound(iouAmountRay, 1, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+
+        vm.prank(admin);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        withdrawalPolicy.setAssetFeeBps(assetOut, uint16(assetFeeBps), true);
+
+        uint256 amountOut = withdrawalPolicy.previewWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, ""));
+        uint256 chargedFee = iouAmountRay - amountOut;
+
+        uint256 floor = (iouAmountRay * assetFeeBps) / Constants.MAX_BPS;
+        uint256 ceil = (iouAmountRay * assetFeeBps + Constants.MAX_BPS - 1) / Constants.MAX_BPS;
+        assertEq(chargedFee, ceil, "Cap must round up");
+        assertGe(chargedFee, floor, "Cap must never round below floor");
+    }
+
+    // Computes the asset-cap ray amount for a given iou amount and bp limit (rounds up, matching protocol).
+    function _capRay(uint256 iouAmountRay, uint256 feeBps) internal pure returns (uint256) {
+        return (iouAmountRay * feeBps + Constants.MAX_BPS - 1) / Constants.MAX_BPS;
+    }
+
+    // Helper to create signed personal-fee data
+    function _createSignedFeeData(
         uint256 signerPk,
         address user,
         address assetOut,
         uint256 iouAmountRay,
-        uint16 personalFeeBps,
+        uint256 personalFeeAmountRay,
         uint256 nonce,
         uint256 deadline
     ) internal view returns (bytes memory) {
-        bytes memory signature =
-            _signFeeDiscount(signerPk, user, assetOut, iouAmountRay, personalFeeBps, nonce, deadline);
+        bytes memory signature = _signPersonalFee(
+            signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, nonce, deadline
+        );
 
         return abi.encode(
-            WithdrawalPolicy.SignedFeeDiscount({
-                personalFeeBps: personalFeeBps, nonce: nonce, deadline: deadline, signature: signature
+            WithdrawalPolicy.SignedFee({
+                personalFeeAmountRay: personalFeeAmountRay, nonce: nonce, deadline: deadline, signature: signature
             })
         );
     }
 
     // Helper for mismatch test - creates data where claimed fee differs from signed fee
-    function _createSignedFeeDiscountDataWithMismatch(
+    function _createSignedFeeDataWithMismatch(
         uint256 signerPk,
         address user,
         address assetOut,
         uint256 iouAmountRay,
-        uint16 claimedFeeBps,
-        uint16 signedFeeBps,
+        uint256 claimedFeeAmountRay,
+        uint256 signedFeeAmountRay,
         uint256 nonce,
         uint256 deadline
     ) internal view returns (bytes memory) {
-        // Sign with signedFeeBps but encode with claimedFeeBps
-        bytes memory signature = _signFeeDiscount(signerPk, user, assetOut, iouAmountRay, signedFeeBps, nonce, deadline);
+        // Sign with signedFeeAmountRay but encode with claimedFeeAmountRay
+        bytes memory signature =
+            _signPersonalFee(signerPk, user, assetOut, iouAmountRay, signedFeeAmountRay, nonce, deadline);
 
         return abi.encode(
-            WithdrawalPolicy.SignedFeeDiscount({
-                personalFeeBps: claimedFeeBps, nonce: nonce, deadline: deadline, signature: signature
+            WithdrawalPolicy.SignedFee({
+                personalFeeAmountRay: claimedFeeAmountRay, nonce: nonce, deadline: deadline, signature: signature
             })
         );
     }
 
-    function _signFeeDiscount(
+    function _signPersonalFee(
         uint256 signerPk,
         address user,
         address assetOut,
         uint256 iouAmountRay,
-        uint16 personalFeeBps,
+        uint256 personalFeeAmountRay,
         uint256 nonce,
         uint256 deadline
     ) internal view returns (bytes memory) {
-        bytes32 digest = _buildFeeDiscountDigest(user, assetOut, iouAmountRay, personalFeeBps, nonce, deadline);
+        bytes32 digest = _buildSignedFeeDigest(user, assetOut, iouAmountRay, personalFeeAmountRay, nonce, deadline);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, digest);
         return abi.encodePacked(r, s, v);
     }
 
-    function _buildFeeDiscountDigest(
+    function _buildSignedFeeDigest(
         address user,
         address assetOut,
         uint256 iouAmountRay,
-        uint16 personalFeeBps,
+        uint256 personalFeeAmountRay,
         uint256 nonce,
         uint256 deadline
     ) internal view returns (bytes32) {
-        // Must match FEE_DISCOUNT_TYPEHASH in WithdrawalPolicy
+        // Must match SIGNED_FEE_TYPEHASH in WithdrawalPolicy
         bytes32 typeHash = keccak256(
-            "FeeDiscount(address user,address assetOut,uint256 iouAmountRay,uint16 personalFeeBps,uint256 nonce,uint256 deadline)"
+            "SignedFee(address user,address assetOut,uint256 iouAmountRay,uint256 personalFeeAmountRay,uint256 nonce,uint256 deadline)"
         );
 
         bytes32 structHash =
-            keccak256(abi.encode(typeHash, user, assetOut, iouAmountRay, personalFeeBps, nonce, deadline));
+            keccak256(abi.encode(typeHash, user, assetOut, iouAmountRay, personalFeeAmountRay, nonce, deadline));
 
         bytes32 domainSeparator = keccak256(
             abi.encode(
