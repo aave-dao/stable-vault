@@ -21,10 +21,6 @@ interface IAccountingChainGateway is IChainGateway {
     /// @dev The Accounting Chain does not prescribe to the Earning Chain which strategy to push assets to.
     /// @dev One asset is pushed at a time to avoid dependencies on bridges that support multiple assets bridged
     /// together.
-    /// @dev `bridgeParamsEncoded` is `BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams)`. The Gateway
-    /// validates `bridgeAdapter` against the whitelist and the target chain's oracle freshness, then forwards
-    /// the blob opaquely to the adapter.
-    /// @dev `feePayer` is propagated as an explicit calldata parameter; see `IBridgeAdapter.BridgeParams`.
     /// @param asset The asset to send.
     /// @param amount The amount of the asset to send.
     /// @param targetChainId The chain id of the Earning Chain to send the assets to.

@@ -38,8 +38,6 @@ interface IIouTokenManager {
     function getLockedBalance() external view returns (uint256);
 
     /// @notice Entry point for IOU token owners to bridge tokens to a destination chain.
-    /// @dev `bridgeParamsEncoded` is `BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams)`. This contract
-    /// forwards the blob opaquely to the Gateway; only the adapter decodes.
     /// @param destinationChainId The chain id of the chain to publish the message to.
     /// @param iouTokenRecipient The address to send the IOU tokens to on the destination chain.
     /// @param iouTokenAmountRay The amount of IOU tokens to bridge.

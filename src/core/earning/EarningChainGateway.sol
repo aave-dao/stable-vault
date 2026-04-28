@@ -100,12 +100,8 @@ contract EarningChainGateway is
         bytes memory data
     ) external payable virtual override nonReentrant assertingTransferHelperBalanceFor(assetOut) returns (uint256) {
         require(iouTokenAmountRay > 0, Errors.ZeroAmount());
-        // Narrow gateway-side decode for one load-bearing safety invariant: the destination gas limit
-        // must meet the minimum needed to successfully process a BURN_IOU_TOKEN message on the
-        // Accounting Chain. Insufficient gasLimit would cause a destination revert with the CCIP
-        // message dropped while IOUs are already burned locally — silent IOU loss with no compensating
-        // effect on the Accounting Chain's obligation accounting. The adapter owns all fee handling;
-        // this is the only gateway-side `BridgeParams` field read.
+        // An insufficient destination gasLimit would cause the BURN_IOU_TOKEN message to be dropped while
+        // IOUs are already burned locally — silent IOU loss with no compensating obligation reduction.
         require(
             BridgeParamsCodec.decode(bridgeParamsEncoded).gasLimit >= MIN_BURN_IOU_TOKEN_GAS_LIMIT,
             Errors.InvalidGasLimit()
@@ -142,7 +138,7 @@ contract EarningChainGateway is
         bytes calldata bridgeParamsEncoded
     ) external payable override restricted assertingTransferHelperBalanceFor(asset) {
         require(amount > 0, Errors.ZeroAmount());
-        // Pull funds from liquidity into the TransferHelper. Bridge-fee staging is owned by the adapter.
+        // Pull funds from liquidity into the TransferHelper.
         IAllocator(ALLOCATOR).withdraw(asset, amount);
         _returnFunds(asset, amount, bridgeAdapter, msg.sender, bridgeParamsEncoded);
         emit AssetOutflow(asset, amount);
@@ -218,7 +214,6 @@ contract EarningChainGateway is
         return amountOut;
     }
 
-    /// @dev This function is just needed to prevent StackTooDeep
     function _sendBurnIouTokenMessage(
         uint256 iouTokenAmountRay,
         address bridgeAdapter,

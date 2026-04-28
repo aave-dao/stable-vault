@@ -97,9 +97,6 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
     /// @dev IOUs should be bridged via bridges which require finalization on the source chain. If IOUs are bridged and
     /// exchanged for assets on a destination, but the source chain reorgs, then a user would keep their IOUs and the
     /// assets withdrawn on the destination chain.
-    /// @dev Forwards `bridgeParamsEncoded` opaquely to the gateway and on to the adapter. The adapter
-    /// is the sole decoder and owns bridge-fee staging. `msg.value` is forwarded so the adapter can use
-    /// it for native bridge fees.
     function bridgeTokens(
         uint256 destinationChainId,
         address iouTokenRecipient,

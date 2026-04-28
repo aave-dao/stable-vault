@@ -18,7 +18,6 @@ interface IEarningChainGateway is IChainGateway {
     function getAggregatedBalance() external view returns (uint256);
 
     /// @notice Withdraws a specific asset from the Allocator and bridges it to the Accounting Chain.
-    /// @dev `bridgeParamsEncoded` is `BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams)`.
     /// @param asset The asset to withdraw.
     /// @param amount The amount of the asset to withdraw in the asset's native decimals.
     /// @param bridgeAdapter The whitelisted bridge adapter to use for bridging the asset.
@@ -31,8 +30,6 @@ interface IEarningChainGateway is IChainGateway {
     ) external payable;
 
     /// @notice Exchanges IOU tokens for a specific asset and bridges data back to the Accounting Chain.
-    /// @dev `bridgeParamsEncoded` is `BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams)` for the
-    /// `BURN_IOU_TOKEN` data-only dispatch.
     /// @param iouTokenAmountRay The amount of IOU tokens to exchange.
     /// @param assetOut The asset to exchange the IOU tokens for.
     /// @param minAmountOut The minimum amount of `assetOut` to receive for `iouTokenAmountRay` of IOU tokens.

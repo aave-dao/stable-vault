@@ -58,8 +58,6 @@ interface IFundsHandler {
 
     /// @notice Retrieves funds from liquidity source on native chain before pushing funds to another chain through the
     /// Gateway contract.
-    /// @dev `bridgeParamsEncoded` is `BridgeParamsCodec.encode(IBridgeAdapter.BridgeParams)`. This contract
-    /// forwards the blob opaquely to the Gateway.
     /// @param asset Address of the asset to push to the destination chain.
     /// @param amount Amount of the asset to push to the destination chain.
     /// @param chainId Chain id of the destination chain.

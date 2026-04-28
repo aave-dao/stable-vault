@@ -102,15 +102,6 @@ contract CcipAdapter is
     }
 
     /// @inheritdoc IBridgeAdapter
-    /// @dev Sole decoder for `bridgeParamsEncoded`. Owns bridge-fee staging end-to-end: pulls `feeAmount`
-    /// of `feeToken` directly from `feePayer` (ERC-20 via `safeTransferFrom`, native via `msg.value`),
-    /// pulls the bridged asset (if any) from the TransferHelper, approves the CCIP router for
-    /// `estimatedFeeAmount` (combined with the asset approval when `feeToken == asset`), spends the
-    /// router fee, and refunds the unused excess per `feeRefundThreshold`. ERC-20 fee tokens require
-    /// `feePayer` to have approved this adapter (NOT the TransferHelper) for at least `feeAmount`.
-    /// @dev `feePayer` is a trusted gateway-propagated identity (the original caller's `msg.sender`),
-    /// supplied as an explicit calldata parameter and not decoded from the opaque blob. See
-    /// `IBridgeAdapter.BridgeParams` NatSpec for why identity is kept outside the blob.
     function publishMessageToChainWithFeePayer(
         uint256 destinationChainId,
         address asset,
@@ -146,14 +137,11 @@ contract CcipAdapter is
         uint256 estimatedFeeAmount = IRouterClient(CCIP_ROUTER).getFee(chainSelector, ccipMessage);
         require(bridgeParams.feeAmount >= estimatedFeeAmount, Errors.InsufficientFunds());
 
-        // Stage the bridge fee directly in this adapter (no TransferHelper round-trip).
-        // Native: msg.value already lands here; just validate the amount.
-        // ERC-20: pull from feePayer via safeTransferFrom (caller must approve this adapter).
         if (bridgeParams.feeToken == Constants.NATIVE_CURRENCY) {
             require(msg.value >= bridgeParams.feeAmount, Errors.InsufficientFunds());
         } else {
-            // Reject msg.value to prevent accidental native loss; bridges are not expected to require
-            // both native and ERC-20 fees simultaneously.
+            // Reject msg.value to prevent accidental native loss; bridges are not expected to require both native
+            // and ERC-20 fees simultaneously.
             require(msg.value == 0, Errors.InvalidParameter());
             if (bridgeParams.feeAmount > 0) {
                 IERC20(bridgeParams.feeToken).safeTransferFrom(feePayer, address(this), bridgeParams.feeAmount);

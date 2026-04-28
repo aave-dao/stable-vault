@@ -145,11 +145,6 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         require($storage().supportedBridgeAdapters[asset][chainId][bridgeAdapter], AdapterNotFound());
     }
 
-    /// @dev Forwards an outbound cross-chain message to a validated bridge adapter. `bridgeParamsEncoded`
-    /// is opaque at this layer — only the adapter's `publishMessageToChainWithFeePayer` decodes it.
-    /// `feePayer` is forwarded as an explicit calldata parameter (not part of the opaque blob) so the
-    /// adapter pulls fees from a caller-bound identity, not a blob-supplied one. All unconsumed `msg.value`
-    /// is forwarded so the adapter can use it for native bridge fees when applicable.
     function _sendCrossChainMessage(
         uint256 destinationChainId,
         address bridgeAdapter,

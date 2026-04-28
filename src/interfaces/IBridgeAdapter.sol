@@ -26,12 +26,9 @@ interface IBridgeAdapter {
     error OnlyBridgeRouter();
 
     /// @notice The parameters for the bridge adapter.
-    /// @dev `feePayer` is intentionally NOT part of this struct. It is propagated as an explicit calldata
-    /// parameter through every layer (entry → gateway → adapter), set to the entry-point's `msg.sender`.
-    /// Putting it inside the opaque blob would make any non-zero ERC20 approval to the adapter consumable
-    /// by ANY caller of ANY bridge entry-point — a forged blob `feePayer` would `safeTransferFrom` from the
-    /// approval owner regardless of who triggered the bridge. Keeping `feePayer` outside the blob lets the
-    /// trusted entry-point bind it to caller identity.
+    /// @dev `feePayer` is intentionally not part of this struct; it is propagated as an explicit calldata
+    /// parameter set by the trusted entry-point to its `msg.sender`. A blob-supplied `feePayer` would let
+    /// any caller of any bridge entry-point drain a non-zero ERC20 approval to the adapter.
     /// @param feeToken Token to pay the bridge fee in.
     /// @param feeAmount Amount of `feeToken` approved by `feePayer` to spend on fees.
     /// @param feeRefundThreshold Minimum amount of `feeToken` that must remain unused in order to trigger a refund to
@@ -60,21 +57,13 @@ interface IBridgeAdapter {
     function setDestinationChainAdapter(uint256 chainId, address destinationChainAdapter) external;
 
     /// @notice Sends an arbitrary message containing instructions or data updates to a destination chain.
-    /// @dev `bridgeParamsEncoded` is `BridgeParamsCodec.encode(BridgeParams)`. The adapter is the sole
-    /// decoder — Gateway and intermediate layers forward the blob opaquely. The adapter also owns bridge-
-    /// fee staging: it pulls fees DIRECTLY from `feePayer` (ERC-20 via `transferFrom`, native via
-    /// `msg.value`), spends them on the underlying router, and refunds excess per `feeRefundThreshold`.
-    /// @dev ERC-20 fee tokens require `feePayer` to have approved the bridge adapter contract (NOT the
-    /// TransferHelper) for at least `feeAmount` prior to invocation. Native fees must be supplied via
-    /// `msg.value`.
-    /// @dev `feePayer` is forwarded by the gateway as an explicit calldata parameter, not decoded from
-    /// the blob — see `BridgeParams` NatSpec for rationale.
+    /// @dev ERC-20 fees require `feePayer` to have approved this adapter for `feeAmount`; native fees come
+    /// via `msg.value`.
     /// @param destinationChainId Chain id of the chain to publish the message to.
     /// @param asset Asset to bridge; set to `address(0)` for data only messages.
     /// @param amount Amount of the asset to bridge; set to 0 for data only messages.
     /// @param data Arbitrary data that would be decoded and handled by the destination chain.
-    /// @param feePayer Address that will pay the bridge fee (also the recipient of any refund). Set by the
-    /// trusted entry-point to the original caller's `msg.sender`.
+    /// @param feePayer Address that will pay the bridge fee (also the recipient of any refund).
     /// @param bridgeParamsEncoded ABI-encoded `BridgeParams` blob; decoded inside the adapter.
     function publishMessageToChainWithFeePayer(
         uint256 destinationChainId,

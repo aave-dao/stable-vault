@@ -6,12 +6,8 @@ import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 
 /// @title BridgeParamsCodec
 /// @author Aave Labs
-/// @notice Shared encode/decode helpers for the opaque `bridgeParamsEncoded` bytes that travel through
-/// every bridge-flow entrypoint. Callers (users, scripts, SDK) and tests use `encode` to construct the
-/// blob; concrete bridge adapters use `decode` to recover the typed `BridgeParams` struct.
-/// @dev The canonical shape is `abi.encode(IBridgeAdapter.BridgeParams)`. No version byte, no
-/// discriminator — a second adapter with a different params shape would ship its own codec alongside
-/// its own struct definition.
+/// @notice Helper to encode/decode an adapter's bridge parameters.
+/// @dev An adapter requiring a different parameter shape would ship its own codec alongside its struct definition.
 library BridgeParamsCodec {
     /// @notice Encodes a `BridgeParams` struct into the opaque bytes shape expected by bridge-flow
     /// entrypoints.
