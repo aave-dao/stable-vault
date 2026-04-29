@@ -1090,6 +1090,45 @@ contract CcipAdapterTest is TestWithHelpers {
         );
     }
 
+    function test_publishMessageToChainWithFeePayer_reverts_ifNativeMsgValueExceedsFeeAmountByOne() public {
+        // The adapter enforces strict equality between msg.value and bridgeParams.feeAmount when the fee token is
+        // native; sending one extra wei must revert rather than silently being absorbed by the adapter.
+        // This is enforced to avoid an under-counted refund.
+        uint256 feeAmount = 1 ether;
+
+        vm.deal(address(_mockAccountingChainGateway), feeAmount + 1);
+
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feeToken: address(0), feeAmount: feeAmount, feeRefundThreshold: 0, gasLimit: DEFAULT_GAS_LIMIT, data: ""
+            })
+        );
+
+        Client.EVM2AnyMessage memory expectedCcipMessage = Client.EVM2AnyMessage({
+            receiver: abi.encode(_earningChainCcipAdapter),
+            data: "",
+            tokenAmounts: new Client.EVMTokenAmount[](0),
+            feeToken: address(0),
+            extraArgs: Client._argsToBytes(
+                Client.GenericExtraArgsV2({gasLimit: DEFAULT_GAS_LIMIT, allowOutOfOrderExecution: true})
+            )
+        });
+
+        // Estimated fee matches feeAmount, so the first `feeAmount >= estimatedFeeAmount` check passes and the
+        // strict-equality `msg.value == feeAmount` check is the one that reverts.
+        vm.mockCall(
+            address(_mockCCIPRouter),
+            abi.encodeWithSelector(IRouterClient.getFee.selector, EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage),
+            abi.encode(feeAmount)
+        );
+
+        vm.expectRevert(Errors.InsufficientFunds.selector);
+        vm.prank(address(_mockAccountingChainGateway));
+        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer{value: feeAmount + 1}(
+            EARNING_CHAIN_ID, address(0), 0, "", address(this), bridgeParams
+        );
+    }
+
     function test_publishMessageToChainWithFeePayer_reverts_ifOnlyGateway(address caller) public {
         vm.assume(caller != address(_mockAccountingChainGateway));
         vm.assume(caller != address(_mockEarningChainGateway));

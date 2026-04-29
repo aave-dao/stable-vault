@@ -138,7 +138,7 @@ contract CcipAdapter is
         require(bridgeParams.feeAmount >= estimatedFeeAmount, Errors.InsufficientFunds());
 
         if (bridgeParams.feeToken == Constants.NATIVE_CURRENCY) {
-            require(msg.value >= bridgeParams.feeAmount, Errors.InsufficientFunds());
+            require(msg.value == bridgeParams.feeAmount, Errors.InsufficientFunds());
         } else {
             // Reject msg.value to prevent accidental native loss; bridges are not expected to require both native
             // and ERC-20 fees simultaneously.
