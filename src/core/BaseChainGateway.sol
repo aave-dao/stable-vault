@@ -98,8 +98,9 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
         address bridgeAdapter,
-        IBridgeAdapter.BridgeParams memory bridgeParams
-    ) external override {
+        address feePayer,
+        bytes calldata bridgeParamsEncoded
+    ) external payable override {
         require(msg.sender == IOU_TOKEN_MANAGER, OnlyIouTokenManager());
         require(iouTokenAmountRay > 0, Errors.ZeroAmount());
         _validateBridgeAdapterIsSupported(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, destinationChainId, bridgeAdapter);
@@ -112,10 +113,15 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
                 )
             })
         );
-        IBridgeAdapter(bridgeAdapter)
-            .publishMessageToChainWithFeePayer(
-                destinationChainId, Constants.ASSET_FOR_DATA_ONLY_BRIDGE, 0, bridgeIouTokenMessageEncoded, bridgeParams
-            );
+        _sendCrossChainMessage(
+            destinationChainId,
+            bridgeAdapter,
+            Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
+            0,
+            bridgeIouTokenMessageEncoded,
+            feePayer,
+            bridgeParamsEncoded
+        );
     }
 
     /// @inheritdoc IChainGateway
@@ -145,15 +151,15 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         address assetToBridge,
         uint256 amountToBridge,
         bytes memory dataToBridge,
-        IBridgeAdapter.BridgeParams memory bridgeParams
+        address feePayer,
+        bytes memory bridgeParamsEncoded
     ) internal {
         if (assetToBridge == Constants.ASSET_FOR_DATA_ONLY_BRIDGE) {
             require(amountToBridge == 0, Errors.InvalidParameter());
         }
-        IBridgeAdapter(bridgeAdapter)
-            .publishMessageToChainWithFeePayer(
-                destinationChainId, assetToBridge, amountToBridge, dataToBridge, bridgeParams
-            );
+        IBridgeAdapter(bridgeAdapter).publishMessageToChainWithFeePayer{value: msg.value}(
+            destinationChainId, assetToBridge, amountToBridge, dataToBridge, feePayer, bridgeParamsEncoded
+        );
         if (assetToBridge != Constants.ASSET_FOR_DATA_ONLY_BRIDGE) {
             emit FundsSent(assetToBridge, amountToBridge, destinationChainId);
         }

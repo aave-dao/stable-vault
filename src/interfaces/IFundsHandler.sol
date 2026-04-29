@@ -2,8 +2,6 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.22;
 
-import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
-
 /// @title IFundsHandler
 /// @author Aave Labs
 /// @notice Interface for the FundsHandler contract.
@@ -64,13 +62,13 @@ interface IFundsHandler {
     /// @param amount Amount of the asset to push to the destination chain.
     /// @param chainId Chain id of the destination chain.
     /// @param bridgeAdapter The whitelisted bridge adapter to use for bridging the asset.
-    /// @param bridgeParams The parameters for the bridge adapter.
+    /// @param bridgeParamsEncoded Opaque bridge parameters blob consumed by the adapter.
     function pushFundsToChain(
         address asset,
         uint256 amount,
         uint256 chainId,
         address bridgeAdapter,
-        IBridgeAdapter.BridgeParams memory bridgeParams
+        bytes calldata bridgeParamsEncoded
     ) external payable;
 
     /// @notice Callback function for when funds arrive from a chain.

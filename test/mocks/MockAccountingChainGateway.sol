@@ -14,26 +14,22 @@ contract MockAccountingChainGateway is IAccountingChainGateway {
         TRANSFER_HELPER = transferHelper;
     }
 
-    address[] _assetsToPullFromTransferHelperInNextCall;
-    uint256[] _amountsToPullFromTransferHelperInNextCall;
-
-    function mockToConsumeAssetFromTransferHelperInNextCall(address asset, uint256 amount) external {
-        _assetsToPullFromTransferHelperInNextCall.push(asset);
-        _amountsToPullFromTransferHelperInNextCall.push(amount);
-    }
-
     function getIouTokenManager() external view returns (address) {}
 
+    /// @dev Mirrors `BaseChainGateway._sendCrossChainMessage`: the gateway is a pure forwarder. Fee
+    /// staging (pulling the fee token from the feePayer or accepting native via msg.value) and asset
+    /// consumption from the TransferHelper both live downstream in the bridge adapter.
     function sendPushFundsToChainMessage(
-        address, // asset
-        uint256, // amount
-        uint256, // targetChainId
-        address, // bridgeAdapter
-        IBridgeAdapter.BridgeParams memory // bridgeParams
-    )
-        external
-    {
-        _pullAssetsFromTransferHelper();
+        address asset,
+        uint256 amount,
+        uint256 targetChainId,
+        address bridgeAdapter,
+        address feePayer,
+        bytes calldata bridgeParamsEncoded
+    ) external payable {
+        IBridgeAdapter(bridgeAdapter).publishMessageToChainWithFeePayer{value: msg.value}(
+            targetChainId, asset, amount, "", feePayer, bridgeParamsEncoded
+        );
     }
 
     function addBridgeAdapter(address asset, uint256 chainId, address bridgeAdapter) external {}
@@ -54,13 +50,7 @@ contract MockAccountingChainGateway is IAccountingChainGateway {
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
         address bridgeAdapter,
-        IBridgeAdapter.BridgeParams memory bridgeParams
-    ) external {}
-
-    function _pullAssetsFromTransferHelper() internal {
-        if (_assetsToPullFromTransferHelperInNextCall.length > 0) {
-            ITransferHelper(TRANSFER_HELPER)
-                .pull(_assetsToPullFromTransferHelperInNextCall, _amountsToPullFromTransferHelperInNextCall);
-        }
-    }
+        address feePayer,
+        bytes calldata bridgeParamsEncoded
+    ) external payable {}
 }

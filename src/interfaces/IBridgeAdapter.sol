@@ -26,7 +26,9 @@ interface IBridgeAdapter {
     error OnlyBridgeRouter();
 
     /// @notice The parameters for the bridge adapter.
-    /// @param feePayer Address that will pay the bridge fee (also the recipient of any refund).
+    /// @dev `feePayer` is intentionally not part of this struct; it is propagated as an explicit calldata
+    /// parameter set by the trusted entry-point to its `msg.sender`. A blob-supplied `feePayer` would let
+    /// any caller of any bridge entry-point drain a non-zero ERC20 approval to the adapter.
     /// @param feeToken Token to pay the bridge fee in.
     /// @param feeAmount Amount of `feeToken` approved by `feePayer` to spend on fees.
     /// @param feeRefundThreshold Minimum amount of `feeToken` that must remain unused in order to trigger a refund to
@@ -35,7 +37,6 @@ interface IBridgeAdapter {
     /// processed on the destination chain (including round trips).
     /// @param data Arbitrary data that may be required by the bridge adapter to operate.
     struct BridgeParams {
-        address feePayer;
         address feeToken;
         uint256 feeAmount;
         uint256 feeRefundThreshold;
@@ -56,16 +57,20 @@ interface IBridgeAdapter {
     function setDestinationChainAdapter(uint256 chainId, address destinationChainAdapter) external;
 
     /// @notice Sends an arbitrary message containing instructions or data updates to a destination chain.
+    /// @dev ERC-20 fees require `feePayer` to have approved this adapter for `feeAmount`; native fees come
+    /// via `msg.value`.
     /// @param destinationChainId Chain id of the chain to publish the message to.
     /// @param asset Asset to bridge; set to `address(0)` for data only messages.
     /// @param amount Amount of the asset to bridge; set to 0 for data only messages.
     /// @param data Arbitrary data that would be decoded and handled by the destination chain.
-    /// @param bridgeParams Parameters for the bridge adapter.
+    /// @param feePayer Address that will pay the bridge fee (also the recipient of any refund).
+    /// @param bridgeParamsEncoded ABI-encoded bridge parameters blob for the adapter to decode.
     function publishMessageToChainWithFeePayer(
         uint256 destinationChainId,
         address asset,
         uint256 amount,
         bytes memory data,
-        BridgeParams memory bridgeParams
-    ) external;
+        address feePayer,
+        bytes memory bridgeParamsEncoded
+    ) external payable;
 }

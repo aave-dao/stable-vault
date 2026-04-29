@@ -2,7 +2,6 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.22;
 
-import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 
 /// @title IAccountingChainGateway
@@ -26,12 +25,14 @@ interface IAccountingChainGateway is IChainGateway {
     /// @param amount The amount of the asset to send.
     /// @param targetChainId The chain id of the Earning Chain to send the assets to.
     /// @param bridgeAdapter The whitelisted bridge adapter to use for bridging the asset.
-    /// @param bridgeParams The parameters for the bridge adapter.
+    /// @param feePayer Address that will pay the bridge fee.
+    /// @param bridgeParamsEncoded Opaque bridge parameters blob consumed by the adapter.
     function sendPushFundsToChainMessage(
         address asset,
         uint256 amount,
         uint256 targetChainId,
         address bridgeAdapter,
-        IBridgeAdapter.BridgeParams memory bridgeParams
-    ) external;
+        address feePayer,
+        bytes calldata bridgeParamsEncoded
+    ) external payable;
 }

@@ -5,7 +5,6 @@ pragma solidity ^0.8.22;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IIouToken} from "src/interfaces/IIouToken.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
@@ -103,8 +102,8 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
         address bridgeAdapter,
-        IBridgeAdapter.BridgeParams memory bridgeParams
-    ) external payable override assertingTransferHelperBalanceFor(bridgeParams.feeToken) {
+        bytes calldata bridgeParamsEncoded
+    ) external payable override {
         require(destinationChainId != block.chainid, Errors.InvalidDestinationChainId());
         require(iouTokenRecipient != address(0), Errors.InvalidParameter());
         require(iouTokenAmountRay > 0, Errors.ZeroAmount());
@@ -113,12 +112,10 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
         } else {
             _burnTokens(msg.sender, iouTokenAmountRay);
         }
-        _transferBridgeFeeToTransferHelper(bridgeParams);
 
-        IChainGateway(CHAIN_GATEWAY)
-            .sendBridgeIouTokenMessageWithFeePayer(
-                destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeAdapter, bridgeParams
-            );
+        IChainGateway(CHAIN_GATEWAY).sendBridgeIouTokenMessageWithFeePayer{value: msg.value}(
+            destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeAdapter, msg.sender, bridgeParamsEncoded
+        );
 
         emit TokensBridged(destinationChainId, iouTokenRecipient, iouTokenAmountRay);
     }

@@ -5,7 +5,6 @@ pragma solidity ^0.8.22;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
@@ -49,34 +48,17 @@ abstract contract TransferHelperClient {
         }
     }
 
-    function _transferHelperBalance(address asset) private view returns (uint256) {
+    function _transferHelperBalance(address asset) internal view returns (uint256) {
         if (asset == Constants.NATIVE_CURRENCY) {
             return TRANSFER_HELPER.balance;
         }
         return IERC20(asset).balanceOf(TRANSFER_HELPER);
     }
 
-    /// @dev Transfers the bridge fee to the TransferHelper to be pulled by Bridge Adapter.
-    function _transferBridgeFeeToTransferHelper(IBridgeAdapter.BridgeParams memory bridgeParams) internal {
-        require(bridgeParams.feePayer == msg.sender, Errors.InvalidBridgeFeePayer());
-        if (bridgeParams.feeToken == Constants.NATIVE_CURRENCY) {
-            require(msg.value >= bridgeParams.feeAmount, Errors.InsufficientFunds());
-            _transferNativeToTransferHelper(msg.value);
-        } else {
-            // Assumes bridges will not require both native and ERC-20 fees.
-            // Rejecting msg.value prevents accidental native loss (which would otherwise remain in this client
-            // contract).
-            require(msg.value == 0, Errors.InvalidParameter());
-            if (bridgeParams.feeAmount > 0) {
-                IERC20(bridgeParams.feeToken)
-                    .safeTransferFrom(bridgeParams.feePayer, TRANSFER_HELPER, bridgeParams.feeAmount);
-            }
-        }
-    }
-
     function _transferToTransferHelper(address asset, uint256 amount) internal {
         if (asset == Constants.NATIVE_CURRENCY) {
-            _transferNativeToTransferHelper(amount);
+            (bool callSucceeded,) = TRANSFER_HELPER.call{value: amount}("");
+            require(callSucceeded, Errors.NativeTransferFailed());
         } else {
             IERC20(asset).safeTransfer(TRANSFER_HELPER, amount);
         }
@@ -86,10 +68,5 @@ abstract contract TransferHelperClient {
     /// funds must be in this contract and the overloaded function without the `from` parameter should be used instead.
     function _transferToTransferHelper(address from, address asset, uint256 amount) internal {
         IERC20(asset).safeTransferFrom(from, TRANSFER_HELPER, amount);
-    }
-
-    function _transferNativeToTransferHelper(uint256 amount) private {
-        (bool callSucceeded,) = TRANSFER_HELPER.call{value: amount}("");
-        require(callSucceeded, Errors.NativeTransferFailed());
     }
 }

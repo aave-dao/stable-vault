@@ -4,6 +4,7 @@ pragma solidity ^0.8.22;
 
 import {EarningChainBaseScript} from "script/interact/earning/EarningChainBaseScript.s.sol";
 
+import {BridgeParamsCodec} from "src/bridging/BridgeParamsCodec.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
 
@@ -21,18 +22,13 @@ contract EarningChainGatewayInteractionScript is EarningChainBaseScript {
         address asset = USDT;
         uint256 amount = 123 * 10 ** 6;
         IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
-            feePayer: address(0xC9213f6189b0f4F96Ba859c675589755178ae276),
-            feeToken: LINK,
-            feeAmount: 100000000000000000000,
-            feeRefundThreshold: 0,
-            gasLimit: 750000,
-            data: ""
+            feeToken: LINK, feeAmount: 100000000000000000000, feeRefundThreshold: 0, gasLimit: 750000, data: ""
         });
 
         vm.startBroadcast(vm.envUint("ADMIN_PRIVATE_KEY"));
         address bridgeAdapter = address(0); // TODO: Set the whitelisted bridge adapter address.
         IEarningChainGateway(EARNING_CHAIN_GATEWAY)
-            .pushFundsToAccountingChain(asset, amount, bridgeAdapter, bridgeParams);
+            .pushFundsToAccountingChain(asset, amount, bridgeAdapter, BridgeParamsCodec.encode(bridgeParams));
         vm.stopBroadcast();
     }
 

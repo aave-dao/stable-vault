@@ -38,10 +38,6 @@ library Errors {
     /// @custom:selector 0x6f79c78a
     error InvalidAsset(address asset);
 
-    /// @notice Thrown when bridge fee payer is not the expected caller.
-    /// @custom:selector 0xecec4b20
-    error InvalidBridgeFeePayer();
-
     /// @notice Thrown when destination chain id checked is the same as the current chain id.
     /// @custom:selector 0x90eaaa70
     error InvalidDestinationChainId();
