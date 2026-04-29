@@ -99,7 +99,7 @@ interface IChainGateway {
     /// @param iouTokenAmountRay The amount of IOU tokens to bridge.
     /// @param bridgeAdapter The whitelisted bridge adapter to use for the message.
     /// @param feePayer Address that will pay the bridge fee.
-    /// @param bridgeParamsEncoded Opaque `BridgeParams` blob consumed by the adapter.
+    /// @param bridgeParamsEncoded Opaque bridge parameters blob consumed by the adapter.
     function sendBridgeIouTokenMessageWithFeePayer(
         uint256 destinationChainId,
         address iouTokenRecipient,

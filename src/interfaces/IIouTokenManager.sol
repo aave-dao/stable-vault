@@ -42,7 +42,7 @@ interface IIouTokenManager {
     /// @param iouTokenRecipient The address to send the IOU tokens to on the destination chain.
     /// @param iouTokenAmountRay The amount of IOU tokens to bridge.
     /// @param bridgeAdapter The whitelisted bridge adapter to use for the message.
-    /// @param bridgeParamsEncoded Opaque `BridgeParams` blob consumed by the adapter.
+    /// @param bridgeParamsEncoded Opaque bridge parameters blob consumed by the adapter.
     function bridgeTokens(
         uint256 destinationChainId,
         address iouTokenRecipient,

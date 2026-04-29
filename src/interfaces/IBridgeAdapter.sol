@@ -64,7 +64,7 @@ interface IBridgeAdapter {
     /// @param amount Amount of the asset to bridge; set to 0 for data only messages.
     /// @param data Arbitrary data that would be decoded and handled by the destination chain.
     /// @param feePayer Address that will pay the bridge fee (also the recipient of any refund).
-    /// @param bridgeParamsEncoded ABI-encoded `BridgeParams` blob; decoded inside the adapter.
+    /// @param bridgeParamsEncoded ABI-encoded bridge parameters blob for the adapter to decode.
     function publishMessageToChainWithFeePayer(
         uint256 destinationChainId,
         address asset,

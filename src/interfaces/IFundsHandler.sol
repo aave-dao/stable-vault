@@ -62,7 +62,7 @@ interface IFundsHandler {
     /// @param amount Amount of the asset to push to the destination chain.
     /// @param chainId Chain id of the destination chain.
     /// @param bridgeAdapter The whitelisted bridge adapter to use for bridging the asset.
-    /// @param bridgeParamsEncoded Opaque `BridgeParams` blob consumed by the adapter.
+    /// @param bridgeParamsEncoded Opaque bridge parameters blob consumed by the adapter.
     function pushFundsToChain(
         address asset,
         uint256 amount,
