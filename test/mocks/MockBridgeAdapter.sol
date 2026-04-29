@@ -38,7 +38,7 @@ contract MockBridgeAdapter is IBridgeAdapter {
 
         // Mirror CcipAdapter: adapter pulls fee directly from feePayer (no TransferHelper round-trip).
         if (bridgeParams.feeToken == Constants.NATIVE_CURRENCY) {
-            require(msg.value >= bridgeParams.feeAmount, Errors.InsufficientFunds());
+            require(msg.value == bridgeParams.feeAmount, Errors.InsufficientFunds());
         } else {
             require(msg.value == 0, Errors.InvalidParameter());
             if (bridgeParams.feeAmount > 0) {
