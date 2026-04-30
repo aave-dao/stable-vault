@@ -97,7 +97,7 @@ contract EarningChainGateway is
         address receiver,
         address bridgeAdapter,
         bytes calldata bridgeParamsEncoded,
-        bytes memory data
+        bytes memory withdrawalPolicyData
     ) external payable virtual override nonReentrant assertingTransferHelperBalanceFor(assetOut) returns (uint256) {
         require(iouTokenAmountRay > 0, Errors.ZeroAmount());
         // An insufficient destination gasLimit would cause the BURN_IOU_TOKEN message to be dropped while
@@ -109,7 +109,7 @@ contract EarningChainGateway is
         );
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(msg.sender, iouTokenAmountRay);
 
-        uint256 amountOut = _getWithdrawalAmountOut(iouTokenAmountRay, assetOut, minAmountOut, data);
+        uint256 amountOut = _getWithdrawalAmountOut(iouTokenAmountRay, assetOut, minAmountOut, withdrawalPolicyData);
         IAllocator(ALLOCATOR).withdraw(assetOut, amountOut);
 
         // Send data to synchronize the Accounting Chain's state.
@@ -199,12 +199,12 @@ contract EarningChainGateway is
         uint256 iouTokenAmountRay,
         address assetOut,
         uint256 minAmountOut,
-        bytes memory data
+        bytes memory withdrawalPolicyData
     ) private returns (uint256) {
         uint256 amountOutRay = IWithdrawalPolicy(WITHDRAWAL_POLICY)
             .applyWithdrawalPolicy(
                 IWithdrawalPolicy.WithdrawalRequest({
-                user: msg.sender, assetOut: assetOut, iouAmountRay: iouTokenAmountRay, data: data
+                user: msg.sender, assetOut: assetOut, iouAmountRay: iouTokenAmountRay, data: withdrawalPolicyData
             })
             );
         // Note: The rayToAssetDecimals conversion truncates, so the user may burn slightly more IOUs than the

@@ -33,7 +33,7 @@ contract MockEarningChainGateway is IEarningChainGateway {
         address receiver,
         address bridgeAdapter,
         bytes calldata bridgeParamsEncoded,
-        bytes memory data
+        bytes memory withdrawalPolicyData
     ) external payable returns (uint256) {}
 
     function sendPushFundsToChainMessage(
