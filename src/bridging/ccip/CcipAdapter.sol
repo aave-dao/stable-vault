@@ -163,15 +163,16 @@ contract CcipAdapter is
 
     /// @inheritdoc IAny2EVMMessageReceiver
     function ccipReceive(Client.Any2EVMMessage calldata message) external override nonReentrant onlyRouter {
-        emit MessageReceived(message.messageId);
         // Only process messages if the sender from the source chain is the recognized adapter.
         _validateMessageSource(message);
         _processMessage(message);
+        emit MessageReceived(message.messageId);
     }
 
     /// @inheritdoc ICcipBridgeAdapter
     function replayFundsReceiving(address asset, uint256 amount) external override nonReentrant restricted {
-        _processReceivedFunds(asset, amount);
+        _transferToTransferHelper(asset, amount);
+        IChainGateway(GATEWAY).receiveMessage(RECEIVED_FUNDS_ONLY_SOURCE_CHAIN_ID, asset, amount, "");
     }
 
     function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
@@ -179,20 +180,18 @@ contract CcipAdapter is
     }
 
     function _processMessage(Client.Any2EVMMessage memory message) internal {
-        // Process data first to allow any potential state modifications to take place before processing tokens.
-        // Assumes if data is sent with tokens, then the data must be processed first.
-        if (message.data.length > 0) {
-            IChainGateway(GATEWAY)
-                .receiveMessage(
-                    _chainIdOf[message.sourceChainSelector], Constants.ASSET_FOR_DATA_ONLY_BRIDGE, 0, message.data
-                );
-        }
         uint256 tokenCount = message.destTokenAmounts.length;
-        for (uint256 i = 0; i < tokenCount; i++) {
-            address asset = message.destTokenAmounts[i].token;
-            uint256 amount = message.destTokenAmounts[i].amount;
-            _processReceivedFunds(asset, amount);
+        require(tokenCount < 2, IBridgeAdapter.InvalidTokenCount());
+        uint256 sourceChainId = _chainIdOf[message.sourceChainSelector];
+
+        address asset = Constants.ASSET_FOR_DATA_ONLY_BRIDGE;
+        uint256 amount = 0;
+        if (tokenCount == 1) {
+            asset = message.destTokenAmounts[0].token;
+            amount = message.destTokenAmounts[0].amount;
+            _transferToTransferHelper(asset, amount);
         }
+        IChainGateway(GATEWAY).receiveMessage(sourceChainId, asset, amount, message.data);
     }
 
     function _pullAssetFromTransferHelperAndApproveCcipRouter(

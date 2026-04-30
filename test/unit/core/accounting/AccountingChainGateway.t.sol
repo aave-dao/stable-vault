@@ -2,6 +2,7 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.22;
 
+import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -13,6 +14,7 @@ import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
+import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
@@ -127,6 +129,21 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         assertEq(_accountingChainGateway.getIouTokenManager(), address(_mockIouTokenManager));
     }
 
+    function test_constructor_reverts_ifFundsHandlerIsZeroAddress() public {
+        vm.expectRevert(Errors.ZeroAddress.selector);
+        new AccountingChainGateway(address(0), address(_mockIouTokenManager), address(_mockChainBalanceOracle));
+    }
+
+    function test_constructor_reverts_ifChainBalanceOracleIsZeroAddress() public {
+        vm.expectRevert(Errors.ZeroAddress.selector);
+        new AccountingChainGateway(address(_mockFundsHandler), address(_mockIouTokenManager), address(0));
+    }
+
+    function test_constructor_reverts_ifInvalidIouTokenManager() public {
+        vm.expectRevert(Errors.ZeroAddress.selector);
+        new AccountingChainGateway(address(_mockFundsHandler), address(0), address(_mockChainBalanceOracle));
+    }
+
     function test_rescueTokens_transfersIdleFundsToMsgSender() public {
         address asset = address(_mockUsdt);
         uint256 amount = 1000000000000000000;
@@ -140,6 +157,57 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         _accountingChainGateway.rescueTokens(asset, amount);
         assertEq(_mockUsdt.balanceOf(everyRoleAccount), amount);
         assertEq(_mockUsdt.balanceOf(address(_accountingChainGateway)), 0);
+    }
+
+    function test_rescueTokens_reverts_ifMsgSenderIsNotAuthorized(address unauthorizedMsgSender, uint256 amount)
+        public
+    {
+        vm.assume(unauthorizedMsgSender != address(0));
+        _assumeNotProxyAdmin(unauthorizedMsgSender, address(_accountingChainGateway));
+        _mockAccessManager.mockRejectCall(
+            unauthorizedMsgSender, address(_accountingChainGateway), IRescuableToken.rescueTokens.selector
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
+        );
+        vm.prank(unauthorizedMsgSender);
+        _accountingChainGateway.rescueTokens(address(_mockUsdt), amount);
+    }
+
+    function test_rescueNative_transfersExpectedAmountToMsgSender(uint256 gatewayBalance, uint256 amountToRescue)
+        public
+    {
+        address msgSender = makeAddr("msgSender");
+
+        gatewayBalance = _boundNativeAmount(gatewayBalance);
+        amountToRescue = _boundNativeAmount(amountToRescue);
+        vm.assume(gatewayBalance >= amountToRescue);
+
+        vm.deal(address(_accountingChainGateway), gatewayBalance);
+        vm.expectEmit(true, true, true, true);
+        emit IRescuableNative.NativeRescued(msgSender, amountToRescue);
+        vm.prank(msgSender);
+        _accountingChainGateway.rescueNative(amountToRescue);
+
+        assertEq(address(msgSender).balance, amountToRescue);
+        assertEq(address(_accountingChainGateway).balance, gatewayBalance - amountToRescue);
+    }
+
+    function test_rescueNative_reverts_ifMsgSenderIsNotAuthorized(address unauthorizedMsgSender, uint256 amount)
+        public
+    {
+        vm.assume(unauthorizedMsgSender != address(0));
+        _assumeNotProxyAdmin(unauthorizedMsgSender, address(_accountingChainGateway));
+        _mockAccessManager.mockRejectCall(
+            unauthorizedMsgSender, address(_accountingChainGateway), IRescuableNative.rescueNative.selector
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
+        );
+        vm.prank(unauthorizedMsgSender);
+        _accountingChainGateway.rescueNative(amount);
     }
 
     function test_removeBridgeAdapter_removesBridgeAdapter() public {
@@ -224,6 +292,12 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         vm.expectRevert(Errors.InvalidParameter.selector);
         vm.prank(everyRoleAccount);
         _accountingChainGateway.addBridgeAdapter(address(_mockUsdt), block.chainid, makeAddr("bridgeAdapter"));
+    }
+
+    function test_addBridgeAdapter_reverts_ifChainIdIsZero() public {
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        vm.prank(everyRoleAccount);
+        _accountingChainGateway.addBridgeAdapter(address(_mockUsdt), 0, makeAddr("bridgeAdapter"));
     }
 
     function test_sendBridgeIouTokenMessageWithFeePayer_withTokenBridgeFee(
@@ -469,6 +543,17 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         _accountingChainGateway.receiveMessage(EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "");
     }
 
+    function test_receiveMessage_noops_whenNoFundsAndNoData() public {
+        vm.mockCallRevert(
+            address(_mockFundsHandler),
+            abi.encodeWithSelector(IFundsHandler.fundsArrivedFromChainCallback.selector),
+            bytes("unexpected")
+        );
+
+        vm.prank(makeAddr("notAdapter"));
+        _accountingChainGateway.receiveMessage(EARNING_CHAIN_ID, address(0), 0, "");
+    }
+
     function test_receiveMessage_whenBridgeIouTokenIsReceived(address iouTokenRecipient, uint256 iouTokenAmountRay)
         public
     {
@@ -489,6 +574,26 @@ contract AccountingChainGatewayTest is TestWithHelpers {
                     messageType: IChainGateway.MessageType.BRIDGE_IOU_TOKEN,
                     data: abi.encode(
                         IChainGateway.IouTokenBridgeMessage({recipient: iouTokenRecipient, amount: iouTokenAmountRay})
+                    )
+                })
+            )
+        );
+    }
+
+    function test_receiveMessage_reverts_whenBridgeIouTokenIsBundledWithFunds(uint256 amountUsdt) public {
+        amountUsdt = _boundAssetAmount(address(_mockUsdt), amountUsdt);
+
+        vm.expectRevert(IChainGateway.DataNotAllowedWithFunds.selector);
+        vm.prank(address(_mockBridgeAdapterAssets));
+        _accountingChainGateway.receiveMessage(
+            EARNING_CHAIN_ID,
+            address(_mockUsdt),
+            amountUsdt,
+            abi.encode(
+                IChainGateway.CrossChainMessage({
+                    messageType: IChainGateway.MessageType.BRIDGE_IOU_TOKEN,
+                    data: abi.encode(
+                        IChainGateway.IouTokenBridgeMessage({recipient: makeAddr("iouTokenRecipient"), amount: 100_000})
                     )
                 })
             )
@@ -516,6 +621,34 @@ contract AccountingChainGatewayTest is TestWithHelpers {
             EARNING_CHAIN_ID,
             address(0),
             0,
+            abi.encode(
+                IChainGateway.CrossChainMessage({
+                    messageType: IChainGateway.MessageType.BURN_IOU_TOKEN,
+                    data: abi.encode(
+                        IChainGateway.BurnIouTokenMessage({
+                            iouTokenAmountBurnedRay: iouTokenAmountBurnedRay,
+                            timestamp: block.timestamp,
+                            blockNumber: block.number
+                        })
+                    )
+                })
+            )
+        );
+    }
+
+    function test_receiveMessage_reverts_whenBurnIouTokenIsBundledWithFunds(
+        uint256 amountUsdt,
+        uint256 iouTokenAmountBurnedRay
+    ) public {
+        amountUsdt = _boundAssetAmount(address(_mockUsdt), amountUsdt);
+        iouTokenAmountBurnedRay = _boundRayAmount(iouTokenAmountBurnedRay);
+
+        vm.expectRevert(IChainGateway.DataNotAllowedWithFunds.selector);
+        vm.prank(address(_mockBridgeAdapterAssets));
+        _accountingChainGateway.receiveMessage(
+            EARNING_CHAIN_ID,
+            address(_mockUsdt),
+            amountUsdt,
             abi.encode(
                 IChainGateway.CrossChainMessage({
                     messageType: IChainGateway.MessageType.BURN_IOU_TOKEN,
@@ -602,6 +735,38 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         );
     }
 
+    function test_receiveMessage_whenReturnFundsIsBundledWithFunds(uint256 amountUsdt) public {
+        amountUsdt = _boundAssetAmount(address(_mockUsdt), amountUsdt);
+
+        _mockChainBalanceOracle.mockChainBalance(
+            EARNING_CHAIN_ID,
+            100_000e27,
+            block.timestamp,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            false
+        );
+
+        vm.expectCall(
+            address(_mockFundsHandler),
+            abi.encodeCall(IFundsHandler.fundsArrivedFromChainCallback, (address(_mockUsdt), amountUsdt))
+        );
+
+        vm.prank(address(_mockBridgeAdapterAssets));
+        _accountingChainGateway.receiveMessage(
+            EARNING_CHAIN_ID,
+            address(_mockUsdt),
+            amountUsdt,
+            abi.encode(
+                IChainGateway.CrossChainMessage({
+                    messageType: IChainGateway.MessageType.RETURN_FUNDS,
+                    data: abi.encode(
+                        IChainGateway.ReturnFundsMessage({timestamp: block.timestamp, blockNumber: block.number})
+                    )
+                })
+            )
+        );
+    }
+
     function test_receiveMessage_reverts_whenReturnFundsAndSnapshotBlockIsOlderThanMessage() public {
         // Move to the next block so we can publish a snapshot with an older source block number.
         vm.roll(block.number + 1);
@@ -623,6 +788,38 @@ contract AccountingChainGatewayTest is TestWithHelpers {
             EARNING_CHAIN_ID,
             address(0),
             0,
+            abi.encode(
+                IChainGateway.CrossChainMessage({
+                    messageType: IChainGateway.MessageType.RETURN_FUNDS,
+                    data: abi.encode(
+                        IChainGateway.ReturnFundsMessage({timestamp: block.timestamp, blockNumber: block.number})
+                    )
+                })
+            )
+        );
+    }
+
+    function test_receiveMessage_reverts_whenReturnFundsBundledWithFundsAndSnapshotBlockIsOlderThanMessage(uint256 amountUsdt)
+        public
+    {
+        amountUsdt = _boundAssetAmount(address(_mockUsdt), amountUsdt);
+
+        vm.roll(block.number + 1);
+        _mockChainBalanceOracle.mockChainBalance(
+            EARNING_CHAIN_ID,
+            0,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS * 2,
+            block.number - 1,
+            false
+        );
+
+        vm.expectRevert(IAccountingChainGateway.StaleChainBalance.selector);
+        vm.prank(address(_mockBridgeAdapterAssets));
+        _accountingChainGateway.receiveMessage(
+            EARNING_CHAIN_ID,
+            address(_mockUsdt),
+            amountUsdt,
             abi.encode(
                 IChainGateway.CrossChainMessage({
                     messageType: IChainGateway.MessageType.RETURN_FUNDS,
@@ -676,6 +873,44 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         );
     }
 
+    function test_receiveMessage_whenReturnFundsBundledWithFunds_givenWhitelistedAssetBridgeAdapter(uint256 amountUsdt)
+        public
+    {
+        amountUsdt = _boundAssetAmount(address(_mockUsdt), amountUsdt);
+
+        _mockChainBalanceOracle.mockChainBalance(
+            EARNING_CHAIN_ID,
+            100_000e27,
+            block.timestamp,
+            block.timestamp - DEFAULT_CHAIN_BALANCE_ORACLE_PUBLISH_DELAY_SECONDS,
+            false
+        );
+
+        address unknownAdapter = makeAddr("unknownAdapter");
+        vm.prank(admin);
+        _accountingChainGateway.addBridgeAdapter(address(_mockUsdt), EARNING_CHAIN_ID, unknownAdapter);
+
+        vm.expectCall(
+            address(_mockFundsHandler),
+            abi.encodeCall(IFundsHandler.fundsArrivedFromChainCallback, (address(_mockUsdt), amountUsdt))
+        );
+
+        vm.prank(unknownAdapter);
+        _accountingChainGateway.receiveMessage(
+            EARNING_CHAIN_ID,
+            address(_mockUsdt),
+            amountUsdt,
+            abi.encode(
+                IChainGateway.CrossChainMessage({
+                    messageType: IChainGateway.MessageType.RETURN_FUNDS,
+                    data: abi.encode(
+                        IChainGateway.ReturnFundsMessage({timestamp: block.timestamp, blockNumber: block.number})
+                    )
+                })
+            )
+        );
+    }
+
     function test_receiveMessage_reverts_ifInvalidMessageType() public {
         vm.expectRevert(IChainGateway.InvalidMessageType.selector);
         // Call must come from whitelisted data bridge bridge adapter
@@ -684,6 +919,19 @@ contract AccountingChainGatewayTest is TestWithHelpers {
             EARNING_CHAIN_ID,
             address(0),
             0,
+            abi.encode(IChainGateway.CrossChainMessage({messageType: IChainGateway.MessageType.INVALID, data: ""}))
+        );
+    }
+
+    function test_receiveMessage_reverts_whenInvalidMessageTypeIsBundledWithFunds(uint256 amountUsdt) public {
+        amountUsdt = _boundAssetAmount(address(_mockUsdt), amountUsdt);
+
+        vm.expectRevert(IChainGateway.DataNotAllowedWithFunds.selector);
+        vm.prank(address(_mockBridgeAdapterAssets));
+        _accountingChainGateway.receiveMessage(
+            EARNING_CHAIN_ID,
+            address(_mockUsdt),
+            amountUsdt,
             abi.encode(IChainGateway.CrossChainMessage({messageType: IChainGateway.MessageType.INVALID, data: ""}))
         );
     }
@@ -709,6 +957,48 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         // Call must come from unsupported bridge adapter
         vm.prank(address(makeAddr("unsupportedAdapter")));
         _accountingChainGateway.receiveMessage(EARNING_CHAIN_ID, address(0), 0, data);
+    }
+
+    function test_receiveMessage_reverts_whenReturnFundsBundledWithFundsFromDataOnlyAdapter(uint256 amountUsdt) public {
+        amountUsdt = _boundAssetAmount(address(_mockUsdt), amountUsdt);
+
+        vm.expectRevert(IChainGateway.AdapterNotFound.selector);
+        vm.prank(address(_mockBridgeAdapterData));
+        _accountingChainGateway.receiveMessage(
+            EARNING_CHAIN_ID,
+            address(_mockUsdt),
+            amountUsdt,
+            abi.encode(
+                IChainGateway.CrossChainMessage({
+                    messageType: IChainGateway.MessageType.RETURN_FUNDS,
+                    data: abi.encode(
+                        IChainGateway.ReturnFundsMessage({timestamp: block.timestamp, blockNumber: block.number})
+                    )
+                })
+            )
+        );
+    }
+
+    function test_receiveMessage_reverts_whenReturnFundsBundledWithFundsFromUnsupportedAssetAdapter(uint256 amountUsdt)
+        public
+    {
+        amountUsdt = _boundAssetAmount(address(_mockUsdt), amountUsdt);
+
+        vm.expectRevert(IChainGateway.AdapterNotFound.selector);
+        vm.prank(makeAddr("unsupportedAdapter"));
+        _accountingChainGateway.receiveMessage(
+            EARNING_CHAIN_ID,
+            address(_mockUsdt),
+            amountUsdt,
+            abi.encode(
+                IChainGateway.CrossChainMessage({
+                    messageType: IChainGateway.MessageType.RETURN_FUNDS,
+                    data: abi.encode(
+                        IChainGateway.ReturnFundsMessage({timestamp: block.timestamp, blockNumber: block.number})
+                    )
+                })
+            )
+        );
     }
 
     function test_sendPushFundsToChainMessage_sendsFundsToEarningChainWithTokenBridgeFee(
@@ -1006,6 +1296,25 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         vm.prank(address(_mockFundsHandler));
         _accountingChainGateway.sendPushFundsToChainMessage(
             address(_mockUsdt), 100e6, EARNING_CHAIN_ID, bogusAdapter, address(_mockFundsHandler), bridgeParams
+        );
+    }
+
+    function test_sendPushFundsToChainMessage_reverts_ifAssetIsDataOnlyBridgeAndAmountIsNonZero() public {
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, gasLimit: 100000, data: ""
+            })
+        );
+
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        vm.prank(address(_mockFundsHandler));
+        _accountingChainGateway.sendPushFundsToChainMessage(
+            address(0),
+            100e6,
+            EARNING_CHAIN_ID,
+            address(_mockBridgeAdapterData),
+            address(_mockFundsHandler),
+            bridgeParams
         );
     }
 }

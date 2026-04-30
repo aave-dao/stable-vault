@@ -71,9 +71,4 @@ abstract contract BaseBridgeAdapter is AccessManaged, TransferHelperClient, IBri
         _destinationChainAdapterOf[chainId] = destinationChainAdapter;
         emit DestinationChainAdapterSet(chainId, destinationChainAdapter);
     }
-
-    function _processReceivedFunds(address asset, uint256 amount) internal assertingTransferHelperBalanceFor(asset) {
-        _transferToTransferHelper(asset, amount);
-        IChainGateway(GATEWAY).receiveMessage(RECEIVED_FUNDS_ONLY_SOURCE_CHAIN_ID, asset, amount, "");
-    }
 }

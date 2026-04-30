@@ -10,12 +10,16 @@ interface IBridgeAdapter {
     /// @dev The message id matches the one in the `MessageReceived` event.
     event MessagePublished(bytes32 indexed messageId);
 
-    /// @notice Emitted when a message is received before being processed.
+    /// @notice Emitted when a message is received and processed.
     /// @dev The message id matches the one in the `MessagePublished` event.
     event MessageReceived(bytes32 indexed messageId);
 
     /// @notice Emitted when the destination chain adapter is set.
     event DestinationChainAdapterSet(uint256 indexed chainId, address indexed destinationChainAdapter);
+
+    /// @notice Thrown when the number of tokens in a message is greater than the max expected.
+    /// @custom:selector 0xe778681d
+    error InvalidTokenCount();
 
     /// @notice Address checked is not the destination chain adapter.
     /// @custom:selector 0x75503511

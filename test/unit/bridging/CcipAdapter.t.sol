@@ -34,6 +34,7 @@ import {IMockErc20} from "test/mocks/MockErc20.sol";
 import {MockGasHeavyReceiver} from "test/mocks/MockGasHeavyReceiver.sol";
 import {MockNonStandardErc20} from "test/mocks/MockNonStandardErc20.sol";
 import {MockReentrantGateway} from "test/mocks/MockReentrantGateway.sol";
+import {MockRejectNativeReceiver} from "test/mocks/MockRejectNativeReceiver.sol";
 import {MockTransferHelper} from "test/mocks/MockTransferHelper.sol";
 
 contract CcipAdapterTest is TestWithHelpers {
@@ -128,6 +129,35 @@ contract CcipAdapterTest is TestWithHelpers {
         vm.expectRevert();
         _deployCcipAdapter(
             address(_mockAccessManager), address(_mockAccountingChainGateway), address(_mockCCIPRouter), address(0)
+        );
+    }
+
+    function test_constructor_reverts_ifInvalidCCIPRouter() public {
+        vm.expectRevert(Errors.ZeroAddress.selector);
+        _deployCcipAdapter(
+            address(_mockAccessManager), address(_mockAccountingChainGateway), address(0), address(_mockTransferHelper)
+        );
+    }
+
+    function test_constructor_reverts_ifInvalidAssetRegistry() public {
+        vm.expectRevert(Errors.ZeroAddress.selector);
+        new CcipAdapter(
+            address(_mockAccessManager),
+            address(_mockAccountingChainGateway),
+            address(_mockCCIPRouter),
+            address(_mockTransferHelper),
+            address(0)
+        );
+    }
+
+    function test_constructor_reverts_ifInvalidGateway() public {
+        vm.expectRevert(Errors.ZeroAddress.selector);
+        new CcipAdapter(
+            address(_mockAccessManager),
+            address(0),
+            address(_mockCCIPRouter),
+            address(_mockTransferHelper),
+            address(_mockAssetRegistry)
         );
     }
 
@@ -822,6 +852,54 @@ contract CcipAdapterTest is TestWithHelpers {
         assertEq(gasHeavyFeePayer.lastValue(), excessFee);
     }
 
+    function test_publishMessageToChainWithFeePayer_reverts_ifNativeFeeRefundFails() public {
+        uint256 amountUsdt = 100_000000;
+        uint256 estimatedFeeAmount = 1 ether;
+        uint256 excessFee = 1 wei;
+        uint256 allocatedFeeAmount = estimatedFeeAmount + excessFee;
+
+        MockRejectNativeReceiver rejectingFeePayer = new MockRejectNativeReceiver();
+
+        _mockTransferHelper.mockAsset(address(_mockUsdt), amountUsdt);
+        vm.deal(address(_mockAccountingChainGateway), allocatedFeeAmount);
+
+        bytes memory bridgeParams = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feeToken: address(0),
+                feeAmount: allocatedFeeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: DEFAULT_GAS_LIMIT,
+                data: ""
+            })
+        );
+
+        Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
+        ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
+
+        Client.EVM2AnyMessage memory expectedCcipMessage = Client.EVM2AnyMessage({
+            receiver: abi.encode(_earningChainCcipAdapter),
+            data: "",
+            tokenAmounts: ccipTokenAmounts,
+            feeToken: address(0),
+            extraArgs: Client._argsToBytes(
+                Client.GenericExtraArgsV2({gasLimit: DEFAULT_GAS_LIMIT, allowOutOfOrderExecution: true})
+            )
+        });
+
+        vm.mockCall(
+            address(_mockCCIPRouter),
+            abi.encodeWithSelector(IRouterClient.getFee.selector, EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage),
+            abi.encode(estimatedFeeAmount)
+        );
+        _expectBridgeAssetsApproval(ccipTokenAmounts);
+
+        vm.expectRevert(Errors.NativeTransferFailed.selector);
+        vm.prank(address(_mockAccountingChainGateway));
+        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer{value: allocatedFeeAmount}(
+            EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "", address(rejectingFeePayer), bridgeParams
+        );
+    }
+
     function test_publishMessageToChainWithFeePayer_refundThresholdWorksAsExpected_TokenBridgeFee(
         address feePayer,
         uint256 feeAmount,
@@ -1220,28 +1298,20 @@ contract CcipAdapterTest is TestWithHelpers {
         );
     }
 
-    function test_ccipReceive_handlesFundsReceived(uint256 amountUsdt, uint256 amountGho) public {
+    function test_ccipReceive_handlesFundsReceived(uint256 amountUsdt) public {
         // Context: Earning Chain -> Accounting Chain
 
         amountUsdt = _boundAssetAmount(address(_mockUsdt), amountUsdt);
-        amountGho = _boundAssetAmount(address(_mockGho), amountGho);
 
         // Mint to adapter to mimic bridged funds
         _mockUsdt.mint(address(_accountingChainCcipAdapter), amountUsdt);
-        _mockGho.mint(address(_accountingChainCcipAdapter), amountGho);
 
-        Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](2);
+        Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
         ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
-        ccipTokenAmounts[1] = Client.EVMTokenAmount({token: address(_mockGho), amount: amountGho});
 
-        // receiveMessage is called once per asset
         vm.expectCall(
             address(_mockAccountingChainGateway),
-            abi.encodeCall(IChainGateway.receiveMessage, (0, address(_mockUsdt), amountUsdt, ""))
-        );
-        vm.expectCall(
-            address(_mockAccountingChainGateway),
-            abi.encodeCall(IChainGateway.receiveMessage, (0, address(_mockGho), amountGho, ""))
+            abi.encodeCall(IChainGateway.receiveMessage, (EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, ""))
         );
 
         vm.prank(address(_mockCCIPRouter));
@@ -1259,25 +1329,9 @@ contract CcipAdapterTest is TestWithHelpers {
     function test_ccipReceive_emitsMessageId() public {
         // Context: Earning Chain -> Accounting Chain
 
-        uint256 amountUsdt = 123 * 10 ** 6;
-        uint256 amountGho = 456 * 10 ** 18;
-
-        // Mint to adapter to mimic bridged funds
-        _mockUsdt.mint(address(_accountingChainCcipAdapter), amountUsdt);
-        _mockGho.mint(address(_accountingChainCcipAdapter), amountGho);
-
-        Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](2);
-        ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
-        ccipTokenAmounts[1] = Client.EVMTokenAmount({token: address(_mockGho), amount: amountGho});
-
-        // receiveMessage is called once per asset
         vm.expectCall(
             address(_mockAccountingChainGateway),
-            abi.encodeCall(IChainGateway.receiveMessage, (0, address(_mockUsdt), amountUsdt, ""))
-        );
-        vm.expectCall(
-            address(_mockAccountingChainGateway),
-            abi.encodeCall(IChainGateway.receiveMessage, (0, address(_mockGho), amountGho, ""))
+            abi.encodeCall(IChainGateway.receiveMessage, (EARNING_CHAIN_ID, address(0), 0, ""))
         );
 
         bytes32 messageId = keccak256("messageId");
@@ -1291,41 +1345,29 @@ contract CcipAdapterTest is TestWithHelpers {
                 sourceChainSelector: EARNING_CHAIN_CCIP_SELECTOR,
                 sender: abi.encode(address(_earningChainCcipAdapter)),
                 data: "",
-                destTokenAmounts: ccipTokenAmounts
+                destTokenAmounts: new Client.EVMTokenAmount[](0)
             })
         );
     }
 
-    function test_ccipReceive_handlesBothAssetsAndMessageData(uint256 amountUsdt, uint256 amountGho) public {
+    function test_ccipReceive_handlesFundsAndMessageData(uint256 amountUsdt) public {
         // Context: Earning Chain -> Accounting Chain
 
         amountUsdt = _boundAssetAmount(address(_mockUsdt), amountUsdt);
-        amountGho = _boundAssetAmount(address(_mockGho), amountGho);
 
         bytes memory arbitraryData = abi.encode(keccak256(hex"c0ffee"));
 
         // Mint to adapter to mimic bridged funds
         _mockUsdt.mint(address(_accountingChainCcipAdapter), amountUsdt);
-        _mockGho.mint(address(_accountingChainCcipAdapter), amountGho);
 
-        Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](2);
+        Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
         ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
-        ccipTokenAmounts[1] = Client.EVMTokenAmount({token: address(_mockGho), amount: amountGho});
 
-        // Expect both assets and message data to be passed to gateway in separate calls
-        // Assets are processed one at a time
         vm.expectCall(
             address(_mockAccountingChainGateway),
-            abi.encodeCall(IChainGateway.receiveMessage, (0, address(_mockUsdt), amountUsdt, ""))
-        );
-        vm.expectCall(
-            address(_mockAccountingChainGateway),
-            abi.encodeCall(IChainGateway.receiveMessage, (0, address(_mockGho), amountGho, ""))
-        );
-        // Message data is passed separately
-        vm.expectCall(
-            address(_mockAccountingChainGateway),
-            abi.encodeCall(IChainGateway.receiveMessage, (EARNING_CHAIN_ID, address(0), 0, arbitraryData))
+            abi.encodeCall(
+                IChainGateway.receiveMessage, (EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, arbitraryData)
+            )
         );
 
         vm.prank(address(_mockCCIPRouter));
@@ -1340,18 +1382,15 @@ contract CcipAdapterTest is TestWithHelpers {
         );
     }
 
-    function test_ccipReceive_reverts_ifFundsHandlingFails(uint256 amountUsdt, uint256 amountGho) public {
+    function test_ccipReceive_reverts_ifFundsHandlingFails(uint256 amountUsdt) public {
         // Context: Earning Chain -> Accounting Chain
 
         amountUsdt = _boundAssetAmount(address(_mockUsdt), amountUsdt);
-        amountGho = _boundAssetAmount(address(_mockGho), amountGho);
 
         _mockUsdt.mint(address(_accountingChainCcipAdapter), amountUsdt);
-        _mockGho.mint(address(_accountingChainCcipAdapter), amountGho);
 
-        Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](2);
+        Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
         ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
-        ccipTokenAmounts[1] = Client.EVMTokenAmount({token: address(_mockGho), amount: amountGho});
 
         bytes32 messageId = keccak256("messageId");
         Client.Any2EVMMessage memory ccipMessage = Client.Any2EVMMessage({
@@ -1366,13 +1405,34 @@ contract CcipAdapterTest is TestWithHelpers {
         // e.g. deposit of asset into Allocator is disabled
         vm.mockCallRevert(
             address(_mockAccountingChainGateway),
-            abi.encodeCall(IChainGateway.receiveMessage, (0, address(_mockUsdt), amountUsdt, "")),
+            abi.encodeCall(IChainGateway.receiveMessage, (EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "")),
             abi.encodeWithSelector(Errors.InvalidParameter.selector, "test")
         );
 
         vm.prank(address(_mockCCIPRouter));
         vm.expectRevert(abi.encodeWithSelector(Errors.InvalidParameter.selector, "test"));
         _accountingChainCcipAdapter.ccipReceive(ccipMessage);
+    }
+
+    function test_ccipReceive_reverts_ifMoreThanOneTokenIsReceived(uint256 amountUsdt, uint256 amountGho) public {
+        amountUsdt = _boundAssetAmount(address(_mockUsdt), amountUsdt);
+        amountGho = _boundAssetAmount(address(_mockGho), amountGho);
+
+        Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](2);
+        ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
+        ccipTokenAmounts[1] = Client.EVMTokenAmount({token: address(_mockGho), amount: amountGho});
+
+        vm.expectRevert(IBridgeAdapter.InvalidTokenCount.selector);
+        vm.prank(address(_mockCCIPRouter));
+        _accountingChainCcipAdapter.ccipReceive(
+            Client.Any2EVMMessage({
+                messageId: 0,
+                sourceChainSelector: EARNING_CHAIN_CCIP_SELECTOR,
+                sender: abi.encode(address(_earningChainCcipAdapter)),
+                data: "",
+                destTokenAmounts: ccipTokenAmounts
+            })
+        );
     }
 
     function test_ccipReceive_reverts_ifOnlyDestinationChainAdapter(address sender) public {

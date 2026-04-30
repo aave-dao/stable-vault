@@ -5,11 +5,15 @@ pragma solidity ^0.8.22;
 /// @title IChainGateway
 /// @author Aave Labs
 /// @notice Interface for handling the communication between chains for bridging assets and data.
-/// @dev Assumes bridged assets and bridged data can be handled independently of each other.
+/// @dev Supports funds-only, data-only, and explicitly allowed funds-with-data bridge messages.
 interface IChainGateway {
     /// @notice Thrown when a bridge adapter is not found for a given asset and chain.
     /// @custom:selector 0xf7b1bf8e
     error AdapterNotFound();
+
+    /// @notice Thrown when a given message contains both funds and a data payload which is not allowed.
+    /// @custom:selector 0x9d73280d
+    error DataNotAllowedWithFunds();
 
     /// @notice Thrown when the message type for the arbitrary message data is not recognized.
     /// @custom:selector 0x5b60892f

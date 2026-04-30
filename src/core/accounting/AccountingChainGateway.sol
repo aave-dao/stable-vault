@@ -65,7 +65,6 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
         address feePayer,
         bytes calldata bridgeParamsEncoded
     ) external payable override onlyFundsHandler {
-        _validateBridgeAdapterIsSupported(asset, targetChainId, bridgeAdapter);
         // Block pushing funds to a chain whose balance oracle is stale, as the target chain's state is unknown and
         // may be unhealthy (e.g. chain or oracle infrastructure is down). Sending funds there risks locking assets or
         // DoSing withdrawals due to a lack of aggregated liquidity until the oracle staleness is resolved.
@@ -73,12 +72,30 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
         _sendCrossChainMessage(targetChainId, bridgeAdapter, asset, amount, "", feePayer, bridgeParamsEncoded);
     }
 
+    function _receiveData(uint256 sourceChainId, bytes memory data) internal override {
+        IChainGateway.CrossChainMessage memory crossChainMessage = abi.decode(data, (IChainGateway.CrossChainMessage));
+        _receiveCrossChainMessage(sourceChainId, crossChainMessage);
+    }
+
     function _receiveFunds(address asset, uint256 amount) internal override {
         IFundsHandler(FUNDS_HANDLER).fundsArrivedFromChainCallback(asset, amount);
     }
 
-    function _receiveData(uint256 sourceChainId, bytes memory data) internal override {
+    function _receiveFundsWithData(uint256 sourceChainId, address asset, uint256 amount, bytes memory data)
+        internal
+        override
+    {
         IChainGateway.CrossChainMessage memory crossChainMessage = abi.decode(data, (IChainGateway.CrossChainMessage));
+
+        // Only RETURN_FUNDS is allowed to be ingested along with funds.
+        require(crossChainMessage.messageType == IChainGateway.MessageType.RETURN_FUNDS, DataNotAllowedWithFunds());
+        _receiveCrossChainMessage(sourceChainId, crossChainMessage);
+        _receiveFunds(asset, amount);
+    }
+
+    function _receiveCrossChainMessage(uint256 sourceChainId, IChainGateway.CrossChainMessage memory crossChainMessage)
+        private
+    {
         if (crossChainMessage.messageType == IChainGateway.MessageType.BRIDGE_IOU_TOKEN) {
             _bridgeIouTokenFromEarningChain(crossChainMessage.data);
         } else if (crossChainMessage.messageType == IChainGateway.MessageType.BURN_IOU_TOKEN) {
@@ -90,20 +107,20 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
         }
     }
 
-    function _bridgeIouTokenFromEarningChain(bytes memory data) internal {
+    function _bridgeIouTokenFromEarningChain(bytes memory data) private {
         IChainGateway.IouTokenBridgeMessage memory iouTokenBridgeMessage =
             abi.decode(data, (IChainGateway.IouTokenBridgeMessage));
         IIouTokenManager(IOU_TOKEN_MANAGER).releaseTokens(iouTokenBridgeMessage.recipient, iouTokenBridgeMessage.amount);
     }
 
-    function _burnIouToken(uint256 sourceChainId, bytes memory data) internal {
+    function _burnIouToken(uint256 sourceChainId, bytes memory data) private {
         IChainGateway.BurnIouTokenMessage memory burnIouTokenMessage =
             abi.decode(data, (IChainGateway.BurnIouTokenMessage));
         _validateInboundMessageBlockNumber(sourceChainId, burnIouTokenMessage.blockNumber);
         IIouTokenManager(IOU_TOKEN_MANAGER).burnLockedTokens(burnIouTokenMessage.iouTokenAmountBurnedRay);
     }
 
-    function _processReturnFundsData(uint256 sourceChainId, bytes memory data) internal view {
+    function _processReturnFundsData(uint256 sourceChainId, bytes memory data) private view {
         IChainGateway.ReturnFundsMessage memory returnFundsMessage =
             abi.decode(data, (IChainGateway.ReturnFundsMessage));
         _validateInboundMessageBlockNumber(sourceChainId, returnFundsMessage.blockNumber);
@@ -118,7 +135,7 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
     /// @param earningChainId The ID of the Earning Chain that sent the message.
     /// @param earningChainMessageBlockNumber The block number of when the Earning Chain message was published.
     function _validateInboundMessageBlockNumber(uint256 earningChainId, uint256 earningChainMessageBlockNumber)
-        internal
+        private
         view
     {
         IChainBalanceOracle.ChainBalance memory chainBalance =
