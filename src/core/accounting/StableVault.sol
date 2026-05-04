@@ -436,7 +436,7 @@ contract StableVault is
         address assetOut,
         uint256 minAmountOut,
         uint256 iouAmountRay,
-        bytes memory data
+        bytes memory withdrawalPolicyData
     ) external virtual override nonReentrant assertingTransferHelperBalanceFor(assetOut) {
         require(user == msg.sender, OnlyUser());
         require(iouAmountRay > 0, Errors.ZeroAmount());
@@ -444,7 +444,7 @@ contract StableVault is
         uint256 amountOutRay = IWithdrawalPolicy(WITHDRAWAL_POLICY)
             .applyWithdrawalPolicy(
                 IWithdrawalPolicy.WithdrawalRequest({
-                user: user, assetOut: assetOut, iouAmountRay: iouAmountRay, data: data
+                user: user, assetOut: assetOut, iouAmountRay: iouAmountRay, data: withdrawalPolicyData
             })
             );
         // Note: The `rayToAssetDecimals` conversion truncates, so the user may burn slightly more IOUs than the

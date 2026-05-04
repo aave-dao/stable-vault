@@ -36,7 +36,7 @@ interface IEarningChainGateway is IChainGateway {
     /// @param receiver The address to send the exchanged asset to.
     /// @param bridgeAdapter The whitelisted bridge adapter to use for the data-only message.
     /// @param bridgeParamsEncoded Opaque bridge parameters blob consumed by the adapter.
-    /// @param data Additional data for the withdrawal fee calculation.
+    /// @param withdrawalPolicyData Additional data for the withdrawal policy.
     /// @return amountOut The amount of the exchanged asset transferred to the receiver.
     function exchangeIouTokens(
         uint256 iouTokenAmountRay,
@@ -45,6 +45,6 @@ interface IEarningChainGateway is IChainGateway {
         address receiver,
         address bridgeAdapter,
         bytes calldata bridgeParamsEncoded,
-        bytes memory data
+        bytes memory withdrawalPolicyData
     ) external payable returns (uint256);
 }
