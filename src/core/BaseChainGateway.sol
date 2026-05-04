@@ -24,6 +24,8 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
     /// @custom:storage-location erc7201:aave.storage.BaseChainGateway
     struct BaseChainGatewayStorage {
         /// @dev Set of adapters whitelisted for usage.
+        /// @dev An adapter whitelisted for a token is assumed to also be trusted to ingest data sent along with the
+        /// token.
         /// @dev asset == address(0) for data-only bridging.
         mapping(address asset => mapping(uint256 chainId => mapping(address bridgeAdapter => bool)))
             supportedBridgeAdapters;
@@ -76,18 +78,24 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
 
     /// @inheritdoc IChainGateway
     function receiveMessage(uint256 sourceChainId, address asset, uint256 amount, bytes memory data) external override {
-        if (asset != Constants.ASSET_FOR_DATA_ONLY_BRIDGE && amount > 0) {
-            // Receiving of funds should not check for whitelisted adapter because we may want to recover tokens from
-            // adapter even after removing the adapter. We may have to remove an adapter if we do not trust it for
-            // receiving arbitrary messages.
-            // If someone wants to send funds to the Gateway then it will take it.
-            _receiveFunds(asset, amount);
+        bool hasFunds = asset != Constants.ASSET_FOR_DATA_ONLY_BRIDGE && amount > 0;
+        bool hasData = data.length > 0;
+
+        if (hasFunds) {
+            if (hasData) {
+                // Require msg.sender to be a whitelisted bridge adapter to ingest the data accompanying the funds.
+                _validateBridgeAdapterIsSupported(asset, sourceChainId, msg.sender);
+                _receiveFundsWithData(sourceChainId, asset, amount, data);
+            } else {
+                // Receiving of funds should not check for whitelisted bridge adapter because we may want to recover
+                // tokens from an adapter even after removing it from arbitrary message handling.
+                // If someone wants to send funds to the Gateway then it will take it.
+                _receiveFunds(asset, amount);
+            }
             emit FundsReceived(asset, amount, sourceChainId);
-        }
-        if (data.length > 0) {
-            _validateBridgeAdapterIsSupported({
-                asset: Constants.ASSET_FOR_DATA_ONLY_BRIDGE, chainId: sourceChainId, bridgeAdapter: msg.sender
-            });
+        } else if (hasData) {
+            // Require msg.sender to be a whitelisted bridge adapter to ingest the data from a data-only message.
+            _validateBridgeAdapterIsSupported(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, sourceChainId, msg.sender);
             _receiveData(sourceChainId, data);
         }
     }
@@ -103,7 +111,6 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
     ) external payable override {
         require(msg.sender == IOU_TOKEN_MANAGER, OnlyIouTokenManager());
         require(iouTokenAmountRay > 0, Errors.ZeroAmount());
-        _validateBridgeAdapterIsSupported(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, destinationChainId, bridgeAdapter);
 
         bytes memory bridgeIouTokenMessageEncoded = abi.encode(
             IChainGateway.CrossChainMessage({
@@ -127,7 +134,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
     /// @inheritdoc IChainGateway
     function addBridgeAdapter(address asset, uint256 chainId, address bridgeAdapter) external override restricted {
         require(bridgeAdapter != address(0), Errors.ZeroAddress());
-        require(chainId != block.chainid, Errors.InvalidParameter());
+        require(chainId != block.chainid && chainId != 0, Errors.InvalidParameter());
         require(!$storage().supportedBridgeAdapters[asset][chainId][bridgeAdapter], Errors.AddressAlreadyWhitelisted());
         $storage().supportedBridgeAdapters[asset][chainId][bridgeAdapter] = true;
         emit BridgeAdapterAdded(asset, chainId, bridgeAdapter);
@@ -140,11 +147,6 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         emit BridgeAdapterRemoved(asset, chainId, bridgeAdapter);
     }
 
-    /// @dev Validates that the bridge adapter is whitelisted for the given asset and chain.
-    function _validateBridgeAdapterIsSupported(address asset, uint256 chainId, address bridgeAdapter) internal view {
-        require($storage().supportedBridgeAdapters[asset][chainId][bridgeAdapter], AdapterNotFound());
-    }
-
     function _sendCrossChainMessage(
         uint256 destinationChainId,
         address bridgeAdapter,
@@ -154,6 +156,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         address feePayer,
         bytes memory bridgeParamsEncoded
     ) internal {
+        _validateBridgeAdapterIsSupported(assetToBridge, destinationChainId, bridgeAdapter);
         if (assetToBridge == Constants.ASSET_FOR_DATA_ONLY_BRIDGE) {
             require(amountToBridge == 0, Errors.InvalidParameter());
         }
@@ -182,7 +185,26 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         _checkCanCall(_msgSender(), _msgData());
     }
 
+    function _receiveData(uint256 sourceChainId, bytes memory data) internal virtual;
+
     function _receiveFunds(address asset, uint256 amount) internal virtual;
 
-    function _receiveData(uint256 sourceChainId, bytes memory data) internal virtual;
+    /// @dev Reverts by default.
+    /// @dev Must be overridden if the Chain Gateway can ingest funds along with data from a single cross-chain message.
+    function _receiveFundsWithData(
+        uint256, // sourceChainId
+        address, // asset
+        uint256, // amount
+        bytes memory // data
+    )
+        internal
+        virtual
+    {
+        revert DataNotAllowedWithFunds();
+    }
+
+    /// @dev Validates that the bridge adapter is whitelisted for the given asset and chain.
+    function _validateBridgeAdapterIsSupported(address asset, uint256 chainId, address bridgeAdapter) private view {
+        require($storage().supportedBridgeAdapters[asset][chainId][bridgeAdapter], AdapterNotFound());
+    }
 }

@@ -38,6 +38,9 @@ interface IIouTokenManager {
     function getLockedBalance() external view returns (uint256);
 
     /// @notice Entry point for IOU token owners to bridge tokens to a destination chain.
+    /// @dev IOUs should be bridged via bridges which require finalization on the source chain. If IOUs are bridged and
+    /// exchanged for assets on a destination, but the source chain reorgs, then a user would keep their IOUs and the
+    /// assets withdrawn on the destination chain.
     /// @param destinationChainId The chain id of the chain to publish the message to.
     /// @param iouTokenRecipient The address to send the IOU tokens to on the destination chain.
     /// @param iouTokenAmountRay The amount of IOU tokens to bridge.
