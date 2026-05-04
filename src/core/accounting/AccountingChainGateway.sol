@@ -74,6 +74,12 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
 
     function _receiveData(uint256 sourceChainId, bytes memory data) internal override {
         IChainGateway.CrossChainMessage memory crossChainMessage = abi.decode(data, (IChainGateway.CrossChainMessage));
+
+        require(
+            crossChainMessage.messageType == IChainGateway.MessageType.BRIDGE_IOU_TOKEN
+                || crossChainMessage.messageType == IChainGateway.MessageType.BURN_IOU_TOKEN,
+            InvalidDataOnlyMessage()
+        );
         _receiveCrossChainMessage(sourceChainId, crossChainMessage);
     }
 
@@ -103,6 +109,7 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
         } else if (crossChainMessage.messageType == IChainGateway.MessageType.RETURN_FUNDS) {
             _processReturnFundsData(sourceChainId, crossChainMessage.data);
         } else {
+            // Unreachable code due to message type validation in _receiveData() and _receiveFundsWithData().
             revert IChainGateway.InvalidMessageType();
         }
     }

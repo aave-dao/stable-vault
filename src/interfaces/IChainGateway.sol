@@ -15,6 +15,10 @@ interface IChainGateway {
     /// @custom:selector 0x9d73280d
     error DataNotAllowedWithFunds();
 
+    /// @notice Thrown when a message type does not match the expected message types, for a data-only message.
+    /// @custom:selector 0x82d8a626
+    error InvalidDataOnlyMessage();
+
     /// @notice Thrown when the message type for the arbitrary message data is not recognized.
     /// @custom:selector 0x5b60892f
     error InvalidMessageType();

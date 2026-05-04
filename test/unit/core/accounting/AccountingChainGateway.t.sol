@@ -717,22 +717,19 @@ contract AccountingChainGatewayTest is TestWithHelpers {
             false
         );
 
-        vm.prank(address(_mockBridgeAdapterData));
-        _accountingChainGateway.receiveMessage(
-            EARNING_CHAIN_ID,
-            // The bridge adapters separately call receiveMessage for each asset, so the asset is not relevant for this
-            // test.
-            address(0),
-            0,
-            abi.encode(
-                IChainGateway.CrossChainMessage({
-                    messageType: IChainGateway.MessageType.RETURN_FUNDS,
-                    data: abi.encode(
-                        IChainGateway.ReturnFundsMessage({timestamp: block.timestamp, blockNumber: block.number})
-                    )
-                })
-            )
+        address asset = address(_mockUsdt);
+        uint256 amount = 100_000e27;
+        bytes memory data = abi.encode(
+            IChainGateway.CrossChainMessage({
+                messageType: IChainGateway.MessageType.RETURN_FUNDS,
+                data: abi.encode(
+                    IChainGateway.ReturnFundsMessage({timestamp: block.timestamp, blockNumber: block.number})
+                )
+            })
         );
+
+        vm.prank(address(_mockBridgeAdapterAssets));
+        _accountingChainGateway.receiveMessage(EARNING_CHAIN_ID, asset, amount, data);
     }
 
     function test_receiveMessage_whenReturnFundsIsBundledWithFunds(uint256 amountUsdt) public {
@@ -782,21 +779,20 @@ contract AccountingChainGatewayTest is TestWithHelpers {
             false
         );
 
-        vm.expectRevert(IAccountingChainGateway.StaleChainBalance.selector);
-        vm.prank(address(_mockBridgeAdapterData));
-        _accountingChainGateway.receiveMessage(
-            EARNING_CHAIN_ID,
-            address(0),
-            0,
-            abi.encode(
-                IChainGateway.CrossChainMessage({
-                    messageType: IChainGateway.MessageType.RETURN_FUNDS,
-                    data: abi.encode(
-                        IChainGateway.ReturnFundsMessage({timestamp: block.timestamp, blockNumber: block.number})
-                    )
-                })
-            )
+        address asset = address(_mockUsdt);
+        uint256 amount = 100_000e27;
+        bytes memory data = abi.encode(
+            IChainGateway.CrossChainMessage({
+                messageType: IChainGateway.MessageType.RETURN_FUNDS,
+                data: abi.encode(
+                    IChainGateway.ReturnFundsMessage({timestamp: block.timestamp, blockNumber: block.number})
+                )
+            })
         );
+
+        vm.expectRevert(IAccountingChainGateway.StaleChainBalance.selector);
+        vm.prank(address(_mockBridgeAdapterAssets));
+        _accountingChainGateway.receiveMessage(EARNING_CHAIN_ID, asset, amount, data);
     }
 
     function test_receiveMessage_reverts_whenReturnFundsBundledWithFundsAndSnapshotBlockIsOlderThanMessage(uint256 amountUsdt)
@@ -912,7 +908,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
     }
 
     function test_receiveMessage_reverts_ifInvalidMessageType() public {
-        vm.expectRevert(IChainGateway.InvalidMessageType.selector);
+        vm.expectRevert(IChainGateway.InvalidDataOnlyMessage.selector);
         // Call must come from whitelisted data bridge bridge adapter
         vm.prank(address(_mockBridgeAdapterData));
         _accountingChainGateway.receiveMessage(
@@ -920,6 +916,16 @@ contract AccountingChainGatewayTest is TestWithHelpers {
             address(0),
             0,
             abi.encode(IChainGateway.CrossChainMessage({messageType: IChainGateway.MessageType.INVALID, data: ""}))
+        );
+
+        vm.expectRevert(IChainGateway.InvalidDataOnlyMessage.selector);
+        // Call must come from whitelisted data bridge bridge adapter
+        vm.prank(address(_mockBridgeAdapterData));
+        _accountingChainGateway.receiveMessage(
+            EARNING_CHAIN_ID,
+            address(0),
+            0,
+            abi.encode(IChainGateway.CrossChainMessage({messageType: IChainGateway.MessageType.RETURN_FUNDS, data: ""}))
         );
     }
 
