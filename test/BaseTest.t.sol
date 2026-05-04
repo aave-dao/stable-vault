@@ -39,6 +39,7 @@ import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 import {ChainBalanceOracle} from "src/oracles/balance/ChainBalanceOracle.sol";
 import {ChainlinkL2ChainBalanceOracleAdapter} from "src/oracles/balance/ChainlinkL2ChainBalanceOracleAdapter.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
+import {Constants} from "src/types/Constants.sol";
 import {_toSelectorArray} from "test/helpers/TypeHelpers.sol";
 import {EarningChainStateProviderHarness} from "test/mocks/EarningChainStateProviderHarness.sol";
 import {MockBundleFeed} from "test/mocks/MockBundleFeed.sol";
@@ -781,12 +782,16 @@ contract BaseTest is TestWithHelpers {
         // chainId
         accountingChainGateway.addBridgeAdapter(address(GHO), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain));
         accountingChainGateway.addBridgeAdapter(address(USDC), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain));
-        accountingChainGateway.addBridgeAdapter(address(0), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain));
+        accountingChainGateway.addBridgeAdapter(
+            Constants.ASSET_FOR_DATA_ONLY_BRIDGE, EARNING_CHAIN_ID, address(ccipAdapter_accountingChain)
+        );
 
         // Set up Earning Chain Gateway (Earning chain)
         earningChainGateway.addBridgeAdapter(address(GHO), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
         earningChainGateway.addBridgeAdapter(address(USDC), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
-        earningChainGateway.addBridgeAdapter(address(0), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
+        earningChainGateway.addBridgeAdapter(
+            Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain)
+        );
 
         ccipAdapter_accountingChain.setChainSelector(EARNING_CHAIN_ID, EARNING_CHAIN_CCIP_SELECTOR);
         ccipAdapter_accountingChain.setDestinationChainAdapter(EARNING_CHAIN_ID, address(ccipAdapter_earningChain));
