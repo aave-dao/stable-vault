@@ -108,9 +108,10 @@ contract CcipAdapter is
         uint256 amount,
         bytes memory data,
         address feePayer,
+        uint256 gasLimit,
         bytes memory bridgeParamsEncoded
     ) external payable override(BaseBridgeAdapter, IBridgeAdapter) onlyGateway {
-        IBridgeAdapter.BridgeParams memory bridgeParams = BridgeParamsCodec.decode(bridgeParamsEncoded);
+        BridgeParamsCodec.BridgeParams memory bridgeParams = BridgeParamsCodec.decode(bridgeParamsEncoded);
 
         address destinationChainAdapter = _destinationChainAdapterOf[destinationChainId];
         require(destinationChainAdapter != address(0), Errors.InvalidParameter());
@@ -129,7 +130,8 @@ contract CcipAdapter is
             tokenAmounts: tokenAmounts,
             feeToken: bridgeParams.feeToken,
             extraArgs: Client._argsToBytes(
-                Client.GenericExtraArgsV2({gasLimit: bridgeParams.gasLimit, allowOutOfOrderExecution: true})
+                // We pass the input gasLimit, the IRouterClient::getFee will add on top any bridge adapter overhead.
+                Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: true})
             )
         });
 

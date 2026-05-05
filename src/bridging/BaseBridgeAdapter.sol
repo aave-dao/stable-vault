@@ -63,6 +63,7 @@ abstract contract BaseBridgeAdapter is AccessManaged, TransferHelperClient, IBri
         uint256 amount,
         bytes memory data,
         address feePayer,
+        uint256 gasLimit,
         bytes memory bridgeParamsEncoded
     ) external payable virtual override;
 
