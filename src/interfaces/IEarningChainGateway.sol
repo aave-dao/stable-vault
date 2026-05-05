@@ -14,6 +14,9 @@ interface IEarningChainGateway is IChainGateway {
     /// @param amount The amount of the asset that was removed.
     event AssetOutflow(address indexed asset, uint256 amount);
 
+    /// @notice Emitted when the bridge policy address is updated.
+    event BridgePolicySet(address indexed oldPolicy, address indexed newPolicy);
+
     /// @notice The aggregated balance of the Earning Chain.
     function getAggregatedBalance() external view returns (uint256);
 
@@ -27,6 +30,22 @@ interface IEarningChainGateway is IChainGateway {
         uint256 amount,
         address bridgeAdapter,
         bytes calldata bridgeParamsEncoded
+    ) external payable;
+
+    /// @notice Bridges IOU tokens to a destination chain.
+    /// @param destinationChainId The chain id of the chain to publish the message to.
+    /// @param iouTokenRecipient The address to send the IOU tokens to on the destination chain.
+    /// @param iouTokenAmountRay The amount of IOU tokens to bridge.
+    /// @param bridgeAdapter The whitelisted bridge adapter to use for the message.
+    /// @param bridgeParamsEncoded Opaque bridge parameters blob consumed by the adapter.
+    /// @param extraData Additional data for the bridge policy.
+    function bridgeIouTokens(
+        uint256 destinationChainId,
+        address iouTokenRecipient,
+        uint256 iouTokenAmountRay,
+        address bridgeAdapter,
+        bytes calldata bridgeParamsEncoded,
+        bytes calldata extraData
     ) external payable;
 
     /// @notice Exchanges IOU tokens for a specific asset and bridges data back to the Accounting Chain.
@@ -47,4 +66,10 @@ interface IEarningChainGateway is IChainGateway {
         bytes calldata bridgeParamsEncoded,
         bytes memory withdrawalPolicyData
     ) external payable returns (uint256);
+
+    /// @notice Sets the bridge policy. `address(0)` disables the policy.
+    function setBridgePolicy(address policy) external;
+
+    /// @notice Getter for the bridge policy address.
+    function getBridgePolicy() external view returns (address);
 }

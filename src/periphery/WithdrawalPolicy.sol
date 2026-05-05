@@ -125,6 +125,28 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
         return amountOutRay;
     }
 
+    /// @inheritdoc IWithdrawalPolicy
+    /// @dev No request-stage restrictions are applied by this implementation.
+    function applyWithdrawalRequestPolicy(WithdrawalRequestPolicyRequest calldata request)
+        external
+        override
+        returns (bool)
+    {
+        emit WithdrawalRequestPolicyApplied(request.caller, request.user, request.requestedAmountInRay);
+        return true;
+    }
+
+    /// @inheritdoc IWithdrawalPolicy
+    /// @dev No request-stage restrictions are applied by this implementation.
+    function previewWithdrawalRequestPolicy(WithdrawalRequestPolicyRequest calldata)
+        external
+        pure
+        override
+        returns (bool)
+    {
+        return true;
+    }
+
     /// @notice Getter for the configuration for an asset-specific fee.
     /// @param asset Address of the asset to get the configuration for.
     /// @return assetFeeConfig Configuration for the asset-specific fee.

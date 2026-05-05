@@ -13,11 +13,15 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
+import {IBridgePolicy} from "src/interfaces/IBridgePolicy.sol";
+import {IDepositPolicy} from "src/interfaces/IDepositPolicy.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {IStableVault} from "src/interfaces/IStableVault.sol";
+import {ISurplusClaimPolicy} from "src/interfaces/ISurplusClaimPolicy.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
+import {ITransferPolicy} from "src/interfaces/ITransferPolicy.sol";
 import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
@@ -121,6 +125,12 @@ contract StableVault is
 
         /// @dev ERC20-style symbol of the Stable Vault position token.
         string symbol;
+
+        address depositPolicy;
+        address withdrawalRequestPolicy;
+        address transferPolicy;
+        address surplusClaimPolicy;
+        address bridgePolicy;
     }
 
     // keccak256(abi.encode(uint256(keccak256("aave.storage.StableVault")) - 1)) & ~bytes32(uint256(0xff))
@@ -209,7 +219,7 @@ contract StableVault is
     }
 
     /// @inheritdoc IStableVault
-    function deposit(address user, address asset, uint256 amount)
+    function deposit(address user, address asset, uint256 amount, bytes calldata extraData)
         external
         virtual
         override
@@ -218,6 +228,8 @@ contract StableVault is
     {
         require(IAssetRegistry(ASSET_REGISTRY).isUserDepositAllowed(asset), Errors.UnsupportedAsset(asset));
         require(amount > 0, Errors.InvalidAmount());
+
+        _applyDepositPolicy(user, asset, amount, extraData);
 
         IPriceOracle(PRICE_ORACLE).validatePrice(asset);
 
@@ -252,6 +264,36 @@ contract StableVault is
         emit Transfer(address(0), user, amount.assetDecimalsToRay(asset));
     }
 
+    /// @inheritdoc IStableVault
+    function bridgeIouTokens(
+        uint256 destinationChainId,
+        address iouTokenRecipient,
+        uint256 iouTokenAmountRay,
+        address bridgeAdapter,
+        bytes calldata bridgeParamsEncoded,
+        bytes calldata extraData
+    ) external payable virtual override nonReentrant {
+        require(destinationChainId != block.chainid, Errors.InvalidDestinationChainId());
+        require(iouTokenRecipient != address(0), Errors.InvalidParameter());
+        require(iouTokenAmountRay > 0, Errors.ZeroAmount());
+
+        _applyBridgeIouPolicy(destinationChainId, iouTokenRecipient, iouTokenAmountRay, extraData);
+
+        IIouTokenManager(IOU_TOKEN_MANAGER).bridgeTokensFrom{value: msg.value}(
+            msg.sender,
+            destinationChainId,
+            iouTokenRecipient,
+            iouTokenAmountRay,
+            bridgeAdapter,
+            msg.sender,
+            bridgeParamsEncoded
+        );
+    }
+
+    function transfer(address to, uint256 amountRay) external virtual override returns (bool) {
+        return _transfer(to, amountRay, "");
+    }
+
     /// @notice Transfers Stable Vault balance (denominated in RAY) between users.
     /// @dev This is accounting-only (no IOUs, no assets, no WithdrawalPolicy).
     /// @dev For full balance transfers, use transferAll() instead.
@@ -262,7 +304,22 @@ contract StableVault is
     /// @dev Principal is tracked as one aggregate balance per user (not by deposit lots). The principal moved to the
     /// recipient is capped at the sender's remaining `originalDepositRay`; any excess of `amountRay` above that is
     /// treated as interest and does not contribute to the recipient's principal.
-    function transfer(address to, uint256 amountRay) external virtual override nonReentrant returns (bool) {
+    function transfer(address to, uint256 amountRay, bytes calldata extraData)
+        external
+        virtual
+        override
+        returns (bool)
+    {
+        return _transfer(to, amountRay, extraData);
+    }
+
+    /// @notice Transfers the sender's full position to another user.
+    /// @dev Any remaining original deposit amount is also transferred to the recipient.
+    function transferAll(address to, bytes calldata extraData) external virtual override returns (bool) {
+        return _transferAll(to, extraData);
+    }
+
+    function _transfer(address to, uint256 amountRay, bytes memory extraData) internal nonReentrant returns (bool) {
         address from = msg.sender;
         require(amountRay >= Constants.MIN_WITHDRAWABLE_AMOUNT_RAY, Errors.InvalidAmount());
         require(to != address(0), Errors.InvalidParameter());
@@ -277,6 +334,8 @@ contract StableVault is
             _computeTransferShares(from, amountRay, fromSubVaultId, fromConversionRate);
 
         uint256 toSubVaultId = _getOrAssignUserSubVaultId(to);
+
+        _applyTransferPolicy({from: from, to: to, amountRay: amountRay, extraData: extraData});
 
         uint256 toUserShares;
         if (toSubVaultId == fromSubVaultId) {
@@ -302,9 +361,7 @@ contract StableVault is
         return true;
     }
 
-    /// @notice Transfers the sender's full position to another user.
-    /// @dev Any remaining original deposit amount is also transferred to the recipient.
-    function transferAll(address to) external virtual override nonReentrant returns (bool) {
+    function _transferAll(address to, bytes memory extraData) internal nonReentrant returns (bool) {
         address from = msg.sender;
         require(to != address(0), Errors.InvalidParameter());
         require(to != from, Errors.InvalidParameter());
@@ -318,6 +375,8 @@ contract StableVault is
             _previewFullWithdrawalRequest(from);
 
         uint256 toSubVaultId = _getOrAssignUserSubVaultId(to);
+
+        _applyTransferPolicy({from: from, to: to, amountRay: amountOfWithdrawalRay, extraData: extraData});
 
         uint256 toUserShares;
         if (toSubVaultId == fromSubVaultId) {
@@ -368,7 +427,7 @@ contract StableVault is
     }
 
     /// @inheritdoc IStableVault
-    function requestWithdrawal(address user, uint256 requestedAmountInRay)
+    function requestWithdrawal(address user, uint256 requestedAmountInRay, bytes calldata extraData)
         external
         virtual
         override
@@ -397,6 +456,8 @@ contract StableVault is
                 (actualAmountInRay, guaranteedAmountRay, redeemedShares) = _previewFullWithdrawalRequest(user);
             }
         }
+
+        _applyWithdrawalRequestPolicy({user: user, requestedAmountInRay: requestedAmountInRay, extraData: extraData});
 
         uint256 remainingShares = _burnShares(user, subVaultId, redeemedShares);
         if (remainingShares == 0) {
@@ -471,6 +532,9 @@ contract StableVault is
         restricted
         assertingTransferHelperBalanceForAssets(assets)
     {
+        address treasury = $storage().treasury;
+        require(treasury != address(0), TreasuryNotSet());
+        _applySurplusClaimPolicy(treasury, assets, amounts);
         for (uint256 i = 0; i < assets.length; i++) {
             require(amounts[i] > 0, Errors.ZeroAmount());
             IFundsHandler(FUNDS_HANDLER).processWithdrawal(assets[i], amounts[i]);
@@ -481,8 +545,6 @@ contract StableVault is
         // chain). Operators should avoid calling claimSurplusInterest() during these transient windows to prevent
         // unnecessary reverts.
         require(_getVaultObligations() <= _getVaultAggregatedBalance(), SurplusInterestClaimLeadsToInsolvency());
-        address treasury = $storage().treasury;
-        require(treasury != address(0), TreasuryNotSet());
         ITransferHelper(TRANSFER_HELPER).transfer(assets, amounts, treasury);
         emit SurplusInterestClaimed(assets, amounts);
     }
@@ -492,7 +554,62 @@ contract StableVault is
         _setTreasury(treasury);
     }
 
+    /// @inheritdoc IStableVault
+    function setDepositPolicy(address policy) external override restricted {
+        emit DepositPolicySet($storage().depositPolicy, policy);
+        $storage().depositPolicy = policy;
+    }
+
+    /// @inheritdoc IStableVault
+    function setWithdrawalRequestPolicy(address policy) external override restricted {
+        emit WithdrawalRequestPolicySet($storage().withdrawalRequestPolicy, policy);
+        $storage().withdrawalRequestPolicy = policy;
+    }
+
+    /// @inheritdoc IStableVault
+    function setTransferPolicy(address policy) external override restricted {
+        emit TransferPolicySet($storage().transferPolicy, policy);
+        $storage().transferPolicy = policy;
+    }
+
+    /// @inheritdoc IStableVault
+    function setSurplusClaimPolicy(address policy) external override restricted {
+        emit SurplusClaimPolicySet($storage().surplusClaimPolicy, policy);
+        $storage().surplusClaimPolicy = policy;
+    }
+
+    /// @inheritdoc IStableVault
+    function setBridgePolicy(address policy) external override restricted {
+        emit BridgePolicySet($storage().bridgePolicy, policy);
+        $storage().bridgePolicy = policy;
+    }
+
     ////////////////////////////////////////////////// GETTERS /////////////////////////////////////////////////////
+
+    /// @inheritdoc IStableVault
+    function getDepositPolicy() external view override returns (address) {
+        return $storage().depositPolicy;
+    }
+
+    /// @inheritdoc IStableVault
+    function getWithdrawalRequestPolicy() external view override returns (address) {
+        return $storage().withdrawalRequestPolicy;
+    }
+
+    /// @inheritdoc IStableVault
+    function getTransferPolicy() external view override returns (address) {
+        return $storage().transferPolicy;
+    }
+
+    /// @inheritdoc IStableVault
+    function getSurplusClaimPolicy() external view override returns (address) {
+        return $storage().surplusClaimPolicy;
+    }
+
+    /// @inheritdoc IStableVault
+    function getBridgePolicy() external view override returns (address) {
+        return $storage().bridgePolicy;
+    }
 
     /// @inheritdoc IStableVault
     function getGlobalOriginalDepositAmount() external view override returns (uint256) {
@@ -941,6 +1058,89 @@ contract StableVault is
     function _setTreasury(address treasury) internal {
         $storage().treasury = treasury;
         emit TreasurySet(treasury);
+    }
+
+    /////////////////////////////////////// POLICY APPLICATION /////////////////////////////////////////////////////
+
+    function _applyDepositPolicy(address user, address asset, uint256 amount, bytes calldata extraData) internal {
+        address policy = $storage().depositPolicy;
+        if (policy == address(0)) {
+            return;
+        }
+        bool allowed = IDepositPolicy(policy)
+            .applyDepositPolicy(
+                IDepositPolicy.DepositRequest({
+                caller: msg.sender, user: user, asset: asset, amount: amount, extraData: extraData
+            })
+            );
+        require(allowed, Errors.PolicyDenied());
+    }
+
+    function _applyWithdrawalRequestPolicy(address user, uint256 requestedAmountInRay, bytes calldata extraData)
+        internal
+    {
+        address policy = $storage().withdrawalRequestPolicy;
+        if (policy == address(0)) {
+            return;
+        }
+        bool allowed = IWithdrawalPolicy(policy)
+            .applyWithdrawalRequestPolicy(
+                IWithdrawalPolicy.WithdrawalRequestPolicyRequest({
+                caller: msg.sender, user: user, requestedAmountInRay: requestedAmountInRay, extraData: extraData
+            })
+            );
+        require(allowed, Errors.PolicyDenied());
+    }
+
+    function _applyTransferPolicy(address from, address to, uint256 amountRay, bytes memory extraData) internal {
+        address policy = $storage().transferPolicy;
+        if (policy == address(0)) {
+            return;
+        }
+        bool allowed = ITransferPolicy(policy)
+            .applyTransferPolicy(
+                ITransferPolicy.TransferRequest({from: from, to: to, amountRay: amountRay, extraData: extraData})
+            );
+        require(allowed, Errors.PolicyDenied());
+    }
+
+    function _applySurplusClaimPolicy(address treasury, address[] calldata assets, uint256[] calldata amounts)
+        internal
+    {
+        address policy = $storage().surplusClaimPolicy;
+        if (policy == address(0)) {
+            return;
+        }
+        bool allowed = ISurplusClaimPolicy(policy)
+            .applySurplusClaimPolicy(
+                ISurplusClaimPolicy.SurplusClaimRequest({
+                caller: msg.sender, treasury: treasury, assets: assets, amounts: amounts
+            })
+            );
+        require(allowed, Errors.PolicyDenied());
+    }
+
+    function _applyBridgeIouPolicy(
+        uint256 destChainId,
+        address recipient,
+        uint256 iouAmountRay,
+        bytes calldata extraData
+    ) internal {
+        address policy = $storage().bridgePolicy;
+        if (policy == address(0)) {
+            return;
+        }
+        bool allowed = IBridgePolicy(policy)
+            .applyBridgeIouPolicy(
+                IBridgePolicy.BridgeIouRequest({
+                caller: msg.sender,
+                destChainId: destChainId,
+                recipient: recipient,
+                iouAmountRay: iouAmountRay,
+                extraData: extraData
+            })
+            );
+        require(allowed, Errors.PolicyDenied());
     }
 
     function _beforeRescueTokens(

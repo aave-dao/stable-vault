@@ -37,20 +37,24 @@ interface IIouTokenManager {
     /// @return lockedBalance Locked balance of the IOU token.
     function getLockedBalance() external view returns (uint256);
 
-    /// @notice Entry point for IOU token owners to bridge tokens to a destination chain.
+    /// @notice Bridges IOU tokens from a user to a destination chain.
     /// @dev IOUs should be bridged via bridges which require finalization on the source chain. If IOUs are bridged and
     /// exchanged for assets on a destination, but the source chain reorgs, then a user would keep their IOUs and the
     /// assets withdrawn on the destination chain.
+    /// @param from The address to lock or burn IOU tokens from.
     /// @param destinationChainId The chain id of the chain to publish the message to.
     /// @param iouTokenRecipient The address to send the IOU tokens to on the destination chain.
     /// @param iouTokenAmountRay The amount of IOU tokens to bridge.
     /// @param bridgeAdapter The whitelisted bridge adapter to use for the message.
+    /// @param feePayer Address that will pay the bridge fee.
     /// @param bridgeParamsEncoded Opaque bridge parameters blob consumed by the adapter.
-    function bridgeTokens(
+    function bridgeTokensFrom(
+        address from,
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
         address bridgeAdapter,
+        address feePayer,
         bytes calldata bridgeParamsEncoded
     ) external payable;
 

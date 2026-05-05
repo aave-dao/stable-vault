@@ -18,6 +18,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
+import {IRebalancePolicy} from "src/interfaces/IRebalancePolicy.sol";
 import {ISwapper} from "src/interfaces/ISwapper.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
@@ -67,6 +68,7 @@ contract Allocator is
         mapping(address strategy => StrategyConfig strategyConfig) strategyConfigs;
         // To iterate through all strategies for an asset.
         mapping(address asset => EnumerableSet.AddressSet) assetStrategies;
+        address rebalancePolicy;
     }
 
     // keccak256(abi.encode(uint256(keccak256("aave.storage.Allocator")) - 1)) & ~bytes32(uint256(0xff))
@@ -294,9 +296,21 @@ contract Allocator is
 
     /// @inheritdoc IAllocator
     function rebalance(RebalanceParams[] memory params) external virtual override restricted nonReentrant {
+        _applyRebalancePolicy(params);
         for (uint256 i = 0; i < params.length; i++) {
             _rebalance(params[i]);
         }
+    }
+
+    /// @inheritdoc IAllocator
+    function setRebalancePolicy(address policy) external override restricted {
+        emit RebalancePolicySet($storage().rebalancePolicy, policy);
+        $storage().rebalancePolicy = policy;
+    }
+
+    /// @inheritdoc IAllocator
+    function getRebalancePolicy() external view override returns (address) {
+        return $storage().rebalancePolicy;
     }
 
     /// @inheritdoc IAllocator
@@ -369,6 +383,16 @@ contract Allocator is
     }
 
     ////////////////////////////////////////////////// INTERNAL ////////////////////////////////////////////////////////
+
+    function _applyRebalancePolicy(RebalanceParams[] memory params) internal {
+        address policy = $storage().rebalancePolicy;
+        if (policy == address(0)) {
+            return;
+        }
+        bool allowed = IRebalancePolicy(policy)
+            .applyRebalancePolicy(IRebalancePolicy.RebalanceRequest({caller: msg.sender, params: params}));
+        require(allowed, Errors.PolicyDenied());
+    }
 
     function _rebalance(RebalanceParams memory rebalanceParams) internal {
         uint256 i;

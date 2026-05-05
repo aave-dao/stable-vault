@@ -62,6 +62,10 @@ library Errors {
     /// @custom:selector 0xec76af13
     error OnlyGateway();
 
+    /// @notice Thrown when an entry-point operation is denied by its configured policy.
+    /// @custom:selector 0xf0b3c09f
+    error PolicyDenied();
+
     /// @notice Address checked is not the contract being called.
     /// @custom:selector 0x14d4a4e8
     error OnlySelf();

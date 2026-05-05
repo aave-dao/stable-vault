@@ -52,6 +52,21 @@ interface IStableVault {
 
     event SubVaultDeactivated(uint256 indexed subVaultId);
 
+    /// @notice Emitted when the deposit policy address is updated.
+    event DepositPolicySet(address indexed oldPolicy, address indexed newPolicy);
+
+    /// @notice Emitted when the withdrawal-request policy address is updated.
+    event WithdrawalRequestPolicySet(address indexed oldPolicy, address indexed newPolicy);
+
+    /// @notice Emitted when the transfer policy address is updated.
+    event TransferPolicySet(address indexed oldPolicy, address indexed newPolicy);
+
+    /// @notice Emitted when the surplus-claim policy address is updated.
+    event SurplusClaimPolicySet(address indexed oldPolicy, address indexed newPolicy);
+
+    /// @notice Emitted when the bridge policy address is updated.
+    event BridgePolicySet(address indexed oldPolicy, address indexed newPolicy);
+
     /// @notice Thrown when the amount requested to withdraw is greater than the amount available.
     /// @dev It is possible the system does not have enough profits i.e. balances over 'original deposits' to cover a
     /// user's withdrawal request.
@@ -110,6 +125,36 @@ interface IStableVault {
     /// @param treasury Address of the treasury. If set to address(0), surplus interest claiming will revert.
     function setTreasury(address treasury) external;
 
+    /// @notice Sets the deposit policy. `address(0)` disables the policy.
+    function setDepositPolicy(address policy) external;
+
+    /// @notice Sets the withdrawal-request policy. `address(0)` disables the policy.
+    function setWithdrawalRequestPolicy(address policy) external;
+
+    /// @notice Sets the transfer policy. `address(0)` disables the policy.
+    function setTransferPolicy(address policy) external;
+
+    /// @notice Sets the surplus-claim policy. `address(0)` disables the policy.
+    function setSurplusClaimPolicy(address policy) external;
+
+    /// @notice Sets the bridge policy. `address(0)` disables the policy.
+    function setBridgePolicy(address policy) external;
+
+    /// @notice Getter for the deposit policy address.
+    function getDepositPolicy() external view returns (address);
+
+    /// @notice Getter for the withdrawal-request policy address.
+    function getWithdrawalRequestPolicy() external view returns (address);
+
+    /// @notice Getter for the transfer policy address.
+    function getTransferPolicy() external view returns (address);
+
+    /// @notice Getter for the surplus-claim policy address.
+    function getSurplusClaimPolicy() external view returns (address);
+
+    /// @notice Getter for the bridge policy address.
+    function getBridgePolicy() external view returns (address);
+
     /// @notice Claims surplus interest from the vault.
     /// @dev If funds requested can be covered by the system's surplus interest, the funds are pulled from downstream
     /// components and transferred to a Treasury address.
@@ -148,7 +193,24 @@ interface IStableVault {
     /// @param user Address of the user depositing the assets.
     /// @param asset Address of the asset being deposited.
     /// @param amount Amount of assets being deposited.
-    function deposit(address user, address asset, uint256 amount) external;
+    /// @param extraData Additional data for the deposit policy.
+    function deposit(address user, address asset, uint256 amount, bytes calldata extraData) external;
+
+    /// @notice Bridges IOU tokens to a destination chain.
+    /// @param destinationChainId The chain id of the chain to publish the message to.
+    /// @param iouTokenRecipient The address to send the IOU tokens to on the destination chain.
+    /// @param iouTokenAmountRay The amount of IOU tokens to bridge.
+    /// @param bridgeAdapter The whitelisted bridge adapter to use for the message.
+    /// @param bridgeParamsEncoded Opaque bridge parameters blob consumed by the adapter.
+    /// @param extraData Additional data for the bridge policy.
+    function bridgeIouTokens(
+        uint256 destinationChainId,
+        address iouTokenRecipient,
+        uint256 iouTokenAmountRay,
+        address bridgeAdapter,
+        bytes calldata bridgeParamsEncoded,
+        bytes calldata extraData
+    ) external payable;
 
     /// @notice ERC20-style total Stable Vault position supply in RAY.
     /// @dev Excludes IOU supply; includes only active Stable Vault position obligations.
@@ -179,18 +241,29 @@ interface IStableVault {
     /// @return success True if the transfer was successful.
     function transfer(address to, uint256 amountRay) external returns (bool success);
 
+    /// @notice Transfers Stable Vault balance (denominated in RAY) to another user, with policy data.
+    /// @param to Address of the recipient.
+    /// @param amountRay Amount of Stable Vault balance to transfer, denominated in RAY.
+    /// @param extraData Additional data for the transfer policy.
+    /// @return success True if the transfer was successful.
+    function transfer(address to, uint256 amountRay, bytes calldata extraData) external returns (bool success);
+
     /// @notice Transfers the sender's full Stable Vault balance (denominated in RAY) to another user.
     /// @param to Address of the recipient.
+    /// @param extraData Additional data for the transfer policy.
     /// @return success True if the transfer was successful.
-    function transferAll(address to) external returns (bool success);
+    function transferAll(address to, bytes calldata extraData) external returns (bool success);
 
     /// @notice Requests a withdrawal of assets from the vault.
     /// @dev User shares are burned; the amount requested to withdraw stops accruing yield.
     /// @dev User is minted units of IOUs which can be used to claim assets.
     /// @param user The address of the user requesting the withdrawal
     /// @param requestedAmountInRay The amount of assets requested to withdraw (normalized to RAY units)
+    /// @param extraData Additional data for the withdrawal-request policy.
     /// @return amountOfIouTokensMinted Amount of IOU tokens minted to the user.
-    function requestWithdrawal(address user, uint256 requestedAmountInRay) external returns (uint256);
+    function requestWithdrawal(address user, uint256 requestedAmountInRay, bytes calldata extraData)
+        external
+        returns (uint256);
 
     /// @notice Exchanges IOUs for a supported asset.
     /// @param user Address of the user executing the withdrawal.

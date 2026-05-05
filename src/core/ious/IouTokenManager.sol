@@ -63,6 +63,11 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
         _;
     }
 
+    modifier onlyAllowedBridgeCaller() {
+        require(msg.sender == (IS_ACCOUNTING_CHAIN ? VAULT : CHAIN_GATEWAY), Errors.NotAuthorized());
+        _;
+    }
+
     /// @dev Constructor.
     /// @param iouToken Address of the IOU token.
     /// @param chainGateway Address of the ChainGateway contract.
@@ -97,24 +102,28 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
     /// @dev IOUs should be bridged via bridges which require finalization on the source chain. If IOUs are bridged and
     /// exchanged for assets on a destination, but the source chain reorgs, then a user would keep their IOUs and the
     /// assets withdrawn on the destination chain.
-    function bridgeTokens(
+    function bridgeTokensFrom(
+        address from,
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
         address bridgeAdapter,
+        address feePayer,
         bytes calldata bridgeParamsEncoded
-    ) external payable override {
+    ) external payable override onlyAllowedBridgeCaller {
         require(destinationChainId != block.chainid, Errors.InvalidDestinationChainId());
+        require(from != address(0), Errors.InvalidParameter());
         require(iouTokenRecipient != address(0), Errors.InvalidParameter());
         require(iouTokenAmountRay > 0, Errors.ZeroAmount());
+
         if (IS_ACCOUNTING_CHAIN) {
-            _lockTokens(msg.sender, iouTokenAmountRay);
+            _lockTokens(from, iouTokenAmountRay);
         } else {
-            _burnTokens(msg.sender, iouTokenAmountRay);
+            _burnTokens(from, iouTokenAmountRay);
         }
 
         IChainGateway(CHAIN_GATEWAY).sendBridgeIouTokenMessageWithFeePayer{value: msg.value}(
-            destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeAdapter, msg.sender, bridgeParamsEncoded
+            destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeAdapter, feePayer, bridgeParamsEncoded
         );
 
         emit TokensBridged(destinationChainId, iouTokenRecipient, iouTokenAmountRay);

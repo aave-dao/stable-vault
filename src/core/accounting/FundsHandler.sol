@@ -11,6 +11,7 @@ import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/
 import {LocalBalanceAggregator} from "src/core/LocalBalanceAggregator.sol";
 import {IAccountingChainGateway} from "src/interfaces/IAccountingChainGateway.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
+import {IBridgePolicy} from "src/interfaces/IBridgePolicy.sol";
 import {IChainBalanceOracle} from "src/interfaces/IChainBalanceOracle.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
@@ -43,6 +44,7 @@ contract FundsHandler is
     /// @custom:storage-location erc7201:aave.storage.FundsHandler
     struct FundsHandlerStorage {
         EnumerableSet.UintSet earningChainIds;
+        address bridgePolicy;
     }
 
     // keccak256(abi.encode(uint256(keccak256("aave.storage.FundsHandler")) - 1)) & ~bytes32(uint256(0xff))
@@ -156,12 +158,25 @@ contract FundsHandler is
         require(amount > 0, Errors.ZeroAmount());
         require($storage().earningChainIds.contains(chainId), Errors.InvalidDestinationChainId());
 
+        _applyBridgeFundsPolicy(chainId, asset, amount);
+
         // Pull funds from liquidity into the TransferHelper.
         _pullFundsFromImmediateLiquidity(asset, amount);
 
         IAccountingChainGateway(GATEWAY).sendPushFundsToChainMessage{value: msg.value}(
             asset, amount, chainId, bridgeAdapter, msg.sender, bridgeParamsEncoded
         );
+    }
+
+    /// @inheritdoc IFundsHandler
+    function setBridgePolicy(address policy) external override restricted {
+        emit BridgePolicySet($storage().bridgePolicy, policy);
+        $storage().bridgePolicy = policy;
+    }
+
+    /// @inheritdoc IFundsHandler
+    function getBridgePolicy() external view override returns (address) {
+        return $storage().bridgePolicy;
     }
 
     // Gateway Functions
@@ -175,6 +190,20 @@ contract FundsHandler is
 
     function _pullFundsFromImmediateLiquidity(address asset, uint256 amount) internal {
         IAllocator(ALLOCATOR).withdraw(asset, amount);
+    }
+
+    function _applyBridgeFundsPolicy(uint256 chainId, address asset, uint256 amount) internal {
+        address policy = $storage().bridgePolicy;
+        if (policy == address(0)) {
+            return;
+        }
+        bool allowed = IBridgePolicy(policy)
+            .applyBridgeFundsPolicy(
+                IBridgePolicy.BridgeFundsRequest({
+                caller: msg.sender, destChainId: chainId, asset: asset, amount: amount
+            })
+            );
+        require(allowed, Errors.PolicyDenied());
     }
 
     /// @dev Returns 0 when the chain balance is stale, grossly underestimating the balance.

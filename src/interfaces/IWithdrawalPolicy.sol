@@ -4,10 +4,8 @@ pragma solidity ^0.8.22;
 
 /// @title IWithdrawalPolicy
 /// @author Aave Labs
-/// @notice Interface of the contract enforcing conditions during withdrawal executions.
-/// @dev The implementation must not control who can withdraw, all users have the right to do so. Thus, the conditions
-/// enforced by this contract must not prevent withdrawals, but rather ensure that permissionless withdrawals meet the
-/// protocol's requirements.
+/// @notice Interface of the contract enforcing conditions across the withdrawal lifecycle.
+/// @dev Withdrawal-request limits must not apply to the user's principal portion.
 interface IWithdrawalPolicy {
     /// @notice Emitted when a nonce is marked as used, either by a successful appliance of the withdrawal policy or by
     /// a nonce invalidation.
@@ -25,6 +23,9 @@ interface IWithdrawalPolicy {
     /// @notice Emitted when the withdrawal policy is applied and a fee is charged.
     event WithdrawalPolicyApplied(address indexed user, address assetOut, uint256 iouAmountRay, uint256 amountOutRay);
 
+    /// @notice Emitted when the withdrawal-request policy is applied.
+    event WithdrawalRequestPolicyApplied(address indexed caller, address indexed user, uint256 requestedAmountInRay);
+
     /// @notice Thrown when a recovered signer is not a whitelisted signer.
     /// @custom:selector 0x8baa579f
     error InvalidSignature();
@@ -37,7 +38,7 @@ interface IWithdrawalPolicy {
     /// @custom:selector 0x1ab7da6b
     error DeadlineExpired();
 
-    /// @notice Core parameters for a withdrawal request.
+    /// @notice Core parameters for the IOU to asset exchange stage.
     /// @param user Address of the user withdrawing.
     /// @param assetOut Address of the asset to receive.
     /// @param iouAmountRay Amount of IOU tokens being redeemed (in RAY).
@@ -47,6 +48,18 @@ interface IWithdrawalPolicy {
         address assetOut;
         uint256 iouAmountRay;
         bytes data;
+    }
+
+    /// @notice Core parameters for the withdrawal-request stage (used by `requestWithdrawal`).
+    /// @param caller `msg.sender` of `StableVault.requestWithdrawal` (must equal `user`).
+    /// @param user The user requesting the withdrawal.
+    /// @param requestedAmountInRay Total amount the user requested (RAY).
+    /// @param extraData Additional data for the withdrawal-request policy.
+    struct WithdrawalRequestPolicyRequest {
+        address caller;
+        address user;
+        uint256 requestedAmountInRay;
+        bytes extraData;
     }
 
     /// @notice Applies the withdrawal policy and returns the final amount the user receives.
@@ -60,4 +73,19 @@ interface IWithdrawalPolicy {
     /// @param request The withdrawal request parameters.
     /// @return The amount of assets the user would receive (in RAY), after the withdrawal policy is applied.
     function previewWithdrawalPolicy(WithdrawalRequest calldata request) external view returns (uint256);
+
+    /// @notice Applies the withdrawal-request policy.
+    /// @param request The withdrawal-request parameters.
+    /// @return allowed `true` iff the withdrawal request is permitted by the policy.
+    function applyWithdrawalRequestPolicy(WithdrawalRequestPolicyRequest calldata request)
+        external
+        returns (bool allowed);
+
+    /// @notice Previews the withdrawal-request policy result without modifying state.
+    /// @param request The withdrawal-request parameters.
+    /// @return allowed `true` iff the withdrawal request would be permitted at the current state.
+    function previewWithdrawalRequestPolicy(WithdrawalRequestPolicyRequest calldata request)
+        external
+        view
+        returns (bool allowed);
 }

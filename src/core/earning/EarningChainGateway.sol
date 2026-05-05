@@ -10,6 +10,7 @@ import {BridgeParamsCodec} from "src/bridging/BridgeParamsCodec.sol";
 import {BaseChainGateway} from "src/core/BaseChainGateway.sol";
 import {LocalBalanceAggregator} from "src/core/LocalBalanceAggregator.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
+import {IBridgePolicy} from "src/interfaces/IBridgePolicy.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
@@ -42,6 +43,21 @@ contract EarningChainGateway is
 
     uint256 internal immutable ACCOUNTING_CHAIN_ID;
     address internal immutable WITHDRAWAL_POLICY;
+
+    /// @custom:storage-location erc7201:aave.storage.EarningChainGateway
+    struct EarningChainGatewayStorage {
+        address bridgePolicy;
+    }
+
+    // keccak256(abi.encode(uint256(keccak256("aave.storage.EarningChainGateway")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant STORAGE_SLOT_EARNING_CHAIN_GATEWAY =
+        0xea411196201e72c7e0e88a9d617e29d22f6a4cdc36b2e7eaf3afb0e3a6a8a900;
+
+    function $earningChainGatewayStorage() private pure returns (EarningChainGatewayStorage storage _storage) {
+        assembly {
+            _storage.slot := STORAGE_SLOT_EARNING_CHAIN_GATEWAY
+        }
+    }
 
     /// @dev Constructor.
     /// @param accountingChainId The Chain ID of the Accounting Chain.
@@ -138,10 +154,48 @@ contract EarningChainGateway is
         bytes calldata bridgeParamsEncoded
     ) external payable override restricted assertingTransferHelperBalanceFor(asset) {
         require(amount > 0, Errors.ZeroAmount());
+        _applyBridgeFundsPolicy(ACCOUNTING_CHAIN_ID, asset, amount);
         // Pull funds from liquidity into the TransferHelper.
         IAllocator(ALLOCATOR).withdraw(asset, amount);
         _returnFunds(asset, amount, bridgeAdapter, msg.sender, bridgeParamsEncoded);
         emit AssetOutflow(asset, amount);
+    }
+
+    /// @inheritdoc IEarningChainGateway
+    function bridgeIouTokens(
+        uint256 destinationChainId,
+        address iouTokenRecipient,
+        uint256 iouTokenAmountRay,
+        address bridgeAdapter,
+        bytes calldata bridgeParamsEncoded,
+        bytes calldata extraData
+    ) external payable override nonReentrant {
+        require(destinationChainId != block.chainid, Errors.InvalidDestinationChainId());
+        require(iouTokenRecipient != address(0), Errors.InvalidParameter());
+        require(iouTokenAmountRay > 0, Errors.ZeroAmount());
+
+        _applyBridgeIouPolicy(destinationChainId, iouTokenRecipient, iouTokenAmountRay, extraData);
+
+        IIouTokenManager(IOU_TOKEN_MANAGER).bridgeTokensFrom{value: msg.value}(
+            msg.sender,
+            destinationChainId,
+            iouTokenRecipient,
+            iouTokenAmountRay,
+            bridgeAdapter,
+            msg.sender,
+            bridgeParamsEncoded
+        );
+    }
+
+    /// @inheritdoc IEarningChainGateway
+    function setBridgePolicy(address policy) external override restricted {
+        emit BridgePolicySet($earningChainGatewayStorage().bridgePolicy, policy);
+        $earningChainGatewayStorage().bridgePolicy = policy;
+    }
+
+    /// @inheritdoc IEarningChainGateway
+    function getBridgePolicy() external view override returns (address) {
+        return $earningChainGatewayStorage().bridgePolicy;
     }
 
     function _receiveData(
@@ -215,6 +269,43 @@ contract EarningChainGateway is
         uint256 amountOut = amountOutRay.rayToAssetDecimals(assetOut);
         require(amountOut != 0 && amountOut >= minAmountOut, Errors.InsufficientAmountOut());
         return amountOut;
+    }
+
+    function _applyBridgeIouPolicy(
+        uint256 destChainId,
+        address recipient,
+        uint256 iouAmountRay,
+        bytes calldata extraData
+    ) internal {
+        address policy = $earningChainGatewayStorage().bridgePolicy;
+        if (policy == address(0)) {
+            return;
+        }
+        bool allowed = IBridgePolicy(policy)
+            .applyBridgeIouPolicy(
+                IBridgePolicy.BridgeIouRequest({
+                caller: msg.sender,
+                destChainId: destChainId,
+                recipient: recipient,
+                iouAmountRay: iouAmountRay,
+                extraData: extraData
+            })
+            );
+        require(allowed, Errors.PolicyDenied());
+    }
+
+    function _applyBridgeFundsPolicy(uint256 destChainId, address asset, uint256 amount) internal {
+        address policy = $earningChainGatewayStorage().bridgePolicy;
+        if (policy == address(0)) {
+            return;
+        }
+        bool allowed = IBridgePolicy(policy)
+            .applyBridgeFundsPolicy(
+                IBridgePolicy.BridgeFundsRequest({
+                caller: msg.sender, destChainId: destChainId, asset: asset, amount: amount
+            })
+            );
+        require(allowed, Errors.PolicyDenied());
     }
 
     function _sendBurnIouTokenMessage(
