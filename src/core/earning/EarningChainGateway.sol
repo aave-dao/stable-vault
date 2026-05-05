@@ -6,7 +6,6 @@ import {
     ReentrancyGuardTransientUpgradeable
 } from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardTransientUpgradeable.sol";
 
-import {BridgeParamsCodec} from "src/bridging/BridgeParamsCodec.sol";
 import {BaseChainGateway} from "src/core/BaseChainGateway.sol";
 import {LocalBalanceAggregator} from "src/core/LocalBalanceAggregator.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
@@ -96,17 +95,14 @@ contract EarningChainGateway is
         uint256 minAmountOut,
         address receiver,
         address bridgeAdapter,
+        uint256 gasLimit,
         bytes calldata bridgeParamsEncoded,
         bytes memory withdrawalPolicyData
     ) external payable virtual override nonReentrant assertingTransferHelperBalanceFor(assetOut) returns (uint256) {
         require(iouTokenAmountRay > 0, Errors.ZeroAmount());
         // An insufficient destination gasLimit would cause the BURN_IOU_TOKEN message to be dropped while
         // IOUs are already burned locally — silent IOU loss with no compensating obligation reduction.
-        // TODO: This decoding should be removed from here and should only happen at bridge adapter level
-        require(
-            BridgeParamsCodec.decode(bridgeParamsEncoded).gasLimit >= MIN_BURN_IOU_TOKEN_GAS_LIMIT,
-            Errors.InvalidGasLimit()
-        );
+        require(gasLimit >= MIN_BURN_IOU_TOKEN_GAS_LIMIT, Errors.InvalidGasLimit());
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(msg.sender, iouTokenAmountRay);
 
         uint256 amountOut = _getWithdrawalAmountOut(iouTokenAmountRay, assetOut, minAmountOut, withdrawalPolicyData);
@@ -122,7 +118,7 @@ contract EarningChainGateway is
         // accepted after the oracle snapshot reflects this outflow, preventing the reverse (obligations reduced while
         // assets are still overstated). Operators are expected to account for this transient state when scheduling
         // claimSurplusInterest() calls.
-        _sendBurnIouTokenMessage(iouTokenAmountRay, bridgeAdapter, msg.sender, bridgeParamsEncoded);
+        _sendBurnIouTokenMessage(iouTokenAmountRay, bridgeAdapter, msg.sender, gasLimit, bridgeParamsEncoded);
 
         ITransferHelper(TRANSFER_HELPER).transfer(assetOut, amountOut, receiver);
         emit AssetOutflow(assetOut, amountOut);
@@ -135,12 +131,13 @@ contract EarningChainGateway is
         address asset,
         uint256 amount,
         address bridgeAdapter,
+        uint256 gasLimit,
         bytes calldata bridgeParamsEncoded
     ) external payable override restricted assertingTransferHelperBalanceFor(asset) {
         require(amount > 0, Errors.ZeroAmount());
         // Pull funds from liquidity into the TransferHelper.
         IAllocator(ALLOCATOR).withdraw(asset, amount);
-        _returnFunds(asset, amount, bridgeAdapter, msg.sender, bridgeParamsEncoded);
+        _returnFunds(asset, amount, bridgeAdapter, msg.sender, gasLimit, bridgeParamsEncoded);
         emit AssetOutflow(asset, amount);
     }
 
@@ -178,6 +175,7 @@ contract EarningChainGateway is
         uint256 amount,
         address bridgeAdapter,
         address feePayer,
+        uint256 gasLimit,
         bytes calldata bridgeParamsEncoded
     ) private {
         // Include the message block number (and timestamp metadata) so the Accounting Chain can verify the chain
@@ -191,7 +189,14 @@ contract EarningChainGateway is
             })
         );
         _sendCrossChainMessage(
-            ACCOUNTING_CHAIN_ID, bridgeAdapter, asset, amount, returnFundsMessageEncoded, feePayer, bridgeParamsEncoded
+            ACCOUNTING_CHAIN_ID,
+            bridgeAdapter,
+            asset,
+            amount,
+            returnFundsMessageEncoded,
+            feePayer,
+            gasLimit,
+            bridgeParamsEncoded
         );
     }
 
@@ -221,6 +226,7 @@ contract EarningChainGateway is
         uint256 iouTokenAmountRay,
         address bridgeAdapter,
         address feePayer,
+        uint256 gasLimit,
         bytes calldata bridgeParamsEncoded
     ) private {
         // Prepare data to synchronize the Accounting Chain's state.
@@ -247,6 +253,7 @@ contract EarningChainGateway is
             0,
             burnIouTokenMessageEncoded,
             feePayer,
+            gasLimit,
             bridgeParamsEncoded
         );
     }
