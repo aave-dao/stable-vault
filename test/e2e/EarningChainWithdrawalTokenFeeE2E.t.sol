@@ -112,13 +112,10 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             userInitialDeposit,
             EARNING_CHAIN_ID,
             address(ccipAdapter_accountingChain),
+            DEFAULT_GAS_LIMIT,
             BridgeParamsCodec.encode(
-                IBridgeAdapter.BridgeParams({
-                    feeToken: address(bridgeFeeToken),
-                    feeAmount: bridgeFeeAmount,
-                    feeRefundThreshold: 0,
-                    gasLimit: 350000,
-                    data: ""
+                BridgeParamsCodec.BridgeParams({
+                    feeToken: address(bridgeFeeToken), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
                 })
             )
         );
@@ -396,13 +393,10 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             user,
             iouAmountRequestedRay,
             bridgeAdapter,
+            DEFAULT_GAS_LIMIT,
             BridgeParamsCodec.encode(
-                IBridgeAdapter.BridgeParams({
-                    feeToken: address(bridgeFeeToken),
-                    feeAmount: bridgeFeeAmount,
-                    feeRefundThreshold: 0,
-                    gasLimit: 150000,
-                    data: ""
+                BridgeParamsCodec.BridgeParams({
+                    feeToken: address(bridgeFeeToken), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
                 })
             )
         );
@@ -419,15 +413,15 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             0,
             user,
             address(ccipAdapter_earningChain),
+            DEFAULT_GAS_LIMIT,
             BridgeParamsCodec.encode(
-                IBridgeAdapter.BridgeParams({
+                BridgeParamsCodec.BridgeParams({
                     feeToken: address(bridgeFeeToken),
                     feeAmount: bridgeFeeAmount,
                     feeRefundThreshold: 0,
                     // Use a higher gas limit to ensure the transaction is successful on Accounting Chain because the
                     // snapshot
                     // struct may be pushed to the FH storage.
-                    gasLimit: 350000,
                     data: ""
                 })
             ),

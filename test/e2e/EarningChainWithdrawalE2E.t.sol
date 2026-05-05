@@ -105,9 +105,10 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             userInitialDeposit,
             EARNING_CHAIN_ID,
             address(ccipAdapter_accountingChain),
+            DEFAULT_GAS_LIMIT,
             BridgeParamsCodec.encode(
-                IBridgeAdapter.BridgeParams({
-                    feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, gasLimit: 300000, data: ""
+                BridgeParamsCodec.BridgeParams({
+                    feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
                 })
             )
         );
@@ -184,9 +185,10 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             user1,
             iouAmountRequestedRay,
             address(ccipAdapter_accountingChain),
+            DEFAULT_GAS_LIMIT,
             BridgeParamsCodec.encode(
-                IBridgeAdapter.BridgeParams({
-                    feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, gasLimit: 300000, data: ""
+                BridgeParamsCodec.BridgeParams({
+                    feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
                 })
             )
         );
@@ -266,12 +268,17 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         vm.deal(user2, bridgeFeeAmount);
         {
             bytes memory bp = BridgeParamsCodec.encode(
-                IBridgeAdapter.BridgeParams({
-                    feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, gasLimit: 100000, data: ""
+                BridgeParamsCodec.BridgeParams({
+                    feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
                 })
             );
             iouTokenManager_accountingChain.bridgeTokens{value: bridgeFeeAmount}(
-                EARNING_CHAIN_ID, user2, iouAmountRequestedRay, address(ccipAdapter_accountingChain), bp
+                EARNING_CHAIN_ID,
+                user2,
+                iouAmountRequestedRay,
+                address(ccipAdapter_accountingChain),
+                DEFAULT_GAS_LIMIT,
+                bp
             );
         }
         require(
@@ -289,12 +296,17 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         vm.prank(user2);
         {
             bytes memory bp = BridgeParamsCodec.encode(
-                IBridgeAdapter.BridgeParams({
-                    feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, gasLimit: 100000, data: ""
+                BridgeParamsCodec.BridgeParams({
+                    feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
                 })
             );
             iouTokenManager_earningChain.bridgeTokens{value: bridgeFeeAmount}(
-                ACCOUNTING_CHAIN_ID, user2, iouAmountRequestedRay, address(ccipAdapter_earningChain), bp
+                ACCOUNTING_CHAIN_ID,
+                user2,
+                iouAmountRequestedRay,
+                address(ccipAdapter_earningChain),
+                DEFAULT_GAS_LIMIT,
+                bp
             );
         }
         require(
@@ -338,10 +350,9 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             address(ccipAdapter_earningChain),
             // Use a higher gas limit to ensure the transaction is successful on Accounting Chain because the snapshot
             // struct will be pushed to the FH storage.
+            DEFAULT_GAS_LIMIT,
             BridgeParamsCodec.encode(
-                IBridgeAdapter.BridgeParams({
-                    feeToken: address(0), feeAmount: 1, feeRefundThreshold: 0, gasLimit: 300000, data: ""
-                })
+                BridgeParamsCodec.BridgeParams({feeToken: address(0), feeAmount: 1, feeRefundThreshold: 0, data: ""})
             ),
             ""
         );
