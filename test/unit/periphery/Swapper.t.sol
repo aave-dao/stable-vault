@@ -14,9 +14,9 @@ import {Swapper} from "src/periphery/Swapper.sol";
 import {Errors} from "src/types/Errors.sol";
 
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
+import {MockAccessManager} from "test/mocks/MockAccessManager.sol";
 import {IMockDex, MockDex} from "test/mocks/MockDex.sol";
 import {IMockErc20} from "test/mocks/MockErc20.sol";
-import {MockAccessManager} from "test/mocks/MockAccessManager.sol";
 import {MockNonStandardErc20} from "test/mocks/MockNonStandardErc20.sol";
 
 contract SwapperTest is TestWithHelpers {
@@ -92,9 +92,8 @@ contract SwapperTest is TestWithHelpers {
         _seedOutputToken(_mockGho, minAmountOut);
         _setSlippageBps(0);
 
-        bytes memory data = _encodeDexSwapExactInputData(
-            address(_mockUsdt), address(_mockGho), amountIn, minAmountOut, 0
-        );
+        bytes memory data =
+            _encodeDexSwapExactInputData(address(_mockUsdt), address(_mockGho), amountIn, minAmountOut, 0);
         vm.prank(allocator);
         uint256 actualAmountOut =
             _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
@@ -118,9 +117,8 @@ contract SwapperTest is TestWithHelpers {
         _seedOutputToken(_mockUsdt, minAmountOut);
         _setSlippageBps(0);
 
-        bytes memory data = _encodeDexSwapExactInputData(
-            address(_mockGho), address(_mockUsdt), amountIn, minAmountOut, 0
-        );
+        bytes memory data =
+            _encodeDexSwapExactInputData(address(_mockGho), address(_mockUsdt), amountIn, minAmountOut, 0);
         vm.prank(allocator);
         uint256 actualAmountOut =
             _swapper.executeSwap(address(_mockGho), address(_mockUsdt), amountIn, rebalancer, data);
@@ -230,9 +228,8 @@ contract SwapperTest is TestWithHelpers {
         _seedOutputToken(_mockGho, actualAmountOut);
         _setSlippageBps(0);
 
-        bytes memory data = _encodeDexSwapExactInputData(
-            address(_mockUsdt), address(_mockGho), amountIn, amountOutIfNoSlippage, 0
-        );
+        bytes memory data =
+            _encodeDexSwapExactInputData(address(_mockUsdt), address(_mockGho), amountIn, amountOutIfNoSlippage, 0);
         vm.prank(allocator);
         uint256 actualAmountOutFromSwap =
             _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
@@ -276,8 +273,7 @@ contract SwapperTest is TestWithHelpers {
         address[] memory targets = new address[](1);
         targets[0] = address(_vault);
         bytes[] memory callDatas = new bytes[](1);
-        callDatas[0] =
-            abi.encodeCall(ISlippageCoverageVault.pullCoverage, (address(_mockGho), 1));
+        callDatas[0] = abi.encodeCall(ISlippageCoverageVault.pullCoverage, (address(_mockGho), 1));
         bytes memory data = abi.encode(targets, callDatas, uint16(0));
 
         _mockTransferIntoSwapper(_mockUsdt, 100);
@@ -293,9 +289,7 @@ contract SwapperTest is TestWithHelpers {
         vm.prank(operator);
         _vault.setMaxSlippageBps(1_00);
 
-        bytes memory data = _encodeDexSwapExactInputData(
-            address(_mockUsdt), address(_mockGho), 100, 0, 200
-        );
+        bytes memory data = _encodeDexSwapExactInputData(address(_mockUsdt), address(_mockGho), 100, 0, 200);
 
         _mockTransferIntoSwapper(_mockUsdt, 100);
         vm.expectRevert(abi.encodeWithSelector(ISwapper.SlippageToleranceTooHigh.selector));
@@ -310,9 +304,7 @@ contract SwapperTest is TestWithHelpers {
         vm.prank(operator);
         _vault.setOverrideMode(true);
 
-        bytes memory data = _encodeDexSwapExactInputData(
-            address(_mockUsdt), address(_mockGho), 100, 0, 2_001
-        );
+        bytes memory data = _encodeDexSwapExactInputData(address(_mockUsdt), address(_mockGho), 100, 0, 2_001);
 
         _mockTransferIntoSwapper(_mockUsdt, 100);
         vm.expectRevert(abi.encodeWithSelector(ISwapper.SlippageToleranceTooHigh.selector));
@@ -389,7 +381,9 @@ contract SwapperTest is TestWithHelpers {
 
         vm.mockCallRevert(
             address(_mockDex),
-            abi.encodeWithSelector(IMockDex.swapExactInput.selector, address(_mockUsdt), address(_mockGho), amountIn, 0),
+            abi.encodeWithSelector(
+                IMockDex.swapExactInput.selector, address(_mockUsdt), address(_mockGho), amountIn, 0
+            ),
             abi.encodeWithSelector(IMockDex.InsufficientLiquidity.selector)
         );
 

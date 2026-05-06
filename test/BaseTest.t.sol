@@ -515,8 +515,9 @@ contract BaseTest is TestWithHelpers {
         );
 
         // 21a. Slippage Coverage Vault (non-upgradeable)
-        slippageCoverageVault_accountingChain =
-            new SlippageCoverageVault(swapper_accountingChainAddress, accessManager_accountingChainAddress, 1_00, 50_00);
+        slippageCoverageVault_accountingChain = new SlippageCoverageVault(
+            swapper_accountingChainAddress, accessManager_accountingChainAddress, 1_00, 50_00
+        );
         Logger.log("\tSlippage Coverage Vault: %s", address(slippageCoverageVault_accountingChain));
         require(
             address(slippageCoverageVault_accountingChain) == slippageCoverageVault_accountingChainAddress,
@@ -607,11 +608,9 @@ contract BaseTest is TestWithHelpers {
         allocator_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
         Logger.log("\tAllocator (Earning Chain) Predicted Address: %s", allocator_earningChainAddress);
 
-        slippageCoverageVault_earningChainAddress =
-            vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
+        slippageCoverageVault_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
         Logger.log(
-            "\tSlippage Coverage Vault (Earning Chain) Predicted Address: %s",
-            slippageCoverageVault_earningChainAddress
+            "\tSlippage Coverage Vault (Earning Chain) Predicted Address: %s", slippageCoverageVault_earningChainAddress
         );
 
         swapper_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);

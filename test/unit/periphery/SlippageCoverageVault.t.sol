@@ -2,9 +2,9 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.22;
 
-import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
 import {ISlippageCoverageVault} from "src/interfaces/ISlippageCoverageVault.sol";
 import {SlippageCoverageVault} from "src/periphery/SlippageCoverageVault.sol";
@@ -41,7 +41,8 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         vm.warp(1_700_000_000);
 
         _accessManager = new MockAccessManager(address(this));
-        _vault = new SlippageCoverageVault(recipient, address(_accessManager), DEFAULT_MAX_BPS, DEFAULT_OVERRIDE_MAX_BPS);
+        _vault =
+            new SlippageCoverageVault(recipient, address(_accessManager), DEFAULT_MAX_BPS, DEFAULT_OVERRIDE_MAX_BPS);
 
         _usdc = new MockErc20("USD Coin", "USDC", 6);
         _gho = new MockErc20("GHO", "GHO", 18);
