@@ -17,6 +17,7 @@ import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
+import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
@@ -370,12 +371,8 @@ contract FundsHandlerTest is TestWithHelpers {
         bridgeParams_feeAmount = _boundNativeAmount(bridgeParams_feeAmount);
         vm.deal(address(unauthorizedMsgSender), bridgeParams_feeAmount);
         bytes memory bridgeParams = BridgeParamsCodec.encode(
-            IBridgeAdapter.BridgeParams({
-                feeToken: address(0),
-                feeAmount: bridgeParams_feeAmount,
-                feeRefundThreshold: 0,
-                gasLimit: bridgeParams_gasLimit,
-                data: ""
+            BridgeParamsCodec.BridgeParams({
+                feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeParams_feeAmount, feeRefundThreshold: 0, data: ""
             })
         );
 
@@ -394,7 +391,9 @@ contract FundsHandlerTest is TestWithHelpers {
             abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
         );
         vm.prank(unauthorizedMsgSender);
-        fundsHandler.pushFundsToChain(asset, amount, chainId, makeAddr("bridgeAdapter"), bridgeParams);
+        fundsHandler.pushFundsToChain(
+            asset, amount, chainId, makeAddr("bridgeAdapter"), bridgeParams_gasLimit, bridgeParams
+        );
     }
 
     /// @dev Under the opaque-bytes dispatch shape the bridge-fee balance-leak check moved from
@@ -419,18 +418,14 @@ contract FundsHandlerTest is TestWithHelpers {
         vm.deal(address(this), bridgeParams_feeAmount);
 
         bytes memory bridgeParams = BridgeParamsCodec.encode(
-            IBridgeAdapter.BridgeParams({
-                feeToken: address(0),
-                feeAmount: bridgeParams_feeAmount,
-                feeRefundThreshold: 0,
-                gasLimit: bridgeParams_gasLimit,
-                data: ""
+            BridgeParamsCodec.BridgeParams({
+                feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeParams_feeAmount, feeRefundThreshold: 0, data: ""
             })
         );
 
         vm.expectRevert(abi.encodeWithSelector(Errors.ZeroAmount.selector));
         fundsHandler.pushFundsToChain{value: bridgeParams_feeAmount}(
-            address(mockAsset), 0, chainId, makeAddr("bridgeAdapter"), bridgeParams
+            address(mockAsset), 0, chainId, makeAddr("bridgeAdapter"), bridgeParams_gasLimit, bridgeParams
         );
     }
 
@@ -447,12 +442,8 @@ contract FundsHandlerTest is TestWithHelpers {
         bridgeParams_feeAmount = _boundAssetAmount(address(mockAsset), bridgeParams_feeAmount);
 
         bytes memory bridgeParams = BridgeParamsCodec.encode(
-            IBridgeAdapter.BridgeParams({
-                feeToken: address(mockAsset),
-                feeAmount: bridgeParams_feeAmount,
-                feeRefundThreshold: 0,
-                gasLimit: bridgeParams_gasLimit,
-                data: ""
+            BridgeParamsCodec.BridgeParams({
+                feeToken: address(mockAsset), feeAmount: bridgeParams_feeAmount, feeRefundThreshold: 0, data: ""
             })
         );
 
@@ -469,7 +460,9 @@ contract FundsHandlerTest is TestWithHelpers {
         vm.expectRevert(
             abi.encodeWithSelector(TransferHelperClient.TransferHelperBalanceNotConsumed.selector, address(mockAsset))
         );
-        fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, address(mockBridgeAdapter), bridgeParams);
+        fundsHandler.pushFundsToChain(
+            address(mockAsset), amount, chainId, address(mockBridgeAdapter), bridgeParams_gasLimit, bridgeParams
+        );
     }
 
     function test_pushFundsToChain_reverts_ifTransferHelperBalanceIsNotFullyConsumed_amountAssetDiffThanFeeToken(
@@ -488,12 +481,8 @@ contract FundsHandlerTest is TestWithHelpers {
         bridgeParams_feeAmount = _boundAssetAmount(feeToken, bridgeParams_feeAmount);
 
         bytes memory bridgeParams = BridgeParamsCodec.encode(
-            IBridgeAdapter.BridgeParams({
-                feeToken: feeToken,
-                feeAmount: bridgeParams_feeAmount,
-                feeRefundThreshold: 0,
-                gasLimit: bridgeParams_gasLimit,
-                data: ""
+            BridgeParamsCodec.BridgeParams({
+                feeToken: feeToken, feeAmount: bridgeParams_feeAmount, feeRefundThreshold: 0, data: ""
             })
         );
 
@@ -510,7 +499,9 @@ contract FundsHandlerTest is TestWithHelpers {
         vm.expectRevert(
             abi.encodeWithSelector(TransferHelperClient.TransferHelperBalanceNotConsumed.selector, address(mockAsset))
         );
-        fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, address(mockBridgeAdapter), bridgeParams);
+        fundsHandler.pushFundsToChain(
+            address(mockAsset), amount, chainId, address(mockBridgeAdapter), bridgeParams_gasLimit, bridgeParams
+        );
     }
 
     /// @dev Under the opaque-bytes dispatch shape the `feePayer == msg.sender` guard was dropped
@@ -533,12 +524,8 @@ contract FundsHandlerTest is TestWithHelpers {
         mockAsset.mint(unauthorizedFeePayer, bridgeParams_feeAmount);
 
         bytes memory bridgeParams = BridgeParamsCodec.encode(
-            IBridgeAdapter.BridgeParams({
-                feeToken: address(mockAsset),
-                feeAmount: bridgeParams_feeAmount,
-                feeRefundThreshold: 0,
-                gasLimit: bridgeParams_gasLimit,
-                data: ""
+            BridgeParamsCodec.BridgeParams({
+                feeToken: address(mockAsset), feeAmount: bridgeParams_feeAmount, feeRefundThreshold: 0, data: ""
             })
         );
 
@@ -547,7 +534,9 @@ contract FundsHandlerTest is TestWithHelpers {
 
         // ERC20 allowance semantics reject the forged feePayer — they never approved the adapter.
         vm.expectRevert();
-        fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, address(mockBridgeAdapter), bridgeParams);
+        fundsHandler.pushFundsToChain(
+            address(mockAsset), amount, chainId, address(mockBridgeAdapter), bridgeParams_gasLimit, bridgeParams
+        );
     }
 
     function test_pushFundsToChain_reverts_ifDestinationChainIdNotAddedAsEarningChain(
@@ -560,17 +549,15 @@ contract FundsHandlerTest is TestWithHelpers {
         bridgeParams_feeAmount = _boundAssetAmount(address(mockAsset), bridgeParams_feeAmount);
 
         bytes memory bridgeParams = BridgeParamsCodec.encode(
-            IBridgeAdapter.BridgeParams({
-                feeToken: address(mockAsset),
-                feeAmount: bridgeParams_feeAmount,
-                feeRefundThreshold: 0,
-                gasLimit: bridgeParams_gasLimit,
-                data: ""
+            BridgeParamsCodec.BridgeParams({
+                feeToken: address(mockAsset), feeAmount: bridgeParams_feeAmount, feeRefundThreshold: 0, data: ""
             })
         );
 
         vm.expectRevert(abi.encodeWithSelector(Errors.InvalidDestinationChainId.selector));
-        fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, address(mockBridgeAdapter), bridgeParams);
+        fundsHandler.pushFundsToChain(
+            address(mockAsset), amount, chainId, address(mockBridgeAdapter), bridgeParams_gasLimit, bridgeParams
+        );
     }
 
     function test_pushFundsToChain_callsGatewaySendPushFundsMessage(
@@ -592,12 +579,8 @@ contract FundsHandlerTest is TestWithHelpers {
         mockAsset.forceApprove(address(mockBridgeAdapter), bridgeParams_feeAmount);
 
         bytes memory bridgeParams = BridgeParamsCodec.encode(
-            IBridgeAdapter.BridgeParams({
-                feeToken: address(mockAsset),
-                feeAmount: bridgeParams_feeAmount,
-                feeRefundThreshold: 0,
-                gasLimit: bridgeParams_gasLimit,
-                data: ""
+            BridgeParamsCodec.BridgeParams({
+                feeToken: address(mockAsset), feeAmount: bridgeParams_feeAmount, feeRefundThreshold: 0, data: ""
             })
         );
 
@@ -608,10 +591,20 @@ contract FundsHandlerTest is TestWithHelpers {
             address(mockGateway),
             abi.encodeCall(
                 MockAccountingChainGateway.sendPushFundsToChainMessage,
-                (address(mockAsset), amount, chainId, address(mockBridgeAdapter), address(this), bridgeParams)
+                (
+                    address(mockAsset),
+                    amount,
+                    chainId,
+                    address(mockBridgeAdapter),
+                    address(this),
+                    bridgeParams_gasLimit,
+                    bridgeParams
+                )
             )
         );
-        fundsHandler.pushFundsToChain(address(mockAsset), amount, chainId, address(mockBridgeAdapter), bridgeParams);
+        fundsHandler.pushFundsToChain(
+            address(mockAsset), amount, chainId, address(mockBridgeAdapter), bridgeParams_gasLimit, bridgeParams
+        );
     }
 
     function test_getEarningChainIds_returnsEmptyByDefault() public view {

@@ -65,12 +65,15 @@ interface IFundsHandler {
     /// @param amount Amount of the asset to push to the destination chain.
     /// @param chainId Chain id of the destination chain.
     /// @param bridgeAdapter The whitelisted bridge adapter to use for bridging the asset.
+    /// @param gasLimit Gas limit that should be allocated for execution of the message on the destination chain,
+    /// without considering the bridge adapter overhead.
     /// @param bridgeParamsEncoded Opaque bridge parameters blob consumed by the adapter.
     function pushFundsToChain(
         address asset,
         uint256 amount,
         uint256 chainId,
         address bridgeAdapter,
+        uint256 gasLimit,
         bytes calldata bridgeParamsEncoded
     ) external payable;
 

@@ -5,7 +5,6 @@ pragma solidity ^0.8.22;
 import {AccountingChainBaseScript} from "script/interact/accounting/AccountingChainBaseScript.s.sol";
 
 import {BridgeParamsCodec} from "src/bridging/BridgeParamsCodec.sol";
-import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 
 /// @dev See example usage below:
@@ -22,15 +21,16 @@ contract FundsHandlerInteractionScript is AccountingChainBaseScript {
         address token = GHO;
         uint256 amount = 234 * 10 ** 18;
         uint256 chainId = 1;
-        IBridgeAdapter.BridgeParams memory bridgeParams = IBridgeAdapter.BridgeParams({
-            feeToken: LINK, feeAmount: 100000000000000000000, feeRefundThreshold: 0, gasLimit: 750000, data: ""
+        BridgeParamsCodec.BridgeParams memory bridgeParams = BridgeParamsCodec.BridgeParams({
+            feeToken: LINK, feeAmount: 100000000000000000000, feeRefundThreshold: 0, data: ""
         });
+        uint256 gasLimit = 0; // TODO: Set the destination gas limit.
 
         uint256 key = vm.envUint("ADMIN_PRIVATE_KEY");
         vm.startBroadcast(key);
         address bridgeAdapter = address(0); // TODO: Set the whitelisted bridge adapter address.
         IFundsHandler(FUNDS_HANDLER)
-            .pushFundsToChain(token, amount, chainId, bridgeAdapter, BridgeParamsCodec.encode(bridgeParams));
+            .pushFundsToChain(token, amount, chainId, bridgeAdapter, gasLimit, BridgeParamsCodec.encode(bridgeParams));
         vm.stopBroadcast();
     }
 }

@@ -270,6 +270,7 @@ contract StableVault is
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
         address bridgeAdapter,
+        uint256 gasLimit,
         bytes calldata bridgeParamsEncoded,
         bytes calldata extraData
     ) external payable virtual override nonReentrant {
@@ -286,6 +287,7 @@ contract StableVault is
             iouTokenAmountRay,
             bridgeAdapter,
             msg.sender,
+            gasLimit,
             bridgeParamsEncoded
         );
     }

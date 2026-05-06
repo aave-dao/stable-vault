@@ -67,6 +67,7 @@ contract MockFundsHandler is IFundsHandler {
         uint256 amount,
         uint256 chainId,
         address bridgeAdapter,
+        uint256 gasLimit,
         bytes calldata bridgeParamsEncoded
     ) external payable override {}
 

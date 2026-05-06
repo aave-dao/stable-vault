@@ -6,7 +6,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {BridgeParamsCodec} from "src/bridging/BridgeParamsCodec.sol";
-import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {Constants} from "src/types/Constants.sol";
@@ -48,9 +47,10 @@ contract MockGateway is IChainGateway {
         uint256, /*iouTokenAmountRay*/
         address, /*bridgeAdapter*/
         address feePayer,
+        uint256, /*gasLimit*/
         bytes calldata bridgeParamsEncoded
     ) external payable override {
-        IBridgeAdapter.BridgeParams memory bridgeParams = BridgeParamsCodec.decode(bridgeParamsEncoded);
+        BridgeParamsCodec.BridgeParams memory bridgeParams = BridgeParamsCodec.decode(bridgeParamsEncoded);
         if (bridgeParams.feeToken == Constants.NATIVE_CURRENCY) {
             require(msg.value >= bridgeParams.feeAmount, Errors.InsufficientFunds());
             if (msg.value > 0) {

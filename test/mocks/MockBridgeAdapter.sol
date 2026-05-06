@@ -31,10 +31,11 @@ contract MockBridgeAdapter is IBridgeAdapter {
         uint256 amount,
         bytes memory data,
         address feePayer,
+        uint256 gasLimit,
         bytes memory bridgeParamsEncoded
     ) external payable override {
-        (destinationChainId, data);
-        IBridgeAdapter.BridgeParams memory bridgeParams = BridgeParamsCodec.decode(bridgeParamsEncoded);
+        (destinationChainId, data, gasLimit);
+        BridgeParamsCodec.BridgeParams memory bridgeParams = BridgeParamsCodec.decode(bridgeParamsEncoded);
 
         // Mirror CcipAdapter: adapter pulls fee directly from feePayer (no TransferHelper round-trip).
         if (bridgeParams.feeToken == Constants.NATIVE_CURRENCY) {

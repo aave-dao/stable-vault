@@ -21,6 +21,7 @@ import {MathLib} from "src/libraries/MathLib.sol";
 import {ChainlinkL2PriceOracleAdapter} from "src/oracles/price/ChainlinkL2PriceOracleAdapter.sol";
 import {ChainlinkPriceOracleAdapter} from "src/oracles/price/ChainlinkPriceOracleAdapter.sol";
 import {EarningChainStateSchemaV1} from "src/periphery/EarningChainStateSchemaV1.sol";
+import {Constants} from "src/types/Constants.sol";
 
 import {BaseTest} from "test/BaseTest.t.sol";
 import {MockCCIPRouter} from "test/mocks/MockCcipRouter.sol";
@@ -238,9 +239,10 @@ contract OracleFeedE2ETest is BaseTest {
             user1,
             userBalanceWithInterest,
             address(ccipAdapter_accountingChain),
+            DEFAULT_GAS_LIMIT,
             BridgeParamsCodec.encode(
-                IBridgeAdapter.BridgeParams({
-                    feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, gasLimit: 300000, data: ""
+                BridgeParamsCodec.BridgeParams({
+                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
                 })
             ),
             ""
@@ -269,9 +271,10 @@ contract OracleFeedE2ETest is BaseTest {
             0,
             user1,
             address(ccipAdapter_earningChain),
+            DEFAULT_GAS_LIMIT,
             BridgeParamsCodec.encode(
-                IBridgeAdapter.BridgeParams({
-                    feeToken: address(0), feeAmount: 1, feeRefundThreshold: 0, gasLimit: 300000, data: ""
+                BridgeParamsCodec.BridgeParams({
+                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: 1, feeRefundThreshold: 0, data: ""
                 })
             ),
             ""
@@ -827,9 +830,10 @@ contract OracleFeedE2ETest is BaseTest {
             address(USDC),
             returnAmount,
             address(ccipAdapter_earningChain),
+            DEFAULT_GAS_LIMIT,
             BridgeParamsCodec.encode(
-                IBridgeAdapter.BridgeParams({
-                    feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, gasLimit: 300000, data: ""
+                BridgeParamsCodec.BridgeParams({
+                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
                 })
             )
         );
@@ -889,9 +893,10 @@ contract OracleFeedE2ETest is BaseTest {
             address(USDC),
             returnAmount,
             address(ccipAdapter_earningChain),
+            DEFAULT_GAS_LIMIT,
             BridgeParamsCodec.encode(
-                IBridgeAdapter.BridgeParams({
-                    feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, gasLimit: 300000, data: ""
+                BridgeParamsCodec.BridgeParams({
+                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
                 })
             )
         );
@@ -954,9 +959,10 @@ contract OracleFeedE2ETest is BaseTest {
             address(USDC),
             depositAmount,
             address(ccipAdapter_earningChain),
+            DEFAULT_GAS_LIMIT,
             BridgeParamsCodec.encode(
-                IBridgeAdapter.BridgeParams({
-                    feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, gasLimit: 300000, data: ""
+                BridgeParamsCodec.BridgeParams({
+                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
                 })
             )
         );
@@ -982,9 +988,10 @@ contract OracleFeedE2ETest is BaseTest {
             address(USDC),
             depositAmount,
             address(ccipAdapter_earningChain),
+            DEFAULT_GAS_LIMIT,
             BridgeParamsCodec.encode(
-                IBridgeAdapter.BridgeParams({
-                    feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, gasLimit: 300000, data: ""
+                BridgeParamsCodec.BridgeParams({
+                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
                 })
             )
         );
@@ -1041,9 +1048,10 @@ contract OracleFeedE2ETest is BaseTest {
             amount,
             EARNING_CHAIN_ID,
             address(ccipAdapter_accountingChain),
+            DEFAULT_GAS_LIMIT,
             BridgeParamsCodec.encode(
-                IBridgeAdapter.BridgeParams({
-                    feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, gasLimit: 300000, data: ""
+                BridgeParamsCodec.BridgeParams({
+                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
                 })
             )
         );

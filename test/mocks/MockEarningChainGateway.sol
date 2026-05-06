@@ -23,6 +23,7 @@ contract MockEarningChainGateway is IEarningChainGateway {
         address asset,
         uint256 amount,
         address bridgeAdapter,
+        uint256 gasLimit,
         bytes calldata bridgeParamsEncoded
     ) external payable {}
 
@@ -32,6 +33,7 @@ contract MockEarningChainGateway is IEarningChainGateway {
         uint256 minAmountOut,
         address receiver,
         address bridgeAdapter,
+        uint256 gasLimit,
         bytes calldata bridgeParamsEncoded,
         bytes memory withdrawalPolicyData
     ) external payable returns (uint256) {}
@@ -42,6 +44,7 @@ contract MockEarningChainGateway is IEarningChainGateway {
         uint256 targetChainId,
         address bridgeAdapter,
         address feePayer,
+        uint256 gasLimit,
         bytes calldata bridgeParamsEncoded
     ) external payable {}
 
@@ -64,6 +67,7 @@ contract MockEarningChainGateway is IEarningChainGateway {
         uint256 iouTokenAmountRay,
         address bridgeAdapter,
         address feePayer,
+        uint256 gasLimit,
         bytes calldata bridgeParamsEncoded
     ) external payable {}
 
@@ -72,6 +76,7 @@ contract MockEarningChainGateway is IEarningChainGateway {
         address, // iouTokenRecipient
         uint256, // iouTokenAmountRay
         address, // bridgeAdapter
+        uint256, // gasLimit
         bytes calldata, // bridgeParamsEncoded
         bytes calldata // extraData
     )

@@ -26,7 +26,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         /// @dev Set of adapters whitelisted for usage.
         /// @dev An adapter whitelisted for a token is assumed to also be trusted to ingest data sent along with the
         /// token.
-        /// @dev asset == address(0) for data-only bridging.
+        /// @dev asset == `address(0xDA7ada7aDA7ADA7ADA7AdA7aDA7aDA7ADA7adA7a)` for data-only bridging.
         mapping(address asset => mapping(uint256 chainId => mapping(address bridgeAdapter => bool)))
             supportedBridgeAdapters;
     }
@@ -107,6 +107,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         uint256 iouTokenAmountRay,
         address bridgeAdapter,
         address feePayer,
+        uint256 gasLimit,
         bytes calldata bridgeParamsEncoded
     ) external payable override {
         require(msg.sender == IOU_TOKEN_MANAGER, OnlyIouTokenManager());
@@ -127,6 +128,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
             0,
             bridgeIouTokenMessageEncoded,
             feePayer,
+            gasLimit,
             bridgeParamsEncoded
         );
     }
@@ -154,6 +156,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         uint256 amountToBridge,
         bytes memory dataToBridge,
         address feePayer,
+        uint256 gasLimit,
         bytes memory bridgeParamsEncoded
     ) internal {
         _validateBridgeAdapterIsSupported(assetToBridge, destinationChainId, bridgeAdapter);
@@ -161,7 +164,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
             require(amountToBridge == 0, Errors.InvalidParameter());
         }
         IBridgeAdapter(bridgeAdapter).publishMessageToChainWithFeePayer{value: msg.value}(
-            destinationChainId, assetToBridge, amountToBridge, dataToBridge, feePayer, bridgeParamsEncoded
+            destinationChainId, assetToBridge, amountToBridge, dataToBridge, feePayer, gasLimit, bridgeParamsEncoded
         );
         if (assetToBridge != Constants.ASSET_FOR_DATA_ONLY_BRIDGE) {
             emit FundsSent(assetToBridge, amountToBridge, destinationChainId);

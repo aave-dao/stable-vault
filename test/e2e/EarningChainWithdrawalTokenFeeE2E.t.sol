@@ -15,6 +15,7 @@ import {IouTokenManager} from "src/core/ious/IouTokenManager.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
+import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
 import {BaseTest} from "test/BaseTest.t.sol";
@@ -112,13 +113,10 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             userInitialDeposit,
             EARNING_CHAIN_ID,
             address(ccipAdapter_accountingChain),
+            DEFAULT_GAS_LIMIT,
             BridgeParamsCodec.encode(
-                IBridgeAdapter.BridgeParams({
-                    feeToken: address(bridgeFeeToken),
-                    feeAmount: bridgeFeeAmount,
-                    feeRefundThreshold: 0,
-                    gasLimit: 350000,
-                    data: ""
+                BridgeParamsCodec.BridgeParams({
+                    feeToken: address(bridgeFeeToken), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
                 })
             )
         );
@@ -394,20 +392,20 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
         vm.prank(user);
         IERC20(iouTokenManager.getAsset()).approve(address(iouTokenManager), iouAmountRequestedRay);
         bytes memory bp = BridgeParamsCodec.encode(
-            IBridgeAdapter.BridgeParams({
-                feeToken: address(bridgeFeeToken),
-                feeAmount: bridgeFeeAmount,
-                feeRefundThreshold: 0,
-                gasLimit: 150000,
-                data: ""
+            BridgeParamsCodec.BridgeParams({
+                feeToken: address(bridgeFeeToken), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
             })
         );
         if (isFromAccountingChain) {
             vm.prank(user);
-            vault.bridgeIouTokens(destinationChainId, user, iouAmountRequestedRay, bridgeAdapter, bp, "");
+            vault.bridgeIouTokens(
+                destinationChainId, user, iouAmountRequestedRay, bridgeAdapter, DEFAULT_GAS_LIMIT, bp, ""
+            );
         } else {
             vm.prank(user);
-            earningChainGateway.bridgeIouTokens(destinationChainId, user, iouAmountRequestedRay, bridgeAdapter, bp, "");
+            earningChainGateway.bridgeIouTokens(
+                destinationChainId, user, iouAmountRequestedRay, bridgeAdapter, DEFAULT_GAS_LIMIT, bp, ""
+            );
         }
     }
 
@@ -422,15 +420,15 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             0,
             user,
             address(ccipAdapter_earningChain),
+            DEFAULT_GAS_LIMIT,
             BridgeParamsCodec.encode(
-                IBridgeAdapter.BridgeParams({
+                BridgeParamsCodec.BridgeParams({
                     feeToken: address(bridgeFeeToken),
                     feeAmount: bridgeFeeAmount,
                     feeRefundThreshold: 0,
                     // Use a higher gas limit to ensure the transaction is successful on Accounting Chain because the
                     // snapshot
                     // struct may be pushed to the FH storage.
-                    gasLimit: 350000,
                     data: ""
                 })
             ),
