@@ -11,6 +11,7 @@ import {StableVault} from "src/core/accounting/StableVault.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
+import {Constants} from "src/types/Constants.sol";
 
 import {BaseTest} from "test/BaseTest.t.sol";
 
@@ -91,7 +92,7 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
             DEFAULT_GAS_LIMIT,
             abi.encode(
                 ICcipBridgeAdapter.AdapterData({
-                    feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
+                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
             )
         );
@@ -138,7 +139,7 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
             DEFAULT_GAS_LIMIT,
             abi.encode(
                 ICcipBridgeAdapter.AdapterData({
-                    feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
+                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
             )
         );
@@ -170,7 +171,7 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
             DEFAULT_GAS_LIMIT,
             abi.encode(
                 ICcipBridgeAdapter.AdapterData({
-                    feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
+                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
             ),
             ""

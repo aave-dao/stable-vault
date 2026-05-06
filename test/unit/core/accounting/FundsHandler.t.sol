@@ -17,6 +17,7 @@ import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
+import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
@@ -371,7 +372,7 @@ contract FundsHandlerTest is TestWithHelpers {
         vm.deal(address(unauthorizedMsgSender), adapterData_feeAmount);
         bytes memory adapterData = abi.encode(
             ICcipBridgeAdapter.AdapterData({
-                feeToken: address(0), feeAmount: adapterData_feeAmount, feeRefundThreshold: 0
+                feeToken: Constants.NATIVE_CURRENCY, feeAmount: adapterData_feeAmount, feeRefundThreshold: 0
             })
         );
 
@@ -418,7 +419,7 @@ contract FundsHandlerTest is TestWithHelpers {
 
         bytes memory adapterData = abi.encode(
             ICcipBridgeAdapter.AdapterData({
-                feeToken: address(0), feeAmount: adapterData_feeAmount, feeRefundThreshold: 0
+                feeToken: Constants.NATIVE_CURRENCY, feeAmount: adapterData_feeAmount, feeRefundThreshold: 0
             })
         );
 

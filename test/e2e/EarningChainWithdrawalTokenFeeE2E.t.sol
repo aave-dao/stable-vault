@@ -15,6 +15,7 @@ import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
+import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
 import {BaseTest} from "test/BaseTest.t.sol";

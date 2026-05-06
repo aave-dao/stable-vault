@@ -48,6 +48,10 @@ contract CcipAdapter is
 {
     using SafeERC20 for IERC20;
 
+    /// @dev CCIP's `EVM2AnyMessage.feeToken` uses `address(0)` for native. This adapter translates our own native
+    /// currency constant convention to CCIP's convention.
+    address internal constant CCIP_NATIVE_FEE_TOKEN = address(0);
+
     address internal immutable CCIP_ROUTER;
     address internal immutable ASSET_REGISTRY;
 
@@ -128,7 +132,9 @@ contract CcipAdapter is
             receiver: abi.encode(destinationChainAdapter),
             data: data,
             tokenAmounts: tokenAmounts,
-            feeToken: ccipAdapterData.feeToken,
+            feeToken: ccipAdapterData.feeToken == Constants.NATIVE_CURRENCY
+                ? CCIP_NATIVE_FEE_TOKEN
+                : ccipAdapterData.feeToken,
             extraArgs: Client._argsToBytes(
                 // We pass the input gasLimit, the IRouterClient::getFee will add on top any bridge adapter overhead.
                 Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: true})

@@ -10,6 +10,7 @@ import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
+import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
 import {ExtendedIouTokenManager} from "test/mocks/ExtendedIouTokenManager.sol";
@@ -225,8 +226,10 @@ contract IouTokenManagerTest_AccountingChain is Test {
         vm.assume(iouTokenRecipient != address(0));
         vm.assume(iouTokenAmountRay > 0);
 
-        bytes memory adapterData =
-            abi.encode(ICcipBridgeAdapter.AdapterData({feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0}));
+        bytes memory adapterData = abi.encode(
+            ICcipBridgeAdapter.AdapterData({feeToken: Constants.NATIVE_CURRENCY, feeAmount: 0, feeRefundThreshold: 0})
+        );
+
         vm.prank(iouTokenManagerAddress);
         MockErc20(iouToken).mint(from, iouTokenAmountRay);
         vm.prank(from);
@@ -257,8 +260,9 @@ contract IouTokenManagerTest_AccountingChain is Test {
         address iouTokenRecipient = makeAddr("iouRecipient");
         uint256 iouTokenAmountRay = 1_000_000e27;
 
-        bytes memory adapterData =
-            abi.encode(ICcipBridgeAdapter.AdapterData({feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0}));
+        bytes memory adapterData = abi.encode(
+            ICcipBridgeAdapter.AdapterData({feeToken: Constants.NATIVE_CURRENCY, feeAmount: 0, feeRefundThreshold: 0})
+        );
 
         // Mint IOU tokens to the user and approve the manager
         vm.prank(iouTokenManagerAddress);
@@ -289,8 +293,11 @@ contract IouTokenManagerTest_AccountingChain is Test {
         vm.assume(iouTokenRecipient != address(0));
         vm.assume(iouTokenAmountRay > 0);
         uint256 destinationChainId = block.chainid;
-        bytes memory adapterData =
-            abi.encode(ICcipBridgeAdapter.AdapterData({feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0}));
+
+        bytes memory adapterData = abi.encode(
+            ICcipBridgeAdapter.AdapterData({feeToken: Constants.NATIVE_CURRENCY, feeAmount: 0, feeRefundThreshold: 0})
+        );
+
         vm.expectRevert(Errors.InvalidDestinationChainId.selector);
         vm.prank(from);
         iouTokenManager.bridgeTokens(
@@ -403,7 +410,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
         assertEq(IERC20(feeToken).balanceOf(from), feeAmount, "Fee tokens should not have been consumed");
 
         vm.prank(attacker);
-        MockTransferHelper(payable(transferHelper)).pull(address(0), 0);
+        MockTransferHelper(payable(transferHelper)).pull(Constants.NATIVE_CURRENCY, 0);
         assertEq(attacker.balance, 0, "Attacker should not be able to steal native from TransferHelper");
     }
 
@@ -420,13 +427,17 @@ contract IouTokenManagerTest_AccountingChain is Test {
         vm.assume(from != address(0));
         vm.assume(iouTokenRecipient != address(0));
         vm.assume(iouTokenAmountRay > 0);
+
         bytes memory adapterData = abi.encode(
-            ICcipBridgeAdapter.AdapterData({feeToken: address(0), feeAmount: feeAmount, feeRefundThreshold: 0})
+            ICcipBridgeAdapter.AdapterData({
+                feeToken: Constants.NATIVE_CURRENCY, feeAmount: feeAmount, feeRefundThreshold: 0
+            })
         );
         address feeRecipient = makeAddr("bridgeAdapter");
         if (feeAmount > 0) {
             vm.deal(from, feeAmount);
-            MockGateway(chainGateway).mockConsumeOnNextCall(transferHelper, feeAmount, address(0), feeRecipient);
+            MockGateway(chainGateway)
+                .mockConsumeOnNextCall(transferHelper, feeAmount, Constants.NATIVE_CURRENCY, feeRecipient);
         }
         if (iouTokenAmountRay > 0) {
             vm.prank(iouTokenManagerAddress);
@@ -490,8 +501,11 @@ contract IouTokenManagerTest_AccountingChain is Test {
         uint256 iouTokenAmountRay = 100_000;
         uint256 destinationChainId = block.chainid + 1;
         address iouTokenRecipient = address(0);
-        bytes memory adapterData =
-            abi.encode(ICcipBridgeAdapter.AdapterData({feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0}));
+
+        bytes memory adapterData = abi.encode(
+            ICcipBridgeAdapter.AdapterData({feeToken: Constants.NATIVE_CURRENCY, feeAmount: 0, feeRefundThreshold: 0})
+        );
+
         vm.expectRevert(Errors.InvalidParameter.selector);
         vm.prank(from);
         iouTokenManager.bridgeTokens(
@@ -508,8 +522,11 @@ contract IouTokenManagerTest_AccountingChain is Test {
         vm.assume(from != address(0));
         vm.assume(destinationChainId != block.chainid);
         address iouTokenRecipient = makeAddr("iouTokenRecipient");
-        bytes memory adapterData =
-            abi.encode(ICcipBridgeAdapter.AdapterData({feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0}));
+
+        bytes memory adapterData = abi.encode(
+            ICcipBridgeAdapter.AdapterData({feeToken: Constants.NATIVE_CURRENCY, feeAmount: 0, feeRefundThreshold: 0})
+        );
+
         vm.expectRevert(Errors.ZeroAmount.selector);
         vm.prank(from);
         iouTokenManager.bridgeTokens(
