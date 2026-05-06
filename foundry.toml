@@ -25,8 +25,11 @@ additional_compiler_profiles = [
 compilation_restrictions = [
     # Use `size-optimized` compiler profile for `ATokenVaultMerklRewardClaimer` contract.
     { paths = "lib/aave-vault/src/ATokenVaultMerklRewardClaimer.sol", optimizer_runs = 200 },
-    # Use `balanced` compiler profile for `Allocator` contract to stay within EIP-170 size limit.
-    { paths = "src/core/Allocator.sol", optimizer_runs = 30_000 },
+    # Use `size-optimized` compiler profile for `Allocator` and `StableVault` to stay within
+    # EIP-170 runtime size limit after the policy hooks were added.
+    # TODO: Consider some strategy like splitting logic into semantic libraries to reduce size instead of lowering runs
+    { paths = "src/core/Allocator.sol", optimizer_runs = 200 },
+    { paths = "src/core/accounting/StableVault.sol", optimizer_runs = 200 },
 ]
 
 [profile.default.fuzz]
