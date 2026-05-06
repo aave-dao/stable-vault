@@ -47,6 +47,7 @@ interface IBridgeAdapter {
     /// @param feePayer Address that will pay the bridge fee.
     /// @param payloadExecutionGasLimit Gas limit for the destination gateway call and everything it executes.
     /// @param bridgeAdapterData Any bridge adapter custom parameters that it may need to operate.
+    /// @dev The adapter should add its own gas overhead to `payloadExecutionGasLimit` when executing the message.
     function publishDataOnlyMessage(
         uint256 destinationChainId,
         bytes memory messageData,
