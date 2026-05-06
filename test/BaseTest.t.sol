@@ -32,9 +32,12 @@ import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {AssetRegistry} from "src/periphery/AssetRegistry.sol";
 import {EarningChainStateSchemaV1, SCHEMA_VERSION} from "src/periphery/EarningChainStateSchemaV1.sol";
+import {SlippageCoverageVault} from "src/periphery/SlippageCoverageVault.sol";
 import {Swapper} from "src/periphery/Swapper.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
+
+import {ISlippageCoverageVault} from "src/interfaces/ISlippageCoverageVault.sol";
 
 import {ChainBalanceOracle} from "src/oracles/balance/ChainBalanceOracle.sol";
 import {ChainlinkL2ChainBalanceOracleAdapter} from "src/oracles/balance/ChainlinkL2ChainBalanceOracleAdapter.sol";
@@ -98,6 +101,7 @@ contract BaseTest is TestWithHelpers {
     address withdrawalPolicy_accountingChainAddress;
     address fundsHandler_accountingChainAddress;
     address allocator_accountingChainAddress;
+    address slippageCoverageVault_accountingChainAddress;
     address swapper_accountingChainAddress;
     address chainGateway_accountingChainAddress;
     address ccipAdapter_accountingChainAddress;
@@ -111,6 +115,7 @@ contract BaseTest is TestWithHelpers {
     WithdrawalPolicy withdrawalPolicy_accountingChain;
     FundsHandler fundsHandler;
     Allocator allocator_accountingChain;
+    SlippageCoverageVault slippageCoverageVault_accountingChain;
     Swapper swapper_accountingChain;
     AccountingChainGateway accountingChainGateway;
     CcipAdapter ccipAdapter_accountingChain;
@@ -126,6 +131,7 @@ contract BaseTest is TestWithHelpers {
     address ccipAdapter_earningChainAddress;
     address chainGateway_earningChainAddress;
     address allocator_earningChainAddress;
+    address slippageCoverageVault_earningChainAddress;
     address swapper_earningChainAddress;
     address ghoStrategyVault_earningChainAddress;
     address usdcStrategyVault_earningChainAddress;
@@ -137,6 +143,7 @@ contract BaseTest is TestWithHelpers {
     CcipAdapter ccipAdapter_earningChain;
     EarningChainGateway earningChainGateway;
     Allocator allocator_earningChain;
+    SlippageCoverageVault slippageCoverageVault_earningChain;
     Swapper swapper_earningChain;
     TestErc4626 ghoStrategyVault_earningChain;
     TestErc4626 usdcStrategyVault_earningChain;
@@ -320,6 +327,13 @@ contract BaseTest is TestWithHelpers {
             "\tAccounting Chain Gateway (Accounting Chain) Predicted Address: %s", chainGateway_accountingChainAddress
         );
 
+        slippageCoverageVault_accountingChainAddress =
+            vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
+        Logger.log(
+            "\tSlippage Coverage Vault (Accounting Chain) Predicted Address: %s",
+            slippageCoverageVault_accountingChainAddress
+        );
+
         swapper_accountingChainAddress = vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
         Logger.log("\tSwapper (Accounting Chain) Predicted Address: %s", swapper_accountingChainAddress);
 
@@ -500,8 +514,18 @@ contract BaseTest is TestWithHelpers {
             "Accounting Chain Gateway (Accounting Chain) address mismatch"
         );
 
-        // 21. Swapper
-        swapper_accountingChain = new Swapper(allocator_accountingChainAddress);
+        // 21a. Slippage Coverage Vault (non-upgradeable)
+        slippageCoverageVault_accountingChain =
+            new SlippageCoverageVault(swapper_accountingChainAddress, accessManager_accountingChainAddress, 1_00, 50_00);
+        Logger.log("\tSlippage Coverage Vault: %s", address(slippageCoverageVault_accountingChain));
+        require(
+            address(slippageCoverageVault_accountingChain) == slippageCoverageVault_accountingChainAddress,
+            "Slippage Coverage Vault (Accounting Chain) address mismatch"
+        );
+
+        // 21c. Swapper
+        swapper_accountingChain =
+            new Swapper(allocator_accountingChainAddress, slippageCoverageVault_accountingChainAddress);
         Logger.log("\tSwapper: %s", address(swapper_accountingChain));
         require(
             address(swapper_accountingChain) == swapper_accountingChainAddress,
@@ -582,6 +606,13 @@ contract BaseTest is TestWithHelpers {
         deployerNonce_earningChain++; // Incrementing for Allocator implementation
         allocator_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
         Logger.log("\tAllocator (Earning Chain) Predicted Address: %s", allocator_earningChainAddress);
+
+        slippageCoverageVault_earningChainAddress =
+            vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
+        Logger.log(
+            "\tSlippage Coverage Vault (Earning Chain) Predicted Address: %s",
+            slippageCoverageVault_earningChainAddress
+        );
 
         swapper_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
         Logger.log("\tSwapper (Earning Chain) Predicted Address: %s", swapper_earningChainAddress);
@@ -714,8 +745,17 @@ contract BaseTest is TestWithHelpers {
             "Allocator (Earning Chain) address mismatch"
         );
 
-        // 14. Swapper
-        swapper_earningChain = new Swapper(allocator_earningChainAddress);
+        // 14a. Slippage Coverage Vault (non-upgradeable)
+        slippageCoverageVault_earningChain =
+            new SlippageCoverageVault(swapper_earningChainAddress, accessManager_earningChainAddress, 1_00, 50_00);
+        Logger.log("\tSlippage Coverage Vault: %s", address(slippageCoverageVault_earningChain));
+        require(
+            address(slippageCoverageVault_earningChain) == slippageCoverageVault_earningChainAddress,
+            "Slippage Coverage Vault (Earning Chain) address mismatch"
+        );
+
+        // 14c. Swapper
+        swapper_earningChain = new Swapper(allocator_earningChainAddress, slippageCoverageVault_earningChainAddress);
         Logger.log("\tSwapper: %s", address(swapper_earningChain));
         require(
             address(swapper_earningChain) == swapper_earningChainAddress, "Swapper (Earning Chain) address mismatch"
@@ -942,6 +982,22 @@ contract BaseTest is TestWithHelpers {
             OPERATOR_ROLE
         );
 
+        // For SlippageCoverageVault (intentionally collapsed to a single OPERATOR_ROLE in tests; production
+        // uses split critical/operational roles per RolesConfig).
+        bytes4[] memory vaultSelectors = new bytes4[](9);
+        vaultSelectors[0] = ISlippageCoverageVault.setOverrideMode.selector;
+        vaultSelectors[1] = ISlippageCoverageVault.raisePullCapPerTx.selector;
+        vaultSelectors[2] = ISlippageCoverageVault.lowerPullCapPerTx.selector;
+        vaultSelectors[3] = ISlippageCoverageVault.raiseWindowCap.selector;
+        vaultSelectors[4] = ISlippageCoverageVault.lowerWindowCap.selector;
+        vaultSelectors[5] = ISlippageCoverageVault.setMaxSlippageBps.selector;
+        vaultSelectors[6] = ISlippageCoverageVault.setOverrideMaxSlippageBps.selector;
+        vaultSelectors[7] = ISlippageCoverageVault.fundCoverage.selector;
+        vaultSelectors[8] = ISlippageCoverageVault.sweep.selector;
+        accessManager.setTargetFunctionRole(
+            address(slippageCoverageVault_accountingChain), vaultSelectors, OPERATOR_ROLE
+        );
+
         vm.stopPrank();
     }
 
@@ -1012,6 +1068,19 @@ contract BaseTest is TestWithHelpers {
             _toSelectorArray(IEarningChainGateway.pushFundsToAccountingChain.selector),
             OPERATOR_ROLE
         );
+
+        // For SlippageCoverageVault on earning chain (collapsed to OPERATOR_ROLE for tests).
+        bytes4[] memory vaultSelectors = new bytes4[](9);
+        vaultSelectors[0] = ISlippageCoverageVault.setOverrideMode.selector;
+        vaultSelectors[1] = ISlippageCoverageVault.raisePullCapPerTx.selector;
+        vaultSelectors[2] = ISlippageCoverageVault.lowerPullCapPerTx.selector;
+        vaultSelectors[3] = ISlippageCoverageVault.raiseWindowCap.selector;
+        vaultSelectors[4] = ISlippageCoverageVault.lowerWindowCap.selector;
+        vaultSelectors[5] = ISlippageCoverageVault.setMaxSlippageBps.selector;
+        vaultSelectors[6] = ISlippageCoverageVault.setOverrideMaxSlippageBps.selector;
+        vaultSelectors[7] = ISlippageCoverageVault.fundCoverage.selector;
+        vaultSelectors[8] = ISlippageCoverageVault.sweep.selector;
+        accessManager.setTargetFunctionRole(address(slippageCoverageVault_earningChain), vaultSelectors, OPERATOR_ROLE);
 
         vm.stopPrank();
     }
