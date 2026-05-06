@@ -25,16 +25,47 @@ contract MockBridgeAdapter is IBridgeAdapter {
 
     function getGateway() external view override returns (address) {}
 
-    function publishMessageToChainWithFeePayer(
+    function publishDataOnlyMessage(
         uint256 destinationChainId,
-        address asset,
-        uint256 amount,
-        bytes memory data,
+        bytes memory messageData,
         address feePayer,
         uint256 gasLimit,
         bytes memory bridgeParamsEncoded
     ) external payable override {
-        (destinationChainId, data, gasLimit);
+        _publishMessage(
+            destinationChainId,
+            Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
+            0,
+            messageData,
+            feePayer,
+            gasLimit,
+            bridgeParamsEncoded
+        );
+    }
+
+    function publishMessageWithFunds(
+        uint256 destinationChainId,
+        address asset,
+        uint256 amount,
+        bytes memory messageData,
+        address feePayer,
+        uint256 gasLimit,
+        bytes memory bridgeParamsEncoded
+    ) external payable override {
+        require(asset != Constants.ASSET_FOR_DATA_ONLY_BRIDGE && amount > 0, Errors.InvalidParameter());
+        _publishMessage(destinationChainId, asset, amount, messageData, feePayer, gasLimit, bridgeParamsEncoded);
+    }
+
+    function _publishMessage(
+        uint256 destinationChainId,
+        address asset,
+        uint256 amount,
+        bytes memory messageData,
+        address feePayer,
+        uint256 gasLimit,
+        bytes memory bridgeParamsEncoded
+    ) internal {
+        (destinationChainId, messageData, gasLimit);
         BridgeParamsCodec.BridgeParams memory bridgeParams = BridgeParamsCodec.decode(bridgeParamsEncoded);
 
         // Mirror CcipAdapter: adapter pulls fee directly from feePayer (no TransferHelper round-trip).

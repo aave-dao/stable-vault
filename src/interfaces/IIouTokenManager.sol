@@ -45,15 +45,14 @@ interface IIouTokenManager {
     /// @param iouTokenRecipient The address to send the IOU tokens to on the destination chain.
     /// @param iouTokenAmountRay The amount of IOU tokens to bridge.
     /// @param bridgeAdapter The whitelisted bridge adapter to use for the message.
-    /// @param gasLimit Gas limit that should be allocated for execution of the message on the destination chain,
-    /// without considering the bridge adapter overhead.
+    /// @param payloadExecutionGasLimit Gas limit for the destination gateway call and everything it executes.
     /// @param bridgeParamsEncoded Opaque bridge parameters blob consumed by the adapter.
     function bridgeTokens(
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
         address bridgeAdapter,
-        uint256 gasLimit,
+        uint256 payloadExecutionGasLimit,
         bytes calldata bridgeParamsEncoded
     ) external payable;
 

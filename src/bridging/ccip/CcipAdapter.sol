@@ -53,6 +53,10 @@ contract CcipAdapter is
     /// currency constant convention to CCIP's convention.
     address internal constant CCIP_NATIVE_FEE_TOKEN = address(0);
 
+    /// @dev Gas added on top of data-only payload execution so CCIP can execute this adapter around the gateway call.
+    /// Gas tests measured about 6.9k gas for this path with a no-op gateway; 15k keeps more than 2x margin.
+    uint256 internal constant DATA_ONLY_RECEIVE_GAS_OVERHEAD = 15_000;
+
     address internal immutable CCIP_ROUTER;
     address internal immutable ASSET_REGISTRY;
 
@@ -106,38 +110,76 @@ contract CcipAdapter is
     }
 
     /// @inheritdoc IBridgeAdapter
-    function publishMessageToChainWithFeePayer(
+    function publishDataOnlyMessage(
+        uint256 destinationChainId,
+        bytes memory messageData,
+        address feePayer,
+        uint256 payloadExecutionGasLimit,
+        bytes memory bridgeParamsEncoded
+    ) external payable override(BaseBridgeAdapter, IBridgeAdapter) onlyGateway {
+        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
+        uint256 receiverExecutionGasLimit = payloadExecutionGasLimit + DATA_ONLY_RECEIVE_GAS_OVERHEAD;
+        _publishCcipMessage(
+            destinationChainId,
+            Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
+            0,
+            tokenAmounts,
+            messageData,
+            feePayer,
+            receiverExecutionGasLimit,
+            bridgeParamsEncoded
+        );
+    }
+
+    /// @inheritdoc IBridgeAdapter
+    function publishMessageWithFunds(
         uint256 destinationChainId,
         address asset,
         uint256 amount,
-        bytes memory data,
+        bytes memory messageData,
         address feePayer,
-        uint256 gasLimit,
+        uint256 receiverExecutionGasLimit,
         bytes memory bridgeParamsEncoded
     ) external payable override(BaseBridgeAdapter, IBridgeAdapter) onlyGateway {
+        require(asset != Constants.ASSET_FOR_DATA_ONLY_BRIDGE && amount > 0, Errors.InvalidParameter());
+        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+        tokenAmounts[0] = Client.EVMTokenAmount({token: asset, amount: amount});
+        _publishCcipMessage(
+            destinationChainId,
+            asset,
+            amount,
+            tokenAmounts,
+            messageData,
+            feePayer,
+            receiverExecutionGasLimit,
+            bridgeParamsEncoded
+        );
+    }
+
+    function _publishCcipMessage(
+        uint256 destinationChainId,
+        address assetToBridge,
+        uint256 amountToBridge,
+        Client.EVMTokenAmount[] memory tokenAmounts,
+        bytes memory messageData,
+        address feePayer,
+        uint256 receiverExecutionGasLimit,
+        bytes memory bridgeParamsEncoded
+    ) internal {
         BridgeParamsCodec.BridgeParams memory bridgeParams = BridgeParamsCodec.decode(bridgeParamsEncoded);
 
         address destinationChainAdapter = _destinationChainAdapterOf[destinationChainId];
         require(destinationChainAdapter != address(0), Errors.InvalidParameter());
 
-        Client.EVMTokenAmount[] memory tokenAmounts;
-        if (asset == Constants.ASSET_FOR_DATA_ONLY_BRIDGE) {
-            tokenAmounts = new Client.EVMTokenAmount[](0);
-        } else {
-            tokenAmounts = new Client.EVMTokenAmount[](1);
-            tokenAmounts[0] = Client.EVMTokenAmount({token: asset, amount: amount});
-        }
-
         Client.EVM2AnyMessage memory ccipMessage = Client.EVM2AnyMessage({
             receiver: abi.encode(destinationChainAdapter),
-            data: data,
+            data: messageData,
             tokenAmounts: tokenAmounts,
             feeToken: bridgeParams.feeToken == Constants.NATIVE_CURRENCY
                 ? CCIP_NATIVE_FEE_TOKEN
                 : bridgeParams.feeToken,
             extraArgs: Client._argsToBytes(
-                // We pass the input gasLimit, the IRouterClient::getFee will add on top any bridge adapter overhead.
-                Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: true})
+                Client.GenericExtraArgsV2({gasLimit: receiverExecutionGasLimit, allowOutOfOrderExecution: true})
             )
         });
 
@@ -156,7 +198,9 @@ contract CcipAdapter is
             }
         }
 
-        _pullAssetFromTransferHelperAndApproveCcipRouter(asset, amount, bridgeParams.feeToken, estimatedFeeAmount);
+        _pullAssetFromTransferHelperAndApproveCcipRouter(
+            assetToBridge, amountToBridge, bridgeParams.feeToken, estimatedFeeAmount
+        );
 
         _sendMessageWithFeePayer(
             chainSelector,

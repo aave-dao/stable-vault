@@ -49,6 +49,7 @@ contract CcipAdapterTest is TestWithHelpers {
     uint256 internal EARNING_CHAIN_ID = 2;
     uint64 internal EARNING_CHAIN_CCIP_SELECTOR = 20;
     uint256 internal DEFAULT_GAS_LIMIT = 100000;
+    uint256 internal DATA_ONLY_RECEIVE_GAS_OVERHEAD = 15_000;
 
     /// @dev CCIP encodes native fees as `address(0)` in `EVM2AnyMessage.feeToken`. Defined here (rather than imported
     /// from the adapter) so the test independently asserts CCIP's external convention.
@@ -354,7 +355,7 @@ contract CcipAdapterTest is TestWithHelpers {
         _accountingChainCcipAdapter.setDestinationChainAdapter(block.chainid, makeAddr("adapter"));
     }
 
-    function test_publishMessageToChainWithFeePayer_withTokenBridgeFee(
+    function test_publishMessageWithFunds_withTokenBridgeFee(
         uint256 amountUsdt,
         address feePayer,
         uint256 feeAmount,
@@ -419,7 +420,7 @@ contract CcipAdapterTest is TestWithHelpers {
         vm.expectEmit(true, true, true, true);
         emit IBridgeAdapter.MessagePublished(messageId);
         vm.prank(address(_mockAccountingChainGateway));
-        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
+        _accountingChainCcipAdapter.publishMessageWithFunds(
             EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, bridgedData, feePayer, gasLimit, bridgeParams
         );
 
@@ -428,7 +429,7 @@ contract CcipAdapterTest is TestWithHelpers {
         assertEq(_mockTransferHelper.getBalance(address(_mockGho)), 0);
     }
 
-    function test_publishMessageToChainWithFeePayer_withNativeBridgeFee(
+    function test_publishMessageWithFunds_withNativeBridgeFee(
         uint256 amountUsdt,
         address feePayer,
         uint256 feeAmount,
@@ -495,7 +496,7 @@ contract CcipAdapterTest is TestWithHelpers {
             emit IBridgeAdapter.MessagePublished(messageId);
         }
         vm.prank(address(_mockAccountingChainGateway));
-        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer{value: feeAmount}(
+        _accountingChainCcipAdapter.publishMessageWithFunds{value: feeAmount}(
             EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, bridgedData, feePayer, gasLimit, bridgeParams
         );
 
@@ -503,7 +504,7 @@ contract CcipAdapterTest is TestWithHelpers {
         assertEq(_mockTransferHelper.getBalance(address(_mockUsdt)), 0);
     }
 
-    function test_publishMessageToChainWithFeePayer_pullsErc20FeeDirectlyFromFeePayer() public {
+    function test_publishMessageWithFunds_pullsErc20FeeDirectlyFromFeePayer() public {
         // Regression: post round-trip removal, ERC-20 fee must move feePayer -> adapter via
         // safeTransferFrom, never through the TransferHelper.
         address feePayer = makeAddr("feePayerDirectPull");
@@ -544,7 +545,7 @@ contract CcipAdapterTest is TestWithHelpers {
         );
 
         vm.prank(address(_mockAccountingChainGateway));
-        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
+        _accountingChainCcipAdapter.publishMessageWithFunds(
             EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "", feePayer, DEFAULT_GAS_LIMIT, bridgeParams
         );
 
@@ -552,7 +553,7 @@ contract CcipAdapterTest is TestWithHelpers {
         assertEq(_mockTransferHelper.getBalance(address(_mockGho)), 0);
     }
 
-    function test_publishMessageToChainWithFeePayer_nativeFeeNeverEntersTransferHelper() public {
+    function test_publishMessageWithFunds_nativeFeeNeverEntersTransferHelper() public {
         address payable feePayer = payable(makeAddr("feePayerNativeDirect"));
         uint256 amountUsdt = 100_000000;
         uint256 feeAmount = 1 ether;
@@ -586,7 +587,7 @@ contract CcipAdapterTest is TestWithHelpers {
         _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, bytes32(uint256(2)));
 
         vm.prank(address(_mockAccountingChainGateway));
-        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer{value: feeAmount}(
+        _accountingChainCcipAdapter.publishMessageWithFunds{value: feeAmount}(
             EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "", feePayer, DEFAULT_GAS_LIMIT, bridgeParams
         );
 
@@ -594,7 +595,7 @@ contract CcipAdapterTest is TestWithHelpers {
         assertEq(address(_mockTransferHelper).balance, thNativeBefore, "TH native balance changed");
     }
 
-    function test_publishMessageToChainWithFeePayer_withTokenBridgeFeeAndRefund(
+    function test_publishMessageWithFunds_withTokenBridgeFeeAndRefund(
         uint256 amountUsdt,
         address feePayer,
         uint256 feeAmount,
@@ -660,7 +661,7 @@ contract CcipAdapterTest is TestWithHelpers {
 
         _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, bytes32(0));
         vm.prank(address(_mockAccountingChainGateway));
-        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
+        _accountingChainCcipAdapter.publishMessageWithFunds(
             EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, bridgedData, feePayer, gasLimit, bridgeParams
         );
 
@@ -670,7 +671,7 @@ contract CcipAdapterTest is TestWithHelpers {
         assertEq(_mockGho.balanceOf(address(feePayer)), expectedFeeRefund);
     }
 
-    function test_publishMessageToChainWithFeePayer_withNativeBridgeFeeAndRefund(
+    function test_publishMessageWithFunds_withNativeBridgeFeeAndRefund(
         uint256 amountUsdt,
         address payable feePayer,
         uint256 feeAmount,
@@ -738,7 +739,7 @@ contract CcipAdapterTest is TestWithHelpers {
 
         _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, bytes32(0));
         vm.prank(address(_mockAccountingChainGateway));
-        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer{value: feeAmount}(
+        _accountingChainCcipAdapter.publishMessageWithFunds{value: feeAmount}(
             EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "", feePayer, gasLimit, bridgeParams
         );
 
@@ -747,7 +748,7 @@ contract CcipAdapterTest is TestWithHelpers {
         assertEq(address(feePayer).balance, feePayerBalance + 1); // expectedFeeRefund = 1
     }
 
-    function test_publishMessageToChainWithFeePayer_nativeFeeRefundSucceeds_eoaFeePayer(uint256 excessFee) public {
+    function test_publishMessageWithFunds_nativeFeeRefundSucceeds_eoaFeePayer(uint256 excessFee) public {
         excessFee = _boundNativeAmount(excessFee);
         uint256 amountUsdt = 100_000000; // 100 USDT
 
@@ -788,16 +789,14 @@ contract CcipAdapterTest is TestWithHelpers {
         _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, bytes32(0));
 
         vm.prank(address(_mockAccountingChainGateway));
-        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer{value: allocatedFeeAmount}(
+        _accountingChainCcipAdapter.publishMessageWithFunds{value: allocatedFeeAmount}(
             EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "", feePayer, DEFAULT_GAS_LIMIT, bridgeParams
         );
 
         assertEq(address(feePayer).balance, feePayerBalance + excessFee);
     }
 
-    function test_publishMessageToChainWithFeePayer_nativeFeeRefundSucceeds_gasHeavyContractFeePayer(uint256 excessFee)
-        public
-    {
+    function test_publishMessageWithFunds_nativeFeeRefundSucceeds_gasHeavyContractFeePayer(uint256 excessFee) public {
         excessFee = _boundNativeAmount(excessFee);
         uint256 amountUsdt = 100_000000; // 100 USDT
 
@@ -837,7 +836,7 @@ contract CcipAdapterTest is TestWithHelpers {
         _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, bytes32(0));
 
         vm.prank(address(_mockAccountingChainGateway));
-        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer{value: allocatedFeeAmount}(
+        _accountingChainCcipAdapter.publishMessageWithFunds{value: allocatedFeeAmount}(
             EARNING_CHAIN_ID,
             address(_mockUsdt),
             amountUsdt,
@@ -852,7 +851,7 @@ contract CcipAdapterTest is TestWithHelpers {
         assertEq(gasHeavyFeePayer.lastValue(), excessFee);
     }
 
-    function test_publishMessageToChainWithFeePayer_reverts_ifNativeFeeRefundFails() public {
+    function test_publishMessageWithFunds_reverts_ifNativeFeeRefundFails() public {
         uint256 amountUsdt = 100_000000;
         uint256 estimatedFeeAmount = 1 ether;
         uint256 excessFee = 1 wei;
@@ -891,7 +890,7 @@ contract CcipAdapterTest is TestWithHelpers {
 
         vm.expectRevert(Errors.NativeTransferFailed.selector);
         vm.prank(address(_mockAccountingChainGateway));
-        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer{value: allocatedFeeAmount}(
+        _accountingChainCcipAdapter.publishMessageWithFunds{value: allocatedFeeAmount}(
             EARNING_CHAIN_ID,
             address(_mockUsdt),
             amountUsdt,
@@ -902,7 +901,7 @@ contract CcipAdapterTest is TestWithHelpers {
         );
     }
 
-    function test_publishMessageToChainWithFeePayer_refundThresholdWorksAsExpected_TokenBridgeFee(
+    function test_publishMessageWithFunds_refundThresholdWorksAsExpected_TokenBridgeFee(
         address feePayer,
         uint256 feeAmount,
         uint256 feeRefundThreshold,
@@ -966,7 +965,7 @@ contract CcipAdapterTest is TestWithHelpers {
 
         _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, bytes32(0));
         vm.prank(address(_mockAccountingChainGateway));
-        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
+        _accountingChainCcipAdapter.publishMessageWithFunds(
             EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "", feePayer, DEFAULT_GAS_LIMIT, bridgeParams
         );
 
@@ -988,7 +987,7 @@ contract CcipAdapterTest is TestWithHelpers {
         assertEq(_mockGho.balanceOf(feePayer), expectedFeeRefund);
     }
 
-    function test_publishMessageToChainWithFeePayer_refundThresholdWorksAsExpected_NativeBridgeFee(
+    function test_publishMessageWithFunds_refundThresholdWorksAsExpected_NativeBridgeFee(
         address feePayer,
         uint256 feeAmount,
         uint256 feeRefundThreshold,
@@ -1060,7 +1059,7 @@ contract CcipAdapterTest is TestWithHelpers {
 
         _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, bytes32(0));
         vm.prank(address(_mockAccountingChainGateway));
-        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer{value: feeAmount}(
+        _accountingChainCcipAdapter.publishMessageWithFunds{value: feeAmount}(
             EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "", feePayer, DEFAULT_GAS_LIMIT, bridgeParams
         );
 
@@ -1081,7 +1080,7 @@ contract CcipAdapterTest is TestWithHelpers {
         assertEq(address(feePayer).balance, expectedFeeRefund);
     }
 
-    function test_publishMessageToChainWithFeePayer_dataOnlyMessage_withTokenBridgeFee(uint256 feeAmount) public {
+    function test_publishDataOnlyMessage_withTokenBridgeFee(uint256 feeAmount) public {
         feeAmount = _boundAssetAmount(address(_mockGho), feeAmount);
 
         bytes memory arbitraryData = abi.encode(keccak256(hex"c0ffee"));
@@ -1096,7 +1095,9 @@ contract CcipAdapterTest is TestWithHelpers {
             tokenAmounts: new Client.EVMTokenAmount[](0),
             feeToken: address(_mockGho),
             extraArgs: Client._argsToBytes(
-                Client.GenericExtraArgsV2({gasLimit: DEFAULT_GAS_LIMIT, allowOutOfOrderExecution: true})
+                Client.GenericExtraArgsV2({
+                    gasLimit: DEFAULT_GAS_LIMIT + DATA_ONLY_RECEIVE_GAS_OVERHEAD, allowOutOfOrderExecution: true
+                })
             )
         });
 
@@ -1106,25 +1107,17 @@ contract CcipAdapterTest is TestWithHelpers {
             })
         );
 
-        vm.expectCall(
-            address(_mockCCIPRouter),
-            0,
-            abi.encodeCall(IRouterClient.ccipSend, (EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage))
-        );
         _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, bytes32(0));
+        vm.mockCall(
+            address(_mockCCIPRouter), abi.encodeWithSelector(IRouterClient.ccipSend.selector), abi.encode(bytes32(0))
+        );
         vm.prank(address(_mockAccountingChainGateway));
-        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
-            EARNING_CHAIN_ID,
-            Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
-            0,
-            arbitraryData,
-            everyRoleAccount,
-            DEFAULT_GAS_LIMIT,
-            bridgeParams
+        _accountingChainCcipAdapter.publishDataOnlyMessage(
+            EARNING_CHAIN_ID, arbitraryData, everyRoleAccount, DEFAULT_GAS_LIMIT, bridgeParams
         );
     }
 
-    function test_publishMessageToChainWithFeePayer_reverts_ifNativeFeeIsBelowEstimate() public {
+    function test_publishDataOnlyMessage_reverts_ifNativeFeeIsBelowEstimate() public {
         uint256 idleNativeAssetAmount = 123;
         uint256 actualFeeAmount = 100;
 
@@ -1143,15 +1136,15 @@ contract CcipAdapterTest is TestWithHelpers {
             tokenAmounts: new Client.EVMTokenAmount[](0),
             feeToken: CCIP_NATIVE_FEE_TOKEN,
             extraArgs: Client._argsToBytes(
-                Client.GenericExtraArgsV2({gasLimit: DEFAULT_GAS_LIMIT, allowOutOfOrderExecution: true})
+                Client.GenericExtraArgsV2({
+                    gasLimit: DEFAULT_GAS_LIMIT + DATA_ONLY_RECEIVE_GAS_OVERHEAD, allowOutOfOrderExecution: true
+                })
             )
         });
 
         // Mock call to router.getFee - return the fee amount to trigger refund flow
         vm.mockCall(
-            address(_mockCCIPRouter),
-            abi.encodeWithSelector(IRouterClient.getFee.selector, EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage),
-            abi.encode(actualFeeAmount)
+            address(_mockCCIPRouter), abi.encodeWithSelector(IRouterClient.getFee.selector), abi.encode(actualFeeAmount)
         );
         // Stub the call to router.ccipSend
         _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, bytes32(0));
@@ -1159,18 +1152,12 @@ contract CcipAdapterTest is TestWithHelpers {
         vm.expectRevert(Errors.InsufficientFunds.selector);
         vm.prank(address(_mockAccountingChainGateway));
         // Do not send any native asset with the call to try using the idle funds on the adapter.
-        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
-            EARNING_CHAIN_ID,
-            Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
-            0,
-            "",
-            address(this),
-            DEFAULT_GAS_LIMIT,
-            bridgeParams
+        _accountingChainCcipAdapter.publishDataOnlyMessage(
+            EARNING_CHAIN_ID, "", address(this), DEFAULT_GAS_LIMIT, bridgeParams
         );
     }
 
-    function test_publishMessageToChainWithFeePayer_reverts_ifNativeMsgValueExceedsFeeAmountByOne() public {
+    function test_publishDataOnlyMessage_reverts_ifNativeMsgValueExceedsFeeAmountByOne() public {
         // The adapter enforces strict equality between msg.value and bridgeParams.feeAmount when the fee token is
         // native; sending one extra wei must revert rather than silently being absorbed by the adapter.
         // This is enforced to avoid an under-counted refund.
@@ -1190,7 +1177,9 @@ contract CcipAdapterTest is TestWithHelpers {
             tokenAmounts: new Client.EVMTokenAmount[](0),
             feeToken: CCIP_NATIVE_FEE_TOKEN,
             extraArgs: Client._argsToBytes(
-                Client.GenericExtraArgsV2({gasLimit: DEFAULT_GAS_LIMIT, allowOutOfOrderExecution: true})
+                Client.GenericExtraArgsV2({
+                    gasLimit: DEFAULT_GAS_LIMIT + DATA_ONLY_RECEIVE_GAS_OVERHEAD, allowOutOfOrderExecution: true
+                })
             )
         });
 
@@ -1204,27 +1193,19 @@ contract CcipAdapterTest is TestWithHelpers {
 
         vm.expectRevert(Errors.InsufficientFunds.selector);
         vm.prank(address(_mockAccountingChainGateway));
-        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer{value: feeAmount + 1}(
-            EARNING_CHAIN_ID,
-            Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
-            0,
-            "",
-            address(this),
-            DEFAULT_GAS_LIMIT,
-            bridgeParams
+        _accountingChainCcipAdapter.publishDataOnlyMessage{value: feeAmount + 1}(
+            EARNING_CHAIN_ID, "", address(this), DEFAULT_GAS_LIMIT, bridgeParams
         );
     }
 
-    function test_publishMessageToChainWithFeePayer_reverts_ifOnlyGateway(address caller) public {
+    function test_publishMessageWithFunds_reverts_ifOnlyGateway(address caller) public {
         vm.assume(caller != address(_mockAccountingChainGateway));
         vm.assume(caller != address(_mockEarningChainGateway));
 
         vm.prank(caller);
         vm.expectRevert(Errors.OnlyGateway.selector);
-        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
+        _accountingChainCcipAdapter.publishDataOnlyMessage(
             EARNING_CHAIN_ID,
-            address(0),
-            0,
             "",
             address(this),
             DEFAULT_GAS_LIMIT,
@@ -1237,10 +1218,8 @@ contract CcipAdapterTest is TestWithHelpers {
 
         vm.prank(caller);
         vm.expectRevert(Errors.OnlyGateway.selector);
-        _earningChainCcipAdapter.publishMessageToChainWithFeePayer(
+        _earningChainCcipAdapter.publishDataOnlyMessage(
             ACCOUNTING_CHAIN_ID,
-            address(0),
-            0,
             "",
             address(this),
             DEFAULT_GAS_LIMIT,
@@ -1252,16 +1231,12 @@ contract CcipAdapterTest is TestWithHelpers {
         );
     }
 
-    function test_publishMessageToChainWithFeePayer_reverts_ifDestinationChainAdapterNotSet(uint256 destinationChainId)
-        public
-    {
+    function test_publishMessageWithFunds_reverts_ifDestinationChainAdapterNotSet(uint256 destinationChainId) public {
         vm.assume(destinationChainId != EARNING_CHAIN_ID);
         vm.expectRevert(Errors.InvalidParameter.selector);
         vm.prank(address(_mockAccountingChainGateway));
-        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
+        _accountingChainCcipAdapter.publishDataOnlyMessage(
             destinationChainId,
-            address(0),
-            0,
             "",
             address(this),
             DEFAULT_GAS_LIMIT,
@@ -1632,7 +1607,7 @@ contract CcipAdapterTest is TestWithHelpers {
         adapterWithMaliciousGateway.ccipReceive(ccipMessage);
     }
 
-    function test_publishMessageToChainWithFeePayer_resetsAdapterToRouterAllowanceToZero_FeeTokenNotBeingBridged(
+    function test_publishMessageWithFunds_resetsAdapterToRouterAllowanceToZero_FeeTokenNotBeingBridged(
         uint256 amountGho,
         address feePayer,
         uint256 feeAmount,
@@ -1661,7 +1636,7 @@ contract CcipAdapterTest is TestWithHelpers {
         _mockCCIPRouter.setFee(feeAmount);
 
         vm.prank(address(_mockAccountingChainGateway));
-        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
+        _accountingChainCcipAdapter.publishMessageWithFunds(
             EARNING_CHAIN_ID, address(_mockGho), amountGho, "", feePayer, gasLimit, bridgeParams
         );
 
@@ -1670,7 +1645,7 @@ contract CcipAdapterTest is TestWithHelpers {
         assertEq(remainingAllowance, 0, "Fee token allowance should be reset to 0 after send");
     }
 
-    function test_publishMessageToChainWithFeePayer_resetsAdapterToRouterAllowanceToZero_FeeTokenBeingBridged(
+    function test_publishMessageWithFunds_resetsAdapterToRouterAllowanceToZero_FeeTokenBeingBridged(
         uint256 amountUsdt,
         address feePayer,
         uint256 feeAmount,
@@ -1700,7 +1675,7 @@ contract CcipAdapterTest is TestWithHelpers {
         _mockCCIPRouter.setFee(feeAmount);
 
         vm.prank(address(_mockAccountingChainGateway));
-        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
+        _accountingChainCcipAdapter.publishMessageWithFunds(
             EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "", feePayer, gasLimit, bridgeParams
         );
 
@@ -1709,7 +1684,7 @@ contract CcipAdapterTest is TestWithHelpers {
         assertEq(remainingAllowance, 0, "Fee token allowance should be reset to 0 even when matching bridged asset");
     }
 
-    function test_publishMessageToChainWithFeePayer_stuckFundsCannotBeUsedToCoverBridgeFees() public {
+    function test_publishMessageWithFunds_stuckFundsCannotBeUsedToCoverBridgeFees() public {
         uint256 stuckAmount = 100 * 10 ** 6; // 100 USDC stuck in adapter
         uint256 amountGho = 50 * 10 ** 18; // 50 GHO to bridge
         address attacker = makeAddr("attacker");
@@ -1742,7 +1717,7 @@ contract CcipAdapterTest is TestWithHelpers {
         _mockCCIPRouter.setFee(legitimateFeeAmount);
 
         vm.prank(address(_mockAccountingChainGateway));
-        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
+        _accountingChainCcipAdapter.publishMessageWithFunds(
             EARNING_CHAIN_ID, address(_mockGho), amountGho, "", attacker, DEFAULT_GAS_LIMIT, bridgeParams
         );
 
@@ -1763,9 +1738,7 @@ contract CcipAdapterTest is TestWithHelpers {
         );
     }
 
-    function test_publishMessageToChainWithFeePayer_allowanceResetPreventsSubsequentFreeBridgingByPassingZeroFee()
-        public
-    {
+    function test_publishMessageWithFunds_allowanceResetPreventsSubsequentFreeBridgingByPassingZeroFee() public {
         uint256 stuckAmount = 100 * 10 ** 6; // 100 USDC
         uint256 amountGho = 50 * 10 ** 18; // 50 GHO to bridge
         address feePayer = makeAddr("feePayer");
@@ -1797,12 +1770,12 @@ contract CcipAdapterTest is TestWithHelpers {
         _mockCCIPRouter.setFee(actualFeeAmount);
 
         vm.prank(address(_mockAccountingChainGateway));
-        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
+        _accountingChainCcipAdapter.publishMessageWithFunds(
             EARNING_CHAIN_ID, address(_mockGho), amountGho, "", feePayer, DEFAULT_GAS_LIMIT, bridgeParams
         );
 
         // Allowance should be 0, otherwise the allowance would remain at allocatedFeeAmount, allowing an attacker
-        // to call publishMessageToChainWithFeePayer with feeAmount=0 and have the router use the stuck funds via the
+        // to call publishMessageWithFunds with feeAmount=0 and have the router use the stuck funds via the
         // leftover allowance.
         uint256 routerAllowance = _mockUsdt.allowance(address(_accountingChainCcipAdapter), address(_mockCCIPRouter));
         assertEq(
@@ -1823,7 +1796,7 @@ contract CcipAdapterTest is TestWithHelpers {
         );
     }
 
-    function test_publishMessageToChainWithFeePayer_nativeFeesDoNotAffectTokenAllowance() public {
+    function test_publishMessageWithFunds_nativeFeesDoNotAffectTokenAllowance() public {
         uint256 stuckUsdt = 100 * 10 ** 6; // 100 USDT stuck
         uint256 amountGho = 50 * 10 ** 18;
         uint256 nativeFeeAmount = 1 ether;
@@ -1867,7 +1840,7 @@ contract CcipAdapterTest is TestWithHelpers {
         _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, bytes32(0));
 
         vm.prank(address(_mockAccountingChainGateway));
-        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer{value: nativeFeeAmount}(
+        _accountingChainCcipAdapter.publishMessageWithFunds{value: nativeFeeAmount}(
             EARNING_CHAIN_ID, address(_mockGho), amountGho, "", feePayer, DEFAULT_GAS_LIMIT, bridgeParams
         );
 
@@ -1956,7 +1929,7 @@ contract CcipAdapterTest is TestWithHelpers {
         IRescuableToken(address(_accountingChainCcipAdapter)).rescueTokens(address(_mockUsdt), 100);
     }
 
-    function test_publishMessageToChainWithFeePayer_emitsFeeRefunded_whenExcessFeeExceedsThreshold() public {
+    function test_publishMessageWithFunds_emitsFeeRefunded_whenExcessFeeExceedsThreshold() public {
         // Context: Accounting Chain -> Earning Chain
 
         address feePayer = makeAddr("feePayer");
@@ -2006,7 +1979,7 @@ contract CcipAdapterTest is TestWithHelpers {
         emit ICcipBridgeAdapter.FeeRefunded(feePayer, feeToken, expectedRefundAmount);
 
         vm.prank(address(_mockAccountingChainGateway));
-        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
+        _accountingChainCcipAdapter.publishMessageWithFunds(
             EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "", feePayer, DEFAULT_GAS_LIMIT, bridgeParams
         );
     }

@@ -16,9 +16,6 @@ contract MockAccountingChainGateway is IAccountingChainGateway {
 
     function getIouTokenManager() external view returns (address) {}
 
-    /// @dev Mirrors `BaseChainGateway._sendCrossChainMessage`: the gateway is a pure forwarder. Fee
-    /// staging (pulling the fee token from the feePayer or accepting native via msg.value) and asset
-    /// consumption from the TransferHelper both live downstream in the bridge adapter.
     function sendPushFundsToChainMessage(
         address asset,
         uint256 amount,
@@ -28,7 +25,7 @@ contract MockAccountingChainGateway is IAccountingChainGateway {
         uint256 gasLimit,
         bytes calldata bridgeParamsEncoded
     ) external payable {
-        IBridgeAdapter(bridgeAdapter).publishMessageToChainWithFeePayer{value: msg.value}(
+        IBridgeAdapter(bridgeAdapter).publishMessageWithFunds{value: msg.value}(
             targetChainId, asset, amount, "", feePayer, gasLimit, bridgeParamsEncoded
         );
     }

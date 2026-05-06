@@ -107,8 +107,7 @@ interface IChainGateway {
     /// @param iouTokenAmountRay The amount of IOU tokens to bridge.
     /// @param bridgeAdapter The whitelisted bridge adapter to use for the message.
     /// @param feePayer Address that will pay the bridge fee.
-    /// @param gasLimit Gas limit that should be allocated for execution of the message on the destination chain,
-    /// without considering the bridge adapter overhead.
+    /// @param payloadExecutionGasLimit Gas limit for the destination gateway call and everything it executes.
     /// @param bridgeParamsEncoded Opaque bridge parameters blob consumed by the adapter.
     function sendBridgeIouTokenMessageWithFeePayer(
         uint256 destinationChainId,
@@ -116,7 +115,7 @@ interface IChainGateway {
         uint256 iouTokenAmountRay,
         address bridgeAdapter,
         address feePayer,
-        uint256 gasLimit,
+        uint256 payloadExecutionGasLimit,
         bytes calldata bridgeParamsEncoded
     ) external payable;
 }
