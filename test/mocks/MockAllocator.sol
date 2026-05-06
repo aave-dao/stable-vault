@@ -102,6 +102,8 @@ contract MockAllocator is IAllocator {
     function trustStrategy(address strategy) external override {}
     function distrustStrategy(address strategy) external override {}
     function isStrategyTrusted(address strategy) external view override returns (bool) {}
+    function setRebalancePolicy(address policy) external override {}
+    function getRebalancePolicy() external view override returns (address) {}
 
     function _pushToTransferHelper() internal {
         for (uint256 i = 0; i < _assetsToPushToTransferHelperInNextCall.length; i++) {

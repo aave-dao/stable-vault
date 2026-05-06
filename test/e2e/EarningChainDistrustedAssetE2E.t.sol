@@ -122,14 +122,17 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
         // User requests withdrawal of their original deposit
         uint256 iouAmountRequestedRay = userInitialDeposit.assetDecimalsToRay(address(USDC));
         vm.prank(user1);
-        vault.requestWithdrawal(user1, iouAmountRequestedRay);
+        vault.requestWithdrawal(user1, iouAmountRequestedRay, "");
         // User should have minted IOU tokens
         assertEq(iouToken_accountingChain.balanceOf(user1), iouAmountRequestedRay);
 
-        // User bridges IOUs to the Earning Chain
-        vm.prank(user1);
+        // User bridges IOUs to the Earning Chain via the Vault's user-facing entry-point
         vm.deal(user1, bridgeFeeAmount);
-        iouTokenManager_accountingChain.bridgeTokens{value: bridgeFeeAmount}(
+        vm.prank(user1);
+        IERC20(address(iouToken_accountingChain))
+            .approve(address(iouTokenManager_accountingChain), iouAmountRequestedRay);
+        vm.prank(user1);
+        vault.bridgeIouTokens{value: bridgeFeeAmount}(
             EARNING_CHAIN_ID,
             user1,
             iouAmountRequestedRay,
@@ -138,7 +141,8 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
                 IBridgeAdapter.BridgeParams({
                     feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, gasLimit: 300000, data: ""
                 })
-            )
+            ),
+            ""
         );
 
         // Check the IOU token balance on Accounting Chain went down
@@ -183,7 +187,7 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
         USDC.mint(user, amount);
         vm.startPrank(user);
         USDC.approve(address(vault), amount);
-        vault.deposit(user, address(USDC), amount);
+        vault.deposit(user, address(USDC), amount, "");
         vm.stopPrank();
     }
 }

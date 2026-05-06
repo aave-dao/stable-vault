@@ -9,11 +9,13 @@ contract MockDummyIouTokenManager is IIouTokenManager {
 
     function getLockedBalance() external view override returns (uint256) {}
 
-    function bridgeTokens(
+    function bridgeTokensFrom(
+        address, // from
         uint256, // destinationChainId
         address, // iouTokenRecipient
         uint256 iouTokenAmountRay,
         address, // bridgeAdapter
+        address, // feePayer
         bytes calldata // bridgeParamsEncoded
     )
         external

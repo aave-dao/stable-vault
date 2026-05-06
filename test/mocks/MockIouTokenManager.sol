@@ -43,21 +43,19 @@ contract MockIouTokenManager is IIouTokenManager {
         return _lockedBalance;
     }
 
-    function bridgeTokens(
+    function bridgeTokensFrom(
+        address from,
         uint256, // destinationChainId
         address, // iouTokenRecipient
         uint256 iouTokenAmountRay,
         address, // bridgeAdapter
+        address, // feePayer
         bytes calldata // bridgeParamsEncoded
-    )
-        external
-        payable
-        override
-    {
+    ) external payable override {
         if (_isCanonicalChain) {
-            _lockTokens(msg.sender, iouTokenAmountRay);
+            _lockTokens(from, iouTokenAmountRay);
         } else {
-            _burnTokens(msg.sender, iouTokenAmountRay);
+            _burnTokens(from, iouTokenAmountRay);
         }
     }
 

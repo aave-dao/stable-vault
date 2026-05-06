@@ -171,13 +171,13 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             )
         );
         vm.prank(user1);
-        vault.requestWithdrawal(user1, userBalanceAfterHalfYearInRay);
+        vault.requestWithdrawal(user1, userBalanceAfterHalfYearInRay, "");
 
         // 5. User requests to withdrawal their original deposit
         uint256 iouAmountRequestedRay = userInitialDeposit.assetDecimalsToRay(address(USDC));
         vm.prank(user1);
         Logger.log("!!! Actual requesting withdrawal for user1", user1);
-        vault.requestWithdrawal(user1, iouAmountRequestedRay);
+        vault.requestWithdrawal(user1, iouAmountRequestedRay, "");
         // Check the IOU token balance went up (units are in RAY)
         assertEq(
             iouToken_accountingChain.balanceOf(user1),
@@ -207,7 +207,7 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
         // Check that requesting another withdrawal fails because the user was alredy given IOUs.
         vm.expectRevert(abi.encodeWithSelector(Errors.InvalidAmount.selector));
         vm.prank(user1);
-        vault.requestWithdrawal(user1, iouAmountRequestedRay);
+        vault.requestWithdrawal(user1, iouAmountRequestedRay, "");
 
         // 7. A second depositor deposits and tries to withdraw (check the iousInCirculationRay math)
         _mintAndDepositUsdcToStableVault(user2, userInitialDeposit);
@@ -229,11 +229,11 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             )
         );
         vm.prank(user2);
-        vault.requestWithdrawal(user2, user2BalanceAfterOneYearInRay);
+        vault.requestWithdrawal(user2, user2BalanceAfterOneYearInRay, "");
 
         // User2 should be able to withdraw their original deposit
         vm.prank(user2);
-        vault.requestWithdrawal(user2, iouAmountRequestedRay);
+        vault.requestWithdrawal(user2, iouAmountRequestedRay, "");
         // Check the IOU token balance on Accounting Chain went up
         assertEq(
             iouToken_accountingChain.balanceOf(user2),
@@ -370,7 +370,7 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
         USDC.mint(user, amount);
         vm.startPrank(user);
         USDC.approve(address(vault), amount);
-        vault.deposit(user, address(USDC), amount);
+        vault.deposit(user, address(USDC), amount, "");
         vm.stopPrank();
     }
 
@@ -386,26 +386,29 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
         uint256 iouAmountRequestedRay,
         uint256 destinationChainId
     ) internal {
+        bool isFromAccountingChain = destinationChainId == EARNING_CHAIN_ID;
         // Determine the right bridge adapter based on which chain is the source
-        address bridgeAdapter = destinationChainId == EARNING_CHAIN_ID
-            ? address(ccipAdapter_accountingChain)
-            : address(ccipAdapter_earningChain);
+        address bridgeAdapter =
+            isFromAccountingChain ? address(ccipAdapter_accountingChain) : address(ccipAdapter_earningChain);
+        // User must approve the IouTokenManager to lock/burn their IOUs.
         vm.prank(user);
-        iouTokenManager.bridgeTokens(
-            destinationChainId,
-            user,
-            iouAmountRequestedRay,
-            bridgeAdapter,
-            BridgeParamsCodec.encode(
-                IBridgeAdapter.BridgeParams({
-                    feeToken: address(bridgeFeeToken),
-                    feeAmount: bridgeFeeAmount,
-                    feeRefundThreshold: 0,
-                    gasLimit: 150000,
-                    data: ""
-                })
-            )
+        IERC20(iouTokenManager.getAsset()).approve(address(iouTokenManager), iouAmountRequestedRay);
+        bytes memory bp = BridgeParamsCodec.encode(
+            IBridgeAdapter.BridgeParams({
+                feeToken: address(bridgeFeeToken),
+                feeAmount: bridgeFeeAmount,
+                feeRefundThreshold: 0,
+                gasLimit: 150000,
+                data: ""
+            })
         );
+        if (isFromAccountingChain) {
+            vm.prank(user);
+            vault.bridgeIouTokens(destinationChainId, user, iouAmountRequestedRay, bridgeAdapter, bp, "");
+        } else {
+            vm.prank(user);
+            earningChainGateway.bridgeIouTokens(destinationChainId, user, iouAmountRequestedRay, bridgeAdapter, bp, "");
+        }
     }
 
     function _runExchangeIouTokens(EarningChainGateway earningChainGateway, address user, uint256 iouAmountRequestedRay)

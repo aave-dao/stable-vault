@@ -41,7 +41,7 @@ contract EndToEndTest is BaseTest {
         // User makes a deposit of 2 wei into Stable Vault.
         vm.startPrank(user);
         USDC.approve(address(vault), 2);
-        vault.deposit(user, address(USDC), 2);
+        vault.deposit(user, address(USDC), 2, "");
 
         uint256 userBalanceInRay = vault.getUserBalance(user);
         uint256 vaultAssetsInRay = vault.getAggregatedBalance();
@@ -74,7 +74,7 @@ contract EndToEndTest is BaseTest {
         vm.startPrank(user);
         USDC.approve(address(vault), amountForMaximumLoss);
         vm.expectRevert(Errors.InsufficientAmountOut.selector);
-        vault.deposit(user, address(USDC), amountForMaximumLoss);
+        vault.deposit(user, address(USDC), amountForMaximumLoss, "");
 
         uint256 userBalanceInRay = vault.getUserBalance(user);
         uint256 vaultAssetsInRay = vault.getAggregatedBalance();
@@ -94,7 +94,7 @@ contract EndToEndTest is BaseTest {
         // 1. User1 deposits 500 USDC to Vault on Accounting Chain
         vm.startPrank(user);
         USDC.approve(address(vault), userInitialDeposit);
-        vault.deposit(user, address(USDC), userInitialDeposit);
+        vault.deposit(user, address(USDC), userInitialDeposit, "");
         vm.stopPrank();
 
         // - check that funds are dropped into default liquidity vault
@@ -410,7 +410,7 @@ contract EndToEndTest is BaseTest {
 
             // Request withdrawal
             vm.prank(user);
-            iouAmountRequestedRay = vault.requestWithdrawal(user, 0);
+            iouAmountRequestedRay = vault.requestWithdrawal(user, 0, "");
 
             Logger.log("... request withdrawal minted IOU tokens: %s", iouAmountRequestedRay);
             // Check user IOU token balance

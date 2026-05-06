@@ -160,13 +160,13 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             )
         );
         vm.prank(user1);
-        vault.requestWithdrawal(user1, userBalanceAfterHalfYearInRay);
+        vault.requestWithdrawal(user1, userBalanceAfterHalfYearInRay, "");
 
         // 5. User requests to withdrawal their original deposit
         uint256 iouAmountRequestedRay = userInitialDeposit.assetDecimalsToRay(address(USDC));
         vm.prank(user1);
         Logger.log("!!! Actual requesting withdrawal for user1", user1);
-        vault.requestWithdrawal(user1, iouAmountRequestedRay);
+        vault.requestWithdrawal(user1, iouAmountRequestedRay, "");
         // Check the IOU token balance went up (units are in RAY)
         assertEq(
             iouToken_accountingChain.balanceOf(user1),
@@ -178,8 +178,11 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         // The user will use native asset to pay for bridge fees
         // User must approve the IOU token manager to spend the IOU tokens
         vm.prank(user1);
+        IERC20(address(iouToken_accountingChain))
+            .approve(address(iouTokenManager_accountingChain), iouAmountRequestedRay);
         vm.deal(user1, bridgeFeeAmount);
-        iouTokenManager_accountingChain.bridgeTokens{value: bridgeFeeAmount}(
+        vm.prank(user1);
+        vault.bridgeIouTokens{value: bridgeFeeAmount}(
             EARNING_CHAIN_ID,
             user1,
             iouAmountRequestedRay,
@@ -188,7 +191,8 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
                 IBridgeAdapter.BridgeParams({
                     feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, gasLimit: 300000, data: ""
                 })
-            )
+            ),
+            ""
         );
         // Check the IOU token balance on Accounting Chain went down
         assertEq(iouToken_accountingChain.balanceOf(user1), 0, "User should have bridged IOU tokens");
@@ -208,7 +212,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         // Check that requesting another withdrawal fails because the user was alredy given IOUs.
         vm.expectRevert(abi.encodeWithSelector(Errors.InvalidAmount.selector));
         vm.prank(user1);
-        vault.requestWithdrawal(user1, iouAmountRequestedRay);
+        vault.requestWithdrawal(user1, iouAmountRequestedRay, "");
 
         // 7. A second depositor deposits and tries to withdraw (check the iousInCirculationRay math)
         _mintAndDepositUsdcToStableVault(user2, userInitialDeposit);
@@ -230,11 +234,11 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             )
         );
         vm.prank(user2);
-        vault.requestWithdrawal(user2, user2BalanceAfterOneYearInRay);
+        vault.requestWithdrawal(user2, user2BalanceAfterOneYearInRay, "");
 
         // User2 should be able to withdraw their original deposit
         vm.prank(user2);
-        vault.requestWithdrawal(user2, iouAmountRequestedRay);
+        vault.requestWithdrawal(user2, iouAmountRequestedRay, "");
         // Check the IOU token balance on Accounting Chain went up
         assertEq(
             iouToken_accountingChain.balanceOf(user2),
@@ -262,16 +266,16 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         );
         vm.prank(user2);
         iouToken_accountingChain.approve(address(iouTokenManager_accountingChain), iouAmountRequestedRay);
-        vm.prank(user2);
         vm.deal(user2, bridgeFeeAmount);
+        vm.prank(user2);
         {
             bytes memory bp = BridgeParamsCodec.encode(
                 IBridgeAdapter.BridgeParams({
                     feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, gasLimit: 100000, data: ""
                 })
             );
-            iouTokenManager_accountingChain.bridgeTokens{value: bridgeFeeAmount}(
-                EARNING_CHAIN_ID, user2, iouAmountRequestedRay, address(ccipAdapter_accountingChain), bp
+            vault.bridgeIouTokens{value: bridgeFeeAmount}(
+                EARNING_CHAIN_ID, user2, iouAmountRequestedRay, address(ccipAdapter_accountingChain), bp, ""
             );
         }
         require(
@@ -293,8 +297,8 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
                     feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, gasLimit: 100000, data: ""
                 })
             );
-            iouTokenManager_earningChain.bridgeTokens{value: bridgeFeeAmount}(
-                ACCOUNTING_CHAIN_ID, user2, iouAmountRequestedRay, address(ccipAdapter_earningChain), bp
+            earningChainGateway.bridgeIouTokens{value: bridgeFeeAmount}(
+                ACCOUNTING_CHAIN_ID, user2, iouAmountRequestedRay, address(ccipAdapter_earningChain), bp, ""
             );
         }
         require(
@@ -404,7 +408,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         USDC.mint(user, amount);
         vm.startPrank(user);
         USDC.approve(address(vault), amount);
-        vault.deposit(user, address(USDC), amount);
+        vault.deposit(user, address(USDC), amount, "");
         vm.stopPrank();
     }
 }

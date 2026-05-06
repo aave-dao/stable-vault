@@ -209,7 +209,7 @@ contract OracleFeedE2ETest is BaseTest {
             )
         );
         vm.prank(user1);
-        vault.requestWithdrawal(user1, userBalanceWithInterest);
+        vault.requestWithdrawal(user1, userBalanceWithInterest, "");
 
         // Top up Earning Chain Allocator with USDC to simulate interest accrual
         uint256 interestAccrued = userBalanceWithInterest - userInitialDeposit.assetDecimalsToRay(address(USDC));
@@ -221,7 +221,7 @@ contract OracleFeedE2ETest is BaseTest {
 
         // 4. User requests withdrawal -> gets IOUs
         vm.prank(user1);
-        vault.requestWithdrawal(user1, userBalanceWithInterest);
+        vault.requestWithdrawal(user1, userBalanceWithInterest, "");
         assertEq(
             iouToken_accountingChain.balanceOf(user1), userBalanceWithInterest, "User should have minted IOU tokens"
         );
@@ -229,8 +229,11 @@ contract OracleFeedE2ETest is BaseTest {
         // 5. Bridge IOUs to Earning Chain
         uint256 bridgeFeeAmount = 1000;
         vm.prank(user1);
+        IERC20(address(iouToken_accountingChain))
+            .approve(address(iouTokenManager_accountingChain), userBalanceWithInterest);
         vm.deal(user1, bridgeFeeAmount);
-        iouTokenManager_accountingChain.bridgeTokens{value: bridgeFeeAmount}(
+        vm.prank(user1);
+        vault.bridgeIouTokens{value: bridgeFeeAmount}(
             EARNING_CHAIN_ID,
             user1,
             userBalanceWithInterest,
@@ -239,7 +242,8 @@ contract OracleFeedE2ETest is BaseTest {
                 IBridgeAdapter.BridgeParams({
                     feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, gasLimit: 300000, data: ""
                 })
-            )
+            ),
+            ""
         );
         assertEq(iouToken_accountingChain.balanceOf(user1), 0, "User should have bridged IOU tokens");
 
@@ -380,7 +384,7 @@ contract OracleFeedE2ETest is BaseTest {
             )
         );
         vm.prank(user1);
-        vault.requestWithdrawal(user1, userBalance);
+        vault.requestWithdrawal(user1, userBalance, "");
 
         // Recovery: restore oracle and user can now withdraw
         _mockChainBalance(
@@ -400,7 +404,7 @@ contract OracleFeedE2ETest is BaseTest {
         // User can now withdraw their original deposit (not the interest beyond available)
         uint256 guaranteedAmount = userDeposit.assetDecimalsToRay(address(USDC));
         vm.prank(user1);
-        vault.requestWithdrawal(user1, guaranteedAmount);
+        vault.requestWithdrawal(user1, guaranteedAmount, "");
         assertEq(iouToken_accountingChain.balanceOf(user1), guaranteedAmount, "User should receive IOUs after recovery");
     }
 
@@ -499,7 +503,7 @@ contract OracleFeedE2ETest is BaseTest {
         vm.startPrank(user1);
         USDC.approve(address(vault), depositAmount);
         vm.expectRevert(abi.encodeWithSelector(IPriceOracle.StalePrice.selector));
-        vault.deposit(user1, address(USDC), depositAmount);
+        vault.deposit(user1, address(USDC), depositAmount, "");
         vm.stopPrank();
     }
 
@@ -572,7 +576,7 @@ contract OracleFeedE2ETest is BaseTest {
         vm.startPrank(user2);
         USDC.approve(address(vault), newDeposit);
         vm.expectRevert(abi.encodeWithSelector(IPriceOracle.PriceTooLow.selector));
-        vault.deposit(user2, address(USDC), newDeposit);
+        vault.deposit(user2, address(USDC), newDeposit, "");
         vm.stopPrank();
     }
 
@@ -589,7 +593,7 @@ contract OracleFeedE2ETest is BaseTest {
         GHO.mint(user2, ghoDeposit);
         vm.startPrank(user2);
         GHO.approve(address(vault), ghoDeposit);
-        vault.deposit(user2, address(GHO), ghoDeposit);
+        vault.deposit(user2, address(GHO), ghoDeposit, "");
         vm.stopPrank();
 
         // Both assets at price 1 RAY
@@ -704,12 +708,12 @@ contract OracleFeedE2ETest is BaseTest {
         // Full withdrawal (with interest) should fail - no interest available when balance is 0
         vm.expectRevert();
         vm.prank(user1);
-        vault.requestWithdrawal(user1, userBalance);
+        vault.requestWithdrawal(user1, userBalance, "");
 
         // But withdrawing the original guaranteed amount should still succeed
         // since guaranteedObligations includes the originalDeposit and the interest portion is 0
         vm.prank(user1);
-        vault.requestWithdrawal(user1, depositRay);
+        vault.requestWithdrawal(user1, depositRay, "");
         assertEq(
             iouToken_accountingChain.balanceOf(user1),
             depositRay,
@@ -1024,7 +1028,7 @@ contract OracleFeedE2ETest is BaseTest {
         USDC.mint(user, amount);
         vm.startPrank(user);
         USDC.approve(address(vault), amount);
-        vault.deposit(user, address(USDC), amount);
+        vault.deposit(user, address(USDC), amount, "");
         vm.stopPrank();
     }
 

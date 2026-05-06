@@ -66,4 +66,21 @@ contract MockEarningChainGateway is IEarningChainGateway {
         address feePayer,
         bytes calldata bridgeParamsEncoded
     ) external payable {}
+
+    function bridgeIouTokens(
+        uint256, // destinationChainId
+        address, // iouTokenRecipient
+        uint256, // iouTokenAmountRay
+        address, // bridgeAdapter
+        bytes calldata, // bridgeParamsEncoded
+        bytes calldata // extraData
+    )
+        external
+        payable
+        override
+    {}
+
+    function setBridgePolicy(address policy) external override {}
+
+    function getBridgePolicy() external view override returns (address) {}
 }

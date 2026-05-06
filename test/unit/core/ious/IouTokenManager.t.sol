@@ -42,6 +42,12 @@ contract IouTokenManagerTest_AccountingChain is Test {
         assertEq(iouTokenAddress, iouToken);
     }
 
+    /// @dev On the Accounting chain only the Vault can call `bridgeTokensFrom`; on Earning chains
+    /// only the ChainGateway can. Tests prank this address before invoking.
+    function _bridgeCaller() internal view virtual returns (address) {
+        return vault;
+    }
+
     function test_constructor_reverts_ifInvalidTransferHelper() public {
         vm.expectRevert();
         new ExtendedIouTokenManager(iouTokenAddress, chainGateway, vault, address(0), true);
@@ -245,9 +251,9 @@ contract IouTokenManagerTest_AccountingChain is Test {
                 bridgeParams
             )
         );
-        vm.prank(from);
-        iouTokenManager.bridgeTokens(
-            destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeAdapter, bridgeParams
+        vm.prank(_bridgeCaller());
+        iouTokenManager.bridgeTokensFrom(
+            from, destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeAdapter, from, bridgeParams
         );
     }
 
@@ -273,9 +279,15 @@ contract IouTokenManagerTest_AccountingChain is Test {
         vm.expectEmit(true, false, false, true);
         emit IIouTokenManager.TokensLocked(from, iouTokenAmountRay);
 
-        vm.prank(from);
-        iouTokenManager.bridgeTokens(
-            destinationChainId, iouTokenRecipient, iouTokenAmountRay, makeAddr("bridgeAdapter"), bridgeParams
+        vm.prank(_bridgeCaller());
+        iouTokenManager.bridgeTokensFrom(
+            from,
+            destinationChainId,
+            iouTokenRecipient,
+            iouTokenAmountRay,
+            makeAddr("bridgeAdapter"),
+            from,
+            bridgeParams
         );
     }
 
@@ -293,9 +305,15 @@ contract IouTokenManagerTest_AccountingChain is Test {
             })
         );
         vm.expectRevert(Errors.InvalidDestinationChainId.selector);
-        vm.prank(from);
-        iouTokenManager.bridgeTokens(
-            destinationChainId, iouTokenRecipient, iouTokenAmountRay, makeAddr("bridgeAdapter"), bridgeParams
+        vm.prank(_bridgeCaller());
+        iouTokenManager.bridgeTokensFrom(
+            from,
+            destinationChainId,
+            iouTokenRecipient,
+            iouTokenAmountRay,
+            makeAddr("bridgeAdapter"),
+            from,
+            bridgeParams
         );
     }
 
@@ -313,17 +331,18 @@ contract IouTokenManagerTest_AccountingChain is Test {
         vm.assume(destinationChainId != block.chainid);
         vm.assume(iouTokenAmountRay > 0);
         address feeToken = address(new MockErc20("Test USD", "TUSD", 6));
-        bytes memory bridgeParams = BridgeParamsCodec.encode(
-            IBridgeAdapter.BridgeParams({
-                feeToken: feeToken, feeAmount: feeAmount, feeRefundThreshold: 0, gasLimit: gasLimit, data: data
-            })
-        );
         if (feeAmount > 0) {
             MockErc20(feeToken).mint(from, feeAmount);
             vm.prank(from);
             // Under the opaque-bytes shape, fee-staging is owned by the adapter (the MockGateway
             // stands in for adapter-level transferFrom here).
             IERC20(feeToken).approve(address(chainGateway), feeAmount);
+            // NOTE: under the opaque-bytes dispatch shape, fee-staging is owned by the adapter, not
+            // the IouTokenManager. The historic `vm.expectCall` asserting `transferFrom(from,
+            // TransferHelper, feeAmount)` at this layer was removed — that transfer now happens
+            // inside the CcipAdapter post-decode, covered by CcipAdapter.t.sol tests.
+            MockGateway(chainGateway)
+                .mockConsumeOnNextCall(transferHelper, feeAmount, feeToken, makeAddr("bridgeAdapter"));
         }
         if (iouTokenAmountRay > 0) {
             vm.prank(iouTokenManagerAddress);
@@ -331,17 +350,19 @@ contract IouTokenManagerTest_AccountingChain is Test {
             vm.prank(from);
             IERC20(iouToken).approve(address(iouTokenManager), iouTokenAmountRay);
         }
-        address feeRecipient = makeAddr("bridgeAdapter");
-        // NOTE: under the opaque-bytes dispatch shape, fee-staging is owned by the adapter, not the
-        // IouTokenManager. The historic `vm.expectCall` asserting `transferFrom(from, TransferHelper,
-        // feeAmount)` at this layer was removed — that transfer now happens inside the CcipAdapter
-        // post-decode, covered by CcipAdapter.t.sol tests.
-        if (feeAmount > 0) {
-            MockGateway(chainGateway).mockConsumeOnNextCall(transferHelper, feeAmount, feeToken, feeRecipient);
-        }
-        vm.prank(from);
-        iouTokenManager.bridgeTokens(
-            destinationChainId, iouTokenRecipient, iouTokenAmountRay, makeAddr("bridgeAdapter"), bridgeParams
+        vm.prank(_bridgeCaller());
+        iouTokenManager.bridgeTokensFrom(
+            from,
+            destinationChainId,
+            iouTokenRecipient,
+            iouTokenAmountRay,
+            makeAddr("bridgeAdapter"),
+            from,
+            BridgeParamsCodec.encode(
+                IBridgeAdapter.BridgeParams({
+                    feeToken: feeToken, feeAmount: feeAmount, feeRefundThreshold: 0, gasLimit: gasLimit, data: data
+                })
+            )
         );
         assertEq(
             IERC20(feeToken).balanceOf(address(transferHelper)),
@@ -349,7 +370,9 @@ contract IouTokenManagerTest_AccountingChain is Test {
             "Token fee not properly transferred out of TransferHelper"
         );
         assertEq(
-            IERC20(feeToken).balanceOf(feeRecipient), feeAmount, "Token fee not properly transferred to bridge adapter"
+            IERC20(feeToken).balanceOf(makeAddr("bridgeAdapter")),
+            feeAmount,
+            "Token fee not properly transferred to bridge adapter"
         );
     }
 
@@ -386,14 +409,24 @@ contract IouTokenManagerTest_AccountingChain is Test {
         address feeRecipient = makeAddr("bridgeAdapter");
         MockGateway(chainGateway).mockConsumeOnNextCall(transferHelper, feeAmount, feeToken, feeRecipient);
 
-        vm.deal(from, accidentalMsgValue);
-        vm.prank(from);
+        vm.deal(_bridgeCaller(), accidentalMsgValue);
+        vm.prank(_bridgeCaller());
         vm.expectRevert(Errors.InvalidParameter.selector);
-        iouTokenManager.bridgeTokens{value: accidentalMsgValue}(
-            destinationChainId, iouTokenRecipient, iouTokenAmountRay, makeAddr("bridgeAdapter"), bridgeParams
+        iouTokenManager.bridgeTokensFrom{value: accidentalMsgValue}(
+            from,
+            destinationChainId,
+            iouTokenRecipient,
+            iouTokenAmountRay,
+            makeAddr("bridgeAdapter"),
+            from,
+            bridgeParams
         );
 
-        assertEq(from.balance, accidentalMsgValue, "Caller's native balance should be fully preserved after revert");
+        assertEq(
+            _bridgeCaller().balance,
+            accidentalMsgValue,
+            "Caller's native balance should be fully preserved after revert"
+        );
         assertEq(address(transferHelper).balance, 0, "No native should have leaked to TransferHelper");
         assertEq(IERC20(iouToken).balanceOf(from), iouTokenAmountRay, "IOU tokens should not have been consumed");
         assertEq(IERC20(feeToken).balanceOf(from), feeAmount, "Fee tokens should not have been consumed");
@@ -417,15 +450,10 @@ contract IouTokenManagerTest_AccountingChain is Test {
         vm.assume(from != address(0));
         vm.assume(iouTokenRecipient != address(0));
         vm.assume(iouTokenAmountRay > 0);
-        bytes memory bridgeParams = BridgeParamsCodec.encode(
-            IBridgeAdapter.BridgeParams({
-                feeToken: address(0), feeAmount: feeAmount, feeRefundThreshold: 0, gasLimit: gasLimit, data: data
-            })
-        );
-        address feeRecipient = makeAddr("bridgeAdapter");
         if (feeAmount > 0) {
-            vm.deal(from, feeAmount);
-            MockGateway(chainGateway).mockConsumeOnNextCall(transferHelper, feeAmount, address(0), feeRecipient);
+            vm.deal(_bridgeCaller(), feeAmount);
+            MockGateway(chainGateway)
+                .mockConsumeOnNextCall(transferHelper, feeAmount, address(0), makeAddr("bridgeAdapter"));
         }
         if (iouTokenAmountRay > 0) {
             vm.prank(iouTokenManagerAddress);
@@ -433,12 +461,22 @@ contract IouTokenManagerTest_AccountingChain is Test {
             vm.prank(from);
             IERC20(iouToken).approve(address(iouTokenManager), iouTokenAmountRay);
         }
-        vm.prank(from);
-        iouTokenManager.bridgeTokens{value: feeAmount}(
-            destinationChainId, iouTokenRecipient, iouTokenAmountRay, makeAddr("bridgeAdapter"), bridgeParams
+        vm.prank(_bridgeCaller());
+        iouTokenManager.bridgeTokensFrom{value: feeAmount}(
+            from,
+            destinationChainId,
+            iouTokenRecipient,
+            iouTokenAmountRay,
+            makeAddr("bridgeAdapter"),
+            from,
+            BridgeParamsCodec.encode(
+                IBridgeAdapter.BridgeParams({
+                    feeToken: address(0), feeAmount: feeAmount, feeRefundThreshold: 0, gasLimit: gasLimit, data: data
+                })
+            )
         );
         assertEq(transferHelper.balance, 0, "Native fee not properly transferred out of TransferHelper");
-        assertEq(feeRecipient.balance, feeAmount, "Native fee not properly transferred to bridge adapter");
+        assertEq(makeAddr("bridgeAdapter").balance, feeAmount, "Native fee not properly transferred to bridge adapter");
     }
 
     /// @dev Under the opaque-bytes dispatch shape the `feePayer == msg.sender` guard was dropped
@@ -475,9 +513,15 @@ contract IouTokenManagerTest_AccountingChain is Test {
 
         // ERC20 allowance semantics reject the forged feePayer — they never approved the gateway.
         vm.expectRevert();
-        vm.prank(from);
-        iouTokenManager.bridgeTokens(
-            destinationChainId, iouTokenRecipient, iouTokenAmountRay, makeAddr("bridgeAdapter"), bridgeParams
+        vm.prank(_bridgeCaller());
+        iouTokenManager.bridgeTokensFrom(
+            from,
+            destinationChainId,
+            iouTokenRecipient,
+            iouTokenAmountRay,
+            makeAddr("bridgeAdapter"),
+            forgedFeePayer,
+            bridgeParams
         );
     }
 
@@ -492,9 +536,15 @@ contract IouTokenManagerTest_AccountingChain is Test {
             })
         );
         vm.expectRevert(Errors.InvalidParameter.selector);
-        vm.prank(from);
-        iouTokenManager.bridgeTokens(
-            destinationChainId, iouTokenRecipient, iouTokenAmountRay, makeAddr("bridgeAdapter"), bridgeParams
+        vm.prank(_bridgeCaller());
+        iouTokenManager.bridgeTokensFrom(
+            from,
+            destinationChainId,
+            iouTokenRecipient,
+            iouTokenAmountRay,
+            makeAddr("bridgeAdapter"),
+            from,
+            bridgeParams
         );
     }
 
@@ -508,17 +558,18 @@ contract IouTokenManagerTest_AccountingChain is Test {
             })
         );
         vm.expectRevert(Errors.ZeroAmount.selector);
-        vm.prank(from);
-        iouTokenManager.bridgeTokens(destinationChainId, iouTokenRecipient, 0, makeAddr("bridgeAdapter"), bridgeParams);
+        vm.prank(_bridgeCaller());
+        iouTokenManager.bridgeTokensFrom(
+            from, destinationChainId, iouTokenRecipient, 0, makeAddr("bridgeAdapter"), from, bridgeParams
+        );
     }
 
     /// @notice Regression test for the cross-flow approval-theft surface that aa-eyup flagged in
-    /// `#discussion_r3144045362`. Pre-Step-1, `feePayer` was a field of the opaque `BridgeParams`
-    /// blob — any caller of any bridge entry-point could put a victim's address there and the adapter
-    /// would `safeTransferFrom(victim, ...)` against an approval the victim had given for an
-    /// unrelated bridge action. After Step 1 `feePayer` is hardcoded by the entry-point to its
-    /// `msg.sender`; the blob-supplied identity vector is structurally gone. This test pins that
-    /// property in: Eve cannot consume Alice's approval by calling `bridgeTokens` herself.
+    /// `#discussion_r3144045362`. After the entry-point split (Step 1) and the introduction of
+    /// `bridgeTokensFrom` restricted to the Vault / ChainGateway, the attack vector is structurally
+    /// gone at this layer: Eve cannot reach `bridgeTokensFrom` directly. The corresponding property
+    /// at the user-facing entry-point (`feePayer` is hardcoded to `msg.sender`) is covered by the
+    /// Vault / EarningChainGateway tests.
     function test_bridgeTokens_approvalIsBoundToCaller() public {
         address alice = makeAddr("alice");
         address eve = makeAddr("eve");
@@ -531,13 +582,9 @@ contract IouTokenManagerTest_AccountingChain is Test {
         vm.prank(alice);
         IERC20(address(feeToken)).approve(bridgeAdapter, feeAmount);
 
-        // Eve mints herself enough IOU dust to have something to bridge, but does NOT approve the
-        // adapter for the fee token.
         uint256 iouTokenAmountRay = 1;
         vm.prank(iouTokenManagerAddress);
         MockErc20(iouToken).mint(eve, iouTokenAmountRay);
-        vm.prank(eve);
-        IERC20(iouToken).approve(address(iouTokenManager), iouTokenAmountRay);
 
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             IBridgeAdapter.BridgeParams({
@@ -545,13 +592,12 @@ contract IouTokenManagerTest_AccountingChain is Test {
             })
         );
 
-        // Eve calls bridgeTokens. The entry-point hardcodes feePayer = msg.sender = Eve. The adapter
-        // does `safeTransferFrom(Eve, ...)` — Eve hasn't approved, so this reverts. Alice's approval
-        // is untouched.
+        // Eve cannot reach `bridgeTokensFrom` — the access control restricts it to the Vault /
+        // ChainGateway. Even if she could supply `alice` as `feePayer`, the call never lands.
         vm.prank(eve);
-        vm.expectRevert();
-        iouTokenManager.bridgeTokens(
-            block.chainid + 1, makeAddr("recipient"), iouTokenAmountRay, bridgeAdapter, bridgeParams
+        vm.expectRevert(Errors.NotAuthorized.selector);
+        iouTokenManager.bridgeTokensFrom(
+            eve, block.chainid + 1, makeAddr("recipient"), iouTokenAmountRay, bridgeAdapter, alice, bridgeParams
         );
 
         // Alice's approval is still intact.
@@ -585,6 +631,10 @@ contract IouTokenManagerTest_EarningChain is IouTokenManagerTest_AccountingChain
 
         assertEq(iouTokenManagerAddress, address(iouTokenManager));
         assertEq(iouTokenAddress, iouToken);
+    }
+
+    function _bridgeCaller() internal view override returns (address) {
+        return chainGateway;
     }
 
     // Skip TokensLocked test on non-Accounting chain (earning chain burns instead of locking).

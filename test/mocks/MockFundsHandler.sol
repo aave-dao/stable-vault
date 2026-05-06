@@ -71,4 +71,8 @@ contract MockFundsHandler is IFundsHandler {
     ) external payable override {}
 
     function fundsArrivedFromChainCallback(address asset, uint256 amount) external override {}
+
+    function setBridgePolicy(address policy) external override {}
+
+    function getBridgePolicy() external view override returns (address) {}
 }

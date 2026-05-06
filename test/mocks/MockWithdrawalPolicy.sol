@@ -14,4 +14,22 @@ contract MockWithdrawalPolicy is IWithdrawalPolicy {
     function previewWithdrawalPolicy(WithdrawalRequest calldata request) external pure override returns (uint256) {
         return request.iouAmountRay;
     }
+
+    function applyWithdrawalRequestPolicy(WithdrawalRequestPolicyRequest calldata)
+        external
+        pure
+        override
+        returns (bool)
+    {
+        return true;
+    }
+
+    function previewWithdrawalRequestPolicy(WithdrawalRequestPolicyRequest calldata)
+        external
+        pure
+        override
+        returns (bool)
+    {
+        return true;
+    }
 }
