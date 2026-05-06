@@ -6,22 +6,22 @@ import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManage
 import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 
 import {IDepositPolicy} from "src/interfaces/IDepositPolicy.sol";
-import {RateLimitWindowLib} from "src/libraries/RateLimitWindowLib.sol";
+import {RateLimitBucketLib} from "src/libraries/RateLimitBucketLib.sol";
 import {Errors} from "src/types/Errors.sol";
 
 /// @title DepositPolicy
 /// @author Aave Labs
-/// @notice Per-asset rate-limited deposit policy. Each asset has a window with a max capacity and a per-second refill
+/// @notice Per-asset rate-limited deposit policy. Each asset has a bucket with a max capacity and a per-second refill
 /// rate; deposits consume from the available capacity and revert when it is exhausted. Assets without a configured
-/// window are unrestricted.
+/// bucket are unrestricted.
 contract DepositPolicy is AccessManaged, IDepositPolicy {
-    using RateLimitWindowLib for RateLimitWindowLib.Window;
+    using RateLimitBucketLib for RateLimitBucketLib.Bucket;
 
-    event DepositWindowSet(address indexed asset, uint128 maxAmount, uint128 refillRate);
+    event DepositBucketSet(address indexed asset, uint128 capacity, uint128 refillRate);
 
     address internal immutable DEPOSIT_POLICY_APPLIER;
 
-    mapping(address asset => RateLimitWindowLib.Window window) internal _windows;
+    mapping(address asset => RateLimitBucketLib.Bucket bucket) internal _buckets;
 
     modifier onlyDepositPolicyApplier() {
         require(msg.sender == DEPOSIT_POLICY_APPLIER, Errors.NotAuthorized());
@@ -41,9 +41,9 @@ contract DepositPolicy is AccessManaged, IDepositPolicy {
         onlyDepositPolicyApplier
         returns (bool)
     {
-        RateLimitWindowLib.Window storage window = _windows[request.asset];
-        if (window.maxAmount != 0) {
-            window.consume(request.amount);
+        RateLimitBucketLib.Bucket storage bucket = _buckets[request.asset];
+        if (bucket.capacity != 0) {
+            bucket.consume(request.amount);
         }
         emit DepositPolicyApplied(request.caller, request.user, request.asset, request.amount);
         return true;
@@ -51,29 +51,31 @@ contract DepositPolicy is AccessManaged, IDepositPolicy {
 
     /// @inheritdoc IDepositPolicy
     function previewDepositPolicy(DepositRequest calldata request) external view override returns (bool) {
-        RateLimitWindowLib.Window storage window = _windows[request.asset];
-        if (window.maxAmount == 0) {
+        RateLimitBucketLib.Bucket storage bucket = _buckets[request.asset];
+        if (bucket.capacity == 0) {
             return true;
         }
-        return window.preview() >= request.amount;
+        return bucket.preview() >= request.amount;
     }
 
     function getAvailableAmount(address asset) external view returns (uint256) {
-        RateLimitWindowLib.Window storage window = _windows[asset];
-        if (window.maxAmount == 0) {
+        RateLimitBucketLib.Bucket storage bucket = _buckets[asset];
+        if (bucket.capacity == 0) {
             // Unconfigured asset: no limit.
             return type(uint256).max;
         }
-        return window.preview();
+        return bucket.preview();
     }
 
-    function getDepositWindow(address asset) external view returns (RateLimitWindowLib.Window memory) {
-        return _windows[asset];
+    function getDepositBucket(address asset) external view returns (RateLimitBucketLib.Bucket memory) {
+        return _buckets[asset];
     }
 
-    function setDepositWindow(address asset, uint128 maxAmount, uint128 refillRate) external restricted {
+    // Over any `capacity / refillRate`-second interval, a caller can extract up to `2 * capacity` (drain the full
+    // bucket at the start, then match the refill rate). Set `capacity` accordingly.
+    function setDepositBucket(address asset, uint128 capacity, uint128 refillRate) external restricted {
         require(asset != address(0), Errors.ZeroAddress());
-        _windows[asset].configure(maxAmount, refillRate);
-        emit DepositWindowSet(asset, maxAmount, refillRate);
+        _buckets[asset].configure(capacity, refillRate);
+        emit DepositBucketSet(asset, capacity, refillRate);
     }
 }
