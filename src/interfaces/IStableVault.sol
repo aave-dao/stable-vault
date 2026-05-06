@@ -61,9 +61,6 @@ interface IStableVault {
     /// @notice Emitted when the transfer policy address is updated.
     event TransferPolicySet(address indexed oldPolicy, address indexed newPolicy);
 
-    /// @notice Emitted when the surplus-claim policy address is updated.
-    event SurplusClaimPolicySet(address indexed oldPolicy, address indexed newPolicy);
-
     /// @notice Emitted when the bridge policy address is updated.
     event BridgePolicySet(address indexed oldPolicy, address indexed newPolicy);
 
@@ -134,9 +131,6 @@ interface IStableVault {
     /// @notice Sets the transfer policy. `address(0)` disables the policy.
     function setTransferPolicy(address policy) external;
 
-    /// @notice Sets the surplus-claim policy. `address(0)` disables the policy.
-    function setSurplusClaimPolicy(address policy) external;
-
     /// @notice Sets the bridge policy. `address(0)` disables the policy.
     function setBridgePolicy(address policy) external;
 
@@ -148,9 +142,6 @@ interface IStableVault {
 
     /// @notice Getter for the transfer policy address.
     function getTransferPolicy() external view returns (address);
-
-    /// @notice Getter for the surplus-claim policy address.
-    function getSurplusClaimPolicy() external view returns (address);
 
     /// @notice Getter for the bridge policy address.
     function getBridgePolicy() external view returns (address);

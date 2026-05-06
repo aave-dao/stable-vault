@@ -19,7 +19,6 @@ import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {IStableVault} from "src/interfaces/IStableVault.sol";
-import {ISurplusClaimPolicy} from "src/interfaces/ISurplusClaimPolicy.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {ITransferPolicy} from "src/interfaces/ITransferPolicy.sol";
 import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
@@ -129,7 +128,6 @@ contract StableVault is
         address depositPolicy;
         address withdrawalRequestPolicy;
         address transferPolicy;
-        address surplusClaimPolicy;
         address bridgePolicy;
     }
 
@@ -536,7 +534,6 @@ contract StableVault is
     {
         address treasury = $storage().treasury;
         require(treasury != address(0), TreasuryNotSet());
-        _applySurplusClaimPolicy(treasury, assets, amounts);
         for (uint256 i = 0; i < assets.length; i++) {
             require(amounts[i] > 0, Errors.ZeroAmount());
             IFundsHandler(FUNDS_HANDLER).processWithdrawal(assets[i], amounts[i]);
@@ -575,12 +572,6 @@ contract StableVault is
     }
 
     /// @inheritdoc IStableVault
-    function setSurplusClaimPolicy(address policy) external override restricted {
-        emit SurplusClaimPolicySet($storage().surplusClaimPolicy, policy);
-        $storage().surplusClaimPolicy = policy;
-    }
-
-    /// @inheritdoc IStableVault
     function setBridgePolicy(address policy) external override restricted {
         emit BridgePolicySet($storage().bridgePolicy, policy);
         $storage().bridgePolicy = policy;
@@ -601,11 +592,6 @@ contract StableVault is
     /// @inheritdoc IStableVault
     function getTransferPolicy() external view override returns (address) {
         return $storage().transferPolicy;
-    }
-
-    /// @inheritdoc IStableVault
-    function getSurplusClaimPolicy() external view override returns (address) {
-        return $storage().surplusClaimPolicy;
     }
 
     /// @inheritdoc IStableVault
@@ -1102,22 +1088,6 @@ contract StableVault is
         bool allowed = ITransferPolicy(policy)
             .applyTransferPolicy(
                 ITransferPolicy.TransferRequest({from: from, to: to, amountRay: amountRay, extraData: extraData})
-            );
-        require(allowed, Errors.PolicyDenied());
-    }
-
-    function _applySurplusClaimPolicy(address treasury, address[] calldata assets, uint256[] calldata amounts)
-        internal
-    {
-        address policy = $storage().surplusClaimPolicy;
-        if (policy == address(0)) {
-            return;
-        }
-        bool allowed = ISurplusClaimPolicy(policy)
-            .applySurplusClaimPolicy(
-                ISurplusClaimPolicy.SurplusClaimRequest({
-                caller: msg.sender, treasury: treasury, assets: assets, amounts: amounts
-            })
             );
         require(allowed, Errors.PolicyDenied());
     }
