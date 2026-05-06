@@ -10,10 +10,10 @@ library Constants {
     uint256 internal constant MAX_BPS = 100_00;
 
     /// @dev The token address used to indicate the asset used to pay a bridge fee is the native currency.
-    address public constant NATIVE_CURRENCY = address(0);
+    address public constant NATIVE_CURRENCY = address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE);
 
     /// @dev The token address used in bridging flows when only data is being bridged (no asset).
-    address internal constant ASSET_FOR_DATA_ONLY_BRIDGE = address(0);
+    address internal constant ASSET_FOR_DATA_ONLY_BRIDGE = address(0xDA7ada7aDA7ADA7ADA7AdA7aDA7aDA7ADA7adA7a);
 
     /// @dev The number of decimals for the RAY denomination.
     uint8 internal constant RAY_DECIMALS = 27;

@@ -13,6 +13,7 @@ import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {Swapper} from "src/periphery/Swapper.sol";
+import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
 import {BaseTest} from "test/BaseTest.t.sol";
@@ -145,7 +146,7 @@ contract EndToEndTest is BaseTest {
                 address(ccipAdapter_accountingChain),
                 BridgeParamsCodec.encode(
                     IBridgeAdapter.BridgeParams({
-                        feeToken: address(0),
+                        feeToken: Constants.NATIVE_CURRENCY,
                         feeAmount: bridgeFeeAmount,
                         feeRefundThreshold: 0,
                         gasLimit: 300000,
@@ -298,7 +299,7 @@ contract EndToEndTest is BaseTest {
                 address(ccipAdapter_earningChain),
                 BridgeParamsCodec.encode(
                     IBridgeAdapter.BridgeParams({
-                        feeToken: address(0),
+                        feeToken: Constants.NATIVE_CURRENCY,
                         feeAmount: bridgeFeeAmount,
                         feeRefundThreshold: 0,
                         gasLimit: 300000,
@@ -461,7 +462,7 @@ contract EndToEndTest is BaseTest {
             {
                 bytes memory bp = BridgeParamsCodec.encode(
                     IBridgeAdapter.BridgeParams({
-                        feeToken: address(0),
+                        feeToken: Constants.NATIVE_CURRENCY,
                         feeAmount: bridgeFeeAmount,
                         feeRefundThreshold: 0,
                         gasLimit: 300000,

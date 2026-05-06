@@ -64,7 +64,7 @@ interface IBridgeAdapter {
     /// @dev ERC-20 fees require `feePayer` to have approved this adapter for `feeAmount`; native fees come
     /// via `msg.value`.
     /// @param destinationChainId Chain id of the chain to publish the message to.
-    /// @param asset Asset to bridge; set to `address(0)` for data only messages.
+    /// @param asset Asset to bridge; `address(0xDA7ada7aDA7ADA7ADA7AdA7aDA7aDA7ADA7adA7a)` for data only messages.
     /// @param amount Amount of the asset to bridge; set to 0 for data only messages.
     /// @param data Arbitrary data that would be decoded and handled by the destination chain.
     /// @param feePayer Address that will pay the bridge fee (also the recipient of any refund).

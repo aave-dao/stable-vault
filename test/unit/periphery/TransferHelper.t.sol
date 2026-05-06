@@ -7,6 +7,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
+import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
@@ -107,9 +108,9 @@ contract TransferHelperTest is TestWithHelpers {
         vm.deal(address(transferHelper), nativeAmount);
 
         vm.prank(msgSender);
-        transferHelper.pull(address(0), pullAmount);
+        transferHelper.pull(Constants.NATIVE_CURRENCY, pullAmount);
 
-        assertEq(address(transferHelper).balance, transferHelper.getBalance(address(0)));
+        assertEq(address(transferHelper).balance, transferHelper.getBalance(Constants.NATIVE_CURRENCY));
         assertEq(address(transferHelper).balance, nativeAmount - pullAmount);
         assertEq(msgSender.balance, pullAmount);
     }
@@ -128,7 +129,7 @@ contract TransferHelperTest is TestWithHelpers {
 
         vm.prank(msgSender);
         vm.expectRevert(abi.encodeWithSelector(Errors.NativeTransferFailed.selector));
-        transferHelper.pull(address(0), pullAmount);
+        transferHelper.pull(Constants.NATIVE_CURRENCY, pullAmount);
     }
 
     function test_pull_nativeAndErc20(
@@ -157,7 +158,7 @@ contract TransferHelperTest is TestWithHelpers {
         IMockErc20(asset).mint(address(transferHelper), assetAmount);
 
         address[] memory assets = new address[](2);
-        assets[0] = address(0);
+        assets[0] = Constants.NATIVE_CURRENCY;
         assets[1] = asset;
         uint256[] memory amounts = new uint256[](2);
         amounts[0] = nativePullAmount;
@@ -166,7 +167,7 @@ contract TransferHelperTest is TestWithHelpers {
         vm.prank(msgSender);
         transferHelper.pull(assets, amounts);
 
-        assertEq(address(transferHelper).balance, transferHelper.getBalance(address(0)));
+        assertEq(address(transferHelper).balance, transferHelper.getBalance(Constants.NATIVE_CURRENCY));
         assertEq(address(transferHelper).balance, nativeAmount - nativePullAmount);
         assertEq(msgSender.balance, nativePullAmount);
 
@@ -354,7 +355,7 @@ contract TransferHelperTest is TestWithHelpers {
 
         vm.prank(msgSender);
         vm.expectRevert(abi.encodeWithSelector(Errors.NativeTransferFailed.selector));
-        transferHelper.transfer(address(0), pullAmount, destination);
+        transferHelper.transfer(Constants.NATIVE_CURRENCY, pullAmount, destination);
     }
 
     //////////////////////////////////////////////// HELPERS ///////////////////////////////////////////////////////////
