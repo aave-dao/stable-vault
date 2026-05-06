@@ -28,7 +28,7 @@ interface IAccountingChainGateway is IChainGateway {
     /// @param feePayer Address that will pay the bridge fee.
     /// @param gasLimit Gas limit that should be allocated for execution of the message on the destination chain,
     /// without considering the bridge adapter overhead.
-    /// @param bridgeParamsEncoded Opaque bridge parameters blob consumed by the adapter.
+    /// @param adapterData Adapter-specific data blob forwarded untouched to the adapter.
     function sendPushFundsToChainMessage(
         address asset,
         uint256 amount,
@@ -36,6 +36,6 @@ interface IAccountingChainGateway is IChainGateway {
         address bridgeAdapter,
         address feePayer,
         uint256 gasLimit,
-        bytes calldata bridgeParamsEncoded
+        bytes calldata adapterData
     ) external payable;
 }

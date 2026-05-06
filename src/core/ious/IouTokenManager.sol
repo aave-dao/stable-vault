@@ -103,7 +103,7 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
         uint256 iouTokenAmountRay,
         address bridgeAdapter,
         uint256 gasLimit,
-        bytes calldata bridgeParamsEncoded
+        bytes calldata adapterData
     ) external payable override {
         require(destinationChainId != block.chainid, Errors.InvalidDestinationChainId());
         require(iouTokenRecipient != address(0), Errors.InvalidParameter());
@@ -115,13 +115,7 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
         }
 
         IChainGateway(CHAIN_GATEWAY).sendBridgeIouTokenMessageWithFeePayer{value: msg.value}(
-            destinationChainId,
-            iouTokenRecipient,
-            iouTokenAmountRay,
-            bridgeAdapter,
-            msg.sender,
-            gasLimit,
-            bridgeParamsEncoded
+            destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeAdapter, msg.sender, gasLimit, adapterData
         );
 
         emit TokensBridged(destinationChainId, iouTokenRecipient, iouTokenAmountRay);

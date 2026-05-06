@@ -12,7 +12,6 @@ import {IRouterClient} from "@chainlink-ccip/contracts/interfaces/IRouterClient.
 import {Client} from "@chainlink-ccip/contracts/libraries/Client.sol";
 
 import {BaseBridgeAdapter} from "src/bridging/BaseBridgeAdapter.sol";
-import {BridgeParamsCodec} from "src/bridging/BridgeParamsCodec.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
@@ -109,9 +108,10 @@ contract CcipAdapter is
         bytes memory data,
         address feePayer,
         uint256 gasLimit,
-        bytes memory bridgeParamsEncoded
+        bytes memory adapterData
     ) external payable override(BaseBridgeAdapter, IBridgeAdapter) onlyGateway {
-        BridgeParamsCodec.BridgeParams memory bridgeParams = BridgeParamsCodec.decode(bridgeParamsEncoded);
+        ICcipBridgeAdapter.AdapterData memory ccipAdapterData =
+            abi.decode(adapterData, (ICcipBridgeAdapter.AdapterData));
 
         address destinationChainAdapter = _destinationChainAdapterOf[destinationChainId];
         require(destinationChainAdapter != address(0), Errors.InvalidParameter());
@@ -128,7 +128,7 @@ contract CcipAdapter is
             receiver: abi.encode(destinationChainAdapter),
             data: data,
             tokenAmounts: tokenAmounts,
-            feeToken: bridgeParams.feeToken,
+            feeToken: ccipAdapterData.feeToken,
             extraArgs: Client._argsToBytes(
                 // We pass the input gasLimit, the IRouterClient::getFee will add on top any bridge adapter overhead.
                 Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: true})
@@ -137,28 +137,28 @@ contract CcipAdapter is
 
         uint64 chainSelector = _chainSelectorOf[destinationChainId];
         uint256 estimatedFeeAmount = IRouterClient(CCIP_ROUTER).getFee(chainSelector, ccipMessage);
-        require(bridgeParams.feeAmount >= estimatedFeeAmount, Errors.InsufficientFunds());
+        require(ccipAdapterData.feeAmount >= estimatedFeeAmount, Errors.InsufficientFunds());
 
-        if (bridgeParams.feeToken == Constants.NATIVE_CURRENCY) {
-            require(msg.value == bridgeParams.feeAmount, Errors.InsufficientFunds());
+        if (ccipAdapterData.feeToken == Constants.NATIVE_CURRENCY) {
+            require(msg.value == ccipAdapterData.feeAmount, Errors.InsufficientFunds());
         } else {
             // Reject msg.value to prevent accidental native loss; bridges are not expected to require both native
             // and ERC-20 fees simultaneously.
             require(msg.value == 0, Errors.InvalidParameter());
-            if (bridgeParams.feeAmount > 0) {
-                IERC20(bridgeParams.feeToken).safeTransferFrom(feePayer, address(this), bridgeParams.feeAmount);
+            if (ccipAdapterData.feeAmount > 0) {
+                IERC20(ccipAdapterData.feeToken).safeTransferFrom(feePayer, address(this), ccipAdapterData.feeAmount);
             }
         }
 
-        _pullAssetFromTransferHelperAndApproveCcipRouter(asset, amount, bridgeParams.feeToken, estimatedFeeAmount);
+        _pullAssetFromTransferHelperAndApproveCcipRouter(asset, amount, ccipAdapterData.feeToken, estimatedFeeAmount);
 
         _sendMessageWithFeePayer(
             chainSelector,
             ccipMessage,
             feePayer,
-            bridgeParams.feeToken,
-            bridgeParams.feeAmount,
-            bridgeParams.feeRefundThreshold,
+            ccipAdapterData.feeToken,
+            ccipAdapterData.feeAmount,
+            ccipAdapterData.feeRefundThreshold,
             estimatedFeeAmount
         );
     }

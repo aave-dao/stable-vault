@@ -5,8 +5,8 @@ pragma solidity ^0.8.22;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {BridgeParamsCodec} from "src/bridging/BridgeParamsCodec.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
+import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
@@ -32,18 +32,19 @@ contract MockBridgeAdapter is IBridgeAdapter {
         bytes memory data,
         address feePayer,
         uint256 gasLimit,
-        bytes memory bridgeParamsEncoded
+        bytes memory adapterData
     ) external payable override {
         (destinationChainId, data, gasLimit);
-        BridgeParamsCodec.BridgeParams memory bridgeParams = BridgeParamsCodec.decode(bridgeParamsEncoded);
+        ICcipBridgeAdapter.AdapterData memory ccipAdapterData =
+            abi.decode(adapterData, (ICcipBridgeAdapter.AdapterData));
 
         // Mirror CcipAdapter: adapter pulls fee directly from feePayer (no TransferHelper round-trip).
-        if (bridgeParams.feeToken == Constants.NATIVE_CURRENCY) {
-            require(msg.value == bridgeParams.feeAmount, Errors.InsufficientFunds());
+        if (ccipAdapterData.feeToken == Constants.NATIVE_CURRENCY) {
+            require(msg.value == ccipAdapterData.feeAmount, Errors.InsufficientFunds());
         } else {
             require(msg.value == 0, Errors.InvalidParameter());
-            if (bridgeParams.feeAmount > 0) {
-                IERC20(bridgeParams.feeToken).safeTransferFrom(feePayer, address(this), bridgeParams.feeAmount);
+            if (ccipAdapterData.feeAmount > 0) {
+                IERC20(ccipAdapterData.feeToken).safeTransferFrom(feePayer, address(this), ccipAdapterData.feeAmount);
             }
         }
 

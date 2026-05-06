@@ -51,7 +51,7 @@ interface IBridgeAdapter {
     /// @param feePayer Address that will pay the bridge fee (also the recipient of any refund).
     /// @param gasLimit Gas limit that should be allocated for execution of the message on the destination chain,
     /// without considering the bridge adapter overhead.
-    /// @param bridgeParamsEncoded ABI-encoded bridge parameters blob for the adapter to decode.
+    /// @param adapterData Adapter-specific data blob forwarded untouched for the adapter to decode.
     function publishMessageToChainWithFeePayer(
         uint256 destinationChainId,
         address asset,
@@ -59,6 +59,6 @@ interface IBridgeAdapter {
         bytes memory data,
         address feePayer,
         uint256 gasLimit,
-        bytes memory bridgeParamsEncoded
+        bytes memory adapterData
     ) external payable;
 }

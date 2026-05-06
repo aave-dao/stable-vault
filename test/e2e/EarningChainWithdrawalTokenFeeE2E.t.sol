@@ -7,12 +7,12 @@ import {IERC20} from "forge-std/interfaces/IERC20.sol";
 
 import {Logger} from "test/helpers/Logger.sol";
 
-import {BridgeParamsCodec} from "src/bridging/BridgeParamsCodec.sol";
 import {StableVault} from "src/core/accounting/StableVault.sol";
 import {StableVault} from "src/core/accounting/StableVault.sol";
 import {EarningChainGateway} from "src/core/earning/EarningChainGateway.sol";
 import {IouTokenManager} from "src/core/ious/IouTokenManager.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
+import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {Errors} from "src/types/Errors.sol";
@@ -113,9 +113,9 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             EARNING_CHAIN_ID,
             address(ccipAdapter_accountingChain),
             DEFAULT_GAS_LIMIT,
-            BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({
-                    feeToken: address(bridgeFeeToken), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
+            abi.encode(
+                ICcipBridgeAdapter.AdapterData({
+                    feeToken: address(bridgeFeeToken), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
             )
         );
@@ -394,9 +394,9 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             iouAmountRequestedRay,
             bridgeAdapter,
             DEFAULT_GAS_LIMIT,
-            BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({
-                    feeToken: address(bridgeFeeToken), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
+            abi.encode(
+                ICcipBridgeAdapter.AdapterData({
+                    feeToken: address(bridgeFeeToken), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
             )
         );
@@ -413,16 +413,12 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             0,
             user,
             address(ccipAdapter_earningChain),
+            // Use a higher gas limit to ensure the transaction is successful on Accounting Chain because the
+            // snapshot struct may be pushed to the FH storage.
             DEFAULT_GAS_LIMIT,
-            BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({
-                    feeToken: address(bridgeFeeToken),
-                    feeAmount: bridgeFeeAmount,
-                    feeRefundThreshold: 0,
-                    // Use a higher gas limit to ensure the transaction is successful on Accounting Chain because the
-                    // snapshot
-                    // struct may be pushed to the FH storage.
-                    data: ""
+            abi.encode(
+                ICcipBridgeAdapter.AdapterData({
+                    feeToken: address(bridgeFeeToken), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
             ),
             ""

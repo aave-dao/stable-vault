@@ -64,7 +64,7 @@ abstract contract BaseBridgeAdapter is AccessManaged, TransferHelperClient, IBri
         bytes memory data,
         address feePayer,
         uint256 gasLimit,
-        bytes memory bridgeParamsEncoded
+        bytes memory adapterData
     ) external payable virtual override;
 
     function setDestinationChainAdapter(uint256 chainId, address destinationChainAdapter) external override restricted {

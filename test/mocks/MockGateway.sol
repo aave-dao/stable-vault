@@ -5,7 +5,7 @@ pragma solidity ^0.8.20;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {BridgeParamsCodec} from "src/bridging/BridgeParamsCodec.sol";
+import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {Constants} from "src/types/Constants.sol";
@@ -39,7 +39,7 @@ contract MockGateway is IChainGateway {
         }
     }
 
-    /// @dev Simulates adapter-owned fee staging: decodes bridge params, pulls feeToken from feePayer
+    /// @dev Simulates adapter-owned fee staging: decodes adapter data, pulls feeToken from feePayer
     /// (or accepts native via msg.value) into TransferHelper, then simulates fee consumption.
     function sendBridgeIouTokenMessageWithFeePayer(
         uint256, /*destinationChainId*/
@@ -48,19 +48,20 @@ contract MockGateway is IChainGateway {
         address, /*bridgeAdapter*/
         address feePayer,
         uint256, /*gasLimit*/
-        bytes calldata bridgeParamsEncoded
+        bytes calldata adapterData
     ) external payable override {
-        BridgeParamsCodec.BridgeParams memory bridgeParams = BridgeParamsCodec.decode(bridgeParamsEncoded);
-        if (bridgeParams.feeToken == Constants.NATIVE_CURRENCY) {
-            require(msg.value >= bridgeParams.feeAmount, Errors.InsufficientFunds());
+        ICcipBridgeAdapter.AdapterData memory ccipAdapterData =
+            abi.decode(adapterData, (ICcipBridgeAdapter.AdapterData));
+        if (ccipAdapterData.feeToken == Constants.NATIVE_CURRENCY) {
+            require(msg.value >= ccipAdapterData.feeAmount, Errors.InsufficientFunds());
             if (msg.value > 0) {
                 (bool ok,) = _transferHelper.call{value: msg.value}("");
                 require(ok, Errors.NativeTransferFailed());
             }
         } else {
             require(msg.value == 0, Errors.InvalidParameter());
-            if (bridgeParams.feeAmount > 0) {
-                IERC20(bridgeParams.feeToken).safeTransferFrom(feePayer, _transferHelper, bridgeParams.feeAmount);
+            if (ccipAdapterData.feeAmount > 0) {
+                IERC20(ccipAdapterData.feeToken).safeTransferFrom(feePayer, _transferHelper, ccipAdapterData.feeAmount);
             }
         }
         _mockConsume();

@@ -12,10 +12,10 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transpa
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {BridgeParamsCodec} from "src/bridging/BridgeParamsCodec.sol";
 import {EarningChainGateway} from "src/core/earning/EarningChainGateway.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
+import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
@@ -391,12 +391,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
             vm.prank(bridgeFeePayer);
             MockNonStandardErc20(bridgeFeeToken).approve(address(_mockBridgeAdapterData), bridgeFeeAmount);
 
-            bytes memory bridgeParams = BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({
-                    feeToken: bridgeFeeToken,
-                    feeAmount: bridgeFeeAmount,
-                    feeRefundThreshold: 0,
-                    data: abi.encode(keccak256(hex"c0ffee"))
+            bytes memory adapterData = abi.encode(
+                ICcipBridgeAdapter.AdapterData({
+                    feeToken: bridgeFeeToken, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
             );
 
@@ -408,7 +405,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 address(_mockBridgeAdapterData),
                 abi.encodeCall(
                     IBridgeAdapter.publishMessageToChainWithFeePayer,
-                    (ACCOUNTING_CHAIN_ID, address(0), 0, data, bridgeFeePayer, DEFAULT_GAS_LIMIT, bridgeParams)
+                    (ACCOUNTING_CHAIN_ID, address(0), 0, data, bridgeFeePayer, DEFAULT_GAS_LIMIT, adapterData)
                 )
             );
             _mockTransferHelper.mockAsset(address(_mockUsdt), amountOut);
@@ -422,7 +419,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 tokenOutReceiver,
                 address(_mockBridgeAdapterData),
                 BURN_IOU_TOKEN_GAS_LIMIT,
-                bridgeParams,
+                adapterData,
                 ""
             );
         }
@@ -451,12 +448,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
             vm.prank(bridgeFeePayer);
             MockNonStandardErc20(bridgeFeeToken).approve(address(_mockBridgeAdapterData), bridgeFeeAmount);
 
-            bytes memory bridgeParams = BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({
-                    feeToken: bridgeFeeToken,
-                    feeAmount: bridgeFeeAmount,
-                    feeRefundThreshold: 0,
-                    data: abi.encode(keccak256(hex"c0ffee"))
+            bytes memory adapterData = abi.encode(
+                ICcipBridgeAdapter.AdapterData({
+                    feeToken: bridgeFeeToken, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
             );
 
@@ -468,7 +462,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 address(_mockBridgeAdapterData),
                 abi.encodeCall(
                     IBridgeAdapter.publishMessageToChainWithFeePayer,
-                    (ACCOUNTING_CHAIN_ID, address(0), 0, data, bridgeFeePayer, DEFAULT_GAS_LIMIT, bridgeParams)
+                    (ACCOUNTING_CHAIN_ID, address(0), 0, data, bridgeFeePayer, DEFAULT_GAS_LIMIT, adapterData)
                 )
             );
             _mockTransferHelper.mockAsset(address(_mockUsdt), amountOut);
@@ -481,7 +475,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 tokenOutReceiver,
                 address(_mockBridgeAdapterData),
                 BURN_IOU_TOKEN_GAS_LIMIT,
-                bridgeParams,
+                adapterData,
                 ""
             );
         }
@@ -500,7 +494,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         address tokenOut = address(_mockUsdt);
         vm.assume(iouTokenAmountRay.rayToAssetDecimals(tokenOut) > 0);
 
-        bytes memory bridgeParams;
+        bytes memory adapterData;
         // Setup mocks and expectations
         {
             vm.expectCall(
@@ -520,12 +514,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 abi.encode(allocatorBalances)
             );
 
-            bridgeParams = BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({
-                    feeToken: address(0),
-                    feeAmount: bridgeFeeAmount,
-                    feeRefundThreshold: 0,
-                    data: abi.encode(keccak256(hex"c0ffee"))
+            adapterData = abi.encode(
+                ICcipBridgeAdapter.AdapterData({
+                    feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
             );
 
@@ -534,7 +525,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             vm.expectCall(address(_mockUsdt), abi.encodeCall(IERC20.transfer, (tokenOutReceiver, amountOut)));
             vm.expectCall(
                 address(_mockBridgeAdapterData),
-                _expectedBurnIouCalldata(iouTokenAmountRay, tokenOutReceiver, DEFAULT_GAS_LIMIT, bridgeParams)
+                _expectedBurnIouCalldata(iouTokenAmountRay, tokenOutReceiver, DEFAULT_GAS_LIMIT, adapterData)
             );
         }
 
@@ -547,7 +538,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             tokenOutReceiver,
             address(_mockBridgeAdapterData),
             BURN_IOU_TOKEN_GAS_LIMIT,
-            bridgeParams,
+            adapterData,
             ""
         );
     }
@@ -575,11 +566,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             user,
             address(_mockBridgeAdapterData),
             DEFAULT_GAS_LIMIT,
-            BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({
-                    feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, data: abi.encode(keccak256(hex"c0ffee"))
-                })
-            ),
+            abi.encode(ICcipBridgeAdapter.AdapterData({feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0})),
             ""
         );
     }
@@ -593,11 +580,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             makeAddr("tokenOutReceiver"),
             address(_mockBridgeAdapterData),
             DEFAULT_GAS_LIMIT,
-            BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({
-                    feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, data: abi.encode(keccak256(hex"c0ffee"))
-                })
-            ),
+            abi.encode(ICcipBridgeAdapter.AdapterData({feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0})),
             ""
         );
     }
@@ -613,11 +596,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             makeAddr("tokenOutReceiver"),
             address(_mockBridgeAdapterData),
             BURN_IOU_TOKEN_GAS_LIMIT - 1,
-            BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({
-                    feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, data: abi.encode(keccak256(hex"c0ffee"))
-                })
-            ),
+            abi.encode(ICcipBridgeAdapter.AdapterData({feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0})),
             ""
         );
     }
@@ -637,11 +616,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             makeAddr("tokenOutReceiver"),
             address(_mockBridgeAdapterData),
             DEFAULT_GAS_LIMIT,
-            BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({
-                    feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, data: abi.encode(keccak256(hex"c0ffee"))
-                })
-            ),
+            abi.encode(ICcipBridgeAdapter.AdapterData({feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0})),
             ""
         );
     }
@@ -664,11 +639,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             makeAddr("tokenOutReceiver"),
             address(_mockBridgeAdapterData),
             DEFAULT_GAS_LIMIT,
-            BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({
-                    feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, data: abi.encode(keccak256(hex"c0ffee"))
-                })
-            ),
+            abi.encode(ICcipBridgeAdapter.AdapterData({feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0})),
             ""
         );
     }
@@ -688,14 +659,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             makeAddr("tokenOutReceiver"),
             address(_mockBridgeAdapterData),
             DEFAULT_GAS_LIMIT,
-            BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({
-                    feeToken: address(0),
-                    feeAmount: 123,
-                    feeRefundThreshold: 0,
-                    data: abi.encode(keccak256(hex"c0ffee"))
-                })
-            ),
+            abi.encode(ICcipBridgeAdapter.AdapterData({feeToken: address(0), feeAmount: 123, feeRefundThreshold: 0})),
             ""
         );
     }
@@ -734,14 +698,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             makeAddr("tokenOutReceiver"),
             address(_mockBridgeAdapterData),
             DEFAULT_GAS_LIMIT,
-            BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({
-                    feeToken: address(0),
-                    feeAmount: 123,
-                    feeRefundThreshold: 0,
-                    data: abi.encode(keccak256(hex"c0ffee"))
-                })
-            ),
+            abi.encode(ICcipBridgeAdapter.AdapterData({feeToken: address(0), feeAmount: 123, feeRefundThreshold: 0})),
             ""
         );
     }
@@ -768,12 +725,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
             tokenOutReceiver,
             address(_mockBridgeAdapterData),
             DEFAULT_GAS_LIMIT,
-            BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({
-                    feeToken: address(0),
-                    feeAmount: bridgeFeeAmount,
-                    feeRefundThreshold: 0,
-                    data: abi.encode(keccak256(hex"c0ffee"))
+            abi.encode(
+                ICcipBridgeAdapter.AdapterData({
+                    feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
             ),
             ""
@@ -794,9 +748,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
             tokenOutReceiver,
             bogusAdapter,
             DEFAULT_GAS_LIMIT,
-            BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({
-                    feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
+            abi.encode(
+                ICcipBridgeAdapter.AdapterData({
+                    feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
             ),
             ""
@@ -825,12 +779,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
             tokenOutReceiver,
             address(_mockBridgeAdapterData),
             DEFAULT_GAS_LIMIT,
-            BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({
-                    feeToken: address(0),
-                    feeAmount: bridgeFeeAmount,
-                    feeRefundThreshold: 0,
-                    data: abi.encode(keccak256(hex"c0ffee"))
+            abi.encode(
+                ICcipBridgeAdapter.AdapterData({
+                    feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
             ),
             ""
@@ -863,12 +814,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
             })
         );
 
-        bytes memory bridgeParams = BridgeParamsCodec.encode(
-            BridgeParamsCodec.BridgeParams({
-                feeToken: bridgeFeeToken,
-                feeAmount: bridgeFeeAmount,
-                feeRefundThreshold: 0,
-                data: abi.encode(keccak256(hex"c0ffee"))
+        bytes memory adapterData = abi.encode(
+            ICcipBridgeAdapter.AdapterData({
+                feeToken: bridgeFeeToken, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
             })
         );
 
@@ -884,7 +832,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     returnFundsMessageEncoded,
                     sender,
                     DEFAULT_GAS_LIMIT,
-                    bridgeParams
+                    adapterData
                 )
             )
         );
@@ -892,7 +840,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         vm.prank(sender);
         _earningChainGateway.pushFundsToAccountingChain(
-            address(_mockUsdt), amountToken, address(_mockBridgeAdapterAssets), DEFAULT_GAS_LIMIT, bridgeParams
+            address(_mockUsdt), amountToken, address(_mockBridgeAdapterAssets), DEFAULT_GAS_LIMIT, adapterData
         );
     }
 
@@ -922,12 +870,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
             })
         );
 
-        bytes memory bridgeParams = BridgeParamsCodec.encode(
-            BridgeParamsCodec.BridgeParams({
-                feeToken: bridgeFeeToken,
-                feeAmount: bridgeFeeAmount,
-                feeRefundThreshold: 0,
-                data: abi.encode(keccak256(hex"c0ffee"))
+        bytes memory adapterData = abi.encode(
+            ICcipBridgeAdapter.AdapterData({
+                feeToken: bridgeFeeToken, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
             })
         );
 
@@ -942,7 +887,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     returnFundsMessageEncoded,
                     sender,
                     DEFAULT_GAS_LIMIT,
-                    bridgeParams
+                    adapterData
                 )
             )
         );
@@ -951,7 +896,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         // Call from random account to ensure the fee payer is used
         vm.prank(sender);
         _earningChainGateway.pushFundsToAccountingChain(
-            address(_mockGho), amountToken, address(_mockBridgeAdapterAssets), DEFAULT_GAS_LIMIT, bridgeParams
+            address(_mockGho), amountToken, address(_mockBridgeAdapterAssets), DEFAULT_GAS_LIMIT, adapterData
         );
     }
 
@@ -979,12 +924,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
             })
         );
 
-        bytes memory bridgeParams = BridgeParamsCodec.encode(
-            BridgeParamsCodec.BridgeParams({
-                feeToken: bridgeFeeToken,
-                feeAmount: bridgeFeeAmount,
-                feeRefundThreshold: 0,
-                data: abi.encode(keccak256(hex"c0ffee"))
+        bytes memory adapterData = abi.encode(
+            ICcipBridgeAdapter.AdapterData({
+                feeToken: bridgeFeeToken, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
             })
         );
 
@@ -1000,14 +942,14 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     returnFundsMessageEncoded,
                     feePayer,
                     DEFAULT_GAS_LIMIT,
-                    bridgeParams
+                    adapterData
                 )
             )
         );
 
         vm.prank(feePayer);
         _earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
-            address(_mockUsdt), amountToken, address(_mockBridgeAdapterAssets), DEFAULT_GAS_LIMIT, bridgeParams
+            address(_mockUsdt), amountToken, address(_mockBridgeAdapterAssets), DEFAULT_GAS_LIMIT, adapterData
         );
     }
 
@@ -1026,11 +968,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             amountToken,
             address(_mockBridgeAdapterAssets),
             DEFAULT_GAS_LIMIT,
-            BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({
-                    feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, data: abi.encode(keccak256(hex"c0ffee"))
-                })
-            )
+            abi.encode(ICcipBridgeAdapter.AdapterData({feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0}))
         );
     }
 
@@ -1048,11 +986,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             amountToken,
             address(_mockBridgeAdapterAssets),
             DEFAULT_GAS_LIMIT,
-            BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({
-                    feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, data: abi.encode(keccak256(hex"c0ffee"))
-                })
-            )
+            abi.encode(ICcipBridgeAdapter.AdapterData({feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0}))
         );
     }
 
@@ -1070,9 +1004,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             amountToken,
             address(_mockBridgeAdapterAssets),
             DEFAULT_GAS_LIMIT,
-            BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, data: ""})
-            )
+            abi.encode(ICcipBridgeAdapter.AdapterData({feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0}))
         );
     }
 
@@ -1099,11 +1031,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             100_000_000_000_000 * 10 ** 6,
             address(_mockBridgeAdapterAssets),
             DEFAULT_GAS_LIMIT,
-            BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({
-                    feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, data: abi.encode(keccak256(hex"c0ffee"))
-                })
-            )
+            abi.encode(ICcipBridgeAdapter.AdapterData({feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0}))
         );
     }
 
@@ -1115,11 +1043,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             0,
             address(_mockBridgeAdapterAssets),
             DEFAULT_GAS_LIMIT,
-            BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({
-                    feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, data: abi.encode(keccak256(hex"c0ffee"))
-                })
-            )
+            abi.encode(ICcipBridgeAdapter.AdapterData({feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0}))
         );
     }
 
@@ -1135,14 +1059,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             amount,
             address(_mockBridgeAdapterAssets),
             DEFAULT_GAS_LIMIT,
-            BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({
-                    feeToken: address(0),
-                    feeAmount: 123,
-                    feeRefundThreshold: 0,
-                    data: abi.encode(keccak256(hex"c0ffee"))
-                })
-            )
+            abi.encode(ICcipBridgeAdapter.AdapterData({feeToken: address(0), feeAmount: 123, feeRefundThreshold: 0}))
         );
     }
 
@@ -1173,12 +1090,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
             amount,
             address(_mockBridgeAdapterAssets),
             DEFAULT_GAS_LIMIT,
-            BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({
-                    feeToken: bridgeFeeToken,
-                    feeAmount: bridgeFeeAmount,
-                    feeRefundThreshold: 0,
-                    data: abi.encode(keccak256(hex"c0ffee"))
+            abi.encode(
+                ICcipBridgeAdapter.AdapterData({
+                    feeToken: bridgeFeeToken, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
             )
         );
@@ -1193,9 +1107,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             100,
             bogusAdapter,
             DEFAULT_GAS_LIMIT,
-            BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, data: ""})
-            )
+            abi.encode(ICcipBridgeAdapter.AdapterData({feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0}))
         );
     }
 
@@ -1207,9 +1119,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             100,
             address(_mockBridgeAdapterData),
             DEFAULT_GAS_LIMIT,
-            BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, data: ""})
-            )
+            abi.encode(ICcipBridgeAdapter.AdapterData({feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0}))
         );
     }
 
@@ -1223,11 +1133,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             100_000_000_000_000 * 10 ** 6,
             address(_mockBridgeAdapterAssets),
             DEFAULT_GAS_LIMIT,
-            BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({
-                    feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0, data: abi.encode(keccak256(hex"c0ffee"))
-                })
-            )
+            abi.encode(ICcipBridgeAdapter.AdapterData({feeToken: address(0), feeAmount: 0, feeRefundThreshold: 0}))
         );
     }
 
@@ -1275,12 +1181,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     ),
                     bridgeFeePayer,
                     DEFAULT_GAS_LIMIT,
-                    BridgeParamsCodec.encode(
-                        BridgeParamsCodec.BridgeParams({
-                            feeToken: feeToken,
-                            feeAmount: feeAmount,
-                            feeRefundThreshold: 0,
-                            data: abi.encode(keccak256(hex"c0ffee"))
+                    abi.encode(
+                        ICcipBridgeAdapter.AdapterData({
+                            feeToken: feeToken, feeAmount: feeAmount, feeRefundThreshold: 0
                         })
                     )
                 )
@@ -1295,12 +1198,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockBridgeAdapterData),
             bridgeFeePayer,
             DEFAULT_GAS_LIMIT,
-            BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({
-                    feeToken: address(_mockGho),
-                    feeAmount: feeAmount,
-                    feeRefundThreshold: 0,
-                    data: abi.encode(keccak256(hex"c0ffee"))
+            abi.encode(
+                ICcipBridgeAdapter.AdapterData({
+                    feeToken: address(_mockGho), feeAmount: feeAmount, feeRefundThreshold: 0
                 })
             )
         );
@@ -1340,12 +1240,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     ),
                     bridgeFeePayer,
                     DEFAULT_GAS_LIMIT,
-                    BridgeParamsCodec.encode(
-                        BridgeParamsCodec.BridgeParams({
-                            feeToken: address(0),
-                            feeAmount: bridgeFeeAmount,
-                            feeRefundThreshold: 0,
-                            data: abi.encode(keccak256(hex"c0ffee"))
+                    abi.encode(
+                        ICcipBridgeAdapter.AdapterData({
+                            feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                         })
                     )
                 )
@@ -1360,12 +1257,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockBridgeAdapterData),
             bridgeFeePayer,
             DEFAULT_GAS_LIMIT,
-            BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({
-                    feeToken: address(0),
-                    feeAmount: bridgeFeeAmount,
-                    feeRefundThreshold: 0,
-                    data: abi.encode(keccak256(hex"c0ffee"))
+            abi.encode(
+                ICcipBridgeAdapter.AdapterData({
+                    feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
             )
         );
@@ -1381,12 +1275,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockBridgeAdapterData),
             address(this),
             DEFAULT_GAS_LIMIT,
-            BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({
-                    feeToken: address(_mockUsdt),
-                    feeAmount: 100_000,
-                    feeRefundThreshold: 0,
-                    data: abi.encode(keccak256(hex"c0ffee"))
+            abi.encode(
+                ICcipBridgeAdapter.AdapterData({
+                    feeToken: address(_mockUsdt), feeAmount: 100_000, feeRefundThreshold: 0
                 })
             )
         );
@@ -1406,12 +1297,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockBridgeAdapterData),
             address(this),
             DEFAULT_GAS_LIMIT,
-            BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({
-                    feeToken: address(_mockUsdt),
-                    feeAmount: 100_000,
-                    feeRefundThreshold: 0,
-                    data: abi.encode(keccak256(hex"c0ffee"))
+            abi.encode(
+                ICcipBridgeAdapter.AdapterData({
+                    feeToken: address(_mockUsdt), feeAmount: 100_000, feeRefundThreshold: 0
                 })
             )
         );
@@ -1427,9 +1315,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
             makeAddr("bridgeAdapter"),
             address(this),
             DEFAULT_GAS_LIMIT,
-            BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({
-                    feeToken: address(_mockUsdt), feeAmount: 100_000, feeRefundThreshold: 0, data: ""
+            abi.encode(
+                ICcipBridgeAdapter.AdapterData({
+                    feeToken: address(_mockUsdt), feeAmount: 100_000, feeRefundThreshold: 0
                 })
             )
         );
@@ -1698,13 +1586,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
         // Setup the reentrant callback: when transfer() is called, re-enter exchangeIouTokens
         uint256 bridgeFeeAmount = 100;
         vm.deal(attacker, bridgeFeeAmount * 2);
-        bytes memory reentrantBridgeParams = BridgeParamsCodec.encode(
-            BridgeParamsCodec.BridgeParams({
-                feeToken: address(0),
-                feeAmount: bridgeFeeAmount,
-                feeRefundThreshold: 0,
-                data: abi.encode(keccak256(hex"c0ffee"))
-            })
+        bytes memory reentrantAdapterData = abi.encode(
+            ICcipBridgeAdapter.AdapterData({feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0})
         );
         reentrantAsset.setReentrantCall(
             address(_earningChainGateway),
@@ -1717,7 +1600,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     attacker,
                     address(_mockBridgeAdapterData),
                     BURN_IOU_TOKEN_GAS_LIMIT,
-                    reentrantBridgeParams,
+                    reentrantAdapterData,
                     ""
                 )
             )
@@ -1733,7 +1616,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             attacker,
             address(_mockBridgeAdapterData),
             BURN_IOU_TOKEN_GAS_LIMIT,
-            reentrantBridgeParams,
+            reentrantAdapterData,
             ""
         );
     }
@@ -1759,7 +1642,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         uint256 iouTokenAmountRay,
         address feePayer,
         uint256 gasLimit,
-        bytes memory bridgeParams
+        bytes memory adapterData
     ) internal view returns (bytes memory) {
         bytes memory data = abi.encode(
             IChainGateway.CrossChainMessage({
@@ -1775,7 +1658,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         );
         return abi.encodeCall(
             IBridgeAdapter.publishMessageToChainWithFeePayer,
-            (ACCOUNTING_CHAIN_ID, address(0), 0, data, feePayer, gasLimit, bridgeParams)
+            (ACCOUNTING_CHAIN_ID, address(0), 0, data, feePayer, gasLimit, adapterData)
         );
     }
 }
