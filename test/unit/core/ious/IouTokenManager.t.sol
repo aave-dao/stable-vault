@@ -5,9 +5,9 @@ pragma solidity ^0.8.20;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Test} from "forge-std/Test.sol";
 
-import {BridgeParamsCodec} from "src/bridging/BridgeParamsCodec.sol";
 import {IouToken} from "src/core/ious/IouToken.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
+import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
 import {Constants} from "src/types/Constants.sol";
@@ -215,7 +215,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
     }
 
     // Bridging tokens
-    function test_bridgeTokens_withoutBridgeParams(
+    function test_bridgeTokens_withoutCcipFeeParams(
         address from,
         uint256 destinationChainId,
         address iouTokenRecipient,
@@ -226,11 +226,10 @@ contract IouTokenManagerTest_AccountingChain is Test {
         vm.assume(iouTokenRecipient != address(0));
         vm.assume(iouTokenAmountRay > 0);
 
-        bytes memory bridgeParams = BridgeParamsCodec.encode(
-            BridgeParamsCodec.BridgeParams({
-                feeToken: Constants.NATIVE_CURRENCY, feeAmount: 0, feeRefundThreshold: 0, data: ""
-            })
+        bytes memory bridgeAdapterData = abi.encode(
+            ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeAmount: 0, feeRefundThreshold: 0})
         );
+
         vm.prank(iouTokenManagerAddress);
         MockErc20(iouToken).mint(from, iouTokenAmountRay);
         vm.prank(from);
@@ -246,12 +245,17 @@ contract IouTokenManagerTest_AccountingChain is Test {
                 bridgeAdapter,
                 from,
                 DEFAULT_GAS_LIMIT,
-                bridgeParams
+                bridgeAdapterData
             )
         );
         vm.prank(from);
         iouTokenManager.bridgeTokens(
-            destinationChainId, iouTokenRecipient, iouTokenAmountRay, bridgeAdapter, DEFAULT_GAS_LIMIT, bridgeParams
+            destinationChainId,
+            iouTokenRecipient,
+            iouTokenAmountRay,
+            bridgeAdapter,
+            DEFAULT_GAS_LIMIT,
+            bridgeAdapterData
         );
     }
 
@@ -261,10 +265,8 @@ contract IouTokenManagerTest_AccountingChain is Test {
         address iouTokenRecipient = makeAddr("iouRecipient");
         uint256 iouTokenAmountRay = 1_000_000e27;
 
-        bytes memory bridgeParams = BridgeParamsCodec.encode(
-            BridgeParamsCodec.BridgeParams({
-                feeToken: Constants.NATIVE_CURRENCY, feeAmount: 0, feeRefundThreshold: 0, data: ""
-            })
+        bytes memory bridgeAdapterData = abi.encode(
+            ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeAmount: 0, feeRefundThreshold: 0})
         );
 
         // Mint IOU tokens to the user and approve the manager
@@ -284,7 +286,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
             iouTokenAmountRay,
             makeAddr("bridgeAdapter"),
             DEFAULT_GAS_LIMIT,
-            bridgeParams
+            bridgeAdapterData
         );
     }
 
@@ -296,11 +298,11 @@ contract IouTokenManagerTest_AccountingChain is Test {
         vm.assume(iouTokenRecipient != address(0));
         vm.assume(iouTokenAmountRay > 0);
         uint256 destinationChainId = block.chainid;
-        bytes memory bridgeParams = BridgeParamsCodec.encode(
-            BridgeParamsCodec.BridgeParams({
-                feeToken: Constants.NATIVE_CURRENCY, feeAmount: 0, feeRefundThreshold: 0, data: ""
-            })
+
+        bytes memory bridgeAdapterData = abi.encode(
+            ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeAmount: 0, feeRefundThreshold: 0})
         );
+
         vm.expectRevert(Errors.InvalidDestinationChainId.selector);
         vm.prank(from);
         iouTokenManager.bridgeTokens(
@@ -309,28 +311,25 @@ contract IouTokenManagerTest_AccountingChain is Test {
             iouTokenAmountRay,
             makeAddr("bridgeAdapter"),
             DEFAULT_GAS_LIMIT,
-            bridgeParams
+            bridgeAdapterData
         );
     }
 
-    function test_bridgeTokens_bridgeParams_ClientTransfersNonNativeFeeToken(
+    function test_bridgeTokens_bridgeAdapterData_ClientTransfersNonNativeFeeToken(
         address from,
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
         uint256 feeAmount,
-        uint256 gasLimit,
-        bytes memory data
+        uint256 gasLimit
     ) public {
         vm.assume(from != address(0));
         vm.assume(iouTokenRecipient != address(0));
         vm.assume(destinationChainId != block.chainid);
         vm.assume(iouTokenAmountRay > 0);
         address feeToken = address(new MockErc20("Test USD", "TUSD", 6));
-        bytes memory bridgeParams = BridgeParamsCodec.encode(
-            BridgeParamsCodec.BridgeParams({
-                feeToken: feeToken, feeAmount: feeAmount, feeRefundThreshold: 0, data: data
-            })
+        bytes memory bridgeAdapterData = abi.encode(
+            ICcipBridgeAdapter.CcipFeeParams({feeToken: feeToken, feeAmount: feeAmount, feeRefundThreshold: 0})
         );
         if (feeAmount > 0) {
             MockErc20(feeToken).mint(from, feeAmount);
@@ -355,7 +354,12 @@ contract IouTokenManagerTest_AccountingChain is Test {
         }
         vm.prank(from);
         iouTokenManager.bridgeTokens(
-            destinationChainId, iouTokenRecipient, iouTokenAmountRay, makeAddr("bridgeAdapter"), gasLimit, bridgeParams
+            destinationChainId,
+            iouTokenRecipient,
+            iouTokenAmountRay,
+            makeAddr("bridgeAdapter"),
+            gasLimit,
+            bridgeAdapterData
         );
         assertEq(
             IERC20(feeToken).balanceOf(address(transferHelper)),
@@ -382,8 +386,8 @@ contract IouTokenManagerTest_AccountingChain is Test {
         feeAmount = bound(feeAmount, 1, 1e18);
         accidentalMsgValue = bound(accidentalMsgValue, 1, 100 ether);
 
-        bytes memory bridgeParams = BridgeParamsCodec.encode(
-            BridgeParamsCodec.BridgeParams({feeToken: feeToken, feeAmount: feeAmount, feeRefundThreshold: 0, data: ""})
+        bytes memory bridgeAdapterData = abi.encode(
+            ICcipBridgeAdapter.CcipFeeParams({feeToken: feeToken, feeAmount: feeAmount, feeRefundThreshold: 0})
         );
 
         MockErc20(feeToken).mint(from, feeAmount);
@@ -407,7 +411,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
             iouTokenAmountRay,
             makeAddr("bridgeAdapter"),
             DEFAULT_GAS_LIMIT,
-            bridgeParams
+            bridgeAdapterData
         );
 
         assertEq(from.balance, accidentalMsgValue, "Caller's native balance should be fully preserved after revert");
@@ -420,23 +424,23 @@ contract IouTokenManagerTest_AccountingChain is Test {
         assertEq(attacker.balance, 0, "Attacker should not be able to steal native from TransferHelper");
     }
 
-    function test_bridgeTokens_bridgeParams_ClientTransfersNativeFeeToken(
+    function test_bridgeTokens_bridgeAdapterData_ClientTransfersNativeFeeToken(
         address from,
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
         uint256 feeAmount,
-        uint256 gasLimit,
-        bytes memory data
+        uint256 gasLimit
     ) public {
         vm.assume(destinationChainId != block.chainid);
         vm.assume(from != address(chainGateway));
         vm.assume(from != address(0));
         vm.assume(iouTokenRecipient != address(0));
         vm.assume(iouTokenAmountRay > 0);
-        bytes memory bridgeParams = BridgeParamsCodec.encode(
-            BridgeParamsCodec.BridgeParams({
-                feeToken: Constants.NATIVE_CURRENCY, feeAmount: feeAmount, feeRefundThreshold: 0, data: data
+
+        bytes memory bridgeAdapterData = abi.encode(
+            ICcipBridgeAdapter.CcipFeeParams({
+                feeToken: Constants.NATIVE_CURRENCY, feeAmount: feeAmount, feeRefundThreshold: 0
             })
         );
         address feeRecipient = makeAddr("bridgeAdapter");
@@ -453,7 +457,12 @@ contract IouTokenManagerTest_AccountingChain is Test {
         }
         vm.prank(from);
         iouTokenManager.bridgeTokens{value: feeAmount}(
-            destinationChainId, iouTokenRecipient, iouTokenAmountRay, makeAddr("bridgeAdapter"), gasLimit, bridgeParams
+            destinationChainId,
+            iouTokenRecipient,
+            iouTokenAmountRay,
+            makeAddr("bridgeAdapter"),
+            gasLimit,
+            bridgeAdapterData
         );
         assertEq(transferHelper.balance, 0, "Native fee not properly transferred out of TransferHelper");
         assertEq(feeRecipient.balance, feeAmount, "Native fee not properly transferred to bridge adapter");
@@ -479,8 +488,8 @@ contract IouTokenManagerTest_AccountingChain is Test {
         vm.assume(iouTokenAmountRay > 0);
         uint256 feeAmount = 1000;
         address feeToken = address(new MockErc20("Test USD", "TUSD", 6));
-        bytes memory bridgeParams = BridgeParamsCodec.encode(
-            BridgeParamsCodec.BridgeParams({feeToken: feeToken, feeAmount: feeAmount, feeRefundThreshold: 0, data: ""})
+        bytes memory bridgeAdapterData = abi.encode(
+            ICcipBridgeAdapter.CcipFeeParams({feeToken: feeToken, feeAmount: feeAmount, feeRefundThreshold: 0})
         );
         MockErc20(feeToken).mint(forgedFeePayer, feeAmount);
 
@@ -498,7 +507,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
             iouTokenAmountRay,
             makeAddr("bridgeAdapter"),
             DEFAULT_GAS_LIMIT,
-            bridgeParams
+            bridgeAdapterData
         );
     }
 
@@ -507,11 +516,11 @@ contract IouTokenManagerTest_AccountingChain is Test {
         uint256 iouTokenAmountRay = 100_000;
         uint256 destinationChainId = block.chainid + 1;
         address iouTokenRecipient = address(0);
-        bytes memory bridgeParams = BridgeParamsCodec.encode(
-            BridgeParamsCodec.BridgeParams({
-                feeToken: Constants.NATIVE_CURRENCY, feeAmount: 0, feeRefundThreshold: 0, data: ""
-            })
+
+        bytes memory bridgeAdapterData = abi.encode(
+            ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeAmount: 0, feeRefundThreshold: 0})
         );
+
         vm.expectRevert(Errors.InvalidParameter.selector);
         vm.prank(from);
         iouTokenManager.bridgeTokens(
@@ -520,7 +529,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
             iouTokenAmountRay,
             makeAddr("bridgeAdapter"),
             DEFAULT_GAS_LIMIT,
-            bridgeParams
+            bridgeAdapterData
         );
     }
 
@@ -528,20 +537,20 @@ contract IouTokenManagerTest_AccountingChain is Test {
         vm.assume(from != address(0));
         vm.assume(destinationChainId != block.chainid);
         address iouTokenRecipient = makeAddr("iouTokenRecipient");
-        bytes memory bridgeParams = BridgeParamsCodec.encode(
-            BridgeParamsCodec.BridgeParams({
-                feeToken: Constants.NATIVE_CURRENCY, feeAmount: 0, feeRefundThreshold: 0, data: ""
-            })
+
+        bytes memory bridgeAdapterData = abi.encode(
+            ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeAmount: 0, feeRefundThreshold: 0})
         );
+
         vm.expectRevert(Errors.ZeroAmount.selector);
         vm.prank(from);
         iouTokenManager.bridgeTokens(
-            destinationChainId, iouTokenRecipient, 0, makeAddr("bridgeAdapter"), DEFAULT_GAS_LIMIT, bridgeParams
+            destinationChainId, iouTokenRecipient, 0, makeAddr("bridgeAdapter"), DEFAULT_GAS_LIMIT, bridgeAdapterData
         );
     }
 
     /// @notice Regression test for the cross-flow approval-theft surface that aa-eyup flagged in
-    /// `#discussion_r3144045362`. Pre-Step-1, `feePayer` was a field of the opaque `BridgeParams`
+    /// `#discussion_r3144045362`. Pre-Step-1, `feePayer` was a field of the opaque adapter data.
     /// blob — any caller of any bridge entry-point could put a victim's address there and the adapter
     /// would `safeTransferFrom(victim, ...)` against an approval the victim had given for an
     /// unrelated bridge action. After Step 1 `feePayer` is hardcoded by the entry-point to its
@@ -567,10 +576,8 @@ contract IouTokenManagerTest_AccountingChain is Test {
         vm.prank(eve);
         IERC20(iouToken).approve(address(iouTokenManager), iouTokenAmountRay);
 
-        bytes memory bridgeParams = BridgeParamsCodec.encode(
-            BridgeParamsCodec.BridgeParams({
-                feeToken: address(feeToken), feeAmount: feeAmount, feeRefundThreshold: 0, data: ""
-            })
+        bytes memory bridgeAdapterData = abi.encode(
+            ICcipBridgeAdapter.CcipFeeParams({feeToken: address(feeToken), feeAmount: feeAmount, feeRefundThreshold: 0})
         );
 
         // Eve calls bridgeTokens. The entry-point hardcodes feePayer = msg.sender = Eve. The adapter
@@ -579,7 +586,12 @@ contract IouTokenManagerTest_AccountingChain is Test {
         vm.prank(eve);
         vm.expectRevert();
         iouTokenManager.bridgeTokens(
-            block.chainid + 1, makeAddr("recipient"), iouTokenAmountRay, bridgeAdapter, DEFAULT_GAS_LIMIT, bridgeParams
+            block.chainid + 1,
+            makeAddr("recipient"),
+            iouTokenAmountRay,
+            bridgeAdapter,
+            DEFAULT_GAS_LIMIT,
+            bridgeAdapterData
         );
 
         // Alice's approval is still intact.

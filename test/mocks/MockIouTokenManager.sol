@@ -49,7 +49,7 @@ contract MockIouTokenManager is IIouTokenManager {
         uint256 iouTokenAmountRay,
         address, // bridgeAdapter
         uint256, // gasLimit
-        bytes calldata // bridgeParamsEncoded
+        bytes calldata // bridgeAdapterData
     )
         external
         payable

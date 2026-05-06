@@ -108,7 +108,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         address bridgeAdapter,
         address feePayer,
         uint256 gasLimit,
-        bytes calldata bridgeParamsEncoded
+        bytes calldata bridgeAdapterData
     ) external payable override {
         require(msg.sender == IOU_TOKEN_MANAGER, OnlyIouTokenManager());
         require(iouTokenAmountRay > 0, Errors.ZeroAmount());
@@ -129,7 +129,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
             bridgeIouTokenMessageEncoded,
             feePayer,
             gasLimit,
-            bridgeParamsEncoded
+            bridgeAdapterData
         );
     }
 
@@ -157,14 +157,14 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         bytes memory dataToBridge,
         address feePayer,
         uint256 gasLimit,
-        bytes memory bridgeParamsEncoded
+        bytes memory bridgeAdapterData
     ) internal {
         _validateBridgeAdapterIsSupported(assetToBridge, destinationChainId, bridgeAdapter);
         if (assetToBridge == Constants.ASSET_FOR_DATA_ONLY_BRIDGE) {
             require(amountToBridge == 0, Errors.InvalidParameter());
         }
         IBridgeAdapter(bridgeAdapter).publishMessageToChainWithFeePayer{value: msg.value}(
-            destinationChainId, assetToBridge, amountToBridge, dataToBridge, feePayer, gasLimit, bridgeParamsEncoded
+            destinationChainId, assetToBridge, amountToBridge, dataToBridge, feePayer, gasLimit, bridgeAdapterData
         );
         if (assetToBridge != Constants.ASSET_FOR_DATA_ONLY_BRIDGE) {
             emit FundsSent(assetToBridge, amountToBridge, destinationChainId);
