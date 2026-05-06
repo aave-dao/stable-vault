@@ -51,7 +51,7 @@ contract MockIouTokenManager is IIouTokenManager {
         address, // bridgeAdapter
         address, // feePayer
         uint256, // gasLimit
-        bytes calldata // bridgeParamsEncoded
+        bytes calldata // bridgeAdapterData
     ) external payable override {
         if (_isCanonicalChain) {
             _lockTokens(from, iouTokenAmountRay);

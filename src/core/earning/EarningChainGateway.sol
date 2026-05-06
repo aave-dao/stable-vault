@@ -112,7 +112,7 @@ contract EarningChainGateway is
         address receiver,
         address bridgeAdapter,
         uint256 gasLimit,
-        bytes calldata bridgeParamsEncoded,
+        bytes calldata bridgeAdapterData,
         bytes memory withdrawalPolicyData
     ) external payable virtual override nonReentrant assertingTransferHelperBalanceFor(assetOut) returns (uint256) {
         require(iouTokenAmountRay > 0, Errors.ZeroAmount());
@@ -134,7 +134,7 @@ contract EarningChainGateway is
         // accepted after the oracle snapshot reflects this outflow, preventing the reverse (obligations reduced while
         // assets are still overstated). Operators are expected to account for this transient state when scheduling
         // claimSurplusInterest() calls.
-        _sendBurnIouTokenMessage(iouTokenAmountRay, bridgeAdapter, msg.sender, gasLimit, bridgeParamsEncoded);
+        _sendBurnIouTokenMessage(iouTokenAmountRay, bridgeAdapter, msg.sender, gasLimit, bridgeAdapterData);
 
         ITransferHelper(TRANSFER_HELPER).transfer(assetOut, amountOut, receiver);
         emit AssetOutflow(assetOut, amountOut);
@@ -148,13 +148,13 @@ contract EarningChainGateway is
         uint256 amount,
         address bridgeAdapter,
         uint256 gasLimit,
-        bytes calldata bridgeParamsEncoded
+        bytes calldata bridgeAdapterData
     ) external payable override restricted assertingTransferHelperBalanceFor(asset) {
         require(amount > 0, Errors.ZeroAmount());
         _applyBridgeFundsPolicy(ACCOUNTING_CHAIN_ID, asset, amount);
         // Pull funds from liquidity into the TransferHelper.
         IAllocator(ALLOCATOR).withdraw(asset, amount);
-        _returnFunds(asset, amount, bridgeAdapter, msg.sender, gasLimit, bridgeParamsEncoded);
+        _returnFunds(asset, amount, bridgeAdapter, msg.sender, gasLimit, bridgeAdapterData);
         emit AssetOutflow(asset, amount);
     }
 
@@ -232,7 +232,7 @@ contract EarningChainGateway is
         address bridgeAdapter,
         address feePayer,
         uint256 gasLimit,
-        bytes calldata bridgeParamsEncoded
+        bytes calldata bridgeAdapterData
     ) private {
         // Include the message block number (and timestamp metadata) so the Accounting Chain can verify the chain
         // balance snapshot includes this asset outflow.
@@ -252,7 +252,7 @@ contract EarningChainGateway is
             returnFundsMessageEncoded,
             feePayer,
             gasLimit,
-            bridgeParamsEncoded
+            bridgeAdapterData
         );
     }
 
@@ -320,7 +320,7 @@ contract EarningChainGateway is
         address bridgeAdapter,
         address feePayer,
         uint256 gasLimit,
-        bytes calldata bridgeParamsEncoded
+        bytes calldata bridgeAdapterData
     ) private {
         // Prepare data to synchronize the Accounting Chain's state.
         // Include the message block number (and timestamp metadata) so the Accounting Chain can verify the chain
@@ -347,7 +347,7 @@ contract EarningChainGateway is
             burnIouTokenMessageEncoded,
             feePayer,
             gasLimit,
-            bridgeParamsEncoded
+            bridgeAdapterData
         );
     }
 }

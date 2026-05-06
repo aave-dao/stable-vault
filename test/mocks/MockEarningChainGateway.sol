@@ -17,14 +17,14 @@ contract MockEarningChainGateway is IEarningChainGateway {
 
     function getAggregatedBalance() external view returns (uint256) {}
 
-    function sendBalanceUpdateWithFeePayer(bytes calldata bridgeParamsEncoded) external payable {}
+    function sendBalanceUpdateWithFeePayer(bytes calldata bridgeAdapterData) external payable {}
 
     function pushFundsToAccountingChain(
         address asset,
         uint256 amount,
         address bridgeAdapter,
         uint256 gasLimit,
-        bytes calldata bridgeParamsEncoded
+        bytes calldata bridgeAdapterData
     ) external payable {}
 
     function exchangeIouTokens(
@@ -34,7 +34,7 @@ contract MockEarningChainGateway is IEarningChainGateway {
         address receiver,
         address bridgeAdapter,
         uint256 gasLimit,
-        bytes calldata bridgeParamsEncoded,
+        bytes calldata bridgeAdapterData,
         bytes memory withdrawalPolicyData
     ) external payable returns (uint256) {}
 
@@ -45,7 +45,7 @@ contract MockEarningChainGateway is IEarningChainGateway {
         address bridgeAdapter,
         address feePayer,
         uint256 gasLimit,
-        bytes calldata bridgeParamsEncoded
+        bytes calldata bridgeAdapterData
     ) external payable {}
 
     function addBridgeAdapter(address asset, uint256 chainId, address bridgeAdapter) external {}
@@ -68,7 +68,7 @@ contract MockEarningChainGateway is IEarningChainGateway {
         address bridgeAdapter,
         address feePayer,
         uint256 gasLimit,
-        bytes calldata bridgeParamsEncoded
+        bytes calldata bridgeAdapterData
     ) external payable {}
 
     function bridgeIouTokens(
