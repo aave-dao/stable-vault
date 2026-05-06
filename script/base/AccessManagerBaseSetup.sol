@@ -138,6 +138,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         _setupTarget__WithdrawalPolicy(deployer);
         _setupTarget__AssetRegistry(deployer);
         _setupTarget__PriceOracle(deployer);
+        _setupTarget__SlippageCoverageVault(deployer);
         _setupTarget__ATokenVaults();
     }
 
@@ -390,6 +391,24 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         roles[0] = RolesConfig.getRole__setOracleAdapterForAsset();
 
         _setTargetFunctionRoles(priceOracle, roles);
+    }
+
+    function _setupTarget__SlippageCoverageVault(address deployer) internal {
+        address slippageCoverageVault = getSlippageCoverageVaultAddress(deployer);
+
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](9);
+
+        roles[0] = RolesConfig.getRole__setOverrideMode();
+        roles[1] = RolesConfig.getRole__raisePullCapPerTx();
+        roles[2] = RolesConfig.getRole__lowerPullCapPerTx();
+        roles[3] = RolesConfig.getRole__raiseWindowCap();
+        roles[4] = RolesConfig.getRole__lowerWindowCap();
+        roles[5] = RolesConfig.getRole__setMaxSlippageBps();
+        roles[6] = RolesConfig.getRole__setOverrideMaxSlippageBps();
+        roles[7] = RolesConfig.getRole__fundCoverage();
+        roles[8] = RolesConfig.getRole__sweepSlippageCoverageVault();
+
+        _setTargetFunctionRoles(slippageCoverageVault, roles);
     }
 
     function _setupTarget__ATokenVaults() internal {

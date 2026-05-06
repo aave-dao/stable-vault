@@ -23,6 +23,10 @@
     "defaultFeeBps": 625,
     "signer": "0x2F87296892feD4AEE35D02eA71B3d04A5Be151a0"
   },
+  "slippageCoverageVault": {
+    "maxSlippageBps": "100",
+    "overrideMaxSlippageBps": "5000"
+  },
   "earningChain": {
     "chainId": 1,
     "ccipSelector": "5009297550715157269",
