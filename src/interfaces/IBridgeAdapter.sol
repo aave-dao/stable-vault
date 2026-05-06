@@ -46,13 +46,13 @@ interface IBridgeAdapter {
     /// @param messageData Data decoded and handled by the destination gateway.
     /// @param feePayer Address that will pay the bridge fee.
     /// @param payloadExecutionGasLimit Gas limit for the destination gateway call and everything it executes.
-    /// @param bridgeParamsEncoded ABI-encoded bridge parameters blob for the adapter to decode.
+    /// @param bridgeAdapterData Any bridge adapter custom parameters that it may need to operate.
     function publishDataOnlyMessage(
         uint256 destinationChainId,
         bytes memory messageData,
         address feePayer,
         uint256 payloadExecutionGasLimit,
-        bytes memory bridgeParamsEncoded
+        bytes memory bridgeAdapterData
     ) external payable;
 
     /// @notice Sends funds, optionally with message data, to a destination chain.
@@ -63,7 +63,7 @@ interface IBridgeAdapter {
     /// @param feePayer Address that will pay the bridge fee.
     /// @param receiverExecutionGasLimit Gas limit for destination receiver execution. This includes adapter receive
     /// logic, token handling, and the gateway call, but excludes bridge provider infrastructure.
-    /// @param bridgeParamsEncoded ABI-encoded bridge parameters blob for the adapter to decode.
+    /// @param bridgeAdapterData Any bridge adapter custom parameters that it may need to operate.
     function publishMessageWithFunds(
         uint256 destinationChainId,
         address asset,
@@ -71,6 +71,6 @@ interface IBridgeAdapter {
         bytes memory messageData,
         address feePayer,
         uint256 receiverExecutionGasLimit,
-        bytes memory bridgeParamsEncoded
+        bytes memory bridgeAdapterData
     ) external payable;
 }

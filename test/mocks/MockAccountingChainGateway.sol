@@ -22,11 +22,11 @@ contract MockAccountingChainGateway is IAccountingChainGateway {
         uint256 targetChainId,
         address bridgeAdapter,
         address feePayer,
-        uint256 gasLimit,
-        bytes calldata bridgeParamsEncoded
+        uint256 receiverExecutionGasLimit,
+        bytes calldata bridgeAdapterData
     ) external payable {
         IBridgeAdapter(bridgeAdapter).publishMessageWithFunds{value: msg.value}(
-            targetChainId, asset, amount, "", feePayer, gasLimit, bridgeParamsEncoded
+            targetChainId, asset, amount, "", feePayer, receiverExecutionGasLimit, bridgeAdapterData
         );
     }
 
@@ -50,6 +50,6 @@ contract MockAccountingChainGateway is IAccountingChainGateway {
         address bridgeAdapter,
         address feePayer,
         uint256 gasLimit,
-        bytes calldata bridgeParamsEncoded
+        bytes calldata bridgeAdapterData
     ) external payable {}
 }

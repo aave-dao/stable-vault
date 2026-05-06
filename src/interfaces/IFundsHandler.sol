@@ -64,14 +64,14 @@ interface IFundsHandler {
     /// @param bridgeAdapter The whitelisted bridge adapter to use for bridging the asset.
     /// @param receiverExecutionGasLimit Gas limit for destination receiver execution. This includes adapter receive
     /// logic, token handling, and the gateway call, but excludes bridge provider infrastructure.
-    /// @param bridgeParamsEncoded Opaque bridge parameters blob consumed by the adapter.
+    /// @param bridgeAdapterData Any bridge adapter custom parameters that it may need to operate.
     function pushFundsToChain(
         address asset,
         uint256 amount,
         uint256 chainId,
         address bridgeAdapter,
         uint256 receiverExecutionGasLimit,
-        bytes calldata bridgeParamsEncoded
+        bytes calldata bridgeAdapterData
     ) external payable;
 
     /// @notice Callback function for when funds arrive from a chain.

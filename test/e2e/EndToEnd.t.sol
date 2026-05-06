@@ -7,9 +7,9 @@ import {IERC20} from "forge-std/interfaces/IERC20.sol";
 import {IERC4626} from "forge-std/interfaces/IERC4626.sol";
 import {Logger} from "test/helpers/Logger.sol";
 
-import {BridgeParamsCodec} from "src/bridging/BridgeParamsCodec.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
+import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {Swapper} from "src/periphery/Swapper.sol";
@@ -145,9 +145,9 @@ contract EndToEndTest is BaseTest {
                 EARNING_CHAIN_ID,
                 address(ccipAdapter_accountingChain),
                 DEFAULT_GAS_LIMIT,
-                BridgeParamsCodec.encode(
-                    BridgeParamsCodec.BridgeParams({
-                        feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
+                abi.encode(
+                    ICcipBridgeAdapter.CcipFeeParams({
+                        feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                     })
                 )
             );
@@ -292,9 +292,10 @@ contract EndToEndTest is BaseTest {
             vm.deal(everyRoleAccount, bridgeFeeAmount);
 
             {
-                bytes memory bp = BridgeParamsCodec.encode(
-                    BridgeParamsCodec.BridgeParams({
-                        feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
+
+                bytes memory bp = abi.encode(
+                    ICcipBridgeAdapter.CcipFeeParams({
+                        feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                     })
                 );
                 earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
@@ -454,9 +455,10 @@ contract EndToEndTest is BaseTest {
             vm.prank(everyRoleAccount);
             vm.deal(everyRoleAccount, bridgeFeeAmount);
             {
-                bytes memory bp = BridgeParamsCodec.encode(
-                    BridgeParamsCodec.BridgeParams({
-                        feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
+
+                bytes memory bp = abi.encode(
+                    ICcipBridgeAdapter.CcipFeeParams({
+                        feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                     })
                 );
                 earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(

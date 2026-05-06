@@ -37,7 +37,7 @@ import {MockGateway} from "test/mocks/MockGateway.sol";
 /// CCIP as receiverExecutionGasLimit.
 contract BurnIouTokenGasTest is BaseTest {
     string internal NAMESPACE = "BurnIouToken";
-    uint256 internal constant DATA_ONLY_RECEIVE_GAS_OVERHEAD = 15_000;
+    uint256 internal constant DATA_ONLY_RECEIVE_GAS_OVERHEAD = 30_000;
     uint256 internal constant ENFORCED_BURN_IOU_TOKEN_PAYLOAD_EXECUTION_GAS_LIMIT = 120_000;
 
     // keccak256(abi.encode(uint256(keccak256("aave.storage.IouTokenManager")) - 1)) & ~bytes32(uint256(0xff))
