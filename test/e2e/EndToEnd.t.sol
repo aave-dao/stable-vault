@@ -13,6 +13,7 @@ import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {Swapper} from "src/periphery/Swapper.sol";
+import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
 import {BaseTest} from "test/BaseTest.t.sol";
@@ -146,7 +147,7 @@ contract EndToEndTest is BaseTest {
                 DEFAULT_GAS_LIMIT,
                 BridgeParamsCodec.encode(
                     BridgeParamsCodec.BridgeParams({
-                        feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
+                        feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
                     })
                 )
             );
@@ -289,10 +290,11 @@ contract EndToEndTest is BaseTest {
             userEarningsInGho = userEarningsInRay.rayToAssetDecimals(address(GHO));
             vm.prank(everyRoleAccount);
             vm.deal(everyRoleAccount, bridgeFeeAmount);
+
             {
                 bytes memory bp = BridgeParamsCodec.encode(
                     BridgeParamsCodec.BridgeParams({
-                        feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
+                        feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
                     })
                 );
                 earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
@@ -454,7 +456,7 @@ contract EndToEndTest is BaseTest {
             {
                 bytes memory bp = BridgeParamsCodec.encode(
                     BridgeParamsCodec.BridgeParams({
-                        feeToken: address(0), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
+                        feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
                     })
                 );
                 earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(

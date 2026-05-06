@@ -26,7 +26,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         /// @dev Set of adapters whitelisted for usage.
         /// @dev An adapter whitelisted for a token is assumed to also be trusted to ingest data sent along with the
         /// token.
-        /// @dev asset == address(0) for data-only bridging.
+        /// @dev asset == `address(0xDA7ada7aDA7ADA7ADA7AdA7aDA7aDA7ADA7adA7a)` for data-only bridging.
         mapping(address asset => mapping(uint256 chainId => mapping(address bridgeAdapter => bool)))
             supportedBridgeAdapters;
     }

@@ -17,6 +17,7 @@ import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
+import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
@@ -371,7 +372,7 @@ contract FundsHandlerTest is TestWithHelpers {
         vm.deal(address(unauthorizedMsgSender), bridgeParams_feeAmount);
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             BridgeParamsCodec.BridgeParams({
-                feeToken: address(0), feeAmount: bridgeParams_feeAmount, feeRefundThreshold: 0, data: ""
+                feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeParams_feeAmount, feeRefundThreshold: 0, data: ""
             })
         );
 
@@ -418,7 +419,7 @@ contract FundsHandlerTest is TestWithHelpers {
 
         bytes memory bridgeParams = BridgeParamsCodec.encode(
             BridgeParamsCodec.BridgeParams({
-                feeToken: address(0), feeAmount: bridgeParams_feeAmount, feeRefundThreshold: 0, data: ""
+                feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeParams_feeAmount, feeRefundThreshold: 0, data: ""
             })
         );
 
