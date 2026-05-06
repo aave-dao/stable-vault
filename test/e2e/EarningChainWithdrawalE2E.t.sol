@@ -108,7 +108,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             address(ccipAdapter_accountingChain),
             DEFAULT_GAS_LIMIT,
             abi.encode(
-                ICcipBridgeAdapter.AdapterData({
+                ICcipBridgeAdapter.CcipFeeParams({
                     feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
             )
@@ -188,7 +188,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             address(ccipAdapter_accountingChain),
             DEFAULT_GAS_LIMIT,
             abi.encode(
-                ICcipBridgeAdapter.AdapterData({
+                ICcipBridgeAdapter.CcipFeeParams({
                     feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
             )
@@ -270,7 +270,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         {
 
             bytes memory bp = abi.encode(
-                ICcipBridgeAdapter.AdapterData({
+                ICcipBridgeAdapter.CcipFeeParams({
                     feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
             );
@@ -299,7 +299,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         {
 
             bytes memory bp = abi.encode(
-                ICcipBridgeAdapter.AdapterData({
+                ICcipBridgeAdapter.CcipFeeParams({
                     feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
             );
@@ -355,7 +355,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             // struct will be pushed to the FH storage.
             DEFAULT_GAS_LIMIT,
             abi.encode(
-                ICcipBridgeAdapter.AdapterData({
+                ICcipBridgeAdapter.CcipFeeParams({
                     feeToken: Constants.NATIVE_CURRENCY, feeAmount: 1, feeRefundThreshold: 0
                 })
             ),

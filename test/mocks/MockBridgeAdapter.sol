@@ -32,19 +32,19 @@ contract MockBridgeAdapter is IBridgeAdapter {
         bytes memory data,
         address feePayer,
         uint256 gasLimit,
-        bytes memory adapterData
+        bytes memory bridgeAdapterData
     ) external payable override {
         (destinationChainId, data, gasLimit);
-        ICcipBridgeAdapter.AdapterData memory ccipAdapterData =
-            abi.decode(adapterData, (ICcipBridgeAdapter.AdapterData));
+        ICcipBridgeAdapter.CcipFeeParams memory ccipFeeParams =
+            abi.decode(bridgeAdapterData, (ICcipBridgeAdapter.CcipFeeParams));
 
         // Mirror CcipAdapter: adapter pulls fee directly from feePayer (no TransferHelper round-trip).
-        if (ccipAdapterData.feeToken == Constants.NATIVE_CURRENCY) {
-            require(msg.value == ccipAdapterData.feeAmount, Errors.InsufficientFunds());
+        if (ccipFeeParams.feeToken == Constants.NATIVE_CURRENCY) {
+            require(msg.value == ccipFeeParams.feeAmount, Errors.InsufficientFunds());
         } else {
             require(msg.value == 0, Errors.InvalidParameter());
-            if (ccipAdapterData.feeAmount > 0) {
-                IERC20(ccipAdapterData.feeToken).safeTransferFrom(feePayer, address(this), ccipAdapterData.feeAmount);
+            if (ccipFeeParams.feeAmount > 0) {
+                IERC20(ccipFeeParams.feeToken).safeTransferFrom(feePayer, address(this), ccipFeeParams.feeAmount);
             }
         }
 

@@ -36,6 +36,6 @@ interface IAccountingChainGateway is IChainGateway {
         address bridgeAdapter,
         address feePayer,
         uint256 gasLimit,
-        bytes calldata adapterData
+        bytes calldata bridgeAdapterData
     ) external payable;
 }

@@ -68,7 +68,7 @@ contract MockFundsHandler is IFundsHandler {
         uint256 chainId,
         address bridgeAdapter,
         uint256 gasLimit,
-        bytes calldata adapterData
+        bytes calldata bridgeAdapterData
     ) external payable override {}
 
     function fundsArrivedFromChainCallback(address asset, uint256 amount) external override {}

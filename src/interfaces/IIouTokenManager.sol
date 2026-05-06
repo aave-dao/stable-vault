@@ -47,14 +47,14 @@ interface IIouTokenManager {
     /// @param bridgeAdapter The whitelisted bridge adapter to use for the message.
     /// @param gasLimit Gas limit that should be allocated for execution of the message on the destination chain,
     /// without considering the bridge adapter overhead.
-    /// @param adapterData Adapter-specific data blob forwarded untouched to the adapter.
+    /// @param bridgeAdapterData Any bridge adapter custom parameters that it may need to operate.
     function bridgeTokens(
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
         address bridgeAdapter,
         uint256 gasLimit,
-        bytes calldata adapterData
+        bytes calldata bridgeAdapterData
     ) external payable;
 
     /// @notice Mints tokens to the specified address (assumes this contract has mint privileges on the IOU token).

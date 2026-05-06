@@ -112,10 +112,10 @@ contract CcipAdapter is
         bytes memory data,
         address feePayer,
         uint256 gasLimit,
-        bytes memory adapterData
+        bytes memory bridgeAdapterData
     ) external payable override(BaseBridgeAdapter, IBridgeAdapter) onlyGateway {
-        ICcipBridgeAdapter.AdapterData memory ccipAdapterData =
-            abi.decode(adapterData, (ICcipBridgeAdapter.AdapterData));
+        ICcipBridgeAdapter.CcipFeeParams memory ccipFeeParams =
+            abi.decode(bridgeAdapterData, (ICcipBridgeAdapter.CcipFeeParams));
 
         address destinationChainAdapter = _destinationChainAdapterOf[destinationChainId];
         require(destinationChainAdapter != address(0), Errors.InvalidParameter());
@@ -132,9 +132,9 @@ contract CcipAdapter is
             receiver: abi.encode(destinationChainAdapter),
             data: data,
             tokenAmounts: tokenAmounts,
-            feeToken: ccipAdapterData.feeToken == Constants.NATIVE_CURRENCY
+            feeToken: ccipFeeParams.feeToken == Constants.NATIVE_CURRENCY
                 ? CCIP_NATIVE_FEE_TOKEN
-                : ccipAdapterData.feeToken,
+                : ccipFeeParams.feeToken,
             extraArgs: Client._argsToBytes(
                 // We pass the input gasLimit, the IRouterClient::getFee will add on top any bridge adapter overhead.
                 Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: true})
@@ -143,28 +143,28 @@ contract CcipAdapter is
 
         uint64 chainSelector = _chainSelectorOf[destinationChainId];
         uint256 estimatedFeeAmount = IRouterClient(CCIP_ROUTER).getFee(chainSelector, ccipMessage);
-        require(ccipAdapterData.feeAmount >= estimatedFeeAmount, Errors.InsufficientFunds());
+        require(ccipFeeParams.feeAmount >= estimatedFeeAmount, Errors.InsufficientFunds());
 
-        if (ccipAdapterData.feeToken == Constants.NATIVE_CURRENCY) {
-            require(msg.value == ccipAdapterData.feeAmount, Errors.InsufficientFunds());
+        if (ccipFeeParams.feeToken == Constants.NATIVE_CURRENCY) {
+            require(msg.value == ccipFeeParams.feeAmount, Errors.InsufficientFunds());
         } else {
             // Reject msg.value to prevent accidental native loss; bridges are not expected to require both native
             // and ERC-20 fees simultaneously.
             require(msg.value == 0, Errors.InvalidParameter());
-            if (ccipAdapterData.feeAmount > 0) {
-                IERC20(ccipAdapterData.feeToken).safeTransferFrom(feePayer, address(this), ccipAdapterData.feeAmount);
+            if (ccipFeeParams.feeAmount > 0) {
+                IERC20(ccipFeeParams.feeToken).safeTransferFrom(feePayer, address(this), ccipFeeParams.feeAmount);
             }
         }
 
-        _pullAssetFromTransferHelperAndApproveCcipRouter(asset, amount, ccipAdapterData.feeToken, estimatedFeeAmount);
+        _pullAssetFromTransferHelperAndApproveCcipRouter(asset, amount, ccipFeeParams.feeToken, estimatedFeeAmount);
 
         _sendMessageWithFeePayer(
             chainSelector,
             ccipMessage,
             feePayer,
-            ccipAdapterData.feeToken,
-            ccipAdapterData.feeAmount,
-            ccipAdapterData.feeRefundThreshold,
+            ccipFeeParams.feeToken,
+            ccipFeeParams.feeAmount,
+            ccipFeeParams.feeRefundThreshold,
             estimatedFeeAmount
         );
     }

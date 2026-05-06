@@ -365,14 +365,14 @@ contract FundsHandlerTest is TestWithHelpers {
         address asset,
         uint256 amount,
         uint256 chainId,
-        uint256 adapterData_feeAmount,
-        uint256 adapterData_gasLimit
+        uint256 bridgeAdapterData_feeAmount,
+        uint256 bridgeAdapterData_gasLimit
     ) public {
-        adapterData_feeAmount = _boundNativeAmount(adapterData_feeAmount);
-        vm.deal(address(unauthorizedMsgSender), adapterData_feeAmount);
-        bytes memory adapterData = abi.encode(
-            ICcipBridgeAdapter.AdapterData({
-                feeToken: Constants.NATIVE_CURRENCY, feeAmount: adapterData_feeAmount, feeRefundThreshold: 0
+        bridgeAdapterData_feeAmount = _boundNativeAmount(bridgeAdapterData_feeAmount);
+        vm.deal(address(unauthorizedMsgSender), bridgeAdapterData_feeAmount);
+        bytes memory bridgeAdapterData = abi.encode(
+            ICcipBridgeAdapter.CcipFeeParams({
+                feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeAdapterData_feeAmount, feeRefundThreshold: 0
             })
         );
 
@@ -392,7 +392,7 @@ contract FundsHandlerTest is TestWithHelpers {
         );
         vm.prank(unauthorizedMsgSender);
         fundsHandler.pushFundsToChain(
-            asset, amount, chainId, makeAddr("bridgeAdapter"), adapterData_gasLimit, adapterData
+            asset, amount, chainId, makeAddr("bridgeAdapter"), bridgeAdapterData_gasLimit, bridgeAdapterData
         );
     }
 
@@ -407,43 +407,43 @@ contract FundsHandlerTest is TestWithHelpers {
 
     function test_pushFundsToChain_reverts_ifAmountIsZero(
         uint256 chainId,
-        uint256 adapterData_feeAmount,
-        uint256 adapterData_gasLimit
+        uint256 bridgeAdapterData_feeAmount,
+        uint256 bridgeAdapterData_gasLimit
     ) public {
         vm.assume(chainId != block.chainid);
         vm.prank(ADMIN);
         fundsHandler.addEarningChain(chainId);
 
-        adapterData_feeAmount = _boundNativeAmount(adapterData_feeAmount);
-        vm.deal(address(this), adapterData_feeAmount);
+        bridgeAdapterData_feeAmount = _boundNativeAmount(bridgeAdapterData_feeAmount);
+        vm.deal(address(this), bridgeAdapterData_feeAmount);
 
-        bytes memory adapterData = abi.encode(
-            ICcipBridgeAdapter.AdapterData({
-                feeToken: Constants.NATIVE_CURRENCY, feeAmount: adapterData_feeAmount, feeRefundThreshold: 0
+        bytes memory bridgeAdapterData = abi.encode(
+            ICcipBridgeAdapter.CcipFeeParams({
+                feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeAdapterData_feeAmount, feeRefundThreshold: 0
             })
         );
 
         vm.expectRevert(abi.encodeWithSelector(Errors.ZeroAmount.selector));
-        fundsHandler.pushFundsToChain{value: adapterData_feeAmount}(
-            address(mockAsset), 0, chainId, makeAddr("bridgeAdapter"), adapterData_gasLimit, adapterData
+        fundsHandler.pushFundsToChain{value: bridgeAdapterData_feeAmount}(
+            address(mockAsset), 0, chainId, makeAddr("bridgeAdapter"), bridgeAdapterData_gasLimit, bridgeAdapterData
         );
     }
 
     function test_pushFundsToChain_reverts_ifTransferHelperBalanceIsNotFullyConsumed_amountAssetSameAsFeeToken(
         uint256 amount,
         uint256 chainId,
-        uint256 adapterData_feeAmount,
-        uint256 adapterData_gasLimit
+        uint256 bridgeAdapterData_feeAmount,
+        uint256 bridgeAdapterData_gasLimit
     ) public {
         vm.assume(chainId != block.chainid);
         vm.prank(ADMIN);
         fundsHandler.addEarningChain(chainId);
         amount = _boundAssetAmount(address(mockAsset), amount);
-        adapterData_feeAmount = _boundAssetAmount(address(mockAsset), adapterData_feeAmount);
+        bridgeAdapterData_feeAmount = _boundAssetAmount(address(mockAsset), bridgeAdapterData_feeAmount);
 
-        bytes memory adapterData = abi.encode(
-            ICcipBridgeAdapter.AdapterData({
-                feeToken: address(mockAsset), feeAmount: adapterData_feeAmount, feeRefundThreshold: 0
+        bytes memory bridgeAdapterData = abi.encode(
+            ICcipBridgeAdapter.CcipFeeParams({
+                feeToken: address(mockAsset), feeAmount: bridgeAdapterData_feeAmount, feeRefundThreshold: 0
             })
         );
 
@@ -461,7 +461,12 @@ contract FundsHandlerTest is TestWithHelpers {
             abi.encodeWithSelector(TransferHelperClient.TransferHelperBalanceNotConsumed.selector, address(mockAsset))
         );
         fundsHandler.pushFundsToChain(
-            address(mockAsset), amount, chainId, address(mockBridgeAdapter), adapterData_gasLimit, adapterData
+            address(mockAsset),
+            amount,
+            chainId,
+            address(mockBridgeAdapter),
+            bridgeAdapterData_gasLimit,
+            bridgeAdapterData
         );
     }
 
@@ -470,19 +475,19 @@ contract FundsHandlerTest is TestWithHelpers {
         uint256 chainId,
         bytes32 feeTokenSalt,
         uint8 feeTokenDecimals,
-        uint256 adapterData_feeAmount,
-        uint256 adapterData_gasLimit
+        uint256 bridgeAdapterData_feeAmount,
+        uint256 bridgeAdapterData_gasLimit
     ) public {
         vm.assume(chainId != block.chainid);
         vm.prank(ADMIN);
         fundsHandler.addEarningChain(chainId);
         address feeToken = _deployAssetWithSalt(feeTokenSalt, feeTokenDecimals);
         amount = _boundAssetAmount(address(mockAsset), amount);
-        adapterData_feeAmount = _boundAssetAmount(feeToken, adapterData_feeAmount);
+        bridgeAdapterData_feeAmount = _boundAssetAmount(feeToken, bridgeAdapterData_feeAmount);
 
-        bytes memory adapterData = abi.encode(
-            ICcipBridgeAdapter.AdapterData({
-                feeToken: feeToken, feeAmount: adapterData_feeAmount, feeRefundThreshold: 0
+        bytes memory bridgeAdapterData = abi.encode(
+            ICcipBridgeAdapter.CcipFeeParams({
+                feeToken: feeToken, feeAmount: bridgeAdapterData_feeAmount, feeRefundThreshold: 0
             })
         );
 
@@ -500,7 +505,12 @@ contract FundsHandlerTest is TestWithHelpers {
             abi.encodeWithSelector(TransferHelperClient.TransferHelperBalanceNotConsumed.selector, address(mockAsset))
         );
         fundsHandler.pushFundsToChain(
-            address(mockAsset), amount, chainId, address(mockBridgeAdapter), adapterData_gasLimit, adapterData
+            address(mockAsset),
+            amount,
+            chainId,
+            address(mockBridgeAdapter),
+            bridgeAdapterData_gasLimit,
+            bridgeAdapterData
         );
     }
 
@@ -511,21 +521,21 @@ contract FundsHandlerTest is TestWithHelpers {
     function test_pushFundsToChain_forgedFeePayer_withoutApproval_revertsWithErc20(
         uint256 amount,
         uint256 chainId,
-        uint256 adapterData_feeAmount,
-        uint256 adapterData_gasLimit
+        uint256 bridgeAdapterData_feeAmount,
+        uint256 bridgeAdapterData_gasLimit
     ) public {
         vm.assume(chainId != block.chainid);
         vm.prank(ADMIN);
         fundsHandler.addEarningChain(chainId);
         amount = _boundAssetAmount(address(mockAsset), amount);
-        adapterData_feeAmount = _boundAssetAmount(address(mockAsset), adapterData_feeAmount);
-        vm.assume(adapterData_feeAmount > 0);
+        bridgeAdapterData_feeAmount = _boundAssetAmount(address(mockAsset), bridgeAdapterData_feeAmount);
+        vm.assume(bridgeAdapterData_feeAmount > 0);
         address unauthorizedFeePayer = makeAddr("unauthorizedFeePayer");
-        mockAsset.mint(unauthorizedFeePayer, adapterData_feeAmount);
+        mockAsset.mint(unauthorizedFeePayer, bridgeAdapterData_feeAmount);
 
-        bytes memory adapterData = abi.encode(
-            ICcipBridgeAdapter.AdapterData({
-                feeToken: address(mockAsset), feeAmount: adapterData_feeAmount, feeRefundThreshold: 0
+        bytes memory bridgeAdapterData = abi.encode(
+            ICcipBridgeAdapter.CcipFeeParams({
+                feeToken: address(mockAsset), feeAmount: bridgeAdapterData_feeAmount, feeRefundThreshold: 0
             })
         );
 
@@ -535,36 +545,46 @@ contract FundsHandlerTest is TestWithHelpers {
         // ERC20 allowance semantics reject the forged feePayer — they never approved the adapter.
         vm.expectRevert();
         fundsHandler.pushFundsToChain(
-            address(mockAsset), amount, chainId, address(mockBridgeAdapter), adapterData_gasLimit, adapterData
+            address(mockAsset),
+            amount,
+            chainId,
+            address(mockBridgeAdapter),
+            bridgeAdapterData_gasLimit,
+            bridgeAdapterData
         );
     }
 
     function test_pushFundsToChain_reverts_ifDestinationChainIdNotAddedAsEarningChain(
         uint256 amount,
         uint256 chainId,
-        uint256 adapterData_feeAmount,
-        uint256 adapterData_gasLimit
+        uint256 bridgeAdapterData_feeAmount,
+        uint256 bridgeAdapterData_gasLimit
     ) public {
         amount = _boundAssetAmount(address(mockAsset), amount);
-        adapterData_feeAmount = _boundAssetAmount(address(mockAsset), adapterData_feeAmount);
+        bridgeAdapterData_feeAmount = _boundAssetAmount(address(mockAsset), bridgeAdapterData_feeAmount);
 
-        bytes memory adapterData = abi.encode(
-            ICcipBridgeAdapter.AdapterData({
-                feeToken: address(mockAsset), feeAmount: adapterData_feeAmount, feeRefundThreshold: 0
+        bytes memory bridgeAdapterData = abi.encode(
+            ICcipBridgeAdapter.CcipFeeParams({
+                feeToken: address(mockAsset), feeAmount: bridgeAdapterData_feeAmount, feeRefundThreshold: 0
             })
         );
 
         vm.expectRevert(abi.encodeWithSelector(Errors.InvalidDestinationChainId.selector));
         fundsHandler.pushFundsToChain(
-            address(mockAsset), amount, chainId, address(mockBridgeAdapter), adapterData_gasLimit, adapterData
+            address(mockAsset),
+            amount,
+            chainId,
+            address(mockBridgeAdapter),
+            bridgeAdapterData_gasLimit,
+            bridgeAdapterData
         );
     }
 
     function test_pushFundsToChain_callsGatewaySendPushFundsMessage(
         uint256 amount,
         uint256 chainId,
-        uint256 adapterData_feeAmount,
-        uint256 adapterData_gasLimit
+        uint256 bridgeAdapterData_feeAmount,
+        uint256 bridgeAdapterData_gasLimit
     ) public {
         vm.assume(chainId != block.chainid);
 
@@ -572,15 +592,15 @@ contract FundsHandlerTest is TestWithHelpers {
         fundsHandler.addEarningChain(chainId);
 
         amount = _boundAssetAmount(address(mockAsset), amount);
-        adapterData_feeAmount = _boundAssetAmount(address(mockAsset), adapterData_feeAmount);
-        mockAsset.mint(address(this), adapterData_feeAmount);
+        bridgeAdapterData_feeAmount = _boundAssetAmount(address(mockAsset), bridgeAdapterData_feeAmount);
+        mockAsset.mint(address(this), bridgeAdapterData_feeAmount);
         // The adapter (not the gateway) is the contract that does safeTransferFrom on the fee
         // token; approval must be set on the adapter to mirror the source flow.
-        mockAsset.forceApprove(address(mockBridgeAdapter), adapterData_feeAmount);
+        mockAsset.forceApprove(address(mockBridgeAdapter), bridgeAdapterData_feeAmount);
 
-        bytes memory adapterData = abi.encode(
-            ICcipBridgeAdapter.AdapterData({
-                feeToken: address(mockAsset), feeAmount: adapterData_feeAmount, feeRefundThreshold: 0
+        bytes memory bridgeAdapterData = abi.encode(
+            ICcipBridgeAdapter.CcipFeeParams({
+                feeToken: address(mockAsset), feeAmount: bridgeAdapterData_feeAmount, feeRefundThreshold: 0
             })
         );
 
@@ -597,13 +617,18 @@ contract FundsHandlerTest is TestWithHelpers {
                     chainId,
                     address(mockBridgeAdapter),
                     address(this),
-                    adapterData_gasLimit,
-                    adapterData
+                    bridgeAdapterData_gasLimit,
+                    bridgeAdapterData
                 )
             )
         );
         fundsHandler.pushFundsToChain(
-            address(mockAsset), amount, chainId, address(mockBridgeAdapter), adapterData_gasLimit, adapterData
+            address(mockAsset),
+            amount,
+            chainId,
+            address(mockBridgeAdapter),
+            bridgeAdapterData_gasLimit,
+            bridgeAdapterData
         );
     }
 

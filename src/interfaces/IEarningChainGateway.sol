@@ -23,13 +23,13 @@ interface IEarningChainGateway is IChainGateway {
     /// @param bridgeAdapter The whitelisted bridge adapter to use for bridging the asset.
     /// @param gasLimit Gas limit that should be allocated for execution of the message on the destination chain,
     /// without considering the bridge adapter overhead.
-    /// @param adapterData Adapter-specific data blob forwarded untouched to the adapter.
+    /// @param bridgeAdapterData Any bridge adapter custom parameters that it may need to operate.
     function pushFundsToAccountingChain(
         address asset,
         uint256 amount,
         address bridgeAdapter,
         uint256 gasLimit,
-        bytes calldata adapterData
+        bytes calldata bridgeAdapterData
     ) external payable;
 
     /// @notice Exchanges IOU tokens for a specific asset and bridges data back to the Accounting Chain.
@@ -40,7 +40,7 @@ interface IEarningChainGateway is IChainGateway {
     /// @param bridgeAdapter The whitelisted bridge adapter to use for the data-only message.
     /// @param gasLimit Gas limit that should be allocated for execution of the message on the destination chain,
     /// without considering the bridge adapter overhead.
-    /// @param adapterData Adapter-specific data blob forwarded untouched to the adapter.
+    /// @param bridgeAdapterData Any bridge adapter custom parameters that it may need to operate.
     /// @param withdrawalPolicyData Additional data for the withdrawal policy.
     /// @return amountOut The amount of the exchanged asset transferred to the receiver.
     function exchangeIouTokens(
@@ -50,7 +50,7 @@ interface IEarningChainGateway is IChainGateway {
         address receiver,
         address bridgeAdapter,
         uint256 gasLimit,
-        bytes calldata adapterData,
+        bytes calldata bridgeAdapterData,
         bytes memory withdrawalPolicyData
     ) external payable returns (uint256);
 }

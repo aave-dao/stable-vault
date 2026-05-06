@@ -109,7 +109,7 @@ interface IChainGateway {
     /// @param feePayer Address that will pay the bridge fee.
     /// @param gasLimit Gas limit that should be allocated for execution of the message on the destination chain,
     /// without considering the bridge adapter overhead.
-    /// @param adapterData Adapter-specific data blob forwarded untouched to the adapter.
+    /// @param bridgeAdapterData Any bridge adapter custom parameters that it may need to operate.
     function sendBridgeIouTokenMessageWithFeePayer(
         uint256 destinationChainId,
         address iouTokenRecipient,
@@ -117,6 +117,6 @@ interface IChainGateway {
         address bridgeAdapter,
         address feePayer,
         uint256 gasLimit,
-        bytes calldata adapterData
+        bytes calldata bridgeAdapterData
     ) external payable;
 }

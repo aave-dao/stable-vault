@@ -15,7 +15,7 @@ contract MockDummyIouTokenManager is IIouTokenManager {
         uint256 iouTokenAmountRay,
         address, // bridgeAdapter
         uint256, // gasLimit
-        bytes calldata // adapterData
+        bytes calldata // bridgeAdapterData
     )
         external
         payable

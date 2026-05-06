@@ -115,7 +115,7 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             address(ccipAdapter_accountingChain),
             DEFAULT_GAS_LIMIT,
             abi.encode(
-                ICcipBridgeAdapter.AdapterData({
+                ICcipBridgeAdapter.CcipFeeParams({
                     feeToken: address(bridgeFeeToken), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
             )
@@ -396,7 +396,7 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             bridgeAdapter,
             DEFAULT_GAS_LIMIT,
             abi.encode(
-                ICcipBridgeAdapter.AdapterData({
+                ICcipBridgeAdapter.CcipFeeParams({
                     feeToken: address(bridgeFeeToken), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
             )
@@ -418,7 +418,7 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             // snapshot struct may be pushed to the FH storage.
             DEFAULT_GAS_LIMIT,
             abi.encode(
-                ICcipBridgeAdapter.AdapterData({
+                ICcipBridgeAdapter.CcipFeeParams({
                     feeToken: address(bridgeFeeToken), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
             ),

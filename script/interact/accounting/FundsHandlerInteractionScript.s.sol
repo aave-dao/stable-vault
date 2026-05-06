@@ -21,15 +21,15 @@ contract FundsHandlerInteractionScript is AccountingChainBaseScript {
         address token = GHO;
         uint256 amount = 234 * 10 ** 18;
         uint256 chainId = 1;
-        ICcipBridgeAdapter.AdapterData memory adapterData =
-            ICcipBridgeAdapter.AdapterData({feeToken: LINK, feeAmount: 100000000000000000000, feeRefundThreshold: 0});
+        ICcipBridgeAdapter.CcipFeeParams memory bridgeAdapterData =
+            ICcipBridgeAdapter.CcipFeeParams({feeToken: LINK, feeAmount: 100000000000000000000, feeRefundThreshold: 0});
         uint256 gasLimit = 0; // TODO: Set the destination gas limit.
 
         uint256 key = vm.envUint("ADMIN_PRIVATE_KEY");
         vm.startBroadcast(key);
         address bridgeAdapter = address(0); // TODO: Set the whitelisted bridge adapter address.
         IFundsHandler(FUNDS_HANDLER)
-            .pushFundsToChain(token, amount, chainId, bridgeAdapter, gasLimit, abi.encode(adapterData));
+            .pushFundsToChain(token, amount, chainId, bridgeAdapter, gasLimit, abi.encode(bridgeAdapterData));
         vm.stopBroadcast();
     }
 }

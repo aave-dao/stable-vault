@@ -91,7 +91,7 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
             address(ccipAdapter_accountingChain),
             DEFAULT_GAS_LIMIT,
             abi.encode(
-                ICcipBridgeAdapter.AdapterData({
+                ICcipBridgeAdapter.CcipFeeParams({
                     feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
             )
@@ -138,7 +138,7 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
             address(ccipAdapter_accountingChain),
             DEFAULT_GAS_LIMIT,
             abi.encode(
-                ICcipBridgeAdapter.AdapterData({
+                ICcipBridgeAdapter.CcipFeeParams({
                     feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
             )
@@ -170,7 +170,7 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
             address(ccipAdapter_earningChain),
             DEFAULT_GAS_LIMIT,
             abi.encode(
-                ICcipBridgeAdapter.AdapterData({
+                ICcipBridgeAdapter.CcipFeeParams({
                     feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
             ),

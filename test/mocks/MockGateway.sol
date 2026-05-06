@@ -48,20 +48,20 @@ contract MockGateway is IChainGateway {
         address, /*bridgeAdapter*/
         address feePayer,
         uint256, /*gasLimit*/
-        bytes calldata adapterData
+        bytes calldata bridgeAdapterData
     ) external payable override {
-        ICcipBridgeAdapter.AdapterData memory ccipAdapterData =
-            abi.decode(adapterData, (ICcipBridgeAdapter.AdapterData));
-        if (ccipAdapterData.feeToken == Constants.NATIVE_CURRENCY) {
-            require(msg.value >= ccipAdapterData.feeAmount, Errors.InsufficientFunds());
+        ICcipBridgeAdapter.CcipFeeParams memory ccipFeeParams =
+            abi.decode(bridgeAdapterData, (ICcipBridgeAdapter.CcipFeeParams));
+        if (ccipFeeParams.feeToken == Constants.NATIVE_CURRENCY) {
+            require(msg.value >= ccipFeeParams.feeAmount, Errors.InsufficientFunds());
             if (msg.value > 0) {
                 (bool ok,) = _transferHelper.call{value: msg.value}("");
                 require(ok, Errors.NativeTransferFailed());
             }
         } else {
             require(msg.value == 0, Errors.InvalidParameter());
-            if (ccipAdapterData.feeAmount > 0) {
-                IERC20(ccipAdapterData.feeToken).safeTransferFrom(feePayer, _transferHelper, ccipAdapterData.feeAmount);
+            if (ccipFeeParams.feeAmount > 0) {
+                IERC20(ccipFeeParams.feeToken).safeTransferFrom(feePayer, _transferHelper, ccipFeeParams.feeAmount);
             }
         }
         _mockConsume();
