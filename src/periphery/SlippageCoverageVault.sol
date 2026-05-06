@@ -13,12 +13,10 @@ import {Errors} from "src/types/Errors.sol";
 
 /// @title SlippageCoverageVault
 /// @author Aave Labs
-/// @notice Holds coverage capital for rebalance-swap shortfalls. Coverage flows out only via `pullCoverage`, callable
-/// by the immutable bound `SLIPPAGE_RECIPIENT` (the Swapper). Outflows are push-based via `safeTransfer`; the vault
-/// never grants ERC-20 allowances. Per-tx and sliding-window caps bound a compromised manager's drain. Override mode,
-/// held by a role distinct from the rebalance manager, bypasses caps for emergency rebalances.
-/// @dev Non-upgradeable. The Swapper and the Vault are immutably cross-bound — any bug fix in either forces a paired
-/// redeploy of both, so a proxy on the Vault would buy nothing while expanding the trust surface.
+/// @notice Holds coverage capital for rebalance-swap shortfalls. Push-based outflows to the immutable bound Swapper,
+/// gated by per-tx + sliding-window caps. Override mode (separate role from the rebalancer) bypasses caps.
+/// @dev Non-upgradeable. The Swapper and Vault are immutably cross-bound, so a vault proxy would only expand the trust
+/// surface without buying anything.
 contract SlippageCoverageVault is AccessManaged, ReentrancyGuardTransient, ISlippageCoverageVault {
     using SafeERC20 for IERC20;
 

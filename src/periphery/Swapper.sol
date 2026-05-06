@@ -16,9 +16,8 @@ import {Errors} from "src/types/Errors.sol";
 /// @title Swapper
 /// @author Aave Labs
 /// @notice Swapper contract for executing swaps with slippage coverage and access control.
-/// @dev Coverage funds are pulled from the immutable bound `SLIPPAGE_VAULT` via `pullCoverage`. The vault enforces
-/// per-tx + sliding-window caps and bounds the manager's per-call slippage tolerance against governance-tunable
-/// `maxSlippageBps` (or `overrideMaxSlippageBps` in override mode).
+/// @dev Coverage is pulled from the immutable bound `SLIPPAGE_VAULT`, which also enforces caps and bounds the per-call
+/// `slippageToleranceBps` against `maxSlippageBps` (or `overrideMaxSlippageBps` in override mode).
 contract Swapper is Ownable, ReentrancyGuard, ISwapper {
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
@@ -48,17 +47,13 @@ contract Swapper is Ownable, ReentrancyGuard, ISwapper {
             abi.decode(data, (address[], bytes[], uint16));
         require(targets.length == callDatas.length, Errors.InvalidParameter());
 
-        // Hardening 2 (fail fast): slippage tolerance is bounded against governance-tunable bounds on the vault.
-        // Reads the vault's bounds before the target loop so a tolerance abuse reverts cheaply, regardless of what
-        // the loop does.
+        // Hardening 2: bound the slippage tolerance against vault config; read before the loop to fail fast.
         uint16 maxBps = ISlippageCoverageVault(SLIPPAGE_VAULT).getOverrideMode()
             ? ISlippageCoverageVault(SLIPPAGE_VAULT).getOverrideMaxSlippageBps()
             : ISlippageCoverageVault(SLIPPAGE_VAULT).getMaxSlippageBps();
         require(slippageToleranceBps <= maxBps, ISwapper.SlippageToleranceTooHigh());
 
-        // Hardening 1: targets cannot be the bound vault. Without this, manager could craft
-        // `targets[i] = vault, callDatas[i] = pullCoverage(...)` — msg.sender at the vault would be the Swapper
-        // (the bound recipient), so the loop would bypass the slippage cap entirely.
+        // Hardening 1: targets cannot be the bound vault, otherwise the loop could call `pullCoverage` directly.
         for (uint256 i = 0; i < targets.length; i++) {
             require(targets[i] != SLIPPAGE_VAULT, ISwapper.BadTarget());
             (bool callSucceeded,) = targets[i].call(callDatas[i]);
@@ -81,9 +76,8 @@ contract Swapper is Ownable, ReentrancyGuard, ISwapper {
             amountOut = expectedAmountOut;
         }
 
-        // Hardening 3: assetIn must be fully consumed by the call loop. Closes the assetIn-redirection attack —
-        // manager redirects `amountIn` to attacker EOA inside the loop while coverage funds `assetOut`; without this,
-        // the Allocator's 1:1 invariant on `assetOut` doesn't catch it.
+        // Hardening 3: assetIn must be fully consumed; closes the assetIn-redirection attack the Allocator's 1:1
+        // invariant on assetOut alone wouldn't catch.
         require(IERC20(assetIn).balanceOf(address(this)) == 0, ISwapper.AssetInLeftOver());
 
         // Approve funds to be pulled by the caller i.e. the owner of the Swapper.

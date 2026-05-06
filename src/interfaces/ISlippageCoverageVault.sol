@@ -5,9 +5,7 @@ pragma solidity ^0.8.22;
 /// @title ISlippageCoverageVault
 /// @author Aave Labs
 /// @notice Interface for the SlippageCoverageVault contract.
-/// @dev The vault holds coverage capital used to top up shortfalls during rebalance swaps. Coverage flows out only via
-/// `pullCoverage`, callable by the immutable bound `SLIPPAGE_RECIPIENT` (the Swapper). The vault never grants ERC-20
-/// allowances; outflows are push-based via `safeTransfer`.
+/// @dev Push-based outflows to the immutable `SLIPPAGE_RECIPIENT`; the vault never grants ERC-20 allowances.
 interface ISlippageCoverageVault {
     /// @notice Sliding-window cap state for an asset.
     /// @param windowStart Timestamp at which the current window started.
