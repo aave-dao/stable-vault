@@ -77,6 +77,8 @@ contract BaseTest is TestWithHelpers {
     uint64 internal constant EARNING_CHAIN_CCIP_SELECTOR = 20;
     uint256 internal constant CHAIN_BALANCE_ORACLE_HEARTBEAT_SECONDS = 3600;
     uint256 internal constant CHAIN_BALANCE_ORACLE_PUBLISH_BUFFER_SECONDS = 90;
+    uint256 internal constant DEFAULT_GAS_LIMIT = 300_000;
+    uint256 internal constant BURN_IOU_TOKEN_GAS_LIMIT = 120_000;
 
     // Transfer Helper
     address transferHelper_accountingChainAddress;

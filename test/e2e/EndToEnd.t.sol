@@ -144,13 +144,10 @@ contract EndToEndTest is BaseTest {
                 userInitialDeposit,
                 EARNING_CHAIN_ID,
                 address(ccipAdapter_accountingChain),
+                DEFAULT_GAS_LIMIT,
                 BridgeParamsCodec.encode(
-                    IBridgeAdapter.BridgeParams({
-                        feeToken: Constants.NATIVE_CURRENCY,
-                        feeAmount: bridgeFeeAmount,
-                        feeRefundThreshold: 0,
-                        gasLimit: 300000,
-                        data: ""
+                    BridgeParamsCodec.BridgeParams({
+                        feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
                     })
                 )
             );
@@ -293,20 +290,17 @@ contract EndToEndTest is BaseTest {
             userEarningsInGho = userEarningsInRay.rayToAssetDecimals(address(GHO));
             vm.prank(everyRoleAccount);
             vm.deal(everyRoleAccount, bridgeFeeAmount);
-            earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
-                address(GHO),
-                userEarningsInGho,
-                address(ccipAdapter_earningChain),
-                BridgeParamsCodec.encode(
-                    IBridgeAdapter.BridgeParams({
-                        feeToken: Constants.NATIVE_CURRENCY,
-                        feeAmount: bridgeFeeAmount,
-                        feeRefundThreshold: 0,
-                        gasLimit: 300000,
-                        data: ""
+
+            {
+                bytes memory bp = BridgeParamsCodec.encode(
+                    BridgeParamsCodec.BridgeParams({
+                        feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
                     })
-                )
-            );
+                );
+                earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
+                    address(GHO), userEarningsInGho, address(ccipAdapter_earningChain), DEFAULT_GAS_LIMIT, bp
+                );
+            }
 
             // Publish the post-return snapshot reflecting reduced Earning Chain balance after bridging back.
             uint256 remainingEarningChainBalanceRay = earningChainGateway.getAggregatedBalance();
@@ -461,16 +455,12 @@ contract EndToEndTest is BaseTest {
             vm.deal(everyRoleAccount, bridgeFeeAmount);
             {
                 bytes memory bp = BridgeParamsCodec.encode(
-                    IBridgeAdapter.BridgeParams({
-                        feeToken: Constants.NATIVE_CURRENCY,
-                        feeAmount: bridgeFeeAmount,
-                        feeRefundThreshold: 0,
-                        gasLimit: 300000,
-                        data: ""
+                    BridgeParamsCodec.BridgeParams({
+                        feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
                     })
                 );
                 earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
-                    address(GHO), ghoBalanceOnVaultLeft, address(ccipAdapter_earningChain), bp
+                    address(GHO), ghoBalanceOnVaultLeft, address(ccipAdapter_earningChain), DEFAULT_GAS_LIMIT, bp
                 );
             }
 

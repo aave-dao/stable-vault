@@ -89,13 +89,10 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
             userInitialDeposit,
             EARNING_CHAIN_ID,
             address(ccipAdapter_accountingChain),
+            DEFAULT_GAS_LIMIT,
             BridgeParamsCodec.encode(
-                IBridgeAdapter.BridgeParams({
-                    feeToken: Constants.NATIVE_CURRENCY,
-                    feeAmount: bridgeFeeAmount,
-                    feeRefundThreshold: 0,
-                    gasLimit: 300000,
-                    data: ""
+                BridgeParamsCodec.BridgeParams({
+                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
                 })
             )
         );
@@ -139,13 +136,10 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
             user1,
             iouAmountRequestedRay,
             address(ccipAdapter_accountingChain),
+            DEFAULT_GAS_LIMIT,
             BridgeParamsCodec.encode(
-                IBridgeAdapter.BridgeParams({
-                    feeToken: Constants.NATIVE_CURRENCY,
-                    feeAmount: bridgeFeeAmount,
-                    feeRefundThreshold: 0,
-                    gasLimit: 300000,
-                    data: ""
+                BridgeParamsCodec.BridgeParams({
+                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
                 })
             )
         );
@@ -174,13 +168,10 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
             0,
             user1,
             address(ccipAdapter_earningChain),
+            DEFAULT_GAS_LIMIT,
             BridgeParamsCodec.encode(
-                IBridgeAdapter.BridgeParams({
-                    feeToken: Constants.NATIVE_CURRENCY,
-                    feeAmount: bridgeFeeAmount,
-                    feeRefundThreshold: 0,
-                    gasLimit: 300000,
-                    data: ""
+                BridgeParamsCodec.BridgeParams({
+                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
                 })
             ),
             ""

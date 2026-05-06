@@ -14,6 +14,7 @@ contract MockDummyIouTokenManager is IIouTokenManager {
         address, // iouTokenRecipient
         uint256 iouTokenAmountRay,
         address, // bridgeAdapter
+        uint256, // gasLimit
         bytes calldata // bridgeParamsEncoded
     )
         external

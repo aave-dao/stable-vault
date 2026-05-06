@@ -63,13 +63,14 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
         uint256 targetChainId,
         address bridgeAdapter,
         address feePayer,
+        uint256 gasLimit,
         bytes calldata bridgeParamsEncoded
     ) external payable override onlyFundsHandler {
         // Block pushing funds to a chain whose balance oracle is stale, as the target chain's state is unknown and
         // may be unhealthy (e.g. chain or oracle infrastructure is down). Sending funds there risks locking assets or
         // DoSing withdrawals due to a lack of aggregated liquidity until the oracle staleness is resolved.
         require(!IChainBalanceOracle(CHAIN_BALANCE_ORACLE).getChainBalance(targetChainId).isStale, StaleChainBalance());
-        _sendCrossChainMessage(targetChainId, bridgeAdapter, asset, amount, "", feePayer, bridgeParamsEncoded);
+        _sendCrossChainMessage(targetChainId, bridgeAdapter, asset, amount, "", feePayer, gasLimit, bridgeParamsEncoded);
     }
 
     function _receiveData(uint256 sourceChainId, bytes memory data) internal override {
