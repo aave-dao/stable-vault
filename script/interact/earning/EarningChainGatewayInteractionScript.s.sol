@@ -4,7 +4,7 @@ pragma solidity ^0.8.22;
 
 import {EarningChainBaseScript} from "script/interact/earning/EarningChainBaseScript.s.sol";
 
-import {BridgeParamsCodec} from "src/bridging/BridgeParamsCodec.sol";
+import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
 
 /// @dev See example usage below:
@@ -20,15 +20,14 @@ contract EarningChainGatewayInteractionScript is EarningChainBaseScript {
     function pushFundsToAccountingChain() public {
         address asset = USDT;
         uint256 amount = 123 * 10 ** 6;
-        BridgeParamsCodec.BridgeParams memory bridgeParams = BridgeParamsCodec.BridgeParams({
-            feeToken: LINK, feeAmount: 100000000000000000000, feeRefundThreshold: 0, data: ""
-        });
+        ICcipBridgeAdapter.CcipFeeParams memory bridgeAdapterData =
+            ICcipBridgeAdapter.CcipFeeParams({feeToken: LINK, feeAmount: 100000000000000000000, feeRefundThreshold: 0});
         uint256 gasLimit = 0; // TODO: Set the destination gas limit.
 
         vm.startBroadcast(vm.envUint("ADMIN_PRIVATE_KEY"));
         address bridgeAdapter = address(0); // TODO: Set the whitelisted bridge adapter address.
         IEarningChainGateway(EARNING_CHAIN_GATEWAY)
-            .pushFundsToAccountingChain(asset, amount, bridgeAdapter, gasLimit, BridgeParamsCodec.encode(bridgeParams));
+            .pushFundsToAccountingChain(asset, amount, bridgeAdapter, gasLimit, abi.encode(bridgeAdapterData));
         vm.stopBroadcast();
     }
 
