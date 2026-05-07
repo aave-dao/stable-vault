@@ -35,8 +35,8 @@ contract AccessManagerEarningChainSetupForkTest is AccessManagerEarningChainSetu
     {
         IAllocator allocator = IAllocator(getAllocatorAddress(_deployer()));
         address[] memory vaults = new address[](2);
-        vaults[0] = allocator.getDefaultStrategy(_usdc());
-        vaults[1] = allocator.getDefaultStrategy(_usdt());
+        vaults[0] = allocator.getStrategiesForAsset(_usdc())[0];
+        vaults[1] = allocator.getStrategiesForAsset(_usdt())[0];
         return vaults;
     }
 }

@@ -14,7 +14,6 @@ import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {Swapper} from "src/periphery/Swapper.sol";
 import {Constants} from "src/types/Constants.sol";
-import {Errors} from "src/types/Errors.sol";
 
 import {BaseTest} from "test/BaseTest.t.sol";
 
@@ -25,62 +24,6 @@ contract EndToEndTest is BaseTest {
 
     function setUp() public override {
         super.setUp();
-    }
-
-    function testDepositSlippageBase() public {
-        USDC.mint(user, 100e6);
-
-        // User deposits directly into the strategy vault.
-        vm.startPrank(user);
-        USDC.approve(address(usdcStrategyVault_accountingChain), 1e6);
-        usdcStrategyVault_accountingChain.deposit(1e6, user);
-        vm.stopPrank();
-
-        // Inflate the funds in the strategy vault.
-        USDC.mint(address(usdcStrategyVault_accountingChain), 1e3);
-
-        // User makes a deposit of 2 wei into Stable Vault.
-        vm.startPrank(user);
-        USDC.approve(address(vault), 2);
-        vault.deposit(user, address(USDC), 2);
-
-        uint256 userBalanceInRay = vault.getUserBalance(user);
-        uint256 vaultAssetsInRay = vault.getAggregatedBalance();
-        Logger.log("userBalanceInRay %e", userBalanceInRay);
-        Logger.log("vaultAssetsInRay %e", vaultAssetsInRay);
-        assert(userBalanceInRay > vaultAssetsInRay);
-        // The user's balance in Stable Vault is 1 unit of USDC greater than the actual assets in the system (this is
-        // treated as interest the system owes to the user).
-        assertEq(userBalanceInRay - vaultAssetsInRay, 1e21);
-        uint256 originalDepositRay = vault.getGlobalOriginalDepositAmount();
-        // Check that the original deposit is incremented by the amount of the net deposit.
-        assertEq(originalDepositRay, vaultAssetsInRay);
-    }
-
-    function testDepositSlippageInflatedVault_reverts_ifSlippageExceeded() public {
-        USDC.mint(user, 100e6);
-
-        // User deposits directly into the strategy vault.
-        vm.startPrank(user);
-        USDC.approve(address(usdcStrategyVault_accountingChain), 1);
-        usdcStrategyVault_accountingChain.deposit(1, user);
-        vm.stopPrank();
-
-        // Inflate the funds in the strategy vault.
-        USDC.mint(address(usdcStrategyVault_accountingChain), 1e6);
-
-        // Get the user to make a deposit of the amount for maximum loss - check that the deposit reverts if a slippage
-        // tolerane is exceeded.
-        uint256 amountForMaximumLoss = usdcStrategyVault_accountingChain.previewMint(2) - 1;
-        vm.startPrank(user);
-        USDC.approve(address(vault), amountForMaximumLoss);
-        vm.expectRevert(Errors.InsufficientAmountOut.selector);
-        vault.deposit(user, address(USDC), amountForMaximumLoss);
-
-        uint256 userBalanceInRay = vault.getUserBalance(user);
-        uint256 vaultAssetsInRay = vault.getAggregatedBalance();
-        assertEq(userBalanceInRay, vaultAssetsInRay);
-        assertEq(userBalanceInRay, 0);
     }
 
     function test_endToEnd() public {
@@ -98,13 +41,15 @@ contract EndToEndTest is BaseTest {
         vault.deposit(user, address(USDC), userInitialDeposit);
         vm.stopPrank();
 
-        // - check that funds are dropped into default liquidity vault
+        // - funds land idle on the Allocator; manager rebalances them into the strategy.
+        address defaultUsdcVault_AccountingChain = allocator_accountingChain.getStrategiesForAsset(address(USDC))[0];
+        _routeIdleToStrategy(
+            allocator_accountingChain, address(USDC), defaultUsdcVault_AccountingChain, userInitialDeposit
+        );
         {
             Logger.log("User deposited %s USDC into Vault", userInitialDeposit);
-            address defaultUsdcVault_AccountingChain = allocator_accountingChain.getDefaultStrategy(address(USDC));
             Logger.log("Default vault for USDC is: %s", defaultUsdcVault_AccountingChain);
             Logger.log("It's balance of USDC is: %s", IERC20(address(USDC)).balanceOf(defaultUsdcVault_AccountingChain));
-            // TODO: Replace with Before/After balance
             assertEq(
                 IERC20(address(USDC)).balanceOf(defaultUsdcVault_AccountingChain),
                 userInitialDeposit,
@@ -135,7 +80,7 @@ contract EndToEndTest is BaseTest {
 
         // 3. Manager sends the money to the Earning Chain via CCIP
         uint256 bridgeFeeAmount = 1000;
-        address defaultUsdcVault_earningChain = allocator_earningChain.getDefaultStrategy(address(USDC));
+        address defaultUsdcVault_earningChain = allocator_earningChain.getStrategiesForAsset(address(USDC))[0];
         {
             vm.prank(everyRoleAccount);
             vm.deal(everyRoleAccount, bridgeFeeAmount);
@@ -152,7 +97,10 @@ contract EndToEndTest is BaseTest {
                 )
             );
 
-            // - check that the funds land on Earning Chain and are dropped into default liquidity vault there
+            // - funds land idle on the Earning Chain Allocator; route them into the strategy.
+            _routeIdleToStrategy(
+                allocator_earningChain, address(USDC), defaultUsdcVault_earningChain, userInitialDeposit
+            );
             Logger.log("Earning Chain default vault for USDC is: %s", defaultUsdcVault_earningChain);
             Logger.log("It's balance of USDC is: %s", IERC20(address(USDC)).balanceOf(defaultUsdcVault_earningChain));
             assertEq(
@@ -199,7 +147,7 @@ contract EndToEndTest is BaseTest {
             callDatas[0] = abi.encodeCall(IERC20.transfer, (address(this), userInitialDeposit));
             Swapper.SlippageParams memory slippageParams = Swapper.SlippageParams(0, address(0));
 
-            defaultGhoVault_earningChain = allocator_earningChain.getDefaultStrategy(address(GHO));
+            defaultGhoVault_earningChain = allocator_earningChain.getStrategiesForAsset(address(GHO))[0];
             // Deallocation params
             IAllocator.DeallocationParams[] memory deallocationParams = new IAllocator.DeallocationParams[](1);
             deallocationParams[0] =
@@ -274,7 +222,7 @@ contract EndToEndTest is BaseTest {
         // NOTE: With the oracle-based balance system, funds must be on the Accounting Chain before withdrawal
         // requests can be processed. The FundsHandler uses the chain balance oracle to track cross-chain balances.
         uint256 userEarningsInGho;
-        address defaultGhoVault_accountingChain = allocator_accountingChain.getDefaultStrategy(address(GHO));
+        address defaultGhoVault_accountingChain = allocator_accountingChain.getStrategiesForAsset(address(GHO))[0];
         {
             // Publish a fresh pre-return snapshot (time has warped since step 3).
             // AccountingChainGateway requires sourceChainBlockNumber >= RETURN_FUNDS message block number.
@@ -312,7 +260,10 @@ contract EndToEndTest is BaseTest {
                 false
             );
 
-            // - check that the funds land on the Accounting Chain and are dropped into default liquidity vault there
+            // - funds land idle on the Accounting Chain Allocator; route them into the strategy.
+            _routeIdleToStrategy(
+                allocator_accountingChain, address(GHO), defaultGhoVault_accountingChain, userEarningsInGho
+            );
             Logger.log("Accounting Chain default vault for GHO is: %s", defaultGhoVault_accountingChain);
             Logger.log("It's balance of GHO is: %s", IERC20(address(GHO)).balanceOf(defaultGhoVault_accountingChain));
             assertEq(
@@ -345,7 +296,7 @@ contract EndToEndTest is BaseTest {
             callDatas[0] = abi.encodeCall(IERC20.transfer, (address(this), amountGhoIn));
             Swapper.SlippageParams memory slippageParams = Swapper.SlippageParams(0, address(0));
 
-            address defaultUsdcVault_accountingChain = allocator_accountingChain.getDefaultStrategy(address(USDC));
+            address defaultUsdcVault_accountingChain = allocator_accountingChain.getStrategiesForAsset(address(USDC))[0];
             IAllocator.DeallocationParams[] memory deallocationParams = new IAllocator.DeallocationParams[](1);
             deallocationParams[0] =
                 IAllocator.DeallocationParams(address(GHO), defaultGhoVault_accountingChain, amountGhoIn);

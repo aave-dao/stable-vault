@@ -149,28 +149,11 @@ contract FundsHandlerTest is TestWithHelpers {
         address asset = _deployAssetWithSalt(assetDeploymentSalt, assetDecimals);
         amount = _boundAssetAmount(asset, amount);
 
-        vm.expectCall(address(mockAllocator), abi.encodeWithSelector(IAllocator.deposit.selector, asset, amount));
+        vm.expectCall(address(mockAllocator), abi.encodeWithSelector(IAllocator.pullIdle.selector, asset, amount));
 
         vm.prank(address(mockStableVault));
         uint256 netDepositAmount = fundsHandler.processDeposit(asset, amount);
         assertEq(netDepositAmount, amount);
-    }
-
-    function test_processDeposit_pushesFundsToAllocatorWithSlippage(
-        bytes32 assetDeploymentSalt,
-        uint8 assetDecimals,
-        uint256 amountOfSlippage,
-        uint256 amount
-    ) public {
-        address asset = _deployAssetWithSalt(assetDeploymentSalt, assetDecimals);
-        amount = _boundAssetAmountAllowingZero(asset, amount);
-        vm.assume(amount > amountOfSlippage);
-
-        vm.expectCall(address(mockAllocator), abi.encodeWithSelector(IAllocator.deposit.selector, asset, amount));
-        mockAllocator.mockAmountOfSlippage(amountOfSlippage);
-        vm.prank(address(mockStableVault));
-        uint256 netDepositAmount = fundsHandler.processDeposit(asset, amount);
-        assertEq(netDepositAmount, amount - amountOfSlippage);
     }
 
     function test_processDeposit_reverts_ifAmountIsZero(bytes32 assetDeploymentSalt, uint8 assetDecimals) public {
@@ -263,9 +246,7 @@ contract FundsHandlerTest is TestWithHelpers {
         address asset = _deployAssetWithSalt(assetDeploymentSalt, assetDecimals);
         amount = _boundAssetAmountAllowingZero(address(asset), amount);
 
-        vm.expectCall(
-            address(mockAllocator), abi.encodeWithSelector(IAllocator.depositAllowIdle.selector, asset, amount)
-        );
+        vm.expectCall(address(mockAllocator), abi.encodeWithSelector(IAllocator.pullIdle.selector, asset, amount));
 
         vm.prank(address(mockGateway));
         fundsHandler.fundsArrivedFromChainCallback(asset, amount);

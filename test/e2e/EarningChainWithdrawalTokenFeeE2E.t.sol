@@ -91,8 +91,11 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
         // 1. User1 deposits 500 USDC to Vault on Accounting Chain
         _mintAndDepositUsdcToStableVault(user1, userInitialDeposit);
 
-        // Check the deposit was made into the default earning strategy for USDC
-        address defaultUsdcVault_AccountingChain = allocator_accountingChain.getDefaultStrategy(address(USDC));
+        // Funds land idle on the Allocator; route them into the strategy.
+        address defaultUsdcVault_AccountingChain = allocator_accountingChain.getStrategiesForAsset(address(USDC))[0];
+        _routeIdleToStrategy(
+            allocator_accountingChain, address(USDC), defaultUsdcVault_AccountingChain, userInitialDeposit
+        );
         assertEq(
             IERC20(address(USDC)).balanceOf(defaultUsdcVault_AccountingChain),
             userInitialDeposit,
@@ -121,8 +124,9 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             )
         );
 
-        // Check the funds were bridged to the Earning Chain
-        address defaultUsdcVault_earningChain = allocator_earningChain.getDefaultStrategy(address(USDC));
+        // Funds arrive idle on the Earning Chain Allocator; route them into the strategy.
+        address defaultUsdcVault_earningChain = allocator_earningChain.getStrategiesForAsset(address(USDC))[0];
+        _routeIdleToStrategy(allocator_earningChain, address(USDC), defaultUsdcVault_earningChain, userInitialDeposit);
         assertEq(
             IERC20(address(USDC)).balanceOf(defaultUsdcVault_earningChain),
             userInitialDeposit,

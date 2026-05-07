@@ -79,8 +79,11 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
         // User1 deposits 500 USDC to Vault on Accounting Chain
         _mintAndDepositUsdcToStableVault(user1, userInitialDeposit);
 
-        // Check the deposit was made into the default earning strategy for USDC
-        address defaultUsdcVault_AccountingChain = allocator_accountingChain.getDefaultStrategy(address(USDC));
+        // Funds land idle on the Allocator; route them into the strategy.
+        address defaultUsdcVault_AccountingChain = allocator_accountingChain.getStrategiesForAsset(address(USDC))[0];
+        _routeIdleToStrategy(
+            allocator_accountingChain, address(USDC), defaultUsdcVault_AccountingChain, userInitialDeposit
+        );
         assertEq(
             IERC20(address(USDC)).balanceOf(defaultUsdcVault_AccountingChain),
             userInitialDeposit,
@@ -162,15 +165,21 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
         // User2 deposits 500 GHO to Vault on Accounting Chain
         _mintAndDepositGhoToStableVault(user2, user2InitialDeposit);
 
-        // Check the deposit was made into the default earning strategy for USDC
-        address defaultUsdcVault_AccountingChain = allocator_accountingChain.getDefaultStrategy(address(USDC));
+        // Funds land idle on the Allocator; route both assets into their default strategies.
+        address defaultUsdcVault_AccountingChain = allocator_accountingChain.getStrategiesForAsset(address(USDC))[0];
+        address defaultGhoVault_AccountingChain = allocator_accountingChain.getStrategiesForAsset(address(GHO))[0];
+        _routeIdleToStrategy(
+            allocator_accountingChain, address(USDC), defaultUsdcVault_AccountingChain, user1InitialDeposit
+        );
+        _routeIdleToStrategy(
+            allocator_accountingChain, address(GHO), defaultGhoVault_AccountingChain, user2InitialDeposit
+        );
+
         assertEq(
             IERC20(address(USDC)).balanceOf(defaultUsdcVault_AccountingChain),
             user1InitialDeposit,
             "Default USDC strategy vault should have the deposited amount of USDC"
         );
-        // Check the deposit was made into the default earning strategy for GHO
-        address defaultGhoVault_AccountingChain = allocator_accountingChain.getDefaultStrategy(address(GHO));
         assertEq(
             IERC20(address(GHO)).balanceOf(defaultGhoVault_AccountingChain),
             user2InitialDeposit,
@@ -235,8 +244,11 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
         // User1 deposits 500 USDC to Vault on Accounting Chain
         _mintAndDepositUsdcToStableVault(user1, userInitialDeposit);
 
-        // Check the deposit was made into the default earning strategy for USDC
-        address defaultUsdcVault_AccountingChain = allocator_accountingChain.getDefaultStrategy(address(USDC));
+        // Funds land idle on the Allocator; route them into the strategy.
+        address defaultUsdcVault_AccountingChain = allocator_accountingChain.getStrategiesForAsset(address(USDC))[0];
+        _routeIdleToStrategy(
+            allocator_accountingChain, address(USDC), defaultUsdcVault_AccountingChain, userInitialDeposit
+        );
         assertEq(
             IERC20(address(USDC)).balanceOf(defaultUsdcVault_AccountingChain),
             userInitialDeposit,
@@ -295,15 +307,21 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
         // User2 deposits 500 GHO to Vault on Accounting Chain
         _mintAndDepositGhoToStableVault(user2, user2InitialDeposit);
 
-        // Check the deposit was made into the default earning strategy for USDC
-        address defaultUsdcVault_AccountingChain = allocator_accountingChain.getDefaultStrategy(address(USDC));
+        // Funds land idle on the Allocator; route both assets into their default strategies.
+        address defaultUsdcVault_AccountingChain = allocator_accountingChain.getStrategiesForAsset(address(USDC))[0];
+        address defaultGhoVault_AccountingChain = allocator_accountingChain.getStrategiesForAsset(address(GHO))[0];
+        _routeIdleToStrategy(
+            allocator_accountingChain, address(USDC), defaultUsdcVault_AccountingChain, user1InitialDeposit
+        );
+        _routeIdleToStrategy(
+            allocator_accountingChain, address(GHO), defaultGhoVault_AccountingChain, user2InitialDeposit
+        );
+
         assertEq(
             IERC20(address(USDC)).balanceOf(defaultUsdcVault_AccountingChain),
             user1InitialDeposit,
             "Default USDC strategy vault should have the deposited amount of USDC"
         );
-        // Check the deposit was made into the default earning strategy for GHO
-        address defaultGhoVault_AccountingChain = allocator_accountingChain.getDefaultStrategy(address(GHO));
         assertEq(
             IERC20(address(GHO)).balanceOf(defaultGhoVault_AccountingChain),
             user2InitialDeposit,

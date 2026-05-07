@@ -1565,9 +1565,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         vm.prank(address(_mockBridgeAdapterAssets));
         MockNonStandardErc20(address(_mockUsdt)).approve(address(_earningChainGateway), amountUsdt);
 
-        vm.expectCall(
-            address(_mockAllocator), abi.encodeCall(IAllocator.depositAllowIdle, (address(_mockUsdt), amountUsdt))
-        );
+        vm.expectCall(address(_mockAllocator), abi.encodeCall(IAllocator.pullIdle, (address(_mockUsdt), amountUsdt)));
 
         vm.prank(address(_mockBridgeAdapterAssets));
         _earningChainGateway.receiveMessage(ACCOUNTING_CHAIN_ID, address(_mockUsdt), amountUsdt, "");
@@ -1622,7 +1620,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
     function test_receiveMessage_noops_whenNoFundsAndNoData() public {
         vm.mockCallRevert(
-            address(_mockAllocator), abi.encodeWithSelector(IAllocator.depositAllowIdle.selector), bytes("unexpected")
+            address(_mockAllocator), abi.encodeWithSelector(IAllocator.pullIdle.selector), bytes("unexpected")
         );
 
         vm.prank(makeAddr("notAdapter"));

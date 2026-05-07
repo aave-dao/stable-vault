@@ -97,8 +97,9 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
             )
         );
 
-        // Check the funds were bridged to the Earning Chain
-        address defaultUsdcVault_earningChain = allocator_earningChain.getDefaultStrategy(address(USDC));
+        // Funds arrive idle on the Earning Chain Allocator; route them into the strategy.
+        address defaultUsdcVault_earningChain = allocator_earningChain.getStrategiesForAsset(address(USDC))[0];
+        _routeIdleToStrategy(allocator_earningChain, address(USDC), defaultUsdcVault_earningChain, userInitialDeposit);
         assertEq(
             IERC20(address(USDC)).balanceOf(defaultUsdcVault_earningChain),
             userInitialDeposit,
