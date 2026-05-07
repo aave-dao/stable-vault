@@ -58,9 +58,6 @@ interface IStableVault {
     /// @notice Emitted when the withdrawal-request policy address is updated.
     event WithdrawalRequestPolicySet(address indexed oldPolicy, address indexed newPolicy);
 
-    /// @notice Emitted when the transfer policy address is updated.
-    event TransferPolicySet(address indexed oldPolicy, address indexed newPolicy);
-
     /// @notice Emitted when the bridge policy address is updated.
     event BridgePolicySet(address indexed oldPolicy, address indexed newPolicy);
 
@@ -128,9 +125,6 @@ interface IStableVault {
     /// @notice Sets the withdrawal-request policy. `address(0)` disables the policy.
     function setWithdrawalRequestPolicy(address policy) external;
 
-    /// @notice Sets the transfer policy. `address(0)` disables the policy.
-    function setTransferPolicy(address policy) external;
-
     /// @notice Sets the bridge policy. `address(0)` disables the policy.
     function setBridgePolicy(address policy) external;
 
@@ -139,9 +133,6 @@ interface IStableVault {
 
     /// @notice Getter for the withdrawal-request policy address.
     function getWithdrawalRequestPolicy() external view returns (address);
-
-    /// @notice Getter for the transfer policy address.
-    function getTransferPolicy() external view returns (address);
 
     /// @notice Getter for the bridge policy address.
     function getBridgePolicy() external view returns (address);
@@ -235,18 +226,10 @@ interface IStableVault {
     /// @return success True if the transfer was successful.
     function transfer(address to, uint256 amountRay) external returns (bool success);
 
-    /// @notice Transfers Stable Vault balance (denominated in RAY) to another user, with policy data.
-    /// @param to Address of the recipient.
-    /// @param amountRay Amount of Stable Vault balance to transfer, denominated in RAY.
-    /// @param extraData Additional data for the transfer policy.
-    /// @return success True if the transfer was successful.
-    function transfer(address to, uint256 amountRay, bytes calldata extraData) external returns (bool success);
-
     /// @notice Transfers the sender's full Stable Vault balance (denominated in RAY) to another user.
     /// @param to Address of the recipient.
-    /// @param extraData Additional data for the transfer policy.
     /// @return success True if the transfer was successful.
-    function transferAll(address to, bytes calldata extraData) external returns (bool success);
+    function transferAll(address to) external returns (bool success);
 
     /// @notice Requests a withdrawal of assets from the vault.
     /// @dev User shares are burned; the amount requested to withdraw stops accruing yield.

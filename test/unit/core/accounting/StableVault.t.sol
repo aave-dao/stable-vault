@@ -735,7 +735,7 @@ contract StableVaultTest is TestWithHelpers {
         emit IStableVault.SubVaultDeactivated(userSubVaultId);
 
         vm.prank(user);
-        stableVault.transferAll(recipient, "");
+        stableVault.transferAll(recipient);
     }
 
     function test_deposit_emitsUserRateSet_onFirstDeposit() public {
@@ -801,7 +801,7 @@ contract StableVaultTest is TestWithHelpers {
 
         // user1 transfers their full position to user3, leaving user1 with no position
         vm.prank(user1);
-        stableVault.transferAll(user3, "");
+        stableVault.transferAll(user3);
 
         assertEq(stableVault.getUserSubVault(user1).id, 0);
 
@@ -2450,7 +2450,7 @@ contract StableVaultTest is TestWithHelpers {
 
         // User should use transferAll() instead
         vm.prank(user);
-        assertTrue(stableVault.transferAll(recipient, ""));
+        assertTrue(stableVault.transferAll(recipient));
 
         assertEq(stableVault.getUserSubVault(user).id, 0);
         assertEq(stableVault.getUserBalance(user), 0);
@@ -2569,7 +2569,7 @@ contract StableVaultTest is TestWithHelpers {
         uint256 iouSupplyBefore = mockIouToken.totalSupply();
 
         vm.prank(user);
-        assertTrue(stableVault.transferAll(recipient, ""));
+        assertTrue(stableVault.transferAll(recipient));
 
         assertEq(stableVault.getGlobalOriginalDepositAmount(), globalOriginalBefore);
         assertEq(mockIouToken.totalSupply(), iouSupplyBefore);
@@ -2980,7 +2980,7 @@ contract StableVaultTest is TestWithHelpers {
 
         vm.expectRevert(Errors.InvalidParameter.selector);
         vm.prank(user);
-        stableVault.transferAll(address(0), "");
+        stableVault.transferAll(address(0));
     }
 
     function test_transferAll_reverts_ifRecipientIsSender(address user, uint256 depositAmount) public {
@@ -2993,7 +2993,7 @@ contract StableVaultTest is TestWithHelpers {
 
         vm.expectRevert(Errors.InvalidParameter.selector);
         vm.prank(user);
-        stableVault.transferAll(user, "");
+        stableVault.transferAll(user);
     }
 
     function test_transferAll_reverts_ifUserDoesNotHaveAPosition(address user, address recipient) public {
@@ -3005,7 +3005,7 @@ contract StableVaultTest is TestWithHelpers {
 
         vm.expectRevert(IStableVault.NonExistentPosition.selector);
         vm.prank(user);
-        stableVault.transferAll(recipient, "");
+        stableVault.transferAll(recipient);
     }
 
     function test_transferAll_allowsMinimumAmount() public {
@@ -3026,7 +3026,7 @@ contract StableVaultTest is TestWithHelpers {
         stableVault.deposit(user, address(mockAsset18dp), amount, "");
 
         vm.prank(user);
-        assertTrue(stableVault.transferAll(recipient, ""));
+        assertTrue(stableVault.transferAll(recipient));
     }
 
     function test_transferAll_allowsFullBalanceBelowMinimum() public {
@@ -3077,7 +3077,7 @@ contract StableVaultTest is TestWithHelpers {
         assertEq(dustSenderBalanceRay, Constants.MIN_WITHDRAWABLE_AMOUNT_RAY - 1);
 
         vm.prank(dustSender);
-        assertTrue(stableVault.transferAll(recipient, ""));
+        assertTrue(stableVault.transferAll(recipient));
 
         assertEq(stableVault.getUserBalance(dustSender), 0);
         assertEq(stableVault.getUserSubVault(dustSender).id, 0);
@@ -3137,7 +3137,7 @@ contract StableVaultTest is TestWithHelpers {
         //              = 1e9 * 1e27 / 1e27 / 1e36 = 1e9 / 1e36 ≈ 0
         vm.prank(user);
         vm.expectRevert(Errors.InvalidAmount.selector);
-        stableVault.transferAll(recipient, "");
+        stableVault.transferAll(recipient);
     }
 
     function test_transferAll_allowsMinimumAmount_evenWhenRoundingWouldBeBelowMinShares() public {
@@ -3164,7 +3164,7 @@ contract StableVaultTest is TestWithHelpers {
         _setUserRate(user, MathLib.RAY + 1);
 
         vm.prank(user);
-        assertTrue(stableVault.transferAll(recipient, ""));
+        assertTrue(stableVault.transferAll(recipient));
     }
 
     function test_transferAll_allowsSmallAmounts_evenWhenRoundingIsUnfavorable(uint256 amountDelta) public {
@@ -3186,7 +3186,7 @@ contract StableVaultTest is TestWithHelpers {
         stableVault.deposit(user, address(mockAsset18dp), amount, "");
 
         vm.prank(user);
-        assertTrue(stableVault.transferAll(recipient, ""));
+        assertTrue(stableVault.transferAll(recipient));
     }
 
     function test_transferAll_succeeds_whenDustSenderAndRecipientCombine() public {
@@ -3221,7 +3221,7 @@ contract StableVaultTest is TestWithHelpers {
         _setUserRate(recipient, MathLib.RAY + 1);
 
         vm.prank(user);
-        assertTrue(stableVault.transferAll(recipient, ""));
+        assertTrue(stableVault.transferAll(recipient));
     }
 
     function test_transferAll_emitsTransferEvent(address user, address recipient, uint256 depositAmount) public {
@@ -3240,7 +3240,7 @@ contract StableVaultTest is TestWithHelpers {
         emit IStableVault.Transfer(user, recipient, fullAmountRay);
 
         vm.prank(user);
-        stableVault.transferAll(recipient, "");
+        stableVault.transferAll(recipient);
     }
 
     function test_transferAll_crossSubVault(
@@ -3272,7 +3272,7 @@ contract StableVaultTest is TestWithHelpers {
         uint256 recipientBalanceBefore = stableVault.getUserBalance(recipient);
 
         vm.prank(user);
-        assertTrue(stableVault.transferAll(recipient, ""));
+        assertTrue(stableVault.transferAll(recipient));
 
         // User's position is deleted
         assertEq(stableVault.getUserBalance(user), 0);
@@ -3303,7 +3303,7 @@ contract StableVaultTest is TestWithHelpers {
         assertEq(stableVault.getUserSubVault(recipient).id, 0);
 
         vm.prank(user);
-        assertTrue(stableVault.transferAll(recipient, ""));
+        assertTrue(stableVault.transferAll(recipient));
 
         // Recipient is assigned the default subVault
         assertEq(stableVault.getUserSubVault(recipient).id, stableVault.getDefaultSubVault().id);
@@ -3332,7 +3332,7 @@ contract StableVaultTest is TestWithHelpers {
         vm.warp(block.timestamp + 100);
 
         vm.prank(user);
-        assertTrue(stableVault.transferAll(recipient, ""));
+        assertTrue(stableVault.transferAll(recipient));
 
         assertEq(stableVault.getUserBalance(user), 0);
         // Both were in same subVault, so transfer is 1:1 in shares (converted to value)
@@ -3496,7 +3496,7 @@ contract StableVaultTest is TestWithHelpers {
 
         vm.expectRevert(IStableVault.TooManyActiveSubVaults.selector);
         vm.prank(user1);
-        assertFalse(stableVault.transferAll(recipient, ""));
+        assertFalse(stableVault.transferAll(recipient));
     }
 
     function test_transfer_partialTransferUpdatesOriginalDeposit(address user, address recipient, uint256 depositAmount)
@@ -3610,14 +3610,14 @@ contract StableVaultTest is TestWithHelpers {
 
         // Alice -> Bob (full)
         vm.prank(alice);
-        assertTrue(stableVault.transferAll(bob, ""));
+        assertTrue(stableVault.transferAll(bob));
 
         assertEq(stableVault.getUserBalance(alice), 0);
         assertEq(stableVault.getUserBalance(bob), initialAmount);
 
         // Bob -> Charlie (full)
         vm.prank(bob);
-        assertTrue(stableVault.transferAll(charlie, ""));
+        assertTrue(stableVault.transferAll(charlie));
 
         assertEq(stableVault.getUserBalance(bob), 0);
         assertEq(stableVault.getUserBalance(charlie), initialAmount);
@@ -3650,7 +3650,7 @@ contract StableVaultTest is TestWithHelpers {
 
         // Transfer all to recipient (who will be in default subVault)
         vm.prank(user);
-        assertTrue(stableVault.transferAll(recipient, ""));
+        assertTrue(stableVault.transferAll(recipient));
 
         // The user's original subVault should no longer be active (if it was only user)
         IStableVault.SubVaultData[] memory activeSubVaultsAfter = stableVault.getActiveSubVaults();
