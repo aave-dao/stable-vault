@@ -14,6 +14,7 @@ import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IBridgePolicy} from "src/interfaces/IBridgePolicy.sol";
 import {IChainBalanceOracle} from "src/interfaces/IChainBalanceOracle.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
+import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {RescuableNative} from "src/misc/RescuableNative.sol";
@@ -40,11 +41,14 @@ contract FundsHandler is
     address internal immutable VAULT;
     address internal immutable GATEWAY;
     address internal immutable CHAIN_BALANCE_ORACLE;
+    address internal immutable POLICY_REGISTRY;
+
+    // keccak256("aave.stable-vault.FundsHandler.policy.bridge")
+    bytes32 internal constant BRIDGE_POLICY_ID = 0xe8134dfa9ba78c8f4bc7215c2603da92d80f826e18cf8cf1673b973cae3e6165;
 
     /// @custom:storage-location erc7201:aave.storage.FundsHandler
     struct FundsHandlerStorage {
         EnumerableSet.UintSet earningChainIds;
-        address bridgePolicy;
     }
 
     // keccak256(abi.encode(uint256(keccak256("aave.storage.FundsHandler")) - 1)) & ~bytes32(uint256(0xff))
@@ -74,21 +78,25 @@ contract FundsHandler is
     /// @param priceOracle The address of the PriceOracle contract to use for pricing assets.
     /// @param transferHelper The address of the TransferHelper contract to use for minimizing the number of transfers.
     /// @param chainBalanceOracle The address of the ChainBalanceOracle contract to use for cross-chain balance queries.
+    /// @param policyRegistry The address of the PolicyRegistry contract used to look up policies by ID.
     constructor(
         address stableVault,
         address gateway,
         address allocator,
         address priceOracle,
         address transferHelper,
-        address chainBalanceOracle
+        address chainBalanceOracle,
+        address policyRegistry
     ) TransferHelperClient(transferHelper) LocalBalanceAggregator(allocator, priceOracle) {
         require(stableVault != address(0), Errors.ZeroAddress());
         require(gateway != address(0), Errors.ZeroAddress());
         require(chainBalanceOracle != address(0), Errors.ZeroAddress());
+        require(policyRegistry != address(0), Errors.ZeroAddress());
         _disableInitializers();
         VAULT = stableVault;
         GATEWAY = gateway;
         CHAIN_BALANCE_ORACLE = chainBalanceOracle;
+        POLICY_REGISTRY = policyRegistry;
     }
 
     /// @dev Initializer.
@@ -169,17 +177,6 @@ contract FundsHandler is
         );
     }
 
-    /// @inheritdoc IFundsHandler
-    function setBridgePolicy(address policy) external override restricted {
-        emit BridgePolicySet($storage().bridgePolicy, policy);
-        $storage().bridgePolicy = policy;
-    }
-
-    /// @inheritdoc IFundsHandler
-    function getBridgePolicy() external view override returns (address) {
-        return $storage().bridgePolicy;
-    }
-
     // Gateway Functions
 
     /// @inheritdoc IFundsHandler
@@ -194,7 +191,7 @@ contract FundsHandler is
     }
 
     function _applyBridgeFundsPolicy(uint256 chainId, address asset, uint256 amount) internal {
-        address policy = $storage().bridgePolicy;
+        address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(BRIDGE_POLICY_ID);
         if (policy == address(0)) {
             return;
         }

@@ -84,8 +84,4 @@ contract MockEarningChainGateway is IEarningChainGateway {
         payable
         override
     {}
-
-    function setBridgePolicy(address policy) external override {}
-
-    function getBridgePolicy() external view override returns (address) {}
 }

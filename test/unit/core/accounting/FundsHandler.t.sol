@@ -17,6 +17,7 @@ import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
+import {PolicyRegistry} from "src/periphery/PolicyRegistry.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
@@ -46,6 +47,7 @@ contract FundsHandlerTest is TestWithHelpers {
     MockChainBalanceOracle mockChainBalanceOracle;
     MockTransferHelper mockTransferHelper;
     MockAccessManager mockAccessManager;
+    PolicyRegistry policyRegistry;
     IMockErc20 mockAsset;
 
     FundsHandler fundsHandler;
@@ -61,10 +63,19 @@ contract FundsHandlerTest is TestWithHelpers {
         address priceOracleAddr,
         address transferHelper,
         address chainBalanceOracle,
-        address accessManager
+        address accessManager,
+        address policyRegistryAddress
     ) internal returns (FundsHandler) {
         address fundsHandlerImpl = address(
-            new FundsHandler(stableVault, gateway, allocator, priceOracleAddr, transferHelper, chainBalanceOracle)
+            new FundsHandler(
+                stableVault,
+                gateway,
+                allocator,
+                priceOracleAddr,
+                transferHelper,
+                chainBalanceOracle,
+                policyRegistryAddress
+            )
         );
         return FundsHandler(
             address(
@@ -85,6 +96,7 @@ contract FundsHandlerTest is TestWithHelpers {
         mockBridgeAdapter = new MockBridgeAdapter(address(mockTransferHelper));
         mockAllocator = new MockAllocator();
         mockAccessManager = new MockAccessManager(ADMIN);
+        policyRegistry = new PolicyRegistry(address(mockAccessManager));
         priceOracle = _deployPriceOracle(address(mockAccessManager), 9_995e23);
         mockChainBalanceOracle = new MockChainBalanceOracle();
         mockAsset = IMockErc20(address(new MockNonStandardErc20("Test USD", "tUSD", 6)));
@@ -95,7 +107,8 @@ contract FundsHandlerTest is TestWithHelpers {
             address(priceOracle),
             address(mockTransferHelper),
             address(mockChainBalanceOracle),
-            address(mockAccessManager)
+            address(mockAccessManager),
+            address(policyRegistry)
         );
         mockAllocator.mockTransferHelper(address(mockTransferHelper));
     }
@@ -108,7 +121,8 @@ contract FundsHandlerTest is TestWithHelpers {
             address(mockAllocator),
             address(priceOracle),
             address(0),
-            address(mockChainBalanceOracle)
+            address(mockChainBalanceOracle),
+            address(policyRegistry)
         );
     }
 

@@ -21,6 +21,7 @@ import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
+import {PolicyRegistry} from "src/periphery/PolicyRegistry.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
@@ -61,6 +62,7 @@ contract StableVaultTest is TestWithHelpers {
     MockAssetRegistry mockAssetRegistry;
     MockTransferHelper mockTransferHelper;
     WithdrawalPolicy mockWithdrawalPolicy;
+    PolicyRegistry policyRegistry;
     PriceOracle mockPriceOracle;
     IStableVault stableVault;
 
@@ -79,7 +81,8 @@ contract StableVaultTest is TestWithHelpers {
         address withdrawalFeeCalculatorAddress,
         address priceOracleAddress,
         uint256 maxActiveSubVaults,
-        address treasuryAddress
+        address treasuryAddress,
+        address policyRegistryAddress
     ) internal returns (IStableVault) {
         address vaultImpl = address(
             new StableVault(
@@ -90,7 +93,8 @@ contract StableVaultTest is TestWithHelpers {
                 transferHelper,
                 withdrawalFeeCalculatorAddress,
                 priceOracleAddress,
-                maxActiveSubVaults
+                maxActiveSubVaults,
+                policyRegistryAddress
             )
         );
         return StableVault(
@@ -124,7 +128,8 @@ contract StableVaultTest is TestWithHelpers {
         address withdrawalFeeCalculatorAddress,
         address priceOracleAddress,
         uint256 maxActiveSubVaults,
-        address treasuryAddress
+        address treasuryAddress,
+        address policyRegistryAddress
     ) internal returns (StableVaultHarness) {
         address vaultImpl = address(
             new StableVaultHarness(
@@ -135,7 +140,8 @@ contract StableVaultTest is TestWithHelpers {
                 transferHelper,
                 withdrawalFeeCalculatorAddress,
                 priceOracleAddress,
-                maxActiveSubVaults
+                maxActiveSubVaults,
+                policyRegistryAddress
             )
         );
         return StableVaultHarness(
@@ -181,6 +187,7 @@ contract StableVaultTest is TestWithHelpers {
         mockAsset = _deployDefaultAsset();
         mockTransferHelper = new MockTransferHelper();
         mockFundsHandler = new MockFundsHandler(address(mockTransferHelper));
+        policyRegistry = new PolicyRegistry(address(mockAccessManager));
 
         mockPriceOracle = _deployPriceOracle(address(mockAccessManager), 9_995e23);
         // Mock price for the default asset (1 RAY = 1:1 price ratio)
@@ -204,7 +211,8 @@ contract StableVaultTest is TestWithHelpers {
             address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
-            treasury
+            treasury,
+            address(policyRegistry)
         );
     }
 
@@ -225,7 +233,8 @@ contract StableVaultTest is TestWithHelpers {
             address(mockTransferHelper),
             address(mockWithdrawalPolicy),
             address(mockPriceOracle),
-            DEFAULT_MAX_ACTIVE_SUB_VAULTS
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+            address(policyRegistry)
         );
 
         assertEq(newStableVault.getMaxValidPerSecondRate(), expectedMaxValidPerSecondRate);
@@ -243,7 +252,8 @@ contract StableVaultTest is TestWithHelpers {
             address(mockTransferHelper),
             address(mockWithdrawalPolicy),
             address(mockPriceOracle),
-            DEFAULT_MAX_ACTIVE_SUB_VAULTS
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+            address(policyRegistry)
         );
     }
 
@@ -257,7 +267,8 @@ contract StableVaultTest is TestWithHelpers {
             address(0),
             address(mockWithdrawalPolicy),
             address(mockPriceOracle),
-            DEFAULT_MAX_ACTIVE_SUB_VAULTS
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+            address(policyRegistry)
         );
     }
 
@@ -282,7 +293,8 @@ contract StableVaultTest is TestWithHelpers {
                 address(mockTransferHelper),
                 address(mockWithdrawalPolicy),
                 address(mockPriceOracle),
-                DEFAULT_MAX_ACTIVE_SUB_VAULTS
+                DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+                address(policyRegistry)
             )
         );
 
@@ -323,7 +335,8 @@ contract StableVaultTest is TestWithHelpers {
                 address(mockTransferHelper),
                 address(mockWithdrawalPolicy),
                 address(mockPriceOracle),
-                DEFAULT_MAX_ACTIVE_SUB_VAULTS
+                DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+                address(policyRegistry)
             )
         );
 
@@ -379,7 +392,8 @@ contract StableVaultTest is TestWithHelpers {
                 address(mockTransferHelper),
                 address(mockWithdrawalPolicy),
                 address(mockPriceOracle),
-                DEFAULT_MAX_ACTIVE_SUB_VAULTS
+                DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+                address(policyRegistry)
             )
         );
 
@@ -411,7 +425,8 @@ contract StableVaultTest is TestWithHelpers {
                 address(mockTransferHelper),
                 address(mockWithdrawalPolicy),
                 address(mockPriceOracle),
-                DEFAULT_MAX_ACTIVE_SUB_VAULTS
+                DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+                address(policyRegistry)
             )
         );
 
@@ -436,7 +451,8 @@ contract StableVaultTest is TestWithHelpers {
                 address(mockTransferHelper),
                 address(mockWithdrawalPolicy),
                 address(mockPriceOracle),
-                DEFAULT_MAX_ACTIVE_SUB_VAULTS
+                DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+                address(policyRegistry)
             )
         );
 
@@ -588,7 +604,8 @@ contract StableVaultTest is TestWithHelpers {
             address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
-            treasury
+            treasury,
+            address(policyRegistry)
         );
 
         // Warp just 1 second, conversionRate grows slightly above RAY
@@ -889,7 +906,8 @@ contract StableVaultTest is TestWithHelpers {
             address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             maxActiveSubVaults,
-            treasury
+            treasury,
+            address(policyRegistry)
         );
 
         uint256 amountToDeposit = 10e6;
@@ -927,7 +945,8 @@ contract StableVaultTest is TestWithHelpers {
             address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             maxActiveSubVaults,
-            treasury
+            treasury,
+            address(policyRegistry)
         );
 
         uint256 amountToDeposit = 10e6;
@@ -974,7 +993,8 @@ contract StableVaultTest is TestWithHelpers {
             address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             2, // MAX_ACTIVE_SUB_VAULTS
-            treasury
+            treasury,
+            address(policyRegistry)
         );
 
         // Users A, B and C all deposit into the default subvault (subvault 1).
@@ -1025,7 +1045,8 @@ contract StableVaultTest is TestWithHelpers {
             address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             2, // MAX_ACTIVE_SUB_VAULTS
-            treasury
+            treasury,
+            address(policyRegistry)
         );
 
         // 3 users deposit into default subvault
@@ -1071,7 +1092,8 @@ contract StableVaultTest is TestWithHelpers {
             address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
-            treasury
+            treasury,
+            address(policyRegistry)
         );
         mockAsset = IMockErc20(address(new MockNonStandardErc20("Test GHO", "tGHO", 18)));
 
@@ -2216,7 +2238,8 @@ contract StableVaultTest is TestWithHelpers {
             address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
-            treasury
+            treasury,
+            address(policyRegistry)
         );
 
         vm.warp(block.timestamp + 1);
@@ -2780,7 +2803,8 @@ contract StableVaultTest is TestWithHelpers {
             address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
-            treasury
+            treasury,
+            address(policyRegistry)
         );
 
         vm.warp(block.timestamp + 1);
@@ -2821,7 +2845,8 @@ contract StableVaultTest is TestWithHelpers {
             address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
-            treasury
+            treasury,
+            address(policyRegistry)
         );
 
         vm.warp(block.timestamp + 1);
@@ -2862,7 +2887,8 @@ contract StableVaultTest is TestWithHelpers {
             address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
-            treasury
+            treasury,
+            address(policyRegistry)
         );
 
         vm.warp(block.timestamp + 1);
@@ -2901,7 +2927,8 @@ contract StableVaultTest is TestWithHelpers {
             address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
-            treasury
+            treasury,
+            address(policyRegistry)
         );
 
         vm.warp(block.timestamp + 1);
@@ -3098,7 +3125,8 @@ contract StableVaultTest is TestWithHelpers {
             address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
-            treasury
+            treasury,
+            address(policyRegistry)
         );
         mockAsset = IMockErc20(address(new MockNonStandardErc20("Test GHO", "tGHO", 18)));
 
@@ -3351,7 +3379,8 @@ contract StableVaultTest is TestWithHelpers {
             address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
-            treasury
+            treasury,
+            address(policyRegistry)
         );
 
         address user = makeAddr("user");
@@ -3391,7 +3420,8 @@ contract StableVaultTest is TestWithHelpers {
             address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
-            treasury
+            treasury,
+            address(policyRegistry)
         );
 
         address user = makeAddr("user");
@@ -3432,7 +3462,8 @@ contract StableVaultTest is TestWithHelpers {
             address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             maxActiveSubVaults,
-            treasury
+            treasury,
+            address(policyRegistry)
         );
 
         address user1 = makeAddr("user1");
@@ -3470,7 +3501,8 @@ contract StableVaultTest is TestWithHelpers {
             address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             maxActiveSubVaults,
-            treasury
+            treasury,
+            address(policyRegistry)
         );
 
         address user1 = makeAddr("user1");

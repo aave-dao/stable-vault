@@ -17,6 +17,7 @@ import {IBridgePolicy} from "src/interfaces/IBridgePolicy.sol";
 import {IDepositPolicy} from "src/interfaces/IDepositPolicy.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
+import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
@@ -87,6 +88,16 @@ contract StableVault is
 
     uint256 internal immutable MAX_ACTIVE_SUB_VAULTS;
 
+    address internal immutable POLICY_REGISTRY;
+
+    // keccak256("aave.stable-vault.StableVault.policy.deposit")
+    bytes32 internal constant DEPOSIT_POLICY_ID = 0x780c69a8d1890ef009c0e82622a8ad8b5fcebdb4655a550589c95587ab9f8737;
+    // keccak256("aave.stable-vault.StableVault.policy.withdrawal-request")
+    bytes32 internal constant WITHDRAWAL_REQUEST_POLICY_ID =
+        0x9c238a3c8b0489eb6352e8961b4f7a11406d8d4dea0b75e9f2b5cab473d164d8;
+    // keccak256("aave.stable-vault.StableVault.policy.bridge")
+    bytes32 internal constant BRIDGE_POLICY_ID = 0x37dc2ea773b99d3122abc0fc102e7fcff6fa00038da80335f7d66b533221dd1a;
+
     /// @custom:storage-location erc7201:aave.storage.StableVault
     struct StableVaultStorage {
         /// @dev Keeps track of the sum of all users' original deposits.
@@ -123,10 +134,6 @@ contract StableVault is
 
         /// @dev ERC20-style symbol of the Stable Vault position token.
         string symbol;
-
-        address depositPolicy;
-        address withdrawalRequestPolicy;
-        address bridgePolicy;
     }
 
     // keccak256(abi.encode(uint256(keccak256("aave.storage.StableVault")) - 1)) & ~bytes32(uint256(0xff))
@@ -152,6 +159,7 @@ contract StableVault is
     /// @param withdrawalPolicy The address of the contract ensuring protocol's withdrawal requirements are met.
     /// @param priceOracle The address of the PriceOracle contract.
     /// @param maxActiveSubVaults The maximum number of active sub-vaults allowed.
+    /// @param policyRegistry The address of the PolicyRegistry contract used to look up policies by ID.
     constructor(
         uint256 maxValidPerSecondRate,
         address assetRegistry,
@@ -160,13 +168,15 @@ contract StableVault is
         address transferHelper,
         address withdrawalPolicy,
         address priceOracle,
-        uint256 maxActiveSubVaults
+        uint256 maxActiveSubVaults,
+        address policyRegistry
     ) TransferHelperClient(transferHelper) {
         require(assetRegistry != address(0), Errors.ZeroAddress());
         require(iouTokenManager != address(0), Errors.ZeroAddress());
         require(fundsHandler != address(0), Errors.ZeroAddress());
         require(withdrawalPolicy != address(0), Errors.ZeroAddress());
         require(priceOracle != address(0), Errors.ZeroAddress());
+        require(policyRegistry != address(0), Errors.ZeroAddress());
         require(maxValidPerSecondRate > MathLib.RAY, InvalidRate());
         require(maxActiveSubVaults > 0, Errors.InvalidParameter());
         _disableInitializers();
@@ -177,6 +187,7 @@ contract StableVault is
         PRICE_ORACLE = priceOracle;
         MAX_VALID_PER_SECOND_RATE = maxValidPerSecondRate;
         MAX_ACTIVE_SUB_VAULTS = maxActiveSubVaults;
+        POLICY_REGISTRY = policyRegistry;
     }
 
     /// @dev Initializer.
@@ -530,40 +541,7 @@ contract StableVault is
         _setTreasury(treasury);
     }
 
-    /// @inheritdoc IStableVault
-    function setDepositPolicy(address policy) external override restricted {
-        emit DepositPolicySet($storage().depositPolicy, policy);
-        $storage().depositPolicy = policy;
-    }
-
-    /// @inheritdoc IStableVault
-    function setWithdrawalRequestPolicy(address policy) external override restricted {
-        emit WithdrawalRequestPolicySet($storage().withdrawalRequestPolicy, policy);
-        $storage().withdrawalRequestPolicy = policy;
-    }
-
-    /// @inheritdoc IStableVault
-    function setBridgePolicy(address policy) external override restricted {
-        emit BridgePolicySet($storage().bridgePolicy, policy);
-        $storage().bridgePolicy = policy;
-    }
-
     ////////////////////////////////////////////////// GETTERS /////////////////////////////////////////////////////
-
-    /// @inheritdoc IStableVault
-    function getDepositPolicy() external view override returns (address) {
-        return $storage().depositPolicy;
-    }
-
-    /// @inheritdoc IStableVault
-    function getWithdrawalRequestPolicy() external view override returns (address) {
-        return $storage().withdrawalRequestPolicy;
-    }
-
-    /// @inheritdoc IStableVault
-    function getBridgePolicy() external view override returns (address) {
-        return $storage().bridgePolicy;
-    }
 
     /// @inheritdoc IStableVault
     function getGlobalOriginalDepositAmount() external view override returns (uint256) {
@@ -1017,7 +995,7 @@ contract StableVault is
     /////////////////////////////////////// POLICY APPLICATION /////////////////////////////////////////////////////
 
     function _applyDepositPolicy(address user, address asset, uint256 amount, bytes calldata extraData) internal {
-        address policy = $storage().depositPolicy;
+        address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(DEPOSIT_POLICY_ID);
         if (policy == address(0)) {
             return;
         }
@@ -1033,7 +1011,7 @@ contract StableVault is
     function _applyWithdrawalRequestPolicy(address user, uint256 requestedAmountInRay, bytes calldata extraData)
         internal
     {
-        address policy = $storage().withdrawalRequestPolicy;
+        address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(WITHDRAWAL_REQUEST_POLICY_ID);
         if (policy == address(0)) {
             return;
         }
@@ -1052,7 +1030,7 @@ contract StableVault is
         uint256 iouAmountRay,
         bytes calldata extraData
     ) internal {
-        address policy = $storage().bridgePolicy;
+        address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(BRIDGE_POLICY_ID);
         if (policy == address(0)) {
             return;
         }

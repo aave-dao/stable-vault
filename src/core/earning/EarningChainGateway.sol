@@ -13,6 +13,7 @@ import {IBridgePolicy} from "src/interfaces/IBridgePolicy.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
+import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
@@ -42,21 +43,10 @@ contract EarningChainGateway is
 
     uint256 internal immutable ACCOUNTING_CHAIN_ID;
     address internal immutable WITHDRAWAL_POLICY;
+    address internal immutable POLICY_REGISTRY;
 
-    /// @custom:storage-location erc7201:aave.storage.EarningChainGateway
-    struct EarningChainGatewayStorage {
-        address bridgePolicy;
-    }
-
-    // keccak256(abi.encode(uint256(keccak256("aave.storage.EarningChainGateway")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant STORAGE_SLOT_EARNING_CHAIN_GATEWAY =
-        0xea411196201e72c7e0e88a9d617e29d22f6a4cdc36b2e7eaf3afb0e3a6a8a900;
-
-    function $earningChainGatewayStorage() private pure returns (EarningChainGatewayStorage storage _storage) {
-        assembly {
-            _storage.slot := STORAGE_SLOT_EARNING_CHAIN_GATEWAY
-        }
-    }
+    // keccak256("aave.stable-vault.EarningChainGateway.policy.bridge")
+    bytes32 internal constant BRIDGE_POLICY_ID = 0x537fb58e71f5b54dc09d8afff5cbf9bf5e630233f65f0531590f8cfa4a81bc6c;
 
     /// @dev Constructor.
     /// @param accountingChainId The Chain ID of the Accounting Chain.
@@ -66,23 +56,27 @@ contract EarningChainGateway is
     /// tokens.
     /// @param transferHelper Address of the TransferHelper contract used to transfer assets across components.
     /// @param withdrawalPolicy Address of the contract ensuring protocol's withdrawal requirements are met.
+    /// @param policyRegistry Address of the PolicyRegistry contract used to look up policies by ID.
     constructor(
         uint256 accountingChainId,
         address allocator,
         address priceOracle,
         address iouTokenManager,
         address transferHelper,
-        address withdrawalPolicy
+        address withdrawalPolicy,
+        address policyRegistry
     )
         TransferHelperClient(transferHelper)
         BaseChainGateway(iouTokenManager)
         LocalBalanceAggregator(allocator, priceOracle)
     {
         require(withdrawalPolicy != address(0), Errors.ZeroAddress());
+        require(policyRegistry != address(0), Errors.ZeroAddress());
         require(accountingChainId != 0 && accountingChainId != block.chainid, Errors.InvalidParameter());
         _disableInitializers();
         ACCOUNTING_CHAIN_ID = accountingChainId;
         WITHDRAWAL_POLICY = withdrawalPolicy;
+        POLICY_REGISTRY = policyRegistry;
     }
 
     /// @dev Initializer.
@@ -186,17 +180,6 @@ contract EarningChainGateway is
         );
     }
 
-    /// @inheritdoc IEarningChainGateway
-    function setBridgePolicy(address policy) external override restricted {
-        emit BridgePolicySet($earningChainGatewayStorage().bridgePolicy, policy);
-        $earningChainGatewayStorage().bridgePolicy = policy;
-    }
-
-    /// @inheritdoc IEarningChainGateway
-    function getBridgePolicy() external view override returns (address) {
-        return $earningChainGatewayStorage().bridgePolicy;
-    }
-
     function _receiveData(
         uint256, // sourceChainId
         bytes memory data
@@ -284,7 +267,7 @@ contract EarningChainGateway is
         uint256 iouAmountRay,
         bytes calldata extraData
     ) internal {
-        address policy = $earningChainGatewayStorage().bridgePolicy;
+        address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(BRIDGE_POLICY_ID);
         if (policy == address(0)) {
             return;
         }
@@ -302,7 +285,7 @@ contract EarningChainGateway is
     }
 
     function _applyBridgeFundsPolicy(uint256 destChainId, address asset, uint256 amount) internal {
-        address policy = $earningChainGatewayStorage().bridgePolicy;
+        address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(BRIDGE_POLICY_ID);
         if (policy == address(0)) {
             return;
         }

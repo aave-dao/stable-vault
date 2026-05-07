@@ -25,6 +25,7 @@ import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
+import {PolicyRegistry} from "src/periphery/PolicyRegistry.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
@@ -65,6 +66,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     PriceOracle internal _priceOracle;
     MockTransferHelper internal _mockTransferHelper;
     WithdrawalPolicy internal _mockWithdrawalPolicy;
+    PolicyRegistry internal _policyRegistry;
 
     EarningChainGateway internal _earningChainGateway;
 
@@ -74,11 +76,18 @@ contract EarningChainGatewayTest is TestWithHelpers {
         address allocator,
         address priceOracle,
         address transferHelper,
-        address withdrawalPolicy
+        address withdrawalPolicy,
+        address policyRegistry
     ) internal returns (EarningChainGateway) {
         address earningChainGatewayImpl = address(
             new EarningChainGateway(
-                ACCOUNTING_CHAIN_ID, allocator, priceOracle, iouTokenManager, transferHelper, withdrawalPolicy
+                ACCOUNTING_CHAIN_ID,
+                allocator,
+                priceOracle,
+                iouTokenManager,
+                transferHelper,
+                withdrawalPolicy,
+                policyRegistry
             )
         );
         EarningChainGateway earningChainGateway = EarningChainGateway(
@@ -142,6 +151,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         _mockBridgeCcipFeeParams = new MockBridgeAdapter(address(_mockTransferHelper));
 
+        _policyRegistry = new PolicyRegistry(address(_mockAccessManager));
+
         // Predict gateway proxy address after WithdrawalPolicy impl+proxy and gateway impl deployments.
         uint256 deployerNonce = vm.getNonce(address(this));
         address expectedGatewayProxy = vm.computeCreateAddress(address(this), deployerNonce + 3);
@@ -154,7 +165,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockAllocator),
             address(_priceOracle),
             address(_mockTransferHelper),
-            address(_mockWithdrawalPolicy)
+            address(_mockWithdrawalPolicy),
+            address(_policyRegistry)
         );
     }
 
@@ -166,7 +178,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_priceOracle),
             address(_mockIouTokenManager),
             address(0),
-            address(_mockWithdrawalPolicy)
+            address(_mockWithdrawalPolicy),
+            address(_policyRegistry)
         );
     }
 
@@ -178,7 +191,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_priceOracle),
             address(_mockIouTokenManager),
             address(_mockTransferHelper),
-            address(0)
+            address(0),
+            address(_policyRegistry)
         );
     }
 
@@ -190,7 +204,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_priceOracle),
             address(_mockIouTokenManager),
             address(_mockTransferHelper),
-            address(_mockWithdrawalPolicy)
+            address(_mockWithdrawalPolicy),
+            address(_policyRegistry)
         );
     }
 
@@ -202,7 +217,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_priceOracle),
             address(_mockIouTokenManager),
             address(_mockTransferHelper),
-            address(_mockWithdrawalPolicy)
+            address(_mockWithdrawalPolicy),
+            address(_policyRegistry)
         );
     }
 
@@ -214,7 +230,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_priceOracle),
             address(0),
             address(_mockTransferHelper),
-            address(_mockWithdrawalPolicy)
+            address(_mockWithdrawalPolicy),
+            address(_policyRegistry)
         );
     }
 

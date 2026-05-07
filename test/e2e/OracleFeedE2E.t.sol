@@ -119,7 +119,8 @@ contract OracleFeedE2ETest is BaseTest {
         address withdrawalFeeCalculator,
         address priceOracle,
         uint256 maxActiveSubVaults,
-        address treasuryAddress
+        address treasuryAddress,
+        address policyRegistry
     ) internal virtual override returns (StableVault) {
         // Deploy a vault without restriction in the valid per-second rate
         address vaultImpl = address(
@@ -131,7 +132,8 @@ contract OracleFeedE2ETest is BaseTest {
                 transferHelper,
                 withdrawalFeeCalculator,
                 priceOracle,
-                maxActiveSubVaults
+                maxActiveSubVaults,
+                policyRegistry
             )
         );
         return StableVault(

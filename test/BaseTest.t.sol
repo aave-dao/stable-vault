@@ -13,7 +13,6 @@ import {Allocator} from "src/core/Allocator.sol";
 import {AccountingChainGateway} from "src/core/accounting/AccountingChainGateway.sol";
 import {FundsHandler} from "src/core/accounting/FundsHandler.sol";
 import {StableVault} from "src/core/accounting/StableVault.sol";
-import {StableVault} from "src/core/accounting/StableVault.sol";
 import {EarningChainGateway} from "src/core/earning/EarningChainGateway.sol";
 import {IouToken} from "src/core/ious/IouToken.sol";
 import {IouTokenManager} from "src/core/ious/IouTokenManager.sol";
@@ -32,6 +31,7 @@ import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {AssetRegistry} from "src/periphery/AssetRegistry.sol";
 import {EarningChainStateSchemaV1, SCHEMA_VERSION} from "src/periphery/EarningChainStateSchemaV1.sol";
+import {PolicyRegistry} from "src/periphery/PolicyRegistry.sol";
 import {Swapper} from "src/periphery/Swapper.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
@@ -104,6 +104,7 @@ contract BaseTest is TestWithHelpers {
     address ghoStrategyVault_accountingChainAddress;
     address usdcStrategyVault_accountingChainAddress;
     AccessManager accessManager_accountingChain;
+    PolicyRegistry policyRegistry_accountingChain;
     StableVault vault;
     IouToken iouToken_accountingChain;
     IouTokenManager iouTokenManager_accountingChain;
@@ -130,6 +131,7 @@ contract BaseTest is TestWithHelpers {
     address ghoStrategyVault_earningChainAddress;
     address usdcStrategyVault_earningChainAddress;
     AccessManager accessManager_earningChain;
+    PolicyRegistry policyRegistry_earningChain;
     AssetRegistry assetRegistry_earningChain;
     WithdrawalPolicy withdrawalPolicy_earningChain;
     IouToken iouToken_earningChain;
@@ -189,7 +191,8 @@ contract BaseTest is TestWithHelpers {
         address withdrawalFeeCalculator,
         address priceOracle,
         uint256 maxActiveSubVaults,
-        address treasuryAddress
+        address treasuryAddress,
+        address policyRegistry
     ) internal virtual returns (StableVault) {
         address vaultImpl = address(
             new StableVault(
@@ -200,10 +203,19 @@ contract BaseTest is TestWithHelpers {
                 transferHelper,
                 withdrawalFeeCalculator,
                 priceOracle,
-                maxActiveSubVaults
+                maxActiveSubVaults,
+                policyRegistry
             )
         );
+        return _wrapStableVaultProxy(vaultImpl, accessManager, treasuryAddress, defaultSubVaultPerSecondRate);
+    }
 
+    function _wrapStableVaultProxy(
+        address vaultImpl,
+        address accessManager,
+        address treasuryAddress,
+        uint256 defaultSubVaultPerSecondRate
+    ) internal returns (StableVault) {
         address stableVault = address(
             new TransparentUpgradeableProxy(
                 vaultImpl,
@@ -300,6 +312,8 @@ contract BaseTest is TestWithHelpers {
         Logger.log(
             "\tIOU Token Manager (Accounting Chain) Predicted Address: %s", iouTokenManager_accountingChainAddress
         );
+
+        deployerNonce_accountingChain++; // Incrementing for PolicyRegistry
 
         deployerNonce_accountingChain++; // Incrementing for StableVault implementation
         vault_accountingChainAddress = vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
@@ -409,6 +423,10 @@ contract BaseTest is TestWithHelpers {
             "IOU Token Manager (Accounting Chain) address mismatch"
         );
 
+        // 12b. Policy Registry
+        policyRegistry_accountingChain = new PolicyRegistry(accessManager_accountingChainAddress);
+        Logger.log("\tPolicy Registry (Accounting Chain): %s", address(policyRegistry_accountingChain));
+
         // 13-14. Stable Vault (Impl + Proxy)
         // Impl and proxy deployed in the internal `_deployStableVault` function
         vault = _deployStableVault(
@@ -422,7 +440,8 @@ contract BaseTest is TestWithHelpers {
             withdrawalPolicy_accountingChainAddress,
             address(priceOracle_accountingChain),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
-            treasury
+            treasury,
+            address(policyRegistry_accountingChain)
         );
         Logger.log("\tVault: %s", vault_accountingChainAddress);
         require(address(vault) == vault_accountingChainAddress, "Vault (Accounting Chain) address mismatch");
@@ -461,7 +480,8 @@ contract BaseTest is TestWithHelpers {
                 allocator_accountingChainAddress,
                 address(priceOracle_accountingChain),
                 transferHelper_accountingChainAddress,
-                address(chainBalanceOracle)
+                address(chainBalanceOracle),
+                address(policyRegistry_accountingChain)
             )
         );
         fundsHandler = FundsHandler(
@@ -585,6 +605,8 @@ contract BaseTest is TestWithHelpers {
 
         swapper_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
         Logger.log("\tSwapper (Earning Chain) Predicted Address: %s", swapper_earningChainAddress);
+
+        deployerNonce_earningChain++; // Incrementing for PolicyRegistry
 
         deployerNonce_earningChain++; // Incrementing for Gateway implementation
         chainGateway_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
@@ -721,6 +743,10 @@ contract BaseTest is TestWithHelpers {
             address(swapper_earningChain) == swapper_earningChainAddress, "Swapper (Earning Chain) address mismatch"
         );
 
+        // 14b. Policy Registry
+        policyRegistry_earningChain = new PolicyRegistry(accessManager_earningChainAddress);
+        Logger.log("\tPolicy Registry (Earning Chain): %s", address(policyRegistry_earningChain));
+
         // 15-16. Earning Chain Gateway (Impl + Proxy)
         address earningChainGateway_impl = address(
             new EarningChainGateway(
@@ -729,7 +755,8 @@ contract BaseTest is TestWithHelpers {
                 address(priceOracle_earningChain),
                 iouTokenManager_earningChainAddress,
                 transferHelper_earningChainAddress,
-                address(withdrawalPolicy_earningChain)
+                address(withdrawalPolicy_earningChain),
+                address(policyRegistry_earningChain)
             )
         );
         earningChainGateway = EarningChainGateway(

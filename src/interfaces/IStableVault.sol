@@ -52,15 +52,6 @@ interface IStableVault {
 
     event SubVaultDeactivated(uint256 indexed subVaultId);
 
-    /// @notice Emitted when the deposit policy address is updated.
-    event DepositPolicySet(address indexed oldPolicy, address indexed newPolicy);
-
-    /// @notice Emitted when the withdrawal-request policy address is updated.
-    event WithdrawalRequestPolicySet(address indexed oldPolicy, address indexed newPolicy);
-
-    /// @notice Emitted when the bridge policy address is updated.
-    event BridgePolicySet(address indexed oldPolicy, address indexed newPolicy);
-
     /// @notice Thrown when the amount requested to withdraw is greater than the amount available.
     /// @dev It is possible the system does not have enough profits i.e. balances over 'original deposits' to cover a
     /// user's withdrawal request.
@@ -118,24 +109,6 @@ interface IStableVault {
     /// @notice Sets the treasury address, where claimed surplus interest is sent to.
     /// @param treasury Address of the treasury. If set to address(0), surplus interest claiming will revert.
     function setTreasury(address treasury) external;
-
-    /// @notice Sets the deposit policy. `address(0)` disables the policy.
-    function setDepositPolicy(address policy) external;
-
-    /// @notice Sets the withdrawal-request policy. `address(0)` disables the policy.
-    function setWithdrawalRequestPolicy(address policy) external;
-
-    /// @notice Sets the bridge policy. `address(0)` disables the policy.
-    function setBridgePolicy(address policy) external;
-
-    /// @notice Getter for the deposit policy address.
-    function getDepositPolicy() external view returns (address);
-
-    /// @notice Getter for the withdrawal-request policy address.
-    function getWithdrawalRequestPolicy() external view returns (address);
-
-    /// @notice Getter for the bridge policy address.
-    function getBridgePolicy() external view returns (address);
 
     /// @notice Claims surplus interest from the vault.
     /// @dev If funds requested can be covered by the system's surplus interest, the funds are pulled from downstream

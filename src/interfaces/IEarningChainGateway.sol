@@ -14,9 +14,6 @@ interface IEarningChainGateway is IChainGateway {
     /// @param amount The amount of the asset that was removed.
     event AssetOutflow(address indexed asset, uint256 amount);
 
-    /// @notice Emitted when the bridge policy address is updated.
-    event BridgePolicySet(address indexed oldPolicy, address indexed newPolicy);
-
     /// @notice The aggregated balance of the Earning Chain.
     function getAggregatedBalance() external view returns (uint256);
 
@@ -75,10 +72,4 @@ interface IEarningChainGateway is IChainGateway {
         bytes calldata bridgeAdapterData,
         bytes memory withdrawalPolicyData
     ) external payable returns (uint256);
-
-    /// @notice Sets the bridge policy. `address(0)` disables the policy.
-    function setBridgePolicy(address policy) external;
-
-    /// @notice Getter for the bridge policy address.
-    function getBridgePolicy() external view returns (address);
 }

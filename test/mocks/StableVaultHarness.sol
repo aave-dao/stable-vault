@@ -13,7 +13,8 @@ contract StableVaultHarness is StableVault {
         address transferHelper,
         address withdrawalPolicy,
         address priceOracle,
-        uint256 maxActiveSubVaults
+        uint256 maxActiveSubVaults,
+        address policyRegistry
     )
         StableVault(
             maxValidPerSecondRate,
@@ -23,7 +24,8 @@ contract StableVaultHarness is StableVault {
             transferHelper,
             withdrawalPolicy,
             priceOracle,
-            maxActiveSubVaults
+            maxActiveSubVaults,
+            policyRegistry
         )
     {}
 

@@ -26,9 +26,6 @@ interface IFundsHandler {
     /// @param chainId Chain id of the earning chain that was removed.
     event EarningChainRemoved(uint256 chainId);
 
-    /// @notice Emitted when the bridge policy address is updated.
-    event BridgePolicySet(address indexed oldPolicy, address indexed newPolicy);
-
     /// @notice Getter for the total assets in the local Allocator and the Allocators on all Earning Chains.
     /// @dev May underestimate when trust or freshness guarantees cannot be satisfied for a given contribution
     /// (conservative by design). See the implementation for specific policies.
@@ -76,12 +73,6 @@ interface IFundsHandler {
         uint256 gasLimit,
         bytes calldata bridgeAdapterData
     ) external payable;
-
-    /// @notice Sets the bridge policy. `address(0)` disables the policy.
-    function setBridgePolicy(address policy) external;
-
-    /// @notice Getter for the bridge policy address.
-    function getBridgePolicy() external view returns (address);
 
     /// @notice Callback function for when funds arrive from a chain.
     /// @param asset Address of the asset that arrived from the chain.
