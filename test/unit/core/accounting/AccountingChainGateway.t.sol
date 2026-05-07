@@ -233,22 +233,22 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         );
     }
 
-    /// @dev `setUp` pre-wires (ASSET_FOR_DATA_ONLY_BRIDGE, EARNING_CHAIN_ID, _mockBridgeAdapterData),
-    /// (_mockUsdt, EARNING_CHAIN_ID, _mockBridgeAdapterAssets), and (_mockGho, EARNING_CHAIN_ID, _mockBridgeAdapterAssets).
-    /// Fuzz inputs that hit any of those triples must be excluded.
+    /// @dev `setUp` pre-wires (ASSET_FOR_DATA_ONLY_BRIDGE, EARNING_CHAIN_ID, _mockBridgeCcipFeeParams),
+    /// (_mockUsdt, EARNING_CHAIN_ID, _mockBridgeAdapterAssets), and (_mockGho, EARNING_CHAIN_ID,
+    /// _mockBridgeAdapterAssets). Fuzz inputs that hit any of those triples must be excluded.
     function _assumeFreshBridgeAdapterTuple(address asset, uint256 chainId, address bridgeAdapter) internal view {
         vm.assume(asset != address(0) && bridgeAdapter != address(0) && chainId != 0 && chainId != block.chainid);
         vm.assume(
             !(asset == Constants.ASSET_FOR_DATA_ONLY_BRIDGE && chainId == EARNING_CHAIN_ID
-                && bridgeAdapter == address(_mockBridgeAdapterData))
+                    && bridgeAdapter == address(_mockBridgeCcipFeeParams))
         );
         vm.assume(
             !(asset == address(_mockUsdt) && chainId == EARNING_CHAIN_ID
-                && bridgeAdapter == address(_mockBridgeAdapterAssets))
+                    && bridgeAdapter == address(_mockBridgeAdapterAssets))
         );
         vm.assume(
             !(asset == address(_mockGho) && chainId == EARNING_CHAIN_ID
-                && bridgeAdapter == address(_mockBridgeAdapterAssets))
+                    && bridgeAdapter == address(_mockBridgeAdapterAssets))
         );
     }
 
