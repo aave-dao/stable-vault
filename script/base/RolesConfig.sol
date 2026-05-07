@@ -13,6 +13,7 @@ import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
+import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
 import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {IStableVault} from "src/interfaces/IStableVault.sol";
@@ -586,6 +587,19 @@ abstract contract RolesConfig is DeploymentConfig {
         });
     }
 
+    /// @custom:delay Critical
+    /// @custom:location PolicyRegistry
+    function getRole__setPolicy() internal view returns (Role memory) {
+        bytes4 selector = IPolicyRegistry.setPolicy.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: CRITICAL_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
+        });
+    }
+
     /// @custom:delay None
     /// @custom:location aToken Vault
     function getRole__claimMerklRewards() internal pure returns (Role memory) {
@@ -613,7 +627,7 @@ abstract contract RolesConfig is DeploymentConfig {
     }
 
     function getAllFunctionBasedRoles() internal view returns (Role[] memory) {
-        Role[] memory roles = new Role[](44);
+        Role[] memory roles = new Role[](45);
 
         // AssetRegistry
         roles[0] = getRole__setAssetConfig();
@@ -678,6 +692,9 @@ abstract contract RolesConfig is DeploymentConfig {
         // External - aToken Vault
         roles[42] = getRole__claimMerklRewards();
         roles[43] = getRole__emergencyRescue();
+
+        // PolicyRegistry
+        roles[44] = getRole__setPolicy();
 
         return roles;
     }

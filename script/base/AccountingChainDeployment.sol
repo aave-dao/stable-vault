@@ -367,7 +367,8 @@ abstract contract AccountingChainDeployment is
                 transferHelper: getTransferHelperAddress(_deployer()),
                 withdrawalPolicy: getWithdrawalPolicyAddress(_deployer()),
                 priceOracle: getPriceOracleAddress(_deployer()),
-                maxActiveSubVaults: _configUint(".accountingChain.defaultMaxActiveSubVaults")
+                maxActiveSubVaults: _configUint(".accountingChain.defaultMaxActiveSubVaults"),
+                policyRegistry: getPolicyRegistryAddress(_deployer())
             })
         );
         _logDeployment("StableVault::Implementation", "", implementation);
@@ -424,7 +425,8 @@ abstract contract AccountingChainDeployment is
                 allocator: getAllocatorAddress(_deployer()),
                 priceOracle: getPriceOracleAddress(_deployer()),
                 transferHelper: getTransferHelperAddress(_deployer()),
-                chainBalanceOracle: getChainBalanceOracleAddress(_deployer())
+                chainBalanceOracle: getChainBalanceOracleAddress(_deployer()),
+                policyRegistry: getPolicyRegistryAddress(_deployer())
             })
         );
         _logDeployment("FundsHandler::Implementation", "", implementation);

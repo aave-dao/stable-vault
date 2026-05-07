@@ -138,6 +138,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         _setupTarget__WithdrawalPolicy(deployer);
         _setupTarget__AssetRegistry(deployer);
         _setupTarget__PriceOracle(deployer);
+        _setupTarget__PolicyRegistry(deployer);
         _setupTarget__ATokenVaults();
     }
 
@@ -390,6 +391,16 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         roles[0] = RolesConfig.getRole__setOracleAdapterForAsset();
 
         _setTargetFunctionRoles(priceOracle, roles);
+    }
+
+    function _setupTarget__PolicyRegistry(address deployer) internal {
+        address policyRegistry = getPolicyRegistryAddress(deployer);
+
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](1);
+
+        roles[0] = RolesConfig.getRole__setPolicy();
+
+        _setTargetFunctionRoles(policyRegistry, roles);
     }
 
     function _setupTarget__ATokenVaults() internal {

@@ -38,7 +38,8 @@ contract UpgradeStableVault is Create3AddressBook, Upgrade {
                 transferHelper: getTransferHelperAddress(DEPLOYER),
                 withdrawalPolicy: getWithdrawalPolicyAddress(DEPLOYER),
                 priceOracle: address(0), // TODO: Deploy Price Oracle properly
-                maxActiveSubVaults: DEFAULT_MAX_ACTIVE_SUB_VAULTS
+                maxActiveSubVaults: DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+                policyRegistry: getPolicyRegistryAddress(DEPLOYER)
             })
         );
         _logDeployment("StableVault::Implementation", "", implementation);

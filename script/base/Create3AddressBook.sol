@@ -20,6 +20,7 @@ contract Create3AddressBook {
     string constant PRICE_ORACLE_SALT_SEED = "aave.stable-vault.PriceOracle";
     string constant CHAIN_BALANCE_ORACLE_SALT_SEED = "aave.stable-vault.ChainBalanceOracle";
     string constant EARNING_CHAIN_STATE_PROVIDER_SALT_SEED = "aave.stable-vault.EarningChainStateProvider";
+    string constant POLICY_REGISTRY_SALT_SEED = "aave.stable-vault.PolicyRegistry";
 
     function getStableVaultAddress(address deployer) internal pure virtual returns (address) {
         return Create3AddressLib.computeCreate3Address(STABLE_VAULT_SALT_SEED, deployer);
@@ -79,5 +80,9 @@ contract Create3AddressBook {
 
     function getEarningChainStateProviderAddress(address deployer) internal pure virtual returns (address) {
         return Create3AddressLib.computeCreate3Address(EARNING_CHAIN_STATE_PROVIDER_SALT_SEED, deployer);
+    }
+
+    function getPolicyRegistryAddress(address deployer) internal pure virtual returns (address) {
+        return Create3AddressLib.computeCreate3Address(POLICY_REGISTRY_SALT_SEED, deployer);
     }
 }
