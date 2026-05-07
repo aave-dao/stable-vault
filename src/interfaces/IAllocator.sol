@@ -16,8 +16,6 @@ interface IAllocator {
 
     event AssetToppedUp(address indexed asset, uint256 amount);
 
-    event DefaultStrategySet(address indexed asset, address indexed strategy);
-
     event StrategyDepositFailed(address indexed strategy, uint256 amount);
 
     event StrategyDepositsToggled(address indexed strategy, bool depositsEnabled);
@@ -31,11 +29,6 @@ interface IAllocator {
     event StrategyTrusted(address indexed strategy);
 
     event StrategyDistrusted(address indexed strategy);
-
-    /// @notice Thrown when setting as default a strategy that already is the default, or when removing a strategy
-    /// that is currently set as the default.
-    /// @custom:selector 0x13e93f82
-    error DefaultStrategy(address strategy);
 
     /// @notice Thrown when funds fail to deposit into a yield strategy.
     /// @custom:selector 0x3868bf52
@@ -159,10 +152,10 @@ interface IAllocator {
     /// strategies).
     function getTrustedAssetBalance(address asset) external view returns (uint256);
 
-    /// @notice Getter for the default strategy for a given asset.
-    /// @param asset Address of the asset to get the default strategy for.
-    /// @return strategy Address of the default strategy for the asset.
-    function getDefaultStrategy(address asset) external view returns (address);
+    /// @notice Getter for the list of strategies registered for a given asset, in insertion order.
+    /// @param asset Address of the asset to get strategies for.
+    /// @return strategies Addresses of the registered strategies for the asset.
+    function getStrategiesForAsset(address asset) external view returns (address[] memory strategies);
 
     /// @notice Getter for the configuration of a given strategy.
     /// @param strategy Address of the strategy to get the configuration for.
@@ -180,19 +173,12 @@ interface IAllocator {
     /// @return isSupported Whether the strategy is supported for allocating or deallocating.
     function isStrategySupported(address strategy) external view returns (bool);
 
-    /// @notice Deposits a given amount of an asset into the default strategy for the asset.
-    /// @param asset Address of the asset to deposit.
-    /// @param amount Amount of the asset to deposit.
-    /// @return netDepositAmount Amount of the asset deposited after accounting for slippage.
-    function deposit(address asset, uint256 amount) external returns (uint256 netDepositAmount);
-
-    /// @notice Deposits a given amount of an asset into the default strategy for the asset, allowing idle funds if the
-    /// deposit fails.
-    /// @dev This function is to allow funds being bridged to the local chain to be kept in the Allocator
-    /// even during error scenarios.
-    /// @param asset Address of the asset to deposit.
-    /// @param amount Amount of the asset to deposit.
-    function depositAllowIdle(address asset, uint256 amount) external;
+    /// @notice Pulls assets from the TransferHelper into the Allocator and emits AssetLeftIdle.
+    /// @dev Used by the depositor (FundsHandler / EarningChainGateway) for both user-deposit and bridge-callback flows.
+    /// Zero amount is a no-op for bridge-callback safety.
+    /// @param asset Address of the asset to pull.
+    /// @param amount Amount of the asset to pull.
+    function pullIdle(address asset, uint256 amount) external;
 
     /// @notice Rebalances underlying assets.
     /// @dev A rebalance is an ordered combination of the following operations: deallocation of assets from strategies,
@@ -206,9 +192,8 @@ interface IAllocator {
     /// @param amount Amount of the asset to deposit.
     function topUp(address asset, uint256 amount) external;
 
-    /// @notice Withdraws a given amount of an asset, sourcing from idle funds, the default strategy, then
-    /// non-default strategies as needed.
-    /// @dev Prioritizes idle funds, default strategy, then non-default strategy(s).
+    /// @notice Withdraws a given amount of an asset, sourcing from idle funds first then iterating registered
+    /// strategies in insertion order.
     /// @param asset Address of the asset to withdraw.
     /// @param amount Amount of the asset to withdraw.
     function withdraw(address asset, uint256 amount) external;
@@ -221,12 +206,6 @@ interface IAllocator {
     /// @notice Removes a yield strategy from the allocator.
     /// @param strategy Address of the ERC-4626 strategy to remove.
     function removeStrategy(address strategy) external;
-
-    /// @notice Sets the default yield strategy for an asset.
-    /// @dev Reverts if the strategy is not trusted or has deposits disabled.
-    /// @param asset Address of the asset to set the default strategy for.
-    /// @param strategy Address of the ERC-4626 strategy to set as the default.
-    function setDefaultStrategy(address asset, address strategy) external;
 
     /// @notice Disables deposits to a given strategy.
     /// @param strategy Address of the ERC-4626 strategy to disable deposits for.
@@ -242,9 +221,8 @@ interface IAllocator {
     function trustStrategy(address strategy) external;
 
     /// @notice Distrusts a strategy, excluding its balance from the system's TVL.
-    /// @dev As a side effect, deposits into the strategy are automatically disabled if currently enabled, and the
-    /// strategy is unset as the default for its asset if it is the current default.
-    /// @dev Trusting the strategy again does NOT re-enable deposits or restore it as the default.
+    /// @dev As a side effect, deposits into the strategy are automatically disabled if currently enabled.
+    /// @dev Trusting the strategy again does NOT re-enable deposits.
     /// @param strategy Address of the strategy to distrust.
     function distrustStrategy(address strategy) external;
 
