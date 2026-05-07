@@ -233,10 +233,29 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         );
     }
 
+    /// @dev `setUp` pre-wires (ASSET_FOR_DATA_ONLY_BRIDGE, EARNING_CHAIN_ID, _mockBridgeAdapterData),
+    /// (_mockUsdt, EARNING_CHAIN_ID, _mockBridgeAdapterAssets), and (_mockGho, EARNING_CHAIN_ID, _mockBridgeAdapterAssets).
+    /// Fuzz inputs that hit any of those triples must be excluded.
+    function _assumeFreshBridgeAdapterTuple(address asset, uint256 chainId, address bridgeAdapter) internal view {
+        vm.assume(asset != address(0) && bridgeAdapter != address(0) && chainId != 0 && chainId != block.chainid);
+        vm.assume(
+            !(asset == Constants.ASSET_FOR_DATA_ONLY_BRIDGE && chainId == EARNING_CHAIN_ID
+                && bridgeAdapter == address(_mockBridgeAdapterData))
+        );
+        vm.assume(
+            !(asset == address(_mockUsdt) && chainId == EARNING_CHAIN_ID
+                && bridgeAdapter == address(_mockBridgeAdapterAssets))
+        );
+        vm.assume(
+            !(asset == address(_mockGho) && chainId == EARNING_CHAIN_ID
+                && bridgeAdapter == address(_mockBridgeAdapterAssets))
+        );
+    }
+
     function test_isBridgeAdapterSupported_returnsTrueAfterAdd(address asset, uint256 chainId, address bridgeAdapter)
         public
     {
-        vm.assume(asset != address(0) && bridgeAdapter != address(0) && chainId != 0 && chainId != block.chainid);
+        _assumeFreshBridgeAdapterTuple(asset, chainId, bridgeAdapter);
 
         assertFalse(_accountingChainGateway.isBridgeAdapterSupported(asset, chainId, bridgeAdapter));
 
@@ -251,7 +270,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         uint256 chainId,
         address bridgeAdapter
     ) public {
-        vm.assume(asset != address(0) && bridgeAdapter != address(0) && chainId != 0 && chainId != block.chainid);
+        _assumeFreshBridgeAdapterTuple(asset, chainId, bridgeAdapter);
 
         vm.prank(everyRoleAccount);
         _accountingChainGateway.addBridgeAdapter(asset, chainId, bridgeAdapter);
@@ -267,15 +286,14 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         uint256 chainId,
         address bridgeAdapter
     ) public view {
+        _assumeFreshBridgeAdapterTuple(asset, chainId, bridgeAdapter);
         assertFalse(_accountingChainGateway.isBridgeAdapterSupported(asset, chainId, bridgeAdapter));
     }
 
     function test_addBridgeAdapter_setsExpectedBridgeAdapter(address asset, uint256 chainId, address bridgeAdapter)
         public
     {
-        vm.assume(asset != address(0));
-        vm.assume(chainId != 0 && chainId != block.chainid);
-        vm.assume(bridgeAdapter != address(0));
+        _assumeFreshBridgeAdapterTuple(asset, chainId, bridgeAdapter);
         vm.prank(admin);
         _accountingChainGateway.addBridgeAdapter(asset, chainId, bridgeAdapter);
         assertTrue(_accountingChainGateway.isBridgeAdapterSupported(asset, chainId, bridgeAdapter));
