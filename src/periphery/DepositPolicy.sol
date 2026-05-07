@@ -17,7 +17,9 @@ import {Errors} from "src/types/Errors.sol";
 contract DepositPolicy is AccessManaged, IDepositPolicy {
     using RateLimitBucketLib for RateLimitBucketLib.Bucket;
 
-    event DepositBucketSet(address indexed asset, uint128 capacity, uint128 refillRate);
+    event DepositBucketSet(
+        address indexed asset, uint128 oldCapacity, uint128 oldRefillRate, uint128 newCapacity, uint128 newRefillRate
+    );
 
     address internal immutable DEPOSIT_POLICY_APPLIER;
 
@@ -75,7 +77,10 @@ contract DepositPolicy is AccessManaged, IDepositPolicy {
     // bucket at the start, then match the refill rate). Set `capacity` accordingly.
     function setDepositBucket(address asset, uint128 capacity, uint128 refillRate) external restricted {
         require(asset != address(0), Errors.ZeroAddress());
-        _buckets[asset].configure(capacity, refillRate);
-        emit DepositBucketSet(asset, capacity, refillRate);
+        RateLimitBucketLib.Bucket storage bucket = _buckets[asset];
+        uint128 oldCapacity = bucket.capacity;
+        uint128 oldRefillRate = bucket.refillRate;
+        bucket.configure(capacity, refillRate);
+        emit DepositBucketSet(asset, oldCapacity, oldRefillRate, capacity, refillRate);
     }
 }
