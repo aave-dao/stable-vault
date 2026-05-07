@@ -19,6 +19,11 @@ import {Errors} from "src/types/Errors.sol";
 contract AdiAdapter is BaseBridgeAdapter, IAdiBridgeAdapter {
     using SafeERC20 for IERC20;
 
+    /// @notice Additional gas a.DI should allocate for this adapter before entering the destination Gateway.
+    /// @dev The current mocked receiver trace measures the adapter wrapper at about 7,163 gas. Rounded up to 10k for
+    /// calldata growth and cold access variance.
+    uint256 public constant ADI_RECEIVER_GAS_OVERHEAD = 10_000;
+
     address internal immutable ADI_CROSS_CHAIN_CONTROLLER;
 
     modifier onlyCrossChainController() {
@@ -38,6 +43,19 @@ contract AdiAdapter is BaseBridgeAdapter, IAdiBridgeAdapter {
         return ADI_CROSS_CHAIN_CONTROLLER;
     }
 
+    /// @inheritdoc IAdiBridgeAdapter
+    function quoteMessageToChain(uint256 destinationChainId, bytes calldata messageData, uint256 gasLimit)
+        external
+        view
+        override
+        returns (uint256 nativeFee, IAdiCrossChainForwarder.Fee[] memory fees)
+    {
+        address destinationChainAdapter = _destinationChainAdapterOf[destinationChainId];
+        require(destinationChainAdapter != address(0), Errors.InvalidParameter());
+
+        return _quoteForwardMessage(destinationChainId, destinationChainAdapter, gasLimit, messageData);
+    }
+
     /// @inheritdoc IBridgeAdapter
     function publishMessageToChainWithFeePayer(
         uint256 destinationChainId,
@@ -50,46 +68,76 @@ contract AdiAdapter is BaseBridgeAdapter, IAdiBridgeAdapter {
     ) external payable override(BaseBridgeAdapter, IBridgeAdapter) onlyGateway {
         require(asset == Constants.ASSET_FOR_DATA_ONLY_BRIDGE, Errors.UnsupportedAsset(asset));
         require(amount == 0, Errors.InvalidParameter());
+        require(feePayer != address(0), Errors.ZeroAddress());
+        require(bridgeAdapterData.length == 0, Errors.InvalidParameter());
 
         address destinationChainAdapter = _destinationChainAdapterOf[destinationChainId];
         require(destinationChainAdapter != address(0), Errors.InvalidParameter());
 
-        _fundCrossChainController(feePayer, bridgeAdapterData);
+        uint256 adjustedGasLimit = gasLimit + ADI_RECEIVER_GAS_OVERHEAD;
+        (uint256 nativeFee, IAdiCrossChainForwarder.Fee[] memory fees) =
+            _quoteForwardMessage(destinationChainId, destinationChainAdapter, gasLimit, data);
+        _fundCrossChainController(feePayer, nativeFee, fees);
 
-        (bytes32 envelopeId,) = IAdiCrossChainForwarder(ADI_CROSS_CHAIN_CONTROLLER)
-            .forwardMessage(destinationChainId, destinationChainAdapter, gasLimit, data);
+        (bytes32 envelopeId,,) = IAdiCrossChainForwarder(ADI_CROSS_CHAIN_CONTROLLER)
+            .forwardMessageStrict(destinationChainId, destinationChainAdapter, adjustedGasLimit, data);
         emit MessagePublished(envelopeId);
+
+        _refundExcessNative(feePayer, nativeFee);
     }
 
     /// @inheritdoc IAdiBridgeAdapter
-    function receiveCrossChainMessage(address originSender, uint256 originChainId, bytes calldata message)
-        external
-        override
-        onlyCrossChainController
-    {
+    function receiveCrossChainMessage(
+        address originSender,
+        uint256 originChainId,
+        bytes calldata message,
+        bytes32 envelopeId
+    ) external override onlyCrossChainController {
         address trustedOriginSender = _destinationChainAdapterOf[originChainId];
         require(trustedOriginSender != address(0), Errors.InvalidParameter());
         require(originSender == trustedOriginSender, OnlyDestinationChainAdapter());
 
         IChainGateway(GATEWAY).receiveMessage(originChainId, Constants.ASSET_FOR_DATA_ONLY_BRIDGE, 0, message);
+        emit MessageReceived(envelopeId);
     }
 
-    function _fundCrossChainController(address feePayer, bytes memory bridgeAdapterData) internal {
-        if (msg.value > 0) {
-            (bool callSucceeded,) = payable(ADI_CROSS_CHAIN_CONTROLLER).call{value: msg.value}("");
+    function _quoteForwardMessage(
+        uint256 destinationChainId,
+        address destinationChainAdapter,
+        uint256 gasLimit,
+        bytes memory data
+    ) internal view returns (uint256 nativeFee, IAdiCrossChainForwarder.Fee[] memory fees) {
+        IAdiCrossChainForwarder crossChainForwarder = IAdiCrossChainForwarder(ADI_CROSS_CHAIN_CONTROLLER);
+        uint256 quoteBandwidth = crossChainForwarder.getOptimalBandwidthByChain(destinationChainId);
+        return crossChainForwarder.quoteForwardMessage(
+            destinationChainId, destinationChainAdapter, gasLimit + ADI_RECEIVER_GAS_OVERHEAD, data, quoteBandwidth
+        );
+    }
+
+    function _fundCrossChainController(address feePayer, uint256 nativeFee, IAdiCrossChainForwarder.Fee[] memory fees)
+        internal
+    {
+        require(msg.value >= nativeFee, Errors.InsufficientFunds());
+
+        if (nativeFee > 0) {
+            (bool callSucceeded,) = payable(ADI_CROSS_CHAIN_CONTROLLER).call{value: nativeFee}("");
             require(callSucceeded, Errors.NativeTransferFailed());
         }
 
-        if (bridgeAdapterData.length == 0) {
-            return;
-        }
-
-        IAdiBridgeAdapter.Fee[] memory fees = abi.decode(bridgeAdapterData, (IAdiBridgeAdapter.Fee[]));
         for (uint256 i = 0; i < fees.length; i++) {
-            require(fees[i].asset != address(0), Errors.InvalidParameter());
-            require(fees[i].asset != Constants.NATIVE_CURRENCY, Errors.InvalidParameter());
-            require(fees[i].amount > 0, Errors.InvalidParameter());
-            IERC20(fees[i].asset).safeTransferFrom(feePayer, ADI_CROSS_CHAIN_CONTROLLER, fees[i].amount);
+            require(fees[i].token != address(0), Errors.InvalidParameter());
+            require(fees[i].token != Constants.NATIVE_CURRENCY, Errors.InvalidParameter());
+            if (fees[i].amount > 0) {
+                IERC20(fees[i].token).safeTransferFrom(feePayer, ADI_CROSS_CHAIN_CONTROLLER, fees[i].amount);
+            }
+        }
+    }
+
+    function _refundExcessNative(address feePayer, uint256 nativeFee) internal {
+        uint256 excessNative = msg.value - nativeFee;
+        if (excessNative > 0) {
+            (bool callSucceeded,) = payable(feePayer).call{value: excessNative}("");
+            require(callSucceeded, Errors.NativeTransferFailed());
         }
     }
 }
