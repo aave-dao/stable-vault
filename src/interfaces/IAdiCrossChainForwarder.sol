@@ -39,6 +39,7 @@ interface IAdiCrossChainForwarder {
     }
 
     /// @notice Forwards a message through a.DI to a destination chain receiver portal.
+    /// @dev a.DI enforces the configured required source-side forwarding successes before returning.
     /// @param destinationChainId Chain id of the destination chain.
     /// @param destination Receiver portal on the destination chain.
     /// @param gasLimit Gas cost on receiving side of the message.
@@ -48,21 +49,6 @@ interface IAdiCrossChainForwarder {
     function forwardMessage(uint256 destinationChainId, address destination, uint256 gasLimit, bytes calldata message)
         external
         returns (bytes32 envelopeId, bytes32 transactionId);
-
-    /// @notice Forwards a message through a.DI and reverts unless enough source-side adapter sends succeed.
-    /// @param destinationChainId Chain id of the destination chain.
-    /// @param destination Receiver portal on the destination chain.
-    /// @param gasLimit Gas cost on receiving side of the message.
-    /// @param message Message payload to bridge.
-    /// @return envelopeId a.DI envelope id.
-    /// @return transactionId a.DI transaction id.
-    /// @return forwardingSuccesses Number of successful source-side bridge adapter sends.
-    function forwardMessageStrict(
-        uint256 destinationChainId,
-        address destination,
-        uint256 gasLimit,
-        bytes calldata message
-    ) external returns (bytes32 envelopeId, bytes32 transactionId, uint256 forwardingSuccesses);
 
     /// @notice Returns the configured optimal forwarding bandwidth for a destination chain.
     /// @param chainId Chain id of the destination chain.

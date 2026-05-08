@@ -14,7 +14,6 @@ contract MockAdiCrossChainController is IAdiCrossChainForwarder {
     address public lastDestination;
     uint256 public lastGasLimit;
     uint256 public forwardMessageCallCount;
-    uint256 public forwardMessageStrictCallCount;
     uint256 public retryEnvelopeCallCount;
     uint256 public retryTransactionCallCount;
     uint256 public nativeFee;
@@ -37,17 +36,6 @@ contract MockAdiCrossChainController is IAdiCrossChainForwarder {
         forwardMessageCallCount++;
         _recordForwardMessage(destinationChainId, destination, gasLimit, message);
         return (bytes32(uint256(1)), bytes32(uint256(2)));
-    }
-
-    function forwardMessageStrict(
-        uint256 destinationChainId,
-        address destination,
-        uint256 gasLimit,
-        bytes calldata message
-    ) external override returns (bytes32 envelopeId, bytes32 transactionId, uint256 forwardingSuccesses) {
-        forwardMessageStrictCallCount++;
-        _recordForwardMessage(destinationChainId, destination, gasLimit, message);
-        return (bytes32(uint256(1)), bytes32(uint256(2)), 1);
     }
 
     function quoteForwardMessage(uint256, address, uint256 gasLimit, bytes calldata, uint256 quoteBandwidth)

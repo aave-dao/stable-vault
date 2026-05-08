@@ -79,8 +79,8 @@ contract AdiAdapter is BaseBridgeAdapter, IAdiBridgeAdapter {
             _quoteForwardMessage(destinationChainId, destinationChainAdapter, gasLimit, data);
         _fundCrossChainController(feePayer, nativeFee, fees);
 
-        (bytes32 envelopeId,,) = IAdiCrossChainForwarder(ADI_CROSS_CHAIN_CONTROLLER)
-            .forwardMessageStrict(destinationChainId, destinationChainAdapter, adjustedGasLimit, data);
+        (bytes32 envelopeId,) = IAdiCrossChainForwarder(ADI_CROSS_CHAIN_CONTROLLER)
+            .forwardMessage(destinationChainId, destinationChainAdapter, adjustedGasLimit, data);
         emit MessagePublished(envelopeId);
 
         _refundExcessNative(feePayer, nativeFee);
