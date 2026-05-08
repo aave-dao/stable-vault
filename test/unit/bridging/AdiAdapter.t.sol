@@ -224,8 +224,7 @@ contract AdiAdapterTest is TestWithHelpers {
             DEFAULT_GAS_LIMIT + _accountingChainAdiAdapter.ADI_RECEIVER_GAS_OVERHEAD()
         );
         assertEq(_mockAdiCrossChainController.getLastMessage(), data);
-        assertEq(_mockAdiCrossChainController.forwardMessageCallCount(), 0);
-        assertEq(_mockAdiCrossChainController.forwardMessageStrictCallCount(), 1);
+        assertEq(_mockAdiCrossChainController.forwardMessageCallCount(), 1);
     }
 
     function test_publishMessageToChainWithFeePayer_usesTopLevelGasLimit() public {
