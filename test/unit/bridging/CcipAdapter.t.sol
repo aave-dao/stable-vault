@@ -2,6 +2,8 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.22;
 
+import {Vm} from "forge-std/Vm.sol";
+
 import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -883,7 +885,7 @@ contract CcipAdapterTest is TestWithHelpers {
             abi.encodeWithSelector(IRouterClient.getFee.selector, EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage),
             abi.encode(estimatedFeeAmount)
         );
-        _expectBridgeAssetsApproval(ccipTokenAmounts);
+        // Refund now happens before asset approval / ccipSend, so a failing refund reverts before either runs.
 
         vm.expectRevert(Errors.NativeTransferFailed.selector);
         vm.prank(address(_mockAccountingChainGateway));
@@ -898,13 +900,16 @@ contract CcipAdapterTest is TestWithHelpers {
         );
     }
 
-    function test_publishMessageToChainWithFeePayer_refundThresholdWorksAsExpected_TokenBridgeFee(
+    function test_publishMessageToChainWithFeePayer_erc20FeePath_keepsUnspentApprovalWithFeePayer(
         address feePayer,
         uint256 feeAmount,
         uint256 feeRefundThreshold,
         uint256 actualFeeAmount
     ) public {
         // Context: Accounting Chain -> Earning Chain
+        // The ERC-20 fee path pulls only the CCIP-quoted estimate from `feePayer`, so the unspent allowance
+        // (`feeAmount - estimatedFeeAmount`) always remains with `feePayer` regardless of `feeRefundThreshold`.
+        // No `FeeRefunded` event is emitted on this path.
 
         vm.assume(feePayer != address(0));
         vm.assume(feePayer != address(_mockTransferHelper));
@@ -941,22 +946,17 @@ contract CcipAdapterTest is TestWithHelpers {
             )
         });
 
-        {
-            // Mock call to router.getFee - return the fee amount to trigger refund flow
-            vm.mockCall(
-                address(_mockCCIPRouter),
-                abi.encodeWithSelector(IRouterClient.getFee.selector, EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage),
-                abi.encode(actualFeeAmount)
-            );
+        vm.mockCall(
+            address(_mockCCIPRouter),
+            abi.encodeWithSelector(IRouterClient.getFee.selector, EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage),
+            abi.encode(actualFeeAmount)
+        );
 
-            // Expect a call to router to approve the bridged assets
-            _expectBridgeAssetsApproval(ccipTokenAmounts);
-
-            // Expect a call to router.ccipSend
+        // Pull is for `actualFeeAmount` (the estimate), not the full `feeAmount`.
+        if (actualFeeAmount > 0) {
             vm.expectCall(
-                address(_mockCCIPRouter),
-                0,
-                abi.encodeCall(IRouterClient.ccipSend, (EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage))
+                feeToken,
+                abi.encodeCall(IERC20.transferFrom, (feePayer, address(_accountingChainCcipAdapter), actualFeeAmount))
             );
         }
 
@@ -970,18 +970,9 @@ contract CcipAdapterTest is TestWithHelpers {
         assertEq(_mockTransferHelper.getBalance(address(_mockUsdt)), 0);
         assertEq(_mockTransferHelper.getBalance(address(_mockGho)), 0);
 
-        // We already assumed that feeAmount >= actualFeeAmount, so we can safely subtract them to get the excess fee
-        uint256 excessFee = feeAmount - actualFeeAmount;
-
-        uint256 expectedFeeRefund;
-        if (excessFee > feeRefundThreshold) {
-            expectedFeeRefund = excessFee;
-        } else {
-            // If the excess fee is less than the refund threshold, no refund is triggered nor expected
-            expectedFeeRefund = 0;
-        }
-
-        assertEq(_mockGho.balanceOf(feePayer), expectedFeeRefund);
+        // The unspent allocation (`feeAmount - actualFeeAmount`) sits on `feePayer` independent of the threshold —
+        // no refund flow runs on the ERC-20 path.
+        assertEq(_mockGho.balanceOf(feePayer), feeAmount - actualFeeAmount);
     }
 
     function test_publishMessageToChainWithFeePayer_refundThresholdWorksAsExpected_NativeBridgeFee(
@@ -1947,12 +1938,14 @@ contract CcipAdapterTest is TestWithHelpers {
         IRescuableToken(address(_accountingChainCcipAdapter)).rescueTokens(address(_mockUsdt), 100);
     }
 
-    function test_publishMessageToChainWithFeePayer_emitsFeeRefunded_whenExcessFeeExceedsThreshold() public {
+    function test_publishMessageToChainWithFeePayer_nativeFeePath_emitsFeeRefunded_whenExcessFeeExceedsThreshold()
+        public
+    {
         // Context: Accounting Chain -> Earning Chain
+        // Refund flow exists only on the native-fee path.
 
-        address feePayer = makeAddr("feePayer");
+        address payable feePayer = payable(makeAddr("feePayer"));
         uint256 amountUsdt = 100_000000; // 100 USDT
-        address feeToken = address(_mockGho);
 
         uint256 feeAmount = 10 ether; // fee allocated by the user
         uint256 actualFeeAmount = 7 ether; // fee estimated by the router
@@ -1960,11 +1953,11 @@ contract CcipAdapterTest is TestWithHelpers {
         // excessFee = 3 ether, which is > feeRefundThreshold (1 ether), so FeeRefunded should emit
 
         _mockTransferHelper.mockAsset(address(_mockUsdt), amountUsdt);
-        _stageTokenFeeFromPayer(address(_accountingChainCcipAdapter), feePayer, _mockGho, feeAmount);
+        vm.deal(address(_mockAccountingChainGateway), feeAmount);
 
         bytes memory bridgeAdapterData = abi.encode(
             ICcipBridgeAdapter.CcipFeeParams({
-                feeToken: feeToken, feeAmount: feeAmount, feeRefundThreshold: feeRefundThreshold
+                feeToken: Constants.NATIVE_CURRENCY, feeAmount: feeAmount, feeRefundThreshold: feeRefundThreshold
             })
         );
 
@@ -1975,7 +1968,7 @@ contract CcipAdapterTest is TestWithHelpers {
             receiver: abi.encode(_earningChainCcipAdapter),
             data: "",
             tokenAmounts: ccipTokenAmounts,
-            feeToken: _ccipFeeToken(feeToken),
+            feeToken: CCIP_NATIVE_FEE_TOKEN,
             extraArgs: Client._argsToBytes(
                 Client.GenericExtraArgsV2({gasLimit: DEFAULT_GAS_LIMIT, allowOutOfOrderExecution: true})
             )
@@ -1994,12 +1987,64 @@ contract CcipAdapterTest is TestWithHelpers {
 
         // Expect FeeRefunded event: feePayer (indexed), feeToken (indexed), amount
         vm.expectEmit(true, true, false, true);
-        emit ICcipBridgeAdapter.FeeRefunded(feePayer, feeToken, expectedRefundAmount);
+        emit ICcipBridgeAdapter.FeeRefunded(feePayer, Constants.NATIVE_CURRENCY, expectedRefundAmount);
 
+        vm.prank(address(_mockAccountingChainGateway));
+        _accountingChainCcipAdapter.publishMessageToChainWithFeePayer{value: feeAmount}(
+            EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "", feePayer, DEFAULT_GAS_LIMIT, bridgeAdapterData
+        );
+    }
+
+    function test_publishMessageToChainWithFeePayer_erc20FeePath_doesNotEmitFeeRefunded() public {
+        // Context: Accounting Chain -> Earning Chain
+        // ERC-20 path: even when allocated > estimated, no FeeRefunded fires because only `estimatedFeeAmount`
+        // is ever pulled from `feePayer` (the surplus stays as residual approval).
+
+        address feePayer = makeAddr("feePayer");
+        uint256 amountUsdt = 100_000000;
+        address feeToken = address(_mockGho);
+
+        uint256 feeAmount = 10 ether;
+        uint256 actualFeeAmount = 7 ether;
+
+        _mockTransferHelper.mockAsset(address(_mockUsdt), amountUsdt);
+        _stageTokenFeeFromPayer(address(_accountingChainCcipAdapter), feePayer, _mockGho, feeAmount);
+
+        bytes memory bridgeAdapterData = abi.encode(
+            ICcipBridgeAdapter.CcipFeeParams({feeToken: feeToken, feeAmount: feeAmount, feeRefundThreshold: 0})
+        );
+
+        Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
+        ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
+        Client.EVM2AnyMessage memory expectedCcipMessage = Client.EVM2AnyMessage({
+            receiver: abi.encode(_earningChainCcipAdapter),
+            data: "",
+            tokenAmounts: ccipTokenAmounts,
+            feeToken: _ccipFeeToken(feeToken),
+            extraArgs: Client._argsToBytes(
+                Client.GenericExtraArgsV2({gasLimit: DEFAULT_GAS_LIMIT, allowOutOfOrderExecution: true})
+            )
+        });
+
+        vm.mockCall(
+            address(_mockCCIPRouter),
+            abi.encodeWithSelector(IRouterClient.getFee.selector, EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage),
+            abi.encode(actualFeeAmount)
+        );
+        _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, bytes32(0));
+
+        // Record logs and assert no FeeRefunded was emitted across the call.
+        vm.recordLogs();
         vm.prank(address(_mockAccountingChainGateway));
         _accountingChainCcipAdapter.publishMessageToChainWithFeePayer(
             EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "", feePayer, DEFAULT_GAS_LIMIT, bridgeAdapterData
         );
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 feeRefundedTopic = ICcipBridgeAdapter.FeeRefunded.selector;
+        for (uint256 i = 0; i < logs.length; i++) {
+            assertNotEq(logs[i].topics[0], feeRefundedTopic, "FeeRefunded must not fire on the ERC-20 path");
+        }
     }
 
     function _expectBridgeAssetsApproval(Client.EVMTokenAmount[] memory tokens) internal {
