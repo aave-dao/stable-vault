@@ -332,6 +332,58 @@ contract SwapperTest is TestWithHelpers {
         _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
     }
 
+    /// @dev Hardening 3 delta accounting: a partial leftover (only `amountIn / 2` consumed) reverts even when the
+    /// pre-seeded assetOut keeps the slippage check happy. Catches the assetIn-redirection attack the Allocator's
+    /// `assetOut`-only invariant cannot see.
+    function test_executeSwap_reverts_ifAssetInPartiallyLeftover() public {
+        uint256 amountIn = 100;
+        uint256 expectedAmountOut = amountIn.convertAssetDecimals(address(_mockUsdt), address(_mockGho));
+
+        _mockTransferIntoSwapper(_mockUsdt, amountIn);
+        // Pre-seed assetOut directly on the Swapper so post-loop balance == expectedAmountOut and the slippage
+        // check passes. This isolates Hardening 3.
+        _mockGho.mint(address(_swapper), expectedAmountOut);
+
+        // Single target burns half of assetIn (transfers it to a recipient outside the system) and leaves the rest.
+        address dust = makeAddr("dust");
+        address[] memory targets = new address[](1);
+        targets[0] = address(_mockUsdt);
+        bytes[] memory callDatas = new bytes[](1);
+        callDatas[0] = abi.encodeWithSelector(IERC20.transfer.selector, dust, amountIn / 2);
+        bytes memory data = abi.encode(targets, callDatas, uint16(0));
+
+        vm.expectRevert(abi.encodeWithSelector(ISwapper.AssetInLeftOver.selector));
+        vm.prank(allocator);
+        _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
+    }
+
+    /// @dev Hardening 3 delta accounting must be immune to dust donations: an attacker who pre-funds the Swapper
+    /// with a small amount of `assetIn` before the rebalance broadcasts cannot brick the call. Donations are baked
+    /// into both `before` and `after` snapshots and cancel out.
+    function test_executeSwap_succeeds_whenAssetInDonatedBeforeCall(uint256 donation) public {
+        uint256 amountIn = 100;
+        donation = bound(donation, 1, 1_000_000); // arbitrary non-zero donation
+        uint256 minAmountOut = amountIn.convertAssetDecimals(address(_mockUsdt), address(_mockGho));
+        vm.assume(minAmountOut > 0);
+
+        // Pre-fund the Swapper with `donation` of assetIn (the grief).
+        _mockUsdt.mint(address(_swapper), donation);
+
+        _mockTransferIntoSwapper(_mockUsdt, amountIn);
+        _seedOutputToken(_mockGho, minAmountOut);
+        _setSlippageBps(0);
+
+        bytes memory data =
+            _encodeDexSwapExactInputData(address(_mockUsdt), address(_mockGho), amountIn, minAmountOut, 0);
+        vm.prank(allocator);
+        uint256 actualAmountOut =
+            _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
+
+        // `amountIn` was consumed by the DEX; the donation remains stuck on the Swapper but does not block the swap.
+        assertEq(IERC20(_mockUsdt).balanceOf(address(_swapper)), donation);
+        assertEq(actualAmountOut, minAmountOut);
+    }
+
     function test_executeSwap_reverts_ifTargetsAndCallDatasLengthMismatch() public {
         address[] memory targets = new address[](2);
         targets[0] = address(_mockUsdt);
