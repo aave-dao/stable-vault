@@ -462,7 +462,8 @@ contract BaseTest is TestWithHelpers {
                 fundsHandler_accountingChainAddress,
                 address(priceOracle_accountingChain),
                 transferHelper_accountingChainAddress,
-                MAX_STRATEGIES_PER_ASSET
+                MAX_STRATEGIES_PER_ASSET,
+                policyRegistry_accountingChainAddress
             )
         );
         allocator_accountingChain = Allocator(
@@ -728,7 +729,8 @@ contract BaseTest is TestWithHelpers {
                 chainGateway_earningChainAddress,
                 address(priceOracle_earningChain),
                 transferHelper_earningChainAddress,
-                MAX_STRATEGIES_PER_ASSET
+                MAX_STRATEGIES_PER_ASSET,
+                policyRegistry_earningChainAddress
             )
         );
         allocator_earningChain = Allocator(

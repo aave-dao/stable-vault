@@ -17,6 +17,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
+import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {IRebalancePolicy} from "src/interfaces/IRebalancePolicy.sol";
 import {ISwapper} from "src/interfaces/ISwapper.sol";
@@ -56,11 +57,15 @@ contract Allocator is
     address internal immutable WITHDRAWER;
     address internal immutable ASSET_REGISTRY;
     address internal immutable PRICE_ORACLE;
+    address internal immutable POLICY_REGISTRY;
     uint8 internal immutable MAX_STRATEGIES_PER_ASSET;
 
     /// @dev Maximum slippage, denominated in asset units, tolerated to account for rounding errors when depositing
     /// to ERC-4626 yield strategies.
     uint8 internal constant STRATEGY_DEPOSIT_SLIPPAGE_TOLERANCE = 10;
+
+    // keccak256("aave.stable-vault.Allocator.policy.rebalance")
+    bytes32 internal constant REBALANCE_POLICY_ID = 0xc8677baa58e60e0903b82d16b92a11a49685a8844fe0f67b4f06e7d3ecef34cb;
 
     /// @custom:storage-location erc7201:aave.storage.Allocator
     struct AllocatorStorage {
@@ -68,7 +73,6 @@ contract Allocator is
         mapping(address strategy => StrategyConfig strategyConfig) strategyConfigs;
         // To iterate through all strategies for an asset.
         mapping(address asset => EnumerableSet.AddressSet) assetStrategies;
-        address rebalancePolicy;
     }
 
     // keccak256(abi.encode(uint256(keccak256("aave.storage.Allocator")) - 1)) & ~bytes32(uint256(0xff))
@@ -105,24 +109,28 @@ contract Allocator is
     /// @param priceOracle The address of the price oracle contract.
     /// @param transferHelper The address of the contract that helps to minimize the number of transfers across flows.
     /// @param maxStrategiesPerAsset The maximum number of allowed yield strategies per asset.
+    /// @param policyRegistry The address of the PolicyRegistry contract used to look up policies by ID.
     constructor(
         address assetRegistry,
         address depositor,
         address withdrawer,
         address priceOracle,
         address transferHelper,
-        uint8 maxStrategiesPerAsset
+        uint8 maxStrategiesPerAsset,
+        address policyRegistry
     ) TransferHelperClient(transferHelper) {
         require(assetRegistry != address(0), Errors.ZeroAddress());
         require(depositor != address(0), Errors.ZeroAddress());
         require(withdrawer != address(0), Errors.ZeroAddress());
         require(priceOracle != address(0), Errors.ZeroAddress());
+        require(policyRegistry != address(0), Errors.ZeroAddress());
         require(maxStrategiesPerAsset > 0, Errors.InvalidParameter());
         _disableInitializers();
         ASSET_REGISTRY = assetRegistry;
         DEPOSITOR = depositor;
         WITHDRAWER = withdrawer;
         PRICE_ORACLE = priceOracle;
+        POLICY_REGISTRY = policyRegistry;
         MAX_STRATEGIES_PER_ASSET = maxStrategiesPerAsset;
     }
 
@@ -303,17 +311,6 @@ contract Allocator is
     }
 
     /// @inheritdoc IAllocator
-    function setRebalancePolicy(address policy) external override restricted {
-        emit RebalancePolicySet($storage().rebalancePolicy, policy);
-        $storage().rebalancePolicy = policy;
-    }
-
-    /// @inheritdoc IAllocator
-    function getRebalancePolicy() external view override returns (address) {
-        return $storage().rebalancePolicy;
-    }
-
-    /// @inheritdoc IAllocator
     function topUp(address asset, uint256 amount) external override restricted {
         require(amount > 0, Errors.ZeroAmount());
         require(IAssetRegistry(ASSET_REGISTRY).isDepositToAllocatorAllowed(asset), Errors.UnsupportedAsset(asset));
@@ -385,7 +382,7 @@ contract Allocator is
     ////////////////////////////////////////////////// INTERNAL ////////////////////////////////////////////////////////
 
     function _applyRebalancePolicy(RebalanceParams[] memory params) internal {
-        address policy = $storage().rebalancePolicy;
+        address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(REBALANCE_POLICY_ID);
         if (policy == address(0)) {
             return;
         }

@@ -22,6 +22,7 @@ import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
+import {PolicyRegistry} from "src/periphery/PolicyRegistry.sol";
 import {Errors} from "src/types/Errors.sol";
 
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
@@ -68,16 +69,20 @@ contract AllocatorTest is TestWithHelpers {
     MockTransferHelper internal _mockTransferHelper;
 
     Allocator internal _allocator;
+    PolicyRegistry internal _policyRegistry;
 
     function _deployAllocator(
         MockAccessManager mockAccessManager,
         address assetRegistry,
         address priceOracle,
         address transferHelper,
-        uint8 maxStrategiesPerAsset
+        uint8 maxStrategiesPerAsset,
+        address policyRegistry
     ) internal returns (Allocator) {
         address allocatorImpl = address(
-            new Allocator(assetRegistry, depositor, withdrawer, priceOracle, transferHelper, maxStrategiesPerAsset)
+            new Allocator(
+                assetRegistry, depositor, withdrawer, priceOracle, transferHelper, maxStrategiesPerAsset, policyRegistry
+            )
         );
         Allocator allocator = Allocator(
             address(
@@ -105,6 +110,7 @@ contract AllocatorTest is TestWithHelpers {
         _extraGhoStrategy = new TestErc4626(_mockGho);
 
         _mockAccessManager = new MockAccessManager(admin);
+        _policyRegistry = new PolicyRegistry(address(_mockAccessManager));
 
         _mockSwapper = new MockSwapper();
         _priceOracle = _deployPriceOracle(address(_mockAccessManager), 9_995e23);
@@ -143,7 +149,8 @@ contract AllocatorTest is TestWithHelpers {
             address(_mockAssetRegistry),
             address(_priceOracle),
             address(_mockTransferHelper),
-            MAX_STRATEGIES_PER_ASSET
+            MAX_STRATEGIES_PER_ASSET,
+            address(_policyRegistry)
         );
 
         // Set up strategy vaults
@@ -170,7 +177,8 @@ contract AllocatorTest is TestWithHelpers {
             withdrawer,
             address(_priceOracle),
             address(0),
-            MAX_STRATEGIES_PER_ASSET
+            MAX_STRATEGIES_PER_ASSET,
+            address(_policyRegistry)
         );
     }
 
@@ -1308,7 +1316,8 @@ contract AllocatorTest is TestWithHelpers {
             address(_mockAssetRegistry),
             address(_priceOracle),
             address(_mockTransferHelper),
-            MAX_STRATEGIES_PER_ASSET
+            MAX_STRATEGIES_PER_ASSET,
+            address(_policyRegistry)
         );
 
         MockErc4626Strategy mockStrategy = new MockErc4626Strategy(_mockUsdt);
@@ -2405,7 +2414,8 @@ contract AllocatorTest is TestWithHelpers {
             address(_mockAssetRegistry),
             address(_priceOracle),
             address(_mockTransferHelper),
-            maxStrategiesPerAsset
+            maxStrategiesPerAsset,
+            address(_policyRegistry)
         );
 
         address strategy;

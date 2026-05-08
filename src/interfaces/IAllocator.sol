@@ -32,9 +32,6 @@ interface IAllocator {
 
     event StrategyDistrusted(address indexed strategy);
 
-    /// @notice Emitted when the rebalance policy address is updated.
-    event RebalancePolicySet(address indexed oldPolicy, address indexed newPolicy);
-
     /// @notice Thrown when setting as default a strategy that already is the default, or when removing a strategy
     /// that is currently set as the default.
     /// @custom:selector 0x13e93f82
@@ -202,12 +199,6 @@ interface IAllocator {
     /// swaps between assets, and allocation of assets to strategies.
     /// @param params Array of rebalance parameters.
     function rebalance(RebalanceParams[] memory params) external;
-
-    /// @notice Sets the rebalance policy. `address(0)` disables the policy.
-    function setRebalancePolicy(address policy) external;
-
-    /// @notice Getter for the rebalance policy address.
-    function getRebalancePolicy() external view returns (address);
 
     /// @notice Deposit assets into the Allocator to increase the total value of the system.
     /// @dev This function will be used exclusively to improve the solvency of the system.

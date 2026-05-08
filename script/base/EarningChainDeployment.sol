@@ -311,7 +311,8 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
                 withdrawer: ALLOCATOR_WITHDRAWER,
                 priceOracle: getPriceOracleAddress(_deployer()),
                 transferHelper: getTransferHelperAddress(_deployer()),
-                maxStrategiesPerAsset: uint8(_configUint(".maxStrategiesPerAsset"))
+                maxStrategiesPerAsset: uint8(_configUint(".maxStrategiesPerAsset")),
+                policyRegistry: getPolicyRegistryAddress(_deployer())
             })
         );
         _logDeployment("Allocator::Implementation", "", implementation);

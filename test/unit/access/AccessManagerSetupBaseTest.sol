@@ -614,7 +614,17 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         address withdrawer = makeAddr("WITHDRAWER");
         address transferHelper = address(new TransferHelper());
 
-        address newImpl = address(new Allocator(assetRegistry, depositor, withdrawer, priceOracle, transferHelper, 1));
+        address newImpl = address(
+            new Allocator(
+                assetRegistry,
+                depositor,
+                withdrawer,
+                priceOracle,
+                transferHelper,
+                1,
+                getPolicyRegistryAddress(_deployer())
+            )
+        );
         bytes memory callData = abi.encodeCall(
             ProxyAdmin.upgradeAndCall, (ITransparentUpgradeableProxy(getAllocatorAddress(_deployer())), newImpl, "")
         );
