@@ -304,10 +304,12 @@ contract Allocator is
 
     /// @inheritdoc IAllocator
     function rebalance(RebalanceParams[] memory params) external virtual override restricted nonReentrant {
-        _applyRebalancePolicy(params);
         for (uint256 i = 0; i < params.length; i++) {
             _rebalance(params[i]);
         }
+        // The policy is applied after the rebalance so it can assert against post-state invariants efficiently without
+        // needing to parse the entire array of rebalance operations.
+        _applyRebalancePolicy(params);
     }
 
     /// @inheritdoc IAllocator
