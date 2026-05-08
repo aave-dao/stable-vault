@@ -48,9 +48,7 @@ contract Swapper is Ownable, ReentrancyGuard, ISwapper {
         require(targets.length == callDatas.length, Errors.InvalidParameter());
 
         // Hardening 2: bound the slippage tolerance against vault config; read before the loop to fail fast.
-        uint16 maxBps = ISlippageCoverageVault(SLIPPAGE_VAULT).getOverrideMode()
-            ? ISlippageCoverageVault(SLIPPAGE_VAULT).getOverrideMaxSlippageBps()
-            : ISlippageCoverageVault(SLIPPAGE_VAULT).getMaxSlippageBps();
+        uint16 maxBps = ISlippageCoverageVault(SLIPPAGE_VAULT).getEffectiveMaxSlippageBps();
         require(slippageToleranceBps <= maxBps, ISwapper.SlippageToleranceTooHigh());
 
         // Hardening 1: targets cannot be the bound vault, otherwise the loop could call `pullCoverage` directly.

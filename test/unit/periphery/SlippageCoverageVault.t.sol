@@ -696,6 +696,42 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         _vault.setOverrideMaxSlippageBps(10_001);
     }
 
+    /* ============================ getEffectiveMaxSlippageBps ============================ */
+
+    function test_getEffectiveMaxSlippageBps_returnsNormalBps_whenOverrideOff() public view {
+        // Sanity: override is off by default.
+        assertEq(_vault.getOverrideMode(), false);
+        assertEq(_vault.getEffectiveMaxSlippageBps(), DEFAULT_MAX_BPS);
+    }
+
+    function test_getEffectiveMaxSlippageBps_returnsOverrideBps_whenOverrideOn() public {
+        vm.prank(operator);
+        _vault.setOverrideMode(true);
+        assertEq(_vault.getEffectiveMaxSlippageBps(), DEFAULT_OVERRIDE_MAX_BPS);
+    }
+
+    function test_getEffectiveMaxSlippageBps_tracksLatestSetters() public {
+        // Mutate normal-mode bound while override is off.
+        vm.prank(operator);
+        _vault.setMaxSlippageBps(123);
+        assertEq(_vault.getEffectiveMaxSlippageBps(), 123);
+
+        // Flip override on; effective bound switches to override-mode value.
+        vm.prank(operator);
+        _vault.setOverrideMode(true);
+        assertEq(_vault.getEffectiveMaxSlippageBps(), DEFAULT_OVERRIDE_MAX_BPS);
+
+        // Mutate override-mode bound; effective bound updates.
+        vm.prank(operator);
+        _vault.setOverrideMaxSlippageBps(456);
+        assertEq(_vault.getEffectiveMaxSlippageBps(), 456);
+
+        // Flip override off; effective bound switches back to the (already-mutated) normal-mode value.
+        vm.prank(operator);
+        _vault.setOverrideMode(false);
+        assertEq(_vault.getEffectiveMaxSlippageBps(), 123);
+    }
+
     /* ============================ fundCoverage ============================ */
 
     function test_fundCoverage_pullsFromCallerAndEmits() public {

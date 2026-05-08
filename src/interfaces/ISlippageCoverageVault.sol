@@ -117,4 +117,8 @@ interface ISlippageCoverageVault {
 
     /// @notice Getter for the override-mode max slippage tolerance.
     function getOverrideMaxSlippageBps() external view returns (uint16);
+
+    /// @notice Max slippage tolerance currently in effect: `overrideMaxSlippageBps` if override mode is enabled,
+    /// otherwise `maxSlippageBps`.
+    function getEffectiveMaxSlippageBps() external view returns (uint16);
 }

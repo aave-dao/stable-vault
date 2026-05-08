@@ -182,6 +182,11 @@ contract SlippageCoverageVault is AccessManaged, ReentrancyGuardTransient, ISlip
         return _overrideMaxSlippageBps;
     }
 
+    /// @inheritdoc ISlippageCoverageVault
+    function getEffectiveMaxSlippageBps() external view override returns (uint16) {
+        return _overrideMode ? _overrideMaxSlippageBps : _maxSlippageBps;
+    }
+
     //////////////////////////////// INTERNAL FUNCTIONS ////////////////////////////////
 
     /// @dev Updates the sliding-window cap state for `asset`. Rolls over when the elapsed time exceeds `windowSeconds`.
