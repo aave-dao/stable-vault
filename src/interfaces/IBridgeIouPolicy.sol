@@ -5,8 +5,6 @@ pragma solidity ^0.8.22;
 /// @title IBridgeIouPolicy
 /// @author Aave Labs
 /// @notice Interface for the contract enforcing conditions on outbound IOU-bridge messages (data-only dispatches).
-/// @dev Applied only on send-side entry points (e.g. `StableVault.bridgeIouTokens`,
-/// `EarningChainGateway.bridgeIouTokens`).
 interface IBridgeIouPolicy {
     /// @notice Emitted when the bridge-iou policy is applied.
     event BridgeIouPolicyApplied(address indexed caller, uint256 indexed destChainId, uint256 iouAmountRay);
