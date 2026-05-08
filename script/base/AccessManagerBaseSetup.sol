@@ -264,7 +264,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         address rebalancerProfile = _getProfile__Rebalancer();
         require(rebalancerProfile != address(0), "Rebalancer profile address not set");
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](6);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](8);
 
         roles[0] = RolesConfig.getRole__rebalance();
         roles[1] = RolesConfig.getRole__setDefaultStrategy();
@@ -274,6 +274,10 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         // Only used on the Earning Chain (EarningChainGateway), but granted in both Accounting and Earning Chain setups
         roles[4] = RolesConfig.getRole__pushFundsToAccountingChain();
         roles[5] = RolesConfig.getRole__topUp();
+        // Operational SlippageCoverageVault hooks: flip override for planned big swaps and top up the coverage pool
+        // after a drawdown without going through the admin multisig.
+        roles[6] = RolesConfig.getRole__setOverrideMode();
+        roles[7] = RolesConfig.getRole__fundCoverage();
 
         _grantRolesToProfile(rebalancerProfile, roles);
     }
@@ -284,7 +288,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         address disablerProfile = _getProfile__Disabler();
         require(disablerProfile != address(0), "Disabler profile address not set");
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](14);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](16);
 
         roles[0] = RolesConfig.getRole__rebalance();
         roles[1] = RolesConfig.getRole__removeStrategy();
@@ -300,6 +304,10 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         roles[11] = RolesConfig.getRole__setDefaultStrategy();
         roles[12] = RolesConfig.getRole__distrustStrategy();
         roles[13] = RolesConfig.getRole__removeSigner();
+        // Monotonic-tightening SlippageCoverageVault hooks: lower per-tx and window caps during incident response
+        // without requiring the admin multisig. Loosening (`raise*`) stays admin-gated.
+        roles[14] = RolesConfig.getRole__lowerPullCapPerTx();
+        roles[15] = RolesConfig.getRole__lowerWindowCap();
 
         _grantRolesToProfile(disablerProfile, roles);
     }

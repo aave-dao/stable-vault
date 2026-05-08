@@ -194,13 +194,15 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     }
 
     function test_rebalancerProfile_hasTheExpectedRoles() public view {
-        uint64[] memory expected = new uint64[](6);
+        uint64[] memory expected = new uint64[](8);
         expected[0] = RolesConfig.getRole__rebalance().roleId;
         expected[1] = RolesConfig.getRole__setDefaultStrategy().roleId;
         expected[2] = RolesConfig.getRole__disableDepositsToStrategy().roleId;
         expected[3] = RolesConfig.getRole__pushFundsToChain().roleId;
         expected[4] = RolesConfig.getRole__pushFundsToAccountingChain().roleId;
         expected[5] = RolesConfig.getRole__topUp().roleId;
+        expected[6] = RolesConfig.getRole__setOverrideMode().roleId;
+        expected[7] = RolesConfig.getRole__fundCoverage().roleId;
         _assertProfileHasExactlyTheseRoles(_getProfile__Rebalancer(), expected);
 
         for (uint256 i = 0; i < expected.length; i++) {
@@ -209,7 +211,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     }
 
     function test_disablerProfile_hasTheExpectedRoles() public view {
-        uint64[] memory expected = new uint64[](14);
+        uint64[] memory expected = new uint64[](16);
         expected[0] = RolesConfig.getRole__rebalance().roleId;
         expected[1] = RolesConfig.getRole__removeStrategy().roleId;
         expected[2] = RolesConfig.getRole__rescueTokens().roleId;
@@ -224,6 +226,8 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         expected[11] = RolesConfig.getRole__setDefaultStrategy().roleId;
         expected[12] = RolesConfig.getRole__distrustStrategy().roleId;
         expected[13] = RolesConfig.getRole__removeSigner().roleId;
+        expected[14] = RolesConfig.getRole__lowerPullCapPerTx().roleId;
+        expected[15] = RolesConfig.getRole__lowerWindowCap().roleId;
         _assertProfileHasExactlyTheseRoles(_getProfile__Disabler(), expected);
 
         for (uint256 i = 0; i < expected.length; i++) {
