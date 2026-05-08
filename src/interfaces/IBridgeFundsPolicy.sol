@@ -10,17 +10,23 @@ pragma solidity ^0.8.22;
 interface IBridgeFundsPolicy {
     /// @notice Emitted when the bridge-funds policy is applied.
     event BridgeFundsPolicyApplied(
-        address indexed caller, uint256 indexed destChainId, address indexed asset, uint256 amount
+        address indexed caller,
+        address bridgeAdapter,
+        uint256 indexed destChainId,
+        address indexed asset,
+        uint256 amount
     );
 
     /// @notice Parameters for the funds-bearing dispatch path.
     /// @param caller `msg.sender` at the entry point (manager for `pushFundsToChain` /
     /// `pushFundsToAccountingChain`).
+    /// @param bridgeAdapter Bridge adapter selected for this dispatch.
     /// @param destChainId Destination chain id.
     /// @param asset The asset being bridged.
     /// @param amount Amount of `asset` being bridged (in the asset's native decimals).
     struct BridgeFundsRequest {
         address caller;
+        address bridgeAdapter;
         uint256 destChainId;
         address asset;
         uint256 amount;

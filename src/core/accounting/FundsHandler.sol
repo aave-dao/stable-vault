@@ -167,7 +167,7 @@ contract FundsHandler is
         require(amount > 0, Errors.ZeroAmount());
         require($storage().earningChainIds.contains(chainId), Errors.InvalidDestinationChainId());
 
-        _applyBridgeFundsPolicy(chainId, asset, amount);
+        _applyBridgeFundsPolicy(chainId, bridgeAdapter, asset, amount);
 
         // Pull funds from liquidity into the TransferHelper.
         _pullFundsFromImmediateLiquidity(asset, amount);
@@ -190,7 +190,7 @@ contract FundsHandler is
         IAllocator(ALLOCATOR).withdraw(asset, amount);
     }
 
-    function _applyBridgeFundsPolicy(uint256 chainId, address asset, uint256 amount) internal {
+    function _applyBridgeFundsPolicy(uint256 chainId, address bridgeAdapter, address asset, uint256 amount) internal {
         address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(BRIDGE_POLICY_ID);
         if (policy == address(0)) {
             return;
@@ -198,7 +198,7 @@ contract FundsHandler is
         bool allowed = IBridgeFundsPolicy(policy)
             .applyBridgeFundsPolicy(
                 IBridgeFundsPolicy.BridgeFundsRequest({
-                caller: msg.sender, destChainId: chainId, asset: asset, amount: amount
+                caller: msg.sender, bridgeAdapter: bridgeAdapter, destChainId: chainId, asset: asset, amount: amount
             })
             );
         require(allowed, Errors.PolicyDenied());

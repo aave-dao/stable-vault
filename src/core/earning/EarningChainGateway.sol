@@ -145,7 +145,7 @@ contract EarningChainGateway is
         bytes calldata bridgeAdapterData
     ) external payable override restricted assertingTransferHelperBalanceFor(asset) {
         require(amount > 0, Errors.ZeroAmount());
-        _applyBridgeFundsPolicy(ACCOUNTING_CHAIN_ID, asset, amount);
+        _applyBridgeFundsPolicy(ACCOUNTING_CHAIN_ID, bridgeAdapter, asset, amount);
         // Pull funds from liquidity into the TransferHelper.
         IAllocator(ALLOCATOR).withdraw(asset, amount);
         _returnFunds(asset, amount, bridgeAdapter, msg.sender, gasLimit, bridgeAdapterData);
@@ -233,7 +233,9 @@ contract EarningChainGateway is
         return amountOut;
     }
 
-    function _applyBridgeFundsPolicy(uint256 destChainId, address asset, uint256 amount) internal {
+    function _applyBridgeFundsPolicy(uint256 destChainId, address bridgeAdapter, address asset, uint256 amount)
+        internal
+    {
         address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(BRIDGE_POLICY_ID);
         if (policy == address(0)) {
             return;
@@ -241,7 +243,7 @@ contract EarningChainGateway is
         bool allowed = IBridgeFundsPolicy(policy)
             .applyBridgeFundsPolicy(
                 IBridgeFundsPolicy.BridgeFundsRequest({
-                caller: msg.sender, destChainId: destChainId, asset: asset, amount: amount
+                caller: msg.sender, bridgeAdapter: bridgeAdapter, destChainId: destChainId, asset: asset, amount: amount
             })
             );
         require(allowed, Errors.PolicyDenied());
