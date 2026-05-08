@@ -74,16 +74,27 @@ library RateLimitBucketLib {
         bucket.lastUpdate = uint128(block.timestamp);
     }
 
-    /// @notice Resets a bucket to full capacity with the supplied configuration. Starts the bucket full so callers
-    /// don't have to wait a full refill cycle before honoring operations after enabling or updating a limit.
+    /// @notice Updates a bucket's `(capacity, refillRate)`. Settles the refill accrued at the old rate up to `now`
+    /// and carries the post-refill `consumed` forward, clamped to the new capacity, so a reconfigure cannot refill
+    /// a drained bucket. The first enable (old `capacity == 0`) starts the bucket full; disabling (`capacity == 0`)
+    /// requires `refillRate == 0`.
     /// @param bucket The bucket to configure.
     /// @param capacity Maximum capacity of the bucket. `0` disables the limit and requires `refillRate` to also be 0.
     /// @param refillRate Amount of capacity restored per second.
     function configure(Bucket storage bucket, uint128 capacity, uint128 refillRate) internal {
         require(capacity > 0 || refillRate == 0, Errors.InvalidParameter());
+        uint256 newConsumed;
+        if (bucket.capacity != 0 && capacity != 0) {
+            uint256 available = preview(bucket);
+            if (available < capacity) {
+                newConsumed = capacity - available;
+            }
+        }
         bucket.capacity = capacity;
         bucket.refillRate = refillRate;
-        bucket.consumed = 0;
+        // `newConsumed` is either 0 or `capacity - available < capacity <= type(uint128).max`.
+        // forge-lint: disable-next-line(unsafe-typecast)
+        bucket.consumed = uint128(newConsumed);
         // Casting to uint128 is safe because block.timestamp fits in uint128 for any practical chain lifetime.
         // forge-lint: disable-next-line(unsafe-typecast)
         bucket.lastUpdate = uint128(block.timestamp);
