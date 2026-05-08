@@ -116,6 +116,9 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         _deploySwapper();
         _deployCcipAdapter();
         _deployEarningChainStateProvider();
+        // TODO: Deploy `PolicyRegistry` (and any policy contracts consumed by EarningChainGateway here) and bind them
+        // via `PolicyRegistry.setPolicy(...)`. Must run before `_setupAccessManager` revokes the deployer's
+        // ADMIN_ROLE.
     }
 
     function _setupContracts() internal {
@@ -124,6 +127,9 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         _setupAllocator();
         _setupWithdrawalPolicy();
         _setupPriceOracleAdapters();
+        // TODO: Add target/role wiring for any policy contracts deployed on the Earning Chain inside `_setup_Targets`
+        // in `AccessManagerBaseSetup.sol`. Must be done before this `_setupAccessManager` call locks down the
+        // deployer.
         _setupAccessManager(_deployer()); // Must be last – revokes deployer's ADMIN_ROLE
     }
 

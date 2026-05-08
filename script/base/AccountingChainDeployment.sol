@@ -164,6 +164,9 @@ abstract contract AccountingChainDeployment is
         _deployGateway();
         _deploySwapper();
         _deployCcipAdapter();
+        // TODO: Deploy `PolicyRegistry` and `DepositPolicy` (and any other policy contracts) here, then bind them via
+        // `PolicyRegistry.setPolicy(...)` for each `policyId` consumed by StableVault / FundsHandler /
+        // EarningChainGateway. Must run before `_setupAccessManager` revokes the deployer's ADMIN_ROLE.
     }
 
     function _setupContracts() internal {
@@ -174,6 +177,11 @@ abstract contract AccountingChainDeployment is
         _setupWithdrawalPolicy();
         _setupPriceOracleAdapters();
         _setupChainBalanceOracleAdapters();
+        // TODO: Add `_setupTarget__DepositPolicy(deployer)` (and any other policy contracts) inside `_setup_Targets`
+        // in `AccessManagerBaseSetup.sol`, defining the corresponding roles in `RolesConfig.sol`:
+        //   - `loosenDepositLimit` → `CRITICAL_DELAY`, `hasCriticalRisk: true` (loosens the limit).
+        //   - `tightenDepositLimit` → `NO_DELAY` (tightens the limit; safe to act fast).
+        // Must be done before this `_setupAccessManager` call locks down the deployer.
         _setupAccessManager(_deployer()); // Must be last – revokes deployer's ADMIN_ROLE
     }
 
