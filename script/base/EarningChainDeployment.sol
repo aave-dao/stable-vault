@@ -28,7 +28,7 @@ import {AssetRegistry} from "src/periphery/AssetRegistry.sol";
 import {EarningChainStateProvider} from "src/periphery/EarningChainStateProvider.sol";
 import {Swapper} from "src/periphery/Swapper.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
-import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
+import {WithdrawalPolicy} from "src/policies/WithdrawalPolicy.sol";
 
 abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainSetup, ATokenVaultDeployment {
     using Strings for address;

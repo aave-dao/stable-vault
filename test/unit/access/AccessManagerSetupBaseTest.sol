@@ -23,7 +23,7 @@ import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
-import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
+import {WithdrawalPolicy} from "src/policies/WithdrawalPolicy.sol";
 
 abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

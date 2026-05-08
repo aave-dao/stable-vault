@@ -8,7 +8,7 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {Create3AddressBook} from "script/base/Create3AddressBook.sol";
 import {Upgrade} from "script/base/Upgrade.sol";
-import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
+import {WithdrawalPolicy} from "src/policies/WithdrawalPolicy.sol";
 
 contract UpgradeWithdrawalPolicy is Create3AddressBook, Upgrade {
     using Strings for address;
