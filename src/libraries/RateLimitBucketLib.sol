@@ -59,6 +59,9 @@ library RateLimitBucketLib {
     /// @param bucket The bucket to update.
     /// @param amount The amount to consume.
     function consume(Bucket storage bucket, uint256 amount) internal {
+        if (amount == 0) {
+            return;
+        }
         uint256 capacity = bucket.capacity;
         uint256 available = preview(bucket);
         require(available >= amount, RateLimited());
