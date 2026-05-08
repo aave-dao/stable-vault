@@ -151,25 +151,6 @@ interface IStableVault {
     /// @param extraData Additional data for the deposit policy.
     function deposit(address user, address asset, uint256 amount, bytes calldata extraData) external;
 
-    /// @notice Bridges IOU tokens to a destination chain.
-    /// @param destinationChainId The chain id of the chain to publish the message to.
-    /// @param iouTokenRecipient The address to send the IOU tokens to on the destination chain.
-    /// @param iouTokenAmountRay The amount of IOU tokens to bridge.
-    /// @param bridgeAdapter The whitelisted bridge adapter to use for the message.
-    /// @param gasLimit Gas limit that should be allocated for execution of the message on the destination chain,
-    /// without considering the bridge adapter overhead.
-    /// @param bridgeParamsEncoded Opaque bridge parameters blob consumed by the adapter.
-    /// @param extraData Additional data for the bridge policy.
-    function bridgeIouTokens(
-        uint256 destinationChainId,
-        address iouTokenRecipient,
-        uint256 iouTokenAmountRay,
-        address bridgeAdapter,
-        uint256 gasLimit,
-        bytes calldata bridgeParamsEncoded,
-        bytes calldata extraData
-    ) external payable;
-
     /// @notice ERC20-style total Stable Vault position supply in RAY.
     /// @dev Excludes IOU supply; includes only active Stable Vault position obligations.
     /// @return supplyRay Total Stable Vault position supply in RAY.

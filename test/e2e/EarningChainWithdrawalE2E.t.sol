@@ -186,7 +186,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             .approve(address(iouTokenManager_accountingChain), iouAmountRequestedRay);
         vm.deal(user1, bridgeFeeAmount);
         vm.prank(user1);
-        vault.bridgeIouTokens{value: bridgeFeeAmount}(
+        iouTokenManager_accountingChain.bridgeTokens{value: bridgeFeeAmount}(
             EARNING_CHAIN_ID,
             user1,
             iouAmountRequestedRay,
@@ -196,8 +196,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
                 ICcipBridgeAdapter.CcipFeeParams({
                     feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
-            ),
-            ""
+            )
         );
         // Check the IOU token balance on Accounting Chain went down
         assertEq(iouToken_accountingChain.balanceOf(user1), 0, "User should have bridged IOU tokens");
@@ -280,14 +279,13 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
                     feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
             );
-            vault.bridgeIouTokens{value: bridgeFeeAmount}(
+            iouTokenManager_accountingChain.bridgeTokens{value: bridgeFeeAmount}(
                 EARNING_CHAIN_ID,
                 user2,
                 iouAmountRequestedRay,
                 address(ccipAdapter_accountingChain),
                 DEFAULT_GAS_LIMIT,
-                bp,
-                ""
+                bp
             );
         }
         require(
@@ -310,14 +308,13 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
                     feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
             );
-            earningChainGateway.bridgeIouTokens{value: bridgeFeeAmount}(
+            iouTokenManager_earningChain.bridgeTokens{value: bridgeFeeAmount}(
                 ACCOUNTING_CHAIN_ID,
                 user2,
                 iouAmountRequestedRay,
                 address(ccipAdapter_earningChain),
                 DEFAULT_GAS_LIMIT,
-                bp,
-                ""
+                bp
             );
         }
         require(

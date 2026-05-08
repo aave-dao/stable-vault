@@ -284,6 +284,7 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
                 chainGateway: getGatewayAddress(_deployer()),
                 vault: address(0),
                 transferHelper: getTransferHelperAddress(_deployer()),
+                policyRegistry: getPolicyRegistryAddress(_deployer()),
                 isAccountingChain: false
             })
         );

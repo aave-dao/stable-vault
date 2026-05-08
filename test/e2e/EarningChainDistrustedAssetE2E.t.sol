@@ -130,13 +130,13 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
         // User should have minted IOU tokens
         assertEq(iouToken_accountingChain.balanceOf(user1), iouAmountRequestedRay);
 
-        // User bridges IOUs to the Earning Chain via the Vault's user-facing entry-point
+        // User bridges IOUs to the Earning Chain
         vm.deal(user1, bridgeFeeAmount);
         vm.prank(user1);
         IERC20(address(iouToken_accountingChain))
             .approve(address(iouTokenManager_accountingChain), iouAmountRequestedRay);
         vm.prank(user1);
-        vault.bridgeIouTokens{value: bridgeFeeAmount}(
+        iouTokenManager_accountingChain.bridgeTokens{value: bridgeFeeAmount}(
             EARNING_CHAIN_ID,
             user1,
             iouAmountRequestedRay,
@@ -146,8 +146,7 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
                 ICcipBridgeAdapter.CcipFeeParams({
                     feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
-            ),
-            ""
+            )
         );
 
         // Check the IOU token balance on Accounting Chain went down

@@ -400,13 +400,13 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
         );
         if (isFromAccountingChain) {
             vm.prank(user);
-            vault.bridgeIouTokens(
-                destinationChainId, user, iouAmountRequestedRay, bridgeAdapter, DEFAULT_GAS_LIMIT, bp, ""
+            iouTokenManager_accountingChain.bridgeTokens(
+                destinationChainId, user, iouAmountRequestedRay, bridgeAdapter, DEFAULT_GAS_LIMIT, bp
             );
         } else {
             vm.prank(user);
-            earningChainGateway.bridgeIouTokens(
-                destinationChainId, user, iouAmountRequestedRay, bridgeAdapter, DEFAULT_GAS_LIMIT, bp, ""
+            iouTokenManager_earningChain.bridgeTokens(
+                destinationChainId, user, iouAmountRequestedRay, bridgeAdapter, DEFAULT_GAS_LIMIT, bp
             );
         }
     }

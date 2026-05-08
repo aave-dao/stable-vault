@@ -104,6 +104,7 @@ contract BaseTest is TestWithHelpers {
     address ghoStrategyVault_accountingChainAddress;
     address usdcStrategyVault_accountingChainAddress;
     AccessManager accessManager_accountingChain;
+    address policyRegistry_accountingChainAddress;
     PolicyRegistry policyRegistry_accountingChain;
     StableVault vault;
     IouToken iouToken_accountingChain;
@@ -131,6 +132,7 @@ contract BaseTest is TestWithHelpers {
     address ghoStrategyVault_earningChainAddress;
     address usdcStrategyVault_earningChainAddress;
     AccessManager accessManager_earningChain;
+    address policyRegistry_earningChainAddress;
     PolicyRegistry policyRegistry_earningChain;
     AssetRegistry assetRegistry_earningChain;
     WithdrawalPolicy withdrawalPolicy_earningChain;
@@ -313,7 +315,8 @@ contract BaseTest is TestWithHelpers {
             "\tIOU Token Manager (Accounting Chain) Predicted Address: %s", iouTokenManager_accountingChainAddress
         );
 
-        deployerNonce_accountingChain++; // Incrementing for PolicyRegistry
+        policyRegistry_accountingChainAddress = vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
+        Logger.log("\tPolicy Registry (Accounting Chain) Predicted Address: %s", policyRegistry_accountingChainAddress);
 
         deployerNonce_accountingChain++; // Incrementing for StableVault implementation
         vault_accountingChainAddress = vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
@@ -411,6 +414,7 @@ contract BaseTest is TestWithHelpers {
                 chainGateway_accountingChainAddress,
                 vault_accountingChainAddress,
                 transferHelper_accountingChainAddress,
+                policyRegistry_accountingChainAddress,
                 true
             )
         );
@@ -426,6 +430,10 @@ contract BaseTest is TestWithHelpers {
         // 12b. Policy Registry
         policyRegistry_accountingChain = new PolicyRegistry(accessManager_accountingChainAddress);
         Logger.log("\tPolicy Registry (Accounting Chain): %s", address(policyRegistry_accountingChain));
+        require(
+            address(policyRegistry_accountingChain) == policyRegistry_accountingChainAddress,
+            "Policy Registry (Accounting Chain) address mismatch"
+        );
 
         // 13-14. Stable Vault (Impl + Proxy)
         // Impl and proxy deployed in the internal `_deployStableVault` function
@@ -606,7 +614,8 @@ contract BaseTest is TestWithHelpers {
         swapper_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
         Logger.log("\tSwapper (Earning Chain) Predicted Address: %s", swapper_earningChainAddress);
 
-        deployerNonce_earningChain++; // Incrementing for PolicyRegistry
+        policyRegistry_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
+        Logger.log("\tPolicy Registry (Earning Chain) Predicted Address: %s", policyRegistry_earningChainAddress);
 
         deployerNonce_earningChain++; // Incrementing for Gateway implementation
         chainGateway_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
@@ -698,6 +707,7 @@ contract BaseTest is TestWithHelpers {
                 chainGateway_earningChainAddress,
                 address(0),
                 transferHelper_earningChainAddress,
+                policyRegistry_earningChainAddress,
                 false
             )
         );
@@ -746,6 +756,10 @@ contract BaseTest is TestWithHelpers {
         // 14b. Policy Registry
         policyRegistry_earningChain = new PolicyRegistry(accessManager_earningChainAddress);
         Logger.log("\tPolicy Registry (Earning Chain): %s", address(policyRegistry_earningChain));
+        require(
+            address(policyRegistry_earningChain) == policyRegistry_earningChainAddress,
+            "Policy Registry (Earning Chain) address mismatch"
+        );
 
         // 15-16. Earning Chain Gateway (Impl + Proxy)
         address earningChainGateway_impl = address(

@@ -236,7 +236,7 @@ contract OracleFeedE2ETest is BaseTest {
             .approve(address(iouTokenManager_accountingChain), userBalanceWithInterest);
         vm.deal(user1, bridgeFeeAmount);
         vm.prank(user1);
-        vault.bridgeIouTokens{value: bridgeFeeAmount}(
+        iouTokenManager_accountingChain.bridgeTokens{value: bridgeFeeAmount}(
             EARNING_CHAIN_ID,
             user1,
             userBalanceWithInterest,
@@ -246,8 +246,7 @@ contract OracleFeedE2ETest is BaseTest {
                 ICcipBridgeAdapter.CcipFeeParams({
                     feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
-            ),
-            ""
+            )
         );
         assertEq(iouToken_accountingChain.balanceOf(user1), 0, "User should have bridged IOU tokens");
 

@@ -70,18 +70,4 @@ contract MockEarningChainGateway is IEarningChainGateway {
         uint256 gasLimit,
         bytes calldata bridgeAdapterData
     ) external payable {}
-
-    function bridgeIouTokens(
-        uint256, // destinationChainId
-        address, // iouTokenRecipient
-        uint256, // iouTokenAmountRay
-        address, // bridgeAdapter
-        uint256, // gasLimit
-        bytes calldata, // bridgeParamsEncoded
-        bytes calldata // extraData
-    )
-        external
-        payable
-        override
-    {}
 }

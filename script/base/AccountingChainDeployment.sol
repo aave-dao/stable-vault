@@ -347,6 +347,7 @@ abstract contract AccountingChainDeployment is
                 chainGateway: getGatewayAddress(_deployer()),
                 vault: getStableVaultAddress(_deployer()),
                 transferHelper: getTransferHelperAddress(_deployer()),
+                policyRegistry: getPolicyRegistryAddress(_deployer()),
                 isAccountingChain: true
             })
         );

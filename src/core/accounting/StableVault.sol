@@ -13,7 +13,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
-import {IBridgeIouPolicy} from "src/interfaces/IBridgeIouPolicy.sol";
 import {IDepositPolicy} from "src/interfaces/IDepositPolicy.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
@@ -96,8 +95,6 @@ contract StableVault is
     // keccak256("aave.stable-vault.StableVault.policy.withdrawal-request")
     bytes32 internal constant WITHDRAWAL_REQUEST_POLICY_ID =
         0x9c238a3c8b0489eb6352e8961b4f7a11406d8d4dea0b75e9f2b5cab473d164d8;
-    // keccak256("aave.stable-vault.StableVault.policy.bridge")
-    bytes32 internal constant BRIDGE_POLICY_ID = 0x37dc2ea773b99d3122abc0fc102e7fcff6fa00038da80335f7d66b533221dd1a;
 
     /// @custom:storage-location erc7201:aave.storage.StableVault
     struct StableVaultStorage {
@@ -270,34 +267,6 @@ contract StableVault is
 
         emit Deposit(user, asset, amount);
         emit Transfer(address(0), user, amount.assetDecimalsToRay(asset));
-    }
-
-    /// @inheritdoc IStableVault
-    function bridgeIouTokens(
-        uint256 destinationChainId,
-        address iouTokenRecipient,
-        uint256 iouTokenAmountRay,
-        address bridgeAdapter,
-        uint256 gasLimit,
-        bytes calldata bridgeParamsEncoded,
-        bytes calldata extraData
-    ) external payable virtual override nonReentrant {
-        require(destinationChainId != block.chainid, Errors.InvalidDestinationChainId());
-        require(iouTokenRecipient != address(0), Errors.InvalidParameter());
-        require(iouTokenAmountRay > 0, Errors.ZeroAmount());
-
-        _applyBridgeIouPolicy(destinationChainId, iouTokenRecipient, iouTokenAmountRay, extraData);
-
-        IIouTokenManager(IOU_TOKEN_MANAGER).bridgeTokensFrom{value: msg.value}(
-            msg.sender,
-            destinationChainId,
-            iouTokenRecipient,
-            iouTokenAmountRay,
-            bridgeAdapter,
-            msg.sender,
-            gasLimit,
-            bridgeParamsEncoded
-        );
     }
 
     /// @notice Transfers Stable Vault balance (denominated in RAY) between users.
@@ -1020,29 +989,6 @@ contract StableVault is
             .applyWithdrawalRequestPolicy(
                 IWithdrawalRequestPolicy.WithdrawalRequestPolicyRequest({
                 caller: msg.sender, user: user, requestedAmountInRay: requestedAmountInRay, extraData: extraData
-            })
-            );
-        require(allowed, Errors.PolicyDenied());
-    }
-
-    function _applyBridgeIouPolicy(
-        uint256 destChainId,
-        address recipient,
-        uint256 iouAmountRay,
-        bytes calldata extraData
-    ) internal {
-        address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(BRIDGE_POLICY_ID);
-        if (policy == address(0)) {
-            return;
-        }
-        bool allowed = IBridgeIouPolicy(policy)
-            .applyBridgeIouPolicy(
-                IBridgeIouPolicy.BridgeIouRequest({
-                caller: msg.sender,
-                destChainId: destChainId,
-                recipient: recipient,
-                iouAmountRay: iouAmountRay,
-                extraData: extraData
             })
             );
         require(allowed, Errors.PolicyDenied());

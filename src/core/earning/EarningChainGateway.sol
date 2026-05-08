@@ -10,7 +10,6 @@ import {BaseChainGateway} from "src/core/BaseChainGateway.sol";
 import {LocalBalanceAggregator} from "src/core/LocalBalanceAggregator.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IBridgeFundsPolicy} from "src/interfaces/IBridgeFundsPolicy.sol";
-import {IBridgeIouPolicy} from "src/interfaces/IBridgeIouPolicy.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
@@ -153,34 +152,6 @@ contract EarningChainGateway is
         emit AssetOutflow(asset, amount);
     }
 
-    /// @inheritdoc IEarningChainGateway
-    function bridgeIouTokens(
-        uint256 destinationChainId,
-        address iouTokenRecipient,
-        uint256 iouTokenAmountRay,
-        address bridgeAdapter,
-        uint256 gasLimit,
-        bytes calldata bridgeParamsEncoded,
-        bytes calldata extraData
-    ) external payable override nonReentrant {
-        require(destinationChainId != block.chainid, Errors.InvalidDestinationChainId());
-        require(iouTokenRecipient != address(0), Errors.InvalidParameter());
-        require(iouTokenAmountRay > 0, Errors.ZeroAmount());
-
-        _applyBridgeIouPolicy(destinationChainId, iouTokenRecipient, iouTokenAmountRay, extraData);
-
-        IIouTokenManager(IOU_TOKEN_MANAGER).bridgeTokensFrom{value: msg.value}(
-            msg.sender,
-            destinationChainId,
-            iouTokenRecipient,
-            iouTokenAmountRay,
-            bridgeAdapter,
-            msg.sender,
-            gasLimit,
-            bridgeParamsEncoded
-        );
-    }
-
     function _receiveData(
         uint256, // sourceChainId
         bytes memory data
@@ -260,29 +231,6 @@ contract EarningChainGateway is
         uint256 amountOut = amountOutRay.rayToAssetDecimals(assetOut);
         require(amountOut != 0 && amountOut >= minAmountOut, Errors.InsufficientAmountOut());
         return amountOut;
-    }
-
-    function _applyBridgeIouPolicy(
-        uint256 destChainId,
-        address recipient,
-        uint256 iouAmountRay,
-        bytes calldata extraData
-    ) internal {
-        address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(BRIDGE_POLICY_ID);
-        if (policy == address(0)) {
-            return;
-        }
-        bool allowed = IBridgeIouPolicy(policy)
-            .applyBridgeIouPolicy(
-                IBridgeIouPolicy.BridgeIouRequest({
-                caller: msg.sender,
-                destChainId: destChainId,
-                recipient: recipient,
-                iouAmountRay: iouAmountRay,
-                extraData: extraData
-            })
-            );
-        require(allowed, Errors.PolicyDenied());
     }
 
     function _applyBridgeFundsPolicy(uint256 destChainId, address asset, uint256 amount) internal {
