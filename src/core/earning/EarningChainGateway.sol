@@ -9,7 +9,8 @@ import {
 import {BaseChainGateway} from "src/core/BaseChainGateway.sol";
 import {LocalBalanceAggregator} from "src/core/LocalBalanceAggregator.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
-import {IBridgePolicy} from "src/interfaces/IBridgePolicy.sol";
+import {IBridgeFundsPolicy} from "src/interfaces/IBridgeFundsPolicy.sol";
+import {IBridgeIouPolicy} from "src/interfaces/IBridgeIouPolicy.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
@@ -271,9 +272,9 @@ contract EarningChainGateway is
         if (policy == address(0)) {
             return;
         }
-        bool allowed = IBridgePolicy(policy)
+        bool allowed = IBridgeIouPolicy(policy)
             .applyBridgeIouPolicy(
-                IBridgePolicy.BridgeIouRequest({
+                IBridgeIouPolicy.BridgeIouRequest({
                 caller: msg.sender,
                 destChainId: destChainId,
                 recipient: recipient,
@@ -289,9 +290,9 @@ contract EarningChainGateway is
         if (policy == address(0)) {
             return;
         }
-        bool allowed = IBridgePolicy(policy)
+        bool allowed = IBridgeFundsPolicy(policy)
             .applyBridgeFundsPolicy(
-                IBridgePolicy.BridgeFundsRequest({
+                IBridgeFundsPolicy.BridgeFundsRequest({
                 caller: msg.sender, destChainId: destChainId, asset: asset, amount: amount
             })
             );

@@ -12,6 +12,7 @@ import {EfficientHashLib} from "@solady/utils/EfficientHashLib.sol";
 import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 
 import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
+import {IWithdrawalRequestPolicy} from "src/interfaces/IWithdrawalRequestPolicy.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
@@ -27,7 +28,7 @@ import {Errors} from "src/types/Errors.sol";
 /// a personal fee denominated in RAY to charge an exact amount; this signed amount is clamped to the asset's bp cap,
 /// with the cap amount rounded up in favor of the protocol.
 /// @custom:upgradeable
-contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithdrawalPolicy {
+contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithdrawalPolicy, IWithdrawalRequestPolicy {
     // EIP-712 typeHash:
     // keccak256("SignedFee(address user,address assetOut,uint256 iouAmountRay,uint256 personalFeeAmountRay,uint256
     // nonce,uint256 deadline)").
@@ -125,7 +126,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
         return amountOutRay;
     }
 
-    /// @inheritdoc IWithdrawalPolicy
+    /// @inheritdoc IWithdrawalRequestPolicy
     /// @dev No request-stage restrictions are applied by this implementation.
     function applyWithdrawalRequestPolicy(WithdrawalRequestPolicyRequest calldata request)
         external
@@ -136,7 +137,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
         return true;
     }
 
-    /// @inheritdoc IWithdrawalPolicy
+    /// @inheritdoc IWithdrawalRequestPolicy
     /// @dev No request-stage restrictions are applied by this implementation.
     function previewWithdrawalRequestPolicy(WithdrawalRequestPolicyRequest calldata)
         external

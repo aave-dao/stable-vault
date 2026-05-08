@@ -11,7 +11,7 @@ import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/
 import {LocalBalanceAggregator} from "src/core/LocalBalanceAggregator.sol";
 import {IAccountingChainGateway} from "src/interfaces/IAccountingChainGateway.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
-import {IBridgePolicy} from "src/interfaces/IBridgePolicy.sol";
+import {IBridgeFundsPolicy} from "src/interfaces/IBridgeFundsPolicy.sol";
 import {IChainBalanceOracle} from "src/interfaces/IChainBalanceOracle.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
@@ -195,9 +195,9 @@ contract FundsHandler is
         if (policy == address(0)) {
             return;
         }
-        bool allowed = IBridgePolicy(policy)
+        bool allowed = IBridgeFundsPolicy(policy)
             .applyBridgeFundsPolicy(
-                IBridgePolicy.BridgeFundsRequest({
+                IBridgeFundsPolicy.BridgeFundsRequest({
                 caller: msg.sender, destChainId: chainId, asset: asset, amount: amount
             })
             );

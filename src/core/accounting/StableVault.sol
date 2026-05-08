@@ -13,7 +13,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
-import {IBridgePolicy} from "src/interfaces/IBridgePolicy.sol";
+import {IBridgeIouPolicy} from "src/interfaces/IBridgeIouPolicy.sol";
 import {IDepositPolicy} from "src/interfaces/IDepositPolicy.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
@@ -22,6 +22,7 @@ import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
+import {IWithdrawalRequestPolicy} from "src/interfaces/IWithdrawalRequestPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {Multicall} from "src/misc/Multicall.sol";
@@ -1015,9 +1016,9 @@ contract StableVault is
         if (policy == address(0)) {
             return;
         }
-        bool allowed = IWithdrawalPolicy(policy)
+        bool allowed = IWithdrawalRequestPolicy(policy)
             .applyWithdrawalRequestPolicy(
-                IWithdrawalPolicy.WithdrawalRequestPolicyRequest({
+                IWithdrawalRequestPolicy.WithdrawalRequestPolicyRequest({
                 caller: msg.sender, user: user, requestedAmountInRay: requestedAmountInRay, extraData: extraData
             })
             );
@@ -1034,9 +1035,9 @@ contract StableVault is
         if (policy == address(0)) {
             return;
         }
-        bool allowed = IBridgePolicy(policy)
+        bool allowed = IBridgeIouPolicy(policy)
             .applyBridgeIouPolicy(
-                IBridgePolicy.BridgeIouRequest({
+                IBridgeIouPolicy.BridgeIouRequest({
                 caller: msg.sender,
                 destChainId: destChainId,
                 recipient: recipient,
