@@ -46,12 +46,10 @@ interface IAdiBridgeAdapter is IBridgeAdapter {
     /// @param encodedTransaction ABI-encoded a.DI transaction to retry.
     /// @param gasLimit Gas limit requested for Gateway payload execution on the destination chain.
     /// @param bridgeAdaptersToRetry Current-chain a.DI bridge adapters to retry.
-    /// @param feePayer Address that will pay the retry fee and receive any native refund.
     function retryTransaction(
         bytes calldata encodedTransaction,
         uint256 gasLimit,
-        address[] calldata bridgeAdaptersToRetry,
-        address feePayer
+        address[] calldata bridgeAdaptersToRetry
     ) external payable;
 
     /// @notice Quotes the funding required to retry a registered StableVault a.DI envelope as a new transaction.
@@ -70,9 +68,8 @@ interface IAdiBridgeAdapter is IBridgeAdapter {
     /// @notice Retries a registered StableVault a.DI envelope as a new transaction using caller-provided funding.
     /// @param envelope a.DI envelope to retry.
     /// @param gasLimit Gas limit requested for Gateway payload execution on the destination chain.
-    /// @param feePayer Address that will pay the retry fee and receive any native refund.
     /// @return transactionId a.DI transaction id for the retry.
-    function retryEnvelope(IAdiCrossChainForwarder.Envelope calldata envelope, uint256 gasLimit, address feePayer)
+    function retryEnvelope(IAdiCrossChainForwarder.Envelope calldata envelope, uint256 gasLimit)
         external
         payable
         returns (bytes32 transactionId);

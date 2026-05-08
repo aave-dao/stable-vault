@@ -573,23 +573,28 @@ contract AdiAdapterTest is TestWithHelpers {
         );
     }
 
-    function test_retryTransaction_fundsRetriesAndRefundsExcessNative() public {
+    function test_retryTransaction_fundsRetriesFromCallerAndRefundsExcessNative() public {
         uint256 nativeFee = 1 ether;
         uint256 providedNative = 1.5 ether;
         uint256 erc20Fee = 100e6;
         IAdiCrossChainForwarder.Envelope memory envelope = _validRetryEnvelope();
         bytes memory encodedTransaction = _encodeTransaction(envelope);
         address[] memory bridgeAdaptersToRetry = _singleAddress(makeAddr("bridgeAdapter"));
-        vm.deal(address(this), providedNative);
+        vm.deal(feePayer, providedNative);
         _stageFee(feePayer, _mockUsdc, erc20Fee);
         _mockAdiCrossChainController.setNativeFee(nativeFee);
         _setQuotedFees(_singleAddress(address(_mockUsdc)), _singleUint256(erc20Fee));
 
         vm.expectEmit(true, true, true, true);
         emit IBridgeAdapter.MessagePublished(_envelopeId(envelope));
+        vm.expectCall(
+            address(_mockUsdc),
+            abi.encodeCall(IERC20.transferFrom, (feePayer, address(_mockAdiCrossChainController), erc20Fee))
+        );
 
+        vm.prank(feePayer);
         _accountingChainAdiAdapter.retryTransaction{value: providedNative}(
-            encodedTransaction, DEFAULT_GAS_LIMIT, bridgeAdaptersToRetry, feePayer
+            encodedTransaction, DEFAULT_GAS_LIMIT, bridgeAdaptersToRetry
         );
 
         assertEq(_mockAdiCrossChainController.retryTransactionCallCount(), 1);
@@ -613,20 +618,14 @@ contract AdiAdapterTest is TestWithHelpers {
         vm.expectEmit(true, true, true, true);
         emit IBridgeAdapter.MessagePublished(_envelopeId(envelope));
 
-        bytes32 transactionId = _accountingChainAdiAdapter.retryEnvelope(envelope, DEFAULT_GAS_LIMIT, feePayer);
+        vm.prank(feePayer);
+        bytes32 transactionId = _accountingChainAdiAdapter.retryEnvelope(envelope, DEFAULT_GAS_LIMIT);
 
         assertEq(transactionId, bytes32(uint256(3)));
         assertEq(_mockAdiCrossChainController.retryEnvelopeCallCount(), 1);
         assertEq(
             _mockAdiCrossChainController.lastGasLimit(),
             DEFAULT_GAS_LIMIT + _accountingChainAdiAdapter.ADI_RECEIVER_GAS_OVERHEAD()
-        );
-    }
-
-    function test_retryTransaction_reverts_ifFeePayerIsZero() public {
-        vm.expectRevert(Errors.ZeroAddress.selector);
-        _accountingChainAdiAdapter.retryTransaction(
-            _encodeTransaction(_validRetryEnvelope()), DEFAULT_GAS_LIMIT, new address[](0), address(0)
         );
     }
 

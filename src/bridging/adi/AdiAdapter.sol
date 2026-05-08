@@ -108,11 +108,8 @@ contract AdiAdapter is BaseBridgeAdapter, IAdiBridgeAdapter {
     function retryTransaction(
         bytes calldata encodedTransaction,
         uint256 gasLimit,
-        address[] calldata bridgeAdaptersToRetry,
-        address feePayer
+        address[] calldata bridgeAdaptersToRetry
     ) external payable override {
-        require(feePayer != address(0), Errors.ZeroAddress());
-
         IAdiCrossChainForwarder.Envelope memory envelope = _decodeTransactionEnvelope(encodedTransaction);
         _validateRetryEnvelope(envelope);
 
@@ -120,13 +117,13 @@ contract AdiAdapter is BaseBridgeAdapter, IAdiBridgeAdapter {
         (uint256 nativeFee, IAdiCrossChainForwarder.Fee[] memory fees,) = IAdiCrossChainForwarder(
                 ADI_CROSS_CHAIN_CONTROLLER
             ).quoteRetryTransaction(encodedTransaction, adjustedGasLimit, bridgeAdaptersToRetry);
-        _fundCrossChainController(feePayer, nativeFee, fees);
+        _fundCrossChainController(msg.sender, nativeFee, fees);
 
         IAdiCrossChainForwarder(ADI_CROSS_CHAIN_CONTROLLER)
             .retryTransaction(encodedTransaction, adjustedGasLimit, bridgeAdaptersToRetry);
         emit MessagePublished(_getEnvelopeId(envelope));
 
-        _refundExcessNative(feePayer, nativeFee);
+        _refundExcessNative(msg.sender, nativeFee);
     }
 
     /// @inheritdoc IAdiBridgeAdapter
@@ -147,13 +144,12 @@ contract AdiAdapter is BaseBridgeAdapter, IAdiBridgeAdapter {
     }
 
     /// @inheritdoc IAdiBridgeAdapter
-    function retryEnvelope(IAdiCrossChainForwarder.Envelope calldata envelope, uint256 gasLimit, address feePayer)
+    function retryEnvelope(IAdiCrossChainForwarder.Envelope calldata envelope, uint256 gasLimit)
         external
         payable
         override
         returns (bytes32 transactionId)
     {
-        require(feePayer != address(0), Errors.ZeroAddress());
         _validateRetryEnvelope(envelope);
 
         uint256 adjustedGasLimit = gasLimit + ADI_RECEIVER_GAS_OVERHEAD;
@@ -162,12 +158,12 @@ contract AdiAdapter is BaseBridgeAdapter, IAdiBridgeAdapter {
         (uint256 nativeFee, IAdiCrossChainForwarder.Fee[] memory fees,) = IAdiCrossChainForwarder(
                 ADI_CROSS_CHAIN_CONTROLLER
             ).quoteRetryEnvelope(envelope, adjustedGasLimit, quoteBandwidth);
-        _fundCrossChainController(feePayer, nativeFee, fees);
+        _fundCrossChainController(msg.sender, nativeFee, fees);
 
         transactionId = IAdiCrossChainForwarder(ADI_CROSS_CHAIN_CONTROLLER).retryEnvelope(envelope, adjustedGasLimit);
         emit MessagePublished(_getEnvelopeId(envelope));
 
-        _refundExcessNative(feePayer, nativeFee);
+        _refundExcessNative(msg.sender, nativeFee);
     }
 
     /// @inheritdoc IAdiBridgeAdapter
