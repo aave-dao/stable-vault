@@ -354,7 +354,7 @@ contract OwnedMulticallTest is TestWithHelpers {
     }
 
     /// @dev Path A regression: a compromised manager crafts an `aggregate3` directly calling vault.pullCoverage.
-    /// The vault's `OnlyRecipient` check rejects.
+    /// The vault's `OnlyBeneficiary` check rejects.
     function test_rebalance_viaOwnedMulticall_attemptDirectVaultCallReverts() public {
         _mockGho.mint(address(_slippageVault), 1_000);
 
@@ -365,7 +365,7 @@ contract OwnedMulticallTest is TestWithHelpers {
             callData: abi.encodeCall(ISlippageCoverageVault.pullCoverage, (address(_mockGho), 1_000))
         });
 
-        vm.expectRevert(); // Multicall3 wraps as a generic revert string; underlying is OnlyRecipient.
+        vm.expectRevert(); // Multicall3 wraps as a generic revert string; underlying is OnlyBeneficiary.
         vm.prank(everyRoleAccount);
         _ownedMulticall.aggregate3(calls);
 

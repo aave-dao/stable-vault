@@ -5,7 +5,7 @@ pragma solidity ^0.8.22;
 /// @title ISlippageCoverageVault
 /// @author Aave Labs
 /// @notice Interface for the SlippageCoverageVault contract.
-/// @dev Push-based outflows to the immutable `SLIPPAGE_RECIPIENT`; the vault never grants ERC-20 allowances.
+/// @dev Push-based outflows to the immutable `SLIPPAGE_BENEFICIARY`; the vault never grants ERC-20 allowances.
 interface ISlippageCoverageVault {
     /// @notice Sliding-window cap state for an asset.
     /// @param windowStart Timestamp at which the current window started.
@@ -22,7 +22,7 @@ interface ISlippageCoverageVault {
     /// @notice Emitted when the vault is funded.
     event CoverageFunded(address indexed asset, address indexed from, uint256 amount);
 
-    /// @notice Emitted when coverage is pulled by the bound recipient.
+    /// @notice Emitted when coverage is pulled by the bound beneficiary.
     event CoveragePulled(address indexed asset, uint256 amount, bool overrideMode);
 
     /// @notice Emitted when the normal-mode max slippage tolerance is set.
@@ -57,12 +57,12 @@ interface ISlippageCoverageVault {
     /// @custom:selector 0x21ff5759
     error ExceedsWindowCap();
 
-    /// @notice Thrown when the caller of a recipient-gated function is not the immutable bound recipient.
-    /// @custom:selector 0xa1bfc65b
-    error OnlyRecipient();
+    /// @notice Thrown when the caller of a beneficiary-gated function is not the immutable bound beneficiary.
+    /// @custom:selector 0x5e5a9749
+    error OnlyBeneficiary();
 
-    /// @notice Pulls `amount` of `asset` from the vault to the bound recipient.
-    /// @dev Callable only by `SLIPPAGE_RECIPIENT`. Bypasses caps in override mode. Updates window state before the
+    /// @notice Pulls `amount` of `asset` from the vault to the bound beneficiary.
+    /// @dev Callable only by `SLIPPAGE_BENEFICIARY`. Bypasses caps in override mode. Updates window state before the
     /// transfer.
     /// @param asset The asset to pull.
     /// @param amount The amount to pull.
@@ -100,8 +100,8 @@ interface ISlippageCoverageVault {
     /// @notice Sweeps `amount` of `asset` from the vault to `to`.
     function sweep(address asset, uint256 amount, address to) external;
 
-    /// @notice Getter for the immutable bound recipient (the Swapper).
-    function getRecipient() external view returns (address);
+    /// @notice Getter for the immutable bound beneficiary (the Swapper).
+    function getBeneficiary() external view returns (address);
 
     /// @notice Getter for whether override mode is enabled.
     function getOverrideMode() external view returns (bool);

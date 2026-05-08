@@ -23,7 +23,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
     MockErc20 internal _usdc; // 6 decimals
     MockErc20 internal _gho; // 18 decimals
 
-    address internal recipient = makeAddr("RECIPIENT"); // bound Swapper
+    address internal beneficiary = makeAddr("BENEFICIARY"); // bound Swapper
     address internal operator = makeAddr("OPERATOR"); // privileged setter caller
     address internal attacker = makeAddr("ATTACKER");
     address internal funder = makeAddr("FUNDER");
@@ -42,7 +42,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
         _accessManager = new MockAccessManager(address(this));
         _vault =
-            new SlippageCoverageVault(recipient, address(_accessManager), DEFAULT_MAX_BPS, DEFAULT_OVERRIDE_MAX_BPS);
+            new SlippageCoverageVault(beneficiary, address(_accessManager), DEFAULT_MAX_BPS, DEFAULT_OVERRIDE_MAX_BPS);
 
         _usdc = new MockErc20("USD Coin", "USDC", 6);
         _gho = new MockErc20("GHO", "GHO", 18);
@@ -50,24 +50,24 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
     /* ============================ Constructor ============================ */
 
-    function test_constructor_reverts_ifRecipientIsZero() public {
+    function test_constructor_reverts_ifBeneficiaryIsZero() public {
         vm.expectRevert(abi.encodeWithSelector(Errors.ZeroAddress.selector));
         new SlippageCoverageVault(address(0), address(_accessManager), DEFAULT_MAX_BPS, DEFAULT_OVERRIDE_MAX_BPS);
     }
 
     function test_constructor_reverts_ifMaxSlippageBpsExceedsMaxBps() public {
         vm.expectRevert(abi.encodeWithSelector(Errors.InvalidParameter.selector));
-        new SlippageCoverageVault(recipient, address(_accessManager), 10_001, DEFAULT_OVERRIDE_MAX_BPS);
+        new SlippageCoverageVault(beneficiary, address(_accessManager), 10_001, DEFAULT_OVERRIDE_MAX_BPS);
     }
 
     function test_constructor_reverts_ifOverrideMaxSlippageBpsExceedsMaxBps() public {
         vm.expectRevert(abi.encodeWithSelector(Errors.InvalidParameter.selector));
-        new SlippageCoverageVault(recipient, address(_accessManager), DEFAULT_MAX_BPS, 10_001);
+        new SlippageCoverageVault(beneficiary, address(_accessManager), DEFAULT_MAX_BPS, 10_001);
     }
 
     function test_constructor_setsImmutableAndState() public view {
-        assertEq(_vault.SLIPPAGE_RECIPIENT(), recipient);
-        assertEq(_vault.getRecipient(), recipient);
+        assertEq(_vault.SLIPPAGE_BENEFICIARY(), beneficiary);
+        assertEq(_vault.getBeneficiary(), beneficiary);
         assertEq(_vault.getMaxSlippageBps(), DEFAULT_MAX_BPS);
         assertEq(_vault.getOverrideMaxSlippageBps(), DEFAULT_OVERRIDE_MAX_BPS);
         assertEq(_vault.getOverrideMode(), false);
@@ -78,17 +78,17 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         emit ISlippageCoverageVault.MaxSlippageBpsSet(0, DEFAULT_MAX_BPS);
         vm.expectEmit(false, false, false, true);
         emit ISlippageCoverageVault.OverrideMaxSlippageBpsSet(0, DEFAULT_OVERRIDE_MAX_BPS);
-        new SlippageCoverageVault(recipient, address(_accessManager), DEFAULT_MAX_BPS, DEFAULT_OVERRIDE_MAX_BPS);
+        new SlippageCoverageVault(beneficiary, address(_accessManager), DEFAULT_MAX_BPS, DEFAULT_OVERRIDE_MAX_BPS);
     }
 
     /* ============================ pullCoverage — gates ============================ */
 
-    /// @dev Path B: only the immutable bound recipient can ever pull.
-    function test_pullCoverage_reverts_ifCallerIsNotRecipient() public {
+    /// @dev Path B: only the immutable bound beneficiary can ever pull.
+    function test_pullCoverage_reverts_ifCallerIsNotBeneficiary() public {
         _configureUsdcCaps(LARGE_CAP, LARGE_CAP, ONE_DAY);
         _fund(_usdc, 1_000e6);
 
-        vm.expectRevert(abi.encodeWithSelector(ISlippageCoverageVault.OnlyRecipient.selector));
+        vm.expectRevert(abi.encodeWithSelector(ISlippageCoverageVault.OnlyBeneficiary.selector));
         vm.prank(attacker);
         _vault.pullCoverage(address(_usdc), 1);
     }
@@ -98,7 +98,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         _fund(_usdc, 1_000e6);
 
         vm.expectRevert(abi.encodeWithSelector(Errors.ZeroAmount.selector));
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 0);
     }
 
@@ -107,7 +107,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
         // pullCapPerTx == 0 → first guard trips.
         vm.expectRevert(abi.encodeWithSelector(ISlippageCoverageVault.ExceedsPerTxCap.selector));
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 1);
     }
 
@@ -116,7 +116,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         _fund(_usdc, 50_000e6);
 
         vm.expectRevert(abi.encodeWithSelector(ISlippageCoverageVault.ExceedsPerTxCap.selector));
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 5_000e6 + 1);
     }
 
@@ -127,7 +127,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         _fund(_usdc, 1_000e6);
 
         vm.expectRevert(abi.encodeWithSelector(ISlippageCoverageVault.ExceedsWindowCap.selector));
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 1_000);
     }
 
@@ -136,22 +136,22 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         // No funding.
 
         vm.expectRevert(); // SafeERC20FailedOperation propagates from the underlying ERC20
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 1_000e6);
     }
 
     /* ============================ pullCoverage — happy path ============================ */
 
-    function test_pullCoverage_transfersToRecipientAndUpdatesWindow() public {
+    function test_pullCoverage_transfersToBeneficiaryAndUpdatesWindow() public {
         _configureUsdcCaps(5_000e6, 50_000e6, ONE_DAY);
         _fund(_usdc, 50_000e6);
 
         uint256 amount = 4_999e6;
 
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), amount);
 
-        assertEq(_usdc.balanceOf(recipient), amount);
+        assertEq(_usdc.balanceOf(beneficiary), amount);
         assertEq(_usdc.balanceOf(address(_vault)), 50_000e6 - amount);
 
         ISlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
@@ -168,7 +168,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         vm.expectEmit(true, false, false, true);
         emit ISlippageCoverageVault.CoveragePulled(address(_usdc), 1_000e6, false);
 
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 1_000e6);
     }
 
@@ -180,7 +180,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         vm.expectEmit(true, false, false, true);
         emit ISlippageCoverageVault.CoveragePulled(address(_usdc), 100e6, true);
 
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 100e6);
     }
 
@@ -191,18 +191,18 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         _fund(_usdc, 50_000e6);
         _fund(_gho, 50_000e18);
 
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 50_000e6);
 
         // USDC window full → reverts.
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         vm.expectRevert(abi.encodeWithSelector(ISlippageCoverageVault.ExceedsWindowCap.selector));
         _vault.pullCoverage(address(_usdc), 1);
 
         // GHO window untouched → succeeds.
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_gho), 50_000e18);
-        assertEq(_gho.balanceOf(recipient), 50_000e18);
+        assertEq(_gho.balanceOf(beneficiary), 50_000e18);
     }
 
     /* ============================ Window mechanics ============================ */
@@ -212,7 +212,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         _fund(_usdc, 50_000e6);
 
         // Window state defaults are all zero. After first pull, windowStart = block.timestamp.
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 1_000e6);
 
         ISlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
@@ -225,19 +225,19 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         _fund(_usdc, 200_000e6);
 
         // Drain the entire window.
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 50_000e6);
         uint256 firstWindowStart = block.timestamp;
 
         // Just before rollover → reverts.
         vm.warp(firstWindowStart + ONE_DAY - 1);
         vm.expectRevert(abi.encodeWithSelector(ISlippageCoverageVault.ExceedsWindowCap.selector));
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 1);
 
         // At the boundary → rolls over and succeeds.
         vm.warp(firstWindowStart + ONE_DAY);
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 50_000e6);
 
         ISlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
@@ -254,36 +254,36 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         uint256 t0 = block.timestamp;
 
         // Anchor windowStart to t0 with a 1-wei pull (the cap minus 1 below absorbs this).
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 1);
 
         // Drain the rest of the window at t = t0 + windowSeconds - 1.
         vm.warp(t0 + ONE_DAY - 1);
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 50_000e6 - 1);
 
         // At rollover boundary, drain another full cap — 2x cap minus 1 in ~1 second.
         vm.warp(t0 + ONE_DAY);
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 50_000e6);
 
         // Total drained ~ 2 × cap.
-        assertEq(_usdc.balanceOf(recipient), 100_000e6);
+        assertEq(_usdc.balanceOf(beneficiary), 100_000e6);
     }
 
     function test_pullCoverage_rollsOverAfterMultiDayIdle() public {
         _configureUsdcCaps(50_000e6, 50_000e6, ONE_DAY);
         _fund(_usdc, 100_000e6);
 
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 50_000e6);
 
         // Idle for 30 days, then pull — should roll over once and accept the full cap again.
         vm.warp(block.timestamp + 30 days);
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 50_000e6);
 
-        assertEq(_usdc.balanceOf(recipient), 100_000e6);
+        assertEq(_usdc.balanceOf(beneficiary), 100_000e6);
     }
 
     function test_pullCoverage_manySmallPullsTotalingCap_revertsOnNext() public {
@@ -292,13 +292,13 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
         // 10 × 1_000 = 10_000 (the cap).
         for (uint256 i = 0; i < 10; i++) {
-            vm.prank(recipient);
+            vm.prank(beneficiary);
             _vault.pullCoverage(address(_usdc), 1_000e6);
         }
 
         // 11th pull of any amount must revert.
         vm.expectRevert(abi.encodeWithSelector(ISlippageCoverageVault.ExceedsWindowCap.selector));
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 1);
 
         ISlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
@@ -314,11 +314,11 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
         for (uint256 i = 0; i < 10; i++) {
             vm.warp(block.timestamp + 1);
-            vm.prank(recipient);
+            vm.prank(beneficiary);
             _vault.pullCoverage(address(_usdc), 1_000e6);
         }
 
-        assertEq(_usdc.balanceOf(recipient), 10_000e6);
+        assertEq(_usdc.balanceOf(beneficiary), 10_000e6);
     }
 
     function test_pullCoverage_largeWindowSeconds_pullsTrickleOver() public {
@@ -329,13 +329,13 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         _vault.raiseWindowCap(address(_usdc), 10_000e6, type(uint64).max);
         _fund(_usdc, 100_000e6);
 
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 10_000e6);
 
         // Many years later, still no rollover (windowSeconds = uint64.max ≈ 5.8e11 years).
         vm.warp(block.timestamp + 365 days * 100);
         vm.expectRevert(abi.encodeWithSelector(ISlippageCoverageVault.ExceedsWindowCap.selector));
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 1);
     }
 
@@ -345,12 +345,12 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         _configureUsdcCaps(10_000e6, 10_000e6, ONE_DAY);
         _fund(_usdc, 100_000e6);
 
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 10_000e6);
 
         // Window is full at 10k.
         vm.expectRevert(abi.encodeWithSelector(ISlippageCoverageVault.ExceedsWindowCap.selector));
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 1);
 
         // Raise window cap to 20k mid-window.
@@ -358,7 +358,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         _vault.raiseWindowCap(address(_usdc), 20_000e6, ONE_DAY);
 
         // Now an additional 10k is allowed (consumed not reset).
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 10_000e6);
 
         ISlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
@@ -370,7 +370,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         _configureUsdcCaps(5_000e6, 10_000e6, ONE_DAY);
         _fund(_usdc, 50_000e6);
 
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 5_000e6);
         ISlippageCoverageVault.Window memory wBefore = _vault.getWindow(address(_usdc));
         assertEq(wBefore.consumed, 5_000e6);
@@ -381,12 +381,12 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
         // Any pull reverts: consumed (5k) + amount > cap (1k).
         vm.expectRevert(abi.encodeWithSelector(ISlippageCoverageVault.ExceedsWindowCap.selector));
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 1);
 
         // After rollover, full new cap available (per-tx cap is already 5k ≥ 1k, no adjustment needed).
         vm.warp(block.timestamp + ONE_DAY);
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 1_000e6);
         assertEq(_vault.getWindow(address(_usdc)).consumed, 1_000e6);
     }
@@ -397,7 +397,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         _fund(_usdc, 100_000e6);
 
         uint256 t0 = block.timestamp;
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 10_000e6);
 
         // Half a day in, lower window to 1k cap with 1 hour windowSeconds.
@@ -409,7 +409,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         vm.prank(operator);
         _vault.lowerPullCapPerTx(address(_usdc), 1_000e6);
 
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 500e6);
         ISlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
         assertEq(w.consumed, 500e6);
@@ -426,7 +426,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         uint256 totalPulled;
         for (uint256 i = 0; i < numPulls; i++) {
             uint256 amount = baseAmount + i;
-            vm.prank(recipient);
+            vm.prank(beneficiary);
             _vault.pullCoverage(address(_usdc), amount);
             totalPulled += amount;
         }
@@ -459,9 +459,9 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         _vault.setOverrideMode(true);
         _fund(_usdc, 1_000_000);
 
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 1_000_000);
-        assertEq(_usdc.balanceOf(recipient), 1_000_000);
+        assertEq(_usdc.balanceOf(beneficiary), 1_000_000);
     }
 
     function test_pullCoverage_overrideModeBypassesWindowCap() public {
@@ -469,16 +469,16 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         _fund(_usdc, 1_000_000e6);
 
         // Drain the normal-mode window.
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 5_000e6);
 
         // Flip override; pull amounts that would otherwise revert.
         vm.prank(operator);
         _vault.setOverrideMode(true);
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 100_000e6);
 
-        assertEq(_usdc.balanceOf(recipient), 105_000e6);
+        assertEq(_usdc.balanceOf(beneficiary), 105_000e6);
     }
 
     /// @dev Crucial: override mode must NOT bump `consumed`. Otherwise turning override off would leave a poisoned
@@ -490,7 +490,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         // Override on, drain a lot.
         vm.prank(operator);
         _vault.setOverrideMode(true);
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 100_000e6);
 
         ISlippageCoverageVault.Window memory wDuringOverride = _vault.getWindow(address(_usdc));
@@ -501,7 +501,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         _fund(_usdc, 5_000e6);
         vm.prank(operator);
         _vault.setOverrideMode(false);
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 5_000e6);
 
         ISlippageCoverageVault.Window memory wAfter = _vault.getWindow(address(_usdc));
@@ -515,14 +515,14 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         // Override on: pull above per-tx cap.
         vm.prank(operator);
         _vault.setOverrideMode(true);
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 50_000);
 
         // Flip off: any pull above per-tx cap reverts.
         vm.prank(operator);
         _vault.setOverrideMode(false);
         vm.expectRevert(abi.encodeWithSelector(ISlippageCoverageVault.ExceedsPerTxCap.selector));
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 1_001);
     }
 
@@ -835,7 +835,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         _vault.sweep(address(_usdc), 10_000e6, sweepTo);
 
         vm.expectRevert(); // SafeERC20FailedOperation
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 1_000e6);
     }
 
@@ -846,7 +846,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         _fund(_usdc, 10_000e6);
         // Allowance from vault to attacker is 0, has never been set, vault has no code path that sets it.
         assertEq(_usdc.allowance(address(_vault), attacker), 0);
-        assertEq(_usdc.allowance(address(_vault), recipient), 0);
+        assertEq(_usdc.allowance(address(_vault), beneficiary), 0);
         assertEq(_usdc.allowance(address(_vault), operator), 0);
     }
 
@@ -870,7 +870,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
         // Outer call would set the transient nonReentrant flag → inner call reverts → propagates.
         vm.expectRevert(abi.encodeWithSelector(ReentrancyGuardTransient.ReentrancyGuardReentrantCall.selector));
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(hostile), 100);
     }
 
@@ -899,12 +899,12 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         _fund(_usdc, 1_000);
 
         for (uint256 i = 0; i < 100; i++) {
-            vm.prank(recipient);
+            vm.prank(beneficiary);
             _vault.pullCoverage(address(_usdc), 1);
         }
 
         vm.expectRevert(abi.encodeWithSelector(ISlippageCoverageVault.ExceedsWindowCap.selector));
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 1);
 
         ISlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
@@ -918,13 +918,13 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
         // 5 × 1_000 = 5_000 (= window cap).
         for (uint256 i = 0; i < 5; i++) {
-            vm.prank(recipient);
+            vm.prank(beneficiary);
             _vault.pullCoverage(address(_usdc), 1_000);
         }
 
         // 6th pull blocked.
         vm.expectRevert(abi.encodeWithSelector(ISlippageCoverageVault.ExceedsWindowCap.selector));
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 1);
     }
 
@@ -935,7 +935,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         _fund(_usdc, 100_000e6);
 
         uint256 t0 = block.timestamp;
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 5_000e6);
 
         // Shrink windowSeconds to 1 hour.
@@ -944,7 +944,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
         // Warp 1 hour after t0 → rollover triggers (now >= t0 + 1h).
         vm.warp(t0 + 1 hours);
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 4_000e6);
 
         ISlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
@@ -960,24 +960,24 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         // Override on → pull big.
         vm.prank(operator);
         _vault.setOverrideMode(true);
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 50_000);
 
         // Override off → must respect cap.
         vm.prank(operator);
         _vault.setOverrideMode(false);
         vm.expectRevert(abi.encodeWithSelector(ISlippageCoverageVault.ExceedsPerTxCap.selector));
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 101);
 
         // Within cap.
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 100);
 
         // Override on again → bypass.
         vm.prank(operator);
         _vault.setOverrideMode(true);
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 50_000);
     }
 
@@ -991,12 +991,12 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         _fund(_usdc, type(uint128).max);
 
         // Fill the bucket.
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), LARGE_CAP);
 
         // One more wei must revert via the consumed+amount > cap check, not via uint128 overflow.
         vm.expectRevert(abi.encodeWithSelector(ISlippageCoverageVault.ExceedsWindowCap.selector));
-        vm.prank(recipient);
+        vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 1);
     }
 
@@ -1014,8 +1014,8 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         assertEq(_vault.getPullCapPerTx(address(_gho)), 0);
     }
 
-    function test_getRecipient_returnsImmutable() public view {
-        assertEq(_vault.getRecipient(), recipient);
+    function test_getBeneficiary_returnsImmutable() public view {
+        assertEq(_vault.getBeneficiary(), beneficiary);
     }
 
     /* ============================ Helpers ============================ */

@@ -21,7 +21,7 @@ contract SlippageCoverageVault is AccessManaged, ReentrancyGuardTransient, ISlip
     using SafeERC20 for IERC20;
 
     /// @dev Bound puller (the Swapper). Set at construction; never changes.
-    address public immutable SLIPPAGE_RECIPIENT;
+    address public immutable SLIPPAGE_BENEFICIARY;
 
     bool internal _overrideMode;
     uint16 internal _maxSlippageBps;
@@ -30,20 +30,20 @@ contract SlippageCoverageVault is AccessManaged, ReentrancyGuardTransient, ISlip
     mapping(address asset => Window) internal _windowByAsset;
 
     /// @dev Constructor.
-    /// @param slippageRecipient The bound puller (the Swapper).
+    /// @param slippageBeneficiary The bound puller (the Swapper).
     /// @param authority The AccessManager authority for restricted setters.
     /// @param initialMaxSlippageBps Initial normal-mode max slippage tolerance in basis points.
     /// @param initialOverrideMaxSlippageBps Initial override-mode max slippage tolerance in basis points.
     constructor(
-        address slippageRecipient,
+        address slippageBeneficiary,
         address authority,
         uint16 initialMaxSlippageBps,
         uint16 initialOverrideMaxSlippageBps
     ) AccessManaged(authority) {
-        require(slippageRecipient != address(0), Errors.ZeroAddress());
+        require(slippageBeneficiary != address(0), Errors.ZeroAddress());
         require(initialMaxSlippageBps <= Constants.MAX_BPS, Errors.InvalidParameter());
         require(initialOverrideMaxSlippageBps <= Constants.MAX_BPS, Errors.InvalidParameter());
-        SLIPPAGE_RECIPIENT = slippageRecipient;
+        SLIPPAGE_BENEFICIARY = slippageBeneficiary;
         _maxSlippageBps = initialMaxSlippageBps;
         _overrideMaxSlippageBps = initialOverrideMaxSlippageBps;
         emit MaxSlippageBpsSet(0, initialMaxSlippageBps);
@@ -52,7 +52,7 @@ contract SlippageCoverageVault is AccessManaged, ReentrancyGuardTransient, ISlip
 
     /// @inheritdoc ISlippageCoverageVault
     function pullCoverage(address asset, uint256 amount) external override nonReentrant {
-        require(msg.sender == SLIPPAGE_RECIPIENT, OnlyRecipient());
+        require(msg.sender == SLIPPAGE_BENEFICIARY, OnlyBeneficiary());
         require(amount > 0, Errors.ZeroAmount());
 
         bool inOverride = _overrideMode;
@@ -62,7 +62,7 @@ contract SlippageCoverageVault is AccessManaged, ReentrancyGuardTransient, ISlip
             _consumeWindow(asset, amount);
         }
 
-        IERC20(asset).safeTransfer(SLIPPAGE_RECIPIENT, amount);
+        IERC20(asset).safeTransfer(SLIPPAGE_BENEFICIARY, amount);
         emit CoveragePulled(asset, amount, inOverride);
     }
 
@@ -153,8 +153,8 @@ contract SlippageCoverageVault is AccessManaged, ReentrancyGuardTransient, ISlip
     //////////////////////////////// VIEW FUNCTIONS ////////////////////////////////
 
     /// @inheritdoc ISlippageCoverageVault
-    function getRecipient() external view override returns (address) {
-        return SLIPPAGE_RECIPIENT;
+    function getBeneficiary() external view override returns (address) {
+        return SLIPPAGE_BENEFICIARY;
     }
 
     /// @inheritdoc ISlippageCoverageVault
