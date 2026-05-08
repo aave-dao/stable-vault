@@ -38,7 +38,8 @@
     },
     "ccipRouterAddress": "0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D",
     "aaveV3PoolAddressesProvider": "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e",
-    "deploymentOutputPath": "deployments/vnet/v0.3/earning.json"
+    "deploymentOutputPath": "deployments/vnet/v0.3/earning.json",
+    "minBurnIouTokenGasLimit": "120000"
   },
   "accountingChain": {
     "chainId": 42161,

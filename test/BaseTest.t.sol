@@ -729,7 +729,8 @@ contract BaseTest is TestWithHelpers {
                 address(priceOracle_earningChain),
                 iouTokenManager_earningChainAddress,
                 transferHelper_earningChainAddress,
-                address(withdrawalPolicy_earningChain)
+                address(withdrawalPolicy_earningChain),
+                BURN_IOU_TOKEN_GAS_LIMIT
             )
         );
         earningChainGateway = EarningChainGateway(

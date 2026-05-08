@@ -32,12 +32,11 @@ contract EarningChainGateway is
 {
     using AssetLib for uint256;
 
-    /// @notice Minimum destination gas limit required for the Accounting Chain to process a
-    /// `BURN_IOU_TOKEN` message.
-    /// @dev Set to 120k gas units based on gas-snapshot tests of the full destination execution path.
-    /// The gas tests measured ~106.6k gas consumed and about 110k as the minimum exact-gas
-    /// value that succeeds under `CallWithExactGas` delivery semantics. 120k adds around 10% safety margin on top.
-    uint256 internal constant MIN_BURN_IOU_TOKEN_GAS_LIMIT = 120_000;
+    /// @notice Minimum destination gas limit required for the Accounting Chain to process a `BURN_IOU_TOKEN` message.
+    /// @dev Configured at deploy time so the value can be tuned per chain pair without source changes. Calibrated
+    /// against gas-snapshot tests of the full destination execution path (~106.6k consumed, ~110k as the exact-gas
+    /// minimum that succeeds under `CallWithExactGas` delivery semantics; 120k adds ~10% safety margin on top).
+    uint256 public immutable MIN_BURN_IOU_TOKEN_GAS_LIMIT;
 
     uint256 internal immutable ACCOUNTING_CHAIN_ID;
     address internal immutable WITHDRAWAL_POLICY;
@@ -50,13 +49,16 @@ contract EarningChainGateway is
     /// tokens.
     /// @param transferHelper Address of the TransferHelper contract used to transfer assets across components.
     /// @param withdrawalPolicy Address of the contract ensuring protocol's withdrawal requirements are met.
+    /// @param minBurnIouTokenGasLimit Minimum destination gas limit accepted on `exchangeIouTokens` for the
+    /// `BURN_IOU_TOKEN` message. Must be non-zero.
     constructor(
         uint256 accountingChainId,
         address allocator,
         address priceOracle,
         address iouTokenManager,
         address transferHelper,
-        address withdrawalPolicy
+        address withdrawalPolicy,
+        uint256 minBurnIouTokenGasLimit
     )
         TransferHelperClient(transferHelper)
         BaseChainGateway(iouTokenManager)
@@ -64,9 +66,11 @@ contract EarningChainGateway is
     {
         require(withdrawalPolicy != address(0), Errors.ZeroAddress());
         require(accountingChainId != 0 && accountingChainId != block.chainid, Errors.InvalidParameter());
+        require(minBurnIouTokenGasLimit > 0, Errors.InvalidParameter());
         _disableInitializers();
         ACCOUNTING_CHAIN_ID = accountingChainId;
         WITHDRAWAL_POLICY = withdrawalPolicy;
+        MIN_BURN_IOU_TOKEN_GAS_LIMIT = minBurnIouTokenGasLimit;
     }
 
     /// @dev Initializer.
