@@ -48,7 +48,7 @@ contract AdiAdapter is BaseBridgeAdapter, IAdiBridgeAdapter {
         external
         view
         override
-        returns (uint256 nativeFee, IAdiCrossChainForwarder.Fee[] memory fees)
+        returns (uint256 nativeFee, IAdiCrossChainForwarder.Fee[] memory fees, uint256 successfulQuotes)
     {
         address destinationChainAdapter = _destinationChainAdapterOf[destinationChainId];
         require(destinationChainAdapter != address(0), Errors.InvalidParameter());
@@ -75,7 +75,7 @@ contract AdiAdapter is BaseBridgeAdapter, IAdiBridgeAdapter {
         require(destinationChainAdapter != address(0), Errors.InvalidParameter());
 
         uint256 adjustedGasLimit = gasLimit + ADI_RECEIVER_GAS_OVERHEAD;
-        (uint256 nativeFee, IAdiCrossChainForwarder.Fee[] memory fees) =
+        (uint256 nativeFee, IAdiCrossChainForwarder.Fee[] memory fees,) =
             _quoteForwardMessage(destinationChainId, destinationChainAdapter, gasLimit, data);
         _fundCrossChainController(feePayer, nativeFee, fees);
 
@@ -106,7 +106,7 @@ contract AdiAdapter is BaseBridgeAdapter, IAdiBridgeAdapter {
         address destinationChainAdapter,
         uint256 gasLimit,
         bytes memory data
-    ) internal view returns (uint256 nativeFee, IAdiCrossChainForwarder.Fee[] memory fees) {
+    ) internal view returns (uint256 nativeFee, IAdiCrossChainForwarder.Fee[] memory fees, uint256 successfulQuotes) {
         IAdiCrossChainForwarder crossChainForwarder = IAdiCrossChainForwarder(ADI_CROSS_CHAIN_CONTROLLER);
         uint256 quoteBandwidth = crossChainForwarder.getOptimalBandwidthByChain(destinationChainId);
         return crossChainForwarder.quoteForwardMessage(

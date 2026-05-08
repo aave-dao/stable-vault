@@ -23,10 +23,11 @@ interface IAdiBridgeAdapter is IBridgeAdapter {
     /// @param gasLimit Gas limit requested for Gateway payload execution on the destination chain.
     /// @return nativeFee Native funding required by a.DI.
     /// @return fees ERC20 funding required by a.DI.
+    /// @return successfulQuotes Number of selected a.DI bridge adapters that quoted successfully.
     function quoteMessageToChain(uint256 destinationChainId, bytes calldata messageData, uint256 gasLimit)
         external
         view
-        returns (uint256 nativeFee, IAdiCrossChainForwarder.Fee[] memory fees);
+        returns (uint256 nativeFee, IAdiCrossChainForwarder.Fee[] memory fees, uint256 successfulQuotes);
 
     /// @notice Receives a confirmed a.DI message from the configured CrossChainController.
     /// @param originSender Sender address on the origin chain.

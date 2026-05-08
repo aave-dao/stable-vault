@@ -53,11 +53,12 @@ interface IAdiCrossChainForwarder {
     /// @param quoteBandwidth Number of adapters to quote. Zero quotes all configured adapters.
     /// @return nativeFee Native funding required by the selected a.DI adapter set.
     /// @return fees ERC20 funding required by the selected a.DI adapter set.
+    /// @return successfulQuotes Number of selected bridge adapters that quoted successfully.
     function quoteForwardMessage(
         uint256 destinationChainId,
         address destination,
         uint256 gasLimit,
         bytes calldata message,
         uint256 quoteBandwidth
-    ) external view returns (uint256 nativeFee, Fee[] memory fees);
+    ) external view returns (uint256 nativeFee, Fee[] memory fees, uint256 successfulQuotes);
 }

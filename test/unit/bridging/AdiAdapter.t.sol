@@ -105,15 +105,18 @@ contract AdiAdapterTest is TestWithHelpers {
     function test_quoteMessageToChain_returnsControllerQuote() public {
         uint256 nativeFee = 1 ether;
         uint256 erc20Fee = 100e6;
+        uint256 successfulQuotes = 2;
         _mockAdiCrossChainController.setNativeFee(nativeFee);
+        _mockAdiCrossChainController.setSuccessfulQuotes(successfulQuotes);
         _setQuotedFees(_singleAddress(address(_mockUsdc)), _singleUint256(erc20Fee));
         _mockAdiCrossChainController.setExpectedQuote(
             DEFAULT_GAS_LIMIT + _accountingChainAdiAdapter.ADI_RECEIVER_GAS_OVERHEAD(), 0
         );
 
-        (uint256 quotedNativeFee, IAdiCrossChainForwarder.Fee[] memory quotedFees) =
+        (uint256 quotedNativeFee, IAdiCrossChainForwarder.Fee[] memory quotedFees, uint256 quotedSuccessfulQuotes) =
             _accountingChainAdiAdapter.quoteMessageToChain(EARNING_CHAIN_ID, "message", DEFAULT_GAS_LIMIT);
 
+        assertEq(quotedSuccessfulQuotes, successfulQuotes);
         assertEq(quotedNativeFee, nativeFee);
         assertEq(quotedFees.length, 1);
         assertEq(quotedFees[0].token, address(_mockUsdc));

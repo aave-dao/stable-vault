@@ -16,6 +16,7 @@ contract MockAdiCrossChainController is IAdiCrossChainForwarder {
     uint256 public forwardMessageCallCount;
     uint256 public forwardMessageStrictCallCount;
     uint256 public nativeFee;
+    uint256 public successfulQuotes = 1;
     uint256 internal _optimalBandwidth;
     uint256 internal _expectedQuoteGasLimit;
     uint256 internal _expectedQuoteBandwidth;
@@ -51,7 +52,7 @@ contract MockAdiCrossChainController is IAdiCrossChainForwarder {
         external
         view
         override
-        returns (uint256, IAdiCrossChainForwarder.Fee[] memory)
+        returns (uint256, IAdiCrossChainForwarder.Fee[] memory, uint256)
     {
         if (_shouldValidateQuote) {
             require(gasLimit == _expectedQuoteGasLimit, UnexpectedQuoteGasLimit());
@@ -62,7 +63,7 @@ contract MockAdiCrossChainController is IAdiCrossChainForwarder {
         for (uint256 i = 0; i < _fees.length; i++) {
             quotedFees[i] = _fees[i];
         }
-        return (nativeFee, quotedFees);
+        return (nativeFee, quotedFees, successfulQuotes);
     }
 
     function getOptimalBandwidthByChain(uint256) external view override returns (uint256) {
@@ -71,6 +72,10 @@ contract MockAdiCrossChainController is IAdiCrossChainForwarder {
 
     function setNativeFee(uint256 newNativeFee) external {
         nativeFee = newNativeFee;
+    }
+
+    function setSuccessfulQuotes(uint256 newSuccessfulQuotes) external {
+        successfulQuotes = newSuccessfulQuotes;
     }
 
     function setOptimalBandwidth(uint256 newOptimalBandwidth) external {
