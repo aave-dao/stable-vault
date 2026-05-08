@@ -87,6 +87,8 @@ interface IAdiCrossChainForwarder {
     ) external view returns (uint256 nativeFee, Fee[] memory fees, uint256 successfulQuotes);
 
     /// @notice Quotes the funding required to retry a registered envelope as a new a.DI transaction.
+    /// @dev `quoteBandwidth` is caller-selected for exploratory/off-chain quotes. The actual `retryEnvelope` path uses
+    /// the CrossChainController's configured optimal bandwidth.
     /// @param envelope a.DI envelope to retry.
     /// @param gasLimit Gas cost on receiving side of the message.
     /// @param quoteBandwidth Number of adapters to quote. Zero quotes all configured adapters.

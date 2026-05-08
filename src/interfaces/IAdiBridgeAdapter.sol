@@ -53,6 +53,9 @@ interface IAdiBridgeAdapter is IBridgeAdapter {
     ) external payable;
 
     /// @notice Quotes the funding required to retry a registered StableVault a.DI envelope as a new transaction.
+    /// @dev `quoteBandwidth` is intentionally caller-selected so off-chain callers can quote a custom adapter set, such
+    /// as all configured adapters for a conservative estimate. `retryEnvelope` does not accept `quoteBandwidth`; it
+    /// requotes using the CrossChainController's configured optimal bandwidth before funding and retrying.
     /// @param envelope a.DI envelope to retry.
     /// @param gasLimit Gas limit requested for Gateway payload execution on the destination chain.
     /// @param quoteBandwidth Number of adapters to quote. Zero quotes all configured adapters.
@@ -66,6 +69,7 @@ interface IAdiBridgeAdapter is IBridgeAdapter {
     ) external view returns (uint256 nativeFee, IAdiCrossChainForwarder.Fee[] memory fees, uint256 successfulQuotes);
 
     /// @notice Retries a registered StableVault a.DI envelope as a new transaction using caller-provided funding.
+    /// @dev Uses the CrossChainController's configured optimal bandwidth for both the internal quote and retry.
     /// @param envelope a.DI envelope to retry.
     /// @param gasLimit Gas limit requested for Gateway payload execution on the destination chain.
     /// @return transactionId a.DI transaction id for the retry.
