@@ -15,6 +15,8 @@ contract MockAdiCrossChainController is IAdiCrossChainForwarder {
     uint256 public lastGasLimit;
     uint256 public forwardMessageCallCount;
     uint256 public forwardMessageStrictCallCount;
+    uint256 public retryEnvelopeCallCount;
+    uint256 public retryTransactionCallCount;
     uint256 public nativeFee;
     uint256 public successfulQuotes = 1;
     uint256 internal _optimalBandwidth;
@@ -66,8 +68,57 @@ contract MockAdiCrossChainController is IAdiCrossChainForwarder {
         return (nativeFee, quotedFees, successfulQuotes);
     }
 
+    function quoteRetryEnvelope(IAdiCrossChainForwarder.Envelope calldata, uint256 gasLimit, uint256 quoteBandwidth)
+        external
+        view
+        override
+        returns (uint256, IAdiCrossChainForwarder.Fee[] memory, uint256)
+    {
+        if (_shouldValidateQuote) {
+            require(gasLimit == _expectedQuoteGasLimit, UnexpectedQuoteGasLimit());
+            require(quoteBandwidth == _expectedQuoteBandwidth, UnexpectedQuoteBandwidth());
+        }
+
+        return (nativeFee, _copyFees(), successfulQuotes);
+    }
+
+    function quoteRetryTransaction(bytes calldata, uint256 gasLimit, address[] calldata)
+        external
+        view
+        override
+        returns (uint256, IAdiCrossChainForwarder.Fee[] memory, uint256)
+    {
+        if (_shouldValidateQuote) {
+            require(gasLimit == _expectedQuoteGasLimit, UnexpectedQuoteGasLimit());
+        }
+
+        return (nativeFee, _copyFees(), successfulQuotes);
+    }
+
     function getOptimalBandwidthByChain(uint256) external view override returns (uint256) {
         return _optimalBandwidth;
+    }
+
+    function retryEnvelope(IAdiCrossChainForwarder.Envelope calldata envelope, uint256 gasLimit)
+        external
+        override
+        returns (bytes32 transactionId)
+    {
+        retryEnvelopeCallCount++;
+        _recordRetryEnvelope(envelope, gasLimit);
+        return bytes32(uint256(3));
+    }
+
+    function retryTransaction(bytes calldata encodedTransaction, uint256 gasLimit, address[] calldata)
+        external
+        override
+    {
+        retryTransactionCallCount++;
+        IAdiCrossChainForwarder.Transaction memory transaction =
+            abi.decode(encodedTransaction, (IAdiCrossChainForwarder.Transaction));
+        IAdiCrossChainForwarder.Envelope memory envelope =
+            abi.decode(transaction.encodedEnvelope, (IAdiCrossChainForwarder.Envelope));
+        _recordRetryEnvelope(envelope, gasLimit);
     }
 
     function setNativeFee(uint256 newNativeFee) external {
@@ -125,5 +176,20 @@ contract MockAdiCrossChainController is IAdiCrossChainForwarder {
         lastDestination = destination;
         lastGasLimit = gasLimit;
         _lastMessage = message;
+    }
+
+    function _recordRetryEnvelope(IAdiCrossChainForwarder.Envelope memory envelope, uint256 gasLimit) internal {
+        require(!_shouldRevertForwardMessage, ForwardMessageFailed());
+        lastDestinationChainId = envelope.destinationChainId;
+        lastDestination = envelope.destination;
+        lastGasLimit = gasLimit;
+        _lastMessage = envelope.message;
+    }
+
+    function _copyFees() internal view returns (IAdiCrossChainForwarder.Fee[] memory quotedFees) {
+        quotedFees = new IAdiCrossChainForwarder.Fee[](_fees.length);
+        for (uint256 i = 0; i < _fees.length; i++) {
+            quotedFees[i] = _fees[i];
+        }
     }
 }

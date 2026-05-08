@@ -87,6 +87,90 @@ contract AdiAdapter is BaseBridgeAdapter, IAdiBridgeAdapter {
     }
 
     /// @inheritdoc IAdiBridgeAdapter
+    function quoteRetryTransaction(
+        bytes calldata encodedTransaction,
+        uint256 gasLimit,
+        address[] calldata bridgeAdaptersToRetry
+    )
+        external
+        view
+        override
+        returns (uint256 nativeFee, IAdiCrossChainForwarder.Fee[] memory fees, uint256 successfulQuotes)
+    {
+        IAdiCrossChainForwarder.Envelope memory envelope = _decodeTransactionEnvelope(encodedTransaction);
+        _validateRetryEnvelope(envelope);
+
+        return IAdiCrossChainForwarder(ADI_CROSS_CHAIN_CONTROLLER)
+            .quoteRetryTransaction(encodedTransaction, gasLimit + ADI_RECEIVER_GAS_OVERHEAD, bridgeAdaptersToRetry);
+    }
+
+    /// @inheritdoc IAdiBridgeAdapter
+    function retryTransaction(
+        bytes calldata encodedTransaction,
+        uint256 gasLimit,
+        address[] calldata bridgeAdaptersToRetry,
+        address feePayer
+    ) external payable override {
+        require(feePayer != address(0), Errors.ZeroAddress());
+
+        IAdiCrossChainForwarder.Envelope memory envelope = _decodeTransactionEnvelope(encodedTransaction);
+        _validateRetryEnvelope(envelope);
+
+        uint256 adjustedGasLimit = gasLimit + ADI_RECEIVER_GAS_OVERHEAD;
+        (uint256 nativeFee, IAdiCrossChainForwarder.Fee[] memory fees,) = IAdiCrossChainForwarder(
+                ADI_CROSS_CHAIN_CONTROLLER
+            ).quoteRetryTransaction(encodedTransaction, adjustedGasLimit, bridgeAdaptersToRetry);
+        _fundCrossChainController(feePayer, nativeFee, fees);
+
+        IAdiCrossChainForwarder(ADI_CROSS_CHAIN_CONTROLLER)
+            .retryTransaction(encodedTransaction, adjustedGasLimit, bridgeAdaptersToRetry);
+        emit MessagePublished(_getEnvelopeId(envelope));
+
+        _refundExcessNative(feePayer, nativeFee);
+    }
+
+    /// @inheritdoc IAdiBridgeAdapter
+    function quoteRetryEnvelope(
+        IAdiCrossChainForwarder.Envelope calldata envelope,
+        uint256 gasLimit,
+        uint256 quoteBandwidth
+    )
+        external
+        view
+        override
+        returns (uint256 nativeFee, IAdiCrossChainForwarder.Fee[] memory fees, uint256 successfulQuotes)
+    {
+        _validateRetryEnvelope(envelope);
+
+        return IAdiCrossChainForwarder(ADI_CROSS_CHAIN_CONTROLLER)
+            .quoteRetryEnvelope(envelope, gasLimit + ADI_RECEIVER_GAS_OVERHEAD, quoteBandwidth);
+    }
+
+    /// @inheritdoc IAdiBridgeAdapter
+    function retryEnvelope(IAdiCrossChainForwarder.Envelope calldata envelope, uint256 gasLimit, address feePayer)
+        external
+        payable
+        override
+        returns (bytes32 transactionId)
+    {
+        require(feePayer != address(0), Errors.ZeroAddress());
+        _validateRetryEnvelope(envelope);
+
+        uint256 adjustedGasLimit = gasLimit + ADI_RECEIVER_GAS_OVERHEAD;
+        uint256 quoteBandwidth =
+            IAdiCrossChainForwarder(ADI_CROSS_CHAIN_CONTROLLER).getOptimalBandwidthByChain(envelope.destinationChainId);
+        (uint256 nativeFee, IAdiCrossChainForwarder.Fee[] memory fees,) = IAdiCrossChainForwarder(
+                ADI_CROSS_CHAIN_CONTROLLER
+            ).quoteRetryEnvelope(envelope, adjustedGasLimit, quoteBandwidth);
+        _fundCrossChainController(feePayer, nativeFee, fees);
+
+        transactionId = IAdiCrossChainForwarder(ADI_CROSS_CHAIN_CONTROLLER).retryEnvelope(envelope, adjustedGasLimit);
+        emit MessagePublished(_getEnvelopeId(envelope));
+
+        _refundExcessNative(feePayer, nativeFee);
+    }
+
+    /// @inheritdoc IAdiBridgeAdapter
     function receiveCrossChainMessage(
         address originSender,
         uint256 originChainId,
@@ -112,6 +196,28 @@ contract AdiAdapter is BaseBridgeAdapter, IAdiBridgeAdapter {
         return crossChainForwarder.quoteForwardMessage(
             destinationChainId, destinationChainAdapter, gasLimit + ADI_RECEIVER_GAS_OVERHEAD, data, quoteBandwidth
         );
+    }
+
+    function _decodeTransactionEnvelope(bytes calldata encodedTransaction)
+        internal
+        pure
+        returns (IAdiCrossChainForwarder.Envelope memory envelope)
+    {
+        IAdiCrossChainForwarder.Transaction memory transaction =
+            abi.decode(encodedTransaction, (IAdiCrossChainForwarder.Transaction));
+        return abi.decode(transaction.encodedEnvelope, (IAdiCrossChainForwarder.Envelope));
+    }
+
+    function _validateRetryEnvelope(IAdiCrossChainForwarder.Envelope memory envelope) internal view {
+        address destinationChainAdapter = _destinationChainAdapterOf[envelope.destinationChainId];
+        require(destinationChainAdapter != address(0), Errors.InvalidParameter());
+        require(envelope.origin == address(this), Errors.InvalidParameter());
+        require(envelope.originChainId == block.chainid, Errors.InvalidParameter());
+        require(envelope.destination == destinationChainAdapter, Errors.InvalidParameter());
+    }
+
+    function _getEnvelopeId(IAdiCrossChainForwarder.Envelope memory envelope) internal pure returns (bytes32) {
+        return keccak256(abi.encode(envelope));
     }
 
     function _fundCrossChainController(address feePayer, uint256 nativeFee, IAdiCrossChainForwarder.Fee[] memory fees)

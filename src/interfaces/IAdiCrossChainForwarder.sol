@@ -14,6 +14,30 @@ interface IAdiCrossChainForwarder {
         uint256 amount;
     }
 
+    /// @notice a.DI envelope routing data.
+    /// @param nonce Envelope nonce assigned by a.DI.
+    /// @param origin Origin sender on the source chain.
+    /// @param destination Destination receiver on the destination chain.
+    /// @param originChainId Source chain id.
+    /// @param destinationChainId Destination chain id.
+    /// @param message Message payload to bridge.
+    struct Envelope {
+        uint256 nonce;
+        address origin;
+        address destination;
+        uint256 originChainId;
+        uint256 destinationChainId;
+        bytes message;
+    }
+
+    /// @notice a.DI transaction wrapping an encoded envelope.
+    /// @param nonce Transaction nonce assigned by a.DI.
+    /// @param encodedEnvelope ABI-encoded a.DI envelope.
+    struct Transaction {
+        uint256 nonce;
+        bytes encodedEnvelope;
+    }
+
     /// @notice Forwards a message through a.DI to a destination chain receiver portal.
     /// @param destinationChainId Chain id of the destination chain.
     /// @param destination Receiver portal on the destination chain.
@@ -61,4 +85,45 @@ interface IAdiCrossChainForwarder {
         bytes calldata message,
         uint256 quoteBandwidth
     ) external view returns (uint256 nativeFee, Fee[] memory fees, uint256 successfulQuotes);
+
+    /// @notice Quotes the funding required to retry a registered envelope as a new a.DI transaction.
+    /// @param envelope a.DI envelope to retry.
+    /// @param gasLimit Gas cost on receiving side of the message.
+    /// @param quoteBandwidth Number of adapters to quote. Zero quotes all configured adapters.
+    /// @return nativeFee Native funding required by the selected a.DI adapter set.
+    /// @return fees ERC20 funding required by the selected a.DI adapter set.
+    /// @return successfulQuotes Number of selected bridge adapters that quoted successfully.
+    function quoteRetryEnvelope(Envelope calldata envelope, uint256 gasLimit, uint256 quoteBandwidth)
+        external
+        view
+        returns (uint256 nativeFee, Fee[] memory fees, uint256 successfulQuotes);
+
+    /// @notice Quotes the funding required to retry an already forwarded a.DI transaction.
+    /// @param encodedTransaction ABI-encoded a.DI transaction to retry.
+    /// @param gasLimit Gas cost on receiving side of the message.
+    /// @param bridgeAdaptersToRetry Current-chain a.DI bridge adapters to retry.
+    /// @return nativeFee Native funding required by the selected a.DI adapter set.
+    /// @return fees ERC20 funding required by the selected a.DI adapter set.
+    /// @return successfulQuotes Number of selected bridge adapters that quoted successfully.
+    function quoteRetryTransaction(
+        bytes calldata encodedTransaction,
+        uint256 gasLimit,
+        address[] calldata bridgeAdaptersToRetry
+    ) external view returns (uint256 nativeFee, Fee[] memory fees, uint256 successfulQuotes);
+
+    /// @notice Retries a registered envelope as a new a.DI transaction.
+    /// @param envelope a.DI envelope to retry.
+    /// @param gasLimit Gas cost on receiving side of the message.
+    /// @return transactionId a.DI transaction id for the retry.
+    function retryEnvelope(Envelope calldata envelope, uint256 gasLimit) external returns (bytes32 transactionId);
+
+    /// @notice Retries an already forwarded a.DI transaction.
+    /// @param encodedTransaction ABI-encoded a.DI transaction to retry.
+    /// @param gasLimit Gas cost on receiving side of the message.
+    /// @param bridgeAdaptersToRetry Current-chain a.DI bridge adapters to retry.
+    function retryTransaction(
+        bytes calldata encodedTransaction,
+        uint256 gasLimit,
+        address[] calldata bridgeAdaptersToRetry
+    ) external;
 }
