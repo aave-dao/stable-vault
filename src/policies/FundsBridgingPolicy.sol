@@ -10,8 +10,8 @@ import {Errors} from "src/types/Errors.sol";
 /// @title FundsBridgingPolicy
 /// @author Aave Labs
 /// @notice Per-route rate-limited bridge-funds policy. Each `(asset, destChainId, bridgeAdapter)` triple has its own
-/// bucket; amounts are denominated in the asset's native decimals. A triple without a configured bucket
-/// (`capacity == 0`) is unrestricted.
+/// bucket; amounts are denominated in the asset's native decimals. Triples default to a zero-capacity bucket (fully
+/// rate-limited) until governance configures one; setting capacity to max uint128 removes the limit entirely.
 contract FundsBridgingPolicy is RateLimitPolicy, IBridgeFundsPolicy {
     event BridgingLimitLoosened(
         address indexed asset,
@@ -82,7 +82,8 @@ contract FundsBridgingPolicy is RateLimitPolicy, IBridgeFundsPolicy {
         return _buckets[asset][destChainId][bridgeAdapter];
     }
 
-    /// @notice Loosens the limit for a route (raises capacity and/or refill rate, or disables it via `capacity = 0`).
+    /// @notice Loosens the limit for a route (raises capacity and/or refill rate, or removes it by setting
+    /// `capacity` to max uint128).
     /// @dev Over any `capacity / refillRate`-second interval, a caller can extract up to `2 * capacity` (drain the
     /// full bucket at the start, then match the refill rate). Set `capacity` accordingly.
     function loosenBridgingLimit(
@@ -98,8 +99,8 @@ contract FundsBridgingPolicy is RateLimitPolicy, IBridgeFundsPolicy {
     }
 
     /// @notice Tightens the limit for a route. Both `capacity` and `refillRate` must be non-increasing and at least
-    /// one must strictly decrease; `capacity = 0` (disable) is forbidden here because it would loosen the limit (use
-    /// `loosenBridgingLimit`).
+    /// one must strictly decrease. `capacity = 0` (fully rate-limited) is allowed as a maximal tighten; max uint128
+    /// is forbidden because it would loosen (use `loosenBridgingLimit`).
     function tightenBridgingLimit(
         address asset,
         uint256 destChainId,

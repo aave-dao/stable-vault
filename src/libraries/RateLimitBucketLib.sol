@@ -12,9 +12,12 @@ import {Errors} from "src/types/Errors.sol";
 /// the full bucket at the start of the interval and then match the refill rate for the remaining time. Callers
 /// should set `capacity` with this in mind.
 library RateLimitBucketLib {
+    uint256 internal constant UNLIMITED_CAPACITY = type(uint128).max;
+
     /// @notice State and configuration of a rate-limit bucket. Grouped so a single mapping value carries both the
-    /// admin-set parameters and the live consumption tracking.
-    /// @param capacity Maximum capacity of the bucket. A value of `0` disables the limit.
+    /// admin-set parameters and the live consumption tracking. By default a bucket is fully rate-limited (zero
+    /// capacity); set `capacity` to max uint128 to remove the limit entirely.
+    /// @param capacity Maximum capacity of the bucket.
     /// @param refillRate Amount of capacity restored per second.
     /// @param consumed Capacity used at `lastUpdate`, never above `capacity`. Available capacity is
     /// `capacity - consumed` after applying the refill accrued since `lastUpdate`.
@@ -74,17 +77,18 @@ library RateLimitBucketLib {
         bucket.lastUpdate = uint128(block.timestamp);
     }
 
-    /// @notice Updates a bucket's `(capacity, refillRate)`. Settles the refill accrued at the old rate up to `now`
-    /// and carries the post-refill `consumed` forward, clamped to the new capacity, so a reconfigure cannot refill
-    /// a drained bucket. The first enable (old `capacity == 0`) starts the bucket full; disabling (`capacity == 0`)
-    /// requires `refillRate == 0`.
+    /// @notice Updates a bucket's `(capacity, refillRate)`. The refill accrued at the old rate is settled to `now`
+    /// and the post-refill `consumed` is carried forward, clamped to the new capacity, so a reconfigure cannot
+    /// refill a drained bucket. The unlimited case (max uint128 on either side) skips the carry and starts the
+    /// bucket at zero `consumed`, since `consumed` is meaningless for an unlimited bucket. `refillRate` must be `0`
+    /// when `capacity` is max uint128.
     /// @param bucket The bucket to configure.
-    /// @param capacity Maximum capacity of the bucket. `0` disables the limit and requires `refillRate` to also be 0.
-    /// @param refillRate Amount of capacity restored per second.
+    /// @param capacity New capacity.
+    /// @param refillRate New refill rate.
     function configure(Bucket storage bucket, uint128 capacity, uint128 refillRate) internal {
-        require(capacity > 0 || refillRate == 0, Errors.InvalidParameter());
+        require(capacity != UNLIMITED_CAPACITY || refillRate == 0, Errors.InvalidParameter());
         uint256 newConsumed;
-        if (bucket.capacity != 0 && capacity != 0) {
+        if (bucket.capacity != UNLIMITED_CAPACITY && capacity != UNLIMITED_CAPACITY) {
             uint256 available = preview(bucket);
             if (available < capacity) {
                 newConsumed = capacity - available;

@@ -11,7 +11,8 @@ import {Errors} from "src/types/Errors.sol";
 /// @author Aave Labs
 /// @notice Per-asset rate-limited deposit policy. Each asset has a deposit limit defined by a max capacity and a
 /// per-second refill rate; deposits consume from the available capacity and revert when it is exhausted. Assets
-/// without a configured limit are unrestricted.
+/// default to a zero-capacity bucket (fully rate-limited) until governance configures one; setting capacity to max
+/// uint128 removes the limit entirely.
 contract DepositPolicy is RateLimitPolicy, IDepositPolicy {
     event DepositLimitLoosened(
         address indexed asset, uint128 oldCapacity, uint128 oldRefillRate, uint128 newCapacity, uint128 newRefillRate
@@ -55,7 +56,8 @@ contract DepositPolicy is RateLimitPolicy, IDepositPolicy {
         return _buckets[asset];
     }
 
-    /// @notice Loosens the limit (raises capacity and/or refill rate, or disables it via `capacity = 0`).
+    /// @notice Loosens the limit (raises capacity and/or refill rate, or removes it by setting `capacity` to max
+    /// uint128).
     /// @dev Over any `capacity / refillRate`-second interval, a caller can extract up to `2 * capacity` (drain the full
     /// bucket at the start, then match the refill rate). Set `capacity` accordingly.
     function loosenDepositLimit(address asset, uint128 capacity, uint128 refillRate) external restricted {
@@ -63,9 +65,9 @@ contract DepositPolicy is RateLimitPolicy, IDepositPolicy {
         emit DepositLimitLoosened(asset, oldCapacity, oldRefillRate, capacity, refillRate);
     }
 
-    /// @notice Tightens the bucket. Both `capacity` and `refillRate` must be non-increasing and at least one must
-    /// strictly decrease; `capacity = 0` (disable) is forbidden here because it would loosen the limit (use
-    /// `loosenDepositLimit`).
+    /// @notice Tightens the limit. Both `capacity` and `refillRate` must be non-increasing and at least one must
+    /// strictly decrease. `capacity = 0` (fully rate-limited) is allowed as a maximal tighten; max uint128 is
+    /// forbidden because it would loosen (use `loosenDepositLimit`).
     function tightenDepositLimit(address asset, uint128 capacity, uint128 refillRate) external restricted {
         (uint128 oldCapacity, uint128 oldRefillRate) = _tightenBucket(_buckets[asset], capacity, refillRate);
         emit DepositLimitTightened(asset, oldCapacity, oldRefillRate, capacity, refillRate);

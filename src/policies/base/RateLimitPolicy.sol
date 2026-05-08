@@ -23,8 +23,8 @@ abstract contract RateLimitPolicy is AccessManaged {
     }
 
     /// @dev Validates a loosening change and writes it to `bucket`.
-    /// @dev `capacity == 0` disables the limit (maximal loosening); otherwise at least one dimension must strictly
-    /// increase. Same-or-tighter changes belong on the tighten path.
+    /// @dev Setting `capacity` to max uint128 removes the limit (maximal loosening); otherwise at least one
+    /// dimension must strictly increase. Same-or-tighter changes belong on the tighten path.
     /// @param bucket The bucket storage reference owned by the child contract.
     /// @param capacity New capacity.
     /// @param refillRate New refill rate.
@@ -36,13 +36,16 @@ abstract contract RateLimitPolicy is AccessManaged {
     {
         oldCapacity = bucket.capacity;
         oldRefillRate = bucket.refillRate;
-        require(capacity == 0 || capacity > oldCapacity || refillRate > oldRefillRate, Errors.InvalidParameter());
+        require(
+            capacity == RateLimitBucketLib.UNLIMITED_CAPACITY || capacity > oldCapacity || refillRate > oldRefillRate,
+            Errors.InvalidParameter()
+        );
         bucket.configure(capacity, refillRate);
     }
 
     /// @dev Validates a tightening change and writes it to `bucket`. Both dimensions must be non-increasing and at
-    /// least one must strictly decrease; `capacity = 0` (disable) is forbidden here because it loosens, use the
-    /// loosen path.
+    /// least one must strictly decrease. Max uint128 is forbidden here because it loosens, use the loosen path.
+    /// `capacity == 0` (fully rate-limited) is allowed as a maximal tighten.
     /// @param bucket The bucket storage reference owned by the child contract.
     /// @param capacity New capacity.
     /// @param refillRate New refill rate.
@@ -52,7 +55,7 @@ abstract contract RateLimitPolicy is AccessManaged {
         internal
         returns (uint128 oldCapacity, uint128 oldRefillRate)
     {
-        require(capacity > 0, Errors.InvalidParameter());
+        require(capacity != RateLimitBucketLib.UNLIMITED_CAPACITY, Errors.InvalidParameter());
         oldCapacity = bucket.capacity;
         oldRefillRate = bucket.refillRate;
         require(
@@ -63,18 +66,20 @@ abstract contract RateLimitPolicy is AccessManaged {
         bucket.configure(capacity, refillRate);
     }
 
-    /// @dev Consumes `amount` from `bucket`. No-op if the bucket is unconfigured (`capacity == 0`); reverts via
-    /// `RateLimitBucketLib.RateLimited` if the bucket is configured but lacks capacity.
+    /// @dev Consumes `amount` from `bucket`. No-op when the bucket is unlimited (capacity is max uint128); otherwise
+    /// delegates to `consume`, which reverts via `RateLimitBucketLib.RateLimited` when the bucket lacks capacity
+    /// (including the default zero-capacity state).
     function _consumeBucket(RateLimitBucketLib.Bucket storage bucket, uint256 amount) internal {
-        if (bucket.capacity == 0) {
+        if (bucket.capacity == RateLimitBucketLib.UNLIMITED_CAPACITY) {
             return;
         }
         bucket.consume(amount);
     }
 
-    /// @dev Returns whether `bucket` would accept a consumption of `amount`. Always true for unconfigured buckets.
+    /// @dev Returns whether `bucket` would accept a consumption of `amount`. Always true for unlimited buckets;
+    /// false for zero-capacity buckets when `amount > 0`.
     function _canConsumeBucket(RateLimitBucketLib.Bucket storage bucket, uint256 amount) internal view returns (bool) {
-        if (bucket.capacity == 0) {
+        if (bucket.capacity == RateLimitBucketLib.UNLIMITED_CAPACITY) {
             return true;
         }
         return bucket.preview() >= amount;
