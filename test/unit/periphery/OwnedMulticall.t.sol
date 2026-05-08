@@ -117,7 +117,7 @@ contract OwnedMulticallTest is TestWithHelpers {
         // Deploy SlippageCoverageVault (non-upgradeable) bound to the predicted Swapper address.
         uint256 nonce = vm.getNonce(address(this));
         address predictedSwapper = vm.computeCreateAddress(address(this), nonce + 1);
-        _slippageVault = new SlippageCoverageVault(predictedSwapper, address(_mockAccessManager), 100, 5_000);
+        _slippageVault = new SlippageCoverageVault(predictedSwapper, address(_mockAccessManager), 100, 5_000, false);
 
         // Deploy Swapper owned by the Allocator and bound to the vault.
         _swapper = new Swapper(address(_allocator), address(_slippageVault));

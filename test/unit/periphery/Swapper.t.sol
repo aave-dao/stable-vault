@@ -48,7 +48,7 @@ contract SwapperTest is TestWithHelpers {
         uint256 deployerNonce = vm.getNonce(address(this));
         address predictedSwapper = vm.computeCreateAddress(address(this), deployerNonce + 1);
 
-        _vault = new SlippageCoverageVault(predictedSwapper, address(_accessManager), 100, 5_000);
+        _vault = new SlippageCoverageVault(predictedSwapper, address(_accessManager), 100, 5_000, false);
 
         _swapper = new Swapper(allocator, address(_vault));
         require(address(_swapper) == predictedSwapper, "Swapper address mismatch");

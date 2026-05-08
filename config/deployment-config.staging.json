@@ -25,7 +25,8 @@
   },
   "slippageCoverageVault": {
     "maxSlippageBps": "100",
-    "overrideMaxSlippageBps": "5000"
+    "overrideMaxSlippageBps": "5000",
+    "initialOverrideMode": true
   },
   "earningChain": {
     "chainId": 1,

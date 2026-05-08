@@ -41,8 +41,9 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         vm.warp(1_700_000_000);
 
         _accessManager = new MockAccessManager(address(this));
-        _vault =
-            new SlippageCoverageVault(beneficiary, address(_accessManager), DEFAULT_MAX_BPS, DEFAULT_OVERRIDE_MAX_BPS);
+        _vault = new SlippageCoverageVault(
+            beneficiary, address(_accessManager), DEFAULT_MAX_BPS, DEFAULT_OVERRIDE_MAX_BPS, false
+        );
 
         _usdc = new MockErc20("USD Coin", "USDC", 6);
         _gho = new MockErc20("GHO", "GHO", 18);
@@ -52,20 +53,20 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
     function test_constructor_reverts_ifBeneficiaryIsZero() public {
         vm.expectRevert(abi.encodeWithSelector(Errors.ZeroAddress.selector));
-        new SlippageCoverageVault(address(0), address(_accessManager), DEFAULT_MAX_BPS, DEFAULT_OVERRIDE_MAX_BPS);
+        new SlippageCoverageVault(address(0), address(_accessManager), DEFAULT_MAX_BPS, DEFAULT_OVERRIDE_MAX_BPS, false);
     }
 
     function test_constructor_reverts_ifMaxSlippageBpsExceedsMaxBps() public {
         vm.expectRevert(abi.encodeWithSelector(Errors.InvalidParameter.selector));
-        new SlippageCoverageVault(beneficiary, address(_accessManager), 10_001, DEFAULT_OVERRIDE_MAX_BPS);
+        new SlippageCoverageVault(beneficiary, address(_accessManager), 10_001, DEFAULT_OVERRIDE_MAX_BPS, false);
     }
 
     function test_constructor_reverts_ifOverrideMaxSlippageBpsExceedsMaxBps() public {
         vm.expectRevert(abi.encodeWithSelector(Errors.InvalidParameter.selector));
-        new SlippageCoverageVault(beneficiary, address(_accessManager), DEFAULT_MAX_BPS, 10_001);
+        new SlippageCoverageVault(beneficiary, address(_accessManager), DEFAULT_MAX_BPS, 10_001, false);
     }
 
-    function test_constructor_setsImmutableAndState() public view {
+    function test_constructor_setsImmutableAndState_overrideOff() public view {
         assertEq(_vault.SLIPPAGE_BENEFICIARY(), beneficiary);
         assertEq(_vault.getBeneficiary(), beneficiary);
         assertEq(_vault.getMaxSlippageBps(), DEFAULT_MAX_BPS);
@@ -73,12 +74,38 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         assertEq(_vault.getOverrideMode(), false);
     }
 
-    function test_constructor_emitsInitialBoundsEvents() public {
+    function test_constructor_setsImmutableAndState_overrideOn() public {
+        SlippageCoverageVault vaultWithOverride = new SlippageCoverageVault(
+            beneficiary, address(_accessManager), DEFAULT_MAX_BPS, DEFAULT_OVERRIDE_MAX_BPS, true
+        );
+        assertEq(vaultWithOverride.getOverrideMode(), true, "Vault should launch in override mode");
+        assertEq(
+            vaultWithOverride.getEffectiveMaxSlippageBps(),
+            DEFAULT_OVERRIDE_MAX_BPS,
+            "Effective bound should reflect override-mode bps from block one"
+        );
+    }
+
+    function test_constructor_emitsInitialBoundsEvents_overrideOff() public {
         vm.expectEmit(false, false, false, true);
         emit ISlippageCoverageVault.MaxSlippageBpsSet(0, DEFAULT_MAX_BPS);
         vm.expectEmit(false, false, false, true);
         emit ISlippageCoverageVault.OverrideMaxSlippageBpsSet(0, DEFAULT_OVERRIDE_MAX_BPS);
-        new SlippageCoverageVault(beneficiary, address(_accessManager), DEFAULT_MAX_BPS, DEFAULT_OVERRIDE_MAX_BPS);
+        vm.expectEmit(false, false, false, true);
+        emit ISlippageCoverageVault.OverrideModeSet(false);
+        new SlippageCoverageVault(
+            beneficiary, address(_accessManager), DEFAULT_MAX_BPS, DEFAULT_OVERRIDE_MAX_BPS, false
+        );
+    }
+
+    function test_constructor_emitsInitialBoundsEvents_overrideOn() public {
+        vm.expectEmit(false, false, false, true);
+        emit ISlippageCoverageVault.MaxSlippageBpsSet(0, DEFAULT_MAX_BPS);
+        vm.expectEmit(false, false, false, true);
+        emit ISlippageCoverageVault.OverrideMaxSlippageBpsSet(0, DEFAULT_OVERRIDE_MAX_BPS);
+        vm.expectEmit(false, false, false, true);
+        emit ISlippageCoverageVault.OverrideModeSet(true);
+        new SlippageCoverageVault(beneficiary, address(_accessManager), DEFAULT_MAX_BPS, DEFAULT_OVERRIDE_MAX_BPS, true);
     }
 
     /* ============================ pullCoverage — gates ============================ */

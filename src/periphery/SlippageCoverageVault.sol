@@ -34,11 +34,15 @@ contract SlippageCoverageVault is AccessManaged, ReentrancyGuardTransient, ISlip
     /// @param authority The AccessManager authority for restricted setters.
     /// @param initialMaxSlippageBps Initial normal-mode max slippage tolerance in basis points.
     /// @param initialOverrideMaxSlippageBps Initial override-mode max slippage tolerance in basis points.
+    /// @param initialOverrideMode Initial override-mode state. Setting `true` lets the vault accept pulls without
+    /// per-tx or window cap configuration, so the system can launch with the bound Swapper functional from block one
+    /// while caps are tuned later via setters.
     constructor(
         address slippageBeneficiary,
         address authority,
         uint16 initialMaxSlippageBps,
-        uint16 initialOverrideMaxSlippageBps
+        uint16 initialOverrideMaxSlippageBps,
+        bool initialOverrideMode
     ) AccessManaged(authority) {
         require(slippageBeneficiary != address(0), Errors.ZeroAddress());
         require(initialMaxSlippageBps <= Constants.MAX_BPS, Errors.InvalidParameter());
@@ -46,8 +50,10 @@ contract SlippageCoverageVault is AccessManaged, ReentrancyGuardTransient, ISlip
         SLIPPAGE_BENEFICIARY = slippageBeneficiary;
         _maxSlippageBps = initialMaxSlippageBps;
         _overrideMaxSlippageBps = initialOverrideMaxSlippageBps;
+        _overrideMode = initialOverrideMode;
         emit MaxSlippageBpsSet(0, initialMaxSlippageBps);
         emit OverrideMaxSlippageBpsSet(0, initialOverrideMaxSlippageBps);
+        emit OverrideModeSet(initialOverrideMode);
     }
 
     /// @inheritdoc ISlippageCoverageVault

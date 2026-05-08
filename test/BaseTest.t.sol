@@ -514,9 +514,10 @@ contract BaseTest is TestWithHelpers {
             "Accounting Chain Gateway (Accounting Chain) address mismatch"
         );
 
-        // 21a. Slippage Coverage Vault (non-upgradeable)
+        // 21a. Slippage Coverage Vault (non-upgradeable). `false` keeps existing test scenarios deterministic; tests
+        // that exercise override mode flip it explicitly via `setOverrideMode`.
         slippageCoverageVault_accountingChain = new SlippageCoverageVault(
-            swapper_accountingChainAddress, accessManager_accountingChainAddress, 1_00, 50_00
+            swapper_accountingChainAddress, accessManager_accountingChainAddress, 1_00, 50_00, false
         );
         Logger.log("\tSlippage Coverage Vault: %s", address(slippageCoverageVault_accountingChain));
         require(
@@ -744,9 +745,11 @@ contract BaseTest is TestWithHelpers {
             "Allocator (Earning Chain) address mismatch"
         );
 
-        // 14a. Slippage Coverage Vault (non-upgradeable)
-        slippageCoverageVault_earningChain =
-            new SlippageCoverageVault(swapper_earningChainAddress, accessManager_earningChainAddress, 1_00, 50_00);
+        // 14a. Slippage Coverage Vault (non-upgradeable). `false` keeps existing test scenarios deterministic; tests
+        // that exercise override mode flip it explicitly via `setOverrideMode`.
+        slippageCoverageVault_earningChain = new SlippageCoverageVault(
+            swapper_earningChainAddress, accessManager_earningChainAddress, 1_00, 50_00, false
+        );
         Logger.log("\tSlippage Coverage Vault: %s", address(slippageCoverageVault_earningChain));
         require(
             address(slippageCoverageVault_earningChain) == slippageCoverageVault_earningChainAddress,
