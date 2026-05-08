@@ -266,9 +266,9 @@ contract SwapperTest is TestWithHelpers {
         assertEq(_mockGho.balanceOf(address(_vault)), 0);
     }
 
-    /* ---------------------------------- Hardenings (Path C) ---------------------------------- */
+    /* ---------------------------------- Vault binding & assetIn checks ---------------------------------- */
 
-    /// @dev Path C-4: target = vault would call `pullCoverage` inside the loop bypassing the slippage cap.
+    /// @dev target = vault would call `pullCoverage` inside the loop bypassing the slippage cap.
     function test_executeSwap_reverts_ifTargetIsVault() public {
         address[] memory targets = new address[](1);
         targets[0] = address(_vault);
@@ -283,7 +283,7 @@ contract SwapperTest is TestWithHelpers {
         _swapper.executeSwap(address(_mockUsdt), address(_mockGho), 100, rebalancer, data);
     }
 
-    /// @dev Path C-2: manager sets tolerance above the vault-bounded max in normal mode.
+    /// @dev Manager sets tolerance above the vault-bounded max in normal mode.
     function test_executeSwap_reverts_ifSlippageToleranceAboveMax_normalMode() public {
         // Tighten max to 1% and request 2%.
         vm.prank(operator);
@@ -297,7 +297,7 @@ contract SwapperTest is TestWithHelpers {
         _swapper.executeSwap(address(_mockUsdt), address(_mockGho), 100, rebalancer, data);
     }
 
-    /// @dev Path C-2 in override mode: override max is the upper bound.
+    /// @dev Override mode: override max is the upper bound.
     function test_executeSwap_reverts_ifSlippageToleranceAboveMax_overrideMode() public {
         vm.prank(operator);
         _vault.setOverrideMaxSlippageBps(2_000); // 20%
@@ -312,9 +312,9 @@ contract SwapperTest is TestWithHelpers {
         _swapper.executeSwap(address(_mockUsdt), address(_mockGho), 100, rebalancer, data);
     }
 
-    /// @dev Path C-3: assetIn redirected inside the call loop instead of swapped at the DEX.
-    /// To isolate Hardening 3 we seed the Swapper with enough assetOut directly so the slippage check passes; the
-    /// only failure left is the assetIn-leftover invariant.
+    /// @dev assetIn redirected inside the call loop instead of swapped at the DEX. To isolate the assetIn-leftover
+    /// check we seed the Swapper with enough assetOut directly so the slippage check passes; the only failure left
+    /// is the assetIn-leftover invariant.
     function test_executeSwap_reverts_ifAssetInLeftover() public {
         uint256 amountIn = 100;
         uint256 expectedAmountOut = amountIn.convertAssetDecimals(address(_mockUsdt), address(_mockGho));
@@ -332,7 +332,7 @@ contract SwapperTest is TestWithHelpers {
         _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
     }
 
-    /// @dev Hardening 3 delta accounting: a partial leftover (only `amountIn / 2` consumed) reverts even when the
+    /// @dev Delta-accounting on assetIn: a partial leftover (only `amountIn / 2` consumed) reverts even when the
     /// pre-seeded assetOut keeps the slippage check happy. Catches the assetIn-redirection attack the Allocator's
     /// `assetOut`-only invariant cannot see.
     function test_executeSwap_reverts_ifAssetInPartiallyLeftover() public {
@@ -341,7 +341,7 @@ contract SwapperTest is TestWithHelpers {
 
         _mockTransferIntoSwapper(_mockUsdt, amountIn);
         // Pre-seed assetOut directly on the Swapper so post-loop balance == expectedAmountOut and the slippage
-        // check passes. This isolates Hardening 3.
+        // check passes. This isolates the assetIn-leftover check.
         _mockGho.mint(address(_swapper), expectedAmountOut);
 
         // Single target burns half of assetIn (transfers it to a recipient outside the system) and leaves the rest.
@@ -357,7 +357,7 @@ contract SwapperTest is TestWithHelpers {
         _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
     }
 
-    /// @dev Hardening 3 delta accounting must be immune to dust donations: an attacker who pre-funds the Swapper
+    /// @dev Delta-accounting on assetIn must be immune to dust donations: an attacker who pre-funds the Swapper
     /// with a small amount of `assetIn` before the rebalance broadcasts cannot brick the call. Donations are baked
     /// into both `before` and `after` snapshots and cancel out.
     function test_executeSwap_succeeds_whenAssetInDonatedBeforeCall(uint256 donation) public {

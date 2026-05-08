@@ -47,15 +47,15 @@ contract Swapper is Ownable, ReentrancyGuard, ISwapper {
             abi.decode(data, (address[], bytes[], uint16));
         require(targets.length == callDatas.length, Errors.InvalidParameter());
 
-        // Hardening 2: bound the slippage tolerance against vault config; read before the loop to fail fast.
+        // Bound the slippage tolerance against vault config; read before the loop to fail fast.
         uint16 maxBps = ISlippageCoverageVault(SLIPPAGE_VAULT).getEffectiveMaxSlippageBps();
         require(slippageToleranceBps <= maxBps, ISwapper.SlippageToleranceTooHigh());
 
-        // Snapshot pre-loop `assetIn` balance for the post-loop delta check (Hardening 3). Donations sitting on the
-        // contract before this call are baked into both `before` and `after`, so they cancel out.
+        // Snapshot pre-loop `assetIn` balance for the post-loop delta check. Donations sitting on the contract
+        // before this call are baked into both `before` and `after`, so they cancel out.
         uint256 assetInBefore = IERC20(assetIn).balanceOf(address(this));
 
-        // Hardening 1: targets cannot be the bound vault, otherwise the loop could call `pullCoverage` directly.
+        // Targets cannot be the bound vault, otherwise the loop could call `pullCoverage` directly.
         for (uint256 i = 0; i < targets.length; i++) {
             require(targets[i] != SLIPPAGE_VAULT, ISwapper.BadTarget());
             (bool callSucceeded,) = targets[i].call(callDatas[i]);
@@ -78,9 +78,9 @@ contract Swapper is Ownable, ReentrancyGuard, ISwapper {
             amountOut = expectedAmountOut;
         }
 
-        // Hardening 3: exactly `amountIn` of `assetIn` must have left the Swapper across the loop. Closes the
-        // partial-leftover attack the Allocator's `assetOut`-only invariant cannot see, and is immune to dust
-        // donations because the snapshot above absorbs them into the baseline.
+        // Exactly `amountIn` of `assetIn` must have left the Swapper across the loop. Closes the partial-leftover
+        // attack the Allocator's `assetOut`-only invariant cannot see, and is immune to dust donations because the
+        // snapshot above absorbs them into the baseline.
         require(assetInBefore - IERC20(assetIn).balanceOf(address(this)) == amountIn, ISwapper.AssetInLeftOver());
 
         // Approve funds to be pulled by the caller i.e. the owner of the Swapper.
