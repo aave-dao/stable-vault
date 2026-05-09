@@ -349,9 +349,10 @@ contract RateLimitBucketLibTest is Test {
         uint256 elapsed
     ) public {
         capacity = _boundLimitedCapacity(capacity);
-        refillRate = _boundLimitedRefillRate(refillRate, capacity);
+        // refillRate is unbounded across uint128 — the lib does not enforce refillRate <= capacity, so the invariant
+        // must hold even when refill outpaces the cap.
         consumed = bound(consumed, 0, capacity);
-        elapsed = bound(elapsed, 0, 365 days);
+        elapsed = bound(elapsed, 0, type(uint128).max - START_TIMESTAMP);
 
         w.configure(UNLIMITED, 0);
         w.configure(capacity, refillRate);
