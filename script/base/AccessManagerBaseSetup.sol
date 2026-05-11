@@ -139,6 +139,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         _setupTarget__AssetRegistry(deployer);
         _setupTarget__PriceOracle(deployer);
         _setupTarget__PolicyRegistry(deployer);
+        _setupTarget__FundsBridgingPolicy(deployer);
         _setupTarget__ATokenVaults();
     }
 
@@ -284,7 +285,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         address disablerProfile = _getProfile__Disabler();
         require(disablerProfile != address(0), "Disabler profile address not set");
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](14);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](16);
 
         roles[0] = RolesConfig.getRole__rebalance();
         roles[1] = RolesConfig.getRole__removeStrategy();
@@ -300,6 +301,9 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         roles[11] = RolesConfig.getRole__setDefaultStrategy();
         roles[12] = RolesConfig.getRole__distrustStrategy();
         roles[13] = RolesConfig.getRole__removeSigner();
+        // Only used on the Accounting Chain (DepositPolicy is Accounting-only), but granted in both chain setups.
+        roles[14] = RolesConfig.getRole__tightenDepositLimit();
+        roles[15] = RolesConfig.getRole__tightenBridgingLimit();
 
         _grantRolesToProfile(disablerProfile, roles);
     }
@@ -401,6 +405,17 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         roles[0] = RolesConfig.getRole__setPolicy();
 
         _setTargetFunctionRoles(policyRegistry, roles);
+    }
+
+    function _setupTarget__FundsBridgingPolicy(address deployer) internal {
+        address fundsBridgingPolicy = getFundsBridgingPolicyAddress(deployer);
+
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](2);
+
+        roles[0] = RolesConfig.getRole__loosenBridgingLimit();
+        roles[1] = RolesConfig.getRole__tightenBridgingLimit();
+
+        _setTargetFunctionRoles(fundsBridgingPolicy, roles);
     }
 
     function _setupTarget__ATokenVaults() internal {

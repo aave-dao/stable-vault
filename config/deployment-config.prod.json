@@ -38,6 +38,16 @@
     },
     "ccipRouterAddress": "0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D",
     "aaveV3PoolAddressesProvider": "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e",
+    "fundsBridgingPolicy": {
+      "perAssetLimits": {
+        "gho": {
+          "capacity": "1000000000000000000000000",
+          "refillRate": "11574074074074074074"
+        },
+        "usdc": { "capacity": "1000000000000", "refillRate": "11574074" },
+        "usdt": { "capacity": "1000000000000", "refillRate": "11574074" }
+      }
+    },
     "deploymentOutputPath": "deployments/prod/v1/earning.json"
   },
   "accountingChain": {
@@ -64,6 +74,26 @@
     "useMockSequencerUptimeFeed": false,
     "chainlinkBundleAggregatorProxy": "0x0000000000000000000000000000000000000000",
     "sequencerUptimeFeed": "0xFdB631F5EE196F0ed6FAa767959853A9F217697D",
+    "depositPolicy": {
+      "perAssetLimits": {
+        "gho": {
+          "capacity": "1000000000000000000000000",
+          "refillRate": "11574074074074074074"
+        },
+        "usdc": { "capacity": "1000000000000", "refillRate": "11574074" },
+        "usdt": { "capacity": "1000000000000", "refillRate": "11574074" }
+      }
+    },
+    "fundsBridgingPolicy": {
+      "perAssetLimits": {
+        "gho": {
+          "capacity": "1000000000000000000000000",
+          "refillRate": "11574074074074074074"
+        },
+        "usdc": { "capacity": "1000000000000", "refillRate": "11574074" },
+        "usdt": { "capacity": "1000000000000", "refillRate": "11574074" }
+      }
+    },
     "deploymentOutputPath": "deployments/prod/v1/accounting.json"
   }
 }

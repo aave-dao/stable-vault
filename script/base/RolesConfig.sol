@@ -19,6 +19,8 @@ import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {ChainBalanceOracle} from "src/oracles/balance/ChainBalanceOracle.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
+import {DepositPolicy} from "src/policies/DepositPolicy.sol";
+import {FundsBridgingPolicy} from "src/policies/FundsBridgingPolicy.sol";
 import {WithdrawalPolicy} from "src/policies/WithdrawalPolicy.sol";
 
 abstract contract RolesConfig is DeploymentConfig {
@@ -600,6 +602,58 @@ abstract contract RolesConfig is DeploymentConfig {
         });
     }
 
+    /// @custom:delay High
+    /// @custom:location DepositPolicy
+    function getRole__loosenDepositLimit() internal view returns (Role memory) {
+        bytes4 selector = DepositPolicy.loosenDepositLimit.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: HIGH_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
+        });
+    }
+
+    /// @custom:delay None
+    /// @custom:location DepositPolicy
+    function getRole__tightenDepositLimit() internal pure returns (Role memory) {
+        bytes4 selector = DepositPolicy.tightenDepositLimit.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: NO_DELAY,
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
+        });
+    }
+
+    /// @custom:delay High
+    /// @custom:location FundsBridgingPolicy
+    function getRole__loosenBridgingLimit() internal view returns (Role memory) {
+        bytes4 selector = FundsBridgingPolicy.loosenBridgingLimit.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: HIGH_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
+        });
+    }
+
+    /// @custom:delay None
+    /// @custom:location FundsBridgingPolicy
+    function getRole__tightenBridgingLimit() internal pure returns (Role memory) {
+        bytes4 selector = FundsBridgingPolicy.tightenBridgingLimit.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: NO_DELAY,
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
+        });
+    }
+
     /// @custom:delay None
     /// @custom:location aToken Vault
     function getRole__claimMerklRewards() internal pure returns (Role memory) {
@@ -627,7 +681,7 @@ abstract contract RolesConfig is DeploymentConfig {
     }
 
     function getAllFunctionBasedRoles() internal view returns (Role[] memory) {
-        Role[] memory roles = new Role[](45);
+        Role[] memory roles = new Role[](49);
 
         // AssetRegistry
         roles[0] = getRole__setAssetConfig();
@@ -695,6 +749,12 @@ abstract contract RolesConfig is DeploymentConfig {
 
         // PolicyRegistry
         roles[44] = getRole__setPolicy();
+
+        // DepositPolicy / FundsBridgingPolicy
+        roles[45] = getRole__loosenDepositLimit();
+        roles[46] = getRole__tightenDepositLimit();
+        roles[47] = getRole__loosenBridgingLimit();
+        roles[48] = getRole__tightenBridgingLimit();
 
         return roles;
     }

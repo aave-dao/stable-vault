@@ -27,6 +27,7 @@ abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
         _setupTarget__FundsHandler(deployer);
         _setupTarget__AccountingChainGateway(deployer);
         _setupTarget__ChainBalanceOracle(deployer);
+        _setupTarget__DepositPolicy(deployer);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -98,5 +99,16 @@ abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
         roles[0] = RolesConfig.getRole__setChainBalanceOracleAdapter();
 
         _setTargetFunctionRoles(chainBalanceOracle, roles);
+    }
+
+    function _setupTarget__DepositPolicy(address deployer) internal {
+        address depositPolicy = getDepositPolicyAddress(deployer);
+
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](2);
+
+        roles[0] = RolesConfig.getRole__loosenDepositLimit();
+        roles[1] = RolesConfig.getRole__tightenDepositLimit();
+
+        _setTargetFunctionRoles(depositPolicy, roles);
     }
 }

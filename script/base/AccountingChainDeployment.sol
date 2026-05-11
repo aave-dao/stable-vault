@@ -26,6 +26,7 @@ import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IEarningChainStateProvider} from "src/interfaces/IEarningChainStateProvider.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
+import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
 import {ChainBalanceOracle} from "src/oracles/balance/ChainBalanceOracle.sol";
 import {IBundleBaseAggregator} from "src/oracles/balance/ChainlinkChainBalanceOracleAdapter.sol";
 import {ChainlinkL2ChainBalanceOracleAdapter} from "src/oracles/balance/ChainlinkL2ChainBalanceOracleAdapter.sol";
@@ -34,8 +35,11 @@ import {AggregatorV3Interface} from "src/oracles/price/ChainlinkPriceOracleAdapt
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {AssetRegistry} from "src/periphery/AssetRegistry.sol";
 import {EarningChainStateSchemaV1, SCHEMA_VERSION} from "src/periphery/EarningChainStateSchemaV1.sol";
+import {PolicyRegistry} from "src/periphery/PolicyRegistry.sol";
 import {Swapper} from "src/periphery/Swapper.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
+import {DepositPolicy} from "src/policies/DepositPolicy.sol";
+import {FundsBridgingPolicy} from "src/policies/FundsBridgingPolicy.sol";
 import {WithdrawalPolicy} from "src/policies/WithdrawalPolicy.sol";
 import {MockBundleFeed} from "test/mocks/MockBundleFeed.sol";
 import {MockSequencerUptimeFeed} from "test/mocks/MockSequencerUptimeFeed.sol";
@@ -153,6 +157,7 @@ abstract contract AccountingChainDeployment is
         _deployTransferHelper();
         _deployAccessManager();
         _deployAssetRegistry();
+        _deployPolicyRegistry();
         _deployWithdrawalPolicy();
         _deployIouToken();
         _deployIouTokenManager();
@@ -164,9 +169,8 @@ abstract contract AccountingChainDeployment is
         _deployGateway();
         _deploySwapper();
         _deployCcipAdapter();
-        // TODO: Deploy `PolicyRegistry` and `DepositPolicy` (and any other policy contracts) here, then bind them via
-        // `PolicyRegistry.setPolicy(...)` for each `policyId` consumed by StableVault / FundsHandler /
-        // EarningChainGateway. Must run before `_setupAccessManager` revokes the deployer's ADMIN_ROLE.
+        _deployDepositPolicy();
+        _deployFundsBridgingPolicy();
     }
 
     function _setupContracts() internal {
@@ -177,11 +181,8 @@ abstract contract AccountingChainDeployment is
         _setupWithdrawalPolicy();
         _setupPriceOracleAdapters();
         _setupChainBalanceOracleAdapters();
-        // TODO: Add `_setupTarget__DepositPolicy(deployer)` (and any other policy contracts) inside `_setup_Targets`
-        // in `AccessManagerBaseSetup.sol`, defining the corresponding roles in `RolesConfig.sol`:
-        //   - `loosenDepositLimit` → `CRITICAL_DELAY`, `hasCriticalRisk: true` (loosens the limit).
-        //   - `tightenDepositLimit` → `NO_DELAY` (tightens the limit; safe to act fast).
-        // Must be done before this `_setupAccessManager` call locks down the deployer.
+        _setupDepositPolicy();
+        _setupFundsBridgingPolicy();
         _setupAccessManager(_deployer()); // Must be last – revokes deployer's ADMIN_ROLE
     }
 
@@ -250,6 +251,11 @@ abstract contract AccountingChainDeployment is
         WithdrawalPolicy withdrawalPolicy = WithdrawalPolicy(getWithdrawalPolicyAddress(_deployer()));
         withdrawalPolicy.setDefaultFeeBps(uint16(_configUint(".withdrawalPolicy.defaultFeeBps")));
         withdrawalPolicy.addSigner(_configAddress(".withdrawalPolicy.signer"));
+
+        IPolicyRegistry(getPolicyRegistryAddress(_deployer()))
+            .setPolicy(
+                keccak256(bytes("aave.stable-vault.StableVault.policy.withdrawal-request")), address(withdrawalPolicy)
+            );
     }
 
     function _setupAssetRegistry() internal {
@@ -347,7 +353,6 @@ abstract contract AccountingChainDeployment is
                 chainGateway: getGatewayAddress(_deployer()),
                 vault: getStableVaultAddress(_deployer()),
                 transferHelper: getTransferHelperAddress(_deployer()),
-                policyRegistry: getPolicyRegistryAddress(_deployer()),
                 isAccountingChain: true
             })
         );
@@ -599,6 +604,101 @@ abstract contract AccountingChainDeployment is
         _logDeployment("ChainlinkL2ChainBalanceOracleAdapter", "", adapter);
         ChainBalanceOracle(getChainBalanceOracleAddress(_deployer()))
             .setChainBalanceOracleAdapter(earningChainId, adapter);
+    }
+
+    function _deployPolicyRegistry() internal returns (address) {
+        address policyRegistry = _deploy_create3({
+            namespacedSaltSeed: POLICY_REGISTRY_SALT_SEED,
+            deployer: _deployer(),
+            initCode: abi.encodePacked(
+                type(PolicyRegistry).creationCode, abi.encode(getAccessManagerAddress(_deployer()))
+            )
+        });
+        require(
+            policyRegistry == getPolicyRegistryAddress(_deployer()), "PolicyRegistry does not match expected address"
+        );
+        _logDeployment("PolicyRegistry", POLICY_REGISTRY_SALT_SEED, policyRegistry);
+        return policyRegistry;
+    }
+
+    function _deployDepositPolicy() internal returns (address) {
+        address depositPolicy = _deploy_create3({
+            namespacedSaltSeed: DEPOSIT_POLICY_SALT_SEED,
+            deployer: _deployer(),
+            initCode: abi.encodePacked(
+                type(DepositPolicy).creationCode,
+                abi.encode(getAccessManagerAddress(_deployer()), getStableVaultAddress(_deployer()))
+            )
+        });
+        require(depositPolicy == getDepositPolicyAddress(_deployer()), "DepositPolicy does not match expected address");
+        _logDeployment("DepositPolicy", DEPOSIT_POLICY_SALT_SEED, depositPolicy);
+        return depositPolicy;
+    }
+
+    function _deployFundsBridgingPolicy() internal returns (address) {
+        address fundsBridgingPolicy = _deploy_create3({
+            namespacedSaltSeed: FUNDS_BRIDGING_POLICY_SALT_SEED,
+            deployer: _deployer(),
+            initCode: abi.encodePacked(
+                type(FundsBridgingPolicy).creationCode,
+                abi.encode(getAccessManagerAddress(_deployer()), getFundsHandlerAddress(_deployer()))
+            )
+        });
+        require(
+            fundsBridgingPolicy == getFundsBridgingPolicyAddress(_deployer()),
+            "FundsBridgingPolicy does not match expected address"
+        );
+        _logDeployment("FundsBridgingPolicy", FUNDS_BRIDGING_POLICY_SALT_SEED, fundsBridgingPolicy);
+        return fundsBridgingPolicy;
+    }
+
+    function _setupDepositPolicy() internal {
+        DepositPolicy policy = DepositPolicy(getDepositPolicyAddress(_deployer()));
+
+        IPolicyRegistry(getPolicyRegistryAddress(_deployer()))
+            .setPolicy(keccak256(bytes("aave.stable-vault.StableVault.policy.deposit")), address(policy));
+
+        _loosenDepositLimit(policy, _gho(), ".accountingChain.depositPolicy.perAssetLimits.gho");
+        _loosenDepositLimit(policy, _usdc(), ".accountingChain.depositPolicy.perAssetLimits.usdc");
+        _loosenDepositLimit(policy, _usdt(), ".accountingChain.depositPolicy.perAssetLimits.usdt");
+    }
+
+    function _loosenDepositLimit(DepositPolicy policy, address asset, string memory configKey) private {
+        uint128 capacity = uint128(vm.parseUint(_configString(string.concat(configKey, ".capacity"))));
+        uint128 refillRate = uint128(vm.parseUint(_configString(string.concat(configKey, ".refillRate"))));
+        policy.loosenDepositLimit(asset, capacity, refillRate);
+    }
+
+    function _setupFundsBridgingPolicy() internal {
+        FundsBridgingPolicy policy = FundsBridgingPolicy(getFundsBridgingPolicyAddress(_deployer()));
+
+        IPolicyRegistry(getPolicyRegistryAddress(_deployer()))
+            .setPolicy(keccak256(bytes("aave.stable-vault.FundsHandler.policy.bridge")), address(policy));
+
+        uint256 destChainId = _configUint(".earningChain.chainId");
+        address bridgeAdapter = getCcipAdapterAddress(_deployer());
+
+        _loosenBridgingLimit(
+            policy, _gho(), destChainId, bridgeAdapter, ".accountingChain.fundsBridgingPolicy.perAssetLimits.gho"
+        );
+        _loosenBridgingLimit(
+            policy, _usdc(), destChainId, bridgeAdapter, ".accountingChain.fundsBridgingPolicy.perAssetLimits.usdc"
+        );
+        _loosenBridgingLimit(
+            policy, _usdt(), destChainId, bridgeAdapter, ".accountingChain.fundsBridgingPolicy.perAssetLimits.usdt"
+        );
+    }
+
+    function _loosenBridgingLimit(
+        FundsBridgingPolicy policy,
+        address asset,
+        uint256 destChainId,
+        address bridgeAdapter,
+        string memory configKey
+    ) private {
+        uint128 capacity = uint128(vm.parseUint(_configString(string.concat(configKey, ".capacity"))));
+        uint128 refillRate = uint128(vm.parseUint(_configString(string.concat(configKey, ".refillRate"))));
+        policy.loosenBridgingLimit(asset, destChainId, bridgeAdapter, capacity, refillRate);
     }
 
     function _logDeployment(string memory name, string memory saltSeed, address addr) internal virtual override {

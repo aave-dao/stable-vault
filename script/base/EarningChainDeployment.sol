@@ -22,12 +22,15 @@ import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
+import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
 import {AggregatorV3Interface, ChainlinkPriceOracleAdapter} from "src/oracles/price/ChainlinkPriceOracleAdapter.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {AssetRegistry} from "src/periphery/AssetRegistry.sol";
 import {EarningChainStateProvider} from "src/periphery/EarningChainStateProvider.sol";
+import {PolicyRegistry} from "src/periphery/PolicyRegistry.sol";
 import {Swapper} from "src/periphery/Swapper.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
+import {FundsBridgingPolicy} from "src/policies/FundsBridgingPolicy.sol";
 import {WithdrawalPolicy} from "src/policies/WithdrawalPolicy.sol";
 
 abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainSetup, ATokenVaultDeployment {
@@ -107,6 +110,7 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         _deployTransferHelper();
         _deployAccessManager();
         _deployAssetRegistry();
+        _deployPolicyRegistry();
         _deployWithdrawalPolicy();
         _deployIouToken();
         _deployIouTokenManager();
@@ -116,9 +120,7 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         _deploySwapper();
         _deployCcipAdapter();
         _deployEarningChainStateProvider();
-        // TODO: Deploy `PolicyRegistry` (and any policy contracts consumed by EarningChainGateway here) and bind them
-        // via `PolicyRegistry.setPolicy(...)`. Must run before `_setupAccessManager` revokes the deployer's
-        // ADMIN_ROLE.
+        _deployFundsBridgingPolicy();
     }
 
     function _setupContracts() internal {
@@ -127,9 +129,7 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         _setupAllocator();
         _setupWithdrawalPolicy();
         _setupPriceOracleAdapters();
-        // TODO: Add target/role wiring for any policy contracts deployed on the Earning Chain inside `_setup_Targets`
-        // in `AccessManagerBaseSetup.sol`. Must be done before this `_setupAccessManager` call locks down the
-        // deployer.
+        _setupFundsBridgingPolicy();
         _setupAccessManager(_deployer()); // Must be last – revokes deployer's ADMIN_ROLE
     }
 
@@ -284,7 +284,6 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
                 chainGateway: getGatewayAddress(_deployer()),
                 vault: address(0),
                 transferHelper: getTransferHelperAddress(_deployer()),
-                policyRegistry: getPolicyRegistryAddress(_deployer()),
                 isAccountingChain: false
             })
         );
@@ -445,6 +444,70 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         );
         _logDeployment("ChainlinkPriceOracleAdapter::USDT", "", usdtAdapter);
         priceOracle.setOracleAdapterForAsset(_usdt(), usdtAdapter);
+    }
+
+    function _deployPolicyRegistry() internal returns (address) {
+        address policyRegistry = _deploy_create3({
+            namespacedSaltSeed: POLICY_REGISTRY_SALT_SEED,
+            deployer: _deployer(),
+            initCode: abi.encodePacked(
+                type(PolicyRegistry).creationCode, abi.encode(getAccessManagerAddress(_deployer()))
+            )
+        });
+        require(
+            policyRegistry == getPolicyRegistryAddress(_deployer()), "PolicyRegistry does not match expected address"
+        );
+        _logDeployment("PolicyRegistry", POLICY_REGISTRY_SALT_SEED, policyRegistry);
+        return policyRegistry;
+    }
+
+    function _deployFundsBridgingPolicy() internal returns (address) {
+        address fundsBridgingPolicy = _deploy_create3({
+            namespacedSaltSeed: FUNDS_BRIDGING_POLICY_SALT_SEED,
+            deployer: _deployer(),
+            initCode: abi.encodePacked(
+                type(FundsBridgingPolicy).creationCode,
+                abi.encode(getAccessManagerAddress(_deployer()), getGatewayAddress(_deployer()))
+            )
+        });
+        require(
+            fundsBridgingPolicy == getFundsBridgingPolicyAddress(_deployer()),
+            "FundsBridgingPolicy does not match expected address"
+        );
+        _logDeployment("FundsBridgingPolicy", FUNDS_BRIDGING_POLICY_SALT_SEED, fundsBridgingPolicy);
+        return fundsBridgingPolicy;
+    }
+
+    function _setupFundsBridgingPolicy() internal {
+        FundsBridgingPolicy policy = FundsBridgingPolicy(getFundsBridgingPolicyAddress(_deployer()));
+
+        IPolicyRegistry(getPolicyRegistryAddress(_deployer()))
+            .setPolicy(keccak256(bytes("aave.stable-vault.EarningChainGateway.policy.bridge")), address(policy));
+
+        uint256 destChainId = _configUint(".accountingChain.chainId");
+        address bridgeAdapter = getCcipAdapterAddress(_deployer());
+
+        _loosenBridgingLimit(
+            policy, _gho(), destChainId, bridgeAdapter, ".earningChain.fundsBridgingPolicy.perAssetLimits.gho"
+        );
+        _loosenBridgingLimit(
+            policy, _usdc(), destChainId, bridgeAdapter, ".earningChain.fundsBridgingPolicy.perAssetLimits.usdc"
+        );
+        _loosenBridgingLimit(
+            policy, _usdt(), destChainId, bridgeAdapter, ".earningChain.fundsBridgingPolicy.perAssetLimits.usdt"
+        );
+    }
+
+    function _loosenBridgingLimit(
+        FundsBridgingPolicy policy,
+        address asset,
+        uint256 destChainId,
+        address bridgeAdapter,
+        string memory configKey
+    ) private {
+        uint128 capacity = uint128(vm.parseUint(_configString(string.concat(configKey, ".capacity"))));
+        uint128 refillRate = uint128(vm.parseUint(_configString(string.concat(configKey, ".refillRate"))));
+        policy.loosenBridgingLimit(asset, destChainId, bridgeAdapter, capacity, refillRate);
     }
 
     function _logDeployment(string memory name, string memory saltSeed, address addr) internal virtual override {
