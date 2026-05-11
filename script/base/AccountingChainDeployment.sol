@@ -251,11 +251,6 @@ abstract contract AccountingChainDeployment is
         WithdrawalPolicy withdrawalPolicy = WithdrawalPolicy(getWithdrawalPolicyAddress(_deployer()));
         withdrawalPolicy.setDefaultFeeBps(uint16(_configUint(".withdrawalPolicy.defaultFeeBps")));
         withdrawalPolicy.addSigner(_configAddress(".withdrawalPolicy.signer"));
-
-        IPolicyRegistry(getPolicyRegistryAddress(_deployer()))
-            .setPolicy(
-                keccak256(bytes("aave.stable-vault.StableVault.policy.withdrawal-request")), address(withdrawalPolicy)
-            );
     }
 
     function _setupAssetRegistry() internal {

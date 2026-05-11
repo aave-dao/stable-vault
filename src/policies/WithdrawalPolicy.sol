@@ -12,7 +12,6 @@ import {EfficientHashLib} from "@solady/utils/EfficientHashLib.sol";
 import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 
 import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
-import {IWithdrawalRequestPolicy} from "src/interfaces/IWithdrawalRequestPolicy.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
@@ -28,7 +27,7 @@ import {Errors} from "src/types/Errors.sol";
 /// a personal fee denominated in RAY to charge an exact amount; this signed amount is clamped to the asset's bp cap,
 /// with the cap amount rounded up in favor of the protocol.
 /// @custom:upgradeable
-contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithdrawalPolicy, IWithdrawalRequestPolicy {
+contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithdrawalPolicy {
     // EIP-712 typeHash:
     // keccak256("SignedFee(address user,address assetOut,uint256 iouAmountRay,uint256 personalFeeAmountRay,uint256
     // nonce,uint256 deadline)").
@@ -124,28 +123,6 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     function previewWithdrawalPolicy(WithdrawalRequest calldata request) external view override returns (uint256) {
         (uint256 amountOutRay,,) = _previewWithdrawalPolicy(request);
         return amountOutRay;
-    }
-
-    /// @inheritdoc IWithdrawalRequestPolicy
-    /// @dev No request-stage restrictions are applied by this implementation.
-    function applyWithdrawalRequestPolicy(WithdrawalRequestPolicyRequest calldata request)
-        external
-        override
-        returns (bool)
-    {
-        emit WithdrawalRequestPolicyApplied(request.caller, request.user, request.requestedAmountInRay);
-        return true;
-    }
-
-    /// @inheritdoc IWithdrawalRequestPolicy
-    /// @dev No request-stage restrictions are applied by this implementation.
-    function previewWithdrawalRequestPolicy(WithdrawalRequestPolicyRequest calldata)
-        external
-        pure
-        override
-        returns (bool)
-    {
-        return true;
     }
 
     /// @notice Getter for the configuration for an asset-specific fee.
