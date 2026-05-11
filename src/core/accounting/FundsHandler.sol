@@ -11,8 +11,8 @@ import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/
 import {LocalBalanceAggregator} from "src/core/LocalBalanceAggregator.sol";
 import {IAccountingChainGateway} from "src/interfaces/IAccountingChainGateway.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
-import {IBridgeFundsPolicy} from "src/interfaces/IBridgeFundsPolicy.sol";
 import {IChainBalanceOracle} from "src/interfaces/IChainBalanceOracle.sol";
+import {IFundsBridgingPolicy} from "src/interfaces/IFundsBridgingPolicy.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
@@ -167,7 +167,7 @@ contract FundsHandler is
         require(amount > 0, Errors.ZeroAmount());
         require($storage().earningChainIds.contains(chainId), Errors.InvalidDestinationChainId());
 
-        _applyBridgeFundsPolicy(chainId, bridgeAdapter, asset, amount);
+        _applyFundsBridgingPolicy(chainId, bridgeAdapter, asset, amount);
 
         // Pull funds from liquidity into the TransferHelper.
         _pullFundsFromImmediateLiquidity(asset, amount);
@@ -190,14 +190,14 @@ contract FundsHandler is
         IAllocator(ALLOCATOR).withdraw(asset, amount);
     }
 
-    function _applyBridgeFundsPolicy(uint256 chainId, address bridgeAdapter, address asset, uint256 amount) internal {
+    function _applyFundsBridgingPolicy(uint256 chainId, address bridgeAdapter, address asset, uint256 amount) internal {
         address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(BRIDGE_POLICY_ID);
         if (policy == address(0)) {
             return;
         }
-        bool allowed = IBridgeFundsPolicy(policy)
-            .applyBridgeFundsPolicy(
-                IBridgeFundsPolicy.BridgeFundsRequest({
+        bool allowed = IFundsBridgingPolicy(policy)
+            .applyFundsBridgingPolicy(
+                IFundsBridgingPolicy.FundsBridgingIntent({
                 caller: msg.sender, bridgeAdapter: bridgeAdapter, destChainId: chainId, asset: asset, amount: amount
             })
             );

@@ -15,7 +15,7 @@ interface IDepositPolicy {
     /// @param asset The asset being deposited.
     /// @param amount The amount of `asset` being deposited (in the asset's native decimals).
     /// @param extraData Additional data for the deposit policy.
-    struct DepositRequest {
+    struct DepositIntent {
         address caller;
         address user;
         address asset;
@@ -24,12 +24,12 @@ interface IDepositPolicy {
     }
 
     /// @notice Applies the deposit policy.
-    /// @param request The deposit request parameters.
+    /// @param deposit The deposit intent.
     /// @return allowed `true` iff the deposit is permitted by the policy.
-    function applyDepositPolicy(DepositRequest calldata request) external returns (bool allowed);
+    function applyDepositPolicy(DepositIntent calldata deposit) external returns (bool allowed);
 
     /// @notice Previews the deposit policy result without modifying state.
-    /// @param request The deposit request parameters.
+    /// @param deposit The deposit intent.
     /// @return allowed `true` iff the deposit would be permitted at the current state.
-    function previewDepositPolicy(DepositRequest calldata request) external view returns (bool allowed);
+    function previewDepositPolicy(DepositIntent calldata deposit) external view returns (bool allowed);
 }

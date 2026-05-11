@@ -40,15 +40,15 @@ contract DepositPolicy is RateLimitPolicy, IDepositPolicy {
     }
 
     /// @inheritdoc IDepositPolicy
-    function applyDepositPolicy(DepositRequest calldata request) external override onlyPolicyApplier returns (bool) {
-        _consumeBucket(_buckets[request.asset], request.amount);
-        emit DepositPolicyApplied(request.caller, request.user, request.asset, request.amount);
+    function applyDepositPolicy(DepositIntent calldata deposit) external override onlyPolicyApplier returns (bool) {
+        _consumeBucket(_buckets[deposit.asset], deposit.amount);
+        emit DepositPolicyApplied(deposit.caller, deposit.user, deposit.asset, deposit.amount);
         return true;
     }
 
     /// @inheritdoc IDepositPolicy
-    function previewDepositPolicy(DepositRequest calldata request) external view override returns (bool) {
-        return _canConsumeBucket(_buckets[request.asset], request.amount);
+    function previewDepositPolicy(DepositIntent calldata deposit) external view override returns (bool) {
+        return _canConsumeBucket(_buckets[deposit.asset], deposit.amount);
     }
 
     /// @notice Returns the current deposit-limit bucket for an asset.

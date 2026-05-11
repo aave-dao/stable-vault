@@ -6,22 +6,22 @@ import {IWithdrawalExecutionPolicy} from "src/interfaces/IWithdrawalExecutionPol
 
 contract MockWithdrawalExecutionPolicy is IWithdrawalExecutionPolicy {
     /// @dev Returns the full iouAmountRay (no fee) for testing purposes.
-    function applyWithdrawalExecutionPolicy(WithdrawalExecutionPolicyRequest calldata request)
+    function applyWithdrawalExecutionPolicy(WithdrawalExecutionIntent calldata withdrawalExecution)
         external
         pure
         override
         returns (uint256)
     {
-        return request.iouAmountRay;
+        return withdrawalExecution.iouAmountRay;
     }
 
     /// @dev Returns the full iouAmountRay (no fee) for testing purposes.
-    function previewWithdrawalExecutionPolicy(WithdrawalExecutionPolicyRequest calldata request)
+    function previewWithdrawalExecutionPolicy(WithdrawalExecutionIntent calldata withdrawalExecution)
         external
         pure
         override
         returns (uint256)
     {
-        return request.iouAmountRay;
+        return withdrawalExecution.iouAmountRay;
     }
 }

@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.22;
 
-import {IBridgeFundsPolicy} from "src/interfaces/IBridgeFundsPolicy.sol";
+import {IFundsBridgingPolicy} from "src/interfaces/IFundsBridgingPolicy.sol";
 import {RateLimitBucketLib} from "src/libraries/RateLimitBucketLib.sol";
 import {RateLimitPolicy} from "src/policies/base/RateLimitPolicy.sol";
 import {Errors} from "src/types/Errors.sol";
@@ -12,7 +12,7 @@ import {Errors} from "src/types/Errors.sol";
 /// @notice Per-route rate-limited bridge-funds policy. Each `(asset, destChainId, bridgeAdapter)` triple has its own
 /// bucket; amounts are denominated in the asset's native decimals. Triples default to a zero-capacity bucket (fully
 /// rate-limited) until governance configures one; setting capacity to max uint128 removes the limit entirely.
-contract FundsBridgingPolicy is RateLimitPolicy, IBridgeFundsPolicy {
+contract FundsBridgingPolicy is RateLimitPolicy, IFundsBridgingPolicy {
     event BridgingLimitLoosened(
         address indexed asset,
         uint256 indexed destChainId,
@@ -54,23 +54,36 @@ contract FundsBridgingPolicy is RateLimitPolicy, IBridgeFundsPolicy {
         POLICY_APPLIER = fundsBridgingPolicyApplier;
     }
 
-    /// @inheritdoc IBridgeFundsPolicy
-    function applyBridgeFundsPolicy(BridgeFundsRequest calldata request)
+    /// @inheritdoc IFundsBridgingPolicy
+    function applyFundsBridgingPolicy(FundsBridgingIntent calldata fundsBridging)
         external
         override
         onlyPolicyApplier
         returns (bool)
     {
-        _consumeBucket(_buckets[request.asset][request.destChainId][request.bridgeAdapter], request.amount);
-        emit BridgeFundsPolicyApplied(
-            request.caller, request.bridgeAdapter, request.destChainId, request.asset, request.amount
+        _consumeBucket(
+            _buckets[fundsBridging.asset][fundsBridging.destChainId][fundsBridging.bridgeAdapter], fundsBridging.amount
+        );
+        emit FundsBridgingPolicyApplied(
+            fundsBridging.caller,
+            fundsBridging.bridgeAdapter,
+            fundsBridging.destChainId,
+            fundsBridging.asset,
+            fundsBridging.amount
         );
         return true;
     }
 
-    /// @inheritdoc IBridgeFundsPolicy
-    function previewBridgeFundsPolicy(BridgeFundsRequest calldata request) external view override returns (bool) {
-        return _canConsumeBucket(_buckets[request.asset][request.destChainId][request.bridgeAdapter], request.amount);
+    /// @inheritdoc IFundsBridgingPolicy
+    function previewFundsBridgingPolicy(FundsBridgingIntent calldata fundsBridging)
+        external
+        view
+        override
+        returns (bool)
+    {
+        return _canConsumeBucket(
+            _buckets[fundsBridging.asset][fundsBridging.destChainId][fundsBridging.bridgeAdapter], fundsBridging.amount
+        );
     }
 
     /// @notice Returns the current bridge-funds bucket for the given route.

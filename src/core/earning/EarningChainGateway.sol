@@ -9,9 +9,9 @@ import {
 import {BaseChainGateway} from "src/core/BaseChainGateway.sol";
 import {LocalBalanceAggregator} from "src/core/LocalBalanceAggregator.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
-import {IBridgeFundsPolicy} from "src/interfaces/IBridgeFundsPolicy.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
+import {IFundsBridgingPolicy} from "src/interfaces/IFundsBridgingPolicy.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
 import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
@@ -146,7 +146,7 @@ contract EarningChainGateway is
         bytes calldata bridgeAdapterData
     ) external payable override restricted assertingTransferHelperBalanceFor(asset) {
         require(amount > 0, Errors.ZeroAmount());
-        _applyBridgeFundsPolicy(ACCOUNTING_CHAIN_ID, bridgeAdapter, asset, amount);
+        _applyFundsBridgingPolicy(ACCOUNTING_CHAIN_ID, bridgeAdapter, asset, amount);
         // Pull funds from liquidity into the TransferHelper.
         IAllocator(ALLOCATOR).withdraw(asset, amount);
         _returnFunds(asset, amount, bridgeAdapter, msg.sender, gasLimit, bridgeAdapterData);
@@ -220,7 +220,7 @@ contract EarningChainGateway is
     ) private returns (uint256) {
         uint256 amountOutRay = IWithdrawalExecutionPolicy(WITHDRAWAL_EXECUTION_POLICY)
             .applyWithdrawalExecutionPolicy(
-                IWithdrawalExecutionPolicy.WithdrawalExecutionPolicyRequest({
+                IWithdrawalExecutionPolicy.WithdrawalExecutionIntent({
                 user: msg.sender,
                 assetOut: assetOut,
                 iouAmountRay: iouTokenAmountRay,
@@ -237,16 +237,16 @@ contract EarningChainGateway is
         return amountOut;
     }
 
-    function _applyBridgeFundsPolicy(uint256 destChainId, address bridgeAdapter, address asset, uint256 amount)
+    function _applyFundsBridgingPolicy(uint256 destChainId, address bridgeAdapter, address asset, uint256 amount)
         internal
     {
         address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(BRIDGE_POLICY_ID);
         if (policy == address(0)) {
             return;
         }
-        bool allowed = IBridgeFundsPolicy(policy)
-            .applyBridgeFundsPolicy(
-                IBridgeFundsPolicy.BridgeFundsRequest({
+        bool allowed = IFundsBridgingPolicy(policy)
+            .applyFundsBridgingPolicy(
+                IFundsBridgingPolicy.FundsBridgingIntent({
                 caller: msg.sender, bridgeAdapter: bridgeAdapter, destChainId: destChainId, asset: asset, amount: amount
             })
             );

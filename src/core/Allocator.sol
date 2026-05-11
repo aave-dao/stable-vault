@@ -389,7 +389,7 @@ contract Allocator is
             return;
         }
         bool allowed = IRebalancePolicy(policy)
-            .applyRebalancePolicy(IRebalancePolicy.RebalanceRequest({caller: msg.sender, params: params}));
+            .applyRebalancePolicy(IRebalancePolicy.RebalanceIntent({caller: msg.sender, params: params}));
         require(allowed, Errors.PolicyDenied());
     }
 

@@ -5,7 +5,7 @@ pragma solidity ^0.8.22;
 import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import {Test} from "forge-std/Test.sol";
 
-import {IBridgeFundsPolicy} from "src/interfaces/IBridgeFundsPolicy.sol";
+import {IFundsBridgingPolicy} from "src/interfaces/IFundsBridgingPolicy.sol";
 import {RateLimitBucketLib} from "src/libraries/RateLimitBucketLib.sol";
 import {FundsBridgingPolicy} from "src/policies/FundsBridgingPolicy.sol";
 import {Errors} from "src/types/Errors.sol";
@@ -33,9 +33,9 @@ contract FundsBridgingPolicyTest is Test {
     function _request(address asset, uint256 destChainId, address bridgeAdapter, uint256 amount)
         internal
         view
-        returns (IBridgeFundsPolicy.BridgeFundsRequest memory)
+        returns (IFundsBridgingPolicy.FundsBridgingIntent memory)
     {
-        return IBridgeFundsPolicy.BridgeFundsRequest({
+        return IFundsBridgingPolicy.FundsBridgingIntent({
             caller: applier, bridgeAdapter: bridgeAdapter, destChainId: destChainId, asset: asset, amount: amount
         });
     }
@@ -72,9 +72,9 @@ contract FundsBridgingPolicyTest is Test {
         new FundsBridgingPolicy(address(accessManager), address(0));
     }
 
-    /////////////////////////////////// applyBridgeFundsPolicy: access ///////////////////////////////////
+    /////////////////////////////////// applyFundsBridgingPolicy: access ///////////////////////////////////
 
-    function test_applyBridgeFundsPolicy_revertsIfCallerIsNotApplier(
+    function test_applyFundsBridgingPolicy_revertsIfCallerIsNotApplier(
         address caller,
         address asset,
         uint256 destChainId,
@@ -85,10 +85,10 @@ contract FundsBridgingPolicyTest is Test {
 
         vm.expectRevert(Errors.NotAuthorized.selector);
         vm.prank(caller);
-        policy.applyBridgeFundsPolicy(_request(asset, destChainId, bridgeAdapter, amount));
+        policy.applyFundsBridgingPolicy(_request(asset, destChainId, bridgeAdapter, amount));
     }
 
-    function test_applyBridgeFundsPolicy_succeedsIfCallerIsApplier(
+    function test_applyFundsBridgingPolicy_succeedsIfCallerIsApplier(
         address asset,
         uint256 destChainId,
         address bridgeAdapter
@@ -96,13 +96,13 @@ contract FundsBridgingPolicyTest is Test {
         _setLimit(asset, destChainId, bridgeAdapter, UNLIMITED, 0);
 
         vm.prank(applier);
-        bool allowed = policy.applyBridgeFundsPolicy(_request(asset, destChainId, bridgeAdapter, 1));
+        bool allowed = policy.applyFundsBridgingPolicy(_request(asset, destChainId, bridgeAdapter, 1));
         assertTrue(allowed);
     }
 
-    /////////////////////////////////// applyBridgeFundsPolicy: behavior ///////////////////////////////////
+    /////////////////////////////////// applyFundsBridgingPolicy: behavior ///////////////////////////////////
 
-    function test_applyBridgeFundsPolicy_emitsEvent(
+    function test_applyFundsBridgingPolicy_emitsEvent(
         address asset,
         uint256 destChainId,
         address bridgeAdapter,
@@ -111,12 +111,12 @@ contract FundsBridgingPolicyTest is Test {
         _setLimit(asset, destChainId, bridgeAdapter, UNLIMITED, 0);
 
         vm.expectEmit(true, true, true, true);
-        emit IBridgeFundsPolicy.BridgeFundsPolicyApplied(applier, bridgeAdapter, destChainId, asset, amount);
+        emit IFundsBridgingPolicy.FundsBridgingPolicyApplied(applier, bridgeAdapter, destChainId, asset, amount);
         vm.prank(applier);
-        policy.applyBridgeFundsPolicy(_request(asset, destChainId, bridgeAdapter, amount));
+        policy.applyFundsBridgingPolicy(_request(asset, destChainId, bridgeAdapter, amount));
     }
 
-    function test_applyBridgeFundsPolicy_revertsForUnconfiguredRoute(
+    function test_applyFundsBridgingPolicy_revertsForUnconfiguredRoute(
         address asset,
         uint256 destChainId,
         address bridgeAdapter,
@@ -126,20 +126,20 @@ contract FundsBridgingPolicyTest is Test {
 
         vm.expectRevert(RateLimitBucketLib.RateLimited.selector);
         vm.prank(applier);
-        policy.applyBridgeFundsPolicy(_request(asset, destChainId, bridgeAdapter, amount));
+        policy.applyFundsBridgingPolicy(_request(asset, destChainId, bridgeAdapter, amount));
     }
 
-    function test_applyBridgeFundsPolicy_zeroAmountIsAlwaysAccepted(
+    function test_applyFundsBridgingPolicy_zeroAmountIsAlwaysAccepted(
         address asset,
         uint256 destChainId,
         address bridgeAdapter
     ) public {
         vm.prank(applier);
-        bool allowed = policy.applyBridgeFundsPolicy(_request(asset, destChainId, bridgeAdapter, 0));
+        bool allowed = policy.applyFundsBridgingPolicy(_request(asset, destChainId, bridgeAdapter, 0));
         assertTrue(allowed);
     }
 
-    function test_applyBridgeFundsPolicy_unlimitedNeverConsumes(
+    function test_applyFundsBridgingPolicy_unlimitedNeverConsumes(
         address asset,
         uint256 destChainId,
         address bridgeAdapter,
@@ -148,14 +148,14 @@ contract FundsBridgingPolicyTest is Test {
         _setLimit(asset, destChainId, bridgeAdapter, UNLIMITED, 0);
 
         vm.prank(applier);
-        policy.applyBridgeFundsPolicy(_request(asset, destChainId, bridgeAdapter, amount));
+        policy.applyFundsBridgingPolicy(_request(asset, destChainId, bridgeAdapter, amount));
 
         RateLimitBucketLib.Bucket memory bucket = policy.getBridgingLimit(asset, destChainId, bridgeAdapter);
         assertEq(bucket.consumed, 0);
         assertEq(bucket.capacity, UNLIMITED);
     }
 
-    function test_applyBridgeFundsPolicy_consumesFromBucket(
+    function test_applyFundsBridgingPolicy_consumesFromBucket(
         address asset,
         uint256 destChainId,
         address bridgeAdapter,
@@ -165,13 +165,13 @@ contract FundsBridgingPolicyTest is Test {
         _setLimit(asset, destChainId, bridgeAdapter, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
 
         vm.prank(applier);
-        policy.applyBridgeFundsPolicy(_request(asset, destChainId, bridgeAdapter, amount));
+        policy.applyFundsBridgingPolicy(_request(asset, destChainId, bridgeAdapter, amount));
 
         RateLimitBucketLib.Bucket memory bucket = policy.getBridgingLimit(asset, destChainId, bridgeAdapter);
         assertEq(bucket.consumed, amount);
     }
 
-    function test_applyBridgeFundsPolicy_revertsWhenAmountExceedsCapacity(
+    function test_applyFundsBridgingPolicy_revertsWhenAmountExceedsCapacity(
         address asset,
         uint256 destChainId,
         address bridgeAdapter,
@@ -182,10 +182,10 @@ contract FundsBridgingPolicyTest is Test {
 
         vm.expectRevert(RateLimitBucketLib.RateLimited.selector);
         vm.prank(applier);
-        policy.applyBridgeFundsPolicy(_request(asset, destChainId, bridgeAdapter, amount));
+        policy.applyFundsBridgingPolicy(_request(asset, destChainId, bridgeAdapter, amount));
     }
 
-    function test_applyBridgeFundsPolicy_perRouteIsolation_byAsset(
+    function test_applyFundsBridgingPolicy_perRouteIsolation_byAsset(
         address assetA,
         address assetB,
         uint256 destChainId,
@@ -198,13 +198,13 @@ contract FundsBridgingPolicyTest is Test {
         _setLimit(assetB, destChainId, bridgeAdapter, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
 
         vm.prank(applier);
-        policy.applyBridgeFundsPolicy(_request(assetA, destChainId, bridgeAdapter, amount));
+        policy.applyFundsBridgingPolicy(_request(assetA, destChainId, bridgeAdapter, amount));
 
         assertEq(policy.getBridgingLimit(assetA, destChainId, bridgeAdapter).consumed, amount);
         assertEq(policy.getBridgingLimit(assetB, destChainId, bridgeAdapter).consumed, 0);
     }
 
-    function test_applyBridgeFundsPolicy_perRouteIsolation_byDestChainId(
+    function test_applyFundsBridgingPolicy_perRouteIsolation_byDestChainId(
         address asset,
         uint256 destChainIdA,
         uint256 destChainIdB,
@@ -217,13 +217,13 @@ contract FundsBridgingPolicyTest is Test {
         _setLimit(asset, destChainIdB, bridgeAdapter, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
 
         vm.prank(applier);
-        policy.applyBridgeFundsPolicy(_request(asset, destChainIdA, bridgeAdapter, amount));
+        policy.applyFundsBridgingPolicy(_request(asset, destChainIdA, bridgeAdapter, amount));
 
         assertEq(policy.getBridgingLimit(asset, destChainIdA, bridgeAdapter).consumed, amount);
         assertEq(policy.getBridgingLimit(asset, destChainIdB, bridgeAdapter).consumed, 0);
     }
 
-    function test_applyBridgeFundsPolicy_perRouteIsolation_byBridgeAdapter(
+    function test_applyFundsBridgingPolicy_perRouteIsolation_byBridgeAdapter(
         address asset,
         uint256 destChainId,
         address bridgeAdapterA,
@@ -236,43 +236,43 @@ contract FundsBridgingPolicyTest is Test {
         _setLimit(asset, destChainId, bridgeAdapterB, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
 
         vm.prank(applier);
-        policy.applyBridgeFundsPolicy(_request(asset, destChainId, bridgeAdapterA, amount));
+        policy.applyFundsBridgingPolicy(_request(asset, destChainId, bridgeAdapterA, amount));
 
         assertEq(policy.getBridgingLimit(asset, destChainId, bridgeAdapterA).consumed, amount);
         assertEq(policy.getBridgingLimit(asset, destChainId, bridgeAdapterB).consumed, 0);
     }
 
-    /////////////////////////////////// previewBridgeFundsPolicy ///////////////////////////////////
+    /////////////////////////////////// previewFundsBridgingPolicy ///////////////////////////////////
 
-    function test_previewBridgeFundsPolicy_unconfigured_isFalseForNonZero(
+    function test_previewFundsBridgingPolicy_unconfigured_isFalseForNonZero(
         address asset,
         uint256 destChainId,
         address bridgeAdapter,
         uint256 amount
     ) public view {
         amount = bound(amount, 1, type(uint256).max);
-        assertFalse(policy.previewBridgeFundsPolicy(_request(asset, destChainId, bridgeAdapter, amount)));
+        assertFalse(policy.previewFundsBridgingPolicy(_request(asset, destChainId, bridgeAdapter, amount)));
     }
 
-    function test_previewBridgeFundsPolicy_unconfigured_isTrueForZero(
+    function test_previewFundsBridgingPolicy_unconfigured_isTrueForZero(
         address asset,
         uint256 destChainId,
         address bridgeAdapter
     ) public view {
-        assertTrue(policy.previewBridgeFundsPolicy(_request(asset, destChainId, bridgeAdapter, 0)));
+        assertTrue(policy.previewFundsBridgingPolicy(_request(asset, destChainId, bridgeAdapter, 0)));
     }
 
-    function test_previewBridgeFundsPolicy_unlimited_isAlwaysTrue(
+    function test_previewFundsBridgingPolicy_unlimited_isAlwaysTrue(
         address asset,
         uint256 destChainId,
         address bridgeAdapter,
         uint256 amount
     ) public {
         _setLimit(asset, destChainId, bridgeAdapter, UNLIMITED, 0);
-        assertTrue(policy.previewBridgeFundsPolicy(_request(asset, destChainId, bridgeAdapter, amount)));
+        assertTrue(policy.previewFundsBridgingPolicy(_request(asset, destChainId, bridgeAdapter, amount)));
     }
 
-    function test_previewBridgeFundsPolicy_doesNotMutateState(
+    function test_previewFundsBridgingPolicy_doesNotMutateState(
         address asset,
         uint256 destChainId,
         address bridgeAdapter,
@@ -282,7 +282,7 @@ contract FundsBridgingPolicyTest is Test {
         _setLimit(asset, destChainId, bridgeAdapter, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
         RateLimitBucketLib.Bucket memory before = policy.getBridgingLimit(asset, destChainId, bridgeAdapter);
 
-        policy.previewBridgeFundsPolicy(_request(asset, destChainId, bridgeAdapter, amount));
+        policy.previewFundsBridgingPolicy(_request(asset, destChainId, bridgeAdapter, amount));
 
         RateLimitBucketLib.Bucket memory afterBucket = policy.getBridgingLimit(asset, destChainId, bridgeAdapter);
         assertEq(afterBucket.capacity, before.capacity);
@@ -291,7 +291,7 @@ contract FundsBridgingPolicyTest is Test {
         assertEq(afterBucket.lastUpdate, before.lastUpdate);
     }
 
-    function test_previewBridgeFundsPolicy_matchesAppliedOutcome(
+    function test_previewFundsBridgingPolicy_matchesAppliedOutcome(
         address asset,
         uint256 destChainId,
         address bridgeAdapter,
@@ -300,15 +300,15 @@ contract FundsBridgingPolicyTest is Test {
         amount = bound(amount, 0, DEFAULT_CAPACITY * 2);
         _setLimit(asset, destChainId, bridgeAdapter, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
 
-        bool previewed = policy.previewBridgeFundsPolicy(_request(asset, destChainId, bridgeAdapter, amount));
+        bool previewed = policy.previewFundsBridgingPolicy(_request(asset, destChainId, bridgeAdapter, amount));
         if (previewed) {
             vm.prank(applier);
-            bool applied = policy.applyBridgeFundsPolicy(_request(asset, destChainId, bridgeAdapter, amount));
+            bool applied = policy.applyFundsBridgingPolicy(_request(asset, destChainId, bridgeAdapter, amount));
             assertTrue(applied);
         } else {
             vm.expectRevert(RateLimitBucketLib.RateLimited.selector);
             vm.prank(applier);
-            policy.applyBridgeFundsPolicy(_request(asset, destChainId, bridgeAdapter, amount));
+            policy.applyFundsBridgingPolicy(_request(asset, destChainId, bridgeAdapter, amount));
         }
     }
 

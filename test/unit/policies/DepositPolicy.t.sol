@@ -30,8 +30,8 @@ contract DepositPolicyTest is Test {
         vm.warp(START_TIMESTAMP);
     }
 
-    function _request(address asset, uint256 amount) internal view returns (IDepositPolicy.DepositRequest memory) {
-        return IDepositPolicy.DepositRequest({
+    function _request(address asset, uint256 amount) internal view returns (IDepositPolicy.DepositIntent memory) {
+        return IDepositPolicy.DepositIntent({
             caller: applier, user: address(this), asset: asset, amount: amount, extraData: ""
         });
     }

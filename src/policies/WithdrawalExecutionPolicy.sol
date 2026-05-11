@@ -63,7 +63,7 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
 
     address internal immutable WITHDRAWAL_EXECUTION_POLICY_APPLIER;
 
-    /// @notice Signed personal fee data (decoded from WithdrawalExecutionPolicyRequest.data).
+    /// @notice Signed personal fee data (decoded from WithdrawalExecutionIntent.data).
     /// @param personalFeeAmountRay The personal fee amount in RAY signed by a whitelisted signer. Used directly as
     /// the fee charged, capped by the asset-specific bp limit.
     /// @param nonce Unique nonce to prevent signature replay.
@@ -134,28 +134,30 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
     }
 
     /// @inheritdoc IWithdrawalExecutionPolicy
-    function applyWithdrawalExecutionPolicy(WithdrawalExecutionPolicyRequest calldata request)
+    function applyWithdrawalExecutionPolicy(WithdrawalExecutionIntent calldata withdrawalExecution)
         external
         override
         onlyWithdrawalExecutionPolicyApplier
         returns (uint256)
     {
-        (uint256 amountOutRay, address signer, uint256 nonce) = _previewWithdrawalExecutionPolicy(request);
+        (uint256 amountOutRay, address signer, uint256 nonce) = _previewWithdrawalExecutionPolicy(withdrawalExecution);
         if (signer != address(0)) {
             _markNonceAsUsed(signer, nonce);
         }
-        emit WithdrawalExecutionPolicyApplied(request.user, request.assetOut, request.iouAmountRay, amountOutRay);
+        emit WithdrawalExecutionPolicyApplied(
+            withdrawalExecution.user, withdrawalExecution.assetOut, withdrawalExecution.iouAmountRay, amountOutRay
+        );
         return amountOutRay;
     }
 
     /// @inheritdoc IWithdrawalExecutionPolicy
-    function previewWithdrawalExecutionPolicy(WithdrawalExecutionPolicyRequest calldata request)
+    function previewWithdrawalExecutionPolicy(WithdrawalExecutionIntent calldata withdrawalExecution)
         external
         view
         override
         returns (uint256)
     {
-        (uint256 amountOutRay,,) = _previewWithdrawalExecutionPolicy(request);
+        (uint256 amountOutRay,,) = _previewWithdrawalExecutionPolicy(withdrawalExecution);
         return amountOutRay;
     }
 
@@ -248,25 +250,26 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
     /// @dev The fee charged is the signed `personalFeeAmountRay` when provided, capped at the asset-specific bp limit
     /// applied to `iouAmountRay` (rounded up in favor of the protocol). When no signed data is supplied, the capped
     /// amount itself is charged.
-    /// @param request The withdrawal request parameters.
+    /// @param withdrawalExecution The withdrawal-execution intent.
     /// @return amountOutRay The amount of assets the user would receive (in RAY) after the fee is applied.
     /// @return signer The address that signed the personal fee, or `address(0)` when no signed data was supplied.
     /// @return nonce The nonce from the signed personal fee (only meaningful when `signer != address(0)`).
-    function _previewWithdrawalExecutionPolicy(WithdrawalExecutionPolicyRequest calldata request)
+    function _previewWithdrawalExecutionPolicy(WithdrawalExecutionIntent calldata withdrawalExecution)
         internal
         view
         returns (uint256 amountOutRay, address signer, uint256 nonce)
     {
-        uint16 feeBps = _getAssetFeeBps(request.assetOut);
-        uint256 feeAmountToChargeRay = (request.iouAmountRay * feeBps + Constants.MAX_BPS - 1) / Constants.MAX_BPS;
-        if (request.data.length > 0) {
+        uint16 feeBps = _getAssetFeeBps(withdrawalExecution.assetOut);
+        uint256 feeAmountToChargeRay =
+            (withdrawalExecution.iouAmountRay * feeBps + Constants.MAX_BPS - 1) / Constants.MAX_BPS;
+        if (withdrawalExecution.data.length > 0) {
             uint256 personalFeeAmountRay;
-            (signer, nonce, personalFeeAmountRay) = _verifySignedFee(request);
+            (signer, nonce, personalFeeAmountRay) = _verifySignedFee(withdrawalExecution);
             if (personalFeeAmountRay < feeAmountToChargeRay) {
                 feeAmountToChargeRay = personalFeeAmountRay;
             }
         }
-        amountOutRay = request.iouAmountRay - feeAmountToChargeRay;
+        amountOutRay = withdrawalExecution.iouAmountRay - feeAmountToChargeRay;
     }
 
     function _markNonceAsUsed(address signer, uint256 nonce) internal {
@@ -278,16 +281,16 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
     /// @return signer The address that signed the personal fee.
     /// @return nonce The nonce from the signed personal fee.
     /// @return personalFeeAmountRay The personal fee amount (in RAY) from the signed data.
-    function _verifySignedFee(WithdrawalExecutionPolicyRequest calldata request)
+    function _verifySignedFee(WithdrawalExecutionIntent calldata withdrawalExecution)
         internal
         view
         returns (address signer, uint256 nonce, uint256 personalFeeAmountRay)
     {
-        SignedFee memory signedFee = abi.decode(request.data, (SignedFee));
+        SignedFee memory signedFee = abi.decode(withdrawalExecution.data, (SignedFee));
 
         require(signedFee.deadline >= block.timestamp, DeadlineExpired());
 
-        signer = _recoverSigner(request, signedFee);
+        signer = _recoverSigner(withdrawalExecution, signedFee);
         require($storage().isSigner[signer], InvalidSignature());
         require(!$storage().wasNonceUsed[signer][signedFee.nonce], NonceAlreadyUsed());
 
@@ -295,7 +298,7 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
     }
 
     /// @dev Recovers the signer address from the EIP-712 signature.
-    function _recoverSigner(WithdrawalExecutionPolicyRequest calldata request, SignedFee memory signedFee)
+    function _recoverSigner(WithdrawalExecutionIntent calldata withdrawalExecution, SignedFee memory signedFee)
         internal
         view
         returns (address)
@@ -303,9 +306,9 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
         bytes32 structHash = EfficientHashLib.hash(
             abi.encode(
                 SIGNED_FEE_TYPEHASH,
-                request.user,
-                request.assetOut,
-                request.iouAmountRay,
+                withdrawalExecution.user,
+                withdrawalExecution.assetOut,
+                withdrawalExecution.iouAmountRay,
                 signedFee.personalFeeAmountRay,
                 signedFee.nonce,
                 signedFee.deadline

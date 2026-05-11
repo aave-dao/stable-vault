@@ -17,7 +17,7 @@ interface IWithdrawalExecutionPolicy {
     /// @param assetOut Address of the asset to receive.
     /// @param iouAmountRay Amount of IOU tokens being redeemed (in RAY).
     /// @param data Implementation-specific data (e.g., signed fee discounts).
-    struct WithdrawalExecutionPolicyRequest {
+    struct WithdrawalExecutionIntent {
         address user;
         address assetOut;
         uint256 iouAmountRay;
@@ -26,17 +26,17 @@ interface IWithdrawalExecutionPolicy {
 
     /// @notice Applies the withdrawal policy and returns the final amount the user receives.
     /// @dev May have side effects (e.g., consuming nonces). Reverts if policy is violated.
-    /// @param request The withdrawal request parameters.
+    /// @param withdrawalExecution The withdrawal-execution intent.
     /// @return The amount of assets the user will receive (in RAY), after the withdrawal policy is applied.
-    function applyWithdrawalExecutionPolicy(WithdrawalExecutionPolicyRequest calldata request)
+    function applyWithdrawalExecutionPolicy(WithdrawalExecutionIntent calldata withdrawalExecution)
         external
         returns (uint256);
 
     /// @notice Previews the withdrawal policy result without modifying state.
     /// @dev Validates everything (asset, signature, deadline, nonce) but doesn't consume the nonce.
-    /// @param request The withdrawal request parameters.
+    /// @param withdrawalExecution The withdrawal-execution intent.
     /// @return The amount of assets the user would receive (in RAY), after the withdrawal policy is applied.
-    function previewWithdrawalExecutionPolicy(WithdrawalExecutionPolicyRequest calldata request)
+    function previewWithdrawalExecutionPolicy(WithdrawalExecutionIntent calldata withdrawalExecution)
         external
         view
         returns (uint256);

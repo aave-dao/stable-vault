@@ -462,7 +462,7 @@ contract StableVault is
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(user, iouAmountRay);
         uint256 amountOutRay = IWithdrawalExecutionPolicy(WITHDRAWAL_EXECUTION_POLICY)
             .applyWithdrawalExecutionPolicy(
-                IWithdrawalExecutionPolicy.WithdrawalExecutionPolicyRequest({
+                IWithdrawalExecutionPolicy.WithdrawalExecutionIntent({
                 user: user, assetOut: assetOut, iouAmountRay: iouAmountRay, data: withdrawalExecutionPolicyData
             })
             );
@@ -971,7 +971,7 @@ contract StableVault is
         }
         bool allowed = IDepositPolicy(policy)
             .applyDepositPolicy(
-                IDepositPolicy.DepositRequest({
+                IDepositPolicy.DepositIntent({
                 caller: msg.sender, user: user, asset: asset, amount: amount, extraData: extraData
             })
             );
@@ -987,7 +987,7 @@ contract StableVault is
         }
         bool allowed = IWithdrawalRequestPolicy(policy)
             .applyWithdrawalRequestPolicy(
-                IWithdrawalRequestPolicy.WithdrawalRequestPolicyRequest({
+                IWithdrawalRequestPolicy.WithdrawalRequestIntent({
                 caller: msg.sender, user: user, requestedAmountInRay: requestedAmountInRay, extraData: extraData
             })
             );

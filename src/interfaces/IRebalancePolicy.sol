@@ -14,18 +14,18 @@ interface IRebalancePolicy {
     /// @notice Core parameters for a rebalance.
     /// @param caller `msg.sender` of `Allocator.rebalance`.
     /// @param params The native rebalance parameters (deallocations / swaps / allocations).
-    struct RebalanceRequest {
+    struct RebalanceIntent {
         address caller;
         IAllocator.RebalanceParams[] params;
     }
 
     /// @notice Applies the rebalance policy.
-    /// @param request The rebalance request parameters.
+    /// @param rebalance The rebalance intent.
     /// @return allowed `true` iff the rebalance is permitted by the policy.
-    function applyRebalancePolicy(RebalanceRequest calldata request) external returns (bool allowed);
+    function applyRebalancePolicy(RebalanceIntent calldata rebalance) external returns (bool allowed);
 
     /// @notice Previews the rebalance policy result without modifying state.
-    /// @param request The rebalance request parameters.
+    /// @param rebalance The rebalance intent.
     /// @return allowed `true` iff the rebalance would be permitted at the current state.
-    function previewRebalancePolicy(RebalanceRequest calldata request) external view returns (bool allowed);
+    function previewRebalancePolicy(RebalanceIntent calldata rebalance) external view returns (bool allowed);
 }

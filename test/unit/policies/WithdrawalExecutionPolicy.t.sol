@@ -52,9 +52,9 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
     function _buildRequest(address user, address assetOut, uint256 iouAmountRay, bytes memory data)
         internal
         pure
-        returns (IWithdrawalExecutionPolicy.WithdrawalExecutionPolicyRequest memory)
+        returns (IWithdrawalExecutionPolicy.WithdrawalExecutionIntent memory)
     {
-        return IWithdrawalExecutionPolicy.WithdrawalExecutionPolicyRequest({
+        return IWithdrawalExecutionPolicy.WithdrawalExecutionIntent({
             user: user, assetOut: assetOut, iouAmountRay: iouAmountRay, data: data
         });
     }
@@ -261,7 +261,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
 
         assertFalse(withdrawalExecutionPolicy.getAssetFeeConfig(assetOut).isSet, "Asset fee is set");
 
-        IWithdrawalExecutionPolicy.WithdrawalExecutionPolicyRequest memory request =
+        IWithdrawalExecutionPolicy.WithdrawalExecutionIntent memory request =
             _buildRequest(user, assetOut, iouAmountRay, "");
 
         // Preview should return same result
@@ -302,7 +302,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
         assertTrue(withdrawalExecutionPolicy.getAssetFeeConfig(assetOut).isSet, "Asset fee is not set");
         assertEq(withdrawalExecutionPolicy.getAssetFeeConfig(assetOut).feeBps, assetFeeBps);
 
-        IWithdrawalExecutionPolicy.WithdrawalExecutionPolicyRequest memory request =
+        IWithdrawalExecutionPolicy.WithdrawalExecutionIntent memory request =
             _buildRequest(user, assetOut, iouAmountRay, "");
 
         // Preview should return same result
@@ -358,7 +358,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
         // Signed fee is used directly (no rounding) as long as it's at-or-below the cap.
         uint256 expectedAmountOut = iouAmountRay - personalFeeAmountRay;
 
-        IWithdrawalExecutionPolicy.WithdrawalExecutionPolicyRequest memory request =
+        IWithdrawalExecutionPolicy.WithdrawalExecutionIntent memory request =
             _buildRequest(user, assetOut, iouAmountRay, data);
 
         // Preview should return same result and NOT consume the nonce
@@ -391,7 +391,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
         uint256 expectedFee = (iouAmountRay * baseFeeBps + Constants.MAX_BPS - 1) / Constants.MAX_BPS;
         uint256 expectedAmountOut = iouAmountRay - expectedFee;
 
-        IWithdrawalExecutionPolicy.WithdrawalExecutionPolicyRequest memory request =
+        IWithdrawalExecutionPolicy.WithdrawalExecutionIntent memory request =
             _buildRequest(user, assetOut, iouAmountRay, "");
 
         vm.expectEmit(true, true, true, true);
@@ -419,7 +419,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
         bytes memory data = _createSignedFeeData(
             signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, DEFAULT_DEADLINE
         );
-        IWithdrawalExecutionPolicy.WithdrawalExecutionPolicyRequest memory request =
+        IWithdrawalExecutionPolicy.WithdrawalExecutionIntent memory request =
             _buildRequest(user, assetOut, iouAmountRay, data);
 
         address attacker = makeAddr("attacker");
@@ -477,7 +477,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
 
         uint256 expectedAmountOut = iouAmountRay - capRay;
 
-        IWithdrawalExecutionPolicy.WithdrawalExecutionPolicyRequest memory request =
+        IWithdrawalExecutionPolicy.WithdrawalExecutionIntent memory request =
             _buildRequest(user, assetOut, iouAmountRay, data);
 
         assertFalse(
@@ -720,7 +720,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
             signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, expiredDeadline
         );
 
-        IWithdrawalExecutionPolicy.WithdrawalExecutionPolicyRequest memory request =
+        IWithdrawalExecutionPolicy.WithdrawalExecutionIntent memory request =
             _buildRequest(user, assetOut, iouAmountRay, data);
 
         // Both preview and apply should revert
@@ -752,7 +752,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
             signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, DEFAULT_DEADLINE
         );
 
-        IWithdrawalExecutionPolicy.WithdrawalExecutionPolicyRequest memory request =
+        IWithdrawalExecutionPolicy.WithdrawalExecutionIntent memory request =
             _buildRequest(user, assetOut, iouAmountRay, data);
 
         // Preview can be called multiple times
@@ -1207,7 +1207,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
             signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, DEFAULT_DEADLINE
         );
 
-        IWithdrawalExecutionPolicy.WithdrawalExecutionPolicyRequest memory request =
+        IWithdrawalExecutionPolicy.WithdrawalExecutionIntent memory request =
             _buildRequest(user, assetOut, iouAmountRay, data);
 
         // Preview works while signer is whitelisted — signed fee at-or-below cap is charged verbatim.

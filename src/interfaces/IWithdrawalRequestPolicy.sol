@@ -16,7 +16,7 @@ interface IWithdrawalRequestPolicy {
     /// @param user The user requesting the withdrawal.
     /// @param requestedAmountInRay Total amount the user requested (RAY).
     /// @param extraData Additional data for the withdrawal-request policy.
-    struct WithdrawalRequestPolicyRequest {
+    struct WithdrawalRequestIntent {
         address caller;
         address user;
         uint256 requestedAmountInRay;
@@ -24,16 +24,16 @@ interface IWithdrawalRequestPolicy {
     }
 
     /// @notice Applies the withdrawal-request policy.
-    /// @param request The withdrawal-request parameters.
+    /// @param withdrawalRequest The withdrawal-request intent.
     /// @return allowed `true` iff the withdrawal request is permitted by the policy.
-    function applyWithdrawalRequestPolicy(WithdrawalRequestPolicyRequest calldata request)
+    function applyWithdrawalRequestPolicy(WithdrawalRequestIntent calldata withdrawalRequest)
         external
         returns (bool allowed);
 
     /// @notice Previews the withdrawal-request policy result without modifying state.
-    /// @param request The withdrawal-request parameters.
+    /// @param withdrawalRequest The withdrawal-request intent.
     /// @return allowed `true` iff the withdrawal request would be permitted at the current state.
-    function previewWithdrawalRequestPolicy(WithdrawalRequestPolicyRequest calldata request)
+    function previewWithdrawalRequestPolicy(WithdrawalRequestIntent calldata withdrawalRequest)
         external
         view
         returns (bool allowed);
