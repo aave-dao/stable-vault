@@ -244,13 +244,12 @@ contract EarningChainGateway is
         if (policy == address(0)) {
             return;
         }
-        bool allowed = IFundsBridgingPolicy(policy)
+        IFundsBridgingPolicy(policy)
             .applyFundsBridgingPolicy(
                 IFundsBridgingPolicy.FundsBridgingIntent({
                 caller: msg.sender, bridgeAdapter: bridgeAdapter, destChainId: destChainId, asset: asset, amount: amount
             })
             );
-        require(allowed, Errors.PolicyDenied());
     }
 
     function _sendBurnIouTokenMessage(

@@ -40,10 +40,9 @@ contract DepositPolicy is RateLimitPolicy, IDepositPolicy {
     }
 
     /// @inheritdoc IDepositPolicy
-    function applyDepositPolicy(DepositIntent calldata deposit) external override onlyPolicyApplier returns (bool) {
+    function applyDepositPolicy(DepositIntent calldata deposit) external override onlyPolicyApplier {
         _consumeBucket(_buckets[deposit.asset], deposit.amount);
         emit DepositPolicyApplied(deposit.caller, deposit.user, deposit.asset, deposit.amount);
-        return true;
     }
 
     /// @inheritdoc IDepositPolicy

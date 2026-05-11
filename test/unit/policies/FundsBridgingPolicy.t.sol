@@ -96,8 +96,7 @@ contract FundsBridgingPolicyTest is Test {
         _setLimit(asset, destChainId, bridgeAdapter, UNLIMITED, 0);
 
         vm.prank(applier);
-        bool allowed = policy.applyFundsBridgingPolicy(_request(asset, destChainId, bridgeAdapter, 1));
-        assertTrue(allowed);
+        policy.applyFundsBridgingPolicy(_request(asset, destChainId, bridgeAdapter, 1));
     }
 
     /////////////////////////////////// applyFundsBridgingPolicy: behavior ///////////////////////////////////
@@ -135,8 +134,7 @@ contract FundsBridgingPolicyTest is Test {
         address bridgeAdapter
     ) public {
         vm.prank(applier);
-        bool allowed = policy.applyFundsBridgingPolicy(_request(asset, destChainId, bridgeAdapter, 0));
-        assertTrue(allowed);
+        policy.applyFundsBridgingPolicy(_request(asset, destChainId, bridgeAdapter, 0));
     }
 
     function test_applyFundsBridgingPolicy_unlimitedNeverConsumes(
@@ -303,8 +301,7 @@ contract FundsBridgingPolicyTest is Test {
         bool previewed = policy.previewFundsBridgingPolicy(_request(asset, destChainId, bridgeAdapter, amount));
         if (previewed) {
             vm.prank(applier);
-            bool applied = policy.applyFundsBridgingPolicy(_request(asset, destChainId, bridgeAdapter, amount));
-            assertTrue(applied);
+            policy.applyFundsBridgingPolicy(_request(asset, destChainId, bridgeAdapter, amount));
         } else {
             vm.expectRevert(RateLimitBucketLib.RateLimited.selector);
             vm.prank(applier);

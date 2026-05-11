@@ -32,10 +32,10 @@ interface IFundsBridgingPolicy {
         uint256 amount;
     }
 
-    /// @notice Applies the bridge policy for funds-bearing messages.
+    /// @notice Applies the bridge policy for funds-bearing messages. Reverts if the dispatch does not comply with the
+    /// policy restrictions.
     /// @param fundsBridging The bridge-funds intent.
-    /// @return allowed `true` iff the dispatch is permitted by the policy.
-    function applyFundsBridgingPolicy(FundsBridgingIntent calldata fundsBridging) external returns (bool allowed);
+    function applyFundsBridgingPolicy(FundsBridgingIntent calldata fundsBridging) external;
 
     /// @notice Previews the bridge-funds policy result without modifying state.
     /// @param fundsBridging The bridge-funds intent.

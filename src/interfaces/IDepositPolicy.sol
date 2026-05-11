@@ -23,10 +23,9 @@ interface IDepositPolicy {
         bytes extraData;
     }
 
-    /// @notice Applies the deposit policy.
+    /// @notice Applies the deposit policy. Reverts if the deposit does not comply with the policy restrictions.
     /// @param deposit The deposit intent.
-    /// @return allowed `true` iff the deposit is permitted by the policy.
-    function applyDepositPolicy(DepositIntent calldata deposit) external returns (bool allowed);
+    function applyDepositPolicy(DepositIntent calldata deposit) external;
 
     /// @notice Previews the deposit policy result without modifying state.
     /// @param deposit The deposit intent.

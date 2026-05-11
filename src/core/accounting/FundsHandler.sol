@@ -195,13 +195,12 @@ contract FundsHandler is
         if (policy == address(0)) {
             return;
         }
-        bool allowed = IFundsBridgingPolicy(policy)
+        IFundsBridgingPolicy(policy)
             .applyFundsBridgingPolicy(
                 IFundsBridgingPolicy.FundsBridgingIntent({
                 caller: msg.sender, bridgeAdapter: bridgeAdapter, destChainId: chainId, asset: asset, amount: amount
             })
             );
-        require(allowed, Errors.PolicyDenied());
     }
 
     /// @dev Returns 0 when the chain balance is stale, grossly underestimating the balance.

@@ -83,8 +83,7 @@ contract DepositPolicyTest is Test {
         _setLimit(asset, UNLIMITED, 0);
 
         vm.prank(applier);
-        bool allowed = policy.applyDepositPolicy(_request(asset, 1));
-        assertTrue(allowed);
+        policy.applyDepositPolicy(_request(asset, 1));
     }
 
     /////////////////////////////////// applyDepositPolicy: behavior ///////////////////////////////////
@@ -110,8 +109,7 @@ contract DepositPolicyTest is Test {
     function test_applyDepositPolicy_zeroAmountIsAlwaysAccepted(address asset) public {
         // Even an unconfigured (cap=0) bucket accepts amount=0 because consume short-circuits.
         vm.prank(applier);
-        bool allowed = policy.applyDepositPolicy(_request(asset, 0));
-        assertTrue(allowed);
+        policy.applyDepositPolicy(_request(asset, 0));
     }
 
     function test_applyDepositPolicy_unlimitedNeverConsumes(address asset, uint256 amount) public {
@@ -195,8 +193,7 @@ contract DepositPolicyTest is Test {
         bool previewed = policy.previewDepositPolicy(_request(asset, amount));
         if (previewed) {
             vm.prank(applier);
-            bool applied = policy.applyDepositPolicy(_request(asset, amount));
-            assertTrue(applied);
+            policy.applyDepositPolicy(_request(asset, amount));
         } else {
             vm.expectRevert(RateLimitBucketLib.RateLimited.selector);
             vm.prank(applier);

@@ -969,13 +969,12 @@ contract StableVault is
         if (policy == address(0)) {
             return;
         }
-        bool allowed = IDepositPolicy(policy)
+        IDepositPolicy(policy)
             .applyDepositPolicy(
                 IDepositPolicy.DepositIntent({
                 caller: msg.sender, user: user, asset: asset, amount: amount, extraData: extraData
             })
             );
-        require(allowed, Errors.PolicyDenied());
     }
 
     function _applyWithdrawalRequestPolicy(address user, uint256 requestedAmountInRay, bytes calldata extraData)
@@ -985,13 +984,12 @@ contract StableVault is
         if (policy == address(0)) {
             return;
         }
-        bool allowed = IWithdrawalRequestPolicy(policy)
+        IWithdrawalRequestPolicy(policy)
             .applyWithdrawalRequestPolicy(
                 IWithdrawalRequestPolicy.WithdrawalRequestIntent({
                 caller: msg.sender, user: user, requestedAmountInRay: requestedAmountInRay, extraData: extraData
             })
             );
-        require(allowed, Errors.PolicyDenied());
     }
 
     function _beforeRescueTokens(

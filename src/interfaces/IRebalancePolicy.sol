@@ -19,10 +19,9 @@ interface IRebalancePolicy {
         IAllocator.RebalanceParams[] params;
     }
 
-    /// @notice Applies the rebalance policy.
+    /// @notice Applies the rebalance policy. Reverts if the rebalance does not comply with the policy restrictions.
     /// @param rebalance The rebalance intent.
-    /// @return allowed `true` iff the rebalance is permitted by the policy.
-    function applyRebalancePolicy(RebalanceIntent calldata rebalance) external returns (bool allowed);
+    function applyRebalancePolicy(RebalanceIntent calldata rebalance) external;
 
     /// @notice Previews the rebalance policy result without modifying state.
     /// @param rebalance The rebalance intent.

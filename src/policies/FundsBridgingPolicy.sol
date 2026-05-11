@@ -55,12 +55,7 @@ contract FundsBridgingPolicy is RateLimitPolicy, IFundsBridgingPolicy {
     }
 
     /// @inheritdoc IFundsBridgingPolicy
-    function applyFundsBridgingPolicy(FundsBridgingIntent calldata fundsBridging)
-        external
-        override
-        onlyPolicyApplier
-        returns (bool)
-    {
+    function applyFundsBridgingPolicy(FundsBridgingIntent calldata fundsBridging) external override onlyPolicyApplier {
         _consumeBucket(
             _buckets[fundsBridging.asset][fundsBridging.destChainId][fundsBridging.bridgeAdapter], fundsBridging.amount
         );
@@ -71,7 +66,6 @@ contract FundsBridgingPolicy is RateLimitPolicy, IFundsBridgingPolicy {
             fundsBridging.asset,
             fundsBridging.amount
         );
-        return true;
     }
 
     /// @inheritdoc IFundsBridgingPolicy

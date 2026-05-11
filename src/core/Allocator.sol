@@ -388,9 +388,8 @@ contract Allocator is
         if (policy == address(0)) {
             return;
         }
-        bool allowed = IRebalancePolicy(policy)
+        IRebalancePolicy(policy)
             .applyRebalancePolicy(IRebalancePolicy.RebalanceIntent({caller: msg.sender, params: params}));
-        require(allowed, Errors.PolicyDenied());
     }
 
     function _rebalance(RebalanceParams memory rebalanceParams) internal {

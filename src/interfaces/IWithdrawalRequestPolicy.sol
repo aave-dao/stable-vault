@@ -23,12 +23,10 @@ interface IWithdrawalRequestPolicy {
         bytes extraData;
     }
 
-    /// @notice Applies the withdrawal-request policy.
+    /// @notice Applies the withdrawal-request policy. Reverts if the withdrawal request does not comply with the
+    /// policy restrictions.
     /// @param withdrawalRequest The withdrawal-request intent.
-    /// @return allowed `true` iff the withdrawal request is permitted by the policy.
-    function applyWithdrawalRequestPolicy(WithdrawalRequestIntent calldata withdrawalRequest)
-        external
-        returns (bool allowed);
+    function applyWithdrawalRequestPolicy(WithdrawalRequestIntent calldata withdrawalRequest) external;
 
     /// @notice Previews the withdrawal-request policy result without modifying state.
     /// @param withdrawalRequest The withdrawal-request intent.
