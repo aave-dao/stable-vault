@@ -245,6 +245,14 @@ interface IAllocator {
     /// @dev As a side effect, deposits into the strategy are automatically disabled if currently enabled, and the
     /// strategy is unset as the default for its asset if it is the current default.
     /// @dev Trusting the strategy again does NOT re-enable deposits or restore it as the default.
+    /// @dev If the strategy still holds assets at the time of the call, those assets stop contributing to the
+    /// system's TVL while user obligations (deposits + outstanding IOUs) remain unchanged. This can transiently
+    /// produce `obligations > getAggregatedBalance()` and cause `requestWithdrawal` to revert with
+    /// `InsufficientAssets` until the strategy is re-trusted, the assets are returned to the Allocator
+    /// (e.g., via `rebalance` deallocation), or the system is otherwise topped up. For a graceful retirement
+    /// (cooperative strategy, non-emergency), the recommended sequence is: drain the strategy via `rebalance`
+    /// first, then call `distrustStrategy`. `getAssetBalanceInStrategy(strategy)` and `isStrategyTrusted(strategy)`
+    /// can be used to inspect the relevant state before submitting.
     /// @param strategy Address of the strategy to distrust.
     function distrustStrategy(address strategy) external;
 
