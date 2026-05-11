@@ -11,6 +11,8 @@ import {Errors} from "src/types/Errors.sol";
 /// @dev Over any `capacity / refillRate`-second interval, a caller can extract up to `2 * capacity`: they can drain
 /// the full bucket at the start of the interval and then match the refill rate for the remaining time. Callers
 /// should set `capacity` with this in mind.
+/// @dev This library does not emit events; callers are responsible for emitting any events they need around bucket
+/// state or configuration changes.
 library RateLimitBucketLib {
     uint256 internal constant UNLIMITED_CAPACITY = type(uint128).max;
 
