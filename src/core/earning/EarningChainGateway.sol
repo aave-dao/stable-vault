@@ -15,7 +15,7 @@ import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
 import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
-import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
+import {IWithdrawalExecutionPolicy} from "src/interfaces/IWithdrawalExecutionPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
 import {Constants} from "src/types/Constants.sol";
@@ -42,7 +42,7 @@ contract EarningChainGateway is
     uint256 internal constant MIN_BURN_IOU_TOKEN_GAS_LIMIT = 120_000;
 
     uint256 internal immutable ACCOUNTING_CHAIN_ID;
-    address internal immutable WITHDRAWAL_POLICY;
+    address internal immutable WITHDRAWAL_EXECUTION_POLICY;
     address internal immutable POLICY_REGISTRY;
 
     // keccak256("aave.stable-vault.EarningChainGateway.policy.bridge")
@@ -55,7 +55,7 @@ contract EarningChainGateway is
     /// @param iouTokenManager Address of the IOU token manager contract used to mint and burn bridged or exchanged IOU
     /// tokens.
     /// @param transferHelper Address of the TransferHelper contract used to transfer assets across components.
-    /// @param withdrawalPolicy Address of the contract ensuring protocol's withdrawal requirements are met.
+    /// @param withdrawalExecutionPolicy Address of the contract ensuring protocol's withdrawal requirements are met.
     /// @param policyRegistry Address of the PolicyRegistry contract used to look up policies by ID.
     constructor(
         uint256 accountingChainId,
@@ -63,19 +63,19 @@ contract EarningChainGateway is
         address priceOracle,
         address iouTokenManager,
         address transferHelper,
-        address withdrawalPolicy,
+        address withdrawalExecutionPolicy,
         address policyRegistry
     )
         TransferHelperClient(transferHelper)
         BaseChainGateway(iouTokenManager)
         LocalBalanceAggregator(allocator, priceOracle)
     {
-        require(withdrawalPolicy != address(0), Errors.ZeroAddress());
+        require(withdrawalExecutionPolicy != address(0), Errors.ZeroAddress());
         require(policyRegistry != address(0), Errors.ZeroAddress());
         require(accountingChainId != 0 && accountingChainId != block.chainid, Errors.InvalidParameter());
         _disableInitializers();
         ACCOUNTING_CHAIN_ID = accountingChainId;
-        WITHDRAWAL_POLICY = withdrawalPolicy;
+        WITHDRAWAL_EXECUTION_POLICY = withdrawalExecutionPolicy;
         POLICY_REGISTRY = policyRegistry;
     }
 
@@ -107,7 +107,7 @@ contract EarningChainGateway is
         address bridgeAdapter,
         uint256 gasLimit,
         bytes calldata bridgeAdapterData,
-        bytes memory withdrawalPolicyData
+        bytes memory withdrawalExecutionPolicyData
     ) external payable virtual override nonReentrant assertingTransferHelperBalanceFor(assetOut) returns (uint256) {
         require(iouTokenAmountRay > 0, Errors.ZeroAmount());
         // An insufficient destination gasLimit would cause the BURN_IOU_TOKEN message to be dropped while
@@ -115,7 +115,8 @@ contract EarningChainGateway is
         require(gasLimit >= MIN_BURN_IOU_TOKEN_GAS_LIMIT, Errors.InvalidGasLimit());
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(msg.sender, iouTokenAmountRay);
 
-        uint256 amountOut = _getWithdrawalAmountOut(iouTokenAmountRay, assetOut, minAmountOut, withdrawalPolicyData);
+        uint256 amountOut =
+            _getWithdrawalAmountOut(iouTokenAmountRay, assetOut, minAmountOut, withdrawalExecutionPolicyData);
         IAllocator(ALLOCATOR).withdraw(assetOut, amountOut);
 
         // Send data to synchronize the Accounting Chain's state.
@@ -215,12 +216,15 @@ contract EarningChainGateway is
         uint256 iouTokenAmountRay,
         address assetOut,
         uint256 minAmountOut,
-        bytes memory withdrawalPolicyData
+        bytes memory withdrawalExecutionPolicyData
     ) private returns (uint256) {
-        uint256 amountOutRay = IWithdrawalPolicy(WITHDRAWAL_POLICY)
-            .applyWithdrawalPolicy(
-                IWithdrawalPolicy.WithdrawalRequest({
-                user: msg.sender, assetOut: assetOut, iouAmountRay: iouTokenAmountRay, data: withdrawalPolicyData
+        uint256 amountOutRay = IWithdrawalExecutionPolicy(WITHDRAWAL_EXECUTION_POLICY)
+            .applyWithdrawalExecutionPolicy(
+                IWithdrawalExecutionPolicy.WithdrawalExecutionPolicyRequest({
+                user: msg.sender,
+                assetOut: assetOut,
+                iouAmountRay: iouTokenAmountRay,
+                data: withdrawalExecutionPolicyData
             })
             );
         // Note: The rayToAssetDecimals conversion truncates, so the user may burn slightly more IOUs than the

@@ -135,7 +135,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     function _setup_Targets(address deployer) internal virtual {
         _setupTarget__CcipAdapter(deployer);
         _setupTarget__Allocator(deployer);
-        _setupTarget__WithdrawalPolicy(deployer);
+        _setupTarget__WithdrawalExecutionPolicy(deployer);
         _setupTarget__AssetRegistry(deployer);
         _setupTarget__PriceOracle(deployer);
         _setupTarget__PolicyRegistry(deployer);
@@ -354,8 +354,8 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         _setTargetFunctionRoles(allocator, roles);
     }
 
-    function _setupTarget__WithdrawalPolicy(address deployer) internal {
-        address withdrawalPolicy = getWithdrawalPolicyAddress(deployer);
+    function _setupTarget__WithdrawalExecutionPolicy(address deployer) internal {
+        address withdrawalExecutionPolicy = getWithdrawalExecutionPolicyAddress(deployer);
 
         RolesConfig.Role[] memory roles = new RolesConfig.Role[](4);
 
@@ -364,7 +364,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         roles[2] = RolesConfig.getRole__addSigner();
         roles[3] = RolesConfig.getRole__removeSigner();
 
-        _setTargetFunctionRoles(withdrawalPolicy, roles);
+        _setTargetFunctionRoles(withdrawalExecutionPolicy, roles);
     }
 
     function _setupTarget__AssetRegistry(address deployer) internal {

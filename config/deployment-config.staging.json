@@ -19,7 +19,7 @@
     "aTokenVaultRewardClaimer": "0xE49D14D7157412da6145a155DaeFdD1cA069f626",
     "stableVaultManager": "0x4B0353F7B7122862487d22C447bd9cDc91779133"
   },
-  "withdrawalPolicy": {
+  "withdrawalExecutionPolicy": {
     "defaultFeeBps": 625,
     "signer": "0x8eFCe8C8cF3d1B198D95B3067EcF43Fb0A1039e2"
   },

@@ -21,12 +21,12 @@ import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
 import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
-import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
+import {IWithdrawalExecutionPolicy} from "src/interfaces/IWithdrawalExecutionPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {PolicyRegistry} from "src/periphery/PolicyRegistry.sol";
-import {WithdrawalPolicy} from "src/policies/WithdrawalPolicy.sol";
+import {WithdrawalExecutionPolicy} from "src/policies/WithdrawalExecutionPolicy.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
@@ -65,7 +65,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     MockAssetRegistry internal _mockAssetRegistry;
     PriceOracle internal _priceOracle;
     MockTransferHelper internal _mockTransferHelper;
-    WithdrawalPolicy internal _mockWithdrawalPolicy;
+    WithdrawalExecutionPolicy internal _mockWithdrawalExecutionPolicy;
     PolicyRegistry internal _policyRegistry;
 
     EarningChainGateway internal _earningChainGateway;
@@ -76,7 +76,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         address allocator,
         address priceOracle,
         address transferHelper,
-        address withdrawalPolicy,
+        address withdrawalExecutionPolicy,
         address policyRegistry
     ) internal returns (EarningChainGateway) {
         address earningChainGatewayImpl = address(
@@ -86,7 +86,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 priceOracle,
                 iouTokenManager,
                 transferHelper,
-                withdrawalPolicy,
+                withdrawalExecutionPolicy,
                 policyRegistry
             )
         );
@@ -110,15 +110,17 @@ contract EarningChainGatewayTest is TestWithHelpers {
         return earningChainGateway;
     }
 
-    function _deployWithdrawalPolicy(address accessManager, address withdrawalPolicyApplier)
+    function _deployWithdrawalExecutionPolicy(address accessManager, address withdrawalExecutionPolicyApplier)
         internal
-        returns (WithdrawalPolicy)
+        returns (WithdrawalExecutionPolicy)
     {
-        address withdrawalPolicyImpl = address(new WithdrawalPolicy(withdrawalPolicyApplier));
-        return WithdrawalPolicy(
+        address withdrawalExecutionPolicyImpl = address(new WithdrawalExecutionPolicy(withdrawalExecutionPolicyApplier));
+        return WithdrawalExecutionPolicy(
             address(
                 new TransparentUpgradeableProxy(
-                    withdrawalPolicyImpl, address(this), abi.encodeCall(WithdrawalPolicy.initialize, (accessManager, 0))
+                    withdrawalExecutionPolicyImpl,
+                    address(this),
+                    abi.encodeCall(WithdrawalExecutionPolicy.initialize, (accessManager, 0))
                 )
             )
         );
@@ -153,11 +155,12 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         _policyRegistry = new PolicyRegistry(address(_mockAccessManager));
 
-        // Predict gateway proxy address after WithdrawalPolicy impl+proxy and gateway impl deployments.
+        // Predict gateway proxy address after WithdrawalExecutionPolicy impl+proxy and gateway impl deployments.
         uint256 deployerNonce = vm.getNonce(address(this));
         address expectedGatewayProxy = vm.computeCreateAddress(address(this), deployerNonce + 3);
 
-        _mockWithdrawalPolicy = _deployWithdrawalPolicy(address(_mockAccessManager), expectedGatewayProxy);
+        _mockWithdrawalExecutionPolicy =
+            _deployWithdrawalExecutionPolicy(address(_mockAccessManager), expectedGatewayProxy);
 
         _earningChainGateway = _deployEarningChainGateway(
             _mockAccessManager,
@@ -165,7 +168,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockAllocator),
             address(_priceOracle),
             address(_mockTransferHelper),
-            address(_mockWithdrawalPolicy),
+            address(_mockWithdrawalExecutionPolicy),
             address(_policyRegistry)
         );
     }
@@ -178,12 +181,12 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_priceOracle),
             address(_mockIouTokenManager),
             address(0),
-            address(_mockWithdrawalPolicy),
+            address(_mockWithdrawalExecutionPolicy),
             address(_policyRegistry)
         );
     }
 
-    function test_constructor_reverts_ifWithdrawalPolicyIsZeroAddress() public {
+    function test_constructor_reverts_ifWithdrawalExecutionPolicyIsZeroAddress() public {
         vm.expectRevert(Errors.ZeroAddress.selector);
         new EarningChainGateway(
             ACCOUNTING_CHAIN_ID,
@@ -204,7 +207,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_priceOracle),
             address(_mockIouTokenManager),
             address(_mockTransferHelper),
-            address(_mockWithdrawalPolicy),
+            address(_mockWithdrawalExecutionPolicy),
             address(_policyRegistry)
         );
     }
@@ -217,7 +220,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_priceOracle),
             address(_mockIouTokenManager),
             address(_mockTransferHelper),
-            address(_mockWithdrawalPolicy),
+            address(_mockWithdrawalExecutionPolicy),
             address(_policyRegistry)
         );
     }
@@ -230,7 +233,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_priceOracle),
             address(0),
             address(_mockTransferHelper),
-            address(_mockWithdrawalPolicy),
+            address(_mockWithdrawalExecutionPolicy),
             address(_policyRegistry)
         );
     }
@@ -688,8 +691,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
         uint256 iouTokenAmountRay = 1e21;
 
         vm.mockCall(
-            address(_mockWithdrawalPolicy),
-            abi.encodeWithSelector(IWithdrawalPolicy.applyWithdrawalPolicy.selector),
+            address(_mockWithdrawalExecutionPolicy),
+            abi.encodeWithSelector(IWithdrawalExecutionPolicy.applyWithdrawalExecutionPolicy.selector),
             abi.encode(uint256(0)) // amountOutRay = 0, simulating 100% fee
         );
 
@@ -742,9 +745,11 @@ contract EarningChainGatewayTest is TestWithHelpers {
         _mockTransferHelper.mockAsset(address(_mockUnsupportedAsset), amountOut);
 
         vm.mockCall(
-            address(_mockWithdrawalPolicy),
+            address(_mockWithdrawalExecutionPolicy),
             abi.encodeWithSelector(
-                IWithdrawalPolicy.applyWithdrawalPolicy.selector, address(_mockUnsupportedAsset), iouTokenAmountRay
+                IWithdrawalExecutionPolicy.applyWithdrawalExecutionPolicy.selector,
+                address(_mockUnsupportedAsset),
+                iouTokenAmountRay
             ),
             abi.encode(iouTokenAmountRay)
         );

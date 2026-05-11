@@ -23,7 +23,7 @@ import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
-import {WithdrawalPolicy} from "src/policies/WithdrawalPolicy.sol";
+import {WithdrawalExecutionPolicy} from "src/policies/WithdrawalExecutionPolicy.sol";
 
 abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -421,17 +421,19 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         );
     }
 
-    function test_targetSetup_withdrawalPolicy() public view {
-        address target = getWithdrawalPolicyAddress(_deployer());
+    function test_targetSetup_withdrawalExecutionPolicy() public view {
+        address target = getWithdrawalExecutionPolicyAddress(_deployer());
         _assertTargetFunctionRole(
-            target, WithdrawalPolicy.setAssetFeeBps.selector, RolesConfig.getRole__setAssetFeeBps().roleId
+            target, WithdrawalExecutionPolicy.setAssetFeeBps.selector, RolesConfig.getRole__setAssetFeeBps().roleId
         );
         _assertTargetFunctionRole(
-            target, WithdrawalPolicy.setDefaultFeeBps.selector, RolesConfig.getRole__setDefaultFeeBps().roleId
+            target, WithdrawalExecutionPolicy.setDefaultFeeBps.selector, RolesConfig.getRole__setDefaultFeeBps().roleId
         );
-        _assertTargetFunctionRole(target, WithdrawalPolicy.addSigner.selector, RolesConfig.getRole__addSigner().roleId);
         _assertTargetFunctionRole(
-            target, WithdrawalPolicy.removeSigner.selector, RolesConfig.getRole__removeSigner().roleId
+            target, WithdrawalExecutionPolicy.addSigner.selector, RolesConfig.getRole__addSigner().roleId
+        );
+        _assertTargetFunctionRole(
+            target, WithdrawalExecutionPolicy.removeSigner.selector, RolesConfig.getRole__removeSigner().roleId
         );
     }
 
@@ -546,7 +548,11 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         address wpm = _getProfile__WithdrawalPolicyManager();
 
         _assertCanCall(
-            wpm, getWithdrawalPolicyAddress(_deployer()), WithdrawalPolicy.setDefaultFeeBps.selector, true, 0
+            wpm,
+            getWithdrawalExecutionPolicyAddress(_deployer()),
+            WithdrawalExecutionPolicy.setDefaultFeeBps.selector,
+            true,
+            0
         );
         // Unauthorized
         _assertCanCall(wpm, getAllocatorAddress(_deployer()), IAllocator.rebalance.selector, false, 0);

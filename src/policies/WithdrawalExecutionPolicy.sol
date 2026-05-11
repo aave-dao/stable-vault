@@ -11,11 +11,11 @@ import {EfficientHashLib} from "@solady/utils/EfficientHashLib.sol";
 
 import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 
-import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
+import {IWithdrawalExecutionPolicy} from "src/interfaces/IWithdrawalExecutionPolicy.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
-/// @title WithdrawalPolicy
+/// @title WithdrawalExecutionPolicy
 /// @author Aave Labs
 /// @notice Contract that enforces conditions during withdrawal executions (i.e. when exchanging IOUs for assets).
 /// @dev This contract does not control who can withdraw, all users have the right to do so. Thus, the conditions
@@ -27,7 +27,7 @@ import {Errors} from "src/types/Errors.sol";
 /// a personal fee denominated in RAY to charge an exact amount; this signed amount is clamped to the asset's bp cap,
 /// with the cap amount rounded up in favor of the protocol.
 /// @custom:upgradeable
-contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithdrawalPolicy {
+contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithdrawalExecutionPolicy {
     /// @notice Emitted when a nonce is marked as used, either by a successful appliance of the withdrawal policy or by
     /// a nonce invalidation.
     event NonceUsed(address indexed signer, uint256 indexed nonce);
@@ -61,9 +61,9 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     /// @dev The maximum fee in basis points that can be applied to a withdrawal. Set to 10.00%.
     uint16 internal constant FEE_CAP_BPS = 10_00;
 
-    address internal immutable WITHDRAWAL_POLICY_APPLIER;
+    address internal immutable WITHDRAWAL_EXECUTION_POLICY_APPLIER;
 
-    /// @notice Signed personal fee data (decoded from WithdrawalRequest.data).
+    /// @notice Signed personal fee data (decoded from WithdrawalExecutionPolicyRequest.data).
     /// @param personalFeeAmountRay The personal fee amount in RAY signed by a whitelisted signer. Used directly as
     /// the fee charged, capped by the asset-specific bp limit.
     /// @param nonce Unique nonce to prevent signature replay.
@@ -84,69 +84,78 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
         bool isSet;
     }
 
-    /// @custom:storage-location erc7201:aave.storage.WithdrawalPolicy
-    struct WithdrawalPolicyStorage {
+    /// @custom:storage-location erc7201:aave.storage.WithdrawalExecutionPolicy
+    struct WithdrawalExecutionPolicyStorage {
         uint16 defaultFeeBps;
         mapping(address asset => AssetFeeConfig config) assetFeeConfigs;
         mapping(address account => bool isSigner) isSigner;
         mapping(address signer => mapping(uint256 nonce => bool used)) wasNonceUsed;
     }
 
-    // keccak256(abi.encode(uint256(keccak256("aave.storage.WithdrawalPolicy")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant STORAGE_SLOT_WITHDRAWAL_POLICY =
-        0x48eb1b6299cf8fd4c062909cb421828ec45d2e192a5da81d7bd68b7aecc6f800;
+    // keccak256(abi.encode(uint256(keccak256("aave.storage.WithdrawalExecutionPolicy")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant STORAGE_SLOT_WITHDRAWAL_EXECUTION_POLICY =
+        0xe0ede6c18863c23819b4a5a3a3bb65fcec772573189c09b6a86a044b146cb900;
 
-    function $storage() private pure returns (WithdrawalPolicyStorage storage _storage) {
+    function $storage() private pure returns (WithdrawalExecutionPolicyStorage storage _storage) {
         assembly {
-            _storage.slot := STORAGE_SLOT_WITHDRAWAL_POLICY
+            _storage.slot := STORAGE_SLOT_WITHDRAWAL_EXECUTION_POLICY
         }
     }
 
-    modifier onlyWithdrawalPolicyApplier() {
-        require(msg.sender == WITHDRAWAL_POLICY_APPLIER, Errors.NotAuthorized());
+    modifier onlyWithdrawalExecutionPolicyApplier() {
+        require(msg.sender == WITHDRAWAL_EXECUTION_POLICY_APPLIER, Errors.NotAuthorized());
         _;
     }
 
     /// @dev Constructor.
-    /// @param withdrawalPolicyApplier Address allowed to apply the withdrawal policy.
-    constructor(address withdrawalPolicyApplier) EIP712Upgradeable() {
-        require(withdrawalPolicyApplier != address(0), Errors.ZeroAddress());
+    /// @param withdrawalExecutionPolicyApplier Address allowed to apply the withdrawal policy.
+    constructor(address withdrawalExecutionPolicyApplier) EIP712Upgradeable() {
+        require(withdrawalExecutionPolicyApplier != address(0), Errors.ZeroAddress());
         _disableInitializers();
-        WITHDRAWAL_POLICY_APPLIER = withdrawalPolicyApplier;
+        WITHDRAWAL_EXECUTION_POLICY_APPLIER = withdrawalExecutionPolicyApplier;
     }
 
     /// @dev Initializer.
     /// @param accessManager The address of the IAccessManager contract used for handling access control.
     /// @param defaultFeeBps The initial default fee in basis points.
     function initialize(address accessManager, uint16 defaultFeeBps) external virtual initializer {
-        __WithdrawalPolicy_init(accessManager, defaultFeeBps);
+        __WithdrawalExecutionPolicy_init(accessManager, defaultFeeBps);
     }
 
-    function __WithdrawalPolicy_init(address accessManager, uint16 defaultFeeBps) internal virtual onlyInitializing {
+    function __WithdrawalExecutionPolicy_init(address accessManager, uint16 defaultFeeBps)
+        internal
+        virtual
+        onlyInitializing
+    {
         IAccessManager(accessManager).canCall(address(0), address(0), bytes4(0));
         __AccessManaged_init(accessManager);
-        __EIP712_init("WithdrawalPolicy", "1");
+        __EIP712_init("WithdrawalExecutionPolicy", "1");
         _setDefaultFeeBps(defaultFeeBps);
     }
 
-    /// @inheritdoc IWithdrawalPolicy
-    function applyWithdrawalPolicy(WithdrawalRequest calldata request)
+    /// @inheritdoc IWithdrawalExecutionPolicy
+    function applyWithdrawalExecutionPolicy(WithdrawalExecutionPolicyRequest calldata request)
         external
         override
-        onlyWithdrawalPolicyApplier
+        onlyWithdrawalExecutionPolicyApplier
         returns (uint256)
     {
-        (uint256 amountOutRay, address signer, uint256 nonce) = _previewWithdrawalPolicy(request);
+        (uint256 amountOutRay, address signer, uint256 nonce) = _previewWithdrawalExecutionPolicy(request);
         if (signer != address(0)) {
             _markNonceAsUsed(signer, nonce);
         }
-        emit WithdrawalPolicyApplied(request.user, request.assetOut, request.iouAmountRay, amountOutRay);
+        emit WithdrawalExecutionPolicyApplied(request.user, request.assetOut, request.iouAmountRay, amountOutRay);
         return amountOutRay;
     }
 
-    /// @inheritdoc IWithdrawalPolicy
-    function previewWithdrawalPolicy(WithdrawalRequest calldata request) external view override returns (uint256) {
-        (uint256 amountOutRay,,) = _previewWithdrawalPolicy(request);
+    /// @inheritdoc IWithdrawalExecutionPolicy
+    function previewWithdrawalExecutionPolicy(WithdrawalExecutionPolicyRequest calldata request)
+        external
+        view
+        override
+        returns (uint256)
+    {
+        (uint256 amountOutRay,,) = _previewWithdrawalExecutionPolicy(request);
         return amountOutRay;
     }
 
@@ -243,7 +252,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     /// @return amountOutRay The amount of assets the user would receive (in RAY) after the fee is applied.
     /// @return signer The address that signed the personal fee, or `address(0)` when no signed data was supplied.
     /// @return nonce The nonce from the signed personal fee (only meaningful when `signer != address(0)`).
-    function _previewWithdrawalPolicy(WithdrawalRequest calldata request)
+    function _previewWithdrawalExecutionPolicy(WithdrawalExecutionPolicyRequest calldata request)
         internal
         view
         returns (uint256 amountOutRay, address signer, uint256 nonce)
@@ -269,7 +278,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     /// @return signer The address that signed the personal fee.
     /// @return nonce The nonce from the signed personal fee.
     /// @return personalFeeAmountRay The personal fee amount (in RAY) from the signed data.
-    function _verifySignedFee(WithdrawalRequest calldata request)
+    function _verifySignedFee(WithdrawalExecutionPolicyRequest calldata request)
         internal
         view
         returns (address signer, uint256 nonce, uint256 personalFeeAmountRay)
@@ -286,7 +295,7 @@ contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithd
     }
 
     /// @dev Recovers the signer address from the EIP-712 signature.
-    function _recoverSigner(WithdrawalRequest calldata request, SignedFee memory signedFee)
+    function _recoverSigner(WithdrawalExecutionPolicyRequest calldata request, SignedFee memory signedFee)
         internal
         view
         returns (address)

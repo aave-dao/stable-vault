@@ -20,7 +20,7 @@ import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
-import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
+import {IWithdrawalExecutionPolicy} from "src/interfaces/IWithdrawalExecutionPolicy.sol";
 import {IWithdrawalRequestPolicy} from "src/interfaces/IWithdrawalRequestPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
@@ -82,7 +82,7 @@ contract StableVault is
 
     address internal immutable FUNDS_HANDLER;
 
-    address internal immutable WITHDRAWAL_POLICY;
+    address internal immutable WITHDRAWAL_EXECUTION_POLICY;
 
     address internal immutable PRICE_ORACLE;
 
@@ -154,8 +154,8 @@ contract StableVault is
     /// @param iouTokenManager The address of the address that manages the supply of IOUs.
     /// @param fundsHandler The address of the contract that handles funds of the accounting chain.
     /// @param transferHelper The address of the contract that helps minimize the number of transfers across flows.
-    /// @param withdrawalPolicy The address of the contract ensuring protocol's withdrawal requirements are met.
-    /// @param priceOracle The address of the PriceOracle contract.
+    /// @param withdrawalExecutionPolicy The address of the contract ensuring protocol's withdrawal requirements are
+    /// met. @param priceOracle The address of the PriceOracle contract.
     /// @param maxActiveSubVaults The maximum number of active sub-vaults allowed.
     /// @param policyRegistry The address of the PolicyRegistry contract used to look up policies by ID.
     constructor(
@@ -164,7 +164,7 @@ contract StableVault is
         address iouTokenManager,
         address fundsHandler,
         address transferHelper,
-        address withdrawalPolicy,
+        address withdrawalExecutionPolicy,
         address priceOracle,
         uint256 maxActiveSubVaults,
         address policyRegistry
@@ -172,7 +172,7 @@ contract StableVault is
         require(assetRegistry != address(0), Errors.ZeroAddress());
         require(iouTokenManager != address(0), Errors.ZeroAddress());
         require(fundsHandler != address(0), Errors.ZeroAddress());
-        require(withdrawalPolicy != address(0), Errors.ZeroAddress());
+        require(withdrawalExecutionPolicy != address(0), Errors.ZeroAddress());
         require(priceOracle != address(0), Errors.ZeroAddress());
         require(policyRegistry != address(0), Errors.ZeroAddress());
         require(maxValidPerSecondRate > MathLib.RAY, InvalidRate());
@@ -181,7 +181,7 @@ contract StableVault is
         ASSET_REGISTRY = assetRegistry;
         IOU_TOKEN_MANAGER = iouTokenManager;
         FUNDS_HANDLER = fundsHandler;
-        WITHDRAWAL_POLICY = withdrawalPolicy;
+        WITHDRAWAL_EXECUTION_POLICY = withdrawalExecutionPolicy;
         PRICE_ORACLE = priceOracle;
         MAX_VALID_PER_SECOND_RATE = maxValidPerSecondRate;
         MAX_ACTIVE_SUB_VAULTS = maxActiveSubVaults;
@@ -270,7 +270,7 @@ contract StableVault is
     }
 
     /// @notice Transfers Stable Vault balance (denominated in RAY) between users.
-    /// @dev This is accounting-only (no IOUs, no assets, no WithdrawalPolicy).
+    /// @dev This is accounting-only (no IOUs, no assets, no WithdrawalExecutionPolicy).
     /// @dev For full balance transfers, use transferAll() instead.
     /// @dev Reverts if the remaining sender balance after transfer would be below dust threshold.
     /// @dev The sender's principal (`originalDepositRay`) is decremented by up to `amountRay` and the same principal
@@ -455,15 +455,15 @@ contract StableVault is
         address assetOut,
         uint256 minAmountOut,
         uint256 iouAmountRay,
-        bytes memory withdrawalPolicyData
+        bytes memory withdrawalExecutionPolicyData
     ) external virtual override nonReentrant assertingTransferHelperBalanceFor(assetOut) {
         require(user == msg.sender, OnlyUser());
         require(iouAmountRay > 0, Errors.ZeroAmount());
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(user, iouAmountRay);
-        uint256 amountOutRay = IWithdrawalPolicy(WITHDRAWAL_POLICY)
-            .applyWithdrawalPolicy(
-                IWithdrawalPolicy.WithdrawalRequest({
-                user: user, assetOut: assetOut, iouAmountRay: iouAmountRay, data: withdrawalPolicyData
+        uint256 amountOutRay = IWithdrawalExecutionPolicy(WITHDRAWAL_EXECUTION_POLICY)
+            .applyWithdrawalExecutionPolicy(
+                IWithdrawalExecutionPolicy.WithdrawalExecutionPolicyRequest({
+                user: user, assetOut: assetOut, iouAmountRay: iouAmountRay, data: withdrawalExecutionPolicyData
             })
             );
         // Note: The `rayToAssetDecimals` conversion truncates, so the user may burn slightly more IOUs than the

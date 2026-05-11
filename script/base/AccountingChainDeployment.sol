@@ -40,7 +40,7 @@ import {Swapper} from "src/periphery/Swapper.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
 import {DepositPolicy} from "src/policies/DepositPolicy.sol";
 import {FundsBridgingPolicy} from "src/policies/FundsBridgingPolicy.sol";
-import {WithdrawalPolicy} from "src/policies/WithdrawalPolicy.sol";
+import {WithdrawalExecutionPolicy} from "src/policies/WithdrawalExecutionPolicy.sol";
 import {MockBundleFeed} from "test/mocks/MockBundleFeed.sol";
 import {MockSequencerUptimeFeed} from "test/mocks/MockSequencerUptimeFeed.sol";
 
@@ -54,7 +54,7 @@ abstract contract AccountingChainDeployment is
     address immutable PROXY_ADMIN_OWNER = getAccessManagerAddress(_deployer());
     address immutable STABLE_VAULT_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
     address immutable ALLOCATOR_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
-    address immutable WITHDRAWAL_POLICY_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
+    address immutable WITHDRAWAL_EXECUTION_POLICY_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
     address immutable ASSET_REGISTRY_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
     address immutable GATEWAY_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
     address immutable IOU_TOKEN_MANAGER_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
@@ -140,7 +140,7 @@ abstract contract AccountingChainDeployment is
         );
 
         // Validate withdrawal policy signer
-        require(_configAddress(".withdrawalPolicy.signer") != address(0), "Withdrawal policy signer not set");
+        require(_configAddress(".withdrawalExecutionPolicy.signer") != address(0), "Withdrawal policy signer not set");
     }
 
     function _deployContracts() internal {
@@ -158,7 +158,7 @@ abstract contract AccountingChainDeployment is
         _deployAccessManager();
         _deployAssetRegistry();
         _deployPolicyRegistry();
-        _deployWithdrawalPolicy();
+        _deployWithdrawalExecutionPolicy();
         _deployIouToken();
         _deployIouTokenManager();
         _deployPriceOracle();
@@ -178,7 +178,7 @@ abstract contract AccountingChainDeployment is
         _setupAssetRegistry();
         _setupAllocator();
         _setupFundsHandler();
-        _setupWithdrawalPolicy();
+        _setupWithdrawalExecutionPolicy();
         _setupPriceOracleAdapters();
         _setupChainBalanceOracleAdapters();
         _setupDepositPolicy();
@@ -247,10 +247,11 @@ abstract contract AccountingChainDeployment is
         fundsHandler.addEarningChain(_configUint(".earningChain.chainId"));
     }
 
-    function _setupWithdrawalPolicy() internal {
-        WithdrawalPolicy withdrawalPolicy = WithdrawalPolicy(getWithdrawalPolicyAddress(_deployer()));
-        withdrawalPolicy.setDefaultFeeBps(uint16(_configUint(".withdrawalPolicy.defaultFeeBps")));
-        withdrawalPolicy.addSigner(_configAddress(".withdrawalPolicy.signer"));
+    function _setupWithdrawalExecutionPolicy() internal {
+        WithdrawalExecutionPolicy withdrawalExecutionPolicy =
+            WithdrawalExecutionPolicy(getWithdrawalExecutionPolicyAddress(_deployer()));
+        withdrawalExecutionPolicy.setDefaultFeeBps(uint16(_configUint(".withdrawalExecutionPolicy.defaultFeeBps")));
+        withdrawalExecutionPolicy.addSigner(_configAddress(".withdrawalExecutionPolicy.signer"));
     }
 
     function _setupAssetRegistry() internal {
@@ -305,22 +306,24 @@ abstract contract AccountingChainDeployment is
         return assetRegistry;
     }
 
-    function _deployWithdrawalPolicy() internal returns (address) {
-        address implementation = address(new WithdrawalPolicy(getStableVaultAddress(_deployer())));
-        _logDeployment("WithdrawalPolicy::Implementation", "", implementation);
-        address withdrawalPolicy = _deployTransparentProxy_create3({
-            namespacedSaltSeed: WITHDRAWAL_POLICY_SALT_SEED,
+    function _deployWithdrawalExecutionPolicy() internal returns (address) {
+        address implementation = address(new WithdrawalExecutionPolicy(getStableVaultAddress(_deployer())));
+        _logDeployment("WithdrawalExecutionPolicy::Implementation", "", implementation);
+        address withdrawalExecutionPolicy = _deployTransparentProxy_create3({
+            namespacedSaltSeed: WITHDRAWAL_EXECUTION_POLICY_SALT_SEED,
             deployer: _deployer(),
             implementation: implementation,
-            proxyAdminOwner: WITHDRAWAL_POLICY_PROXY_ADMIN_OWNER,
-            initCalldata: abi.encodeCall(WithdrawalPolicy.initialize, (getAccessManagerAddress(_deployer()), 0))
+            proxyAdminOwner: WITHDRAWAL_EXECUTION_POLICY_PROXY_ADMIN_OWNER,
+            initCalldata: abi.encodeCall(
+                WithdrawalExecutionPolicy.initialize, (getAccessManagerAddress(_deployer()), 0)
+            )
         });
         require(
-            withdrawalPolicy == getWithdrawalPolicyAddress(_deployer()),
-            "WithdrawalPolicy does not match expected address"
+            withdrawalExecutionPolicy == getWithdrawalExecutionPolicyAddress(_deployer()),
+            "WithdrawalExecutionPolicy does not match expected address"
         );
-        _logDeployment("WithdrawalPolicy", WITHDRAWAL_POLICY_SALT_SEED, withdrawalPolicy);
-        return withdrawalPolicy;
+        _logDeployment("WithdrawalExecutionPolicy", WITHDRAWAL_EXECUTION_POLICY_SALT_SEED, withdrawalExecutionPolicy);
+        return withdrawalExecutionPolicy;
     }
 
     function _deployIouToken() internal returns (address) {
@@ -374,7 +377,7 @@ abstract contract AccountingChainDeployment is
                 iouTokenManager: getIouTokenManagerAddress(_deployer()),
                 fundsHandler: getFundsHandlerAddress(_deployer()),
                 transferHelper: getTransferHelperAddress(_deployer()),
-                withdrawalPolicy: getWithdrawalPolicyAddress(_deployer()),
+                withdrawalExecutionPolicy: getWithdrawalExecutionPolicyAddress(_deployer()),
                 priceOracle: getPriceOracleAddress(_deployer()),
                 maxActiveSubVaults: _configUint(".accountingChain.defaultMaxActiveSubVaults"),
                 policyRegistry: getPolicyRegistryAddress(_deployer())

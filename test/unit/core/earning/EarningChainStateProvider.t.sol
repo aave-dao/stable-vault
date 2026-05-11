@@ -49,7 +49,7 @@ contract EarningChainStateProviderTest is TestWithHelpers {
 
         MockDummyIouTokenManager mockIouTokenManager = new MockDummyIouTokenManager();
 
-        address withdrawalPolicy = makeAddr("withdrawalPolicy");
+        address withdrawalExecutionPolicy = makeAddr("withdrawalExecutionPolicy");
         PolicyRegistry policyRegistry = new PolicyRegistry(address(_mockAccessManager));
 
         address earningChainGatewayImpl = address(
@@ -59,7 +59,7 @@ contract EarningChainStateProviderTest is TestWithHelpers {
                 _priceOracle,
                 address(mockIouTokenManager),
                 address(_mockTransferHelper),
-                withdrawalPolicy,
+                withdrawalExecutionPolicy,
                 address(policyRegistry)
             )
         );

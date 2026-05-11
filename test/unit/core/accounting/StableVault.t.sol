@@ -17,12 +17,12 @@ import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {IStableVault} from "src/interfaces/IStableVault.sol";
-import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
+import {IWithdrawalExecutionPolicy} from "src/interfaces/IWithdrawalExecutionPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {PolicyRegistry} from "src/periphery/PolicyRegistry.sol";
-import {WithdrawalPolicy} from "src/policies/WithdrawalPolicy.sol";
+import {WithdrawalExecutionPolicy} from "src/policies/WithdrawalExecutionPolicy.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
@@ -61,7 +61,7 @@ contract StableVaultTest is TestWithHelpers {
     MockIouTokenManager mockIouTokenManager;
     MockAssetRegistry mockAssetRegistry;
     MockTransferHelper mockTransferHelper;
-    WithdrawalPolicy mockWithdrawalPolicy;
+    WithdrawalExecutionPolicy mockWithdrawalExecutionPolicy;
     PolicyRegistry policyRegistry;
     PriceOracle mockPriceOracle;
     IStableVault stableVault;
@@ -164,15 +164,17 @@ contract StableVaultTest is TestWithHelpers {
         );
     }
 
-    function _deployWithdrawalPolicy(address accessManager, address withdrawalPolicyApplier)
+    function _deployWithdrawalExecutionPolicy(address accessManager, address withdrawalExecutionPolicyApplier)
         internal
-        returns (WithdrawalPolicy)
+        returns (WithdrawalExecutionPolicy)
     {
-        address withdrawalPolicyImpl = address(new WithdrawalPolicy(withdrawalPolicyApplier));
-        return WithdrawalPolicy(
+        address withdrawalExecutionPolicyImpl = address(new WithdrawalExecutionPolicy(withdrawalExecutionPolicyApplier));
+        return WithdrawalExecutionPolicy(
             address(
                 new TransparentUpgradeableProxy(
-                    withdrawalPolicyImpl, address(this), abi.encodeCall(WithdrawalPolicy.initialize, (accessManager, 0))
+                    withdrawalExecutionPolicyImpl,
+                    address(this),
+                    abi.encodeCall(WithdrawalExecutionPolicy.initialize, (accessManager, 0))
                 )
             )
         );
@@ -195,11 +197,13 @@ contract StableVaultTest is TestWithHelpers {
         // Mock validatePrice to pass for any asset (tests may create additional assets)
         _mockValidatePriceForAll(address(mockPriceOracle));
 
-        // Predict StableVault proxy address after WithdrawalPolicy impl+proxy and StableVault impl deployments.
+        // Predict StableVault proxy address after WithdrawalExecutionPolicy impl+proxy and StableVault impl
+        // deployments.
         uint256 deployerNonce = vm.getNonce(address(this));
         address expectedStableVaultProxy = vm.computeCreateAddress(address(this), deployerNonce + 3);
 
-        mockWithdrawalPolicy = _deployWithdrawalPolicy(address(mockAccessManager), expectedStableVaultProxy);
+        mockWithdrawalExecutionPolicy =
+            _deployWithdrawalExecutionPolicy(address(mockAccessManager), expectedStableVaultProxy);
         stableVault = _deployStableVault(
             address(mockAccessManager),
             DEFAULT_MAX_PER_SECOND_RATE,
@@ -208,7 +212,7 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
+            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
             treasury,
@@ -231,7 +235,7 @@ contract StableVaultTest is TestWithHelpers {
             expectedIouManager,
             expectedFundsHandler,
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
+            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
             address(policyRegistry)
@@ -250,7 +254,7 @@ contract StableVaultTest is TestWithHelpers {
             address(mockIouTokenManager),
             address(mockFundsHandler),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
+            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
             address(policyRegistry)
@@ -265,7 +269,7 @@ contract StableVaultTest is TestWithHelpers {
             address(mockIouTokenManager),
             address(mockFundsHandler),
             address(0),
-            address(mockWithdrawalPolicy),
+            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
             address(policyRegistry)
@@ -291,7 +295,7 @@ contract StableVaultTest is TestWithHelpers {
                 address(mockIouTokenManager),
                 address(mockFundsHandler),
                 address(mockTransferHelper),
-                address(mockWithdrawalPolicy),
+                address(mockWithdrawalExecutionPolicy),
                 address(mockPriceOracle),
                 DEFAULT_MAX_ACTIVE_SUB_VAULTS,
                 address(policyRegistry)
@@ -333,7 +337,7 @@ contract StableVaultTest is TestWithHelpers {
                 address(mockIouTokenManager),
                 address(mockFundsHandler),
                 address(mockTransferHelper),
-                address(mockWithdrawalPolicy),
+                address(mockWithdrawalExecutionPolicy),
                 address(mockPriceOracle),
                 DEFAULT_MAX_ACTIVE_SUB_VAULTS,
                 address(policyRegistry)
@@ -390,7 +394,7 @@ contract StableVaultTest is TestWithHelpers {
                 address(mockIouTokenManager),
                 address(mockFundsHandler),
                 address(mockTransferHelper),
-                address(mockWithdrawalPolicy),
+                address(mockWithdrawalExecutionPolicy),
                 address(mockPriceOracle),
                 DEFAULT_MAX_ACTIVE_SUB_VAULTS,
                 address(policyRegistry)
@@ -423,7 +427,7 @@ contract StableVaultTest is TestWithHelpers {
                 address(mockIouTokenManager),
                 address(mockFundsHandler),
                 address(mockTransferHelper),
-                address(mockWithdrawalPolicy),
+                address(mockWithdrawalExecutionPolicy),
                 address(mockPriceOracle),
                 DEFAULT_MAX_ACTIVE_SUB_VAULTS,
                 address(policyRegistry)
@@ -449,7 +453,7 @@ contract StableVaultTest is TestWithHelpers {
                 address(mockIouTokenManager),
                 address(mockFundsHandler),
                 address(mockTransferHelper),
-                address(mockWithdrawalPolicy),
+                address(mockWithdrawalExecutionPolicy),
                 address(mockPriceOracle),
                 DEFAULT_MAX_ACTIVE_SUB_VAULTS,
                 address(policyRegistry)
@@ -601,7 +605,7 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
+            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
             treasury,
@@ -903,7 +907,7 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
+            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             maxActiveSubVaults,
             treasury,
@@ -942,7 +946,7 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
+            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             maxActiveSubVaults,
             treasury,
@@ -990,7 +994,7 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
+            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             2, // MAX_ACTIVE_SUB_VAULTS
             treasury,
@@ -1042,7 +1046,7 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
+            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             2, // MAX_ACTIVE_SUB_VAULTS
             treasury,
@@ -1089,7 +1093,7 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
+            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
             treasury,
@@ -2235,7 +2239,7 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
+            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
             treasury,
@@ -2800,7 +2804,7 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
+            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
             treasury,
@@ -2842,7 +2846,7 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
+            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
             treasury,
@@ -2884,7 +2888,7 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
+            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
             treasury,
@@ -2924,7 +2928,7 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
+            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
             treasury,
@@ -3122,7 +3126,7 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
+            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
             treasury,
@@ -3376,7 +3380,7 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
+            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
             treasury,
@@ -3417,7 +3421,7 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
+            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
             treasury,
@@ -3459,7 +3463,7 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
+            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             maxActiveSubVaults,
             treasury,
@@ -3498,7 +3502,7 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
+            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             maxActiveSubVaults,
             treasury,
@@ -3741,8 +3745,10 @@ contract StableVaultTest is TestWithHelpers {
         mockIouToken.mint(user, iouAmountRay);
 
         vm.mockCall(
-            address(mockWithdrawalPolicy),
-            abi.encodeWithSelector(IWithdrawalPolicy.applyWithdrawalPolicy.selector, address(mockAsset), iouAmountRay),
+            address(mockWithdrawalExecutionPolicy),
+            abi.encodeWithSelector(
+                IWithdrawalExecutionPolicy.applyWithdrawalExecutionPolicy.selector, address(mockAsset), iouAmountRay
+            ),
             abi.encode(iouAmountRay)
         );
 
@@ -3822,8 +3828,8 @@ contract StableVaultTest is TestWithHelpers {
         vm.assume(iouAmountRay.rayToAssetDecimals(address(mockAsset)) > 0);
 
         vm.mockCall(
-            address(mockWithdrawalPolicy),
-            abi.encodeWithSelector(IWithdrawalPolicy.applyWithdrawalPolicy.selector),
+            address(mockWithdrawalExecutionPolicy),
+            abi.encodeWithSelector(IWithdrawalExecutionPolicy.applyWithdrawalExecutionPolicy.selector),
             abi.encode(uint256(0)) // amountOutRay = 0, simulating 100% fee
         );
 

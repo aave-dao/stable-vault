@@ -5,8 +5,8 @@ pragma solidity ^0.8.20;
 import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
-import {WithdrawalPolicy} from "src/policies/WithdrawalPolicy.sol";
+import {IWithdrawalExecutionPolicy} from "src/interfaces/IWithdrawalExecutionPolicy.sol";
+import {WithdrawalExecutionPolicy} from "src/policies/WithdrawalExecutionPolicy.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
@@ -14,8 +14,8 @@ import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
 import {MockAccessManager} from "test/mocks/MockAccessManager.sol";
 import {MockAssetRegistry} from "test/mocks/MockAssetRegistry.sol";
 
-contract WithdrawalPolicyTest is TestWithHelpers {
-    WithdrawalPolicy withdrawalPolicy;
+contract WithdrawalExecutionPolicyTest is TestWithHelpers {
+    WithdrawalExecutionPolicy withdrawalExecutionPolicy;
     MockAccessManager mockAccessManager;
     MockAssetRegistry mockAssetRegistry;
     address admin = makeAddr("admin");
@@ -26,15 +26,17 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
     uint16 constant FEE_CAP_BPS = 10_00; // 10.00%
 
-    function _deployWithdrawalPolicy(address accessManager, address withdrawalPolicyApplier)
+    function _deployWithdrawalExecutionPolicy(address accessManager, address withdrawalExecutionPolicyApplier)
         internal
-        returns (WithdrawalPolicy)
+        returns (WithdrawalExecutionPolicy)
     {
-        address withdrawalPolicyImpl = address(new WithdrawalPolicy(withdrawalPolicyApplier));
-        return WithdrawalPolicy(
+        address withdrawalExecutionPolicyImpl = address(new WithdrawalExecutionPolicy(withdrawalExecutionPolicyApplier));
+        return WithdrawalExecutionPolicy(
             address(
                 new TransparentUpgradeableProxy(
-                    withdrawalPolicyImpl, address(this), abi.encodeCall(WithdrawalPolicy.initialize, (accessManager, 0))
+                    withdrawalExecutionPolicyImpl,
+                    address(this),
+                    abi.encodeCall(WithdrawalExecutionPolicy.initialize, (accessManager, 0))
                 )
             )
         );
@@ -43,25 +45,25 @@ contract WithdrawalPolicyTest is TestWithHelpers {
     function setUp() public {
         mockAccessManager = new MockAccessManager(admin);
         mockAssetRegistry = new MockAssetRegistry();
-        withdrawalPolicy = _deployWithdrawalPolicy(address(mockAccessManager), address(this));
+        withdrawalExecutionPolicy = _deployWithdrawalExecutionPolicy(address(mockAccessManager), address(this));
     }
 
     // Helper to build WithdrawalRequest
     function _buildRequest(address user, address assetOut, uint256 iouAmountRay, bytes memory data)
         internal
         pure
-        returns (IWithdrawalPolicy.WithdrawalRequest memory)
+        returns (IWithdrawalExecutionPolicy.WithdrawalExecutionPolicyRequest memory)
     {
-        return IWithdrawalPolicy.WithdrawalRequest({
+        return IWithdrawalExecutionPolicy.WithdrawalExecutionPolicyRequest({
             user: user, assetOut: assetOut, iouAmountRay: iouAmountRay, data: data
         });
     }
 
     // Constructor tests
 
-    function test_constructor_reverts_ifWithdrawalPolicyApplierIsZeroAddress() public {
+    function test_constructor_reverts_ifWithdrawalExecutionPolicyApplierIsZeroAddress() public {
         vm.expectRevert(Errors.ZeroAddress.selector);
-        new WithdrawalPolicy(address(0));
+        new WithdrawalExecutionPolicy(address(0));
     }
 
     // Restricted functions access control tests
@@ -73,10 +75,10 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         bool isSet
     ) public {
         vm.assume(unauthorizedMsgSender != address(0));
-        _assumeNotProxyAdmin(unauthorizedMsgSender, address(withdrawalPolicy));
+        _assumeNotProxyAdmin(unauthorizedMsgSender, address(withdrawalExecutionPolicy));
 
         mockAccessManager.mockRejectCall(
-            unauthorizedMsgSender, address(withdrawalPolicy), WithdrawalPolicy.setAssetFeeBps.selector
+            unauthorizedMsgSender, address(withdrawalExecutionPolicy), WithdrawalExecutionPolicy.setAssetFeeBps.selector
         );
 
         vm.expectRevert(
@@ -84,7 +86,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         );
         vm.prank(unauthorizedMsgSender);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setAssetFeeBps(asset, uint16(newAssetFeeBps), isSet);
+        withdrawalExecutionPolicy.setAssetFeeBps(asset, uint16(newAssetFeeBps), isSet);
     }
 
     function test_setDefaultFeeBps_reverts_ifMsgSenderIsNotAuthorized(
@@ -92,10 +94,12 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         uint256 newDefaultFeeBps
     ) public {
         vm.assume(unauthorizedMsgSender != address(0));
-        _assumeNotProxyAdmin(unauthorizedMsgSender, address(withdrawalPolicy));
+        _assumeNotProxyAdmin(unauthorizedMsgSender, address(withdrawalExecutionPolicy));
 
         mockAccessManager.mockRejectCall(
-            unauthorizedMsgSender, address(withdrawalPolicy), WithdrawalPolicy.setDefaultFeeBps.selector
+            unauthorizedMsgSender,
+            address(withdrawalExecutionPolicy),
+            WithdrawalExecutionPolicy.setDefaultFeeBps.selector
         );
 
         vm.expectRevert(
@@ -103,37 +107,37 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         );
         vm.prank(unauthorizedMsgSender);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setDefaultFeeBps(uint16(newDefaultFeeBps));
+        withdrawalExecutionPolicy.setDefaultFeeBps(uint16(newDefaultFeeBps));
     }
 
     function test_addSigner_reverts_ifMsgSenderIsNotAuthorized(address unauthorizedMsgSender, address signer) public {
         vm.assume(unauthorizedMsgSender != address(0));
-        _assumeNotProxyAdmin(unauthorizedMsgSender, address(withdrawalPolicy));
+        _assumeNotProxyAdmin(unauthorizedMsgSender, address(withdrawalExecutionPolicy));
         mockAccessManager.mockRejectCall(
-            unauthorizedMsgSender, address(withdrawalPolicy), WithdrawalPolicy.addSigner.selector
+            unauthorizedMsgSender, address(withdrawalExecutionPolicy), WithdrawalExecutionPolicy.addSigner.selector
         );
 
         vm.expectRevert(
             abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
         );
         vm.prank(unauthorizedMsgSender);
-        withdrawalPolicy.addSigner(signer);
+        withdrawalExecutionPolicy.addSigner(signer);
     }
 
     function test_removeSigner_reverts_ifMsgSenderIsNotAuthorized(address unauthorizedMsgSender, address signer)
         public
     {
         vm.assume(unauthorizedMsgSender != address(0));
-        _assumeNotProxyAdmin(unauthorizedMsgSender, address(withdrawalPolicy));
+        _assumeNotProxyAdmin(unauthorizedMsgSender, address(withdrawalExecutionPolicy));
         mockAccessManager.mockRejectCall(
-            unauthorizedMsgSender, address(withdrawalPolicy), WithdrawalPolicy.removeSigner.selector
+            unauthorizedMsgSender, address(withdrawalExecutionPolicy), WithdrawalExecutionPolicy.removeSigner.selector
         );
 
         vm.expectRevert(
             abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
         );
         vm.prank(unauthorizedMsgSender);
-        withdrawalPolicy.removeSigner(signer);
+        withdrawalExecutionPolicy.removeSigner(signer);
     }
 
     // Setters & Getters tests
@@ -145,12 +149,12 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         vm.expectEmit(true, true, true, true);
         // forge-lint: disable-next-line(unsafe-typecast)
-        emit WithdrawalPolicy.AssetFeeBpsSet(asset, uint16(feeBps), isSet);
+        emit WithdrawalExecutionPolicy.AssetFeeBpsSet(asset, uint16(feeBps), isSet);
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setAssetFeeBps(asset, uint16(feeBps), isSet);
+        withdrawalExecutionPolicy.setAssetFeeBps(asset, uint16(feeBps), isSet);
 
-        WithdrawalPolicy.AssetFeeConfig memory config = withdrawalPolicy.getAssetFeeConfig(asset);
+        WithdrawalExecutionPolicy.AssetFeeConfig memory config = withdrawalExecutionPolicy.getAssetFeeConfig(asset);
         assertEq(config.feeBps, feeBps);
         assertEq(config.isSet, isSet);
     }
@@ -161,7 +165,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         vm.expectRevert(Errors.ZeroAddress.selector);
         vm.prank(admin);
-        withdrawalPolicy.setAssetFeeBps(address(0), feeBps16, isSet);
+        withdrawalExecutionPolicy.setAssetFeeBps(address(0), feeBps16, isSet);
     }
 
     function test_setAssetFeeBps_reverts_ifFeeBpsIsInvalid(address asset, uint256 feeBps, bool isSet) public {
@@ -171,7 +175,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         vm.expectRevert(Errors.InvalidParameter.selector);
         vm.prank(admin);
-        withdrawalPolicy.setAssetFeeBps(asset, feeBps16, isSet);
+        withdrawalExecutionPolicy.setAssetFeeBps(asset, feeBps16, isSet);
     }
 
     function test_setAssetFeeBps_reverts_ifNotSetWithNonZeroFee(address asset, uint256 feeBps) public {
@@ -181,7 +185,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         vm.expectRevert(Errors.InvalidParameter.selector);
         vm.prank(admin);
-        withdrawalPolicy.setAssetFeeBps(asset, feeBps16, false);
+        withdrawalExecutionPolicy.setAssetFeeBps(asset, feeBps16, false);
     }
 
     function test_setDefaultFeeBps_setsExpectedFee(uint256 feeBps) public {
@@ -189,12 +193,12 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         vm.expectEmit(true, true, true, true);
         // forge-lint: disable-next-line(unsafe-typecast)
-        emit WithdrawalPolicy.DefaultFeeBpsSet(uint16(feeBps));
+        emit WithdrawalExecutionPolicy.DefaultFeeBpsSet(uint16(feeBps));
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setDefaultFeeBps(uint16(feeBps));
+        withdrawalExecutionPolicy.setDefaultFeeBps(uint16(feeBps));
 
-        assertEq(withdrawalPolicy.getDefaultFeeBps(), feeBps);
+        assertEq(withdrawalExecutionPolicy.getDefaultFeeBps(), feeBps);
     }
 
     function test_setDefaultFeeBps_reverts_ifFeeBpsIsInvalid(uint256 feeBps) public {
@@ -203,42 +207,42 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         vm.expectRevert(Errors.InvalidParameter.selector);
         vm.prank(admin);
-        withdrawalPolicy.setDefaultFeeBps(feeBps16);
+        withdrawalExecutionPolicy.setDefaultFeeBps(feeBps16);
     }
 
     function test_addSigner_setsSignerStatus(address signer) public {
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer);
+        withdrawalExecutionPolicy.addSigner(signer);
 
-        assertEq(withdrawalPolicy.isSigner(signer), true);
+        assertEq(withdrawalExecutionPolicy.isSigner(signer), true);
     }
 
     function test_removeSigner_setsSignerStatus(address signer) public {
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer);
+        withdrawalExecutionPolicy.addSigner(signer);
         vm.prank(admin);
-        withdrawalPolicy.removeSigner(signer);
+        withdrawalExecutionPolicy.removeSigner(signer);
 
-        assertEq(withdrawalPolicy.isSigner(signer), false);
+        assertEq(withdrawalExecutionPolicy.isSigner(signer), false);
     }
 
     function test_addSigner_emitsSignerSet(address signer) public {
         vm.expectEmit(true, true, true, true);
-        emit WithdrawalPolicy.SignerSet(signer, true);
+        emit WithdrawalExecutionPolicy.SignerSet(signer, true);
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer);
+        withdrawalExecutionPolicy.addSigner(signer);
     }
 
     function test_removeSigner_emitsSignerSet(address signer) public {
         vm.expectEmit(true, true, true, true);
-        emit WithdrawalPolicy.SignerSet(signer, false);
+        emit WithdrawalExecutionPolicy.SignerSet(signer, false);
         vm.prank(admin);
-        withdrawalPolicy.removeSigner(signer);
+        withdrawalExecutionPolicy.removeSigner(signer);
     }
 
     // Calculation tests
 
-    function test_applyWithdrawalPolicy_returnsDefaultFee(
+    function test_applyWithdrawalExecutionPolicy_returnsDefaultFee(
         address user,
         address assetOut,
         uint256 iouAmountRay,
@@ -249,26 +253,27 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
+        withdrawalExecutionPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         // Fee rounds up, so expectedAmountOut rounds down
         uint256 expectedFee = (iouAmountRay * baseFeeBps + Constants.MAX_BPS - 1) / Constants.MAX_BPS;
         uint256 expectedAmountOut = iouAmountRay - expectedFee;
 
-        assertFalse(withdrawalPolicy.getAssetFeeConfig(assetOut).isSet, "Asset fee is set");
+        assertFalse(withdrawalExecutionPolicy.getAssetFeeConfig(assetOut).isSet, "Asset fee is set");
 
-        IWithdrawalPolicy.WithdrawalRequest memory request = _buildRequest(user, assetOut, iouAmountRay, "");
+        IWithdrawalExecutionPolicy.WithdrawalExecutionPolicyRequest memory request =
+            _buildRequest(user, assetOut, iouAmountRay, "");
 
         // Preview should return same result
-        uint256 previewAmountOut = withdrawalPolicy.previewWithdrawalPolicy(request);
+        uint256 previewAmountOut = withdrawalExecutionPolicy.previewWithdrawalExecutionPolicy(request);
         assertEq(previewAmountOut, expectedAmountOut, "Preview should match expected");
 
         // Apply should return same result
-        uint256 actualAmountOut = withdrawalPolicy.applyWithdrawalPolicy(request);
+        uint256 actualAmountOut = withdrawalExecutionPolicy.applyWithdrawalExecutionPolicy(request);
         assertEq(actualAmountOut, expectedAmountOut, "Apply should match expected");
     }
 
-    function test_applyWithdrawalPolicy_returnsAssetFee(
+    function test_applyWithdrawalExecutionPolicy_returnsAssetFee(
         address user,
         address assetOut,
         uint256 iouAmountRay,
@@ -283,32 +288,33 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
-        assertEq(withdrawalPolicy.getDefaultFeeBps(), baseFeeBps);
+        withdrawalExecutionPolicy.setDefaultFeeBps(uint16(baseFeeBps));
+        assertEq(withdrawalExecutionPolicy.getDefaultFeeBps(), baseFeeBps);
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setAssetFeeBps(assetOut, uint16(assetFeeBps), true);
+        withdrawalExecutionPolicy.setAssetFeeBps(assetOut, uint16(assetFeeBps), true);
 
         // Fee rounds up, so expectedAmountOut rounds down
         uint256 expectedFee = (iouAmountRay * assetFeeBps + Constants.MAX_BPS - 1) / Constants.MAX_BPS;
         uint256 expectedAmountOut = iouAmountRay - expectedFee;
 
-        assertTrue(withdrawalPolicy.getAssetFeeConfig(assetOut).isSet, "Asset fee is not set");
-        assertEq(withdrawalPolicy.getAssetFeeConfig(assetOut).feeBps, assetFeeBps);
+        assertTrue(withdrawalExecutionPolicy.getAssetFeeConfig(assetOut).isSet, "Asset fee is not set");
+        assertEq(withdrawalExecutionPolicy.getAssetFeeConfig(assetOut).feeBps, assetFeeBps);
 
-        IWithdrawalPolicy.WithdrawalRequest memory request = _buildRequest(user, assetOut, iouAmountRay, "");
+        IWithdrawalExecutionPolicy.WithdrawalExecutionPolicyRequest memory request =
+            _buildRequest(user, assetOut, iouAmountRay, "");
 
         // Preview should return same result
-        uint256 previewAmountOut = withdrawalPolicy.previewWithdrawalPolicy(request);
+        uint256 previewAmountOut = withdrawalExecutionPolicy.previewWithdrawalExecutionPolicy(request);
         assertEq(previewAmountOut, expectedAmountOut, "Preview should match expected");
 
         // Apply should return same result
-        uint256 actualAmountOut = withdrawalPolicy.applyWithdrawalPolicy(request);
+        uint256 actualAmountOut = withdrawalExecutionPolicy.applyWithdrawalExecutionPolicy(request);
         assertEq(actualAmountOut, expectedAmountOut, "Apply should match expected");
     }
 
-    function test_applyWithdrawalPolicy_returnsPersonalFee(
+    function test_applyWithdrawalExecutionPolicy_returnsPersonalFee(
         address user,
         address assetOut,
         uint256 iouAmountRay,
@@ -329,20 +335,20 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         // Setup base fee
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
+        withdrawalExecutionPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         // Setup asset fee
         if (isAssetFeeSet) {
             vm.prank(admin);
             // forge-lint: disable-next-line(unsafe-typecast)
-            withdrawalPolicy.setAssetFeeBps(assetOut, uint16(assetFeeBps), true);
+            withdrawalExecutionPolicy.setAssetFeeBps(assetOut, uint16(assetFeeBps), true);
         }
 
         // Create signer wallet and whitelist it
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer);
-        assertTrue(withdrawalPolicy.isSigner(signer), "Signer is not whitelisted");
+        withdrawalExecutionPolicy.addSigner(signer);
+        assertTrue(withdrawalExecutionPolicy.isSigner(signer), "Signer is not whitelisted");
 
         // Build signed personal-fee data
         bytes memory data = _createSignedFeeData(
@@ -352,21 +358,24 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         // Signed fee is used directly (no rounding) as long as it's at-or-below the cap.
         uint256 expectedAmountOut = iouAmountRay - personalFeeAmountRay;
 
-        IWithdrawalPolicy.WithdrawalRequest memory request = _buildRequest(user, assetOut, iouAmountRay, data);
+        IWithdrawalExecutionPolicy.WithdrawalExecutionPolicyRequest memory request =
+            _buildRequest(user, assetOut, iouAmountRay, data);
 
         // Preview should return same result and NOT consume the nonce
-        assertFalse(withdrawalPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Nonce should not be used before preview");
-        uint256 previewAmountOut = withdrawalPolicy.previewWithdrawalPolicy(request);
+        assertFalse(
+            withdrawalExecutionPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Nonce should not be used before preview"
+        );
+        uint256 previewAmountOut = withdrawalExecutionPolicy.previewWithdrawalExecutionPolicy(request);
         assertEq(previewAmountOut, expectedAmountOut, "Preview should match expected");
-        assertFalse(withdrawalPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Preview should NOT consume nonce");
+        assertFalse(withdrawalExecutionPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Preview should NOT consume nonce");
 
         // Apply should return same result and consume the nonce
-        uint256 actualAmountOut = withdrawalPolicy.applyWithdrawalPolicy(request);
+        uint256 actualAmountOut = withdrawalExecutionPolicy.applyWithdrawalExecutionPolicy(request);
         assertEq(actualAmountOut, expectedAmountOut, "Apply should match expected");
-        assertTrue(withdrawalPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Apply should consume nonce");
+        assertTrue(withdrawalExecutionPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Apply should consume nonce");
     }
 
-    function test_applyWithdrawalPolicy_emitsWithdrawalPolicyApplied(
+    function test_applyWithdrawalExecutionPolicy_emitsWithdrawalExecutionPolicyApplied(
         address user,
         address assetOut,
         uint256 iouAmountRay,
@@ -377,20 +386,23 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
+        withdrawalExecutionPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         uint256 expectedFee = (iouAmountRay * baseFeeBps + Constants.MAX_BPS - 1) / Constants.MAX_BPS;
         uint256 expectedAmountOut = iouAmountRay - expectedFee;
 
-        IWithdrawalPolicy.WithdrawalRequest memory request = _buildRequest(user, assetOut, iouAmountRay, "");
+        IWithdrawalExecutionPolicy.WithdrawalExecutionPolicyRequest memory request =
+            _buildRequest(user, assetOut, iouAmountRay, "");
 
         vm.expectEmit(true, true, true, true);
-        emit IWithdrawalPolicy.WithdrawalPolicyApplied(user, assetOut, iouAmountRay, expectedAmountOut);
+        emit IWithdrawalExecutionPolicy.WithdrawalExecutionPolicyApplied(
+            user, assetOut, iouAmountRay, expectedAmountOut
+        );
 
-        withdrawalPolicy.applyWithdrawalPolicy(request);
+        withdrawalExecutionPolicy.applyWithdrawalExecutionPolicy(request);
     }
 
-    function test_applyWithdrawalPolicy_reverts_ifCallerIsNotApplier() public {
+    function test_applyWithdrawalExecutionPolicy_reverts_ifCallerIsNotApplier() public {
         address user = makeAddr("user");
         address assetOut = makeAddr("assetOut");
         uint256 iouAmountRay = 1000e27;
@@ -398,29 +410,32 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         uint16 baseFeeBps = 5_00;
 
         vm.prank(admin);
-        withdrawalPolicy.setDefaultFeeBps(baseFeeBps);
+        withdrawalExecutionPolicy.setDefaultFeeBps(baseFeeBps);
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer);
+        withdrawalExecutionPolicy.addSigner(signer);
 
         bytes memory data = _createSignedFeeData(
             signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, DEFAULT_DEADLINE
         );
-        IWithdrawalPolicy.WithdrawalRequest memory request = _buildRequest(user, assetOut, iouAmountRay, data);
+        IWithdrawalExecutionPolicy.WithdrawalExecutionPolicyRequest memory request =
+            _buildRequest(user, assetOut, iouAmountRay, data);
 
         address attacker = makeAddr("attacker");
         vm.expectRevert(Errors.NotAuthorized.selector);
         vm.prank(attacker);
-        withdrawalPolicy.applyWithdrawalPolicy(request);
-        assertFalse(withdrawalPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Nonce should not be used after revert");
+        withdrawalExecutionPolicy.applyWithdrawalExecutionPolicy(request);
+        assertFalse(
+            withdrawalExecutionPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Nonce should not be used after revert"
+        );
 
-        uint256 amountOut = withdrawalPolicy.applyWithdrawalPolicy(request);
+        uint256 amountOut = withdrawalExecutionPolicy.applyWithdrawalExecutionPolicy(request);
         assertEq(amountOut, iouAmountRay, "Authorized caller should apply fee waiver");
-        assertTrue(withdrawalPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Apply should consume nonce");
+        assertTrue(withdrawalExecutionPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Apply should consume nonce");
     }
 
-    function test_applyWithdrawalPolicy_clampsSignedFeeToAssetCap(
+    function test_applyWithdrawalExecutionPolicy_clampsSignedFeeToAssetCap(
         address user,
         address assetOut,
         uint256 iouAmountRay,
@@ -441,20 +456,20 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         // Setup base fee
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
+        withdrawalExecutionPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         // Setup asset fee
         if (isAssetFeeSet) {
             vm.prank(admin);
             // forge-lint: disable-next-line(unsafe-typecast)
-            withdrawalPolicy.setAssetFeeBps(assetOut, uint16(assetFeeBps), true);
+            withdrawalExecutionPolicy.setAssetFeeBps(assetOut, uint16(assetFeeBps), true);
         }
 
         // Create signer wallet and whitelist it
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer);
-        assertTrue(withdrawalPolicy.isSigner(signer), "Signer is not whitelisted");
+        withdrawalExecutionPolicy.addSigner(signer);
+        assertTrue(withdrawalExecutionPolicy.isSigner(signer), "Signer is not whitelisted");
 
         bytes memory data = _createSignedFeeData(
             signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, DEFAULT_DEADLINE
@@ -462,19 +477,22 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         uint256 expectedAmountOut = iouAmountRay - capRay;
 
-        IWithdrawalPolicy.WithdrawalRequest memory request = _buildRequest(user, assetOut, iouAmountRay, data);
+        IWithdrawalExecutionPolicy.WithdrawalExecutionPolicyRequest memory request =
+            _buildRequest(user, assetOut, iouAmountRay, data);
 
-        assertFalse(withdrawalPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Nonce should not be used before preview");
-        uint256 previewAmountOut = withdrawalPolicy.previewWithdrawalPolicy(request);
+        assertFalse(
+            withdrawalExecutionPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Nonce should not be used before preview"
+        );
+        uint256 previewAmountOut = withdrawalExecutionPolicy.previewWithdrawalExecutionPolicy(request);
         assertEq(previewAmountOut, expectedAmountOut, "Preview should clamp to asset cap");
-        assertFalse(withdrawalPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Preview should NOT consume nonce");
+        assertFalse(withdrawalExecutionPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Preview should NOT consume nonce");
 
-        uint256 actualAmountOut = withdrawalPolicy.applyWithdrawalPolicy(request);
+        uint256 actualAmountOut = withdrawalExecutionPolicy.applyWithdrawalExecutionPolicy(request);
         assertEq(actualAmountOut, expectedAmountOut, "Apply should clamp to asset cap");
-        assertTrue(withdrawalPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Apply should consume nonce");
+        assertTrue(withdrawalExecutionPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Apply should consume nonce");
     }
 
-    function test_applyWithdrawalPolicy_reverts_ifSignerIsNotWhitelisted(
+    function test_applyWithdrawalExecutionPolicy_reverts_ifSignerIsNotWhitelisted(
         address user,
         address assetOut,
         uint256 iouAmountRay,
@@ -486,7 +504,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         uint256 SECP256K1_ORDER = 115792089237316195423570985008687907852837564279074904382605163141518161494337;
         nonWhitelistedSignerPk = bound(nonWhitelistedSignerPk, 1, SECP256K1_ORDER - 1);
         address nonWhitelistedSigner = vm.addr(nonWhitelistedSignerPk);
-        vm.assume(withdrawalPolicy.isSigner(nonWhitelistedSigner) == false);
+        vm.assume(withdrawalExecutionPolicy.isSigner(nonWhitelistedSigner) == false);
 
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
@@ -495,18 +513,18 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         // Setup base fee
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
+        withdrawalExecutionPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         // Build signed personal-fee data with non-whitelisted signer
         bytes memory data = _createSignedFeeData(
             nonWhitelistedSignerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, DEFAULT_DEADLINE
         );
 
-        vm.expectRevert(WithdrawalPolicy.InvalidSignature.selector);
-        withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
+        vm.expectRevert(WithdrawalExecutionPolicy.InvalidSignature.selector);
+        withdrawalExecutionPolicy.applyWithdrawalExecutionPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
     }
 
-    function test_applyWithdrawalPolicy_reverts_ifSignatureIsForDifferentUser(
+    function test_applyWithdrawalExecutionPolicy_reverts_ifSignatureIsForDifferentUser(
         address user,
         address wrongUser,
         address assetOut,
@@ -522,23 +540,23 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         // Setup base fee
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
+        withdrawalExecutionPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         // Create signer wallet and whitelist it
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer);
+        withdrawalExecutionPolicy.addSigner(signer);
 
         // Build signed personal-fee data for WRONG user
         bytes memory data = _createSignedFeeData(
             signerPk, wrongUser, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, DEFAULT_DEADLINE
         );
 
-        vm.expectRevert(WithdrawalPolicy.InvalidSignature.selector);
-        withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
+        vm.expectRevert(WithdrawalExecutionPolicy.InvalidSignature.selector);
+        withdrawalExecutionPolicy.applyWithdrawalExecutionPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
     }
 
-    function test_applyWithdrawalPolicy_reverts_ifSignatureIsForDifferentAsset(
+    function test_applyWithdrawalExecutionPolicy_reverts_ifSignatureIsForDifferentAsset(
         address user,
         address assetOut,
         address wrongAssetOut,
@@ -554,23 +572,23 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         // Setup base fee
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
+        withdrawalExecutionPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         // Create signer wallet and whitelist it
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer);
+        withdrawalExecutionPolicy.addSigner(signer);
 
         // Build signed personal-fee data for WRONG asset
         bytes memory data = _createSignedFeeData(
             signerPk, user, wrongAssetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, DEFAULT_DEADLINE
         );
 
-        vm.expectRevert(WithdrawalPolicy.InvalidSignature.selector);
-        withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
+        vm.expectRevert(WithdrawalExecutionPolicy.InvalidSignature.selector);
+        withdrawalExecutionPolicy.applyWithdrawalExecutionPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
     }
 
-    function test_applyWithdrawalPolicy_reverts_ifSignatureIsForDifferentAmount(
+    function test_applyWithdrawalExecutionPolicy_reverts_ifSignatureIsForDifferentAmount(
         address user,
         address assetOut,
         uint256 iouAmountRay,
@@ -588,23 +606,23 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         // Setup base fee
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
+        withdrawalExecutionPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         // Create signer wallet and whitelist it
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer);
+        withdrawalExecutionPolicy.addSigner(signer);
 
         // Build signed personal-fee data for WRONG amount
         bytes memory data = _createSignedFeeData(
             signerPk, user, assetOut, wrongIouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, DEFAULT_DEADLINE
         );
 
-        vm.expectRevert(WithdrawalPolicy.InvalidSignature.selector);
-        withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
+        vm.expectRevert(WithdrawalExecutionPolicy.InvalidSignature.selector);
+        withdrawalExecutionPolicy.applyWithdrawalExecutionPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
     }
 
-    function test_applyWithdrawalPolicy_reverts_ifSignatureIsForDifferentPersonalFee(
+    function test_applyWithdrawalExecutionPolicy_reverts_ifSignatureIsForDifferentPersonalFee(
         address user,
         address assetOut,
         uint256 iouAmountRay,
@@ -622,12 +640,12 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         // Setup base fee
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
+        withdrawalExecutionPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         // Create signer wallet and whitelist it
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer);
+        withdrawalExecutionPolicy.addSigner(signer);
 
         // Create data with the CORRECT personalFeeAmountRay claimed but signature for a different ray amount
         bytes memory wrongData = _createSignedFeeDataWithMismatch(
@@ -641,11 +659,11 @@ contract WithdrawalPolicyTest is TestWithHelpers {
             DEFAULT_DEADLINE
         );
 
-        vm.expectRevert(WithdrawalPolicy.InvalidSignature.selector);
-        withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, wrongData));
+        vm.expectRevert(WithdrawalExecutionPolicy.InvalidSignature.selector);
+        withdrawalExecutionPolicy.applyWithdrawalExecutionPolicy(_buildRequest(user, assetOut, iouAmountRay, wrongData));
     }
 
-    function test_applyWithdrawalPolicy_reverts_ifSignatureIsMalformed(
+    function test_applyWithdrawalExecutionPolicy_reverts_ifSignatureIsMalformed(
         address user,
         address assetOut,
         uint256 iouAmountRay,
@@ -661,16 +679,16 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         // Setup base fee
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
+        withdrawalExecutionPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         // Create signer wallet and whitelist it
         (address signer,) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer);
+        withdrawalExecutionPolicy.addSigner(signer);
 
         // Manually encode SignedFee with malformed signature
         bytes memory data = abi.encode(
-            WithdrawalPolicy.SignedFee({
+            WithdrawalExecutionPolicy.SignedFee({
                 personalFeeAmountRay: personalFeeAmountRay,
                 nonce: DEFAULT_NONCE,
                 deadline: DEFAULT_DEADLINE,
@@ -679,10 +697,10 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         );
 
         vm.expectRevert();
-        withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
+        withdrawalExecutionPolicy.applyWithdrawalExecutionPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
     }
 
-    function test_applyWithdrawalPolicy_reverts_ifDeadlineExpired() public {
+    function test_applyWithdrawalExecutionPolicy_reverts_ifDeadlineExpired() public {
         address user = makeAddr("user");
         address assetOut = makeAddr("assetOut");
         uint256 iouAmountRay = 1000e27;
@@ -690,11 +708,11 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         uint16 baseFeeBps = 5_00;
 
         vm.prank(admin);
-        withdrawalPolicy.setDefaultFeeBps(baseFeeBps);
+        withdrawalExecutionPolicy.setDefaultFeeBps(baseFeeBps);
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer);
+        withdrawalExecutionPolicy.addSigner(signer);
 
         // Create signature with expired deadline
         uint256 expiredDeadline = block.timestamp - 1;
@@ -702,20 +720,21 @@ contract WithdrawalPolicyTest is TestWithHelpers {
             signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, expiredDeadline
         );
 
-        IWithdrawalPolicy.WithdrawalRequest memory request = _buildRequest(user, assetOut, iouAmountRay, data);
+        IWithdrawalExecutionPolicy.WithdrawalExecutionPolicyRequest memory request =
+            _buildRequest(user, assetOut, iouAmountRay, data);
 
         // Both preview and apply should revert
-        vm.expectRevert(WithdrawalPolicy.DeadlineExpired.selector);
-        withdrawalPolicy.previewWithdrawalPolicy(request);
+        vm.expectRevert(WithdrawalExecutionPolicy.DeadlineExpired.selector);
+        withdrawalExecutionPolicy.previewWithdrawalExecutionPolicy(request);
 
-        vm.expectRevert(WithdrawalPolicy.DeadlineExpired.selector);
-        withdrawalPolicy.applyWithdrawalPolicy(request);
+        vm.expectRevert(WithdrawalExecutionPolicy.DeadlineExpired.selector);
+        withdrawalExecutionPolicy.applyWithdrawalExecutionPolicy(request);
     }
 
     // Preview Tests
 
     /// @notice Test that preview can be called multiple times without consuming nonces
-    function test_previewWithdrawalPolicy_doesNotConsumeNonce() public {
+    function test_previewWithdrawalExecutionPolicy_doesNotConsumeNonce() public {
         address user = makeAddr("user");
         address assetOut = makeAddr("assetOut");
         uint256 iouAmountRay = 1000e27;
@@ -723,41 +742,44 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         uint16 baseFeeBps = 5_00; // 5% base fee
 
         vm.prank(admin);
-        withdrawalPolicy.setDefaultFeeBps(baseFeeBps);
+        withdrawalExecutionPolicy.setDefaultFeeBps(baseFeeBps);
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer);
+        withdrawalExecutionPolicy.addSigner(signer);
 
         bytes memory data = _createSignedFeeData(
             signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, DEFAULT_DEADLINE
         );
 
-        IWithdrawalPolicy.WithdrawalRequest memory request = _buildRequest(user, assetOut, iouAmountRay, data);
+        IWithdrawalExecutionPolicy.WithdrawalExecutionPolicyRequest memory request =
+            _buildRequest(user, assetOut, iouAmountRay, data);
 
         // Preview can be called multiple times
-        uint256 preview1 = withdrawalPolicy.previewWithdrawalPolicy(request);
-        uint256 preview2 = withdrawalPolicy.previewWithdrawalPolicy(request);
-        uint256 preview3 = withdrawalPolicy.previewWithdrawalPolicy(request);
+        uint256 preview1 = withdrawalExecutionPolicy.previewWithdrawalExecutionPolicy(request);
+        uint256 preview2 = withdrawalExecutionPolicy.previewWithdrawalExecutionPolicy(request);
+        uint256 preview3 = withdrawalExecutionPolicy.previewWithdrawalExecutionPolicy(request);
 
         assertEq(preview1, preview2, "Preview results should be consistent");
         assertEq(preview2, preview3, "Preview results should be consistent");
-        assertFalse(withdrawalPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Nonce should not be consumed by preview");
+        assertFalse(
+            withdrawalExecutionPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Nonce should not be consumed by preview"
+        );
 
         // Apply consumes the nonce
-        uint256 applied = withdrawalPolicy.applyWithdrawalPolicy(request);
+        uint256 applied = withdrawalExecutionPolicy.applyWithdrawalExecutionPolicy(request);
         assertEq(applied, preview1, "Apply should return same as preview");
-        assertTrue(withdrawalPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Nonce should be consumed by apply");
+        assertTrue(withdrawalExecutionPolicy.wasNonceUsed(signer, DEFAULT_NONCE), "Nonce should be consumed by apply");
 
         // Now preview should revert because nonce is used
-        vm.expectRevert(WithdrawalPolicy.NonceAlreadyUsed.selector);
-        withdrawalPolicy.previewWithdrawalPolicy(request);
+        vm.expectRevert(WithdrawalExecutionPolicy.NonceAlreadyUsed.selector);
+        withdrawalExecutionPolicy.previewWithdrawalExecutionPolicy(request);
     }
 
     // Signature Replay Protection Tests
 
     /// @notice Test that signatures cannot be replayed after first use
-    function test_applyWithdrawalPolicy_reverts_onSignatureReplay() public {
+    function test_applyWithdrawalExecutionPolicy_reverts_onSignatureReplay() public {
         address user = makeAddr("user");
         address assetOut = makeAddr("assetOut");
         uint256 iouAmountRay = 1000e27; // 1000 tokens in RAY
@@ -766,11 +788,11 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         // Setup: Configure base fee and whitelist signer
         vm.prank(admin);
-        withdrawalPolicy.setDefaultFeeBps(baseFeeBps);
+        withdrawalExecutionPolicy.setDefaultFeeBps(baseFeeBps);
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer);
+        withdrawalExecutionPolicy.addSigner(signer);
 
         // Create signature for personal fee waiver
         bytes memory data = _createSignedFeeData(
@@ -778,12 +800,13 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         );
 
         // First use: Should succeed and return full amount (0% fee)
-        uint256 amountOut1 = withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
+        uint256 amountOut1 =
+            withdrawalExecutionPolicy.applyWithdrawalExecutionPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
         assertEq(amountOut1, iouAmountRay, "First use should return full amount (0% fee)");
 
         // Second use: Should REVERT because nonce was consumed
-        vm.expectRevert(WithdrawalPolicy.NonceAlreadyUsed.selector);
-        withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
+        vm.expectRevert(WithdrawalExecutionPolicy.NonceAlreadyUsed.selector);
+        withdrawalExecutionPolicy.applyWithdrawalExecutionPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
     }
 
     // Nonce Invalidation Tests
@@ -791,68 +814,68 @@ contract WithdrawalPolicyTest is TestWithHelpers {
     function test_invalidateNonce_allowsSignerToInvalidateOwnNonce() public {
         (address signer,) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer);
+        withdrawalExecutionPolicy.addSigner(signer);
 
         uint256 nonce = 42;
-        assertFalse(withdrawalPolicy.wasNonceUsed(signer, nonce), "Nonce should not be used initially");
+        assertFalse(withdrawalExecutionPolicy.wasNonceUsed(signer, nonce), "Nonce should not be used initially");
 
         vm.prank(signer);
-        withdrawalPolicy.invalidateNonce(signer, nonce);
+        withdrawalExecutionPolicy.invalidateNonce(signer, nonce);
 
-        assertTrue(withdrawalPolicy.wasNonceUsed(signer, nonce), "Nonce should be invalidated");
+        assertTrue(withdrawalExecutionPolicy.wasNonceUsed(signer, nonce), "Nonce should be invalidated");
     }
 
     function test_invalidateNonce_emitsExpectedEvent(uint256 nonceSalt) public {
         (address signer,) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer);
+        withdrawalExecutionPolicy.addSigner(signer);
 
         uint256 nonce = uint256(keccak256(abi.encodePacked("fuzzedNonce:", nonceSalt)));
-        assertFalse(withdrawalPolicy.wasNonceUsed(signer, nonce), "Nonce should not be used initially");
+        assertFalse(withdrawalExecutionPolicy.wasNonceUsed(signer, nonce), "Nonce should not be used initially");
 
         vm.expectEmit(true, true, true, true);
-        emit WithdrawalPolicy.NonceUsed(signer, nonce);
+        emit WithdrawalExecutionPolicy.NonceUsed(signer, nonce);
 
         vm.prank(signer);
-        withdrawalPolicy.invalidateNonce(signer, nonce);
+        withdrawalExecutionPolicy.invalidateNonce(signer, nonce);
     }
 
     function test_invalidateNonce_reverts_ifCallerIsNotSigner() public {
         address notSigner = makeAddr("notSigner");
         (address signer,) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer);
+        withdrawalExecutionPolicy.addSigner(signer);
 
         vm.prank(notSigner);
         vm.expectRevert(Errors.NotAuthorized.selector);
-        withdrawalPolicy.invalidateNonce(notSigner, 1);
+        withdrawalExecutionPolicy.invalidateNonce(notSigner, 1);
     }
 
     function test_invalidateNonce_reverts_ifSignerParamDoesNotMatchCaller() public {
         (address signer1,) = makeAddrAndKey("signer1");
         (address signer2,) = makeAddrAndKey("signer2");
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer1);
+        withdrawalExecutionPolicy.addSigner(signer1);
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer2);
+        withdrawalExecutionPolicy.addSigner(signer2);
 
         // signer1 tries to invalidate signer2's nonce
         vm.prank(signer1);
         vm.expectRevert(Errors.NotAuthorized.selector);
-        withdrawalPolicy.invalidateNonce(signer2, 1);
+        withdrawalExecutionPolicy.invalidateNonce(signer2, 1);
     }
 
     function test_invalidateNonce_reverts_ifAlreadyInvalidated() public {
         (address signer,) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer);
+        withdrawalExecutionPolicy.addSigner(signer);
 
         vm.prank(signer);
-        withdrawalPolicy.invalidateNonce(signer, 1);
+        withdrawalExecutionPolicy.invalidateNonce(signer, 1);
 
-        vm.expectRevert(WithdrawalPolicy.NonceAlreadyUsed.selector);
+        vm.expectRevert(WithdrawalExecutionPolicy.NonceAlreadyUsed.selector);
         vm.prank(signer);
-        withdrawalPolicy.invalidateNonce(signer, 1);
+        withdrawalExecutionPolicy.invalidateNonce(signer, 1);
     }
 
     function test_invalidateNonce_preventsSignatureFromBeingApplied(
@@ -869,22 +892,22 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
+        withdrawalExecutionPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer);
+        withdrawalExecutionPolicy.addSigner(signer);
 
         bytes memory data =
             _createSignedFeeData(signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, nonce, DEFAULT_DEADLINE);
 
         // Signer invalidates the nonce before it's used
         vm.prank(signer);
-        withdrawalPolicy.invalidateNonce(signer, nonce);
+        withdrawalExecutionPolicy.invalidateNonce(signer, nonce);
 
         // Now apply should revert
-        vm.expectRevert(WithdrawalPolicy.NonceAlreadyUsed.selector);
-        withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
+        vm.expectRevert(WithdrawalExecutionPolicy.NonceAlreadyUsed.selector);
+        withdrawalExecutionPolicy.applyWithdrawalExecutionPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
     }
 
     function test_invalidateNonce_preventsSignatureFromBeingPreviewed(
@@ -901,27 +924,27 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
+        withdrawalExecutionPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer);
+        withdrawalExecutionPolicy.addSigner(signer);
 
         bytes memory data =
             _createSignedFeeData(signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, nonce, DEFAULT_DEADLINE);
 
         // Signer invalidates the nonce before it's used
         vm.prank(signer);
-        withdrawalPolicy.invalidateNonce(signer, nonce);
+        withdrawalExecutionPolicy.invalidateNonce(signer, nonce);
 
         // Now preview should also revert
-        vm.expectRevert(WithdrawalPolicy.NonceAlreadyUsed.selector);
-        withdrawalPolicy.previewWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
+        vm.expectRevert(WithdrawalExecutionPolicy.NonceAlreadyUsed.selector);
+        withdrawalExecutionPolicy.previewWithdrawalExecutionPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
     }
 
     // Deadline Tests
 
-    function test_applyWithdrawalPolicy_acceptsDeadlineAtCurrentTimestamp() public {
+    function test_applyWithdrawalExecutionPolicy_acceptsDeadlineAtCurrentTimestamp() public {
         address user = makeAddr("user");
         address assetOut = makeAddr("assetOut");
         uint256 iouAmountRay = 1000e27;
@@ -929,11 +952,11 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         uint16 baseFeeBps = 5_00;
 
         vm.prank(admin);
-        withdrawalPolicy.setDefaultFeeBps(baseFeeBps);
+        withdrawalExecutionPolicy.setDefaultFeeBps(baseFeeBps);
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer);
+        withdrawalExecutionPolicy.addSigner(signer);
 
         // Deadline exactly at current timestamp should work
         uint256 deadline = block.timestamp;
@@ -941,11 +964,12 @@ contract WithdrawalPolicyTest is TestWithHelpers {
             _createSignedFeeData(signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, deadline);
 
         // Should succeed
-        uint256 amountOut = withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
+        uint256 amountOut =
+            withdrawalExecutionPolicy.applyWithdrawalExecutionPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
         assertGt(amountOut, 0, "Should return non-zero amount");
     }
 
-    function test_applyWithdrawalPolicy_acceptsDeadlineInFuture(
+    function test_applyWithdrawalExecutionPolicy_acceptsDeadlineInFuture(
         address user,
         address assetOut,
         uint256 iouAmountRay,
@@ -960,11 +984,11 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
+        withdrawalExecutionPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer);
+        withdrawalExecutionPolicy.addSigner(signer);
 
         // Deadline in the future should work
         uint256 deadline = block.timestamp + deadlineOffset;
@@ -972,13 +996,14 @@ contract WithdrawalPolicyTest is TestWithHelpers {
             _createSignedFeeData(signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, deadline);
 
         // Should succeed — signed fee is at-or-below cap so it's charged verbatim.
-        uint256 amountOut = withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
+        uint256 amountOut =
+            withdrawalExecutionPolicy.applyWithdrawalExecutionPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
         assertEq(amountOut, iouAmountRay - personalFeeAmountRay, "Should return correct amount");
     }
 
     // Nonce Tests
 
-    function test_applyWithdrawalPolicy_allowsDifferentNoncesFromSameSigner(
+    function test_applyWithdrawalExecutionPolicy_allowsDifferentNoncesFromSameSigner(
         address user,
         address assetOut,
         uint256 iouAmountRay,
@@ -995,35 +1020,35 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
+        withdrawalExecutionPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer);
+        withdrawalExecutionPolicy.addSigner(signer);
 
         // First signature with nonce1
         bytes memory data1 = _createSignedFeeData(
             signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, nonce1, DEFAULT_DEADLINE
         );
-        withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data1));
-        assertTrue(withdrawalPolicy.wasNonceUsed(signer, nonce1), "Nonce1 should be used");
+        withdrawalExecutionPolicy.applyWithdrawalExecutionPolicy(_buildRequest(user, assetOut, iouAmountRay, data1));
+        assertTrue(withdrawalExecutionPolicy.wasNonceUsed(signer, nonce1), "Nonce1 should be used");
 
         // Second signature with nonce2 should also work
         bytes memory data2 = _createSignedFeeData(
             signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, nonce2, DEFAULT_DEADLINE
         );
-        withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data2));
-        assertTrue(withdrawalPolicy.wasNonceUsed(signer, nonce2), "Nonce2 should be used");
+        withdrawalExecutionPolicy.applyWithdrawalExecutionPolicy(_buildRequest(user, assetOut, iouAmountRay, data2));
+        assertTrue(withdrawalExecutionPolicy.wasNonceUsed(signer, nonce2), "Nonce2 should be used");
 
         // Third signature with nonce3 should also work
         bytes memory data3 = _createSignedFeeData(
             signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, nonce3, DEFAULT_DEADLINE
         );
-        withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data3));
-        assertTrue(withdrawalPolicy.wasNonceUsed(signer, nonce3), "Nonce3 should be used");
+        withdrawalExecutionPolicy.applyWithdrawalExecutionPolicy(_buildRequest(user, assetOut, iouAmountRay, data3));
+        assertTrue(withdrawalExecutionPolicy.wasNonceUsed(signer, nonce3), "Nonce3 should be used");
     }
 
-    function test_applyWithdrawalPolicy_acceptsNonceZero() public {
+    function test_applyWithdrawalExecutionPolicy_acceptsNonceZero() public {
         address user = makeAddr("user");
         address assetOut = makeAddr("assetOut");
         uint256 iouAmountRay = 1000e27;
@@ -1031,11 +1056,11 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         uint16 baseFeeBps = 5_00;
 
         vm.prank(admin);
-        withdrawalPolicy.setDefaultFeeBps(baseFeeBps);
+        withdrawalExecutionPolicy.setDefaultFeeBps(baseFeeBps);
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer);
+        withdrawalExecutionPolicy.addSigner(signer);
 
         // Nonce 0 should be valid
         uint256 nonceZero = 0;
@@ -1043,14 +1068,15 @@ contract WithdrawalPolicyTest is TestWithHelpers {
             signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, nonceZero, DEFAULT_DEADLINE
         );
 
-        assertFalse(withdrawalPolicy.wasNonceUsed(signer, nonceZero), "Nonce 0 should not be used initially");
+        assertFalse(withdrawalExecutionPolicy.wasNonceUsed(signer, nonceZero), "Nonce 0 should not be used initially");
 
-        uint256 amountOut = withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
+        uint256 amountOut =
+            withdrawalExecutionPolicy.applyWithdrawalExecutionPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
         assertGt(amountOut, 0, "Should return non-zero amount");
-        assertTrue(withdrawalPolicy.wasNonceUsed(signer, nonceZero), "Nonce 0 should be used after apply");
+        assertTrue(withdrawalExecutionPolicy.wasNonceUsed(signer, nonceZero), "Nonce 0 should be used after apply");
     }
 
-    function test_applyWithdrawalPolicy_allowsSameNonceFromDifferentSigners(
+    function test_applyWithdrawalExecutionPolicy_allowsSameNonceFromDifferentSigners(
         address user,
         address assetOut,
         uint256 iouAmountRay,
@@ -1064,34 +1090,36 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
+        withdrawalExecutionPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         (address signer1, uint256 signerPk1) = makeAddrAndKey("signer1");
         (address signer2, uint256 signerPk2) = makeAddrAndKey("signer2");
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer1);
+        withdrawalExecutionPolicy.addSigner(signer1);
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer2);
+        withdrawalExecutionPolicy.addSigner(signer2);
 
         // Signer1 uses the shared nonce
         bytes memory data1 = _createSignedFeeData(
             signerPk1, user, assetOut, iouAmountRay, personalFeeAmountRay, sharedNonce, DEFAULT_DEADLINE
         );
-        withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data1));
-        assertTrue(withdrawalPolicy.wasNonceUsed(signer1, sharedNonce), "Signer1 nonce should be used");
-        assertFalse(withdrawalPolicy.wasNonceUsed(signer2, sharedNonce), "Signer2 nonce should not be used yet");
+        withdrawalExecutionPolicy.applyWithdrawalExecutionPolicy(_buildRequest(user, assetOut, iouAmountRay, data1));
+        assertTrue(withdrawalExecutionPolicy.wasNonceUsed(signer1, sharedNonce), "Signer1 nonce should be used");
+        assertFalse(
+            withdrawalExecutionPolicy.wasNonceUsed(signer2, sharedNonce), "Signer2 nonce should not be used yet"
+        );
 
         // Signer2 can also use the same nonce
         bytes memory data2 = _createSignedFeeData(
             signerPk2, user, assetOut, iouAmountRay, personalFeeAmountRay, sharedNonce, DEFAULT_DEADLINE
         );
-        withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data2));
-        assertTrue(withdrawalPolicy.wasNonceUsed(signer2, sharedNonce), "Signer2 nonce should now be used");
+        withdrawalExecutionPolicy.applyWithdrawalExecutionPolicy(_buildRequest(user, assetOut, iouAmountRay, data2));
+        assertTrue(withdrawalExecutionPolicy.wasNonceUsed(signer2, sharedNonce), "Signer2 nonce should now be used");
     }
 
     // Signer Removal Tests
 
-    function test_applyWithdrawalPolicy_reverts_ifSignerWasRemoved(
+    function test_applyWithdrawalExecutionPolicy_reverts_ifSignerWasRemoved(
         address user,
         address assetOut,
         uint256 iouAmountRay,
@@ -1104,11 +1132,11 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
+        withdrawalExecutionPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer);
+        withdrawalExecutionPolicy.addSigner(signer);
 
         bytes memory data = _createSignedFeeData(
             signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, DEFAULT_DEADLINE
@@ -1116,15 +1144,15 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         // Remove the signer
         vm.prank(admin);
-        withdrawalPolicy.removeSigner(signer);
-        assertFalse(withdrawalPolicy.isSigner(signer), "Signer should be removed");
+        withdrawalExecutionPolicy.removeSigner(signer);
+        assertFalse(withdrawalExecutionPolicy.isSigner(signer), "Signer should be removed");
 
         // Apply should revert because signer is no longer whitelisted
-        vm.expectRevert(WithdrawalPolicy.InvalidSignature.selector);
-        withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
+        vm.expectRevert(WithdrawalExecutionPolicy.InvalidSignature.selector);
+        withdrawalExecutionPolicy.applyWithdrawalExecutionPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
     }
 
-    function test_previewWithdrawalPolicy_reverts_ifSignerWasRemoved(
+    function test_previewWithdrawalExecutionPolicy_reverts_ifSignerWasRemoved(
         address user,
         address assetOut,
         uint256 iouAmountRay,
@@ -1137,11 +1165,11 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
+        withdrawalExecutionPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer);
+        withdrawalExecutionPolicy.addSigner(signer);
 
         bytes memory data = _createSignedFeeData(
             signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, DEFAULT_DEADLINE
@@ -1149,14 +1177,14 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         // Remove the signer
         vm.prank(admin);
-        withdrawalPolicy.removeSigner(signer);
+        withdrawalExecutionPolicy.removeSigner(signer);
 
         // Preview should also revert because signer is no longer whitelisted
-        vm.expectRevert(WithdrawalPolicy.InvalidSignature.selector);
-        withdrawalPolicy.previewWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
+        vm.expectRevert(WithdrawalExecutionPolicy.InvalidSignature.selector);
+        withdrawalExecutionPolicy.previewWithdrawalExecutionPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
     }
 
-    function test_previewWithdrawalPolicy_becomesInvalidAfterSignerRemoved(
+    function test_previewWithdrawalExecutionPolicy_becomesInvalidAfterSignerRemoved(
         address user,
         address assetOut,
         uint256 iouAmountRay,
@@ -1169,32 +1197,33 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
+        withdrawalExecutionPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer);
+        withdrawalExecutionPolicy.addSigner(signer);
 
         bytes memory data = _createSignedFeeData(
             signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, DEFAULT_DEADLINE
         );
 
-        IWithdrawalPolicy.WithdrawalRequest memory request = _buildRequest(user, assetOut, iouAmountRay, data);
+        IWithdrawalExecutionPolicy.WithdrawalExecutionPolicyRequest memory request =
+            _buildRequest(user, assetOut, iouAmountRay, data);
 
         // Preview works while signer is whitelisted — signed fee at-or-below cap is charged verbatim.
-        uint256 previewAmount = withdrawalPolicy.previewWithdrawalPolicy(request);
+        uint256 previewAmount = withdrawalExecutionPolicy.previewWithdrawalExecutionPolicy(request);
         assertEq(previewAmount, iouAmountRay - personalFeeAmountRay, "Preview should return correct amount");
 
         // Remove the signer
         vm.prank(admin);
-        withdrawalPolicy.removeSigner(signer);
+        withdrawalExecutionPolicy.removeSigner(signer);
 
         // Same preview should now revert
-        vm.expectRevert(WithdrawalPolicy.InvalidSignature.selector);
-        withdrawalPolicy.previewWithdrawalPolicy(request);
+        vm.expectRevert(WithdrawalExecutionPolicy.InvalidSignature.selector);
+        withdrawalExecutionPolicy.previewWithdrawalExecutionPolicy(request);
     }
 
-    function test_applyWithdrawalPolicy_acceptsSignatureAfterSignerReAdded(
+    function test_applyWithdrawalExecutionPolicy_acceptsSignatureAfterSignerReAdded(
         address user,
         address assetOut,
         uint256 iouAmountRay,
@@ -1207,11 +1236,11 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
+        withdrawalExecutionPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer);
+        withdrawalExecutionPolicy.addSigner(signer);
 
         bytes memory data = _createSignedFeeData(
             signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, DEFAULT_DEADLINE
@@ -1219,22 +1248,23 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         // Remove the signer
         vm.prank(admin);
-        withdrawalPolicy.removeSigner(signer);
+        withdrawalExecutionPolicy.removeSigner(signer);
 
         // Apply should revert
-        vm.expectRevert(WithdrawalPolicy.InvalidSignature.selector);
-        withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
+        vm.expectRevert(WithdrawalExecutionPolicy.InvalidSignature.selector);
+        withdrawalExecutionPolicy.applyWithdrawalExecutionPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
 
         // Re-add the signer
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer);
+        withdrawalExecutionPolicy.addSigner(signer);
 
         // Apply should now succeed
-        uint256 amountOut = withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
+        uint256 amountOut =
+            withdrawalExecutionPolicy.applyWithdrawalExecutionPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
         assertEq(amountOut, iouAmountRay - personalFeeAmountRay, "Should return correct amount after signer re-added");
     }
 
-    function test_applyWithdrawalPolicy_otherSignersUnaffectedWhenOneRemoved(
+    function test_applyWithdrawalExecutionPolicy_otherSignersUnaffectedWhenOneRemoved(
         address user,
         address assetOut,
         uint256 iouAmountRay,
@@ -1247,14 +1277,14 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setDefaultFeeBps(uint16(baseFeeBps));
+        withdrawalExecutionPolicy.setDefaultFeeBps(uint16(baseFeeBps));
 
         (address signer1, uint256 signerPk1) = makeAddrAndKey("signer1");
         (address signer2, uint256 signerPk2) = makeAddrAndKey("signer2");
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer1);
+        withdrawalExecutionPolicy.addSigner(signer1);
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer2);
+        withdrawalExecutionPolicy.addSigner(signer2);
 
         bytes memory data1 =
             _createSignedFeeData(signerPk1, user, assetOut, iouAmountRay, personalFeeAmountRay, 1, DEFAULT_DEADLINE);
@@ -1263,14 +1293,16 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         // Remove signer1
         vm.prank(admin);
-        withdrawalPolicy.removeSigner(signer1);
+        withdrawalExecutionPolicy.removeSigner(signer1);
 
         // Signer1's signature should fail
-        vm.expectRevert(WithdrawalPolicy.InvalidSignature.selector);
-        withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data1));
+        vm.expectRevert(WithdrawalExecutionPolicy.InvalidSignature.selector);
+        withdrawalExecutionPolicy.applyWithdrawalExecutionPolicy(_buildRequest(user, assetOut, iouAmountRay, data1));
 
         // Signer2's signature should still work
-        uint256 amountOut = withdrawalPolicy.applyWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data2));
+        uint256 amountOut = withdrawalExecutionPolicy.applyWithdrawalExecutionPolicy(
+            _buildRequest(user, assetOut, iouAmountRay, data2)
+        );
         assertEq(amountOut, iouAmountRay - personalFeeAmountRay, "Signer2 signature should still work");
     }
 
@@ -1279,21 +1311,21 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         (address signer,) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer);
+        withdrawalExecutionPolicy.addSigner(signer);
 
         // Signer can invalidate while whitelisted
         vm.prank(signer);
-        withdrawalPolicy.invalidateNonce(signer, nonce1);
-        assertTrue(withdrawalPolicy.wasNonceUsed(signer, nonce1), "Nonce1 should be invalidated");
+        withdrawalExecutionPolicy.invalidateNonce(signer, nonce1);
+        assertTrue(withdrawalExecutionPolicy.wasNonceUsed(signer, nonce1), "Nonce1 should be invalidated");
 
         // Remove the signer
         vm.prank(admin);
-        withdrawalPolicy.removeSigner(signer);
+        withdrawalExecutionPolicy.removeSigner(signer);
 
         // Removed signer cannot invalidate nonces anymore
         vm.prank(signer);
         vm.expectRevert(Errors.NotAuthorized.selector);
-        withdrawalPolicy.invalidateNonce(signer, nonce2);
+        withdrawalExecutionPolicy.invalidateNonce(signer, nonce2);
     }
 
     /// @notice Invariant: the fee charged to the user is never more than the asset-bp cap applied to iouAmountRay
@@ -1311,17 +1343,19 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setAssetFeeBps(assetOut, uint16(assetFeeBps), true);
+        withdrawalExecutionPolicy.setAssetFeeBps(assetOut, uint16(assetFeeBps), true);
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer);
+        withdrawalExecutionPolicy.addSigner(signer);
 
         bytes memory data = _createSignedFeeData(
             signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, DEFAULT_DEADLINE
         );
 
-        uint256 amountOut = withdrawalPolicy.previewWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
+        uint256 amountOut = withdrawalExecutionPolicy.previewWithdrawalExecutionPolicy(
+            _buildRequest(user, assetOut, iouAmountRay, data)
+        );
         uint256 chargedFee = iouAmountRay - amountOut;
 
         assertLe(chargedFee, _capRay(iouAmountRay, assetFeeBps), "Charged fee must not exceed asset-bp cap");
@@ -1341,18 +1375,20 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setAssetFeeBps(assetOut, uint16(assetFeeBps), true);
+        withdrawalExecutionPolicy.setAssetFeeBps(assetOut, uint16(assetFeeBps), true);
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer);
+        withdrawalExecutionPolicy.addSigner(signer);
 
         uint256 personalFeeAmountRay = _capRay(iouAmountRay, signedBps);
         bytes memory data = _createSignedFeeData(
             signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, DEFAULT_DEADLINE
         );
 
-        uint256 amountOut = withdrawalPolicy.previewWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
+        uint256 amountOut = withdrawalExecutionPolicy.previewWithdrawalExecutionPolicy(
+            _buildRequest(user, assetOut, iouAmountRay, data)
+        );
         assertEq(
             iouAmountRay - amountOut,
             _capRay(iouAmountRay, signedBps),
@@ -1371,19 +1407,21 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
 
         vm.prank(admin);
-        withdrawalPolicy.setDefaultFeeBps(0);
+        withdrawalExecutionPolicy.setDefaultFeeBps(0);
         vm.prank(admin);
-        withdrawalPolicy.setAssetFeeBps(assetOut, 0, true);
+        withdrawalExecutionPolicy.setAssetFeeBps(assetOut, 0, true);
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer);
+        withdrawalExecutionPolicy.addSigner(signer);
 
         bytes memory data = _createSignedFeeData(
             signerPk, user, assetOut, iouAmountRay, personalFeeAmountRay, DEFAULT_NONCE, DEFAULT_DEADLINE
         );
 
-        uint256 amountOut = withdrawalPolicy.previewWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
+        uint256 amountOut = withdrawalExecutionPolicy.previewWithdrawalExecutionPolicy(
+            _buildRequest(user, assetOut, iouAmountRay, data)
+        );
         assertEq(amountOut, iouAmountRay, "No fee may be charged when asset bp is 0");
     }
 
@@ -1401,16 +1439,18 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setAssetFeeBps(assetOut, uint16(assetFeeBps), true);
+        withdrawalExecutionPolicy.setAssetFeeBps(assetOut, uint16(assetFeeBps), true);
 
         (address signer, uint256 signerPk) = makeAddrAndKey("signer");
         vm.prank(admin);
-        withdrawalPolicy.addSigner(signer);
+        withdrawalExecutionPolicy.addSigner(signer);
 
         bytes memory data =
             _createSignedFeeData(signerPk, user, assetOut, iouAmountRay, capRay + 1, DEFAULT_NONCE, DEFAULT_DEADLINE);
 
-        uint256 amountOut = withdrawalPolicy.previewWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, data));
+        uint256 amountOut = withdrawalExecutionPolicy.previewWithdrawalExecutionPolicy(
+            _buildRequest(user, assetOut, iouAmountRay, data)
+        );
         assertEq(amountOut, iouAmountRay - capRay, "One wei above cap must clamp to cap");
     }
 
@@ -1428,9 +1468,10 @@ contract WithdrawalPolicyTest is TestWithHelpers {
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
-        withdrawalPolicy.setAssetFeeBps(assetOut, uint16(assetFeeBps), true);
+        withdrawalExecutionPolicy.setAssetFeeBps(assetOut, uint16(assetFeeBps), true);
 
-        uint256 amountOut = withdrawalPolicy.previewWithdrawalPolicy(_buildRequest(user, assetOut, iouAmountRay, ""));
+        uint256 amountOut =
+            withdrawalExecutionPolicy.previewWithdrawalExecutionPolicy(_buildRequest(user, assetOut, iouAmountRay, ""));
         uint256 chargedFee = iouAmountRay - amountOut;
 
         uint256 floor = (iouAmountRay * assetFeeBps) / Constants.MAX_BPS;
@@ -1459,7 +1500,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         );
 
         return abi.encode(
-            WithdrawalPolicy.SignedFee({
+            WithdrawalExecutionPolicy.SignedFee({
                 personalFeeAmountRay: personalFeeAmountRay, nonce: nonce, deadline: deadline, signature: signature
             })
         );
@@ -1481,7 +1522,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
             _signPersonalFee(signerPk, user, assetOut, iouAmountRay, signedFeeAmountRay, nonce, deadline);
 
         return abi.encode(
-            WithdrawalPolicy.SignedFee({
+            WithdrawalExecutionPolicy.SignedFee({
                 personalFeeAmountRay: claimedFeeAmountRay, nonce: nonce, deadline: deadline, signature: signature
             })
         );
@@ -1509,7 +1550,7 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         uint256 nonce,
         uint256 deadline
     ) internal view returns (bytes32) {
-        // Must match SIGNED_FEE_TYPEHASH in WithdrawalPolicy
+        // Must match SIGNED_FEE_TYPEHASH in WithdrawalExecutionPolicy
         bytes32 typeHash = keccak256(
             "SignedFee(address user,address assetOut,uint256 iouAmountRay,uint256 personalFeeAmountRay,uint256 nonce,uint256 deadline)"
         );
@@ -1520,10 +1561,10 @@ contract WithdrawalPolicyTest is TestWithHelpers {
         bytes32 domainSeparator = keccak256(
             abi.encode(
                 keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                keccak256("WithdrawalPolicy"),
+                keccak256("WithdrawalExecutionPolicy"),
                 keccak256("1"),
                 block.chainid,
-                address(withdrawalPolicy)
+                address(withdrawalExecutionPolicy)
             )
         );
 

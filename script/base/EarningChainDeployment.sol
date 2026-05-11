@@ -31,14 +31,14 @@ import {PolicyRegistry} from "src/periphery/PolicyRegistry.sol";
 import {Swapper} from "src/periphery/Swapper.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
 import {FundsBridgingPolicy} from "src/policies/FundsBridgingPolicy.sol";
-import {WithdrawalPolicy} from "src/policies/WithdrawalPolicy.sol";
+import {WithdrawalExecutionPolicy} from "src/policies/WithdrawalExecutionPolicy.sol";
 
 abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainSetup, ATokenVaultDeployment {
     using Strings for address;
 
     address immutable PROXY_ADMIN_OWNER = getAccessManagerAddress(_deployer());
     address immutable ALLOCATOR_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
-    address immutable WITHDRAWAL_POLICY_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
+    address immutable WITHDRAWAL_EXECUTION_POLICY_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
     address immutable ASSET_REGISTRY_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
     address immutable GATEWAY_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
     address immutable IOU_TOKEN_MANAGER_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
@@ -103,7 +103,7 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         );
 
         // Validate withdrawal policy signer
-        require(_configAddress(".withdrawalPolicy.signer") != address(0), "Withdrawal policy signer not set");
+        require(_configAddress(".withdrawalExecutionPolicy.signer") != address(0), "Withdrawal policy signer not set");
     }
 
     function _deployContracts() internal {
@@ -111,7 +111,7 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         _deployAccessManager();
         _deployAssetRegistry();
         _deployPolicyRegistry();
-        _deployWithdrawalPolicy();
+        _deployWithdrawalExecutionPolicy();
         _deployIouToken();
         _deployIouTokenManager();
         _deployPriceOracle();
@@ -127,7 +127,7 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         _setupBridgeAdapters();
         _setupAssetRegistry();
         _setupAllocator();
-        _setupWithdrawalPolicy();
+        _setupWithdrawalExecutionPolicy();
         _setupPriceOracleAdapters();
         _setupFundsBridgingPolicy();
         _setupAccessManager(_deployer()); // Must be last – revokes deployer's ADMIN_ROLE
@@ -164,10 +164,11 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         ICcipBridgeAdapter(localCcipAdapter).setDestinationChainAdapter(accountingChainId, accountingCcipAdapter);
     }
 
-    function _setupWithdrawalPolicy() internal {
-        WithdrawalPolicy withdrawalPolicy = WithdrawalPolicy(getWithdrawalPolicyAddress(_deployer()));
-        withdrawalPolicy.setDefaultFeeBps(uint16(_configUint(".withdrawalPolicy.defaultFeeBps")));
-        withdrawalPolicy.addSigner(_configAddress(".withdrawalPolicy.signer"));
+    function _setupWithdrawalExecutionPolicy() internal {
+        WithdrawalExecutionPolicy withdrawalExecutionPolicy =
+            WithdrawalExecutionPolicy(getWithdrawalExecutionPolicyAddress(_deployer()));
+        withdrawalExecutionPolicy.setDefaultFeeBps(uint16(_configUint(".withdrawalExecutionPolicy.defaultFeeBps")));
+        withdrawalExecutionPolicy.addSigner(_configAddress(".withdrawalExecutionPolicy.signer"));
     }
 
     function _setupAllocator() internal {
@@ -241,22 +242,24 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         return assetRegistry;
     }
 
-    function _deployWithdrawalPolicy() internal returns (address) {
-        address implementation = address(new WithdrawalPolicy(getGatewayAddress(_deployer())));
-        _logDeployment("WithdrawalPolicy::Implementation", "", implementation);
-        address withdrawalPolicy = _deployTransparentProxy_create3({
-            namespacedSaltSeed: WITHDRAWAL_POLICY_SALT_SEED,
+    function _deployWithdrawalExecutionPolicy() internal returns (address) {
+        address implementation = address(new WithdrawalExecutionPolicy(getGatewayAddress(_deployer())));
+        _logDeployment("WithdrawalExecutionPolicy::Implementation", "", implementation);
+        address withdrawalExecutionPolicy = _deployTransparentProxy_create3({
+            namespacedSaltSeed: WITHDRAWAL_EXECUTION_POLICY_SALT_SEED,
             deployer: _deployer(),
             implementation: implementation,
-            proxyAdminOwner: WITHDRAWAL_POLICY_PROXY_ADMIN_OWNER,
-            initCalldata: abi.encodeCall(WithdrawalPolicy.initialize, (getAccessManagerAddress(_deployer()), 0))
+            proxyAdminOwner: WITHDRAWAL_EXECUTION_POLICY_PROXY_ADMIN_OWNER,
+            initCalldata: abi.encodeCall(
+                WithdrawalExecutionPolicy.initialize, (getAccessManagerAddress(_deployer()), 0)
+            )
         });
         require(
-            withdrawalPolicy == getWithdrawalPolicyAddress(_deployer()),
-            "WithdrawalPolicy does not match expected address"
+            withdrawalExecutionPolicy == getWithdrawalExecutionPolicyAddress(_deployer()),
+            "WithdrawalExecutionPolicy does not match expected address"
         );
-        _logDeployment("WithdrawalPolicy", WITHDRAWAL_POLICY_SALT_SEED, withdrawalPolicy);
-        return withdrawalPolicy;
+        _logDeployment("WithdrawalExecutionPolicy", WITHDRAWAL_EXECUTION_POLICY_SALT_SEED, withdrawalExecutionPolicy);
+        return withdrawalExecutionPolicy;
     }
 
     function _deployIouToken() internal returns (address) {
@@ -335,7 +338,7 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
                 priceOracle: getPriceOracleAddress(_deployer()),
                 iouTokenManager: getIouTokenManagerAddress(_deployer()),
                 transferHelper: getTransferHelperAddress(_deployer()),
-                withdrawalPolicy: getWithdrawalPolicyAddress(_deployer()),
+                withdrawalExecutionPolicy: getWithdrawalExecutionPolicyAddress(_deployer()),
                 policyRegistry: getPolicyRegistryAddress(_deployer())
             })
         );

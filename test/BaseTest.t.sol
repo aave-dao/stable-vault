@@ -34,7 +34,7 @@ import {EarningChainStateSchemaV1, SCHEMA_VERSION} from "src/periphery/EarningCh
 import {PolicyRegistry} from "src/periphery/PolicyRegistry.sol";
 import {Swapper} from "src/periphery/Swapper.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
-import {WithdrawalPolicy} from "src/policies/WithdrawalPolicy.sol";
+import {WithdrawalExecutionPolicy} from "src/policies/WithdrawalExecutionPolicy.sol";
 
 import {ChainBalanceOracle} from "src/oracles/balance/ChainBalanceOracle.sol";
 import {ChainlinkL2ChainBalanceOracleAdapter} from "src/oracles/balance/ChainlinkL2ChainBalanceOracleAdapter.sol";
@@ -95,7 +95,7 @@ contract BaseTest is TestWithHelpers {
     address iouToken_accountingChainAddress;
     address iouTokenManager_accountingChainAddress;
     address assetRegistry_accountingChainAddress;
-    address withdrawalPolicy_accountingChainAddress;
+    address withdrawalExecutionPolicy_accountingChainAddress;
     address fundsHandler_accountingChainAddress;
     address allocator_accountingChainAddress;
     address swapper_accountingChainAddress;
@@ -110,7 +110,7 @@ contract BaseTest is TestWithHelpers {
     IouToken iouToken_accountingChain;
     IouTokenManager iouTokenManager_accountingChain;
     AssetRegistry assetRegistry_accountingChain;
-    WithdrawalPolicy withdrawalPolicy_accountingChain;
+    WithdrawalExecutionPolicy withdrawalExecutionPolicy_accountingChain;
     FundsHandler fundsHandler;
     Allocator allocator_accountingChain;
     Swapper swapper_accountingChain;
@@ -122,7 +122,7 @@ contract BaseTest is TestWithHelpers {
     // Earning Chain: Earning Chain Gateway, CCIP Adapter, CCIP Router, Swapper, Allocator, Strategy Vault/4626
     address accessManager_earningChainAddress;
     address assetRegistry_earningChainAddress;
-    address withdrawalPolicy_earningChainAddress;
+    address withdrawalExecutionPolicy_earningChainAddress;
     address iouToken_earningChainAddress;
     address iouTokenManager_earningChainAddress;
     address ccipAdapter_earningChainAddress;
@@ -135,7 +135,7 @@ contract BaseTest is TestWithHelpers {
     address policyRegistry_earningChainAddress;
     PolicyRegistry policyRegistry_earningChain;
     AssetRegistry assetRegistry_earningChain;
-    WithdrawalPolicy withdrawalPolicy_earningChain;
+    WithdrawalExecutionPolicy withdrawalExecutionPolicy_earningChain;
     IouToken iouToken_earningChain;
     IouTokenManager iouTokenManager_earningChain;
     CcipAdapter ccipAdapter_earningChain;
@@ -300,10 +300,11 @@ contract BaseTest is TestWithHelpers {
         Logger.log("\tAsset Registry (Accounting Chain) Predicted Address: %s", assetRegistry_accountingChainAddress);
 
         deployerNonce_accountingChain++; // Incrementing for Withdrawal Policy implementation
-        withdrawalPolicy_accountingChainAddress =
+        withdrawalExecutionPolicy_accountingChainAddress =
             vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
         Logger.log(
-            "\tWithdrawal Policy (Accounting Chain) Predicted Address: %s", withdrawalPolicy_accountingChainAddress
+            "\tWithdrawal Execution Policy (Accounting Chain) Predicted Address: %s",
+            withdrawalExecutionPolicy_accountingChainAddress
         );
 
         iouToken_accountingChainAddress = vm.computeCreateAddress(address(this), deployerNonce_accountingChain++);
@@ -382,20 +383,23 @@ contract BaseTest is TestWithHelpers {
         );
 
         // 8-9. Withdrawal Policy (Impl + Proxy)
-        address withdrawalPolicy_accountingChain_impl = address(new WithdrawalPolicy(vault_accountingChainAddress));
-        withdrawalPolicy_accountingChain = WithdrawalPolicy(
+        address withdrawalExecutionPolicy_accountingChain_impl =
+            address(new WithdrawalExecutionPolicy(vault_accountingChainAddress));
+        withdrawalExecutionPolicy_accountingChain = WithdrawalExecutionPolicy(
             address(
                 new TransparentUpgradeableProxy(
-                    withdrawalPolicy_accountingChain_impl,
+                    withdrawalExecutionPolicy_accountingChain_impl,
                     proxyAdmin,
-                    abi.encodeCall(WithdrawalPolicy.initialize, (accessManager_accountingChainAddress, 0))
+                    abi.encodeCall(WithdrawalExecutionPolicy.initialize, (accessManager_accountingChainAddress, 0))
                 )
             )
         );
-        Logger.log("\tWithdrawal Policy (Accounting Chain): %s", address(withdrawalPolicy_accountingChain));
+        Logger.log(
+            "\tWithdrawal Execution Policy (Accounting Chain): %s", address(withdrawalExecutionPolicy_accountingChain)
+        );
         require(
-            address(withdrawalPolicy_accountingChain) == withdrawalPolicy_accountingChainAddress,
-            "Withdrawal Policy (Accounting Chain) address mismatch"
+            address(withdrawalExecutionPolicy_accountingChain) == withdrawalExecutionPolicy_accountingChainAddress,
+            "Withdrawal Execution Policy (Accounting Chain) address mismatch"
         );
 
         // 10. IOU Token
@@ -444,7 +448,7 @@ contract BaseTest is TestWithHelpers {
             fundsHandler_accountingChainAddress,
             assetRegistry_accountingChainAddress,
             transferHelper_accountingChainAddress,
-            withdrawalPolicy_accountingChainAddress,
+            withdrawalExecutionPolicy_accountingChainAddress,
             address(priceOracle_accountingChain),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
             treasury,
@@ -594,8 +598,12 @@ contract BaseTest is TestWithHelpers {
         Logger.log("\tAsset Registry (Earning Chain) Predicted Address: %s", assetRegistry_earningChainAddress);
 
         deployerNonce_earningChain++; // Incrementing for Withdrawal Policy implementation
-        withdrawalPolicy_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
-        Logger.log("\tWithdrawal Policy (Earning Chain) Predicted Address: %s", withdrawalPolicy_earningChainAddress);
+        withdrawalExecutionPolicy_earningChainAddress =
+            vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
+        Logger.log(
+            "\tWithdrawal Execution Policy (Earning Chain) Predicted Address: %s",
+            withdrawalExecutionPolicy_earningChainAddress
+        );
 
         ccipAdapter_earningChainAddress = vm.computeCreateAddress(address(this), deployerNonce_earningChain++);
         Logger.log("\tCCIP Adapter (Earning Chain) Predicted Address: %s", ccipAdapter_earningChainAddress);
@@ -662,20 +670,21 @@ contract BaseTest is TestWithHelpers {
         );
 
         // 6-7. Withdrawal Policy (Impl + Proxy)
-        address withdrawalPolicy_earningChain_impl = address(new WithdrawalPolicy(chainGateway_earningChainAddress));
-        withdrawalPolicy_earningChain = WithdrawalPolicy(
+        address withdrawalExecutionPolicy_earningChain_impl =
+            address(new WithdrawalExecutionPolicy(chainGateway_earningChainAddress));
+        withdrawalExecutionPolicy_earningChain = WithdrawalExecutionPolicy(
             address(
                 new TransparentUpgradeableProxy(
-                    withdrawalPolicy_earningChain_impl,
+                    withdrawalExecutionPolicy_earningChain_impl,
                     proxyAdmin,
-                    abi.encodeCall(WithdrawalPolicy.initialize, (accessManager_earningChainAddress, 0))
+                    abi.encodeCall(WithdrawalExecutionPolicy.initialize, (accessManager_earningChainAddress, 0))
                 )
             )
         );
-        Logger.log("\tWithdrawal Policy (Earning Chain): %s", address(withdrawalPolicy_earningChain));
+        Logger.log("\tWithdrawal Execution Policy (Earning Chain): %s", address(withdrawalExecutionPolicy_earningChain));
         require(
-            address(withdrawalPolicy_earningChain) == withdrawalPolicy_earningChainAddress,
-            "Withdrawal Policy (Earning Chain) address mismatch"
+            address(withdrawalExecutionPolicy_earningChain) == withdrawalExecutionPolicy_earningChainAddress,
+            "Withdrawal Execution Policy (Earning Chain) address mismatch"
         );
 
         // 8. CCIP Adapter
@@ -769,7 +778,7 @@ contract BaseTest is TestWithHelpers {
                 address(priceOracle_earningChain),
                 iouTokenManager_earningChainAddress,
                 transferHelper_earningChainAddress,
-                address(withdrawalPolicy_earningChain),
+                address(withdrawalExecutionPolicy_earningChain),
                 address(policyRegistry_earningChain)
             )
         );

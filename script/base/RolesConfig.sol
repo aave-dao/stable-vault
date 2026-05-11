@@ -21,7 +21,7 @@ import {ChainBalanceOracle} from "src/oracles/balance/ChainBalanceOracle.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {DepositPolicy} from "src/policies/DepositPolicy.sol";
 import {FundsBridgingPolicy} from "src/policies/FundsBridgingPolicy.sol";
-import {WithdrawalPolicy} from "src/policies/WithdrawalPolicy.sol";
+import {WithdrawalExecutionPolicy} from "src/policies/WithdrawalExecutionPolicy.sol";
 
 abstract contract RolesConfig is DeploymentConfig {
     uint32 internal constant NO_DELAY = 0;
@@ -213,9 +213,9 @@ abstract contract RolesConfig is DeploymentConfig {
     }
 
     /// @custom:delay None
-    /// @custom:location WithdrawalPolicy
+    /// @custom:location WithdrawalExecutionPolicy
     function getRole__setAssetFeeBps() internal pure returns (Role memory) {
-        bytes4 selector = WithdrawalPolicy.setAssetFeeBps.selector;
+        bytes4 selector = WithdrawalExecutionPolicy.setAssetFeeBps.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
@@ -226,9 +226,9 @@ abstract contract RolesConfig is DeploymentConfig {
     }
 
     /// @custom:delay None
-    /// @custom:location WithdrawalPolicy
+    /// @custom:location WithdrawalExecutionPolicy
     function getRole__setDefaultFeeBps() internal pure returns (Role memory) {
-        bytes4 selector = WithdrawalPolicy.setDefaultFeeBps.selector;
+        bytes4 selector = WithdrawalExecutionPolicy.setDefaultFeeBps.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
@@ -239,9 +239,9 @@ abstract contract RolesConfig is DeploymentConfig {
     }
 
     /// @custom:delay High
-    /// @custom:location WithdrawalPolicy
+    /// @custom:location WithdrawalExecutionPolicy
     function getRole__addSigner() internal view returns (Role memory) {
-        bytes4 selector = WithdrawalPolicy.addSigner.selector;
+        bytes4 selector = WithdrawalExecutionPolicy.addSigner.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
@@ -252,9 +252,9 @@ abstract contract RolesConfig is DeploymentConfig {
     }
 
     /// @custom:delay None
-    /// @custom:location WithdrawalPolicy
+    /// @custom:location WithdrawalExecutionPolicy
     function getRole__removeSigner() internal pure returns (Role memory) {
-        bytes4 selector = WithdrawalPolicy.removeSigner.selector;
+        bytes4 selector = WithdrawalExecutionPolicy.removeSigner.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
@@ -700,7 +700,7 @@ abstract contract RolesConfig is DeploymentConfig {
         roles[11] = getRole__addBridgeAdapter();
         roles[12] = getRole__removeBridgeAdapter();
 
-        // WithdrawalPolicy
+        // WithdrawalExecutionPolicy
         roles[13] = getRole__setAssetFeeBps();
         roles[14] = getRole__setDefaultFeeBps();
         roles[15] = getRole__addSigner();

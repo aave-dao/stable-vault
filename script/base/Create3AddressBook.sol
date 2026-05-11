@@ -7,7 +7,7 @@ import {Create3AddressLib} from "script/libraries/Create3AddressLib.sol";
 contract Create3AddressBook {
     string constant STABLE_VAULT_SALT_SEED = "aave.stable-vault.StableVault";
     string constant TRANSFER_HELPER_SALT_SEED = "aave.stable-vault.TransferHelper";
-    string constant WITHDRAWAL_POLICY_SALT_SEED = "aave.stable-vault.WithdrawalPolicy";
+    string constant WITHDRAWAL_EXECUTION_POLICY_SALT_SEED = "aave.stable-vault.WithdrawalExecutionPolicy";
     string constant FUNDS_HANDLER_SALT_SEED = "aave.stable-vault.FundsHandler";
     string constant ALLOCATOR_SALT_SEED = "aave.stable-vault.Allocator";
     string constant GATEWAY_SALT_SEED = "aave.stable-vault.Gateway";
@@ -32,8 +32,8 @@ contract Create3AddressBook {
         return Create3AddressLib.computeCreate3Address(TRANSFER_HELPER_SALT_SEED, deployer);
     }
 
-    function getWithdrawalPolicyAddress(address deployer) internal pure virtual returns (address) {
-        return Create3AddressLib.computeCreate3Address(WITHDRAWAL_POLICY_SALT_SEED, deployer);
+    function getWithdrawalExecutionPolicyAddress(address deployer) internal pure virtual returns (address) {
+        return Create3AddressLib.computeCreate3Address(WITHDRAWAL_EXECUTION_POLICY_SALT_SEED, deployer);
     }
 
     function getFundsHandlerAddress(address deployer) internal pure virtual returns (address) {

@@ -41,7 +41,7 @@ interface IEarningChainGateway is IChainGateway {
     /// @param gasLimit Gas limit that should be allocated for execution of the message on the destination chain,
     /// without considering the bridge adapter overhead.
     /// @param bridgeAdapterData Any bridge adapter custom parameters that it may need to operate.
-    /// @param withdrawalPolicyData Additional data for the withdrawal policy.
+    /// @param withdrawalExecutionPolicyData Additional data for the withdrawal policy.
     /// @return amountOut The amount of the exchanged asset transferred to the receiver.
     function exchangeIouTokens(
         uint256 iouTokenAmountRay,
@@ -51,6 +51,6 @@ interface IEarningChainGateway is IChainGateway {
         address bridgeAdapter,
         uint256 gasLimit,
         bytes calldata bridgeAdapterData,
-        bytes memory withdrawalPolicyData
+        bytes memory withdrawalExecutionPolicyData
     ) external payable returns (uint256);
 }

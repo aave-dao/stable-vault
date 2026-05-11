@@ -8,16 +8,16 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {Create3AddressBook} from "script/base/Create3AddressBook.sol";
 import {Upgrade} from "script/base/Upgrade.sol";
-import {WithdrawalPolicy} from "src/policies/WithdrawalPolicy.sol";
+import {WithdrawalExecutionPolicy} from "src/policies/WithdrawalExecutionPolicy.sol";
 
-contract UpgradeWithdrawalPolicy is Create3AddressBook, Upgrade {
+contract UpgradeWithdrawalExecutionPolicy is Create3AddressBook, Upgrade {
     using Strings for address;
 
-    address WITHDRAWAL_POLICY_PROXY;
+    address WITHDRAWAL_EXECUTION_POLICY_PROXY;
     address DEPLOYER = 0xBB700dA5CCC9Ec5605780Fc40695f1206B090303;
 
     function run() public {
-        WITHDRAWAL_POLICY_PROXY = getWithdrawalPolicyAddress(DEPLOYER);
+        WITHDRAWAL_EXECUTION_POLICY_PROXY = getWithdrawalExecutionPolicyAddress(DEPLOYER);
 
         vm.startBroadcast(DEPLOYER);
         _upgrade();
@@ -25,10 +25,11 @@ contract UpgradeWithdrawalPolicy is Create3AddressBook, Upgrade {
     }
 
     function _upgrade() internal {
-        address implementation = address(new WithdrawalPolicy(getStableVaultAddress(DEPLOYER)));
-        _logDeployment("WithdrawalPolicy::Implementation", "", implementation);
-        address proxyAdmin = _getAdminFromSlot(WITHDRAWAL_POLICY_PROXY);
-        ProxyAdmin(proxyAdmin).upgradeAndCall(ITransparentUpgradeableProxy(WITHDRAWAL_POLICY_PROXY), implementation, "");
+        address implementation = address(new WithdrawalExecutionPolicy(getStableVaultAddress(DEPLOYER)));
+        _logDeployment("WithdrawalExecutionPolicy::Implementation", "", implementation);
+        address proxyAdmin = _getAdminFromSlot(WITHDRAWAL_EXECUTION_POLICY_PROXY);
+        ProxyAdmin(proxyAdmin)
+            .upgradeAndCall(ITransparentUpgradeableProxy(WITHDRAWAL_EXECUTION_POLICY_PROXY), implementation, "");
     }
 
     function _logDeployment(string memory name, string memory saltSeed, address addr) internal {
