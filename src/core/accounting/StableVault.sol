@@ -154,8 +154,9 @@ contract StableVault is
     /// @param iouTokenManager The address of the address that manages the supply of IOUs.
     /// @param fundsHandler The address of the contract that handles funds of the accounting chain.
     /// @param transferHelper The address of the contract that helps minimize the number of transfers across flows.
-    /// @param withdrawalExecutionPolicy The address of the contract ensuring protocol's withdrawal requirements are
-    /// met. @param priceOracle The address of the PriceOracle contract.
+    /// @param withdrawalExecutionPolicy The address of the contract ensuring protocol's withdrawal execution
+    /// requirements are met.
+    /// @param priceOracle The address of the PriceOracle contract.
     /// @param maxActiveSubVaults The maximum number of active sub-vaults allowed.
     /// @param policyRegistry The address of the PolicyRegistry contract used to look up policies by ID.
     constructor(
