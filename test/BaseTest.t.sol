@@ -414,7 +414,6 @@ contract BaseTest is TestWithHelpers {
                 chainGateway_accountingChainAddress,
                 vault_accountingChainAddress,
                 transferHelper_accountingChainAddress,
-                policyRegistry_accountingChainAddress,
                 true
             )
         );
@@ -708,7 +707,6 @@ contract BaseTest is TestWithHelpers {
                 chainGateway_earningChainAddress,
                 address(0),
                 transferHelper_earningChainAddress,
-                policyRegistry_earningChainAddress,
                 false
             )
         );

@@ -13,10 +13,7 @@ import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
-import {PolicyRegistry} from "src/periphery/PolicyRegistry.sol";
-
 import {ExtendedIouTokenManager} from "test/mocks/ExtendedIouTokenManager.sol";
-import {MockAccessManager} from "test/mocks/MockAccessManager.sol";
 import {MockErc20} from "test/mocks/MockErc20.sol";
 import {MockGateway} from "test/mocks/MockGateway.sol";
 import {MockTransferHelper} from "test/mocks/MockTransferHelper.sol";
@@ -29,22 +26,19 @@ contract IouTokenManagerTest_AccountingChain is Test {
     address public chainGateway;
     address public vault = makeAddr("VAULT");
     address public transferHelper;
-    address public policyRegistry;
     address iouTokenManagerAddress;
     address iouTokenAddress;
 
     function setUp() public virtual {
         chainGateway = address(new MockGateway());
         transferHelper = address(new MockTransferHelper());
-        policyRegistry = address(new PolicyRegistry(address(new MockAccessManager(makeAddr("admin")))));
 
         uint256 deployerNonce = vm.getNonce(address(this));
 
         iouTokenManagerAddress = vm.computeCreateAddress(address(this), deployerNonce);
         iouTokenAddress = vm.computeCreateAddress(address(this), deployerNonce + 1);
 
-        iouTokenManager =
-            new ExtendedIouTokenManager(iouTokenAddress, chainGateway, vault, transferHelper, policyRegistry, true);
+        iouTokenManager = new ExtendedIouTokenManager(iouTokenAddress, chainGateway, vault, transferHelper, true);
         iouToken = address(new IouToken(iouTokenManagerAddress, "IOU: Aave USD Stable Vault", "IOU-USD"));
 
         assertEq(iouTokenManagerAddress, address(iouTokenManager));
@@ -53,7 +47,7 @@ contract IouTokenManagerTest_AccountingChain is Test {
 
     function test_constructor_reverts_ifInvalidTransferHelper() public {
         vm.expectRevert();
-        new ExtendedIouTokenManager(iouTokenAddress, chainGateway, vault, address(0), policyRegistry, true);
+        new ExtendedIouTokenManager(iouTokenAddress, chainGateway, vault, address(0), true);
     }
 
     // Minting tokens
@@ -612,8 +606,7 @@ contract IouTokenManagerTest_EarningChain is IouTokenManagerTest_AccountingChain
         iouTokenManagerAddress = vm.computeCreateAddress(address(this), deployerNonce);
         iouTokenAddress = vm.computeCreateAddress(address(this), deployerNonce + 1);
 
-        iouTokenManager =
-            new ExtendedIouTokenManager(iouTokenAddress, chainGateway, vault, transferHelper, policyRegistry, false);
+        iouTokenManager = new ExtendedIouTokenManager(iouTokenAddress, chainGateway, vault, transferHelper, false);
         iouToken = address(new IouToken(iouTokenManagerAddress, "IOU: Aave USD Stable Vault", "IOU-USD"));
 
         assertEq(iouTokenManagerAddress, address(iouTokenManager));

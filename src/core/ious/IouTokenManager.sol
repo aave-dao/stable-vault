@@ -5,12 +5,10 @@ pragma solidity ^0.8.22;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {IBridgeIouPolicy} from "src/interfaces/IBridgeIouPolicy.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IIouToken} from "src/interfaces/IIouToken.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
 import {IMintableBurnableIERC20} from "src/interfaces/IMintableBurnableIERC20.sol";
-import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
 import {Errors} from "src/types/Errors.sol";
 
@@ -24,11 +22,7 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
     address internal immutable IOU_TOKEN;
     address internal immutable CHAIN_GATEWAY;
     address internal immutable VAULT;
-    address internal immutable POLICY_REGISTRY;
     bool internal immutable IS_ACCOUNTING_CHAIN;
-
-    // keccak256("aave.stable-vault.IouTokenManager.policy.bridge")
-    bytes32 internal constant BRIDGE_POLICY_ID = 0x2dbdcf700a8096ddeb8166aef5ebe73ff7422be6b7a563168d1d9757b35d538c;
 
     /// @custom:storage-location erc7201:aave.storage.IouTokenManager
     struct IouTokenManagerStorage {
@@ -74,26 +68,18 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
     /// @param chainGateway Address of the ChainGateway contract.
     /// @param vault Address of the Vault contract.
     /// @param transferHelper Address of the TransferHelper contract.
-    /// @param policyRegistry Address of the PolicyRegistry contract used to look up policies by ID.
     /// @param isAccountingChain Whether the current chain is the Accounting chain.
-    constructor(
-        address iouToken,
-        address chainGateway,
-        address vault,
-        address transferHelper,
-        address policyRegistry,
-        bool isAccountingChain
-    ) TransferHelperClient(transferHelper) {
+    constructor(address iouToken, address chainGateway, address vault, address transferHelper, bool isAccountingChain)
+        TransferHelperClient(transferHelper)
+    {
         require(iouToken != address(0), Errors.ZeroAddress());
         require(chainGateway != address(0), Errors.ZeroAddress());
-        require(policyRegistry != address(0), Errors.ZeroAddress());
         if (isAccountingChain) {
             require(vault != address(0), Errors.ZeroAddress());
         }
         IOU_TOKEN = iouToken;
         CHAIN_GATEWAY = chainGateway;
         VAULT = vault;
-        POLICY_REGISTRY = policyRegistry;
         IS_ACCOUNTING_CHAIN = isAccountingChain;
     }
 
@@ -122,8 +108,6 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
         require(destinationChainId != block.chainid, Errors.InvalidDestinationChainId());
         require(iouTokenRecipient != address(0), Errors.InvalidParameter());
         require(iouTokenAmountRay > 0, Errors.ZeroAmount());
-
-        _applyBridgeIouPolicy(destinationChainId, iouTokenRecipient, iouTokenAmountRay);
 
         if (IS_ACCOUNTING_CHAIN) {
             _lockTokens(msg.sender, iouTokenAmountRay);
@@ -183,23 +167,5 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
 
     function _mintTokens(address to, uint256 amount) internal {
         IMintableBurnableIERC20(IOU_TOKEN).mint(to, amount);
-    }
-
-    function _applyBridgeIouPolicy(uint256 destChainId, address recipient, uint256 iouAmountRay) internal {
-        address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(BRIDGE_POLICY_ID);
-        if (policy == address(0)) {
-            return;
-        }
-        bool allowed = IBridgeIouPolicy(policy)
-            .applyBridgeIouPolicy(
-                IBridgeIouPolicy.BridgeIouRequest({
-                caller: msg.sender,
-                destChainId: destChainId,
-                recipient: recipient,
-                iouAmountRay: iouAmountRay,
-                extraData: ""
-            })
-            );
-        require(allowed, Errors.PolicyDenied());
     }
 }
