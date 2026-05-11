@@ -28,6 +28,31 @@ import {Errors} from "src/types/Errors.sol";
 /// with the cap amount rounded up in favor of the protocol.
 /// @custom:upgradeable
 contract WithdrawalPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithdrawalPolicy {
+    /// @notice Emitted when a nonce is marked as used, either by a successful appliance of the withdrawal policy or by
+    /// a nonce invalidation.
+    event NonceUsed(address indexed signer, uint256 indexed nonce);
+
+    /// @notice Emitted when an address is added or removed from the set of whitelisted signers.
+    event SignerSet(address indexed signer, bool indexed whitelistAsSigner);
+
+    /// @notice Emitted when the default fee in basis points is set.
+    event DefaultFeeBpsSet(uint16 defaultFeeBps);
+
+    /// @notice Emitted when the asset fee in basis points is set.
+    event AssetFeeBpsSet(address indexed asset, uint16 assetFeeBps, bool isSet);
+
+    /// @notice Thrown when a recovered signer is not a whitelisted signer.
+    /// @custom:selector 0x8baa579f
+    error InvalidSignature();
+
+    /// @notice Thrown when a signature nonce has already been consumed.
+    /// @custom:selector 0x1fb09b80
+    error NonceAlreadyUsed();
+
+    /// @notice Thrown when the signature deadline has passed.
+    /// @custom:selector 0x1ab7da6b
+    error DeadlineExpired();
+
     // EIP-712 typeHash:
     // keccak256("SignedFee(address user,address assetOut,uint256 iouAmountRay,uint256 personalFeeAmountRay,uint256
     // nonce,uint256 deadline)").
