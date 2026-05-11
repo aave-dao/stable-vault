@@ -49,12 +49,10 @@ contract RateLimitBucketLibTest is Test {
     }
 
     function test_preview_afterConfigure_returnsCapacity() public {
+        // configure preserves `consumed`. Default state has consumed = 0, so first enable carries 0 forward and
+        // the bucket starts full at the new capacity.
         w.configure(DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
-        // Default state has capacity == 0, so the configure path zeroes consumed (transition involves the 0 side).
-        // Actually 0 is not a special branch in configure — but preview of pre-configure default is 0, so
-        // newConsumed = newCapacity. So bucket starts drained. See configure tests below for the contract.
-        // Right after configure, lastUpdate == now, so no time has elapsed and no refill has accrued yet.
-        assertEq(w.preview(), 0);
+        assertEq(w.preview(), DEFAULT_CAPACITY);
     }
 
     function test_preview_afterConfigureFromConsumedZero_returnsCapacity() public {
@@ -267,67 +265,62 @@ contract RateLimitBucketLibTest is Test {
 
     function test_configure_carriesConsumedForward(uint256 elapsed) public {
         elapsed = bound(elapsed, 0, 39); // < consumed/refillRate so no full refill
-        w.configure(UNLIMITED, 0);
         w.configure(DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
 
         w.consume(400);
         vm.warp(block.timestamp + elapsed);
 
-        // available before reconfigure
-        uint256 availableBefore = w.preview();
-        assertEq(availableBefore, DEFAULT_CAPACITY - 400 + elapsed * DEFAULT_REFILL_RATE);
+        uint256 consumedBefore = 400 - elapsed * DEFAULT_REFILL_RATE; // post-refill consumed at `now`
 
-        // Loosen by raising capacity. Carry must produce: newConsumed = newCap - availableBefore.
+        // Loosen by raising capacity. consumed is carried forward; available grows by the capacity delta.
         uint128 newCapacity = DEFAULT_CAPACITY * 2;
         w.configure(newCapacity, DEFAULT_REFILL_RATE);
 
         assertEq(w.getBucket().capacity, newCapacity);
-        assertEq(w.getBucket().consumed, newCapacity - availableBefore);
-        assertEq(w.preview(), availableBefore);
+        assertEq(w.getBucket().consumed, consumedBefore);
+        assertEq(w.preview(), newCapacity - consumedBefore);
     }
 
-    function test_configure_clampsConsumedWhenAvailableExceedsNewCapacity() public {
-        w.configure(UNLIMITED, 0);
+    function test_configure_clampsConsumedWhenItExceedsNewCapacity() public {
         w.configure(DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
 
-        w.consume(100); // available = 900
+        w.consume(900); // consumed = 900, available = 100
 
-        uint128 newCapacity = 500;
-        w.configure(newCapacity, DEFAULT_REFILL_RATE); // available (900) > newCap (500), clamp to 0
+        uint128 newCapacity = 500; // < consumed, must clamp consumed down to newCapacity
+        w.configure(newCapacity, DEFAULT_REFILL_RATE);
 
-        assertEq(w.getBucket().consumed, 0);
-        assertEq(w.preview(), newCapacity);
+        assertEq(w.getBucket().consumed, newCapacity);
+        assertEq(w.preview(), 0);
     }
 
     function test_configure_zeroCapacityCarry_clampsToZero() public {
-        w.configure(UNLIMITED, 0);
         w.configure(DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
         w.consume(300);
 
-        w.configure(0, 0); // pause: available is 700, newCap=0, clamp consumed to 0
+        w.configure(0, 0); // pause: consumed (300) clamped down to 0.
 
         assertEq(w.getBucket().capacity, 0);
         assertEq(w.getBucket().consumed, 0);
         assertEq(w.preview(), 0);
     }
 
-    function test_configure_fromZeroCapacity_drains() public {
-        // Default state has capacity == 0 — preview returns 0, so reconfiguring to (N, R) leaves consumed = N.
+    function test_configure_fromDefaultState_startsFull() public {
+        // Default state has consumed == 0, which is carried forward; first enable starts full.
         w.configure(DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
 
-        assertEq(w.getBucket().consumed, DEFAULT_CAPACITY);
-        assertEq(w.preview(), 0);
+        assertEq(w.getBucket().consumed, 0);
+        assertEq(w.preview(), DEFAULT_CAPACITY);
     }
 
-    function test_configure_pauseUnpauseLeavesBucketDrained() public {
-        w.configure(UNLIMITED, 0);
+    function test_configure_pauseUnpauseStartsFull() public {
         w.configure(DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
-        assertEq(w.preview(), DEFAULT_CAPACITY); // start full
+        w.consume(400);
+        assertEq(w.preview(), DEFAULT_CAPACITY - 400);
 
-        w.configure(0, 0); // pause
-        w.configure(DEFAULT_CAPACITY, DEFAULT_REFILL_RATE); // unpause
-        assertEq(w.preview(), 0);
-        assertEq(w.getBucket().consumed, DEFAULT_CAPACITY);
+        w.configure(0, 0); // pause: consumed (400) clamped to 0.
+        w.configure(DEFAULT_CAPACITY, DEFAULT_REFILL_RATE); // unpause: consumed = 0 carried forward, bucket is full.
+        assertEq(w.preview(), DEFAULT_CAPACITY);
+        assertEq(w.getBucket().consumed, 0);
     }
 
     function test_configure_alwaysUpdatesLastUpdate(uint128 capacity, uint128 refillRate, uint256 warpAhead) public {
