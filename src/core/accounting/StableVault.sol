@@ -630,15 +630,21 @@ contract StableVault is
         return newSubVaultId;
     }
 
-    function _migrateUserToSubVault(address user, uint256 oldSubVaultId, uint256 newSubVaultId) internal {
+    function _migrateUserToSubVault(address user, uint256 oldSubVaultId, uint256 newSubVaultId)
+        internal
+        returns (bool migrated)
+    {
         uint256 oldConversionRate = _accrueSubVaultConversionRate(oldSubVaultId);
         uint256 newConversionRate = _accrueSubVaultConversionRate(newSubVaultId);
         uint256 userOldShares = $storage().positions[user].shares;
         // Round down the amount of shares after sub-vault migration, so that the rounding is in favor of the protocol.
         uint256 userNewShares = userOldShares.rayMulDown(oldConversionRate).rayDivDown(newConversionRate);
-        // Do not allow the user position share quantity to deplete to zero which can happen if a user has a small
-        // userOldShares quantity and newConversionRate is large.
-        require(userNewShares > 0, Errors.InvalidAmount());
+        // Skip migration when the new share count rounds to zero (dust position relative to the target sub-vault's
+        // conversion rate). Reverting would block the entire `setUserRate` batch on a single dust-positioned user;
+        // consistent with the no-position skip in `_setUserRate`.
+        if (userNewShares == 0) {
+            return false;
+        }
 
         _moveShares({
             from: user,
@@ -652,6 +658,7 @@ contract StableVault is
         // `_validateAmountOfActiveSubVaults()` is intentionally not called here: this function runs inside the
         // `setUserRate` batch loop, where intermediate states may transiently exceed the limit before settling
         // to a valid final state. Validation is performed upstream in `setUserRate` after the loop completes.
+        return true;
     }
 
     /// @dev Callers must invoke `_validateAmountOfActiveSubVaults()` after their logical operation
@@ -931,8 +938,9 @@ contract StableVault is
                 RedundantRate(user, newPerSecondRate)
             );
             uint256 newSubVaultId = _getOrCreateSubVaultWithRate(newPerSecondRate);
-            emit UserRateSet(user, newSubVaultId, newPerSecondRate);
-            _migrateUserToSubVault(user, oldSubVaultId, newSubVaultId);
+            if (_migrateUserToSubVault(user, oldSubVaultId, newSubVaultId)) {
+                emit UserRateSet(user, newSubVaultId, newPerSecondRate);
+            }
         }
         // `_validateAmountOfActiveSubVaults()` is intentionally not called here: this is invoked per-user inside
         // the `setUserRate` batch loop. Validation is performed upstream in `setUserRate` after the loop.
