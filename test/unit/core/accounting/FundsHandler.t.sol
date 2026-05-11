@@ -11,6 +11,7 @@ import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
+import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
 import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
@@ -635,6 +636,45 @@ contract FundsHandlerTest is TestWithHelpers {
                     bridgeAdapterData
                 )
             )
+        );
+        fundsHandler.pushFundsToChain(
+            address(mockAsset),
+            amount,
+            chainId,
+            address(mockBridgeAdapter),
+            bridgeAdapterData_gasLimit,
+            bridgeAdapterData
+        );
+    }
+
+    function test_pushFundsToChain_queriesRegistryWithBridgePolicyId(
+        uint256 amount,
+        uint256 chainId,
+        uint256 bridgeAdapterData_feeAmount,
+        uint256 bridgeAdapterData_gasLimit
+    ) public {
+        vm.assume(chainId != block.chainid);
+
+        vm.prank(ADMIN);
+        fundsHandler.addEarningChain(chainId);
+
+        amount = _boundAssetAmount(address(mockAsset), amount);
+        bridgeAdapterData_feeAmount = _boundAssetAmount(address(mockAsset), bridgeAdapterData_feeAmount);
+        mockAsset.mint(address(this), bridgeAdapterData_feeAmount);
+        mockAsset.forceApprove(address(mockBridgeAdapter), bridgeAdapterData_feeAmount);
+
+        bytes memory bridgeAdapterData = abi.encode(
+            ICcipBridgeAdapter.CcipFeeParams({
+                feeToken: address(mockAsset), feeAmount: bridgeAdapterData_feeAmount, feeRefundThreshold: 0
+            })
+        );
+
+        mockAsset.mint(address(mockAllocator), amount);
+        mockAllocator.mockToPushToTransferHelperInNextCall(address(mockAsset), amount);
+
+        vm.expectCall(
+            address(policyRegistry),
+            abi.encodeCall(IPolicyRegistry.getPolicy, keccak256("aave.stable-vault.FundsHandler.policy.bridge"))
         );
         fundsHandler.pushFundsToChain(
             address(mockAsset),

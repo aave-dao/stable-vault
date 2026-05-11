@@ -13,6 +13,7 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {StableVault} from "src/core/accounting/StableVault.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
+import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
@@ -690,6 +691,26 @@ contract StableVaultTest is TestWithHelpers {
         vm.expectCall(
             address(mockFundsHandler),
             abi.encodeWithSelector(IFundsHandler.processDeposit.selector, address(mockAsset), amount)
+        );
+
+        vm.prank(user);
+        stableVault.deposit(user, address(mockAsset), amount, "");
+    }
+
+    function test_deposit_queriesRegistryWithDepositPolicyId(address user, uint256 amount) public {
+        vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
+        _assumeNotProxyAdmin(user, address(stableVault));
+        amount = _boundAssetAmount(address(mockAsset), amount);
+
+        mockAsset.mint(user, amount);
+
+        vm.prank(user);
+        mockAsset.forceApprove(address(stableVault), amount);
+
+        vm.expectCall(
+            address(policyRegistry),
+            abi.encodeCall(IPolicyRegistry.getPolicy, keccak256("aave.stable-vault.StableVault.policy.deposit"))
         );
 
         vm.prank(user);
@@ -1786,6 +1807,26 @@ contract StableVaultTest is TestWithHelpers {
         uint256 actualWithdrawalAmountRay = stableVault.requestWithdrawal(user, 0, "");
 
         assertEq(actualWithdrawalAmountRay, userBalanceRay);
+    }
+
+    function test_requestWithdrawal_queriesRegistryWithWithdrawalRequestPolicyId(address user, uint256 depositAmount)
+        public
+    {
+        vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
+        _assumeNotProxyAdmin(user, address(stableVault));
+        depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
+        _deposit(user, depositAmount);
+
+        vm.expectCall(
+            address(policyRegistry),
+            abi.encodeCall(
+                IPolicyRegistry.getPolicy, keccak256("aave.stable-vault.StableVault.policy.withdrawal-request")
+            )
+        );
+
+        vm.prank(user);
+        stableVault.requestWithdrawal(user, 0, "");
     }
 
     // Couldn't reproduce the case where the withdrawal amount is zero due to conversion rounding loss.

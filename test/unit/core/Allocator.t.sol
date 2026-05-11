@@ -17,6 +17,7 @@ import {Vm} from "forge-std/Vm.sol";
 import {Allocator} from "src/core/Allocator.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
+import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
@@ -1585,6 +1586,18 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), amount);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
+    }
+
+    function test_rebalance_queriesRegistryWithRebalancePolicyId(uint256 amount) public {
+        amount = _boundAssetAmount(address(_mockUsdt), amount);
+        _mockUsdt.mint(address(_allocator), amount);
+
+        vm.expectCall(
+            address(_policyRegistry),
+            abi.encodeCall(IPolicyRegistry.getPolicy, keccak256("aave.stable-vault.Allocator.policy.rebalance"))
+        );
+        vm.prank(address(everyRoleAccount));
+        _allocator.rebalance(_getDepositIdleFundsRebalanceParams(address(_mockUsdt)));
     }
 
     function test_rebalance_allocate_reverts_ifStrategyIsNotSupportedForAsset(uint256 amount) public {
