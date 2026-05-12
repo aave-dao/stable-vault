@@ -14,6 +14,7 @@ import {Errors} from "src/types/Errors.sol";
 
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
 import {MockAccessManager} from "test/mocks/MockAccessManager.sol";
+import {GasBurnerPriceOracleAdapter} from "test/mocks/GasBurnerPriceOracleAdapter.sol";
 import {MockPriceOracleAdapter} from "test/mocks/MockPriceOracleAdapter.sol";
 
 contract PriceOracleTest is TestWithHelpers {
@@ -166,6 +167,39 @@ contract PriceOracleTest is TestWithHelpers {
     function test_getPrice_reverts_ifAdapterNotFound() public {
         vm.expectRevert(abi.encodeWithSelector(IPriceOracle.OracleAdapterNotFound.selector, asset1));
         _priceOracle.getPrice(asset1);
+    }
+
+    /// @dev Q-03 / VA-188: a genuine adapter revert (paused / deprecated Chainlink feed, L2 sequencer downtime, etc.)
+    /// must not propagate through the aggregation pipeline. Catch path treats the asset's contribution as 0 — same
+    /// conservative direction as `response.isStale`.
+    function test_getPrice_returnsZero_whenAdapterReverts() public {
+        // Configure the adapter first while it's still responsive, so `setOracleAdapterForAsset`'s
+        // sanity-call `getPrice` passes.
+        vm.prank(everyRoleAccount);
+        _priceOracle.setOracleAdapterForAsset(asset1, address(_mockAdapter));
+
+        // Flip the adapter into permanent-revert mode after registration.
+        _mockAdapter.setShouldRevert(true, "feed paused");
+
+        uint256 result = _priceOracle.getPrice(asset1);
+        assertEq(result, 0, "Should return 0 when adapter reverts (mirrors stale fallback)");
+    }
+
+    /// @dev Q-03 / VA-188: if the catch fired due to OOG (inner call exhausted its 63/64 gas allowance),
+    /// re-revert with `InsufficientGasForExternalCall` instead of silently marking a healthy feed as failed.
+    function test_getPrice_reverts_whenAdapterOOGs() public {
+        GasBurnerPriceOracleAdapter burner = new GasBurnerPriceOracleAdapter();
+        burner.setResponse(MathLib.RAY, false); // benign response for the setter's sanity-call
+
+        vm.prank(everyRoleAccount);
+        _priceOracle.setOracleAdapterForAsset(asset1, address(burner));
+
+        burner.setBurnEnabled(true);
+
+        // Forward enough gas that PriceOracle's frame and the catch can complete, but not enough that the inner
+        // gas-burning loop finishes — so the 63/64 leftover fires the guard.
+        vm.expectRevert(IPriceOracle.InsufficientGasForExternalCall.selector);
+        _priceOracle.getPrice{gas: 200_000}(asset1);
     }
 
     function test_getPrice_capsToMaxPriceRay(uint256 priceRay) public {

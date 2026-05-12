@@ -22,6 +22,10 @@ interface IPriceOracle {
     /// @custom:selector 0x19abf40e
     error StalePrice();
 
+    /// @notice Thrown when an adapter call ran out of gas (catch path) and was re-reverted instead of being treated as
+    /// a genuine adapter revert. Distinguishes OOG-induced catches from real adapter failures.
+    error InsufficientGasForExternalCall();
+
     /// @notice Emitted when an adapter is set for an asset.
     event OracleAdapterSet(address indexed asset, address indexed newAdapter, address indexed previousAdapter);
 
