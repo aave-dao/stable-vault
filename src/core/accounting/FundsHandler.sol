@@ -162,12 +162,13 @@ contract FundsHandler is
         uint256 chainId,
         address bridgeAdapter,
         uint256 gasLimit,
-        bytes calldata bridgeAdapterData
+        bytes calldata bridgeAdapterData,
+        bytes calldata policyData
     ) external payable override restricted assertingTransferHelperBalanceFor(asset) {
         require(amount > 0, Errors.ZeroAmount());
         require($storage().earningChainIds.contains(chainId), Errors.InvalidDestinationChainId());
 
-        _applyFundsBridgingPolicy(chainId, bridgeAdapter, asset, amount);
+        _applyFundsBridgingPolicy(chainId, bridgeAdapter, asset, amount, policyData);
 
         // Pull funds from liquidity into the TransferHelper.
         _pullFundsFromImmediateLiquidity(asset, amount);
@@ -190,7 +191,13 @@ contract FundsHandler is
         IAllocator(ALLOCATOR).withdraw(asset, amount);
     }
 
-    function _applyFundsBridgingPolicy(uint256 chainId, address bridgeAdapter, address asset, uint256 amount) internal {
+    function _applyFundsBridgingPolicy(
+        uint256 chainId,
+        address bridgeAdapter,
+        address asset,
+        uint256 amount,
+        bytes calldata policyData
+    ) internal {
         address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(BRIDGE_POLICY_ID);
         if (policy == address(0)) {
             return;
@@ -198,7 +205,12 @@ contract FundsHandler is
         IFundsBridgingPolicy(policy)
             .applyFundsBridgingPolicy(
                 IFundsBridgingPolicy.FundsBridgingIntent({
-                caller: msg.sender, bridgeAdapter: bridgeAdapter, destChainId: chainId, asset: asset, amount: amount
+                caller: msg.sender,
+                bridgeAdapter: bridgeAdapter,
+                destChainId: chainId,
+                asset: asset,
+                amount: amount,
+                policyData: policyData
             })
             );
     }

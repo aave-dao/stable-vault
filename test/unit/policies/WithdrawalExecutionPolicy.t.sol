@@ -55,7 +55,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
         returns (IWithdrawalExecutionPolicy.WithdrawalExecutionIntent memory)
     {
         return IWithdrawalExecutionPolicy.WithdrawalExecutionIntent({
-            user: user, assetOut: assetOut, iouAmountRay: iouAmountRay, data: data
+            user: user, assetOut: assetOut, iouAmountRay: iouAmountRay, policyData: data
         });
     }
 

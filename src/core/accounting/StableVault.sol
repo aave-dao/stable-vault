@@ -221,7 +221,7 @@ contract StableVault is
     }
 
     /// @inheritdoc IStableVault
-    function deposit(address user, address asset, uint256 amount, bytes calldata extraData)
+    function deposit(address user, address asset, uint256 amount, bytes calldata policyData)
         external
         virtual
         override
@@ -231,7 +231,7 @@ contract StableVault is
         require(IAssetRegistry(ASSET_REGISTRY).isUserDepositAllowed(asset), Errors.UnsupportedAsset(asset));
         require(amount > 0, Errors.InvalidAmount());
 
-        _applyDepositPolicy(user, asset, amount, extraData);
+        _applyDepositPolicy(user, asset, amount, policyData);
 
         IPriceOracle(PRICE_ORACLE).validatePrice(asset);
 
@@ -382,7 +382,7 @@ contract StableVault is
     }
 
     /// @inheritdoc IStableVault
-    function requestWithdrawal(address user, uint256 requestedAmountInRay, bytes calldata extraData)
+    function requestWithdrawal(address user, uint256 requestedAmountInRay, bytes calldata policyData)
         external
         virtual
         override
@@ -416,7 +416,7 @@ contract StableVault is
             user: user,
             principalAmountInRay: guaranteedAmountRay,
             interestAmountInRay: actualAmountInRay - guaranteedAmountRay,
-            extraData: extraData
+            policyData: policyData
         });
 
         uint256 remainingShares = _burnShares(user, subVaultId, redeemedShares);
@@ -962,7 +962,7 @@ contract StableVault is
 
     /////////////////////////////////////// POLICY APPLICATION /////////////////////////////////////////////////////
 
-    function _applyDepositPolicy(address user, address asset, uint256 amount, bytes calldata extraData) internal {
+    function _applyDepositPolicy(address user, address asset, uint256 amount, bytes calldata policyData) internal {
         address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(DEPOSIT_POLICY_ID);
         if (policy == address(0)) {
             return;
@@ -970,7 +970,7 @@ contract StableVault is
         IDepositPolicy(policy)
             .applyDepositPolicy(
                 IDepositPolicy.DepositIntent({
-                caller: msg.sender, user: user, asset: asset, amount: amount, extraData: extraData
+                caller: msg.sender, user: user, asset: asset, amount: amount, policyData: policyData
             })
             );
     }
@@ -979,7 +979,7 @@ contract StableVault is
         address user,
         uint256 principalAmountInRay,
         uint256 interestAmountInRay,
-        bytes calldata extraData
+        bytes calldata policyData
     ) internal {
         address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(WITHDRAWAL_REQUEST_POLICY_ID);
         if (policy == address(0)) {
@@ -992,7 +992,7 @@ contract StableVault is
                 user: user,
                 principalAmountInRay: principalAmountInRay,
                 interestAmountInRay: interestAmountInRay,
-                extraData: extraData
+                policyData: policyData
             })
             );
     }
@@ -1008,7 +1008,7 @@ contract StableVault is
         return IWithdrawalExecutionPolicy(policy)
             .applyWithdrawalExecutionPolicy(
                 IWithdrawalExecutionPolicy.WithdrawalExecutionIntent({
-                user: user, assetOut: assetOut, iouAmountRay: iouAmountRay, data: data
+                user: user, assetOut: assetOut, iouAmountRay: iouAmountRay, policyData: data
             })
             );
     }

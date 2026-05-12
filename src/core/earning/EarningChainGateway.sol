@@ -141,10 +141,11 @@ contract EarningChainGateway is
         uint256 amount,
         address bridgeAdapter,
         uint256 gasLimit,
-        bytes calldata bridgeAdapterData
+        bytes calldata bridgeAdapterData,
+        bytes calldata policyData
     ) external payable override restricted assertingTransferHelperBalanceFor(asset) {
         require(amount > 0, Errors.ZeroAmount());
-        _applyFundsBridgingPolicy(ACCOUNTING_CHAIN_ID, bridgeAdapter, asset, amount);
+        _applyFundsBridgingPolicy(ACCOUNTING_CHAIN_ID, bridgeAdapter, asset, amount, policyData);
         // Pull funds from liquidity into the TransferHelper.
         IAllocator(ALLOCATOR).withdraw(asset, amount);
         _returnFunds(asset, amount, bridgeAdapter, msg.sender, gasLimit, bridgeAdapterData);
@@ -224,7 +225,7 @@ contract EarningChainGateway is
                 user: msg.sender,
                 assetOut: assetOut,
                 iouAmountRay: iouTokenAmountRay,
-                data: withdrawalExecutionPolicyData
+                policyData: withdrawalExecutionPolicyData
             })
             );
         // Note: The rayToAssetDecimals conversion truncates, so the user may burn slightly more IOUs than the
@@ -237,9 +238,13 @@ contract EarningChainGateway is
         return amountOut;
     }
 
-    function _applyFundsBridgingPolicy(uint256 destChainId, address bridgeAdapter, address asset, uint256 amount)
-        internal
-    {
+    function _applyFundsBridgingPolicy(
+        uint256 destChainId,
+        address bridgeAdapter,
+        address asset,
+        uint256 amount,
+        bytes calldata policyData
+    ) internal {
         address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(BRIDGE_POLICY_ID);
         if (policy == address(0)) {
             return;
@@ -247,7 +252,12 @@ contract EarningChainGateway is
         IFundsBridgingPolicy(policy)
             .applyFundsBridgingPolicy(
                 IFundsBridgingPolicy.FundsBridgingIntent({
-                caller: msg.sender, bridgeAdapter: bridgeAdapter, destChainId: destChainId, asset: asset, amount: amount
+                caller: msg.sender,
+                bridgeAdapter: bridgeAdapter,
+                destChainId: destChainId,
+                asset: asset,
+                amount: amount,
+                policyData: policyData
             })
             );
     }

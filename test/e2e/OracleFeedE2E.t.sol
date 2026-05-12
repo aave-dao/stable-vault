@@ -834,7 +834,8 @@ contract OracleFeedE2ETest is BaseTest {
                 ICcipBridgeAdapter.CcipFeeParams({
                     feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
-            )
+            ),
+            ""
         );
 
         // 5. Verify funds arrived back on Accounting Chain
@@ -897,7 +898,8 @@ contract OracleFeedE2ETest is BaseTest {
                 ICcipBridgeAdapter.CcipFeeParams({
                     feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
-            )
+            ),
+            ""
         );
 
         // Re-sync oracle to reflect the remaining Earning Chain balance
@@ -963,7 +965,8 @@ contract OracleFeedE2ETest is BaseTest {
                 ICcipBridgeAdapter.CcipFeeParams({
                     feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
-            )
+            ),
+            ""
         );
     }
 
@@ -992,7 +995,8 @@ contract OracleFeedE2ETest is BaseTest {
                 ICcipBridgeAdapter.CcipFeeParams({
                     feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
-            )
+            ),
+            ""
         );
         _publishAndSyncOracle();
 
@@ -1052,7 +1056,8 @@ contract OracleFeedE2ETest is BaseTest {
                 ICcipBridgeAdapter.CcipFeeParams({
                     feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
-            )
+            ),
+            ""
         );
     }
 

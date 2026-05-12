@@ -232,7 +232,7 @@ contract OwnedMulticallTest is TestWithHelpers {
 
         vm.prank(everyRoleAccount);
         vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, everyRoleAccount));
-        _allocator.rebalance(rebalanceParams);
+        _allocator.rebalance(rebalanceParams, "");
     }
 
     function test_rebalance_viaOwnedMulticall_deallocateAndAllocate(uint256 depositAmount) public {
@@ -269,7 +269,7 @@ contract OwnedMulticallTest is TestWithHelpers {
         calls[0] = OwnedMulticall.Call3({
             target: address(_allocator),
             allowFailure: false,
-            callData: abi.encodeCall(IAllocator.rebalance, (rebalanceParams))
+            callData: abi.encodeCall(IAllocator.rebalance, (rebalanceParams, ""))
         });
 
         vm.prank(everyRoleAccount);
@@ -333,7 +333,7 @@ contract OwnedMulticallTest is TestWithHelpers {
         multicallCalls[idx] = OwnedMulticall.Call3({
             target: address(_allocator),
             allowFailure: false,
-            callData: abi.encodeCall(IAllocator.rebalance, (rebalanceParams))
+            callData: abi.encodeCall(IAllocator.rebalance, (rebalanceParams, ""))
         });
 
         vm.prank(everyRoleAccount);
@@ -392,7 +392,7 @@ contract OwnedMulticallTest is TestWithHelpers {
         calls[0] = OwnedMulticall.Call3({
             target: address(_allocator),
             allowFailure: false,
-            callData: abi.encodeCall(IAllocator.rebalance, (rebalanceParams))
+            callData: abi.encodeCall(IAllocator.rebalance, (rebalanceParams, ""))
         });
 
         vm.prank(unauthorizedCaller);
@@ -430,7 +430,7 @@ contract OwnedMulticallTest is TestWithHelpers {
 
         OwnedMulticall.Call[] memory calls = new OwnedMulticall.Call[](1);
         calls[0] = OwnedMulticall.Call({
-            target: address(_allocator), callData: abi.encodeCall(IAllocator.rebalance, (rebalanceParams))
+            target: address(_allocator), callData: abi.encodeCall(IAllocator.rebalance, (rebalanceParams, ""))
         });
 
         vm.prank(everyRoleAccount);
@@ -458,7 +458,7 @@ contract OwnedMulticallTest is TestWithHelpers {
 
         OwnedMulticall.Call[] memory calls = new OwnedMulticall.Call[](1);
         calls[0] = OwnedMulticall.Call({
-            target: address(_allocator), callData: abi.encodeCall(IAllocator.rebalance, (rebalanceParams))
+            target: address(_allocator), callData: abi.encodeCall(IAllocator.rebalance, (rebalanceParams, ""))
         });
 
         vm.prank(everyRoleAccount);
@@ -511,7 +511,7 @@ contract OwnedMulticallTest is TestWithHelpers {
         multicallCalls[0] = OwnedMulticall.Call3({
             target: address(_allocator),
             allowFailure: true,
-            callData: abi.encodeCall(IAllocator.rebalance, (rebalanceParams))
+            callData: abi.encodeCall(IAllocator.rebalance, (rebalanceParams, ""))
         });
 
         vm.prank(everyRoleAccount);
@@ -580,7 +580,7 @@ contract OwnedMulticallTest is TestWithHelpers {
         calls[0] = OwnedMulticall.Call3({
             target: address(_allocator),
             allowFailure: false,
-            callData: abi.encodeCall(IAllocator.rebalance, (rebalanceParams))
+            callData: abi.encodeCall(IAllocator.rebalance, (rebalanceParams, ""))
         });
         return calls;
     }

@@ -14,9 +14,11 @@ interface IRebalancePolicy {
     /// @notice Core parameters for a rebalance.
     /// @param caller `msg.sender` of `Allocator.rebalance`.
     /// @param params The native rebalance parameters (deallocations / swaps / allocations).
+    /// @param policyData Additional data that the rebalance policy might need to operate.
     struct RebalanceIntent {
         address caller;
         IAllocator.RebalanceParams[] params;
+        bytes policyData;
     }
 
     /// @notice Applies the rebalance policy. Reverts if the rebalance does not comply with the policy restrictions.

@@ -24,12 +24,14 @@ interface IEarningChainGateway is IChainGateway {
     /// @param gasLimit Gas limit that should be allocated for execution of the message on the destination chain,
     /// without considering the bridge adapter overhead.
     /// @param bridgeAdapterData Any bridge adapter custom parameters that it may need to operate.
+    /// @param policyData Additional data that the bridge-funds policy might need to operate.
     function pushFundsToAccountingChain(
         address asset,
         uint256 amount,
         address bridgeAdapter,
         uint256 gasLimit,
-        bytes calldata bridgeAdapterData
+        bytes calldata bridgeAdapterData,
+        bytes calldata policyData
     ) external payable;
 
     /// @notice Exchanges IOU tokens for a specific asset and bridges data back to the Accounting Chain.

@@ -14,13 +14,13 @@ interface IDepositPolicy {
     /// @param user The position beneficiary.
     /// @param asset The asset being deposited.
     /// @param amount The amount of `asset` being deposited (in the asset's native decimals).
-    /// @param extraData Additional data for the deposit policy.
+    /// @param policyData Additional data that the deposit policy might need to operate.
     struct DepositIntent {
         address caller;
         address user;
         address asset;
         uint256 amount;
-        bytes extraData;
+        bytes policyData;
     }
 
     /// @notice Applies the deposit policy. Reverts if the deposit does not comply with the policy restrictions.

@@ -149,7 +149,8 @@ contract EndToEndTest is BaseTest {
                     ICcipBridgeAdapter.CcipFeeParams({
                         feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                     })
-                )
+                ),
+                ""
             );
 
             // - check that the funds land on Earning Chain and are dropped into default liquidity vault there
@@ -230,7 +231,7 @@ contract EndToEndTest is BaseTest {
 
             Logger.log("Rebalancing by swap from USDC to GHO on the Earning chain...");
             vm.prank(everyRoleAccount);
-            allocator_earningChain.rebalance(rebalances);
+            allocator_earningChain.rebalance(rebalances, "");
 
             // - check that the funds are swapped to GHO
             Logger.log(
@@ -299,7 +300,7 @@ contract EndToEndTest is BaseTest {
                     })
                 );
                 earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
-                    address(GHO), userEarningsInGho, address(ccipAdapter_earningChain), DEFAULT_GAS_LIMIT, bp
+                    address(GHO), userEarningsInGho, address(ccipAdapter_earningChain), DEFAULT_GAS_LIMIT, bp, ""
                 );
             }
 
@@ -374,7 +375,7 @@ contract EndToEndTest is BaseTest {
 
             Logger.log("Rebalancing by swap from GHO to USDC on the Accounting chain...");
             vm.prank(everyRoleAccount);
-            allocator_accountingChain.rebalance(rebalances);
+            allocator_accountingChain.rebalance(rebalances, "");
 
             // - check that the funds are swapped to USDC (includes 1 extra wei for precision)
             Logger.log(
@@ -462,7 +463,7 @@ contract EndToEndTest is BaseTest {
                     })
                 );
                 earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
-                    address(GHO), ghoBalanceOnVaultLeft, address(ccipAdapter_earningChain), DEFAULT_GAS_LIMIT, bp
+                    address(GHO), ghoBalanceOnVaultLeft, address(ccipAdapter_earningChain), DEFAULT_GAS_LIMIT, bp, ""
                 );
             }
 

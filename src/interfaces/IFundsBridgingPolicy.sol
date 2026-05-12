@@ -24,12 +24,14 @@ interface IFundsBridgingPolicy {
     /// @param destChainId Destination chain id.
     /// @param asset The asset being bridged.
     /// @param amount Amount of `asset` being bridged (in the asset's native decimals).
+    /// @param policyData Additional data that the bridge-funds policy might need to operate.
     struct FundsBridgingIntent {
         address caller;
         address bridgeAdapter;
         uint256 destChainId;
         address asset;
         uint256 amount;
+        bytes policyData;
     }
 
     /// @notice Applies the bridge policy for funds-bearing messages. Reverts if the dispatch does not comply with the

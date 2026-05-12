@@ -36,7 +36,12 @@ contract FundsBridgingPolicyTest is Test {
         returns (IFundsBridgingPolicy.FundsBridgingIntent memory)
     {
         return IFundsBridgingPolicy.FundsBridgingIntent({
-            caller: applier, bridgeAdapter: bridgeAdapter, destChainId: destChainId, asset: asset, amount: amount
+            caller: applier,
+            bridgeAdapter: bridgeAdapter,
+            destChainId: destChainId,
+            asset: asset,
+            amount: amount,
+            policyData: ""
         });
     }
 

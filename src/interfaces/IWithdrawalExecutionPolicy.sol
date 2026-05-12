@@ -16,12 +16,12 @@ interface IWithdrawalExecutionPolicy {
     /// @param user Address of the user withdrawing.
     /// @param assetOut Address of the asset to receive.
     /// @param iouAmountRay Amount of IOU tokens being redeemed (in RAY).
-    /// @param data Implementation-specific data (e.g., signed fee discounts).
+    /// @param policyData Additional data that the withdrawal-execution policy might need to operate.
     struct WithdrawalExecutionIntent {
         address user;
         address assetOut;
         uint256 iouAmountRay;
-        bytes data;
+        bytes policyData;
     }
 
     /// @notice Applies the withdrawal policy and returns the final amount the user receives.

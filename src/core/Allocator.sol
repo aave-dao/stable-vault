@@ -303,13 +303,19 @@ contract Allocator is
     //////////////////////////////////////////// MANAGER FUNCTIONS /////////////////////////////////////////////////////
 
     /// @inheritdoc IAllocator
-    function rebalance(RebalanceParams[] memory params) external virtual override restricted nonReentrant {
+    function rebalance(RebalanceParams[] memory params, bytes calldata policyData)
+        external
+        virtual
+        override
+        restricted
+        nonReentrant
+    {
         for (uint256 i = 0; i < params.length; i++) {
             _rebalance(params[i]);
         }
         // The policy is applied after the rebalance so it can assert against post-state invariants efficiently without
         // needing to parse the entire array of rebalance operations.
-        _applyRebalancePolicy(params);
+        _applyRebalancePolicy(params, policyData);
     }
 
     /// @inheritdoc IAllocator
@@ -383,13 +389,15 @@ contract Allocator is
 
     ////////////////////////////////////////////////// INTERNAL ////////////////////////////////////////////////////////
 
-    function _applyRebalancePolicy(RebalanceParams[] memory params) internal {
+    function _applyRebalancePolicy(RebalanceParams[] memory params, bytes calldata policyData) internal {
         address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(REBALANCE_POLICY_ID);
         if (policy == address(0)) {
             return;
         }
         IRebalancePolicy(policy)
-            .applyRebalancePolicy(IRebalancePolicy.RebalanceIntent({caller: msg.sender, params: params}));
+            .applyRebalancePolicy(
+                IRebalancePolicy.RebalanceIntent({caller: msg.sender, params: params, policyData: policyData})
+            );
     }
 
     function _rebalance(RebalanceParams memory rebalanceParams) internal {

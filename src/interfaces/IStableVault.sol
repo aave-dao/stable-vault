@@ -148,8 +148,8 @@ interface IStableVault {
     /// @param user Address of the user depositing the assets.
     /// @param asset Address of the asset being deposited.
     /// @param amount Amount of assets being deposited.
-    /// @param extraData Additional data for the deposit policy.
-    function deposit(address user, address asset, uint256 amount, bytes calldata extraData) external;
+    /// @param policyData Additional data that the deposit policy might need to operate.
+    function deposit(address user, address asset, uint256 amount, bytes calldata policyData) external;
 
     /// @notice ERC20-style total Stable Vault position supply in RAY.
     /// @dev Excludes IOU supply; includes only active Stable Vault position obligations.
@@ -190,9 +190,9 @@ interface IStableVault {
     /// @dev User is minted units of IOUs which can be used to claim assets.
     /// @param user The address of the user requesting the withdrawal
     /// @param requestedAmountInRay The amount of assets requested to withdraw (normalized to RAY units)
-    /// @param extraData Additional data for the withdrawal-request policy.
+    /// @param policyData Additional data that the withdrawal-request policy might need to operate.
     /// @return amountOfIouTokensMinted Amount of IOU tokens minted to the user.
-    function requestWithdrawal(address user, uint256 requestedAmountInRay, bytes calldata extraData)
+    function requestWithdrawal(address user, uint256 requestedAmountInRay, bytes calldata policyData)
         external
         returns (uint256);
 

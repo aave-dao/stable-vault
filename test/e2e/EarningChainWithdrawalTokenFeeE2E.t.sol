@@ -118,7 +118,8 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
                 ICcipBridgeAdapter.CcipFeeParams({
                     feeToken: address(bridgeFeeToken), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
-            )
+            ),
+            ""
         );
 
         // Check the funds were bridged to the Earning Chain

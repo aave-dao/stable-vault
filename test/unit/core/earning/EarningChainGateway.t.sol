@@ -901,7 +901,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         vm.prank(sender);
         _earningChainGateway.pushFundsToAccountingChain(
-            address(_mockUsdt), amountToken, address(_mockBridgeAdapterAssets), DEFAULT_GAS_LIMIT, bridgeAdapterData
+            address(_mockUsdt), amountToken, address(_mockBridgeAdapterAssets), DEFAULT_GAS_LIMIT, bridgeAdapterData, ""
         );
     }
 
@@ -933,7 +933,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         vm.prank(sender);
         _earningChainGateway.pushFundsToAccountingChain(
-            address(_mockUsdt), amountToken, address(_mockBridgeAdapterAssets), DEFAULT_GAS_LIMIT, bridgeAdapterData
+            address(_mockUsdt), amountToken, address(_mockBridgeAdapterAssets), DEFAULT_GAS_LIMIT, bridgeAdapterData, ""
         );
     }
 
@@ -989,7 +989,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         // Call from random account to ensure the fee payer is used
         vm.prank(sender);
         _earningChainGateway.pushFundsToAccountingChain(
-            address(_mockGho), amountToken, address(_mockBridgeAdapterAssets), DEFAULT_GAS_LIMIT, bridgeAdapterData
+            address(_mockGho), amountToken, address(_mockBridgeAdapterAssets), DEFAULT_GAS_LIMIT, bridgeAdapterData, ""
         );
     }
 
@@ -1042,7 +1042,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         vm.prank(feePayer);
         _earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
-            address(_mockUsdt), amountToken, address(_mockBridgeAdapterAssets), DEFAULT_GAS_LIMIT, bridgeAdapterData
+            address(_mockUsdt), amountToken, address(_mockBridgeAdapterAssets), DEFAULT_GAS_LIMIT, bridgeAdapterData, ""
         );
     }
 
@@ -1065,7 +1065,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 ICcipBridgeAdapter.CcipFeeParams({
                     feeToken: Constants.NATIVE_CURRENCY, feeAmount: 0, feeRefundThreshold: 0
                 })
-            )
+            ),
+            ""
         );
     }
 
@@ -1087,7 +1088,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 ICcipBridgeAdapter.CcipFeeParams({
                     feeToken: Constants.NATIVE_CURRENCY, feeAmount: 0, feeRefundThreshold: 0
                 })
-            )
+            ),
+            ""
         );
     }
 
@@ -1109,7 +1111,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 ICcipBridgeAdapter.CcipFeeParams({
                     feeToken: Constants.NATIVE_CURRENCY, feeAmount: 0, feeRefundThreshold: 0
                 })
-            )
+            ),
+            ""
         );
     }
 
@@ -1140,7 +1143,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 ICcipBridgeAdapter.CcipFeeParams({
                     feeToken: Constants.NATIVE_CURRENCY, feeAmount: 0, feeRefundThreshold: 0
                 })
-            )
+            ),
+            ""
         );
     }
 
@@ -1156,7 +1160,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 ICcipBridgeAdapter.CcipFeeParams({
                     feeToken: Constants.NATIVE_CURRENCY, feeAmount: 0, feeRefundThreshold: 0
                 })
-            )
+            ),
+            ""
         );
     }
 
@@ -1176,7 +1181,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 ICcipBridgeAdapter.CcipFeeParams({
                     feeToken: Constants.NATIVE_CURRENCY, feeAmount: 123, feeRefundThreshold: 0
                 })
-            )
+            ),
+            ""
         );
     }
 
@@ -1211,7 +1217,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 ICcipBridgeAdapter.CcipFeeParams({
                     feeToken: bridgeFeeToken, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
-            )
+            ),
+            ""
         );
     }
 
@@ -1228,7 +1235,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 ICcipBridgeAdapter.CcipFeeParams({
                     feeToken: Constants.NATIVE_CURRENCY, feeAmount: 0, feeRefundThreshold: 0
                 })
-            )
+            ),
+            ""
         );
     }
 
@@ -1253,7 +1261,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 ICcipBridgeAdapter.CcipFeeParams({
                     feeToken: Constants.NATIVE_CURRENCY, feeAmount: 0, feeRefundThreshold: 0
                 })
-            )
+            ),
+            ""
         );
     }
 
@@ -1271,7 +1280,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 ICcipBridgeAdapter.CcipFeeParams({
                     feeToken: Constants.NATIVE_CURRENCY, feeAmount: 0, feeRefundThreshold: 0
                 })
-            )
+            ),
+            ""
         );
     }
 

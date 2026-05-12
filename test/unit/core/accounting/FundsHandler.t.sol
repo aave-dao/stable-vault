@@ -407,7 +407,7 @@ contract FundsHandlerTest is TestWithHelpers {
         );
         vm.prank(unauthorizedMsgSender);
         fundsHandler.pushFundsToChain(
-            asset, amount, chainId, makeAddr("bridgeAdapter"), bridgeAdapterData_gasLimit, bridgeAdapterData
+            asset, amount, chainId, makeAddr("bridgeAdapter"), bridgeAdapterData_gasLimit, bridgeAdapterData, ""
         );
     }
 
@@ -440,7 +440,7 @@ contract FundsHandlerTest is TestWithHelpers {
 
         vm.expectRevert(abi.encodeWithSelector(Errors.ZeroAmount.selector));
         fundsHandler.pushFundsToChain{value: bridgeAdapterData_feeAmount}(
-            address(mockAsset), 0, chainId, makeAddr("bridgeAdapter"), bridgeAdapterData_gasLimit, bridgeAdapterData
+            address(mockAsset), 0, chainId, makeAddr("bridgeAdapter"), bridgeAdapterData_gasLimit, bridgeAdapterData, ""
         );
     }
 
@@ -481,7 +481,8 @@ contract FundsHandlerTest is TestWithHelpers {
             chainId,
             address(mockBridgeAdapter),
             bridgeAdapterData_gasLimit,
-            bridgeAdapterData
+            bridgeAdapterData,
+            ""
         );
     }
 
@@ -525,7 +526,8 @@ contract FundsHandlerTest is TestWithHelpers {
             chainId,
             address(mockBridgeAdapter),
             bridgeAdapterData_gasLimit,
-            bridgeAdapterData
+            bridgeAdapterData,
+            ""
         );
     }
 
@@ -565,7 +567,8 @@ contract FundsHandlerTest is TestWithHelpers {
             chainId,
             address(mockBridgeAdapter),
             bridgeAdapterData_gasLimit,
-            bridgeAdapterData
+            bridgeAdapterData,
+            ""
         );
     }
 
@@ -591,7 +594,8 @@ contract FundsHandlerTest is TestWithHelpers {
             chainId,
             address(mockBridgeAdapter),
             bridgeAdapterData_gasLimit,
-            bridgeAdapterData
+            bridgeAdapterData,
+            ""
         );
     }
 
@@ -643,7 +647,8 @@ contract FundsHandlerTest is TestWithHelpers {
             chainId,
             address(mockBridgeAdapter),
             bridgeAdapterData_gasLimit,
-            bridgeAdapterData
+            bridgeAdapterData,
+            ""
         );
     }
 
@@ -682,7 +687,8 @@ contract FundsHandlerTest is TestWithHelpers {
             chainId,
             address(mockBridgeAdapter),
             bridgeAdapterData_gasLimit,
-            bridgeAdapterData
+            bridgeAdapterData,
+            ""
         );
     }
 

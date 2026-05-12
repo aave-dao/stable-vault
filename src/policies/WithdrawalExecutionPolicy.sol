@@ -63,7 +63,7 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
 
     address internal immutable WITHDRAWAL_EXECUTION_POLICY_APPLIER;
 
-    /// @notice Signed personal fee data (decoded from WithdrawalExecutionIntent.data).
+    /// @notice Signed personal fee data (decoded from WithdrawalExecutionIntent.policyData).
     /// @param personalFeeAmountRay The personal fee amount in RAY signed by a whitelisted signer. Used directly as
     /// the fee charged, capped by the asset-specific bp limit.
     /// @param nonce Unique nonce to prevent signature replay.
@@ -262,7 +262,7 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
         uint16 feeBps = _getAssetFeeBps(withdrawalExecution.assetOut);
         uint256 feeAmountToChargeRay =
             (withdrawalExecution.iouAmountRay * feeBps + Constants.MAX_BPS - 1) / Constants.MAX_BPS;
-        if (withdrawalExecution.data.length > 0) {
+        if (withdrawalExecution.policyData.length > 0) {
             uint256 personalFeeAmountRay;
             (signer, nonce, personalFeeAmountRay) = _verifySignedFee(withdrawalExecution);
             if (personalFeeAmountRay < feeAmountToChargeRay) {
@@ -286,7 +286,7 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
         view
         returns (address signer, uint256 nonce, uint256 personalFeeAmountRay)
     {
-        SignedFee memory signedFee = abi.decode(withdrawalExecution.data, (SignedFee));
+        SignedFee memory signedFee = abi.decode(withdrawalExecution.policyData, (SignedFee));
 
         require(signedFee.deadline >= block.timestamp, DeadlineExpired());
 

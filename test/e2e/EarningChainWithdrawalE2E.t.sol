@@ -111,7 +111,8 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
                 ICcipBridgeAdapter.CcipFeeParams({
                     feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
-            )
+            ),
+            ""
         );
 
         // Check the funds were bridged to the Earning Chain

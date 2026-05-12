@@ -32,7 +32,7 @@ contract DepositPolicyTest is Test {
 
     function _request(address asset, uint256 amount) internal view returns (IDepositPolicy.DepositIntent memory) {
         return IDepositPolicy.DepositIntent({
-            caller: applier, user: address(this), asset: asset, amount: amount, extraData: ""
+            caller: applier, user: address(this), asset: asset, amount: amount, policyData: ""
         });
     }
 

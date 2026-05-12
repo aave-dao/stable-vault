@@ -23,13 +23,13 @@ interface IWithdrawalRequestPolicy {
     /// @param principalAmountInRay Principal portion being withdrawn (RAY).
     /// @param interestAmountInRay Interest portion being withdrawn (RAY). The total amount withdrawn is
     /// `principalAmountInRay + interestAmountInRay`.
-    /// @param extraData Additional data for the withdrawal-request policy.
+    /// @param policyData Additional data that the withdrawal-request policy might need to operate.
     struct WithdrawalRequestIntent {
         address caller;
         address user;
         uint256 principalAmountInRay;
         uint256 interestAmountInRay;
-        bytes extraData;
+        bytes policyData;
     }
 
     /// @notice Applies the withdrawal-request policy. Reverts if the withdrawal request does not comply with the
