@@ -1116,9 +1116,7 @@ contract StableVaultTest is TestWithHelpers {
 
         IStableVault.SubVaultData memory user2VaultAfter = stableVault.getUserSubVault(user2);
         assertEq(user2VaultAfter.id, user2VaultBefore.id, "user2 sub-vault should not change");
-        assertEq(
-            user2VaultAfter.perSecondRate, user2VaultBefore.perSecondRate, "user2 perSecondRate should not change"
-        );
+        assertEq(user2VaultAfter.perSecondRate, user2VaultBefore.perSecondRate, "user2 perSecondRate should not change");
     }
 
     function test_setUserRate_batch_skipsDustUserAndMigratesTheRest() public {
