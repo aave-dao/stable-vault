@@ -201,13 +201,13 @@ interface IStableVault {
     /// @param assetOut Address of the asset to withdraw.
     /// @param minAmountOut Minimum amount of `assetOut` to receive in exchange of `iouAmountRay` IOUs.
     /// @param iouAmountRay Amount of the IOU tokens to exchange as part of the withdrawal execution.
-    /// @param withdrawalExecutionPolicyData Additional data for the withdrawal policy.
+    /// @param policyData Additional data that the withdrawal execution policy might need to operate.
     function executeWithdrawal(
         address user,
         address assetOut,
         uint256 minAmountOut,
         uint256 iouAmountRay,
-        bytes memory withdrawalExecutionPolicyData
+        bytes memory policyData
     ) external;
 
     /// @notice Getter for the aggregated obligations owed to depositors in RAY of the denominating currency.

@@ -105,7 +105,7 @@ contract EarningChainGateway is
         address bridgeAdapter,
         uint256 gasLimit,
         bytes calldata bridgeAdapterData,
-        bytes memory withdrawalExecutionPolicyData
+        bytes memory policyData
     ) external payable virtual override nonReentrant assertingTransferHelperBalanceFor(assetOut) returns (uint256) {
         require(iouTokenAmountRay > 0, Errors.ZeroAmount());
         // An insufficient destination gasLimit would cause the BURN_IOU_TOKEN message to be dropped while
@@ -113,8 +113,7 @@ contract EarningChainGateway is
         require(gasLimit >= MIN_BURN_IOU_TOKEN_GAS_LIMIT, Errors.InvalidGasLimit());
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(msg.sender, iouTokenAmountRay);
 
-        uint256 amountOut =
-            _getWithdrawalAmountOut(iouTokenAmountRay, assetOut, minAmountOut, withdrawalExecutionPolicyData);
+        uint256 amountOut = _getWithdrawalAmountOut(iouTokenAmountRay, assetOut, minAmountOut, policyData);
         IAllocator(ALLOCATOR).withdraw(assetOut, amountOut);
 
         // Send data to synchronize the Accounting Chain's state.
@@ -211,21 +210,20 @@ contract EarningChainGateway is
         );
     }
 
+    /// @dev The withdrawal-execution policy is required: unlike the other policies it returns the post-fee amount,
+    /// so a missing registry entry would silently disable fees and let users withdraw at full IOU value.
     function _getWithdrawalAmountOut(
         uint256 iouTokenAmountRay,
         address assetOut,
         uint256 minAmountOut,
-        bytes memory withdrawalExecutionPolicyData
+        bytes memory policyData
     ) private returns (uint256) {
         address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(WITHDRAWAL_EXECUTION_POLICY_ID);
         require(policy != address(0), Errors.ZeroAddress());
         uint256 amountOutRay = IWithdrawalExecutionPolicy(policy)
             .applyWithdrawalExecutionPolicy(
                 IWithdrawalExecutionPolicy.WithdrawalExecutionIntent({
-                user: msg.sender,
-                assetOut: assetOut,
-                iouAmountRay: iouTokenAmountRay,
-                policyData: withdrawalExecutionPolicyData
+                user: msg.sender, assetOut: assetOut, iouAmountRay: iouTokenAmountRay, policyData: policyData
             })
             );
         // Note: The rayToAssetDecimals conversion truncates, so the user may burn slightly more IOUs than the

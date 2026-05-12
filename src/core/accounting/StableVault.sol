@@ -457,13 +457,12 @@ contract StableVault is
         address assetOut,
         uint256 minAmountOut,
         uint256 iouAmountRay,
-        bytes memory withdrawalExecutionPolicyData
+        bytes memory policyData
     ) external virtual override nonReentrant assertingTransferHelperBalanceFor(assetOut) {
         require(user == msg.sender, OnlyUser());
         require(iouAmountRay > 0, Errors.ZeroAmount());
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(user, iouAmountRay);
-        uint256 amountOutRay =
-            _applyWithdrawalExecutionPolicy(user, assetOut, iouAmountRay, withdrawalExecutionPolicyData);
+        uint256 amountOutRay = _applyWithdrawalExecutionPolicy(user, assetOut, iouAmountRay, policyData);
         // Note: The `rayToAssetDecimals` conversion truncates, so the user may burn slightly more IOUs than the
         // exact RAY-equivalent of the assets received. This "dust" loss is at most `10 ^ (27 - assetDecimals) - 1` RAY
         // per withdrawal, which is economically negligible (e.g., <$0.000001 for 6-decimal stablecoins; it would take
