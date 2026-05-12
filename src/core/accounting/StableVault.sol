@@ -1006,12 +1006,14 @@ contract StableVault is
         if (policy == address(0)) {
             return iouAmountRay;
         }
-        return IWithdrawalExecutionPolicy(policy)
+        uint256 amountOutRay = IWithdrawalExecutionPolicy(policy)
             .applyWithdrawalExecutionPolicy(
                 IWithdrawalExecutionPolicy.WithdrawalExecutionIntent({
                 user: user, assetOut: assetOut, iouAmountRay: iouAmountRay, policyData: policyData
             })
             );
+        require(amountOutRay <= iouAmountRay, Errors.InvalidAmount());
+        return amountOutRay;
     }
 
     function _beforeRescueTokens(

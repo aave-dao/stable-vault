@@ -3917,6 +3917,32 @@ contract StableVaultTest is TestWithHelpers {
         assertEq(mockAsset.balanceOf(user), actualWithdrawnAssets);
     }
 
+    /// @dev Defense-in-depth: the policy is expected to deduct a fee, so the post-fee amount must be `<= iouAmountRay`.
+    /// A misconfigured or compromised policy returning more would otherwise inflate the withdrawal.
+    function test_executeWithdrawal_reverts_ifPolicyReturnsMoreThanIouAmount(
+        address user,
+        uint256 iouAmountRay,
+        uint256 policyReturnedAmountRay
+    ) public {
+        vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
+        _assumeNotProxyAdmin(user, address(stableVault));
+        iouAmountRay = _boundRayAmount(iouAmountRay);
+        vm.assume(iouAmountRay < type(uint256).max);
+        policyReturnedAmountRay = bound(policyReturnedAmountRay, iouAmountRay + 1, type(uint256).max);
+        mockIouToken.mint(user, iouAmountRay);
+
+        vm.mockCall(
+            address(mockWithdrawalExecutionPolicy),
+            abi.encodeWithSelector(IWithdrawalExecutionPolicy.applyWithdrawalExecutionPolicy.selector),
+            abi.encode(policyReturnedAmountRay)
+        );
+
+        vm.prank(user);
+        vm.expectRevert(Errors.InvalidAmount.selector);
+        stableVault.executeWithdrawal(user, address(mockAsset), 0, iouAmountRay, "");
+    }
+
     /// @dev When the withdrawal-execution policy is unregistered, the vault skips the policy call and treats the IOU
     /// amount as the post-fee amount, so the user withdraws the full `iouAmountRay` truncated to asset decimals.
     function test_executeWithdrawal_withdrawsFullIouAmountIfNoPolicyRegistered(address user, uint256 iouAmountRay)

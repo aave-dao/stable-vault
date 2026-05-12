@@ -604,6 +604,44 @@ contract EarningChainGatewayTest is TestWithHelpers {
         );
     }
 
+    /// @dev Defense-in-depth: the policy is expected to deduct a fee, so the post-fee amount must be
+    /// `<= iouTokenAmountRay`. A misconfigured or compromised policy returning more would otherwise inflate the
+    /// withdrawal.
+    function test_exchangeIouTokens_reverts_ifPolicyReturnsMoreThanIouAmount(
+        uint256 iouTokenAmountRay,
+        uint256 policyReturnedAmountRay
+    ) public {
+        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        vm.assume(iouTokenAmountRay < type(uint256).max);
+        policyReturnedAmountRay = bound(policyReturnedAmountRay, iouTokenAmountRay + 1, type(uint256).max);
+
+        address user = makeAddr("user");
+        _assumeNotProxyAdmin(user, address(_earningChainGateway));
+
+        vm.mockCall(
+            address(_mockWithdrawalExecutionPolicy),
+            abi.encodeWithSelector(IWithdrawalExecutionPolicy.applyWithdrawalExecutionPolicy.selector),
+            abi.encode(policyReturnedAmountRay)
+        );
+
+        vm.prank(user);
+        vm.expectRevert(Errors.InvalidAmount.selector);
+        _earningChainGateway.exchangeIouTokens(
+            iouTokenAmountRay,
+            address(_mockUsdt),
+            0,
+            user,
+            address(_mockBridgeCcipFeeParams),
+            DEFAULT_GAS_LIMIT,
+            abi.encode(
+                ICcipBridgeAdapter.CcipFeeParams({
+                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: 0, feeRefundThreshold: 0
+                })
+            ),
+            ""
+        );
+    }
+
     /// @dev When the withdrawal-execution policy is unregistered, the gateway skips the policy call and treats the IOU
     /// amount as the post-fee amount, so the user receives the full `iouTokenAmountRay` truncated to asset decimals.
     function test_exchangeIouTokens_withdrawsFullIouAmountIfNoPolicyRegistered(uint256 iouTokenAmountRay) public {
