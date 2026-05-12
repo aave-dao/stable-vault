@@ -16,10 +16,20 @@ import {Errors} from "src/types/Errors.sol";
 abstract contract RateLimitPolicy is AccessManaged {
     using RateLimitBucketLib for RateLimitBucketLib.Bucket;
 
+    address internal immutable POLICY_APPLIER;
+
+    modifier onlyPolicyApplier() {
+        require(msg.sender == POLICY_APPLIER, Errors.NotAuthorized());
+        _;
+    }
+
     /// @dev Constructor.
     /// @param accessManager Address of the IAccessManager contract used for handling access control.
-    constructor(address accessManager) AccessManaged(accessManager) {
+    /// @param policyApplier Address allowed to apply the policy.
+    constructor(address accessManager, address policyApplier) AccessManaged(accessManager) {
+        require(policyApplier != address(0), Errors.ZeroAddress());
         IAccessManager(accessManager).canCall(address(0), address(0), bytes4(0));
+        POLICY_APPLIER = policyApplier;
     }
 
     /// @dev Validates a loosening change and writes it to `bucket`.
@@ -64,24 +74,5 @@ abstract contract RateLimitPolicy is AccessManaged {
             Errors.InvalidParameter()
         );
         bucket.configure(capacity, refillRate);
-    }
-
-    /// @dev Consumes `amount` from `bucket`. No-op when the bucket is unlimited (capacity is max uint128); otherwise
-    /// delegates to `consume`, which reverts via `RateLimitBucketLib.RateLimited` when the bucket lacks capacity
-    /// (including the default zero-capacity state).
-    function _consumeBucket(RateLimitBucketLib.Bucket storage bucket, uint256 amount) internal {
-        if (bucket.capacity == RateLimitBucketLib.UNLIMITED_CAPACITY) {
-            return;
-        }
-        bucket.consume(amount);
-    }
-
-    /// @dev Returns whether `bucket` would accept a consumption of `amount`. Always true for unlimited buckets;
-    /// false for zero-capacity buckets when `amount > 0`.
-    function _canConsumeBucket(RateLimitBucketLib.Bucket storage bucket, uint256 amount) internal view returns (bool) {
-        if (bucket.capacity == RateLimitBucketLib.UNLIMITED_CAPACITY) {
-            return true;
-        }
-        return bucket.preview() >= amount;
     }
 }

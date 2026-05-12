@@ -167,6 +167,38 @@ contract RateLimitBucketLibTest is Test {
         assertEq(w.getBucket().consumed, DEFAULT_CAPACITY);
     }
 
+    function test_consume_unlimited_isNoop(uint256 amount) public {
+        w.configure(UNLIMITED, 0);
+
+        w.consume(amount);
+
+        assertEq(w.getBucket().consumed, 0);
+        assertEq(w.getBucket().capacity, UNLIMITED);
+    }
+
+    /////////////////////////////////// canConsume ///////////////////////////////////
+
+    function test_canConsume_unlimited_isAlwaysTrue(uint256 amount) public {
+        w.configure(UNLIMITED, 0);
+        assertTrue(w.canConsume(amount));
+    }
+
+    function test_canConsume_returnsAvailableComparison(uint256 amount) public {
+        w.configure(UNLIMITED, 0);
+        w.configure(DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
+
+        if (amount <= DEFAULT_CAPACITY) {
+            assertTrue(w.canConsume(amount));
+        } else {
+            assertFalse(w.canConsume(amount));
+        }
+    }
+
+    function test_canConsume_zeroCapacity_isFalseForNonZero(uint256 amount) public view {
+        amount = bound(amount, 1, type(uint256).max);
+        assertFalse(w.canConsume(amount));
+    }
+
     function test_consume_multipleConsumesAccumulate() public {
         w.configure(UNLIMITED, 0);
         w.configure(DEFAULT_CAPACITY, 0); // refillRate=0 to keep accumulation deterministic.

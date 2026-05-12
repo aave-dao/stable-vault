@@ -61,14 +61,15 @@ library RateLimitBucketLib {
     }
 
     /// @notice Refills the bucket and consumes `amount` from the available capacity.
-    /// @dev Reverts when `amount` to consume is greater than the available capacity.
+    /// @dev No-op when the bucket is unlimited (capacity == max uint128) or `amount == 0`.
+    /// @dev Reverts with `RateLimited` when `amount` exceeds the available capacity.
     /// @param bucket The bucket to update.
     /// @param amount The amount to consume.
     function consume(Bucket storage bucket, uint256 amount) internal {
-        if (amount == 0) {
+        uint256 capacity = bucket.capacity;
+        if (capacity == UNLIMITED_CAPACITY || amount == 0) {
             return;
         }
-        uint256 capacity = bucket.capacity;
         uint256 available = preview(bucket);
         require(available >= amount, RateLimited());
         // `capacity - available` is the post-refill `consumed`; adding `amount` yields the new `consumed`.
@@ -78,6 +79,17 @@ library RateLimitBucketLib {
         // Casting to uint128 is safe because block.timestamp fits in uint128 for any practical chain lifetime.
         // forge-lint: disable-next-line(unsafe-typecast)
         bucket.lastUpdate = uint128(block.timestamp);
+    }
+
+    /// @notice Returns whether `bucket` would accept a consumption of `amount` at `block.timestamp`.
+    /// @dev Always true for unlimited buckets; false for zero-capacity buckets when `amount > 0`.
+    /// @param bucket The bucket to read from.
+    /// @param amount The amount that would be consumed.
+    function canConsume(Bucket storage bucket, uint256 amount) internal view returns (bool) {
+        if (bucket.capacity == UNLIMITED_CAPACITY) {
+            return true;
+        }
+        return preview(bucket) >= amount;
     }
 
     /// @notice Updates a bucket's `(capacity, refillRate)`. The refill accrued at the old rate is settled to `now`

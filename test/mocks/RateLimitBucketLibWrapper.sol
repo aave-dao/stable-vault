@@ -17,6 +17,10 @@ contract RateLimitBucketLibWrapper {
         _bucket.consume(amount);
     }
 
+    function canConsume(uint256 amount) external view returns (bool) {
+        return _bucket.canConsume(amount);
+    }
+
     function configure(uint128 capacity, uint128 refillRate) external {
         _bucket.configure(capacity, refillRate);
     }

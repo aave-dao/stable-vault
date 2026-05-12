@@ -5,7 +5,6 @@ pragma solidity ^0.8.22;
 import {IDepositPolicy} from "src/interfaces/IDepositPolicy.sol";
 import {RateLimitBucketLib} from "src/libraries/RateLimitBucketLib.sol";
 import {RateLimitPolicy} from "src/policies/base/RateLimitPolicy.sol";
-import {Errors} from "src/types/Errors.sol";
 
 /// @title DepositPolicy
 /// @author Aave Labs
@@ -14,6 +13,8 @@ import {Errors} from "src/types/Errors.sol";
 /// default to a zero-capacity bucket (fully rate-limited) until governance configures one; setting capacity to max
 /// uint128 removes the limit entirely.
 contract DepositPolicy is RateLimitPolicy, IDepositPolicy {
+    using RateLimitBucketLib for RateLimitBucketLib.Bucket;
+
     event DepositLimitLoosened(
         address indexed asset, uint128 oldCapacity, uint128 oldRefillRate, uint128 newCapacity, uint128 newRefillRate
     );
@@ -22,32 +23,24 @@ contract DepositPolicy is RateLimitPolicy, IDepositPolicy {
         address indexed asset, uint128 oldCapacity, uint128 oldRefillRate, uint128 newCapacity, uint128 newRefillRate
     );
 
-    address internal immutable POLICY_APPLIER;
-
     mapping(address asset => RateLimitBucketLib.Bucket bucket) internal _buckets;
-
-    modifier onlyPolicyApplier() {
-        require(msg.sender == POLICY_APPLIER, Errors.NotAuthorized());
-        _;
-    }
 
     /// @dev Constructor.
     /// @param accessManager Address of the IAccessManager contract used for handling access control.
     /// @param depositPolicyApplier Address allowed to apply the deposit policy (typically the StableVault).
-    constructor(address accessManager, address depositPolicyApplier) RateLimitPolicy(accessManager) {
-        require(depositPolicyApplier != address(0), Errors.ZeroAddress());
-        POLICY_APPLIER = depositPolicyApplier;
-    }
+    constructor(address accessManager, address depositPolicyApplier)
+        RateLimitPolicy(accessManager, depositPolicyApplier)
+    {}
 
     /// @inheritdoc IDepositPolicy
     function applyDepositPolicy(DepositIntent calldata deposit) external override onlyPolicyApplier {
-        _consumeBucket(_buckets[deposit.asset], deposit.amount);
+        _buckets[deposit.asset].consume(deposit.amount);
         emit DepositPolicyApplied(deposit.caller, deposit.user, deposit.asset, deposit.amount);
     }
 
     /// @inheritdoc IDepositPolicy
     function previewDepositPolicy(DepositIntent calldata deposit) external view override returns (bool) {
-        return _canConsumeBucket(_buckets[deposit.asset], deposit.amount);
+        return _buckets[deposit.asset].canConsume(deposit.amount);
     }
 
     /// @notice Returns the current deposit-limit bucket for an asset.

@@ -5,7 +5,6 @@ pragma solidity ^0.8.22;
 import {IFundsBridgingPolicy} from "src/interfaces/IFundsBridgingPolicy.sol";
 import {RateLimitBucketLib} from "src/libraries/RateLimitBucketLib.sol";
 import {RateLimitPolicy} from "src/policies/base/RateLimitPolicy.sol";
-import {Errors} from "src/types/Errors.sol";
 
 /// @title FundsBridgingPolicy
 /// @author Aave Labs
@@ -13,6 +12,8 @@ import {Errors} from "src/types/Errors.sol";
 /// bucket; amounts are denominated in the asset's native decimals. Triples default to a zero-capacity bucket (fully
 /// rate-limited) until governance configures one; setting capacity to max uint128 removes the limit entirely.
 contract FundsBridgingPolicy is RateLimitPolicy, IFundsBridgingPolicy {
+    using RateLimitBucketLib for RateLimitBucketLib.Bucket;
+
     event BridgingLimitLoosened(
         address indexed asset,
         uint256 indexed destChainId,
@@ -33,31 +34,23 @@ contract FundsBridgingPolicy is RateLimitPolicy, IFundsBridgingPolicy {
         uint128 newRefillRate
     );
 
-    address internal immutable POLICY_APPLIER;
-
     mapping(
         address asset
             => mapping(uint256 destChainId => mapping(address bridgeAdapter => RateLimitBucketLib.Bucket bucket))
     ) internal _buckets;
 
-    modifier onlyPolicyApplier() {
-        require(msg.sender == POLICY_APPLIER, Errors.NotAuthorized());
-        _;
-    }
-
     /// @dev Constructor.
     /// @param accessManager Address of the IAccessManager contract used for handling access control.
     /// @param fundsBridgingPolicyApplier Address allowed to apply the bridge-funds policy (typically the FundsHandler
     /// on the Accounting Chain or the EarningChainGateway on an Earning Chain).
-    constructor(address accessManager, address fundsBridgingPolicyApplier) RateLimitPolicy(accessManager) {
-        require(fundsBridgingPolicyApplier != address(0), Errors.ZeroAddress());
-        POLICY_APPLIER = fundsBridgingPolicyApplier;
-    }
+    constructor(address accessManager, address fundsBridgingPolicyApplier)
+        RateLimitPolicy(accessManager, fundsBridgingPolicyApplier)
+    {}
 
     /// @inheritdoc IFundsBridgingPolicy
     function applyFundsBridgingPolicy(FundsBridgingIntent calldata fundsBridging) external override onlyPolicyApplier {
-        _consumeBucket(
-            _buckets[fundsBridging.asset][fundsBridging.destChainId][fundsBridging.bridgeAdapter], fundsBridging.amount
+        _buckets[fundsBridging.asset][fundsBridging.destChainId][fundsBridging.bridgeAdapter].consume(
+            fundsBridging.amount
         );
         emit FundsBridgingPolicyApplied(
             fundsBridging.caller,
@@ -75,8 +68,8 @@ contract FundsBridgingPolicy is RateLimitPolicy, IFundsBridgingPolicy {
         override
         returns (bool)
     {
-        return _canConsumeBucket(
-            _buckets[fundsBridging.asset][fundsBridging.destChainId][fundsBridging.bridgeAdapter], fundsBridging.amount
+        return _buckets[fundsBridging.asset][fundsBridging.destChainId][fundsBridging.bridgeAdapter].canConsume(
+            fundsBridging.amount
         );
     }
 
