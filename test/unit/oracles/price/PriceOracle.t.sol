@@ -13,8 +13,8 @@ import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {Errors} from "src/types/Errors.sol";
 
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
-import {MockAccessManager} from "test/mocks/MockAccessManager.sol";
 import {GasBurnerPriceOracleAdapter} from "test/mocks/GasBurnerPriceOracleAdapter.sol";
+import {MockAccessManager} from "test/mocks/MockAccessManager.sol";
 import {MockPriceOracleAdapter} from "test/mocks/MockPriceOracleAdapter.sol";
 
 contract PriceOracleTest is TestWithHelpers {

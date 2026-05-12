@@ -112,7 +112,9 @@ contract PriceOracle is AccessManagedUpgradeable, IPriceOracle {
         ) {
             return response.isStale ? 0 : _capToMaxPrice(response.priceRay);
         } catch {
-            if (gasleft() <= gasBefore / 64) revert IPriceOracle.InsufficientGasForExternalCall();
+            if (gasleft() <= gasBefore / 64) {
+                revert IPriceOracle.InsufficientGasForExternalCall();
+            }
             return 0;
         }
     }
