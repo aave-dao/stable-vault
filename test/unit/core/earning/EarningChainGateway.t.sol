@@ -604,6 +604,50 @@ contract EarningChainGatewayTest is TestWithHelpers {
         );
     }
 
+    /// @dev When the withdrawal-execution policy is unregistered, the gateway skips the policy call and treats the IOU
+    /// amount as the post-fee amount, so the user receives the full `iouTokenAmountRay` truncated to asset decimals.
+    function test_exchangeIouTokens_withdrawsFullIouAmountIfNoPolicyRegistered(uint256 iouTokenAmountRay) public {
+        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        address tokenOut = address(_mockUsdt);
+        uint256 expectedAmountOut = iouTokenAmountRay.rayToAssetDecimals(tokenOut);
+        vm.assume(expectedAmountOut > 0);
+
+        address user = makeAddr("user");
+        _assumeNotProxyAdmin(user, address(_earningChainGateway));
+
+        _mockUsdt.mint(address(_mockAllocator), expectedAmountOut);
+        _mockTransferHelper.mockAsset(tokenOut, expectedAmountOut);
+
+        _policyRegistry.setPolicy(
+            keccak256(bytes("aave.stable-vault.EarningChainGateway.policy.withdrawal-execution")), address(0)
+        );
+
+        vm.expectCall(
+            address(_mockWithdrawalExecutionPolicy),
+            abi.encodeWithSelector(IWithdrawalExecutionPolicy.applyWithdrawalExecutionPolicy.selector),
+            0
+        );
+
+        vm.prank(user);
+        uint256 amountOut = _earningChainGateway.exchangeIouTokens(
+            iouTokenAmountRay,
+            tokenOut,
+            0,
+            user,
+            address(_mockBridgeCcipFeeParams),
+            DEFAULT_GAS_LIMIT,
+            abi.encode(
+                ICcipBridgeAdapter.CcipFeeParams({
+                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: 0, feeRefundThreshold: 0
+                })
+            ),
+            ""
+        );
+
+        assertEq(amountOut, expectedAmountOut);
+        assertEq(_mockUsdt.balanceOf(user), expectedAmountOut);
+    }
+
     function test_exchangeIouTokens_reverts_ifZeroAmountAsIouTokenAmountRay() public {
         vm.expectRevert(Errors.ZeroAmount.selector);
         _earningChainGateway.exchangeIouTokens(

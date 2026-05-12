@@ -210,30 +210,39 @@ contract EarningChainGateway is
         );
     }
 
-    /// @dev The withdrawal-execution policy is required: unlike the other policies it returns the post-fee amount,
-    /// so a missing registry entry would silently disable fees and let users withdraw at full IOU value.
     function _getWithdrawalAmountOut(
         uint256 iouTokenAmountRay,
         address assetOut,
         uint256 minAmountOut,
         bytes memory policyData
     ) private returns (uint256) {
-        address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(WITHDRAWAL_EXECUTION_POLICY_ID);
-        require(policy != address(0), Errors.ZeroAddress());
-        uint256 amountOutRay = IWithdrawalExecutionPolicy(policy)
-            .applyWithdrawalExecutionPolicy(
-                IWithdrawalExecutionPolicy.WithdrawalExecutionIntent({
-                user: msg.sender, assetOut: assetOut, iouAmountRay: iouTokenAmountRay, policyData: policyData
-            })
-            );
-        // Note: The rayToAssetDecimals conversion truncates, so the user may burn slightly more IOUs than the
-        // exact RAY-equivalent of the assets received. This "dust" loss is at most 10^(27-decimals)-1 RAY per
-        // withdrawal, which is economically negligible (e.g., <$0.000001 for 6-decimal stablecoins; it would take
+        uint256 amountOutRay = _applyWithdrawalExecutionPolicy(msg.sender, assetOut, iouTokenAmountRay, policyData);
+        // Note: The `rayToAssetDecimals` conversion truncates, so the user may burn slightly more IOUs than the
+        // exact RAY-equivalent of the assets received. This "dust" loss is at most `10 ^ (27 - assetDecimals) - 1` RAY
+        // per withdrawal, which is economically negligible (e.g., <$0.000001 for 6-decimal stablecoins; it would take
         // >1,000,000 withdrawals to accumulate $1 of loss). The gas cost of preventing this (~1,600 gas for an extra
         // conversion) exceeds the value of the dust, so we accept this minor rounding in favor of the protocol.
         uint256 amountOut = amountOutRay.rayToAssetDecimals(assetOut);
         require(amountOut != 0 && amountOut >= minAmountOut, Errors.InsufficientAmountOut());
         return amountOut;
+    }
+
+    function _applyWithdrawalExecutionPolicy(
+        address user,
+        address assetOut,
+        uint256 iouAmountRay,
+        bytes memory policyData
+    ) private returns (uint256) {
+        address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(WITHDRAWAL_EXECUTION_POLICY_ID);
+        if (policy == address(0)) {
+            return iouAmountRay;
+        }
+        return IWithdrawalExecutionPolicy(policy)
+            .applyWithdrawalExecutionPolicy(
+                IWithdrawalExecutionPolicy.WithdrawalExecutionIntent({
+                user: user, assetOut: assetOut, iouAmountRay: iouAmountRay, policyData: policyData
+            })
+            );
     }
 
     function _applyFundsBridgingPolicy(

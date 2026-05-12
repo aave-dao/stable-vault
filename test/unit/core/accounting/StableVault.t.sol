@@ -3917,6 +3917,37 @@ contract StableVaultTest is TestWithHelpers {
         assertEq(mockAsset.balanceOf(user), actualWithdrawnAssets);
     }
 
+    /// @dev When the withdrawal-execution policy is unregistered, the vault skips the policy call and treats the IOU
+    /// amount as the post-fee amount, so the user withdraws the full `iouAmountRay` truncated to asset decimals.
+    function test_executeWithdrawal_withdrawsFullIouAmountIfNoPolicyRegistered(address user, uint256 iouAmountRay)
+        public
+    {
+        vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
+        _assumeNotProxyAdmin(user, address(stableVault));
+        iouAmountRay = _boundRayAmount(iouAmountRay);
+        mockIouToken.mint(user, iouAmountRay);
+        uint256 expectedWithdrawnAssets = iouAmountRay.rayToAssetDecimals(address(mockAsset));
+        vm.assume(expectedWithdrawnAssets > 0);
+        vm.assume(mockAsset.balanceOf(user) == 0);
+        mockTransferHelper.mockAsset(address(mockAsset), expectedWithdrawnAssets);
+
+        policyRegistry.setPolicy(
+            keccak256(bytes("aave.stable-vault.StableVault.policy.withdrawal-execution")), address(0)
+        );
+
+        vm.expectCall(
+            address(mockWithdrawalExecutionPolicy),
+            abi.encodeWithSelector(IWithdrawalExecutionPolicy.applyWithdrawalExecutionPolicy.selector),
+            0
+        );
+
+        vm.prank(user);
+        stableVault.executeWithdrawal(user, address(mockAsset), 0, iouAmountRay, "");
+
+        assertEq(mockAsset.balanceOf(user), expectedWithdrawnAssets);
+    }
+
     function test_rescueTokens_reverts_ifMsgSenderIsNotAuthorized(
         address unauthorizedMsgSender,
         uint256 stableVaultAssetBalance,

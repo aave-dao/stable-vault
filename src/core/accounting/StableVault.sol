@@ -996,18 +996,20 @@ contract StableVault is
             );
     }
 
-    /// @dev The withdrawal-execution policy is required: unlike the other policies it returns the post-fee amount,
-    /// so a missing registry entry would silently disable fees and let users withdraw at full IOU value.
-    function _applyWithdrawalExecutionPolicy(address user, address assetOut, uint256 iouAmountRay, bytes memory data)
-        internal
-        returns (uint256)
-    {
+    function _applyWithdrawalExecutionPolicy(
+        address user,
+        address assetOut,
+        uint256 iouAmountRay,
+        bytes memory policyData
+    ) internal returns (uint256) {
         address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(WITHDRAWAL_EXECUTION_POLICY_ID);
-        require(policy != address(0), Errors.ZeroAddress());
+        if (policy == address(0)) {
+            return iouAmountRay;
+        }
         return IWithdrawalExecutionPolicy(policy)
             .applyWithdrawalExecutionPolicy(
                 IWithdrawalExecutionPolicy.WithdrawalExecutionIntent({
-                user: user, assetOut: assetOut, iouAmountRay: iouAmountRay, policyData: data
+                user: user, assetOut: assetOut, iouAmountRay: iouAmountRay, policyData: policyData
             })
             );
     }
