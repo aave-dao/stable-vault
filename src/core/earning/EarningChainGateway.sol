@@ -42,11 +42,13 @@ contract EarningChainGateway is
     uint256 internal constant MIN_BURN_IOU_TOKEN_GAS_LIMIT = 120_000;
 
     uint256 internal immutable ACCOUNTING_CHAIN_ID;
-    address internal immutable WITHDRAWAL_EXECUTION_POLICY;
     address internal immutable POLICY_REGISTRY;
 
     // keccak256("aave.stable-vault.EarningChainGateway.policy.bridge")
     bytes32 internal constant BRIDGE_POLICY_ID = 0x537fb58e71f5b54dc09d8afff5cbf9bf5e630233f65f0531590f8cfa4a81bc6c;
+    // keccak256("aave.stable-vault.EarningChainGateway.policy.withdrawal-execution")
+    bytes32 internal constant WITHDRAWAL_EXECUTION_POLICY_ID =
+        0xf213893b1e253163c05de458d1c9283d3155b096d439aab98ea90b491dce4bfb;
 
     /// @dev Constructor.
     /// @param accountingChainId The Chain ID of the Accounting Chain.
@@ -55,7 +57,6 @@ contract EarningChainGateway is
     /// @param iouTokenManager Address of the IOU token manager contract used to mint and burn bridged or exchanged IOU
     /// tokens.
     /// @param transferHelper Address of the TransferHelper contract used to transfer assets across components.
-    /// @param withdrawalExecutionPolicy Address of the contract ensuring protocol's withdrawal requirements are met.
     /// @param policyRegistry Address of the PolicyRegistry contract used to look up policies by ID.
     constructor(
         uint256 accountingChainId,
@@ -63,19 +64,16 @@ contract EarningChainGateway is
         address priceOracle,
         address iouTokenManager,
         address transferHelper,
-        address withdrawalExecutionPolicy,
         address policyRegistry
     )
         TransferHelperClient(transferHelper)
         BaseChainGateway(iouTokenManager)
         LocalBalanceAggregator(allocator, priceOracle)
     {
-        require(withdrawalExecutionPolicy != address(0), Errors.ZeroAddress());
         require(policyRegistry != address(0), Errors.ZeroAddress());
         require(accountingChainId != 0 && accountingChainId != block.chainid, Errors.InvalidParameter());
         _disableInitializers();
         ACCOUNTING_CHAIN_ID = accountingChainId;
-        WITHDRAWAL_EXECUTION_POLICY = withdrawalExecutionPolicy;
         POLICY_REGISTRY = policyRegistry;
     }
 
@@ -218,7 +216,9 @@ contract EarningChainGateway is
         uint256 minAmountOut,
         bytes memory withdrawalExecutionPolicyData
     ) private returns (uint256) {
-        uint256 amountOutRay = IWithdrawalExecutionPolicy(WITHDRAWAL_EXECUTION_POLICY)
+        address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(WITHDRAWAL_EXECUTION_POLICY_ID);
+        require(policy != address(0), Errors.ZeroAddress());
+        uint256 amountOutRay = IWithdrawalExecutionPolicy(policy)
             .applyWithdrawalExecutionPolicy(
                 IWithdrawalExecutionPolicy.WithdrawalExecutionIntent({
                 user: msg.sender,

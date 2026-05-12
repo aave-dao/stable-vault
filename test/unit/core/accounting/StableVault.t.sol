@@ -79,7 +79,6 @@ contract StableVaultTest is TestWithHelpers {
         address fundsHandler,
         address assetRegistry,
         address transferHelper,
-        address withdrawalFeeCalculatorAddress,
         address priceOracleAddress,
         uint256 maxActiveSubVaults,
         address treasuryAddress,
@@ -92,7 +91,6 @@ contract StableVaultTest is TestWithHelpers {
                 iouTokenManager,
                 fundsHandler,
                 transferHelper,
-                withdrawalFeeCalculatorAddress,
                 priceOracleAddress,
                 maxActiveSubVaults,
                 policyRegistryAddress
@@ -126,7 +124,6 @@ contract StableVaultTest is TestWithHelpers {
         address fundsHandler,
         address assetRegistry,
         address transferHelper,
-        address withdrawalFeeCalculatorAddress,
         address priceOracleAddress,
         uint256 maxActiveSubVaults,
         address treasuryAddress,
@@ -139,7 +136,6 @@ contract StableVaultTest is TestWithHelpers {
                 iouTokenManager,
                 fundsHandler,
                 transferHelper,
-                withdrawalFeeCalculatorAddress,
                 priceOracleAddress,
                 maxActiveSubVaults,
                 policyRegistryAddress
@@ -213,11 +209,14 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
             treasury,
             address(policyRegistry)
+        );
+        policyRegistry.setPolicy(
+            keccak256(bytes("aave.stable-vault.StableVault.policy.withdrawal-execution")),
+            address(mockWithdrawalExecutionPolicy)
         );
     }
 
@@ -236,7 +235,6 @@ contract StableVaultTest is TestWithHelpers {
             expectedIouManager,
             expectedFundsHandler,
             address(mockTransferHelper),
-            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
             address(policyRegistry)
@@ -255,7 +253,6 @@ contract StableVaultTest is TestWithHelpers {
             address(mockIouTokenManager),
             address(mockFundsHandler),
             address(mockTransferHelper),
-            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
             address(policyRegistry)
@@ -270,7 +267,6 @@ contract StableVaultTest is TestWithHelpers {
             address(mockIouTokenManager),
             address(mockFundsHandler),
             address(0),
-            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
             address(policyRegistry)
@@ -296,7 +292,6 @@ contract StableVaultTest is TestWithHelpers {
                 address(mockIouTokenManager),
                 address(mockFundsHandler),
                 address(mockTransferHelper),
-                address(mockWithdrawalExecutionPolicy),
                 address(mockPriceOracle),
                 DEFAULT_MAX_ACTIVE_SUB_VAULTS,
                 address(policyRegistry)
@@ -338,7 +333,6 @@ contract StableVaultTest is TestWithHelpers {
                 address(mockIouTokenManager),
                 address(mockFundsHandler),
                 address(mockTransferHelper),
-                address(mockWithdrawalExecutionPolicy),
                 address(mockPriceOracle),
                 DEFAULT_MAX_ACTIVE_SUB_VAULTS,
                 address(policyRegistry)
@@ -395,7 +389,6 @@ contract StableVaultTest is TestWithHelpers {
                 address(mockIouTokenManager),
                 address(mockFundsHandler),
                 address(mockTransferHelper),
-                address(mockWithdrawalExecutionPolicy),
                 address(mockPriceOracle),
                 DEFAULT_MAX_ACTIVE_SUB_VAULTS,
                 address(policyRegistry)
@@ -428,7 +421,6 @@ contract StableVaultTest is TestWithHelpers {
                 address(mockIouTokenManager),
                 address(mockFundsHandler),
                 address(mockTransferHelper),
-                address(mockWithdrawalExecutionPolicy),
                 address(mockPriceOracle),
                 DEFAULT_MAX_ACTIVE_SUB_VAULTS,
                 address(policyRegistry)
@@ -454,7 +446,6 @@ contract StableVaultTest is TestWithHelpers {
                 address(mockIouTokenManager),
                 address(mockFundsHandler),
                 address(mockTransferHelper),
-                address(mockWithdrawalExecutionPolicy),
                 address(mockPriceOracle),
                 DEFAULT_MAX_ACTIVE_SUB_VAULTS,
                 address(policyRegistry)
@@ -606,7 +597,6 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
             treasury,
@@ -928,7 +918,6 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             maxActiveSubVaults,
             treasury,
@@ -967,7 +956,6 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             maxActiveSubVaults,
             treasury,
@@ -1015,7 +1003,6 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             2, // MAX_ACTIVE_SUB_VAULTS
             treasury,
@@ -1067,7 +1054,6 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             2, // MAX_ACTIVE_SUB_VAULTS
             treasury,
@@ -1114,7 +1100,6 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
             treasury,
@@ -2280,7 +2265,6 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
             treasury,
@@ -2845,7 +2829,6 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
             treasury,
@@ -2887,7 +2870,6 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
             treasury,
@@ -2929,7 +2911,6 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
             treasury,
@@ -2969,7 +2950,6 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
             treasury,
@@ -3167,7 +3147,6 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
             treasury,
@@ -3421,7 +3400,6 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
             treasury,
@@ -3462,7 +3440,6 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
             treasury,
@@ -3504,7 +3481,6 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             maxActiveSubVaults,
             treasury,
@@ -3543,7 +3519,6 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalExecutionPolicy),
             address(mockPriceOracle),
             maxActiveSubVaults,
             treasury,

@@ -35,7 +35,6 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
         address fundsHandler,
         address assetRegistry,
         address transferHelper,
-        address withdrawalFeeCalculator,
         address priceOracle,
         uint256 maxActiveSubVaults,
         address treasuryAddress,
@@ -49,7 +48,6 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
                 iouToken,
                 fundsHandler,
                 transferHelper,
-                withdrawalFeeCalculator,
                 priceOracle,
                 maxActiveSubVaults,
                 policyRegistry

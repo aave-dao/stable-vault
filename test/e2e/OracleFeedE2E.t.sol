@@ -116,7 +116,6 @@ contract OracleFeedE2ETest is BaseTest {
         address fundsHandlerAddr,
         address assetRegistry,
         address transferHelper,
-        address withdrawalFeeCalculator,
         address priceOracle,
         uint256 maxActiveSubVaults,
         address treasuryAddress,
@@ -130,7 +129,6 @@ contract OracleFeedE2ETest is BaseTest {
                 iouToken,
                 fundsHandlerAddr,
                 transferHelper,
-                withdrawalFeeCalculator,
                 priceOracle,
                 maxActiveSubVaults,
                 policyRegistry

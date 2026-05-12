@@ -169,6 +169,12 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
             WithdrawalExecutionPolicy(getWithdrawalExecutionPolicyAddress(_deployer()));
         withdrawalExecutionPolicy.setDefaultFeeBps(uint16(_configUint(".withdrawalExecutionPolicy.defaultFeeBps")));
         withdrawalExecutionPolicy.addSigner(_configAddress(".withdrawalExecutionPolicy.signer"));
+
+        IPolicyRegistry(getPolicyRegistryAddress(_deployer()))
+            .setPolicy(
+                keccak256(bytes("aave.stable-vault.EarningChainGateway.policy.withdrawal-execution")),
+                address(withdrawalExecutionPolicy)
+            );
     }
 
     function _setupAllocator() internal {
@@ -338,7 +344,6 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
                 priceOracle: getPriceOracleAddress(_deployer()),
                 iouTokenManager: getIouTokenManagerAddress(_deployer()),
                 transferHelper: getTransferHelperAddress(_deployer()),
-                withdrawalExecutionPolicy: getWithdrawalExecutionPolicyAddress(_deployer()),
                 policyRegistry: getPolicyRegistryAddress(_deployer())
             })
         );

@@ -190,7 +190,6 @@ contract BaseTest is TestWithHelpers {
         address fundsHandlerAddr,
         address assetRegistry,
         address transferHelper,
-        address withdrawalFeeCalculator,
         address priceOracle,
         uint256 maxActiveSubVaults,
         address treasuryAddress,
@@ -203,7 +202,6 @@ contract BaseTest is TestWithHelpers {
                 iouTokenManager,
                 fundsHandlerAddr,
                 transferHelper,
-                withdrawalFeeCalculator,
                 priceOracle,
                 maxActiveSubVaults,
                 policyRegistry
@@ -437,6 +435,11 @@ contract BaseTest is TestWithHelpers {
             address(policyRegistry_accountingChain) == policyRegistry_accountingChainAddress,
             "Policy Registry (Accounting Chain) address mismatch"
         );
+        vm.prank(admin);
+        policyRegistry_accountingChain.setPolicy(
+            keccak256(bytes("aave.stable-vault.StableVault.policy.withdrawal-execution")),
+            address(withdrawalExecutionPolicy_accountingChain)
+        );
 
         // 13-14. Stable Vault (Impl + Proxy)
         // Impl and proxy deployed in the internal `_deployStableVault` function
@@ -448,7 +451,6 @@ contract BaseTest is TestWithHelpers {
             fundsHandler_accountingChainAddress,
             assetRegistry_accountingChainAddress,
             transferHelper_accountingChainAddress,
-            withdrawalExecutionPolicy_accountingChainAddress,
             address(priceOracle_accountingChain),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
             treasury,
@@ -769,6 +771,11 @@ contract BaseTest is TestWithHelpers {
             address(policyRegistry_earningChain) == policyRegistry_earningChainAddress,
             "Policy Registry (Earning Chain) address mismatch"
         );
+        vm.prank(admin);
+        policyRegistry_earningChain.setPolicy(
+            keccak256(bytes("aave.stable-vault.EarningChainGateway.policy.withdrawal-execution")),
+            address(withdrawalExecutionPolicy_earningChain)
+        );
 
         // 15-16. Earning Chain Gateway (Impl + Proxy)
         address earningChainGateway_impl = address(
@@ -778,7 +785,6 @@ contract BaseTest is TestWithHelpers {
                 address(priceOracle_earningChain),
                 iouTokenManager_earningChainAddress,
                 transferHelper_earningChainAddress,
-                address(withdrawalExecutionPolicy_earningChain),
                 address(policyRegistry_earningChain)
             )
         );

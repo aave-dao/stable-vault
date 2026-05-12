@@ -36,7 +36,6 @@ contract UpgradeStableVault is Create3AddressBook, Upgrade {
                 iouTokenManager: getIouTokenManagerAddress(DEPLOYER),
                 fundsHandler: getFundsHandlerAddress(DEPLOYER),
                 transferHelper: getTransferHelperAddress(DEPLOYER),
-                withdrawalExecutionPolicy: getWithdrawalExecutionPolicyAddress(DEPLOYER),
                 priceOracle: address(0), // TODO: Deploy Price Oracle properly
                 maxActiveSubVaults: DEFAULT_MAX_ACTIVE_SUB_VAULTS,
                 policyRegistry: getPolicyRegistryAddress(DEPLOYER)

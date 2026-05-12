@@ -77,18 +77,11 @@ contract EarningChainGatewayTest is TestWithHelpers {
         address allocator,
         address priceOracle,
         address transferHelper,
-        address withdrawalExecutionPolicy,
         address policyRegistry
     ) internal returns (EarningChainGateway) {
         address earningChainGatewayImpl = address(
             new EarningChainGateway(
-                ACCOUNTING_CHAIN_ID,
-                allocator,
-                priceOracle,
-                iouTokenManager,
-                transferHelper,
-                withdrawalExecutionPolicy,
-                policyRegistry
+                ACCOUNTING_CHAIN_ID, allocator, priceOracle, iouTokenManager, transferHelper, policyRegistry
             )
         );
         EarningChainGateway earningChainGateway = EarningChainGateway(
@@ -169,8 +162,11 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockAllocator),
             address(_priceOracle),
             address(_mockTransferHelper),
-            address(_mockWithdrawalExecutionPolicy),
             address(_policyRegistry)
+        );
+        _policyRegistry.setPolicy(
+            keccak256(bytes("aave.stable-vault.EarningChainGateway.policy.withdrawal-execution")),
+            address(_mockWithdrawalExecutionPolicy)
         );
     }
 
@@ -181,20 +177,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockAllocator),
             address(_priceOracle),
             address(_mockIouTokenManager),
-            address(0),
-            address(_mockWithdrawalExecutionPolicy),
-            address(_policyRegistry)
-        );
-    }
-
-    function test_constructor_reverts_ifWithdrawalExecutionPolicyIsZeroAddress() public {
-        vm.expectRevert(Errors.ZeroAddress.selector);
-        new EarningChainGateway(
-            ACCOUNTING_CHAIN_ID,
-            address(_mockAllocator),
-            address(_priceOracle),
-            address(_mockIouTokenManager),
-            address(_mockTransferHelper),
             address(0),
             address(_policyRegistry)
         );
@@ -208,7 +190,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_priceOracle),
             address(_mockIouTokenManager),
             address(_mockTransferHelper),
-            address(_mockWithdrawalExecutionPolicy),
             address(_policyRegistry)
         );
     }
@@ -221,7 +202,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_priceOracle),
             address(_mockIouTokenManager),
             address(_mockTransferHelper),
-            address(_mockWithdrawalExecutionPolicy),
             address(_policyRegistry)
         );
     }
@@ -234,7 +214,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_priceOracle),
             address(0),
             address(_mockTransferHelper),
-            address(_mockWithdrawalExecutionPolicy),
             address(_policyRegistry)
         );
     }

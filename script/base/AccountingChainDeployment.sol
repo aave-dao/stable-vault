@@ -252,6 +252,12 @@ abstract contract AccountingChainDeployment is
             WithdrawalExecutionPolicy(getWithdrawalExecutionPolicyAddress(_deployer()));
         withdrawalExecutionPolicy.setDefaultFeeBps(uint16(_configUint(".withdrawalExecutionPolicy.defaultFeeBps")));
         withdrawalExecutionPolicy.addSigner(_configAddress(".withdrawalExecutionPolicy.signer"));
+
+        IPolicyRegistry(getPolicyRegistryAddress(_deployer()))
+            .setPolicy(
+                keccak256(bytes("aave.stable-vault.StableVault.policy.withdrawal-execution")),
+                address(withdrawalExecutionPolicy)
+            );
     }
 
     function _setupAssetRegistry() internal {
@@ -377,7 +383,6 @@ abstract contract AccountingChainDeployment is
                 iouTokenManager: getIouTokenManagerAddress(_deployer()),
                 fundsHandler: getFundsHandlerAddress(_deployer()),
                 transferHelper: getTransferHelperAddress(_deployer()),
-                withdrawalExecutionPolicy: getWithdrawalExecutionPolicyAddress(_deployer()),
                 priceOracle: getPriceOracleAddress(_deployer()),
                 maxActiveSubVaults: _configUint(".accountingChain.defaultMaxActiveSubVaults"),
                 policyRegistry: getPolicyRegistryAddress(_deployer())

@@ -11,7 +11,6 @@ contract StableVaultHarness is StableVault {
         address iouTokenManager,
         address fundsHandler,
         address transferHelper,
-        address withdrawalExecutionPolicy,
         address priceOracle,
         uint256 maxActiveSubVaults,
         address policyRegistry
@@ -22,7 +21,6 @@ contract StableVaultHarness is StableVault {
             iouTokenManager,
             fundsHandler,
             transferHelper,
-            withdrawalExecutionPolicy,
             priceOracle,
             maxActiveSubVaults,
             policyRegistry

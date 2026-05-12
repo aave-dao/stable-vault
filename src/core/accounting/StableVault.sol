@@ -82,8 +82,6 @@ contract StableVault is
 
     address internal immutable FUNDS_HANDLER;
 
-    address internal immutable WITHDRAWAL_EXECUTION_POLICY;
-
     address internal immutable PRICE_ORACLE;
 
     uint256 internal immutable MAX_ACTIVE_SUB_VAULTS;
@@ -95,6 +93,9 @@ contract StableVault is
     // keccak256("aave.stable-vault.StableVault.policy.withdrawal-request")
     bytes32 internal constant WITHDRAWAL_REQUEST_POLICY_ID =
         0x9c238a3c8b0489eb6352e8961b4f7a11406d8d4dea0b75e9f2b5cab473d164d8;
+    // keccak256("aave.stable-vault.StableVault.policy.withdrawal-execution")
+    bytes32 internal constant WITHDRAWAL_EXECUTION_POLICY_ID =
+        0x0b31c7380981f7a065b16980994765a46c7c2446175bc97b41109919817f1ca2;
 
     /// @custom:storage-location erc7201:aave.storage.StableVault
     struct StableVaultStorage {
@@ -154,8 +155,6 @@ contract StableVault is
     /// @param iouTokenManager The address of the address that manages the supply of IOUs.
     /// @param fundsHandler The address of the contract that handles funds of the accounting chain.
     /// @param transferHelper The address of the contract that helps minimize the number of transfers across flows.
-    /// @param withdrawalExecutionPolicy The address of the contract ensuring protocol's withdrawal execution
-    /// requirements are met.
     /// @param priceOracle The address of the PriceOracle contract.
     /// @param maxActiveSubVaults The maximum number of active sub-vaults allowed.
     /// @param policyRegistry The address of the PolicyRegistry contract used to look up policies by ID.
@@ -165,7 +164,6 @@ contract StableVault is
         address iouTokenManager,
         address fundsHandler,
         address transferHelper,
-        address withdrawalExecutionPolicy,
         address priceOracle,
         uint256 maxActiveSubVaults,
         address policyRegistry
@@ -173,7 +171,6 @@ contract StableVault is
         require(assetRegistry != address(0), Errors.ZeroAddress());
         require(iouTokenManager != address(0), Errors.ZeroAddress());
         require(fundsHandler != address(0), Errors.ZeroAddress());
-        require(withdrawalExecutionPolicy != address(0), Errors.ZeroAddress());
         require(priceOracle != address(0), Errors.ZeroAddress());
         require(policyRegistry != address(0), Errors.ZeroAddress());
         require(maxValidPerSecondRate > MathLib.RAY, InvalidRate());
@@ -182,7 +179,6 @@ contract StableVault is
         ASSET_REGISTRY = assetRegistry;
         IOU_TOKEN_MANAGER = iouTokenManager;
         FUNDS_HANDLER = fundsHandler;
-        WITHDRAWAL_EXECUTION_POLICY = withdrawalExecutionPolicy;
         PRICE_ORACLE = priceOracle;
         MAX_VALID_PER_SECOND_RATE = maxValidPerSecondRate;
         MAX_ACTIVE_SUB_VAULTS = maxActiveSubVaults;
@@ -461,12 +457,8 @@ contract StableVault is
         require(user == msg.sender, OnlyUser());
         require(iouAmountRay > 0, Errors.ZeroAmount());
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(user, iouAmountRay);
-        uint256 amountOutRay = IWithdrawalExecutionPolicy(WITHDRAWAL_EXECUTION_POLICY)
-            .applyWithdrawalExecutionPolicy(
-                IWithdrawalExecutionPolicy.WithdrawalExecutionIntent({
-                user: user, assetOut: assetOut, iouAmountRay: iouAmountRay, data: withdrawalExecutionPolicyData
-            })
-            );
+        uint256 amountOutRay =
+            _applyWithdrawalExecutionPolicy(user, assetOut, iouAmountRay, withdrawalExecutionPolicyData);
         // Note: The `rayToAssetDecimals` conversion truncates, so the user may burn slightly more IOUs than the
         // exact RAY-equivalent of the assets received. This "dust" loss is at most `10 ^ (27 - assetDecimals) - 1` RAY
         // per withdrawal, which is economically negligible (e.g., <$0.000001 for 6-decimal stablecoins; it would take
@@ -989,6 +981,22 @@ contract StableVault is
             .applyWithdrawalRequestPolicy(
                 IWithdrawalRequestPolicy.WithdrawalRequestIntent({
                 caller: msg.sender, user: user, requestedAmountInRay: requestedAmountInRay, extraData: extraData
+            })
+            );
+    }
+
+    /// @dev The withdrawal-execution policy is required: unlike the other policies it returns the post-fee amount,
+    /// so a missing registry entry would silently disable fees and let users withdraw at full IOU value.
+    function _applyWithdrawalExecutionPolicy(address user, address assetOut, uint256 iouAmountRay, bytes memory data)
+        internal
+        returns (uint256)
+    {
+        address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(WITHDRAWAL_EXECUTION_POLICY_ID);
+        require(policy != address(0), Errors.ZeroAddress());
+        return IWithdrawalExecutionPolicy(policy)
+            .applyWithdrawalExecutionPolicy(
+                IWithdrawalExecutionPolicy.WithdrawalExecutionIntent({
+                user: user, assetOut: assetOut, iouAmountRay: iouAmountRay, data: data
             })
             );
     }
