@@ -412,7 +412,12 @@ contract StableVault is
             }
         }
 
-        _applyWithdrawalRequestPolicy({user: user, requestedAmountInRay: requestedAmountInRay, extraData: extraData});
+        _applyWithdrawalRequestPolicy({
+            user: user,
+            principalAmountInRay: guaranteedAmountRay,
+            interestAmountInRay: actualAmountInRay - guaranteedAmountRay,
+            extraData: extraData
+        });
 
         uint256 remainingShares = _burnShares(user, subVaultId, redeemedShares);
         if (remainingShares == 0) {
@@ -970,9 +975,12 @@ contract StableVault is
             );
     }
 
-    function _applyWithdrawalRequestPolicy(address user, uint256 requestedAmountInRay, bytes calldata extraData)
-        internal
-    {
+    function _applyWithdrawalRequestPolicy(
+        address user,
+        uint256 principalAmountInRay,
+        uint256 interestAmountInRay,
+        bytes calldata extraData
+    ) internal {
         address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(WITHDRAWAL_REQUEST_POLICY_ID);
         if (policy == address(0)) {
             return;
@@ -980,7 +988,11 @@ contract StableVault is
         IWithdrawalRequestPolicy(policy)
             .applyWithdrawalRequestPolicy(
                 IWithdrawalRequestPolicy.WithdrawalRequestIntent({
-                caller: msg.sender, user: user, requestedAmountInRay: requestedAmountInRay, extraData: extraData
+                caller: msg.sender,
+                user: user,
+                principalAmountInRay: principalAmountInRay,
+                interestAmountInRay: interestAmountInRay,
+                extraData: extraData
             })
             );
     }
