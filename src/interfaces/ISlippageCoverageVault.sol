@@ -96,8 +96,6 @@ interface ISlippageCoverageVault {
     function setOverrideMaxSlippageBps(uint16 newBps) external;
 
     /// @notice Funds the vault with `amount` of `asset`. Pulls from the caller via `safeTransferFrom`.
-    /// @dev Named distinctly from `Allocator.topUp` to keep the AccessManager role IDs disjoint (role IDs derive from
-    /// the selector, so two `topUp(address,uint256)` selectors would collide on the same role ID).
     function fundCoverage(address asset, uint256 amount) external;
 
     /// @notice Sweeps `amount` of `asset` from the vault to `to`.
