@@ -19,6 +19,11 @@ contract MockSwapper is ISwapper {
     }
 
     /// @inheritdoc ISwapper
+    function getSlippageVault() external pure override returns (address) {
+        return address(0);
+    }
+
+    /// @inheritdoc ISwapper
     function executeSwap(address assetIn, address assetOut, uint256 amountIn, address, bytes memory)
         external
         override

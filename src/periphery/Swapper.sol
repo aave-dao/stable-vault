@@ -89,8 +89,8 @@ contract Swapper is Ownable, ReentrancyGuard, ISwapper {
         return amountOut;
     }
 
-    /// @notice Getter for the immutable bound vault.
-    function getSlippageVault() external view returns (address) {
+    /// @inheritdoc ISwapper
+    function getSlippageVault() external view override returns (address) {
         return SLIPPAGE_VAULT;
     }
 

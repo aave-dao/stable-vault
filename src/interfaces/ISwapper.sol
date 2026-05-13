@@ -29,6 +29,9 @@ interface ISwapper {
     /// @custom:selector 0x232b3058
     error SlippageToleranceTooHigh();
 
+    /// @notice Returns the immutable bound `SlippageCoverageVault`.
+    function getSlippageVault() external view returns (address);
+
     /// @notice Executes a swap using arbitrary data which can represent a series of calls to one or more contracts.
     /// @dev The Swapper must get `amountIn` of `assetIn` transferred before the `executeSwap` function is invoked.
     /// @dev The Swapper must approve `amountOut` of `assetOut` to be pulled by msg.sender at the end of `executeSwap`
