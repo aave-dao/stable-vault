@@ -2,9 +2,12 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.22;
 
+import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
+import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
+
 import {IDepositPolicy} from "src/interfaces/IDepositPolicy.sol";
 import {RateLimitBucketLib} from "src/libraries/RateLimitBucketLib.sol";
-import {RateLimitPolicy} from "src/policies/base/RateLimitPolicy.sol";
+import {Errors} from "src/types/Errors.sol";
 
 /// @title DepositPolicy
 /// @author Aave Labs
@@ -12,25 +15,31 @@ import {RateLimitPolicy} from "src/policies/base/RateLimitPolicy.sol";
 /// per-second refill rate; deposits consume from the available capacity and revert when it is exhausted. Assets
 /// default to a zero-capacity bucket (fully rate-limited) until governance configures one; setting capacity to max
 /// uint128 removes the limit entirely.
-contract DepositPolicy is RateLimitPolicy, IDepositPolicy {
+contract DepositPolicy is AccessManaged, IDepositPolicy {
     using RateLimitBucketLib for RateLimitBucketLib.Bucket;
 
-    event DepositLimitLoosened(
-        address indexed asset, uint128 oldCapacity, uint128 oldRefillRate, uint128 newCapacity, uint128 newRefillRate
-    );
+    event DepositCapacityRaised(address indexed asset, uint128 oldCapacity, uint128 newCapacity);
+    event DepositCapacityLowered(address indexed asset, uint128 oldCapacity, uint128 newCapacity);
+    event DepositRefillRateRaised(address indexed asset, uint128 oldRefillRate, uint128 newRefillRate);
+    event DepositRefillRateLowered(address indexed asset, uint128 oldRefillRate, uint128 newRefillRate);
 
-    event DepositLimitTightened(
-        address indexed asset, uint128 oldCapacity, uint128 oldRefillRate, uint128 newCapacity, uint128 newRefillRate
-    );
+    address internal immutable POLICY_APPLIER;
 
     mapping(address asset => RateLimitBucketLib.Bucket bucket) internal _buckets;
+
+    modifier onlyPolicyApplier() {
+        require(msg.sender == POLICY_APPLIER, Errors.NotAuthorized());
+        _;
+    }
 
     /// @dev Constructor.
     /// @param accessManager Address of the IAccessManager contract used for handling access control.
     /// @param depositPolicyApplier Address allowed to apply the deposit policy (typically the StableVault).
-    constructor(address accessManager, address depositPolicyApplier)
-        RateLimitPolicy(accessManager, depositPolicyApplier)
-    {}
+    constructor(address accessManager, address depositPolicyApplier) AccessManaged(accessManager) {
+        require(depositPolicyApplier != address(0), Errors.ZeroAddress());
+        IAccessManager(accessManager).canCall(address(0), address(0), bytes4(0));
+        POLICY_APPLIER = depositPolicyApplier;
+    }
 
     /// @inheritdoc IDepositPolicy
     function applyDepositPolicy(DepositIntent calldata deposit) external override onlyPolicyApplier {
@@ -48,20 +57,34 @@ contract DepositPolicy is RateLimitPolicy, IDepositPolicy {
         return _buckets[asset];
     }
 
-    /// @notice Loosens the limit (raises capacity and/or refill rate, or removes it by setting `capacity` to max
-    /// uint128).
+    /// @notice Raises the deposit capacity for `asset`. Use max uint128 to remove the limit.
     /// @dev Over any `capacity / refillRate`-second interval, a caller can extract up to `2 * capacity` (drain the full
     /// bucket at the start, then match the refill rate). Set `capacity` accordingly.
-    function loosenDepositLimit(address asset, uint128 capacity, uint128 refillRate) external restricted {
-        (uint128 oldCapacity, uint128 oldRefillRate) = _loosenBucket(_buckets[asset], capacity, refillRate);
-        emit DepositLimitLoosened(asset, oldCapacity, oldRefillRate, capacity, refillRate);
+    function raiseDepositCapacity(address asset, uint128 newCapacity) external restricted {
+        uint128 oldCapacity = _buckets[asset].capacity;
+        _buckets[asset].raiseCapacity(newCapacity);
+        emit DepositCapacityRaised(asset, oldCapacity, newCapacity);
     }
 
-    /// @notice Tightens the limit. Both `capacity` and `refillRate` must be non-increasing and at least one must
-    /// strictly decrease. `capacity = 0` (fully rate-limited) is allowed as a maximal tighten; max uint128 is
-    /// forbidden because it would loosen (use `loosenDepositLimit`).
-    function tightenDepositLimit(address asset, uint128 capacity, uint128 refillRate) external restricted {
-        (uint128 oldCapacity, uint128 oldRefillRate) = _tightenBucket(_buckets[asset], capacity, refillRate);
-        emit DepositLimitTightened(asset, oldCapacity, oldRefillRate, capacity, refillRate);
+    /// @notice Lowers the deposit capacity for `asset`. `newCapacity = 0` fully rate-limits the asset.
+    function lowerDepositCapacity(address asset, uint128 newCapacity) external restricted {
+        uint128 oldCapacity = _buckets[asset].capacity;
+        _buckets[asset].lowerCapacity(newCapacity);
+        emit DepositCapacityLowered(asset, oldCapacity, newCapacity);
+    }
+
+    /// @notice Raises the deposit refill rate for `asset`.
+    /// @dev Reverts when the asset's capacity is unlimited, since the rate must stay zero in that case.
+    function raiseDepositRefillRate(address asset, uint128 newRefillRate) external restricted {
+        uint128 oldRefillRate = _buckets[asset].refillRate;
+        _buckets[asset].raiseRefillRate(newRefillRate);
+        emit DepositRefillRateRaised(asset, oldRefillRate, newRefillRate);
+    }
+
+    /// @notice Lowers the deposit refill rate for `asset`. `newRefillRate = 0` stops the refill.
+    function lowerDepositRefillRate(address asset, uint128 newRefillRate) external restricted {
+        uint128 oldRefillRate = _buckets[asset].refillRate;
+        _buckets[asset].lowerRefillRate(newRefillRate);
+        emit DepositRefillRateLowered(asset, oldRefillRate, newRefillRate);
     }
 }

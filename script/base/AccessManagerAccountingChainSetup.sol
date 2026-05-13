@@ -104,10 +104,12 @@ abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
     function _setupTarget__DepositPolicy(address deployer) internal {
         address depositPolicy = getDepositPolicyAddress(deployer);
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](2);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](4);
 
-        roles[0] = RolesConfig.getRole__loosenDepositLimit();
-        roles[1] = RolesConfig.getRole__tightenDepositLimit();
+        roles[0] = RolesConfig.getRole__raiseDepositCapacity();
+        roles[1] = RolesConfig.getRole__raiseDepositRefillRate();
+        roles[2] = RolesConfig.getRole__lowerDepositCapacity();
+        roles[3] = RolesConfig.getRole__lowerDepositRefillRate();
 
         _setTargetFunctionRoles(depositPolicy, roles);
     }

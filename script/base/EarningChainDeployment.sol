@@ -495,18 +495,18 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         uint256 destChainId = _configUint(".accountingChain.chainId");
         address bridgeAdapter = getCcipAdapterAddress(_deployer());
 
-        _loosenBridgingLimit(
+        _initBridgingLimit(
             policy, _gho(), destChainId, bridgeAdapter, ".earningChain.fundsBridgingPolicy.perAssetLimits.gho"
         );
-        _loosenBridgingLimit(
+        _initBridgingLimit(
             policy, _usdc(), destChainId, bridgeAdapter, ".earningChain.fundsBridgingPolicy.perAssetLimits.usdc"
         );
-        _loosenBridgingLimit(
+        _initBridgingLimit(
             policy, _usdt(), destChainId, bridgeAdapter, ".earningChain.fundsBridgingPolicy.perAssetLimits.usdt"
         );
     }
 
-    function _loosenBridgingLimit(
+    function _initBridgingLimit(
         FundsBridgingPolicy policy,
         address asset,
         uint256 destChainId,
@@ -515,7 +515,10 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
     ) private {
         uint128 capacity = uint128(vm.parseUint(_configString(string.concat(configKey, ".capacity"))));
         uint128 refillRate = uint128(vm.parseUint(_configString(string.concat(configKey, ".refillRate"))));
-        policy.loosenBridgingLimit(asset, destChainId, bridgeAdapter, capacity, refillRate);
+        policy.raiseBridgingCapacity(asset, destChainId, bridgeAdapter, capacity);
+        if (refillRate > 0) {
+            policy.raiseBridgingRefillRate(asset, destChainId, bridgeAdapter, refillRate);
+        }
     }
 
     function _logDeployment(string memory name, string memory saltSeed, address addr) internal virtual override {

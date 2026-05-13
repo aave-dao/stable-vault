@@ -36,24 +36,21 @@ contract DepositPolicyTest is Test {
         });
     }
 
+    /// @dev Brings `asset`'s bucket from the default (0, 0) state to `(capacity, refillRate)`.
     function _setLimit(address asset, uint128 capacity, uint128 refillRate) internal {
-        // Multi-step path to land on (capacity, refillRate) with consumed = 0 (the "full bucket" baseline most
-        // tests want). Starting from default (0, 0): loosen to UNLIMITED, then tighten to (capacity, 0), then
-        // loosen the refillRate. The unlimited→limited step skips settle-and-carry, so consumed stays at 0.
-        vm.prank(admin);
-        policy.loosenDepositLimit(asset, UNLIMITED, 0);
-
         if (capacity == UNLIMITED) {
             require(refillRate == 0, "_setLimit: UNLIMITED requires refillRate == 0");
+            vm.prank(admin);
+            policy.raiseDepositCapacity(asset, UNLIMITED);
             return;
         }
-
-        vm.prank(admin);
-        policy.tightenDepositLimit(asset, capacity, 0);
-
+        if (capacity > 0) {
+            vm.prank(admin);
+            policy.raiseDepositCapacity(asset, capacity);
+        }
         if (refillRate > 0) {
             vm.prank(admin);
-            policy.loosenDepositLimit(asset, capacity, refillRate);
+            policy.raiseDepositRefillRate(asset, refillRate);
         }
     }
 
@@ -201,126 +198,165 @@ contract DepositPolicyTest is Test {
         }
     }
 
-    /////////////////////////////////// loosenDepositLimit ///////////////////////////////////
+    /////////////////////////////////// raiseDepositCapacity ///////////////////////////////////
 
-    function test_loosenDepositLimit_revertsIfNotAuthorized(address caller, address asset) public {
+    function test_raiseDepositCapacity_revertsIfNotAuthorized(address caller, address asset) public {
         vm.assume(caller != admin);
-        accessManager.mockRejectCall(caller, address(policy), DepositPolicy.loosenDepositLimit.selector);
+        accessManager.mockRejectCall(caller, address(policy), DepositPolicy.raiseDepositCapacity.selector);
 
         vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, caller));
         vm.prank(caller);
-        policy.loosenDepositLimit(asset, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
+        policy.raiseDepositCapacity(asset, DEFAULT_CAPACITY);
     }
 
-    function test_loosenDepositLimit_emitsEventAndUpdatesBucket(address asset, uint128 capacity, uint128 refillRate)
-        public
-    {
+    function test_raiseDepositCapacity_emitsEventAndUpdatesBucket(address asset, uint128 capacity) public {
         capacity = _bound128(capacity, 1, UNLIMITED - 1);
-        refillRate = _bound128(refillRate, 0, capacity);
 
         vm.expectEmit(true, true, true, true);
-        emit DepositPolicy.DepositLimitLoosened(asset, 0, 0, capacity, refillRate);
+        emit DepositPolicy.DepositCapacityRaised(asset, 0, capacity);
         vm.prank(admin);
-        policy.loosenDepositLimit(asset, capacity, refillRate);
+        policy.raiseDepositCapacity(asset, capacity);
 
-        RateLimitBucketLib.Bucket memory bucket = policy.getDepositLimit(asset);
-        assertEq(bucket.capacity, capacity);
-        assertEq(bucket.refillRate, refillRate);
+        assertEq(policy.getDepositLimit(asset).capacity, capacity);
     }
 
-    function test_loosenDepositLimit_acceptsUnlimitedSentinel(address asset) public {
+    function test_raiseDepositCapacity_acceptsUnlimited(address asset) public {
         vm.prank(admin);
-        policy.loosenDepositLimit(asset, UNLIMITED, 0);
+        policy.raiseDepositCapacity(asset, UNLIMITED);
 
         assertEq(policy.getDepositLimit(asset).capacity, UNLIMITED);
     }
 
-    function test_loosenDepositLimit_revertsIfNeitherDimensionIncreases(address asset) public {
+    function test_raiseDepositCapacity_revertsIfNotStrictlyGreater(address asset) public {
+        _setLimit(asset, DEFAULT_CAPACITY, 0);
+
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        vm.prank(admin);
+        policy.raiseDepositCapacity(asset, DEFAULT_CAPACITY);
+    }
+
+    function test_raiseDepositCapacity_revertsWhenUnlimitedWithNonzeroRate(address asset) public {
         _setLimit(asset, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
 
         vm.expectRevert(Errors.InvalidParameter.selector);
         vm.prank(admin);
-        policy.loosenDepositLimit(asset, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
+        policy.raiseDepositCapacity(asset, UNLIMITED);
     }
 
-    function test_loosenDepositLimit_revertsIfStrictDecrease(address asset) public {
-        _setLimit(asset, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
+    /////////////////////////////////// lowerDepositCapacity ///////////////////////////////////
 
-        vm.expectRevert(Errors.InvalidParameter.selector);
-        vm.prank(admin);
-        policy.loosenDepositLimit(asset, DEFAULT_CAPACITY - 1, DEFAULT_REFILL_RATE - 1);
-    }
-
-    function test_loosenDepositLimit_acceptsStrictIncreaseInOneDimension(address asset) public {
-        _setLimit(asset, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
-
-        vm.prank(admin);
-        policy.loosenDepositLimit(asset, DEFAULT_CAPACITY + 1, DEFAULT_REFILL_RATE);
-
-        assertEq(policy.getDepositLimit(asset).capacity, DEFAULT_CAPACITY + 1);
-    }
-
-    /////////////////////////////////// tightenDepositLimit ///////////////////////////////////
-
-    function test_tightenDepositLimit_revertsIfNotAuthorized(address caller, address asset) public {
+    function test_lowerDepositCapacity_revertsIfNotAuthorized(address caller, address asset) public {
         vm.assume(caller != admin);
-        accessManager.mockRejectCall(caller, address(policy), DepositPolicy.tightenDepositLimit.selector);
+        accessManager.mockRejectCall(caller, address(policy), DepositPolicy.lowerDepositCapacity.selector);
 
         vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, caller));
         vm.prank(caller);
-        policy.tightenDepositLimit(asset, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
+        policy.lowerDepositCapacity(asset, 0);
     }
 
-    function test_tightenDepositLimit_revertsIfUnlimited(address asset) public {
-        _setLimit(asset, UNLIMITED, 0);
-
-        vm.expectRevert(Errors.InvalidParameter.selector);
-        vm.prank(admin);
-        policy.tightenDepositLimit(asset, UNLIMITED, 0);
-    }
-
-    function test_tightenDepositLimit_revertsIfNeitherDimensionDecreases(address asset) public {
-        _setLimit(asset, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
-
-        vm.expectRevert(Errors.InvalidParameter.selector);
-        vm.prank(admin);
-        policy.tightenDepositLimit(asset, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
-    }
-
-    function test_tightenDepositLimit_revertsIfAnyDimensionIncreases(address asset) public {
-        _setLimit(asset, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
-
-        vm.expectRevert(Errors.InvalidParameter.selector);
-        vm.prank(admin);
-        policy.tightenDepositLimit(asset, DEFAULT_CAPACITY + 1, DEFAULT_REFILL_RATE);
-
-        vm.expectRevert(Errors.InvalidParameter.selector);
-        vm.prank(admin);
-        policy.tightenDepositLimit(asset, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE + 1);
-    }
-
-    function test_tightenDepositLimit_acceptsZeroCapacityAsMaxTighten(address asset) public {
+    function test_lowerDepositCapacity_emitsEventAndUpdatesBucket(address asset) public {
         _setLimit(asset, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
 
         vm.expectEmit(true, true, true, true);
-        emit DepositPolicy.DepositLimitTightened(asset, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE, 0, 0);
+        emit DepositPolicy.DepositCapacityLowered(asset, DEFAULT_CAPACITY, 500);
         vm.prank(admin);
-        policy.tightenDepositLimit(asset, 0, 0);
+        policy.lowerDepositCapacity(asset, 500);
+
+        assertEq(policy.getDepositLimit(asset).capacity, 500);
+    }
+
+    function test_lowerDepositCapacity_acceptsZero(address asset) public {
+        _setLimit(asset, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
+
+        vm.prank(admin);
+        policy.lowerDepositCapacity(asset, 0);
 
         assertEq(policy.getDepositLimit(asset).capacity, 0);
     }
 
-    function test_tightenDepositLimit_emitsEventAndUpdatesBucket(address asset) public {
+    function test_lowerDepositCapacity_revertsIfNotStrictlyLess(address asset) public {
+        _setLimit(asset, DEFAULT_CAPACITY, 0);
+
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        vm.prank(admin);
+        policy.lowerDepositCapacity(asset, DEFAULT_CAPACITY);
+    }
+
+    /////////////////////////////////// raiseDepositRefillRate ///////////////////////////////////
+
+    function test_raiseDepositRefillRate_revertsIfNotAuthorized(address caller, address asset) public {
+        vm.assume(caller != admin);
+        accessManager.mockRejectCall(caller, address(policy), DepositPolicy.raiseDepositRefillRate.selector);
+
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, caller));
+        vm.prank(caller);
+        policy.raiseDepositRefillRate(asset, 1);
+    }
+
+    function test_raiseDepositRefillRate_emitsEventAndUpdatesBucket(address asset) public {
+        _setLimit(asset, DEFAULT_CAPACITY, 0);
+
+        vm.expectEmit(true, true, true, true);
+        emit DepositPolicy.DepositRefillRateRaised(asset, 0, DEFAULT_REFILL_RATE);
+        vm.prank(admin);
+        policy.raiseDepositRefillRate(asset, DEFAULT_REFILL_RATE);
+
+        assertEq(policy.getDepositLimit(asset).refillRate, DEFAULT_REFILL_RATE);
+    }
+
+    function test_raiseDepositRefillRate_revertsIfUnlimitedCapacity(address asset) public {
+        _setLimit(asset, UNLIMITED, 0);
+
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        vm.prank(admin);
+        policy.raiseDepositRefillRate(asset, 1);
+    }
+
+    function test_raiseDepositRefillRate_revertsIfNotStrictlyGreater(address asset) public {
+        _setLimit(asset, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
+
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        vm.prank(admin);
+        policy.raiseDepositRefillRate(asset, DEFAULT_REFILL_RATE);
+    }
+
+    /////////////////////////////////// lowerDepositRefillRate ///////////////////////////////////
+
+    function test_lowerDepositRefillRate_revertsIfNotAuthorized(address caller, address asset) public {
+        vm.assume(caller != admin);
+        accessManager.mockRejectCall(caller, address(policy), DepositPolicy.lowerDepositRefillRate.selector);
+
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, caller));
+        vm.prank(caller);
+        policy.lowerDepositRefillRate(asset, 0);
+    }
+
+    function test_lowerDepositRefillRate_emitsEventAndUpdatesBucket(address asset) public {
         _setLimit(asset, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
 
         vm.expectEmit(true, true, true, true);
-        emit DepositPolicy.DepositLimitTightened(asset, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE, 500, 5);
+        emit DepositPolicy.DepositRefillRateLowered(asset, DEFAULT_REFILL_RATE, 5);
         vm.prank(admin);
-        policy.tightenDepositLimit(asset, 500, 5);
+        policy.lowerDepositRefillRate(asset, 5);
 
-        RateLimitBucketLib.Bucket memory bucket = policy.getDepositLimit(asset);
-        assertEq(bucket.capacity, 500);
-        assertEq(bucket.refillRate, 5);
+        assertEq(policy.getDepositLimit(asset).refillRate, 5);
+    }
+
+    function test_lowerDepositRefillRate_acceptsZero(address asset) public {
+        _setLimit(asset, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
+
+        vm.prank(admin);
+        policy.lowerDepositRefillRate(asset, 0);
+
+        assertEq(policy.getDepositLimit(asset).refillRate, 0);
+    }
+
+    function test_lowerDepositRefillRate_revertsIfNotStrictlyLess(address asset) public {
+        _setLimit(asset, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
+
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        vm.prank(admin);
+        policy.lowerDepositRefillRate(asset, DEFAULT_REFILL_RATE);
     }
 
     /////////////////////////////////// getDepositLimit ///////////////////////////////////

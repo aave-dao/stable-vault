@@ -92,30 +92,84 @@ library RateLimitBucketLib {
         return preview(bucket) >= amount;
     }
 
-    /// @notice Updates a bucket's `(capacity, refillRate)`. The refill accrued at the old rate is settled to `now`
-    /// and the post-refill `consumed` is carried forward (clamped to the new capacity), so loosening capacity
-    /// immediately grants the caller the matching extra headroom while tightening below the current consumed
-    /// forgives the overshoot. The unlimited case skips the carry and starts the bucket at zero `consumed`,
-    /// since `consumed` is meaningless for an unlimited bucket.
-    /// @param bucket The bucket to configure.
-    /// @param capacity The maximum availability of the bucket. Use max uint128 to set as unlimited capacity.
-    /// @param refillRate The per-second rate at which the bucket will be refilled. It must be zero when `capacity` is
-    /// unlimited.
-    function configure(Bucket storage bucket, uint128 capacity, uint128 refillRate) internal {
-        require(capacity != UNLIMITED_CAPACITY || refillRate == 0, Errors.InvalidParameter());
-        uint256 newConsumed;
+    /// @notice Raises `bucket.capacity` to `newCapacity`. Settles the refill accrued at the current rate and carries
+    /// the post-refill `consumed` forward; transitioning to unlimited capacity resets `consumed` to zero since it is
+    /// meaningless for an unlimited bucket.
+    /// @dev `newCapacity` must strictly exceed the current capacity. Setting `newCapacity` to max uint128 (unlimited)
+    /// requires the current refill rate to be zero.
+    /// @param bucket The bucket to update.
+    /// @param newCapacity The new capacity. Use max uint128 to set as unlimited.
+    function raiseCapacity(Bucket storage bucket, uint128 newCapacity) internal {
         uint128 oldCapacity = bucket.capacity;
-        if (oldCapacity != UNLIMITED_CAPACITY && capacity != UNLIMITED_CAPACITY) {
+        require(newCapacity > oldCapacity, Errors.InvalidParameter());
+        if (newCapacity == UNLIMITED_CAPACITY) {
+            require(bucket.refillRate == 0, Errors.InvalidParameter());
+        }
+        _setCapacity(bucket, oldCapacity, newCapacity);
+    }
+
+    /// @notice Lowers `bucket.capacity` to `newCapacity`. Settles the refill accrued at the current rate and carries
+    /// the post-refill `consumed` forward (clamped to `newCapacity`, so tightening below the current consumed forgives
+    /// the overshoot). Transitioning from unlimited capacity resets `consumed` to zero.
+    /// @dev `newCapacity` must be strictly below the current capacity. `newCapacity = 0` is allowed and fully rate
+    /// limits the bucket.
+    /// @param bucket The bucket to update.
+    /// @param newCapacity The new capacity.
+    function lowerCapacity(Bucket storage bucket, uint128 newCapacity) internal {
+        uint128 oldCapacity = bucket.capacity;
+        require(newCapacity < oldCapacity, Errors.InvalidParameter());
+        _setCapacity(bucket, oldCapacity, newCapacity);
+    }
+
+    /// @notice Raises `bucket.refillRate` to `newRefillRate`. Settles the refill accrued at the old rate before the
+    /// rate change, so the new rate only applies to time after this call.
+    /// @dev `newRefillRate` must strictly exceed the current refill rate. Reverts if `bucket.capacity` is unlimited,
+    /// since the refill rate must stay zero in that case.
+    /// @param bucket The bucket to update.
+    /// @param newRefillRate The new refill rate, in capacity units per second.
+    function raiseRefillRate(Bucket storage bucket, uint128 newRefillRate) internal {
+        require(bucket.capacity != UNLIMITED_CAPACITY, Errors.InvalidParameter());
+        uint128 oldRefillRate = bucket.refillRate;
+        require(newRefillRate > oldRefillRate, Errors.InvalidParameter());
+        _setRefillRate(bucket, newRefillRate);
+    }
+
+    /// @notice Lowers `bucket.refillRate` to `newRefillRate`. Settles the refill accrued at the old rate before the
+    /// rate change, so the new rate only applies to time after this call.
+    /// @dev `newRefillRate` must be strictly below the current refill rate. `newRefillRate = 0` is allowed and stops
+    /// the refill.
+    /// @param bucket The bucket to update.
+    /// @param newRefillRate The new refill rate, in capacity units per second.
+    function lowerRefillRate(Bucket storage bucket, uint128 newRefillRate) internal {
+        uint128 oldRefillRate = bucket.refillRate;
+        require(newRefillRate < oldRefillRate, Errors.InvalidParameter());
+        _setRefillRate(bucket, newRefillRate);
+    }
+
+    function _setCapacity(Bucket storage bucket, uint128 oldCapacity, uint128 newCapacity) private {
+        uint256 newConsumed;
+        if (oldCapacity != UNLIMITED_CAPACITY && newCapacity != UNLIMITED_CAPACITY) {
             // Derive the post-refill `consumed` at `now` from preview's available (using the old rate),
             // then clamp it to the new capacity so the bucket invariant `consumed <= capacity` is preserved.
             newConsumed = uint256(oldCapacity) - preview(bucket);
-            if (newConsumed > capacity) {
-                newConsumed = capacity;
+            if (newConsumed > newCapacity) {
+                newConsumed = newCapacity;
             }
         }
-        bucket.capacity = capacity;
-        bucket.refillRate = refillRate;
-        // `newConsumed` is bounded by `capacity <= type(uint128).max`.
+        bucket.capacity = newCapacity;
+        // `newConsumed` is bounded by `newCapacity <= type(uint128).max`.
+        // forge-lint: disable-next-line(unsafe-typecast)
+        bucket.consumed = uint128(newConsumed);
+        // Casting to uint128 is safe because block.timestamp fits in uint128 for any practical chain lifetime.
+        // forge-lint: disable-next-line(unsafe-typecast)
+        bucket.lastUpdate = uint128(block.timestamp);
+    }
+
+    function _setRefillRate(Bucket storage bucket, uint128 newRefillRate) private {
+        // Capacity is finite here (callers gate the unlimited case), so `preview` returns `capacity - consumed_now`.
+        uint256 newConsumed = uint256(bucket.capacity) - preview(bucket);
+        bucket.refillRate = newRefillRate;
+        // `newConsumed` is bounded by `bucket.capacity <= type(uint128).max`.
         // forge-lint: disable-next-line(unsafe-typecast)
         bucket.consumed = uint128(newConsumed);
         // Casting to uint128 is safe because block.timestamp fits in uint128 for any practical chain lifetime.

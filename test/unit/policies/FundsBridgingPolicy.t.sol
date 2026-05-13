@@ -45,23 +45,24 @@ contract FundsBridgingPolicyTest is Test {
         });
     }
 
+    /// @dev Brings the bucket for `(asset, destChainId, bridgeAdapter)` from the default (0, 0) state to
+    /// `(capacity, refillRate)`.
     function _setLimit(address asset, uint256 destChainId, address bridgeAdapter, uint128 capacity, uint128 refillRate)
         internal
     {
-        vm.prank(admin);
-        policy.loosenBridgingLimit(asset, destChainId, bridgeAdapter, UNLIMITED, 0);
-
         if (capacity == UNLIMITED) {
             require(refillRate == 0, "_setLimit: UNLIMITED requires refillRate == 0");
+            vm.prank(admin);
+            policy.raiseBridgingCapacity(asset, destChainId, bridgeAdapter, UNLIMITED);
             return;
         }
-
-        vm.prank(admin);
-        policy.tightenBridgingLimit(asset, destChainId, bridgeAdapter, capacity, 0);
-
+        if (capacity > 0) {
+            vm.prank(admin);
+            policy.raiseBridgingCapacity(asset, destChainId, bridgeAdapter, capacity);
+        }
         if (refillRate > 0) {
             vm.prank(admin);
-            policy.loosenBridgingLimit(asset, destChainId, bridgeAdapter, capacity, refillRate);
+            policy.raiseBridgingRefillRate(asset, destChainId, bridgeAdapter, refillRate);
         }
     }
 
@@ -314,54 +315,60 @@ contract FundsBridgingPolicyTest is Test {
         }
     }
 
-    /////////////////////////////////// loosenBridgingLimit ///////////////////////////////////
+    /////////////////////////////////// raiseBridgingCapacity ///////////////////////////////////
 
-    function test_loosenBridgingLimit_revertsIfNotAuthorized(
+    function test_raiseBridgingCapacity_revertsIfNotAuthorized(
         address caller,
         address asset,
         uint256 destChainId,
         address bridgeAdapter
     ) public {
         vm.assume(caller != admin);
-        accessManager.mockRejectCall(caller, address(policy), FundsBridgingPolicy.loosenBridgingLimit.selector);
+        accessManager.mockRejectCall(caller, address(policy), FundsBridgingPolicy.raiseBridgingCapacity.selector);
 
         vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, caller));
         vm.prank(caller);
-        policy.loosenBridgingLimit(asset, destChainId, bridgeAdapter, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
+        policy.raiseBridgingCapacity(asset, destChainId, bridgeAdapter, DEFAULT_CAPACITY);
     }
 
-    function test_loosenBridgingLimit_emitsEventAndUpdatesBucket(
+    function test_raiseBridgingCapacity_emitsEventAndUpdatesBucket(
         address asset,
         uint256 destChainId,
         address bridgeAdapter,
-        uint128 capacity,
-        uint128 refillRate
+        uint128 capacity
     ) public {
         capacity = _bound128(capacity, 1, UNLIMITED - 1);
-        refillRate = _bound128(refillRate, 0, capacity);
 
         vm.expectEmit(true, true, true, true);
-        emit FundsBridgingPolicy.BridgingLimitLoosened(asset, destChainId, bridgeAdapter, 0, 0, capacity, refillRate);
+        emit FundsBridgingPolicy.BridgingCapacityRaised(asset, destChainId, bridgeAdapter, 0, capacity);
         vm.prank(admin);
-        policy.loosenBridgingLimit(asset, destChainId, bridgeAdapter, capacity, refillRate);
+        policy.raiseBridgingCapacity(asset, destChainId, bridgeAdapter, capacity);
 
-        RateLimitBucketLib.Bucket memory bucket = policy.getBridgingLimit(asset, destChainId, bridgeAdapter);
-        assertEq(bucket.capacity, capacity);
-        assertEq(bucket.refillRate, refillRate);
+        assertEq(policy.getBridgingLimit(asset, destChainId, bridgeAdapter).capacity, capacity);
     }
 
-    function test_loosenBridgingLimit_acceptsUnlimitedSentinel(
-        address asset,
-        uint256 destChainId,
-        address bridgeAdapter
-    ) public {
+    function test_raiseBridgingCapacity_acceptsUnlimited(address asset, uint256 destChainId, address bridgeAdapter)
+        public
+    {
         vm.prank(admin);
-        policy.loosenBridgingLimit(asset, destChainId, bridgeAdapter, UNLIMITED, 0);
+        policy.raiseBridgingCapacity(asset, destChainId, bridgeAdapter, UNLIMITED);
 
         assertEq(policy.getBridgingLimit(asset, destChainId, bridgeAdapter).capacity, UNLIMITED);
     }
 
-    function test_loosenBridgingLimit_revertsIfNeitherDimensionIncreases(
+    function test_raiseBridgingCapacity_revertsIfNotStrictlyGreater(
+        address asset,
+        uint256 destChainId,
+        address bridgeAdapter
+    ) public {
+        _setLimit(asset, destChainId, bridgeAdapter, DEFAULT_CAPACITY, 0);
+
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        vm.prank(admin);
+        policy.raiseBridgingCapacity(asset, destChainId, bridgeAdapter, DEFAULT_CAPACITY);
+    }
+
+    function test_raiseBridgingCapacity_revertsWhenUnlimitedWithNonzeroRate(
         address asset,
         uint256 destChainId,
         address bridgeAdapter
@@ -370,87 +377,26 @@ contract FundsBridgingPolicyTest is Test {
 
         vm.expectRevert(Errors.InvalidParameter.selector);
         vm.prank(admin);
-        policy.loosenBridgingLimit(asset, destChainId, bridgeAdapter, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
+        policy.raiseBridgingCapacity(asset, destChainId, bridgeAdapter, UNLIMITED);
     }
 
-    function test_loosenBridgingLimit_revertsIfStrictDecrease(address asset, uint256 destChainId, address bridgeAdapter)
-        public
-    {
-        _setLimit(asset, destChainId, bridgeAdapter, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
+    /////////////////////////////////// lowerBridgingCapacity ///////////////////////////////////
 
-        vm.expectRevert(Errors.InvalidParameter.selector);
-        vm.prank(admin);
-        policy.loosenBridgingLimit(asset, destChainId, bridgeAdapter, DEFAULT_CAPACITY - 1, DEFAULT_REFILL_RATE - 1);
-    }
-
-    function test_loosenBridgingLimit_acceptsStrictIncreaseInOneDimension(
-        address asset,
-        uint256 destChainId,
-        address bridgeAdapter
-    ) public {
-        _setLimit(asset, destChainId, bridgeAdapter, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
-
-        vm.prank(admin);
-        policy.loosenBridgingLimit(asset, destChainId, bridgeAdapter, DEFAULT_CAPACITY + 1, DEFAULT_REFILL_RATE);
-
-        assertEq(policy.getBridgingLimit(asset, destChainId, bridgeAdapter).capacity, DEFAULT_CAPACITY + 1);
-    }
-
-    /////////////////////////////////// tightenBridgingLimit ///////////////////////////////////
-
-    function test_tightenBridgingLimit_revertsIfNotAuthorized(
+    function test_lowerBridgingCapacity_revertsIfNotAuthorized(
         address caller,
         address asset,
         uint256 destChainId,
         address bridgeAdapter
     ) public {
         vm.assume(caller != admin);
-        accessManager.mockRejectCall(caller, address(policy), FundsBridgingPolicy.tightenBridgingLimit.selector);
+        accessManager.mockRejectCall(caller, address(policy), FundsBridgingPolicy.lowerBridgingCapacity.selector);
 
         vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, caller));
         vm.prank(caller);
-        policy.tightenBridgingLimit(asset, destChainId, bridgeAdapter, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
+        policy.lowerBridgingCapacity(asset, destChainId, bridgeAdapter, 0);
     }
 
-    function test_tightenBridgingLimit_revertsIfUnlimited(address asset, uint256 destChainId, address bridgeAdapter)
-        public
-    {
-        _setLimit(asset, destChainId, bridgeAdapter, UNLIMITED, 0);
-
-        vm.expectRevert(Errors.InvalidParameter.selector);
-        vm.prank(admin);
-        policy.tightenBridgingLimit(asset, destChainId, bridgeAdapter, UNLIMITED, 0);
-    }
-
-    function test_tightenBridgingLimit_revertsIfNeitherDimensionDecreases(
-        address asset,
-        uint256 destChainId,
-        address bridgeAdapter
-    ) public {
-        _setLimit(asset, destChainId, bridgeAdapter, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
-
-        vm.expectRevert(Errors.InvalidParameter.selector);
-        vm.prank(admin);
-        policy.tightenBridgingLimit(asset, destChainId, bridgeAdapter, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
-    }
-
-    function test_tightenBridgingLimit_revertsIfAnyDimensionIncreases(
-        address asset,
-        uint256 destChainId,
-        address bridgeAdapter
-    ) public {
-        _setLimit(asset, destChainId, bridgeAdapter, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
-
-        vm.expectRevert(Errors.InvalidParameter.selector);
-        vm.prank(admin);
-        policy.tightenBridgingLimit(asset, destChainId, bridgeAdapter, DEFAULT_CAPACITY + 1, DEFAULT_REFILL_RATE);
-
-        vm.expectRevert(Errors.InvalidParameter.selector);
-        vm.prank(admin);
-        policy.tightenBridgingLimit(asset, destChainId, bridgeAdapter, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE + 1);
-    }
-
-    function test_tightenBridgingLimit_acceptsZeroCapacityAsMaxTighten(
+    function test_lowerBridgingCapacity_emitsEventAndUpdatesBucket(
         address asset,
         uint256 destChainId,
         address bridgeAdapter
@@ -458,16 +404,106 @@ contract FundsBridgingPolicyTest is Test {
         _setLimit(asset, destChainId, bridgeAdapter, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
 
         vm.expectEmit(true, true, true, true);
-        emit FundsBridgingPolicy.BridgingLimitTightened(
-            asset, destChainId, bridgeAdapter, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE, 0, 0
-        );
+        emit FundsBridgingPolicy.BridgingCapacityLowered(asset, destChainId, bridgeAdapter, DEFAULT_CAPACITY, 500);
         vm.prank(admin);
-        policy.tightenBridgingLimit(asset, destChainId, bridgeAdapter, 0, 0);
+        policy.lowerBridgingCapacity(asset, destChainId, bridgeAdapter, 500);
+
+        assertEq(policy.getBridgingLimit(asset, destChainId, bridgeAdapter).capacity, 500);
+    }
+
+    function test_lowerBridgingCapacity_acceptsZero(address asset, uint256 destChainId, address bridgeAdapter) public {
+        _setLimit(asset, destChainId, bridgeAdapter, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
+
+        vm.prank(admin);
+        policy.lowerBridgingCapacity(asset, destChainId, bridgeAdapter, 0);
 
         assertEq(policy.getBridgingLimit(asset, destChainId, bridgeAdapter).capacity, 0);
     }
 
-    function test_tightenBridgingLimit_emitsEventAndUpdatesBucket(
+    function test_lowerBridgingCapacity_revertsIfNotStrictlyLess(
+        address asset,
+        uint256 destChainId,
+        address bridgeAdapter
+    ) public {
+        _setLimit(asset, destChainId, bridgeAdapter, DEFAULT_CAPACITY, 0);
+
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        vm.prank(admin);
+        policy.lowerBridgingCapacity(asset, destChainId, bridgeAdapter, DEFAULT_CAPACITY);
+    }
+
+    /////////////////////////////////// raiseBridgingRefillRate ///////////////////////////////////
+
+    function test_raiseBridgingRefillRate_revertsIfNotAuthorized(
+        address caller,
+        address asset,
+        uint256 destChainId,
+        address bridgeAdapter
+    ) public {
+        vm.assume(caller != admin);
+        accessManager.mockRejectCall(caller, address(policy), FundsBridgingPolicy.raiseBridgingRefillRate.selector);
+
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, caller));
+        vm.prank(caller);
+        policy.raiseBridgingRefillRate(asset, destChainId, bridgeAdapter, 1);
+    }
+
+    function test_raiseBridgingRefillRate_emitsEventAndUpdatesBucket(
+        address asset,
+        uint256 destChainId,
+        address bridgeAdapter
+    ) public {
+        _setLimit(asset, destChainId, bridgeAdapter, DEFAULT_CAPACITY, 0);
+
+        vm.expectEmit(true, true, true, true);
+        emit FundsBridgingPolicy.BridgingRefillRateRaised(asset, destChainId, bridgeAdapter, 0, DEFAULT_REFILL_RATE);
+        vm.prank(admin);
+        policy.raiseBridgingRefillRate(asset, destChainId, bridgeAdapter, DEFAULT_REFILL_RATE);
+
+        assertEq(policy.getBridgingLimit(asset, destChainId, bridgeAdapter).refillRate, DEFAULT_REFILL_RATE);
+    }
+
+    function test_raiseBridgingRefillRate_revertsIfUnlimitedCapacity(
+        address asset,
+        uint256 destChainId,
+        address bridgeAdapter
+    ) public {
+        _setLimit(asset, destChainId, bridgeAdapter, UNLIMITED, 0);
+
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        vm.prank(admin);
+        policy.raiseBridgingRefillRate(asset, destChainId, bridgeAdapter, 1);
+    }
+
+    function test_raiseBridgingRefillRate_revertsIfNotStrictlyGreater(
+        address asset,
+        uint256 destChainId,
+        address bridgeAdapter
+    ) public {
+        _setLimit(asset, destChainId, bridgeAdapter, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
+
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        vm.prank(admin);
+        policy.raiseBridgingRefillRate(asset, destChainId, bridgeAdapter, DEFAULT_REFILL_RATE);
+    }
+
+    /////////////////////////////////// lowerBridgingRefillRate ///////////////////////////////////
+
+    function test_lowerBridgingRefillRate_revertsIfNotAuthorized(
+        address caller,
+        address asset,
+        uint256 destChainId,
+        address bridgeAdapter
+    ) public {
+        vm.assume(caller != admin);
+        accessManager.mockRejectCall(caller, address(policy), FundsBridgingPolicy.lowerBridgingRefillRate.selector);
+
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, caller));
+        vm.prank(caller);
+        policy.lowerBridgingRefillRate(asset, destChainId, bridgeAdapter, 0);
+    }
+
+    function test_lowerBridgingRefillRate_emitsEventAndUpdatesBucket(
         address asset,
         uint256 destChainId,
         address bridgeAdapter
@@ -475,15 +511,34 @@ contract FundsBridgingPolicyTest is Test {
         _setLimit(asset, destChainId, bridgeAdapter, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
 
         vm.expectEmit(true, true, true, true);
-        emit FundsBridgingPolicy.BridgingLimitTightened(
-            asset, destChainId, bridgeAdapter, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE, 500, 5
-        );
+        emit FundsBridgingPolicy.BridgingRefillRateLowered(asset, destChainId, bridgeAdapter, DEFAULT_REFILL_RATE, 5);
         vm.prank(admin);
-        policy.tightenBridgingLimit(asset, destChainId, bridgeAdapter, 500, 5);
+        policy.lowerBridgingRefillRate(asset, destChainId, bridgeAdapter, 5);
 
-        RateLimitBucketLib.Bucket memory bucket = policy.getBridgingLimit(asset, destChainId, bridgeAdapter);
-        assertEq(bucket.capacity, 500);
-        assertEq(bucket.refillRate, 5);
+        assertEq(policy.getBridgingLimit(asset, destChainId, bridgeAdapter).refillRate, 5);
+    }
+
+    function test_lowerBridgingRefillRate_acceptsZero(address asset, uint256 destChainId, address bridgeAdapter)
+        public
+    {
+        _setLimit(asset, destChainId, bridgeAdapter, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
+
+        vm.prank(admin);
+        policy.lowerBridgingRefillRate(asset, destChainId, bridgeAdapter, 0);
+
+        assertEq(policy.getBridgingLimit(asset, destChainId, bridgeAdapter).refillRate, 0);
+    }
+
+    function test_lowerBridgingRefillRate_revertsIfNotStrictlyLess(
+        address asset,
+        uint256 destChainId,
+        address bridgeAdapter
+    ) public {
+        _setLimit(asset, destChainId, bridgeAdapter, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
+
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        vm.prank(admin);
+        policy.lowerBridgingRefillRate(asset, destChainId, bridgeAdapter, DEFAULT_REFILL_RATE);
     }
 
     /////////////////////////////////// getBridgingLimit ///////////////////////////////////

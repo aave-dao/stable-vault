@@ -604,8 +604,21 @@ abstract contract RolesConfig is DeploymentConfig {
 
     /// @custom:delay High
     /// @custom:location DepositPolicy
-    function getRole__loosenDepositLimit() internal view returns (Role memory) {
-        bytes4 selector = DepositPolicy.loosenDepositLimit.selector;
+    function getRole__raiseDepositCapacity() internal view returns (Role memory) {
+        bytes4 selector = DepositPolicy.raiseDepositCapacity.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: HIGH_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
+        });
+    }
+
+    /// @custom:delay High
+    /// @custom:location DepositPolicy
+    function getRole__raiseDepositRefillRate() internal view returns (Role memory) {
+        bytes4 selector = DepositPolicy.raiseDepositRefillRate.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
@@ -617,8 +630,21 @@ abstract contract RolesConfig is DeploymentConfig {
 
     /// @custom:delay None
     /// @custom:location DepositPolicy
-    function getRole__tightenDepositLimit() internal pure returns (Role memory) {
-        bytes4 selector = DepositPolicy.tightenDepositLimit.selector;
+    function getRole__lowerDepositCapacity() internal pure returns (Role memory) {
+        bytes4 selector = DepositPolicy.lowerDepositCapacity.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: NO_DELAY,
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
+        });
+    }
+
+    /// @custom:delay None
+    /// @custom:location DepositPolicy
+    function getRole__lowerDepositRefillRate() internal pure returns (Role memory) {
+        bytes4 selector = DepositPolicy.lowerDepositRefillRate.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
@@ -630,8 +656,21 @@ abstract contract RolesConfig is DeploymentConfig {
 
     /// @custom:delay High
     /// @custom:location FundsBridgingPolicy
-    function getRole__loosenBridgingLimit() internal view returns (Role memory) {
-        bytes4 selector = FundsBridgingPolicy.loosenBridgingLimit.selector;
+    function getRole__raiseBridgingCapacity() internal view returns (Role memory) {
+        bytes4 selector = FundsBridgingPolicy.raiseBridgingCapacity.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: HIGH_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
+        });
+    }
+
+    /// @custom:delay High
+    /// @custom:location FundsBridgingPolicy
+    function getRole__raiseBridgingRefillRate() internal view returns (Role memory) {
+        bytes4 selector = FundsBridgingPolicy.raiseBridgingRefillRate.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
@@ -643,8 +682,21 @@ abstract contract RolesConfig is DeploymentConfig {
 
     /// @custom:delay None
     /// @custom:location FundsBridgingPolicy
-    function getRole__tightenBridgingLimit() internal pure returns (Role memory) {
-        bytes4 selector = FundsBridgingPolicy.tightenBridgingLimit.selector;
+    function getRole__lowerBridgingCapacity() internal pure returns (Role memory) {
+        bytes4 selector = FundsBridgingPolicy.lowerBridgingCapacity.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: NO_DELAY,
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
+        });
+    }
+
+    /// @custom:delay None
+    /// @custom:location FundsBridgingPolicy
+    function getRole__lowerBridgingRefillRate() internal pure returns (Role memory) {
+        bytes4 selector = FundsBridgingPolicy.lowerBridgingRefillRate.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
@@ -681,7 +733,7 @@ abstract contract RolesConfig is DeploymentConfig {
     }
 
     function getAllFunctionBasedRoles() internal view returns (Role[] memory) {
-        Role[] memory roles = new Role[](49);
+        Role[] memory roles = new Role[](53);
 
         // AssetRegistry
         roles[0] = getRole__setAssetConfig();
@@ -751,10 +803,14 @@ abstract contract RolesConfig is DeploymentConfig {
         roles[44] = getRole__setPolicy();
 
         // DepositPolicy / FundsBridgingPolicy
-        roles[45] = getRole__loosenDepositLimit();
-        roles[46] = getRole__tightenDepositLimit();
-        roles[47] = getRole__loosenBridgingLimit();
-        roles[48] = getRole__tightenBridgingLimit();
+        roles[45] = getRole__raiseDepositCapacity();
+        roles[46] = getRole__raiseDepositRefillRate();
+        roles[47] = getRole__lowerDepositCapacity();
+        roles[48] = getRole__lowerDepositRefillRate();
+        roles[49] = getRole__raiseBridgingCapacity();
+        roles[50] = getRole__raiseBridgingRefillRate();
+        roles[51] = getRole__lowerBridgingCapacity();
+        roles[52] = getRole__lowerBridgingRefillRate();
 
         return roles;
     }

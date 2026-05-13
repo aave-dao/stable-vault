@@ -285,7 +285,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         address disablerProfile = _getProfile__Disabler();
         require(disablerProfile != address(0), "Disabler profile address not set");
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](16);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](18);
 
         roles[0] = RolesConfig.getRole__rebalance();
         roles[1] = RolesConfig.getRole__removeStrategy();
@@ -302,8 +302,10 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         roles[12] = RolesConfig.getRole__distrustStrategy();
         roles[13] = RolesConfig.getRole__removeSigner();
         // Only used on the Accounting Chain (DepositPolicy is Accounting-only), but granted in both chain setups.
-        roles[14] = RolesConfig.getRole__tightenDepositLimit();
-        roles[15] = RolesConfig.getRole__tightenBridgingLimit();
+        roles[14] = RolesConfig.getRole__lowerDepositCapacity();
+        roles[15] = RolesConfig.getRole__lowerDepositRefillRate();
+        roles[16] = RolesConfig.getRole__lowerBridgingCapacity();
+        roles[17] = RolesConfig.getRole__lowerBridgingRefillRate();
 
         _grantRolesToProfile(disablerProfile, roles);
     }
@@ -410,10 +412,12 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     function _setupTarget__FundsBridgingPolicy(address deployer) internal {
         address fundsBridgingPolicy = getFundsBridgingPolicyAddress(deployer);
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](2);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](4);
 
-        roles[0] = RolesConfig.getRole__loosenBridgingLimit();
-        roles[1] = RolesConfig.getRole__tightenBridgingLimit();
+        roles[0] = RolesConfig.getRole__raiseBridgingCapacity();
+        roles[1] = RolesConfig.getRole__raiseBridgingRefillRate();
+        roles[2] = RolesConfig.getRole__lowerBridgingCapacity();
+        roles[3] = RolesConfig.getRole__lowerBridgingRefillRate();
 
         _setTargetFunctionRoles(fundsBridgingPolicy, roles);
     }

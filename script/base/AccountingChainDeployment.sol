@@ -661,15 +661,18 @@ abstract contract AccountingChainDeployment is
         IPolicyRegistry(getPolicyRegistryAddress(_deployer()))
             .setPolicy(keccak256(bytes("aave.stable-vault.StableVault.policy.deposit")), address(policy));
 
-        _loosenDepositLimit(policy, _gho(), ".accountingChain.depositPolicy.perAssetLimits.gho");
-        _loosenDepositLimit(policy, _usdc(), ".accountingChain.depositPolicy.perAssetLimits.usdc");
-        _loosenDepositLimit(policy, _usdt(), ".accountingChain.depositPolicy.perAssetLimits.usdt");
+        _initDepositLimit(policy, _gho(), ".accountingChain.depositPolicy.perAssetLimits.gho");
+        _initDepositLimit(policy, _usdc(), ".accountingChain.depositPolicy.perAssetLimits.usdc");
+        _initDepositLimit(policy, _usdt(), ".accountingChain.depositPolicy.perAssetLimits.usdt");
     }
 
-    function _loosenDepositLimit(DepositPolicy policy, address asset, string memory configKey) private {
+    function _initDepositLimit(DepositPolicy policy, address asset, string memory configKey) private {
         uint128 capacity = uint128(vm.parseUint(_configString(string.concat(configKey, ".capacity"))));
         uint128 refillRate = uint128(vm.parseUint(_configString(string.concat(configKey, ".refillRate"))));
-        policy.loosenDepositLimit(asset, capacity, refillRate);
+        policy.raiseDepositCapacity(asset, capacity);
+        if (refillRate > 0) {
+            policy.raiseDepositRefillRate(asset, refillRate);
+        }
     }
 
     function _setupFundsBridgingPolicy() internal {
@@ -681,18 +684,18 @@ abstract contract AccountingChainDeployment is
         uint256 destChainId = _configUint(".earningChain.chainId");
         address bridgeAdapter = getCcipAdapterAddress(_deployer());
 
-        _loosenBridgingLimit(
+        _initBridgingLimit(
             policy, _gho(), destChainId, bridgeAdapter, ".accountingChain.fundsBridgingPolicy.perAssetLimits.gho"
         );
-        _loosenBridgingLimit(
+        _initBridgingLimit(
             policy, _usdc(), destChainId, bridgeAdapter, ".accountingChain.fundsBridgingPolicy.perAssetLimits.usdc"
         );
-        _loosenBridgingLimit(
+        _initBridgingLimit(
             policy, _usdt(), destChainId, bridgeAdapter, ".accountingChain.fundsBridgingPolicy.perAssetLimits.usdt"
         );
     }
 
-    function _loosenBridgingLimit(
+    function _initBridgingLimit(
         FundsBridgingPolicy policy,
         address asset,
         uint256 destChainId,
@@ -701,7 +704,10 @@ abstract contract AccountingChainDeployment is
     ) private {
         uint128 capacity = uint128(vm.parseUint(_configString(string.concat(configKey, ".capacity"))));
         uint128 refillRate = uint128(vm.parseUint(_configString(string.concat(configKey, ".refillRate"))));
-        policy.loosenBridgingLimit(asset, destChainId, bridgeAdapter, capacity, refillRate);
+        policy.raiseBridgingCapacity(asset, destChainId, bridgeAdapter, capacity);
+        if (refillRate > 0) {
+            policy.raiseBridgingRefillRate(asset, destChainId, bridgeAdapter, refillRate);
+        }
     }
 
     function _logDeployment(string memory name, string memory saltSeed, address addr) internal virtual override {
