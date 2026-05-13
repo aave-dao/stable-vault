@@ -7,6 +7,7 @@ import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessMana
 
 import {IFundsBridgingPolicy} from "src/interfaces/IFundsBridgingPolicy.sol";
 import {RateLimitBucketLib} from "src/libraries/RateLimitBucketLib.sol";
+import {Multicall} from "src/misc/Multicall.sol";
 import {Errors} from "src/types/Errors.sol";
 
 /// @title FundsBridgingPolicy
@@ -14,7 +15,7 @@ import {Errors} from "src/types/Errors.sol";
 /// @notice Per-route rate-limited bridge-funds policy. Each `(asset, destChainId, bridgeAdapter)` triple has its own
 /// bucket; amounts are denominated in the asset's native decimals. Triples default to a zero-capacity bucket (fully
 /// rate-limited) until governance configures one; setting capacity to max uint128 removes the limit entirely.
-contract FundsBridgingPolicy is AccessManaged, IFundsBridgingPolicy {
+contract FundsBridgingPolicy is AccessManaged, Multicall, IFundsBridgingPolicy {
     using RateLimitBucketLib for RateLimitBucketLib.Bucket;
 
     event BridgingCapacityRaised(

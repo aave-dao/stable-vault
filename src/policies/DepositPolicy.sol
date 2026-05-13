@@ -7,6 +7,7 @@ import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessMana
 
 import {IDepositPolicy} from "src/interfaces/IDepositPolicy.sol";
 import {RateLimitBucketLib} from "src/libraries/RateLimitBucketLib.sol";
+import {Multicall} from "src/misc/Multicall.sol";
 import {Errors} from "src/types/Errors.sol";
 
 /// @title DepositPolicy
@@ -15,7 +16,7 @@ import {Errors} from "src/types/Errors.sol";
 /// per-second refill rate; deposits consume from the available capacity and revert when it is exhausted. Assets
 /// default to a zero-capacity bucket (fully rate-limited) until governance configures one; setting capacity to max
 /// uint128 removes the limit entirely.
-contract DepositPolicy is AccessManaged, IDepositPolicy {
+contract DepositPolicy is AccessManaged, Multicall, IDepositPolicy {
     using RateLimitBucketLib for RateLimitBucketLib.Bucket;
 
     event DepositCapacityRaised(address indexed asset, uint128 oldCapacity, uint128 newCapacity);
