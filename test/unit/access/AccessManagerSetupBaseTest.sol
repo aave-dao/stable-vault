@@ -21,6 +21,7 @@ import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
+import {ISlippageCoverageVault} from "src/interfaces/ISlippageCoverageVault.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
 import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
@@ -473,6 +474,39 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         _assertTargetFunctionRole(target, IAssetRegistry.trustAsset.selector, RolesConfig.getRole__trustAsset().roleId);
         _assertTargetFunctionRole(
             target, IAssetRegistry.distrustAsset.selector, RolesConfig.getRole__distrustAsset().roleId
+        );
+    }
+
+    function test_targetSetup_slippageCoverageVault() public view {
+        address target = getSlippageCoverageVaultAddress(_deployer());
+        _assertTargetFunctionRole(
+            target, ISlippageCoverageVault.setOverrideMode.selector, RolesConfig.getRole__setOverrideMode().roleId
+        );
+        _assertTargetFunctionRole(
+            target, ISlippageCoverageVault.raisePullCapPerTx.selector, RolesConfig.getRole__raisePullCapPerTx().roleId
+        );
+        _assertTargetFunctionRole(
+            target, ISlippageCoverageVault.lowerPullCapPerTx.selector, RolesConfig.getRole__lowerPullCapPerTx().roleId
+        );
+        _assertTargetFunctionRole(
+            target, ISlippageCoverageVault.raiseWindowCap.selector, RolesConfig.getRole__raiseWindowCap().roleId
+        );
+        _assertTargetFunctionRole(
+            target, ISlippageCoverageVault.lowerWindowCap.selector, RolesConfig.getRole__lowerWindowCap().roleId
+        );
+        _assertTargetFunctionRole(
+            target, ISlippageCoverageVault.setMaxSlippageBps.selector, RolesConfig.getRole__setMaxSlippageBps().roleId
+        );
+        _assertTargetFunctionRole(
+            target,
+            ISlippageCoverageVault.setOverrideMaxSlippageBps.selector,
+            RolesConfig.getRole__setOverrideMaxSlippageBps().roleId
+        );
+        _assertTargetFunctionRole(
+            target, ISlippageCoverageVault.fundCoverage.selector, RolesConfig.getRole__fundCoverage().roleId
+        );
+        _assertTargetFunctionRole(
+            target, ISlippageCoverageVault.sweep.selector, RolesConfig.getRole__sweepSlippageCoverageVault().roleId
         );
     }
 
