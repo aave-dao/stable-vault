@@ -110,9 +110,12 @@ library RateLimitBucketLib {
 
     /// @notice Lowers `bucket.capacity` to `newCapacity`. Settles the refill accrued at the current rate and carries
     /// the post-refill `consumed` forward (clamped to `newCapacity`, so tightening below the current consumed forgives
-    /// the overshoot). Transitioning from unlimited capacity resets `consumed` to zero.
+    /// the overshoot).
     /// @dev `newCapacity` must be strictly below the current capacity. `newCapacity = 0` is allowed and fully rate
     /// limits the bucket.
+    /// @dev Transitioning from `UNLIMITED_CAPACITY` to a finite capacity resets `consumed` to zero regardless of how
+    /// much was consumed while unlimited, since `consumed` is not tracked for unlimited buckets. Operators tightening
+    /// from unlimited should size `newCapacity` with this in mind: the new bucket is immediately fully available.
     /// @param bucket The bucket to update.
     /// @param newCapacity The new capacity.
     function lowerCapacity(Bucket storage bucket, uint128 newCapacity) internal {
