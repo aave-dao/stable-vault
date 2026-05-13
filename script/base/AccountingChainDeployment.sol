@@ -68,6 +68,14 @@ abstract contract AccountingChainDeployment is
     address immutable ALLOCATOR_DEPOSITOR = getFundsHandlerAddress(_deployer());
     address immutable ALLOCATOR_WITHDRAWER = getFundsHandlerAddress(_deployer());
 
+    // keccak256("aave.stable-vault.StableVault.policy.deposit")
+    bytes32 internal constant DEPOSIT_POLICY_ID = 0x780c69a8d1890ef009c0e82622a8ad8b5fcebdb4655a550589c95587ab9f8737;
+    // keccak256("aave.stable-vault.StableVault.policy.withdrawal-execution")
+    bytes32 internal constant WITHDRAWAL_EXECUTION_POLICY_ID =
+        0x0b31c7380981f7a065b16980994765a46c7c2446175bc97b41109919817f1ca2;
+    // keccak256("aave.stable-vault.FundsHandler.policy.bridge")
+    bytes32 internal constant BRIDGE_POLICY_ID = 0xe8134dfa9ba78c8f4bc7215c2603da92d80f826e18cf8cf1673b973cae3e6165;
+
     address internal _chainlinkBundleAggregatorProxy;
     address internal _sequencerUptimeFeed;
 
@@ -183,7 +191,20 @@ abstract contract AccountingChainDeployment is
         _setupChainBalanceOracleAdapters();
         _setupDepositPolicy();
         _setupFundsBridgingPolicy();
+        // Enforce required policies are set before the deployer loses ADMIN_ROLE. Otherwise, a missing policy
+        // would only surface in prod, where setting is gated by `CRITICAL_DELAY`.
+        _assertRequiredPoliciesSet();
         _setupAccessManager(_deployer()); // Must be last – revokes deployer's ADMIN_ROLE
+    }
+
+    function _assertRequiredPoliciesSet() private view {
+        IPolicyRegistry registry = IPolicyRegistry(getPolicyRegistryAddress(_deployer()));
+        require(registry.getPolicy(DEPOSIT_POLICY_ID) != address(0), "missing accounting-chain deposit policy");
+        require(
+            registry.getPolicy(WITHDRAWAL_EXECUTION_POLICY_ID) != address(0),
+            "missing accounting-chain withdrawal-execution policy"
+        );
+        require(registry.getPolicy(BRIDGE_POLICY_ID) != address(0), "missing accounting-chain bridge policy");
     }
 
     function _accessManager() internal view virtual override returns (address) {
@@ -254,10 +275,7 @@ abstract contract AccountingChainDeployment is
         withdrawalExecutionPolicy.addSigner(_configAddress(".withdrawalExecutionPolicy.signer"));
 
         IPolicyRegistry(getPolicyRegistryAddress(_deployer()))
-            .setPolicy(
-                keccak256(bytes("aave.stable-vault.StableVault.policy.withdrawal-execution")),
-                address(withdrawalExecutionPolicy)
-            );
+            .setPolicy(WITHDRAWAL_EXECUTION_POLICY_ID, address(withdrawalExecutionPolicy));
     }
 
     function _setupAssetRegistry() internal {
@@ -658,8 +676,7 @@ abstract contract AccountingChainDeployment is
     function _setupDepositPolicy() internal {
         DepositPolicy policy = DepositPolicy(getDepositPolicyAddress(_deployer()));
 
-        IPolicyRegistry(getPolicyRegistryAddress(_deployer()))
-            .setPolicy(keccak256(bytes("aave.stable-vault.StableVault.policy.deposit")), address(policy));
+        IPolicyRegistry(getPolicyRegistryAddress(_deployer())).setPolicy(DEPOSIT_POLICY_ID, address(policy));
 
         _initDepositLimit(policy, _gho(), ".accountingChain.depositPolicy.perAssetLimits.gho");
         _initDepositLimit(policy, _usdc(), ".accountingChain.depositPolicy.perAssetLimits.usdc");
@@ -678,8 +695,7 @@ abstract contract AccountingChainDeployment is
     function _setupFundsBridgingPolicy() internal {
         FundsBridgingPolicy policy = FundsBridgingPolicy(getFundsBridgingPolicyAddress(_deployer()));
 
-        IPolicyRegistry(getPolicyRegistryAddress(_deployer()))
-            .setPolicy(keccak256(bytes("aave.stable-vault.FundsHandler.policy.bridge")), address(policy));
+        IPolicyRegistry(getPolicyRegistryAddress(_deployer())).setPolicy(BRIDGE_POLICY_ID, address(policy));
 
         uint256 destChainId = _configUint(".earningChain.chainId");
         address bridgeAdapter = getCcipAdapterAddress(_deployer());

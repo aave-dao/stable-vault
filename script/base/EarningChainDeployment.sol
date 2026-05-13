@@ -50,6 +50,12 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
     address immutable ALLOCATOR_DEPOSITOR = getGatewayAddress(_deployer());
     address immutable ALLOCATOR_WITHDRAWER = getGatewayAddress(_deployer());
 
+    // keccak256("aave.stable-vault.EarningChainGateway.policy.withdrawal-execution")
+    bytes32 internal constant WITHDRAWAL_EXECUTION_POLICY_ID =
+        0xf213893b1e253163c05de458d1c9283d3155b096d439aab98ea90b491dce4bfb;
+    // keccak256("aave.stable-vault.EarningChainGateway.policy.bridge")
+    bytes32 internal constant BRIDGE_POLICY_ID = 0x537fb58e71f5b54dc09d8afff5cbf9bf5e630233f65f0531590f8cfa4a81bc6c;
+
     function _gho() internal view returns (address) {
         return _configAddress(".earningChain.assets.gho");
     }
@@ -130,7 +136,19 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         _setupWithdrawalExecutionPolicy();
         _setupPriceOracleAdapters();
         _setupFundsBridgingPolicy();
+        // Enforce required policies are set before the deployer loses ADMIN_ROLE. Otherwise, a missing policy
+        // would only surface in prod, where setting is gated by `CRITICAL_DELAY`.
+        _assertRequiredPoliciesSet();
         _setupAccessManager(_deployer()); // Must be last – revokes deployer's ADMIN_ROLE
+    }
+
+    function _assertRequiredPoliciesSet() private view {
+        IPolicyRegistry registry = IPolicyRegistry(getPolicyRegistryAddress(_deployer()));
+        require(
+            registry.getPolicy(WITHDRAWAL_EXECUTION_POLICY_ID) != address(0),
+            "missing earning-chain withdrawal-execution policy"
+        );
+        require(registry.getPolicy(BRIDGE_POLICY_ID) != address(0), "missing earning-chain bridge policy");
     }
 
     function _accessManager() internal view virtual override returns (address) {
@@ -171,10 +189,7 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         withdrawalExecutionPolicy.addSigner(_configAddress(".withdrawalExecutionPolicy.signer"));
 
         IPolicyRegistry(getPolicyRegistryAddress(_deployer()))
-            .setPolicy(
-                keccak256(bytes("aave.stable-vault.EarningChainGateway.policy.withdrawal-execution")),
-                address(withdrawalExecutionPolicy)
-            );
+            .setPolicy(WITHDRAWAL_EXECUTION_POLICY_ID, address(withdrawalExecutionPolicy));
     }
 
     function _setupAllocator() internal {
@@ -489,8 +504,7 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
     function _setupFundsBridgingPolicy() internal {
         FundsBridgingPolicy policy = FundsBridgingPolicy(getFundsBridgingPolicyAddress(_deployer()));
 
-        IPolicyRegistry(getPolicyRegistryAddress(_deployer()))
-            .setPolicy(keccak256(bytes("aave.stable-vault.EarningChainGateway.policy.bridge")), address(policy));
+        IPolicyRegistry(getPolicyRegistryAddress(_deployer())).setPolicy(BRIDGE_POLICY_ID, address(policy));
 
         uint256 destChainId = _configUint(".accountingChain.chainId");
         address bridgeAdapter = getCcipAdapterAddress(_deployer());
