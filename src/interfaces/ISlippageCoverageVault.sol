@@ -73,7 +73,7 @@ interface ISlippageCoverageVault {
 
     /// @notice Toggles override mode.
     /// @dev When enabled, `pullCoverage` bypasses both per-tx and window caps; the Swapper accepts the higher
-    /// `overrideMaxSlippageBps`. Held by a role distinct from the rebalance manager.
+    /// `overrideMaxSlippageBps`.
     function setOverrideMode(bool enabled) external;
 
     /// @notice Raises the per-tx cap for an asset. Reverts if `newCap <= current`.
