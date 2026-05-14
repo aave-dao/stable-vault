@@ -307,8 +307,6 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         roles[11] = RolesConfig.getRole__setDefaultStrategy();
         roles[12] = RolesConfig.getRole__distrustStrategy();
         roles[13] = RolesConfig.getRole__removeSigner();
-        // Monotonic-tightening SlippageCoverageVault hooks: lower per-tx and window caps during incident response
-        // without requiring the admin multisig. Loosening (`raise*`) stays admin-gated.
         roles[14] = RolesConfig.getRole__lowerPullCapPerTx();
         roles[15] = RolesConfig.getRole__lowerWindowCap();
 
