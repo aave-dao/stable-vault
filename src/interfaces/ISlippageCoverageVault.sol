@@ -101,6 +101,10 @@ interface ISlippageCoverageVault {
     function lowerPullCapPerTx(address asset, uint256 newCap) external;
 
     /// @notice Raises the window cap for an asset. Reverts if `newCap <= current`. Preserves `windowSeconds`.
+    /// @dev Boundary burst: under a fixed-window with lazy rollover, a caller can drain `newCap` at
+    /// `t = windowStart + windowSeconds - 1` and another full `newCap` at `t = windowStart + windowSeconds`, for
+    /// `2 * newCap` across a ~1-second span. Size `newCap` such that `2 * newCap` is an acceptable dollar exposure
+    /// within `windowSeconds`.
     function raiseWindowCap(address asset, uint256 newCap) external;
 
     /// @notice Lowers the window cap for an asset. Reverts if `newCap >= current`. Preserves `windowSeconds`.
@@ -109,7 +113,8 @@ interface ISlippageCoverageVault {
     /// @notice Raises the window length (in seconds) for an asset, lengthening the window.
     /// @dev Counter-intuitive risk direction: raising `windowSeconds` SLOWS the drain rate (same cap, more time)
     /// and is therefore a **tightening** action, gated on the operational/no-delay path. Reverts if
-    /// `newWindowSeconds <= current`. Preserves `cap`.
+    /// `newWindowSeconds <= current`. Preserves `cap`. Boundary burst is `2 * cap` per `windowSeconds`; see
+    /// `raiseWindowCap`.
     function raiseWindowSeconds(address asset, uint64 newWindowSeconds) external;
 
     /// @notice Lowers the window length (in seconds) for an asset, shortening the window.
