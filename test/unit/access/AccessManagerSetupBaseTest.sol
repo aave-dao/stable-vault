@@ -219,8 +219,11 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         // Trilemma: CoverageGuardian must NOT also be the Rebalancer.
         assertTrue(_getProfile__CoverageGuardian() != _getProfile__Rebalancer(), "guardian == rebalancer");
 
-        // Asymmetric delays: enable has LOW_DELAY (cancellable scheduling window), disable has NO_DELAY (fast tighten).
-        _assertProfileRoleDelay(_getProfile__CoverageGuardian(), expected[0], LOW_DELAY);
+        // No on-chain delay on either selector; CoverageGuardian compromise resistance is structural (N-of-M
+        // multisig signer composition), not temporal. A timelock would slow legitimate depeg response without
+        // changing the worst case (CoverageGuardian + Rebalancer both compromised collapses to vault balance
+        // regardless).
+        _assertProfileRoleDelay(_getProfile__CoverageGuardian(), expected[0], RolesConfig.NO_DELAY);
         _assertProfileRoleDelay(_getProfile__CoverageGuardian(), expected[1], RolesConfig.NO_DELAY);
     }
 

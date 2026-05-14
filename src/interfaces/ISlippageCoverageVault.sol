@@ -90,8 +90,9 @@ interface ISlippageCoverageVault {
 
     /// @notice Enables override mode. While enabled, `pullCoverage` bypasses both per-tx and window caps and the
     /// Swapper accepts the higher `overrideMaxSlippageBps`.
-    /// @dev Gated by a role separate from the rebalancer (CoverageGuardian) with a scheduling delay so the loosening
-    /// has a public, cancellable window. Reverts with `AlreadyEnabled` if already on.
+    /// @dev Gated by the CoverageGuardian role (separate from the rebalancer, expected to be an N-of-M multisig).
+    /// No on-chain delay; compromise resistance is structural (quorum), not temporal. Reverts with `AlreadyEnabled`
+    /// if already on.
     function enableOverrideMode() external;
 
     /// @notice Disables override mode and restores per-tx + window cap enforcement and `maxSlippageBps`.

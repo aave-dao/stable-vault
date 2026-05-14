@@ -613,14 +613,17 @@ abstract contract RolesConfig is DeploymentConfig {
         });
     }
 
-    /// @custom:delay Low
+    /// @custom:delay None
     /// @custom:location SlippageCoverageVault
-    function getRole__enableOverrideMode() internal view returns (Role memory) {
+    /// @dev No on-chain delay. Compromise resistance comes from signer composition (the CoverageGuardian profile is
+    /// an N-of-M multisig); a timelock here would slow legitimate depeg response without changing the worst case
+    /// (CoverageGuardian + Rebalancer both compromised collapses to `vault.balanceOf(asset)` either way).
+    function getRole__enableOverrideMode() internal pure returns (Role memory) {
         bytes4 selector = ISlippageCoverageVault.enableOverrideMode.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
-            delay: LOW_DELAY,
+            delay: NO_DELAY,
             guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
             hasCriticalRisk: false
         });
