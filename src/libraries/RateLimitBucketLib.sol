@@ -8,9 +8,9 @@ import {Errors} from "src/types/Errors.sol";
 /// @author Aave Labs
 /// @notice Rate-limit primitive shared across policies. Each bucket has a maximum capacity and refills linearly at a
 /// fixed rate per second; operations consume from the available capacity and revert when it is exhausted.
-/// @dev Over any `capacity / refillRate`-second interval, a caller can extract up to `2 * capacity`: they can drain
-/// the full bucket at the start of the interval and then match the refill rate for the remaining time. Callers
-/// should set `capacity` with this in mind.
+/// @dev For any `(capacity, refillRate)` configuration, starting with a full bucket, a caller can extract
+/// up to `2 * capacity` over a `capacity / refillRate`-second interval: they can consume the full bucket at the start
+/// of the interval and then match the refill rate for the remaining time. The capacity should be set with this in mind.
 /// @dev This library does not emit events; callers are responsible for emitting any events they need around bucket
 /// state or configuration changes.
 library RateLimitBucketLib {

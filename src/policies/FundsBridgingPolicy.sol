@@ -105,8 +105,9 @@ contract FundsBridgingPolicy is AccessManaged, Multicall, IFundsBridgingPolicy {
     }
 
     /// @notice Raises the bridging capacity for a route. Use max uint128 to remove the limit.
-    /// @dev Over any `capacity / refillRate`-second interval, a caller can extract up to `2 * capacity` (drain the
-    /// full bucket at the start, then match the refill rate). Set `capacity` accordingly.
+    /// @dev Starting with a full bucket, a caller could extract up to `2 * capacity` over
+    /// a `capacity / refillRate`-second interval: they can consume the full bucket at the start of the interval and
+    /// then match the refill rate for the remaining time. Set `capacity` accordingly.
     function raiseBridgingCapacity(address asset, uint256 destChainId, address bridgeAdapter, uint128 newCapacity)
         external
         restricted

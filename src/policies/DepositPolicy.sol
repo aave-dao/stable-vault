@@ -59,8 +59,9 @@ contract DepositPolicy is AccessManaged, Multicall, IDepositPolicy {
     }
 
     /// @notice Raises the deposit capacity for `asset`. Use max uint128 to remove the limit.
-    /// @dev Over any `capacity / refillRate`-second interval, a caller can extract up to `2 * capacity` (drain the full
-    /// bucket at the start, then match the refill rate). Set `capacity` accordingly.
+    /// @dev Starting with a full bucket, a caller could extract up to `2 * capacity` over
+    /// a `capacity / refillRate`-second interval: they can consume the full bucket at the start of the interval and
+    /// then match the refill rate for the remaining time. Set `capacity` accordingly.
     function raiseDepositCapacity(address asset, uint128 newCapacity) external restricted {
         uint128 oldCapacity = _buckets[asset].capacity;
         _buckets[asset].raiseCapacity(newCapacity);
