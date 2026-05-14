@@ -531,6 +531,11 @@ contract Allocator is
             revert DepositIntoStrategyFailed(strategy);
         }
 
+        // Clear any residual allowance. ERC4626 deposit may pull less than `amount` (e.g. `ATokenVault._baseDeposit`
+        // pulls `_convertToAssets(shares, Up)`, which can round below `amount`), leaving dust that accumulates
+        // across deposits and gives the strategy contract a latent pull-without-going-through-this-function surface.
+        IERC20(asset).forceApprove(strategy, 0);
+
         emit AssetAllocated(asset, strategy, amount, netDepositAmount);
         return netDepositAmount;
     }
