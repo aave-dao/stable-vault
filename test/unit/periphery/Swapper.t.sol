@@ -312,39 +312,41 @@ contract SwapperTest is TestWithHelpers {
         _swapper.executeSwap(address(_mockUsdt), address(_mockGho), 100, rebalancer, data);
     }
 
-    /// @dev assetIn redirected inside the call loop instead of swapped at the DEX. To isolate the assetIn-leftover
-    /// check we seed the Swapper with enough assetOut directly so the slippage check passes; the only failure left
-    /// is the assetIn-leftover invariant.
-    function test_executeSwap_reverts_ifAssetInLeftover() public {
+    /// @dev Empty target loop: `assetIn` is never consumed. The full `amountIn` is swept back to msg.sender (the
+    /// Allocator) and `AssetInSwept` is emitted. assetOut is pre-seeded so the slippage check passes.
+    function test_executeSwap_sweepsAssetIn_ifFullyLeftover() public {
         uint256 amountIn = 100;
         uint256 expectedAmountOut = amountIn.convertAssetDecimals(address(_mockUsdt), address(_mockGho));
 
         _mockTransferIntoSwapper(_mockUsdt, amountIn);
         _mockGho.mint(address(_swapper), expectedAmountOut); // pre-seed so amountOut == expected
 
-        // Empty target loop: assetIn never gets consumed.
         address[] memory targets = new address[](0);
         bytes[] memory callDatas = new bytes[](0);
         bytes memory data = abi.encode(targets, callDatas, uint16(0));
 
-        vm.expectRevert(abi.encodeWithSelector(ISwapper.AssetInLeftOver.selector));
+        uint256 allocatorAssetInBefore = _mockUsdt.balanceOf(allocator);
+
+        vm.expectEmit(true, false, false, true, address(_swapper));
+        emit ISwapper.AssetInSwept(address(_mockUsdt), amountIn);
         vm.prank(allocator);
         _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
+
+        assertEq(_mockUsdt.balanceOf(allocator) - allocatorAssetInBefore, amountIn, "leftover not swept");
+        assertEq(_mockUsdt.balanceOf(address(_swapper)), 0, "assetIn still on swapper");
     }
 
-    /// @dev Delta-accounting on assetIn: a partial leftover (only `amountIn / 2` consumed) reverts even when the
-    /// pre-seeded assetOut keeps the slippage check happy. Catches the assetIn-redirection attack the Allocator's
-    /// `assetOut`-only invariant cannot see.
-    function test_executeSwap_reverts_ifAssetInPartiallyLeftover() public {
+    /// @dev Partial venue consumption: half of `amountIn` is sent to an external recipient inside the loop, half
+    /// stays in the Swapper. The half left on the Swapper is swept back to msg.sender. assetOut is pre-seeded so
+    /// the slippage check passes. The half routed away is the residual that monitoring + vault caps bound under a
+    /// compromised rebalancer; this test only asserts the sweep semantics.
+    function test_executeSwap_sweepsAssetIn_ifPartiallyLeftover() public {
         uint256 amountIn = 100;
         uint256 expectedAmountOut = amountIn.convertAssetDecimals(address(_mockUsdt), address(_mockGho));
 
         _mockTransferIntoSwapper(_mockUsdt, amountIn);
-        // Pre-seed assetOut directly on the Swapper so post-loop balance == expectedAmountOut and the slippage
-        // check passes. This isolates the assetIn-leftover check.
         _mockGho.mint(address(_swapper), expectedAmountOut);
 
-        // Single target burns half of assetIn (transfers it to a recipient outside the system) and leaves the rest.
         address dust = makeAddr("dust");
         address[] memory targets = new address[](1);
         targets[0] = address(_mockUsdt);
@@ -352,14 +354,21 @@ contract SwapperTest is TestWithHelpers {
         callDatas[0] = abi.encodeWithSelector(IERC20.transfer.selector, dust, amountIn / 2);
         bytes memory data = abi.encode(targets, callDatas, uint16(0));
 
-        vm.expectRevert(abi.encodeWithSelector(ISwapper.AssetInLeftOver.selector));
+        uint256 allocatorAssetInBefore = _mockUsdt.balanceOf(allocator);
+
+        vm.expectEmit(true, false, false, true, address(_swapper));
+        emit ISwapper.AssetInSwept(address(_mockUsdt), amountIn / 2);
         vm.prank(allocator);
         _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
+
+        assertEq(_mockUsdt.balanceOf(allocator) - allocatorAssetInBefore, amountIn / 2, "leftover not swept");
+        assertEq(_mockUsdt.balanceOf(dust), amountIn / 2, "dust did not receive its half");
+        assertEq(_mockUsdt.balanceOf(address(_swapper)), 0, "assetIn still on swapper");
     }
 
-    /// @dev Delta-accounting on assetIn must be immune to dust donations: an attacker who pre-funds the Swapper
-    /// with a small amount of `assetIn` before the rebalance broadcasts cannot brick the call. Donations are baked
-    /// into both `before` and `after` snapshots and cancel out.
+    /// @dev Sweep must be immune to dust donations: an attacker who pre-funds the Swapper with a small amount of
+    /// `assetIn` before the rebalance broadcasts cannot brick the call nor get those tokens swept to the Allocator.
+    /// The pre-loop snapshot excludes the donation from the sweep baseline; the donation remains on the Swapper.
     function test_executeSwap_succeeds_whenAssetInDonatedBeforeCall(uint256 donation) public {
         uint256 amountIn = 100;
         donation = bound(donation, 1, 1_000_000); // arbitrary non-zero donation

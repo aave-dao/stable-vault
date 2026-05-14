@@ -9,9 +9,11 @@ interface ISwapper {
     /// @notice Emitted when slippage coverage source covers the shortfall from a swap.
     event SlippageCovered(address indexed slippageCoverageSource, address indexed assetOut, uint256 amount);
 
-    /// @notice Thrown when `assetIn` is not fully consumed by the call loop.
-    /// @custom:selector 0x84cc6d30
-    error AssetInLeftOver();
+    /// @notice Emitted when leftover `assetIn` is swept back to the Allocator after the call loop.
+    /// @dev Indicates a venue under-consumed `amountIn`. Operators should monitor: persistent drift
+    /// can also signal a compromised rebalancer routing `assetIn` outside the swap; the dollar bound is
+    /// the `SlippageCoverageVault` per-tx + window caps and the bounded `maxSlippageBps`.
+    event AssetInSwept(address indexed asset, uint256 amount);
 
     /// @notice Thrown when a target in the call loop equals the bound vault.
     /// @custom:selector 0x13496fda
