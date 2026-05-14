@@ -28,6 +28,7 @@ interface IAdiControllerAdmin {
     function guardian() external view returns (address);
 }
 
+/// @notice Minimal gateway that records receives and forwards publishes to a bridge adapter.
 contract RecordingGateway is IChainGateway {
     uint256 public receiveCount;
     uint256 public lastSourceChainId;
@@ -68,7 +69,8 @@ contract RecordingGateway is IChainGateway {
         payable {}
 }
 
-contract AdiAdapterPigeonLocalForkTest is Test {
+/// @dev Shared fork setup, Pigeon helpers, and helpers for local aDI + Stable Vaults `AdiAdapter` fork tests.
+abstract contract AdiAdapterPigeonLocalForkBase is Test {
     uint256 internal constant ETH_CHAIN_ID = 1;
     uint256 internal constant ARB_CHAIN_ID = 42161;
     uint256 internal constant DEFAULT_GAS_LIMIT = 200_000;
@@ -108,12 +110,20 @@ contract AdiAdapterPigeonLocalForkTest is Test {
     address internal _arbCcc;
     address internal _ethArbAdapter;
 
+    /// @dev Optional deployment addresses from `adi-deploy` JSON (exported by `run-adi-pigeon-fork-test.sh`).
+    address internal _ethCcipAdapter;
+    address internal _ethLzAdapter;
+    address internal _ethHlAdapter;
+    address internal _arbCcipAdapter;
+    address internal _arbLzAdapter;
+    address internal _arbHlAdapter;
+
     modifier onlyForkTest() {
         vm.skip(!vm.envOr("FORK_TEST", false), "Set FORK_TEST=true to run local aDI fork integration tests");
         _;
     }
 
-    function setUp() public {
+    function setUp() public virtual {
         if (!vm.envOr("FORK_TEST", false)) {
             return;
         }
@@ -132,118 +142,6 @@ contract AdiAdapterPigeonLocalForkTest is Test {
         _configureAdaptersAndAdiPermissions();
     }
 
-    function test_ethToArb_pigeonFork_deliversViaLocalAdi() public onlyForkTest {
-        bytes memory message = abi.encode("hello-arb");
-
-        vm.selectFork(_ethFork);
-        uint256 nativeFee = _prepareForwardFees(_ethAdiAdapter, ARB_CHAIN_ID, message);
-
-        vm.recordLogs();
-        _ethGateway.publishDataMessage{value: nativeFee}(
-            ARB_CHAIN_ID, address(_ethAdiAdapter), address(this), DEFAULT_GAS_LIMIT, message
-        );
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-
-        assertEq(_adiHelper.countSuccessfulForwards(logs), 1, "ETH->ARB should forward through one adapter");
-
-        _adiHelper.helpEthToArb(
-            AdiHelper.EthToArbArgs({
-                l2ForkId: _arbFork, l1Inbox: ARB_INBOX, l1Bridge: ARB_BRIDGE, expectedL1CCC: _ethCcc, logs: logs
-            })
-        );
-
-        vm.selectFork(_arbFork);
-        assertEq(_arbGateway.receiveCount(), 1, "ARB gateway did not receive");
-        assertEq(_arbGateway.lastSourceChainId(), ETH_CHAIN_ID, "unexpected source chain");
-        assertEq(_arbGateway.lastAsset(), Constants.ASSET_FOR_DATA_ONLY_BRIDGE, "unexpected asset");
-        assertEq(_arbGateway.lastAmount(), 0, "unexpected amount");
-        assertEq(abi.decode(_arbGateway.lastData(), (string)), "hello-arb", "unexpected message");
-    }
-
-    function test_arbToEth_pigeonFork_deliversViaTwoOfThree() public onlyForkTest {
-        bytes memory message = abi.encode("hello-eth");
-
-        vm.selectFork(_arbFork);
-        uint256 nativeFee = _prepareForwardFees(_arbAdiAdapter, ETH_CHAIN_ID, message);
-
-        vm.recordLogs();
-        _arbGateway.publishDataMessage{value: nativeFee}(
-            ETH_CHAIN_ID, address(_arbAdiAdapter), address(this), DEFAULT_GAS_LIMIT, message
-        );
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-
-        assertGe(_adiHelper.countSuccessfulForwards(logs), 2, "ARB->ETH should meet forwarding threshold");
-
-        _adiHelper.helpMultiBridge(
-            AdiHelper.MultiBridgeArgs({
-                dstForkId: _ethFork,
-                dstCcipRouter: ETH_CCIP_ROUTER,
-                dstCcipChainSelector: ETH_CCIP_CHAIN_SELECTOR,
-                srcCcipOnRamp: address(0),
-                dstLzEndpoint: LZ_ENDPOINT_V2,
-                srcHlMailbox: ARB_HL_MAILBOX,
-                dstHlMailbox: ETH_HL_MAILBOX,
-                logs: logs
-            })
-        );
-
-        vm.selectFork(_ethFork);
-        assertEq(_ethGateway.receiveCount(), 1, "ETH gateway did not receive");
-        assertEq(_ethGateway.lastSourceChainId(), ARB_CHAIN_ID, "unexpected source chain");
-        assertEq(_ethGateway.lastAsset(), Constants.ASSET_FOR_DATA_ONLY_BRIDGE, "unexpected asset");
-        assertEq(_ethGateway.lastAmount(), 0, "unexpected amount");
-        assertEq(abi.decode(_ethGateway.lastData(), (string)), "hello-eth", "unexpected message");
-    }
-
-    function test_retryTransaction_pigeonFork_deliversViaLocalAdiGuardian() public onlyForkTest {
-        bytes memory message = abi.encode("retry-hello-arb");
-        address[] memory bridgeAdaptersToRetry = _singleAddress(_ethArbAdapter);
-
-        vm.selectFork(_ethFork);
-        uint256 forwardNativeFee = _prepareForwardFees(_ethAdiAdapter, ARB_CHAIN_ID, message);
-
-        vm.recordLogs();
-        _ethGateway.publishDataMessage{value: forwardNativeFee}(
-            ARB_CHAIN_ID, address(_ethAdiAdapter), address(this), DEFAULT_GAS_LIMIT, message
-        );
-        Vm.Log[] memory forwardLogs = vm.getRecordedLogs();
-        bytes memory encodedTransaction = _firstSuccessfulEncodedTransaction(forwardLogs);
-
-        vm.selectFork(_arbFork);
-        assertEq(_arbGateway.receiveCount(), 0, "original transaction should not be relayed");
-
-        vm.selectFork(_ethFork);
-        _setGuardian(_ethCcc, _stableVaultsOwner);
-        uint256 retryNativeFee = _prepareRetryFees(_ethAdiAdapter, encodedTransaction, bridgeAdaptersToRetry);
-
-        vm.expectRevert();
-        _ethAdiAdapter.retryTransaction{value: retryNativeFee}(
-            encodedTransaction, DEFAULT_GAS_LIMIT, bridgeAdaptersToRetry
-        );
-
-        _setGuardian(_ethCcc, address(_ethAdiAdapter));
-        retryNativeFee = _prepareRetryFees(_ethAdiAdapter, encodedTransaction, bridgeAdaptersToRetry);
-
-        vm.recordLogs();
-        _ethAdiAdapter.retryTransaction{value: retryNativeFee}(
-            encodedTransaction, DEFAULT_GAS_LIMIT, bridgeAdaptersToRetry
-        );
-        Vm.Log[] memory retryLogs = vm.getRecordedLogs();
-
-        assertEq(_adiHelper.countSuccessfulForwards(retryLogs), 1, "retry should forward through one adapter");
-
-        _adiHelper.helpEthToArb(
-            AdiHelper.EthToArbArgs({
-                l2ForkId: _arbFork, l1Inbox: ARB_INBOX, l1Bridge: ARB_BRIDGE, expectedL1CCC: _ethCcc, logs: retryLogs
-            })
-        );
-
-        vm.selectFork(_arbFork);
-        assertEq(_arbGateway.receiveCount(), 1, "ARB gateway did not receive retry");
-        assertEq(_arbGateway.lastSourceChainId(), ETH_CHAIN_ID, "unexpected source chain");
-        assertEq(abi.decode(_arbGateway.lastData(), (string)), "retry-hello-arb", "unexpected retry message");
-    }
-
     function _deployLocalAdapter(address crossChainController)
         internal
         returns (RecordingGateway gateway, AdiAdapter adapter)
@@ -255,11 +153,18 @@ contract AdiAdapterPigeonLocalForkTest is Test {
             new AdiAdapter(address(accessManager), address(gateway), crossChainController, address(transferHelper));
     }
 
-    function _loadForkDeploymentConfig() internal {
+    function _loadForkDeploymentConfig() internal virtual {
         _stableVaultsOwner = vm.envOr("STABLE_VAULTS_OWNER", DEFAULT_STABLE_VAULTS_OWNER);
         _ethCcc = vm.envOr("ETH_CCC", DEFAULT_ETH_CCC);
         _arbCcc = vm.envOr("ARB_CCC", DEFAULT_ARB_CCC);
         _ethArbAdapter = vm.envOr("ETH_ARB_ADAPTER", DEFAULT_ETH_ARB_ADAPTER);
+
+        _ethCcipAdapter = vm.envOr("ETH_CCIP_ADAPTER", address(0));
+        _ethLzAdapter = vm.envOr("ETH_LZ_ADAPTER", address(0));
+        _ethHlAdapter = vm.envOr("ETH_HL_ADAPTER", address(0));
+        _arbCcipAdapter = vm.envOr("ARB_CCIP_ADAPTER", address(0));
+        _arbLzAdapter = vm.envOr("ARB_LZ_ADAPTER", address(0));
+        _arbHlAdapter = vm.envOr("ARB_HL_ADAPTER", address(0));
     }
 
     function _deployPigeonHelpers() internal {
@@ -348,6 +253,30 @@ contract AdiAdapterPigeonLocalForkTest is Test {
         }
     }
 
+    function _prepareRetryEnvelopeFees(AdiAdapter adapter, IAdiCrossChainForwarder.Envelope memory envelope)
+        internal
+        returns (uint256 nativeFee)
+    {
+        uint256 quoteBandwidth = IAdiCrossChainForwarder(adapter.getCrossChainController())
+            .getOptimalBandwidthByChain(envelope.destinationChainId);
+        IAdiCrossChainForwarder.Fee[] memory fees;
+        uint256 successfulQuotes;
+        (nativeFee, fees, successfulQuotes) = adapter.quoteRetryEnvelope(envelope, DEFAULT_GAS_LIMIT, quoteBandwidth);
+        assertGt(successfulQuotes, 0, "no successful retry envelope quotes");
+
+        for (uint256 i = 0; i < fees.length; i++) {
+            if (fees[i].amount == 0) {
+                continue;
+            }
+            deal(fees[i].token, address(this), fees[i].amount);
+            IERC20(fees[i].token).approve(address(adapter), fees[i].amount);
+        }
+
+        if (nativeFee > 0) {
+            vm.deal(address(this), nativeFee);
+        }
+    }
+
     function _firstSuccessfulEncodedTransaction(Vm.Log[] memory logs) internal pure returns (bytes memory) {
         for (uint256 i = 0; i < logs.length; i++) {
             if (logs[i].topics.length < 4) {
@@ -367,6 +296,17 @@ contract AdiAdapterPigeonLocalForkTest is Test {
         }
 
         revert("NO_SUCCESSFUL_TRANSACTION");
+    }
+
+    function _envelopeFromFirstSuccessfulForward(Vm.Log[] memory logs)
+        internal
+        pure
+        returns (IAdiCrossChainForwarder.Envelope memory envelope)
+    {
+        bytes memory encodedTransaction = _firstSuccessfulEncodedTransaction(logs);
+        IAdiCrossChainForwarder.Transaction memory transaction =
+            abi.decode(encodedTransaction, (IAdiCrossChainForwarder.Transaction));
+        envelope = abi.decode(transaction.encodedEnvelope, (IAdiCrossChainForwarder.Envelope));
     }
 
     function _singleAddress(address value) internal pure returns (address[] memory values) {

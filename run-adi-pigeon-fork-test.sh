@@ -16,7 +16,7 @@ ARB_PORT="${ARB_PORT:-8546}"
 ETH_FORK_RPC="${ETH_FORK_RPC:-http://127.0.0.1:${ETH_PORT}}"
 ARB_FORK_RPC="${ARB_FORK_RPC:-http://127.0.0.1:${ARB_PORT}}"
 
-MATCH_CONTRACT="${MATCH_CONTRACT:-AdiAdapterPigeonLocalForkTest}"
+MATCH_CONTRACT="${MATCH_CONTRACT:-AdiAdapterPigeon}"
 FORGE_TEST_ARGS="${FORGE_TEST_ARGS:--vvv}"
 
 function log() {
@@ -143,11 +143,23 @@ function export_deployment_env() {
   export ETH_CCC
   export ARB_CCC
   export ETH_ARB_ADAPTER
+  export ETH_CCIP_ADAPTER
+  export ETH_LZ_ADAPTER
+  export ETH_HL_ADAPTER
+  export ARB_CCIP_ADAPTER
+  export ARB_LZ_ADAPTER
+  export ARB_HL_ADAPTER
 
   STABLE_VAULTS_OWNER="${STABLE_VAULTS_OWNER:-$(json_get "$eth_json" owner)}"
   ETH_CCC="${ETH_CCC:-$(json_get "$eth_json" crossChainController)}"
   ARB_CCC="${ARB_CCC:-$(json_get "$arb_json" crossChainController)}"
   ETH_ARB_ADAPTER="${ETH_ARB_ADAPTER:-$(json_get "$eth_json" arbAdapter)}"
+  ETH_CCIP_ADAPTER="${ETH_CCIP_ADAPTER:-$(json_get "$eth_json" ccipAdapter)}"
+  ETH_LZ_ADAPTER="${ETH_LZ_ADAPTER:-$(json_get "$eth_json" lzAdapter)}"
+  ETH_HL_ADAPTER="${ETH_HL_ADAPTER:-$(json_get "$eth_json" hlAdapter)}"
+  ARB_CCIP_ADAPTER="${ARB_CCIP_ADAPTER:-$(json_get "$arb_json" ccipAdapter)}"
+  ARB_LZ_ADAPTER="${ARB_LZ_ADAPTER:-$(json_get "$arb_json" lzAdapter)}"
+  ARB_HL_ADAPTER="${ARB_HL_ADAPTER:-$(json_get "$arb_json" hlAdapter)}"
 
   log "Stable Vaults fork test config"
   echo "ETH_FORK_RPC=$ETH_FORK_RPC"
@@ -158,6 +170,12 @@ function export_deployment_env() {
   echo "ETH_CCC=$ETH_CCC"
   echo "ARB_CCC=$ARB_CCC"
   echo "ETH_ARB_ADAPTER=$ETH_ARB_ADAPTER"
+  echo "ETH_CCIP_ADAPTER=$ETH_CCIP_ADAPTER"
+  echo "ETH_LZ_ADAPTER=$ETH_LZ_ADAPTER"
+  echo "ETH_HL_ADAPTER=$ETH_HL_ADAPTER"
+  echo "ARB_CCIP_ADAPTER=$ARB_CCIP_ADAPTER"
+  echo "ARB_LZ_ADAPTER=$ARB_LZ_ADAPTER"
+  echo "ARB_HL_ADAPTER=$ARB_HL_ADAPTER"
 }
 
 function log_fork_status() {
