@@ -32,8 +32,8 @@ library RateLimitBucketLib {
     }
 
     /// @notice Thrown by `consume` when the operation amount exceeds the available capacity.
-    /// @custom:selector 0x3f7b7a68
-    error RateLimited();
+    /// @custom:selector 0x40df7ba9
+    error RateLimited(uint256 amountToConsume, uint256 available);
 
     /// @notice Returns the available capacity at `block.timestamp`, refilled but not written back.
     /// @param bucket The bucket to read from.
@@ -71,7 +71,7 @@ library RateLimitBucketLib {
             return;
         }
         uint256 available = preview(bucket);
-        require(available >= amount, RateLimited());
+        require(available >= amount, RateLimited(amount, available));
         // `capacity - available` is the post-refill `consumed`; adding `amount` yields the new `consumed`.
         // Both terms are bounded by `capacity <= type(uint128).max`, so the cast is safe.
         // forge-lint: disable-next-line(unsafe-typecast)

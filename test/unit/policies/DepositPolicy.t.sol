@@ -98,7 +98,7 @@ contract DepositPolicyTest is Test {
     function test_applyDepositPolicy_revertsForUnconfiguredAsset(address asset, uint256 amount) public {
         amount = bound(amount, 1, type(uint256).max);
 
-        vm.expectRevert(RateLimitBucketLib.RateLimited.selector);
+        vm.expectRevert(abi.encodeWithSelector(RateLimitBucketLib.RateLimited.selector, amount, uint256(0)));
         vm.prank(applier);
         policy.applyDepositPolicy(_request(asset, amount));
     }
@@ -135,7 +135,7 @@ contract DepositPolicyTest is Test {
         amount = bound(amount, DEFAULT_CAPACITY + 1, type(uint128).max);
         _setLimit(asset, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
 
-        vm.expectRevert(RateLimitBucketLib.RateLimited.selector);
+        vm.expectRevert(abi.encodeWithSelector(RateLimitBucketLib.RateLimited.selector, amount, DEFAULT_CAPACITY));
         vm.prank(applier);
         policy.applyDepositPolicy(_request(asset, amount));
     }
@@ -192,7 +192,7 @@ contract DepositPolicyTest is Test {
             vm.prank(applier);
             policy.applyDepositPolicy(_request(asset, amount));
         } else {
-            vm.expectRevert(RateLimitBucketLib.RateLimited.selector);
+            vm.expectRevert(abi.encodeWithSelector(RateLimitBucketLib.RateLimited.selector, amount, DEFAULT_CAPACITY));
             vm.prank(applier);
             policy.applyDepositPolicy(_request(asset, amount));
         }

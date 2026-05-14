@@ -129,7 +129,7 @@ contract FundsBridgingPolicyTest is Test {
     ) public {
         amount = bound(amount, 1, type(uint256).max);
 
-        vm.expectRevert(RateLimitBucketLib.RateLimited.selector);
+        vm.expectRevert(abi.encodeWithSelector(RateLimitBucketLib.RateLimited.selector, amount, uint256(0)));
         vm.prank(applier);
         policy.applyFundsBridgingPolicy(_request(asset, destChainId, bridgeAdapter, amount));
     }
@@ -184,7 +184,7 @@ contract FundsBridgingPolicyTest is Test {
         amount = bound(amount, DEFAULT_CAPACITY + 1, type(uint128).max);
         _setLimit(asset, destChainId, bridgeAdapter, DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
 
-        vm.expectRevert(RateLimitBucketLib.RateLimited.selector);
+        vm.expectRevert(abi.encodeWithSelector(RateLimitBucketLib.RateLimited.selector, amount, DEFAULT_CAPACITY));
         vm.prank(applier);
         policy.applyFundsBridgingPolicy(_request(asset, destChainId, bridgeAdapter, amount));
     }
@@ -309,7 +309,7 @@ contract FundsBridgingPolicyTest is Test {
             vm.prank(applier);
             policy.applyFundsBridgingPolicy(_request(asset, destChainId, bridgeAdapter, amount));
         } else {
-            vm.expectRevert(RateLimitBucketLib.RateLimited.selector);
+            vm.expectRevert(abi.encodeWithSelector(RateLimitBucketLib.RateLimited.selector, amount, DEFAULT_CAPACITY));
             vm.prank(applier);
             policy.applyFundsBridgingPolicy(_request(asset, destChainId, bridgeAdapter, amount));
         }

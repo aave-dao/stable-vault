@@ -144,13 +144,13 @@ contract RateLimitBucketLibTest is Test {
         amount = bound(amount, DEFAULT_CAPACITY + 1, type(uint128).max);
         _setBucket(DEFAULT_CAPACITY, DEFAULT_REFILL_RATE);
 
-        vm.expectRevert(RateLimitBucketLib.RateLimited.selector);
+        vm.expectRevert(abi.encodeWithSelector(RateLimitBucketLib.RateLimited.selector, amount, DEFAULT_CAPACITY));
         w.consume(amount);
     }
 
     function test_consume_revertsWhenCapacityIsZero() public {
         // Default state: capacity == 0, consumed == 0. preview returns 0. Any amount > 0 reverts.
-        vm.expectRevert(RateLimitBucketLib.RateLimited.selector);
+        vm.expectRevert(abi.encodeWithSelector(RateLimitBucketLib.RateLimited.selector, uint256(1), uint256(0)));
         w.consume(1);
     }
 
@@ -498,7 +498,7 @@ contract RateLimitBucketLibTest is Test {
         uint256 availableNow = w.preview();
         assertLe(availableNow, capacity);
         // Try to consume more than available — must revert.
-        vm.expectRevert(RateLimitBucketLib.RateLimited.selector);
+        vm.expectRevert(abi.encodeWithSelector(RateLimitBucketLib.RateLimited.selector, availableNow + 1, availableNow));
         w.consume(availableNow + 1);
     }
 }
