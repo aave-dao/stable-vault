@@ -195,20 +195,33 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     }
 
     function test_rebalancerProfile_hasTheExpectedRoles() public view {
-        uint64[] memory expected = new uint64[](8);
+        uint64[] memory expected = new uint64[](7);
         expected[0] = RolesConfig.getRole__rebalance().roleId;
         expected[1] = RolesConfig.getRole__setDefaultStrategy().roleId;
         expected[2] = RolesConfig.getRole__disableDepositsToStrategy().roleId;
         expected[3] = RolesConfig.getRole__pushFundsToChain().roleId;
         expected[4] = RolesConfig.getRole__pushFundsToAccountingChain().roleId;
         expected[5] = RolesConfig.getRole__topUp().roleId;
-        expected[6] = RolesConfig.getRole__setOverrideMode().roleId;
-        expected[7] = RolesConfig.getRole__fundCoverage().roleId;
+        expected[6] = RolesConfig.getRole__fundCoverage().roleId;
         _assertProfileHasExactlyTheseRoles(_getProfile__Rebalancer(), expected);
 
         for (uint256 i = 0; i < expected.length; i++) {
             _assertProfileRoleDelay(_getProfile__Rebalancer(), expected[i], RolesConfig.NO_DELAY);
         }
+    }
+
+    function test_coverageGuardianProfile_hasTheExpectedRoles() public view {
+        uint64[] memory expected = new uint64[](2);
+        expected[0] = RolesConfig.getRole__enableOverrideMode().roleId;
+        expected[1] = RolesConfig.getRole__disableOverrideMode().roleId;
+        _assertProfileHasExactlyTheseRoles(_getProfile__CoverageGuardian(), expected);
+
+        // Trilemma: CoverageGuardian must NOT also be the Rebalancer.
+        assertTrue(_getProfile__CoverageGuardian() != _getProfile__Rebalancer(), "guardian == rebalancer");
+
+        // Asymmetric delays: enable has LOW_DELAY (cancellable scheduling window), disable has NO_DELAY (fast tighten).
+        _assertProfileRoleDelay(_getProfile__CoverageGuardian(), expected[0], LOW_DELAY);
+        _assertProfileRoleDelay(_getProfile__CoverageGuardian(), expected[1], RolesConfig.NO_DELAY);
     }
 
     function test_disablerProfile_hasTheExpectedRoles() public view {
@@ -480,7 +493,14 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     function test_targetSetup_slippageCoverageVault() public view {
         address target = getSlippageCoverageVaultAddress(_deployer());
         _assertTargetFunctionRole(
-            target, ISlippageCoverageVault.setOverrideMode.selector, RolesConfig.getRole__setOverrideMode().roleId
+            target,
+            ISlippageCoverageVault.enableOverrideMode.selector,
+            RolesConfig.getRole__enableOverrideMode().roleId
+        );
+        _assertTargetFunctionRole(
+            target,
+            ISlippageCoverageVault.disableOverrideMode.selector,
+            RolesConfig.getRole__disableOverrideMode().roleId
         );
         _assertTargetFunctionRole(
             target, ISlippageCoverageVault.raisePullCapPerTx.selector, RolesConfig.getRole__raisePullCapPerTx().roleId

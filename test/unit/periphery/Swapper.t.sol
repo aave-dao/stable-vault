@@ -245,7 +245,7 @@ contract SwapperTest is TestWithHelpers {
         _vault.setMaxSlippageBps(1_00);
 
         vm.prank(operator);
-        _vault.setOverrideMode(true);
+        _vault.enableOverrideMode();
 
         uint16 slippageBps = 3_000; // 30%
         uint256 amountIn = 1_000_000;
@@ -302,7 +302,7 @@ contract SwapperTest is TestWithHelpers {
         vm.prank(operator);
         _vault.setOverrideMaxSlippageBps(2_000); // 20%
         vm.prank(operator);
-        _vault.setOverrideMode(true);
+        _vault.enableOverrideMode();
 
         bytes memory data = _encodeDexSwapExactInputData(address(_mockUsdt), address(_mockGho), 100, 0, 2_001);
 

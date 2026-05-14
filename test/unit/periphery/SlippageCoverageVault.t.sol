@@ -201,7 +201,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
     function test_pullCoverage_emitsCoveragePulledWithOverrideTrueInOverrideMode() public {
         vm.prank(operator);
-        _vault.setOverrideMode(true);
+        _vault.enableOverrideMode();
         _fund(_usdc, 1_000e6);
 
         vm.expectEmit(true, false, false, true);
@@ -464,18 +464,50 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
     /* ============================ Override mode ============================ */
 
-    function test_setOverrideMode_revertsIfUnauthorized() public {
-        _accessManager.mockRejectCall(attacker, address(_vault), ISlippageCoverageVault.setOverrideMode.selector);
+    function test_enableOverrideMode_revertsIfUnauthorized() public {
+        _accessManager.mockRejectCall(attacker, address(_vault), ISlippageCoverageVault.enableOverrideMode.selector);
         vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, attacker));
         vm.prank(attacker);
-        _vault.setOverrideMode(true);
+        _vault.enableOverrideMode();
     }
 
-    function test_setOverrideMode_emitsEvent() public {
+    function test_disableOverrideMode_revertsIfUnauthorized() public {
+        vm.prank(operator);
+        _vault.enableOverrideMode();
+        _accessManager.mockRejectCall(attacker, address(_vault), ISlippageCoverageVault.disableOverrideMode.selector);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, attacker));
+        vm.prank(attacker);
+        _vault.disableOverrideMode();
+    }
+
+    function test_enableOverrideMode_emitsEvent() public {
         vm.expectEmit(false, false, false, true);
         emit ISlippageCoverageVault.OverrideModeSet(true);
         vm.prank(operator);
-        _vault.setOverrideMode(true);
+        _vault.enableOverrideMode();
+    }
+
+    function test_disableOverrideMode_emitsEvent() public {
+        vm.prank(operator);
+        _vault.enableOverrideMode();
+        vm.expectEmit(false, false, false, true);
+        emit ISlippageCoverageVault.OverrideModeSet(false);
+        vm.prank(operator);
+        _vault.disableOverrideMode();
+    }
+
+    function test_enableOverrideMode_revertsIfAlreadyEnabled() public {
+        vm.prank(operator);
+        _vault.enableOverrideMode();
+        vm.expectRevert(abi.encodeWithSelector(ISlippageCoverageVault.AlreadyEnabled.selector));
+        vm.prank(operator);
+        _vault.enableOverrideMode();
+    }
+
+    function test_disableOverrideMode_revertsIfAlreadyDisabled() public {
+        vm.expectRevert(abi.encodeWithSelector(ISlippageCoverageVault.AlreadyDisabled.selector));
+        vm.prank(operator);
+        _vault.disableOverrideMode();
     }
 
     function test_pullCoverage_overrideModeBypassesPerTxCap() public {
@@ -483,7 +515,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         vm.prank(operator);
         _vault.raisePullCapPerTx(address(_usdc), 100);
         vm.prank(operator);
-        _vault.setOverrideMode(true);
+        _vault.enableOverrideMode();
         _fund(_usdc, 1_000_000);
 
         vm.prank(beneficiary);
@@ -501,7 +533,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
         // Flip override; pull amounts that would otherwise revert.
         vm.prank(operator);
-        _vault.setOverrideMode(true);
+        _vault.enableOverrideMode();
         vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 100_000e6);
 
@@ -516,7 +548,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
         // Override on, drain a lot.
         vm.prank(operator);
-        _vault.setOverrideMode(true);
+        _vault.enableOverrideMode();
         vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 100_000e6);
 
@@ -527,7 +559,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         // Top up, flip override off, pull within normal cap → still works fully.
         _fund(_usdc, 5_000e6);
         vm.prank(operator);
-        _vault.setOverrideMode(false);
+        _vault.disableOverrideMode();
         vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 5_000e6);
 
@@ -541,13 +573,13 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
         // Override on: pull above per-tx cap.
         vm.prank(operator);
-        _vault.setOverrideMode(true);
+        _vault.enableOverrideMode();
         vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 50_000);
 
         // Flip off: any pull above per-tx cap reverts.
         vm.prank(operator);
-        _vault.setOverrideMode(false);
+        _vault.disableOverrideMode();
         vm.expectRevert(abi.encodeWithSelector(ISlippageCoverageVault.ExceedsPerTxCap.selector));
         vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 1_001);
@@ -733,7 +765,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
     function test_getEffectiveMaxSlippageBps_returnsOverrideBps_whenOverrideOn() public {
         vm.prank(operator);
-        _vault.setOverrideMode(true);
+        _vault.enableOverrideMode();
         assertEq(_vault.getEffectiveMaxSlippageBps(), DEFAULT_OVERRIDE_MAX_BPS);
     }
 
@@ -745,7 +777,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
         // Flip override on; effective bound switches to override-mode value.
         vm.prank(operator);
-        _vault.setOverrideMode(true);
+        _vault.enableOverrideMode();
         assertEq(_vault.getEffectiveMaxSlippageBps(), DEFAULT_OVERRIDE_MAX_BPS);
 
         // Mutate override-mode bound; effective bound updates.
@@ -755,7 +787,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
         // Flip override off; effective bound switches back to the (already-mutated) normal-mode value.
         vm.prank(operator);
-        _vault.setOverrideMode(false);
+        _vault.disableOverrideMode();
         assertEq(_vault.getEffectiveMaxSlippageBps(), 123);
     }
 
@@ -986,13 +1018,13 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
         // Override on → pull big.
         vm.prank(operator);
-        _vault.setOverrideMode(true);
+        _vault.enableOverrideMode();
         vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 50_000);
 
         // Override off → must respect cap.
         vm.prank(operator);
-        _vault.setOverrideMode(false);
+        _vault.disableOverrideMode();
         vm.expectRevert(abi.encodeWithSelector(ISlippageCoverageVault.ExceedsPerTxCap.selector));
         vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 101);
@@ -1003,7 +1035,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
         // Override on again → bypass.
         vm.prank(operator);
-        _vault.setOverrideMode(true);
+        _vault.enableOverrideMode();
         vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 50_000);
     }

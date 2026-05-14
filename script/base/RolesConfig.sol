@@ -613,10 +613,23 @@ abstract contract RolesConfig is DeploymentConfig {
         });
     }
 
+    /// @custom:delay Low
+    /// @custom:location SlippageCoverageVault
+    function getRole__enableOverrideMode() internal view returns (Role memory) {
+        bytes4 selector = ISlippageCoverageVault.enableOverrideMode.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: LOW_DELAY,
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
+        });
+    }
+
     /// @custom:delay None
     /// @custom:location SlippageCoverageVault
-    function getRole__setOverrideMode() internal pure returns (Role memory) {
-        bytes4 selector = ISlippageCoverageVault.setOverrideMode.selector;
+    function getRole__disableOverrideMode() internal pure returns (Role memory) {
+        bytes4 selector = ISlippageCoverageVault.disableOverrideMode.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
@@ -731,7 +744,7 @@ abstract contract RolesConfig is DeploymentConfig {
     }
 
     function getAllFunctionBasedRoles() internal view returns (Role[] memory) {
-        Role[] memory roles = new Role[](53);
+        Role[] memory roles = new Role[](54);
 
         // AssetRegistry
         roles[0] = getRole__setAssetConfig();
@@ -798,15 +811,16 @@ abstract contract RolesConfig is DeploymentConfig {
         roles[43] = getRole__emergencyRescue();
 
         // SlippageCoverageVault
-        roles[44] = getRole__setOverrideMode();
-        roles[45] = getRole__raisePullCapPerTx();
-        roles[46] = getRole__lowerPullCapPerTx();
-        roles[47] = getRole__raiseWindowCap();
-        roles[48] = getRole__lowerWindowCap();
-        roles[49] = getRole__setMaxSlippageBps();
-        roles[50] = getRole__setOverrideMaxSlippageBps();
-        roles[51] = getRole__fundCoverage();
-        roles[52] = getRole__sweepSlippageCoverageVault();
+        roles[44] = getRole__enableOverrideMode();
+        roles[45] = getRole__disableOverrideMode();
+        roles[46] = getRole__raisePullCapPerTx();
+        roles[47] = getRole__lowerPullCapPerTx();
+        roles[48] = getRole__raiseWindowCap();
+        roles[49] = getRole__lowerWindowCap();
+        roles[50] = getRole__setMaxSlippageBps();
+        roles[51] = getRole__setOverrideMaxSlippageBps();
+        roles[52] = getRole__fundCoverage();
+        roles[53] = getRole__sweepSlippageCoverageVault();
 
         return roles;
     }

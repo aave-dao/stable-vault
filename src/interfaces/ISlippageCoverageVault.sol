@@ -52,6 +52,12 @@ interface ISlippageCoverageVault {
     /// @notice Emitted when the window cap for an asset is raised.
     event WindowCapRaised(address indexed asset, uint256 oldCap, uint256 newCap, uint64 windowSeconds);
 
+    /// @notice Thrown when an `enableOverrideMode` call is made while override mode is already enabled.
+    error AlreadyEnabled();
+
+    /// @notice Thrown when a `disableOverrideMode` call is made while override mode is already disabled.
+    error AlreadyDisabled();
+
     /// @notice Thrown when a single pull would exceed the per-tx cap for the asset.
     /// @custom:selector 0x49aeece1
     error ExceedsPerTxCap();
@@ -71,10 +77,16 @@ interface ISlippageCoverageVault {
     /// @param amount The amount to pull.
     function pullCoverage(address asset, uint256 amount) external;
 
-    /// @notice Toggles override mode.
-    /// @dev When enabled, `pullCoverage` bypasses both per-tx and window caps; the Swapper accepts the higher
-    /// `overrideMaxSlippageBps`.
-    function setOverrideMode(bool enabled) external;
+    /// @notice Enables override mode. While enabled, `pullCoverage` bypasses both per-tx and window caps and the
+    /// Swapper accepts the higher `overrideMaxSlippageBps`.
+    /// @dev Gated by a role separate from the rebalancer (CoverageGuardian) with a scheduling delay so the loosening
+    /// has a public, cancellable window. Reverts with `AlreadyEnabled` if already on.
+    function enableOverrideMode() external;
+
+    /// @notice Disables override mode and restores per-tx + window cap enforcement and `maxSlippageBps`.
+    /// @dev Gated by the CoverageGuardian role with no delay so tightening is instant. Reverts with `AlreadyDisabled`
+    /// if already off.
+    function disableOverrideMode() external;
 
     /// @notice Raises the per-tx cap for an asset. Reverts if `newCap <= current`.
     function raisePullCapPerTx(address asset, uint256 newCap) external;

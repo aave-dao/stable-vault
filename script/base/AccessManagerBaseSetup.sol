@@ -81,6 +81,10 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         return _configAddress(".profiles.aTokenVaultRewardClaimer");
     }
 
+    function _getProfile__CoverageGuardian() internal view virtual returns (address) {
+        return _configAddress(".profiles.coverageGuardian");
+    }
+
     function _getRebalancerMulticallOwner() internal view returns (address) {
         return _configAddress(".profiles.rebalancerMulticallOwner");
     }
@@ -126,6 +130,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         _setupProfile__Rebalancer();
         _setupProfile__Disabler();
         _setupProfile__ATokenVaultRewardClaimer();
+        _setupProfile__CoverageGuardian();
     }
 
     function _logDeployment(string memory, string memory, address) internal virtual {}
@@ -264,7 +269,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         address rebalancerProfile = _getProfile__Rebalancer();
         require(rebalancerProfile != address(0), "Rebalancer profile address not set");
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](8);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](7);
 
         roles[0] = RolesConfig.getRole__rebalance();
         roles[1] = RolesConfig.getRole__setDefaultStrategy();
@@ -274,10 +279,8 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         // Only used on the Earning Chain (EarningChainGateway), but granted in both Accounting and Earning Chain setups
         roles[4] = RolesConfig.getRole__pushFundsToAccountingChain();
         roles[5] = RolesConfig.getRole__topUp();
-        // Operational SlippageCoverageVault hooks: flip override for planned big swaps and top up the coverage pool
-        // after a drawdown without going through the admin multisig.
-        roles[6] = RolesConfig.getRole__setOverrideMode();
-        roles[7] = RolesConfig.getRole__fundCoverage();
+        // Tightening-shape SlippageCoverageVault hook: only adds capital, never relaxes caps.
+        roles[6] = RolesConfig.getRole__fundCoverage();
 
         _grantRolesToProfile(rebalancerProfile, roles);
     }
@@ -322,6 +325,22 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         roles[1] = RolesConfig.getRole__emergencyRescue();
 
         _grantRolesToProfile(aTokenVaultRewardClaimer, roles);
+    }
+
+    function _setupProfile__CoverageGuardian() internal {
+        address coverageGuardian = _getProfile__CoverageGuardian();
+        require(coverageGuardian != address(0), "CoverageGuardian profile address not set");
+
+        // Override mode loosens vault caps, so it must NOT live on the Rebalancer (the same actor that triggers
+        // swaps) — otherwise the cap stack could be atomically bypassed. Enable carries a short delay
+        // (`LOW_DELAY`) so a malicious schedule has a visible cancellation window; disable is `NO_DELAY` so
+        // incident response tightens immediately.
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](2);
+
+        roles[0] = RolesConfig.getRole__enableOverrideMode();
+        roles[1] = RolesConfig.getRole__disableOverrideMode();
+
+        _grantRolesToProfile(coverageGuardian, roles);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -404,17 +423,18 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     function _setupTarget__SlippageCoverageVault(address deployer) internal {
         address slippageCoverageVault = getSlippageCoverageVaultAddress(deployer);
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](9);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](10);
 
-        roles[0] = RolesConfig.getRole__setOverrideMode();
-        roles[1] = RolesConfig.getRole__raisePullCapPerTx();
-        roles[2] = RolesConfig.getRole__lowerPullCapPerTx();
-        roles[3] = RolesConfig.getRole__raiseWindowCap();
-        roles[4] = RolesConfig.getRole__lowerWindowCap();
-        roles[5] = RolesConfig.getRole__setMaxSlippageBps();
-        roles[6] = RolesConfig.getRole__setOverrideMaxSlippageBps();
-        roles[7] = RolesConfig.getRole__fundCoverage();
-        roles[8] = RolesConfig.getRole__sweepSlippageCoverageVault();
+        roles[0] = RolesConfig.getRole__enableOverrideMode();
+        roles[1] = RolesConfig.getRole__disableOverrideMode();
+        roles[2] = RolesConfig.getRole__raisePullCapPerTx();
+        roles[3] = RolesConfig.getRole__lowerPullCapPerTx();
+        roles[4] = RolesConfig.getRole__raiseWindowCap();
+        roles[5] = RolesConfig.getRole__lowerWindowCap();
+        roles[6] = RolesConfig.getRole__setMaxSlippageBps();
+        roles[7] = RolesConfig.getRole__setOverrideMaxSlippageBps();
+        roles[8] = RolesConfig.getRole__fundCoverage();
+        roles[9] = RolesConfig.getRole__sweepSlippageCoverageVault();
 
         _setTargetFunctionRoles(slippageCoverageVault, roles);
     }

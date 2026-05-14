@@ -75,9 +75,17 @@ contract SlippageCoverageVault is AccessManaged, ReentrancyGuardTransient, ISlip
     //////////////////////////////// RESTRICTED FUNCTIONS ////////////////////////////////
 
     /// @inheritdoc ISlippageCoverageVault
-    function setOverrideMode(bool enabled) external override restricted {
-        _overrideMode = enabled;
-        emit OverrideModeSet(enabled);
+    function enableOverrideMode() external override restricted {
+        require(!_overrideMode, AlreadyEnabled());
+        _overrideMode = true;
+        emit OverrideModeSet(true);
+    }
+
+    /// @inheritdoc ISlippageCoverageVault
+    function disableOverrideMode() external override restricted {
+        require(_overrideMode, AlreadyDisabled());
+        _overrideMode = false;
+        emit OverrideModeSet(false);
     }
 
     /// @inheritdoc ISlippageCoverageVault

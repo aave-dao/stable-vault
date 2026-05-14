@@ -515,7 +515,7 @@ contract BaseTest is TestWithHelpers {
         );
 
         // 21a. Slippage Coverage Vault (non-upgradeable). `false` keeps existing test scenarios deterministic; tests
-        // that exercise override mode flip it explicitly via `setOverrideMode`.
+        // that exercise override mode flip it explicitly via `enableOverrideMode`/`disableOverrideMode`.
         slippageCoverageVault_accountingChain = new SlippageCoverageVault(
             swapper_accountingChainAddress, accessManager_accountingChainAddress, 1_00, 50_00, false
         );
@@ -986,16 +986,17 @@ contract BaseTest is TestWithHelpers {
 
         // For SlippageCoverageVault (intentionally collapsed to a single OPERATOR_ROLE in tests; production
         // uses split critical/operational roles per RolesConfig).
-        bytes4[] memory vaultSelectors = new bytes4[](9);
-        vaultSelectors[0] = ISlippageCoverageVault.setOverrideMode.selector;
-        vaultSelectors[1] = ISlippageCoverageVault.raisePullCapPerTx.selector;
-        vaultSelectors[2] = ISlippageCoverageVault.lowerPullCapPerTx.selector;
-        vaultSelectors[3] = ISlippageCoverageVault.raiseWindowCap.selector;
-        vaultSelectors[4] = ISlippageCoverageVault.lowerWindowCap.selector;
-        vaultSelectors[5] = ISlippageCoverageVault.setMaxSlippageBps.selector;
-        vaultSelectors[6] = ISlippageCoverageVault.setOverrideMaxSlippageBps.selector;
-        vaultSelectors[7] = ISlippageCoverageVault.fundCoverage.selector;
-        vaultSelectors[8] = ISlippageCoverageVault.sweep.selector;
+        bytes4[] memory vaultSelectors = new bytes4[](10);
+        vaultSelectors[0] = ISlippageCoverageVault.enableOverrideMode.selector;
+        vaultSelectors[1] = ISlippageCoverageVault.disableOverrideMode.selector;
+        vaultSelectors[2] = ISlippageCoverageVault.raisePullCapPerTx.selector;
+        vaultSelectors[3] = ISlippageCoverageVault.lowerPullCapPerTx.selector;
+        vaultSelectors[4] = ISlippageCoverageVault.raiseWindowCap.selector;
+        vaultSelectors[5] = ISlippageCoverageVault.lowerWindowCap.selector;
+        vaultSelectors[6] = ISlippageCoverageVault.setMaxSlippageBps.selector;
+        vaultSelectors[7] = ISlippageCoverageVault.setOverrideMaxSlippageBps.selector;
+        vaultSelectors[8] = ISlippageCoverageVault.fundCoverage.selector;
+        vaultSelectors[9] = ISlippageCoverageVault.sweep.selector;
         accessManager.setTargetFunctionRole(
             address(slippageCoverageVault_accountingChain), vaultSelectors, OPERATOR_ROLE
         );
@@ -1072,16 +1073,17 @@ contract BaseTest is TestWithHelpers {
         );
 
         // For SlippageCoverageVault on earning chain (collapsed to OPERATOR_ROLE for tests).
-        bytes4[] memory vaultSelectors = new bytes4[](9);
-        vaultSelectors[0] = ISlippageCoverageVault.setOverrideMode.selector;
-        vaultSelectors[1] = ISlippageCoverageVault.raisePullCapPerTx.selector;
-        vaultSelectors[2] = ISlippageCoverageVault.lowerPullCapPerTx.selector;
-        vaultSelectors[3] = ISlippageCoverageVault.raiseWindowCap.selector;
-        vaultSelectors[4] = ISlippageCoverageVault.lowerWindowCap.selector;
-        vaultSelectors[5] = ISlippageCoverageVault.setMaxSlippageBps.selector;
-        vaultSelectors[6] = ISlippageCoverageVault.setOverrideMaxSlippageBps.selector;
-        vaultSelectors[7] = ISlippageCoverageVault.fundCoverage.selector;
-        vaultSelectors[8] = ISlippageCoverageVault.sweep.selector;
+        bytes4[] memory vaultSelectors = new bytes4[](10);
+        vaultSelectors[0] = ISlippageCoverageVault.enableOverrideMode.selector;
+        vaultSelectors[1] = ISlippageCoverageVault.disableOverrideMode.selector;
+        vaultSelectors[2] = ISlippageCoverageVault.raisePullCapPerTx.selector;
+        vaultSelectors[3] = ISlippageCoverageVault.lowerPullCapPerTx.selector;
+        vaultSelectors[4] = ISlippageCoverageVault.raiseWindowCap.selector;
+        vaultSelectors[5] = ISlippageCoverageVault.lowerWindowCap.selector;
+        vaultSelectors[6] = ISlippageCoverageVault.setMaxSlippageBps.selector;
+        vaultSelectors[7] = ISlippageCoverageVault.setOverrideMaxSlippageBps.selector;
+        vaultSelectors[8] = ISlippageCoverageVault.fundCoverage.selector;
+        vaultSelectors[9] = ISlippageCoverageVault.sweep.selector;
         accessManager.setTargetFunctionRole(address(slippageCoverageVault_earningChain), vaultSelectors, OPERATOR_ROLE);
 
         vm.stopPrank();
