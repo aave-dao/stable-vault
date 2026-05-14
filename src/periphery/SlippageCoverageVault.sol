@@ -8,6 +8,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
 import {ISlippageCoverageVault} from "src/interfaces/ISlippageCoverageVault.sol";
+import {Multicall} from "src/misc/Multicall.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
@@ -17,7 +18,7 @@ import {Errors} from "src/types/Errors.sol";
 /// gated by per-tx + sliding-window caps. Override mode bypasses caps.
 /// @dev Non-upgradeable. The Swapper and Vault are immutably cross-bound, so a vault proxy would only expand the trust
 /// surface without buying anything.
-contract SlippageCoverageVault is AccessManaged, ReentrancyGuardTransient, ISlippageCoverageVault {
+contract SlippageCoverageVault is AccessManaged, Multicall, ReentrancyGuardTransient, ISlippageCoverageVault {
     using SafeERC20 for IERC20;
 
     /// @dev Bound puller (the Swapper). Set at construction; never changes.
