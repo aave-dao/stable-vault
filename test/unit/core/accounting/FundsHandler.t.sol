@@ -164,7 +164,7 @@ contract FundsHandlerTest is TestWithHelpers {
         address asset = _deployAssetWithSalt(assetDeploymentSalt, assetDecimals);
         amount = _boundAssetAmount(asset, amount);
 
-        vm.expectCall(address(mockAllocator), abi.encodeWithSelector(IAllocator.pullIdle.selector, asset, amount));
+        vm.expectCall(address(mockAllocator), abi.encodeWithSelector(IAllocator.deposit.selector, asset, amount));
 
         vm.prank(address(mockStableVault));
         uint256 netDepositAmount = fundsHandler.processDeposit(asset, amount);
@@ -261,7 +261,7 @@ contract FundsHandlerTest is TestWithHelpers {
         address asset = _deployAssetWithSalt(assetDeploymentSalt, assetDecimals);
         amount = _boundAssetAmountAllowingZero(address(asset), amount);
 
-        vm.expectCall(address(mockAllocator), abi.encodeWithSelector(IAllocator.pullIdle.selector, asset, amount));
+        vm.expectCall(address(mockAllocator), abi.encodeWithSelector(IAllocator.deposit.selector, asset, amount));
 
         vm.prank(address(mockGateway));
         fundsHandler.fundsArrivedFromChainCallback(asset, amount);

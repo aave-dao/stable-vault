@@ -173,12 +173,10 @@ interface IAllocator {
     /// @return isSupported Whether the strategy is supported for allocating or deallocating.
     function isStrategySupported(address strategy) external view returns (bool);
 
-    /// @notice Pulls assets from the TransferHelper into the Allocator and emits AssetLeftIdle.
-    /// @dev Used by the depositor (FundsHandler / EarningChainGateway) for both user-deposit and bridge-callback flows.
-    /// Zero amount is a no-op for bridge-callback safety.
-    /// @param asset Address of the asset to pull.
-    /// @param amount Amount of the asset to pull.
-    function pullIdle(address asset, uint256 amount) external;
+    /// @notice Deposits assets into the Allocator.
+    /// @param asset Address of the asset to deposit.
+    /// @param amount Amount of the asset to deposit.
+    function deposit(address asset, uint256 amount) external;
 
     /// @notice Rebalances underlying assets.
     /// @dev A rebalance is an ordered combination of the following operations: deallocation of assets from strategies,

@@ -129,7 +129,7 @@ contract FundsHandler is
     /// @inheritdoc IFundsHandler
     function processDeposit(address asset, uint256 amount) external override onlyStableVault returns (uint256) {
         require(amount > 0, Errors.ZeroAmount());
-        IAllocator(ALLOCATOR).pullIdle(asset, amount);
+        IAllocator(ALLOCATOR).deposit(asset, amount);
         return amount;
     }
 
@@ -183,7 +183,7 @@ contract FundsHandler is
 
     /// @inheritdoc IFundsHandler
     function fundsArrivedFromChainCallback(address asset, uint256 amount) external override onlyGateway {
-        IAllocator(ALLOCATOR).pullIdle(asset, amount);
+        IAllocator(ALLOCATOR).deposit(asset, amount);
     }
 
     ////////////////////////////////////////////////// INTERNAL ////////////////////////////////////////////////////////

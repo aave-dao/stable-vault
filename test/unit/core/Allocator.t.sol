@@ -305,12 +305,12 @@ contract AllocatorTest is TestWithHelpers {
         uint256 amount = 1000;
         _mockTransferHelper.mockAsset(address(_mockUsdt), amount);
         vm.prank(depositor);
-        _allocator.pullIdle(address(_mockUsdt), amount);
+        _allocator.deposit(address(_mockUsdt), amount);
 
         _mockAssetRegistry.mockToAllowAssetDepositsIntoAllocator(address(_mockUnsupportedAsset));
         _mockTransferHelper.mockAsset(address(_mockUnsupportedAsset), amount);
         vm.prank(depositor);
-        _allocator.pullIdle(address(_mockUnsupportedAsset), amount);
+        _allocator.deposit(address(_mockUnsupportedAsset), amount);
 
         // Check that balances only return the registered asset
         IAllocator.AllocatorBalance[] memory balances = _allocator.getTrustedAssetBalances();
@@ -403,14 +403,14 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.tryWithdrawFromStrategy(address(_mockUsdt), 100, address(_defaultUsdtStrategy));
     }
 
-    function test_pullIdle_pullsToAllocatorAndEmitsIdle(uint256 depositAmountUsdt) public {
+    function test_deposit_pullsToAllocatorAndEmitsIdle(uint256 depositAmountUsdt) public {
         depositAmountUsdt = _boundAssetAmount(address(_mockUsdt), depositAmountUsdt);
 
         _mockTransferHelper.mockAsset(address(_mockUsdt), depositAmountUsdt);
         vm.prank(depositor);
         vm.expectEmit(true, true, true, true);
         emit IAllocator.AssetLeftIdle(address(_mockUsdt), depositAmountUsdt);
-        _allocator.pullIdle(address(_mockUsdt), depositAmountUsdt);
+        _allocator.deposit(address(_mockUsdt), depositAmountUsdt);
 
         // Funds always land idle on the Allocator regardless of any strategy configuration.
         assertEq(_allocator.getAssetBalance(address(_mockUsdt)), depositAmountUsdt);
@@ -421,7 +421,7 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
     }
 
-    function test_pullIdle_landsIdleWithoutStrategyConfigured(uint256 amount) public {
+    function test_deposit_landsIdleWithoutStrategyConfigured(uint256 amount) public {
         amount = _boundAssetAmount(address(_mockUnsupportedAsset), amount);
 
         // Add the asset to the mock AssetRegistry but do not register a strategy for it.
@@ -429,7 +429,7 @@ contract AllocatorTest is TestWithHelpers {
 
         _mockTransferHelper.mockAsset(address(_mockUnsupportedAsset), amount);
         vm.prank(depositor);
-        _allocator.pullIdle(address(_mockUnsupportedAsset), amount);
+        _allocator.deposit(address(_mockUnsupportedAsset), amount);
 
         // Check the funds are idle in the Allocator
         assertEq(_allocator.getAssetBalance(address(_mockUnsupportedAsset)), amount);
@@ -496,7 +496,7 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalance(address(_mockUsdt)), depositAmount);
     }
 
-    function test_pullIdle_reverts_ifNonDepositorCalls(address nonDepositor, uint256 amount) public {
+    function test_deposit_reverts_ifNonDepositorCalls(address nonDepositor, uint256 amount) public {
         amount = _boundAssetAmount(address(_mockUsdt), amount);
         vm.assume(nonDepositor != depositor);
         _assumeNotProxyAdmin(nonDepositor, address(_allocator));
@@ -504,10 +504,10 @@ contract AllocatorTest is TestWithHelpers {
         _mockUsdt.mint(depositor, amount);
         vm.prank(nonDepositor);
         vm.expectRevert(Errors.AddressNotWhitelisted.selector);
-        _allocator.pullIdle(address(_mockUsdt), amount);
+        _allocator.deposit(address(_mockUsdt), amount);
     }
 
-    function test_pullIdle_reverts_ifAssetRegistryDoesNotAllowDepositIntoAllocator(uint256 amount) public {
+    function test_deposit_reverts_ifAssetRegistryDoesNotAllowDepositIntoAllocator(uint256 amount) public {
         amount = _boundAssetAmount(address(_mockUnsupportedAsset), amount);
 
         _mockAssetRegistry.mockToDisallowAssetDepositsIntoAllocator(address(_mockUnsupportedAsset));
@@ -516,15 +516,15 @@ contract AllocatorTest is TestWithHelpers {
 
         vm.expectRevert(abi.encodeWithSelector(Errors.UnsupportedAsset.selector, address(_mockUnsupportedAsset)));
         vm.prank(depositor);
-        _allocator.pullIdle(address(_mockUnsupportedAsset), amount);
+        _allocator.deposit(address(_mockUnsupportedAsset), amount);
     }
 
-    // Zero-amount pullIdle is intentionally a no-op: this path is used by bridge callbacks
+    // Zero-amount deposit is intentionally a no-op: this path is used by bridge callbacks
     // (fundsArrivedFromChainCallback), where reverting could jam the bridge infrastructure.
-    function test_pullIdle_doesNotRevert_ifAmountIsZero() public {
+    function test_deposit_doesNotRevert_ifAmountIsZero() public {
         vm.recordLogs();
         vm.prank(depositor);
-        _allocator.pullIdle(address(_mockUsdt), 0);
+        _allocator.deposit(address(_mockUsdt), 0);
         // No event emitted, no transfer.
         Vm.Log[] memory logs = vm.getRecordedLogs();
         assertEq(logs.length, 0);
@@ -2451,7 +2451,7 @@ contract AllocatorTest is TestWithHelpers {
     function _pullAndRouteToStrategy(address asset, address strategy, uint256 amount) internal {
         _mockTransferHelper.mockAsset(asset, amount);
         vm.prank(depositor);
-        _allocator.pullIdle(asset, amount);
+        _allocator.deposit(asset, amount);
         _routeIdleToStrategy(asset, strategy, amount);
     }
 
@@ -2729,10 +2729,10 @@ contract AllocatorTest is TestWithHelpers {
         vm.prank(address(everyRoleAccount));
         _allocator.distrustStrategy(address(_defaultUsdtStrategy));
 
-        // pullIdle still lands funds idle on the Allocator regardless of strategy trust state.
+        // deposit still lands funds idle on the Allocator regardless of strategy trust state.
         _mockTransferHelper.mockAsset(address(_mockUsdt), depositAmount);
         vm.prank(depositor);
-        _allocator.pullIdle(address(_mockUsdt), depositAmount);
+        _allocator.deposit(address(_mockUsdt), depositAmount);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), 0);
         assertEq(IERC20(address(_mockUsdt)).balanceOf(address(_allocator)), depositAmount);
 

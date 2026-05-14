@@ -187,8 +187,7 @@ contract Allocator is
     }
 
     /// @inheritdoc IAllocator
-    function pullIdle(address asset, uint256 amount) external override onlyDepositor nonReentrant {
-        // Zero amount is a no-op so bridge callbacks can't be jammed by a degenerate message.
+    function deposit(address asset, uint256 amount) external override onlyDepositor nonReentrant {
         if (amount == 0) {
             return;
         }
