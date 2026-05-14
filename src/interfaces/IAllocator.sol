@@ -198,7 +198,8 @@ interface IAllocator {
     /// @dev A rebalance is an ordered combination of the following operations: deallocation of assets from strategies,
     /// swaps between assets, and allocation of assets to strategies.
     /// @param params Array of rebalance parameters.
-    function rebalance(RebalanceParams[] memory params) external;
+    /// @param policyData Additional data that the rebalance policy might need to operate.
+    function rebalance(RebalanceParams[] memory params, bytes calldata policyData) external;
 
     /// @notice Deposit assets into the Allocator to increase the total value of the system.
     /// @dev This function will be used exclusively to improve the solvency of the system.

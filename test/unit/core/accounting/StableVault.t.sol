@@ -13,15 +13,17 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {StableVault} from "src/core/accounting/StableVault.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
+import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {IStableVault} from "src/interfaces/IStableVault.sol";
-import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
+import {IWithdrawalExecutionPolicy} from "src/interfaces/IWithdrawalExecutionPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
-import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
+import {PolicyRegistry} from "src/periphery/PolicyRegistry.sol";
+import {WithdrawalExecutionPolicy} from "src/policies/WithdrawalExecutionPolicy.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
@@ -60,7 +62,8 @@ contract StableVaultTest is TestWithHelpers {
     MockIouTokenManager mockIouTokenManager;
     MockAssetRegistry mockAssetRegistry;
     MockTransferHelper mockTransferHelper;
-    WithdrawalPolicy mockWithdrawalPolicy;
+    WithdrawalExecutionPolicy mockWithdrawalExecutionPolicy;
+    PolicyRegistry policyRegistry;
     PriceOracle mockPriceOracle;
     IStableVault stableVault;
 
@@ -76,10 +79,10 @@ contract StableVaultTest is TestWithHelpers {
         address fundsHandler,
         address assetRegistry,
         address transferHelper,
-        address withdrawalFeeCalculatorAddress,
         address priceOracleAddress,
         uint256 maxActiveSubVaults,
-        address treasuryAddress
+        address treasuryAddress,
+        address policyRegistryAddress
     ) internal returns (IStableVault) {
         address vaultImpl = address(
             new StableVault(
@@ -88,9 +91,9 @@ contract StableVaultTest is TestWithHelpers {
                 iouTokenManager,
                 fundsHandler,
                 transferHelper,
-                withdrawalFeeCalculatorAddress,
                 priceOracleAddress,
-                maxActiveSubVaults
+                maxActiveSubVaults,
+                policyRegistryAddress
             )
         );
         return StableVault(
@@ -121,10 +124,10 @@ contract StableVaultTest is TestWithHelpers {
         address fundsHandler,
         address assetRegistry,
         address transferHelper,
-        address withdrawalFeeCalculatorAddress,
         address priceOracleAddress,
         uint256 maxActiveSubVaults,
-        address treasuryAddress
+        address treasuryAddress,
+        address policyRegistryAddress
     ) internal returns (StableVaultHarness) {
         address vaultImpl = address(
             new StableVaultHarness(
@@ -133,9 +136,9 @@ contract StableVaultTest is TestWithHelpers {
                 iouTokenManager,
                 fundsHandler,
                 transferHelper,
-                withdrawalFeeCalculatorAddress,
                 priceOracleAddress,
-                maxActiveSubVaults
+                maxActiveSubVaults,
+                policyRegistryAddress
             )
         );
         return StableVaultHarness(
@@ -158,15 +161,17 @@ contract StableVaultTest is TestWithHelpers {
         );
     }
 
-    function _deployWithdrawalPolicy(address accessManager, address withdrawalPolicyApplier)
+    function _deployWithdrawalExecutionPolicy(address accessManager, address withdrawalExecutionPolicyApplier)
         internal
-        returns (WithdrawalPolicy)
+        returns (WithdrawalExecutionPolicy)
     {
-        address withdrawalPolicyImpl = address(new WithdrawalPolicy(withdrawalPolicyApplier));
-        return WithdrawalPolicy(
+        address withdrawalExecutionPolicyImpl = address(new WithdrawalExecutionPolicy(withdrawalExecutionPolicyApplier));
+        return WithdrawalExecutionPolicy(
             address(
                 new TransparentUpgradeableProxy(
-                    withdrawalPolicyImpl, address(this), abi.encodeCall(WithdrawalPolicy.initialize, (accessManager, 0))
+                    withdrawalExecutionPolicyImpl,
+                    address(this),
+                    abi.encodeCall(WithdrawalExecutionPolicy.initialize, (accessManager, 0))
                 )
             )
         );
@@ -181,6 +186,7 @@ contract StableVaultTest is TestWithHelpers {
         mockAsset = _deployDefaultAsset();
         mockTransferHelper = new MockTransferHelper();
         mockFundsHandler = new MockFundsHandler(address(mockTransferHelper));
+        policyRegistry = new PolicyRegistry(address(mockAccessManager));
 
         mockPriceOracle = _deployPriceOracle(address(mockAccessManager), 9_995e23);
         // Mock price for the default asset (1 RAY = 1:1 price ratio)
@@ -188,11 +194,13 @@ contract StableVaultTest is TestWithHelpers {
         // Mock validatePrice to pass for any asset (tests may create additional assets)
         _mockValidatePriceForAll(address(mockPriceOracle));
 
-        // Predict StableVault proxy address after WithdrawalPolicy impl+proxy and StableVault impl deployments.
+        // Predict StableVault proxy address after WithdrawalExecutionPolicy impl+proxy and StableVault impl
+        // deployments.
         uint256 deployerNonce = vm.getNonce(address(this));
         address expectedStableVaultProxy = vm.computeCreateAddress(address(this), deployerNonce + 3);
 
-        mockWithdrawalPolicy = _deployWithdrawalPolicy(address(mockAccessManager), expectedStableVaultProxy);
+        mockWithdrawalExecutionPolicy =
+            _deployWithdrawalExecutionPolicy(address(mockAccessManager), expectedStableVaultProxy);
         stableVault = _deployStableVault(
             address(mockAccessManager),
             DEFAULT_MAX_PER_SECOND_RATE,
@@ -201,10 +209,14 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
-            treasury
+            treasury,
+            address(policyRegistry)
+        );
+        policyRegistry.setPolicy(
+            keccak256(bytes("aave.stable-vault.StableVault.policy.withdrawal-execution")),
+            address(mockWithdrawalExecutionPolicy)
         );
     }
 
@@ -223,9 +235,9 @@ contract StableVaultTest is TestWithHelpers {
             expectedIouManager,
             expectedFundsHandler,
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
             address(mockPriceOracle),
-            DEFAULT_MAX_ACTIVE_SUB_VAULTS
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+            address(policyRegistry)
         );
 
         assertEq(newStableVault.getMaxValidPerSecondRate(), expectedMaxValidPerSecondRate);
@@ -241,9 +253,9 @@ contract StableVaultTest is TestWithHelpers {
             address(mockIouTokenManager),
             address(mockFundsHandler),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
             address(mockPriceOracle),
-            DEFAULT_MAX_ACTIVE_SUB_VAULTS
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+            address(policyRegistry)
         );
     }
 
@@ -255,9 +267,9 @@ contract StableVaultTest is TestWithHelpers {
             address(mockIouTokenManager),
             address(mockFundsHandler),
             address(0),
-            address(mockWithdrawalPolicy),
             address(mockPriceOracle),
-            DEFAULT_MAX_ACTIVE_SUB_VAULTS
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+            address(policyRegistry)
         );
     }
 
@@ -280,9 +292,9 @@ contract StableVaultTest is TestWithHelpers {
                 address(mockIouTokenManager),
                 address(mockFundsHandler),
                 address(mockTransferHelper),
-                address(mockWithdrawalPolicy),
                 address(mockPriceOracle),
-                DEFAULT_MAX_ACTIVE_SUB_VAULTS
+                DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+                address(policyRegistry)
             )
         );
 
@@ -321,9 +333,9 @@ contract StableVaultTest is TestWithHelpers {
                 address(mockIouTokenManager),
                 address(mockFundsHandler),
                 address(mockTransferHelper),
-                address(mockWithdrawalPolicy),
                 address(mockPriceOracle),
-                DEFAULT_MAX_ACTIVE_SUB_VAULTS
+                DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+                address(policyRegistry)
             )
         );
 
@@ -377,9 +389,9 @@ contract StableVaultTest is TestWithHelpers {
                 address(mockIouTokenManager),
                 address(mockFundsHandler),
                 address(mockTransferHelper),
-                address(mockWithdrawalPolicy),
                 address(mockPriceOracle),
-                DEFAULT_MAX_ACTIVE_SUB_VAULTS
+                DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+                address(policyRegistry)
             )
         );
 
@@ -409,9 +421,9 @@ contract StableVaultTest is TestWithHelpers {
                 address(mockIouTokenManager),
                 address(mockFundsHandler),
                 address(mockTransferHelper),
-                address(mockWithdrawalPolicy),
                 address(mockPriceOracle),
-                DEFAULT_MAX_ACTIVE_SUB_VAULTS
+                DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+                address(policyRegistry)
             )
         );
 
@@ -434,9 +446,9 @@ contract StableVaultTest is TestWithHelpers {
                 address(mockIouTokenManager),
                 address(mockFundsHandler),
                 address(mockTransferHelper),
-                address(mockWithdrawalPolicy),
                 address(mockPriceOracle),
-                DEFAULT_MAX_ACTIVE_SUB_VAULTS
+                DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+                address(policyRegistry)
             )
         );
 
@@ -466,7 +478,7 @@ contract StableVaultTest is TestWithHelpers {
         mockAsset.forceApprove(address(stableVault), amount);
 
         vm.prank(user);
-        stableVault.deposit(user, address(mockAsset), amount);
+        stableVault.deposit(user, address(mockAsset), amount, "");
 
         userSubVault = stableVault.getUserSubVault(user);
         assertNotEq(userSubVault.id, 0); // subVault assigned after deposit
@@ -505,7 +517,7 @@ contract StableVaultTest is TestWithHelpers {
         mockAsset.forceApprove(address(stableVault), firstDepositAmount);
 
         vm.prank(user);
-        stableVault.deposit(user, address(mockAsset), firstDepositAmount);
+        stableVault.deposit(user, address(mockAsset), firstDepositAmount, "");
 
         assertEq(stableVault.getUserSubVault(user).id, stableVault.getDefaultSubVault().id);
 
@@ -519,7 +531,7 @@ contract StableVaultTest is TestWithHelpers {
         mockAsset.forceApprove(address(stableVault), secondDepositAmount);
 
         vm.prank(user);
-        stableVault.deposit(user, address(mockAsset), secondDepositAmount);
+        stableVault.deposit(user, address(mockAsset), secondDepositAmount, "");
 
         IStableVault.SubVaultData memory userVaultAfterSecondDeposit = stableVault.getUserSubVault(user);
         assertEq(userVaultBeforeSecondDeposit.id, userVaultAfterSecondDeposit.id);
@@ -538,7 +550,7 @@ contract StableVaultTest is TestWithHelpers {
 
         vm.prank(user);
         vm.expectRevert(Errors.InvalidAmount.selector);
-        stableVault.deposit(user, address(mockAsset), 0);
+        stableVault.deposit(user, address(mockAsset), 0, "");
     }
 
     function test_deposit_reverts_ifAssetIsNotAllowedToDepositIntoStableVault(
@@ -563,7 +575,7 @@ contract StableVaultTest is TestWithHelpers {
 
         vm.prank(user);
         vm.expectRevert(abi.encodeWithSelector(Errors.UnsupportedAsset.selector, address(mockAsset)));
-        stableVault.deposit(user, address(mockAsset), amount);
+        stableVault.deposit(user, address(mockAsset), amount, "");
     }
 
     function test_deposit_reverts_ifUserGetsZeroShares() public {
@@ -585,10 +597,10 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
-            treasury
+            treasury,
+            address(policyRegistry)
         );
 
         // Warp just 1 second, conversionRate grows slightly above RAY
@@ -610,7 +622,7 @@ contract StableVaultTest is TestWithHelpers {
 
         vm.prank(user);
         vm.expectRevert(Errors.InvalidAmount.selector);
-        vault.deposit(user, address(highDecimalToken), depositAmount);
+        vault.deposit(user, address(highDecimalToken), depositAmount, "");
     }
 
     function test_deposit_reverts_ifPriceOracleRejectsPrice(uint256 amount) public {
@@ -623,7 +635,7 @@ contract StableVaultTest is TestWithHelpers {
         mockAsset.forceApprove(address(stableVault), amount);
         vm.prank(user);
         vm.expectRevert(IPriceOracle.PriceTooLow.selector);
-        stableVault.deposit(user, address(mockAsset), amount);
+        stableVault.deposit(user, address(mockAsset), amount, "");
     }
 
     function test_deposit_allowsToDepositOnBehalfOfOtherUser(address user, address msgSender, uint256 amount) public {
@@ -646,7 +658,7 @@ contract StableVaultTest is TestWithHelpers {
         vm.assume(mockAsset.balanceOf(msgSender) == amount);
 
         vm.prank(msgSender);
-        stableVault.deposit(user, address(mockAsset), amount);
+        stableVault.deposit(user, address(mockAsset), amount, "");
 
         assertTrue(stableVault.getUserBalance(user) > 0);
         assertTrue(stableVault.getUserBalance(msgSender) == 0);
@@ -672,7 +684,27 @@ contract StableVaultTest is TestWithHelpers {
         );
 
         vm.prank(user);
-        stableVault.deposit(user, address(mockAsset), amount);
+        stableVault.deposit(user, address(mockAsset), amount, "");
+    }
+
+    function test_deposit_queriesRegistryWithDepositPolicyId(address user, uint256 amount) public {
+        vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
+        _assumeNotProxyAdmin(user, address(stableVault));
+        amount = _boundAssetAmount(address(mockAsset), amount);
+
+        mockAsset.mint(user, amount);
+
+        vm.prank(user);
+        mockAsset.forceApprove(address(stableVault), amount);
+
+        vm.expectCall(
+            address(policyRegistry),
+            abi.encodeCall(IPolicyRegistry.getPolicy, keccak256("aave.stable-vault.StableVault.policy.deposit"))
+        );
+
+        vm.prank(user);
+        stableVault.deposit(user, address(mockAsset), amount, "");
     }
 
     function test_deposit_emitsTransferMintEvent() public {
@@ -692,7 +724,7 @@ contract StableVaultTest is TestWithHelpers {
         emit IStableVault.Transfer(address(0), user, amountRay);
 
         vm.prank(user);
-        stableVault.deposit(user, address(mockAsset), amount);
+        stableVault.deposit(user, address(mockAsset), amount, "");
     }
 
     function test_deposit_emitsSubVaultActivated_onFirstDeposit() public {
@@ -712,7 +744,7 @@ contract StableVaultTest is TestWithHelpers {
         emit IStableVault.SubVaultActivated(defaultSubVault.id);
 
         vm.prank(user);
-        stableVault.deposit(user, address(mockAsset), amount);
+        stableVault.deposit(user, address(mockAsset), amount, "");
     }
 
     function test_transfer_emitsSubVaultDeactivated_whenSubVaultBecomesEmpty() public {
@@ -756,12 +788,12 @@ contract StableVaultTest is TestWithHelpers {
         emit IStableVault.UserRateSet(user, defaultSubVault.id, defaultSubVault.perSecondRate);
 
         vm.prank(user);
-        stableVault.deposit(user, address(mockAsset), amount);
+        stableVault.deposit(user, address(mockAsset), amount, "");
 
         // Second deposit: UserRateSet should NOT fire (user already has a subVaultId)
         vm.recordLogs();
         vm.prank(user);
-        stableVault.deposit(user, address(mockAsset), amount);
+        stableVault.deposit(user, address(mockAsset), amount, "");
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
         bytes32 userRateSetTopic = keccak256("UserRateSet(address,uint256,uint256)");
@@ -832,7 +864,7 @@ contract StableVaultTest is TestWithHelpers {
         // user1 fully withdraws, leaving them with no position
         mockFundsHandler.mockAggregatedBalance(amount * 2);
         vm.prank(user1);
-        stableVault.requestWithdrawal(user1, 0);
+        stableVault.requestWithdrawal(user1, 0, "");
 
         assertEq(stableVault.getUserSubVault(user1).id, 0);
 
@@ -867,7 +899,7 @@ contract StableVaultTest is TestWithHelpers {
         mockAsset.forceApprove(address(stableVault), amount);
 
         vm.prank(user);
-        stableVault.deposit(user, address(mockAsset), amount);
+        stableVault.deposit(user, address(mockAsset), amount, "");
 
         uint256 currentRate = stableVault.getUserSubVault(user).perSecondRate;
 
@@ -886,10 +918,10 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             maxActiveSubVaults,
-            treasury
+            treasury,
+            address(policyRegistry)
         );
 
         uint256 amountToDeposit = 10e6;
@@ -911,7 +943,7 @@ contract StableVaultTest is TestWithHelpers {
         assertEq(stableVault.getActiveSubVaults().length, maxActiveSubVaults);
 
         vm.expectRevert(IStableVault.TooManyActiveSubVaults.selector);
-        stableVault.deposit(user, address(mockAsset), amountToDeposit);
+        stableVault.deposit(user, address(mockAsset), amountToDeposit, "");
     }
 
     function test_setUserRate_reverts_ifMaxActiveSubVaultsIsReached_AtSetUserRate(uint256 maxActiveSubVaults) public {
@@ -924,10 +956,10 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             maxActiveSubVaults,
-            treasury
+            treasury,
+            address(policyRegistry)
         );
 
         uint256 amountToDeposit = 10e6;
@@ -971,10 +1003,10 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             2, // MAX_ACTIVE_SUB_VAULTS
-            treasury
+            treasury,
+            address(policyRegistry)
         );
 
         // Users A, B and C all deposit into the default subvault (subvault 1).
@@ -1022,10 +1054,10 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             2, // MAX_ACTIVE_SUB_VAULTS
-            treasury
+            treasury,
+            address(policyRegistry)
         );
 
         // 3 users deposit into default subvault
@@ -1068,10 +1100,10 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
-            treasury
+            treasury,
+            address(policyRegistry)
         );
         mockAsset = IMockErc20(address(new MockNonStandardErc20("Test GHO", "tGHO", 18)));
 
@@ -1088,7 +1120,7 @@ contract StableVaultTest is TestWithHelpers {
         mockAsset.forceApprove(address(stableVault), amount);
 
         vm.prank(user1);
-        stableVault.deposit(user1, address(mockAsset), amount);
+        stableVault.deposit(user1, address(mockAsset), amount, "");
 
         IStableVault.UserRateData[] memory userRateData = new IStableVault.UserRateData[](1);
         userRateData[0] = IStableVault.UserRateData(user1, newRate);
@@ -1103,7 +1135,7 @@ contract StableVaultTest is TestWithHelpers {
         vm.prank(user2);
         mockAsset.forceApprove(address(stableVault), amount);
         vm.prank(user2);
-        stableVault.deposit(user2, address(mockAsset), amount);
+        stableVault.deposit(user2, address(mockAsset), amount, "");
 
         vm.prank(manager);
         userRateData = new IStableVault.UserRateData[](1);
@@ -1136,7 +1168,7 @@ contract StableVaultTest is TestWithHelpers {
         vm.prank(user1);
         mockAsset.forceApprove(address(stableVault), amount1);
         vm.prank(user1);
-        stableVault.deposit(user1, address(mockAsset), amount1);
+        stableVault.deposit(user1, address(mockAsset), amount1, "");
 
         vm.prank(manager);
         _setUserRate(user1, newRate);
@@ -1146,7 +1178,7 @@ contract StableVaultTest is TestWithHelpers {
         vm.prank(user2);
         mockAsset.forceApprove(address(stableVault), amount2);
         vm.prank(user2);
-        stableVault.deposit(user2, address(mockAsset), amount2);
+        stableVault.deposit(user2, address(mockAsset), amount2, "");
 
         IStableVault.SubVaultData memory user2SubVault = stableVault.getUserSubVault(user2);
 
@@ -1179,7 +1211,7 @@ contract StableVaultTest is TestWithHelpers {
         vm.prank(user);
         mockAsset.forceApprove(address(stableVault), amount);
         vm.prank(user);
-        stableVault.deposit(user, address(mockAsset), amount);
+        stableVault.deposit(user, address(mockAsset), amount, "");
 
         vm.prank(manager);
         _setUserRate(user, newPerSecondRate);
@@ -1328,7 +1360,7 @@ contract StableVaultTest is TestWithHelpers {
 
         mockAsset.mint(obligationsInAssetDecimals);
         mockAsset.forceApprove(address(stableVault), obligationsInAssetDecimals);
-        stableVault.deposit(address(this), address(mockAsset), obligationsInAssetDecimals);
+        stableVault.deposit(address(this), address(mockAsset), obligationsInAssetDecimals, "");
 
         assertGt(stableVault.getVaultObligations(), stableVault.getAggregatedBalance());
 
@@ -1343,7 +1375,7 @@ contract StableVaultTest is TestWithHelpers {
         uint256 depositAmount = 1000e6;
         mockAsset.mint(address(this), depositAmount);
         mockAsset.forceApprove(address(stableVault), depositAmount);
-        stableVault.deposit(address(this), address(mockAsset), depositAmount);
+        stableVault.deposit(address(this), address(mockAsset), depositAmount, "");
         uint256 obligations = stableVault.getVaultObligations();
 
         // Simulate correlated strategy losses: post-withdrawal balance drops below obligations
@@ -1365,7 +1397,7 @@ contract StableVaultTest is TestWithHelpers {
         uint256 depositAmount = 1000e6;
         mockAsset.mint(address(this), depositAmount);
         mockAsset.forceApprove(address(stableVault), depositAmount);
-        stableVault.deposit(address(this), address(mockAsset), depositAmount);
+        stableVault.deposit(address(this), address(mockAsset), depositAmount, "");
         uint256 obligations = stableVault.getVaultObligations();
 
         // Post-withdrawal balance: obligations + surplus - claimed < obligations (since claimed > surplus)
@@ -1506,7 +1538,7 @@ contract StableVaultTest is TestWithHelpers {
         vm.prank(user);
         mockAsset.forceApprove(address(stableVault), amount);
         vm.prank(user);
-        stableVault.deposit(user, address(mockAsset), amount);
+        stableVault.deposit(user, address(mockAsset), amount, "");
         IStableVault.UserRateData[] memory userRateData = new IStableVault.UserRateData[](1);
         userRateData[0] = IStableVault.UserRateData(user, perSecondRate);
         vm.prank(manager);
@@ -1656,7 +1688,7 @@ contract StableVaultTest is TestWithHelpers {
         assertEq(stableVault.getActiveSubVaults().length, 1);
 
         vm.prank(user);
-        stableVault.requestWithdrawal(user, 0);
+        stableVault.requestWithdrawal(user, 0, "");
 
         assertEq(stableVault.getActiveSubVaults().length, 0);
     }
@@ -1708,7 +1740,7 @@ contract StableVaultTest is TestWithHelpers {
         mockFundsHandler.mockAggregatedBalance(stableVault.getVaultObligations());
 
         vm.prank(user);
-        stableVault.requestWithdrawal(user, Constants.MIN_WITHDRAWABLE_AMOUNT_RAY);
+        stableVault.requestWithdrawal(user, Constants.MIN_WITHDRAWABLE_AMOUNT_RAY, "");
 
         assertEq(stableVault.totalSupply(), stableVault.getVaultObligations() - mockIouToken.totalSupply());
         assertGt(mockIouToken.totalSupply(), 0);
@@ -1731,7 +1763,7 @@ contract StableVaultTest is TestWithHelpers {
 
         vm.expectRevert(IStableVault.OnlyUser.selector);
         vm.prank(msgSender);
-        stableVault.requestWithdrawal(user, withdrawalAmountRay);
+        stableVault.requestWithdrawal(user, withdrawalAmountRay, "");
     }
 
     function test_requestWithdrawal_reverts_userDoesNotHaveAPosition(address user, uint256 withdrawalAmountRay) public {
@@ -1742,7 +1774,7 @@ contract StableVaultTest is TestWithHelpers {
 
         vm.expectRevert(IStableVault.NonExistentPosition.selector);
         vm.prank(user);
-        stableVault.requestWithdrawal(user, withdrawalAmountRay);
+        stableVault.requestWithdrawal(user, withdrawalAmountRay, "");
     }
 
     function test_requestWithdrawal_passingZeroWorksAsFullWithdrawalAmountWildcard(address user, uint256 depositAmount)
@@ -1757,9 +1789,29 @@ contract StableVaultTest is TestWithHelpers {
         uint256 userBalanceRay = stableVault.getUserBalance(user);
 
         vm.prank(user);
-        uint256 actualWithdrawalAmountRay = stableVault.requestWithdrawal(user, 0);
+        uint256 actualWithdrawalAmountRay = stableVault.requestWithdrawal(user, 0, "");
 
         assertEq(actualWithdrawalAmountRay, userBalanceRay);
+    }
+
+    function test_requestWithdrawal_queriesRegistryWithWithdrawalRequestPolicyId(address user, uint256 depositAmount)
+        public
+    {
+        vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
+        _assumeNotProxyAdmin(user, address(stableVault));
+        depositAmount = _boundAssetAmount(address(mockAsset), depositAmount);
+        _deposit(user, depositAmount);
+
+        vm.expectCall(
+            address(policyRegistry),
+            abi.encodeCall(
+                IPolicyRegistry.getPolicy, keccak256("aave.stable-vault.StableVault.policy.withdrawal-request")
+            )
+        );
+
+        vm.prank(user);
+        stableVault.requestWithdrawal(user, 0, "");
     }
 
     // Couldn't reproduce the case where the withdrawal amount is zero due to conversion rounding loss.
@@ -1778,10 +1830,10 @@ contract StableVaultTest is TestWithHelpers {
         mockFundsHandler.mockAggregatedBalance(10e27);
 
         vm.prank(user);
-        stableVault.requestWithdrawal(user, depositAmountInRay);
+        stableVault.requestWithdrawal(user, depositAmountInRay, "");
 
         vm.prank(user);
-        stableVault.requestWithdrawal(user, 0);
+        stableVault.requestWithdrawal(user, 0, "");
     }
 
     function test_requestWithdrawal_WithReallySmallInterest(address user) public {
@@ -1800,13 +1852,13 @@ contract StableVaultTest is TestWithHelpers {
         mockFundsHandler.mockAggregatedBalance(10e27);
 
         vm.prank(user);
-        stableVault.requestWithdrawal(user, depositAmountInRay - 1);
+        stableVault.requestWithdrawal(user, depositAmountInRay - 1, "");
 
         // A partial withdrawal that would leave unwithdrawable dust triggers an auto-full-withdrawal which deletes the
         // position. Only request the remainder if the position still exists.
         if (stableVault.getUserSubVault(user).id != 0) {
             vm.prank(user);
-            stableVault.requestWithdrawal(user, 0);
+            stableVault.requestWithdrawal(user, 0, "");
         }
     }
 
@@ -1872,7 +1924,7 @@ contract StableVaultTest is TestWithHelpers {
         mockFundsHandler.mockAggregatedBalance(expectedFullWithdrawalRay);
 
         vm.prank(user);
-        uint256 actualAmountRay = stableVault.requestWithdrawal(user, requestedAmountRay);
+        uint256 actualAmountRay = stableVault.requestWithdrawal(user, requestedAmountRay, "");
 
         assertEq(actualAmountRay, expectedFullWithdrawalRay);
         assertEq(mockIouToken.balanceOf(user), actualAmountRay);
@@ -1937,7 +1989,7 @@ contract StableVaultTest is TestWithHelpers {
         mockFundsHandler.mockAggregatedBalance(maxWithdrawRay);
 
         vm.prank(user);
-        stableVault.requestWithdrawal(user, requestedAmountRay);
+        stableVault.requestWithdrawal(user, requestedAmountRay, "");
 
         if (expectedRemainingShares == 0) {
             assertEq(stableVault.getUserSubVault(user).id, 0);
@@ -1962,14 +2014,14 @@ contract StableVaultTest is TestWithHelpers {
         vm.prank(user);
         asset.forceApprove(address(stableVault), depositAmount);
         vm.prank(user);
-        stableVault.deposit(user, address(asset), depositAmount);
+        stableVault.deposit(user, address(asset), depositAmount, "");
 
         uint256 withdrawalAmountRay = depositAmount.assetDecimalsToRay(address(asset));
 
         vm.assume(asset.balanceOf(user) == 0);
 
         vm.prank(user);
-        stableVault.requestWithdrawal(user, withdrawalAmountRay);
+        stableVault.requestWithdrawal(user, withdrawalAmountRay, "");
 
         assertEq(mockIouToken.balanceOf(user), withdrawalAmountRay);
     }
@@ -1990,7 +2042,7 @@ contract StableVaultTest is TestWithHelpers {
 
         vm.expectRevert(Errors.InvalidAmount.selector);
         vm.prank(user);
-        stableVault.requestWithdrawal(user, withdrawalAmountRay);
+        stableVault.requestWithdrawal(user, withdrawalAmountRay, "");
     }
 
     function test_requestWithdrawal_reverts_ifInterestToWithdrawIsGreaterThanAvailableInterest(
@@ -2020,7 +2072,7 @@ contract StableVaultTest is TestWithHelpers {
             )
         );
         vm.prank(user);
-        stableVault.requestWithdrawal(user, withdrawalAmountRay);
+        stableVault.requestWithdrawal(user, withdrawalAmountRay, "");
     }
 
     function test_requestWithdrawal_mintsExpectedAmountOfIouTokens(
@@ -2053,7 +2105,7 @@ contract StableVaultTest is TestWithHelpers {
         }
 
         vm.prank(user);
-        uint256 actualWithdrawalAmountRay = stableVault.requestWithdrawal(user, withdrawalAmountRay);
+        uint256 actualWithdrawalAmountRay = stableVault.requestWithdrawal(user, withdrawalAmountRay, "");
 
         assertEq(mockIouToken.balanceOf(user), expectedIouTokens);
         assertEq(actualWithdrawalAmountRay, expectedIouTokens);
@@ -2078,7 +2130,7 @@ contract StableVaultTest is TestWithHelpers {
         emit IStableVault.WithdrawalRequested(user, 1, actualWithdrawalAmount, actualWithdrawalAmount);
 
         vm.prank(user);
-        stableVault.requestWithdrawal(user, withdrawalAmountRay);
+        stableVault.requestWithdrawal(user, withdrawalAmountRay, "");
     }
 
     function test_requestWithdrawal_emitsTransferBurnEvent() public {
@@ -2100,7 +2152,7 @@ contract StableVaultTest is TestWithHelpers {
         emit IStableVault.Transfer(user, address(0), withdrawalAmountRay);
 
         vm.prank(user);
-        stableVault.requestWithdrawal(user, withdrawalAmountRay);
+        stableVault.requestWithdrawal(user, withdrawalAmountRay, "");
     }
 
     function test_requestWithdrawal_returnsExpectedAmount(
@@ -2125,7 +2177,7 @@ contract StableVaultTest is TestWithHelpers {
         uint256 expectedReturnValue = withdrawalAmountRay == 0 ? stableVault.getUserBalance(user) : withdrawalAmountRay;
 
         vm.prank(user);
-        uint256 actualReturnValue = stableVault.requestWithdrawal(user, withdrawalAmountRay);
+        uint256 actualReturnValue = stableVault.requestWithdrawal(user, withdrawalAmountRay, "");
 
         assertEq(actualReturnValue, expectedReturnValue);
     }
@@ -2154,7 +2206,7 @@ contract StableVaultTest is TestWithHelpers {
             withdrawalAmountRay == 0 ? stableVault.getUserBalance(user) : withdrawalAmountRay;
 
         vm.prank(user);
-        uint256 actualReturnValue = stableVault.requestWithdrawal(user, withdrawalAmountRay);
+        uint256 actualReturnValue = stableVault.requestWithdrawal(user, withdrawalAmountRay, "");
 
         assertEq(actualReturnValue, actualWithdrawalAmountRay);
         assertEq(stableVault.getUserBalance(user), userBalanceBefore - actualWithdrawalAmountRay);
@@ -2174,7 +2226,7 @@ contract StableVaultTest is TestWithHelpers {
         vm.prank(user1);
         mockAsset.forceApprove(address(stableVault), amount);
         vm.prank(user1);
-        stableVault.deposit(user1, address(mockAsset), amount);
+        stableVault.deposit(user1, address(mockAsset), amount, "");
         vm.warp(block.timestamp + timeBetweenDeposits);
 
         // Deposit 2
@@ -2182,11 +2234,11 @@ contract StableVaultTest is TestWithHelpers {
         vm.prank(user2);
         mockAsset.forceApprove(address(stableVault), amount);
         vm.prank(user2);
-        stableVault.deposit(user2, address(mockAsset), amount);
+        stableVault.deposit(user2, address(mockAsset), amount, "");
 
         // Request Full Withdrawal
         vm.prank(user2);
-        uint256 iouTokenAmount = stableVault.requestWithdrawal(user2, 0);
+        uint256 iouTokenAmount = stableVault.requestWithdrawal(user2, 0, "");
 
         // After removing the assertion and replacing it with the code below from _fullWithdrawalRequest() we expect the
         // IOU quantity to be at least original deposit normalized to RAY decimals:
@@ -2213,10 +2265,10 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
-            treasury
+            treasury,
+            address(policyRegistry)
         );
 
         vm.warp(block.timestamp + 1);
@@ -2235,7 +2287,7 @@ contract StableVaultTest is TestWithHelpers {
         ghoToken.approve(address(highRateVault), depositAmount);
 
         vm.prank(user);
-        highRateVault.deposit(user, address(ghoToken), depositAmount);
+        highRateVault.deposit(user, address(ghoToken), depositAmount, "");
 
         // Mock the aggregated balance to allow withdrawal (high enough to cover any interest)
         mockFundsHandler.mockAggregatedBalance(depositAmount.assetDecimalsToRay(address(ghoToken)) * 10);
@@ -2245,7 +2297,7 @@ contract StableVaultTest is TestWithHelpers {
         //         actualAmountOfWithdrawalRay = originalDepositRay;
         //      }
         vm.prank(user);
-        uint256 iouTokenAmount = highRateVault.requestWithdrawal(user, 0);
+        uint256 iouTokenAmount = highRateVault.requestWithdrawal(user, 0, "");
         assertEq(iouTokenAmount, depositAmount.assetDecimalsToRay(address(ghoToken)));
     }
 
@@ -2537,7 +2589,7 @@ contract StableVaultTest is TestWithHelpers {
         vm.prank(recipient);
         mockAsset18dp.forceApprove(address(stableVault), 1);
         vm.prank(recipient);
-        stableVault.deposit(recipient, address(mockAsset18dp), 1);
+        stableVault.deposit(recipient, address(mockAsset18dp), 1, "");
 
         vm.warp(block.timestamp + 1);
         vm.prank(manager);
@@ -2598,7 +2650,7 @@ contract StableVaultTest is TestWithHelpers {
 
         mockFundsHandler.mockAggregatedBalance(stableVault.getGlobalOriginalDepositAmount());
         vm.prank(recipient);
-        uint256 withdrawnRay = stableVault.requestWithdrawal(recipient, 0);
+        uint256 withdrawnRay = stableVault.requestWithdrawal(recipient, 0, "");
 
         assertGe(withdrawnRay, amountRay);
     }
@@ -2628,7 +2680,7 @@ contract StableVaultTest is TestWithHelpers {
 
         mockFundsHandler.mockAggregatedBalance(stableVault.getGlobalOriginalDepositAmount());
         vm.prank(recipient);
-        uint256 withdrawnRay = stableVault.requestWithdrawal(recipient, 0);
+        uint256 withdrawnRay = stableVault.requestWithdrawal(recipient, 0, "");
 
         // Principal protection still ensures the withdrawal covers at least the transferred amount.
         assertGe(withdrawnRay, amountRay);
@@ -2777,10 +2829,10 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
-            treasury
+            treasury,
+            address(policyRegistry)
         );
 
         vm.warp(block.timestamp + 1);
@@ -2793,7 +2845,7 @@ contract StableVaultTest is TestWithHelpers {
         vm.prank(user);
         ghoToken.approve(address(highRateVault), depositAmount);
         vm.prank(user);
-        highRateVault.deposit(user, address(ghoToken), depositAmount);
+        highRateVault.deposit(user, address(ghoToken), depositAmount, "");
 
         uint256 shareBackedBalanceRay = highRateVault.getUserBalance(user);
         assertEq(shareBackedBalanceRay, fullTransferAmountRay - 2);
@@ -2818,10 +2870,10 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
-            treasury
+            treasury,
+            address(policyRegistry)
         );
 
         vm.warp(block.timestamp + 1);
@@ -2836,7 +2888,7 @@ contract StableVaultTest is TestWithHelpers {
         vm.prank(user);
         ghoToken.approve(address(highRateVault), depositAmount);
         vm.prank(user);
-        highRateVault.deposit(user, address(ghoToken), depositAmount);
+        highRateVault.deposit(user, address(ghoToken), depositAmount, "");
 
         vm.prank(user);
         assertTrue(highRateVault.transfer(recipient, maxPartialTransferAmountRay));
@@ -2859,10 +2911,10 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
-            treasury
+            treasury,
+            address(policyRegistry)
         );
 
         vm.warp(block.timestamp + 1);
@@ -2877,7 +2929,7 @@ contract StableVaultTest is TestWithHelpers {
         vm.prank(user);
         ghoToken.approve(address(highRateVault), depositAmount);
         vm.prank(user);
-        highRateVault.deposit(user, address(ghoToken), depositAmount);
+        highRateVault.deposit(user, address(ghoToken), depositAmount, "");
 
         vm.prank(user);
         vm.expectRevert(Errors.InvalidAmount.selector);
@@ -2898,10 +2950,10 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
-            treasury
+            treasury,
+            address(policyRegistry)
         );
 
         vm.warp(block.timestamp + 1);
@@ -2913,7 +2965,7 @@ contract StableVaultTest is TestWithHelpers {
         vm.prank(user);
         ghoToken.approve(address(highRateVault), depositAmount);
         vm.prank(user);
-        highRateVault.deposit(user, address(ghoToken), depositAmount);
+        highRateVault.deposit(user, address(ghoToken), depositAmount, "");
 
         uint256 senderShareBackedBalanceRay = highRateVault.getUserBalance(user);
         assertEq(senderShareBackedBalanceRay, fullTransferAmountRay - 2);
@@ -2927,7 +2979,7 @@ contract StableVaultTest is TestWithHelpers {
         mockFundsHandler.mockAggregatedBalance(fullTransferAmountRay);
 
         vm.prank(recipient);
-        uint256 iouTokenAmount = highRateVault.requestWithdrawal(recipient, 0);
+        uint256 iouTokenAmount = highRateVault.requestWithdrawal(recipient, 0, "");
         assertEq(iouTokenAmount, fullTransferAmountRay);
     }
 
@@ -3023,7 +3075,7 @@ contract StableVaultTest is TestWithHelpers {
         vm.prank(user);
         mockAsset18dp.forceApprove(address(stableVault), amount);
         vm.prank(user);
-        stableVault.deposit(user, address(mockAsset18dp), amount);
+        stableVault.deposit(user, address(mockAsset18dp), amount, "");
 
         vm.prank(user);
         assertTrue(stableVault.transferAll(recipient));
@@ -3060,7 +3112,7 @@ contract StableVaultTest is TestWithHelpers {
 
         // Withdraw exactly the original deposit amount, leaving only interest shares => originalDepositRay becomes 0.
         vm.prank(donor);
-        stableVault.requestWithdrawal(donor, depositRay);
+        stableVault.requestWithdrawal(donor, depositRay, "");
 
         // Now assign the dust receiver to a slightly-growing default subVault so we can deterministically
         // hit the MIN-1 rounding case on `amountRay.rayDivDown(conversionRate)`.
@@ -3095,10 +3147,10 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
-            treasury
+            treasury,
+            address(policyRegistry)
         );
         mockAsset = IMockErc20(address(new MockNonStandardErc20("Test GHO", "tGHO", 18)));
 
@@ -3113,7 +3165,7 @@ contract StableVaultTest is TestWithHelpers {
         vm.prank(recipient);
         mockAsset.forceApprove(address(stableVault), amount);
         vm.prank(recipient);
-        stableVault.deposit(recipient, address(mockAsset), amount);
+        stableVault.deposit(recipient, address(mockAsset), amount, "");
 
         IStableVault.UserRateData[] memory userRateData = new IStableVault.UserRateData[](1);
         userRateData[0] = IStableVault.UserRateData(recipient, highRate);
@@ -3129,7 +3181,7 @@ contract StableVaultTest is TestWithHelpers {
         vm.prank(user);
         mockAsset.forceApprove(address(stableVault), amount);
         vm.prank(user);
-        stableVault.deposit(user, address(mockAsset), amount);
+        stableVault.deposit(user, address(mockAsset), amount, "");
 
         // User has ~1e9 shares (deposited 1e9 RAY at conversionRate = RAY)
         // Recipient's subVault has conversionRate ≈ 1e36
@@ -3157,7 +3209,7 @@ contract StableVaultTest is TestWithHelpers {
         vm.prank(user);
         mockAsset18dp.forceApprove(address(stableVault), 1);
         vm.prank(user);
-        stableVault.deposit(user, address(mockAsset18dp), 1);
+        stableVault.deposit(user, address(mockAsset18dp), 1, "");
 
         vm.warp(block.timestamp + 1);
         vm.prank(manager);
@@ -3183,7 +3235,7 @@ contract StableVaultTest is TestWithHelpers {
         vm.prank(user);
         mockAsset18dp.forceApprove(address(stableVault), amount);
         vm.prank(user);
-        stableVault.deposit(user, address(mockAsset18dp), amount);
+        stableVault.deposit(user, address(mockAsset18dp), amount, "");
 
         vm.prank(user);
         assertTrue(stableVault.transferAll(recipient));
@@ -3206,13 +3258,13 @@ contract StableVaultTest is TestWithHelpers {
         vm.prank(user);
         mockAsset18dp.forceApprove(address(stableVault), 1);
         vm.prank(user);
-        stableVault.deposit(user, address(mockAsset18dp), 1);
+        stableVault.deposit(user, address(mockAsset18dp), 1, "");
 
         mockAsset18dp.mint(recipient, 1);
         vm.prank(recipient);
         mockAsset18dp.forceApprove(address(stableVault), 1);
         vm.prank(recipient);
-        stableVault.deposit(recipient, address(mockAsset18dp), 1);
+        stableVault.deposit(recipient, address(mockAsset18dp), 1, "");
 
         vm.warp(block.timestamp + 1);
         vm.prank(manager);
@@ -3348,10 +3400,10 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
-            treasury
+            treasury,
+            address(policyRegistry)
         );
 
         address user = makeAddr("user");
@@ -3360,7 +3412,7 @@ contract StableVaultTest is TestWithHelpers {
         vm.prank(user);
         mockAsset.forceApprove(address(stableVaultHarness), depositAmount);
         vm.prank(user);
-        stableVaultHarness.deposit(user, address(mockAsset), depositAmount);
+        stableVaultHarness.deposit(user, address(mockAsset), depositAmount, "");
 
         uint256 userSubVaultId = stableVaultHarness.getUserSubVault(user).id;
         uint256 fullShares = stableVaultHarness.previewFullWithdrawalSharesHarness(user);
@@ -3388,10 +3440,10 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
-            treasury
+            treasury,
+            address(policyRegistry)
         );
 
         address user = makeAddr("user");
@@ -3400,7 +3452,7 @@ contract StableVaultTest is TestWithHelpers {
         vm.prank(user);
         mockAsset.forceApprove(address(stableVaultHarness), depositAmount);
         vm.prank(user);
-        stableVaultHarness.deposit(user, address(mockAsset), depositAmount);
+        stableVaultHarness.deposit(user, address(mockAsset), depositAmount, "");
 
         uint256 userSubVaultId = stableVaultHarness.getUserSubVault(user).id;
         uint256 fullShares = stableVaultHarness.previewFullWithdrawalSharesHarness(user);
@@ -3429,10 +3481,10 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             maxActiveSubVaults,
-            treasury
+            treasury,
+            address(policyRegistry)
         );
 
         address user1 = makeAddr("user1");
@@ -3467,10 +3519,10 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
             address(mockPriceOracle),
             maxActiveSubVaults,
-            treasury
+            treasury,
+            address(policyRegistry)
         );
 
         address user1 = makeAddr("user1");
@@ -3709,8 +3761,10 @@ contract StableVaultTest is TestWithHelpers {
         mockIouToken.mint(user, iouAmountRay);
 
         vm.mockCall(
-            address(mockWithdrawalPolicy),
-            abi.encodeWithSelector(IWithdrawalPolicy.applyWithdrawalPolicy.selector, address(mockAsset), iouAmountRay),
+            address(mockWithdrawalExecutionPolicy),
+            abi.encodeWithSelector(
+                IWithdrawalExecutionPolicy.applyWithdrawalExecutionPolicy.selector, address(mockAsset), iouAmountRay
+            ),
             abi.encode(iouAmountRay)
         );
 
@@ -3790,8 +3844,8 @@ contract StableVaultTest is TestWithHelpers {
         vm.assume(iouAmountRay.rayToAssetDecimals(address(mockAsset)) > 0);
 
         vm.mockCall(
-            address(mockWithdrawalPolicy),
-            abi.encodeWithSelector(IWithdrawalPolicy.applyWithdrawalPolicy.selector),
+            address(mockWithdrawalExecutionPolicy),
+            abi.encodeWithSelector(IWithdrawalExecutionPolicy.applyWithdrawalExecutionPolicy.selector),
             abi.encode(uint256(0)) // amountOutRay = 0, simulating 100% fee
         );
 
@@ -3863,6 +3917,63 @@ contract StableVaultTest is TestWithHelpers {
         assertEq(mockAsset.balanceOf(user), actualWithdrawnAssets);
     }
 
+    /// @dev Defense-in-depth: the policy is expected to deduct a fee, so the post-fee amount must be `<= iouAmountRay`.
+    /// A misconfigured or compromised policy returning more would otherwise inflate the withdrawal.
+    function test_executeWithdrawal_reverts_ifPolicyReturnsMoreThanIouAmount(
+        address user,
+        uint256 iouAmountRay,
+        uint256 policyReturnedAmountRay
+    ) public {
+        vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
+        _assumeNotProxyAdmin(user, address(stableVault));
+        iouAmountRay = _boundRayAmount(iouAmountRay);
+        vm.assume(iouAmountRay < type(uint256).max);
+        policyReturnedAmountRay = bound(policyReturnedAmountRay, iouAmountRay + 1, type(uint256).max);
+        mockIouToken.mint(user, iouAmountRay);
+
+        vm.mockCall(
+            address(mockWithdrawalExecutionPolicy),
+            abi.encodeWithSelector(IWithdrawalExecutionPolicy.applyWithdrawalExecutionPolicy.selector),
+            abi.encode(policyReturnedAmountRay)
+        );
+
+        vm.prank(user);
+        vm.expectRevert(Errors.InvalidAmount.selector);
+        stableVault.executeWithdrawal(user, address(mockAsset), 0, iouAmountRay, "");
+    }
+
+    /// @dev When the withdrawal-execution policy is unregistered, the vault skips the policy call and treats the IOU
+    /// amount as the post-fee amount, so the user withdraws the full `iouAmountRay` truncated to asset decimals.
+    function test_executeWithdrawal_withdrawsFullIouAmountIfNoPolicyRegistered(address user, uint256 iouAmountRay)
+        public
+    {
+        vm.assume(user != address(0));
+        vm.assume(user != address(mockFundsHandler));
+        _assumeNotProxyAdmin(user, address(stableVault));
+        iouAmountRay = _boundRayAmount(iouAmountRay);
+        mockIouToken.mint(user, iouAmountRay);
+        uint256 expectedWithdrawnAssets = iouAmountRay.rayToAssetDecimals(address(mockAsset));
+        vm.assume(expectedWithdrawnAssets > 0);
+        vm.assume(mockAsset.balanceOf(user) == 0);
+        mockTransferHelper.mockAsset(address(mockAsset), expectedWithdrawnAssets);
+
+        policyRegistry.setPolicy(
+            keccak256(bytes("aave.stable-vault.StableVault.policy.withdrawal-execution")), address(0)
+        );
+
+        vm.expectCall(
+            address(mockWithdrawalExecutionPolicy),
+            abi.encodeWithSelector(IWithdrawalExecutionPolicy.applyWithdrawalExecutionPolicy.selector),
+            0
+        );
+
+        vm.prank(user);
+        stableVault.executeWithdrawal(user, address(mockAsset), 0, iouAmountRay, "");
+
+        assertEq(mockAsset.balanceOf(user), expectedWithdrawnAssets);
+    }
+
     function test_rescueTokens_reverts_ifMsgSenderIsNotAuthorized(
         address unauthorizedMsgSender,
         uint256 stableVaultAssetBalance,
@@ -3921,7 +4032,7 @@ contract StableVaultTest is TestWithHelpers {
 
         vm.startPrank(attacker);
         reentrantAsset.approve(address(stableVault), depositAmount);
-        stableVault.deposit(attacker, address(reentrantAsset), depositAmount);
+        stableVault.deposit(attacker, address(reentrantAsset), depositAmount, "");
         vm.stopPrank();
 
         // Request withdrawal to get IOUs
@@ -3929,7 +4040,7 @@ contract StableVaultTest is TestWithHelpers {
         mockFundsHandler.mockAggregatedBalance(depositAmountRay);
 
         vm.prank(attacker);
-        stableVault.requestWithdrawal(attacker, 0);
+        stableVault.requestWithdrawal(attacker, 0, "");
 
         uint256 iouBalance = mockIouToken.balanceOf(attacker);
         assertEq(iouBalance, depositAmountRay);
@@ -3941,7 +4052,7 @@ contract StableVaultTest is TestWithHelpers {
         // 3. transfer() is called on the reentrant token -> attacker re-enters requestWithdrawal
         // 4. At this point, liabilities are reduced but assets haven't left yet
         reentrantAsset.setReentrantCall(
-            address(stableVault), abi.encodeCall(IStableVault.requestWithdrawal, (attacker, 0))
+            address(stableVault), abi.encodeCall(IStableVault.requestWithdrawal, (attacker, 0, ""))
         );
 
         // Mock the asset balance in transfer helper for the withdrawal
@@ -3964,7 +4075,7 @@ contract StableVaultTest is TestWithHelpers {
 
         vm.startPrank(attacker);
         reentrantAsset.approve(address(stableVault), type(uint256).max);
-        stableVault.deposit(attacker, address(reentrantAsset), depositAmount);
+        stableVault.deposit(attacker, address(reentrantAsset), depositAmount, "");
         vm.stopPrank();
 
         // Request withdrawal to get IOUs
@@ -3972,14 +4083,14 @@ contract StableVaultTest is TestWithHelpers {
         mockFundsHandler.mockAggregatedBalance(depositAmountRay);
 
         vm.prank(attacker);
-        stableVault.requestWithdrawal(attacker, 0);
+        stableVault.requestWithdrawal(attacker, 0, "");
 
         uint256 iouBalance = mockIouToken.balanceOf(attacker);
 
         // Setup the reentrant callback to deposit during transfer
         reentrantAsset.setReentrantCall(
             address(stableVault),
-            abi.encodeCall(IStableVault.deposit, (attacker, address(reentrantAsset), depositAmount))
+            abi.encodeCall(IStableVault.deposit, (attacker, address(reentrantAsset), depositAmount, ""))
         );
 
         // Mock the asset balance in transfer helper for the withdrawal
@@ -4002,7 +4113,7 @@ contract StableVaultTest is TestWithHelpers {
 
         vm.startPrank(attacker);
         reentrantAsset.approve(address(stableVault), depositAmount);
-        stableVault.deposit(attacker, address(reentrantAsset), depositAmount);
+        stableVault.deposit(attacker, address(reentrantAsset), depositAmount, "");
         vm.stopPrank();
 
         // Request withdrawal to get IOUs
@@ -4010,7 +4121,7 @@ contract StableVaultTest is TestWithHelpers {
         mockFundsHandler.mockAggregatedBalance(depositAmountRay);
 
         vm.prank(attacker);
-        stableVault.requestWithdrawal(attacker, 0);
+        stableVault.requestWithdrawal(attacker, 0, "");
 
         uint256 iouBalance = mockIouToken.balanceOf(attacker);
         uint256 halfIou = iouBalance / 2;
@@ -4048,14 +4159,14 @@ contract StableVaultTest is TestWithHelpers {
         // Setup the reentrant callback to deposit during transferFrom
         reentrantAsset.setReentrantCall(
             address(stableVault),
-            abi.encodeCall(IStableVault.deposit, (attacker, address(reentrantAsset), depositAmount))
+            abi.encodeCall(IStableVault.deposit, (attacker, address(reentrantAsset), depositAmount, ""))
         );
         reentrantAsset.setReentrancyOnTransferFrom(true);
 
         // Deposit - should revert with ReentrancyGuardReentrantCall when trying to re-enter
         vm.prank(attacker);
         vm.expectRevert(ReentrancyGuardTransientUpgradeable.ReentrancyGuardReentrantCall.selector);
-        stableVault.deposit(attacker, address(reentrantAsset), depositAmount);
+        stableVault.deposit(attacker, address(reentrantAsset), depositAmount, "");
     }
 
     function test_rescueNative_reverts_ifMsgSenderIsNotAuthorized(
@@ -4111,7 +4222,7 @@ contract StableVaultTest is TestWithHelpers {
         vm.prank(user);
         mockAsset.forceApprove(address(stableVault), amount);
         vm.prank(user);
-        stableVault.deposit(user, address(mockAsset), amount);
+        stableVault.deposit(user, address(mockAsset), amount, "");
     }
 
     function _setUserRate(address user, uint256 newPerSecondRate) public {

@@ -17,11 +17,13 @@ import {Vm} from "forge-std/Vm.sol";
 import {Allocator} from "src/core/Allocator.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
+import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
+import {PolicyRegistry} from "src/periphery/PolicyRegistry.sol";
 import {Errors} from "src/types/Errors.sol";
 
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
@@ -68,16 +70,20 @@ contract AllocatorTest is TestWithHelpers {
     MockTransferHelper internal _mockTransferHelper;
 
     Allocator internal _allocator;
+    PolicyRegistry internal _policyRegistry;
 
     function _deployAllocator(
         MockAccessManager mockAccessManager,
         address assetRegistry,
         address priceOracle,
         address transferHelper,
-        uint8 maxStrategiesPerAsset
+        uint8 maxStrategiesPerAsset,
+        address policyRegistry
     ) internal returns (Allocator) {
         address allocatorImpl = address(
-            new Allocator(assetRegistry, depositor, withdrawer, priceOracle, transferHelper, maxStrategiesPerAsset)
+            new Allocator(
+                assetRegistry, depositor, withdrawer, priceOracle, transferHelper, maxStrategiesPerAsset, policyRegistry
+            )
         );
         Allocator allocator = Allocator(
             address(
@@ -105,6 +111,7 @@ contract AllocatorTest is TestWithHelpers {
         _extraGhoStrategy = new TestErc4626(_mockGho);
 
         _mockAccessManager = new MockAccessManager(admin);
+        _policyRegistry = new PolicyRegistry(address(_mockAccessManager));
 
         _mockSwapper = new MockSwapper();
         _priceOracle = _deployPriceOracle(address(_mockAccessManager), 9_995e23);
@@ -143,7 +150,8 @@ contract AllocatorTest is TestWithHelpers {
             address(_mockAssetRegistry),
             address(_priceOracle),
             address(_mockTransferHelper),
-            MAX_STRATEGIES_PER_ASSET
+            MAX_STRATEGIES_PER_ASSET,
+            address(_policyRegistry)
         );
 
         // Set up strategy vaults
@@ -170,7 +178,8 @@ contract AllocatorTest is TestWithHelpers {
             withdrawer,
             address(_priceOracle),
             address(0),
-            MAX_STRATEGIES_PER_ASSET
+            MAX_STRATEGIES_PER_ASSET,
+            address(_policyRegistry)
         );
     }
 
@@ -1308,7 +1317,8 @@ contract AllocatorTest is TestWithHelpers {
             address(_mockAssetRegistry),
             address(_priceOracle),
             address(_mockTransferHelper),
-            MAX_STRATEGIES_PER_ASSET
+            MAX_STRATEGIES_PER_ASSET,
+            address(_policyRegistry)
         );
 
         MockErc4626Strategy mockStrategy = new MockErc4626Strategy(_mockUsdt);
@@ -1539,7 +1549,7 @@ contract AllocatorTest is TestWithHelpers {
         rebalanceParams[0] =
             _buildRebalanceParams(deallocations, _initializeSwapParams(0), _initializeAllocationParams(0));
         vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, operator));
-        _allocator.rebalance(rebalanceParams);
+        _allocator.rebalance(rebalanceParams, "");
     }
 
     function test_rebalance_allocate_depositsIdleFundsIntoDefaultVault(uint256 amount) public {
@@ -1556,7 +1566,7 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
 
         vm.prank(address(everyRoleAccount));
-        _allocator.rebalance(_getDepositIdleFundsRebalanceParams(address(_mockUsdt)));
+        _allocator.rebalance(_getDepositIdleFundsRebalanceParams(address(_mockUsdt)), "");
 
         // Check balances (now all USDT should be in the default vault)
         assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount);
@@ -1567,7 +1577,7 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
 
         vm.prank(address(everyRoleAccount));
-        _allocator.rebalance(_getDepositIdleFundsRebalanceParams(address(_mockGho)));
+        _allocator.rebalance(_getDepositIdleFundsRebalanceParams(address(_mockGho)), "");
 
         // Check balances (now all GHO should be in the default vault)
         assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amount);
@@ -1576,6 +1586,18 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), amount);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
+    }
+
+    function test_rebalance_queriesRegistryWithRebalancePolicyId(uint256 amount) public {
+        amount = _boundAssetAmount(address(_mockUsdt), amount);
+        _mockUsdt.mint(address(_allocator), amount);
+
+        vm.expectCall(
+            address(_policyRegistry),
+            abi.encodeCall(IPolicyRegistry.getPolicy, keccak256("aave.stable-vault.Allocator.policy.rebalance"))
+        );
+        vm.prank(address(everyRoleAccount));
+        _allocator.rebalance(_getDepositIdleFundsRebalanceParams(address(_mockUsdt)), "");
     }
 
     function test_rebalance_allocate_reverts_ifStrategyIsNotSupportedForAsset(uint256 amount) public {
@@ -1588,7 +1610,7 @@ contract AllocatorTest is TestWithHelpers {
             _getDepositIdleFundsRebalanceParams(address(_mockUnsupportedAsset));
         vm.prank(address(everyRoleAccount));
         vm.expectRevert(Errors.AddressNotWhitelisted.selector);
-        _allocator.rebalance(rebalanceParams);
+        _allocator.rebalance(rebalanceParams, "");
     }
 
     function test_rebalance_allocate_reverts_ifVaultRejectsDeposit(uint256 amount) public {
@@ -1606,7 +1628,7 @@ contract AllocatorTest is TestWithHelpers {
             abi.encodeWithSelector(IAllocator.DepositIntoStrategyFailed.selector, address(_defaultUsdtStrategy))
         );
         vm.prank(address(everyRoleAccount));
-        _allocator.rebalance(rebalanceParams);
+        _allocator.rebalance(rebalanceParams, "");
     }
 
     function test_rabalance_allocate_ifAmountSpecified(uint256 amountUsdt, uint256 amountGho) public {
@@ -1635,7 +1657,7 @@ contract AllocatorTest is TestWithHelpers {
         );
         rebalanceParams[0] =
             _buildRebalanceParams(_initializeDeallocationParams(0), _initializeSwapParams(0), allocations);
-        _allocator.rebalance(rebalanceParams);
+        _allocator.rebalance(rebalanceParams, "");
 
         // Check balances after allocating to default strategy
         assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amountUsdt);
@@ -1657,7 +1679,7 @@ contract AllocatorTest is TestWithHelpers {
         rebalanceParams[0] =
             _buildRebalanceParams(_initializeDeallocationParams(0), _initializeSwapParams(0), allocations);
         vm.prank(address(everyRoleAccount));
-        _allocator.rebalance(rebalanceParams);
+        _allocator.rebalance(rebalanceParams, "");
 
         // Check balances after allocating to default strategy
         assertEq(_allocator.getAssetBalance(address(_mockUsdt)), amountUsdt * 2);
@@ -1687,7 +1709,7 @@ contract AllocatorTest is TestWithHelpers {
                 IAllocator.DepositIntoStrategyFailed.selector, _allocator.getDefaultStrategy(address(_mockUsdt))
             )
         );
-        _allocator.rebalance(rebalanceParams);
+        _allocator.rebalance(rebalanceParams, "");
     }
 
     function test_rebalance_deallocate_maxAmount(uint256 depositAmountUsdt, uint256 depositAmountGho) public {
@@ -1739,7 +1761,7 @@ contract AllocatorTest is TestWithHelpers {
             _buildRebalanceParams(deallocations, _initializeSwapParams(0), _initializeAllocationParams(0));
 
         vm.prank(address(everyRoleAccount));
-        _allocator.rebalance(rebalanceParams);
+        _allocator.rebalance(rebalanceParams, "");
 
         // Check balances after deallocating from default strategy
         assertEq(_allocator.getAssetBalance(address(_mockUsdt)), depositAmountUsdt * 2);
@@ -1784,7 +1806,7 @@ contract AllocatorTest is TestWithHelpers {
             _buildRebalanceParams(deallocations, _initializeSwapParams(0), _initializeAllocationParams(0));
 
         vm.prank(address(everyRoleAccount));
-        _allocator.rebalance(rebalanceParams);
+        _allocator.rebalance(rebalanceParams, "");
 
         assertEq(_mockUsdt.balanceOf(address(_allocator)), expectedRedeemedAssets);
         assertEq(_mockUsdt.balanceOf(address(mockStrategy)), expectedRemainingAssets);
@@ -1814,7 +1836,7 @@ contract AllocatorTest is TestWithHelpers {
             _buildRebalanceParams(deallocations, _initializeSwapParams(0), _initializeAllocationParams(0));
 
         vm.prank(address(everyRoleAccount));
-        _allocator.rebalance(rebalanceParams);
+        _allocator.rebalance(rebalanceParams, "");
 
         assertEq(_mockUsdt.balanceOf(address(_allocator)), depositAmountUsdt);
         assertEq(_allocator.getAssetBalanceInStrategy(address(mockStrategy)), 0);
@@ -1855,7 +1877,7 @@ contract AllocatorTest is TestWithHelpers {
 
         vm.prank(address(everyRoleAccount));
         vm.expectRevert("no liquidity");
-        _allocator.rebalance(rebalanceParams);
+        _allocator.rebalance(rebalanceParams, "");
     }
 
     function test_rebalance_deallocate_maxAmount_redeemsAllIfMaxRedeemEqualsShareBalance(uint256 depositAmountUsdt)
@@ -1882,7 +1904,7 @@ contract AllocatorTest is TestWithHelpers {
             _buildRebalanceParams(deallocations, _initializeSwapParams(0), _initializeAllocationParams(0));
 
         vm.prank(address(everyRoleAccount));
-        _allocator.rebalance(rebalanceParams);
+        _allocator.rebalance(rebalanceParams, "");
 
         assertEq(_mockUsdt.balanceOf(address(_allocator)), depositAmountUsdt);
         assertEq(_allocator.getAssetBalanceInStrategy(address(mockStrategy)), 0);
@@ -1898,7 +1920,7 @@ contract AllocatorTest is TestWithHelpers {
 
         vm.prank(address(everyRoleAccount));
         vm.expectRevert(abi.encodeWithSelector(IAllocator.ZeroShareBalance.selector, address(_defaultUsdtStrategy)));
-        _allocator.rebalance(rebalanceParams);
+        _allocator.rebalance(rebalanceParams, "");
     }
 
     function test_rebalance_deallocate_specifiedAmount(uint256 depositAmountUsdt, uint256 depositAmountGho) public {
@@ -1958,7 +1980,7 @@ contract AllocatorTest is TestWithHelpers {
             _buildRebalanceParams(deallocations, _initializeSwapParams(0), _initializeAllocationParams(0));
 
         vm.prank(address(everyRoleAccount));
-        _allocator.rebalance(rebalanceParams);
+        _allocator.rebalance(rebalanceParams, "");
 
         // Check balances after deallocation
         assertEq(_allocator.getAssetBalance(address(_mockUsdt)), depositAmountUsdt * 2);
@@ -2008,7 +2030,7 @@ contract AllocatorTest is TestWithHelpers {
 
         vm.prank(address(everyRoleAccount));
         vm.expectRevert(Errors.InsufficientAmountOut.selector);
-        _allocator.rebalance(rebalanceParams);
+        _allocator.rebalance(rebalanceParams, "");
     }
 
     function test_rebalance_deallocate_specifiedAmount_reverts_ifAmountGreaterThanBalance(uint256 depositAmountUsdt)
@@ -2036,7 +2058,7 @@ contract AllocatorTest is TestWithHelpers {
 
         vm.prank(address(everyRoleAccount));
         vm.expectRevert(Errors.InsufficientAmountOut.selector);
-        _allocator.rebalance(rebalanceParams);
+        _allocator.rebalance(rebalanceParams, "");
     }
 
     function test_rebalance_deallocate_specifiedAmount_reverts_ifStrategyIsNotSupportedForAsset(
@@ -2054,7 +2076,7 @@ contract AllocatorTest is TestWithHelpers {
 
         vm.prank(address(everyRoleAccount));
         vm.expectRevert(Errors.AddressNotWhitelisted.selector);
-        _allocator.rebalance(rebalanceParams);
+        _allocator.rebalance(rebalanceParams, "");
     }
 
     function test_rebalance_swap_multipleCallsToSwapper(uint256 amountAssetInSwapOne, uint256 amountAssetInSwapTwo)
@@ -2092,7 +2114,7 @@ contract AllocatorTest is TestWithHelpers {
         vm.expectEmit(true, true, true, true);
         emit IAllocator.AssetsSwapped(assetIn, assetOut, amountAssetInSwapTwo, amountAssetOutTwo);
         vm.prank(address(everyRoleAccount));
-        _allocator.rebalance(rebalanceParams);
+        _allocator.rebalance(rebalanceParams, "");
 
         // Check balances after the swap
         assertEq(_allocator.getAssetBalance(assetIn), 0);
@@ -2118,7 +2140,7 @@ contract AllocatorTest is TestWithHelpers {
             _buildRebalanceParams(_initializeDeallocationParams(0), swaps, _initializeAllocationParams(0));
         vm.prank(address(everyRoleAccount));
         vm.expectRevert(Errors.InvalidAmount.selector);
-        _allocator.rebalance(rebalanceParams);
+        _allocator.rebalance(rebalanceParams, "");
 
         // Check balances
         assertEq(_allocator.getAssetBalance(assetIn), amountAssetIn);
@@ -2154,7 +2176,7 @@ contract AllocatorTest is TestWithHelpers {
 
         vm.prank(address(everyRoleAccount));
         vm.expectRevert(Errors.InsufficientAmountOut.selector);
-        _allocator.rebalance(rebalanceParams);
+        _allocator.rebalance(rebalanceParams, "");
 
         // Check balances after the swap to make sure of no change
         assertEq(_allocator.getAssetBalance(assetIn), amountAssetInSwapOne);
@@ -2181,7 +2203,7 @@ contract AllocatorTest is TestWithHelpers {
             _buildRebalanceParams(_initializeDeallocationParams(0), swaps, _initializeAllocationParams(0));
         vm.prank(address(everyRoleAccount));
         vm.expectRevert(abi.encodeWithSelector(Errors.UnsupportedAsset.selector, assetIn));
-        _allocator.rebalance(rebalanceParams);
+        _allocator.rebalance(rebalanceParams, "");
 
         // Check balances after the swap to make sure of no change
         assertEq(_allocator.getAssetBalance(assetIn), amountAssetIn);
@@ -2208,7 +2230,7 @@ contract AllocatorTest is TestWithHelpers {
             _buildRebalanceParams(_initializeDeallocationParams(0), swaps, _initializeAllocationParams(0));
         vm.prank(address(everyRoleAccount));
         vm.expectRevert(abi.encodeWithSelector(Errors.UnsupportedAsset.selector, assetOut));
-        _allocator.rebalance(rebalanceParams);
+        _allocator.rebalance(rebalanceParams, "");
 
         // Check balances after the swap to make sure of no change
         assertEq(_allocator.getAssetBalance(assetIn), amountAssetIn);
@@ -2234,7 +2256,7 @@ contract AllocatorTest is TestWithHelpers {
 
         vm.prank(address(everyRoleAccount));
         vm.expectRevert(Errors.InvalidAmount.selector);
-        _allocator.rebalance(rebalanceParams);
+        _allocator.rebalance(rebalanceParams, "");
     }
 
     function test_rebalance_swap_succeeds_ifInputAssetDustIsNotTruncated(uint256 amountAssetIn) public {
@@ -2258,7 +2280,7 @@ contract AllocatorTest is TestWithHelpers {
         rebalanceParams[0] =
             _buildRebalanceParams(_initializeDeallocationParams(0), swaps, _initializeAllocationParams(0));
         vm.prank(address(everyRoleAccount));
-        _allocator.rebalance(rebalanceParams);
+        _allocator.rebalance(rebalanceParams, "");
 
         // Check balances after the swap
         assertEq(_allocator.getAssetBalance(assetIn), 0);
@@ -2285,7 +2307,7 @@ contract AllocatorTest is TestWithHelpers {
             _buildRebalanceParams(_initializeDeallocationParams(0), swaps, _initializeAllocationParams(0));
         vm.prank(address(everyRoleAccount));
         vm.expectRevert(IPriceOracle.PriceTooLow.selector);
-        _allocator.rebalance(rebalanceParams);
+        _allocator.rebalance(rebalanceParams, "");
 
         // Check balances after the swap
         assertEq(_allocator.getAssetBalance(assetIn), amountAssetIn);
@@ -2304,7 +2326,7 @@ contract AllocatorTest is TestWithHelpers {
             _buildRebalanceParams(_initializeDeallocationParams(0), swaps, _initializeAllocationParams(0));
         vm.prank(address(everyRoleAccount));
         vm.expectRevert(Errors.InvalidParameter.selector);
-        _allocator.rebalance(rebalanceParams);
+        _allocator.rebalance(rebalanceParams, "");
     }
 
     function test_rebalance_entireFlow(uint256 amountIn) public {
@@ -2341,7 +2363,7 @@ contract AllocatorTest is TestWithHelpers {
         allocations[0] = _buildAllocationParams(assetOut, address(_defaultGhoStrategy), amountOut);
         rebalanceParams[0] = _buildRebalanceParams(deallocations, swaps, allocations);
         vm.prank(address(everyRoleAccount));
-        _allocator.rebalance(rebalanceParams);
+        _allocator.rebalance(rebalanceParams, "");
 
         // Check balances after the rebalance
         assertEq(_allocator.getAssetBalance(assetIn), 0);
@@ -2405,7 +2427,8 @@ contract AllocatorTest is TestWithHelpers {
             address(_mockAssetRegistry),
             address(_priceOracle),
             address(_mockTransferHelper),
-            maxStrategiesPerAsset
+            maxStrategiesPerAsset,
+            address(_policyRegistry)
         );
 
         address strategy;
@@ -3287,7 +3310,7 @@ contract AllocatorTest is TestWithHelpers {
         });
 
         vm.prank(everyRoleAccount);
-        _allocator.rebalance(params);
+        _allocator.rebalance(params, "");
 
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), depositAmount);
     }
@@ -3332,7 +3355,7 @@ contract AllocatorTest is TestWithHelpers {
         vm.expectRevert(
             abi.encodeWithSelector(IAllocator.DepositsToStrategyDisabled.selector, address(_extraUsdtStrategy))
         );
-        _allocator.rebalance(params);
+        _allocator.rebalance(params, "");
     }
 
     function test_withdrawFromStrategy_succeedsWhenStrategyIsDistrusted(uint256 depositAmount) public {
@@ -3377,7 +3400,7 @@ contract AllocatorTest is TestWithHelpers {
 
         // Configure callback: during redeem() (called via _withdrawFromStrategy), call Allocator.rebalance() again
         reentrantStrategy.setReentrantCall(
-            address(_allocator), abi.encodeCall(IAllocator.rebalance, (new IAllocator.RebalanceParams[](0)))
+            address(_allocator), abi.encodeCall(IAllocator.rebalance, (new IAllocator.RebalanceParams[](0), ""))
         );
         reentrantStrategy.setReentrancyOnRedeem(true);
 
@@ -3392,7 +3415,7 @@ contract AllocatorTest is TestWithHelpers {
 
         vm.prank(admin);
         vm.expectRevert(ReentrancyGuardTransientUpgradeable.ReentrancyGuardReentrantCall.selector);
-        _allocator.rebalance(params);
+        _allocator.rebalance(params, "");
     }
 
     function test_rebalance_reentrancyNotAllowedOnRebalanceViaRedeem() public {
@@ -3402,7 +3425,7 @@ contract AllocatorTest is TestWithHelpers {
 
         // Configure callback: during redeem(), call Allocator.rebalance() again
         reentrantStrategy.setReentrantCall(
-            address(_allocator), abi.encodeCall(IAllocator.rebalance, (new IAllocator.RebalanceParams[](0)))
+            address(_allocator), abi.encodeCall(IAllocator.rebalance, (new IAllocator.RebalanceParams[](0), ""))
         );
         reentrantStrategy.setReentrancyOnRedeem(true);
 
@@ -3416,12 +3439,12 @@ contract AllocatorTest is TestWithHelpers {
 
         vm.prank(admin);
         vm.expectRevert(ReentrancyGuardTransientUpgradeable.ReentrancyGuardReentrantCall.selector);
-        _allocator.rebalance(params);
+        _allocator.rebalance(params, "");
     }
 
     function _configureNonRevertingReentrantCallback(MockReentrantErc4626Strategy strategy) internal {
         strategy.setReentrantCall(
-            address(_allocator), abi.encodeCall(IAllocator.rebalance, (new IAllocator.RebalanceParams[](0)))
+            address(_allocator), abi.encodeCall(IAllocator.rebalance, (new IAllocator.RebalanceParams[](0), ""))
         );
         strategy.setRevertOnReentrantFailure(false);
     }
@@ -3611,7 +3634,7 @@ contract AllocatorTest is TestWithHelpers {
 
         vm.prank(address(everyRoleAccount));
         vm.expectRevert(Errors.InsufficientAmountOut.selector);
-        _allocator.rebalance(rebalanceParams);
+        _allocator.rebalance(rebalanceParams, "");
     }
 
     function test_withdrawFromStrategy_capsSharesAtBalance_withYield() public {
