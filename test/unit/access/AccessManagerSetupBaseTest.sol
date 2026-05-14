@@ -495,9 +495,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     function test_targetSetup_slippageCoverageVault() public view {
         address target = getSlippageCoverageVaultAddress(_deployer());
         _assertTargetFunctionRole(
-            target,
-            ISlippageCoverageVault.enableOverrideMode.selector,
-            RolesConfig.getRole__enableOverrideMode().roleId
+            target, ISlippageCoverageVault.enableOverrideMode.selector, RolesConfig.getRole__enableOverrideMode().roleId
         );
         _assertTargetFunctionRole(
             target,
@@ -517,14 +515,10 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
             target, ISlippageCoverageVault.lowerWindowCap.selector, RolesConfig.getRole__lowerWindowCap().roleId
         );
         _assertTargetFunctionRole(
-            target,
-            ISlippageCoverageVault.raiseWindowSeconds.selector,
-            RolesConfig.getRole__raiseWindowSeconds().roleId
+            target, ISlippageCoverageVault.raiseWindowSeconds.selector, RolesConfig.getRole__raiseWindowSeconds().roleId
         );
         _assertTargetFunctionRole(
-            target,
-            ISlippageCoverageVault.lowerWindowSeconds.selector,
-            RolesConfig.getRole__lowerWindowSeconds().roleId
+            target, ISlippageCoverageVault.lowerWindowSeconds.selector, RolesConfig.getRole__lowerWindowSeconds().roleId
         );
         _assertTargetFunctionRole(
             target, ISlippageCoverageVault.setMaxSlippageBps.selector, RolesConfig.getRole__setMaxSlippageBps().roleId
