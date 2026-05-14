@@ -76,12 +76,12 @@ contract AdiAdapterPigeonLocalForkTest is Test {
     string internal constant DEFAULT_ETH_FORK_RPC = "http://127.0.0.1:8545";
     string internal constant DEFAULT_ARB_FORK_RPC = "http://127.0.0.1:8546";
 
-    address internal constant STABLE_VAULTS_OWNER = 0xfB65C68526969DA4AA3cEDF30b1C53846116D5a2;
+    address internal constant DEFAULT_STABLE_VAULTS_OWNER = 0xfB65C68526969DA4AA3cEDF30b1C53846116D5a2;
 
-    address internal constant ETH_CCC = 0x33E3B9D276f58A873e9Acc9f25A8a46F5b66F259;
-    address internal constant ARB_CCC = 0x98cF75814a129845EA7d69dbD0B6923A6Dac0c6b;
+    address internal constant DEFAULT_ETH_CCC = 0x33E3B9D276f58A873e9Acc9f25A8a46F5b66F259;
+    address internal constant DEFAULT_ARB_CCC = 0x98cF75814a129845EA7d69dbD0B6923A6Dac0c6b;
 
-    address internal constant ETH_ARB_ADAPTER = 0xC9B2A285B62c0eD494C3C23FAc7C169EaE740C59;
+    address internal constant DEFAULT_ETH_ARB_ADAPTER = 0xC9B2A285B62c0eD494C3C23FAc7C169EaE740C59;
 
     address internal constant ARB_INBOX = 0x4Dbd4fc535Ac27206064B68FfCf827b0A60BAB3f;
     address internal constant ARB_BRIDGE = 0x8315177aB297bA92A06054cE80a67Ed4DBd7ed3a;
@@ -103,6 +103,10 @@ contract AdiAdapterPigeonLocalForkTest is Test {
     RecordingGateway internal _arbGateway;
     AdiAdapter internal _ethAdiAdapter;
     AdiAdapter internal _arbAdiAdapter;
+    address internal _stableVaultsOwner;
+    address internal _ethCcc;
+    address internal _arbCcc;
+    address internal _ethArbAdapter;
 
     modifier onlyForkTest() {
         vm.skip(!vm.envOr("FORK_TEST", false), "Set FORK_TEST=true to run local aDI fork integration tests");
@@ -116,12 +120,13 @@ contract AdiAdapterPigeonLocalForkTest is Test {
 
         _ethFork = vm.createSelectFork(vm.envOr("ETH_FORK_RPC", DEFAULT_ETH_FORK_RPC));
         _arbFork = vm.createSelectFork(vm.envOr("ARB_FORK_RPC", DEFAULT_ARB_FORK_RPC));
+        _loadForkDeploymentConfig();
 
         vm.selectFork(_ethFork);
-        (_ethGateway, _ethAdiAdapter) = _deployLocalAdapter(ETH_CCC);
+        (_ethGateway, _ethAdiAdapter) = _deployLocalAdapter(_ethCcc);
 
         vm.selectFork(_arbFork);
-        (_arbGateway, _arbAdiAdapter) = _deployLocalAdapter(ARB_CCC);
+        (_arbGateway, _arbAdiAdapter) = _deployLocalAdapter(_arbCcc);
 
         _deployPigeonHelpers();
         _configureAdaptersAndAdiPermissions();
@@ -143,7 +148,7 @@ contract AdiAdapterPigeonLocalForkTest is Test {
 
         _adiHelper.helpEthToArb(
             AdiHelper.EthToArbArgs({
-                l2ForkId: _arbFork, l1Inbox: ARB_INBOX, l1Bridge: ARB_BRIDGE, expectedL1CCC: ETH_CCC, logs: logs
+                l2ForkId: _arbFork, l1Inbox: ARB_INBOX, l1Bridge: ARB_BRIDGE, expectedL1CCC: _ethCcc, logs: logs
             })
         );
 
@@ -192,7 +197,7 @@ contract AdiAdapterPigeonLocalForkTest is Test {
 
     function test_retryTransaction_pigeonFork_deliversViaLocalAdiGuardian() public onlyForkTest {
         bytes memory message = abi.encode("retry-hello-arb");
-        address[] memory bridgeAdaptersToRetry = _singleAddress(ETH_ARB_ADAPTER);
+        address[] memory bridgeAdaptersToRetry = _singleAddress(_ethArbAdapter);
 
         vm.selectFork(_ethFork);
         uint256 forwardNativeFee = _prepareForwardFees(_ethAdiAdapter, ARB_CHAIN_ID, message);
@@ -208,7 +213,7 @@ contract AdiAdapterPigeonLocalForkTest is Test {
         assertEq(_arbGateway.receiveCount(), 0, "original transaction should not be relayed");
 
         vm.selectFork(_ethFork);
-        _setGuardian(ETH_CCC, STABLE_VAULTS_OWNER);
+        _setGuardian(_ethCcc, _stableVaultsOwner);
         uint256 retryNativeFee = _prepareRetryFees(_ethAdiAdapter, encodedTransaction, bridgeAdaptersToRetry);
 
         vm.expectRevert();
@@ -216,7 +221,7 @@ contract AdiAdapterPigeonLocalForkTest is Test {
             encodedTransaction, DEFAULT_GAS_LIMIT, bridgeAdaptersToRetry
         );
 
-        _setGuardian(ETH_CCC, address(_ethAdiAdapter));
+        _setGuardian(_ethCcc, address(_ethAdiAdapter));
         retryNativeFee = _prepareRetryFees(_ethAdiAdapter, encodedTransaction, bridgeAdaptersToRetry);
 
         vm.recordLogs();
@@ -229,7 +234,7 @@ contract AdiAdapterPigeonLocalForkTest is Test {
 
         _adiHelper.helpEthToArb(
             AdiHelper.EthToArbArgs({
-                l2ForkId: _arbFork, l1Inbox: ARB_INBOX, l1Bridge: ARB_BRIDGE, expectedL1CCC: ETH_CCC, logs: retryLogs
+                l2ForkId: _arbFork, l1Inbox: ARB_INBOX, l1Bridge: ARB_BRIDGE, expectedL1CCC: _ethCcc, logs: retryLogs
             })
         );
 
@@ -243,11 +248,18 @@ contract AdiAdapterPigeonLocalForkTest is Test {
         internal
         returns (RecordingGateway gateway, AdiAdapter adapter)
     {
-        MockAccessManager accessManager = new MockAccessManager(STABLE_VAULTS_OWNER);
+        MockAccessManager accessManager = new MockAccessManager(_stableVaultsOwner);
         MockTransferHelper transferHelper = new MockTransferHelper();
         gateway = new RecordingGateway();
         adapter =
             new AdiAdapter(address(accessManager), address(gateway), crossChainController, address(transferHelper));
+    }
+
+    function _loadForkDeploymentConfig() internal {
+        _stableVaultsOwner = vm.envOr("STABLE_VAULTS_OWNER", DEFAULT_STABLE_VAULTS_OWNER);
+        _ethCcc = vm.envOr("ETH_CCC", DEFAULT_ETH_CCC);
+        _arbCcc = vm.envOr("ARB_CCC", DEFAULT_ARB_CCC);
+        _ethArbAdapter = vm.envOr("ETH_ARB_ADAPTER", DEFAULT_ETH_ARB_ADAPTER);
     }
 
     function _deployPigeonHelpers() internal {
@@ -261,20 +273,20 @@ contract AdiAdapterPigeonLocalForkTest is Test {
     function _configureAdaptersAndAdiPermissions() internal {
         vm.selectFork(_ethFork);
         _ethAdiAdapter.setDestinationChainAdapter(ARB_CHAIN_ID, address(_arbAdiAdapter));
-        _approveAdiAdapter(ETH_CCC, address(_ethAdiAdapter));
-        vm.deal(ETH_CCC, 20 ether);
+        _approveAdiAdapter(_ethCcc, address(_ethAdiAdapter));
+        vm.deal(_ethCcc, 20 ether);
 
         vm.selectFork(_arbFork);
         _arbAdiAdapter.setDestinationChainAdapter(ETH_CHAIN_ID, address(_ethAdiAdapter));
-        _approveAdiAdapter(ARB_CCC, address(_arbAdiAdapter));
-        vm.deal(ARB_CCC, 20 ether);
+        _approveAdiAdapter(_arbCcc, address(_arbAdiAdapter));
+        vm.deal(_arbCcc, 20 ether);
     }
 
     function _approveAdiAdapter(address crossChainController, address adiAdapter) internal {
         address[] memory senders = new address[](1);
         senders[0] = adiAdapter;
 
-        vm.startPrank(STABLE_VAULTS_OWNER);
+        vm.startPrank(_stableVaultsOwner);
         IAdiControllerAdmin(crossChainController).approveSenders(senders);
         IAdiControllerAdmin(crossChainController).updateGuardian(adiAdapter);
         vm.stopPrank();
@@ -284,7 +296,7 @@ contract AdiAdapterPigeonLocalForkTest is Test {
     }
 
     function _setGuardian(address crossChainController, address guardian) internal {
-        vm.prank(STABLE_VAULTS_OWNER);
+        vm.prank(_stableVaultsOwner);
         IAdiControllerAdmin(crossChainController).updateGuardian(guardian);
         assertEq(IAdiControllerAdmin(crossChainController).guardian(), guardian, "unexpected guardian");
     }
