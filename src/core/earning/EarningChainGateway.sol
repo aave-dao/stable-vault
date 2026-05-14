@@ -33,9 +33,7 @@ contract EarningChainGateway is
     using AssetLib for uint256;
 
     /// @notice Minimum destination gas limit required for the Accounting Chain to process a `BURN_IOU_TOKEN` message.
-    /// @dev Configured at deploy time so the value can be tuned per chain pair without source changes. Calibrated
-    /// against gas-snapshot tests of the full destination execution path (~106.6k consumed, ~110k as the exact-gas
-    /// minimum that succeeds under `CallWithExactGas` delivery semantics; 120k adds ~10% safety margin on top).
+    /// @dev Configured at deploy time so the value can be tuned per chain pair without source changes.
     uint256 public immutable MIN_BURN_IOU_TOKEN_GAS_LIMIT;
 
     uint256 internal immutable ACCOUNTING_CHAIN_ID;
