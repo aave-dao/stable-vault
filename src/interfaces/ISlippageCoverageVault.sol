@@ -79,6 +79,11 @@ interface ISlippageCoverageVault {
     /// @notice Pulls `amount` of `asset` from the vault to the bound beneficiary.
     /// @dev Callable only by `SLIPPAGE_BENEFICIARY`. Bypasses caps in override mode. Updates window state before the
     /// transfer.
+    /// @dev Rate-limit roles. `pullCapPerTx` is a **per-call ceiling** — a fixed upper bound on a single pull that
+    /// does not scale with `amountIn`. It catches operator typos and single-burst attacks; chunking across calls
+    /// can still drain up to `windowCap` per `windowSeconds`. `windowCap` + `windowSeconds` are the **actual rate
+    /// limit** that bounds sustained drainage (with the documented `2 × cap` boundary burst). See
+    /// `raiseWindowCap` for the boundary-burst math.
     /// @param asset The asset to pull.
     /// @param amount The amount to pull.
     function pullCoverage(address asset, uint256 amount) external;
