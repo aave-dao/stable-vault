@@ -691,6 +691,36 @@ abstract contract RolesConfig is DeploymentConfig {
         });
     }
 
+    /// @custom:delay None
+    /// @custom:location SlippageCoverageVault
+    /// @dev Direction flip: raising `windowSeconds` slows the drain rate (tightening), so it lives on the
+    /// operational/no-delay path despite the `raise*` prefix.
+    function getRole__raiseWindowSeconds() internal pure returns (Role memory) {
+        bytes4 selector = ISlippageCoverageVault.raiseWindowSeconds.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: NO_DELAY,
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
+        });
+    }
+
+    /// @custom:delay High
+    /// @custom:location SlippageCoverageVault
+    /// @dev Direction flip: lowering `windowSeconds` speeds up the drain rate (loosening), so it lives on the
+    /// admin/high-delay path despite the `lower*` prefix.
+    function getRole__lowerWindowSeconds() internal view returns (Role memory) {
+        bytes4 selector = ISlippageCoverageVault.lowerWindowSeconds.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: HIGH_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
+        });
+    }
+
     /// @custom:delay High
     /// @custom:location SlippageCoverageVault
     function getRole__setMaxSlippageBps() internal view returns (Role memory) {
@@ -744,7 +774,7 @@ abstract contract RolesConfig is DeploymentConfig {
     }
 
     function getAllFunctionBasedRoles() internal view returns (Role[] memory) {
-        Role[] memory roles = new Role[](54);
+        Role[] memory roles = new Role[](56);
 
         // AssetRegistry
         roles[0] = getRole__setAssetConfig();
@@ -817,10 +847,12 @@ abstract contract RolesConfig is DeploymentConfig {
         roles[47] = getRole__lowerPullCapPerTx();
         roles[48] = getRole__raiseWindowCap();
         roles[49] = getRole__lowerWindowCap();
-        roles[50] = getRole__setMaxSlippageBps();
-        roles[51] = getRole__setOverrideMaxSlippageBps();
-        roles[52] = getRole__fundCoverage();
-        roles[53] = getRole__sweepSlippageCoverageVault();
+        roles[50] = getRole__raiseWindowSeconds();
+        roles[51] = getRole__lowerWindowSeconds();
+        roles[52] = getRole__setMaxSlippageBps();
+        roles[53] = getRole__setOverrideMaxSlippageBps();
+        roles[54] = getRole__fundCoverage();
+        roles[55] = getRole__sweepSlippageCoverageVault();
 
         return roles;
     }

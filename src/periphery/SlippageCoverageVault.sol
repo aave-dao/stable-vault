@@ -106,8 +106,7 @@ contract SlippageCoverageVault is AccessManaged, Multicall, ReentrancyGuardTrans
     }
 
     /// @inheritdoc ISlippageCoverageVault
-    function raiseWindowCap(address asset, uint256 newCap, uint64 windowSeconds) external override restricted {
-        require(windowSeconds > 0, Errors.InvalidParameter());
+    function raiseWindowCap(address asset, uint256 newCap) external override restricted {
         require(newCap <= type(uint128).max, Errors.InvalidAmount());
         Window memory w = _windowByAsset[asset];
         uint256 oldCap = w.cap;
@@ -115,23 +114,41 @@ contract SlippageCoverageVault is AccessManaged, Multicall, ReentrancyGuardTrans
         // Cast safe: bounded above by `newCap <= type(uint128).max`.
         // forge-lint: disable-next-line(unsafe-typecast)
         w.cap = uint128(newCap);
-        w.windowSeconds = windowSeconds;
         _windowByAsset[asset] = w;
-        emit WindowCapRaised(asset, oldCap, newCap, windowSeconds);
+        emit WindowCapRaised(asset, oldCap, newCap);
     }
 
     /// @inheritdoc ISlippageCoverageVault
-    function lowerWindowCap(address asset, uint256 newCap, uint64 windowSeconds) external override restricted {
-        require(windowSeconds > 0, Errors.InvalidParameter());
+    function lowerWindowCap(address asset, uint256 newCap) external override restricted {
         Window memory w = _windowByAsset[asset];
         uint256 oldCap = w.cap;
         require(newCap < oldCap, Errors.InvalidParameter());
         // Cast safe: bounded above by `newCap < oldCap` and `oldCap` (a `uint128`) fits in `uint128`.
         // forge-lint: disable-next-line(unsafe-typecast)
         w.cap = uint128(newCap);
-        w.windowSeconds = windowSeconds;
         _windowByAsset[asset] = w;
-        emit WindowCapLowered(asset, oldCap, newCap, windowSeconds);
+        emit WindowCapLowered(asset, oldCap, newCap);
+    }
+
+    /// @inheritdoc ISlippageCoverageVault
+    function raiseWindowSeconds(address asset, uint64 newWindowSeconds) external override restricted {
+        Window memory w = _windowByAsset[asset];
+        uint64 oldWindowSeconds = w.windowSeconds;
+        require(newWindowSeconds > oldWindowSeconds, Errors.InvalidParameter());
+        w.windowSeconds = newWindowSeconds;
+        _windowByAsset[asset] = w;
+        emit WindowSecondsRaised(asset, oldWindowSeconds, newWindowSeconds);
+    }
+
+    /// @inheritdoc ISlippageCoverageVault
+    function lowerWindowSeconds(address asset, uint64 newWindowSeconds) external override restricted {
+        require(newWindowSeconds > 0, Errors.InvalidParameter());
+        Window memory w = _windowByAsset[asset];
+        uint64 oldWindowSeconds = w.windowSeconds;
+        require(newWindowSeconds < oldWindowSeconds, Errors.InvalidParameter());
+        w.windowSeconds = newWindowSeconds;
+        _windowByAsset[asset] = w;
+        emit WindowSecondsLowered(asset, oldWindowSeconds, newWindowSeconds);
     }
 
     /// @inheritdoc ISlippageCoverageVault

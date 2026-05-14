@@ -225,7 +225,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     }
 
     function test_disablerProfile_hasTheExpectedRoles() public view {
-        uint64[] memory expected = new uint64[](16);
+        uint64[] memory expected = new uint64[](17);
         expected[0] = RolesConfig.getRole__rebalance().roleId;
         expected[1] = RolesConfig.getRole__removeStrategy().roleId;
         expected[2] = RolesConfig.getRole__rescueTokens().roleId;
@@ -242,6 +242,8 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         expected[13] = RolesConfig.getRole__removeSigner().roleId;
         expected[14] = RolesConfig.getRole__lowerPullCapPerTx().roleId;
         expected[15] = RolesConfig.getRole__lowerWindowCap().roleId;
+        // raiseWindowSeconds is tightening (longer window = slower rate), even though the prefix says raise.
+        expected[16] = RolesConfig.getRole__raiseWindowSeconds().roleId;
         _assertProfileHasExactlyTheseRoles(_getProfile__Disabler(), expected);
 
         for (uint256 i = 0; i < expected.length; i++) {
@@ -513,6 +515,16 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         );
         _assertTargetFunctionRole(
             target, ISlippageCoverageVault.lowerWindowCap.selector, RolesConfig.getRole__lowerWindowCap().roleId
+        );
+        _assertTargetFunctionRole(
+            target,
+            ISlippageCoverageVault.raiseWindowSeconds.selector,
+            RolesConfig.getRole__raiseWindowSeconds().roleId
+        );
+        _assertTargetFunctionRole(
+            target,
+            ISlippageCoverageVault.lowerWindowSeconds.selector,
+            RolesConfig.getRole__lowerWindowSeconds().roleId
         );
         _assertTargetFunctionRole(
             target, ISlippageCoverageVault.setMaxSlippageBps.selector, RolesConfig.getRole__setMaxSlippageBps().roleId

@@ -57,8 +57,10 @@ contract SwapperTest is TestWithHelpers {
         vm.startPrank(operator);
         _vault.raisePullCapPerTx(address(_mockGho), LARGE_CAP);
         _vault.raisePullCapPerTx(address(_mockUsdt), LARGE_CAP);
-        _vault.raiseWindowCap(address(_mockGho), LARGE_CAP, 1 days);
-        _vault.raiseWindowCap(address(_mockUsdt), LARGE_CAP, 1 days);
+        _vault.raiseWindowCap(address(_mockGho), LARGE_CAP);
+        _vault.raiseWindowSeconds(address(_mockGho), 1 days);
+        _vault.raiseWindowCap(address(_mockUsdt), LARGE_CAP);
+        _vault.raiseWindowSeconds(address(_mockUsdt), 1 days);
         // Allow up to 100% slippage in normal mode for the legacy slippage-coverage tests.
         _vault.setMaxSlippageBps(10_000);
         vm.stopPrank();

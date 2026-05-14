@@ -291,7 +291,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         address disablerProfile = _getProfile__Disabler();
         require(disablerProfile != address(0), "Disabler profile address not set");
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](16);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](17);
 
         roles[0] = RolesConfig.getRole__rebalance();
         roles[1] = RolesConfig.getRole__removeStrategy();
@@ -309,6 +309,9 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         roles[13] = RolesConfig.getRole__removeSigner();
         roles[14] = RolesConfig.getRole__lowerPullCapPerTx();
         roles[15] = RolesConfig.getRole__lowerWindowCap();
+        // `raiseWindowSeconds` is tightening (longer window = slower drain rate) — fits the Disabler's
+        // monotonic-tightening hook set despite the `raise*` prefix.
+        roles[16] = RolesConfig.getRole__raiseWindowSeconds();
 
         _grantRolesToProfile(disablerProfile, roles);
     }
@@ -421,7 +424,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     function _setupTarget__SlippageCoverageVault(address deployer) internal {
         address slippageCoverageVault = getSlippageCoverageVaultAddress(deployer);
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](10);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](12);
 
         roles[0] = RolesConfig.getRole__enableOverrideMode();
         roles[1] = RolesConfig.getRole__disableOverrideMode();
@@ -429,10 +432,12 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         roles[3] = RolesConfig.getRole__lowerPullCapPerTx();
         roles[4] = RolesConfig.getRole__raiseWindowCap();
         roles[5] = RolesConfig.getRole__lowerWindowCap();
-        roles[6] = RolesConfig.getRole__setMaxSlippageBps();
-        roles[7] = RolesConfig.getRole__setOverrideMaxSlippageBps();
-        roles[8] = RolesConfig.getRole__fundCoverage();
-        roles[9] = RolesConfig.getRole__sweepSlippageCoverageVault();
+        roles[6] = RolesConfig.getRole__raiseWindowSeconds();
+        roles[7] = RolesConfig.getRole__lowerWindowSeconds();
+        roles[8] = RolesConfig.getRole__setMaxSlippageBps();
+        roles[9] = RolesConfig.getRole__setOverrideMaxSlippageBps();
+        roles[10] = RolesConfig.getRole__fundCoverage();
+        roles[11] = RolesConfig.getRole__sweepSlippageCoverageVault();
 
         _setTargetFunctionRoles(slippageCoverageVault, roles);
     }

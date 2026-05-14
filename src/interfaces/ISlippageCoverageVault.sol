@@ -47,10 +47,16 @@ interface ISlippageCoverageVault {
     event Swept(address indexed asset, address indexed to, uint256 amount);
 
     /// @notice Emitted when the window cap for an asset is lowered.
-    event WindowCapLowered(address indexed asset, uint256 oldCap, uint256 newCap, uint64 windowSeconds);
+    event WindowCapLowered(address indexed asset, uint256 oldCap, uint256 newCap);
 
     /// @notice Emitted when the window cap for an asset is raised.
-    event WindowCapRaised(address indexed asset, uint256 oldCap, uint256 newCap, uint64 windowSeconds);
+    event WindowCapRaised(address indexed asset, uint256 oldCap, uint256 newCap);
+
+    /// @notice Emitted when the window length (in seconds) for an asset is lowered.
+    event WindowSecondsLowered(address indexed asset, uint64 oldWindowSeconds, uint64 newWindowSeconds);
+
+    /// @notice Emitted when the window length (in seconds) for an asset is raised.
+    event WindowSecondsRaised(address indexed asset, uint64 oldWindowSeconds, uint64 newWindowSeconds);
 
     /// @notice Thrown when an `enableOverrideMode` call is made while override mode is already enabled.
     error AlreadyEnabled();
@@ -94,12 +100,23 @@ interface ISlippageCoverageVault {
     /// @notice Lowers the per-tx cap for an asset. Reverts if `newCap >= current`.
     function lowerPullCapPerTx(address asset, uint256 newCap) external;
 
-    /// @notice Raises the window cap for an asset. Reverts if `newCap <= current` or `windowSeconds == 0`.
-    /// @dev `windowSeconds` always replaces the current window length, regardless of direction.
-    function raiseWindowCap(address asset, uint256 newCap, uint64 windowSeconds) external;
+    /// @notice Raises the window cap for an asset. Reverts if `newCap <= current`. Preserves `windowSeconds`.
+    function raiseWindowCap(address asset, uint256 newCap) external;
 
-    /// @notice Lowers the window cap for an asset. Reverts if `newCap >= current` or `windowSeconds == 0`.
-    function lowerWindowCap(address asset, uint256 newCap, uint64 windowSeconds) external;
+    /// @notice Lowers the window cap for an asset. Reverts if `newCap >= current`. Preserves `windowSeconds`.
+    function lowerWindowCap(address asset, uint256 newCap) external;
+
+    /// @notice Raises the window length (in seconds) for an asset, lengthening the window.
+    /// @dev Counter-intuitive risk direction: raising `windowSeconds` SLOWS the drain rate (same cap, more time)
+    /// and is therefore a **tightening** action, gated on the operational/no-delay path. Reverts if
+    /// `newWindowSeconds <= current`. Preserves `cap`.
+    function raiseWindowSeconds(address asset, uint64 newWindowSeconds) external;
+
+    /// @notice Lowers the window length (in seconds) for an asset, shortening the window.
+    /// @dev Counter-intuitive risk direction: lowering `windowSeconds` SPEEDS UP the drain rate (same cap, less
+    /// time) and is therefore a **loosening** action, gated on the admin/high-delay path. Reverts if
+    /// `newWindowSeconds >= current`. Preserves `cap`.
+    function lowerWindowSeconds(address asset, uint64 newWindowSeconds) external;
 
     /// @notice Sets the normal-mode max slippage tolerance in basis points.
     function setMaxSlippageBps(uint16 newBps) external;

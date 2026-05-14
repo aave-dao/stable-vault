@@ -336,7 +336,9 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         vm.prank(operator);
         _vault.raisePullCapPerTx(address(_usdc), 1_000e6);
         vm.prank(operator);
-        _vault.raiseWindowCap(address(_usdc), 1_000e6, 1);
+        _vault.raiseWindowCap(address(_usdc), 1_000e6);
+        vm.prank(operator);
+        _vault.raiseWindowSeconds(address(_usdc), 1);
         _fund(_usdc, 100_000e6);
 
         for (uint256 i = 0; i < 10; i++) {
@@ -353,7 +355,9 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         vm.prank(operator);
         _vault.raisePullCapPerTx(address(_usdc), LARGE_CAP);
         vm.prank(operator);
-        _vault.raiseWindowCap(address(_usdc), 10_000e6, type(uint64).max);
+        _vault.raiseWindowCap(address(_usdc), 10_000e6);
+        vm.prank(operator);
+        _vault.raiseWindowSeconds(address(_usdc), type(uint64).max);
         _fund(_usdc, 100_000e6);
 
         vm.prank(beneficiary);
@@ -382,7 +386,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
         // Raise window cap to 20k mid-window.
         vm.prank(operator);
-        _vault.raiseWindowCap(address(_usdc), 20_000e6, ONE_DAY);
+        _vault.raiseWindowCap(address(_usdc), 20_000e6);
 
         // Now an additional 10k is allowed (consumed not reset).
         vm.prank(beneficiary);
@@ -404,7 +408,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
         // Lower window cap to 1k. consumed=5k > new cap=1k.
         vm.prank(operator);
-        _vault.lowerWindowCap(address(_usdc), 1_000e6, ONE_DAY);
+        _vault.lowerWindowCap(address(_usdc), 1_000e6);
 
         // Any pull reverts: consumed (5k) + amount > cap (1k).
         vm.expectRevert(abi.encodeWithSelector(ISlippageCoverageVault.ExceedsWindowCap.selector));
@@ -418,7 +422,8 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         assertEq(_vault.getWindow(address(_usdc)).consumed, 1_000e6);
     }
 
-    /// @dev windowSeconds shrunk mid-window via lowerWindowCap: the new windowSeconds applies on next rollover check.
+    /// @dev windowSeconds shrunk mid-window via lowerWindowSeconds: the new windowSeconds applies on next rollover
+    /// check.
     function test_pullCoverage_windowSecondsShrunkMidWindow_rollsOverSooner() public {
         _configureUsdcCaps(50_000e6, 10_000e6, ONE_DAY);
         _fund(_usdc, 100_000e6);
@@ -427,10 +432,12 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 10_000e6);
 
-        // Half a day in, lower window to 1k cap with 1 hour windowSeconds.
+        // Half a day in, lower window to 1k cap and shorten window to 1 hour.
         vm.warp(t0 + ONE_DAY / 2);
         vm.prank(operator);
-        _vault.lowerWindowCap(address(_usdc), 1_000e6, 1 hours);
+        _vault.lowerWindowCap(address(_usdc), 1_000e6);
+        vm.prank(operator);
+        _vault.lowerWindowSeconds(address(_usdc), 1 hours);
 
         // 1h after t0 has already passed → next pull rolls over (windowStart + 1h ≤ now).
         vm.prank(operator);
@@ -655,66 +662,101 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
     function test_raiseWindowCap_setsAndEmits() public {
         vm.expectEmit(true, false, false, true);
-        emit ISlippageCoverageVault.WindowCapRaised(address(_usdc), 0, 50_000e6, ONE_DAY);
+        emit ISlippageCoverageVault.WindowCapRaised(address(_usdc), 0, 50_000e6);
         vm.prank(operator);
-        _vault.raiseWindowCap(address(_usdc), 50_000e6, ONE_DAY);
+        _vault.raiseWindowCap(address(_usdc), 50_000e6);
 
         ISlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
         assertEq(w.cap, 50_000e6);
-        assertEq(w.windowSeconds, ONE_DAY);
-    }
-
-    function test_raiseWindowCap_reverts_ifWindowSecondsZero() public {
-        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidParameter.selector));
-        vm.prank(operator);
-        _vault.raiseWindowCap(address(_usdc), 50_000e6, 0);
     }
 
     function test_raiseWindowCap_reverts_ifNewCapExceedsUint128Max() public {
         vm.expectRevert(abi.encodeWithSelector(Errors.InvalidAmount.selector));
         vm.prank(operator);
-        _vault.raiseWindowCap(address(_usdc), uint256(type(uint128).max) + 1, ONE_DAY);
+        _vault.raiseWindowCap(address(_usdc), uint256(type(uint128).max) + 1);
     }
 
     function test_raiseWindowCap_reverts_ifNotIncreasing() public {
         vm.prank(operator);
-        _vault.raiseWindowCap(address(_usdc), 50_000e6, ONE_DAY);
+        _vault.raiseWindowCap(address(_usdc), 50_000e6);
 
         vm.expectRevert(abi.encodeWithSelector(Errors.InvalidParameter.selector));
         vm.prank(operator);
-        _vault.raiseWindowCap(address(_usdc), 50_000e6, ONE_DAY);
+        _vault.raiseWindowCap(address(_usdc), 50_000e6);
     }
 
     function test_lowerWindowCap_setsAndEmits() public {
         vm.prank(operator);
-        _vault.raiseWindowCap(address(_usdc), 50_000e6, ONE_DAY);
+        _vault.raiseWindowCap(address(_usdc), 50_000e6);
 
         vm.expectEmit(true, false, false, true);
-        emit ISlippageCoverageVault.WindowCapLowered(address(_usdc), 50_000e6, 10_000e6, 1 hours);
+        emit ISlippageCoverageVault.WindowCapLowered(address(_usdc), 50_000e6, 10_000e6);
         vm.prank(operator);
-        _vault.lowerWindowCap(address(_usdc), 10_000e6, 1 hours);
+        _vault.lowerWindowCap(address(_usdc), 10_000e6);
 
         ISlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
         assertEq(w.cap, 10_000e6);
-        assertEq(w.windowSeconds, 1 hours);
     }
 
     function test_lowerWindowCap_reverts_ifNotDecreasing() public {
         vm.prank(operator);
-        _vault.raiseWindowCap(address(_usdc), 50_000e6, ONE_DAY);
+        _vault.raiseWindowCap(address(_usdc), 50_000e6);
 
         vm.expectRevert(abi.encodeWithSelector(Errors.InvalidParameter.selector));
         vm.prank(operator);
-        _vault.lowerWindowCap(address(_usdc), 50_000e6, ONE_DAY);
+        _vault.lowerWindowCap(address(_usdc), 50_000e6);
     }
 
-    function test_lowerWindowCap_reverts_ifWindowSecondsZero() public {
+    /* ============================ Setters: windowSeconds ============================ */
+
+    function test_raiseWindowSeconds_setsAndEmits() public {
+        vm.expectEmit(true, false, false, true);
+        emit ISlippageCoverageVault.WindowSecondsRaised(address(_usdc), 0, uint64(ONE_DAY));
         vm.prank(operator);
-        _vault.raiseWindowCap(address(_usdc), 50_000e6, ONE_DAY);
+        _vault.raiseWindowSeconds(address(_usdc), uint64(ONE_DAY));
+
+        ISlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
+        assertEq(w.windowSeconds, ONE_DAY);
+    }
+
+    function test_raiseWindowSeconds_reverts_ifNotIncreasing() public {
+        vm.prank(operator);
+        _vault.raiseWindowSeconds(address(_usdc), uint64(ONE_DAY));
 
         vm.expectRevert(abi.encodeWithSelector(Errors.InvalidParameter.selector));
         vm.prank(operator);
-        _vault.lowerWindowCap(address(_usdc), 10_000e6, 0);
+        _vault.raiseWindowSeconds(address(_usdc), uint64(ONE_DAY));
+    }
+
+    function test_lowerWindowSeconds_setsAndEmits() public {
+        vm.prank(operator);
+        _vault.raiseWindowSeconds(address(_usdc), uint64(ONE_DAY));
+
+        vm.expectEmit(true, false, false, true);
+        emit ISlippageCoverageVault.WindowSecondsLowered(address(_usdc), uint64(ONE_DAY), 1 hours);
+        vm.prank(operator);
+        _vault.lowerWindowSeconds(address(_usdc), 1 hours);
+
+        ISlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
+        assertEq(w.windowSeconds, 1 hours);
+    }
+
+    function test_lowerWindowSeconds_reverts_ifNotDecreasing() public {
+        vm.prank(operator);
+        _vault.raiseWindowSeconds(address(_usdc), uint64(ONE_DAY));
+
+        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidParameter.selector));
+        vm.prank(operator);
+        _vault.lowerWindowSeconds(address(_usdc), uint64(ONE_DAY));
+    }
+
+    function test_lowerWindowSeconds_reverts_ifZero() public {
+        vm.prank(operator);
+        _vault.raiseWindowSeconds(address(_usdc), uint64(ONE_DAY));
+
+        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidParameter.selector));
+        vm.prank(operator);
+        _vault.lowerWindowSeconds(address(_usdc), 0);
     }
 
     /* ============================ Setters: slippage bounds ============================ */
@@ -914,11 +956,14 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         MockReentrantErc20 hostile = new MockReentrantErc20("Hostile", "H", 18);
         _accessManager.mockAllowCall(operator, address(_vault), ISlippageCoverageVault.raisePullCapPerTx.selector);
         _accessManager.mockAllowCall(operator, address(_vault), ISlippageCoverageVault.raiseWindowCap.selector);
+        _accessManager.mockAllowCall(operator, address(_vault), ISlippageCoverageVault.raiseWindowSeconds.selector);
 
         vm.prank(operator);
         _vault.raisePullCapPerTx(address(hostile), LARGE_CAP);
         vm.prank(operator);
-        _vault.raiseWindowCap(address(hostile), LARGE_CAP, ONE_DAY);
+        _vault.raiseWindowCap(address(hostile), LARGE_CAP);
+        vm.prank(operator);
+        _vault.raiseWindowSeconds(address(hostile), ONE_DAY);
 
         hostile.mint(address(_vault), 1_000e18);
 
@@ -997,9 +1042,11 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 5_000e6);
 
-        // Shrink windowSeconds to 1 hour.
+        // Lower the cap and shrink windowSeconds to 1 hour.
         vm.prank(operator);
-        _vault.lowerWindowCap(address(_usdc), 4_999e6, 1 hours);
+        _vault.lowerWindowCap(address(_usdc), 4_999e6);
+        vm.prank(operator);
+        _vault.lowerWindowSeconds(address(_usdc), 1 hours);
 
         // Warp 1 hour after t0 → rollover triggers (now >= t0 + 1h).
         vm.warp(t0 + 1 hours);
@@ -1046,7 +1093,9 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         vm.prank(operator);
         _vault.raisePullCapPerTx(address(_usdc), LARGE_CAP);
         vm.prank(operator);
-        _vault.raiseWindowCap(address(_usdc), LARGE_CAP, ONE_DAY);
+        _vault.raiseWindowCap(address(_usdc), LARGE_CAP);
+        vm.prank(operator);
+        _vault.raiseWindowSeconds(address(_usdc), ONE_DAY);
         _fund(_usdc, type(uint128).max);
 
         // Fill the bucket.
@@ -1083,14 +1132,18 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         vm.prank(operator);
         _vault.raisePullCapPerTx(address(_usdc), perTxCap);
         vm.prank(operator);
-        _vault.raiseWindowCap(address(_usdc), windowCap, windowSeconds);
+        _vault.raiseWindowCap(address(_usdc), windowCap);
+        vm.prank(operator);
+        _vault.raiseWindowSeconds(address(_usdc), windowSeconds);
     }
 
     function _configureGhoCaps(uint256 perTxCap, uint256 windowCap, uint64 windowSeconds) internal {
         vm.prank(operator);
         _vault.raisePullCapPerTx(address(_gho), perTxCap);
         vm.prank(operator);
-        _vault.raiseWindowCap(address(_gho), windowCap, windowSeconds);
+        _vault.raiseWindowCap(address(_gho), windowCap);
+        vm.prank(operator);
+        _vault.raiseWindowSeconds(address(_gho), windowSeconds);
     }
 
     function _fund(MockErc20 token, uint256 amount) internal {

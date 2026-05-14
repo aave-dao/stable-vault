@@ -129,8 +129,10 @@ contract OwnedMulticallTest is TestWithHelpers {
         vm.startPrank(everyRoleAccount);
         _slippageVault.raisePullCapPerTx(address(_mockGho), LARGE_CAP);
         _slippageVault.raisePullCapPerTx(address(_mockUsdt), LARGE_CAP);
-        _slippageVault.raiseWindowCap(address(_mockGho), LARGE_CAP, 1 days);
-        _slippageVault.raiseWindowCap(address(_mockUsdt), LARGE_CAP, 1 days);
+        _slippageVault.raiseWindowCap(address(_mockGho), LARGE_CAP);
+        _slippageVault.raiseWindowSeconds(address(_mockGho), 1 days);
+        _slippageVault.raiseWindowCap(address(_mockUsdt), LARGE_CAP);
+        _slippageVault.raiseWindowSeconds(address(_mockUsdt), 1 days);
         _slippageVault.setMaxSlippageBps(10_000);
         vm.stopPrank();
 
