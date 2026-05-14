@@ -25,7 +25,7 @@ contract AllocatorInteractionScript is InteractionBaseScript {
         rebalanceParams[0] = rebalanceParam;
 
         vm.startBroadcast(vm.envUint("ADMIN_PRIVATE_KEY"));
-        IAllocator(allocator).rebalance(rebalanceParams);
+        IAllocator(allocator).rebalance(rebalanceParams, "");
         vm.stopBroadcast();
     }
 }

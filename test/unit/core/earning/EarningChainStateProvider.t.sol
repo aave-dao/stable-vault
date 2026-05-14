@@ -10,6 +10,7 @@ import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {EarningChainStateProvider} from "src/periphery/EarningChainStateProvider.sol";
 import {EarningChainStateSchemaV1} from "src/periphery/EarningChainStateSchemaV1.sol";
+import {PolicyRegistry} from "src/periphery/PolicyRegistry.sol";
 
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
 import {MockAccessManager} from "test/mocks/MockAccessManager.sol";
@@ -48,7 +49,7 @@ contract EarningChainStateProviderTest is TestWithHelpers {
 
         MockDummyIouTokenManager mockIouTokenManager = new MockDummyIouTokenManager();
 
-        address withdrawalPolicy = makeAddr("withdrawalPolicy");
+        PolicyRegistry policyRegistry = new PolicyRegistry(address(_mockAccessManager));
 
         address earningChainGatewayImpl = address(
             new EarningChainGateway(
@@ -57,7 +58,7 @@ contract EarningChainStateProviderTest is TestWithHelpers {
                 _priceOracle,
                 address(mockIouTokenManager),
                 address(_mockTransferHelper),
-                withdrawalPolicy,
+                address(policyRegistry),
                 120_000
             )
         );

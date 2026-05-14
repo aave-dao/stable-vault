@@ -19,7 +19,7 @@
     "aTokenVaultRewardClaimer": "0xE49D14D7157412da6145a155DaeFdD1cA069f626",
     "stableVaultManager": "0x4B0353F7B7122862487d22C447bd9cDc91779133"
   },
-  "withdrawalPolicy": {
+  "withdrawalExecutionPolicy": {
     "defaultFeeBps": 625,
     "signer": "0x8eFCe8C8cF3d1B198D95B3067EcF43Fb0A1039e2"
   },
@@ -38,6 +38,16 @@
     },
     "ccipRouterAddress": "0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D",
     "aaveV3PoolAddressesProvider": "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e",
+    "fundsBridgingPolicy": {
+      "perAssetLimits": {
+        "gho": {
+          "capacity": "1000000000000000000000000",
+          "refillRate": "11574074074074074074"
+        },
+        "usdc": { "capacity": "1000000000000", "refillRate": "11574074" },
+        "usdt": { "capacity": "1000000000000", "refillRate": "11574074" }
+      }
+    },
     "deploymentOutputPath": "deployments/vnet/v0.3/earning.json",
     "minBurnIouTokenGasLimit": "120000"
   },
@@ -65,6 +75,26 @@
     "useMockSequencerUptimeFeed": true,
     "chainlinkBundleAggregatorProxy": "0x0000000000000000000000000000000000000000",
     "sequencerUptimeFeed": "0x0000000000000000000000000000000000000000",
+    "depositPolicy": {
+      "perAssetLimits": {
+        "gho": {
+          "capacity": "1000000000000000000000000",
+          "refillRate": "11574074074074074074"
+        },
+        "usdc": { "capacity": "1000000000000", "refillRate": "11574074" },
+        "usdt": { "capacity": "1000000000000", "refillRate": "11574074" }
+      }
+    },
+    "fundsBridgingPolicy": {
+      "perAssetLimits": {
+        "gho": {
+          "capacity": "1000000000000000000000000",
+          "refillRate": "11574074074074074074"
+        },
+        "usdc": { "capacity": "1000000000000", "refillRate": "11574074" },
+        "usdt": { "capacity": "1000000000000", "refillRate": "11574074" }
+      }
+    },
     "deploymentOutputPath": "deployments/vnet/v0.3/accounting.json"
   }
 }
