@@ -359,7 +359,8 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
                 priceOracle: getPriceOracleAddress(_deployer()),
                 iouTokenManager: getIouTokenManagerAddress(_deployer()),
                 transferHelper: getTransferHelperAddress(_deployer()),
-                policyRegistry: getPolicyRegistryAddress(_deployer())
+                policyRegistry: getPolicyRegistryAddress(_deployer()),
+                minBurnIouTokenGasLimit: _configUint(".earningChain.minBurnIouTokenGasLimit")
             })
         );
         _logDeployment("EarningChainGateway::Implementation", "", implementation);

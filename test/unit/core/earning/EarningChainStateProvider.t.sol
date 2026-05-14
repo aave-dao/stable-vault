@@ -58,7 +58,8 @@ contract EarningChainStateProviderTest is TestWithHelpers {
                 _priceOracle,
                 address(mockIouTokenManager),
                 address(_mockTransferHelper),
-                address(policyRegistry)
+                address(policyRegistry),
+                120_000
             )
         );
         _earningChainGateway = EarningChainGateway(

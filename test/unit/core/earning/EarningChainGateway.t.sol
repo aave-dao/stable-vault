@@ -81,7 +81,13 @@ contract EarningChainGatewayTest is TestWithHelpers {
     ) internal returns (EarningChainGateway) {
         address earningChainGatewayImpl = address(
             new EarningChainGateway(
-                ACCOUNTING_CHAIN_ID, allocator, priceOracle, iouTokenManager, transferHelper, policyRegistry
+                ACCOUNTING_CHAIN_ID,
+                allocator,
+                priceOracle,
+                iouTokenManager,
+                transferHelper,
+                policyRegistry,
+                BURN_IOU_TOKEN_GAS_LIMIT
             )
         );
         EarningChainGateway earningChainGateway = EarningChainGateway(
@@ -178,7 +184,21 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_priceOracle),
             address(_mockIouTokenManager),
             address(0),
-            address(_policyRegistry)
+            address(_policyRegistry),
+            BURN_IOU_TOKEN_GAS_LIMIT
+        );
+    }
+
+    function test_constructor_reverts_ifPolicyRegistryIsZeroAddress() public {
+        vm.expectRevert(Errors.ZeroAddress.selector);
+        new EarningChainGateway(
+            ACCOUNTING_CHAIN_ID,
+            address(_mockAllocator),
+            address(_priceOracle),
+            address(_mockIouTokenManager),
+            address(_mockTransferHelper),
+            address(0),
+            BURN_IOU_TOKEN_GAS_LIMIT
         );
     }
 
@@ -190,7 +210,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_priceOracle),
             address(_mockIouTokenManager),
             address(_mockTransferHelper),
-            address(_policyRegistry)
+            address(_policyRegistry),
+            BURN_IOU_TOKEN_GAS_LIMIT
         );
     }
 
@@ -202,7 +223,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_priceOracle),
             address(_mockIouTokenManager),
             address(_mockTransferHelper),
-            address(_policyRegistry)
+            address(_policyRegistry),
+            BURN_IOU_TOKEN_GAS_LIMIT
         );
     }
 
@@ -214,8 +236,26 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_priceOracle),
             address(0),
             address(_mockTransferHelper),
-            address(_policyRegistry)
+            address(_policyRegistry),
+            BURN_IOU_TOKEN_GAS_LIMIT
         );
+    }
+
+    function test_constructor_reverts_ifMinBurnIouTokenGasLimitIsZero() public {
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        new EarningChainGateway(
+            ACCOUNTING_CHAIN_ID,
+            address(_mockAllocator),
+            address(_priceOracle),
+            address(_mockIouTokenManager),
+            address(_mockTransferHelper),
+            address(_policyRegistry),
+            0
+        );
+    }
+
+    function test_constructor_setsMinBurnIouTokenGasLimit_immutable() public view {
+        assertEq(_earningChainGateway.MIN_BURN_IOU_TOKEN_GAS_LIMIT(), BURN_IOU_TOKEN_GAS_LIMIT);
     }
 
     function test_getIouTokenManager_returnsExpectedIouTokenManager() public view {

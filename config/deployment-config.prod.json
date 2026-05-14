@@ -48,7 +48,8 @@
         "usdt": { "capacity": "1000000000000", "refillRate": "11574074" }
       }
     },
-    "deploymentOutputPath": "deployments/prod/v1/earning.json"
+    "deploymentOutputPath": "deployments/prod/v1/earning.json",
+    "minBurnIouTokenGasLimit": "120000"
   },
   "accountingChain": {
     "chainId": 42161,
