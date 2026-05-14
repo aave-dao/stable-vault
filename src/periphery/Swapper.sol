@@ -51,9 +51,6 @@ contract Swapper is Ownable, ReentrancyGuard, ISwapper {
         uint16 maxBps = ISlippageCoverageVault(SLIPPAGE_VAULT).getEffectiveMaxSlippageBps();
         require(slippageToleranceBps <= maxBps, ISwapper.SlippageToleranceTooHigh());
 
-        // Snapshot pre-loop `assetIn` balance so any pre-existing donation is not swept back to msg.sender below.
-        uint256 assetInBefore = IERC20(assetIn).balanceOf(address(this));
-
         // Targets cannot be the bound vault, otherwise the loop could call `pullCoverage` directly.
         for (uint256 i = 0; i < targets.length; i++) {
             require(targets[i] != SLIPPAGE_VAULT, ISwapper.BadTarget());
@@ -77,11 +74,16 @@ contract Swapper is Ownable, ReentrancyGuard, ISwapper {
             amountOut = expectedAmountOut;
         }
 
-        // Sweep any unconsumed `assetIn` back to msg.sender (the Allocator). The pre-loop snapshot excludes donations
-        // sitting on the contract before this call. A non-zero sweep means a venue under-consumed `amountIn`; it does
-        // not prevent a compromised rebalancer from redirecting `assetIn` through a venue with a recipient parameter
-        // (bounded by `maxSlippageBps × amountIn` per call, plus the vault's per-tx + window caps; monitor for both).
-        _sweepUnconsumedAssetIn(assetIn, assetInBefore, amountIn);
+        // Sweep any `assetIn` left on the contract back to msg.sender (the Allocator). Covers both under-consumed
+        // `amountIn` and any pre-existing donation of the same asset — the Allocator has a rescue path, the Swapper
+        // does not, so pushing everything out is the safer default. Does not prevent a compromised rebalancer from
+        // redirecting `assetIn` through a venue with a recipient parameter (bounded by `maxSlippageBps × amountIn`
+        // per call plus the vault's per-tx + window caps; monitor for both).
+        uint256 leftover = IERC20(assetIn).balanceOf(address(this));
+        if (leftover > 0) {
+            IERC20(assetIn).safeTransfer(msg.sender, leftover);
+            emit ISwapper.AssetInSwept(assetIn, leftover);
+        }
 
         // Approve funds to be pulled by the caller i.e. the owner of the Swapper.
         IERC20(assetOut).forceApprove(msg.sender, amountOut);
@@ -92,18 +94,6 @@ contract Swapper is Ownable, ReentrancyGuard, ISwapper {
     /// @inheritdoc ISwapper
     function getSlippageVault() external view override returns (address) {
         return SLIPPAGE_VAULT;
-    }
-
-    /// @dev Sweeps unconsumed `assetIn` back to the caller (the Allocator). Extracted to keep `executeSwap`'s stack
-    /// depth under the limit; the snapshot baseline excludes pre-existing donations.
-    function _sweepUnconsumedAssetIn(address assetIn, uint256 assetInBefore, uint256 amountIn) internal {
-        uint256 unconsumed = IERC20(assetIn).balanceOf(address(this));
-        uint256 baseline = assetInBefore - amountIn;
-        if (unconsumed > baseline) {
-            uint256 leftover = unconsumed - baseline;
-            IERC20(assetIn).safeTransfer(msg.sender, leftover);
-            emit ISwapper.AssetInSwept(assetIn, leftover);
-        }
     }
 
     function _minToleratedAmountOut(uint256 expectedAmountOut, uint16 slippageToleranceBps)

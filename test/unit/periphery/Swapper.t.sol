@@ -368,30 +368,36 @@ contract SwapperTest is TestWithHelpers {
         assertEq(_mockUsdt.balanceOf(address(_swapper)), 0, "assetIn still on swapper");
     }
 
-    /// @dev Sweep must be immune to dust donations: an attacker who pre-funds the Swapper with a small amount of
-    /// `assetIn` before the rebalance broadcasts cannot brick the call nor get those tokens swept to the Allocator.
-    /// The pre-loop snapshot excludes the donation from the sweep baseline; the donation remains on the Swapper.
+    /// @dev Donations of the same asset as `assetIn` are swept to the Allocator on the next rebalance — the Swapper
+    /// has no rescue path of its own, so pushing everything out is the safer default. An attacker who pre-funds the
+    /// Swapper with `assetIn` before a rebalance therefore donates those tokens to the protocol; not a grief
+    /// (no funds lost), and not a swap-flow inflation (the swap accounting is unchanged).
     function test_executeSwap_succeeds_whenAssetInDonatedBeforeCall(uint256 donation) public {
         uint256 amountIn = 100;
         donation = bound(donation, 1, 1_000_000); // arbitrary non-zero donation
         uint256 minAmountOut = amountIn.convertAssetDecimals(address(_mockUsdt), address(_mockGho));
         vm.assume(minAmountOut > 0);
 
-        // Pre-fund the Swapper with `donation` of assetIn (the grief).
+        // Pre-fund the Swapper with `donation` of assetIn (the would-be grief).
         _mockUsdt.mint(address(_swapper), donation);
 
         _mockTransferIntoSwapper(_mockUsdt, amountIn);
         _seedOutputToken(_mockGho, minAmountOut);
         _setSlippageBps(0);
 
+        uint256 allocatorAssetInBefore = _mockUsdt.balanceOf(allocator);
+
         bytes memory data =
             _encodeDexSwapExactInputData(address(_mockUsdt), address(_mockGho), amountIn, minAmountOut, 0);
+        vm.expectEmit(true, false, false, true, address(_swapper));
+        emit ISwapper.AssetInSwept(address(_mockUsdt), donation);
         vm.prank(allocator);
         uint256 actualAmountOut =
             _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
 
-        // `amountIn` was consumed by the DEX; the donation remains stuck on the Swapper but does not block the swap.
-        assertEq(IERC20(_mockUsdt).balanceOf(address(_swapper)), donation);
+        // The DEX consumed `amountIn` and the donation was swept to the Allocator; the Swapper holds nothing.
+        assertEq(_mockUsdt.balanceOf(address(_swapper)), 0, "donation not swept off the swapper");
+        assertEq(_mockUsdt.balanceOf(allocator) - allocatorAssetInBefore, donation, "donation not landed on allocator");
         assertEq(actualAmountOut, minAmountOut);
     }
 
