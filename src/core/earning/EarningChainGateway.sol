@@ -11,9 +11,11 @@ import {LocalBalanceAggregator} from "src/core/LocalBalanceAggregator.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
+import {IFundsBridgingPolicy} from "src/interfaces/IFundsBridgingPolicy.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
+import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
-import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
+import {IWithdrawalExecutionPolicy} from "src/interfaces/IWithdrawalExecutionPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
 import {Constants} from "src/types/Constants.sol";
@@ -32,15 +34,18 @@ contract EarningChainGateway is
 {
     using AssetLib for uint256;
 
-    /// @notice Minimum destination gas limit required for the Accounting Chain to process a
-    /// `BURN_IOU_TOKEN` message.
-    /// @dev Set to 120k gas units based on gas-snapshot tests of the full destination execution path.
-    /// The gas tests measured ~106.6k gas consumed and about 110k as the minimum exact-gas
-    /// value that succeeds under `CallWithExactGas` delivery semantics. 120k adds around 10% safety margin on top.
-    uint256 internal constant MIN_BURN_IOU_TOKEN_GAS_LIMIT = 120_000;
+    /// @notice Minimum destination gas limit required for the Accounting Chain to process a `BURN_IOU_TOKEN` message.
+    /// @dev Configured at deploy time so the value can be tuned per chain pair without source changes.
+    uint256 public immutable MIN_BURN_IOU_TOKEN_GAS_LIMIT;
 
     uint256 internal immutable ACCOUNTING_CHAIN_ID;
-    address internal immutable WITHDRAWAL_POLICY;
+    address internal immutable POLICY_REGISTRY;
+
+    // keccak256("aave.stable-vault.EarningChainGateway.policy.bridge")
+    bytes32 internal constant BRIDGE_POLICY_ID = 0x537fb58e71f5b54dc09d8afff5cbf9bf5e630233f65f0531590f8cfa4a81bc6c;
+    // keccak256("aave.stable-vault.EarningChainGateway.policy.withdrawal-execution")
+    bytes32 internal constant WITHDRAWAL_EXECUTION_POLICY_ID =
+        0xf213893b1e253163c05de458d1c9283d3155b096d439aab98ea90b491dce4bfb;
 
     /// @dev Constructor.
     /// @param accountingChainId The Chain ID of the Accounting Chain.
@@ -49,24 +54,29 @@ contract EarningChainGateway is
     /// @param iouTokenManager Address of the IOU token manager contract used to mint and burn bridged or exchanged IOU
     /// tokens.
     /// @param transferHelper Address of the TransferHelper contract used to transfer assets across components.
-    /// @param withdrawalPolicy Address of the contract ensuring protocol's withdrawal requirements are met.
+    /// @param policyRegistry Address of the PolicyRegistry contract used to look up policies by ID.
+    /// @param minBurnIouTokenGasLimit Minimum destination gas limit accepted on `exchangeIouTokens` for the
+    /// `BURN_IOU_TOKEN` message. Must be non-zero.
     constructor(
         uint256 accountingChainId,
         address allocator,
         address priceOracle,
         address iouTokenManager,
         address transferHelper,
-        address withdrawalPolicy
+        address policyRegistry,
+        uint256 minBurnIouTokenGasLimit
     )
         TransferHelperClient(transferHelper)
         BaseChainGateway(iouTokenManager)
         LocalBalanceAggregator(allocator, priceOracle)
     {
-        require(withdrawalPolicy != address(0), Errors.ZeroAddress());
+        require(policyRegistry != address(0), Errors.ZeroAddress());
         require(accountingChainId != 0 && accountingChainId != block.chainid, Errors.InvalidParameter());
+        require(minBurnIouTokenGasLimit > 0, Errors.InvalidParameter());
         _disableInitializers();
         ACCOUNTING_CHAIN_ID = accountingChainId;
-        WITHDRAWAL_POLICY = withdrawalPolicy;
+        POLICY_REGISTRY = policyRegistry;
+        MIN_BURN_IOU_TOKEN_GAS_LIMIT = minBurnIouTokenGasLimit;
     }
 
     /// @dev Initializer.
@@ -96,8 +106,8 @@ contract EarningChainGateway is
         address receiver,
         address bridgeAdapter,
         uint256 gasLimit,
-        bytes calldata bridgeParamsEncoded,
-        bytes memory withdrawalPolicyData
+        bytes calldata bridgeAdapterData,
+        bytes memory policyData
     ) external payable virtual override nonReentrant assertingTransferHelperBalanceFor(assetOut) returns (uint256) {
         require(iouTokenAmountRay > 0, Errors.ZeroAmount());
         // An insufficient destination gasLimit would cause the BURN_IOU_TOKEN message to be dropped while
@@ -105,7 +115,7 @@ contract EarningChainGateway is
         require(gasLimit >= MIN_BURN_IOU_TOKEN_GAS_LIMIT, Errors.InvalidGasLimit());
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(msg.sender, iouTokenAmountRay);
 
-        uint256 amountOut = _getWithdrawalAmountOut(iouTokenAmountRay, assetOut, minAmountOut, withdrawalPolicyData);
+        uint256 amountOut = _getWithdrawalAmountOut(iouTokenAmountRay, assetOut, minAmountOut, policyData);
         IAllocator(ALLOCATOR).withdraw(assetOut, amountOut);
 
         // Send data to synchronize the Accounting Chain's state.
@@ -118,7 +128,7 @@ contract EarningChainGateway is
         // accepted after the oracle snapshot reflects this outflow, preventing the reverse (obligations reduced while
         // assets are still overstated). Operators are expected to account for this transient state when scheduling
         // claimSurplusInterest() calls.
-        _sendBurnIouTokenMessage(iouTokenAmountRay, bridgeAdapter, msg.sender, gasLimit, bridgeParamsEncoded);
+        _sendBurnIouTokenMessage(iouTokenAmountRay, bridgeAdapter, msg.sender, gasLimit, bridgeAdapterData);
 
         ITransferHelper(TRANSFER_HELPER).transfer(assetOut, amountOut, receiver);
         emit AssetOutflow(assetOut, amountOut);
@@ -132,12 +142,14 @@ contract EarningChainGateway is
         uint256 amount,
         address bridgeAdapter,
         uint256 gasLimit,
-        bytes calldata bridgeParamsEncoded
+        bytes calldata bridgeAdapterData,
+        bytes calldata policyData
     ) external payable override restricted assertingTransferHelperBalanceFor(asset) {
         require(amount > 0, Errors.ZeroAmount());
+        _applyFundsBridgingPolicy(ACCOUNTING_CHAIN_ID, bridgeAdapter, asset, amount, policyData);
         // Pull funds from liquidity into the TransferHelper.
         IAllocator(ALLOCATOR).withdraw(asset, amount);
-        _returnFunds(asset, amount, bridgeAdapter, msg.sender, gasLimit, bridgeParamsEncoded);
+        _returnFunds(asset, amount, bridgeAdapter, msg.sender, gasLimit, bridgeAdapterData);
         emit AssetOutflow(asset, amount);
     }
 
@@ -176,7 +188,7 @@ contract EarningChainGateway is
         address bridgeAdapter,
         address feePayer,
         uint256 gasLimit,
-        bytes calldata bridgeParamsEncoded
+        bytes calldata bridgeAdapterData
     ) private {
         // Include the message block number (and timestamp metadata) so the Accounting Chain can verify the chain
         // balance snapshot includes this asset outflow.
@@ -196,7 +208,7 @@ contract EarningChainGateway is
             returnFundsMessageEncoded,
             feePayer,
             gasLimit,
-            bridgeParamsEncoded
+            bridgeAdapterData
         );
     }
 
@@ -204,17 +216,12 @@ contract EarningChainGateway is
         uint256 iouTokenAmountRay,
         address assetOut,
         uint256 minAmountOut,
-        bytes memory withdrawalPolicyData
+        bytes memory policyData
     ) private returns (uint256) {
-        uint256 amountOutRay = IWithdrawalPolicy(WITHDRAWAL_POLICY)
-            .applyWithdrawalPolicy(
-                IWithdrawalPolicy.WithdrawalRequest({
-                user: msg.sender, assetOut: assetOut, iouAmountRay: iouTokenAmountRay, data: withdrawalPolicyData
-            })
-            );
-        // Note: The rayToAssetDecimals conversion truncates, so the user may burn slightly more IOUs than the
-        // exact RAY-equivalent of the assets received. This "dust" loss is at most 10^(27-decimals)-1 RAY per
-        // withdrawal, which is economically negligible (e.g., <$0.000001 for 6-decimal stablecoins; it would take
+        uint256 amountOutRay = _applyWithdrawalExecutionPolicy(msg.sender, assetOut, iouTokenAmountRay, policyData);
+        // Note: The `rayToAssetDecimals` conversion truncates, so the user may burn slightly more IOUs than the
+        // exact RAY-equivalent of the assets received. This "dust" loss is at most `10 ^ (27 - assetDecimals) - 1` RAY
+        // per withdrawal, which is economically negligible (e.g., <$0.000001 for 6-decimal stablecoins; it would take
         // >1,000,000 withdrawals to accumulate $1 of loss). The gas cost of preventing this (~1,600 gas for an extra
         // conversion) exceeds the value of the dust, so we accept this minor rounding in favor of the protocol.
         uint256 amountOut = amountOutRay.rayToAssetDecimals(assetOut);
@@ -222,12 +229,56 @@ contract EarningChainGateway is
         return amountOut;
     }
 
+    function _applyWithdrawalExecutionPolicy(
+        address user,
+        address assetOut,
+        uint256 iouAmountRay,
+        bytes memory policyData
+    ) private returns (uint256) {
+        address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(WITHDRAWAL_EXECUTION_POLICY_ID);
+        if (policy == address(0)) {
+            return iouAmountRay;
+        }
+        uint256 amountOutRay = IWithdrawalExecutionPolicy(policy)
+            .applyWithdrawalExecutionPolicy(
+                IWithdrawalExecutionPolicy.WithdrawalExecutionIntent({
+                user: user, assetOut: assetOut, iouAmountRay: iouAmountRay, policyData: policyData
+            })
+            );
+        require(amountOutRay <= iouAmountRay, Errors.InvalidAmount());
+        return amountOutRay;
+    }
+
+    function _applyFundsBridgingPolicy(
+        uint256 destChainId,
+        address bridgeAdapter,
+        address asset,
+        uint256 amount,
+        bytes calldata policyData
+    ) internal {
+        address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(BRIDGE_POLICY_ID);
+        if (policy == address(0)) {
+            return;
+        }
+        IFundsBridgingPolicy(policy)
+            .applyFundsBridgingPolicy(
+                IFundsBridgingPolicy.FundsBridgingIntent({
+                caller: msg.sender,
+                bridgeAdapter: bridgeAdapter,
+                destChainId: destChainId,
+                asset: asset,
+                amount: amount,
+                policyData: policyData
+            })
+            );
+    }
+
     function _sendBurnIouTokenMessage(
         uint256 iouTokenAmountRay,
         address bridgeAdapter,
         address feePayer,
         uint256 gasLimit,
-        bytes calldata bridgeParamsEncoded
+        bytes calldata bridgeAdapterData
     ) private {
         // Prepare data to synchronize the Accounting Chain's state.
         // Include the message block number (and timestamp metadata) so the Accounting Chain can verify the chain
@@ -254,7 +305,7 @@ contract EarningChainGateway is
             burnIouTokenMessageEncoded,
             feePayer,
             gasLimit,
-            bridgeParamsEncoded
+            bridgeAdapterData
         );
     }
 }

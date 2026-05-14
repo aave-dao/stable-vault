@@ -37,7 +37,8 @@ interface IIouTokenManager {
     /// @return lockedBalance Locked balance of the IOU token.
     function getLockedBalance() external view returns (uint256);
 
-    /// @notice Entry point for IOU token owners to bridge tokens to a destination chain.
+    /// @notice Bridges the caller's IOU tokens to a destination chain. `msg.sender` is locked/burned and pays the
+    /// bridge fee.
     /// @dev IOUs should be bridged via bridges which require finalization on the source chain. If IOUs are bridged and
     /// exchanged for assets on a destination, but the source chain reorgs, then a user would keep their IOUs and the
     /// assets withdrawn on the destination chain.
@@ -47,14 +48,14 @@ interface IIouTokenManager {
     /// @param bridgeAdapter The whitelisted bridge adapter to use for the message.
     /// @param gasLimit Gas limit that should be allocated for execution of the message on the destination chain,
     /// without considering the bridge adapter overhead.
-    /// @param bridgeParamsEncoded Opaque bridge parameters blob consumed by the adapter.
+    /// @param bridgeAdapterData Any bridge adapter custom parameters that it may need to operate.
     function bridgeTokens(
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
         address bridgeAdapter,
         uint256 gasLimit,
-        bytes calldata bridgeParamsEncoded
+        bytes calldata bridgeAdapterData
     ) external payable;
 
     /// @notice Mints tokens to the specified address (assumes this contract has mint privileges on the IOU token).

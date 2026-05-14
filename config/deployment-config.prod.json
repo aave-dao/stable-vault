@@ -19,7 +19,7 @@
     "aTokenVaultRewardClaimer": "0x35b029C7715c668DCD6058B7a52C0377f404a4e8",
     "stableVaultManager": "0x2A74c29e0Ee366788cc5EEa00c540264a3508fDB"
   },
-  "withdrawalPolicy": {
+  "withdrawalExecutionPolicy": {
     "defaultFeeBps": 625,
     "signer": "0x2F87296892feD4AEE35D02eA71B3d04A5Be151a0"
   },
@@ -38,7 +38,18 @@
     },
     "ccipRouterAddress": "0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D",
     "aaveV3PoolAddressesProvider": "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e",
-    "deploymentOutputPath": "deployments/prod/v1/earning.json"
+    "fundsBridgingPolicy": {
+      "perAssetLimits": {
+        "gho": {
+          "capacity": "1000000000000000000000000",
+          "refillRate": "11574074074074074074"
+        },
+        "usdc": { "capacity": "1000000000000", "refillRate": "11574074" },
+        "usdt": { "capacity": "1000000000000", "refillRate": "11574074" }
+      }
+    },
+    "deploymentOutputPath": "deployments/prod/v1/earning.json",
+    "minBurnIouTokenGasLimit": "120000"
   },
   "accountingChain": {
     "chainId": 42161,
@@ -64,6 +75,26 @@
     "useMockSequencerUptimeFeed": false,
     "chainlinkBundleAggregatorProxy": "0x0000000000000000000000000000000000000000",
     "sequencerUptimeFeed": "0xFdB631F5EE196F0ed6FAa767959853A9F217697D",
+    "depositPolicy": {
+      "perAssetLimits": {
+        "gho": {
+          "capacity": "1000000000000000000000000",
+          "refillRate": "11574074074074074074"
+        },
+        "usdc": { "capacity": "1000000000000", "refillRate": "11574074" },
+        "usdt": { "capacity": "1000000000000", "refillRate": "11574074" }
+      }
+    },
+    "fundsBridgingPolicy": {
+      "perAssetLimits": {
+        "gho": {
+          "capacity": "1000000000000000000000000",
+          "refillRate": "11574074074074074074"
+        },
+        "usdc": { "capacity": "1000000000000", "refillRate": "11574074" },
+        "usdt": { "capacity": "1000000000000", "refillRate": "11574074" }
+      }
+    },
     "deploymentOutputPath": "deployments/prod/v1/accounting.json"
   }
 }

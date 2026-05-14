@@ -7,9 +7,9 @@ import {IERC20} from "forge-std/interfaces/IERC20.sol";
 
 import {Logger} from "test/helpers/Logger.sol";
 
-import {BridgeParamsCodec} from "src/bridging/BridgeParamsCodec.sol";
 import {StableVault} from "src/core/accounting/StableVault.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
+import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {Constants} from "src/types/Constants.sol";
@@ -40,10 +40,10 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         address fundsHandler,
         address assetRegistry,
         address transferHelper,
-        address withdrawalFeeCalculator,
         address priceOracle,
         uint256 maxActiveSubVaults,
-        address treasuryAddress
+        address treasuryAddress,
+        address policyRegistry
     ) internal virtual override returns (StableVault) {
         // Deploy a vault without restriction in the valid per-second rate
         address vaultImpl = address(
@@ -53,9 +53,9 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
                 iouToken,
                 fundsHandler,
                 transferHelper,
-                withdrawalFeeCalculator,
                 priceOracle,
-                maxActiveSubVaults
+                maxActiveSubVaults,
+                policyRegistry
             )
         );
         return StableVault(
@@ -110,11 +110,12 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             EARNING_CHAIN_ID,
             address(ccipAdapter_accountingChain),
             DEFAULT_GAS_LIMIT,
-            BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({
-                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
+            abi.encode(
+                ICcipBridgeAdapter.CcipFeeParams({
+                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
-            )
+            ),
+            ""
         );
 
         // Funds arrive idle on the Earning Chain Allocator; route them into the strategy.
@@ -166,13 +167,13 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             )
         );
         vm.prank(user1);
-        vault.requestWithdrawal(user1, userBalanceAfterHalfYearInRay);
+        vault.requestWithdrawal(user1, userBalanceAfterHalfYearInRay, "");
 
         // 5. User requests to withdrawal their original deposit
         uint256 iouAmountRequestedRay = userInitialDeposit.assetDecimalsToRay(address(USDC));
         vm.prank(user1);
         Logger.log("!!! Actual requesting withdrawal for user1", user1);
-        vault.requestWithdrawal(user1, iouAmountRequestedRay);
+        vault.requestWithdrawal(user1, iouAmountRequestedRay, "");
         // Check the IOU token balance went up (units are in RAY)
         assertEq(
             iouToken_accountingChain.balanceOf(user1),
@@ -184,16 +185,19 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         // The user will use native asset to pay for bridge fees
         // User must approve the IOU token manager to spend the IOU tokens
         vm.prank(user1);
+        IERC20(address(iouToken_accountingChain))
+            .approve(address(iouTokenManager_accountingChain), iouAmountRequestedRay);
         vm.deal(user1, bridgeFeeAmount);
+        vm.prank(user1);
         iouTokenManager_accountingChain.bridgeTokens{value: bridgeFeeAmount}(
             EARNING_CHAIN_ID,
             user1,
             iouAmountRequestedRay,
             address(ccipAdapter_accountingChain),
             DEFAULT_GAS_LIMIT,
-            BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({
-                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
+            abi.encode(
+                ICcipBridgeAdapter.CcipFeeParams({
+                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
             )
         );
@@ -215,7 +219,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         // Check that requesting another withdrawal fails because the user was alredy given IOUs.
         vm.expectRevert(abi.encodeWithSelector(Errors.InvalidAmount.selector));
         vm.prank(user1);
-        vault.requestWithdrawal(user1, iouAmountRequestedRay);
+        vault.requestWithdrawal(user1, iouAmountRequestedRay, "");
 
         // 7. A second depositor deposits and tries to withdraw (check the iousInCirculationRay math)
         _mintAndDepositUsdcToStableVault(user2, userInitialDeposit);
@@ -237,11 +241,11 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             )
         );
         vm.prank(user2);
-        vault.requestWithdrawal(user2, user2BalanceAfterOneYearInRay);
+        vault.requestWithdrawal(user2, user2BalanceAfterOneYearInRay, "");
 
         // User2 should be able to withdraw their original deposit
         vm.prank(user2);
-        vault.requestWithdrawal(user2, iouAmountRequestedRay);
+        vault.requestWithdrawal(user2, iouAmountRequestedRay, "");
         // Check the IOU token balance on Accounting Chain went up
         assertEq(
             iouToken_accountingChain.balanceOf(user2),
@@ -269,12 +273,13 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         );
         vm.prank(user2);
         iouToken_accountingChain.approve(address(iouTokenManager_accountingChain), iouAmountRequestedRay);
-        vm.prank(user2);
         vm.deal(user2, bridgeFeeAmount);
+        vm.prank(user2);
         {
-            bytes memory bp = BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({
-                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
+
+            bytes memory bp = abi.encode(
+                ICcipBridgeAdapter.CcipFeeParams({
+                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
             );
             iouTokenManager_accountingChain.bridgeTokens{value: bridgeFeeAmount}(
@@ -300,9 +305,10 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         vm.deal(user2, bridgeFeeAmount);
         vm.prank(user2);
         {
-            bytes memory bp = BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({
-                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
+
+            bytes memory bp = abi.encode(
+                ICcipBridgeAdapter.CcipFeeParams({
+                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                 })
             );
             iouTokenManager_earningChain.bridgeTokens{value: bridgeFeeAmount}(
@@ -356,9 +362,9 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             // Use a higher gas limit to ensure the transaction is successful on Accounting Chain because the snapshot
             // struct will be pushed to the FH storage.
             DEFAULT_GAS_LIMIT,
-            BridgeParamsCodec.encode(
-                BridgeParamsCodec.BridgeParams({
-                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: 1, feeRefundThreshold: 0, data: ""
+            abi.encode(
+                ICcipBridgeAdapter.CcipFeeParams({
+                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: 1, feeRefundThreshold: 0
                 })
             ),
             ""
@@ -422,7 +428,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         USDC.mint(user, amount);
         vm.startPrank(user);
         USDC.approve(address(vault), amount);
-        vault.deposit(user, address(USDC), amount);
+        vault.deposit(user, address(USDC), amount, "");
         vm.stopPrank();
     }
 }

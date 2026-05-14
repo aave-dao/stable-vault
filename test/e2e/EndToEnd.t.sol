@@ -7,9 +7,9 @@ import {IERC20} from "forge-std/interfaces/IERC20.sol";
 import {IERC4626} from "forge-std/interfaces/IERC4626.sol";
 import {Logger} from "test/helpers/Logger.sol";
 
-import {BridgeParamsCodec} from "src/bridging/BridgeParamsCodec.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
+import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {Swapper} from "src/periphery/Swapper.sol";
@@ -38,7 +38,7 @@ contract EndToEndTest is BaseTest {
         // 1. User1 deposits 500 USDC to Vault on Accounting Chain
         vm.startPrank(user);
         USDC.approve(address(vault), userInitialDeposit);
-        vault.deposit(user, address(USDC), userInitialDeposit);
+        vault.deposit(user, address(USDC), userInitialDeposit, "");
         vm.stopPrank();
 
         // - funds land idle on the Allocator; manager rebalances them into the strategy.
@@ -90,11 +90,12 @@ contract EndToEndTest is BaseTest {
                 EARNING_CHAIN_ID,
                 address(ccipAdapter_accountingChain),
                 DEFAULT_GAS_LIMIT,
-                BridgeParamsCodec.encode(
-                    BridgeParamsCodec.BridgeParams({
-                        feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
+                abi.encode(
+                    ICcipBridgeAdapter.CcipFeeParams({
+                        feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                     })
-                )
+                ),
+                ""
             );
 
             // - funds land idle on the Earning Chain Allocator; route them into the strategy.
@@ -178,7 +179,7 @@ contract EndToEndTest is BaseTest {
 
             Logger.log("Rebalancing by swap from USDC to GHO on the Earning chain...");
             vm.prank(everyRoleAccount);
-            allocator_earningChain.rebalance(rebalances);
+            allocator_earningChain.rebalance(rebalances, "");
 
             // - check that the funds are swapped to GHO
             Logger.log(
@@ -240,13 +241,14 @@ contract EndToEndTest is BaseTest {
             vm.deal(everyRoleAccount, bridgeFeeAmount);
 
             {
-                bytes memory bp = BridgeParamsCodec.encode(
-                    BridgeParamsCodec.BridgeParams({
-                        feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
+
+                bytes memory bp = abi.encode(
+                    ICcipBridgeAdapter.CcipFeeParams({
+                        feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                     })
                 );
                 earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
-                    address(GHO), userEarningsInGho, address(ccipAdapter_earningChain), DEFAULT_GAS_LIMIT, bp
+                    address(GHO), userEarningsInGho, address(ccipAdapter_earningChain), DEFAULT_GAS_LIMIT, bp, ""
                 );
             }
 
@@ -324,7 +326,7 @@ contract EndToEndTest is BaseTest {
 
             Logger.log("Rebalancing by swap from GHO to USDC on the Accounting chain...");
             vm.prank(everyRoleAccount);
-            allocator_accountingChain.rebalance(rebalances);
+            allocator_accountingChain.rebalance(rebalances, "");
 
             // - check that the funds are swapped to USDC (includes 1 extra wei for precision)
             Logger.log(
@@ -356,7 +358,7 @@ contract EndToEndTest is BaseTest {
 
             // Request withdrawal
             vm.prank(user);
-            iouAmountRequestedRay = vault.requestWithdrawal(user, 0);
+            iouAmountRequestedRay = vault.requestWithdrawal(user, 0, "");
 
             Logger.log("... request withdrawal minted IOU tokens: %s", iouAmountRequestedRay);
             // Check user IOU token balance
@@ -405,13 +407,14 @@ contract EndToEndTest is BaseTest {
             vm.prank(everyRoleAccount);
             vm.deal(everyRoleAccount, bridgeFeeAmount);
             {
-                bytes memory bp = BridgeParamsCodec.encode(
-                    BridgeParamsCodec.BridgeParams({
-                        feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0, data: ""
+
+                bytes memory bp = abi.encode(
+                    ICcipBridgeAdapter.CcipFeeParams({
+                        feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                     })
                 );
                 earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
-                    address(GHO), ghoBalanceOnVaultLeft, address(ccipAdapter_earningChain), DEFAULT_GAS_LIMIT, bp
+                    address(GHO), ghoBalanceOnVaultLeft, address(ccipAdapter_earningChain), DEFAULT_GAS_LIMIT, bp, ""
                 );
             }
 

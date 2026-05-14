@@ -12,10 +12,10 @@ contract MockDummyIouTokenManager is IIouTokenManager {
     function bridgeTokens(
         uint256, // destinationChainId
         address, // iouTokenRecipient
-        uint256 iouTokenAmountRay,
+        uint256, // iouTokenAmountRay
         address, // bridgeAdapter
         uint256, // gasLimit
-        bytes calldata // bridgeParamsEncoded
+        bytes calldata // bridgeAdapterData
     )
         external
         payable
