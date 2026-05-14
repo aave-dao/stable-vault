@@ -505,28 +505,32 @@ contract Allocator is
     /// @dev Intended to be the lowest level function used to deposit into a strategy.
     /// @dev Does not check if the strategy is trusted because to enable deposits for a strategy it must be trusted.
     /// @dev The state of strategy distrusted, but deposits are still allowed, is not possible.
-    /// @dev Measures the deposit via the newly minted shares (`sharesGained = balanceOf(after) - balanceOf(before)`)
-    /// rather than a pre/post assets snapshot. A snapshot like `previewRedeem(balanceOf) - previewRedeem(balanceOf)`
-    /// is unsafe when the strategy accrues yield as part of its own `deposit` (e.g. `ATokenVault._accrueYield`):
-    /// the pre-snapshot reads a stale index, the deposit moves the index, and the post-snapshot then over-credits
-    /// the strategy's accrued yield to the depositor — masking the slippage check while existing depositors absorb
-    /// the rounding. By computing `previewRedeem(sharesGained)` after the deposit, both legs of the comparison live
-    /// in the post-accrue state and the slippage check measures `amount - assetsRedeemableForNewShares` only.
+    /// @dev Measures the deposit via the `shares` return value of `IERC4626.deposit` (the ERC-4626-canonical count
+    /// of shares minted to the receiver), then computes `previewRedeem(shares)` once on the post-deposit state.
+    /// A pre/post assets snapshot (`previewRedeem(balanceOf) - previewRedeem(balanceOf)`) is unsafe when the
+    /// strategy accrues yield as part of its own `deposit` (e.g. `ATokenVault._accrueYield`): the pre-snapshot
+    /// reads a stale index, the deposit moves the index, and the post-snapshot then over-credits the strategy's
+    /// accrued yield to the depositor — masking the slippage check while existing depositors absorb the rounding.
+    /// A `balanceOf` delta would also be unsafe under reentrancy: a callback during the strategy's `deposit` could
+    /// mint additional shares to this contract and the delta would conflate them with the deposit being measured.
+    /// @dev Assumes `previewRedeem` reflects the post-deposit state on the strategy (i.e. is synchronised with the
+    /// state the deposit just settled into). Small dust losses from depositing-then-redeeming separately are
+    /// expected; `StableVault` non-zero withdrawal fees absorb them.
     function _depositToStrategy(address asset, uint256 amount, address strategy) internal returns (uint256) {
         require(amount > 0, Errors.ZeroAmount());
         require($storage().strategyConfigs[strategy].depositAllowed, DepositsToStrategyDisabled(strategy));
         IERC20(asset).forceApprove(strategy, amount);
 
-        uint256 sharesBefore = IERC4626(strategy).balanceOf(address(this));
-
-        try IERC4626(strategy).deposit(amount, address(this)) {}
-        catch {
+        uint256 netDepositAmount;
+        try IERC4626(strategy).deposit(amount, address(this)) returns (uint256 shares) {
+            netDepositAmount = IERC4626(strategy).previewRedeem(shares);
+            require(
+                amount.satSub(netDepositAmount) <= STRATEGY_DEPOSIT_SLIPPAGE_TOLERANCE, Errors.InsufficientAmountOut()
+            );
+        } catch {
             revert DepositIntoStrategyFailed(strategy);
         }
 
-        uint256 sharesGained = IERC4626(strategy).balanceOf(address(this)) - sharesBefore;
-        uint256 netDepositAmount = IERC4626(strategy).previewRedeem(sharesGained);
-        require(amount.satSub(netDepositAmount) <= STRATEGY_DEPOSIT_SLIPPAGE_TOLERANCE, Errors.InsufficientAmountOut());
         emit AssetAllocated(asset, strategy, amount, netDepositAmount);
         return netDepositAmount;
     }
