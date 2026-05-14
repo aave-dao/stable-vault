@@ -15,7 +15,7 @@ import {Errors} from "src/types/Errors.sol";
 /// @title SlippageCoverageVault
 /// @author Aave Labs
 /// @notice Holds coverage capital for rebalance-swap shortfalls. Push-based outflows to the immutable bound Swapper,
-/// gated by per-tx + sliding-window caps. Override mode bypasses caps.
+/// gated by per-tx + fixed-window caps (with lazy rollover). Override mode bypasses caps.
 /// @dev Non-upgradeable. The Swapper and Vault are immutably cross-bound, so a vault proxy would only expand the trust
 /// surface without buying anything.
 contract SlippageCoverageVault is AccessManaged, Multicall, ReentrancyGuardTransient, ISlippageCoverageVault {
@@ -221,7 +221,8 @@ contract SlippageCoverageVault is AccessManaged, Multicall, ReentrancyGuardTrans
 
     //////////////////////////////// INTERNAL FUNCTIONS ////////////////////////////////
 
-    /// @dev Updates the sliding-window cap state for `asset`. Rolls over when the elapsed time exceeds `windowSeconds`.
+    /// @dev Updates the fixed-window cap state for `asset` (with lazy rollover). Resets when the elapsed time exceeds
+    /// `windowSeconds`.
     /// Reverts if the window is unconfigured (`cap == 0` or `windowSeconds == 0`) or if `consumed + amount` exceeds
     /// `cap`.
     function _consumeWindow(address asset, uint256 amount) internal {

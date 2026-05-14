@@ -10,7 +10,7 @@ pragma solidity ^0.8.22;
 /// without per-tx or window caps configured; governance flips override off and configures caps once risk-team has
 /// set the production targets.
 interface ISlippageCoverageVault {
-    /// @notice Sliding-window cap state for an asset.
+    /// @notice Fixed-window cap state for an asset.
     /// @param windowStart Timestamp at which the current window started.
     /// @param windowSeconds Length of the window in seconds.
     /// @param consumed Amount consumed within the current window.
