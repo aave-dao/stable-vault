@@ -14,7 +14,7 @@ import {Errors} from "src/types/Errors.sol";
 /// @title SlippageCoverageVault
 /// @author Aave Labs
 /// @notice Holds coverage capital for rebalance-swap shortfalls. Push-based outflows to the immutable bound Swapper,
-/// gated by per-tx + sliding-window caps. Override mode (separate role from the rebalancer) bypasses caps.
+/// gated by per-tx + sliding-window caps. Override mode bypasses caps.
 /// @dev Non-upgradeable. The Swapper and Vault are immutably cross-bound, so a vault proxy would only expand the trust
 /// surface without buying anything.
 contract SlippageCoverageVault is AccessManaged, ReentrancyGuardTransient, ISlippageCoverageVault {
