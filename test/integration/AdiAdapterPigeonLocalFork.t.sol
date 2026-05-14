@@ -73,8 +73,8 @@ contract AdiAdapterPigeonLocalForkTest is Test {
     uint256 internal constant ARB_CHAIN_ID = 42161;
     uint256 internal constant DEFAULT_GAS_LIMIT = 200_000;
 
-    string internal constant ETH_RPC = "http://127.0.0.1:8545";
-    string internal constant ARB_RPC = "http://127.0.0.1:8546";
+    string internal constant DEFAULT_ETH_FORK_RPC = "http://127.0.0.1:8545";
+    string internal constant DEFAULT_ARB_FORK_RPC = "http://127.0.0.1:8546";
 
     address internal constant STABLE_VAULTS_OWNER = 0xfB65C68526969DA4AA3cEDF30b1C53846116D5a2;
 
@@ -104,9 +104,18 @@ contract AdiAdapterPigeonLocalForkTest is Test {
     AdiAdapter internal _ethAdiAdapter;
     AdiAdapter internal _arbAdiAdapter;
 
+    modifier onlyForkTest() {
+        vm.skip(!vm.envOr("FORK_TEST", false), "Set FORK_TEST=true to run local aDI fork integration tests");
+        _;
+    }
+
     function setUp() public {
-        _ethFork = vm.createSelectFork(ETH_RPC);
-        _arbFork = vm.createSelectFork(ARB_RPC);
+        if (!vm.envOr("FORK_TEST", false)) {
+            return;
+        }
+
+        _ethFork = vm.createSelectFork(vm.envOr("ETH_FORK_RPC", DEFAULT_ETH_FORK_RPC));
+        _arbFork = vm.createSelectFork(vm.envOr("ARB_FORK_RPC", DEFAULT_ARB_FORK_RPC));
 
         vm.selectFork(_ethFork);
         (_ethGateway, _ethAdiAdapter) = _deployLocalAdapter(ETH_CCC);
@@ -118,7 +127,7 @@ contract AdiAdapterPigeonLocalForkTest is Test {
         _configureAdaptersAndAdiPermissions();
     }
 
-    function test_ethToArb_pigeonFork_deliversViaLocalAdi() public {
+    function test_ethToArb_pigeonFork_deliversViaLocalAdi() public onlyForkTest {
         bytes memory message = abi.encode("hello-arb");
 
         vm.selectFork(_ethFork);
@@ -146,7 +155,7 @@ contract AdiAdapterPigeonLocalForkTest is Test {
         assertEq(abi.decode(_arbGateway.lastData(), (string)), "hello-arb", "unexpected message");
     }
 
-    function test_arbToEth_pigeonFork_deliversViaTwoOfThree() public {
+    function test_arbToEth_pigeonFork_deliversViaTwoOfThree() public onlyForkTest {
         bytes memory message = abi.encode("hello-eth");
 
         vm.selectFork(_arbFork);
@@ -181,7 +190,7 @@ contract AdiAdapterPigeonLocalForkTest is Test {
         assertEq(abi.decode(_ethGateway.lastData(), (string)), "hello-eth", "unexpected message");
     }
 
-    function test_retryTransaction_pigeonFork_deliversViaLocalAdiGuardian() public {
+    function test_retryTransaction_pigeonFork_deliversViaLocalAdiGuardian() public onlyForkTest {
         bytes memory message = abi.encode("retry-hello-arb");
         address[] memory bridgeAdaptersToRetry = _singleAddress(ETH_ARB_ADAPTER);
 
