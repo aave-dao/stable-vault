@@ -331,7 +331,7 @@ contract SwapperTest is TestWithHelpers {
         uint256 vaultAssetInBefore = _mockUsdt.balanceOf(address(_vault));
 
         vm.expectEmit(true, false, false, true, address(_swapper));
-        emit ISwapper.AssetInSwept(address(_mockUsdt), amountIn);
+        emit ISwapper.AssetInSwept(address(_vault), address(_mockUsdt), amountIn);
         vm.prank(allocator);
         _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
 
@@ -360,7 +360,7 @@ contract SwapperTest is TestWithHelpers {
         uint256 vaultAssetInBefore = _mockUsdt.balanceOf(address(_vault));
 
         vm.expectEmit(true, false, false, true, address(_swapper));
-        emit ISwapper.AssetInSwept(address(_mockUsdt), amountIn / 2);
+        emit ISwapper.AssetInSwept(address(_vault), address(_mockUsdt), amountIn / 2);
         vm.prank(allocator);
         _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
 
@@ -393,7 +393,7 @@ contract SwapperTest is TestWithHelpers {
         bytes memory data =
             _encodeDexSwapExactInputData(address(_mockUsdt), address(_mockGho), amountIn, minAmountOut, 0);
         vm.expectEmit(true, false, false, true, address(_swapper));
-        emit ISwapper.AssetInSwept(address(_mockUsdt), donation);
+        emit ISwapper.AssetInSwept(address(_vault), address(_mockUsdt), donation);
         vm.prank(allocator);
         uint256 actualAmountOut =
             _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
@@ -442,6 +442,62 @@ contract SwapperTest is TestWithHelpers {
         _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
 
         assertEq(_mockUsdt.allowance(address(_swapper), address(_vault)), 0, "stale allowance from swapper to vault");
+    }
+
+    /// @dev Combined path: the DEX under-consumes `assetIn` (residual stays on the Swapper) AND under-delivers
+    /// `assetOut` (slippage check pulls coverage).
+    function test_executeSwap_pullsCoverageAndReimbursesLeftover_inSameSwap() public {
+        uint256 amountIn = 1_000_000; // 1 USDT (6 decimals)
+        uint256 leftoverIn = 100_000; // 0.1 USDT residual the DEX is told to skip
+        uint256 swapAmount = amountIn - leftoverIn;
+        uint16 dexSlippageBps = 1_000; // 10% slippage on the consumed portion
+        uint16 swapperToleranceBps = 2_000; // 20% — admits the shortfall computed against the *full* amountIn
+
+        uint256 expectedAmountOut = amountIn.convertAssetDecimals(address(_mockUsdt), address(_mockGho));
+        uint256 dexOutput =
+            swapAmount.convertAssetDecimals(address(_mockUsdt), address(_mockGho)) * (10_000 - dexSlippageBps) / 10_000;
+        uint256 slippageShortfall = expectedAmountOut - dexOutput;
+
+        _mockTransferIntoSwapper(_mockUsdt, amountIn);
+        _seedOutputToken(_mockGho, dexOutput);
+        _setSlippageBps(dexSlippageBps);
+        _fundVault(_mockGho, slippageShortfall);
+
+        uint256 vaultAssetInBefore = _mockUsdt.balanceOf(address(_vault));
+        uint256 vaultAssetOutBefore = _mockGho.balanceOf(address(_vault));
+
+        // Route only `swapAmount` through the DEX; the remaining `leftoverIn` stays on the Swapper.
+        bytes memory data = _encodeDexSwapExactInputData(
+            address(_mockUsdt), address(_mockGho), swapAmount, dexOutput, swapperToleranceBps
+        );
+
+        // Order matches the Swapper flow: pullCoverage -> SlippageCovered -> reimburseCoverage -> AssetInSwept.
+        vm.expectEmit(true, false, false, true, address(_vault));
+        emit ISlippageCoverageVault.CoveragePulled(address(_mockGho), slippageShortfall, false);
+        vm.expectEmit(true, true, false, true, address(_swapper));
+        emit ISwapper.SlippageCovered(address(_vault), address(_mockGho), slippageShortfall);
+        vm.expectEmit(true, true, false, true, address(_vault));
+        emit ISlippageCoverageVault.CoverageFunded(address(_mockUsdt), address(_swapper), leftoverIn);
+        vm.expectEmit(true, true, false, true, address(_swapper));
+        emit ISwapper.AssetInSwept(address(_vault), address(_mockUsdt), leftoverIn);
+
+        vm.prank(allocator);
+        uint256 actualAmountOut =
+            _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
+
+        assertEq(actualAmountOut, expectedAmountOut, "actualAmountOut != expectedAmountOut");
+        assertEq(_mockGho.balanceOf(address(_swapper)), expectedAmountOut, "swapper assetOut balance mismatch");
+        assertEq(_mockUsdt.balanceOf(address(_swapper)), 0, "leftover assetIn still on swapper");
+        assertEq(
+            vaultAssetOutBefore - _mockGho.balanceOf(address(_vault)),
+            slippageShortfall,
+            "vault assetOut not decreased by shortfall"
+        );
+        assertEq(
+            _mockUsdt.balanceOf(address(_vault)) - vaultAssetInBefore,
+            leftoverIn,
+            "vault assetIn not increased by residual"
+        );
     }
 
     function test_executeSwap_reverts_ifTargetsAndCallDatasLengthMismatch() public {

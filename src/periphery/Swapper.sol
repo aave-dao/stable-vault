@@ -27,10 +27,10 @@ contract Swapper is Ownable, ReentrancyGuardTransient, ISwapper {
 
     /// @dev Constructor.
     /// @param allocator Address of the allocator which is the owner of the Swapper.
-    /// @param slippageVault Address of the bound SlippageCoverageVault.
-    constructor(address allocator, address slippageVault) Ownable(allocator) {
-        require(slippageVault != address(0), Errors.ZeroAddress());
-        SLIPPAGE_VAULT = slippageVault;
+    /// @param slippageCoverageSource Address of the bound SlippageCoverageVault.
+    constructor(address allocator, address slippageCoverageSource) Ownable(allocator) {
+        require(slippageCoverageSource != address(0), Errors.ZeroAddress());
+        SLIPPAGE_VAULT = slippageCoverageSource;
     }
 
     /// @inheritdoc ISwapper
@@ -108,6 +108,6 @@ contract Swapper is Ownable, ReentrancyGuardTransient, ISwapper {
     function _reimburseCoverage(address asset, uint256 amount) internal {
         IERC20(asset).forceApprove(address(SLIPPAGE_VAULT), amount);
         ISlippageCoverageVault(SLIPPAGE_VAULT).reimburseCoverage(asset, amount);
-        emit ISwapper.AssetInSwept(asset, amount);
+        emit ISwapper.AssetInSwept(SLIPPAGE_VAULT, asset, amount);
     }
 }
