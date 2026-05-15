@@ -12,7 +12,6 @@ import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.so
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {Vm} from "forge-std/Vm.sol";
 
 import {Allocator} from "src/core/Allocator.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
@@ -393,11 +392,6 @@ contract AllocatorTest is TestWithHelpers {
         assertFalse(_allocator.isStrategySupported(makeAddr("NON_EXISTING_VAULT")));
     }
 
-    function test_tryDepositToStrategy_reverts_onlySelf() public {
-        vm.expectRevert(Errors.OnlySelf.selector);
-        _allocator.tryDepositToStrategy(address(_mockUsdt), 100, address(_defaultUsdtStrategy));
-    }
-
     function test_tryWithdrawFromStrategy_reverts_onlySelf() public {
         vm.expectRevert(Errors.OnlySelf.selector);
         _allocator.tryWithdrawFromStrategy(address(_mockUsdt), 100, address(_defaultUsdtStrategy));
@@ -519,17 +513,10 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.deposit(address(_mockUnsupportedAsset), amount);
     }
 
-    // Zero-amount deposit is intentionally a no-op: this path is used by bridge callbacks
-    // (fundsArrivedFromChainCallback), where reverting could jam the bridge infrastructure.
-    function test_deposit_doesNotRevert_ifAmountIsZero() public {
-        vm.recordLogs();
+    function test_deposit_reverts_ifAmountIsZero() public {
+        vm.expectRevert(Errors.ZeroAmount.selector);
         vm.prank(depositor);
         _allocator.deposit(address(_mockUsdt), 0);
-        // No event emitted, no transfer.
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        assertEq(logs.length, 0);
-        assertEq(_allocator.getAssetBalance(address(_mockUsdt)), 0);
-        assertEq(_mockUsdt.balanceOf(address(_allocator)), 0);
     }
 
     function test_withdraw_reverts_givenMaxWithdrawReturnsZero() public {

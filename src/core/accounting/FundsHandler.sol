@@ -127,10 +127,9 @@ contract FundsHandler is
     }
 
     /// @inheritdoc IFundsHandler
-    function processDeposit(address asset, uint256 amount) external override onlyStableVault returns (uint256) {
+    function processDeposit(address asset, uint256 amount) external override onlyStableVault {
         require(amount > 0, Errors.ZeroAmount());
         IAllocator(ALLOCATOR).deposit(asset, amount);
-        return amount;
     }
 
     /// @inheritdoc IFundsHandler

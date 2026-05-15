@@ -33,7 +33,7 @@ contract EndToEndTest is BaseTest {
         uint256 userInitialDeposit = 500 * (10 ** 6);
         USDC.mint(user, userInitialDeposit);
 
-        // BaseTest setUp already configures default liquidity vaults/strategies on both chains.
+        // BaseTest setUp already configures liquidity strategies on both chains.
 
         // // Steps: ////
         // 1. User1 deposits 500 USDC to Vault on Accounting Chain
@@ -42,27 +42,13 @@ contract EndToEndTest is BaseTest {
         vault.deposit(user, address(USDC), userInitialDeposit, "");
         vm.stopPrank();
 
-        // - funds land idle on the Allocator; manager rebalances them into the strategy.
-        address defaultUsdcVault_AccountingChain = allocator_accountingChain.getStrategiesForAsset(address(USDC))[0];
-        _routeIdleToStrategy(
-            allocator_accountingChain, address(USDC), defaultUsdcVault_AccountingChain, userInitialDeposit
-        );
+        // - check that funds are held as idle allocator liquidity
         {
             Logger.log("User deposited %s USDC into Vault", userInitialDeposit);
-            Logger.log("Default vault for USDC is: %s", defaultUsdcVault_AccountingChain);
-            Logger.log("It's balance of USDC is: %s", IERC20(address(USDC)).balanceOf(defaultUsdcVault_AccountingChain));
             assertEq(
-                IERC20(address(USDC)).balanceOf(defaultUsdcVault_AccountingChain),
+                IERC20(address(USDC)).balanceOf(address(allocator_accountingChain)),
                 userInitialDeposit,
-                "Vault should have the deposited amount of USDC"
-            );
-            Logger.log(
-                "Allocator has %s shares of it",
-                IERC4626(defaultUsdcVault_AccountingChain).balanceOf(address(allocator_accountingChain))
-            );
-            assertTrue(
-                IERC4626(defaultUsdcVault_AccountingChain).balanceOf(address(allocator_accountingChain)) > 0,
-                "Allocator should have shares of the vault"
+                "Allocator should have the deposited amount of USDC"
             );
         }
 
@@ -81,7 +67,6 @@ contract EndToEndTest is BaseTest {
 
         // 3. Manager sends the money to the Earning Chain via CCIP
         uint256 bridgeFeeAmount = 1000;
-        address defaultUsdcVault_earningChain = allocator_earningChain.getStrategiesForAsset(address(USDC))[0];
         {
             vm.prank(everyRoleAccount);
             vm.deal(everyRoleAccount, bridgeFeeAmount);
@@ -97,24 +82,11 @@ contract EndToEndTest is BaseTest {
                 ""
             );
 
-            // - funds land idle on the Earning Chain Allocator; route them into the strategy.
-            _routeIdleToStrategy(
-                allocator_earningChain, address(USDC), defaultUsdcVault_earningChain, userInitialDeposit
-            );
-            Logger.log("Earning Chain default vault for USDC is: %s", defaultUsdcVault_earningChain);
-            Logger.log("It's balance of USDC is: %s", IERC20(address(USDC)).balanceOf(defaultUsdcVault_earningChain));
+            // - check that the funds land on Earning Chain as idle allocator liquidity
             assertEq(
-                IERC20(address(USDC)).balanceOf(defaultUsdcVault_earningChain),
+                IERC20(address(USDC)).balanceOf(address(allocator_earningChain)),
                 userInitialDeposit,
-                "Vault should have the deposited amount of USDC"
-            );
-            Logger.log(
-                "Allocator has %s shares of it",
-                IERC4626(defaultUsdcVault_earningChain).balanceOf(address(allocator_earningChain))
-            );
-            assertTrue(
-                IERC4626(defaultUsdcVault_earningChain).balanceOf(address(allocator_earningChain)) > 0,
-                "Allocator should have shares of the vault"
+                "Allocator should have the deposited amount of USDC"
             );
 
             // Publish a chain balance snapshot via MockBundleFeed so the adapter/oracle path reflects bridged funds.
@@ -136,7 +108,7 @@ contract EndToEndTest is BaseTest {
         }
 
         // 4. Manager rebalances & swaps the funds on the Earning Chain from USDC to GHO (via Swapper)
-        address defaultGhoVault_earningChain;
+        address ghoVault_earningChain;
         {
             uint256 userInitialDepositInGho = userInitialDeposit.convertAssetDecimals(address(USDC), address(GHO));
             GHO.mint(address(swapper_earningChain), userInitialDepositInGho);
@@ -147,11 +119,8 @@ contract EndToEndTest is BaseTest {
             callDatas[0] = abi.encodeCall(IERC20.transfer, (address(this), userInitialDeposit));
             uint16 slippageToleranceBps = 0;
 
-            defaultGhoVault_earningChain = allocator_earningChain.getStrategiesForAsset(address(GHO))[0];
             // Deallocation params
-            IAllocator.DeallocationParams[] memory deallocationParams = new IAllocator.DeallocationParams[](1);
-            deallocationParams[0] =
-                IAllocator.DeallocationParams(address(USDC), defaultUsdcVault_earningChain, userInitialDeposit);
+            IAllocator.DeallocationParams[] memory deallocationParams = new IAllocator.DeallocationParams[](0);
 
             // Swap params
             IAllocator.SwapParams[] memory swapParams = new IAllocator.SwapParams[](1);
@@ -164,9 +133,10 @@ contract EndToEndTest is BaseTest {
             });
 
             // Allocation params
+            ghoVault_earningChain = address(ghoStrategyVault_earningChain);
             IAllocator.AllocationParams[] memory allocationParams = new IAllocator.AllocationParams[](1);
             allocationParams[0] = IAllocator.AllocationParams({
-                asset: address(GHO), strategy: defaultGhoVault_earningChain, amount: userInitialDepositInGho
+                asset: address(GHO), strategy: ghoVault_earningChain, amount: userInitialDepositInGho
             });
 
             IAllocator.RebalanceParams memory rebalanceParams = IAllocator.RebalanceParams({
@@ -182,20 +152,20 @@ contract EndToEndTest is BaseTest {
 
             // - check that the funds are swapped to GHO
             Logger.log(
-                "\tBalance of GHO in The GHO Vault is: %s", IERC20(address(GHO)).balanceOf(defaultGhoVault_earningChain)
+                "\tBalance of GHO in The GHO Vault is: %s", IERC20(address(GHO)).balanceOf(ghoVault_earningChain)
             );
             assertEq(
-                IERC20(address(GHO)).balanceOf(defaultGhoVault_earningChain),
+                IERC20(address(GHO)).balanceOf(ghoVault_earningChain),
                 userInitialDepositInGho,
                 "Vault should have the swapped amount of GHO"
             );
             // - check that the funds land on the GHO vault
             Logger.log(
                 "Allocator has %s shares of it",
-                IERC4626(defaultGhoVault_earningChain).balanceOf(address(allocator_earningChain))
+                IERC4626(ghoVault_earningChain).balanceOf(address(allocator_earningChain))
             );
             assertTrue(
-                IERC4626(defaultGhoVault_earningChain).balanceOf(address(allocator_earningChain)) > 0,
+                IERC4626(ghoVault_earningChain).balanceOf(address(allocator_earningChain)) > 0,
                 "Allocator should have shares of the vault"
             );
         }
@@ -212,17 +182,16 @@ contract EndToEndTest is BaseTest {
         assertTrue(vault.getUserBalance(user) > userInitialDeposit, "User balance didn't grow in half a year");
 
         // - mock the 8% APY earnings on the GHO vault for half a year
-        GHO.mint(defaultGhoVault_earningChain, 19_615242270663188059);
+        GHO.mint(ghoVault_earningChain, 19_615242270663188059);
         Logger.log(
             "GHO vault earned something in this time and it's balance now is: %s GHO",
-            IERC4626(defaultGhoVault_earningChain).balanceOf(address(allocator_earningChain))
+            IERC4626(ghoVault_earningChain).balanceOf(address(allocator_earningChain))
         );
 
         // 6. Manager brings back the money from the Earning Chain to the Accounting Chain via CCIP in GHO
         // NOTE: With the oracle-based balance system, funds must be on the Accounting Chain before withdrawal
         // requests can be processed. The FundsHandler uses the chain balance oracle to track cross-chain balances.
         uint256 userEarningsInGho;
-        address defaultGhoVault_accountingChain = allocator_accountingChain.getStrategiesForAsset(address(GHO))[0];
         {
             // Publish a fresh pre-return snapshot (time has warped since step 3).
             // AccountingChainGateway requires sourceChainBlockNumber >= RETURN_FUNDS message block number.
@@ -259,24 +228,11 @@ contract EndToEndTest is BaseTest {
                 false
             );
 
-            // - funds land idle on the Accounting Chain Allocator; route them into the strategy.
-            _routeIdleToStrategy(
-                allocator_accountingChain, address(GHO), defaultGhoVault_accountingChain, userEarningsInGho
-            );
-            Logger.log("Accounting Chain default vault for GHO is: %s", defaultGhoVault_accountingChain);
-            Logger.log("It's balance of GHO is: %s", IERC20(address(GHO)).balanceOf(defaultGhoVault_accountingChain));
+            // - check that the funds land on the Accounting Chain as idle allocator liquidity
             assertEq(
-                IERC20(address(GHO)).balanceOf(defaultGhoVault_accountingChain),
+                IERC20(address(GHO)).balanceOf(address(allocator_accountingChain)),
                 userEarningsInGho,
-                "Vault should have the exited amount of GHO"
-            );
-            Logger.log(
-                "Allocator has %s shares of it",
-                IERC4626(defaultGhoVault_accountingChain).balanceOf(address(allocator_accountingChain))
-            );
-            assertTrue(
-                IERC4626(defaultGhoVault_accountingChain).balanceOf(address(allocator_accountingChain)) > 0,
-                "Allocator should have shares of the vault"
+                "Allocator should have the returned amount of GHO"
             );
         }
 
@@ -295,10 +251,8 @@ contract EndToEndTest is BaseTest {
             callDatas[0] = abi.encodeCall(IERC20.transfer, (address(this), amountGhoIn));
             uint16 slippageToleranceBps = 0;
 
-            address defaultUsdcVault_accountingChain = allocator_accountingChain.getStrategiesForAsset(address(USDC))[0];
-            IAllocator.DeallocationParams[] memory deallocationParams = new IAllocator.DeallocationParams[](1);
-            deallocationParams[0] =
-                IAllocator.DeallocationParams(address(GHO), defaultGhoVault_accountingChain, amountGhoIn);
+            address usdcVault_accountingChain = address(usdcStrategyVault_accountingChain);
+            IAllocator.DeallocationParams[] memory deallocationParams = new IAllocator.DeallocationParams[](0);
 
             IAllocator.SwapParams[] memory swapParams = new IAllocator.SwapParams[](1);
             swapParams[0] = IAllocator.SwapParams({
@@ -311,7 +265,7 @@ contract EndToEndTest is BaseTest {
 
             IAllocator.AllocationParams[] memory allocationParams = new IAllocator.AllocationParams[](1);
             allocationParams[0] = IAllocator.AllocationParams({
-                asset: address(USDC), strategy: defaultUsdcVault_accountingChain, amount: userEarningsInUsdc + 1
+                asset: address(USDC), strategy: usdcVault_accountingChain, amount: userEarningsInUsdc + 1
             });
 
             IAllocator.RebalanceParams memory rebalanceParams = IAllocator.RebalanceParams({
@@ -327,21 +281,20 @@ contract EndToEndTest is BaseTest {
 
             // - check that the funds are swapped to USDC (includes 1 extra wei for precision)
             Logger.log(
-                "\tBalance of USDC in The USDC Vault is: %s",
-                IERC20(address(USDC)).balanceOf(defaultUsdcVault_accountingChain)
+                "\tBalance of USDC in The USDC Vault is: %s", IERC20(address(USDC)).balanceOf(usdcVault_accountingChain)
             );
             assertEq(
-                IERC20(address(USDC)).balanceOf(defaultUsdcVault_accountingChain),
+                IERC20(address(USDC)).balanceOf(usdcVault_accountingChain),
                 userEarningsInUsdc + 1,
                 "Vault should have the swapped amount of USDC"
             );
             // - check that the funds land on the USDC vault
             Logger.log(
                 "Allocator has %s shares of it",
-                IERC4626(defaultUsdcVault_accountingChain).balanceOf(address(allocator_accountingChain))
+                IERC4626(usdcVault_accountingChain).balanceOf(address(allocator_accountingChain))
             );
             assertTrue(
-                IERC4626(defaultUsdcVault_accountingChain).balanceOf(address(allocator_accountingChain)) > 0,
+                IERC4626(usdcVault_accountingChain).balanceOf(address(allocator_accountingChain)) > 0,
                 "Allocator should have shares of the vault"
             );
         }
@@ -388,8 +341,7 @@ contract EndToEndTest is BaseTest {
 
         // Manager claims fees (withdraws profits)
         {
-            uint256 ghoBalanceOnVaultLeft =
-                IERC4626(defaultGhoVault_earningChain).balanceOf(address(allocator_earningChain));
+            uint256 ghoBalanceOnVaultLeft = IERC4626(ghoVault_earningChain).balanceOf(address(allocator_earningChain));
             Logger.log("Earning chain GHO vault balance after withdrawal is now: %s GHO", ghoBalanceOnVaultLeft);
 
             // Update oracle so the AccountingChainGateway accepts the inbound RETURN_FUNDS message

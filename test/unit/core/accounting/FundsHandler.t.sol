@@ -167,8 +167,7 @@ contract FundsHandlerTest is TestWithHelpers {
         vm.expectCall(address(mockAllocator), abi.encodeWithSelector(IAllocator.deposit.selector, asset, amount));
 
         vm.prank(address(mockStableVault));
-        uint256 netDepositAmount = fundsHandler.processDeposit(asset, amount);
-        assertEq(netDepositAmount, amount);
+        fundsHandler.processDeposit(asset, amount);
     }
 
     function test_processDeposit_reverts_ifAmountIsZero(bytes32 assetDeploymentSalt, uint8 assetDecimals) public {

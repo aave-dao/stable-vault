@@ -94,13 +94,10 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
             ""
         );
 
-        // Funds arrive idle on the Earning Chain Allocator; route them into the strategy.
-        address defaultUsdcVault_earningChain = allocator_earningChain.getStrategiesForAsset(address(USDC))[0];
-        _routeIdleToStrategy(allocator_earningChain, address(USDC), defaultUsdcVault_earningChain, userInitialDeposit);
         assertEq(
-            IERC20(address(USDC)).balanceOf(defaultUsdcVault_earningChain),
+            allocator_earningChain.getAssetBalance(address(USDC)),
             userInitialDeposit,
-            "Default USDC strategy vault on Earning Chain should have the deposited amount of USDC"
+            "Earning Chain Allocator should have the deposited amount of USDC"
         );
 
         // Mimic time passing so that user1's balances increase.

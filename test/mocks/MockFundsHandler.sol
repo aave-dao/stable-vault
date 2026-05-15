@@ -49,9 +49,8 @@ contract MockFundsHandler is IFundsHandler {
         return _mockedAggregatedBalance;
     }
 
-    function processDeposit(address asset, uint256 amount) external override returns (uint256) {
+    function processDeposit(address asset, uint256 amount) external override {
         ITransferHelper(_mockedTransferHelper).pull(asset, amount);
-        return amount;
     }
 
     function processWithdrawal(address asset, uint256 amount) external override {

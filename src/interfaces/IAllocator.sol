@@ -16,8 +16,6 @@ interface IAllocator {
 
     event AssetToppedUp(address indexed asset, uint256 amount);
 
-    event StrategyDepositFailed(address indexed strategy, uint256 amount);
-
     event StrategyDepositsToggled(address indexed strategy, bool depositsEnabled);
 
     event StrategyWithdrawalFailed(address indexed strategy, address indexed asset, uint256 amount);
@@ -152,7 +150,7 @@ interface IAllocator {
     /// strategies).
     function getTrustedAssetBalance(address asset) external view returns (uint256);
 
-    /// @notice Getter for the list of strategies registered for a given asset, in insertion order.
+    /// @notice Getter for the list of strategies registered for a given asset.
     /// @param asset Address of the asset to get strategies for.
     /// @return strategies Addresses of the registered strategies for the asset.
     function getStrategiesForAsset(address asset) external view returns (address[] memory strategies);
@@ -192,7 +190,7 @@ interface IAllocator {
     function topUp(address asset, uint256 amount) external;
 
     /// @notice Withdraws a given amount of an asset, sourcing from idle funds first then iterating registered
-    /// strategies in insertion order.
+    /// strategies.
     /// @param asset Address of the asset to withdraw.
     /// @param amount Amount of the asset to withdraw.
     function withdraw(address asset, uint256 amount) external;

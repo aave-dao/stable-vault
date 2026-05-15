@@ -786,14 +786,7 @@ contract OracleFeedE2ETest is BaseTest {
         // Verify funds left on Accounting Chain (local balance is 0)
         assertEq(fundsHandler.getAggregatedBalance(), 0, "Local balance should be zero after bridging to Earning Chain");
 
-        // Funds arrive idle on the Earning Chain Allocator; route them into the strategy.
-        address defaultUsdcVault_earningChain = allocator_earningChain.getStrategiesForAsset(address(USDC))[0];
-        _routeIdleToStrategy(allocator_earningChain, address(USDC), defaultUsdcVault_earningChain, depositAmount);
-        assertEq(
-            IERC20(address(USDC)).balanceOf(defaultUsdcVault_earningChain),
-            depositAmount,
-            "Earning chain strategy should have the USDC"
-        );
+        assertEq(allocator_earningChain.getAssetBalance(address(USDC)), depositAmount, "Earning chain should have USDC");
 
         // 3. Publish and sync oracle - FundsHandler sees Earning Chain balance
         _publishAndSyncOracle();
@@ -827,13 +820,10 @@ contract OracleFeedE2ETest is BaseTest {
             ""
         );
 
-        // 5. Funds arrive idle on the Accounting Chain Allocator; route them into the strategy.
-        address defaultUsdcVault_accountingChain = allocator_accountingChain.getStrategiesForAsset(address(USDC))[0];
-        _routeIdleToStrategy(allocator_accountingChain, address(USDC), defaultUsdcVault_accountingChain, returnAmount);
         assertEq(
-            IERC20(address(USDC)).balanceOf(defaultUsdcVault_accountingChain),
+            allocator_accountingChain.getAssetBalance(address(USDC)),
             returnAmount,
-            "Accounting chain strategy should have the returned USDC"
+            "Accounting chain should have the returned USDC"
         );
 
         // 6. Earning chain now has 0 balance - re-sync oracle

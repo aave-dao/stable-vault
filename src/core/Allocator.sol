@@ -188,9 +188,7 @@ contract Allocator is
 
     /// @inheritdoc IAllocator
     function deposit(address asset, uint256 amount) external override onlyDepositor nonReentrant {
-        if (amount == 0) {
-            return;
-        }
+        require(amount > 0, Errors.ZeroAmount());
         require(IAssetRegistry(ASSET_REGISTRY).isDepositToAllocatorAllowed(asset), Errors.UnsupportedAsset(asset));
         ITransferHelper(TRANSFER_HELPER).pull(asset, amount);
         emit AssetLeftIdle(asset, amount);
@@ -203,7 +201,7 @@ contract Allocator is
 
         uint256 idleBalance = IERC20(asset).balanceOf(address(this));
         if (idleBalance < amount) {
-            // Consume from idle balance first; iterate strategies in insertion order for the rest.
+            // Consume from idle balance first, then iterate registered strategies for the rest.
             uint256 amountRemaining = amount - idleBalance;
             uint256 length = $storage().assetStrategies[asset].length();
             for (uint256 i = 0; amountRemaining > 0 && i < length; i++) {
@@ -217,12 +215,6 @@ contract Allocator is
             require(amountRemaining == 0, Errors.InsufficientFunds());
         }
         _transferToTransferHelper(asset, amount);
-    }
-
-    /// @dev Implements the external and onlySelf modifier because this function is intended to be wrapped in a
-    /// try-catch.
-    function tryDepositToStrategy(address asset, uint256 amount, address strategy) external onlySelf {
-        _depositToStrategy({asset: asset, amount: amount, strategy: strategy});
     }
 
     /// @dev Implements the external and onlySelf modifier because this function is intended to be wrapped in a
