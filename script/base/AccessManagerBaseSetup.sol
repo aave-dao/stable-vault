@@ -85,6 +85,10 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         return _configAddress(".profiles.coverageGuardian");
     }
 
+    function _getProfile__Funder() internal view virtual returns (address) {
+        return _configAddress(".profiles.funder");
+    }
+
     function _getRebalancerMulticallOwner() internal view returns (address) {
         return _configAddress(".profiles.rebalancerMulticallOwner");
     }
@@ -131,6 +135,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         _setupProfile__Disabler();
         _setupProfile__ATokenVaultRewardClaimer();
         _setupProfile__CoverageGuardian();
+        _setupProfile__Funder();
     }
 
     function _logDeployment(string memory, string memory, address) internal virtual {}
@@ -271,7 +276,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         address rebalancerProfile = _getProfile__Rebalancer();
         require(rebalancerProfile != address(0), "Rebalancer profile address not set");
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](6);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](4);
 
         roles[0] = RolesConfig.getRole__rebalance();
         roles[1] = RolesConfig.getRole__disableDepositsToStrategy();
@@ -279,8 +284,6 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         roles[2] = RolesConfig.getRole__pushFundsToChain();
         // Only used on the Earning Chain (EarningChainGateway), but granted in both Accounting and Earning Chain setups
         roles[3] = RolesConfig.getRole__pushFundsToAccountingChain();
-        roles[4] = RolesConfig.getRole__topUp();
-        roles[5] = RolesConfig.getRole__fundCoverage();
 
         _grantRolesToProfile(rebalancerProfile, roles);
     }
@@ -340,6 +343,18 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         roles[1] = RolesConfig.getRole__disableOverrideMode();
 
         _grantRolesToProfile(coverageGuardian, roles);
+    }
+
+    function _setupProfile__Funder() internal {
+        address funder = _getProfile__Funder();
+        require(funder != address(0), "Funder profile address not set");
+
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](2);
+
+        roles[0] = RolesConfig.getRole__topUp();
+        roles[1] = RolesConfig.getRole__fundCoverage();
+
+        _grantRolesToProfile(funder, roles);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
