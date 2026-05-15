@@ -10,11 +10,10 @@ import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 interface ICcipBridgeAdapter is IBridgeAdapter {
     /// @notice CCIP-specific fee parameters decoded by `CcipAdapter` when publishing a message.
     /// @param feeToken Token to pay the bridge fee in.
-    /// @param feeAmount Amount of `feeToken` approved by `feePayer` to spend on fees.
-    /// @param feeRefundThreshold Minimum unused `feeToken` that must remain to trigger a refund to `feePayer`.
+    /// @param feeRefundThreshold Minimum native-fee surplus over the CCIP-quote estimate that triggers a refund to
+    /// `feePayer`
     struct CcipFeeParams {
         address feeToken;
-        uint256 feeAmount;
         uint256 feeRefundThreshold;
     }
 

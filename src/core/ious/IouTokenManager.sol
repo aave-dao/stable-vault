@@ -14,7 +14,7 @@ import {Errors} from "src/types/Errors.sol";
 
 /// @title IouTokenManager
 /// @author Aave Labs
-/// @notice Manages the IOU token locking, releasing, minting, burning.
+/// @notice Manages the IOU token locking, releasing, minting, burning, and user-initiated cross-chain bridging.
 /// @custom:upgradeable
 contract IouTokenManager is TransferHelperClient, IIouTokenManager {
     using SafeERC20 for IERC20;
@@ -102,12 +102,13 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
         address iouTokenRecipient,
         uint256 iouTokenAmountRay,
         address bridgeAdapter,
-        uint256 gasLimit,
+        uint256 payloadExecutionGasLimit,
         bytes calldata bridgeAdapterData
     ) external payable override {
         require(destinationChainId != block.chainid, Errors.InvalidDestinationChainId());
         require(iouTokenRecipient != address(0), Errors.InvalidParameter());
         require(iouTokenAmountRay > 0, Errors.ZeroAmount());
+
         if (IS_ACCOUNTING_CHAIN) {
             _lockTokens(msg.sender, iouTokenAmountRay);
         } else {
@@ -120,7 +121,7 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
             iouTokenAmountRay,
             bridgeAdapter,
             msg.sender,
-            gasLimit,
+            payloadExecutionGasLimit,
             bridgeAdapterData
         );
 

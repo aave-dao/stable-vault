@@ -12,7 +12,9 @@ import {LocalBalanceAggregator} from "src/core/LocalBalanceAggregator.sol";
 import {IAccountingChainGateway} from "src/interfaces/IAccountingChainGateway.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IChainBalanceOracle} from "src/interfaces/IChainBalanceOracle.sol";
+import {IFundsBridgingPolicy} from "src/interfaces/IFundsBridgingPolicy.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
+import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {RescuableNative} from "src/misc/RescuableNative.sol";
@@ -39,6 +41,10 @@ contract FundsHandler is
     address internal immutable VAULT;
     address internal immutable GATEWAY;
     address internal immutable CHAIN_BALANCE_ORACLE;
+    address internal immutable POLICY_REGISTRY;
+
+    // keccak256("aave.stable-vault.FundsHandler.policy.bridge")
+    bytes32 internal constant BRIDGE_POLICY_ID = 0xe8134dfa9ba78c8f4bc7215c2603da92d80f826e18cf8cf1673b973cae3e6165;
 
     /// @custom:storage-location erc7201:aave.storage.FundsHandler
     struct FundsHandlerStorage {
@@ -72,21 +78,25 @@ contract FundsHandler is
     /// @param priceOracle The address of the PriceOracle contract to use for pricing assets.
     /// @param transferHelper The address of the TransferHelper contract to use for minimizing the number of transfers.
     /// @param chainBalanceOracle The address of the ChainBalanceOracle contract to use for cross-chain balance queries.
+    /// @param policyRegistry The address of the PolicyRegistry contract used to look up policies by ID.
     constructor(
         address stableVault,
         address gateway,
         address allocator,
         address priceOracle,
         address transferHelper,
-        address chainBalanceOracle
+        address chainBalanceOracle,
+        address policyRegistry
     ) TransferHelperClient(transferHelper) LocalBalanceAggregator(allocator, priceOracle) {
         require(stableVault != address(0), Errors.ZeroAddress());
         require(gateway != address(0), Errors.ZeroAddress());
         require(chainBalanceOracle != address(0), Errors.ZeroAddress());
+        require(policyRegistry != address(0), Errors.ZeroAddress());
         _disableInitializers();
         VAULT = stableVault;
         GATEWAY = gateway;
         CHAIN_BALANCE_ORACLE = chainBalanceOracle;
+        POLICY_REGISTRY = policyRegistry;
     }
 
     /// @dev Initializer.
@@ -117,9 +127,9 @@ contract FundsHandler is
     }
 
     /// @inheritdoc IFundsHandler
-    function processDeposit(address asset, uint256 amount) external override onlyStableVault returns (uint256) {
+    function processDeposit(address asset, uint256 amount) external override onlyStableVault {
         require(amount > 0, Errors.ZeroAmount());
-        return IAllocator(ALLOCATOR).deposit(asset, amount);
+        IAllocator(ALLOCATOR).deposit(asset, amount);
     }
 
     /// @inheritdoc IFundsHandler
@@ -151,17 +161,20 @@ contract FundsHandler is
         uint256 amount,
         uint256 chainId,
         address bridgeAdapter,
-        uint256 gasLimit,
-        bytes calldata bridgeAdapterData
+        uint256 receiverExecutionGasLimit,
+        bytes calldata bridgeAdapterData,
+        bytes calldata policyData
     ) external payable override restricted assertingTransferHelperBalanceFor(asset) {
         require(amount > 0, Errors.ZeroAmount());
         require($storage().earningChainIds.contains(chainId), Errors.InvalidDestinationChainId());
+
+        _applyFundsBridgingPolicy(chainId, bridgeAdapter, asset, amount, policyData);
 
         // Pull funds from liquidity into the TransferHelper.
         _pullFundsFromImmediateLiquidity(asset, amount);
 
         IAccountingChainGateway(GATEWAY).sendPushFundsToChainMessage{value: msg.value}(
-            asset, amount, chainId, bridgeAdapter, msg.sender, gasLimit, bridgeAdapterData
+            asset, amount, chainId, bridgeAdapter, msg.sender, receiverExecutionGasLimit, bridgeAdapterData
         );
     }
 
@@ -169,13 +182,37 @@ contract FundsHandler is
 
     /// @inheritdoc IFundsHandler
     function fundsArrivedFromChainCallback(address asset, uint256 amount) external override onlyGateway {
-        IAllocator(ALLOCATOR).depositAllowIdle(asset, amount);
+        IAllocator(ALLOCATOR).deposit(asset, amount);
     }
 
     ////////////////////////////////////////////////// INTERNAL ////////////////////////////////////////////////////////
 
     function _pullFundsFromImmediateLiquidity(address asset, uint256 amount) internal {
         IAllocator(ALLOCATOR).withdraw(asset, amount);
+    }
+
+    function _applyFundsBridgingPolicy(
+        uint256 chainId,
+        address bridgeAdapter,
+        address asset,
+        uint256 amount,
+        bytes calldata policyData
+    ) internal {
+        address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(BRIDGE_POLICY_ID);
+        if (policy == address(0)) {
+            return;
+        }
+        IFundsBridgingPolicy(policy)
+            .applyFundsBridgingPolicy(
+                IFundsBridgingPolicy.FundsBridgingIntent({
+                caller: msg.sender,
+                bridgeAdapter: bridgeAdapter,
+                destChainId: chainId,
+                asset: asset,
+                amount: amount,
+                policyData: policyData
+            })
+            );
     }
 
     /// @dev Returns 0 when the chain balance is stale, grossly underestimating the balance.

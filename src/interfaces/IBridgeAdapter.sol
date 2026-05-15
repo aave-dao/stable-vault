@@ -33,6 +33,10 @@ interface IBridgeAdapter {
     /// @return gateway Address of the Gateway contract.
     function getGateway() external view returns (address);
 
+    /// @notice Getter for the gas overhead added to data-only payload execution.
+    /// @return dataOnlyReceiveGasOverhead Gas overhead added by the adapter before forwarding to the bridge provider.
+    function getDataOnlyReceiveGasOverhead() external view returns (uint256 dataOnlyReceiveGasOverhead);
+
     /// @notice Sets the destination chain adapter for a given chain id.
     /// @dev The adapter on the destination chain must support receiving of messages from the bridge which this adapter
     /// publishes to.
@@ -41,24 +45,39 @@ interface IBridgeAdapter {
     /// @param destinationChainAdapter Address of the destination chain adapter.
     function setDestinationChainAdapter(uint256 chainId, address destinationChainAdapter) external;
 
-    /// @notice Sends an arbitrary message containing instructions or data updates to a destination chain.
-    /// @dev ERC-20 fees require `feePayer` to have approved this adapter for `feeAmount`; native fees come
+    /// @notice Sends a data-only message to a destination chain.
+    /// @dev ERC-20 fees require `feePayer` to have approved this adapter for the quoted fee; native fees come
     /// via `msg.value`.
     /// @param destinationChainId Chain id of the chain to publish the message to.
-    /// @param asset Asset to bridge; `address(0xDA7ada7aDA7ADA7ADA7AdA7aDA7aDA7ADA7adA7a)` for data only messages.
-    /// @param amount Amount of the asset to bridge; set to 0 for data only messages.
-    /// @param data Arbitrary data that would be decoded and handled by the destination chain.
-    /// @param feePayer Address that will pay the bridge fee (also the recipient of any refund).
-    /// @param gasLimit Gas limit that should be allocated for execution of the message on the destination chain,
-    /// without considering the bridge adapter overhead.
+    /// @param messageData Data decoded and handled by the destination gateway.
+    /// @param feePayer Address that will pay the bridge fee.
+    /// @param payloadExecutionGasLimit Gas limit for the destination gateway call and everything it executes.
     /// @param bridgeAdapterData Any bridge adapter custom parameters that it may need to operate.
-    function publishMessageToChainWithFeePayer(
+    /// @dev The adapter must add its own gas overhead to `payloadExecutionGasLimit` when executing the message.
+    function publishDataOnlyMessage(
+        uint256 destinationChainId,
+        bytes memory messageData,
+        address feePayer,
+        uint256 payloadExecutionGasLimit,
+        bytes memory bridgeAdapterData
+    ) external payable;
+
+    /// @notice Sends funds, optionally with message data, to a destination chain.
+    /// @param destinationChainId Chain id of the chain to publish the message to.
+    /// @param asset Asset to bridge.
+    /// @param amount Amount of the asset to bridge.
+    /// @param messageData Data decoded and handled by the destination gateway.
+    /// @param feePayer Address that will pay the bridge fee.
+    /// @param receiverExecutionGasLimit Gas limit for destination receiver execution. This includes adapter receive
+    /// logic, token handling, and the gateway call, but excludes bridge provider infrastructure.
+    /// @param bridgeAdapterData Any bridge adapter custom parameters that it may need to operate.
+    function publishMessageWithFunds(
         uint256 destinationChainId,
         address asset,
         uint256 amount,
-        bytes memory data,
+        bytes memory messageData,
         address feePayer,
-        uint256 gasLimit,
+        uint256 receiverExecutionGasLimit,
         bytes memory bridgeAdapterData
     ) external payable;
 }
