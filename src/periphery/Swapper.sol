@@ -5,7 +5,7 @@ pragma solidity ^0.8.22;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
 import {ISlippageCoverageVault} from "src/interfaces/ISlippageCoverageVault.sol";
 import {ISwapper} from "src/interfaces/ISwapper.sol";
@@ -18,7 +18,7 @@ import {Errors} from "src/types/Errors.sol";
 /// @notice Swapper contract for executing swaps with slippage coverage and access control.
 /// @dev Coverage is pulled from the immutable bound `SLIPPAGE_VAULT`, which also enforces caps and bounds the per-call
 /// `slippageToleranceBps` against `maxSlippageBps` (or `overrideMaxSlippageBps` in override mode).
-contract Swapper is Ownable, ReentrancyGuard, ISwapper {
+contract Swapper is Ownable, ReentrancyGuardTransient, ISwapper {
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
 
