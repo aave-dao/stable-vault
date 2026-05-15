@@ -378,6 +378,9 @@ contract StableVault is
     }
 
     /// @inheritdoc IStableVault
+    /// @dev Partial requests that leave non-redeemable dust are upgraded to full withdrawals, because of that - if the
+    /// Vault is insolvent, the upgraded interest portion might not be covered by the surplus, so the request can revert
+    /// with `InsufficientAssets`. Lower the requested amount in such case.
     function requestWithdrawal(address user, uint256 requestedAmountInRay, bytes calldata policyData)
         external
         virtual
