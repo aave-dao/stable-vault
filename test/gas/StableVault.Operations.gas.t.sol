@@ -32,7 +32,7 @@ contract StableVaultOperationsGasTest is BaseTest {
         address user = _generateNewUser();
         _mintAndApprove(user);
         vm.prank(user);
-        vault.deposit(user, address(USDC), amount);
+        vault.deposit(user, address(USDC), amount, "");
     }
 
     function test_deposit_firstDepositFromUser_baseSubVault() public {
@@ -40,7 +40,7 @@ contract StableVaultOperationsGasTest is BaseTest {
         _mintAndApprove(user);
 
         vm.prank(user);
-        vault.deposit(user, address(USDC), amount);
+        vault.deposit(user, address(USDC), amount, "");
         vm.snapshotGasLastCall(NAMESPACE, "[deposit] base sub-vault - user's 1st deposit");
     }
 
@@ -49,11 +49,11 @@ contract StableVaultOperationsGasTest is BaseTest {
 
         _mintAndApprove(user);
         vm.prank(user);
-        vault.deposit(user, address(USDC), amount);
+        vault.deposit(user, address(USDC), amount, "");
 
         _mintAndApprove(user);
         vm.prank(user);
-        vault.deposit(user, address(USDC), amount);
+        vault.deposit(user, address(USDC), amount, "");
         vm.snapshotGasLastCall(NAMESPACE, "[deposit] base sub-vault - user's 2nd deposit");
     }
 
@@ -62,15 +62,15 @@ contract StableVaultOperationsGasTest is BaseTest {
 
         _mintAndApprove(user);
         vm.prank(user);
-        vault.deposit(user, address(USDC), amount);
+        vault.deposit(user, address(USDC), amount, "");
 
         _mintAndApprove(user);
         vm.prank(user);
-        vault.deposit(user, address(USDC), amount);
+        vault.deposit(user, address(USDC), amount, "");
 
         _mintAndApprove(user);
         vm.prank(user);
-        vault.deposit(user, address(USDC), amount);
+        vault.deposit(user, address(USDC), amount, "");
         vm.snapshotGasLastCall(NAMESPACE, "[deposit] base sub-vault - user's 3rd deposit");
     }
 
@@ -79,7 +79,7 @@ contract StableVaultOperationsGasTest is BaseTest {
 
         _mintAndApprove(user);
         vm.prank(user);
-        vault.deposit(user, address(USDC), amount);
+        vault.deposit(user, address(USDC), amount, "");
 
         uint256 newRate = 1_000000001547125957863212449; // 5% APY
         IStableVault.UserRateData[] memory userRateData = new IStableVault.UserRateData[](1);
@@ -98,7 +98,7 @@ contract StableVaultOperationsGasTest is BaseTest {
             address user = _generateNewUser();
             _mintAndApprove(user);
             vm.prank(user);
-            vault.deposit(user, address(USDC), amount);
+            vault.deposit(user, address(USDC), amount, "");
             userRateData[i] = IStableVault.UserRateData(user, newRate);
         }
 
@@ -115,7 +115,7 @@ contract StableVaultOperationsGasTest is BaseTest {
             address user = _generateNewUser();
             _mintAndApprove(user);
             vm.prank(user);
-            vault.deposit(user, address(USDC), amount);
+            vault.deposit(user, address(USDC), amount, "");
             userRateData[i] = IStableVault.UserRateData(user, newRate);
         }
 
@@ -132,7 +132,7 @@ contract StableVaultOperationsGasTest is BaseTest {
             address user = _generateNewUser();
             _mintAndApprove(user);
             vm.prank(user);
-            vault.deposit(user, address(USDC), amount);
+            vault.deposit(user, address(USDC), amount, "");
             userRateData[i] = IStableVault.UserRateData(user, newRate);
         }
 
@@ -150,7 +150,7 @@ contract StableVaultOperationsGasTest is BaseTest {
             address user = _generateNewUser();
             _mintAndApprove(user);
             vm.prank(user);
-            vault.deposit(user, address(USDC), amount);
+            vault.deposit(user, address(USDC), amount, "");
 
             userRateData[i] = IStableVault.UserRateData(user, ++newRate);
         }
@@ -169,7 +169,7 @@ contract StableVaultOperationsGasTest is BaseTest {
             address user = _generateNewUser();
             _mintAndApprove(user);
             vm.prank(user);
-            vault.deposit(user, address(USDC), amount);
+            vault.deposit(user, address(USDC), amount, "");
 
             userRateData[i] = IStableVault.UserRateData(user, ++newRate);
         }
@@ -184,12 +184,12 @@ contract StableVaultOperationsGasTest is BaseTest {
 
         _mintAndApprove(user);
         vm.prank(user);
-        vault.deposit(user, address(USDC), amount);
+        vault.deposit(user, address(USDC), amount, "");
 
         uint256 partialWithdrawalAmountRay = (amount / 2).assetDecimalsToRay(address(USDC));
 
         vm.prank(user);
-        vault.requestWithdrawal(user, partialWithdrawalAmountRay);
+        vault.requestWithdrawal(user, partialWithdrawalAmountRay, "");
         vm.snapshotGasLastCall(NAMESPACE, "[requestWithdrawal] partial withdrawal");
     }
 
@@ -198,12 +198,12 @@ contract StableVaultOperationsGasTest is BaseTest {
 
         _mintAndApprove(user);
         vm.prank(user);
-        vault.deposit(user, address(USDC), amount);
+        vault.deposit(user, address(USDC), amount, "");
 
         uint256 fullWithdrawalAmountRay = amount.assetDecimalsToRay(address(USDC));
 
         vm.prank(user);
-        vault.requestWithdrawal(user, fullWithdrawalAmountRay);
+        vault.requestWithdrawal(user, fullWithdrawalAmountRay, "");
         vm.snapshotGasLastCall(NAMESPACE, "[requestWithdrawal] full withdrawal");
     }
 
@@ -212,12 +212,12 @@ contract StableVaultOperationsGasTest is BaseTest {
 
         _mintAndApprove(user);
         vm.prank(user);
-        vault.deposit(user, address(USDC), amount);
+        vault.deposit(user, address(USDC), amount, "");
 
         uint256 partialWithdrawalAmountRay = (amount / 2).assetDecimalsToRay(address(USDC));
 
         vm.prank(user);
-        vault.requestWithdrawal(user, partialWithdrawalAmountRay);
+        vault.requestWithdrawal(user, partialWithdrawalAmountRay, "");
 
         vm.prank(user);
         vault.executeWithdrawal(user, address(USDC), 0, partialWithdrawalAmountRay, "");
@@ -229,12 +229,12 @@ contract StableVaultOperationsGasTest is BaseTest {
 
         _mintAndApprove(user);
         vm.prank(user);
-        vault.deposit(user, address(USDC), amount);
+        vault.deposit(user, address(USDC), amount, "");
 
         uint256 fullWithdrawalAmountRay = amount.assetDecimalsToRay(address(USDC));
 
         vm.prank(user);
-        vault.requestWithdrawal(user, fullWithdrawalAmountRay);
+        vault.requestWithdrawal(user, fullWithdrawalAmountRay, "");
 
         vm.prank(user);
         vault.executeWithdrawal(user, address(USDC), 0, fullWithdrawalAmountRay, "");
@@ -263,7 +263,7 @@ contract StableVaultOperationsGasTest is BaseTest {
             }
             _mintAndApprove(user, asset, amountToDeposit);
             vm.prank(user);
-            vault.deposit(user, asset, amountToDeposit);
+            vault.deposit(user, asset, amountToDeposit, "");
             IStableVault.UserRateData[] memory userRateData = new IStableVault.UserRateData[](1);
             userRateData[0] = IStableVault.UserRateData(user, rate);
             vm.prank(everyRoleAccount);

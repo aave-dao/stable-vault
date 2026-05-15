@@ -22,20 +22,24 @@ import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
+import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
 import {AggregatorV3Interface, ChainlinkPriceOracleAdapter} from "src/oracles/price/ChainlinkPriceOracleAdapter.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {AssetRegistry} from "src/periphery/AssetRegistry.sol";
 import {EarningChainStateProvider} from "src/periphery/EarningChainStateProvider.sol";
+import {PolicyRegistry} from "src/periphery/PolicyRegistry.sol";
+import {SlippageCoverageVault} from "src/periphery/SlippageCoverageVault.sol";
 import {Swapper} from "src/periphery/Swapper.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
-import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
+import {FundsBridgingPolicy} from "src/policies/FundsBridgingPolicy.sol";
+import {WithdrawalExecutionPolicy} from "src/policies/WithdrawalExecutionPolicy.sol";
 
 abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainSetup, ATokenVaultDeployment {
     using Strings for address;
 
     address immutable PROXY_ADMIN_OWNER = getAccessManagerAddress(_deployer());
     address immutable ALLOCATOR_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
-    address immutable WITHDRAWAL_POLICY_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
+    address immutable WITHDRAWAL_EXECUTION_POLICY_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
     address immutable ASSET_REGISTRY_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
     address immutable GATEWAY_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
     address immutable IOU_TOKEN_MANAGER_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
@@ -46,6 +50,12 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
 
     address immutable ALLOCATOR_DEPOSITOR = getGatewayAddress(_deployer());
     address immutable ALLOCATOR_WITHDRAWER = getGatewayAddress(_deployer());
+
+    // keccak256("aave.stable-vault.EarningChainGateway.policy.withdrawal-execution")
+    bytes32 internal constant WITHDRAWAL_EXECUTION_POLICY_ID =
+        0xf213893b1e253163c05de458d1c9283d3155b096d439aab98ea90b491dce4bfb;
+    // keccak256("aave.stable-vault.EarningChainGateway.policy.bridge")
+    bytes32 internal constant BRIDGE_POLICY_ID = 0x537fb58e71f5b54dc09d8afff5cbf9bf5e630233f65f0531590f8cfa4a81bc6c;
 
     function _gho() internal view returns (address) {
         return _configAddress(".earningChain.assets.gho");
@@ -100,31 +110,47 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         );
 
         // Validate withdrawal policy signer
-        require(_configAddress(".withdrawalPolicy.signer") != address(0), "Withdrawal policy signer not set");
+        require(_configAddress(".withdrawalExecutionPolicy.signer") != address(0), "Withdrawal policy signer not set");
     }
 
     function _deployContracts() internal {
         _deployTransferHelper();
         _deployAccessManager();
         _deployAssetRegistry();
-        _deployWithdrawalPolicy();
+        _deployPolicyRegistry();
+        _deployWithdrawalExecutionPolicy();
         _deployIouToken();
         _deployIouTokenManager();
         _deployPriceOracle();
         _deployAllocator();
         _deployGateway();
+        _deploySlippageCoverageVault();
         _deploySwapper();
         _deployCcipAdapter();
         _deployEarningChainStateProvider();
+        _deployFundsBridgingPolicy();
     }
 
     function _setupContracts() internal {
         _setupBridgeAdapters();
         _setupAssetRegistry();
         _setupAllocator();
-        _setupWithdrawalPolicy();
+        _setupWithdrawalExecutionPolicy();
         _setupPriceOracleAdapters();
+        _setupFundsBridgingPolicy();
+        // Enforce required policies are set before the deployer loses ADMIN_ROLE. Otherwise, a missing policy
+        // would only surface in prod, where setting is gated by `CRITICAL_DELAY`.
+        _assertRequiredPoliciesSet();
         _setupAccessManager(_deployer()); // Must be last – revokes deployer's ADMIN_ROLE
+    }
+
+    function _assertRequiredPoliciesSet() private view {
+        IPolicyRegistry registry = IPolicyRegistry(getPolicyRegistryAddress(_deployer()));
+        require(
+            registry.getPolicy(WITHDRAWAL_EXECUTION_POLICY_ID) != address(0),
+            "missing earning-chain withdrawal-execution policy"
+        );
+        require(registry.getPolicy(BRIDGE_POLICY_ID) != address(0), "missing earning-chain bridge policy");
     }
 
     function _accessManager() internal view virtual override returns (address) {
@@ -158,10 +184,14 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         ICcipBridgeAdapter(localCcipAdapter).setDestinationChainAdapter(accountingChainId, accountingCcipAdapter);
     }
 
-    function _setupWithdrawalPolicy() internal {
-        WithdrawalPolicy withdrawalPolicy = WithdrawalPolicy(getWithdrawalPolicyAddress(_deployer()));
-        withdrawalPolicy.setDefaultFeeBps(uint16(_configUint(".withdrawalPolicy.defaultFeeBps")));
-        withdrawalPolicy.addSigner(_configAddress(".withdrawalPolicy.signer"));
+    function _setupWithdrawalExecutionPolicy() internal {
+        WithdrawalExecutionPolicy withdrawalExecutionPolicy =
+            WithdrawalExecutionPolicy(getWithdrawalExecutionPolicyAddress(_deployer()));
+        withdrawalExecutionPolicy.setDefaultFeeBps(uint16(_configUint(".withdrawalExecutionPolicy.defaultFeeBps")));
+        withdrawalExecutionPolicy.addSigner(_configAddress(".withdrawalExecutionPolicy.signer"));
+
+        IPolicyRegistry(getPolicyRegistryAddress(_deployer()))
+            .setPolicy(WITHDRAWAL_EXECUTION_POLICY_ID, address(withdrawalExecutionPolicy));
     }
 
     function _setupAllocator() internal {
@@ -235,22 +265,24 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         return assetRegistry;
     }
 
-    function _deployWithdrawalPolicy() internal returns (address) {
-        address implementation = address(new WithdrawalPolicy(getGatewayAddress(_deployer())));
-        _logDeployment("WithdrawalPolicy::Implementation", "", implementation);
-        address withdrawalPolicy = _deployTransparentProxy_create3({
-            namespacedSaltSeed: WITHDRAWAL_POLICY_SALT_SEED,
+    function _deployWithdrawalExecutionPolicy() internal returns (address) {
+        address implementation = address(new WithdrawalExecutionPolicy(getGatewayAddress(_deployer())));
+        _logDeployment("WithdrawalExecutionPolicy::Implementation", "", implementation);
+        address withdrawalExecutionPolicy = _deployTransparentProxy_create3({
+            namespacedSaltSeed: WITHDRAWAL_EXECUTION_POLICY_SALT_SEED,
             deployer: _deployer(),
             implementation: implementation,
-            proxyAdminOwner: WITHDRAWAL_POLICY_PROXY_ADMIN_OWNER,
-            initCalldata: abi.encodeCall(WithdrawalPolicy.initialize, (getAccessManagerAddress(_deployer()), 0))
+            proxyAdminOwner: WITHDRAWAL_EXECUTION_POLICY_PROXY_ADMIN_OWNER,
+            initCalldata: abi.encodeCall(
+                WithdrawalExecutionPolicy.initialize, (getAccessManagerAddress(_deployer()), 0)
+            )
         });
         require(
-            withdrawalPolicy == getWithdrawalPolicyAddress(_deployer()),
-            "WithdrawalPolicy does not match expected address"
+            withdrawalExecutionPolicy == getWithdrawalExecutionPolicyAddress(_deployer()),
+            "WithdrawalExecutionPolicy does not match expected address"
         );
-        _logDeployment("WithdrawalPolicy", WITHDRAWAL_POLICY_SALT_SEED, withdrawalPolicy);
-        return withdrawalPolicy;
+        _logDeployment("WithdrawalExecutionPolicy", WITHDRAWAL_EXECUTION_POLICY_SALT_SEED, withdrawalExecutionPolicy);
+        return withdrawalExecutionPolicy;
     }
 
     function _deployIouToken() internal returns (address) {
@@ -304,7 +336,8 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
                 withdrawer: ALLOCATOR_WITHDRAWER,
                 priceOracle: getPriceOracleAddress(_deployer()),
                 transferHelper: getTransferHelperAddress(_deployer()),
-                maxStrategiesPerAsset: uint8(_configUint(".maxStrategiesPerAsset"))
+                maxStrategiesPerAsset: uint8(_configUint(".maxStrategiesPerAsset")),
+                policyRegistry: getPolicyRegistryAddress(_deployer())
             })
         );
         _logDeployment("Allocator::Implementation", "", implementation);
@@ -328,7 +361,8 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
                 priceOracle: getPriceOracleAddress(_deployer()),
                 iouTokenManager: getIouTokenManagerAddress(_deployer()),
                 transferHelper: getTransferHelperAddress(_deployer()),
-                withdrawalPolicy: getWithdrawalPolicyAddress(_deployer())
+                policyRegistry: getPolicyRegistryAddress(_deployer()),
+                minBurnIouTokenGasLimit: _configUint(".earningChain.minBurnIouTokenGasLimit")
             })
         );
         _logDeployment("EarningChainGateway::Implementation", "", implementation);
@@ -344,11 +378,37 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         return gateway;
     }
 
+    function _deploySlippageCoverageVault() internal returns (address) {
+        address slippageCoverageVault = _deploy_create3({
+            namespacedSaltSeed: SLIPPAGE_COVERAGE_VAULT_SALT_SEED,
+            deployer: _deployer(),
+            initCode: abi.encodePacked(
+                type(SlippageCoverageVault).creationCode,
+                abi.encode(
+                    getSwapperAddress(_deployer()),
+                    getAccessManagerAddress(_deployer()),
+                    uint16(vm.parseUint(_configString(".slippageCoverageVault.maxSlippageBps"))),
+                    uint16(vm.parseUint(_configString(".slippageCoverageVault.overrideMaxSlippageBps"))),
+                    _configBool(".slippageCoverageVault.initialOverrideMode")
+                )
+            )
+        });
+        require(
+            slippageCoverageVault == getSlippageCoverageVaultAddress(_deployer()),
+            "SlippageCoverageVault does not match expected address"
+        );
+        _logDeployment("SlippageCoverageVault", SLIPPAGE_COVERAGE_VAULT_SALT_SEED, slippageCoverageVault);
+        return slippageCoverageVault;
+    }
+
     function _deploySwapper() internal returns (address) {
         address swapper = _deploy_create3({
             namespacedSaltSeed: SWAPPER_SALT_SEED,
             deployer: _deployer(),
-            initCode: abi.encodePacked(type(Swapper).creationCode, abi.encode(getAllocatorAddress(_deployer())))
+            initCode: abi.encodePacked(
+                type(Swapper).creationCode,
+                abi.encode(getAllocatorAddress(_deployer()), getSlippageCoverageVaultAddress(_deployer()))
+            )
         });
         require(swapper == getSwapperAddress(_deployer()), "Swapper does not match expected address");
         _logDeployment("Swapper", SWAPPER_SALT_SEED, swapper);
@@ -436,6 +496,72 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         );
         _logDeployment("ChainlinkPriceOracleAdapter::USDT", "", usdtAdapter);
         priceOracle.setOracleAdapterForAsset(_usdt(), usdtAdapter);
+    }
+
+    function _deployPolicyRegistry() internal returns (address) {
+        address policyRegistry = _deploy_create3({
+            namespacedSaltSeed: POLICY_REGISTRY_SALT_SEED,
+            deployer: _deployer(),
+            initCode: abi.encodePacked(
+                type(PolicyRegistry).creationCode, abi.encode(getAccessManagerAddress(_deployer()))
+            )
+        });
+        require(
+            policyRegistry == getPolicyRegistryAddress(_deployer()), "PolicyRegistry does not match expected address"
+        );
+        _logDeployment("PolicyRegistry", POLICY_REGISTRY_SALT_SEED, policyRegistry);
+        return policyRegistry;
+    }
+
+    function _deployFundsBridgingPolicy() internal returns (address) {
+        address fundsBridgingPolicy = _deploy_create3({
+            namespacedSaltSeed: FUNDS_BRIDGING_POLICY_SALT_SEED,
+            deployer: _deployer(),
+            initCode: abi.encodePacked(
+                type(FundsBridgingPolicy).creationCode,
+                abi.encode(getAccessManagerAddress(_deployer()), getGatewayAddress(_deployer()))
+            )
+        });
+        require(
+            fundsBridgingPolicy == getFundsBridgingPolicyAddress(_deployer()),
+            "FundsBridgingPolicy does not match expected address"
+        );
+        _logDeployment("FundsBridgingPolicy", FUNDS_BRIDGING_POLICY_SALT_SEED, fundsBridgingPolicy);
+        return fundsBridgingPolicy;
+    }
+
+    function _setupFundsBridgingPolicy() internal {
+        FundsBridgingPolicy policy = FundsBridgingPolicy(getFundsBridgingPolicyAddress(_deployer()));
+
+        IPolicyRegistry(getPolicyRegistryAddress(_deployer())).setPolicy(BRIDGE_POLICY_ID, address(policy));
+
+        uint256 destChainId = _configUint(".accountingChain.chainId");
+        address bridgeAdapter = getCcipAdapterAddress(_deployer());
+
+        _initBridgingLimit(
+            policy, _gho(), destChainId, bridgeAdapter, ".earningChain.fundsBridgingPolicy.perAssetLimits.gho"
+        );
+        _initBridgingLimit(
+            policy, _usdc(), destChainId, bridgeAdapter, ".earningChain.fundsBridgingPolicy.perAssetLimits.usdc"
+        );
+        _initBridgingLimit(
+            policy, _usdt(), destChainId, bridgeAdapter, ".earningChain.fundsBridgingPolicy.perAssetLimits.usdt"
+        );
+    }
+
+    function _initBridgingLimit(
+        FundsBridgingPolicy policy,
+        address asset,
+        uint256 destChainId,
+        address bridgeAdapter,
+        string memory configKey
+    ) private {
+        uint128 capacity = uint128(vm.parseUint(_configString(string.concat(configKey, ".capacity"))));
+        uint128 refillRate = uint128(vm.parseUint(_configString(string.concat(configKey, ".refillRate"))));
+        policy.raiseBridgingCapacity(asset, destChainId, bridgeAdapter, capacity);
+        if (refillRate > 0) {
+            policy.raiseBridgingRefillRate(asset, destChainId, bridgeAdapter, refillRate);
+        }
     }
 
     function _logDeployment(string memory name, string memory saltSeed, address addr) internal virtual override {

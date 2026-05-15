@@ -24,7 +24,8 @@ contract MockEarningChainGateway is IEarningChainGateway {
         uint256 amount,
         address bridgeAdapter,
         uint256 gasLimit,
-        bytes calldata bridgeAdapterData
+        bytes calldata bridgeAdapterData,
+        bytes calldata policyData
     ) external payable {}
 
     function exchangeIouTokens(
@@ -35,7 +36,7 @@ contract MockEarningChainGateway is IEarningChainGateway {
         address bridgeAdapter,
         uint256 gasLimit,
         bytes calldata bridgeAdapterData,
-        bytes memory withdrawalPolicyData
+        bytes memory policyData
     ) external payable returns (uint256) {}
 
     function sendPushFundsToChainMessage(

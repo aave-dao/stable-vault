@@ -13,12 +13,15 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
+import {IDepositPolicy} from "src/interfaces/IDepositPolicy.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
+import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
-import {IWithdrawalPolicy} from "src/interfaces/IWithdrawalPolicy.sol";
+import {IWithdrawalExecutionPolicy} from "src/interfaces/IWithdrawalExecutionPolicy.sol";
+import {IWithdrawalRequestPolicy} from "src/interfaces/IWithdrawalRequestPolicy.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {Multicall} from "src/misc/Multicall.sol";
@@ -79,11 +82,20 @@ contract StableVault is
 
     address internal immutable FUNDS_HANDLER;
 
-    address internal immutable WITHDRAWAL_POLICY;
-
     address internal immutable PRICE_ORACLE;
 
     uint256 internal immutable MAX_ACTIVE_SUB_VAULTS;
+
+    address internal immutable POLICY_REGISTRY;
+
+    // keccak256("aave.stable-vault.StableVault.policy.deposit")
+    bytes32 internal constant DEPOSIT_POLICY_ID = 0x780c69a8d1890ef009c0e82622a8ad8b5fcebdb4655a550589c95587ab9f8737;
+    // keccak256("aave.stable-vault.StableVault.policy.withdrawal-request")
+    bytes32 internal constant WITHDRAWAL_REQUEST_POLICY_ID =
+        0x9c238a3c8b0489eb6352e8961b4f7a11406d8d4dea0b75e9f2b5cab473d164d8;
+    // keccak256("aave.stable-vault.StableVault.policy.withdrawal-execution")
+    bytes32 internal constant WITHDRAWAL_EXECUTION_POLICY_ID =
+        0x0b31c7380981f7a065b16980994765a46c7c2446175bc97b41109919817f1ca2;
 
     /// @custom:storage-location erc7201:aave.storage.StableVault
     struct StableVaultStorage {
@@ -143,34 +155,34 @@ contract StableVault is
     /// @param iouTokenManager The address of the address that manages the supply of IOUs.
     /// @param fundsHandler The address of the contract that handles funds of the accounting chain.
     /// @param transferHelper The address of the contract that helps minimize the number of transfers across flows.
-    /// @param withdrawalPolicy The address of the contract ensuring protocol's withdrawal requirements are met.
     /// @param priceOracle The address of the PriceOracle contract.
     /// @param maxActiveSubVaults The maximum number of active sub-vaults allowed.
+    /// @param policyRegistry The address of the PolicyRegistry contract used to look up policies by ID.
     constructor(
         uint256 maxValidPerSecondRate,
         address assetRegistry,
         address iouTokenManager,
         address fundsHandler,
         address transferHelper,
-        address withdrawalPolicy,
         address priceOracle,
-        uint256 maxActiveSubVaults
+        uint256 maxActiveSubVaults,
+        address policyRegistry
     ) TransferHelperClient(transferHelper) {
         require(assetRegistry != address(0), Errors.ZeroAddress());
         require(iouTokenManager != address(0), Errors.ZeroAddress());
         require(fundsHandler != address(0), Errors.ZeroAddress());
-        require(withdrawalPolicy != address(0), Errors.ZeroAddress());
         require(priceOracle != address(0), Errors.ZeroAddress());
+        require(policyRegistry != address(0), Errors.ZeroAddress());
         require(maxValidPerSecondRate > MathLib.RAY, InvalidRate());
         require(maxActiveSubVaults > 0, Errors.InvalidParameter());
         _disableInitializers();
         ASSET_REGISTRY = assetRegistry;
         IOU_TOKEN_MANAGER = iouTokenManager;
         FUNDS_HANDLER = fundsHandler;
-        WITHDRAWAL_POLICY = withdrawalPolicy;
         PRICE_ORACLE = priceOracle;
         MAX_VALID_PER_SECOND_RATE = maxValidPerSecondRate;
         MAX_ACTIVE_SUB_VAULTS = maxActiveSubVaults;
+        POLICY_REGISTRY = policyRegistry;
     }
 
     /// @dev Initializer.
@@ -209,7 +221,7 @@ contract StableVault is
     }
 
     /// @inheritdoc IStableVault
-    function deposit(address user, address asset, uint256 amount)
+    function deposit(address user, address asset, uint256 amount, bytes calldata policyData)
         external
         virtual
         override
@@ -218,6 +230,8 @@ contract StableVault is
     {
         require(IAssetRegistry(ASSET_REGISTRY).isUserDepositAllowed(asset), Errors.UnsupportedAsset(asset));
         require(amount > 0, Errors.InvalidAmount());
+
+        _applyDepositPolicy(user, asset, amount, policyData);
 
         IPriceOracle(PRICE_ORACLE).validatePrice(asset);
 
@@ -253,7 +267,7 @@ contract StableVault is
     }
 
     /// @notice Transfers Stable Vault balance (denominated in RAY) between users.
-    /// @dev This is accounting-only (no IOUs, no assets, no WithdrawalPolicy).
+    /// @dev This is accounting-only (no IOUs, no assets, no WithdrawalExecutionPolicy).
     /// @dev For full balance transfers, use transferAll() instead.
     /// @dev Reverts if the remaining sender balance after transfer would be below dust threshold.
     /// @dev The sender's principal (`originalDepositRay`) is decremented by up to `amountRay` and the same principal
@@ -368,7 +382,7 @@ contract StableVault is
     }
 
     /// @inheritdoc IStableVault
-    function requestWithdrawal(address user, uint256 requestedAmountInRay)
+    function requestWithdrawal(address user, uint256 requestedAmountInRay, bytes calldata policyData)
         external
         virtual
         override
@@ -397,6 +411,13 @@ contract StableVault is
                 (actualAmountInRay, guaranteedAmountRay, redeemedShares) = _previewFullWithdrawalRequest(user);
             }
         }
+
+        _applyWithdrawalRequestPolicy({
+            user: user,
+            principalAmountInRay: guaranteedAmountRay,
+            interestAmountInRay: actualAmountInRay - guaranteedAmountRay,
+            policyData: policyData
+        });
 
         uint256 remainingShares = _burnShares(user, subVaultId, redeemedShares);
         if (remainingShares == 0) {
@@ -436,17 +457,12 @@ contract StableVault is
         address assetOut,
         uint256 minAmountOut,
         uint256 iouAmountRay,
-        bytes memory withdrawalPolicyData
+        bytes memory policyData
     ) external virtual override nonReentrant assertingTransferHelperBalanceFor(assetOut) {
         require(user == msg.sender, OnlyUser());
         require(iouAmountRay > 0, Errors.ZeroAmount());
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(user, iouAmountRay);
-        uint256 amountOutRay = IWithdrawalPolicy(WITHDRAWAL_POLICY)
-            .applyWithdrawalPolicy(
-                IWithdrawalPolicy.WithdrawalRequest({
-                user: user, assetOut: assetOut, iouAmountRay: iouAmountRay, data: withdrawalPolicyData
-            })
-            );
+        uint256 amountOutRay = _applyWithdrawalExecutionPolicy(user, assetOut, iouAmountRay, policyData);
         // Note: The `rayToAssetDecimals` conversion truncates, so the user may burn slightly more IOUs than the
         // exact RAY-equivalent of the assets received. This "dust" loss is at most `10 ^ (27 - assetDecimals) - 1` RAY
         // per withdrawal, which is economically negligible (e.g., <$0.000001 for 6-decimal stablecoins; it would take
@@ -471,6 +487,8 @@ contract StableVault is
         restricted
         assertingTransferHelperBalanceForAssets(assets)
     {
+        address treasury = $storage().treasury;
+        require(treasury != address(0), TreasuryNotSet());
         for (uint256 i = 0; i < assets.length; i++) {
             require(amounts[i] > 0, Errors.ZeroAmount());
             IFundsHandler(FUNDS_HANDLER).processWithdrawal(assets[i], amounts[i]);
@@ -481,8 +499,6 @@ contract StableVault is
         // chain). Operators should avoid calling claimSurplusInterest() during these transient windows to prevent
         // unnecessary reverts.
         require(_getVaultObligations() <= _getVaultAggregatedBalance(), SurplusInterestClaimLeadsToInsolvency());
-        address treasury = $storage().treasury;
-        require(treasury != address(0), TreasuryNotSet());
         ITransferHelper(TRANSFER_HELPER).transfer(assets, amounts, treasury);
         emit SurplusInterestClaimed(assets, amounts);
     }
@@ -604,16 +620,17 @@ contract StableVault is
     }
 
     function _getOrCreateSubVaultWithRate(uint256 perSecondRate) internal returns (uint256) {
-        if (_existsSubVaultWithRate(perSecondRate)) {
-            uint256 subVaultId = $storage().subVaultIdByRate[perSecondRate];
-            if (!_isActiveSubVaultById(subVaultId)) {
-                // This is safe on an inactive sub-vault because by definition such vault does not have any positions.
-                _resetSubVaultConversionRate(subVaultId);
-            }
-            return subVaultId;
-        } else {
+        uint256 subVaultId = $storage().subVaultIdByRate[perSecondRate];
+        if (subVaultId == 0) {
             return _createSubVault(perSecondRate);
         }
+
+        SubVault storage subVault = $storage().subVaultById[subVaultId];
+        if (subVault.totalShares == 0) {
+            subVault.conversionRate = MathLib.RAY;
+            subVault.lastAccrualTimestamp = block.timestamp;
+        }
+        return subVaultId;
     }
 
     function _setDefaultSubVault(uint256 subVaultId, uint256 perSecondRate) internal {
@@ -633,13 +650,6 @@ contract StableVault is
         $storage().subVaultIdByRate[newPerSecondRate] = newSubVaultId;
         emit SubVaultCreated(newSubVaultId, newPerSecondRate);
         return newSubVaultId;
-    }
-
-    // Resetting a subvault's conversion rate helps to prevent it growing and causing dust problems on migrations.
-    function _resetSubVaultConversionRate(uint256 subVaultId) internal {
-        SubVault storage subVault = $storage().subVaultById[subVaultId];
-        subVault.conversionRate = MathLib.RAY;
-        subVault.lastAccrualTimestamp = uint256(block.timestamp);
     }
 
     function _migrateUserToSubVault(address user, uint256 oldSubVaultId, uint256 newSubVaultId)
@@ -953,7 +963,7 @@ contract StableVault is
             if (_migrateUserToSubVault(user, oldSubVaultId, newSubVaultId)) {
                 emit UserRateSet(user, newSubVaultId, newPerSecondRate);
             } else {
-                emit UserRateSkippedDueToZeroShares(user, oldSubVaultId, newSubVaultId, newPerSecondRate);
+                emit UserRateSkippedDueToZeroShares(user, newSubVaultId);
             }
         }
         // `_validateAmountOfActiveSubVaults()` is intentionally not called here: this is invoked per-user inside
@@ -963,6 +973,63 @@ contract StableVault is
     function _setTreasury(address treasury) internal {
         $storage().treasury = treasury;
         emit TreasurySet(treasury);
+    }
+
+    /////////////////////////////////////// POLICY APPLICATION /////////////////////////////////////////////////////
+
+    function _applyDepositPolicy(address user, address asset, uint256 amount, bytes calldata policyData) internal {
+        address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(DEPOSIT_POLICY_ID);
+        if (policy == address(0)) {
+            return;
+        }
+        IDepositPolicy(policy)
+            .applyDepositPolicy(
+                IDepositPolicy.DepositIntent({
+                caller: msg.sender, user: user, asset: asset, amount: amount, policyData: policyData
+            })
+            );
+    }
+
+    function _applyWithdrawalRequestPolicy(
+        address user,
+        uint256 principalAmountInRay,
+        uint256 interestAmountInRay,
+        bytes calldata policyData
+    ) internal {
+        address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(WITHDRAWAL_REQUEST_POLICY_ID);
+        if (policy == address(0)) {
+            return;
+        }
+        IWithdrawalRequestPolicy(policy)
+            .applyWithdrawalRequestPolicy(
+                IWithdrawalRequestPolicy.WithdrawalRequestIntent({
+                caller: msg.sender,
+                user: user,
+                principalAmountInRay: principalAmountInRay,
+                interestAmountInRay: interestAmountInRay,
+                policyData: policyData
+            })
+            );
+    }
+
+    function _applyWithdrawalExecutionPolicy(
+        address user,
+        address assetOut,
+        uint256 iouAmountRay,
+        bytes memory policyData
+    ) internal returns (uint256) {
+        address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(WITHDRAWAL_EXECUTION_POLICY_ID);
+        if (policy == address(0)) {
+            return iouAmountRay;
+        }
+        uint256 amountOutRay = IWithdrawalExecutionPolicy(policy)
+            .applyWithdrawalExecutionPolicy(
+                IWithdrawalExecutionPolicy.WithdrawalExecutionIntent({
+                user: user, assetOut: assetOut, iouAmountRay: iouAmountRay, policyData: policyData
+            })
+            );
+        require(amountOutRay <= iouAmountRay, Errors.InvalidAmount());
+        return amountOutRay;
     }
 
     function _beforeRescueTokens(

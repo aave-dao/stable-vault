@@ -11,6 +11,7 @@ import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IStableVault} from "src/interfaces/IStableVault.sol";
+import {ISwapper} from "src/interfaces/ISwapper.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {Swapper} from "src/periphery/Swapper.sol";
 import {Constants} from "src/types/Constants.sol";
@@ -42,7 +43,7 @@ contract EndToEndTest is BaseTest {
         // User makes a deposit of 2 wei into Stable Vault.
         vm.startPrank(user);
         USDC.approve(address(vault), 2);
-        vault.deposit(user, address(USDC), 2);
+        vault.deposit(user, address(USDC), 2, "");
 
         uint256 userBalanceInRay = vault.getUserBalance(user);
         uint256 vaultAssetsInRay = vault.getAggregatedBalance();
@@ -75,7 +76,7 @@ contract EndToEndTest is BaseTest {
         vm.startPrank(user);
         USDC.approve(address(vault), amountForMaximumLoss);
         vm.expectRevert(Errors.InsufficientAmountOut.selector);
-        vault.deposit(user, address(USDC), amountForMaximumLoss);
+        vault.deposit(user, address(USDC), amountForMaximumLoss, "");
 
         uint256 userBalanceInRay = vault.getUserBalance(user);
         uint256 vaultAssetsInRay = vault.getAggregatedBalance();
@@ -95,7 +96,7 @@ contract EndToEndTest is BaseTest {
         // 1. User1 deposits 500 USDC to Vault on Accounting Chain
         vm.startPrank(user);
         USDC.approve(address(vault), userInitialDeposit);
-        vault.deposit(user, address(USDC), userInitialDeposit);
+        vault.deposit(user, address(USDC), userInitialDeposit, "");
         vm.stopPrank();
 
         // - check that funds are dropped into default liquidity vault
@@ -149,7 +150,8 @@ contract EndToEndTest is BaseTest {
                     ICcipBridgeAdapter.CcipFeeParams({
                         feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                     })
-                )
+                ),
+                ""
             );
 
             // - check that the funds land on Earning Chain and are dropped into default liquidity vault there
@@ -197,7 +199,7 @@ contract EndToEndTest is BaseTest {
             targets[0] = address(USDC);
             bytes[] memory callDatas = new bytes[](1);
             callDatas[0] = abi.encodeCall(IERC20.transfer, (address(this), userInitialDeposit));
-            Swapper.SlippageParams memory slippageParams = Swapper.SlippageParams(0, address(0));
+            uint16 slippageToleranceBps = 0;
 
             defaultGhoVault_earningChain = allocator_earningChain.getDefaultStrategy(address(GHO));
             // Deallocation params
@@ -212,7 +214,7 @@ contract EndToEndTest is BaseTest {
                 amountIn: userInitialDeposit,
                 assetOut: address(GHO),
                 swapper: address(swapper_earningChain),
-                data: abi.encode(targets, callDatas, slippageParams)
+                data: abi.encode(targets, callDatas, slippageToleranceBps)
             });
 
             // Allocation params
@@ -230,7 +232,7 @@ contract EndToEndTest is BaseTest {
 
             Logger.log("Rebalancing by swap from USDC to GHO on the Earning chain...");
             vm.prank(everyRoleAccount);
-            allocator_earningChain.rebalance(rebalances);
+            allocator_earningChain.rebalance(rebalances, "");
 
             // - check that the funds are swapped to GHO
             Logger.log(
@@ -299,7 +301,7 @@ contract EndToEndTest is BaseTest {
                     })
                 );
                 earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
-                    address(GHO), userEarningsInGho, address(ccipAdapter_earningChain), DEFAULT_GAS_LIMIT, bp
+                    address(GHO), userEarningsInGho, address(ccipAdapter_earningChain), DEFAULT_GAS_LIMIT, bp, ""
                 );
             }
 
@@ -344,7 +346,7 @@ contract EndToEndTest is BaseTest {
             uint256 divisor = 10 ** (AssetLib.getDecimals(address(GHO)) - AssetLib.getDecimals(address(USDC)));
             uint256 amountGhoIn = userEarningsInGho / divisor * divisor;
             callDatas[0] = abi.encodeCall(IERC20.transfer, (address(this), amountGhoIn));
-            Swapper.SlippageParams memory slippageParams = Swapper.SlippageParams(0, address(0));
+            uint16 slippageToleranceBps = 0;
 
             address defaultUsdcVault_accountingChain = allocator_accountingChain.getDefaultStrategy(address(USDC));
             IAllocator.DeallocationParams[] memory deallocationParams = new IAllocator.DeallocationParams[](1);
@@ -357,7 +359,7 @@ contract EndToEndTest is BaseTest {
                 amountIn: amountGhoIn,
                 assetOut: address(USDC),
                 swapper: address(swapper_accountingChain),
-                data: abi.encode(targets, callDatas, slippageParams)
+                data: abi.encode(targets, callDatas, slippageToleranceBps)
             });
 
             IAllocator.AllocationParams[] memory allocationParams = new IAllocator.AllocationParams[](1);
@@ -374,7 +376,7 @@ contract EndToEndTest is BaseTest {
 
             Logger.log("Rebalancing by swap from GHO to USDC on the Accounting chain...");
             vm.prank(everyRoleAccount);
-            allocator_accountingChain.rebalance(rebalances);
+            allocator_accountingChain.rebalance(rebalances, "");
 
             // - check that the funds are swapped to USDC (includes 1 extra wei for precision)
             Logger.log(
@@ -406,7 +408,7 @@ contract EndToEndTest is BaseTest {
 
             // Request withdrawal
             vm.prank(user);
-            iouAmountRequestedRay = vault.requestWithdrawal(user, 0);
+            iouAmountRequestedRay = vault.requestWithdrawal(user, 0, "");
 
             Logger.log("... request withdrawal minted IOU tokens: %s", iouAmountRequestedRay);
             // Check user IOU token balance
@@ -462,7 +464,7 @@ contract EndToEndTest is BaseTest {
                     })
                 );
                 earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
-                    address(GHO), ghoBalanceOnVaultLeft, address(ccipAdapter_earningChain), DEFAULT_GAS_LIMIT, bp
+                    address(GHO), ghoBalanceOnVaultLeft, address(ccipAdapter_earningChain), DEFAULT_GAS_LIMIT, bp, ""
                 );
             }
 

@@ -17,7 +17,9 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
+import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
+import {IRebalancePolicy} from "src/interfaces/IRebalancePolicy.sol";
 import {ISwapper} from "src/interfaces/ISwapper.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
@@ -55,11 +57,15 @@ contract Allocator is
     address internal immutable WITHDRAWER;
     address internal immutable ASSET_REGISTRY;
     address internal immutable PRICE_ORACLE;
+    address internal immutable POLICY_REGISTRY;
     uint8 internal immutable MAX_STRATEGIES_PER_ASSET;
 
     /// @dev Maximum slippage, denominated in asset units, tolerated to account for rounding errors when depositing
     /// to ERC-4626 yield strategies.
     uint8 internal constant STRATEGY_DEPOSIT_SLIPPAGE_TOLERANCE = 10;
+
+    // keccak256("aave.stable-vault.Allocator.policy.rebalance")
+    bytes32 internal constant REBALANCE_POLICY_ID = 0xc8677baa58e60e0903b82d16b92a11a49685a8844fe0f67b4f06e7d3ecef34cb;
 
     /// @custom:storage-location erc7201:aave.storage.Allocator
     struct AllocatorStorage {
@@ -103,24 +109,28 @@ contract Allocator is
     /// @param priceOracle The address of the price oracle contract.
     /// @param transferHelper The address of the contract that helps to minimize the number of transfers across flows.
     /// @param maxStrategiesPerAsset The maximum number of allowed yield strategies per asset.
+    /// @param policyRegistry The address of the PolicyRegistry contract used to look up policies by ID.
     constructor(
         address assetRegistry,
         address depositor,
         address withdrawer,
         address priceOracle,
         address transferHelper,
-        uint8 maxStrategiesPerAsset
+        uint8 maxStrategiesPerAsset,
+        address policyRegistry
     ) TransferHelperClient(transferHelper) {
         require(assetRegistry != address(0), Errors.ZeroAddress());
         require(depositor != address(0), Errors.ZeroAddress());
         require(withdrawer != address(0), Errors.ZeroAddress());
         require(priceOracle != address(0), Errors.ZeroAddress());
+        require(policyRegistry != address(0), Errors.ZeroAddress());
         require(maxStrategiesPerAsset > 0, Errors.InvalidParameter());
         _disableInitializers();
         ASSET_REGISTRY = assetRegistry;
         DEPOSITOR = depositor;
         WITHDRAWER = withdrawer;
         PRICE_ORACLE = priceOracle;
+        POLICY_REGISTRY = policyRegistry;
         MAX_STRATEGIES_PER_ASSET = maxStrategiesPerAsset;
     }
 
@@ -293,10 +303,19 @@ contract Allocator is
     //////////////////////////////////////////// MANAGER FUNCTIONS /////////////////////////////////////////////////////
 
     /// @inheritdoc IAllocator
-    function rebalance(RebalanceParams[] memory params) external virtual override restricted nonReentrant {
+    function rebalance(RebalanceParams[] memory params, bytes calldata policyData)
+        external
+        virtual
+        override
+        restricted
+        nonReentrant
+    {
         for (uint256 i = 0; i < params.length; i++) {
             _rebalance(params[i]);
         }
+        // The policy is applied after the rebalance so it can assert against post-state invariants efficiently without
+        // needing to parse the entire array of rebalance operations.
+        _applyRebalancePolicy(params, policyData);
     }
 
     /// @inheritdoc IAllocator
@@ -369,6 +388,17 @@ contract Allocator is
     }
 
     ////////////////////////////////////////////////// INTERNAL ////////////////////////////////////////////////////////
+
+    function _applyRebalancePolicy(RebalanceParams[] memory params, bytes calldata policyData) internal {
+        address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(REBALANCE_POLICY_ID);
+        if (policy == address(0)) {
+            return;
+        }
+        IRebalancePolicy(policy)
+            .applyRebalancePolicy(
+                IRebalancePolicy.RebalanceIntent({caller: msg.sender, params: params, policyData: policyData})
+            );
+    }
 
     function _rebalance(RebalanceParams memory rebalanceParams) internal {
         uint256 i;
