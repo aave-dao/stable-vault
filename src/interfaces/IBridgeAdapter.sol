@@ -46,6 +46,8 @@ interface IBridgeAdapter {
     function setDestinationChainAdapter(uint256 chainId, address destinationChainAdapter) external;
 
     /// @notice Sends a data-only message to a destination chain.
+    /// @dev ERC-20 fees require `feePayer` to have approved this adapter for the quoted fee; native fees come
+    /// via `msg.value`.
     /// @param destinationChainId Chain id of the chain to publish the message to.
     /// @param messageData Data decoded and handled by the destination gateway.
     /// @param feePayer Address that will pay the bridge fee.

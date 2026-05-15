@@ -191,16 +191,15 @@ contract CcipAdapter is
 
         uint64 chainSelector = _chainSelectorOf[destinationChainId];
         uint256 estimatedFeeAmount = IRouterClient(CCIP_ROUTER).getFee(chainSelector, ccipMessage);
-        require(ccipFeeParams.feeAmount >= estimatedFeeAmount, Errors.InsufficientFunds());
 
         if (ccipFeeParams.feeToken == Constants.NATIVE_CURRENCY) {
-            require(msg.value == ccipFeeParams.feeAmount, Errors.InsufficientFunds());
+            require(msg.value >= estimatedFeeAmount, Errors.InsufficientFunds());
         } else {
             // Reject msg.value to prevent accidental native loss; bridges are not expected to require both native
             // and ERC-20 fees simultaneously.
             require(msg.value == 0, Errors.InvalidParameter());
-            if (ccipFeeParams.feeAmount > 0) {
-                IERC20(ccipFeeParams.feeToken).safeTransferFrom(feePayer, address(this), ccipFeeParams.feeAmount);
+            if (estimatedFeeAmount > 0) {
+                IERC20(ccipFeeParams.feeToken).safeTransferFrom(feePayer, address(this), estimatedFeeAmount);
             }
         }
 
@@ -213,7 +212,6 @@ contract CcipAdapter is
             ccipMessage,
             feePayer,
             ccipFeeParams.feeToken,
-            ccipFeeParams.feeAmount,
             ccipFeeParams.feeRefundThreshold,
             estimatedFeeAmount
         );
@@ -278,32 +276,26 @@ contract CcipAdapter is
         Client.EVM2AnyMessage memory message,
         address feePayer,
         address feeToken,
-        uint256 allocatedFeeAmount,
         uint256 feeRefundThreshold,
         uint256 estimatedFeeAmount
     ) internal {
-        uint256 msgValue;
-        if (feeToken == Constants.NATIVE_CURRENCY) {
-            msgValue = estimatedFeeAmount;
-        }
-        if (allocatedFeeAmount > estimatedFeeAmount) {
-            uint256 excessFee = allocatedFeeAmount - estimatedFeeAmount;
-            if (excessFee > feeRefundThreshold) {
-                _triggerFeeRefund(feePayer, feeToken, excessFee);
+        bytes32 messageId = IRouterClient(CCIP_ROUTER)
+        .ccipSend{value: feeToken == Constants.NATIVE_CURRENCY ? estimatedFeeAmount : 0}(
+            chainSelector, message
+        );
+        if (feeToken == Constants.NATIVE_CURRENCY && msg.value > estimatedFeeAmount) {
+            uint256 excessFee = msg.value - estimatedFeeAmount;
+            if (excessFee >= feeRefundThreshold) {
+                _triggerNativeFeeRefund(feePayer, excessFee);
             }
         }
-        bytes32 messageId = IRouterClient(CCIP_ROUTER).ccipSend{value: msgValue}(chainSelector, message);
         emit MessagePublished(messageId);
     }
 
-    function _triggerFeeRefund(address feePayer, address feeToken, uint256 excessFee) internal {
-        if (feeToken == Constants.NATIVE_CURRENCY) {
-            (bool callSucceeded,) = payable(feePayer).call{value: excessFee}("");
-            require(callSucceeded, Errors.NativeTransferFailed());
-        } else {
-            IERC20(feeToken).safeTransfer(feePayer, excessFee);
-        }
-        emit FeeRefunded(feePayer, feeToken, excessFee);
+    function _triggerNativeFeeRefund(address feePayer, uint256 excessFee) internal {
+        (bool callSucceeded,) = payable(feePayer).call{value: excessFee}("");
+        require(callSucceeded, Errors.NativeTransferFailed());
+        emit FeeRefunded(feePayer, Constants.NATIVE_CURRENCY, excessFee);
     }
 
     function _validateMessageSource(Client.Any2EVMMessage calldata message) internal view {
