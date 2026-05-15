@@ -25,6 +25,10 @@ contract MockBridgeAdapter is IBridgeAdapter {
 
     function getGateway() external view override returns (address) {}
 
+    function getDataOnlyReceiveGasOverhead() external pure override returns (uint256) {
+        return 0;
+    }
+
     function publishDataOnlyMessage(
         uint256 destinationChainId,
         bytes memory messageData,

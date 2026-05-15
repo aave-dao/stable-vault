@@ -54,7 +54,7 @@ contract CcipAdapter is
 
     /// @dev Gas added on top of data-only payload execution so CCIP can execute this adapter around the gateway call.
     /// Gas tests measured about 15.3k gas for this exact-gas path; 30k keeps close to a 2x margin.
-    uint256 public constant DATA_ONLY_RECEIVE_GAS_OVERHEAD = 30_000;
+    uint256 internal constant DATA_ONLY_RECEIVE_GAS_OVERHEAD = 30_000;
 
     address internal immutable CCIP_ROUTER;
     address internal immutable ASSET_REGISTRY;
@@ -89,6 +89,11 @@ contract CcipAdapter is
     /// @inheritdoc ICcipBridgeAdapter
     function getRouter() external view override returns (address) {
         return address(CCIP_ROUTER);
+    }
+
+    /// @inheritdoc IBridgeAdapter
+    function getDataOnlyReceiveGasOverhead() external pure override returns (uint256 dataOnlyReceiveGasOverhead) {
+        return DATA_ONLY_RECEIVE_GAS_OVERHEAD;
     }
 
     /// @inheritdoc ICcipBridgeAdapter

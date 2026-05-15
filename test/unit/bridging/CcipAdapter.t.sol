@@ -1091,7 +1091,7 @@ contract CcipAdapterTest is TestWithHelpers {
             feeToken: address(_mockGho),
             extraArgs: Client._argsToBytes(
                 Client.GenericExtraArgsV2({
-                    gasLimit: DEFAULT_GAS_LIMIT + _accountingChainCcipAdapter.DATA_ONLY_RECEIVE_GAS_OVERHEAD(),
+                    gasLimit: DEFAULT_GAS_LIMIT + _accountingChainCcipAdapter.getDataOnlyReceiveGasOverhead(),
                     allowOutOfOrderExecution: true
                 })
             )
@@ -1131,7 +1131,7 @@ contract CcipAdapterTest is TestWithHelpers {
             feeToken: CCIP_NATIVE_FEE_TOKEN,
             extraArgs: Client._argsToBytes(
                 Client.GenericExtraArgsV2({
-                    gasLimit: DEFAULT_GAS_LIMIT + _accountingChainCcipAdapter.DATA_ONLY_RECEIVE_GAS_OVERHEAD(),
+                    gasLimit: DEFAULT_GAS_LIMIT + _accountingChainCcipAdapter.getDataOnlyReceiveGasOverhead(),
                     allowOutOfOrderExecution: true
                 })
             )
@@ -1173,7 +1173,7 @@ contract CcipAdapterTest is TestWithHelpers {
             feeToken: CCIP_NATIVE_FEE_TOKEN,
             extraArgs: Client._argsToBytes(
                 Client.GenericExtraArgsV2({
-                    gasLimit: DEFAULT_GAS_LIMIT + _accountingChainCcipAdapter.DATA_ONLY_RECEIVE_GAS_OVERHEAD(),
+                    gasLimit: DEFAULT_GAS_LIMIT + _accountingChainCcipAdapter.getDataOnlyReceiveGasOverhead(),
                     allowOutOfOrderExecution: true
                 })
             )
@@ -1210,7 +1210,7 @@ contract CcipAdapterTest is TestWithHelpers {
         );
     }
 
-    function test_publishMessageWithFunds_reverts_ifOnlyGateway(address caller) public {
+    function test_publishDataOnlyMessage_reverts_ifOnlyGateway(address caller) public {
         vm.assume(caller != address(_mockAccountingChainGateway));
         vm.assume(caller != address(_mockEarningChainGateway));
 
@@ -1243,12 +1243,48 @@ contract CcipAdapterTest is TestWithHelpers {
         );
     }
 
-    function test_publishMessageWithFunds_reverts_ifDestinationChainAdapterNotSet(uint256 destinationChainId) public {
+    function test_publishMessageWithFunds_reverts_ifOnlyGateway(address caller) public {
+        vm.assume(caller != address(_mockAccountingChainGateway));
+        vm.assume(caller != address(_mockEarningChainGateway));
+
+        vm.prank(caller);
+        vm.expectRevert(Errors.OnlyGateway.selector);
+        _accountingChainCcipAdapter.publishMessageWithFunds(
+            EARNING_CHAIN_ID, address(_mockUsdt), 1, "", address(this), DEFAULT_GAS_LIMIT, ""
+        );
+
+        vm.prank(caller);
+        vm.expectRevert(Errors.OnlyGateway.selector);
+        _earningChainCcipAdapter.publishMessageWithFunds(
+            ACCOUNTING_CHAIN_ID, address(_mockUsdt), 1, "", address(this), DEFAULT_GAS_LIMIT, ""
+        );
+    }
+
+    function test_publishDataOnlyMessage_reverts_ifDestinationChainAdapterNotSet(uint256 destinationChainId) public {
         vm.assume(destinationChainId != EARNING_CHAIN_ID);
         vm.expectRevert(Errors.InvalidParameter.selector);
         vm.prank(address(_mockAccountingChainGateway));
         _accountingChainCcipAdapter.publishDataOnlyMessage(
             destinationChainId,
+            "",
+            address(this),
+            DEFAULT_GAS_LIMIT,
+            abi.encode(
+                ICcipBridgeAdapter.CcipFeeParams({
+                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: 0, feeRefundThreshold: 0
+                })
+            )
+        );
+    }
+
+    function test_publishMessageWithFunds_reverts_ifDestinationChainAdapterNotSet(uint256 destinationChainId) public {
+        vm.assume(destinationChainId != EARNING_CHAIN_ID);
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        vm.prank(address(_mockAccountingChainGateway));
+        _accountingChainCcipAdapter.publishMessageWithFunds(
+            destinationChainId,
+            address(_mockUsdt),
+            1,
             "",
             address(this),
             DEFAULT_GAS_LIMIT,

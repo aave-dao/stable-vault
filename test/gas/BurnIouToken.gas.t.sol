@@ -151,7 +151,7 @@ contract BurnIouTokenGasTest is BaseTest {
         });
 
         (bool success,, uint256 gasUsed) =
-            mockCcipRouter.routeMessage(ccipMessage, 5_000, adapter.DATA_ONLY_RECEIVE_GAS_OVERHEAD(), address(adapter));
+            mockCcipRouter.routeMessage(ccipMessage, 5_000, adapter.getDataOnlyReceiveGasOverhead(), address(adapter));
 
         assertTrue(success, "Should succeed with the configured data-only receive overhead");
         emit log_named_uint("Data-only adapter overhead gas used", gasUsed);
@@ -200,7 +200,7 @@ contract BurnIouTokenGasTest is BaseTest {
     function test_burnIouToken_succeedsWithEnforcedGasLimit() public {
         Client.Any2EVMMessage memory ccipMessage = _buildBurnIouTokenCcipMessage();
         uint256 receiverExecutionGasLimit = ENFORCED_BURN_IOU_TOKEN_PAYLOAD_EXECUTION_GAS_LIMIT
-            + ccipAdapter_accountingChain.DATA_ONLY_RECEIVE_GAS_OVERHEAD();
+            + ccipAdapter_accountingChain.getDataOnlyReceiveGasOverhead();
 
         (bool success,, uint256 gasUsed) = mockCcipRouter.routeMessage(
             ccipMessage,

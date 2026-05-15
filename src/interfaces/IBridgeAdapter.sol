@@ -33,6 +33,10 @@ interface IBridgeAdapter {
     /// @return gateway Address of the Gateway contract.
     function getGateway() external view returns (address);
 
+    /// @notice Getter for the gas overhead added to data-only payload execution.
+    /// @return dataOnlyReceiveGasOverhead Gas overhead added by the adapter before forwarding to the bridge provider.
+    function getDataOnlyReceiveGasOverhead() external view returns (uint256 dataOnlyReceiveGasOverhead);
+
     /// @notice Sets the destination chain adapter for a given chain id.
     /// @dev The adapter on the destination chain must support receiving of messages from the bridge which this adapter
     /// publishes to.
