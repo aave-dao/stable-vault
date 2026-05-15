@@ -360,20 +360,20 @@ contract StableVaultTest is TestWithHelpers {
         );
     }
 
-    /// @dev VA-75: `decimals()` must return RAY_DECIMALS (27) so Etherscan and wallets display StableVault balances
+    /// @dev `decimals()` must return RAY_DECIMALS (27) so Etherscan and wallets display StableVault balances
     /// (which are denominated in RAY) with the correct decimal alignment.
     function test_decimals_returnsRayDecimals() public view {
         assertEq(stableVault.decimals(), Constants.RAY_DECIMALS);
         assertEq(stableVault.decimals(), 27);
     }
 
-    /// @dev VA-99: `name()` returns the value passed to the initializer, allowing each StableVault deployment
+    /// @dev `name()` returns the value passed to the initializer, allowing each StableVault deployment
     /// (USD, EUR, etc.) to set its own ERC20 metadata for off-chain display.
     function test_name_returnsValuePassedToInitializer() public view {
         assertEq(stableVault.name(), TEST_VAULT_NAME);
     }
 
-    /// @dev VA-99: `symbol()` returns the value passed to the initializer.
+    /// @dev `symbol()` returns the value passed to the initializer.
     function test_symbol_returnsValuePassedToInitializer() public view {
         assertEq(stableVault.symbol(), TEST_VAULT_SYMBOL);
     }

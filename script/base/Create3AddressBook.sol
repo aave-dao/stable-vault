@@ -15,6 +15,7 @@ contract Create3AddressBook {
     string constant ASSET_REGISTRY_SALT_SEED = "aave.stable-vault.AssetRegistry";
     string constant IOU_TOKEN_MANAGER_SALT_SEED = "aave.stable-vault.IouTokenManager";
     string constant IOU_TOKEN_SALT_SEED = "aave.stable-vault.IouToken";
+    string constant SLIPPAGE_COVERAGE_VAULT_SALT_SEED = "aave.stable-vault.SlippageCoverageVault";
     string constant SWAPPER_SALT_SEED = "aave.stable-vault.Swapper";
     string constant CCIP_ADAPTER_SALT_SEED = "aave.stable-vault.CcipAdapter";
     string constant PRICE_ORACLE_SALT_SEED = "aave.stable-vault.PriceOracle";
@@ -62,6 +63,10 @@ contract Create3AddressBook {
 
     function getIouTokenAddress(address deployer) internal pure virtual returns (address) {
         return Create3AddressLib.computeCreate3Address(IOU_TOKEN_SALT_SEED, deployer);
+    }
+
+    function getSlippageCoverageVaultAddress(address deployer) internal pure virtual returns (address) {
+        return Create3AddressLib.computeCreate3Address(SLIPPAGE_COVERAGE_VAULT_SALT_SEED, deployer);
     }
 
     function getSwapperAddress(address deployer) internal pure virtual returns (address) {

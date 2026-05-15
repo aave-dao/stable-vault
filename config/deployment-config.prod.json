@@ -17,11 +17,17 @@
     "disablerMulticallOwner": "0x5df9b2D5DA97286742e2aDC3358f0aFA1A7ECbBF",
     "withdrawalPolicyManager": "0xFBcf8bA0aCaECbd90990A29e37B8be3F631c38F6",
     "aTokenVaultRewardClaimer": "0x35b029C7715c668DCD6058B7a52C0377f404a4e8",
-    "stableVaultManager": "0x2A74c29e0Ee366788cc5EEa00c540264a3508fDB"
+    "stableVaultManager": "0x2A74c29e0Ee366788cc5EEa00c540264a3508fDB",
+    "coverageGuardian": "0x00000000000000000000000000000000C0FEC0FE"
   },
   "withdrawalExecutionPolicy": {
     "defaultFeeBps": 625,
     "signer": "0x2F87296892feD4AEE35D02eA71B3d04A5Be151a0"
+  },
+  "slippageCoverageVault": {
+    "maxSlippageBps": "100",
+    "overrideMaxSlippageBps": "5000",
+    "initialOverrideMode": true
   },
   "earningChain": {
     "chainId": 1,

@@ -14,7 +14,7 @@ import {Errors} from "src/types/Errors.sol";
 /// @author Aave Labs
 /// @notice Per-route rate-limited bridge-funds policy. Each `(asset, destChainId, bridgeAdapter)` triple has its own
 /// bucket; amounts are denominated in the asset's native decimals. Triples default to a zero-capacity bucket (fully
-/// rate-limited) until governance configures one; setting capacity to max uint128 removes the limit entirely.
+/// rate-limited) until operator configures one; setting capacity to max uint128 removes the limit entirely.
 contract FundsBridgingPolicy is AccessManaged, Multicall, IFundsBridgingPolicy {
     using RateLimitBucketLib for RateLimitBucketLib.Bucket;
 
