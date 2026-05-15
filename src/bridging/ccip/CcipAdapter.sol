@@ -292,7 +292,7 @@ contract CcipAdapter is
 
     function _requireZeroCcipRouterAllowance(address token) internal view {
         uint256 remainingAllowance = IERC20(token).allowance(address(this), CCIP_ROUTER);
-        require(remainingAllowance == 0, ICcipBridgeAdapter.UnexpectedCcipRouterAllowance(token, remainingAllowance));
+        require(remainingAllowance == 0, UnexpectedCcipRouterAllowance(token, remainingAllowance));
     }
 
     function _sendMessageWithFeePayer(

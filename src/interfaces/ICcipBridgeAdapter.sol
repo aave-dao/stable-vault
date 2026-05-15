@@ -30,8 +30,6 @@ interface ICcipBridgeAdapter is IBridgeAdapter {
     /// @notice Thrown when the CCIP router did not fully consume the allowance granted for a token used in
     /// `ccipSend` (bridged asset or ERC-20 fee token). Indicates the router pulled less than approved, leaving
     /// residual approval that this adapter does not expect.
-    /// @param token Token whose CCIP router allowance was not fully consumed.
-    /// @param remainingAllowance Allowance left on the CCIP router after `ccipSend`.
     /// @custom:selector 0x8d63b92b
     error UnexpectedCcipRouterAllowance(address token, uint256 remainingAllowance);
 
