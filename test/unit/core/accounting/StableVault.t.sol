@@ -1110,8 +1110,13 @@ contract StableVaultTest is TestWithHelpers {
         vm.prank(manager);
         userRateData = new IStableVault.UserRateData[](1);
         userRateData[0] = IStableVault.UserRateData(user2, newRate);
-        // After VA-189: migration is skipped instead of reverting when the user would end up with 0 shares in the new
-        // sub-vault. The call succeeds and user2's position is left untouched.
+        vm.expectEmit(true, true, true, true);
+        emit IStableVault.UserRateSkippedDueToZeroShares(
+            user2, user2VaultBefore.id, stableVault.getSubVaultIdByRate(newRate), newRate
+        );
+
+        // Migration is skipped instead of reverting when the user would end up with 0 shares in the new sub-vault.
+        // The call succeeds and user2's position is left untouched.
         stableVault.setUserRate(userRateData);
 
         IStableVault.SubVaultData memory user2VaultAfter = stableVault.getUserSubVault(user2);
@@ -1178,6 +1183,11 @@ contract StableVaultTest is TestWithHelpers {
         batch[0] = IStableVault.UserRateData(dustUser, newRate);
         batch[1] = IStableVault.UserRateData(normalUser, newRate);
 
+        vm.expectEmit(true, true, true, true);
+        emit IStableVault.UserRateSkippedDueToZeroShares(
+            dustUser, dustVaultBefore.id, stableVault.getSubVaultIdByRate(newRate), newRate
+        );
+
         vm.prank(manager);
         stableVault.setUserRate(batch);
 
@@ -1193,6 +1203,91 @@ contract StableVaultTest is TestWithHelpers {
         // normalUser was migrated.
         assertTrue(normalVaultAfter.id != normalVaultBefore.id, "normalUser should have migrated sub-vaults");
         assertEq(normalVaultAfter.perSecondRate, newRate, "normalUser perSecondRate should match target");
+    }
+
+    function test_setUserRate_resetsInactiveTargetSubVaultBeforeMigration() public {
+        stableVault = _deployStableVault(
+            address(mockAccessManager),
+            DEFAULT_MAX_PER_SECOND_RATE,
+            MathLib.RAY,
+            address(mockIouTokenManager),
+            address(mockFundsHandler),
+            address(mockAssetRegistry),
+            address(mockTransferHelper),
+            address(mockWithdrawalPolicy),
+            address(mockPriceOracle),
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+            treasury
+        );
+        mockAsset = IMockErc20(address(new MockNonStandardErc20("Test GHO", "tGHO", 18)));
+
+        uint256 newRate = 1000000005781378656804591713; // ~20% APY
+
+        address seeder = makeAddr("inactiveSeeder");
+        address recipient = makeAddr("inactiveRecipient");
+        address dustUser = makeAddr("inactiveDustUser");
+
+        mockAsset.mint(seeder, 1);
+        vm.prank(seeder);
+        mockAsset.forceApprove(address(stableVault), 1);
+        vm.prank(seeder);
+        stableVault.deposit(seeder, address(mockAsset), 1);
+
+        IStableVault.UserRateData[] memory seed = new IStableVault.UserRateData[](1);
+        seed[0] = IStableVault.UserRateData(seeder, newRate);
+        vm.prank(manager);
+        stableVault.setUserRate(seed);
+
+        uint256 targetSubVaultId = stableVault.getUserSubVault(seeder).id;
+
+        vm.warp(block.timestamp + 115 * 365 days);
+        assertTrue(stableVault.getSubVaultConversionRate(targetSubVaultId) > MathLib.RAY);
+
+        vm.prank(seeder);
+        stableVault.transferAll(recipient);
+
+        IStableVault.SubVaultData[] memory activeSubVaults = stableVault.getActiveSubVaults();
+        for (uint256 i = 0; i < activeSubVaults.length; i++) {
+            assertTrue(activeSubVaults[i].id != targetSubVaultId, "target sub-vault should be inactive");
+        }
+
+        mockAsset.mint(dustUser, 1);
+        vm.prank(dustUser);
+        mockAsset.forceApprove(address(stableVault), 1);
+        vm.prank(dustUser);
+        stableVault.deposit(dustUser, address(mockAsset), 1);
+
+        IStableVault.UserRateData[] memory batch = new IStableVault.UserRateData[](1);
+        batch[0] = IStableVault.UserRateData(dustUser, newRate);
+
+        vm.recordLogs();
+        vm.prank(manager);
+        stableVault.setUserRate(batch);
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 skippedTopic = keccak256("UserRateSkippedDueToZeroShares(address,uint256,uint256,uint256)");
+        bytes32 userRateSetTopic = keccak256("UserRateSet(address,uint256,uint256)");
+        bool foundSkippedEvent = false;
+        bool foundUserRateSet = false;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics.length > 0 && logs[i].topics[0] == skippedTopic) {
+                foundSkippedEvent = true;
+            }
+            if (
+                logs[i].topics.length > 2 && logs[i].topics[0] == userRateSetTopic
+                    && logs[i].topics[1] == bytes32(uint256(uint160(dustUser)))
+                    && logs[i].topics[2] == bytes32(targetSubVaultId)
+            ) {
+                foundUserRateSet = true;
+            }
+        }
+
+        IStableVault.SubVaultData memory dustVaultAfter = stableVault.getUserSubVault(dustUser);
+        assertFalse(foundSkippedEvent, "dust user should migrate after inactive target reset");
+        assertTrue(foundUserRateSet, "dust user migration should emit UserRateSet");
+        assertEq(dustVaultAfter.id, targetSubVaultId, "dust user should move to reset sub-vault");
+        assertEq(dustVaultAfter.perSecondRate, newRate, "dust user perSecondRate should match target");
+        assertEq(stableVault.getSubVaultConversionRate(targetSubVaultId), MathLib.RAY);
     }
 
     function test_setUserRate_twoUsersWithSameRateLandsInTheSameSubVault(

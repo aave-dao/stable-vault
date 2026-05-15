@@ -605,7 +605,12 @@ contract StableVault is
 
     function _getOrCreateSubVaultWithRate(uint256 perSecondRate) internal returns (uint256) {
         if (_existsSubVaultWithRate(perSecondRate)) {
-            return $storage().subVaultIdByRate[perSecondRate];
+            uint256 subVaultId = $storage().subVaultIdByRate[perSecondRate];
+            if (!_isActiveSubVaultById(subVaultId)) {
+                // This is safe on an inactive sub-vault because by definition such vault does not have any positions.
+                _resetSubVaultConversionRate(subVaultId);
+            }
+            return subVaultId;
         } else {
             return _createSubVault(perSecondRate);
         }
@@ -628,6 +633,13 @@ contract StableVault is
         $storage().subVaultIdByRate[newPerSecondRate] = newSubVaultId;
         emit SubVaultCreated(newSubVaultId, newPerSecondRate);
         return newSubVaultId;
+    }
+
+    // Resetting a subvault's conversion rate helps to prevent it growing and causing dust problems on migrations.
+    function _resetSubVaultConversionRate(uint256 subVaultId) internal {
+        SubVault storage subVault = $storage().subVaultById[subVaultId];
+        subVault.conversionRate = MathLib.RAY;
+        subVault.lastAccrualTimestamp = uint256(block.timestamp);
     }
 
     function _migrateUserToSubVault(address user, uint256 oldSubVaultId, uint256 newSubVaultId)
@@ -940,6 +952,8 @@ contract StableVault is
             uint256 newSubVaultId = _getOrCreateSubVaultWithRate(newPerSecondRate);
             if (_migrateUserToSubVault(user, oldSubVaultId, newSubVaultId)) {
                 emit UserRateSet(user, newSubVaultId, newPerSecondRate);
+            } else {
+                emit UserRateSkippedDueToZeroShares(user, oldSubVaultId, newSubVaultId, newPerSecondRate);
             }
         }
         // `_validateAmountOfActiveSubVaults()` is intentionally not called here: this is invoked per-user inside
