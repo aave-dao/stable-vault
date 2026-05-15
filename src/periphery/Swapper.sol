@@ -22,14 +22,12 @@ contract Swapper is Ownable, ReentrancyGuard, ISwapper {
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
 
-    /// @dev The immutable bound vault. Set at construction; rotation requires Swapper redeploy + AccessManager re-wire.
     address internal immutable SLIPPAGE_VAULT;
 
     /// @dev Constructor.
     /// @param allocator Address of the allocator which is the owner of the Swapper.
     /// @param slippageVault Address of the bound SlippageCoverageVault.
     constructor(address allocator, address slippageVault) Ownable(allocator) {
-        require(allocator != address(0), Errors.ZeroAddress());
         require(slippageVault != address(0), Errors.ZeroAddress());
         SLIPPAGE_VAULT = slippageVault;
     }
@@ -74,18 +72,14 @@ contract Swapper is Ownable, ReentrancyGuard, ISwapper {
             amountOut = expectedAmountOut;
         }
 
-        // Sweep any `assetIn` left on the contract back to msg.sender (the Allocator). Covers both under-consumed
-        // `amountIn` and any pre-existing donation of the same asset — the Allocator has a rescue path, the Swapper
-        // does not, so pushing everything out is the safer default. Does not prevent a compromised rebalancer from
-        // redirecting `assetIn` through a venue with a recipient parameter (bounded by `maxSlippageBps × amountIn`
-        // per call plus the vault's per-tx + window caps; monitor for both).
-        uint256 leftover = IERC20(assetIn).balanceOf(address(this));
-        if (leftover > 0) {
-            IERC20(assetIn).safeTransfer(msg.sender, leftover);
-            emit ISwapper.AssetInSwept(assetIn, leftover);
+        // Sweep any `assetIn` left on the contract back to msg.sender (the Allocator).
+        uint256 assetInLeftover = IERC20(assetIn).balanceOf(address(this));
+        if (assetInLeftover > 0) {
+            IERC20(assetIn).safeTransfer(msg.sender, assetInLeftover);
+            emit ISwapper.AssetInSwept(assetIn, assetInLeftover);
         }
 
-        // Approve funds to be pulled by the caller i.e. the owner of the Swapper.
+        // Approve `assetOut` funds to be pulled by the msg.sender (the Allocator).
         IERC20(assetOut).forceApprove(msg.sender, amountOut);
 
         return amountOut;

@@ -16,12 +16,9 @@ import {Errors} from "src/types/Errors.sol";
 /// @author Aave Labs
 /// @notice Holds coverage capital for rebalance-swap shortfalls. Push-based outflows to the immutable bound Swapper,
 /// gated by per-tx + fixed-window caps (with lazy rollover). Override mode bypasses caps.
-/// @dev Non-upgradeable. The Swapper and Vault are immutably cross-bound, so a vault proxy would only expand the trust
-/// surface without buying anything.
 contract SlippageCoverageVault is AccessManaged, Multicall, ReentrancyGuardTransient, ISlippageCoverageVault {
     using SafeERC20 for IERC20;
 
-    /// @dev Bound puller (the Swapper). Set at construction; never changes.
     address public immutable SLIPPAGE_BENEFICIARY;
 
     bool internal _overrideMode;
@@ -108,46 +105,46 @@ contract SlippageCoverageVault is AccessManaged, Multicall, ReentrancyGuardTrans
     /// @inheritdoc ISlippageCoverageVault
     function raiseWindowCap(address asset, uint256 newCap) external override restricted {
         require(newCap <= type(uint128).max, Errors.InvalidAmount());
-        Window memory w = _windowByAsset[asset];
-        uint256 oldCap = w.cap;
+        Window memory window = _windowByAsset[asset];
+        uint256 oldCap = window.cap;
         require(newCap > oldCap, Errors.InvalidParameter());
         // Cast safe: bounded above by `newCap <= type(uint128).max`.
         // forge-lint: disable-next-line(unsafe-typecast)
-        w.cap = uint128(newCap);
-        _windowByAsset[asset] = w;
+        window.cap = uint128(newCap);
+        _windowByAsset[asset] = window;
         emit WindowCapRaised(asset, oldCap, newCap);
     }
 
     /// @inheritdoc ISlippageCoverageVault
     function lowerWindowCap(address asset, uint256 newCap) external override restricted {
-        Window memory w = _windowByAsset[asset];
-        uint256 oldCap = w.cap;
+        Window memory window = _windowByAsset[asset];
+        uint256 oldCap = window.cap;
         require(newCap < oldCap, Errors.InvalidParameter());
         // Cast safe: bounded above by `newCap < oldCap` and `oldCap` (a `uint128`) fits in `uint128`.
         // forge-lint: disable-next-line(unsafe-typecast)
-        w.cap = uint128(newCap);
-        _windowByAsset[asset] = w;
+        window.cap = uint128(newCap);
+        _windowByAsset[asset] = window;
         emit WindowCapLowered(asset, oldCap, newCap);
     }
 
     /// @inheritdoc ISlippageCoverageVault
     function raiseWindowSeconds(address asset, uint64 newWindowSeconds) external override restricted {
-        Window memory w = _windowByAsset[asset];
-        uint64 oldWindowSeconds = w.windowSeconds;
+        Window memory window = _windowByAsset[asset];
+        uint64 oldWindowSeconds = window.windowSeconds;
         require(newWindowSeconds > oldWindowSeconds, Errors.InvalidParameter());
-        w.windowSeconds = newWindowSeconds;
-        _windowByAsset[asset] = w;
+        window.windowSeconds = newWindowSeconds;
+        _windowByAsset[asset] = window;
         emit WindowSecondsRaised(asset, oldWindowSeconds, newWindowSeconds);
     }
 
     /// @inheritdoc ISlippageCoverageVault
     function lowerWindowSeconds(address asset, uint64 newWindowSeconds) external override restricted {
         require(newWindowSeconds > 0, Errors.InvalidParameter());
-        Window memory w = _windowByAsset[asset];
-        uint64 oldWindowSeconds = w.windowSeconds;
+        Window memory window = _windowByAsset[asset];
+        uint64 oldWindowSeconds = window.windowSeconds;
         require(newWindowSeconds < oldWindowSeconds, Errors.InvalidParameter());
-        w.windowSeconds = newWindowSeconds;
-        _windowByAsset[asset] = w;
+        window.windowSeconds = newWindowSeconds;
+        _windowByAsset[asset] = window;
         emit WindowSecondsLowered(asset, oldWindowSeconds, newWindowSeconds);
     }
 
@@ -226,17 +223,17 @@ contract SlippageCoverageVault is AccessManaged, Multicall, ReentrancyGuardTrans
     /// Reverts if the window is unconfigured (`cap == 0` or `windowSeconds == 0`) or if `consumed + amount` exceeds
     /// `cap`.
     function _consumeWindow(address asset, uint256 amount) internal {
-        Window memory w = _windowByAsset[asset];
-        require(w.cap > 0 && w.windowSeconds > 0, ExceedsWindowCap());
-        if (block.timestamp >= uint256(w.windowStart) + uint256(w.windowSeconds)) {
-            w.windowStart = uint64(block.timestamp);
-            w.consumed = 0;
+        Window memory window = _windowByAsset[asset];
+        require(window.cap > 0 && window.windowSeconds > 0, ExceedsWindowCap());
+        if (block.timestamp >= uint256(window.windowStart) + uint256(window.windowSeconds)) {
+            window.windowStart = uint64(block.timestamp);
+            window.consumed = 0;
         }
-        uint256 newConsumed = uint256(w.consumed) + amount;
-        require(newConsumed <= uint256(w.cap), ExceedsWindowCap());
-        // Cast safe: bounded above by `newConsumed <= w.cap` and `w.cap` (a `uint128`) fits in `uint128`.
+        uint256 newConsumed = uint256(window.consumed) + amount;
+        require(newConsumed <= uint256(window.cap), ExceedsWindowCap());
+        // Cast safe: bounded above by `newConsumed <= window.cap` and `window.cap` (a `uint128`) fits in `uint128`.
         // forge-lint: disable-next-line(unsafe-typecast)
-        w.consumed = uint128(newConsumed);
-        _windowByAsset[asset] = w;
+        window.consumed = uint128(newConsumed);
+        _windowByAsset[asset] = window;
     }
 }

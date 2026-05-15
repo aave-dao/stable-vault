@@ -279,7 +279,6 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         // Only used on the Earning Chain (EarningChainGateway), but granted in both Accounting and Earning Chain setups
         roles[4] = RolesConfig.getRole__pushFundsToAccountingChain();
         roles[5] = RolesConfig.getRole__topUp();
-        // Tightening-shape SlippageCoverageVault hook: only adds capital, never relaxes caps.
         roles[6] = RolesConfig.getRole__fundCoverage();
 
         _grantRolesToProfile(rebalancerProfile, roles);
@@ -309,8 +308,6 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         roles[13] = RolesConfig.getRole__removeSigner();
         roles[14] = RolesConfig.getRole__lowerPullCapPerTx();
         roles[15] = RolesConfig.getRole__lowerWindowCap();
-        // `raiseWindowSeconds` is tightening (longer window = slower drain rate) — fits the Disabler's
-        // monotonic-tightening hook set despite the `raise*` prefix.
         roles[16] = RolesConfig.getRole__raiseWindowSeconds();
 
         _grantRolesToProfile(disablerProfile, roles);
@@ -332,10 +329,6 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         address coverageGuardian = _getProfile__CoverageGuardian();
         require(coverageGuardian != address(0), "CoverageGuardian profile address not set");
 
-        // Override mode loosens vault caps, so it must NOT live on the Rebalancer (the same actor that triggers
-        // swaps) — otherwise the cap stack could be atomically bypassed. Enable carries a short delay
-        // (`LOW_DELAY`) so a malicious schedule has a visible cancellation window; disable is `NO_DELAY` so
-        // incident response tightens immediately.
         RolesConfig.Role[] memory roles = new RolesConfig.Role[](2);
 
         roles[0] = RolesConfig.getRole__enableOverrideMode();

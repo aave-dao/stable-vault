@@ -5,9 +5,7 @@ pragma solidity ^0.8.22;
 /// @title ISwapper
 /// @author Aave Labs
 /// @notice Interface for the Swapper contract.
-/// @dev Some declarations below are coupled to the canonical implementation (events, errors, and
-/// `getSlippageVault`). They are slated for removal under VA-193; the natspec is kept implementation-neutral
-/// so that follow-up does not need to revisit it.
+// TODO: Remove non-essential declarations, avoid coupling the interface to the canonical implementation of it
 interface ISwapper {
     /// @notice Emitted when a slippage shortfall on `assetOut` is covered by an external source.
     event SlippageCovered(address indexed slippageCoverageSource, address indexed assetOut, uint256 amount);

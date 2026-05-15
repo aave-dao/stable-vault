@@ -5,6 +5,7 @@ pragma solidity ^0.8.22;
 /// @title ISlippageCoverageVault
 /// @author Aave Labs
 /// @notice Interface for the SlippageCoverageVault contract.
+// TODO: Remove non-essential declarations, avoid coupling the interface to the canonical implementation of it
 /// @dev Push-based outflows to the immutable `SLIPPAGE_BENEFICIARY`; the vault never grants ERC-20 allowances. The
 /// vault can be deployed in override mode (constructor flag) so the bound Swapper can pull coverage on day one
 /// without per-tx or window caps configured; governance flips override off and configures caps once risk-team has
@@ -59,9 +60,11 @@ interface ISlippageCoverageVault {
     event WindowSecondsRaised(address indexed asset, uint64 oldWindowSeconds, uint64 newWindowSeconds);
 
     /// @notice Thrown when an `enableOverrideMode` call is made while override mode is already enabled.
+    /// @custom:selector 0xf2a5f75a
     error AlreadyEnabled();
 
     /// @notice Thrown when a `disableOverrideMode` call is made while override mode is already disabled.
+    /// @custom:selector 0x005ecddb
     error AlreadyDisabled();
 
     /// @notice Thrown when a single pull would exceed the per-tx cap for the asset.

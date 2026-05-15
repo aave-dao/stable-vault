@@ -615,9 +615,6 @@ abstract contract RolesConfig is DeploymentConfig {
 
     /// @custom:delay None
     /// @custom:location SlippageCoverageVault
-    /// @dev No on-chain delay. Compromise resistance comes from signer composition (the CoverageGuardian profile is
-    /// an N-of-M multisig); a timelock here would slow legitimate depeg response without changing the worst case
-    /// (CoverageGuardian + Rebalancer both compromised collapses to `vault.balanceOf(asset)` either way).
     function getRole__enableOverrideMode() internal pure returns (Role memory) {
         bytes4 selector = ISlippageCoverageVault.enableOverrideMode.selector;
         return Role({
@@ -696,8 +693,6 @@ abstract contract RolesConfig is DeploymentConfig {
 
     /// @custom:delay None
     /// @custom:location SlippageCoverageVault
-    /// @dev Direction flip: raising `windowSeconds` slows the drain rate (tightening), so it lives on the
-    /// operational/no-delay path despite the `raise*` prefix.
     function getRole__raiseWindowSeconds() internal pure returns (Role memory) {
         bytes4 selector = ISlippageCoverageVault.raiseWindowSeconds.selector;
         return Role({
@@ -711,8 +706,6 @@ abstract contract RolesConfig is DeploymentConfig {
 
     /// @custom:delay High
     /// @custom:location SlippageCoverageVault
-    /// @dev Direction flip: lowering `windowSeconds` speeds up the drain rate (loosening), so it lives on the
-    /// admin/high-delay path despite the `lower*` prefix.
     function getRole__lowerWindowSeconds() internal view returns (Role memory) {
         bytes4 selector = ISlippageCoverageVault.lowerWindowSeconds.selector;
         return Role({
