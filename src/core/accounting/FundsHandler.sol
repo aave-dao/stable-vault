@@ -161,7 +161,7 @@ contract FundsHandler is
         uint256 amount,
         uint256 chainId,
         address bridgeAdapter,
-        uint256 gasLimit,
+        uint256 receiverExecutionGasLimit,
         bytes calldata bridgeAdapterData,
         bytes calldata policyData
     ) external payable override restricted assertingTransferHelperBalanceFor(asset) {
@@ -174,7 +174,7 @@ contract FundsHandler is
         _pullFundsFromImmediateLiquidity(asset, amount);
 
         IAccountingChainGateway(GATEWAY).sendPushFundsToChainMessage{value: msg.value}(
-            asset, amount, chainId, bridgeAdapter, msg.sender, gasLimit, bridgeAdapterData
+            asset, amount, chainId, bridgeAdapter, msg.sender, receiverExecutionGasLimit, bridgeAdapterData
         );
     }
 

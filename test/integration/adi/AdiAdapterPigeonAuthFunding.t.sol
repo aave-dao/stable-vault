@@ -3,8 +3,6 @@
 pragma solidity ^0.8.22;
 
 import {AdiAdapter} from "src/bridging/adi/AdiAdapter.sol";
-import {Constants} from "src/types/Constants.sol";
-
 import {MockAccessManager} from "test/mocks/MockAccessManager.sol";
 import {MockTransferHelper} from "test/mocks/MockTransferHelper.sol";
 
@@ -31,8 +29,8 @@ contract AdiAdapterPigeonAuthFunding is AdiAdapterPigeonLocalForkBase {
 
         vm.expectRevert();
         vm.prank(address(rogueGateway));
-        rogueAdapter.publishMessageToChainWithFeePayer{value: nativeFee}(
-            ARB_CHAIN_ID, Constants.ASSET_FOR_DATA_ONLY_BRIDGE, 0, message, address(this), DEFAULT_GAS_LIMIT, ""
+        rogueAdapter.publishDataOnlyMessage{value: nativeFee}(
+            ARB_CHAIN_ID, message, address(this), DEFAULT_GAS_LIMIT, ""
         );
     }
 

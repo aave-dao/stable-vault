@@ -69,34 +69,44 @@ contract AdiAdapter is BaseBridgeAdapter, RescuableNative, RescuableToken, IAdiB
     }
 
     /// @inheritdoc IBridgeAdapter
-    function publishMessageToChainWithFeePayer(
+    function publishDataOnlyMessage(
         uint256 destinationChainId,
-        address asset,
-        uint256 amount,
-        bytes memory data,
+        bytes memory messageData,
         address feePayer,
-        uint256 gasLimit,
+        uint256 payloadExecutionGasLimit,
         bytes memory bridgeAdapterData
     ) external payable override(BaseBridgeAdapter, IBridgeAdapter) onlyGateway {
-        require(asset == Constants.ASSET_FOR_DATA_ONLY_BRIDGE, Errors.UnsupportedAsset(asset));
-        require(amount == 0, Errors.InvalidParameter());
         require(feePayer != address(0), Errors.ZeroAddress());
         require(bridgeAdapterData.length == 0, Errors.InvalidParameter());
 
         address destinationChainAdapter = _destinationChainAdapterOf[destinationChainId];
         require(destinationChainAdapter != address(0), Errors.InvalidParameter());
 
-        uint256 adjustedGasLimit = _withReceiverOverhead(gasLimit);
+        uint256 adjustedGasLimit = _withReceiverOverhead(payloadExecutionGasLimit);
         (uint256 nativeFee, IAdiCrossChainForwarder.Fee[] memory fees, uint256 successfulQuotes) =
-            _quoteForwardMessage(destinationChainId, destinationChainAdapter, gasLimit, data);
+            _quoteForwardMessage(destinationChainId, destinationChainAdapter, payloadExecutionGasLimit, messageData);
         require(successfulQuotes > 0, NoSuccessfulQuotes());
         _fundCrossChainController(feePayer, nativeFee, fees);
 
         (bytes32 envelopeId,) = IAdiCrossChainForwarder(ADI_CROSS_CHAIN_CONTROLLER)
-            .forwardMessage(destinationChainId, destinationChainAdapter, adjustedGasLimit, data);
+            .forwardMessage(destinationChainId, destinationChainAdapter, adjustedGasLimit, messageData);
         emit MessagePublished(envelopeId);
 
         _refundExcessNative(feePayer, nativeFee);
+    }
+
+    /// @inheritdoc IBridgeAdapter
+    function publishMessageWithFunds(
+        uint256 destinationChainId,
+        address asset,
+        uint256 amount,
+        bytes memory messageData,
+        address feePayer,
+        uint256 receiverExecutionGasLimit,
+        bytes memory bridgeAdapterData
+    ) external payable override(BaseBridgeAdapter, IBridgeAdapter) onlyGateway {
+        (destinationChainId, amount, messageData, feePayer, receiverExecutionGasLimit, bridgeAdapterData);
+        revert Errors.UnsupportedAsset(asset);
     }
 
     /// @inheritdoc IAdiBridgeAdapter

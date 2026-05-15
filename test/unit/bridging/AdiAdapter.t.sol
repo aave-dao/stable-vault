@@ -258,14 +258,8 @@ contract AdiAdapterTest is TestWithHelpers {
         emit IBridgeAdapter.MessagePublished(bytes32(uint256(1)));
 
         vm.prank(address(_accountingChainGateway));
-        _accountingChainAdiAdapter.publishMessageToChainWithFeePayer(
-            EARNING_CHAIN_ID,
-            Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
-            0,
-            data,
-            feePayer,
-            DEFAULT_GAS_LIMIT,
-            _bridgeAdapterData()
+        _accountingChainAdiAdapter.publishDataOnlyMessage(
+            EARNING_CHAIN_ID, data, feePayer, DEFAULT_GAS_LIMIT, _bridgeAdapterData()
         );
 
         assertEq(_mockAdiCrossChainController.lastDestinationChainId(), EARNING_CHAIN_ID);
@@ -283,8 +277,8 @@ contract AdiAdapterTest is TestWithHelpers {
         bytes memory data = abi.encode("bridge-iou-token");
 
         vm.prank(address(_accountingChainGateway));
-        _accountingChainAdiAdapter.publishMessageToChainWithFeePayer(
-            EARNING_CHAIN_ID, Constants.ASSET_FOR_DATA_ONLY_BRIDGE, 0, data, feePayer, gasLimit, _bridgeAdapterData()
+        _accountingChainAdiAdapter.publishDataOnlyMessage(
+            EARNING_CHAIN_ID, data, feePayer, gasLimit, _bridgeAdapterData()
         );
 
         assertEq(address(_mockAdiCrossChainController).balance, 0);
@@ -300,15 +294,15 @@ contract AdiAdapterTest is TestWithHelpers {
 
         vm.expectRevert(abi.encodeWithSelector(Errors.UnsupportedAsset.selector, asset));
         vm.prank(address(_accountingChainGateway));
-        _accountingChainAdiAdapter.publishMessageToChainWithFeePayer(
+        _accountingChainAdiAdapter.publishMessageWithFunds(
             EARNING_CHAIN_ID, asset, 1, "", feePayer, DEFAULT_GAS_LIMIT, _bridgeAdapterData()
         );
     }
 
     function test_publishMessageToChainWithFeePayer_reverts_ifAmountWithoutAssetRequested() public {
-        vm.expectRevert(Errors.InvalidParameter.selector);
+        vm.expectRevert(abi.encodeWithSelector(Errors.UnsupportedAsset.selector, Constants.ASSET_FOR_DATA_ONLY_BRIDGE));
         vm.prank(address(_accountingChainGateway));
-        _accountingChainAdiAdapter.publishMessageToChainWithFeePayer(
+        _accountingChainAdiAdapter.publishMessageWithFunds(
             EARNING_CHAIN_ID,
             Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
             1,
@@ -322,14 +316,8 @@ contract AdiAdapterTest is TestWithHelpers {
     function test_publishMessageToChainWithFeePayer_reverts_ifFeePayerIsZero() public {
         vm.expectRevert(Errors.ZeroAddress.selector);
         vm.prank(address(_accountingChainGateway));
-        _accountingChainAdiAdapter.publishMessageToChainWithFeePayer(
-            EARNING_CHAIN_ID,
-            Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
-            0,
-            "",
-            address(0),
-            DEFAULT_GAS_LIMIT,
-            _bridgeAdapterData()
+        _accountingChainAdiAdapter.publishDataOnlyMessage(
+            EARNING_CHAIN_ID, "", address(0), DEFAULT_GAS_LIMIT, _bridgeAdapterData()
         );
     }
 
@@ -339,14 +327,8 @@ contract AdiAdapterTest is TestWithHelpers {
         _mockAdiCrossChainController.setNativeFee(nativeAmount);
 
         vm.prank(address(_accountingChainGateway));
-        _accountingChainAdiAdapter.publishMessageToChainWithFeePayer{value: nativeAmount}(
-            EARNING_CHAIN_ID,
-            Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
-            0,
-            "",
-            feePayer,
-            DEFAULT_GAS_LIMIT,
-            _bridgeAdapterData()
+        _accountingChainAdiAdapter.publishDataOnlyMessage{value: nativeAmount}(
+            EARNING_CHAIN_ID, "", feePayer, DEFAULT_GAS_LIMIT, _bridgeAdapterData()
         );
 
         assertEq(address(_mockAdiCrossChainController).balance, nativeAmount);
@@ -364,14 +346,8 @@ contract AdiAdapterTest is TestWithHelpers {
 
         vm.expectRevert(IAdiBridgeAdapter.NoSuccessfulQuotes.selector);
         vm.prank(address(_accountingChainGateway));
-        _accountingChainAdiAdapter.publishMessageToChainWithFeePayer{value: nativeAmount}(
-            EARNING_CHAIN_ID,
-            Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
-            0,
-            "",
-            feePayer,
-            DEFAULT_GAS_LIMIT,
-            _bridgeAdapterData()
+        _accountingChainAdiAdapter.publishDataOnlyMessage{value: nativeAmount}(
+            EARNING_CHAIN_ID, "", feePayer, DEFAULT_GAS_LIMIT, _bridgeAdapterData()
         );
 
         assertEq(_mockAdiCrossChainController.forwardMessageCallCount(), 0);
@@ -389,14 +365,8 @@ contract AdiAdapterTest is TestWithHelpers {
             abi.encodeCall(IERC20.transferFrom, (feePayer, address(_mockAdiCrossChainController), feeAmount))
         );
         vm.prank(address(_accountingChainGateway));
-        _accountingChainAdiAdapter.publishMessageToChainWithFeePayer(
-            EARNING_CHAIN_ID,
-            Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
-            0,
-            "",
-            feePayer,
-            DEFAULT_GAS_LIMIT,
-            _bridgeAdapterData()
+        _accountingChainAdiAdapter.publishDataOnlyMessage(
+            EARNING_CHAIN_ID, "", feePayer, DEFAULT_GAS_LIMIT, _bridgeAdapterData()
         );
 
         assertEq(_mockUsdc.balanceOf(address(_mockAdiCrossChainController)), feeAmount);
@@ -417,14 +387,8 @@ contract AdiAdapterTest is TestWithHelpers {
         _setQuotedFees(tokens, amounts);
 
         vm.prank(address(_accountingChainGateway));
-        _accountingChainAdiAdapter.publishMessageToChainWithFeePayer(
-            EARNING_CHAIN_ID,
-            Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
-            0,
-            "",
-            feePayer,
-            DEFAULT_GAS_LIMIT,
-            _bridgeAdapterData()
+        _accountingChainAdiAdapter.publishDataOnlyMessage(
+            EARNING_CHAIN_ID, "", feePayer, DEFAULT_GAS_LIMIT, _bridgeAdapterData()
         );
 
         assertEq(_mockUsdc.balanceOf(address(_mockAdiCrossChainController)), usdcAmount);
@@ -440,14 +404,8 @@ contract AdiAdapterTest is TestWithHelpers {
         _setQuotedFees(_singleAddress(address(_mockUsdc)), _singleUint256(feeAmount));
 
         vm.prank(address(_accountingChainGateway));
-        _accountingChainAdiAdapter.publishMessageToChainWithFeePayer{value: nativeAmount}(
-            EARNING_CHAIN_ID,
-            Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
-            0,
-            "",
-            feePayer,
-            DEFAULT_GAS_LIMIT,
-            _bridgeAdapterData()
+        _accountingChainAdiAdapter.publishDataOnlyMessage{value: nativeAmount}(
+            EARNING_CHAIN_ID, "", feePayer, DEFAULT_GAS_LIMIT, _bridgeAdapterData()
         );
 
         assertEq(address(_mockAdiCrossChainController).balance, nativeAmount);
@@ -465,14 +423,8 @@ contract AdiAdapterTest is TestWithHelpers {
 
         vm.expectRevert(MockAdiCrossChainController.ForwardMessageFailed.selector);
         vm.prank(address(_accountingChainGateway));
-        _accountingChainAdiAdapter.publishMessageToChainWithFeePayer{value: nativeAmount}(
-            EARNING_CHAIN_ID,
-            Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
-            0,
-            "",
-            feePayer,
-            DEFAULT_GAS_LIMIT,
-            _bridgeAdapterData()
+        _accountingChainAdiAdapter.publishDataOnlyMessage{value: nativeAmount}(
+            EARNING_CHAIN_ID, "", feePayer, DEFAULT_GAS_LIMIT, _bridgeAdapterData()
         );
 
         assertEq(address(_mockAdiCrossChainController).balance, 0);
@@ -487,14 +439,8 @@ contract AdiAdapterTest is TestWithHelpers {
 
         vm.expectRevert(Errors.InsufficientFunds.selector);
         vm.prank(address(_accountingChainGateway));
-        _accountingChainAdiAdapter.publishMessageToChainWithFeePayer{value: providedNative}(
-            EARNING_CHAIN_ID,
-            Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
-            0,
-            "",
-            feePayer,
-            DEFAULT_GAS_LIMIT,
-            _bridgeAdapterData()
+        _accountingChainAdiAdapter.publishDataOnlyMessage{value: providedNative}(
+            EARNING_CHAIN_ID, "", feePayer, DEFAULT_GAS_LIMIT, _bridgeAdapterData()
         );
 
         assertEq(address(_mockAdiCrossChainController).balance, 0);
@@ -507,14 +453,8 @@ contract AdiAdapterTest is TestWithHelpers {
         _mockAdiCrossChainController.setNativeFee(nativeFee);
 
         vm.prank(address(_accountingChainGateway));
-        _accountingChainAdiAdapter.publishMessageToChainWithFeePayer{value: providedNative}(
-            EARNING_CHAIN_ID,
-            Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
-            0,
-            "",
-            feePayer,
-            DEFAULT_GAS_LIMIT,
-            _bridgeAdapterData()
+        _accountingChainAdiAdapter.publishDataOnlyMessage{value: providedNative}(
+            EARNING_CHAIN_ID, "", feePayer, DEFAULT_GAS_LIMIT, _bridgeAdapterData()
         );
 
         assertEq(address(_mockAdiCrossChainController).balance, nativeFee);
@@ -523,9 +463,7 @@ contract AdiAdapterTest is TestWithHelpers {
 
     function test_publishMessageToChainWithFeePayer_acceptsEmptyBridgeAdapterData() public {
         vm.prank(address(_accountingChainGateway));
-        _accountingChainAdiAdapter.publishMessageToChainWithFeePayer(
-            EARNING_CHAIN_ID, Constants.ASSET_FOR_DATA_ONLY_BRIDGE, 0, "", feePayer, DEFAULT_GAS_LIMIT, ""
-        );
+        _accountingChainAdiAdapter.publishDataOnlyMessage(EARNING_CHAIN_ID, "", feePayer, DEFAULT_GAS_LIMIT, "");
 
         assertEq(_mockAdiCrossChainController.lastDestinationChainId(), EARNING_CHAIN_ID);
     }
@@ -533,14 +471,8 @@ contract AdiAdapterTest is TestWithHelpers {
     function test_publishMessageToChainWithFeePayer_reverts_ifBridgeAdapterDataIsProvided() public {
         vm.expectRevert(Errors.InvalidParameter.selector);
         vm.prank(address(_accountingChainGateway));
-        _accountingChainAdiAdapter.publishMessageToChainWithFeePayer(
-            EARNING_CHAIN_ID,
-            Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
-            0,
-            "",
-            feePayer,
-            DEFAULT_GAS_LIMIT,
-            abi.encode(uint256(1))
+        _accountingChainAdiAdapter.publishDataOnlyMessage(
+            EARNING_CHAIN_ID, "", feePayer, DEFAULT_GAS_LIMIT, abi.encode(uint256(1))
         );
     }
 
@@ -549,14 +481,8 @@ contract AdiAdapterTest is TestWithHelpers {
 
         vm.expectRevert(Errors.InvalidParameter.selector);
         vm.prank(address(_accountingChainGateway));
-        _accountingChainAdiAdapter.publishMessageToChainWithFeePayer(
-            EARNING_CHAIN_ID,
-            Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
-            0,
-            "",
-            feePayer,
-            DEFAULT_GAS_LIMIT,
-            _bridgeAdapterData()
+        _accountingChainAdiAdapter.publishDataOnlyMessage(
+            EARNING_CHAIN_ID, "", feePayer, DEFAULT_GAS_LIMIT, _bridgeAdapterData()
         );
     }
 
@@ -565,14 +491,8 @@ contract AdiAdapterTest is TestWithHelpers {
 
         vm.expectRevert(Errors.InvalidParameter.selector);
         vm.prank(address(_accountingChainGateway));
-        _accountingChainAdiAdapter.publishMessageToChainWithFeePayer(
-            EARNING_CHAIN_ID,
-            Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
-            0,
-            "",
-            feePayer,
-            DEFAULT_GAS_LIMIT,
-            _bridgeAdapterData()
+        _accountingChainAdiAdapter.publishDataOnlyMessage(
+            EARNING_CHAIN_ID, "", feePayer, DEFAULT_GAS_LIMIT, _bridgeAdapterData()
         );
     }
 
@@ -582,26 +502,14 @@ contract AdiAdapterTest is TestWithHelpers {
 
         vm.expectRevert(Errors.OnlyGateway.selector);
         vm.prank(caller);
-        _accountingChainAdiAdapter.publishMessageToChainWithFeePayer(
-            EARNING_CHAIN_ID,
-            Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
-            0,
-            "",
-            feePayer,
-            DEFAULT_GAS_LIMIT,
-            _bridgeAdapterData()
+        _accountingChainAdiAdapter.publishDataOnlyMessage(
+            EARNING_CHAIN_ID, "", feePayer, DEFAULT_GAS_LIMIT, _bridgeAdapterData()
         );
 
         vm.expectRevert(Errors.OnlyGateway.selector);
         vm.prank(caller);
-        _earningChainAdiAdapter.publishMessageToChainWithFeePayer(
-            ACCOUNTING_CHAIN_ID,
-            Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
-            0,
-            "",
-            feePayer,
-            DEFAULT_GAS_LIMIT,
-            _bridgeAdapterData()
+        _earningChainAdiAdapter.publishDataOnlyMessage(
+            ACCOUNTING_CHAIN_ID, "", feePayer, DEFAULT_GAS_LIMIT, _bridgeAdapterData()
         );
     }
 
@@ -728,14 +636,8 @@ contract AdiAdapterTest is TestWithHelpers {
 
         vm.expectRevert(Errors.InvalidParameter.selector);
         vm.prank(address(_accountingChainGateway));
-        _accountingChainAdiAdapter.publishMessageToChainWithFeePayer(
-            destinationChainId,
-            Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
-            0,
-            "",
-            feePayer,
-            DEFAULT_GAS_LIMIT,
-            _bridgeAdapterData()
+        _accountingChainAdiAdapter.publishDataOnlyMessage(
+            destinationChainId, "", feePayer, DEFAULT_GAS_LIMIT, _bridgeAdapterData()
         );
     }
 

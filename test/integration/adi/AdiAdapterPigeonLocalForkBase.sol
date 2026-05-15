@@ -43,8 +43,8 @@ contract RecordingGateway is IChainGateway {
         uint256 gasLimit,
         bytes memory data
     ) external payable {
-        IBridgeAdapter(bridgeAdapter).publishMessageToChainWithFeePayer{value: msg.value}(
-            destinationChainId, Constants.ASSET_FOR_DATA_ONLY_BRIDGE, 0, data, feePayer, gasLimit, ""
+        IBridgeAdapter(bridgeAdapter).publishDataOnlyMessage{value: msg.value}(
+            destinationChainId, data, feePayer, gasLimit, ""
         );
     }
 
