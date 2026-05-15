@@ -621,12 +621,7 @@ contract StableVault is
 
     function _getOrCreateSubVaultWithRate(uint256 perSecondRate) internal returns (uint256) {
         if (_existsSubVaultWithRate(perSecondRate)) {
-            uint256 subVaultId = $storage().subVaultIdByRate[perSecondRate];
-            if (!_isActiveSubVaultById(subVaultId)) {
-                // This is safe on an inactive sub-vault because by definition such vault does not have any positions.
-                _resetSubVaultConversionRate(subVaultId);
-            }
-            return subVaultId;
+            return $storage().subVaultIdByRate[perSecondRate];
         } else {
             return _createSubVault(perSecondRate);
         }
@@ -800,6 +795,9 @@ contract StableVault is
         }
         $storage().activeSubVaultsIds.pop();
         delete $storage().activeSubVaultIndexById[subVaultId];
+        // This is safe because a deactivated sub-vault has no positions, and it prevents stale accrual
+        // from affecting future migrations.
+        _resetSubVaultConversionRate(subVaultId);
         emit SubVaultDeactivated(subVaultId);
     }
 
@@ -971,6 +969,8 @@ contract StableVault is
             } else {
                 // Migration to new sub-vault did not happen.
                 // Skip the user, do not revert, so we avoid blocking the entire `setUserRate` batch.
+                // If migration is skipped, the target sub-vault must already be active. New sub-vaults start at 1 RAY,
+                // and inactive sub-vaults are reset to 1 RAY on deactivation, so dust can still migrate into them.
                 emit SetUserRateSkipped(user);
             }
         }

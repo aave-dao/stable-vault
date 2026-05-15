@@ -1252,7 +1252,7 @@ contract StableVaultTest is TestWithHelpers {
         assertEq(normalVaultAfter.perSecondRate, newRate, "normalUser perSecondRate should match target");
     }
 
-    function test_setUserRate_resetsInactiveTargetSubVaultBeforeMigration() public {
+    function test_setUserRate_reusesSubVaultResetOnDeactivation() public {
         stableVault = _deployStableVault(
             address(mockAccessManager),
             DEFAULT_MAX_PER_SECOND_RATE,
@@ -1292,6 +1292,7 @@ contract StableVaultTest is TestWithHelpers {
 
         vm.prank(seeder);
         stableVault.transferAll(recipient);
+        assertEq(stableVault.getSubVaultConversionRate(targetSubVaultId), MathLib.RAY);
 
         IStableVault.SubVaultData[] memory activeSubVaults = stableVault.getActiveSubVaults();
         for (uint256 i = 0; i < activeSubVaults.length; i++) {
