@@ -70,6 +70,14 @@ contract SlippageCoverageVault is AccessManaged, Multicall, ReentrancyGuardTrans
         emit CoveragePulled(asset, amount, inOverride);
     }
 
+    /// @inheritdoc ISlippageCoverageVault
+    /// @dev Does not decrement consumption because it is the responsibility of the beneficiary to not pull more than
+    /// necessary.
+    function returnCoverage(address asset, uint256 amount) external override nonReentrant {
+        require(msg.sender == SLIPPAGE_BENEFICIARY, OnlyBeneficiary());
+        _pullCoverage(asset, amount);
+    }
+
     //////////////////////////////// RESTRICTED FUNCTIONS ////////////////////////////////
 
     /// @inheritdoc ISlippageCoverageVault
@@ -166,9 +174,7 @@ contract SlippageCoverageVault is AccessManaged, Multicall, ReentrancyGuardTrans
 
     /// @inheritdoc ISlippageCoverageVault
     function fundCoverage(address asset, uint256 amount) external override restricted nonReentrant {
-        require(amount > 0, Errors.ZeroAmount());
-        IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
-        emit CoverageFunded(asset, msg.sender, amount);
+        _pullCoverage(asset, amount);
     }
 
     /// @inheritdoc ISlippageCoverageVault
@@ -235,5 +241,11 @@ contract SlippageCoverageVault is AccessManaged, Multicall, ReentrancyGuardTrans
         // forge-lint: disable-next-line(unsafe-typecast)
         window.consumed = uint128(newConsumed);
         _windowByAsset[asset] = window;
+    }
+
+    function _pullCoverage(address asset, uint256 amount) internal {
+        require(amount > 0, Errors.ZeroAmount());
+        IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
+        emit CoverageFunded(asset, msg.sender, amount);
     }
 }

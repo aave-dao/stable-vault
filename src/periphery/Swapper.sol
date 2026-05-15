@@ -72,11 +72,9 @@ contract Swapper is Ownable, ReentrancyGuardTransient, ISwapper {
             amountOut = expectedAmountOut;
         }
 
-        // Sweep any `assetIn` left on the contract back to msg.sender (the Allocator).
-        uint256 assetInLeftover = IERC20(assetIn).balanceOf(address(this));
-        if (assetInLeftover > 0) {
-            IERC20(assetIn).safeTransfer(msg.sender, assetInLeftover);
-            emit ISwapper.AssetInSwept(assetIn, assetInLeftover);
+        uint256 leftover = IERC20(assetIn).balanceOf(address(this));
+        if (leftover > 0) {
+            _reimburseCoverage(assetIn, leftover);
         }
 
         // Approve `assetOut` funds to be pulled by the msg.sender (the Allocator).
@@ -96,5 +94,19 @@ contract Swapper is Ownable, ReentrancyGuardTransient, ISwapper {
         returns (uint256)
     {
         return expectedAmountOut * (Constants.MAX_BPS - slippageToleranceBps) / Constants.MAX_BPS;
+    }
+
+    /// @notice Repays the vault for `amount` of `asset` left on the Swapper after a swap.
+    /// @dev Leftover `assetIn` happens when the venue doesn't consume the full `amountIn` (RFQ partials,
+    /// aggregator routing) or when someone donated to the Swapper beforehand. In the under-consumption case
+    /// the slippage check above pulled `assetOut` from the vault to cover what looked like slippage but was
+    /// really unconsumed `assetIn`; sending the residual back makes that round trip net to zero (as long as
+    /// the two assets are at peg).
+    /// @param asset The asset to reimburse.
+    /// @param amount The amount to reimburse.
+    function _reimburseCoverage(address asset, uint256 amount) internal {
+        IERC20(asset).forceApprove(address(SLIPPAGE_VAULT), amount);
+        ISlippageCoverageVault(SLIPPAGE_VAULT).returnCoverage(asset, amount);
+        emit ISwapper.AssetInSwept(asset, amount);
     }
 }
