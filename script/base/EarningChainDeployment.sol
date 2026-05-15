@@ -244,12 +244,10 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         address usdcYieldStrategy =
             _deployATokenVault(_usdc(), poolAddressProvider, getAccessManagerAddress(_deployer()), _deployer());
         allocator.addStrategy(_usdc(), usdcYieldStrategy);
-        allocator.setDefaultStrategy(_usdc(), usdcYieldStrategy);
 
         address usdtYieldStrategy =
             _deployATokenVault(_usdt(), poolAddressProvider, getAccessManagerAddress(_deployer()), _deployer());
         allocator.addStrategy(_usdt(), usdtYieldStrategy);
-        allocator.setDefaultStrategy(_usdt(), usdtYieldStrategy);
     }
 
     function _deployedATokenVaultAddresses() internal view virtual override returns (address[] memory) {

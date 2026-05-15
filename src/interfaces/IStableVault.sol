@@ -34,9 +34,13 @@ interface IStableVault {
     event Deposit(address indexed user, address indexed asset, uint256 amount);
 
     /// @notice Emitted on Stable Vault balance transfers (amount is denominated in RAY).
+    /// @dev amountRay represents units of the denominating currency which are used to calculate a number of SubVault
+    /// shares being added/removed from a user's position.
     event Transfer(address indexed from, address indexed to, uint256 amountRay);
 
     event UserRateSet(address indexed user, uint256 indexed subVaultId, uint256 newPerSecondRate);
+
+    event SetUserRateSkipped(address indexed user);
 
     event SubVaultRateSet(uint256 indexed subVaultId, uint256 newPerSecondRate);
 

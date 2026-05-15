@@ -85,6 +85,10 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         return _configAddress(".profiles.coverageGuardian");
     }
 
+    function _getProfile__Funder() internal view virtual returns (address) {
+        return _configAddress(".profiles.funder");
+    }
+
     function _getRebalancerMulticallOwner() internal view returns (address) {
         return _configAddress(".profiles.rebalancerMulticallOwner");
     }
@@ -131,6 +135,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         _setupProfile__Disabler();
         _setupProfile__ATokenVaultRewardClaimer();
         _setupProfile__CoverageGuardian();
+        _setupProfile__Funder();
     }
 
     function _logDeployment(string memory, string memory, address) internal virtual {}
@@ -271,17 +276,14 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         address rebalancerProfile = _getProfile__Rebalancer();
         require(rebalancerProfile != address(0), "Rebalancer profile address not set");
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](7);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](4);
 
         roles[0] = RolesConfig.getRole__rebalance();
-        roles[1] = RolesConfig.getRole__setDefaultStrategy();
-        roles[2] = RolesConfig.getRole__disableDepositsToStrategy();
+        roles[1] = RolesConfig.getRole__disableDepositsToStrategy();
         // Only used on the Accounting Chain (FundsHandler), but granted in both Accounting and Earning Chain setups
-        roles[3] = RolesConfig.getRole__pushFundsToChain();
+        roles[2] = RolesConfig.getRole__pushFundsToChain();
         // Only used on the Earning Chain (EarningChainGateway), but granted in both Accounting and Earning Chain setups
-        roles[4] = RolesConfig.getRole__pushFundsToAccountingChain();
-        roles[5] = RolesConfig.getRole__topUp();
-        roles[6] = RolesConfig.getRole__fundCoverage();
+        roles[3] = RolesConfig.getRole__pushFundsToAccountingChain();
 
         _grantRolesToProfile(rebalancerProfile, roles);
     }
@@ -292,7 +294,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         address disablerProfile = _getProfile__Disabler();
         require(disablerProfile != address(0), "Disabler profile address not set");
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](23);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](22);
 
         roles[0] = RolesConfig.getRole__rebalance();
         roles[1] = RolesConfig.getRole__removeStrategy();
@@ -305,19 +307,18 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         roles[8] = RolesConfig.getRole__distrustAsset();
         roles[9] = RolesConfig.getRole__removeBridgeAdapter();
         roles[10] = RolesConfig.getRole__disableDepositsToStrategy();
-        roles[11] = RolesConfig.getRole__setDefaultStrategy();
-        roles[12] = RolesConfig.getRole__distrustStrategy();
-        roles[13] = RolesConfig.getRole__removeSigner();
-        roles[14] = RolesConfig.getRole__lowerPullCapPerTx();
-        roles[15] = RolesConfig.getRole__lowerWindowCap();
-        roles[16] = RolesConfig.getRole__raiseWindowSeconds();
+        roles[11] = RolesConfig.getRole__distrustStrategy();
+        roles[12] = RolesConfig.getRole__removeSigner();
+        roles[13] = RolesConfig.getRole__lowerPullCapPerTx();
+        roles[14] = RolesConfig.getRole__lowerWindowCap();
+        roles[15] = RolesConfig.getRole__raiseWindowSeconds();
         // Only used on the Accounting Chain (DepositPolicy is Accounting-only), but granted in both chain setups.
-        roles[17] = RolesConfig.getRole__lowerDepositCapacity();
-        roles[18] = RolesConfig.getRole__lowerDepositRefillRate();
-        roles[19] = RolesConfig.getRole__lowerBridgingCapacity();
-        roles[20] = RolesConfig.getRole__lowerBridgingRefillRate();
-        roles[21] = RolesConfig.getRole__lowerRedemptionCapacity();
-        roles[22] = RolesConfig.getRole__lowerRedemptionRefillRate();
+        roles[16] = RolesConfig.getRole__lowerDepositCapacity();
+        roles[17] = RolesConfig.getRole__lowerDepositRefillRate();
+        roles[18] = RolesConfig.getRole__lowerBridgingCapacity();
+        roles[19] = RolesConfig.getRole__lowerBridgingRefillRate();
+        roles[20] = RolesConfig.getRole__lowerRedemptionCapacity();
+        roles[21] = RolesConfig.getRole__lowerRedemptionRefillRate();
 
         _grantRolesToProfile(disablerProfile, roles);
     }
@@ -346,6 +347,18 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         _grantRolesToProfile(coverageGuardian, roles);
     }
 
+    function _setupProfile__Funder() internal {
+        address funder = _getProfile__Funder();
+        require(funder != address(0), "Funder profile address not set");
+
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](2);
+
+        roles[0] = RolesConfig.getRole__topUp();
+        roles[1] = RolesConfig.getRole__fundCoverage();
+
+        _grantRolesToProfile(funder, roles);
+    }
+
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
     function _setupTarget__CcipAdapter(address deployer) internal {
@@ -365,17 +378,16 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     function _setupTarget__Allocator(address deployer) internal {
         address allocator = getAllocatorAddress(deployer);
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](9);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](8);
 
         roles[0] = RolesConfig.getRole__rebalance();
         roles[1] = RolesConfig.getRole__addStrategy();
         roles[2] = RolesConfig.getRole__removeStrategy();
         roles[3] = RolesConfig.getRole__disableDepositsToStrategy();
-        roles[4] = RolesConfig.getRole__setDefaultStrategy();
-        roles[5] = RolesConfig.getRole__enableDepositsToStrategy();
-        roles[6] = RolesConfig.getRole__topUp();
-        roles[7] = RolesConfig.getRole__trustStrategy();
-        roles[8] = RolesConfig.getRole__distrustStrategy();
+        roles[4] = RolesConfig.getRole__enableDepositsToStrategy();
+        roles[5] = RolesConfig.getRole__topUp();
+        roles[6] = RolesConfig.getRole__trustStrategy();
+        roles[7] = RolesConfig.getRole__distrustStrategy();
 
         _setTargetFunctionRoles(allocator, roles);
     }

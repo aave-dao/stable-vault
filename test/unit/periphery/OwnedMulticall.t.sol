@@ -148,11 +148,6 @@ contract OwnedMulticallTest is TestWithHelpers {
         vm.prank(admin);
         _allocator.addStrategy(address(_mockGho), address(_extraGhoStrategy));
 
-        vm.prank(everyRoleAccount);
-        _allocator.setDefaultStrategy(address(_mockUsdt), address(_defaultUsdtStrategy));
-        vm.prank(everyRoleAccount);
-        _allocator.setDefaultStrategy(address(_mockGho), address(_defaultGhoStrategy));
-
         // Grant ONLY the OwnedMulticall the right to call Allocator.rebalance
         _mockAccessManager.mockAllowCall(address(_ownedMulticall), address(_allocator), IAllocator.rebalance.selector);
         // Explicitly reject everyRoleAccount from calling Allocator.rebalance directly
@@ -579,10 +574,14 @@ contract OwnedMulticallTest is TestWithHelpers {
         uint256 amountOut,
         bytes memory swapData
     ) internal view returns (IAllocator.RebalanceParams[] memory) {
+        address strategyIn = assetIn == address(_mockUsdt)
+            ? address(_defaultUsdtStrategy)
+            : address(_defaultGhoStrategy);
+        address strategyOut =
+            assetOut == address(_mockUsdt) ? address(_defaultUsdtStrategy) : address(_defaultGhoStrategy);
+
         IAllocator.DeallocationParams[] memory deallocations = new IAllocator.DeallocationParams[](1);
-        deallocations[0] = IAllocator.DeallocationParams({
-            asset: assetIn, strategy: _allocator.getDefaultStrategy(assetIn), amount: amountIn
-        });
+        deallocations[0] = IAllocator.DeallocationParams({asset: assetIn, strategy: strategyIn, amount: amountIn});
 
         IAllocator.SwapParams[] memory swaps = new IAllocator.SwapParams[](1);
         swaps[0] = IAllocator.SwapParams({
@@ -590,9 +589,7 @@ contract OwnedMulticallTest is TestWithHelpers {
         });
 
         IAllocator.AllocationParams[] memory allocations = new IAllocator.AllocationParams[](1);
-        allocations[0] = IAllocator.AllocationParams({
-            asset: assetOut, strategy: _allocator.getDefaultStrategy(assetOut), amount: amountOut
-        });
+        allocations[0] = IAllocator.AllocationParams({asset: assetOut, strategy: strategyOut, amount: amountOut});
 
         IAllocator.RebalanceParams[] memory rebalanceParams = new IAllocator.RebalanceParams[](1);
         rebalanceParams[0] =

@@ -283,17 +283,14 @@ abstract contract AccountingChainDeployment is
         address ghoYieldStrategy =
             _deployATokenVault(_gho(), poolAddressProvider, getAccessManagerAddress(_deployer()), _deployer());
         allocator.addStrategy(_gho(), ghoYieldStrategy);
-        allocator.setDefaultStrategy(_gho(), ghoYieldStrategy);
 
         address usdcYieldStrategy =
             _deployATokenVault(_usdc(), poolAddressProvider, getAccessManagerAddress(_deployer()), _deployer());
         allocator.addStrategy(_usdc(), usdcYieldStrategy);
-        allocator.setDefaultStrategy(_usdc(), usdcYieldStrategy);
 
         address usdtYieldStrategy =
             _deployATokenVault(_usdt(), poolAddressProvider, getAccessManagerAddress(_deployer()), _deployer());
         allocator.addStrategy(_usdt(), usdtYieldStrategy);
-        allocator.setDefaultStrategy(_usdt(), usdtYieldStrategy);
     }
 
     function _deployedATokenVaultAddresses() internal view virtual override returns (address[] memory) {
