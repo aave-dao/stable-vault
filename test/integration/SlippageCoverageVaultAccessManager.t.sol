@@ -9,7 +9,7 @@ import {ISlippageCoverageVault} from "src/interfaces/ISlippageCoverageVault.sol"
 import {SlippageCoverageVault} from "src/periphery/SlippageCoverageVault.sol";
 
 /// @dev Integration test for `SlippageCoverageVault` running behind a real `AccessManager`. Verifies that the new
-/// `Multicall` inheritance lets governance batch immediate tightening ops (Disabler-tier `lower*`) atomically and
+/// `Multicall` inheritance lets the operator batch immediate tightening ops (Disabler-tier `lower*`) atomically and
 /// also fire scheduled raises in a single tx after the raise delay elapses.
 contract SlippageCoverageVaultAccessManagerIntegrationTest is Test {
     address internal admin = makeAddr("admin");

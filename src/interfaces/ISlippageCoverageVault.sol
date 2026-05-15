@@ -8,7 +8,7 @@ pragma solidity ^0.8.22;
 // TODO: Remove non-essential declarations, avoid coupling the interface to the canonical implementation of it
 /// @dev Push-based outflows to the immutable `SLIPPAGE_BENEFICIARY`; the vault never grants ERC-20 allowances. The
 /// vault can be deployed in override mode (constructor flag) so the bound Swapper can pull coverage on day one
-/// without per-tx or window caps configured; governance flips override off and configures caps once risk-team has
+/// without per-tx or window caps configured; operator flips override off and configures caps once risk-team has
 /// set the production targets.
 interface ISlippageCoverageVault {
     /// @notice Fixed-window cap state for an asset.

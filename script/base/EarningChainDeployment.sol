@@ -379,9 +379,6 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
     }
 
     function _deploySlippageCoverageVault() internal returns (address) {
-        // Non-upgradeable. Bound to the predicted Swapper address (deployed next, same script). Override mode is read
-        // from config so the vault can launch with caps unset and the Swapper functional from block one; governance
-        // flips override off later, once risk-team has tuned per-tx and window caps.
         address slippageCoverageVault = _deploy_create3({
             namespacedSaltSeed: SLIPPAGE_COVERAGE_VAULT_SALT_SEED,
             deployer: _deployer(),
