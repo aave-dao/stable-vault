@@ -19,7 +19,7 @@ import {Errors} from "src/types/Errors.sol";
 contract SlippageCoverageVault is AccessManaged, Multicall, ReentrancyGuardTransient, ISlippageCoverageVault {
     using SafeERC20 for IERC20;
 
-    address public immutable SLIPPAGE_BENEFICIARY;
+    address internal immutable SLIPPAGE_BENEFICIARY;
 
     bool internal _overrideMode;
     uint16 internal _maxSlippageBps;

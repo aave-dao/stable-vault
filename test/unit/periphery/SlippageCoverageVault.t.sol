@@ -67,7 +67,6 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
     }
 
     function test_constructor_setsImmutableAndState_overrideOff() public view {
-        assertEq(_vault.SLIPPAGE_BENEFICIARY(), beneficiary);
         assertEq(_vault.getBeneficiary(), beneficiary);
         assertEq(_vault.getMaxSlippageBps(), DEFAULT_MAX_BPS);
         assertEq(_vault.getOverrideMaxSlippageBps(), DEFAULT_OVERRIDE_MAX_BPS);
