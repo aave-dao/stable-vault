@@ -587,15 +587,10 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(netDeposit, depositAmount - slippageAmount);
     }
 
-    /// @dev Regression for Q-05 / L-01. A pre/post `previewRedeem` snapshot inside `_depositToStrategy` would let
-    /// in-deposit yield accrual mask the `STRATEGY_DEPOSIT_SLIPPAGE_TOLERANCE` check: a real slippage > tolerance is
-    /// silently absorbed by the inflated delta (the existing position's share value rises during the deposit, the
-    /// post-snapshot picks up that rise, and `satSub(amount, delta)` saturates to zero). With the fix (measure via
-    /// `previewRedeem(sharesGained)` after the deposit), the slippage check sees only the actual loss and reverts.
     function test_deposit_doesNotMaskSlippage_whenStrategyAccruesYieldDuringDeposit() public {
         uint256 priorDepositAmount = 1_000_000;
-        uint256 pendingYieldAmount = 100_000; // strategy realises 10% accrual during the second deposit
-        uint256 slippageAmount = 1_000; // well above the 10-wei tolerance, with virtual-share dilution headroom
+        uint256 pendingYieldAmount = 100_000;
+        uint256 slippageAmount = 1_000;
         uint256 secondDepositAmount = 1_000_000;
 
         TestErc4626AccrueOnDeposit strategy = new TestErc4626AccrueOnDeposit(_mockUsdt);
@@ -605,13 +600,12 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.setDefaultStrategy(address(_mockUsdt), address(strategy));
         vm.stopPrank();
 
-        // First deposit primes the strategy with shares owned by the Allocator. Without an existing position the
-        // bug doesn't manifest — there are no pre-deposit shares for the inflated delta to attach to.
+        // Prime the strategy with shares owned by the Allocator so the second deposit has an existing
+        // position whose share value moves with the accrual.
         _mockTransferHelper.mockAsset(address(_mockUsdt), priorDepositAmount);
         vm.prank(depositor);
         _allocator.deposit(address(_mockUsdt), priorDepositAmount);
 
-        // Queue yield to be realised during the next deposit, plus a slippage above the tolerance.
         strategy.setPendingYield(pendingYieldAmount);
         strategy.setDepositSlippage(slippageAmount);
 
@@ -621,11 +615,6 @@ contract AllocatorTest is TestWithHelpers {
         _allocator.deposit(address(_mockUsdt), secondDepositAmount);
     }
 
-    /// @dev Companion to the regression above. The raw `netDepositAmount` emitted in `AssetAllocated` (which is
-    /// also the input to the slippage check) must reflect only the deposited amount, not the strategy's in-deposit
-    /// accrual. Pre-fix it would have been ≈ `secondDepositAmount + pendingYield` (the strategy's whole position
-    /// re-valued by the realised yield); the outer `Allocator.deposit` then clamps via `Math.min(net, amount)`
-    /// before returning, hiding the inflation from a return-value-only check. Hence the assertion on the event.
     function test_deposit_netAmount_isUnaffectedByAccrual_onStrategyAccrueOnDeposit() public {
         uint256 priorDepositAmount = 1_000_000;
         uint256 pendingYieldAmount = 100_000;
@@ -642,8 +631,8 @@ contract AllocatorTest is TestWithHelpers {
         vm.prank(depositor);
         _allocator.deposit(address(_mockUsdt), priorDepositAmount);
 
+        // No depositSlippage so the accrual effect is isolated.
         strategy.setPendingYield(pendingYieldAmount);
-        // No depositSlippage -- isolate the accrual effect.
 
         _mockTransferHelper.mockAsset(address(_mockUsdt), secondDepositAmount);
         vm.recordLogs();
@@ -664,11 +653,7 @@ contract AllocatorTest is TestWithHelpers {
         }
         assertTrue(found, "AssetAllocated event not emitted by the Allocator");
         assertEq(emittedAmount, secondDepositAmount, "event amount must equal the deposit input");
-        // Without the fix this asserts about secondDepositAmount + pendingYield. With the fix it must equal
-        // secondDepositAmount (with up to STRATEGY_MAX_SLIPPAGE_AMOUNT wei of virtual-share rounding floor).
-        assertLe(
-            emittedNetDeposit, secondDepositAmount, "raw netDepositAmount must not exceed input (no accrual masking)"
-        );
+        assertLe(emittedNetDeposit, secondDepositAmount, "raw netDepositAmount must not exceed input");
         assertGe(
             emittedNetDeposit,
             secondDepositAmount - STRATEGY_MAX_SLIPPAGE_AMOUNT,
@@ -686,9 +671,8 @@ contract AllocatorTest is TestWithHelpers {
         vm.prank(everyRoleAccount);
         _allocator.setDefaultStrategy(address(_mockUsdt), address(mockStrategy));
 
-        // Make previewRedeem revert — this simulates a broken strategy. After the fix for Q-05/L-01,
-        // `_depositToStrategy` measures the new shares via `previewRedeem(sharesGained)` once the deposit has
-        // settled, so a broken `previewRedeem` must propagate (rather than silently bypassing the slippage check).
+        // `_depositToStrategy` calls `previewRedeem(shares)` after the deposit, so a broken `previewRedeem`
+        // must propagate rather than silently bypass the slippage check.
         mockStrategy.mockPreviewRedeemToRevert("broken");
 
         _mockTransferHelper.mockAsset(address(_mockUsdt), depositAmount);

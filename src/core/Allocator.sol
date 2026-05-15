@@ -505,17 +505,10 @@ contract Allocator is
     /// @dev Intended to be the lowest level function used to deposit into a strategy.
     /// @dev Does not check if the strategy is trusted because to enable deposits for a strategy it must be trusted.
     /// @dev The state of strategy distrusted, but deposits are still allowed, is not possible.
-    /// @dev Measures the deposit via the `shares` return value of `IERC4626.deposit` (the ERC-4626-canonical count
-    /// of shares minted to the receiver), then computes `previewRedeem(shares)` once on the post-deposit state.
-    /// A pre/post assets snapshot (`previewRedeem(balanceOf) - previewRedeem(balanceOf)`) is unsafe when the
-    /// strategy accrues yield as part of its own `deposit` (e.g. `ATokenVault._accrueYield`): the pre-snapshot
-    /// reads a stale index, the deposit moves the index, and the post-snapshot then over-credits the strategy's
-    /// accrued yield to the depositor — masking the slippage check while existing depositors absorb the rounding.
-    /// A `balanceOf` delta would also be unsafe under reentrancy: a callback during the strategy's `deposit` could
-    /// mint additional shares to this contract and the delta would conflate them with the deposit being measured.
-    /// @dev Assumes `previewRedeem` reflects the post-deposit state on the strategy (i.e. is synchronised with the
-    /// state the deposit just settled into). Small dust losses from depositing-then-redeeming separately are
-    /// expected; `StableVault` non-zero withdrawal fees absorb them.
+    /// @dev Measures the deposit via `previewRedeem(shares)` on the post-deposit state. A pre/post balance delta
+    /// would let a strategy that accrues yield inside its own `deposit` over-credit the depositor and mask the
+    /// slippage check; the same read also bounds a reentrancy that mints further shares to this contract.
+    /// Round-trip rounding from `previewRedeem` is absorbed by `StableVault`'s non-zero withdrawal fee.
     function _depositToStrategy(address asset, uint256 amount, address strategy) internal returns (uint256) {
         require(amount > 0, Errors.ZeroAmount());
         require($storage().strategyConfigs[strategy].depositAllowed, DepositsToStrategyDisabled(strategy));
@@ -531,9 +524,8 @@ contract Allocator is
             revert DepositIntoStrategyFailed(strategy);
         }
 
-        // Clear any residual allowance. ERC4626 deposit may pull less than `amount` (e.g. `ATokenVault._baseDeposit`
-        // pulls `_convertToAssets(shares, Up)`, which can round below `amount`), leaving dust that accumulates
-        // across deposits and gives the strategy contract a latent pull-without-going-through-this-function surface.
+        // ERC4626 deposit may pull less than `amount`; clear the residual so dust doesn't accumulate as a latent
+        // pull surface for the strategy.
         IERC20(asset).forceApprove(strategy, 0);
 
         emit AssetAllocated(asset, strategy, amount, netDepositAmount);
