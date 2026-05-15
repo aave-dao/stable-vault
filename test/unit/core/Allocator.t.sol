@@ -45,7 +45,7 @@ contract AllocatorTest is TestWithHelpers {
     using SafeERC20 for IERC20;
     using SafeERC20 for IMockErc20;
 
-    uint8 constant STRATEGY_MAX_SLIPPAGE_AMOUNT = 10;
+    uint8 constant STRATEGY_DEPOSIT_SLIPPAGE_TOLERANCE = 10;
 
     address admin = makeAddr("ADMIN");
     address everyRoleAccount = makeAddr("EVERY_ROLE_ACCOUNT");
@@ -435,6 +435,28 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
+    }
+
+    function test_depositToStrategy_emitsAssetAllocatedWithSurplus_whenStrategyDonatesToFreshShares() public {
+        uint256 amount = 100;
+        uint256 bonus = 5;
+
+        // The strategy attributes more value to the newly minted shares than was pulled (a deposit bonus
+        // / donation), so `actualDepositedAmount > amount`. The Allocator must surface both values via
+        // `AssetAllocated` so off-chain accounting can attribute the surplus to this strategy/asset.
+        TestErc4626WithSlippage strategyWithBonus = new TestErc4626WithSlippage(_mockUsdt);
+        strategyWithBonus.setDepositBonus(bonus);
+
+        vm.prank(admin);
+        _allocator.addStrategy(address(_mockUsdt), address(strategyWithBonus));
+
+        _mockTransferHelper.mockAsset(address(_mockUsdt), amount);
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), amount);
+
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.AssetAllocated(address(_mockUsdt), address(strategyWithBonus), amount, amount + bonus);
+        _routeIdleToStrategy(address(_mockUsdt), address(strategyWithBonus), amount);
     }
 
     function test_getAssetBalanceInStrategy_returnsZero_ifPreviewRedeemReverts() public {

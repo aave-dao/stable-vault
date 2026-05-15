@@ -477,6 +477,9 @@ contract Allocator is
         require($storage().strategyConfigs[strategy].depositAllowed, DepositsToStrategyDisabled(strategy));
         IERC20(asset).forceApprove(strategy, amount);
 
+        // `actualDepositedAmount` may exceed `amount` when the strategy credits the new shares with value
+        // beyond what was pulled (e.g., a deposit bonus or donation attributed to fresh shares).
+        // `satSub` floors the slippage check to zero in the case actualDepositedAmount > amount.
         uint256 actualDepositedAmount;
         try IERC4626(strategy).deposit(amount, address(this)) returns (uint256 shares) {
             actualDepositedAmount = IERC4626(strategy).previewRedeem(shares);
