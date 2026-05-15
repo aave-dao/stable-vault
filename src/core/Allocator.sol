@@ -17,7 +17,9 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
+import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
 import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
+import {IRebalancePolicy} from "src/interfaces/IRebalancePolicy.sol";
 import {ISwapper} from "src/interfaces/ISwapper.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
@@ -32,8 +34,7 @@ import {Errors} from "src/types/Errors.sol";
 /// @notice Allocator contract for managing asset allocations into yield strategies.
 /// @dev This contract supports batching of calls using the Multicall contract.
 /// @dev Assumptions:
-///      - 1 default strategy per asset which serves as the first strategy to deposit to/withdraw from.
-///      - multiple allowed strategies per asset which require manual rebalancing
+///      - multiple allowed strategies per asset; deposits are always idle until the manager rebalances them
 ///      - assumes all assets in Allocator share a common denomination
 ///      - asset amounts are treated in their native decimals
 ///      - 100% of assets deposited into Allocator belong to the same entity (the Allocator does not track depositors)
@@ -55,15 +56,18 @@ contract Allocator is
     address internal immutable WITHDRAWER;
     address internal immutable ASSET_REGISTRY;
     address internal immutable PRICE_ORACLE;
+    address internal immutable POLICY_REGISTRY;
     uint8 internal immutable MAX_STRATEGIES_PER_ASSET;
 
     /// @dev Maximum slippage, denominated in asset units, tolerated to account for rounding errors when depositing
     /// to ERC-4626 yield strategies.
     uint8 internal constant STRATEGY_DEPOSIT_SLIPPAGE_TOLERANCE = 10;
 
+    // keccak256("aave.stable-vault.Allocator.policy.rebalance")
+    bytes32 internal constant REBALANCE_POLICY_ID = 0xc8677baa58e60e0903b82d16b92a11a49685a8844fe0f67b4f06e7d3ecef34cb;
+
     /// @custom:storage-location erc7201:aave.storage.Allocator
     struct AllocatorStorage {
-        mapping(address asset => address strategy) defaultStrategyByAsset;
         mapping(address strategy => StrategyConfig strategyConfig) strategyConfigs;
         // To iterate through all strategies for an asset.
         mapping(address asset => EnumerableSet.AddressSet) assetStrategies;
@@ -103,24 +107,28 @@ contract Allocator is
     /// @param priceOracle The address of the price oracle contract.
     /// @param transferHelper The address of the contract that helps to minimize the number of transfers across flows.
     /// @param maxStrategiesPerAsset The maximum number of allowed yield strategies per asset.
+    /// @param policyRegistry The address of the PolicyRegistry contract used to look up policies by ID.
     constructor(
         address assetRegistry,
         address depositor,
         address withdrawer,
         address priceOracle,
         address transferHelper,
-        uint8 maxStrategiesPerAsset
+        uint8 maxStrategiesPerAsset,
+        address policyRegistry
     ) TransferHelperClient(transferHelper) {
         require(assetRegistry != address(0), Errors.ZeroAddress());
         require(depositor != address(0), Errors.ZeroAddress());
         require(withdrawer != address(0), Errors.ZeroAddress());
         require(priceOracle != address(0), Errors.ZeroAddress());
+        require(policyRegistry != address(0), Errors.ZeroAddress());
         require(maxStrategiesPerAsset > 0, Errors.InvalidParameter());
         _disableInitializers();
         ASSET_REGISTRY = assetRegistry;
         DEPOSITOR = depositor;
         WITHDRAWER = withdrawer;
         PRICE_ORACLE = priceOracle;
+        POLICY_REGISTRY = policyRegistry;
         MAX_STRATEGIES_PER_ASSET = maxStrategiesPerAsset;
     }
 
@@ -159,19 +167,12 @@ contract Allocator is
     }
 
     /// @inheritdoc IAllocator
-    function getDefaultStrategy(address asset) external view override returns (address) {
-        return $storage().defaultStrategyByAsset[asset];
-    }
-
-    /// @inheritdoc IAllocator
     function getStrategyConfig(address strategy) external view override returns (StrategyConfig memory) {
         return $storage().strategyConfigs[strategy];
     }
 
-    /// @notice Getter for the list of strategies registered for a given asset.
-    /// @param asset The address of the asset to get strategies for.
-    /// @return The list of strategy addresses registered for the asset.
-    function getStrategiesForAsset(address asset) external view returns (address[] memory) {
+    /// @inheritdoc IAllocator
+    function getStrategiesForAsset(address asset) external view override returns (address[] memory) {
         return $storage().assetStrategies[asset].values();
     }
 
@@ -186,35 +187,11 @@ contract Allocator is
     }
 
     /// @inheritdoc IAllocator
-    function deposit(address asset, uint256 amount) external override onlyDepositor nonReentrant returns (uint256) {
+    function deposit(address asset, uint256 amount) external override onlyDepositor nonReentrant {
         require(amount > 0, Errors.ZeroAmount());
         require(IAssetRegistry(ASSET_REGISTRY).isDepositToAllocatorAllowed(asset), Errors.UnsupportedAsset(asset));
         ITransferHelper(TRANSFER_HELPER).pull(asset, amount);
-        uint256 netDepositAmount = amount;
-        address defaultStrategy = $storage().defaultStrategyByAsset[asset];
-        if (defaultStrategy == address(0)) {
-            emit AssetLeftIdle(asset, amount);
-            return amount;
-        }
-        netDepositAmount = _depositToStrategy({asset: asset, amount: amount, strategy: defaultStrategy});
-        return Math.min(netDepositAmount, amount);
-    }
-
-    /// @inheritdoc IAllocator
-    function depositAllowIdle(address asset, uint256 amount) external override onlyDepositor nonReentrant {
-        // We don't check amount for zero here because this function is called from bridge callbacks, where reverting
-        // could jam the bridge. A zero amount is a harmless no-op.
-        require(IAssetRegistry(ASSET_REGISTRY).isDepositToAllocatorAllowed(asset), Errors.UnsupportedAsset(asset));
-        ITransferHelper(TRANSFER_HELPER).pull(asset, amount);
-        if ($storage().defaultStrategyByAsset[asset] == address(0)) {
-            emit AssetLeftIdle(asset, amount);
-            return;
-        }
-        try this.tryDepositToStrategy(asset, amount, $storage().defaultStrategyByAsset[asset]) {}
-        catch {
-            emit AssetLeftIdle(asset, amount);
-            emit StrategyDepositFailed($storage().defaultStrategyByAsset[asset], amount);
-        }
+        emit AssetLeftIdle(asset, amount);
     }
 
     /// @inheritdoc IAllocator
@@ -224,41 +201,20 @@ contract Allocator is
 
         uint256 idleBalance = IERC20(asset).balanceOf(address(this));
         if (idleBalance < amount) {
-            // Consume from idle balance first
+            // Consume from idle balance first, then iterate registered strategies for the rest.
             uint256 amountRemaining = amount - idleBalance;
-
-            address defaultStrategy = $storage().defaultStrategyByAsset[asset];
-            // Consume from default strategy (skip if unset to avoid false StrategyWithdrawalFailed events)
-            if (defaultStrategy != address(0)) {
-                // Wrap in a try-catch to avoid impact to searching other strategies
-                try this.tryWithdrawFromStrategy(asset, amountRemaining, defaultStrategy) returns (uint256 withdrawn) {
-                    amountRemaining = amountRemaining.satSub(withdrawn);
-                } catch {
-                    emit StrategyWithdrawalFailed(defaultStrategy, asset, amountRemaining);
-                }
-            }
-
-            // If necessary, pull from remaining strategies
             uint256 length = $storage().assetStrategies[asset].length();
             for (uint256 i = 0; amountRemaining > 0 && i < length; i++) {
                 address strategy = $storage().assetStrategies[asset].at(i);
-                if (strategy != defaultStrategy) {
-                    try this.tryWithdrawFromStrategy(asset, amountRemaining, strategy) returns (uint256 withdrawn) {
-                        amountRemaining = amountRemaining.satSub(withdrawn);
-                    } catch {
-                        emit StrategyWithdrawalFailed(strategy, asset, amountRemaining);
-                    }
+                try this.tryWithdrawFromStrategy(asset, amountRemaining, strategy) returns (uint256 withdrawn) {
+                    amountRemaining = amountRemaining.satSub(withdrawn);
+                } catch {
+                    emit StrategyWithdrawalFailed(strategy, asset, amountRemaining);
                 }
             }
             require(amountRemaining == 0, Errors.InsufficientFunds());
         }
         _transferToTransferHelper(asset, amount);
-    }
-
-    /// @dev Implements the external and onlySelf modifier because this function is intended to be wrapped in a
-    /// try-catch.
-    function tryDepositToStrategy(address asset, uint256 amount, address strategy) external onlySelf {
-        _depositToStrategy({asset: asset, amount: amount, strategy: strategy});
     }
 
     /// @dev Implements the external and onlySelf modifier because this function is intended to be wrapped in a
@@ -293,10 +249,19 @@ contract Allocator is
     //////////////////////////////////////////// MANAGER FUNCTIONS /////////////////////////////////////////////////////
 
     /// @inheritdoc IAllocator
-    function rebalance(RebalanceParams[] memory params) external virtual override restricted nonReentrant {
+    function rebalance(RebalanceParams[] memory params, bytes calldata policyData)
+        external
+        virtual
+        override
+        restricted
+        nonReentrant
+    {
         for (uint256 i = 0; i < params.length; i++) {
             _rebalance(params[i]);
         }
+        // The policy is applied after the rebalance so it can assert against post-state invariants efficiently without
+        // needing to parse the entire array of rebalance operations.
+        _applyRebalancePolicy(params, policyData);
     }
 
     /// @inheritdoc IAllocator
@@ -316,11 +281,6 @@ contract Allocator is
     /// @inheritdoc IAllocator
     function removeStrategy(address strategy) external override restricted {
         _removeStrategy(strategy);
-    }
-
-    /// @inheritdoc IAllocator
-    function setDefaultStrategy(address asset, address strategy) external override restricted {
-        _setDefaultStrategy(asset, strategy);
     }
 
     /// @inheritdoc IAllocator
@@ -357,10 +317,6 @@ contract Allocator is
             _strategyConfig.depositAllowed = false;
             emit StrategyDepositsToggled(strategy, false);
         }
-        address asset = _strategyConfig.asset;
-        if ($storage().defaultStrategyByAsset[asset] == strategy) {
-            _setDefaultStrategy(asset, address(0));
-        }
     }
 
     /// @inheritdoc IAllocator
@@ -369,6 +325,17 @@ contract Allocator is
     }
 
     ////////////////////////////////////////////////// INTERNAL ////////////////////////////////////////////////////////
+
+    function _applyRebalancePolicy(RebalanceParams[] memory params, bytes calldata policyData) internal {
+        address policy = IPolicyRegistry(POLICY_REGISTRY).getPolicy(REBALANCE_POLICY_ID);
+        if (policy == address(0)) {
+            return;
+        }
+        IRebalancePolicy(policy)
+            .applyRebalancePolicy(
+                IRebalancePolicy.RebalanceIntent({caller: msg.sender, params: params, policyData: policyData})
+            );
+    }
 
     function _rebalance(RebalanceParams memory rebalanceParams) internal {
         uint256 i;
@@ -593,7 +560,6 @@ contract Allocator is
     function _removeStrategy(address strategy) internal {
         address asset = $storage().strategyConfigs[strategy].asset;
         require(asset != address(0), Errors.AddressNotWhitelisted());
-        require($storage().defaultStrategyByAsset[asset] != strategy, DefaultStrategy(strategy));
         // The calls to the strategy are not reliable if the strategy is not trusted.
         require($storage().strategyConfigs[strategy].isTrusted, StrategyNotTrusted(strategy));
         // This can get blocked if assets are deposited into the strategy on behalf of the Allocator.
@@ -606,18 +572,6 @@ contract Allocator is
         $storage().assetStrategies[asset].remove(strategy);
         delete $storage().strategyConfigs[strategy];
         emit StrategyRemoved(asset, strategy);
-    }
-
-    function _setDefaultStrategy(address asset, address strategy) internal {
-        if (strategy != address(0)) {
-            require(strategy != $storage().defaultStrategyByAsset[asset], DefaultStrategy(strategy));
-            require(_isStrategySupportedForAsset({strategy: strategy, asset: asset}), Errors.AddressNotWhitelisted());
-            require($storage().strategyConfigs[strategy].depositAllowed, DepositsToStrategyDisabled(strategy));
-        } else {
-            require(IAssetRegistry(ASSET_REGISTRY).isAssetRegistered(asset), Errors.InvalidAsset(asset));
-        }
-        $storage().defaultStrategyByAsset[asset] = strategy;
-        emit DefaultStrategySet(asset, strategy);
     }
 
     function _beforeRescueTokens(address token, uint256) internal virtual override {

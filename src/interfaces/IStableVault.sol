@@ -34,6 +34,8 @@ interface IStableVault {
     event Deposit(address indexed user, address indexed asset, uint256 amount);
 
     /// @notice Emitted on Stable Vault balance transfers (amount is denominated in RAY).
+    /// @dev amountRay represents units of the denominating currency which are used to calculate a number of SubVault
+    /// shares being added/removed from a user's position.
     event Transfer(address indexed from, address indexed to, uint256 amountRay);
 
     event UserRateSet(address indexed user, uint256 indexed subVaultId, uint256 newPerSecondRate);
@@ -148,7 +150,8 @@ interface IStableVault {
     /// @param user Address of the user depositing the assets.
     /// @param asset Address of the asset being deposited.
     /// @param amount Amount of assets being deposited.
-    function deposit(address user, address asset, uint256 amount) external;
+    /// @param policyData Additional data that the deposit policy might need to operate.
+    function deposit(address user, address asset, uint256 amount, bytes calldata policyData) external;
 
     /// @notice ERC20-style total Stable Vault position supply in RAY.
     /// @dev Excludes IOU supply; includes only active Stable Vault position obligations.
@@ -189,21 +192,24 @@ interface IStableVault {
     /// @dev User is minted units of IOUs which can be used to claim assets.
     /// @param user The address of the user requesting the withdrawal
     /// @param requestedAmountInRay The amount of assets requested to withdraw (normalized to RAY units)
+    /// @param policyData Additional data that the withdrawal-request policy might need to operate.
     /// @return amountOfIouTokensMinted Amount of IOU tokens minted to the user.
-    function requestWithdrawal(address user, uint256 requestedAmountInRay) external returns (uint256);
+    function requestWithdrawal(address user, uint256 requestedAmountInRay, bytes calldata policyData)
+        external
+        returns (uint256);
 
     /// @notice Exchanges IOUs for a supported asset.
     /// @param user Address of the user executing the withdrawal.
     /// @param assetOut Address of the asset to withdraw.
     /// @param minAmountOut Minimum amount of `assetOut` to receive in exchange of `iouAmountRay` IOUs.
     /// @param iouAmountRay Amount of the IOU tokens to exchange as part of the withdrawal execution.
-    /// @param withdrawalPolicyData Additional data for the withdrawal policy.
+    /// @param policyData Additional data that the withdrawal execution policy might need to operate.
     function executeWithdrawal(
         address user,
         address assetOut,
         uint256 minAmountOut,
         uint256 iouAmountRay,
-        bytes memory withdrawalPolicyData
+        bytes memory policyData
     ) external;
 
     /// @notice Getter for the aggregated obligations owed to depositors in RAY of the denominating currency.
