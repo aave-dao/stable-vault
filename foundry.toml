@@ -25,14 +25,13 @@ additional_compiler_profiles = [
 compilation_restrictions = [
     # Use `size-optimized` compiler profile for `ATokenVaultMerklRewardClaimer` contract.
     { paths = "lib/aave-vault/src/ATokenVaultMerklRewardClaimer.sol", optimizer_runs = 200 },
-    # Use `size-optimized` compiler profile for `StableVaultHarness` test mock contract.
-    { paths = "test/mocks/StableVaultHarness.sol", optimizer_runs = 200 },
+    # Use `balanced` compiler profile for `StableVaultHarness` test mock contract (must match `StableVault`).
+    { paths = "test/mocks/StableVaultHarness.sol", optimizer_runs = 9_000 },
     # Use `balanced` compiler profile for `Allocator` contract.
     { paths = "src/core/Allocator.sol", optimizer_runs = 9_000 },
+    # Use `balanced` compiler profile for `StableVault` contract.
+    { paths = "src/core/accounting/StableVault.sol", optimizer_runs = 9_000 },
 ]
-
-[profile.ci]
-optimizer_runs = 9_000
 
 [profile.default.fuzz]
 runs = 10_000
