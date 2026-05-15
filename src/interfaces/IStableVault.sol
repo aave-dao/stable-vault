@@ -52,6 +52,10 @@ interface IStableVault {
 
     event SubVaultActivated(uint256 indexed subVaultId);
 
+    /// @notice Emitted when a sub-vault has no remaining shares and is removed from the active set.
+    /// @dev On deactivation, the sub-vault's `conversionRate` is reset to 1 RAY and its `lastAccrualTimestamp`
+    /// is updated to the current block timestamp. This makes future reuse of the sub-vault safer for dust positions,
+    /// but means the conversion rate is not monotonic across the deactivation boundary.
     event SubVaultDeactivated(uint256 indexed subVaultId);
 
     /// @notice Thrown when the amount requested to withdraw is greater than the amount available.
@@ -248,6 +252,9 @@ interface IStableVault {
     function getClaimableSurplusInterest() external view returns (uint256 surplusInterestRay);
 
     /// @notice Getter for the accrued conversion rate of a sub-vault, computed to the current block timestamp.
+    /// @dev The conversion rate is non-monotonic: it ratchets up via accrual while the sub-vault is in use, but is
+    /// reset to 1 RAY whenever the sub-vault is deactivated (i.e., its share count reaches zero). Off-chain consumers
+    /// should not assume the value only ever increases.
     /// @param subVaultId ID of the sub-vault.
     /// @return conversionRate The conversion rate in RAY, reflecting interest accrued up to now.
     function getSubVaultConversionRate(uint256 subVaultId) external view returns (uint256 conversionRate);

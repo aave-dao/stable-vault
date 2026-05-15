@@ -650,7 +650,7 @@ contract StableVault is
     function _resetSubVaultConversionRate(uint256 subVaultId) internal {
         SubVault storage subVault = $storage().subVaultById[subVaultId];
         subVault.conversionRate = MathLib.RAY;
-        subVault.lastAccrualTimestamp = uint256(block.timestamp);
+        subVault.lastAccrualTimestamp = block.timestamp;
     }
 
     function _migrateUserToSubVault(address user, uint256 oldSubVaultId, uint256 newSubVaultId)
@@ -969,8 +969,6 @@ contract StableVault is
             } else {
                 // Migration to new sub-vault did not happen.
                 // Skip the user, do not revert, so we avoid blocking the entire `setUserRate` batch.
-                // If migration is skipped, the target sub-vault must already be active. New sub-vaults start at 1 RAY,
-                // and inactive sub-vaults are reset to 1 RAY on deactivation, so dust can still migrate into them.
                 emit SetUserRateSkipped(user);
             }
         }
