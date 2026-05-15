@@ -567,7 +567,6 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         });
         stack.assetRegistry.setAssetConfig(address(stack.asset), assetConfig);
         stack.allocator.addStrategy(address(stack.asset), address(stack.strategy));
-        stack.allocator.setDefaultStrategy(address(stack.asset), address(stack.strategy));
         stack.fundsHandler.addEarningChain(ARB_CHAIN_ID);
         stack.gateway.addBridgeAdapter(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ARB_CHAIN_ID, address(stack.adiAdapter));
     }
@@ -581,7 +580,6 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         });
         stack.assetRegistry.setAssetConfig(address(stack.asset), assetConfig);
         stack.allocator.addStrategy(address(stack.asset), address(stack.strategy));
-        stack.allocator.setDefaultStrategy(address(stack.asset), address(stack.strategy));
         stack.gateway.addBridgeAdapter(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ETH_CHAIN_ID, address(stack.adiAdapter));
     }
 
@@ -608,7 +606,7 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         vm.selectFork(_arbFork);
         _earning.asset.mint(address(_earning.transferHelper), amount);
         vm.prank(address(_earning.gateway));
-        _earning.allocator.depositAllowIdle(address(_earning.asset), amount);
+        _earning.allocator.deposit(address(_earning.asset), amount);
     }
 
     function _bridgeAccountingIousToEarning(uint256 amountRay) internal returns (Vm.Log[] memory logs) {
