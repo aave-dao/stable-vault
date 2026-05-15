@@ -11,6 +11,10 @@ interface IChainGateway {
     /// @custom:selector 0xf7b1bf8e
     error AdapterNotFound();
 
+    /// @notice Thrown when removing an adapter would leave a chain without a data-only message route.
+    /// @custom:selector 0xaa601040
+    error CannotRemoveLastDataOnlyBridgeAdapter();
+
     /// @notice Thrown when a given message contains both funds and a data payload which is not allowed.
     /// @custom:selector 0x9d73280d
     error DataNotAllowedWithFunds();
