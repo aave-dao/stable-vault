@@ -38,7 +38,7 @@ interface IStableVault {
 
     event UserRateSet(address indexed user, uint256 indexed subVaultId, uint256 newPerSecondRate);
 
-    event UserRateSkippedDueToZeroShares(address indexed user, uint256 indexed newSubVaultId);
+    event SetUserRateSkipped(address indexed user);
 
     event SubVaultRateSet(uint256 indexed subVaultId, uint256 newPerSecondRate);
 

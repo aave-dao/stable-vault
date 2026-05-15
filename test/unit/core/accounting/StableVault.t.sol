@@ -881,6 +881,25 @@ contract StableVaultTest is TestWithHelpers {
         assertEq(stableVault.getUserSubVault(user1).id, 0);
     }
 
+    function test_setUserRate_emitsSetUserRateSkipped_whenUserHasNoPosition() public {
+        address user = makeAddr("noPositionUser");
+        uint256 newRate = _boundRate(DEFAULT_PER_SECOND_RATE + 1);
+        vm.assume(newRate != stableVault.getDefaultSubVault().perSecondRate);
+
+        assertEq(stableVault.getUserSubVault(user).id, 0);
+
+        IStableVault.UserRateData[] memory userRateData = new IStableVault.UserRateData[](1);
+        userRateData[0] = IStableVault.UserRateData(user, newRate);
+
+        vm.expectEmit(true, false, false, true);
+        emit IStableVault.SetUserRateSkipped(user);
+
+        vm.prank(manager);
+        stableVault.setUserRate(userRateData);
+
+        assertEq(stableVault.getUserSubVault(user).id, 0, "user should still have no position");
+    }
+
     function test_setUserRate_reverts_ifUserIsZeroAddress() public {
         vm.expectRevert(Errors.ZeroAddress.selector);
         vm.prank(manager);
@@ -1142,8 +1161,8 @@ contract StableVaultTest is TestWithHelpers {
         vm.prank(manager);
         userRateData = new IStableVault.UserRateData[](1);
         userRateData[0] = IStableVault.UserRateData(user2, newRate);
-        vm.expectEmit(true, true, false, true);
-        emit IStableVault.UserRateSkippedDueToZeroShares(user2, stableVault.getSubVaultIdByRate(newRate));
+        vm.expectEmit(true, false, false, true);
+        emit IStableVault.SetUserRateSkipped(user2);
 
         // Migration is skipped instead of reverting when the user would end up with 0 shares in the new sub-vault.
         // The call succeeds and user2's position is left untouched.
@@ -1213,8 +1232,8 @@ contract StableVaultTest is TestWithHelpers {
         batch[0] = IStableVault.UserRateData(dustUser, newRate);
         batch[1] = IStableVault.UserRateData(normalUser, newRate);
 
-        vm.expectEmit(true, true, false, true);
-        emit IStableVault.UserRateSkippedDueToZeroShares(dustUser, stableVault.getSubVaultIdByRate(newRate));
+        vm.expectEmit(true, false, false, true);
+        emit IStableVault.SetUserRateSkipped(dustUser);
 
         vm.prank(manager);
         stableVault.setUserRate(batch);
@@ -1293,7 +1312,7 @@ contract StableVaultTest is TestWithHelpers {
         stableVault.setUserRate(batch);
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes32 skippedTopic = keccak256("UserRateSkippedDueToZeroShares(address,uint256)");
+        bytes32 skippedTopic = keccak256("SetUserRateSkipped(address)");
         bytes32 userRateSetTopic = keccak256("UserRateSet(address,uint256,uint256)");
         bool foundSkippedEvent = false;
         bool foundUserRateSet = false;

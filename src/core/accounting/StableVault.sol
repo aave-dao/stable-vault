@@ -654,7 +654,7 @@ contract StableVault is
 
     function _migrateUserToSubVault(address user, uint256 oldSubVaultId, uint256 newSubVaultId)
         internal
-        returns (bool migrated)
+        returns (bool)
     {
         uint256 oldConversionRate = _accrueSubVaultConversionRate(oldSubVaultId);
         uint256 newConversionRate = _accrueSubVaultConversionRate(newSubVaultId);
@@ -662,12 +662,10 @@ contract StableVault is
         // Round down the amount of shares after sub-vault migration, so that the rounding is in favor of the protocol.
         uint256 userNewShares = userOldShares.rayMulDown(oldConversionRate).rayDivDown(newConversionRate);
         // Skip migration when the new share count rounds to zero (dust position relative to the target sub-vault's
-        // conversion rate). Reverting would block the entire `setUserRate` batch on a single dust-positioned user;
-        // consistent with the no-position skip in `_setUserRate`.
+        // conversion rate). Reverting would block the entire `setUserRate` batch on a single dust-positioned user.
         if (userNewShares == 0) {
             return false;
         }
-
         _moveShares({
             from: user,
             to: user,
@@ -954,7 +952,9 @@ contract StableVault is
         uint256 oldSubVaultId = $storage().positions[user].subVaultId;
         // Skip users without a position (e.g., withdrew or transferred out between batch
         // preparation and execution) to avoid reverting the entire batch.
-        if (oldSubVaultId != 0) {
+        if (oldSubVaultId == 0) {
+            emit SetUserRateSkipped(user);
+        } else {
             require(
                 newPerSecondRate != $storage().subVaultById[oldSubVaultId].perSecondRate,
                 RedundantRate(user, newPerSecondRate)
@@ -963,7 +963,7 @@ contract StableVault is
             if (_migrateUserToSubVault(user, oldSubVaultId, newSubVaultId)) {
                 emit UserRateSet(user, newSubVaultId, newPerSecondRate);
             } else {
-                emit UserRateSkippedDueToZeroShares(user, newSubVaultId);
+                emit SetUserRateSkipped(user);
             }
         }
         // `_validateAmountOfActiveSubVaults()` is intentionally not called here: this is invoked per-user inside
