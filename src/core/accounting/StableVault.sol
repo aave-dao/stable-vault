@@ -661,9 +661,9 @@ contract StableVault is
         uint256 userOldShares = $storage().positions[user].shares;
         // Round down the amount of shares after sub-vault migration, so that the rounding is in favor of the protocol.
         uint256 userNewShares = userOldShares.rayMulDown(oldConversionRate).rayDivDown(newConversionRate);
-        // Skip migration when the new share count rounds to zero (dust position relative to the target sub-vault's
-        // conversion rate). Reverting would block the entire `setUserRate` batch on a single dust-positioned user.
         if (userNewShares == 0) {
+            // Skip migration when the new share count rounds to zero (dust position relative to the target sub-vault's
+            // conversion rate).
             return false;
         }
         _moveShares({
@@ -950,9 +950,9 @@ contract StableVault is
     function _setUserRate(address user, uint256 newPerSecondRate) internal {
         require(user != address(0), Errors.ZeroAddress());
         uint256 oldSubVaultId = $storage().positions[user].subVaultId;
-        // Skip users without a position (e.g., withdrew or transferred out between batch
-        // preparation and execution) to avoid reverting the entire batch.
         if (oldSubVaultId == 0) {
+            // Skip users without a position (e.g., withdrew or transferred out between batch
+            // preparation and execution) to avoid reverting the entire batch.
             emit SetUserRateSkipped(user);
         } else {
             require(
@@ -963,6 +963,8 @@ contract StableVault is
             if (_migrateUserToSubVault(user, oldSubVaultId, newSubVaultId)) {
                 emit UserRateSet(user, newSubVaultId, newPerSecondRate);
             } else {
+                // Migration to new sub-vault did not happen.
+                // Skip the user, do not revert, so we avoid blocking the entire `setUserRate` batch.
                 emit SetUserRateSkipped(user);
             }
         }
