@@ -10,8 +10,8 @@ interface ISwapper {
     /// @notice Emitted when a slippage shortfall on `assetOut` is covered by an external source.
     event SlippageCovered(address indexed slippageCoverageSource, address indexed assetOut, uint256 amount);
 
-    /// @notice Emitted when unconsumed `assetIn` is returned to the caller.
-    event AssetInSwept(address indexed asset, uint256 amount);
+    /// @notice Emitted when unconsumed `assetIn` is pushed to an external destination.
+    event AssetInSwept(address indexed to, address indexed asset, uint256 amount);
 
     /// @notice Thrown when a target invariant required by the implementation is violated.
     /// @custom:selector 0x13496fda
