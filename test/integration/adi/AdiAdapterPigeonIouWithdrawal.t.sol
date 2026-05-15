@@ -23,8 +23,9 @@ import {IPriceOracle} from "src/interfaces/IPriceOracle.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {AssetRegistry} from "src/periphery/AssetRegistry.sol";
+import {PolicyRegistry} from "src/periphery/PolicyRegistry.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
-import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
+import {WithdrawalExecutionPolicy} from "src/policies/WithdrawalExecutionPolicy.sol";
 import {Constants} from "src/types/Constants.sol";
 
 import {AdiHelper} from "pigeon/src/adi/AdiHelper.sol";
@@ -67,6 +68,7 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
     using AssetLib for uint256;
 
     uint256 internal constant DEFAULT_MAX_PER_SECOND_RATE = 1000000005781378656804591713; // ~20% APY
+    uint256 internal constant BURN_IOU_TOKEN_GAS_LIMIT = 120_000;
     uint256 internal constant MAX_ACTIVE_SUB_VAULTS = 201;
     uint8 internal constant MAX_STRATEGIES_PER_ASSET = 15;
 
@@ -82,7 +84,8 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         MutableChainBalanceOracle chainBalanceOracle;
         MockErc20 asset;
         AssetRegistry assetRegistry;
-        WithdrawalPolicy withdrawalPolicy;
+        WithdrawalExecutionPolicy withdrawalExecutionPolicy;
+        PolicyRegistry policyRegistry;
         IouToken iouToken;
         IouTokenManager iouTokenManager;
         StableVault vault;
@@ -99,7 +102,8 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         FixedPriceOracle priceOracle;
         MockErc20 asset;
         AssetRegistry assetRegistry;
-        WithdrawalPolicy withdrawalPolicy;
+        WithdrawalExecutionPolicy withdrawalExecutionPolicy;
+        PolicyRegistry policyRegistry;
         IouToken iouToken;
         IouTokenManager iouTokenManager;
         Allocator allocator;
@@ -136,7 +140,7 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
 
         vm.selectFork(_ethFork);
         vm.prank(_user);
-        uint256 mintedIous = _accounting.vault.requestWithdrawal(_user, iouAmountRay);
+        uint256 mintedIous = _accounting.vault.requestWithdrawal(_user, iouAmountRay, "");
         assertEq(mintedIous, iouAmountRay, "unexpected requested IOU amount");
         assertEq(_accounting.iouToken.balanceOf(_user), iouAmountRay, "accounting IOUs not minted");
 
@@ -203,13 +207,14 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
 
         uint256 nonce = vm.getNonce(address(this));
         address assetRegistryAddress = vm.computeCreateAddress(address(this), nonce + 1);
-        address withdrawalPolicyAddress = vm.computeCreateAddress(address(this), nonce + 3);
+        address withdrawalExecutionPolicyAddress = vm.computeCreateAddress(address(this), nonce + 3);
         address iouTokenAddress = vm.computeCreateAddress(address(this), nonce + 4);
         address iouTokenManagerAddress = vm.computeCreateAddress(address(this), nonce + 6);
         address vaultAddress = vm.computeCreateAddress(address(this), nonce + 8);
         address allocatorAddress = vm.computeCreateAddress(address(this), nonce + 10);
         address fundsHandlerAddress = vm.computeCreateAddress(address(this), nonce + 12);
         address gatewayAddress = vm.computeCreateAddress(address(this), nonce + 14);
+        address policyRegistryAddress = vm.computeCreateAddress(address(this), nonce + 15);
 
         stack.assetRegistry = AssetRegistry(
             address(
@@ -222,16 +227,19 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         );
         require(address(stack.assetRegistry) == assetRegistryAddress, "asset registry address mismatch");
 
-        stack.withdrawalPolicy = WithdrawalPolicy(
+        stack.withdrawalExecutionPolicy = WithdrawalExecutionPolicy(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new WithdrawalPolicy(vaultAddress)),
+                    address(new WithdrawalExecutionPolicy(vaultAddress)),
                     _proxyAdmin,
-                    abi.encodeCall(WithdrawalPolicy.initialize, (address(stack.accessManager), 0))
+                    abi.encodeCall(WithdrawalExecutionPolicy.initialize, (address(stack.accessManager), 0))
                 )
             )
         );
-        require(address(stack.withdrawalPolicy) == withdrawalPolicyAddress, "withdrawal policy address mismatch");
+        require(
+            address(stack.withdrawalExecutionPolicy) == withdrawalExecutionPolicyAddress,
+            "withdrawal execution policy address mismatch"
+        );
 
         stack.iouToken = new IouToken(iouTokenManagerAddress, "IOU: Fork Stable Vault", "IOU-FORK");
         require(address(stack.iouToken) == iouTokenAddress, "accounting IOU token address mismatch");
@@ -261,9 +269,9 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
                             iouTokenManagerAddress,
                             fundsHandlerAddress,
                             address(stack.transferHelper),
-                            withdrawalPolicyAddress,
                             address(stack.priceOracle),
-                            MAX_ACTIVE_SUB_VAULTS
+                            MAX_ACTIVE_SUB_VAULTS,
+                            policyRegistryAddress
                         )
                     ),
                     _proxyAdmin,
@@ -286,7 +294,8 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
                             fundsHandlerAddress,
                             address(stack.priceOracle),
                             address(stack.transferHelper),
-                            MAX_STRATEGIES_PER_ASSET
+                            MAX_STRATEGIES_PER_ASSET,
+                            policyRegistryAddress
                         )
                     ),
                     _proxyAdmin,
@@ -306,7 +315,8 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
                             allocatorAddress,
                             address(stack.priceOracle),
                             address(stack.transferHelper),
-                            address(stack.chainBalanceOracle)
+                            address(stack.chainBalanceOracle),
+                            policyRegistryAddress
                         )
                     ),
                     _proxyAdmin,
@@ -331,6 +341,15 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         );
         require(address(stack.gateway) == gatewayAddress, "accounting gateway address mismatch");
 
+        stack.policyRegistry = new PolicyRegistry(address(stack.accessManager));
+        require(address(stack.policyRegistry) == policyRegistryAddress, "accounting policy registry address mismatch");
+        vm.prank(_admin);
+        stack.policyRegistry
+            .setPolicy(
+                keccak256(bytes("aave.stable-vault.StableVault.policy.withdrawal-execution")),
+                address(stack.withdrawalExecutionPolicy)
+            );
+
         stack.adiAdapter =
             new AdiAdapter(address(stack.accessManager), gatewayAddress, _ethCcc, address(stack.transferHelper));
         stack.strategy = new TestErc4626(IERC20(address(stack.asset)));
@@ -347,10 +366,11 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         uint256 nonce = vm.getNonce(address(this));
         address assetRegistryAddress = vm.computeCreateAddress(address(this), nonce + 1);
         address gatewayAddress = vm.computeCreateAddress(address(this), nonce + 10);
-        address withdrawalPolicyAddress = vm.computeCreateAddress(address(this), nonce + 3);
+        address withdrawalExecutionPolicyAddress = vm.computeCreateAddress(address(this), nonce + 3);
         address iouTokenAddress = vm.computeCreateAddress(address(this), nonce + 4);
         address iouTokenManagerAddress = vm.computeCreateAddress(address(this), nonce + 6);
         address allocatorAddress = vm.computeCreateAddress(address(this), nonce + 8);
+        address policyRegistryAddress = vm.computeCreateAddress(address(this), nonce + 11);
 
         stack.assetRegistry = AssetRegistry(
             address(
@@ -363,17 +383,18 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         );
         require(address(stack.assetRegistry) == assetRegistryAddress, "earning asset registry address mismatch");
 
-        stack.withdrawalPolicy = WithdrawalPolicy(
+        stack.withdrawalExecutionPolicy = WithdrawalExecutionPolicy(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new WithdrawalPolicy(gatewayAddress)),
+                    address(new WithdrawalExecutionPolicy(gatewayAddress)),
                     _proxyAdmin,
-                    abi.encodeCall(WithdrawalPolicy.initialize, (address(stack.accessManager), 0))
+                    abi.encodeCall(WithdrawalExecutionPolicy.initialize, (address(stack.accessManager), 0))
                 )
             )
         );
         require(
-            address(stack.withdrawalPolicy) == withdrawalPolicyAddress, "earning withdrawal policy address mismatch"
+            address(stack.withdrawalExecutionPolicy) == withdrawalExecutionPolicyAddress,
+            "earning withdrawal execution policy address mismatch"
         );
 
         stack.iouToken = new IouToken(iouTokenManagerAddress, "IOU: Fork Stable Vault", "IOU-FORK");
@@ -404,7 +425,8 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
                             gatewayAddress,
                             address(stack.priceOracle),
                             address(stack.transferHelper),
-                            MAX_STRATEGIES_PER_ASSET
+                            MAX_STRATEGIES_PER_ASSET,
+                            policyRegistryAddress
                         )
                     ),
                     _proxyAdmin,
@@ -424,7 +446,8 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
                             address(stack.priceOracle),
                             iouTokenManagerAddress,
                             address(stack.transferHelper),
-                            withdrawalPolicyAddress
+                            policyRegistryAddress,
+                            BURN_IOU_TOKEN_GAS_LIMIT
                         )
                     ),
                     _proxyAdmin,
@@ -433,6 +456,15 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
             )
         );
         require(address(stack.gateway) == gatewayAddress, "earning gateway address mismatch");
+
+        stack.policyRegistry = new PolicyRegistry(address(stack.accessManager));
+        require(address(stack.policyRegistry) == policyRegistryAddress, "earning policy registry address mismatch");
+        vm.prank(_admin);
+        stack.policyRegistry
+            .setPolicy(
+                keccak256(bytes("aave.stable-vault.EarningChainGateway.policy.withdrawal-execution")),
+                address(stack.withdrawalExecutionPolicy)
+            );
 
         stack.adiAdapter =
             new AdiAdapter(address(stack.accessManager), gatewayAddress, _arbCcc, address(stack.transferHelper));
@@ -483,7 +515,7 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         _accounting.asset.mint(_user, depositAmount);
         vm.startPrank(_user);
         _accounting.asset.approve(address(_accounting.vault), depositAmount);
-        _accounting.vault.deposit(_user, address(_accounting.asset), depositAmount);
+        _accounting.vault.deposit(_user, address(_accounting.asset), depositAmount, "");
         vm.stopPrank();
     }
 
