@@ -207,17 +207,17 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         }
     }
 
-    function test_treasuryProfile_hasTheExpectedRoles() public view {
+    function test_funderProfile_hasTheExpectedRoles() public view {
         uint64[] memory expected = new uint64[](2);
         expected[0] = RolesConfig.getRole__topUp().roleId;
         expected[1] = RolesConfig.getRole__fundCoverage().roleId;
-        _assertProfileHasExactlyTheseRoles(_getProfile__Treasury(), expected);
+        _assertProfileHasExactlyTheseRoles(_getProfile__Funder(), expected);
 
         // Capital-provider roles live on their own profile, not on the operational Rebalancer.
-        assertTrue(_getProfile__Treasury() != _getProfile__Rebalancer(), "treasury == rebalancer");
+        assertTrue(_getProfile__Funder() != _getProfile__Rebalancer(), "funder == rebalancer");
 
-        _assertProfileRoleDelay(_getProfile__Treasury(), expected[0], RolesConfig.NO_DELAY);
-        _assertProfileRoleDelay(_getProfile__Treasury(), expected[1], RolesConfig.NO_DELAY);
+        _assertProfileRoleDelay(_getProfile__Funder(), expected[0], RolesConfig.NO_DELAY);
+        _assertProfileRoleDelay(_getProfile__Funder(), expected[1], RolesConfig.NO_DELAY);
     }
 
     function test_coverageGuardianProfile_hasTheExpectedRoles() public view {
@@ -316,7 +316,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         profiles[3] = _getProfile__Rebalancer();
         profiles[4] = _getProfile__Disabler();
         profiles[5] = _getProfile__ATokenVaultRewardClaimer();
-        profiles[6] = _getProfile__Treasury();
+        profiles[6] = _getProfile__Funder();
         return profiles;
     }
 
@@ -604,20 +604,16 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         _assertCanCall(rebalancer, getAllocatorAddress(_deployer()), IAllocator.addStrategy.selector, false, 0);
     }
 
-    function test_canCall_treasury() public view {
-        address treasury = _getProfile__Treasury();
+    function test_canCall_funder() public view {
+        address funder = _getProfile__Funder();
 
-        _assertCanCall(treasury, getAllocatorAddress(_deployer()), IAllocator.topUp.selector, true, 0);
+        _assertCanCall(funder, getAllocatorAddress(_deployer()), IAllocator.topUp.selector, true, 0);
         _assertCanCall(
-            treasury,
-            getSlippageCoverageVaultAddress(_deployer()),
-            ISlippageCoverageVault.fundCoverage.selector,
-            true,
-            0
+            funder, getSlippageCoverageVaultAddress(_deployer()), ISlippageCoverageVault.fundCoverage.selector, true, 0
         );
         // Unauthorized functions
-        _assertCanCall(treasury, getAllocatorAddress(_deployer()), IAllocator.rebalance.selector, false, 0);
-        _assertCanCall(treasury, getAllocatorAddress(_deployer()), IAllocator.addStrategy.selector, false, 0);
+        _assertCanCall(funder, getAllocatorAddress(_deployer()), IAllocator.rebalance.selector, false, 0);
+        _assertCanCall(funder, getAllocatorAddress(_deployer()), IAllocator.addStrategy.selector, false, 0);
     }
 
     function test_canCall_disabler() public view {

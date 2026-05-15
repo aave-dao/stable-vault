@@ -85,8 +85,8 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         return _configAddress(".profiles.coverageGuardian");
     }
 
-    function _getProfile__Treasury() internal view virtual returns (address) {
-        return _configAddress(".profiles.treasury");
+    function _getProfile__Funder() internal view virtual returns (address) {
+        return _configAddress(".profiles.funder");
     }
 
     function _getRebalancerMulticallOwner() internal view returns (address) {
@@ -135,7 +135,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         _setupProfile__Disabler();
         _setupProfile__ATokenVaultRewardClaimer();
         _setupProfile__CoverageGuardian();
-        _setupProfile__Treasury();
+        _setupProfile__Funder();
     }
 
     function _logDeployment(string memory, string memory, address) internal virtual {}
@@ -345,16 +345,16 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         _grantRolesToProfile(coverageGuardian, roles);
     }
 
-    function _setupProfile__Treasury() internal {
-        address treasury = _getProfile__Treasury();
-        require(treasury != address(0), "Treasury profile address not set");
+    function _setupProfile__Funder() internal {
+        address funder = _getProfile__Funder();
+        require(funder != address(0), "Funder profile address not set");
 
         RolesConfig.Role[] memory roles = new RolesConfig.Role[](2);
 
         roles[0] = RolesConfig.getRole__topUp();
         roles[1] = RolesConfig.getRole__fundCoverage();
 
-        _grantRolesToProfile(treasury, roles);
+        _grantRolesToProfile(funder, roles);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
