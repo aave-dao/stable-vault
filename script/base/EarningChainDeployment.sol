@@ -112,6 +112,29 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
 
         // Validate withdrawal policy signer
         require(_configAddress(".withdrawalExecutionPolicy.signer") != address(0), "Withdrawal policy signer not set");
+
+        _validateRedemptionLimitConfig();
+    }
+
+    /// @dev Pre-flight: redemption-limit config must be a valid uint128 quadruple with floors > 0 and seed values
+    /// strictly above floors. Running this before any deploy side effect ensures a misconfig doesn't burn the
+    /// deterministic CREATE3 address namespace.
+    function _validateRedemptionLimitConfig() internal view {
+        string memory prefix = ".earningChain.withdrawalExecutionPolicy";
+
+        uint256 minCap = vm.parseUint(_configString(string.concat(prefix, ".minRedemptionCapacity")));
+        require(minCap > 0 && minCap <= type(uint128).max, "minRedemptionCapacity: must be in (0, uint128.max]");
+
+        uint256 minRefill = vm.parseUint(_configString(string.concat(prefix, ".minRedemptionRefillRate")));
+        require(minRefill > 0 && minRefill <= type(uint128).max, "minRedemptionRefillRate: must be in (0, uint128.max]");
+
+        uint256 seedCap = vm.parseUint(_configString(string.concat(prefix, ".redemptionLimit.capacity")));
+        require(seedCap <= type(uint128).max, "redemptionLimit.capacity: exceeds uint128");
+        require(seedCap > minCap, "redemptionLimit.capacity: must exceed minRedemptionCapacity");
+
+        uint256 seedRefill = vm.parseUint(_configString(string.concat(prefix, ".redemptionLimit.refillRate")));
+        require(seedRefill <= type(uint128).max, "redemptionLimit.refillRate: exceeds uint128");
+        require(seedRefill > minRefill, "redemptionLimit.refillRate: must exceed minRedemptionRefillRate");
     }
 
     function _deployContracts() internal {
@@ -153,9 +176,14 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
 
         WithdrawalExecutionPolicy policy = WithdrawalExecutionPolicy(policyAddress);
         RateLimitBucketLib.Bucket memory bucket = policy.getRedemptionBucket();
-        require(bucket.capacity >= policy.getMinRedemptionCapacity(), "earning-chain redemption capacity below floor");
+        // Strict greater than: seeding at floor leaves the bucket pinned with no headroom for `lower*` during
+        // incident response. Force operator headroom by construction.
         require(
-            bucket.refillRate >= policy.getMinRedemptionRefillRate(), "earning-chain redemption refill rate below floor"
+            bucket.capacity > policy.getMinRedemptionCapacity(), "earning-chain redemption capacity must exceed floor"
+        );
+        require(
+            bucket.refillRate > policy.getMinRedemptionRefillRate(),
+            "earning-chain redemption refill rate must exceed floor"
         );
     }
 
@@ -206,9 +234,7 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         uint128 capacity = uint128(vm.parseUint(_configString(string.concat(configKey, ".capacity"))));
         uint128 refillRate = uint128(vm.parseUint(_configString(string.concat(configKey, ".refillRate"))));
         policy.raiseRedemptionCapacity(capacity);
-        if (refillRate > 0) {
-            policy.raiseRedemptionRefillRate(refillRate);
-        }
+        policy.raiseRedemptionRefillRate(refillRate);
     }
 
     function _setupAllocator() internal {

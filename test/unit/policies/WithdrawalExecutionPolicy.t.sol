@@ -91,12 +91,12 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
     }
 
     function test_constructor_reverts_ifMinRedemptionCapacityIsZero() public {
-        vm.expectRevert(WithdrawalExecutionPolicy.ZeroFloorNotAllowed.selector);
+        vm.expectRevert(WithdrawalExecutionPolicy.ZeroMinRedemptionCapacity.selector);
         new WithdrawalExecutionPolicy(address(this), 0, MIN_REDEMPTION_REFILL_RATE);
     }
 
     function test_constructor_reverts_ifMinRedemptionRefillRateIsZero() public {
-        vm.expectRevert(WithdrawalExecutionPolicy.ZeroFloorNotAllowed.selector);
+        vm.expectRevert(WithdrawalExecutionPolicy.ZeroMinRedemptionRefillRate.selector);
         new WithdrawalExecutionPolicy(address(this), MIN_REDEMPTION_CAPACITY, 0);
     }
 

@@ -31,30 +31,40 @@ import {Errors} from "src/types/Errors.sol";
 contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithdrawalExecutionPolicy {
     using RateLimitBucketLib for RateLimitBucketLib.Bucket;
 
-    /// @notice Emitted when a nonce is marked as used, either by a successful appliance of the withdrawal policy or by
-    /// a nonce invalidation.
-    event NonceUsed(address indexed signer, uint256 indexed nonce);
-
-    /// @notice Emitted when an address is added or removed from the set of whitelisted signers.
-    event SignerSet(address indexed signer, bool indexed whitelistAsSigner);
+    /// @notice Emitted when the asset fee in basis points is set.
+    event AssetFeeBpsSet(address indexed asset, uint16 assetFeeBps, bool isSet);
 
     /// @notice Emitted when the default fee in basis points is set.
     event DefaultFeeBpsSet(uint16 defaultFeeBps);
 
-    /// @notice Emitted when the asset fee in basis points is set.
-    event AssetFeeBpsSet(address indexed asset, uint16 assetFeeBps, bool isSet);
-
-    /// @notice Emitted when the redemption bucket capacity is raised.
-    event RedemptionCapacityRaised(uint128 oldCapacity, uint128 newCapacity);
+    /// @notice Emitted when a nonce is marked as used, either by a successful appliance of the withdrawal policy or by
+    /// a nonce invalidation.
+    event NonceUsed(address indexed signer, uint256 indexed nonce);
 
     /// @notice Emitted when the redemption bucket capacity is lowered.
     event RedemptionCapacityLowered(uint128 oldCapacity, uint128 newCapacity);
 
-    /// @notice Emitted when the redemption bucket refill rate is raised.
-    event RedemptionRefillRateRaised(uint128 oldRefillRate, uint128 newRefillRate);
+    /// @notice Emitted when the redemption bucket capacity is raised.
+    event RedemptionCapacityRaised(uint128 oldCapacity, uint128 newCapacity);
 
     /// @notice Emitted when the redemption bucket refill rate is lowered.
     event RedemptionRefillRateLowered(uint128 oldRefillRate, uint128 newRefillRate);
+
+    /// @notice Emitted when the redemption bucket refill rate is raised.
+    event RedemptionRefillRateRaised(uint128 oldRefillRate, uint128 newRefillRate);
+
+    /// @notice Emitted when an address is added or removed from the set of whitelisted signers.
+    event SignerSet(address indexed signer, bool indexed whitelistAsSigner);
+
+    /// @notice Thrown when lowering the redemption capacity below the immutable floor.
+    error BelowMinRedemptionCapacity();
+
+    /// @notice Thrown when lowering the redemption refill rate below the immutable floor.
+    error BelowMinRedemptionRefillRate();
+
+    /// @notice Thrown when the signature deadline has passed.
+    /// @custom:selector 0x1ab7da6b
+    error DeadlineExpired();
 
     /// @notice Thrown when a recovered signer is not a whitelisted signer.
     /// @custom:selector 0x8baa579f
@@ -64,22 +74,15 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
     /// @custom:selector 0x1fb09b80
     error NonceAlreadyUsed();
 
-    /// @notice Thrown when the signature deadline has passed.
-    /// @custom:selector 0x1ab7da6b
-    error DeadlineExpired();
-
-    /// @notice Thrown when lowering the redemption capacity below the immutable floor.
-    error BelowMinRedemptionCapacity();
-
-    /// @notice Thrown when lowering the redemption refill rate below the immutable floor.
-    error BelowMinRedemptionRefillRate();
-
     /// @notice Thrown when raising the redemption capacity to `RateLimitBucketLib.UNLIMITED_CAPACITY`.
     /// @dev UNLIMITED disables the bucket and is incompatible with the always-exit invariant.
     error UnlimitedNotAllowed();
 
-    /// @notice Thrown when the constructor receives a zero floor for either redemption parameter.
-    error ZeroFloorNotAllowed();
+    /// @notice Thrown when the constructor receives a zero `minRedemptionCapacity` floor.
+    error ZeroMinRedemptionCapacity();
+
+    /// @notice Thrown when the constructor receives a zero `minRedemptionRefillRate` floor.
+    error ZeroMinRedemptionRefillRate();
 
     // EIP-712 typeHash:
     // keccak256("SignedFee(address user,address assetOut,uint256 iouAmountRay,uint256 personalFeeAmountRay,uint256
@@ -153,8 +156,8 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
         uint128 minRedemptionRefillRate
     ) EIP712Upgradeable() {
         require(withdrawalExecutionPolicyApplier != address(0), Errors.ZeroAddress());
-        require(minRedemptionCapacity > 0, ZeroFloorNotAllowed());
-        require(minRedemptionRefillRate > 0, ZeroFloorNotAllowed());
+        require(minRedemptionCapacity > 0, ZeroMinRedemptionCapacity());
+        require(minRedemptionRefillRate > 0, ZeroMinRedemptionRefillRate());
         _disableInitializers();
         WITHDRAWAL_EXECUTION_POLICY_APPLIER = withdrawalExecutionPolicyApplier;
         MIN_REDEMPTION_CAPACITY = minRedemptionCapacity;

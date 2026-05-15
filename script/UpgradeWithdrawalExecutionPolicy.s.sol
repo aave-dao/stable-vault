@@ -7,19 +7,20 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transp
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {Create3AddressBook} from "script/base/Create3AddressBook.sol";
+import {DeploymentConfig} from "script/base/DeploymentConfig.sol";
 import {Upgrade} from "script/base/Upgrade.sol";
+import {RateLimitBucketLib} from "src/libraries/RateLimitBucketLib.sol";
 import {WithdrawalExecutionPolicy} from "src/policies/WithdrawalExecutionPolicy.sol";
 
-contract UpgradeWithdrawalExecutionPolicy is Create3AddressBook, Upgrade {
+contract UpgradeWithdrawalExecutionPolicy is Create3AddressBook, Upgrade, DeploymentConfig {
     using Strings for address;
 
     address WITHDRAWAL_EXECUTION_POLICY_PROXY;
     address DEPLOYER = 0xBB700dA5CCC9Ec5605780Fc40695f1206B090303;
 
-    // TODO: source from deployment config before running. Floors are baked into the impl bytecode and cannot be
-    // changed by re-initialising the proxy.
-    uint128 constant MIN_REDEMPTION_CAPACITY = 1;
-    uint128 constant MIN_REDEMPTION_REFILL_RATE = 1;
+    function _configPath() internal pure override returns (string memory) {
+        return "config/deployment-config.staging.json";
+    }
 
     function run() public {
         WITHDRAWAL_EXECUTION_POLICY_PROXY = getWithdrawalExecutionPolicyAddress(DEPLOYER);
@@ -30,15 +31,30 @@ contract UpgradeWithdrawalExecutionPolicy is Create3AddressBook, Upgrade {
     }
 
     function _upgrade() internal {
-        address implementation = address(
-            new WithdrawalExecutionPolicy(
-                getStableVaultAddress(DEPLOYER), MIN_REDEMPTION_CAPACITY, MIN_REDEMPTION_REFILL_RATE
-            )
-        );
+        WithdrawalExecutionPolicy policy = WithdrawalExecutionPolicy(WITHDRAWAL_EXECUTION_POLICY_PROXY);
+
+        uint128 newMinCapacity =
+            uint128(vm.parseUint(_configString(".accountingChain.withdrawalExecutionPolicy.minRedemptionCapacity")));
+        uint128 newMinRefillRate =
+            uint128(vm.parseUint(_configString(".accountingChain.withdrawalExecutionPolicy.minRedemptionRefillRate")));
+
+        // Floors are baked into impl bytecode. The new impl must not weaken either floor, otherwise the
+        // always-exit invariant is silently degraded post-upgrade.
+        require(newMinCapacity >= policy.getMinRedemptionCapacity(), "Upgrade weakens MIN_REDEMPTION_CAPACITY");
+        require(newMinRefillRate >= policy.getMinRedemptionRefillRate(), "Upgrade weakens MIN_REDEMPTION_REFILL_RATE");
+
+        address implementation =
+            address(new WithdrawalExecutionPolicy(getStableVaultAddress(DEPLOYER), newMinCapacity, newMinRefillRate));
         _logDeployment("WithdrawalExecutionPolicy::Implementation", "", implementation);
+
         address proxyAdmin = _getAdminFromSlot(WITHDRAWAL_EXECUTION_POLICY_PROXY);
         ProxyAdmin(proxyAdmin)
             .upgradeAndCall(ITransparentUpgradeableProxy(WITHDRAWAL_EXECUTION_POLICY_PROXY), implementation, "");
+
+        // Proxy storage survives the upgrade. Confirm the already-seeded bucket still respects the new floors.
+        RateLimitBucketLib.Bucket memory bucket = policy.getRedemptionBucket();
+        require(bucket.capacity >= newMinCapacity, "Post-upgrade: bucket capacity below new floor");
+        require(bucket.refillRate >= newMinRefillRate, "Post-upgrade: bucket refill rate below new floor");
     }
 
     function _logDeployment(string memory name, string memory saltSeed, address addr) internal {

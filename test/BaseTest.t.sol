@@ -83,9 +83,10 @@ contract BaseTest is TestWithHelpers {
     uint256 internal constant DEFAULT_GAS_LIMIT = 300_000;
     uint256 internal constant BURN_IOU_TOKEN_GAS_LIMIT = 120_000;
 
-    // Redemption bucket sized to clear the existing e2e assertions; floors small enough that lower-side tests can run.
-    uint128 internal constant TEST_MIN_REDEMPTION_CAPACITY = 1;
-    uint128 internal constant TEST_MIN_REDEMPTION_REFILL_RATE = 1;
+    // Redemption bucket: realistic-ish floors so integration tests exercise the policy's apply-path guards rather
+    // than running with effectively-no-floor (which would mask regressions where `consume()` is bypassed).
+    uint128 internal constant TEST_MIN_REDEMPTION_CAPACITY = 1e30;
+    uint128 internal constant TEST_MIN_REDEMPTION_REFILL_RATE = 1e25;
     uint128 internal constant TEST_SEED_REDEMPTION_CAPACITY = type(uint128).max - 1;
     uint128 internal constant TEST_SEED_REDEMPTION_REFILL_RATE = 1e30;
 
