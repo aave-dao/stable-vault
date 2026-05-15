@@ -1338,6 +1338,94 @@ contract StableVaultTest is TestWithHelpers {
         assertEq(stableVault.getSubVaultConversionRate(targetSubVaultId), MathLib.RAY);
     }
 
+    function test_setUserRate_batch_duplicateUser_appliesEntriesSequentially() public {
+        // The batch loop does not dedupe by user address: each entry is processed independently against
+        // whatever sub-vault the user is in at that moment. This locks in that behavior so a future
+        // change that adds deduping or rejects duplicates is caught.
+        address user = makeAddr("dupUser");
+        uint256 firstRate = _boundRate(DEFAULT_PER_SECOND_RATE + 1);
+        uint256 secondRate = _boundRate(DEFAULT_PER_SECOND_RATE + 2);
+        vm.assume(firstRate != stableVault.getDefaultSubVault().perSecondRate);
+        vm.assume(secondRate != stableVault.getDefaultSubVault().perSecondRate);
+        vm.assume(firstRate != secondRate);
+
+        uint256 amount = _boundAssetAmount(address(mockAsset), 1 ether);
+        _deposit(user, amount);
+
+        IStableVault.UserRateData[] memory batch = new IStableVault.UserRateData[](2);
+        batch[0] = IStableVault.UserRateData(user, firstRate);
+        batch[1] = IStableVault.UserRateData(user, secondRate);
+
+        vm.recordLogs();
+        vm.prank(manager);
+        stableVault.setUserRate(batch);
+
+        // Both entries should have emitted UserRateSet for the same user.
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 userRateSetTopic = keccak256("UserRateSet(address,uint256,uint256)");
+        uint256 userRateSetCountForUser = 0;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (
+                logs[i].topics.length > 1 && logs[i].topics[0] == userRateSetTopic
+                    && logs[i].topics[1] == bytes32(uint256(uint160(user)))
+            ) {
+                userRateSetCountForUser++;
+            }
+        }
+        assertEq(userRateSetCountForUser, 2, "both duplicate entries should emit UserRateSet for the user");
+        assertEq(stableVault.getUserSubVault(user).perSecondRate, secondRate, "user should end at secondRate");
+    }
+
+    function test_setUserRate_resetsDefaultSubVault_whenAllPositionsLeave() public {
+        // Regression coverage for the default sub-vault: it is special (auto-assigned to new depositors via
+        // `_getOrAssignUserSubVaultId`) and can become inactive when its last user migrates out. The reset
+        // on deactivation must apply here too, so a subsequent depositor sees a fresh 1 RAY baseline rather
+        // than the previously accrued conversion rate.
+        address user1 = makeAddr("defaultUser1");
+        address user2 = makeAddr("defaultUser2");
+        uint256 newRate = _boundRate(DEFAULT_PER_SECOND_RATE + 1);
+        vm.assume(newRate != stableVault.getDefaultSubVault().perSecondRate);
+
+        uint256 defaultSubVaultId = stableVault.getDefaultSubVault().id;
+
+        // user1 deposits into the default sub-vault.
+        uint256 amount = _boundAssetAmount(address(mockAsset), 1 ether);
+        _deposit(user1, amount);
+        assertEq(stableVault.getUserSubVault(user1).id, defaultSubVaultId, "user1 should land in default");
+
+        // Let the default sub-vault accrue so we can observe the reset.
+        vm.warp(block.timestamp + 365 days);
+        assertTrue(
+            stableVault.getSubVaultConversionRate(defaultSubVaultId) > MathLib.RAY,
+            "default sub-vault should have accrued"
+        );
+
+        // Migrate user1 out of the default sub-vault.
+        vm.prank(manager);
+        _setUserRate(user1, newRate);
+
+        // Default sub-vault is no longer in the active list and its conversion rate is reset.
+        IStableVault.SubVaultData[] memory activeSubVaults = stableVault.getActiveSubVaults();
+        for (uint256 i = 0; i < activeSubVaults.length; i++) {
+            assertTrue(activeSubVaults[i].id != defaultSubVaultId, "default sub-vault should be inactive");
+        }
+        assertEq(
+            stableVault.getSubVaultConversionRate(defaultSubVaultId),
+            MathLib.RAY,
+            "default sub-vault should be reset to 1 RAY"
+        );
+
+        // A fresh depositor with no position is auto-assigned to the default sub-vault and starts from the
+        // reset baseline (the previously accrued rate must not leak in).
+        _deposit(user2, amount);
+        assertEq(stableVault.getUserSubVault(user2).id, defaultSubVaultId, "user2 should land in reset default");
+        assertEq(
+            stableVault.getSubVaultConversionRate(defaultSubVaultId),
+            MathLib.RAY,
+            "default conversion rate should remain 1 RAY immediately after deposit"
+        );
+    }
+
     function test_setUserRate_twoUsersWithSameRateLandsInTheSameSubVault(
         address user1,
         address user2,
