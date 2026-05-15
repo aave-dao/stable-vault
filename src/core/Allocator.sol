@@ -476,7 +476,7 @@ contract Allocator is
         require(amount > 0, Errors.ZeroAmount());
         require($storage().strategyConfigs[strategy].depositAllowed, DepositsToStrategyDisabled(strategy));
         IERC20(asset).forceApprove(strategy, amount);
-        
+
         uint256 actualDepositedAmount;
         try IERC4626(strategy).deposit(amount, address(this)) returns (uint256 shares) {
             actualDepositedAmount = IERC4626(strategy).previewRedeem(shares);
