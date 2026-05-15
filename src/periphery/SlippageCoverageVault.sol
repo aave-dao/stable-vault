@@ -72,8 +72,7 @@ contract SlippageCoverageVault is AccessManaged, Multicall, ReentrancyGuardTrans
     }
 
     /// @inheritdoc ISlippageCoverageVault
-    /// @dev Does not decrement consumption because it is the responsibility of the beneficiary to not pull more than
-    /// necessary.
+    /// @dev Does not decrement consumption; it is the responsibility of the beneficiary to pull what is necessary.
     function reimburseCoverage(address asset, uint256 amount) external override nonReentrant {
         require(msg.sender == SLIPPAGE_BENEFICIARY, OnlyBeneficiary());
         _takeForCoverage(asset, amount);
