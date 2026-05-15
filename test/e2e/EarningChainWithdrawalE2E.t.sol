@@ -107,11 +107,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             EARNING_CHAIN_ID,
             address(ccipAdapter_accountingChain),
             DEFAULT_GAS_LIMIT,
-            abi.encode(
-                ICcipBridgeAdapter.CcipFeeParams({
-                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
-                })
-            )
+            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0}))
         );
 
         // Check the funds were bridged to the Earning Chain
@@ -187,11 +183,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             iouAmountRequestedRay,
             address(ccipAdapter_accountingChain),
             DEFAULT_GAS_LIMIT,
-            abi.encode(
-                ICcipBridgeAdapter.CcipFeeParams({
-                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
-                })
-            )
+            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0}))
         );
         // Check the IOU token balance on Accounting Chain went down
         assertEq(iouToken_accountingChain.balanceOf(user1), 0, "User should have bridged IOU tokens");
@@ -270,9 +262,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         {
 
             bytes memory bp = abi.encode(
-                ICcipBridgeAdapter.CcipFeeParams({
-                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
-                })
+                ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})
             );
             iouTokenManager_accountingChain.bridgeTokens{value: bridgeFeeAmount}(
                 EARNING_CHAIN_ID,
@@ -299,9 +289,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         {
 
             bytes memory bp = abi.encode(
-                ICcipBridgeAdapter.CcipFeeParams({
-                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
-                })
+                ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})
             );
             iouTokenManager_earningChain.bridgeTokens{value: bridgeFeeAmount}(
                 ACCOUNTING_CHAIN_ID,
@@ -354,11 +342,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             // Use a higher gas limit to ensure the transaction is successful on Accounting Chain because the snapshot
             // struct will be pushed to the FH storage.
             DEFAULT_GAS_LIMIT,
-            abi.encode(
-                ICcipBridgeAdapter.CcipFeeParams({
-                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: 1, feeRefundThreshold: 0
-                })
-            ),
+            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
             ""
         );
 

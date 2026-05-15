@@ -114,11 +114,7 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             EARNING_CHAIN_ID,
             address(ccipAdapter_accountingChain),
             DEFAULT_GAS_LIMIT,
-            abi.encode(
-                ICcipBridgeAdapter.CcipFeeParams({
-                    feeToken: address(bridgeFeeToken), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
-                })
-            )
+            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: address(bridgeFeeToken), feeRefundThreshold: 0}))
         );
 
         // Check the funds were bridged to the Earning Chain
@@ -395,11 +391,7 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             iouAmountRequestedRay,
             bridgeAdapter,
             DEFAULT_GAS_LIMIT,
-            abi.encode(
-                ICcipBridgeAdapter.CcipFeeParams({
-                    feeToken: address(bridgeFeeToken), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
-                })
-            )
+            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: address(bridgeFeeToken), feeRefundThreshold: 0}))
         );
     }
 
@@ -417,11 +409,7 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             // Use a higher gas limit to ensure the transaction is successful on Accounting Chain because the
             // snapshot struct may be pushed to the FH storage.
             DEFAULT_GAS_LIMIT,
-            abi.encode(
-                ICcipBridgeAdapter.CcipFeeParams({
-                    feeToken: address(bridgeFeeToken), feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
-                })
-            ),
+            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: address(bridgeFeeToken), feeRefundThreshold: 0})),
             ""
         );
     }

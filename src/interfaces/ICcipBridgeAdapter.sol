@@ -10,15 +10,10 @@ import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 interface ICcipBridgeAdapter is IBridgeAdapter {
     /// @notice CCIP-specific fee parameters decoded by `CcipAdapter` when publishing a message.
     /// @param feeToken Token to pay the bridge fee in.
-    /// @param feeAmount Maximum the caller is willing to pay in fees. For native fees the caller forwards exactly this
-    /// much via `msg.value` and any surplus over the CCIP-quoted estimate is refunded (see `feeRefundThreshold`). For
-    /// ERC-20 fees the adapter pulls only the quoted estimate from `feePayer`, so this acts purely as an upper-bound
-    /// sanity check (the call reverts if the estimate exceeds it).
-    /// @param feeRefundThreshold Minimum surplus over the CCIP-quoted estimate that triggers a refund to `feePayer`
-    /// on the native-fee path. Ignored on the ERC-20-fee path because no surplus is ever pulled there.
+    /// @param feeRefundThreshold Minimum native-fee surplus over the CCIP-quote estimate that triggers a refund to
+    /// `feePayer`
     struct CcipFeeParams {
         address feeToken;
-        uint256 feeAmount;
         uint256 feeRefundThreshold;
     }
 

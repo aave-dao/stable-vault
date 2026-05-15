@@ -143,24 +143,10 @@ contract CcipAdapter is
 
         uint64 chainSelector = _chainSelectorOf[destinationChainId];
         uint256 estimatedFeeAmount = IRouterClient(CCIP_ROUTER).getFee(chainSelector, ccipMessage);
-        require(ccipFeeParams.feeAmount >= estimatedFeeAmount, Errors.InsufficientFunds());
 
         if (ccipFeeParams.feeToken == Constants.NATIVE_CURRENCY) {
-            // Native path: caller forwards `feeAmount` via `msg.value`; refund the surplus over the CCIP estimate
-            // when the dust exceeds `feeRefundThreshold`. Refund happens here (not after `ccipSend`) so the bookkeeping
-            // — caller sent X, adapter forwards estimated to CCIP, refunds the difference — is linear in this
-            // function.
-            require(msg.value == ccipFeeParams.feeAmount, Errors.InsufficientFunds());
-            if (ccipFeeParams.feeAmount > estimatedFeeAmount) {
-                uint256 excessFee = ccipFeeParams.feeAmount - estimatedFeeAmount;
-                if (excessFee > ccipFeeParams.feeRefundThreshold) {
-                    _triggerNativeFeeRefund(feePayer, excessFee);
-                }
-            }
+            require(msg.value >= estimatedFeeAmount, Errors.InsufficientFunds());
         } else {
-            // ERC-20 path: pull only the CCIP-quoted estimate from `feePayer`. `feeAmount` acts as an upper-bound
-            // (validated above by `feeAmount >= estimatedFeeAmount`) but is otherwise unused here, so no refund is
-            // ever needed and no surplus is ever held by this contract.
             // Reject msg.value to prevent accidental native loss; bridges are not expected to require both native
             // and ERC-20 fees simultaneously.
             require(msg.value == 0, Errors.InvalidParameter());
@@ -171,11 +157,14 @@ contract CcipAdapter is
 
         _pullAssetFromTransferHelperAndApproveCcipRouter(asset, amount, ccipFeeParams.feeToken, estimatedFeeAmount);
 
-        bytes32 messageId = IRouterClient(CCIP_ROUTER)
-        .ccipSend{value: ccipFeeParams.feeToken == Constants.NATIVE_CURRENCY ? estimatedFeeAmount : 0}(
-            chainSelector, ccipMessage
+        _sendMessageWithFeePayer(
+            chainSelector,
+            ccipMessage,
+            feePayer,
+            ccipFeeParams.feeToken,
+            ccipFeeParams.feeRefundThreshold,
+            estimatedFeeAmount
         );
-        emit MessagePublished(messageId);
     }
 
     /// @inheritdoc IAny2EVMMessageReceiver
@@ -232,7 +221,27 @@ contract CcipAdapter is
         }
     }
 
-    /// @dev Native-only path. ERC-20 fees are pulled at the quoted estimate so no surplus is ever held.
+    function _sendMessageWithFeePayer(
+        uint64 chainSelector,
+        Client.EVM2AnyMessage memory message,
+        address feePayer,
+        address feeToken,
+        uint256 feeRefundThreshold,
+        uint256 estimatedFeeAmount
+    ) internal {
+        bytes32 messageId = IRouterClient(CCIP_ROUTER)
+        .ccipSend{value: feeToken == Constants.NATIVE_CURRENCY ? estimatedFeeAmount : 0}(
+            chainSelector, message
+        );
+        if (feeToken == Constants.NATIVE_CURRENCY && msg.value > estimatedFeeAmount) {
+            uint256 excessFee = msg.value - estimatedFeeAmount;
+            if (excessFee > feeRefundThreshold) {
+                _triggerNativeFeeRefund(feePayer, excessFee);
+            }
+        }
+        emit MessagePublished(messageId);
+    }
+
     function _triggerNativeFeeRefund(address feePayer, uint256 excessFee) internal {
         (bool callSucceeded,) = payable(feePayer).call{value: excessFee}("");
         require(callSucceeded, Errors.NativeTransferFailed());

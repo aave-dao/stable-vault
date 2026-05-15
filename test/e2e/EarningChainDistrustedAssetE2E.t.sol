@@ -90,11 +90,7 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
             EARNING_CHAIN_ID,
             address(ccipAdapter_accountingChain),
             DEFAULT_GAS_LIMIT,
-            abi.encode(
-                ICcipBridgeAdapter.CcipFeeParams({
-                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
-                })
-            )
+            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0}))
         );
 
         // Check the funds were bridged to the Earning Chain
@@ -137,11 +133,7 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
             iouAmountRequestedRay,
             address(ccipAdapter_accountingChain),
             DEFAULT_GAS_LIMIT,
-            abi.encode(
-                ICcipBridgeAdapter.CcipFeeParams({
-                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
-                })
-            )
+            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0}))
         );
 
         // Check the IOU token balance on Accounting Chain went down
@@ -169,11 +161,7 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
             user1,
             address(ccipAdapter_earningChain),
             DEFAULT_GAS_LIMIT,
-            abi.encode(
-                ICcipBridgeAdapter.CcipFeeParams({
-                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
-                })
-            ),
+            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
             ""
         );
 

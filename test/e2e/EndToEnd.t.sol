@@ -146,9 +146,7 @@ contract EndToEndTest is BaseTest {
                 address(ccipAdapter_accountingChain),
                 DEFAULT_GAS_LIMIT,
                 abi.encode(
-                    ICcipBridgeAdapter.CcipFeeParams({
-                        feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
-                    })
+                    ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})
                 )
             );
 
@@ -294,9 +292,7 @@ contract EndToEndTest is BaseTest {
             {
 
                 bytes memory bp = abi.encode(
-                    ICcipBridgeAdapter.CcipFeeParams({
-                        feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
-                    })
+                    ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})
                 );
                 earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
                     address(GHO), userEarningsInGho, address(ccipAdapter_earningChain), DEFAULT_GAS_LIMIT, bp
@@ -457,9 +453,7 @@ contract EndToEndTest is BaseTest {
             {
 
                 bytes memory bp = abi.encode(
-                    ICcipBridgeAdapter.CcipFeeParams({
-                        feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
-                    })
+                    ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})
                 );
                 earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
                     address(GHO), ghoBalanceOnVaultLeft, address(ccipAdapter_earningChain), DEFAULT_GAS_LIMIT, bp
