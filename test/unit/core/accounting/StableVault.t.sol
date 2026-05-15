@@ -1134,7 +1134,7 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
+            address(mockAccessManager),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
             treasury
@@ -1214,7 +1214,7 @@ contract StableVaultTest is TestWithHelpers {
             address(mockFundsHandler),
             address(mockAssetRegistry),
             address(mockTransferHelper),
-            address(mockWithdrawalPolicy),
+            address(mockAccessManager),
             address(mockPriceOracle),
             DEFAULT_MAX_ACTIVE_SUB_VAULTS,
             treasury
