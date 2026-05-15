@@ -314,8 +314,9 @@ contract SwapperTest is TestWithHelpers {
         _swapper.executeSwap(address(_mockUsdt), address(_mockGho), 100, rebalancer, data);
     }
 
-    /// @dev Empty target loop: `assetIn` is never consumed. The full `amountIn` is swept back to msg.sender (the
-    /// Allocator) and `AssetInSwept` is emitted. assetOut is pre-seeded so the slippage check passes.
+    /// @dev Empty target loop: `assetIn` is never consumed. The full `amountIn` is returned to the vault (paying it
+    /// back for the over-pull at peg + matching decimals) and `AssetInSwept` is emitted. assetOut is pre-seeded so
+    /// the slippage check passes.
     function test_executeSwap_sweepsAssetIn_ifFullyLeftover() public {
         uint256 amountIn = 100;
         uint256 expectedAmountOut = amountIn.convertAssetDecimals(address(_mockUsdt), address(_mockGho));
@@ -327,21 +328,21 @@ contract SwapperTest is TestWithHelpers {
         bytes[] memory callDatas = new bytes[](0);
         bytes memory data = abi.encode(targets, callDatas, uint16(0));
 
-        uint256 allocatorAssetInBefore = _mockUsdt.balanceOf(allocator);
+        uint256 vaultAssetInBefore = _mockUsdt.balanceOf(address(_vault));
 
         vm.expectEmit(true, false, false, true, address(_swapper));
         emit ISwapper.AssetInSwept(address(_mockUsdt), amountIn);
         vm.prank(allocator);
         _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
 
-        assertEq(_mockUsdt.balanceOf(allocator) - allocatorAssetInBefore, amountIn, "leftover not swept");
+        assertEq(_mockUsdt.balanceOf(address(_vault)) - vaultAssetInBefore, amountIn, "leftover not returned to vault");
         assertEq(_mockUsdt.balanceOf(address(_swapper)), 0, "assetIn still on swapper");
     }
 
     /// @dev Partial venue consumption: half of `amountIn` is sent to an external recipient inside the loop, half
-    /// stays in the Swapper. The half left on the Swapper is swept back to msg.sender. assetOut is pre-seeded so
-    /// the slippage check passes. The half routed away is the residual that monitoring + vault caps bound under a
-    /// compromised rebalancer; this test only asserts the sweep semantics.
+    /// stays in the Swapper. The half left on the Swapper is returned to the vault. assetOut is pre-seeded so the
+    /// slippage check passes. The half routed away is the residual that monitoring + vault caps bound under a
+    /// compromised rebalancer; this test only asserts the return semantics.
     function test_executeSwap_sweepsAssetIn_ifPartiallyLeftover() public {
         uint256 amountIn = 100;
         uint256 expectedAmountOut = amountIn.convertAssetDecimals(address(_mockUsdt), address(_mockGho));
@@ -356,22 +357,24 @@ contract SwapperTest is TestWithHelpers {
         callDatas[0] = abi.encodeWithSelector(IERC20.transfer.selector, dust, amountIn / 2);
         bytes memory data = abi.encode(targets, callDatas, uint16(0));
 
-        uint256 allocatorAssetInBefore = _mockUsdt.balanceOf(allocator);
+        uint256 vaultAssetInBefore = _mockUsdt.balanceOf(address(_vault));
 
         vm.expectEmit(true, false, false, true, address(_swapper));
         emit ISwapper.AssetInSwept(address(_mockUsdt), amountIn / 2);
         vm.prank(allocator);
         _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
 
-        assertEq(_mockUsdt.balanceOf(allocator) - allocatorAssetInBefore, amountIn / 2, "leftover not swept");
+        assertEq(
+            _mockUsdt.balanceOf(address(_vault)) - vaultAssetInBefore, amountIn / 2, "leftover not returned to vault"
+        );
         assertEq(_mockUsdt.balanceOf(dust), amountIn / 2, "dust did not receive its half");
         assertEq(_mockUsdt.balanceOf(address(_swapper)), 0, "assetIn still on swapper");
     }
 
-    /// @dev Donations of the same asset as `assetIn` are swept to the Allocator on the next rebalance — the Swapper
+    /// @dev Donations of the same asset as `assetIn` are swept into the vault on the next rebalance — the Swapper
     /// has no rescue path of its own, so pushing everything out is the safer default. An attacker who pre-funds the
-    /// Swapper with `assetIn` before a rebalance therefore donates those tokens to the protocol; not a grief
-    /// (no funds lost), and not a swap-flow inflation (the swap accounting is unchanged).
+    /// Swapper with `assetIn` before a rebalance therefore donates those tokens to the coverage pool; not a grief
+    /// (no funds lost) and not a swap-flow inflation (the swap accounting is unchanged).
     function test_executeSwap_succeeds_whenAssetInDonatedBeforeCall(uint256 donation) public {
         uint256 amountIn = 100;
         donation = bound(donation, 1, 1_000_000); // arbitrary non-zero donation
@@ -385,7 +388,7 @@ contract SwapperTest is TestWithHelpers {
         _seedOutputToken(_mockGho, minAmountOut);
         _setSlippageBps(0);
 
-        uint256 allocatorAssetInBefore = _mockUsdt.balanceOf(allocator);
+        uint256 vaultAssetInBefore = _mockUsdt.balanceOf(address(_vault));
 
         bytes memory data =
             _encodeDexSwapExactInputData(address(_mockUsdt), address(_mockGho), amountIn, minAmountOut, 0);
@@ -395,10 +398,50 @@ contract SwapperTest is TestWithHelpers {
         uint256 actualAmountOut =
             _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
 
-        // The DEX consumed `amountIn` and the donation was swept to the Allocator; the Swapper holds nothing.
+        // The DEX consumed `amountIn` and the donation was returned to the vault; the Swapper holds nothing.
         assertEq(_mockUsdt.balanceOf(address(_swapper)), 0, "donation not swept off the swapper");
-        assertEq(_mockUsdt.balanceOf(allocator) - allocatorAssetInBefore, donation, "donation not landed on allocator");
+        assertEq(
+            _mockUsdt.balanceOf(address(_vault)) - vaultAssetInBefore, donation, "donation not landed on the vault"
+        );
         assertEq(actualAmountOut, minAmountOut);
+    }
+
+    /// @dev The vault-side `CoverageFunded` event is what monitoring would observe for a return; pin it alongside
+    /// the Swapper's own `AssetInSwept` so both legs of the audit trail are exercised.
+    function test_executeSwap_returnsLeftoverAssetIn_emitsCoverageFundedFromVault() public {
+        uint256 amountIn = 100;
+        uint256 expectedAmountOut = amountIn.convertAssetDecimals(address(_mockUsdt), address(_mockGho));
+
+        _mockTransferIntoSwapper(_mockUsdt, amountIn);
+        _mockGho.mint(address(_swapper), expectedAmountOut);
+
+        address[] memory targets = new address[](0);
+        bytes[] memory callDatas = new bytes[](0);
+        bytes memory data = abi.encode(targets, callDatas, uint16(0));
+
+        vm.expectEmit(true, true, false, true, address(_vault));
+        emit ISlippageCoverageVault.CoverageFunded(address(_mockUsdt), address(_swapper), amountIn);
+        vm.prank(allocator);
+        _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
+    }
+
+    /// @dev `forceApprove(amount)` followed by `transferFrom(amount)` must net to zero allowance — otherwise a stale
+    /// allowance from the Swapper to the vault would persist between rebalances.
+    function test_executeSwap_returnsLeftoverAssetIn_leavesNoResidualAllowance() public {
+        uint256 amountIn = 100;
+        uint256 expectedAmountOut = amountIn.convertAssetDecimals(address(_mockUsdt), address(_mockGho));
+
+        _mockTransferIntoSwapper(_mockUsdt, amountIn);
+        _mockGho.mint(address(_swapper), expectedAmountOut);
+
+        address[] memory targets = new address[](0);
+        bytes[] memory callDatas = new bytes[](0);
+        bytes memory data = abi.encode(targets, callDatas, uint16(0));
+
+        vm.prank(allocator);
+        _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
+
+        assertEq(_mockUsdt.allowance(address(_swapper), address(_vault)), 0, "stale allowance from swapper to vault");
     }
 
     function test_executeSwap_reverts_ifTargetsAndCallDatasLengthMismatch() public {
