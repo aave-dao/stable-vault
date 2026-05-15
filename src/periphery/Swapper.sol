@@ -17,7 +17,8 @@ import {Errors} from "src/types/Errors.sol";
 /// @author Aave Labs
 /// @notice Swapper contract for executing swaps with slippage coverage and access control.
 /// @dev Coverage is pulled from the immutable bound `SLIPPAGE_VAULT`, which also enforces caps and bounds the per-call
-/// `slippageToleranceBps` against `maxSlippageBps` (or `overrideMaxSlippageBps` in override mode).
+/// `slippageToleranceBps` against `maxSlippageBps` (or `overrideMaxSlippageBps` in override mode). Any `assetIn`
+/// left on the Swapper after the swap is returned to the same vault.
 contract Swapper is Ownable, ReentrancyGuardTransient, ISwapper {
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
@@ -106,7 +107,7 @@ contract Swapper is Ownable, ReentrancyGuardTransient, ISwapper {
     /// @param amount The amount to reimburse.
     function _reimburseCoverage(address asset, uint256 amount) internal {
         IERC20(asset).forceApprove(address(SLIPPAGE_VAULT), amount);
-        ISlippageCoverageVault(SLIPPAGE_VAULT).returnCoverage(asset, amount);
+        ISlippageCoverageVault(SLIPPAGE_VAULT).reimburseCoverage(asset, amount);
         emit ISwapper.AssetInSwept(asset, amount);
     }
 }

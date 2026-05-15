@@ -885,34 +885,34 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
     /// @dev Beneficiary gate: the swap-refund path is only callable by the immutable bound Swapper. An attacker
     /// being able to call this would let them forge `CoverageFunded` audit events.
-    function test_returnCoverage_reverts_ifCallerIsNotBeneficiary() public {
+    function test_reimburseCoverage_reverts_ifCallerIsNotBeneficiary() public {
         vm.expectRevert(abi.encodeWithSelector(ISlippageCoverageVault.OnlyBeneficiary.selector));
         vm.prank(attacker);
-        _vault.returnCoverage(address(_usdc), 1);
+        _vault.reimburseCoverage(address(_usdc), 1);
     }
 
     /// @dev Operator is privileged for the restricted setters; the beneficiary gate must still reject them.
-    function test_returnCoverage_reverts_ifCallerIsOperator() public {
+    function test_reimburseCoverage_reverts_ifCallerIsOperator() public {
         vm.expectRevert(abi.encodeWithSelector(ISlippageCoverageVault.OnlyBeneficiary.selector));
         vm.prank(operator);
-        _vault.returnCoverage(address(_usdc), 1);
+        _vault.reimburseCoverage(address(_usdc), 1);
     }
 
     /// @dev Funder can call `fundCoverage` (the governance-funding path) but is not the bound beneficiary, so the
     /// swap-refund path must reject them too.
-    function test_returnCoverage_reverts_ifCallerIsFunder() public {
+    function test_reimburseCoverage_reverts_ifCallerIsFunder() public {
         vm.expectRevert(abi.encodeWithSelector(ISlippageCoverageVault.OnlyBeneficiary.selector));
         vm.prank(funder);
-        _vault.returnCoverage(address(_usdc), 1);
+        _vault.reimburseCoverage(address(_usdc), 1);
     }
 
-    function test_returnCoverage_reverts_ifAmountIsZero() public {
+    function test_reimburseCoverage_reverts_ifAmountIsZero() public {
         vm.expectRevert(abi.encodeWithSelector(Errors.ZeroAmount.selector));
         vm.prank(beneficiary);
-        _vault.returnCoverage(address(_usdc), 0);
+        _vault.reimburseCoverage(address(_usdc), 0);
     }
 
-    function test_returnCoverage_pullsFromBeneficiaryAndEmits() public {
+    function test_reimburseCoverage_pullsFromBeneficiaryAndEmits() public {
         _usdc.mint(beneficiary, 1_000e6);
         vm.prank(beneficiary);
         _usdc.approve(address(_vault), 1_000e6);
@@ -921,7 +921,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         emit ISlippageCoverageVault.CoverageFunded(address(_usdc), beneficiary, 1_000e6);
 
         vm.prank(beneficiary);
-        _vault.returnCoverage(address(_usdc), 1_000e6);
+        _vault.reimburseCoverage(address(_usdc), 1_000e6);
 
         assertEq(_usdc.balanceOf(address(_vault)), 1_000e6);
         assertEq(_usdc.balanceOf(beneficiary), 0);
@@ -929,7 +929,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
     /// @dev Returns are inflows; window-cap accounting tracks outflows only. A return must not credit back the
     /// window budget (otherwise a malicious rebalancer could pull, return, and pull again to bypass the rate limit).
-    function test_returnCoverage_doesNotConsumeOrRestoreWindowCap() public {
+    function test_reimburseCoverage_doesNotConsumeOrRestoreWindowCap() public {
         _configureUsdcCaps(5_000e6, 50_000e6, ONE_DAY);
 
         // Pull first to populate windowStart and consumed.
@@ -944,7 +944,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         vm.prank(beneficiary);
         _usdc.approve(address(_vault), 5_000e6);
         vm.prank(beneficiary);
-        _vault.returnCoverage(address(_usdc), 5_000e6);
+        _vault.reimburseCoverage(address(_usdc), 5_000e6);
 
         ISlippageCoverageVault.Window memory wAfter = _vault.getWindow(address(_usdc));
         assertEq(wAfter.windowStart, wBefore.windowStart, "windowStart shifted");
@@ -955,7 +955,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
     /// @dev Inflows do not depend on override mode — the only gate is the bound-beneficiary check, so returns
     /// succeed regardless of mode.
-    function test_returnCoverage_worksInOverrideMode() public {
+    function test_reimburseCoverage_worksInOverrideMode() public {
         vm.prank(operator);
         _vault.enableOverrideMode();
 
@@ -964,7 +964,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         _usdc.approve(address(_vault), 1_000e6);
 
         vm.prank(beneficiary);
-        _vault.returnCoverage(address(_usdc), 1_000e6);
+        _vault.reimburseCoverage(address(_usdc), 1_000e6);
 
         assertEq(_usdc.balanceOf(address(_vault)), 1_000e6);
     }
@@ -1085,7 +1085,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
     }
 
     /// @dev Returning + reentrancy: the same hostile-token shape but reached via the beneficiary-gated path.
-    function test_adversarial_returnCoverage_reentrantTokenIsBlocked() public {
+    function test_adversarial_reimburseCoverage_reentrantTokenIsBlocked() public {
         MockReentrantErc20 hostile = new MockReentrantErc20("Hostile", "H", 18);
         hostile.setReentrancyOnTransferFrom(true);
 
@@ -1099,7 +1099,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
         vm.expectRevert(abi.encodeWithSelector(ReentrancyGuardTransient.ReentrancyGuardReentrantCall.selector));
         vm.prank(beneficiary);
-        _vault.returnCoverage(address(hostile), 1_000e18);
+        _vault.reimburseCoverage(address(hostile), 1_000e18);
     }
 
     /// @dev Many small pulls totaling exactly cap is fine; +1 reverts.

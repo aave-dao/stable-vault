@@ -14,8 +14,9 @@ import {Errors} from "src/types/Errors.sol";
 
 /// @title SlippageCoverageVault
 /// @author Aave Labs
-/// @notice Holds coverage capital for rebalance-swap shortfalls. Push-based outflows to the immutable bound Swapper,
-/// gated by per-tx + fixed-window caps (with lazy rollover). Override mode bypasses caps.
+/// @notice Holds coverage capital for rebalance-swap shortfalls. Push-based flows to/from the immutable bound
+/// Swapper: outflows cover shortfalls (gated by per-tx + fixed-window caps with lazy rollover; override mode
+/// bypasses caps), inflows return unconsumed `assetIn` residual (no caps — window state tracks outflows only).
 contract SlippageCoverageVault is AccessManaged, Multicall, ReentrancyGuardTransient, ISlippageCoverageVault {
     using SafeERC20 for IERC20;
 
@@ -73,9 +74,9 @@ contract SlippageCoverageVault is AccessManaged, Multicall, ReentrancyGuardTrans
     /// @inheritdoc ISlippageCoverageVault
     /// @dev Does not decrement consumption because it is the responsibility of the beneficiary to not pull more than
     /// necessary.
-    function returnCoverage(address asset, uint256 amount) external override nonReentrant {
+    function reimburseCoverage(address asset, uint256 amount) external override nonReentrant {
         require(msg.sender == SLIPPAGE_BENEFICIARY, OnlyBeneficiary());
-        _pullCoverage(asset, amount);
+        _takeForCoverage(asset, amount);
     }
 
     //////////////////////////////// RESTRICTED FUNCTIONS ////////////////////////////////
@@ -174,7 +175,7 @@ contract SlippageCoverageVault is AccessManaged, Multicall, ReentrancyGuardTrans
 
     /// @inheritdoc ISlippageCoverageVault
     function fundCoverage(address asset, uint256 amount) external override restricted nonReentrant {
-        _pullCoverage(asset, amount);
+        _takeForCoverage(asset, amount);
     }
 
     /// @inheritdoc ISlippageCoverageVault
@@ -243,7 +244,7 @@ contract SlippageCoverageVault is AccessManaged, Multicall, ReentrancyGuardTrans
         _windowByAsset[asset] = window;
     }
 
-    function _pullCoverage(address asset, uint256 amount) internal {
+    function _takeForCoverage(address asset, uint256 amount) internal {
         require(amount > 0, Errors.ZeroAmount());
         IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
         emit CoverageFunded(asset, msg.sender, amount);

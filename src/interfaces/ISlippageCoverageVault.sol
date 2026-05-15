@@ -93,9 +93,9 @@ interface ISlippageCoverageVault {
 
     /// @notice Pulls `amount` of `asset` from the beneficiary back to the Slippage Coverage Vault.
     /// @dev Callable only by `SLIPPAGE_BENEFICIARY`.
-    /// @param asset The asset to pull.
-    /// @param amount The amount to pull.
-    function returnCoverage(address asset, uint256 amount) external;
+    /// @param asset The asset to reimburse.
+    /// @param amount The amount to reimburse.
+    function reimburseCoverage(address asset, uint256 amount) external;
 
     /// @notice Enables override mode. While enabled, `pullCoverage` bypasses both per-tx and window caps and the
     /// Swapper accepts the higher `overrideMaxSlippageBps`.
