@@ -30,6 +30,8 @@ interface IAllocator {
 
     event StrategyDistrusted(address indexed strategy);
 
+    event WithdrawalQueueSet(address indexed asset, address[] queue);
+
     /// @notice Thrown when funds fail to deposit into a yield strategy.
     /// @custom:selector 0x3868bf52
     error DepositIntoStrategyFailed(address strategy);
@@ -53,6 +55,9 @@ interface IAllocator {
     /// @notice Thrown when a strategy has no shares to redeem.
     /// @custom:selector 0xdf4ff092
     error ZeroShareBalance(address strategy);
+
+    /// @notice Thrown when the proposed withdrawal queue is not a permutation of the asset's registered strategies.
+    error InvalidWithdrawalQueue();
 
     /// @notice The representation of an asset balance.
     /// @param asset Address of the asset.
@@ -157,6 +162,14 @@ interface IAllocator {
     /// @return strategies Addresses of the registered strategies for the asset.
     function getStrategiesForAsset(address asset) external view returns (address[] memory strategies);
 
+    /// @notice Getter for the ordered withdrawal queue for a given asset.
+    /// @dev The queue contains the same strategies as `getStrategiesForAsset` but in the order they will be drained
+    /// when fulfilling withdrawals. New strategies are appended to the queue on registration; the order is otherwise
+    /// preserved across removals and can be customized via `setWithdrawalQueue`.
+    /// @param asset Address of the asset to get the withdrawal queue for.
+    /// @return queue Strategies in the order they will be visited during withdrawal.
+    function getWithdrawalQueue(address asset) external view returns (address[] memory queue);
+
     /// @notice Getter for the configuration of a given strategy.
     /// @param strategy Address of the strategy to get the configuration for.
     /// @return config Configuration of the strategy.
@@ -205,6 +218,14 @@ interface IAllocator {
     /// @notice Removes a yield strategy from the allocator.
     /// @param strategy Address of the ERC-4626 strategy to remove.
     function removeStrategy(address strategy) external;
+
+    /// @notice Replaces the withdrawal queue order for a given asset.
+    /// @dev The new queue must be a permutation of the asset's currently registered strategies (same length, every
+    /// registered strategy present exactly once); otherwise the call reverts with `InvalidWithdrawalQueue`. This
+    /// guarantees no strategy can be silently dropped from the withdrawal path.
+    /// @param asset Address of the asset whose withdrawal queue is being set.
+    /// @param newQueue Strategies in the order they should be visited during withdrawal.
+    function setWithdrawalQueue(address asset, address[] calldata newQueue) external;
 
     /// @notice Disables deposits to a given strategy.
     /// @param strategy Address of the ERC-4626 strategy to disable deposits for.
