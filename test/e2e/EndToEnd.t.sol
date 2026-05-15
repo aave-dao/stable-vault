@@ -43,7 +43,7 @@ contract EndToEndTest is BaseTest {
         // User makes a deposit of 2 wei into Stable Vault.
         vm.startPrank(user);
         USDC.approve(address(vault), 2);
-        vault.deposit(user, address(USDC), 2);
+        vault.deposit(user, address(USDC), 2, "");
 
         uint256 userBalanceInRay = vault.getUserBalance(user);
         uint256 vaultAssetsInRay = vault.getAggregatedBalance();
@@ -76,7 +76,7 @@ contract EndToEndTest is BaseTest {
         vm.startPrank(user);
         USDC.approve(address(vault), amountForMaximumLoss);
         vm.expectRevert(Errors.InsufficientAmountOut.selector);
-        vault.deposit(user, address(USDC), amountForMaximumLoss);
+        vault.deposit(user, address(USDC), amountForMaximumLoss, "");
 
         uint256 userBalanceInRay = vault.getUserBalance(user);
         uint256 vaultAssetsInRay = vault.getAggregatedBalance();
@@ -96,7 +96,7 @@ contract EndToEndTest is BaseTest {
         // 1. User1 deposits 500 USDC to Vault on Accounting Chain
         vm.startPrank(user);
         USDC.approve(address(vault), userInitialDeposit);
-        vault.deposit(user, address(USDC), userInitialDeposit);
+        vault.deposit(user, address(USDC), userInitialDeposit, "");
         vm.stopPrank();
 
         // - check that funds are dropped into default liquidity vault
@@ -150,7 +150,8 @@ contract EndToEndTest is BaseTest {
                     ICcipBridgeAdapter.CcipFeeParams({
                         feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
                     })
-                )
+                ),
+                ""
             );
 
             // - check that the funds land on Earning Chain and are dropped into default liquidity vault there
@@ -231,7 +232,7 @@ contract EndToEndTest is BaseTest {
 
             Logger.log("Rebalancing by swap from USDC to GHO on the Earning chain...");
             vm.prank(everyRoleAccount);
-            allocator_earningChain.rebalance(rebalances);
+            allocator_earningChain.rebalance(rebalances, "");
 
             // - check that the funds are swapped to GHO
             Logger.log(
@@ -300,7 +301,7 @@ contract EndToEndTest is BaseTest {
                     })
                 );
                 earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
-                    address(GHO), userEarningsInGho, address(ccipAdapter_earningChain), DEFAULT_GAS_LIMIT, bp
+                    address(GHO), userEarningsInGho, address(ccipAdapter_earningChain), DEFAULT_GAS_LIMIT, bp, ""
                 );
             }
 
@@ -375,7 +376,7 @@ contract EndToEndTest is BaseTest {
 
             Logger.log("Rebalancing by swap from GHO to USDC on the Accounting chain...");
             vm.prank(everyRoleAccount);
-            allocator_accountingChain.rebalance(rebalances);
+            allocator_accountingChain.rebalance(rebalances, "");
 
             // - check that the funds are swapped to USDC (includes 1 extra wei for precision)
             Logger.log(
@@ -407,7 +408,7 @@ contract EndToEndTest is BaseTest {
 
             // Request withdrawal
             vm.prank(user);
-            iouAmountRequestedRay = vault.requestWithdrawal(user, 0);
+            iouAmountRequestedRay = vault.requestWithdrawal(user, 0, "");
 
             Logger.log("... request withdrawal minted IOU tokens: %s", iouAmountRequestedRay);
             // Check user IOU token balance
@@ -463,7 +464,7 @@ contract EndToEndTest is BaseTest {
                     })
                 );
                 earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
-                    address(GHO), ghoBalanceOnVaultLeft, address(ccipAdapter_earningChain), DEFAULT_GAS_LIMIT, bp
+                    address(GHO), ghoBalanceOnVaultLeft, address(ccipAdapter_earningChain), DEFAULT_GAS_LIMIT, bp, ""
                 );
             }
 

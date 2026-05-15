@@ -140,10 +140,12 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     function _setup_Targets(address deployer) internal virtual {
         _setupTarget__CcipAdapter(deployer);
         _setupTarget__Allocator(deployer);
-        _setupTarget__WithdrawalPolicy(deployer);
+        _setupTarget__WithdrawalExecutionPolicy(deployer);
         _setupTarget__AssetRegistry(deployer);
         _setupTarget__PriceOracle(deployer);
         _setupTarget__SlippageCoverageVault(deployer);
+        _setupTarget__PolicyRegistry(deployer);
+        _setupTarget__FundsBridgingPolicy(deployer);
         _setupTarget__ATokenVaults();
     }
 
@@ -290,7 +292,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         address disablerProfile = _getProfile__Disabler();
         require(disablerProfile != address(0), "Disabler profile address not set");
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](17);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](21);
 
         roles[0] = RolesConfig.getRole__rebalance();
         roles[1] = RolesConfig.getRole__removeStrategy();
@@ -309,6 +311,11 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         roles[14] = RolesConfig.getRole__lowerPullCapPerTx();
         roles[15] = RolesConfig.getRole__lowerWindowCap();
         roles[16] = RolesConfig.getRole__raiseWindowSeconds();
+        // Only used on the Accounting Chain (DepositPolicy is Accounting-only), but granted in both chain setups.
+        roles[17] = RolesConfig.getRole__lowerDepositCapacity();
+        roles[18] = RolesConfig.getRole__lowerDepositRefillRate();
+        roles[19] = RolesConfig.getRole__lowerBridgingCapacity();
+        roles[20] = RolesConfig.getRole__lowerBridgingRefillRate();
 
         _grantRolesToProfile(disablerProfile, roles);
     }
@@ -371,8 +378,8 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         _setTargetFunctionRoles(allocator, roles);
     }
 
-    function _setupTarget__WithdrawalPolicy(address deployer) internal {
-        address withdrawalPolicy = getWithdrawalPolicyAddress(deployer);
+    function _setupTarget__WithdrawalExecutionPolicy(address deployer) internal {
+        address withdrawalExecutionPolicy = getWithdrawalExecutionPolicyAddress(deployer);
 
         RolesConfig.Role[] memory roles = new RolesConfig.Role[](4);
 
@@ -381,7 +388,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         roles[2] = RolesConfig.getRole__addSigner();
         roles[3] = RolesConfig.getRole__removeSigner();
 
-        _setTargetFunctionRoles(withdrawalPolicy, roles);
+        _setTargetFunctionRoles(withdrawalExecutionPolicy, roles);
     }
 
     function _setupTarget__AssetRegistry(address deployer) internal {
@@ -433,6 +440,29 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         roles[11] = RolesConfig.getRole__sweepSlippageCoverageVault();
 
         _setTargetFunctionRoles(slippageCoverageVault, roles);
+    }
+
+    function _setupTarget__PolicyRegistry(address deployer) internal {
+        address policyRegistry = getPolicyRegistryAddress(deployer);
+
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](1);
+
+        roles[0] = RolesConfig.getRole__setPolicy();
+
+        _setTargetFunctionRoles(policyRegistry, roles);
+    }
+
+    function _setupTarget__FundsBridgingPolicy(address deployer) internal {
+        address fundsBridgingPolicy = getFundsBridgingPolicyAddress(deployer);
+
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](4);
+
+        roles[0] = RolesConfig.getRole__raiseBridgingCapacity();
+        roles[1] = RolesConfig.getRole__raiseBridgingRefillRate();
+        roles[2] = RolesConfig.getRole__lowerBridgingCapacity();
+        roles[3] = RolesConfig.getRole__lowerBridgingRefillRate();
+
+        _setTargetFunctionRoles(fundsBridgingPolicy, roles);
     }
 
     function _setupTarget__ATokenVaults() internal {

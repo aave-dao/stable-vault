@@ -24,7 +24,7 @@ import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {ISlippageCoverageVault} from "src/interfaces/ISlippageCoverageVault.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
-import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
+import {WithdrawalExecutionPolicy} from "src/policies/WithdrawalExecutionPolicy.sol";
 
 abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -228,7 +228,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     }
 
     function test_disablerProfile_hasTheExpectedRoles() public view {
-        uint64[] memory expected = new uint64[](17);
+        uint64[] memory expected = new uint64[](21);
         expected[0] = RolesConfig.getRole__rebalance().roleId;
         expected[1] = RolesConfig.getRole__removeStrategy().roleId;
         expected[2] = RolesConfig.getRole__rescueTokens().roleId;
@@ -247,6 +247,10 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         expected[15] = RolesConfig.getRole__lowerWindowCap().roleId;
         // raiseWindowSeconds is tightening (longer window = slower rate), even though the prefix says raise.
         expected[16] = RolesConfig.getRole__raiseWindowSeconds().roleId;
+        expected[17] = RolesConfig.getRole__lowerDepositCapacity().roleId;
+        expected[18] = RolesConfig.getRole__lowerDepositRefillRate().roleId;
+        expected[19] = RolesConfig.getRole__lowerBridgingCapacity().roleId;
+        expected[20] = RolesConfig.getRole__lowerBridgingRefillRate().roleId;
         _assertProfileHasExactlyTheseRoles(_getProfile__Disabler(), expected);
 
         for (uint256 i = 0; i < expected.length; i++) {
@@ -442,17 +446,19 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         );
     }
 
-    function test_targetSetup_withdrawalPolicy() public view {
-        address target = getWithdrawalPolicyAddress(_deployer());
+    function test_targetSetup_withdrawalExecutionPolicy() public view {
+        address target = getWithdrawalExecutionPolicyAddress(_deployer());
         _assertTargetFunctionRole(
-            target, WithdrawalPolicy.setAssetFeeBps.selector, RolesConfig.getRole__setAssetFeeBps().roleId
+            target, WithdrawalExecutionPolicy.setAssetFeeBps.selector, RolesConfig.getRole__setAssetFeeBps().roleId
         );
         _assertTargetFunctionRole(
-            target, WithdrawalPolicy.setDefaultFeeBps.selector, RolesConfig.getRole__setDefaultFeeBps().roleId
+            target, WithdrawalExecutionPolicy.setDefaultFeeBps.selector, RolesConfig.getRole__setDefaultFeeBps().roleId
         );
-        _assertTargetFunctionRole(target, WithdrawalPolicy.addSigner.selector, RolesConfig.getRole__addSigner().roleId);
         _assertTargetFunctionRole(
-            target, WithdrawalPolicy.removeSigner.selector, RolesConfig.getRole__removeSigner().roleId
+            target, WithdrawalExecutionPolicy.addSigner.selector, RolesConfig.getRole__addSigner().roleId
+        );
+        _assertTargetFunctionRole(
+            target, WithdrawalExecutionPolicy.removeSigner.selector, RolesConfig.getRole__removeSigner().roleId
         );
     }
 
@@ -611,7 +617,11 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         address wpm = _getProfile__WithdrawalPolicyManager();
 
         _assertCanCall(
-            wpm, getWithdrawalPolicyAddress(_deployer()), WithdrawalPolicy.setDefaultFeeBps.selector, true, 0
+            wpm,
+            getWithdrawalExecutionPolicyAddress(_deployer()),
+            WithdrawalExecutionPolicy.setDefaultFeeBps.selector,
+            true,
+            0
         );
         // Unauthorized
         _assertCanCall(wpm, getAllocatorAddress(_deployer()), IAllocator.rebalance.selector, false, 0);
@@ -681,7 +691,17 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         address withdrawer = makeAddr("WITHDRAWER");
         address transferHelper = address(new TransferHelper());
 
-        address newImpl = address(new Allocator(assetRegistry, depositor, withdrawer, priceOracle, transferHelper, 1));
+        address newImpl = address(
+            new Allocator(
+                assetRegistry,
+                depositor,
+                withdrawer,
+                priceOracle,
+                transferHelper,
+                1,
+                getPolicyRegistryAddress(_deployer())
+            )
+        );
         bytes memory callData = abi.encodeCall(
             ProxyAdmin.upgradeAndCall, (ITransparentUpgradeableProxy(getAllocatorAddress(_deployer())), newImpl, "")
         );
