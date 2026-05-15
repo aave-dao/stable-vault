@@ -94,24 +94,21 @@ contract PriceOracle is AccessManagedUpgradeable, IPriceOracle {
         emit OracleAdapterSet(asset, newAdapter, previousAdapter);
     }
 
-    /// @dev Wraps the adapter call in a try/catch so a single adapter revert (paused feed, deprecated feed, L2
-    /// sequencer downtime, etc.) does not propagate up the aggregation pipeline and block all downstream operations
-    /// — including `requestWithdrawal` for principal-only exits (CORE-1). The catch path treats the asset's
-    /// contribution as 0, mirroring the existing `isStale` handling — same conservative direction.
-    /// @dev Distinguishes OOG-induced catches from genuine adapter reverts using the Liquity v2 pattern:
-    /// the EVM 63/64 rule means an external call receives up to 63/64 of remaining gas and leaves the caller with
-    /// at least 1/64. If `gasleft()` after the catch is ≤ `gasBefore / 64`, the inner call exhausted its budget
-    /// (i.e., out-of-gas) — re-revert rather than silently mark a healthy feed as failed.
     function _getPrice(address asset) internal view returns (uint256 price) {
         address oracleAdapter = $storage().oracleAdapterByAsset[asset];
         require(oracleAdapter != address(0), OracleAdapterNotFound(asset));
 
         uint256 gasBefore = gasleft();
+
+        // Wrap the adapter call in a try-catch so a single adapter revert (paused feed, sequencer downtime, etc.)
+        // does not block downstream consumers — the catch returns zero, mirroring the stale-response branch.
         try IPriceOracleAdapter(oracleAdapter).getPrice(asset) returns (
             IPriceOracleAdapter.OracleResponse memory response
         ) {
             return response.isStale ? 0 : _capToMaxPrice(response.priceRay);
         } catch {
+            // The "all but one 64th" gas check re-reverts when the catch fired from out-of-gas, so a healthy feed
+            // cannot be silently induced to return zero. See EIP-150 for more details.
             if (gasleft() <= gasBefore / 64) {
                 revert IPriceOracle.InsufficientGasForExternalCall();
             }

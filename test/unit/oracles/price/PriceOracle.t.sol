@@ -169,35 +169,26 @@ contract PriceOracleTest is TestWithHelpers {
         _priceOracle.getPrice(asset1);
     }
 
-    /// @dev Q-03 / VA-188: a genuine adapter revert (paused / deprecated Chainlink feed, L2 sequencer downtime, etc.)
-    /// must not propagate through the aggregation pipeline. Catch path treats the asset's contribution as 0 — same
-    /// conservative direction as `response.isStale`.
     function test_getPrice_returnsZero_whenAdapterReverts() public {
-        // Configure the adapter first while it's still responsive, so `setOracleAdapterForAsset`'s
-        // sanity-call `getPrice` passes.
         vm.prank(everyRoleAccount);
         _priceOracle.setOracleAdapterForAsset(asset1, address(_mockAdapter));
 
-        // Flip the adapter into permanent-revert mode after registration.
         _mockAdapter.setShouldRevert(true, "feed paused");
 
         uint256 result = _priceOracle.getPrice(asset1);
-        assertEq(result, 0, "Should return 0 when adapter reverts (mirrors stale fallback)");
+        assertEq(result, 0, "Should return 0 when adapter reverts");
     }
 
-    /// @dev Q-03 / VA-188: if the catch fired due to OOG (inner call exhausted its 63/64 gas allowance),
-    /// re-revert with `InsufficientGasForExternalCall` instead of silently marking a healthy feed as failed.
     function test_getPrice_reverts_whenAdapterOOGs() public {
         GasBurnerPriceOracleAdapter burner = new GasBurnerPriceOracleAdapter();
-        burner.setResponse(MathLib.RAY, false); // benign response for the setter's sanity-call
+        burner.setResponse(MathLib.RAY, false);
 
         vm.prank(everyRoleAccount);
         _priceOracle.setOracleAdapterForAsset(asset1, address(burner));
 
         burner.setBurnEnabled(true);
 
-        // Forward enough gas that PriceOracle's frame and the catch can complete, but not enough that the inner
-        // gas-burning loop finishes — so the 63/64 leftover fires the guard.
+        // Cap forwarded gas so the inner loop OOGs while the outer frame can still execute the catch.
         vm.expectRevert(IPriceOracle.InsufficientGasForExternalCall.selector);
         _priceOracle.getPrice{gas: 200_000}(asset1);
     }
