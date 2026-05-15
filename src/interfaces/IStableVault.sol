@@ -187,17 +187,6 @@ interface IStableVault {
     /// @notice Requests a withdrawal of assets from the vault.
     /// @dev User shares are burned; the amount requested to withdraw stops accruing yield.
     /// @dev User is minted units of IOUs which can be used to claim assets.
-    /// @dev Dust upgrade: if `requestedAmountInRay` would leave the user with shares redeemable for less
-    ///      than `MIN_WITHDRAWABLE_AMOUNT_RAY` of an 18-decimal asset, the request is silently upgraded
-    ///      to a full withdrawal (principal + accrued interest) to avoid leaving non-redeemable dust shares.
-    /// @dev Solvency-revert edge case: as a consequence of the dust upgrade, a request with
-    ///      `requestedAmountInRay <= originalDeposit` can revert with `InsufficientAssets` under vault
-    ///      insolvency, because the upgraded request's interest portion is still subject to the
-    ///      `withdrawalRequestInterestRay <= globalWithdrawableInterestRay` check. To guarantee a
-    ///      principal-only path that bypasses the dust upgrade, pass `requestedAmountInRay` such that
-    ///      `balance - requestedAmountInRay >= MIN_WITHDRAWABLE_AMOUNT_RAY`. Note that passing
-    ///      `requestedAmountInRay = 0` is NOT a workaround: it routes directly to the full-withdrawal
-    ///      path, which is also gated by the same solvency check.
     /// @param user The address of the user requesting the withdrawal
     /// @param requestedAmountInRay The amount of assets requested to withdraw (normalized to RAY units)
     /// @return amountOfIouTokensMinted Amount of IOU tokens minted to the user.
