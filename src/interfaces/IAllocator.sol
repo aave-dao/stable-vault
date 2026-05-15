@@ -6,7 +6,9 @@ pragma solidity ^0.8.22;
 /// @author Aave Labs
 /// @notice Interface for the Allocator contract.
 interface IAllocator {
-    event AssetAllocated(address indexed asset, address indexed strategy, uint256 amount, uint256 netDepositAmount);
+    event AssetAllocated(
+        address indexed asset, address indexed strategy, uint256 amount, uint256 actualDepositedAmount
+    );
 
     event AssetDeallocated(address indexed asset, address indexed strategy, uint256 amount);
 

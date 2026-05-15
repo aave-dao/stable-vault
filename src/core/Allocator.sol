@@ -472,20 +472,17 @@ contract Allocator is
     /// @dev Intended to be the lowest level function used to deposit into a strategy.
     /// @dev Does not check if the strategy is trusted because to enable deposits for a strategy it must be trusted.
     /// @dev The state of strategy distrusted, but deposits are still allowed, is not possible.
-    /// @dev Measures the deposit via `previewRedeem(shares)` on the post-deposit state. A pre/post balance delta
-    /// would let a strategy that accrues yield inside its own `deposit` over-credit the depositor and mask the
-    /// slippage check; the same read also bounds a reentrancy that mints further shares to this contract.
-    /// Round-trip rounding from `previewRedeem` is absorbed by `StableVault`'s non-zero withdrawal fee.
     function _depositToStrategy(address asset, uint256 amount, address strategy) internal returns (uint256) {
         require(amount > 0, Errors.ZeroAmount());
         require($storage().strategyConfigs[strategy].depositAllowed, DepositsToStrategyDisabled(strategy));
         IERC20(asset).forceApprove(strategy, amount);
 
-        uint256 netDepositAmount;
+        uint256 actualDepositedAmount;
         try IERC4626(strategy).deposit(amount, address(this)) returns (uint256 shares) {
-            netDepositAmount = IERC4626(strategy).previewRedeem(shares);
+            actualDepositedAmount = IERC4626(strategy).previewRedeem(shares);
             require(
-                amount.satSub(netDepositAmount) <= STRATEGY_DEPOSIT_SLIPPAGE_TOLERANCE, Errors.InsufficientAmountOut()
+                amount.satSub(actualDepositedAmount) <= STRATEGY_DEPOSIT_SLIPPAGE_TOLERANCE,
+                Errors.InsufficientAmountOut()
             );
         } catch {
             revert DepositIntoStrategyFailed(strategy);
@@ -495,8 +492,8 @@ contract Allocator is
         // pull surface for the strategy.
         IERC20(asset).forceApprove(strategy, 0);
 
-        emit AssetAllocated(asset, strategy, amount, netDepositAmount);
-        return netDepositAmount;
+        emit AssetAllocated(asset, strategy, amount, actualDepositedAmount);
+        return actualDepositedAmount;
     }
 
     /// @dev Returns balances grouped by asset.
