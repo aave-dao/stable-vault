@@ -57,9 +57,11 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
     event SignerSet(address indexed signer, bool indexed whitelistAsSigner);
 
     /// @notice Thrown when lowering the redemption capacity below the immutable floor.
+    /// @custom:selector 0xea1dc422
     error BelowMinRedemptionCapacity();
 
     /// @notice Thrown when lowering the redemption refill rate below the immutable floor.
+    /// @custom:selector 0xec4ddd07
     error BelowMinRedemptionRefillRate();
 
     /// @notice Thrown when the signature deadline has passed.
