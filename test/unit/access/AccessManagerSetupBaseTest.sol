@@ -195,13 +195,14 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     }
 
     function test_rebalancerProfile_hasTheExpectedRoles() public view {
-        uint64[] memory expected = new uint64[](6);
+        uint64[] memory expected = new uint64[](7);
         expected[0] = RolesConfig.getRole__rebalance().roleId;
         expected[1] = RolesConfig.getRole__disableDepositsToStrategy().roleId;
         expected[2] = RolesConfig.getRole__pushFundsToChain().roleId;
         expected[3] = RolesConfig.getRole__pushFundsToAccountingChain().roleId;
         expected[4] = RolesConfig.getRole__topUp().roleId;
         expected[5] = RolesConfig.getRole__fundCoverage().roleId;
+        expected[6] = RolesConfig.getRole__setWithdrawalQueue().roleId;
         _assertProfileHasExactlyTheseRoles(_getProfile__Rebalancer(), expected);
 
         for (uint256 i = 0; i < expected.length; i++) {
@@ -438,6 +439,9 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         );
         _assertTargetFunctionRole(
             target, IAllocator.distrustStrategy.selector, RolesConfig.getRole__distrustStrategy().roleId
+        );
+        _assertTargetFunctionRole(
+            target, IAllocator.setWithdrawalQueue.selector, RolesConfig.getRole__setWithdrawalQueue().roleId
         );
     }
 

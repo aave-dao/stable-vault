@@ -462,6 +462,19 @@ abstract contract RolesConfig is DeploymentConfig {
 
     /// @custom:delay None
     /// @custom:location Allocator
+    function getRole__setWithdrawalQueue() internal pure returns (Role memory) {
+        bytes4 selector = IAllocator.setWithdrawalQueue.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: NO_DELAY,
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
+        });
+    }
+
+    /// @custom:delay None
+    /// @custom:location Allocator
     function getRole__distrustStrategy() internal pure returns (Role memory) {
         bytes4 selector = IAllocator.distrustStrategy.selector;
         return Role({
@@ -877,7 +890,7 @@ abstract contract RolesConfig is DeploymentConfig {
     }
 
     function getAllFunctionBasedRoles() internal view returns (Role[] memory) {
-        Role[] memory roles = new Role[](64);
+        Role[] memory roles = new Role[](65);
 
         // AssetRegistry
         roles[0] = getRole__setAssetConfig();
@@ -968,6 +981,9 @@ abstract contract RolesConfig is DeploymentConfig {
         roles[61] = getRole__raiseBridgingRefillRate();
         roles[62] = getRole__lowerBridgingCapacity();
         roles[63] = getRole__lowerBridgingRefillRate();
+
+        // Allocator (extension)
+        roles[64] = getRole__setWithdrawalQueue();
 
         return roles;
     }
