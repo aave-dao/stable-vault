@@ -21,9 +21,10 @@ import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
+import {ISlippageCoverageVault} from "src/interfaces/ISlippageCoverageVault.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
-import {WithdrawalPolicy} from "src/periphery/WithdrawalPolicy.sol";
+import {WithdrawalExecutionPolicy} from "src/policies/WithdrawalExecutionPolicy.sol";
 
 abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -194,13 +195,14 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     }
 
     function test_rebalancerProfile_hasTheExpectedRoles() public view {
-        uint64[] memory expected = new uint64[](6);
+        uint64[] memory expected = new uint64[](7);
         expected[0] = RolesConfig.getRole__rebalance().roleId;
         expected[1] = RolesConfig.getRole__setDefaultStrategy().roleId;
         expected[2] = RolesConfig.getRole__disableDepositsToStrategy().roleId;
         expected[3] = RolesConfig.getRole__pushFundsToChain().roleId;
         expected[4] = RolesConfig.getRole__pushFundsToAccountingChain().roleId;
         expected[5] = RolesConfig.getRole__topUp().roleId;
+        expected[6] = RolesConfig.getRole__fundCoverage().roleId;
         _assertProfileHasExactlyTheseRoles(_getProfile__Rebalancer(), expected);
 
         for (uint256 i = 0; i < expected.length; i++) {
@@ -208,8 +210,25 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         }
     }
 
+    function test_coverageGuardianProfile_hasTheExpectedRoles() public view {
+        uint64[] memory expected = new uint64[](2);
+        expected[0] = RolesConfig.getRole__enableOverrideMode().roleId;
+        expected[1] = RolesConfig.getRole__disableOverrideMode().roleId;
+        _assertProfileHasExactlyTheseRoles(_getProfile__CoverageGuardian(), expected);
+
+        // Trilemma: CoverageGuardian must NOT also be the Rebalancer.
+        assertTrue(_getProfile__CoverageGuardian() != _getProfile__Rebalancer(), "guardian == rebalancer");
+
+        // No on-chain delay on either selector; CoverageGuardian compromise resistance is structural (N-of-M
+        // multisig signer composition), not temporal. A timelock would slow legitimate depeg response without
+        // changing the worst case (CoverageGuardian + Rebalancer both compromised collapses to vault balance
+        // regardless).
+        _assertProfileRoleDelay(_getProfile__CoverageGuardian(), expected[0], RolesConfig.NO_DELAY);
+        _assertProfileRoleDelay(_getProfile__CoverageGuardian(), expected[1], RolesConfig.NO_DELAY);
+    }
+
     function test_disablerProfile_hasTheExpectedRoles() public view {
-        uint64[] memory expected = new uint64[](14);
+        uint64[] memory expected = new uint64[](21);
         expected[0] = RolesConfig.getRole__rebalance().roleId;
         expected[1] = RolesConfig.getRole__removeStrategy().roleId;
         expected[2] = RolesConfig.getRole__rescueTokens().roleId;
@@ -224,6 +243,14 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         expected[11] = RolesConfig.getRole__setDefaultStrategy().roleId;
         expected[12] = RolesConfig.getRole__distrustStrategy().roleId;
         expected[13] = RolesConfig.getRole__removeSigner().roleId;
+        expected[14] = RolesConfig.getRole__lowerPullCapPerTx().roleId;
+        expected[15] = RolesConfig.getRole__lowerWindowCap().roleId;
+        // raiseWindowSeconds is tightening (longer window = slower rate), even though the prefix says raise.
+        expected[16] = RolesConfig.getRole__raiseWindowSeconds().roleId;
+        expected[17] = RolesConfig.getRole__lowerDepositCapacity().roleId;
+        expected[18] = RolesConfig.getRole__lowerDepositRefillRate().roleId;
+        expected[19] = RolesConfig.getRole__lowerBridgingCapacity().roleId;
+        expected[20] = RolesConfig.getRole__lowerBridgingRefillRate().roleId;
         _assertProfileHasExactlyTheseRoles(_getProfile__Disabler(), expected);
 
         for (uint256 i = 0; i < expected.length; i++) {
@@ -419,17 +446,19 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         );
     }
 
-    function test_targetSetup_withdrawalPolicy() public view {
-        address target = getWithdrawalPolicyAddress(_deployer());
+    function test_targetSetup_withdrawalExecutionPolicy() public view {
+        address target = getWithdrawalExecutionPolicyAddress(_deployer());
         _assertTargetFunctionRole(
-            target, WithdrawalPolicy.setAssetFeeBps.selector, RolesConfig.getRole__setAssetFeeBps().roleId
+            target, WithdrawalExecutionPolicy.setAssetFeeBps.selector, RolesConfig.getRole__setAssetFeeBps().roleId
         );
         _assertTargetFunctionRole(
-            target, WithdrawalPolicy.setDefaultFeeBps.selector, RolesConfig.getRole__setDefaultFeeBps().roleId
+            target, WithdrawalExecutionPolicy.setDefaultFeeBps.selector, RolesConfig.getRole__setDefaultFeeBps().roleId
         );
-        _assertTargetFunctionRole(target, WithdrawalPolicy.addSigner.selector, RolesConfig.getRole__addSigner().roleId);
         _assertTargetFunctionRole(
-            target, WithdrawalPolicy.removeSigner.selector, RolesConfig.getRole__removeSigner().roleId
+            target, WithdrawalExecutionPolicy.addSigner.selector, RolesConfig.getRole__addSigner().roleId
+        );
+        _assertTargetFunctionRole(
+            target, WithdrawalExecutionPolicy.removeSigner.selector, RolesConfig.getRole__removeSigner().roleId
         );
     }
 
@@ -469,6 +498,50 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         _assertTargetFunctionRole(target, IAssetRegistry.trustAsset.selector, RolesConfig.getRole__trustAsset().roleId);
         _assertTargetFunctionRole(
             target, IAssetRegistry.distrustAsset.selector, RolesConfig.getRole__distrustAsset().roleId
+        );
+    }
+
+    function test_targetSetup_slippageCoverageVault() public view {
+        address target = getSlippageCoverageVaultAddress(_deployer());
+        _assertTargetFunctionRole(
+            target, ISlippageCoverageVault.enableOverrideMode.selector, RolesConfig.getRole__enableOverrideMode().roleId
+        );
+        _assertTargetFunctionRole(
+            target,
+            ISlippageCoverageVault.disableOverrideMode.selector,
+            RolesConfig.getRole__disableOverrideMode().roleId
+        );
+        _assertTargetFunctionRole(
+            target, ISlippageCoverageVault.raisePullCapPerTx.selector, RolesConfig.getRole__raisePullCapPerTx().roleId
+        );
+        _assertTargetFunctionRole(
+            target, ISlippageCoverageVault.lowerPullCapPerTx.selector, RolesConfig.getRole__lowerPullCapPerTx().roleId
+        );
+        _assertTargetFunctionRole(
+            target, ISlippageCoverageVault.raiseWindowCap.selector, RolesConfig.getRole__raiseWindowCap().roleId
+        );
+        _assertTargetFunctionRole(
+            target, ISlippageCoverageVault.lowerWindowCap.selector, RolesConfig.getRole__lowerWindowCap().roleId
+        );
+        _assertTargetFunctionRole(
+            target, ISlippageCoverageVault.raiseWindowSeconds.selector, RolesConfig.getRole__raiseWindowSeconds().roleId
+        );
+        _assertTargetFunctionRole(
+            target, ISlippageCoverageVault.lowerWindowSeconds.selector, RolesConfig.getRole__lowerWindowSeconds().roleId
+        );
+        _assertTargetFunctionRole(
+            target, ISlippageCoverageVault.setMaxSlippageBps.selector, RolesConfig.getRole__setMaxSlippageBps().roleId
+        );
+        _assertTargetFunctionRole(
+            target,
+            ISlippageCoverageVault.setOverrideMaxSlippageBps.selector,
+            RolesConfig.getRole__setOverrideMaxSlippageBps().roleId
+        );
+        _assertTargetFunctionRole(
+            target, ISlippageCoverageVault.fundCoverage.selector, RolesConfig.getRole__fundCoverage().roleId
+        );
+        _assertTargetFunctionRole(
+            target, ISlippageCoverageVault.sweep.selector, RolesConfig.getRole__sweepSlippageCoverageVault().roleId
         );
     }
 
@@ -544,7 +617,11 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         address wpm = _getProfile__WithdrawalPolicyManager();
 
         _assertCanCall(
-            wpm, getWithdrawalPolicyAddress(_deployer()), WithdrawalPolicy.setDefaultFeeBps.selector, true, 0
+            wpm,
+            getWithdrawalExecutionPolicyAddress(_deployer()),
+            WithdrawalExecutionPolicy.setDefaultFeeBps.selector,
+            true,
+            0
         );
         // Unauthorized
         _assertCanCall(wpm, getAllocatorAddress(_deployer()), IAllocator.rebalance.selector, false, 0);
@@ -614,7 +691,17 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         address withdrawer = makeAddr("WITHDRAWER");
         address transferHelper = address(new TransferHelper());
 
-        address newImpl = address(new Allocator(assetRegistry, depositor, withdrawer, priceOracle, transferHelper, 1));
+        address newImpl = address(
+            new Allocator(
+                assetRegistry,
+                depositor,
+                withdrawer,
+                priceOracle,
+                transferHelper,
+                1,
+                getPolicyRegistryAddress(_deployer())
+            )
+        );
         bytes memory callData = abi.encodeCall(
             ProxyAdmin.upgradeAndCall, (ITransparentUpgradeableProxy(getAllocatorAddress(_deployer())), newImpl, "")
         );

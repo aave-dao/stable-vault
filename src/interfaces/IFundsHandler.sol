@@ -65,13 +65,15 @@ interface IFundsHandler {
     /// @param receiverExecutionGasLimit Gas limit for destination receiver execution. This includes adapter receive
     /// logic, token handling, and the gateway call, but excludes bridge provider infrastructure.
     /// @param bridgeAdapterData Any bridge adapter custom parameters that it may need to operate.
+    /// @param policyData Additional data that the bridge-funds policy might need to operate.
     function pushFundsToChain(
         address asset,
         uint256 amount,
         uint256 chainId,
         address bridgeAdapter,
         uint256 receiverExecutionGasLimit,
-        bytes calldata bridgeAdapterData
+        bytes calldata bridgeAdapterData,
+        bytes calldata policyData
     ) external payable;
 
     /// @notice Callback function for when funds arrive from a chain.
