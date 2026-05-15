@@ -245,25 +245,21 @@ contract StableVault is
         }
 
         _transferToTransferHelper(msg.sender, asset, amount);
-        uint256 netDepositAmount = IFundsHandler(FUNDS_HANDLER).processDeposit(asset, amount);
+        IFundsHandler(FUNDS_HANDLER).processDeposit(asset, amount);
+        uint256 amountInRay = amount.assetDecimalsToRay(asset);
 
         // Calculate the number of shares to mint based on the full amount deposited.
-        // If (amount - netDepositAmount) > 0, then this ~amount will be treated as interest earned.
         // Round down the division to undershoot the amount of granted shares, favoring the protocol.
-        uint256 shares = amount.assetDecimalsToRay(asset).rayDivDown(conversionRate);
+        uint256 shares = amountInRay.rayDivDown(conversionRate);
         // Prevent deposits that result in 0 shares to avoid user getting nothing in return for their deposit.
         require(shares > 0, Errors.InvalidAmount());
 
         _issueShares(user, subVaultId, shares);
-        // Increment the original deposit amount by the net deposit amount only, not the full amount.
-        // This protects against the system guaranteeing the full amount of the asset deposited in the case an
-        // underlying strategy suffers slippage.
-        uint256 netDepositAmountInRay = netDepositAmount.assetDecimalsToRay(asset);
-        $storage().positions[user].originalDepositRay += netDepositAmountInRay;
-        $storage().globalOriginalDepositsRay += netDepositAmountInRay;
+        $storage().positions[user].originalDepositRay += amountInRay;
+        $storage().globalOriginalDepositsRay += amountInRay;
 
         emit Deposit(user, asset, amount);
-        emit Transfer(address(0), user, amount.assetDecimalsToRay(asset));
+        emit Transfer(address(0), user, amountInRay);
     }
 
     /// @notice Transfers Stable Vault balance (denominated in RAY) between users.

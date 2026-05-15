@@ -91,12 +91,10 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
         // 1. User1 deposits 500 USDC to Vault on Accounting Chain
         _mintAndDepositUsdcToStableVault(user1, userInitialDeposit);
 
-        // Check the deposit was made into the default earning strategy for USDC
-        address defaultUsdcVault_AccountingChain = allocator_accountingChain.getDefaultStrategy(address(USDC));
         assertEq(
-            IERC20(address(USDC)).balanceOf(defaultUsdcVault_AccountingChain),
+            allocator_accountingChain.getAssetBalance(address(USDC)),
             userInitialDeposit,
-            "Default USDC strategy vault should have the deposited amount of USDC"
+            "Accounting Chain Allocator should have the deposited amount of USDC"
         );
         assertEq(
             fundsHandler.getAggregatedBalance(),
@@ -118,12 +116,10 @@ contract EarningChainWithdrawalTokenFeeE2ETest is BaseTest {
             ""
         );
 
-        // Check the funds were bridged to the Earning Chain
-        address defaultUsdcVault_earningChain = allocator_earningChain.getDefaultStrategy(address(USDC));
         assertEq(
-            IERC20(address(USDC)).balanceOf(defaultUsdcVault_earningChain),
+            allocator_earningChain.getAssetBalance(address(USDC)),
             userInitialDeposit,
-            "Default USDC strategy vault on Earning Chain should have the deposited amount of USDC"
+            "Earning Chain Allocator should have the deposited amount of USDC"
         );
 
         // Publish a chain balance snapshot via MockBundleFeed so the adapter/oracle path reflects Earning Chain funds.

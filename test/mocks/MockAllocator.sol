@@ -12,15 +12,10 @@ contract MockAllocator is IAllocator {
 
     mapping(address asset => uint256 balance) _mockedAssetBalances;
     address[] _mockedAssets;
-    uint256 _mockedAmountOfSlippage;
 
     function mockAssetBalance(address asset, uint256 amount) external {
         _mockedAssetBalances[asset] = amount;
         _mockedAssets.push(asset);
-    }
-
-    function mockAmountOfSlippage(uint256 amountOfSlippage) external {
-        _mockedAmountOfSlippage = amountOfSlippage;
     }
 
     function getAssetBalance(address asset) external view override returns (uint256) {
@@ -63,24 +58,12 @@ contract MockAllocator is IAllocator {
         _transferHelper = transferHelper;
     }
 
-    function getDefaultStrategy(address asset) external view override returns (address) {}
     function getStrategyConfig(address strategy) external view override returns (StrategyConfig memory) {}
+    function getStrategiesForAsset(address asset) external view override returns (address[] memory) {}
     function isStrategySupportedForAsset(address asset, address strategy) external view override returns (bool) {}
     function isStrategySupported(address strategy) external view override returns (bool) {}
 
-    function deposit(
-        address,
-        // asset
-        uint256 amount
-    )
-        external
-        view
-        override
-        returns (uint256)
-    {
-        return amount - _mockedAmountOfSlippage;
-    }
-    function depositAllowIdle(address asset, uint256 amount) external override {}
+    function deposit(address asset, uint256 amount) external override {}
     function rebalance(RebalanceParams[] memory params, bytes calldata policyData) external override {}
     function topUp(address asset, uint256 amount) external override {}
 
@@ -96,7 +79,6 @@ contract MockAllocator is IAllocator {
 
     function addStrategy(address asset, address strategy) external override {}
     function removeStrategy(address strategy) external override {}
-    function setDefaultStrategy(address asset, address strategy) external override {}
     function disableDepositsToStrategy(address strategy) external override {}
     function enableDepositsToStrategy(address strategy) external override {}
     function trustStrategy(address strategy) external override {}
