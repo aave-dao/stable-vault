@@ -11,19 +11,22 @@ import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
-/// @dev Mirrors the opaque-bytes shape of IBridgeAdapter and the adapter-owned bridge-fee staging in
-/// CcipAdapter: pulls feeToken directly from feePayer (or accepts native via msg.value) into itself,
-/// then pulls the bridged amount from TransferHelper. The fee never enters the TransferHelper.
+/// @dev Mirrors the opaque-bytes shape of IBridgeAdapter and pulls the bridged amount from TransferHelper.
 contract MockBridgeAdapter is IBridgeAdapter {
     using SafeERC20 for IERC20;
 
     address internal immutable TRANSFER_HELPER;
+    uint256 internal _feeAmount;
 
     constructor(address transferHelper) {
         TRANSFER_HELPER = transferHelper;
     }
 
     function getGateway() external view override returns (address) {}
+
+    function mockFeeAmount(uint256 feeAmount) external {
+        _feeAmount = feeAmount;
+    }
 
     function publishMessageToChainWithFeePayer(
         uint256 destinationChainId,
@@ -38,13 +41,12 @@ contract MockBridgeAdapter is IBridgeAdapter {
         ICcipBridgeAdapter.CcipFeeParams memory ccipFeeParams =
             abi.decode(bridgeAdapterData, (ICcipBridgeAdapter.CcipFeeParams));
 
-        // Mirror CcipAdapter: adapter pulls fee directly from feePayer (no TransferHelper round-trip).
         if (ccipFeeParams.feeToken == Constants.NATIVE_CURRENCY) {
-            require(msg.value == ccipFeeParams.feeAmount, Errors.InsufficientFunds());
+            require(msg.value >= _feeAmount, Errors.InsufficientFunds());
         } else {
             require(msg.value == 0, Errors.InvalidParameter());
-            if (ccipFeeParams.feeAmount > 0) {
-                IERC20(ccipFeeParams.feeToken).safeTransferFrom(feePayer, address(this), ccipFeeParams.feeAmount);
+            if (_feeAmount > 0) {
+                IERC20(ccipFeeParams.feeToken).safeTransferFrom(feePayer, address(this), _feeAmount);
             }
         }
 
