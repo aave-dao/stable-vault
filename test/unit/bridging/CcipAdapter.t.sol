@@ -6,7 +6,7 @@ import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessMana
 import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 import {IAny2EVMMessageReceiver} from "@chainlink-ccip/contracts/interfaces/IAny2EVMMessageReceiver.sol";
@@ -1619,7 +1619,7 @@ contract CcipAdapterTest is TestWithHelpers {
         // 4. Reentrancy guard reverts with ReentrancyGuardReentrantCall
         // 5. Revert bubbles up, entire transaction reverts
 
-        vm.expectRevert(ReentrancyGuard.ReentrancyGuardReentrantCall.selector);
+        vm.expectRevert(ReentrancyGuardTransient.ReentrancyGuardReentrantCall.selector);
         vm.prank(address(_mockCCIPRouter));
         adapterWithMaliciousGateway.ccipReceive(ccipMessage);
     }
