@@ -81,7 +81,7 @@ contract MockAllocator is IAllocator {
         return amount - _mockedAmountOfSlippage;
     }
     function depositAllowIdle(address asset, uint256 amount) external override {}
-    function rebalance(RebalanceParams[] memory params) external override {}
+    function rebalance(RebalanceParams[] memory params, bytes calldata policyData) external override {}
     function topUp(address asset, uint256 amount) external override {}
 
     function withdraw(

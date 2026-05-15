@@ -36,10 +36,10 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
         address fundsHandler,
         address assetRegistry,
         address transferHelper,
-        address withdrawalFeeCalculator,
         address priceOracle,
         uint256 maxActiveSubVaults,
-        address treasuryAddress
+        address treasuryAddress,
+        address policyRegistry
     ) internal virtual override returns (StableVault) {
         // Deploy a vault without restriction in the valid per-second rate
         address vaultImpl = address(
@@ -49,9 +49,9 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
                 iouToken,
                 fundsHandler,
                 transferHelper,
-                withdrawalFeeCalculator,
                 priceOracle,
-                maxActiveSubVaults
+                maxActiveSubVaults,
+                policyRegistry
             )
         );
         return StableVault(
@@ -90,7 +90,8 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
             EARNING_CHAIN_ID,
             address(ccipAdapter_accountingChain),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0}))
+            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
+            ""
         );
 
         // Check the funds were bridged to the Earning Chain
@@ -120,13 +121,16 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
         // User requests withdrawal of their original deposit
         uint256 iouAmountRequestedRay = userInitialDeposit.assetDecimalsToRay(address(USDC));
         vm.prank(user1);
-        vault.requestWithdrawal(user1, iouAmountRequestedRay);
+        vault.requestWithdrawal(user1, iouAmountRequestedRay, "");
         // User should have minted IOU tokens
         assertEq(iouToken_accountingChain.balanceOf(user1), iouAmountRequestedRay);
 
         // User bridges IOUs to the Earning Chain
-        vm.prank(user1);
         vm.deal(user1, bridgeFeeAmount);
+        vm.prank(user1);
+        IERC20(address(iouToken_accountingChain))
+            .approve(address(iouTokenManager_accountingChain), iouAmountRequestedRay);
+        vm.prank(user1);
         iouTokenManager_accountingChain.bridgeTokens{value: bridgeFeeAmount}(
             EARNING_CHAIN_ID,
             user1,
@@ -175,7 +179,7 @@ contract EarningChainDistrustedAssetE2ETest is BaseTest {
         USDC.mint(user, amount);
         vm.startPrank(user);
         USDC.approve(address(vault), amount);
-        vault.deposit(user, address(USDC), amount);
+        vault.deposit(user, address(USDC), amount, "");
         vm.stopPrank();
     }
 }

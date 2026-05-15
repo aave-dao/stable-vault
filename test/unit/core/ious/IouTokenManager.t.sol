@@ -333,20 +333,18 @@ contract IouTokenManagerTest_AccountingChain is Test {
             // Under the opaque-bytes shape, fee-staging is owned by the adapter (the MockGateway
             // stands in for adapter-level transferFrom here).
             IERC20(feeToken).approve(address(chainGateway), feeAmount);
+            // NOTE: under the opaque-bytes dispatch shape, fee-staging is owned by the adapter, not
+            // the IouTokenManager. The historic `vm.expectCall` asserting `transferFrom(from,
+            // TransferHelper, feeAmount)` at this layer was removed — that transfer now happens
+            // inside the CcipAdapter post-decode, covered by CcipAdapter.t.sol tests.
+            MockGateway(chainGateway)
+                .mockConsumeOnNextCall(transferHelper, feeAmount, feeToken, makeAddr("bridgeAdapter"));
         }
         if (iouTokenAmountRay > 0) {
             vm.prank(iouTokenManagerAddress);
             MockErc20(iouToken).mint(from, iouTokenAmountRay);
             vm.prank(from);
             IERC20(iouToken).approve(address(iouTokenManager), iouTokenAmountRay);
-        }
-        address feeRecipient = makeAddr("bridgeAdapter");
-        // NOTE: under the opaque-bytes dispatch shape, fee-staging is owned by the adapter, not the
-        // IouTokenManager. The historic `vm.expectCall` asserting `transferFrom(from, TransferHelper,
-        // feeAmount)` at this layer was removed — that transfer now happens inside the CcipAdapter
-        // post-decode, covered by CcipAdapter.t.sol tests.
-        if (feeAmount > 0) {
-            MockGateway(chainGateway).mockConsumeOnNextCall(transferHelper, feeAmount, feeToken, feeRecipient);
         }
         vm.prank(from);
         iouTokenManager.bridgeTokens(
@@ -363,7 +361,9 @@ contract IouTokenManagerTest_AccountingChain is Test {
             "Token fee not properly transferred out of TransferHelper"
         );
         assertEq(
-            IERC20(feeToken).balanceOf(feeRecipient), feeAmount, "Token fee not properly transferred to bridge adapter"
+            IERC20(feeToken).balanceOf(makeAddr("bridgeAdapter")),
+            feeAmount,
+            "Token fee not properly transferred to bridge adapter"
         );
     }
 
@@ -435,11 +435,10 @@ contract IouTokenManagerTest_AccountingChain is Test {
 
         bytes memory bridgeAdapterData =
             abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0}));
-        address feeRecipient = makeAddr("bridgeAdapter");
         if (feeAmount > 0) {
             vm.deal(from, feeAmount);
             MockGateway(chainGateway)
-                .mockConsumeOnNextCall(transferHelper, feeAmount, Constants.NATIVE_CURRENCY, feeRecipient);
+                .mockConsumeOnNextCall(transferHelper, feeAmount, Constants.NATIVE_CURRENCY, makeAddr("bridgeAdapter"));
         }
         if (iouTokenAmountRay > 0) {
             vm.prank(iouTokenManagerAddress);
@@ -457,40 +456,34 @@ contract IouTokenManagerTest_AccountingChain is Test {
             bridgeAdapterData
         );
         assertEq(transferHelper.balance, 0, "Native fee not properly transferred out of TransferHelper");
-        assertEq(feeRecipient.balance, feeAmount, "Native fee not properly transferred to bridge adapter");
+        assertEq(makeAddr("bridgeAdapter").balance, feeAmount, "Native fee not properly transferred to bridge adapter");
     }
 
-    /// @dev Under the opaque-bytes dispatch shape the `feePayer == msg.sender` guard was dropped
-    /// (ERC20 approval semantics — or msg.value for native — already prevent forgery). The
-    /// previous `test_bridgeTokens_reverts_if_invalidBridgeFeePayer` was removed; the equivalent
-    /// guarantee is now covered by the adapter-level tests in `CcipAdapter.t.sol` and by the
-    /// forged-feePayer regression test added in this PR.
-    function test_bridgeTokens_forgedFeePayer_withoutApproval_revertsWithErc20(
+    /// @dev `bridgeTokens` always charges fees from `msg.sender`. A user calling it without having approved
+    /// the adapter for the fee token reverts at the ERC20 transferFrom step.
+    function test_bridgeTokens_reverts_ifFeePayerDidNotApprove(
         address from,
-        address forgedFeePayer,
         uint256 destinationChainId,
         address iouTokenRecipient,
         uint256 iouTokenAmountRay
     ) public {
         vm.assume(destinationChainId != block.chainid);
         vm.assume(iouTokenRecipient != address(0));
-        vm.assume(forgedFeePayer != from);
-        vm.assume(forgedFeePayer != address(0));
         vm.assume(from != address(0));
         vm.assume(iouTokenAmountRay > 0);
         uint256 feeAmount = 1000;
         address feeToken = address(new MockErc20("Test USD", "TUSD", 6));
         bytes memory bridgeAdapterData =
             abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: feeToken, feeRefundThreshold: 0}));
-        MockErc20(feeToken).mint(forgedFeePayer, feeAmount);
-        MockGateway(chainGateway).mockConsumeOnNextCall(transferHelper, feeAmount, feeToken, makeAddr("feeRecipient"));
+        MockErc20(feeToken).mint(from, feeAmount);
 
         vm.prank(iouTokenManagerAddress);
         MockErc20(iouToken).mint(from, iouTokenAmountRay);
         vm.prank(from);
         IERC20(iouToken).approve(address(iouTokenManager), iouTokenAmountRay);
+        MockGateway(chainGateway).mockConsumeOnNextCall(transferHelper, feeAmount, feeToken, makeAddr("feeRecipient"));
 
-        // ERC20 allowance semantics reject the forged feePayer — they never approved the gateway.
+        // `from` has not approved the adapter for the fee token — the adapter's transferFrom reverts.
         vm.expectRevert();
         vm.prank(from);
         iouTokenManager.bridgeTokens(
@@ -540,12 +533,8 @@ contract IouTokenManagerTest_AccountingChain is Test {
     }
 
     /// @notice Regression test for the cross-flow approval-theft surface that aa-eyup flagged in
-    /// `#discussion_r3144045362`. Pre-Step-1, `feePayer` was a field of the opaque adapter data.
-    /// blob — any caller of any bridge entry-point could put a victim's address there and the adapter
-    /// would `safeTransferFrom(victim, ...)` against an approval the victim had given for an
-    /// unrelated bridge action. After Step 1 `feePayer` is hardcoded by the entry-point to its
-    /// `msg.sender`; the blob-supplied identity vector is structurally gone. This test pins that
-    /// property in: Eve cannot consume Alice's approval by calling `bridgeTokens` herself.
+    /// `#discussion_r3144045362`. `bridgeTokens` always uses `msg.sender` as the fee payer, so even when Eve
+    /// invokes the function with her own IOUs she cannot drain Alice's prior approval to the bridge adapter.
     function test_bridgeTokens_approvalIsBoundToCaller() public {
         address alice = makeAddr("alice");
         address eve = makeAddr("eve");
@@ -558,8 +547,6 @@ contract IouTokenManagerTest_AccountingChain is Test {
         vm.prank(alice);
         IERC20(address(feeToken)).approve(bridgeAdapter, feeAmount);
 
-        // Eve mints herself enough IOU dust to have something to bridge, but does NOT approve the
-        // adapter for the fee token.
         uint256 iouTokenAmountRay = 1;
         vm.prank(iouTokenManagerAddress);
         MockErc20(iouToken).mint(eve, iouTokenAmountRay);
@@ -571,9 +558,8 @@ contract IouTokenManagerTest_AccountingChain is Test {
         MockGateway(chainGateway)
             .mockConsumeOnNextCall(transferHelper, feeAmount, address(feeToken), makeAddr("feeRecipient"));
 
-        // Eve calls bridgeTokens. The entry-point hardcodes feePayer = msg.sender = Eve. The adapter
-        // does `safeTransferFrom(Eve, ...)` — Eve hasn't approved, so this reverts. Alice's approval
-        // is untouched.
+        // Eve calls the permissionless entry-point. `feePayer` is hardcoded to `msg.sender` (= eve), so she
+        // cannot supply `alice`. ERC20 allowance semantics then reject the call (eve hasn't approved the adapter).
         vm.prank(eve);
         vm.expectRevert();
         iouTokenManager.bridgeTokens(

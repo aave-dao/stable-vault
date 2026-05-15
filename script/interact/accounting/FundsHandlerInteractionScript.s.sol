@@ -29,7 +29,7 @@ contract FundsHandlerInteractionScript is AccountingChainBaseScript {
         vm.startBroadcast(key);
         address bridgeAdapter = address(0); // TODO: Set the whitelisted bridge adapter address.
         IFundsHandler(FUNDS_HANDLER)
-            .pushFundsToChain(token, amount, chainId, bridgeAdapter, gasLimit, abi.encode(bridgeAdapterData));
+            .pushFundsToChain(token, amount, chainId, bridgeAdapter, gasLimit, abi.encode(bridgeAdapterData), "");
         vm.stopBroadcast();
     }
 }

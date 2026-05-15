@@ -40,10 +40,10 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         address fundsHandler,
         address assetRegistry,
         address transferHelper,
-        address withdrawalFeeCalculator,
         address priceOracle,
         uint256 maxActiveSubVaults,
-        address treasuryAddress
+        address treasuryAddress,
+        address policyRegistry
     ) internal virtual override returns (StableVault) {
         // Deploy a vault without restriction in the valid per-second rate
         address vaultImpl = address(
@@ -53,9 +53,9 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
                 iouToken,
                 fundsHandler,
                 transferHelper,
-                withdrawalFeeCalculator,
                 priceOracle,
-                maxActiveSubVaults
+                maxActiveSubVaults,
+                policyRegistry
             )
         );
         return StableVault(
@@ -107,7 +107,8 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             EARNING_CHAIN_ID,
             address(ccipAdapter_accountingChain),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0}))
+            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
+            ""
         );
 
         // Check the funds were bridged to the Earning Chain
@@ -158,13 +159,13 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             )
         );
         vm.prank(user1);
-        vault.requestWithdrawal(user1, userBalanceAfterHalfYearInRay);
+        vault.requestWithdrawal(user1, userBalanceAfterHalfYearInRay, "");
 
         // 5. User requests to withdrawal their original deposit
         uint256 iouAmountRequestedRay = userInitialDeposit.assetDecimalsToRay(address(USDC));
         vm.prank(user1);
         Logger.log("!!! Actual requesting withdrawal for user1", user1);
-        vault.requestWithdrawal(user1, iouAmountRequestedRay);
+        vault.requestWithdrawal(user1, iouAmountRequestedRay, "");
         // Check the IOU token balance went up (units are in RAY)
         assertEq(
             iouToken_accountingChain.balanceOf(user1),
@@ -176,7 +177,10 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         // The user will use native asset to pay for bridge fees
         // User must approve the IOU token manager to spend the IOU tokens
         vm.prank(user1);
+        IERC20(address(iouToken_accountingChain))
+            .approve(address(iouTokenManager_accountingChain), iouAmountRequestedRay);
         vm.deal(user1, bridgeFeeAmount);
+        vm.prank(user1);
         iouTokenManager_accountingChain.bridgeTokens{value: bridgeFeeAmount}(
             EARNING_CHAIN_ID,
             user1,
@@ -203,7 +207,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         // Check that requesting another withdrawal fails because the user was alredy given IOUs.
         vm.expectRevert(abi.encodeWithSelector(Errors.InvalidAmount.selector));
         vm.prank(user1);
-        vault.requestWithdrawal(user1, iouAmountRequestedRay);
+        vault.requestWithdrawal(user1, iouAmountRequestedRay, "");
 
         // 7. A second depositor deposits and tries to withdraw (check the iousInCirculationRay math)
         _mintAndDepositUsdcToStableVault(user2, userInitialDeposit);
@@ -225,11 +229,11 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             )
         );
         vm.prank(user2);
-        vault.requestWithdrawal(user2, user2BalanceAfterOneYearInRay);
+        vault.requestWithdrawal(user2, user2BalanceAfterOneYearInRay, "");
 
         // User2 should be able to withdraw their original deposit
         vm.prank(user2);
-        vault.requestWithdrawal(user2, iouAmountRequestedRay);
+        vault.requestWithdrawal(user2, iouAmountRequestedRay, "");
         // Check the IOU token balance on Accounting Chain went up
         assertEq(
             iouToken_accountingChain.balanceOf(user2),
@@ -257,8 +261,8 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         );
         vm.prank(user2);
         iouToken_accountingChain.approve(address(iouTokenManager_accountingChain), iouAmountRequestedRay);
-        vm.prank(user2);
         vm.deal(user2, bridgeFeeAmount);
+        vm.prank(user2);
         {
 
             bytes memory bp = abi.encode(
@@ -404,7 +408,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         USDC.mint(user, amount);
         vm.startPrank(user);
         USDC.approve(address(vault), amount);
-        vault.deposit(user, address(USDC), amount);
+        vault.deposit(user, address(USDC), amount, "");
         vm.stopPrank();
     }
 }
