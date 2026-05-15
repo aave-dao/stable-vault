@@ -195,19 +195,30 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     }
 
     function test_rebalancerProfile_hasTheExpectedRoles() public view {
-        uint64[] memory expected = new uint64[](7);
+        uint64[] memory expected = new uint64[](5);
         expected[0] = RolesConfig.getRole__rebalance().roleId;
         expected[1] = RolesConfig.getRole__setDefaultStrategy().roleId;
         expected[2] = RolesConfig.getRole__disableDepositsToStrategy().roleId;
         expected[3] = RolesConfig.getRole__pushFundsToChain().roleId;
         expected[4] = RolesConfig.getRole__pushFundsToAccountingChain().roleId;
-        expected[5] = RolesConfig.getRole__topUp().roleId;
-        expected[6] = RolesConfig.getRole__fundCoverage().roleId;
         _assertProfileHasExactlyTheseRoles(_getProfile__Rebalancer(), expected);
 
         for (uint256 i = 0; i < expected.length; i++) {
             _assertProfileRoleDelay(_getProfile__Rebalancer(), expected[i], RolesConfig.NO_DELAY);
         }
+    }
+
+    function test_treasuryProfile_hasTheExpectedRoles() public view {
+        uint64[] memory expected = new uint64[](2);
+        expected[0] = RolesConfig.getRole__topUp().roleId;
+        expected[1] = RolesConfig.getRole__fundCoverage().roleId;
+        _assertProfileHasExactlyTheseRoles(_getProfile__Treasury(), expected);
+
+        // Capital-provider roles live on their own profile, not on the operational Rebalancer.
+        assertTrue(_getProfile__Treasury() != _getProfile__Rebalancer(), "treasury == rebalancer");
+
+        _assertProfileRoleDelay(_getProfile__Treasury(), expected[0], RolesConfig.NO_DELAY);
+        _assertProfileRoleDelay(_getProfile__Treasury(), expected[1], RolesConfig.NO_DELAY);
     }
 
     function test_coverageGuardianProfile_hasTheExpectedRoles() public view {
@@ -300,13 +311,14 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     }
 
     function _getAllProfiles() internal view virtual returns (address[] memory) {
-        address[] memory profiles = new address[](6);
+        address[] memory profiles = new address[](7);
         profiles[0] = _getProfile__MainAdmin();
         profiles[1] = _getProfile__SecondaryAdmin();
         profiles[2] = _getProfile__WithdrawalPolicyManager();
         profiles[3] = _getProfile__Rebalancer();
         profiles[4] = _getProfile__Disabler();
         profiles[5] = _getProfile__ATokenVaultRewardClaimer();
+        profiles[6] = _getProfile__Treasury();
         return profiles;
     }
 
@@ -591,10 +603,26 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         address rebalancer = _getProfile__Rebalancer();
 
         _assertCanCall(rebalancer, getAllocatorAddress(_deployer()), IAllocator.rebalance.selector, true, 0);
-        _assertCanCall(rebalancer, getAllocatorAddress(_deployer()), IAllocator.topUp.selector, true, 0);
         // Unauthorized functions
+        _assertCanCall(rebalancer, getAllocatorAddress(_deployer()), IAllocator.topUp.selector, false, 0);
         _assertCanCall(rebalancer, getAllocatorAddress(_deployer()), IAllocator.removeStrategy.selector, false, 0);
         _assertCanCall(rebalancer, getAllocatorAddress(_deployer()), IAllocator.addStrategy.selector, false, 0);
+    }
+
+    function test_canCall_treasury() public view {
+        address treasury = _getProfile__Treasury();
+
+        _assertCanCall(treasury, getAllocatorAddress(_deployer()), IAllocator.topUp.selector, true, 0);
+        _assertCanCall(
+            treasury,
+            getSlippageCoverageVaultAddress(_deployer()),
+            ISlippageCoverageVault.fundCoverage.selector,
+            true,
+            0
+        );
+        // Unauthorized functions
+        _assertCanCall(treasury, getAllocatorAddress(_deployer()), IAllocator.rebalance.selector, false, 0);
+        _assertCanCall(treasury, getAllocatorAddress(_deployer()), IAllocator.addStrategy.selector, false, 0);
     }
 
     function test_canCall_disabler() public view {
