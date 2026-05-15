@@ -41,8 +41,9 @@ contract OwnedMulticall is Ownable {
     /// @param initialOwner address that is set as the initial owner of the contract.
     constructor(address initialOwner) Ownable(initialOwner) {}
 
-    /// @dev Renouncing ownership is not allowed because it may lock tokens on the contract intended to be used as a
-    /// slippage coverage source by the Swapper during a rebalance through the Allocator.
+    /// @dev Renouncing ownership is not allowed: this contract is the on-chain holder of granted roles in the
+    /// `AccessManager` (Rebalancer / Disabler profiles in the Stable Vault deployment), and only the owner can fire
+    /// its restricted aggregate methods. Renouncing would orphan every role granted to this contract.
     function renounceOwnership() public view override onlyOwner {
         revert RenounceOwnershipNotAllowed();
     }
