@@ -83,6 +83,7 @@ abstract contract BaseBridgeAdapter is AccessManaged, TransferHelperClient, IBri
 
     function setDestinationChainAdapter(uint256 chainId, address destinationChainAdapter) external override restricted {
         require(chainId != 0 && chainId != block.chainid, Errors.InvalidParameter());
+        require(_destinationChainAdapterOf[chainId] == address(0), AlreadyConfigured());
         _destinationChainAdapterOf[chainId] = destinationChainAdapter;
         emit DestinationChainAdapterSet(chainId, destinationChainAdapter);
     }

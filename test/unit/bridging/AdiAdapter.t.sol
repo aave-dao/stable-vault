@@ -204,9 +204,11 @@ contract AdiAdapterTest is TestWithHelpers {
         assertEq(_accountingChainAdiAdapter.getDestinationChainAdapter(chainId), adapter);
     }
 
-    function test_getDestinationChainAdapter_reflectsUpdate(uint256 chainId, address adapter1, address adapter2)
-        public
-    {
+    function test_setDestinationChainAdapter_reverts_ifAlreadyConfigured(
+        uint256 chainId,
+        address adapter1,
+        address adapter2
+    ) public {
         vm.assume(chainId != EARNING_CHAIN_ID && chainId != ACCOUNTING_CHAIN_ID);
         vm.assume(chainId != 0 && chainId != block.chainid);
         vm.assume(adapter1 != address(0) && adapter2 != address(0));
@@ -216,9 +218,10 @@ contract AdiAdapterTest is TestWithHelpers {
         _accountingChainAdiAdapter.setDestinationChainAdapter(chainId, adapter1);
         assertEq(_accountingChainAdiAdapter.getDestinationChainAdapter(chainId), adapter1);
 
+        vm.expectRevert(IBridgeAdapter.AlreadyConfigured.selector);
         vm.prank(everyRoleAccount);
         _accountingChainAdiAdapter.setDestinationChainAdapter(chainId, adapter2);
-        assertEq(_accountingChainAdiAdapter.getDestinationChainAdapter(chainId), adapter2);
+        assertEq(_accountingChainAdiAdapter.getDestinationChainAdapter(chainId), adapter1);
     }
 
     function test_getDestinationChainAdapter_returnsZeroForUnsetChain(uint256 chainId) public view {

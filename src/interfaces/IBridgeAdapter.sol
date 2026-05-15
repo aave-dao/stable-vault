@@ -32,6 +32,10 @@ interface IBridgeAdapter {
     /// @custom:selector 0x60055a30
     error OnlyBridgeRouter();
 
+    /// @notice Destination chain adapter is already configured for the chain.
+    /// @custom:selector 0x11b61b6a
+    error AlreadyConfigured();
+
     /// @notice Getter for the address of the Gateway contract.
     /// @return gateway Address of the Gateway contract.
     function getGateway() external view returns (address);
@@ -44,6 +48,8 @@ interface IBridgeAdapter {
     /// @dev The adapter on the destination chain must support receiving of messages from the bridge which this adapter
     /// publishes to.
     /// @dev This destination adapter is used to receive funds and arbitrary data on the destination chain.
+    /// @dev Once set for a chain, the destination adapter cannot be changed. Peer rotation should use a new adapter
+    /// route.
     /// @param chainId Chain id of the chain to set the destination adapter for.
     /// @param destinationChainAdapter Address of the destination chain adapter.
     function setDestinationChainAdapter(uint256 chainId, address destinationChainAdapter) external;
