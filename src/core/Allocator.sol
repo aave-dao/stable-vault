@@ -477,17 +477,23 @@ contract Allocator is
         require($storage().strategyConfigs[strategy].depositAllowed, DepositsToStrategyDisabled(strategy));
         IERC20(asset).forceApprove(strategy, amount);
 
-        uint256 balanceBefore = _getAssetBalanceInStrategy(IERC4626(strategy));
-
-        try IERC4626(strategy).deposit(amount, address(this)) {}
-        catch {
+        uint256 actualDepositedAmount;
+        try IERC4626(strategy).deposit(amount, address(this)) returns (uint256 shares) {
+            actualDepositedAmount = IERC4626(strategy).previewRedeem(shares);
+            require(
+                amount.satSub(actualDepositedAmount) <= STRATEGY_DEPOSIT_SLIPPAGE_TOLERANCE,
+                Errors.InsufficientAmountOut()
+            );
+        } catch {
             revert DepositIntoStrategyFailed(strategy);
         }
 
-        uint256 netDepositAmount = _getAssetBalanceInStrategy(IERC4626(strategy)) - balanceBefore;
-        require(amount.satSub(netDepositAmount) <= STRATEGY_DEPOSIT_SLIPPAGE_TOLERANCE, Errors.InsufficientAmountOut());
-        emit AssetAllocated(asset, strategy, amount, netDepositAmount);
-        return netDepositAmount;
+        // ERC4626 deposit may pull less than `amount`; clear the residual so dust doesn't accumulate as a latent
+        // pull surface for the strategy.
+        IERC20(asset).forceApprove(strategy, 0);
+
+        emit AssetAllocated(asset, strategy, amount, actualDepositedAmount);
+        return actualDepositedAmount;
     }
 
     /// @dev Returns balances grouped by asset.
@@ -514,10 +520,6 @@ contract Allocator is
         }
         balance += IERC20(asset).balanceOf(address(this));
         return balance;
-    }
-
-    function _getAssetBalanceInStrategy(IERC4626 strategy) internal view returns (uint256) {
-        return strategy.previewRedeem(strategy.balanceOf(address(this)));
     }
 
     function _tryGetAssetBalanceInStrategy(IERC4626 strategy) internal view returns (uint256) {

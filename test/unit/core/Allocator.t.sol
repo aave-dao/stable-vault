@@ -35,6 +35,7 @@ import {MockReentrantErc4626Strategy} from "test/mocks/MockReentrantErc4626Strat
 import {MockSwapper} from "test/mocks/MockSwapper.sol";
 import {MockTransferHelper} from "test/mocks/MockTransferHelper.sol";
 import {TestErc4626} from "test/mocks/TestErc4626.sol";
+import {TestErc4626AccrueOnDeposit} from "test/mocks/TestErc4626AccrueOnDeposit.sol";
 import {TestErc4626WithSlippage} from "test/mocks/TestErc4626WithSlippage.sol";
 
 contract AllocatorTest is TestWithHelpers {
@@ -42,8 +43,6 @@ contract AllocatorTest is TestWithHelpers {
     using AssetLib for uint256;
     using SafeERC20 for IERC20;
     using SafeERC20 for IMockErc20;
-
-    uint8 constant STRATEGY_MAX_SLIPPAGE_AMOUNT = 10;
 
     address admin = makeAddr("ADMIN");
     address everyRoleAccount = makeAddr("EVERY_ROLE_ACCOUNT");
@@ -433,6 +432,60 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), 0);
         assertEq(_allocator.getAssetBalanceInStrategy(address(_extraGhoStrategy)), 0);
+    }
+
+    function test_depositToStrategy_emitsAssetAllocatedWithSurplus_whenStrategyDonatesToFreshShares() public {
+        uint256 amount = 100;
+        uint256 bonus = 5;
+
+        // The strategy attributes more value to the newly minted shares than was pulled (a deposit bonus
+        // / donation), so `actualDepositedAmount > amount`. The Allocator must surface both values via
+        // `AssetAllocated` so off-chain accounting can attribute the surplus to this strategy/asset.
+        TestErc4626WithSlippage strategyWithBonus = new TestErc4626WithSlippage(_mockUsdt);
+        strategyWithBonus.setDepositBonus(bonus);
+
+        vm.prank(admin);
+        _allocator.addStrategy(address(_mockUsdt), address(strategyWithBonus));
+
+        _mockTransferHelper.mockAsset(address(_mockUsdt), amount);
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), amount);
+
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.AssetAllocated(address(_mockUsdt), address(strategyWithBonus), amount, amount + bonus);
+        _routeIdleToStrategy(address(_mockUsdt), address(strategyWithBonus), amount);
+    }
+
+    /// @dev Regression test for case where yield is accrued during deposit execution.Measuring
+    /// only the new shares via `previewRedeem(shares)` isolates the actual slippage loss, so the allocation reverts
+    /// with `InsufficientAmountOut`.
+    function test_depositToStrategy_doesNotMaskSlippage_whenStrategyAccruesYieldDuringDeposit() public {
+        uint256 priorDepositAmount = 1_000_000;
+        uint256 pendingYieldAmount = 100_000;
+        uint256 slippageAmount = 1_000;
+        uint256 secondDepositAmount = 1_000_000;
+
+        TestErc4626AccrueOnDeposit strategy = new TestErc4626AccrueOnDeposit(_mockUsdt);
+
+        vm.prank(admin);
+        _allocator.addStrategy(address(_mockUsdt), address(strategy));
+
+        // Prime the strategy with shares owned by the Allocator so the second deposit has an existing
+        // position whose share value moves with the accrual.
+        _mockTransferHelper.mockAsset(address(_mockUsdt), priorDepositAmount);
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), priorDepositAmount);
+        _routeIdleToStrategy(address(_mockUsdt), address(strategy), priorDepositAmount);
+
+        strategy.setPendingYield(pendingYieldAmount);
+        strategy.setDepositSlippage(slippageAmount);
+
+        _mockTransferHelper.mockAsset(address(_mockUsdt), secondDepositAmount);
+        vm.prank(depositor);
+        _allocator.deposit(address(_mockUsdt), secondDepositAmount);
+
+        vm.expectRevert(Errors.InsufficientAmountOut.selector);
+        _routeIdleToStrategy(address(_mockUsdt), address(strategy), secondDepositAmount);
     }
 
     function test_getAssetBalanceInStrategy_returnsZero_ifPreviewRedeemReverts() public {
