@@ -27,6 +27,12 @@ interface ICcipBridgeAdapter is IBridgeAdapter {
     /// @custom:selector 0x9546c78e
     error UnexpectedDataLength();
 
+    /// @notice Thrown when the CCIP router did not fully consume the allowance granted for a token used in
+    /// `ccipSend` (bridged asset or ERC-20 fee token). Indicates the router pulled less than approved, leaving
+    /// residual approval that this adapter does not expect.
+    /// @custom:selector 0x8d63b92b
+    error UnexpectedCcipRouterAllowance(address token, uint256 remainingAllowance);
+
     /// @notice Getter for the address of the Chainlink CCIP router.
     /// @return router Address of the Chainlink CCIP router.
     function getRouter() external view returns (address);

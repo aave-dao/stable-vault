@@ -215,6 +215,8 @@ contract CcipAdapter is
             ccipFeeParams.feeRefundThreshold,
             estimatedFeeAmount
         );
+
+        _assertCcipRouterAllowancesAreFullyConsumed(assetToBridge, amountToBridge, ccipFeeParams.feeToken);
     }
 
     /// @inheritdoc IAny2EVMMessageReceiver
@@ -269,6 +271,28 @@ contract CcipAdapter is
                 IERC20(feeToken).forceApprove(CCIP_ROUTER, estimatedFeeAmount);
             }
         }
+    }
+
+    /// @dev Defensive assertion that the CCIP router fully consumed every allowance set by
+    /// `_pullAssetFromTransferHelperAndApproveCcipRouter`. The router is expected to pull the exact approved
+    /// amounts during `ccipSend`; any leftover allowance signals a router behavior the adapter does not
+    /// account for, so revert rather than silently leave a stale approval.
+    function _assertCcipRouterAllowancesAreFullyConsumed(address asset, uint256 amount, address feeToken)
+        internal
+        view
+    {
+        if (amount > 0) {
+            _requireZeroCcipRouterAllowance(asset);
+        }
+        // When `feeToken == asset && amount > 0`, the asset check above already covered the shared allowance.
+        if (feeToken != Constants.NATIVE_CURRENCY && feeToken != asset) {
+            _requireZeroCcipRouterAllowance(feeToken);
+        }
+    }
+
+    function _requireZeroCcipRouterAllowance(address token) internal view {
+        uint256 remainingAllowance = IERC20(token).allowance(address(this), CCIP_ROUTER);
+        require(remainingAllowance == 0, UnexpectedCcipRouterAllowance(token, remainingAllowance));
     }
 
     function _sendMessageWithFeePayer(
