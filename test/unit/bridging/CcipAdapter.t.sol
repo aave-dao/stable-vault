@@ -48,7 +48,6 @@ contract CcipAdapterTest is TestWithHelpers {
     uint256 internal EARNING_CHAIN_ID = 2;
     uint64 internal EARNING_CHAIN_CCIP_SELECTOR = 20;
     uint256 internal DEFAULT_GAS_LIMIT = 100000;
-    uint256 internal DATA_ONLY_RECEIVE_GAS_OVERHEAD = 30_000;
 
     /// @dev CCIP encodes native fees as `address(0)` in `EVM2AnyMessage.feeToken`. Defined here (rather than imported
     /// from the adapter) so the test independently asserts CCIP's external convention.
@@ -1092,7 +1091,8 @@ contract CcipAdapterTest is TestWithHelpers {
             feeToken: address(_mockGho),
             extraArgs: Client._argsToBytes(
                 Client.GenericExtraArgsV2({
-                    gasLimit: DEFAULT_GAS_LIMIT + DATA_ONLY_RECEIVE_GAS_OVERHEAD, allowOutOfOrderExecution: true
+                    gasLimit: DEFAULT_GAS_LIMIT + _accountingChainCcipAdapter.DATA_ONLY_RECEIVE_GAS_OVERHEAD(),
+                    allowOutOfOrderExecution: true
                 })
             )
         });
@@ -1102,8 +1102,10 @@ contract CcipAdapterTest is TestWithHelpers {
         );
 
         _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, bytes32(0));
-        vm.mockCall(
-            address(_mockCCIPRouter), abi.encodeWithSelector(IRouterClient.ccipSend.selector), abi.encode(bytes32(0))
+        vm.expectCall(
+            address(_mockCCIPRouter),
+            0,
+            abi.encodeCall(IRouterClient.ccipSend, (EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage))
         );
         vm.prank(address(_mockAccountingChainGateway));
         _accountingChainCcipAdapter.publishDataOnlyMessage(
@@ -1129,7 +1131,8 @@ contract CcipAdapterTest is TestWithHelpers {
             feeToken: CCIP_NATIVE_FEE_TOKEN,
             extraArgs: Client._argsToBytes(
                 Client.GenericExtraArgsV2({
-                    gasLimit: DEFAULT_GAS_LIMIT + DATA_ONLY_RECEIVE_GAS_OVERHEAD, allowOutOfOrderExecution: true
+                    gasLimit: DEFAULT_GAS_LIMIT + _accountingChainCcipAdapter.DATA_ONLY_RECEIVE_GAS_OVERHEAD(),
+                    allowOutOfOrderExecution: true
                 })
             )
         });
@@ -1170,7 +1173,8 @@ contract CcipAdapterTest is TestWithHelpers {
             feeToken: CCIP_NATIVE_FEE_TOKEN,
             extraArgs: Client._argsToBytes(
                 Client.GenericExtraArgsV2({
-                    gasLimit: DEFAULT_GAS_LIMIT + DATA_ONLY_RECEIVE_GAS_OVERHEAD, allowOutOfOrderExecution: true
+                    gasLimit: DEFAULT_GAS_LIMIT + _accountingChainCcipAdapter.DATA_ONLY_RECEIVE_GAS_OVERHEAD(),
+                    allowOutOfOrderExecution: true
                 })
             )
         });
@@ -1187,6 +1191,22 @@ contract CcipAdapterTest is TestWithHelpers {
         vm.prank(address(_mockAccountingChainGateway));
         _accountingChainCcipAdapter.publishDataOnlyMessage{value: feeAmount + 1}(
             EARNING_CHAIN_ID, "", address(this), DEFAULT_GAS_LIMIT, bridgeAdapterData
+        );
+    }
+
+    function test_publishMessageWithFunds_reverts_ifAssetIsDataOnlySentinel() public {
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        vm.prank(address(_mockAccountingChainGateway));
+        _accountingChainCcipAdapter.publishMessageWithFunds(
+            EARNING_CHAIN_ID, Constants.ASSET_FOR_DATA_ONLY_BRIDGE, 1, "", address(this), DEFAULT_GAS_LIMIT, ""
+        );
+    }
+
+    function test_publishMessageWithFunds_reverts_ifAmountIsZero() public {
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        vm.prank(address(_mockAccountingChainGateway));
+        _accountingChainCcipAdapter.publishMessageWithFunds(
+            EARNING_CHAIN_ID, address(_mockUsdt), 0, "", address(this), DEFAULT_GAS_LIMIT, ""
         );
     }
 

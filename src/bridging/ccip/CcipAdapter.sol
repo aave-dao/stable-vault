@@ -54,7 +54,7 @@ contract CcipAdapter is
 
     /// @dev Gas added on top of data-only payload execution so CCIP can execute this adapter around the gateway call.
     /// Gas tests measured about 15.3k gas for this exact-gas path; 30k keeps close to a 2x margin.
-    uint256 internal constant DATA_ONLY_RECEIVE_GAS_OVERHEAD = 30_000;
+    uint256 public constant DATA_ONLY_RECEIVE_GAS_OVERHEAD = 30_000;
 
     address internal immutable CCIP_ROUTER;
     address internal immutable ASSET_REGISTRY;
@@ -117,6 +117,7 @@ contract CcipAdapter is
         bytes memory bridgeAdapterData
     ) external payable override(BaseBridgeAdapter, IBridgeAdapter) onlyGateway {
         Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
+        // Add this adapter's receive overhead to the gateway payload execution gas requested upstream.
         uint256 receiverExecutionGasLimit = payloadExecutionGasLimit + DATA_ONLY_RECEIVE_GAS_OVERHEAD;
         _publishCcipMessage(
             destinationChainId,

@@ -37,7 +37,6 @@ import {MockGateway} from "test/mocks/MockGateway.sol";
 /// CCIP as receiverExecutionGasLimit.
 contract BurnIouTokenGasTest is BaseTest {
     string internal NAMESPACE = "BurnIouToken";
-    uint256 internal constant DATA_ONLY_RECEIVE_GAS_OVERHEAD = 30_000;
     uint256 internal constant ENFORCED_BURN_IOU_TOKEN_PAYLOAD_EXECUTION_GAS_LIMIT = 120_000;
 
     // keccak256(abi.encode(uint256(keccak256("aave.storage.IouTokenManager")) - 1)) & ~bytes32(uint256(0xff))
@@ -152,7 +151,7 @@ contract BurnIouTokenGasTest is BaseTest {
         });
 
         (bool success,, uint256 gasUsed) =
-            mockCcipRouter.routeMessage(ccipMessage, 5_000, DATA_ONLY_RECEIVE_GAS_OVERHEAD, address(adapter));
+            mockCcipRouter.routeMessage(ccipMessage, 5_000, adapter.DATA_ONLY_RECEIVE_GAS_OVERHEAD(), address(adapter));
 
         assertTrue(success, "Should succeed with the configured data-only receive overhead");
         emit log_named_uint("Data-only adapter overhead gas used", gasUsed);
@@ -200,8 +199,8 @@ contract BurnIouTokenGasTest is BaseTest {
     /// @notice Demonstrates success with the enforced payload gas limit plus adapter overhead.
     function test_burnIouToken_succeedsWithEnforcedGasLimit() public {
         Client.Any2EVMMessage memory ccipMessage = _buildBurnIouTokenCcipMessage();
-        uint256 receiverExecutionGasLimit =
-            ENFORCED_BURN_IOU_TOKEN_PAYLOAD_EXECUTION_GAS_LIMIT + DATA_ONLY_RECEIVE_GAS_OVERHEAD;
+        uint256 receiverExecutionGasLimit = ENFORCED_BURN_IOU_TOKEN_PAYLOAD_EXECUTION_GAS_LIMIT
+            + ccipAdapter_accountingChain.DATA_ONLY_RECEIVE_GAS_OVERHEAD();
 
         (bool success,, uint256 gasUsed) = mockCcipRouter.routeMessage(
             ccipMessage,
