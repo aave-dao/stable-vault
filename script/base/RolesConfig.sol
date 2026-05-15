@@ -434,19 +434,6 @@ abstract contract RolesConfig is DeploymentConfig {
         });
     }
 
-    /// @custom:delay None
-    /// @custom:location Allocator
-    function getRole__setDefaultStrategy() internal pure returns (Role memory) {
-        bytes4 selector = IAllocator.setDefaultStrategy.selector;
-        return Role({
-            roleId: _selectorToRoleId(selector),
-            selector: selector,
-            delay: NO_DELAY,
-            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
-            hasCriticalRisk: false
-        });
-    }
-
     /// @custom:delay High
     /// @custom:location Allocator
     function getRole__enableDepositsToStrategy() internal view returns (Role memory) {
@@ -890,7 +877,7 @@ abstract contract RolesConfig is DeploymentConfig {
     }
 
     function getAllFunctionBasedRoles() internal view returns (Role[] memory) {
-        Role[] memory roles = new Role[](65);
+        Role[] memory roles = new Role[](64);
 
         // AssetRegistry
         roles[0] = getRole__setAssetConfig();
@@ -932,56 +919,55 @@ abstract contract RolesConfig is DeploymentConfig {
         roles[26] = getRole__addStrategy();
         roles[27] = getRole__removeStrategy();
         roles[28] = getRole__disableDepositsToStrategy();
-        roles[29] = getRole__setDefaultStrategy();
-        roles[30] = getRole__enableDepositsToStrategy();
-        roles[31] = getRole__topUp();
-        roles[32] = getRole__trustStrategy();
-        roles[33] = getRole__distrustStrategy();
+        roles[29] = getRole__enableDepositsToStrategy();
+        roles[30] = getRole__topUp();
+        roles[31] = getRole__trustStrategy();
+        roles[32] = getRole__distrustStrategy();
 
         // Rescue
-        roles[34] = getRole__rescueTokens();
-        roles[35] = getRole__rescueNative();
+        roles[33] = getRole__rescueTokens();
+        roles[34] = getRole__rescueNative();
 
         // FundsHandler / EarningChainGateway
-        roles[36] = getRole__pushFundsToChain();
-        roles[37] = getRole__pushFundsToAccountingChain();
-        roles[38] = getRole__addEarningChain();
-        roles[39] = getRole__removeEarningChain();
+        roles[35] = getRole__pushFundsToChain();
+        roles[36] = getRole__pushFundsToAccountingChain();
+        roles[37] = getRole__addEarningChain();
+        roles[38] = getRole__removeEarningChain();
 
         // Oracles
-        roles[40] = getRole__setChainBalanceOracleAdapter();
-        roles[41] = getRole__setOracleAdapterForAsset();
+        roles[39] = getRole__setChainBalanceOracleAdapter();
+        roles[40] = getRole__setOracleAdapterForAsset();
 
         // External - aToken Vault
-        roles[42] = getRole__claimMerklRewards();
-        roles[43] = getRole__emergencyRescue();
+        roles[41] = getRole__claimMerklRewards();
+        roles[42] = getRole__emergencyRescue();
 
         // SlippageCoverageVault
-        roles[44] = getRole__enableOverrideMode();
-        roles[45] = getRole__disableOverrideMode();
-        roles[46] = getRole__raisePullCapPerTx();
-        roles[47] = getRole__lowerPullCapPerTx();
-        roles[48] = getRole__raiseWindowCap();
-        roles[49] = getRole__lowerWindowCap();
-        roles[50] = getRole__raiseWindowSeconds();
-        roles[51] = getRole__lowerWindowSeconds();
-        roles[52] = getRole__setMaxSlippageBps();
-        roles[53] = getRole__setOverrideMaxSlippageBps();
-        roles[54] = getRole__fundCoverage();
-        roles[55] = getRole__sweepSlippageCoverageVault();
+        roles[43] = getRole__enableOverrideMode();
+        roles[44] = getRole__disableOverrideMode();
+        roles[45] = getRole__raisePullCapPerTx();
+        roles[46] = getRole__lowerPullCapPerTx();
+        roles[47] = getRole__raiseWindowCap();
+        roles[48] = getRole__lowerWindowCap();
+        roles[49] = getRole__raiseWindowSeconds();
+        roles[50] = getRole__lowerWindowSeconds();
+        roles[51] = getRole__setMaxSlippageBps();
+        roles[52] = getRole__setOverrideMaxSlippageBps();
+        roles[53] = getRole__fundCoverage();
+        roles[54] = getRole__sweepSlippageCoverageVault();
 
         // PolicyRegistry
-        roles[56] = getRole__setPolicy();
+        roles[55] = getRole__setPolicy();
 
         // DepositPolicy / FundsBridgingPolicy
-        roles[57] = getRole__raiseDepositCapacity();
-        roles[58] = getRole__raiseDepositRefillRate();
-        roles[59] = getRole__lowerDepositCapacity();
-        roles[60] = getRole__lowerDepositRefillRate();
-        roles[61] = getRole__raiseBridgingCapacity();
-        roles[62] = getRole__raiseBridgingRefillRate();
-        roles[63] = getRole__lowerBridgingCapacity();
-        roles[64] = getRole__lowerBridgingRefillRate();
+        roles[56] = getRole__raiseDepositCapacity();
+        roles[57] = getRole__raiseDepositRefillRate();
+        roles[58] = getRole__lowerDepositCapacity();
+        roles[59] = getRole__lowerDepositRefillRate();
+        roles[60] = getRole__raiseBridgingCapacity();
+        roles[61] = getRole__raiseBridgingRefillRate();
+        roles[62] = getRole__lowerBridgingCapacity();
+        roles[63] = getRole__lowerBridgingRefillRate();
 
         return roles;
     }

@@ -881,6 +881,25 @@ contract StableVaultTest is TestWithHelpers {
         assertEq(stableVault.getUserSubVault(user1).id, 0);
     }
 
+    function test_setUserRate_emitsSetUserRateSkipped_whenUserHasNoPosition() public {
+        address user = makeAddr("noPositionUser");
+        uint256 newRate = _boundRate(DEFAULT_PER_SECOND_RATE + 1);
+        vm.assume(newRate != stableVault.getDefaultSubVault().perSecondRate);
+
+        assertEq(stableVault.getUserSubVault(user).id, 0);
+
+        IStableVault.UserRateData[] memory userRateData = new IStableVault.UserRateData[](1);
+        userRateData[0] = IStableVault.UserRateData(user, newRate);
+
+        vm.expectEmit(true, false, false, true);
+        emit IStableVault.SetUserRateSkipped(user);
+
+        vm.prank(manager);
+        stableVault.setUserRate(userRateData);
+
+        assertEq(stableVault.getUserSubVault(user).id, 0, "user should still have no position");
+    }
+
     function test_setUserRate_reverts_ifUserIsZeroAddress() public {
         vm.expectRevert(Errors.ZeroAddress.selector);
         vm.prank(manager);
@@ -1090,7 +1109,7 @@ contract StableVaultTest is TestWithHelpers {
         stableVault.setUserRate(batch);
     }
 
-    function test_setUserRate_smallConversionRateToLargeConversionRate() public {
+    function test_setUserRate_smallConversionRateToLargeConversionRate_skipsDustMigration() public {
         // Override stableVault with a low default sub-vault rate
         stableVault = _deployStableVault(
             address(mockAccessManager),
@@ -1137,12 +1156,138 @@ contract StableVaultTest is TestWithHelpers {
         vm.prank(user2);
         stableVault.deposit(user2, address(mockAsset), amount, "");
 
+        IStableVault.SubVaultData memory user2VaultBefore = stableVault.getUserSubVault(user2);
+
         vm.prank(manager);
         userRateData = new IStableVault.UserRateData[](1);
         userRateData[0] = IStableVault.UserRateData(user2, newRate);
-        // Check this reverts because the user would end up with 0 shares in the new sub-vault.
-        vm.expectRevert(Errors.InvalidAmount.selector);
+        vm.expectEmit(true, false, false, true);
+        emit IStableVault.SetUserRateSkipped(user2);
+
+        // Migration is skipped instead of reverting when the user would end up with 0 shares in the new sub-vault.
+        // The call succeeds and user2's position is left untouched.
         stableVault.setUserRate(userRateData);
+
+        IStableVault.SubVaultData memory user2VaultAfter = stableVault.getUserSubVault(user2);
+        assertEq(user2VaultAfter.id, user2VaultBefore.id, "user2 sub-vault should not change");
+        assertEq(user2VaultAfter.perSecondRate, user2VaultBefore.perSecondRate, "user2 perSecondRate should not change");
+    }
+
+    function test_setUserRate_batch_skipsDustUserAndMigratesTheRest() public {
+        // Override stableVault with a low default sub-vault rate so a dust position can be set up cheaply.
+        stableVault = _deployStableVault(
+            address(mockAccessManager),
+            DEFAULT_MAX_PER_SECOND_RATE,
+            MathLib.RAY,
+            address(mockIouTokenManager),
+            address(mockFundsHandler),
+            address(mockAssetRegistry),
+            address(mockTransferHelper),
+            address(mockPriceOracle),
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+            treasury,
+            address(policyRegistry)
+        );
+        mockAsset = IMockErc20(address(new MockNonStandardErc20("Test GHO", "tGHO", 18)));
+
+        uint256 newRate = 1000000005781378656804591713; // ~20% APY
+
+        address dustUser = makeAddr("dustUser");
+        address normalUser = makeAddr("normalUser");
+        address seeder = makeAddr("seeder");
+
+        // Seed the target sub-vault and let its conversion rate grow so a dust position migrates to 0 shares.
+        mockAsset.mint(seeder, 1);
+        vm.prank(seeder);
+        mockAsset.forceApprove(address(stableVault), 1);
+        vm.prank(seeder);
+        stableVault.deposit(seeder, address(mockAsset), 1, "");
+
+        IStableVault.UserRateData[] memory seed = new IStableVault.UserRateData[](1);
+        seed[0] = IStableVault.UserRateData(seeder, newRate);
+        vm.prank(manager);
+        stableVault.setUserRate(seed);
+
+        vm.warp(block.timestamp + 115 * 365 days);
+
+        // dustUser: 1 wei position that will round to 0 on migration to the high-rate sub-vault.
+        mockAsset.mint(dustUser, 1);
+        vm.prank(dustUser);
+        mockAsset.forceApprove(address(stableVault), 1);
+        vm.prank(dustUser);
+        stableVault.deposit(dustUser, address(mockAsset), 1, "");
+
+        // normalUser: large position that survives migration.
+        uint256 normalAmount = _boundAssetAmount(address(mockAsset), 1_000e18);
+        mockAsset.mint(normalUser, normalAmount);
+        vm.prank(normalUser);
+        mockAsset.forceApprove(address(stableVault), normalAmount);
+        vm.prank(normalUser);
+        stableVault.deposit(normalUser, address(mockAsset), normalAmount, "");
+
+        IStableVault.SubVaultData memory dustVaultBefore = stableVault.getUserSubVault(dustUser);
+        IStableVault.SubVaultData memory normalVaultBefore = stableVault.getUserSubVault(normalUser);
+
+        IStableVault.UserRateData[] memory batch = new IStableVault.UserRateData[](2);
+        batch[0] = IStableVault.UserRateData(dustUser, newRate);
+        batch[1] = IStableVault.UserRateData(normalUser, newRate);
+
+        vm.expectEmit(true, false, false, true);
+        emit IStableVault.SetUserRateSkipped(dustUser);
+
+        vm.prank(manager);
+        stableVault.setUserRate(batch);
+
+        IStableVault.SubVaultData memory dustVaultAfter = stableVault.getUserSubVault(dustUser);
+        IStableVault.SubVaultData memory normalVaultAfter = stableVault.getUserSubVault(normalUser);
+
+        // dustUser was skipped.
+        assertEq(dustVaultAfter.id, dustVaultBefore.id, "dustUser sub-vault should not change");
+        assertEq(
+            dustVaultAfter.perSecondRate, dustVaultBefore.perSecondRate, "dustUser perSecondRate should not change"
+        );
+
+        // normalUser was migrated.
+        assertTrue(normalVaultAfter.id != normalVaultBefore.id, "normalUser should have migrated sub-vaults");
+        assertEq(normalVaultAfter.perSecondRate, newRate, "normalUser perSecondRate should match target");
+    }
+
+    function test_setUserRate_batch_duplicateUser_appliesEntriesSequentially() public {
+        // The batch loop does not dedupe by user address: each entry is processed independently against
+        // whatever sub-vault the user is in at that moment. This locks in that behavior so a future
+        // change that adds deduping or rejects duplicates is caught.
+        address user = makeAddr("dupUser");
+        uint256 firstRate = _boundRate(DEFAULT_PER_SECOND_RATE + 1);
+        uint256 secondRate = _boundRate(DEFAULT_PER_SECOND_RATE + 2);
+        vm.assume(firstRate != stableVault.getDefaultSubVault().perSecondRate);
+        vm.assume(secondRate != stableVault.getDefaultSubVault().perSecondRate);
+        vm.assume(firstRate != secondRate);
+
+        uint256 amount = _boundAssetAmount(address(mockAsset), 1 ether);
+        _deposit(user, amount);
+
+        IStableVault.UserRateData[] memory batch = new IStableVault.UserRateData[](2);
+        batch[0] = IStableVault.UserRateData(user, firstRate);
+        batch[1] = IStableVault.UserRateData(user, secondRate);
+
+        vm.recordLogs();
+        vm.prank(manager);
+        stableVault.setUserRate(batch);
+
+        // Both entries should have emitted UserRateSet for the same user.
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 userRateSetTopic = keccak256("UserRateSet(address,uint256,uint256)");
+        uint256 userRateSetCountForUser = 0;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (
+                logs[i].topics.length > 1 && logs[i].topics[0] == userRateSetTopic
+                    && logs[i].topics[1] == bytes32(uint256(uint160(user)))
+            ) {
+                userRateSetCountForUser++;
+            }
+        }
+        assertEq(userRateSetCountForUser, 2, "both duplicate entries should emit UserRateSet for the user");
+        assertEq(stableVault.getUserSubVault(user).perSecondRate, secondRate, "user should end at secondRate");
     }
 
     function test_setUserRate_twoUsersWithSameRateLandsInTheSameSubVault(

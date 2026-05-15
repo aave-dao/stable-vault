@@ -79,12 +79,10 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
         // User1 deposits 500 USDC to Vault on Accounting Chain
         _mintAndDepositUsdcToStableVault(user1, userInitialDeposit);
 
-        // Check the deposit was made into the default earning strategy for USDC
-        address defaultUsdcVault_AccountingChain = allocator_accountingChain.getDefaultStrategy(address(USDC));
         assertEq(
-            IERC20(address(USDC)).balanceOf(defaultUsdcVault_AccountingChain),
+            allocator_accountingChain.getAssetBalance(address(USDC)),
             userInitialDeposit,
-            "Default USDC strategy vault should have the deposited amount of USDC"
+            "Allocator should have the deposited amount of USDC"
         );
         assertEq(
             fundsHandler.getAggregatedBalance(),
@@ -162,19 +160,15 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
         // User2 deposits 500 GHO to Vault on Accounting Chain
         _mintAndDepositGhoToStableVault(user2, user2InitialDeposit);
 
-        // Check the deposit was made into the default earning strategy for USDC
-        address defaultUsdcVault_AccountingChain = allocator_accountingChain.getDefaultStrategy(address(USDC));
         assertEq(
-            IERC20(address(USDC)).balanceOf(defaultUsdcVault_AccountingChain),
+            allocator_accountingChain.getAssetBalance(address(USDC)),
             user1InitialDeposit,
-            "Default USDC strategy vault should have the deposited amount of USDC"
+            "Allocator should have the deposited amount of USDC"
         );
-        // Check the deposit was made into the default earning strategy for GHO
-        address defaultGhoVault_AccountingChain = allocator_accountingChain.getDefaultStrategy(address(GHO));
         assertEq(
-            IERC20(address(GHO)).balanceOf(defaultGhoVault_AccountingChain),
+            allocator_accountingChain.getAssetBalance(address(GHO)),
             user2InitialDeposit,
-            "Default GHO strategy vault should have the deposited amount of GHO"
+            "Allocator should have the deposited amount of GHO"
         );
         assertEq(
             fundsHandler.getAggregatedBalance(),
@@ -235,12 +229,10 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
         // User1 deposits 500 USDC to Vault on Accounting Chain
         _mintAndDepositUsdcToStableVault(user1, userInitialDeposit);
 
-        // Check the deposit was made into the default earning strategy for USDC
-        address defaultUsdcVault_AccountingChain = allocator_accountingChain.getDefaultStrategy(address(USDC));
         assertEq(
-            IERC20(address(USDC)).balanceOf(defaultUsdcVault_AccountingChain),
+            allocator_accountingChain.getAssetBalance(address(USDC)),
             userInitialDeposit,
-            "Default USDC strategy vault should have the deposited amount of USDC"
+            "Allocator should have the deposited amount of USDC"
         );
         assertEq(
             fundsHandler.getAggregatedBalance(),
@@ -295,19 +287,15 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
         // User2 deposits 500 GHO to Vault on Accounting Chain
         _mintAndDepositGhoToStableVault(user2, user2InitialDeposit);
 
-        // Check the deposit was made into the default earning strategy for USDC
-        address defaultUsdcVault_AccountingChain = allocator_accountingChain.getDefaultStrategy(address(USDC));
         assertEq(
-            IERC20(address(USDC)).balanceOf(defaultUsdcVault_AccountingChain),
+            allocator_accountingChain.getAssetBalance(address(USDC)),
             user1InitialDeposit,
-            "Default USDC strategy vault should have the deposited amount of USDC"
+            "Allocator should have the deposited amount of USDC"
         );
-        // Check the deposit was made into the default earning strategy for GHO
-        address defaultGhoVault_AccountingChain = allocator_accountingChain.getDefaultStrategy(address(GHO));
         assertEq(
-            IERC20(address(GHO)).balanceOf(defaultGhoVault_AccountingChain),
+            allocator_accountingChain.getAssetBalance(address(GHO)),
             user2InitialDeposit,
-            "Default GHO strategy vault should have the deposited amount of GHO"
+            "Allocator should have the deposited amount of GHO"
         );
         assertEq(
             fundsHandler.getAggregatedBalance(),

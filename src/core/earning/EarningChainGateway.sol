@@ -9,6 +9,7 @@ import {
 import {BaseChainGateway} from "src/core/BaseChainGateway.sol";
 import {LocalBalanceAggregator} from "src/core/LocalBalanceAggregator.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
+import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
 import {IFundsBridgingPolicy} from "src/interfaces/IFundsBridgingPolicy.sol";
@@ -34,9 +35,9 @@ contract EarningChainGateway is
 {
     using AssetLib for uint256;
 
-    /// @notice Minimum destination gas limit required for the Accounting Chain to process a `BURN_IOU_TOKEN` message.
+    /// @notice Minimum payload execution gas required for the Accounting Chain to process a `BURN_IOU_TOKEN` message.
     /// @dev Configured at deploy time so the value can be tuned per chain pair without source changes.
-    uint256 public immutable MIN_BURN_IOU_TOKEN_GAS_LIMIT;
+    uint256 public immutable MIN_BURN_IOU_TOKEN_PAYLOAD_EXECUTION_GAS_LIMIT;
 
     uint256 internal immutable ACCOUNTING_CHAIN_ID;
     address internal immutable POLICY_REGISTRY;
@@ -76,7 +77,7 @@ contract EarningChainGateway is
         _disableInitializers();
         ACCOUNTING_CHAIN_ID = accountingChainId;
         POLICY_REGISTRY = policyRegistry;
-        MIN_BURN_IOU_TOKEN_GAS_LIMIT = minBurnIouTokenGasLimit;
+        MIN_BURN_IOU_TOKEN_PAYLOAD_EXECUTION_GAS_LIMIT = minBurnIouTokenGasLimit;
     }
 
     /// @dev Initializer.
@@ -105,14 +106,14 @@ contract EarningChainGateway is
         uint256 minAmountOut,
         address receiver,
         address bridgeAdapter,
-        uint256 gasLimit,
+        uint256 payloadExecutionGasLimit,
         bytes calldata bridgeAdapterData,
         bytes memory policyData
     ) external payable virtual override nonReentrant assertingTransferHelperBalanceFor(assetOut) returns (uint256) {
         require(iouTokenAmountRay > 0, Errors.ZeroAmount());
-        // An insufficient destination gasLimit would cause the BURN_IOU_TOKEN message to be dropped while
+        // An insufficient payload gas limit would cause the BURN_IOU_TOKEN message to be dropped while
         // IOUs are already burned locally — silent IOU loss with no compensating obligation reduction.
-        require(gasLimit >= MIN_BURN_IOU_TOKEN_GAS_LIMIT, Errors.InvalidGasLimit());
+        require(payloadExecutionGasLimit >= MIN_BURN_IOU_TOKEN_PAYLOAD_EXECUTION_GAS_LIMIT, Errors.InvalidGasLimit());
         IIouTokenManager(IOU_TOKEN_MANAGER).burnTokens(msg.sender, iouTokenAmountRay);
 
         uint256 amountOut = _getWithdrawalAmountOut(iouTokenAmountRay, assetOut, minAmountOut, policyData);
@@ -128,7 +129,9 @@ contract EarningChainGateway is
         // accepted after the oracle snapshot reflects this outflow, preventing the reverse (obligations reduced while
         // assets are still overstated). Operators are expected to account for this transient state when scheduling
         // claimSurplusInterest() calls.
-        _sendBurnIouTokenMessage(iouTokenAmountRay, bridgeAdapter, msg.sender, gasLimit, bridgeAdapterData);
+        _sendBurnIouTokenMessage(
+            iouTokenAmountRay, bridgeAdapter, msg.sender, payloadExecutionGasLimit, bridgeAdapterData
+        );
 
         ITransferHelper(TRANSFER_HELPER).transfer(assetOut, amountOut, receiver);
         emit AssetOutflow(assetOut, amountOut);
@@ -141,7 +144,7 @@ contract EarningChainGateway is
         address asset,
         uint256 amount,
         address bridgeAdapter,
-        uint256 gasLimit,
+        uint256 receiverExecutionGasLimit,
         bytes calldata bridgeAdapterData,
         bytes calldata policyData
     ) external payable override restricted assertingTransferHelperBalanceFor(asset) {
@@ -149,7 +152,7 @@ contract EarningChainGateway is
         _applyFundsBridgingPolicy(ACCOUNTING_CHAIN_ID, bridgeAdapter, asset, amount, policyData);
         // Pull funds from liquidity into the TransferHelper.
         IAllocator(ALLOCATOR).withdraw(asset, amount);
-        _returnFunds(asset, amount, bridgeAdapter, msg.sender, gasLimit, bridgeAdapterData);
+        _returnFunds(asset, amount, bridgeAdapter, msg.sender, receiverExecutionGasLimit, bridgeAdapterData);
         emit AssetOutflow(asset, amount);
     }
 
@@ -165,7 +168,7 @@ contract EarningChainGateway is
     }
 
     function _receiveFunds(address asset, uint256 amount) internal override {
-        IAllocator(ALLOCATOR).depositAllowIdle(asset, amount);
+        IAllocator(ALLOCATOR).deposit(asset, amount);
     }
 
     function _receiveCrossChainMessage(IChainGateway.CrossChainMessage memory crossChainMessage) private {
@@ -187,7 +190,7 @@ contract EarningChainGateway is
         uint256 amount,
         address bridgeAdapter,
         address feePayer,
-        uint256 gasLimit,
+        uint256 receiverExecutionGasLimit,
         bytes calldata bridgeAdapterData
     ) private {
         // Include the message block number (and timestamp metadata) so the Accounting Chain can verify the chain
@@ -200,16 +203,17 @@ contract EarningChainGateway is
                 )
             })
         );
-        _sendCrossChainMessage(
+        _validateBridgeAdapterIsSupported(asset, ACCOUNTING_CHAIN_ID, bridgeAdapter);
+        IBridgeAdapter(bridgeAdapter).publishMessageWithFunds{value: msg.value}(
             ACCOUNTING_CHAIN_ID,
-            bridgeAdapter,
             asset,
             amount,
             returnFundsMessageEncoded,
             feePayer,
-            gasLimit,
+            receiverExecutionGasLimit,
             bridgeAdapterData
         );
+        emit FundsSent(asset, amount, ACCOUNTING_CHAIN_ID);
     }
 
     function _getWithdrawalAmountOut(
@@ -277,7 +281,7 @@ contract EarningChainGateway is
         uint256 iouTokenAmountRay,
         address bridgeAdapter,
         address feePayer,
-        uint256 gasLimit,
+        uint256 payloadExecutionGasLimit,
         bytes calldata bridgeAdapterData
     ) private {
         // Prepare data to synchronize the Accounting Chain's state.
@@ -297,15 +301,9 @@ contract EarningChainGateway is
             })
         );
 
-        _sendCrossChainMessage(
-            ACCOUNTING_CHAIN_ID,
-            bridgeAdapter,
-            Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
-            0,
-            burnIouTokenMessageEncoded,
-            feePayer,
-            gasLimit,
-            bridgeAdapterData
+        _validateBridgeAdapterIsSupported(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ACCOUNTING_CHAIN_ID, bridgeAdapter);
+        IBridgeAdapter(bridgeAdapter).publishDataOnlyMessage{value: msg.value}(
+            ACCOUNTING_CHAIN_ID, burnIouTokenMessageEncoded, feePayer, payloadExecutionGasLimit, bridgeAdapterData
         );
     }
 }

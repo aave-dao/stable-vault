@@ -91,6 +91,12 @@ interface ISlippageCoverageVault {
     /// @param amount The amount to pull.
     function pullCoverage(address asset, uint256 amount) external;
 
+    /// @notice Pulls `amount` of `asset` from the beneficiary back to the Slippage Coverage Vault.
+    /// @dev Callable only by `SLIPPAGE_BENEFICIARY`.
+    /// @param asset The asset to reimburse.
+    /// @param amount The amount to reimburse.
+    function reimburseCoverage(address asset, uint256 amount) external;
+
     /// @notice Enables override mode. While enabled, `pullCoverage` bypasses both per-tx and window caps and the
     /// Swapper accepts the higher `overrideMaxSlippageBps`.
     /// @dev Gated by the CoverageGuardian role (separate from the rebalancer, expected to be an N-of-M multisig).

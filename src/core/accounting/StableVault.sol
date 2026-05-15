@@ -245,25 +245,21 @@ contract StableVault is
         }
 
         _transferToTransferHelper(msg.sender, asset, amount);
-        uint256 netDepositAmount = IFundsHandler(FUNDS_HANDLER).processDeposit(asset, amount);
+        IFundsHandler(FUNDS_HANDLER).processDeposit(asset, amount);
+        uint256 amountInRay = amount.assetDecimalsToRay(asset);
 
         // Calculate the number of shares to mint based on the full amount deposited.
-        // If (amount - netDepositAmount) > 0, then this ~amount will be treated as interest earned.
         // Round down the division to undershoot the amount of granted shares, favoring the protocol.
-        uint256 shares = amount.assetDecimalsToRay(asset).rayDivDown(conversionRate);
+        uint256 shares = amountInRay.rayDivDown(conversionRate);
         // Prevent deposits that result in 0 shares to avoid user getting nothing in return for their deposit.
         require(shares > 0, Errors.InvalidAmount());
 
         _issueShares(user, subVaultId, shares);
-        // Increment the original deposit amount by the net deposit amount only, not the full amount.
-        // This protects against the system guaranteeing the full amount of the asset deposited in the case an
-        // underlying strategy suffers slippage.
-        uint256 netDepositAmountInRay = netDepositAmount.assetDecimalsToRay(asset);
-        $storage().positions[user].originalDepositRay += netDepositAmountInRay;
-        $storage().globalOriginalDepositsRay += netDepositAmountInRay;
+        $storage().positions[user].originalDepositRay += amountInRay;
+        $storage().globalOriginalDepositsRay += amountInRay;
 
         emit Deposit(user, asset, amount);
-        emit Transfer(address(0), user, amount.assetDecimalsToRay(asset));
+        emit Transfer(address(0), user, amountInRay);
     }
 
     /// @notice Transfers Stable Vault balance (denominated in RAY) between users.
@@ -382,6 +378,9 @@ contract StableVault is
     }
 
     /// @inheritdoc IStableVault
+    /// @dev Partial requests that leave non-redeemable dust are upgraded to full withdrawals, because of that - if the
+    /// Vault is insolvent, the upgraded interest portion might not be covered by the surplus, so the request can revert
+    /// with `InsufficientAssets`. Lower the requested amount in such case.
     function requestWithdrawal(address user, uint256 requestedAmountInRay, bytes calldata policyData)
         external
         virtual
@@ -646,16 +645,20 @@ contract StableVault is
         return newSubVaultId;
     }
 
-    function _migrateUserToSubVault(address user, uint256 oldSubVaultId, uint256 newSubVaultId) internal {
+    function _migrateUserToSubVault(address user, uint256 oldSubVaultId, uint256 newSubVaultId)
+        internal
+        returns (bool)
+    {
         uint256 oldConversionRate = _accrueSubVaultConversionRate(oldSubVaultId);
         uint256 newConversionRate = _accrueSubVaultConversionRate(newSubVaultId);
         uint256 userOldShares = $storage().positions[user].shares;
         // Round down the amount of shares after sub-vault migration, so that the rounding is in favor of the protocol.
         uint256 userNewShares = userOldShares.rayMulDown(oldConversionRate).rayDivDown(newConversionRate);
-        // Do not allow the user position share quantity to deplete to zero which can happen if a user has a small
-        // userOldShares quantity and newConversionRate is large.
-        require(userNewShares > 0, Errors.InvalidAmount());
-
+        if (userNewShares == 0) {
+            // Skip migration when the new share count rounds to zero (dust position relative to the target sub-vault's
+            // conversion rate).
+            return false;
+        }
         _moveShares({
             from: user,
             to: user,
@@ -668,6 +671,7 @@ contract StableVault is
         // `_validateAmountOfActiveSubVaults()` is intentionally not called here: this function runs inside the
         // `setUserRate` batch loop, where intermediate states may transiently exceed the limit before settling
         // to a valid final state. Validation is performed upstream in `setUserRate` after the loop completes.
+        return true;
     }
 
     /// @dev Callers must invoke `_validateAmountOfActiveSubVaults()` after their logical operation
@@ -939,16 +943,23 @@ contract StableVault is
     function _setUserRate(address user, uint256 newPerSecondRate) internal {
         require(user != address(0), Errors.ZeroAddress());
         uint256 oldSubVaultId = $storage().positions[user].subVaultId;
-        // Skip users without a position (e.g., withdrew or transferred out between batch
-        // preparation and execution) to avoid reverting the entire batch.
-        if (oldSubVaultId != 0) {
+        if (oldSubVaultId == 0) {
+            // Skip users without a position (e.g., withdrew or transferred out between batch
+            // preparation and execution) to avoid reverting the entire batch.
+            emit SetUserRateSkipped(user);
+        } else {
             require(
                 newPerSecondRate != $storage().subVaultById[oldSubVaultId].perSecondRate,
                 RedundantRate(user, newPerSecondRate)
             );
             uint256 newSubVaultId = _getOrCreateSubVaultWithRate(newPerSecondRate);
-            emit UserRateSet(user, newSubVaultId, newPerSecondRate);
-            _migrateUserToSubVault(user, oldSubVaultId, newSubVaultId);
+            if (_migrateUserToSubVault(user, oldSubVaultId, newSubVaultId)) {
+                emit UserRateSet(user, newSubVaultId, newPerSecondRate);
+            } else {
+                // Migration to new sub-vault did not happen.
+                // Skip the user, do not revert, so we avoid blocking the entire `setUserRate` batch.
+                emit SetUserRateSkipped(user);
+            }
         }
         // `_validateAmountOfActiveSubVaults()` is intentionally not called here: this is invoked per-user inside
         // the `setUserRate` batch loop. Validation is performed upstream in `setUserRate` after the loop.

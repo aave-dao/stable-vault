@@ -13,6 +13,7 @@ import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {Errors} from "src/types/Errors.sol";
 
 import {TestWithHelpers} from "test/helpers/TestWithHelpers.sol";
+import {GasBurnerPriceOracleAdapter} from "test/mocks/GasBurnerPriceOracleAdapter.sol";
 import {MockAccessManager} from "test/mocks/MockAccessManager.sol";
 import {MockPriceOracleAdapter} from "test/mocks/MockPriceOracleAdapter.sol";
 
@@ -166,6 +167,30 @@ contract PriceOracleTest is TestWithHelpers {
     function test_getPrice_reverts_ifAdapterNotFound() public {
         vm.expectRevert(abi.encodeWithSelector(IPriceOracle.OracleAdapterNotFound.selector, asset1));
         _priceOracle.getPrice(asset1);
+    }
+
+    function test_getPrice_returnsZero_whenAdapterReverts() public {
+        vm.prank(everyRoleAccount);
+        _priceOracle.setOracleAdapterForAsset(asset1, address(_mockAdapter));
+
+        _mockAdapter.setShouldRevert(true, "feed paused");
+
+        uint256 result = _priceOracle.getPrice(asset1);
+        assertEq(result, 0, "Should return 0 when adapter reverts");
+    }
+
+    function test_getPrice_reverts_whenAdapterOOGs() public {
+        GasBurnerPriceOracleAdapter burner = new GasBurnerPriceOracleAdapter();
+        burner.setResponse(MathLib.RAY, false);
+
+        vm.prank(everyRoleAccount);
+        _priceOracle.setOracleAdapterForAsset(asset1, address(burner));
+
+        burner.setBurnEnabled(true);
+
+        // Cap forwarded gas so the inner loop OOGs while the outer frame can still execute the catch.
+        vm.expectRevert(IPriceOracle.InsufficientGasForExternalCall.selector);
+        _priceOracle.getPrice{gas: 200_000}(asset1);
     }
 
     function test_getPrice_capsToMaxPriceRay(uint256 priceRay) public {

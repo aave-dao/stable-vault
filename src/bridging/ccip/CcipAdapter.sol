@@ -52,6 +52,10 @@ contract CcipAdapter is
     /// currency constant convention to CCIP's convention.
     address internal constant CCIP_NATIVE_FEE_TOKEN = address(0);
 
+    /// @dev Gas added on top of data-only payload execution so CCIP can execute this adapter around the gateway call.
+    /// Gas tests measured about 15.3k gas for this exact-gas path; 30k keeps close to a 2x margin.
+    uint256 internal constant DATA_ONLY_RECEIVE_GAS_OVERHEAD = 30_000;
+
     address internal immutable CCIP_ROUTER;
     address internal immutable ASSET_REGISTRY;
 
@@ -87,6 +91,11 @@ contract CcipAdapter is
         return address(CCIP_ROUTER);
     }
 
+    /// @inheritdoc IBridgeAdapter
+    function getDataOnlyReceiveGasOverhead() external pure override returns (uint256 dataOnlyReceiveGasOverhead) {
+        return DATA_ONLY_RECEIVE_GAS_OVERHEAD;
+    }
+
     /// @inheritdoc ICcipBridgeAdapter
     function getChainSelector(uint256 chainId) external view override returns (uint64) {
         return _chainSelectorOf[chainId];
@@ -105,68 +114,109 @@ contract CcipAdapter is
     }
 
     /// @inheritdoc IBridgeAdapter
-    function publishMessageToChainWithFeePayer(
+    function publishDataOnlyMessage(
+        uint256 destinationChainId,
+        bytes memory messageData,
+        address feePayer,
+        uint256 payloadExecutionGasLimit,
+        bytes memory bridgeAdapterData
+    ) external payable override(BaseBridgeAdapter, IBridgeAdapter) onlyGateway {
+        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
+        // Add this adapter's receive overhead to the gateway payload execution gas requested upstream.
+        uint256 receiverExecutionGasLimit = payloadExecutionGasLimit + DATA_ONLY_RECEIVE_GAS_OVERHEAD;
+        _publishCcipMessage(
+            destinationChainId,
+            Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
+            0,
+            tokenAmounts,
+            messageData,
+            feePayer,
+            receiverExecutionGasLimit,
+            bridgeAdapterData
+        );
+    }
+
+    /// @inheritdoc IBridgeAdapter
+    function publishMessageWithFunds(
         uint256 destinationChainId,
         address asset,
         uint256 amount,
-        bytes memory data,
+        bytes memory messageData,
         address feePayer,
-        uint256 gasLimit,
+        uint256 receiverExecutionGasLimit,
         bytes memory bridgeAdapterData
     ) external payable override(BaseBridgeAdapter, IBridgeAdapter) onlyGateway {
+        require(asset != Constants.ASSET_FOR_DATA_ONLY_BRIDGE && amount > 0, Errors.InvalidParameter());
+        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+        tokenAmounts[0] = Client.EVMTokenAmount({token: asset, amount: amount});
+        _publishCcipMessage(
+            destinationChainId,
+            asset,
+            amount,
+            tokenAmounts,
+            messageData,
+            feePayer,
+            receiverExecutionGasLimit,
+            bridgeAdapterData
+        );
+    }
+
+    function _publishCcipMessage(
+        uint256 destinationChainId,
+        address assetToBridge,
+        uint256 amountToBridge,
+        Client.EVMTokenAmount[] memory tokenAmounts,
+        bytes memory messageData,
+        address feePayer,
+        uint256 receiverExecutionGasLimit,
+        bytes memory bridgeAdapterData
+    ) internal {
         ICcipBridgeAdapter.CcipFeeParams memory ccipFeeParams =
             abi.decode(bridgeAdapterData, (ICcipBridgeAdapter.CcipFeeParams));
 
         address destinationChainAdapter = _destinationChainAdapterOf[destinationChainId];
         require(destinationChainAdapter != address(0), Errors.InvalidParameter());
 
-        Client.EVMTokenAmount[] memory tokenAmounts;
-        if (asset == Constants.ASSET_FOR_DATA_ONLY_BRIDGE) {
-            tokenAmounts = new Client.EVMTokenAmount[](0);
-        } else {
-            tokenAmounts = new Client.EVMTokenAmount[](1);
-            tokenAmounts[0] = Client.EVMTokenAmount({token: asset, amount: amount});
-        }
-
         Client.EVM2AnyMessage memory ccipMessage = Client.EVM2AnyMessage({
             receiver: abi.encode(destinationChainAdapter),
-            data: data,
+            data: messageData,
             tokenAmounts: tokenAmounts,
             feeToken: ccipFeeParams.feeToken == Constants.NATIVE_CURRENCY
                 ? CCIP_NATIVE_FEE_TOKEN
                 : ccipFeeParams.feeToken,
             extraArgs: Client._argsToBytes(
-                // We pass the input gasLimit, the IRouterClient::getFee will add on top any bridge adapter overhead.
-                Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: true})
+                Client.GenericExtraArgsV2({gasLimit: receiverExecutionGasLimit, allowOutOfOrderExecution: true})
             )
         });
 
         uint64 chainSelector = _chainSelectorOf[destinationChainId];
         uint256 estimatedFeeAmount = IRouterClient(CCIP_ROUTER).getFee(chainSelector, ccipMessage);
-        require(ccipFeeParams.feeAmount >= estimatedFeeAmount, Errors.InsufficientFunds());
 
         if (ccipFeeParams.feeToken == Constants.NATIVE_CURRENCY) {
-            require(msg.value == ccipFeeParams.feeAmount, Errors.InsufficientFunds());
+            require(msg.value >= estimatedFeeAmount, Errors.InsufficientFunds());
         } else {
             // Reject msg.value to prevent accidental native loss; bridges are not expected to require both native
             // and ERC-20 fees simultaneously.
             require(msg.value == 0, Errors.InvalidParameter());
-            if (ccipFeeParams.feeAmount > 0) {
-                IERC20(ccipFeeParams.feeToken).safeTransferFrom(feePayer, address(this), ccipFeeParams.feeAmount);
+            if (estimatedFeeAmount > 0) {
+                IERC20(ccipFeeParams.feeToken).safeTransferFrom(feePayer, address(this), estimatedFeeAmount);
             }
         }
 
-        _pullAssetFromTransferHelperAndApproveCcipRouter(asset, amount, ccipFeeParams.feeToken, estimatedFeeAmount);
+        _pullAssetFromTransferHelperAndApproveCcipRouter(
+            assetToBridge, amountToBridge, ccipFeeParams.feeToken, estimatedFeeAmount
+        );
 
         _sendMessageWithFeePayer(
             chainSelector,
             ccipMessage,
             feePayer,
             ccipFeeParams.feeToken,
-            ccipFeeParams.feeAmount,
             ccipFeeParams.feeRefundThreshold,
             estimatedFeeAmount
         );
+
+        _assertCcipRouterAllowancesAreFullyConsumed(assetToBridge, amountToBridge, ccipFeeParams.feeToken);
     }
 
     /// @inheritdoc IAny2EVMMessageReceiver
@@ -223,37 +273,53 @@ contract CcipAdapter is
         }
     }
 
+    /// @dev Defensive assertion that the CCIP router fully consumed every allowance set by
+    /// `_pullAssetFromTransferHelperAndApproveCcipRouter`. The router is expected to pull the exact approved
+    /// amounts during `ccipSend`; any leftover allowance signals a router behavior the adapter does not
+    /// account for, so revert rather than silently leave a stale approval.
+    function _assertCcipRouterAllowancesAreFullyConsumed(address asset, uint256 amount, address feeToken)
+        internal
+        view
+    {
+        if (amount > 0) {
+            _requireZeroCcipRouterAllowance(asset);
+        }
+        // When `feeToken == asset && amount > 0`, the asset check above already covered the shared allowance.
+        if (feeToken != Constants.NATIVE_CURRENCY && feeToken != asset) {
+            _requireZeroCcipRouterAllowance(feeToken);
+        }
+    }
+
+    function _requireZeroCcipRouterAllowance(address token) internal view {
+        uint256 remainingAllowance = IERC20(token).allowance(address(this), CCIP_ROUTER);
+        require(remainingAllowance == 0, UnexpectedCcipRouterAllowance(token, remainingAllowance));
+    }
+
     function _sendMessageWithFeePayer(
         uint64 chainSelector,
         Client.EVM2AnyMessage memory message,
         address feePayer,
         address feeToken,
-        uint256 allocatedFeeAmount,
         uint256 feeRefundThreshold,
         uint256 estimatedFeeAmount
     ) internal {
-        uint256 msgValue;
-        if (feeToken == Constants.NATIVE_CURRENCY) {
-            msgValue = estimatedFeeAmount;
-        }
-        if (allocatedFeeAmount > estimatedFeeAmount) {
-            uint256 excessFee = allocatedFeeAmount - estimatedFeeAmount;
-            if (excessFee > feeRefundThreshold) {
-                _triggerFeeRefund(feePayer, feeToken, excessFee);
+        bytes32 messageId = IRouterClient(CCIP_ROUTER)
+        .ccipSend{value: feeToken == Constants.NATIVE_CURRENCY ? estimatedFeeAmount : 0}(
+            chainSelector, message
+        );
+        if (feeToken == Constants.NATIVE_CURRENCY && msg.value > estimatedFeeAmount) {
+            uint256 excessFee = msg.value - estimatedFeeAmount;
+            if (excessFee >= feeRefundThreshold) {
+                _triggerNativeFeeRefund(feePayer, excessFee);
             }
         }
-        bytes32 messageId = IRouterClient(CCIP_ROUTER).ccipSend{value: msgValue}(chainSelector, message);
         emit MessagePublished(messageId);
     }
 
-    function _triggerFeeRefund(address feePayer, address feeToken, uint256 excessFee) internal {
-        if (feeToken == Constants.NATIVE_CURRENCY) {
-            (bool callSucceeded,) = payable(feePayer).call{value: excessFee}("");
-            require(callSucceeded, Errors.NativeTransferFailed());
-        } else {
-            IERC20(feeToken).safeTransfer(feePayer, excessFee);
-        }
-        emit FeeRefunded(feePayer, feeToken, excessFee);
+    function _triggerNativeFeeRefund(address feePayer, uint256 excessFee) internal {
+        (bool callSucceeded,) = payable(feePayer).call{value: excessFee}("");
+        require(callSucceeded, Errors.NativeTransferFailed());
+        emit FeeRefunded(feePayer, Constants.NATIVE_CURRENCY, excessFee);
     }
 
     function _validateMessageSource(Client.Any2EVMMessage calldata message) internal view {

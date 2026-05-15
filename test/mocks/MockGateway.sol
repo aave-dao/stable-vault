@@ -39,8 +39,7 @@ contract MockGateway is IChainGateway {
         }
     }
 
-    /// @dev Simulates adapter-owned fee staging: decodes adapter data, pulls feeToken from feePayer
-    /// (or accepts native via msg.value) into TransferHelper, then simulates fee consumption.
+    /// @dev Simulates fee consumption configured through `mockConsumeOnNextCall`.
     function sendBridgeIouTokenMessageWithFeePayer(
         uint256, /*destinationChainId*/
         address, /*iouTokenRecipient*/
@@ -53,15 +52,14 @@ contract MockGateway is IChainGateway {
         ICcipBridgeAdapter.CcipFeeParams memory ccipFeeParams =
             abi.decode(bridgeAdapterData, (ICcipBridgeAdapter.CcipFeeParams));
         if (ccipFeeParams.feeToken == Constants.NATIVE_CURRENCY) {
-            require(msg.value >= ccipFeeParams.feeAmount, Errors.InsufficientFunds());
             if (msg.value > 0) {
                 (bool ok,) = _transferHelper.call{value: msg.value}("");
                 require(ok, Errors.NativeTransferFailed());
             }
         } else {
             require(msg.value == 0, Errors.InvalidParameter());
-            if (ccipFeeParams.feeAmount > 0) {
-                IERC20(ccipFeeParams.feeToken).safeTransferFrom(feePayer, _transferHelper, ccipFeeParams.feeAmount);
+            if (_balanceToConsume > 0) {
+                IERC20(ccipFeeParams.feeToken).safeTransferFrom(feePayer, _transferHelper, _balanceToConsume);
             }
         }
         _mockConsume();

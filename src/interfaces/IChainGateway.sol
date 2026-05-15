@@ -11,6 +11,10 @@ interface IChainGateway {
     /// @custom:selector 0xf7b1bf8e
     error AdapterNotFound();
 
+    /// @notice Thrown when removing an adapter would leave a chain without a data-only message route.
+    /// @custom:selector 0xaa601040
+    error CannotRemoveLastDataOnlyBridgeAdapter();
+
     /// @notice Thrown when a given message contains both funds and a data payload which is not allowed.
     /// @custom:selector 0x9d73280d
     error DataNotAllowedWithFunds();
@@ -107,8 +111,7 @@ interface IChainGateway {
     /// @param iouTokenAmountRay The amount of IOU tokens to bridge.
     /// @param bridgeAdapter The whitelisted bridge adapter to use for the message.
     /// @param feePayer Address that will pay the bridge fee.
-    /// @param gasLimit Gas limit that should be allocated for execution of the message on the destination chain,
-    /// without considering the bridge adapter overhead.
+    /// @param payloadExecutionGasLimit Gas limit for the destination gateway call and everything it executes.
     /// @param bridgeAdapterData Any bridge adapter custom parameters that it may need to operate.
     function sendBridgeIouTokenMessageWithFeePayer(
         uint256 destinationChainId,
@@ -116,7 +119,7 @@ interface IChainGateway {
         uint256 iouTokenAmountRay,
         address bridgeAdapter,
         address feePayer,
-        uint256 gasLimit,
+        uint256 payloadExecutionGasLimit,
         bytes calldata bridgeAdapterData
     ) external payable;
 }

@@ -240,11 +240,7 @@ contract OracleFeedE2ETest is BaseTest {
             userBalanceWithInterest,
             address(ccipAdapter_accountingChain),
             DEFAULT_GAS_LIMIT,
-            abi.encode(
-                ICcipBridgeAdapter.CcipFeeParams({
-                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
-                })
-            )
+            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0}))
         );
         assertEq(iouToken_accountingChain.balanceOf(user1), 0, "User should have bridged IOU tokens");
 
@@ -271,11 +267,7 @@ contract OracleFeedE2ETest is BaseTest {
             user1,
             address(ccipAdapter_earningChain),
             DEFAULT_GAS_LIMIT,
-            abi.encode(
-                ICcipBridgeAdapter.CcipFeeParams({
-                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: 1, feeRefundThreshold: 0
-                })
-            ),
+            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
             ""
         );
 
@@ -794,13 +786,7 @@ contract OracleFeedE2ETest is BaseTest {
         // Verify funds left on Accounting Chain (local balance is 0)
         assertEq(fundsHandler.getAggregatedBalance(), 0, "Local balance should be zero after bridging to Earning Chain");
 
-        // Verify funds arrived on Earning Chain
-        address defaultUsdcVault_earningChain = allocator_earningChain.getDefaultStrategy(address(USDC));
-        assertEq(
-            IERC20(address(USDC)).balanceOf(defaultUsdcVault_earningChain),
-            depositAmount,
-            "Earning chain strategy should have the USDC"
-        );
+        assertEq(allocator_earningChain.getAssetBalance(address(USDC)), depositAmount, "Earning chain should have USDC");
 
         // 3. Publish and sync oracle - FundsHandler sees Earning Chain balance
         _publishAndSyncOracle();
@@ -830,20 +816,14 @@ contract OracleFeedE2ETest is BaseTest {
             returnAmount,
             address(ccipAdapter_earningChain),
             DEFAULT_GAS_LIMIT,
-            abi.encode(
-                ICcipBridgeAdapter.CcipFeeParams({
-                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
-                })
-            ),
+            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
             ""
         );
 
-        // 5. Verify funds arrived back on Accounting Chain
-        address defaultUsdcVault_accountingChain = allocator_accountingChain.getDefaultStrategy(address(USDC));
         assertEq(
-            IERC20(address(USDC)).balanceOf(defaultUsdcVault_accountingChain),
+            allocator_accountingChain.getAssetBalance(address(USDC)),
             returnAmount,
-            "Accounting chain strategy should have the returned USDC"
+            "Accounting chain should have the returned USDC"
         );
 
         // 6. Earning chain now has 0 balance - re-sync oracle
@@ -894,11 +874,7 @@ contract OracleFeedE2ETest is BaseTest {
             returnAmount,
             address(ccipAdapter_earningChain),
             DEFAULT_GAS_LIMIT,
-            abi.encode(
-                ICcipBridgeAdapter.CcipFeeParams({
-                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
-                })
-            ),
+            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
             ""
         );
 
@@ -961,11 +937,7 @@ contract OracleFeedE2ETest is BaseTest {
             depositAmount,
             address(ccipAdapter_earningChain),
             DEFAULT_GAS_LIMIT,
-            abi.encode(
-                ICcipBridgeAdapter.CcipFeeParams({
-                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
-                })
-            ),
+            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
             ""
         );
     }
@@ -991,11 +963,7 @@ contract OracleFeedE2ETest is BaseTest {
             depositAmount,
             address(ccipAdapter_earningChain),
             DEFAULT_GAS_LIMIT,
-            abi.encode(
-                ICcipBridgeAdapter.CcipFeeParams({
-                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
-                })
-            ),
+            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
             ""
         );
         _publishAndSyncOracle();
@@ -1052,11 +1020,7 @@ contract OracleFeedE2ETest is BaseTest {
             EARNING_CHAIN_ID,
             address(ccipAdapter_accountingChain),
             DEFAULT_GAS_LIMIT,
-            abi.encode(
-                ICcipBridgeAdapter.CcipFeeParams({
-                    feeToken: Constants.NATIVE_CURRENCY, feeAmount: bridgeFeeAmount, feeRefundThreshold: 0
-                })
-            ),
+            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
             ""
         );
     }
