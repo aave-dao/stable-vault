@@ -223,8 +223,6 @@ interface IAllocator {
     /// @dev If the strategy still holds assets, they stop contributing to trusted balances while vault obligations
     /// remain unchanged. This can temporarily make obligations exceed `getAggregatedBalance()` and cause
     /// `requestWithdrawal` to revert with `InsufficientAssets`.
-    /// @dev For planned retirements, deallocate through `rebalance` before distrusting the strategy. Use
-    /// `getAssetBalanceInStrategy(strategy)` and `isStrategyTrusted(strategy)` to inspect the state before submitting.
     /// @param strategy Address of the strategy to distrust.
     function distrustStrategy(address strategy) external;
 
