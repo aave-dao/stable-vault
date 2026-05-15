@@ -646,13 +646,6 @@ contract StableVault is
         return newSubVaultId;
     }
 
-    // Resetting a sub-vault's conversion rate helps prevent old accrual from causing dust problems on migrations.
-    function _resetSubVaultConversionRate(uint256 subVaultId) internal {
-        SubVault storage subVault = $storage().subVaultById[subVaultId];
-        subVault.conversionRate = MathLib.RAY;
-        subVault.lastAccrualTimestamp = block.timestamp;
-    }
-
     function _migrateUserToSubVault(address user, uint256 oldSubVaultId, uint256 newSubVaultId)
         internal
         returns (bool)
@@ -795,9 +788,6 @@ contract StableVault is
         }
         $storage().activeSubVaultsIds.pop();
         delete $storage().activeSubVaultIndexById[subVaultId];
-        // This is safe because a deactivated sub-vault has no positions, and it prevents stale accrual
-        // from affecting future migrations.
-        _resetSubVaultConversionRate(subVaultId);
         emit SubVaultDeactivated(subVaultId);
     }
 
