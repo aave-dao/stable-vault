@@ -35,10 +35,10 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
         address fundsHandler,
         address assetRegistry,
         address transferHelper,
-        address withdrawalFeeCalculator,
         address priceOracle,
         uint256 maxActiveSubVaults,
-        address treasuryAddress
+        address treasuryAddress,
+        address policyRegistry
     ) internal virtual override returns (StableVault) {
         // Deploy a vault without restriction in the valid per-second rate
         address vaultImpl = address(
@@ -48,9 +48,9 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
                 iouToken,
                 fundsHandler,
                 transferHelper,
-                withdrawalFeeCalculator,
                 priceOracle,
-                maxActiveSubVaults
+                maxActiveSubVaults,
+                policyRegistry
             )
         );
         return StableVault(
@@ -79,12 +79,10 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
         // User1 deposits 500 USDC to Vault on Accounting Chain
         _mintAndDepositUsdcToStableVault(user1, userInitialDeposit);
 
-        // Check the deposit was made into the default earning strategy for USDC
-        address defaultUsdcVault_AccountingChain = allocator_accountingChain.getDefaultStrategy(address(USDC));
         assertEq(
-            IERC20(address(USDC)).balanceOf(defaultUsdcVault_AccountingChain),
+            allocator_accountingChain.getAssetBalance(address(USDC)),
             userInitialDeposit,
-            "Default USDC strategy vault should have the deposited amount of USDC"
+            "Allocator should have the deposited amount of USDC"
         );
         assertEq(
             fundsHandler.getAggregatedBalance(),
@@ -119,12 +117,12 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
             )
         );
         vm.prank(user1);
-        vault.requestWithdrawal(user1, 0);
+        vault.requestWithdrawal(user1, 0, "");
 
         // Attempt to request a withdrawal for original deposit amount + interest
         uint256 originalDepositAmountInRay = userInitialDeposit.assetDecimalsToRay(address(USDC));
         vm.prank(user1);
-        vault.requestWithdrawal(user1, originalDepositAmountInRay);
+        vault.requestWithdrawal(user1, originalDepositAmountInRay, "");
         // User should still have a balance compromised of interest after requesting withdrawal of original deposit
         assertGt(
             vault.getUserBalance(user1), 0, "User balance should be zero after withdrawing original deposit amount"
@@ -162,19 +160,15 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
         // User2 deposits 500 GHO to Vault on Accounting Chain
         _mintAndDepositGhoToStableVault(user2, user2InitialDeposit);
 
-        // Check the deposit was made into the default earning strategy for USDC
-        address defaultUsdcVault_AccountingChain = allocator_accountingChain.getDefaultStrategy(address(USDC));
         assertEq(
-            IERC20(address(USDC)).balanceOf(defaultUsdcVault_AccountingChain),
+            allocator_accountingChain.getAssetBalance(address(USDC)),
             user1InitialDeposit,
-            "Default USDC strategy vault should have the deposited amount of USDC"
+            "Allocator should have the deposited amount of USDC"
         );
-        // Check the deposit was made into the default earning strategy for GHO
-        address defaultGhoVault_AccountingChain = allocator_accountingChain.getDefaultStrategy(address(GHO));
         assertEq(
-            IERC20(address(GHO)).balanceOf(defaultGhoVault_AccountingChain),
+            allocator_accountingChain.getAssetBalance(address(GHO)),
             user2InitialDeposit,
-            "Default GHO strategy vault should have the deposited amount of GHO"
+            "Allocator should have the deposited amount of GHO"
         );
         assertEq(
             fundsHandler.getAggregatedBalance(),
@@ -196,14 +190,14 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
 
         // User1 deposited 500 USDC, but they will withdraw all 123 GHO in the system
         vm.prank(user1);
-        vault.requestWithdrawal(user1, 0);
+        vault.requestWithdrawal(user1, 0, "");
         uint256 ghoOriginalDepositInRay = user2InitialDeposit.assetDecimalsToRay(address(GHO));
         vm.prank(user1);
         vault.executeWithdrawal(user1, address(GHO), 0, ghoOriginalDepositInRay, "");
 
         // User2 deposited 123 GHO, but since user1 withdrew it all user2 is left to withdraw USDC
         vm.prank(user2);
-        vault.requestWithdrawal(user2, 0);
+        vault.requestWithdrawal(user2, 0, "");
         // Try executing to withdraw GHO and expect revert
         vm.expectRevert(Errors.InsufficientFunds.selector);
         vm.prank(user2);
@@ -235,12 +229,10 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
         // User1 deposits 500 USDC to Vault on Accounting Chain
         _mintAndDepositUsdcToStableVault(user1, userInitialDeposit);
 
-        // Check the deposit was made into the default earning strategy for USDC
-        address defaultUsdcVault_AccountingChain = allocator_accountingChain.getDefaultStrategy(address(USDC));
         assertEq(
-            IERC20(address(USDC)).balanceOf(defaultUsdcVault_AccountingChain),
+            allocator_accountingChain.getAssetBalance(address(USDC)),
             userInitialDeposit,
-            "Default USDC strategy vault should have the deposited amount of USDC"
+            "Allocator should have the deposited amount of USDC"
         );
         assertEq(
             fundsHandler.getAggregatedBalance(),
@@ -295,19 +287,15 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
         // User2 deposits 500 GHO to Vault on Accounting Chain
         _mintAndDepositGhoToStableVault(user2, user2InitialDeposit);
 
-        // Check the deposit was made into the default earning strategy for USDC
-        address defaultUsdcVault_AccountingChain = allocator_accountingChain.getDefaultStrategy(address(USDC));
         assertEq(
-            IERC20(address(USDC)).balanceOf(defaultUsdcVault_AccountingChain),
+            allocator_accountingChain.getAssetBalance(address(USDC)),
             user1InitialDeposit,
-            "Default USDC strategy vault should have the deposited amount of USDC"
+            "Allocator should have the deposited amount of USDC"
         );
-        // Check the deposit was made into the default earning strategy for GHO
-        address defaultGhoVault_AccountingChain = allocator_accountingChain.getDefaultStrategy(address(GHO));
         assertEq(
-            IERC20(address(GHO)).balanceOf(defaultGhoVault_AccountingChain),
+            allocator_accountingChain.getAssetBalance(address(GHO)),
             user2InitialDeposit,
-            "Default GHO strategy vault should have the deposited amount of GHO"
+            "Allocator should have the deposited amount of GHO"
         );
         assertEq(
             fundsHandler.getAggregatedBalance(),
@@ -345,12 +333,12 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
             )
         );
         vm.prank(user2);
-        vault.requestWithdrawal(user2, 0);
+        vault.requestWithdrawal(user2, 0, "");
 
         // Request a withdrawal for the original deposit
         uint256 user2OriginalDepositInRay = user2InitialDeposit.assetDecimalsToRay(address(GHO));
         vm.prank(user2);
-        vault.requestWithdrawal(user2, user2OriginalDepositInRay);
+        vault.requestWithdrawal(user2, user2OriginalDepositInRay, "");
         // Execute the withdrawal
         vm.prank(user2);
         vault.executeWithdrawal(user2, address(GHO), 0, user2OriginalDepositInRay, "");
@@ -360,7 +348,7 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
         USDC.mint(user, amount);
         vm.startPrank(user);
         USDC.approve(address(vault), amount);
-        vault.deposit(user, address(USDC), amount);
+        vault.deposit(user, address(USDC), amount, "");
         vm.stopPrank();
     }
 
@@ -368,7 +356,7 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
         GHO.mint(user, amount);
         vm.startPrank(user);
         GHO.approve(address(vault), amount);
-        vault.deposit(user, address(GHO), amount);
+        vault.deposit(user, address(GHO), amount, "");
         vm.stopPrank();
     }
 }

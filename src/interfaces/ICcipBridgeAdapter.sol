@@ -10,11 +10,10 @@ import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 interface ICcipBridgeAdapter is IBridgeAdapter {
     /// @notice CCIP-specific fee parameters decoded by `CcipAdapter` when publishing a message.
     /// @param feeToken Token to pay the bridge fee in.
-    /// @param feeAmount Amount of `feeToken` approved by `feePayer` to spend on fees.
-    /// @param feeRefundThreshold Minimum unused `feeToken` that must remain to trigger a refund to `feePayer`.
+    /// @param feeRefundThreshold Minimum native-fee surplus over the CCIP-quote estimate that triggers a refund to
+    /// `feePayer`
     struct CcipFeeParams {
         address feeToken;
-        uint256 feeAmount;
         uint256 feeRefundThreshold;
     }
 
@@ -27,6 +26,12 @@ interface ICcipBridgeAdapter is IBridgeAdapter {
     /// @notice Encoded data length does not match the expected value.
     /// @custom:selector 0x9546c78e
     error UnexpectedDataLength();
+
+    /// @notice Thrown when the CCIP router did not fully consume the allowance granted for a token used in
+    /// `ccipSend` (bridged asset or ERC-20 fee token). Indicates the router pulled less than approved, leaving
+    /// residual approval that this adapter does not expect.
+    /// @custom:selector 0x8d63b92b
+    error UnexpectedCcipRouterAllowance(address token, uint256 remainingAllowance);
 
     /// @notice Getter for the address of the Chainlink CCIP router.
     /// @return router Address of the Chainlink CCIP router.

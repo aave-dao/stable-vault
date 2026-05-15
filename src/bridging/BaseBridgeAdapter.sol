@@ -57,13 +57,22 @@ abstract contract BaseBridgeAdapter is AccessManaged, TransferHelperClient, IBri
     }
 
     /// @inheritdoc IBridgeAdapter
-    function publishMessageToChainWithFeePayer(
+    function publishDataOnlyMessage(
+        uint256 destinationChainId,
+        bytes memory messageData,
+        address feePayer,
+        uint256 payloadExecutionGasLimit,
+        bytes memory bridgeAdapterData
+    ) external payable virtual override;
+
+    /// @inheritdoc IBridgeAdapter
+    function publishMessageWithFunds(
         uint256 destinationChainId,
         address asset,
         uint256 amount,
-        bytes memory data,
+        bytes memory messageData,
         address feePayer,
-        uint256 gasLimit,
+        uint256 receiverExecutionGasLimit,
         bytes memory bridgeAdapterData
     ) external payable virtual override;
 

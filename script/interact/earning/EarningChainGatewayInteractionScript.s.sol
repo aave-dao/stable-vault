@@ -21,13 +21,13 @@ contract EarningChainGatewayInteractionScript is EarningChainBaseScript {
         address asset = USDT;
         uint256 amount = 123 * 10 ** 6;
         ICcipBridgeAdapter.CcipFeeParams memory bridgeAdapterData =
-            ICcipBridgeAdapter.CcipFeeParams({feeToken: LINK, feeAmount: 100000000000000000000, feeRefundThreshold: 0});
+            ICcipBridgeAdapter.CcipFeeParams({feeToken: LINK, feeRefundThreshold: 0});
         uint256 gasLimit = 0; // TODO: Set the destination gas limit.
 
         vm.startBroadcast(vm.envUint("ADMIN_PRIVATE_KEY"));
         address bridgeAdapter = address(0); // TODO: Set the whitelisted bridge adapter address.
         IEarningChainGateway(EARNING_CHAIN_GATEWAY)
-            .pushFundsToAccountingChain(asset, amount, bridgeAdapter, gasLimit, abi.encode(bridgeAdapterData));
+            .pushFundsToAccountingChain(asset, amount, bridgeAdapter, gasLimit, abi.encode(bridgeAdapterData), "");
         vm.stopBroadcast();
     }
 

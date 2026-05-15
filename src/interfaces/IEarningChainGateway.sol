@@ -21,15 +21,17 @@ interface IEarningChainGateway is IChainGateway {
     /// @param asset The asset to withdraw.
     /// @param amount The amount of the asset to withdraw in the asset's native decimals.
     /// @param bridgeAdapter The whitelisted bridge adapter to use for bridging the asset.
-    /// @param gasLimit Gas limit that should be allocated for execution of the message on the destination chain,
-    /// without considering the bridge adapter overhead.
+    /// @param receiverExecutionGasLimit Gas limit for destination receiver execution. This includes adapter receive
+    /// logic, token handling, and the gateway call, but excludes bridge provider infrastructure.
     /// @param bridgeAdapterData Any bridge adapter custom parameters that it may need to operate.
+    /// @param policyData Additional data that the bridge-funds policy might need to operate.
     function pushFundsToAccountingChain(
         address asset,
         uint256 amount,
         address bridgeAdapter,
-        uint256 gasLimit,
-        bytes calldata bridgeAdapterData
+        uint256 receiverExecutionGasLimit,
+        bytes calldata bridgeAdapterData,
+        bytes calldata policyData
     ) external payable;
 
     /// @notice Exchanges IOU tokens for a specific asset and bridges data back to the Accounting Chain.
@@ -38,10 +40,9 @@ interface IEarningChainGateway is IChainGateway {
     /// @param minAmountOut The minimum amount of `assetOut` to receive for `iouTokenAmountRay` of IOU tokens.
     /// @param receiver The address to send the exchanged asset to.
     /// @param bridgeAdapter The whitelisted bridge adapter to use for the data-only message.
-    /// @param gasLimit Gas limit that should be allocated for execution of the message on the destination chain,
-    /// without considering the bridge adapter overhead.
+    /// @param payloadExecutionGasLimit Gas limit for the destination gateway call and everything it executes.
     /// @param bridgeAdapterData Any bridge adapter custom parameters that it may need to operate.
-    /// @param withdrawalPolicyData Additional data for the withdrawal policy.
+    /// @param policyData Additional data that the withdrawal execution policy might need to operate.
     /// @return amountOut The amount of the exchanged asset transferred to the receiver.
     function exchangeIouTokens(
         uint256 iouTokenAmountRay,
@@ -49,8 +50,8 @@ interface IEarningChainGateway is IChainGateway {
         uint256 minAmountOut,
         address receiver,
         address bridgeAdapter,
-        uint256 gasLimit,
+        uint256 payloadExecutionGasLimit,
         bytes calldata bridgeAdapterData,
-        bytes memory withdrawalPolicyData
+        bytes memory policyData
     ) external payable returns (uint256);
 }

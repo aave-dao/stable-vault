@@ -25,7 +25,7 @@ contract StableVaultInteractionScript is AccountingChainBaseScript {
 
         vm.startBroadcast();
         IERC20(asset).approve(STABLE_VAULT, amount);
-        IStableVault(STABLE_VAULT).deposit(msg.sender, asset, amount);
+        IStableVault(STABLE_VAULT).deposit(msg.sender, asset, amount, "");
         vm.stopBroadcast();
     }
 
@@ -33,7 +33,7 @@ contract StableVaultInteractionScript is AccountingChainBaseScript {
         uint256 amountInRay = 1 * 10 ** 27;
 
         vm.startBroadcast();
-        IStableVault(STABLE_VAULT).requestWithdrawal(msg.sender, amountInRay);
+        IStableVault(STABLE_VAULT).requestWithdrawal(msg.sender, amountInRay, "");
         vm.stopBroadcast();
     }
 
