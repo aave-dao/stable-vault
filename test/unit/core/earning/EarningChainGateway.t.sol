@@ -255,7 +255,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     }
 
     function test_constructor_setsMinBurnIouTokenGasLimit_immutable() public view {
-        assertEq(_earningChainGateway.MIN_BURN_IOU_TOKEN_GAS_LIMIT(), BURN_IOU_TOKEN_GAS_LIMIT);
+        assertEq(_earningChainGateway.MIN_BURN_IOU_TOKEN_PAYLOAD_EXECUTION_GAS_LIMIT(), BURN_IOU_TOKEN_GAS_LIMIT);
     }
 
     function test_getIouTokenManager_returnsExpectedIouTokenManager() public view {
@@ -470,16 +470,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
             vm.expectCall(
                 address(_mockBridgeCcipFeeParams),
                 abi.encodeCall(
-                    IBridgeAdapter.publishMessageToChainWithFeePayer,
-                    (
-                        ACCOUNTING_CHAIN_ID,
-                        Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
-                        0,
-                        data,
-                        bridgeFeePayer,
-                        DEFAULT_GAS_LIMIT,
-                        bridgeAdapterData
-                    )
+                    IBridgeAdapter.publishDataOnlyMessage,
+                    (ACCOUNTING_CHAIN_ID, data, bridgeFeePayer, DEFAULT_GAS_LIMIT, bridgeAdapterData)
                 )
             );
             _mockTransferHelper.mockAsset(address(_mockUsdt), amountOut);
@@ -534,16 +526,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
             vm.expectCall(
                 address(_mockBridgeCcipFeeParams),
                 abi.encodeCall(
-                    IBridgeAdapter.publishMessageToChainWithFeePayer,
-                    (
-                        ACCOUNTING_CHAIN_ID,
-                        Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
-                        0,
-                        data,
-                        bridgeFeePayer,
-                        DEFAULT_GAS_LIMIT,
-                        bridgeAdapterData
-                    )
+                    IBridgeAdapter.publishDataOnlyMessage,
+                    (ACCOUNTING_CHAIN_ID, data, bridgeFeePayer, DEFAULT_GAS_LIMIT, bridgeAdapterData)
                 )
             );
             _mockTransferHelper.mockAsset(address(_mockUsdt), amountOut);
@@ -967,7 +951,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockBridgeAdapterAssets),
             0,
             abi.encodeCall(
-                IBridgeAdapter.publishMessageToChainWithFeePayer,
+                IBridgeAdapter.publishMessageWithFunds,
                 (
                     ACCOUNTING_CHAIN_ID,
                     address(_mockUsdt),
@@ -1048,7 +1032,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         vm.expectCall(
             address(_mockBridgeAdapterAssets),
             abi.encodeCall(
-                IBridgeAdapter.publishMessageToChainWithFeePayer,
+                IBridgeAdapter.publishMessageWithFunds,
                 (
                     ACCOUNTING_CHAIN_ID,
                     address(_mockGho),
@@ -1100,7 +1084,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockBridgeAdapterAssets),
             bridgeFeeAmount,
             abi.encodeCall(
-                IBridgeAdapter.publishMessageToChainWithFeePayer,
+                IBridgeAdapter.publishMessageWithFunds,
                 (
                     ACCOUNTING_CHAIN_ID,
                     address(_mockUsdt),
@@ -1346,11 +1330,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
         vm.expectCall(
             address(_mockBridgeCcipFeeParams),
             abi.encodeCall(
-                IBridgeAdapter.publishMessageToChainWithFeePayer,
+                IBridgeAdapter.publishDataOnlyMessage,
                 (
                     ACCOUNTING_CHAIN_ID,
-                    Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
-                    0,
                     abi.encode(
                         IChainGateway.CrossChainMessage({
                             messageType: IChainGateway.MessageType.BRIDGE_IOU_TOKEN,
@@ -1397,11 +1379,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockBridgeCcipFeeParams),
             bridgeFeeAmount,
             abi.encodeCall(
-                IBridgeAdapter.publishMessageToChainWithFeePayer,
+                IBridgeAdapter.publishDataOnlyMessage,
                 (
                     ACCOUNTING_CHAIN_ID,
-                    Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
-                    0,
                     abi.encode(
                         IChainGateway.CrossChainMessage({
                             messageType: IChainGateway.MessageType.BRIDGE_IOU_TOKEN,
@@ -1799,7 +1779,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     function _expectedBurnIouCalldata(
         uint256 iouTokenAmountRay,
         address feePayer,
-        uint256 gasLimit,
+        uint256 payloadExecutionGasLimit,
         bytes memory bridgeAdapterData
     ) internal view returns (bytes memory) {
         bytes memory data = abi.encode(
@@ -1815,8 +1795,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
             })
         );
         return abi.encodeCall(
-            IBridgeAdapter.publishMessageToChainWithFeePayer,
-            (ACCOUNTING_CHAIN_ID, Constants.ASSET_FOR_DATA_ONLY_BRIDGE, 0, data, feePayer, gasLimit, bridgeAdapterData)
+            IBridgeAdapter.publishDataOnlyMessage,
+            (ACCOUNTING_CHAIN_ID, data, feePayer, payloadExecutionGasLimit, bridgeAdapterData)
         );
     }
 }

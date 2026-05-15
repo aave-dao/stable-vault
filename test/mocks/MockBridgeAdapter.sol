@@ -24,20 +24,57 @@ contract MockBridgeAdapter is IBridgeAdapter {
 
     function getGateway() external view override returns (address) {}
 
+    function getDataOnlyReceiveGasOverhead() external pure override returns (uint256) {
+        return 0;
+    }
+
     function mockFeeAmount(uint256 feeAmount) external {
         _feeAmount = feeAmount;
     }
 
-    function publishMessageToChainWithFeePayer(
+    function publishDataOnlyMessage(
+        uint256 destinationChainId,
+        bytes memory messageData,
+        address feePayer,
+        uint256 payloadExecutionGasLimit,
+        bytes memory bridgeAdapterData
+    ) external payable override {
+        _publishMessage(
+            destinationChainId,
+            Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
+            0,
+            messageData,
+            feePayer,
+            payloadExecutionGasLimit,
+            bridgeAdapterData
+        );
+    }
+
+    function publishMessageWithFunds(
         uint256 destinationChainId,
         address asset,
         uint256 amount,
-        bytes memory data,
+        bytes memory messageData,
+        address feePayer,
+        uint256 receiverExecutionGasLimit,
+        bytes memory bridgeAdapterData
+    ) external payable override {
+        require(asset != Constants.ASSET_FOR_DATA_ONLY_BRIDGE && amount > 0, Errors.InvalidParameter());
+        _publishMessage(
+            destinationChainId, asset, amount, messageData, feePayer, receiverExecutionGasLimit, bridgeAdapterData
+        );
+    }
+
+    function _publishMessage(
+        uint256 destinationChainId,
+        address asset,
+        uint256 amount,
+        bytes memory messageData,
         address feePayer,
         uint256 gasLimit,
         bytes memory bridgeAdapterData
-    ) external payable override {
-        (destinationChainId, data, gasLimit);
+    ) internal {
+        (destinationChainId, messageData, gasLimit);
         ICcipBridgeAdapter.CcipFeeParams memory ccipFeeParams =
             abi.decode(bridgeAdapterData, (ICcipBridgeAdapter.CcipFeeParams));
 

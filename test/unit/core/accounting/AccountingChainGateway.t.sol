@@ -353,11 +353,9 @@ contract AccountingChainGatewayTest is TestWithHelpers {
             address(_mockBridgeCcipFeeParams),
             0,
             abi.encodeCall(
-                IBridgeAdapter.publishMessageToChainWithFeePayer,
+                IBridgeAdapter.publishDataOnlyMessage,
                 (
                     EARNING_CHAIN_ID,
-                    Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
-                    0,
                     abi.encode(
                         IChainGateway.CrossChainMessage({
                             messageType: IChainGateway.MessageType.BRIDGE_IOU_TOKEN,
@@ -404,11 +402,9 @@ contract AccountingChainGatewayTest is TestWithHelpers {
             address(_mockBridgeCcipFeeParams),
             bridgeFeeAmount,
             abi.encodeCall(
-                IBridgeAdapter.publishMessageToChainWithFeePayer,
+                IBridgeAdapter.publishDataOnlyMessage,
                 (
                     EARNING_CHAIN_ID,
-                    Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
-                    0,
                     abi.encode(
                         IChainGateway.CrossChainMessage({
                             messageType: IChainGateway.MessageType.BRIDGE_IOU_TOKEN,
@@ -1029,7 +1025,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
             address(_mockBridgeAdapterAssets),
             0,
             abi.encodeCall(
-                IBridgeAdapter.publishMessageToChainWithFeePayer,
+                IBridgeAdapter.publishMessageWithFunds,
                 (EARNING_CHAIN_ID, assetToBridge, amount, "", bridgeFeePayer, DEFAULT_GAS_LIMIT, bridgeAdapterData)
             )
         );
@@ -1071,7 +1067,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
             address(_mockBridgeAdapterAssets),
             0,
             abi.encodeCall(
-                IBridgeAdapter.publishMessageToChainWithFeePayer,
+                IBridgeAdapter.publishMessageWithFunds,
                 (EARNING_CHAIN_ID, assetToBridge, amount, "", bridgeFeePayer, DEFAULT_GAS_LIMIT, bridgeAdapterData)
             )
         );
@@ -1221,7 +1217,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
             address(_mockBridgeAdapterAssets),
             0,
             abi.encodeCall(
-                IBridgeAdapter.publishMessageToChainWithFeePayer,
+                IBridgeAdapter.publishMessageWithFunds,
                 (
                     EARNING_CHAIN_ID,
                     assetToBridge,

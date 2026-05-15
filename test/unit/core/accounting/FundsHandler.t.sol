@@ -459,9 +459,7 @@ contract FundsHandlerTest is TestWithHelpers {
         // Override the adapter so it pulls neither fee nor bridged asset, simulating a downstream
         // that failed to consume the bridged asset; FundsHandler must catch the leftover balance.
         vm.mockCall(
-            address(mockBridgeAdapter),
-            abi.encodeWithSelector(IBridgeAdapter.publishMessageToChainWithFeePayer.selector),
-            ""
+            address(mockBridgeAdapter), abi.encodeWithSelector(IBridgeAdapter.publishMessageWithFunds.selector), ""
         );
         vm.expectRevert(
             abi.encodeWithSelector(TransferHelperClient.TransferHelperBalanceNotConsumed.selector, address(mockAsset))
@@ -501,9 +499,7 @@ contract FundsHandlerTest is TestWithHelpers {
         // Override the adapter so it pulls neither fee nor bridged asset, simulating a downstream
         // that failed to consume the bridged asset; FundsHandler must catch the leftover balance.
         vm.mockCall(
-            address(mockBridgeAdapter),
-            abi.encodeWithSelector(IBridgeAdapter.publishMessageToChainWithFeePayer.selector),
-            ""
+            address(mockBridgeAdapter), abi.encodeWithSelector(IBridgeAdapter.publishMessageWithFunds.selector), ""
         );
         vm.expectRevert(
             abi.encodeWithSelector(TransferHelperClient.TransferHelperBalanceNotConsumed.selector, address(mockAsset))
