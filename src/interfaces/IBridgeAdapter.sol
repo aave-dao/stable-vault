@@ -14,6 +14,9 @@ interface IBridgeAdapter {
     /// @dev The message id matches the one in the `MessagePublished` event.
     event MessageReceived(bytes32 indexed messageId);
 
+    /// @notice Emitted when an existing bridge message is retried.
+    event MessageRetried(bytes32 indexed originalMessageId, bytes32 indexed retryMessageId);
+
     /// @notice Emitted when the destination chain adapter is set.
     event DestinationChainAdapterSet(uint256 indexed chainId, address indexed destinationChainAdapter);
 
@@ -32,6 +35,10 @@ interface IBridgeAdapter {
     /// @notice Getter for the address of the Gateway contract.
     /// @return gateway Address of the Gateway contract.
     function getGateway() external view returns (address);
+
+    /// @notice Getter for the extra gas this adapter adds around data-only destination payload execution.
+    /// @return gasOverhead Gas overhead added by this adapter for data-only message receives.
+    function getDataOnlyReceiveGasOverhead() external view returns (uint256 gasOverhead);
 
     /// @notice Sets the destination chain adapter for a given chain id.
     /// @dev The adapter on the destination chain must support receiving of messages from the bridge which this adapter

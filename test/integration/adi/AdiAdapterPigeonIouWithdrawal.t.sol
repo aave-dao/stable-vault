@@ -145,6 +145,11 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         assertEq(_accounting.iouToken.balanceOf(_user), iouAmountRay, "accounting IOUs not minted");
 
         Vm.Log[] memory bridgeLogs = _bridgeAccountingIousToEarning(iouAmountRay);
+
+        vm.selectFork(_arbFork);
+        assertEq(_earning.iouToken.balanceOf(_user), 0, "earning IOUs should not mint before relay");
+        assertEq(_earning.iouToken.totalSupply(), 0, "earning IOU supply should be zero before relay");
+
         _adiHelper.helpEthToArb(
             AdiHelper.EthToArbArgs({
                 l2ForkId: _arbFork, l1Inbox: ARB_INBOX, l1Bridge: ARB_BRIDGE, expectedL1CCC: _ethCcc, logs: bridgeLogs
@@ -158,6 +163,7 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
 
         vm.selectFork(_arbFork);
         assertEq(_earning.iouToken.balanceOf(_user), iouAmountRay, "earning IOUs not minted");
+        assertEq(_earning.iouToken.totalSupply(), iouAmountRay, "earning IOU supply not minted");
         uint256 userAssetBefore = _earning.asset.balanceOf(_user);
         uint256 burnSourceBlock = block.number;
 
@@ -168,6 +174,12 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         assertGt(_earning.asset.balanceOf(_user), userAssetBefore, "user did not receive earning-chain assets");
 
         vm.selectFork(_ethFork);
+        assertEq(_accounting.iouTokenManager.getLockedBalance(), iouAmountRay, "locked IOUs burned before relay");
+        assertEq(
+            _accounting.iouToken.balanceOf(address(_accounting.iouTokenManager)),
+            iouAmountRay,
+            "manager IOUs burned before relay"
+        );
         _accounting.chainBalanceOracle
             .setChainBalance(
                 ARB_CHAIN_ID,
@@ -196,6 +208,79 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         assertEq(_accounting.iouTokenManager.getLockedBalance(), 0, "locked IOUs not burned");
         assertEq(_accounting.iouToken.balanceOf(address(_accounting.iouTokenManager)), 0, "manager still holds IOUs");
         assertEq(_accounting.iouToken.totalSupply(), 0, "accounting IOU supply not burned");
+    }
+
+    function test_iouBurnRetryOverAdi_burnsLockedAccountingIous() public onlyForkTest {
+        uint256 depositAmount = 500e6;
+        vm.selectFork(_ethFork);
+        uint256 iouAmountRay = depositAmount.assetDecimalsToRay(address(_accounting.asset));
+
+        _depositIntoStableVault(depositAmount);
+        _airdropEarningLiquidity(depositAmount);
+
+        vm.selectFork(_ethFork);
+        vm.prank(_user);
+        _accounting.vault.requestWithdrawal(_user, iouAmountRay, "");
+
+        Vm.Log[] memory bridgeLogs = _bridgeAccountingIousToEarning(iouAmountRay);
+        _adiHelper.helpEthToArb(
+            AdiHelper.EthToArbArgs({
+                l2ForkId: _arbFork, l1Inbox: ARB_INBOX, l1Bridge: ARB_BRIDGE, expectedL1CCC: _ethCcc, logs: bridgeLogs
+            })
+        );
+
+        vm.selectFork(_arbFork);
+        assertEq(_earning.iouToken.balanceOf(_user), iouAmountRay, "earning IOUs not minted before burn retry");
+        uint256 userAssetBefore = _earning.asset.balanceOf(_user);
+        uint256 burnSourceBlock = block.number;
+        Vm.Log[] memory burnLogs = _exchangeEarningIousForAssets(iouAmountRay);
+        bytes memory encodedBurnTransaction = _firstSuccessfulEncodedTransaction(burnLogs);
+
+        assertEq(_earning.iouToken.balanceOf(_user), 0, "earning IOUs not burned before retry");
+        assertGt(_earning.asset.balanceOf(_user), userAssetBefore, "user did not receive earning-chain assets");
+
+        vm.selectFork(_ethFork);
+        assertEq(_accounting.iouTokenManager.getLockedBalance(), iouAmountRay, "locked IOUs burned before retry");
+        _accounting.chainBalanceOracle
+            .setChainBalance(
+                ARB_CHAIN_ID,
+                IChainBalanceOracle.ChainBalance({
+                    balanceRay: 0,
+                    lastUpdateTimestamp: block.timestamp,
+                    sourceChainTimestamp: block.timestamp,
+                    sourceChainBlockNumber: burnSourceBlock,
+                    isStale: false
+                })
+            );
+
+        vm.selectFork(_arbFork);
+        address[] memory bridgeAdaptersToRetry = _configuredArbToEthRetryAdapters();
+        uint256 retryNativeFee = _prepareRetryFees(_earning.adiAdapter, encodedBurnTransaction, bridgeAdaptersToRetry);
+
+        vm.recordLogs();
+        _earning.adiAdapter.retryTransaction{value: retryNativeFee}(
+            encodedBurnTransaction, DEFAULT_GAS_LIMIT, bridgeAdaptersToRetry
+        );
+        Vm.Log[] memory retryLogs = vm.getRecordedLogs();
+        assertGe(_adiHelper.countSuccessfulForwards(retryLogs), 2, "BURN retry should meet forwarding threshold");
+
+        _adiHelper.helpMultiBridge(
+            AdiHelper.MultiBridgeArgs({
+                dstForkId: _ethFork,
+                dstCcipRouter: ETH_CCIP_ROUTER,
+                dstCcipChainSelector: ETH_CCIP_CHAIN_SELECTOR,
+                srcCcipOnRamp: address(0),
+                dstLzEndpoint: LZ_ENDPOINT_V2,
+                srcHlMailbox: ARB_HL_MAILBOX,
+                dstHlMailbox: ETH_HL_MAILBOX,
+                logs: retryLogs
+            })
+        );
+
+        vm.selectFork(_ethFork);
+        assertEq(_accounting.iouTokenManager.getLockedBalance(), 0, "locked IOUs not burned by retry");
+        assertEq(_accounting.iouToken.balanceOf(address(_accounting.iouTokenManager)), 0, "manager still holds IOUs");
+        assertEq(_accounting.iouToken.totalSupply(), 0, "accounting IOU supply not burned by retry");
     }
 
     function _deployAccountingStack() internal returns (AccountingStack memory stack) {
@@ -606,5 +691,31 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
                 )
             })
         );
+    }
+
+    function _configuredArbToEthRetryAdapters() internal view returns (address[] memory bridgeAdaptersToRetry) {
+        uint256 adapterCount;
+        if (_arbCcipAdapter != address(0)) {
+            adapterCount++;
+        }
+        if (_arbLzAdapter != address(0)) {
+            adapterCount++;
+        }
+        if (_arbHlAdapter != address(0)) {
+            adapterCount++;
+        }
+        require(adapterCount >= 2, "ARB_ETH_RETRY_ADAPTERS_NOT_CONFIGURED");
+
+        bridgeAdaptersToRetry = new address[](adapterCount);
+        uint256 index;
+        if (_arbCcipAdapter != address(0)) {
+            bridgeAdaptersToRetry[index++] = _arbCcipAdapter;
+        }
+        if (_arbLzAdapter != address(0)) {
+            bridgeAdaptersToRetry[index++] = _arbLzAdapter;
+        }
+        if (_arbHlAdapter != address(0)) {
+            bridgeAdaptersToRetry[index++] = _arbHlAdapter;
+        }
     }
 }

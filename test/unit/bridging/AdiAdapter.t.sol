@@ -10,6 +10,8 @@ import {IAdiBridgeAdapter} from "src/interfaces/IAdiBridgeAdapter.sol";
 import {IAdiCrossChainForwarder} from "src/interfaces/IAdiCrossChainForwarder.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
+import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
+import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
@@ -102,6 +104,11 @@ contract AdiAdapterTest is TestWithHelpers {
         assertEq(_earningChainAdiAdapter.getGateway(), address(_earningChainGateway));
     }
 
+    function test_getDataOnlyReceiveGasOverhead() public view {
+        assertEq(_accountingChainAdiAdapter.getDataOnlyReceiveGasOverhead(), 10_000);
+        assertEq(_earningChainAdiAdapter.getDataOnlyReceiveGasOverhead(), 10_000);
+    }
+
     function test_quoteMessageToChain_returnsControllerQuote() public {
         uint256 nativeFee = 1 ether;
         uint256 erc20Fee = 100e6;
@@ -110,7 +117,7 @@ contract AdiAdapterTest is TestWithHelpers {
         _mockAdiCrossChainController.setSuccessfulQuotes(successfulQuotes);
         _setQuotedFees(_singleAddress(address(_mockUsdc)), _singleUint256(erc20Fee));
         _mockAdiCrossChainController.setExpectedQuote(
-            DEFAULT_GAS_LIMIT + _accountingChainAdiAdapter.ADI_RECEIVER_GAS_OVERHEAD(), 0
+            DEFAULT_GAS_LIMIT + _accountingChainAdiAdapter.getDataOnlyReceiveGasOverhead(), 0
         );
 
         (uint256 quotedNativeFee, IAdiCrossChainForwarder.Fee[] memory quotedFees, uint256 quotedSuccessfulQuotes) =
@@ -127,7 +134,7 @@ contract AdiAdapterTest is TestWithHelpers {
         uint256 optimalBandwidth = 2;
         _mockAdiCrossChainController.setOptimalBandwidth(optimalBandwidth);
         _mockAdiCrossChainController.setExpectedQuote(
-            DEFAULT_GAS_LIMIT + _accountingChainAdiAdapter.ADI_RECEIVER_GAS_OVERHEAD(), optimalBandwidth
+            DEFAULT_GAS_LIMIT + _accountingChainAdiAdapter.getDataOnlyReceiveGasOverhead(), optimalBandwidth
         );
 
         _accountingChainAdiAdapter.quoteMessageToChain(EARNING_CHAIN_ID, "message", DEFAULT_GAS_LIMIT);
@@ -151,7 +158,7 @@ contract AdiAdapterTest is TestWithHelpers {
         _mockAdiCrossChainController.setSuccessfulQuotes(successfulQuotes);
         _setQuotedFees(_singleAddress(address(_mockUsdc)), _singleUint256(erc20Fee));
         _mockAdiCrossChainController.setExpectedQuote(
-            DEFAULT_GAS_LIMIT + _accountingChainAdiAdapter.ADI_RECEIVER_GAS_OVERHEAD(), 0
+            DEFAULT_GAS_LIMIT + _accountingChainAdiAdapter.getDataOnlyReceiveGasOverhead(), 0
         );
 
         (uint256 quotedNativeFee, IAdiCrossChainForwarder.Fee[] memory quotedFees, uint256 quotedSuccessfulQuotes) = _accountingChainAdiAdapter.quoteRetryTransaction(
@@ -169,7 +176,7 @@ contract AdiAdapterTest is TestWithHelpers {
         uint256 quoteBandwidth = 2;
         IAdiCrossChainForwarder.Envelope memory envelope = _validRetryEnvelope();
         _mockAdiCrossChainController.setExpectedQuote(
-            DEFAULT_GAS_LIMIT + _accountingChainAdiAdapter.ADI_RECEIVER_GAS_OVERHEAD(), quoteBandwidth
+            DEFAULT_GAS_LIMIT + _accountingChainAdiAdapter.getDataOnlyReceiveGasOverhead(), quoteBandwidth
         );
 
         _accountingChainAdiAdapter.quoteRetryEnvelope(envelope, DEFAULT_GAS_LIMIT, quoteBandwidth);
@@ -244,7 +251,7 @@ contract AdiAdapterTest is TestWithHelpers {
     function test_publishMessageToChainWithFeePayer_forwardsDataOnlyMessage() public {
         bytes memory data = abi.encode("bridge-iou-token");
         _mockAdiCrossChainController.setExpectedQuote(
-            DEFAULT_GAS_LIMIT + _accountingChainAdiAdapter.ADI_RECEIVER_GAS_OVERHEAD(), 0
+            DEFAULT_GAS_LIMIT + _accountingChainAdiAdapter.getDataOnlyReceiveGasOverhead(), 0
         );
 
         vm.expectEmit(true, true, true, true);
@@ -265,7 +272,7 @@ contract AdiAdapterTest is TestWithHelpers {
         assertEq(_mockAdiCrossChainController.lastDestination(), address(_earningChainAdiAdapter));
         assertEq(
             _mockAdiCrossChainController.lastGasLimit(),
-            DEFAULT_GAS_LIMIT + _accountingChainAdiAdapter.ADI_RECEIVER_GAS_OVERHEAD()
+            DEFAULT_GAS_LIMIT + _accountingChainAdiAdapter.getDataOnlyReceiveGasOverhead()
         );
         assertEq(_mockAdiCrossChainController.getLastMessage(), data);
         assertEq(_mockAdiCrossChainController.forwardMessageCallCount(), 1);
@@ -283,7 +290,7 @@ contract AdiAdapterTest is TestWithHelpers {
         assertEq(address(_mockAdiCrossChainController).balance, 0);
         assertEq(
             _mockAdiCrossChainController.lastGasLimit(),
-            gasLimit + _accountingChainAdiAdapter.ADI_RECEIVER_GAS_OVERHEAD()
+            gasLimit + _accountingChainAdiAdapter.getDataOnlyReceiveGasOverhead()
         );
         assertEq(_mockAdiCrossChainController.getLastMessage(), data);
     }
@@ -344,6 +351,32 @@ contract AdiAdapterTest is TestWithHelpers {
 
         assertEq(address(_mockAdiCrossChainController).balance, nativeAmount);
         assertEq(_mockAdiCrossChainController.lastDestinationChainId(), EARNING_CHAIN_ID);
+    }
+
+    function test_publishMessageToChainWithFeePayer_reverts_ifNoSuccessfulQuotes() public {
+        uint256 nativeAmount = 1 ether;
+        uint256 feeAmount = 100e6;
+        vm.deal(address(_accountingChainGateway), nativeAmount);
+        _stageFee(feePayer, _mockUsdc, feeAmount);
+        _mockAdiCrossChainController.setNativeFee(nativeAmount);
+        _mockAdiCrossChainController.setSuccessfulQuotes(0);
+        _setQuotedFees(_singleAddress(address(_mockUsdc)), _singleUint256(feeAmount));
+
+        vm.expectRevert(IAdiBridgeAdapter.NoSuccessfulQuotes.selector);
+        vm.prank(address(_accountingChainGateway));
+        _accountingChainAdiAdapter.publishMessageToChainWithFeePayer{value: nativeAmount}(
+            EARNING_CHAIN_ID,
+            Constants.ASSET_FOR_DATA_ONLY_BRIDGE,
+            0,
+            "",
+            feePayer,
+            DEFAULT_GAS_LIMIT,
+            _bridgeAdapterData()
+        );
+
+        assertEq(_mockAdiCrossChainController.forwardMessageCallCount(), 0);
+        assertEq(address(_mockAdiCrossChainController).balance, 0);
+        assertEq(_mockUsdc.balanceOf(address(_mockAdiCrossChainController)), 0);
     }
 
     function test_publishMessageToChainWithFeePayer_pullsErc20FundingToCrossChainController() public {
@@ -585,7 +618,7 @@ contract AdiAdapterTest is TestWithHelpers {
         _setQuotedFees(_singleAddress(address(_mockUsdc)), _singleUint256(erc20Fee));
 
         vm.expectEmit(true, true, true, true);
-        emit IBridgeAdapter.MessagePublished(_envelopeId(envelope));
+        emit IBridgeAdapter.MessageRetried(_envelopeId(envelope), _transactionId(encodedTransaction));
         vm.expectCall(
             address(_mockUsdc),
             abi.encodeCall(IERC20.transferFrom, (feePayer, address(_mockAdiCrossChainController), erc20Fee))
@@ -599,11 +632,56 @@ contract AdiAdapterTest is TestWithHelpers {
         assertEq(_mockAdiCrossChainController.retryTransactionCallCount(), 1);
         assertEq(
             _mockAdiCrossChainController.lastGasLimit(),
-            DEFAULT_GAS_LIMIT + _accountingChainAdiAdapter.ADI_RECEIVER_GAS_OVERHEAD()
+            DEFAULT_GAS_LIMIT + _accountingChainAdiAdapter.getDataOnlyReceiveGasOverhead()
         );
         assertEq(address(_mockAdiCrossChainController).balance, nativeFee);
         assertEq(_mockUsdc.balanceOf(address(_mockAdiCrossChainController)), erc20Fee);
         assertEq(feePayer.balance, providedNative - nativeFee);
+    }
+
+    function test_retryTransaction_reverts_ifNoSuccessfulQuotes() public {
+        uint256 nativeFee = 1 ether;
+        uint256 erc20Fee = 100e6;
+        IAdiCrossChainForwarder.Envelope memory envelope = _validRetryEnvelope();
+        bytes memory encodedTransaction = _encodeTransaction(envelope);
+        address[] memory bridgeAdaptersToRetry = _singleAddress(makeAddr("bridgeAdapter"));
+        vm.deal(feePayer, nativeFee);
+        _stageFee(feePayer, _mockUsdc, erc20Fee);
+        _mockAdiCrossChainController.setNativeFee(nativeFee);
+        _mockAdiCrossChainController.setSuccessfulQuotes(0);
+        _setQuotedFees(_singleAddress(address(_mockUsdc)), _singleUint256(erc20Fee));
+
+        vm.expectRevert(IAdiBridgeAdapter.NoSuccessfulQuotes.selector);
+        vm.prank(feePayer);
+        _accountingChainAdiAdapter.retryTransaction{value: nativeFee}(
+            encodedTransaction, DEFAULT_GAS_LIMIT, bridgeAdaptersToRetry
+        );
+
+        assertEq(_mockAdiCrossChainController.retryTransactionCallCount(), 0);
+        assertEq(address(_mockAdiCrossChainController).balance, 0);
+        assertEq(_mockUsdc.balanceOf(address(_mockAdiCrossChainController)), 0);
+    }
+
+    function test_retryTransaction_revertsFunding_ifControllerRetryReverts() public {
+        uint256 nativeFee = 1 ether;
+        uint256 erc20Fee = 100e6;
+        IAdiCrossChainForwarder.Envelope memory envelope = _validRetryEnvelope();
+        bytes memory encodedTransaction = _encodeTransaction(envelope);
+        address[] memory bridgeAdaptersToRetry = _singleAddress(makeAddr("bridgeAdapter"));
+        vm.deal(feePayer, nativeFee);
+        _stageFee(feePayer, _mockUsdc, erc20Fee);
+        _mockAdiCrossChainController.setNativeFee(nativeFee);
+        _setQuotedFees(_singleAddress(address(_mockUsdc)), _singleUint256(erc20Fee));
+        _mockAdiCrossChainController.setShouldRevertForwardMessage(true);
+
+        vm.expectRevert(MockAdiCrossChainController.ForwardMessageFailed.selector);
+        vm.prank(feePayer);
+        _accountingChainAdiAdapter.retryTransaction{value: nativeFee}(
+            encodedTransaction, DEFAULT_GAS_LIMIT, bridgeAdaptersToRetry
+        );
+
+        assertEq(address(_mockAdiCrossChainController).balance, 0);
+        assertEq(_mockUsdc.balanceOf(address(_mockAdiCrossChainController)), 0);
     }
 
     function test_retryEnvelope_usesConfiguredOptimalBandwidthAndReturnsTransactionId() public {
@@ -611,11 +689,11 @@ contract AdiAdapterTest is TestWithHelpers {
         IAdiCrossChainForwarder.Envelope memory envelope = _validRetryEnvelope();
         _mockAdiCrossChainController.setOptimalBandwidth(optimalBandwidth);
         _mockAdiCrossChainController.setExpectedQuote(
-            DEFAULT_GAS_LIMIT + _accountingChainAdiAdapter.ADI_RECEIVER_GAS_OVERHEAD(), optimalBandwidth
+            DEFAULT_GAS_LIMIT + _accountingChainAdiAdapter.getDataOnlyReceiveGasOverhead(), optimalBandwidth
         );
 
         vm.expectEmit(true, true, true, true);
-        emit IBridgeAdapter.MessagePublished(_envelopeId(envelope));
+        emit IBridgeAdapter.MessageRetried(_envelopeId(envelope), bytes32(uint256(3)));
 
         vm.prank(feePayer);
         bytes32 transactionId = _accountingChainAdiAdapter.retryEnvelope(envelope, DEFAULT_GAS_LIMIT);
@@ -624,8 +702,23 @@ contract AdiAdapterTest is TestWithHelpers {
         assertEq(_mockAdiCrossChainController.retryEnvelopeCallCount(), 1);
         assertEq(
             _mockAdiCrossChainController.lastGasLimit(),
-            DEFAULT_GAS_LIMIT + _accountingChainAdiAdapter.ADI_RECEIVER_GAS_OVERHEAD()
+            DEFAULT_GAS_LIMIT + _accountingChainAdiAdapter.getDataOnlyReceiveGasOverhead()
         );
+    }
+
+    function test_retryEnvelope_reverts_ifNoSuccessfulQuotes() public {
+        uint256 nativeFee = 1 ether;
+        IAdiCrossChainForwarder.Envelope memory envelope = _validRetryEnvelope();
+        _mockAdiCrossChainController.setNativeFee(nativeFee);
+        _mockAdiCrossChainController.setSuccessfulQuotes(0);
+        vm.deal(feePayer, nativeFee);
+
+        vm.expectRevert(IAdiBridgeAdapter.NoSuccessfulQuotes.selector);
+        vm.prank(feePayer);
+        _accountingChainAdiAdapter.retryEnvelope{value: nativeFee}(envelope, DEFAULT_GAS_LIMIT);
+
+        assertEq(_mockAdiCrossChainController.retryEnvelopeCallCount(), 0);
+        assertEq(address(_mockAdiCrossChainController).balance, 0);
     }
 
     function test_publishMessageToChainWithFeePayer_reverts_ifDestinationChainAdapterNotSet(uint256 destinationChainId)
@@ -716,6 +809,67 @@ contract AdiAdapterTest is TestWithHelpers {
         );
     }
 
+    function test_rescueNative_transfersExpectedAmountToMsgSender(uint256 adapterBalance, uint256 amountToRescue)
+        public
+    {
+        address rescuer = everyRoleAccount;
+        adapterBalance = bound(adapterBalance, 1, type(uint128).max);
+        amountToRescue = bound(amountToRescue, 1, adapterBalance);
+        vm.deal(address(_accountingChainAdiAdapter), adapterBalance);
+
+        vm.expectEmit(true, true, true, true);
+        emit IRescuableNative.NativeRescued(rescuer, amountToRescue);
+        vm.prank(rescuer);
+        IRescuableNative(address(_accountingChainAdiAdapter)).rescueNative(amountToRescue);
+
+        assertEq(rescuer.balance, amountToRescue);
+        assertEq(address(_accountingChainAdiAdapter).balance, adapterBalance - amountToRescue);
+    }
+
+    function test_rescueNative_reverts_ifMsgSenderIsNotAuthorized(address unauthorizedMsgSender, uint256 amount)
+        public
+    {
+        vm.assume(unauthorizedMsgSender != address(0));
+        _mockAccessManager.mockRejectCall(
+            unauthorizedMsgSender, address(_accountingChainAdiAdapter), IRescuableNative.rescueNative.selector
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
+        );
+        vm.prank(unauthorizedMsgSender);
+        IRescuableNative(address(_accountingChainAdiAdapter)).rescueNative(amount);
+    }
+
+    function test_rescueTokens_transfersExpectedAmountToMsgSender(uint256 amountToRescue) public {
+        address rescuer = everyRoleAccount;
+        amountToRescue = _boundAssetAmount(address(_mockUsdc), amountToRescue);
+        _mockUsdc.mint(address(_accountingChainAdiAdapter), amountToRescue);
+
+        vm.expectEmit(true, true, true, true);
+        emit IRescuableToken.TokensRescued(address(_mockUsdc), rescuer, amountToRescue);
+        vm.prank(rescuer);
+        IRescuableToken(address(_accountingChainAdiAdapter)).rescueTokens(address(_mockUsdc), amountToRescue);
+
+        assertEq(_mockUsdc.balanceOf(rescuer), amountToRescue);
+        assertEq(_mockUsdc.balanceOf(address(_accountingChainAdiAdapter)), 0);
+    }
+
+    function test_rescueTokens_reverts_ifMsgSenderIsNotAuthorized(address unauthorizedMsgSender, uint256 amount)
+        public
+    {
+        vm.assume(unauthorizedMsgSender != address(0));
+        _mockAccessManager.mockRejectCall(
+            unauthorizedMsgSender, address(_accountingChainAdiAdapter), IRescuableToken.rescueTokens.selector
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, unauthorizedMsgSender)
+        );
+        vm.prank(unauthorizedMsgSender);
+        IRescuableToken(address(_accountingChainAdiAdapter)).rescueTokens(address(_mockUsdc), amount);
+    }
+
     function test_setDestinationChainAdapter_reverts_ifNotAuthorized(address operator) public {
         vm.assume(operator != everyRoleAccount);
         vm.assume(operator != address(0));
@@ -765,6 +919,10 @@ contract AdiAdapterTest is TestWithHelpers {
 
     function _envelopeId(IAdiCrossChainForwarder.Envelope memory envelope) internal pure returns (bytes32) {
         return keccak256(abi.encode(envelope));
+    }
+
+    function _transactionId(bytes memory encodedTransaction) internal pure returns (bytes32) {
+        return keccak256(encodedTransaction);
     }
 
     function _bridgeAdapterData() internal pure returns (bytes memory) {

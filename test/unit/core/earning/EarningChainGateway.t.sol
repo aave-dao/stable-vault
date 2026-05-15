@@ -629,6 +629,48 @@ contract EarningChainGatewayTest is TestWithHelpers {
         );
     }
 
+    function test_exchangeIouTokens_rollsBackBurnAndAssetTransferIfBurnMessagePublishReverts(uint256 iouTokenAmountRay)
+        public
+    {
+        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        address tokenOutReceiver = makeAddr("tokenOutReceiver");
+        address tokenOut = address(_mockUsdt);
+        uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(tokenOut);
+        vm.assume(amountOut > 0);
+
+        _mockUsdt.mint(address(_mockAllocator), amountOut);
+        _mockTransferHelper.mockAsset(tokenOut, amountOut);
+        IAllocator.AllocatorBalance[] memory allocatorBalances = _buildAllocatorBalances(123e18, 456e18);
+        vm.mockCall(
+            address(_mockAllocator),
+            abi.encodeWithSelector(MockAllocator.getTrustedAssetBalances.selector),
+            abi.encode(allocatorBalances)
+        );
+
+        bytes memory bridgeAdapterData = abi.encode(
+            ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeAmount: 0, feeRefundThreshold: 0})
+        );
+        _mockBridgeCcipFeeParams.setShouldRevertPublish(true);
+
+        vm.expectRevert(MockBridgeAdapter.PublishMessageFailed.selector);
+        vm.prank(tokenOutReceiver);
+        _earningChainGateway.exchangeIouTokens(
+            iouTokenAmountRay,
+            tokenOut,
+            0,
+            tokenOutReceiver,
+            address(_mockBridgeCcipFeeParams),
+            BURN_IOU_TOKEN_GAS_LIMIT,
+            bridgeAdapterData,
+            ""
+        );
+
+        assertEq(_mockIouTokenManager.burnedAmount(tokenOutReceiver), 0, "IOU burn did not roll back");
+        assertEq(_mockIouTokenManager.totalBurned(), 0, "total IOU burn did not roll back");
+        assertEq(_mockUsdt.balanceOf(tokenOutReceiver), 0, "asset transfer should not happen");
+        assertEq(_mockUsdt.balanceOf(address(_mockTransferHelper)), amountOut, "TransferHelper balance changed");
+    }
+
     function test_exchangeIouTokens_emitsAssetOutflow(uint256 iouTokenAmountRay) public {
         iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
         address tokenOut = address(_mockUsdt);

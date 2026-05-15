@@ -13,6 +13,10 @@ interface IAdiBridgeAdapter is IBridgeAdapter {
     /// @custom:selector 0xe632d197
     error OnlyCrossChainController();
 
+    /// @notice a.DI returned no successful bridge adapter quotes for a message that would be published or retried.
+    /// @custom:selector 0x207ea6be
+    error NoSuccessfulQuotes();
+
     /// @notice Getter for the address of the a.DI CrossChainController.
     /// @return crossChainController Address of the a.DI CrossChainController.
     function getCrossChainController() external view returns (address crossChainController);

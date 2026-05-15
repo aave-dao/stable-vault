@@ -17,13 +17,20 @@ import {Errors} from "src/types/Errors.sol";
 contract MockBridgeAdapter is IBridgeAdapter {
     using SafeERC20 for IERC20;
 
+    error PublishMessageFailed();
+
     address internal immutable TRANSFER_HELPER;
+    bool internal _shouldRevertPublish;
 
     constructor(address transferHelper) {
         TRANSFER_HELPER = transferHelper;
     }
 
     function getGateway() external view override returns (address) {}
+
+    function getDataOnlyReceiveGasOverhead() external pure override returns (uint256) {
+        return 0;
+    }
 
     function publishMessageToChainWithFeePayer(
         uint256 destinationChainId,
@@ -34,6 +41,8 @@ contract MockBridgeAdapter is IBridgeAdapter {
         uint256 gasLimit,
         bytes memory bridgeAdapterData
     ) external payable override {
+        require(!_shouldRevertPublish, PublishMessageFailed());
+
         (destinationChainId, data, gasLimit);
         ICcipBridgeAdapter.CcipFeeParams memory ccipFeeParams =
             abi.decode(bridgeAdapterData, (ICcipBridgeAdapter.CcipFeeParams));
@@ -54,6 +63,10 @@ contract MockBridgeAdapter is IBridgeAdapter {
     }
 
     function setDestinationChainAdapter(uint256 chainId, address destinationChainAdapter) external override {}
+
+    function setShouldRevertPublish(bool shouldRevertPublish) external {
+        _shouldRevertPublish = shouldRevertPublish;
+    }
 
     receive() external payable {}
 }

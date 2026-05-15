@@ -10,19 +10,21 @@ import {IAdiBridgeAdapter} from "src/interfaces/IAdiBridgeAdapter.sol";
 import {IAdiCrossChainForwarder} from "src/interfaces/IAdiCrossChainForwarder.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
+import {RescuableNative} from "src/misc/RescuableNative.sol";
+import {RescuableToken} from "src/misc/RescuableToken.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
 /// @title AdiAdapter
 /// @author Aave Labs
 /// @notice Adapter for sending and receiving data-only messages via a.DI.
-contract AdiAdapter is BaseBridgeAdapter, IAdiBridgeAdapter {
+contract AdiAdapter is BaseBridgeAdapter, RescuableNative, RescuableToken, IAdiBridgeAdapter {
     using SafeERC20 for IERC20;
 
-    /// @notice Additional gas a.DI should allocate for this adapter before entering the destination Gateway.
-    /// @dev The current mocked receiver trace measures the adapter wrapper at about 7,163 gas. Rounded up to 10k for
+    /// @dev Additional gas a.DI should allocate for this adapter before entering the destination Gateway.
+    /// The current mocked Gateway trace measures the adapter wrapper at about 7.2k gas. Rounded up to 10k for
     /// calldata growth and cold access variance.
-    uint256 public constant ADI_RECEIVER_GAS_OVERHEAD = 10_000;
+    uint256 internal constant ADI_RECEIVER_GAS_OVERHEAD = 10_000;
 
     address internal immutable ADI_CROSS_CHAIN_CONTROLLER;
 
@@ -41,6 +43,16 @@ contract AdiAdapter is BaseBridgeAdapter, IAdiBridgeAdapter {
     /// @inheritdoc IAdiBridgeAdapter
     function getCrossChainController() external view override returns (address crossChainController) {
         return ADI_CROSS_CHAIN_CONTROLLER;
+    }
+
+    /// @inheritdoc IBridgeAdapter
+    function getDataOnlyReceiveGasOverhead()
+        public
+        pure
+        override(BaseBridgeAdapter, IBridgeAdapter)
+        returns (uint256 gasOverhead)
+    {
+        return ADI_RECEIVER_GAS_OVERHEAD;
     }
 
     /// @inheritdoc IAdiBridgeAdapter
@@ -74,9 +86,10 @@ contract AdiAdapter is BaseBridgeAdapter, IAdiBridgeAdapter {
         address destinationChainAdapter = _destinationChainAdapterOf[destinationChainId];
         require(destinationChainAdapter != address(0), Errors.InvalidParameter());
 
-        uint256 adjustedGasLimit = gasLimit + ADI_RECEIVER_GAS_OVERHEAD;
-        (uint256 nativeFee, IAdiCrossChainForwarder.Fee[] memory fees,) =
+        uint256 adjustedGasLimit = _withReceiverOverhead(gasLimit);
+        (uint256 nativeFee, IAdiCrossChainForwarder.Fee[] memory fees, uint256 successfulQuotes) =
             _quoteForwardMessage(destinationChainId, destinationChainAdapter, gasLimit, data);
+        require(successfulQuotes > 0, NoSuccessfulQuotes());
         _fundCrossChainController(feePayer, nativeFee, fees);
 
         (bytes32 envelopeId,) = IAdiCrossChainForwarder(ADI_CROSS_CHAIN_CONTROLLER)
@@ -101,7 +114,7 @@ contract AdiAdapter is BaseBridgeAdapter, IAdiBridgeAdapter {
         _validateRetryEnvelope(envelope);
 
         return IAdiCrossChainForwarder(ADI_CROSS_CHAIN_CONTROLLER)
-            .quoteRetryTransaction(encodedTransaction, gasLimit + ADI_RECEIVER_GAS_OVERHEAD, bridgeAdaptersToRetry);
+            .quoteRetryTransaction(encodedTransaction, _withReceiverOverhead(gasLimit), bridgeAdaptersToRetry);
     }
 
     /// @inheritdoc IAdiBridgeAdapter
@@ -113,15 +126,16 @@ contract AdiAdapter is BaseBridgeAdapter, IAdiBridgeAdapter {
         IAdiCrossChainForwarder.Envelope memory envelope = _decodeTransactionEnvelope(encodedTransaction);
         _validateRetryEnvelope(envelope);
 
-        uint256 adjustedGasLimit = gasLimit + ADI_RECEIVER_GAS_OVERHEAD;
-        (uint256 nativeFee, IAdiCrossChainForwarder.Fee[] memory fees,) = IAdiCrossChainForwarder(
+        uint256 adjustedGasLimit = _withReceiverOverhead(gasLimit);
+        (uint256 nativeFee, IAdiCrossChainForwarder.Fee[] memory fees, uint256 successfulQuotes) = IAdiCrossChainForwarder(
                 ADI_CROSS_CHAIN_CONTROLLER
             ).quoteRetryTransaction(encodedTransaction, adjustedGasLimit, bridgeAdaptersToRetry);
+        require(successfulQuotes > 0, NoSuccessfulQuotes());
         _fundCrossChainController(msg.sender, nativeFee, fees);
 
         IAdiCrossChainForwarder(ADI_CROSS_CHAIN_CONTROLLER)
             .retryTransaction(encodedTransaction, adjustedGasLimit, bridgeAdaptersToRetry);
-        emit MessagePublished(_getEnvelopeId(envelope));
+        emit MessageRetried(_getEnvelopeId(envelope), _getTransactionId(encodedTransaction));
 
         _refundExcessNative(msg.sender, nativeFee);
     }
@@ -140,7 +154,7 @@ contract AdiAdapter is BaseBridgeAdapter, IAdiBridgeAdapter {
         _validateRetryEnvelope(envelope);
 
         return IAdiCrossChainForwarder(ADI_CROSS_CHAIN_CONTROLLER)
-            .quoteRetryEnvelope(envelope, gasLimit + ADI_RECEIVER_GAS_OVERHEAD, quoteBandwidth);
+            .quoteRetryEnvelope(envelope, _withReceiverOverhead(gasLimit), quoteBandwidth);
     }
 
     /// @inheritdoc IAdiBridgeAdapter
@@ -152,16 +166,17 @@ contract AdiAdapter is BaseBridgeAdapter, IAdiBridgeAdapter {
     {
         _validateRetryEnvelope(envelope);
 
-        uint256 adjustedGasLimit = gasLimit + ADI_RECEIVER_GAS_OVERHEAD;
+        uint256 adjustedGasLimit = _withReceiverOverhead(gasLimit);
         uint256 quoteBandwidth =
             IAdiCrossChainForwarder(ADI_CROSS_CHAIN_CONTROLLER).getOptimalBandwidthByChain(envelope.destinationChainId);
-        (uint256 nativeFee, IAdiCrossChainForwarder.Fee[] memory fees,) = IAdiCrossChainForwarder(
+        (uint256 nativeFee, IAdiCrossChainForwarder.Fee[] memory fees, uint256 successfulQuotes) = IAdiCrossChainForwarder(
                 ADI_CROSS_CHAIN_CONTROLLER
             ).quoteRetryEnvelope(envelope, adjustedGasLimit, quoteBandwidth);
+        require(successfulQuotes > 0, NoSuccessfulQuotes());
         _fundCrossChainController(msg.sender, nativeFee, fees);
 
         transactionId = IAdiCrossChainForwarder(ADI_CROSS_CHAIN_CONTROLLER).retryEnvelope(envelope, adjustedGasLimit);
-        emit MessagePublished(_getEnvelopeId(envelope));
+        emit MessageRetried(_getEnvelopeId(envelope), transactionId);
 
         _refundExcessNative(msg.sender, nativeFee);
     }
@@ -190,7 +205,7 @@ contract AdiAdapter is BaseBridgeAdapter, IAdiBridgeAdapter {
         IAdiCrossChainForwarder crossChainForwarder = IAdiCrossChainForwarder(ADI_CROSS_CHAIN_CONTROLLER);
         uint256 quoteBandwidth = crossChainForwarder.getOptimalBandwidthByChain(destinationChainId);
         return crossChainForwarder.quoteForwardMessage(
-            destinationChainId, destinationChainAdapter, gasLimit + ADI_RECEIVER_GAS_OVERHEAD, data, quoteBandwidth
+            destinationChainId, destinationChainAdapter, _withReceiverOverhead(gasLimit), data, quoteBandwidth
         );
     }
 
@@ -216,6 +231,14 @@ contract AdiAdapter is BaseBridgeAdapter, IAdiBridgeAdapter {
         return keccak256(abi.encode(envelope));
     }
 
+    function _getTransactionId(bytes calldata encodedTransaction) internal pure returns (bytes32) {
+        return keccak256(encodedTransaction);
+    }
+
+    function _withReceiverOverhead(uint256 gasLimit) internal pure returns (uint256) {
+        return gasLimit + ADI_RECEIVER_GAS_OVERHEAD;
+    }
+
     function _fundCrossChainController(address feePayer, uint256 nativeFee, IAdiCrossChainForwarder.Fee[] memory fees)
         internal
     {
@@ -226,6 +249,7 @@ contract AdiAdapter is BaseBridgeAdapter, IAdiBridgeAdapter {
             require(callSucceeded, Errors.NativeTransferFailed());
         }
 
+        // a.DI merges duplicate ERC20 fee tokens before returning quotes, so this loop intentionally does not dedup.
         for (uint256 i = 0; i < fees.length; i++) {
             require(fees[i].token != address(0), Errors.InvalidParameter());
             require(fees[i].token != Constants.NATIVE_CURRENCY, Errors.InvalidParameter());
@@ -241,5 +265,15 @@ contract AdiAdapter is BaseBridgeAdapter, IAdiBridgeAdapter {
             (bool callSucceeded,) = payable(feePayer).call{value: excessNative}("");
             require(callSucceeded, Errors.NativeTransferFailed());
         }
+    }
+
+    function _beforeRescueNative(uint256) internal virtual override {
+        // Equivalent to adding the `restricted` modifier.
+        _checkCanCall(_msgSender(), _msgData());
+    }
+
+    function _beforeRescueTokens(address, uint256) internal virtual override {
+        // Equivalent to adding the `restricted` modifier.
+        _checkCanCall(_msgSender(), _msgData());
     }
 }

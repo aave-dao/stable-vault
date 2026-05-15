@@ -49,6 +49,11 @@ abstract contract BaseBridgeAdapter is AccessManaged, TransferHelperClient, IBri
         return GATEWAY;
     }
 
+    /// @inheritdoc IBridgeAdapter
+    function getDataOnlyReceiveGasOverhead() public pure virtual override returns (uint256 gasOverhead) {
+        return 0;
+    }
+
     /// @notice Getter for the destination chain adapter for a given chain id.
     /// @param chainId Chain id of the destination chain.
     /// @return The address of the destination chain adapter.

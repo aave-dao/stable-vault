@@ -5,7 +5,7 @@ pragma solidity ^0.8.22;
 import {Vm} from "forge-std/Vm.sol";
 
 import {IAdiCrossChainForwarder} from "src/interfaces/IAdiCrossChainForwarder.sol";
-import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
+import {Constants} from "src/types/Constants.sol";
 
 import {AdiHelper} from "pigeon/src/adi/AdiHelper.sol";
 
@@ -59,6 +59,8 @@ contract AdiAdapterPigeonRetry is AdiAdapterPigeonLocalForkBase {
         vm.selectFork(_arbFork);
         assertEq(_arbGateway.receiveCount(), 1, "ARB gateway did not receive retry");
         assertEq(_arbGateway.lastSourceChainId(), ETH_CHAIN_ID, "unexpected source chain");
+        assertEq(_arbGateway.lastAsset(), Constants.ASSET_FOR_DATA_ONLY_BRIDGE, "unexpected asset");
+        assertEq(_arbGateway.lastAmount(), 0, "unexpected amount");
         assertEq(abi.decode(_arbGateway.lastData(), (string)), "retry-hello-arb", "unexpected retry message");
     }
 
@@ -91,12 +93,10 @@ contract AdiAdapterPigeonRetry is AdiAdapterPigeonLocalForkBase {
         _setGuardian(_ethCcc, address(_ethAdiAdapter));
         uint256 retryNativeFee = _prepareRetryEnvelopeFees(_ethAdiAdapter, envelope);
 
-        vm.expectEmit(true, true, true, true);
-        emit IBridgeAdapter.MessagePublished(keccak256(abi.encode(envelope)));
-
         vm.recordLogs();
-        _ethAdiAdapter.retryEnvelope{value: retryNativeFee}(envelope, DEFAULT_GAS_LIMIT);
+        bytes32 transactionId = _ethAdiAdapter.retryEnvelope{value: retryNativeFee}(envelope, DEFAULT_GAS_LIMIT);
         Vm.Log[] memory retryLogs = vm.getRecordedLogs();
+        assertNotEq(transactionId, bytes32(0), "retry envelope transaction id should be non-zero");
 
         assertEq(_adiHelper.countSuccessfulForwards(retryLogs), 1, "retry envelope should forward through one adapter");
 
@@ -109,6 +109,8 @@ contract AdiAdapterPigeonRetry is AdiAdapterPigeonLocalForkBase {
         vm.selectFork(_arbFork);
         assertEq(_arbGateway.receiveCount(), 1, "ARB gateway did not receive retry envelope");
         assertEq(_arbGateway.lastSourceChainId(), ETH_CHAIN_ID, "unexpected source chain");
+        assertEq(_arbGateway.lastAsset(), Constants.ASSET_FOR_DATA_ONLY_BRIDGE, "unexpected asset");
+        assertEq(_arbGateway.lastAmount(), 0, "unexpected amount");
         assertEq(abi.decode(_arbGateway.lastData(), (string)), "retry-envelope-arb", "unexpected retry message");
     }
 }
