@@ -31,6 +31,9 @@ compilation_restrictions = [
     { paths = "src/core/Allocator.sol", optimizer_runs = 9_000 },
 ]
 
+[profile.ci]
+optimizer_runs = 9_000
+
 [profile.default.fuzz]
 runs = 10_000
 
