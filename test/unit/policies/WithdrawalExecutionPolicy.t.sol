@@ -1670,11 +1670,6 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
         withdrawalExecutionPolicy.lowerRedemptionRefillRate(newRate);
     }
 
-    function test_raiseRedemptionCapacity_reverts_ifUnlimited() public {
-        vm.expectRevert(WithdrawalExecutionPolicy.UnlimitedNotAllowed.selector);
-        withdrawalExecutionPolicy.raiseRedemptionCapacity(uint128(RateLimitBucketLib.UNLIMITED_CAPACITY));
-    }
-
     function test_lowerRedemptionCapacity_reverts_ifBelowFloor(uint128 belowFloor) public {
         WithdrawalExecutionPolicy policy = _deployPolicyWithCustomFloors(1e30, 1e25);
         belowFloor = uint128(bound(belowFloor, 0, 1e30 - 1));

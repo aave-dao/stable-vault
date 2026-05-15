@@ -74,14 +74,12 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
     /// @custom:selector 0x1fb09b80
     error NonceAlreadyUsed();
 
-    /// @notice Thrown when raising the redemption capacity to `RateLimitBucketLib.UNLIMITED_CAPACITY`.
-    /// @dev UNLIMITED disables the bucket and is incompatible with the always-exit invariant.
-    error UnlimitedNotAllowed();
-
     /// @notice Thrown when the constructor receives a zero `minRedemptionCapacity` floor.
+    /// @custom:selector 0x0f29e556
     error ZeroMinRedemptionCapacity();
 
     /// @notice Thrown when the constructor receives a zero `minRedemptionRefillRate` floor.
+    /// @custom:selector 0xc4223463
     error ZeroMinRedemptionRefillRate();
 
     // EIP-712 typeHash:
@@ -94,11 +92,10 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
 
     address internal immutable WITHDRAWAL_EXECUTION_POLICY_APPLIER;
 
-    /// @dev Minimum redemption bucket capacity. Locked at impl-deploy. The `lower*` setters cannot drop the bucket
-    /// below these floors, guaranteeing a minimum exit throughput for the lifetime of the implementation.
+    /// @dev Minimum redemption bucket capacity, guaranteeing a minimum exit throughput.
     uint128 internal immutable MIN_REDEMPTION_CAPACITY;
 
-    /// @dev Minimum redemption bucket refill rate.
+    /// @dev Minimum redemption bucket refill rate, guaranteeing a minimum exit throughput.
     uint128 internal immutable MIN_REDEMPTION_REFILL_RATE;
 
     /// @notice Signed personal fee data (decoded from WithdrawalExecutionIntent.policyData).
@@ -310,12 +307,11 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
         _markNonceAsUsed(signer, nonce);
     }
 
-    /// @notice Raises the redemption bucket capacity. `RateLimitBucketLib.UNLIMITED_CAPACITY` is rejected because the
-    /// bucket is load-bearing for the always-exit invariant.
+    /// @notice Raises the redemption bucket capacity. The always-exit invariant is enforced by
+    /// `MIN_REDEMPTION_CAPACITY`, not by keeping the bucket finite.
     /// @dev Starting with a full bucket, a caller could extract up to `2 * capacity` over a
     /// `capacity / refillRate`-second interval. Set `capacity` accordingly.
     function raiseRedemptionCapacity(uint128 newCapacity) external restricted {
-        require(newCapacity != RateLimitBucketLib.UNLIMITED_CAPACITY, UnlimitedNotAllowed());
         uint128 oldCapacity = $storage().redemptionBucket.capacity;
         $storage().redemptionBucket.raiseCapacity(newCapacity);
         emit RedemptionCapacityRaised(oldCapacity, newCapacity);
