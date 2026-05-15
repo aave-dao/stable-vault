@@ -1993,6 +1993,351 @@ contract CcipAdapterTest is TestWithHelpers {
         }
     }
 
+    function test_publishMessageWithFunds_reverts_ifRouterLeavesAssetAllowance_erc20FeePath() public {
+        // Bridged asset and ERC-20 fee token are distinct; the assertion checks both allowances. Force the
+        // bridged asset's allowance to remain non-zero after ccipSend to confirm the assertion catches it.
+        uint256 amountUsdt = 100_000000;
+        uint256 feeAmount = 10 ether;
+        uint256 leftoverAllowance = 42;
+        address feePayer = makeAddr("feePayer");
+
+        _mockTransferHelper.mockAsset(address(_mockUsdt), amountUsdt);
+        _stageTokenFeeFromPayer(address(_accountingChainCcipAdapter), feePayer, _mockGho, feeAmount);
+
+        bytes memory bridgeAdapterData =
+            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: address(_mockGho), feeRefundThreshold: 0}));
+
+        Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
+        ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
+        Client.EVM2AnyMessage memory expectedCcipMessage = Client.EVM2AnyMessage({
+            receiver: abi.encode(_earningChainCcipAdapter),
+            data: "",
+            tokenAmounts: ccipTokenAmounts,
+            feeToken: address(_mockGho),
+            extraArgs: Client._argsToBytes(
+                Client.GenericExtraArgsV2({gasLimit: DEFAULT_GAS_LIMIT, allowOutOfOrderExecution: true})
+            )
+        });
+        vm.mockCall(
+            address(_mockCCIPRouter),
+            abi.encodeWithSelector(IRouterClient.getFee.selector, EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage),
+            abi.encode(feeAmount)
+        );
+        _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, bytes32(0));
+
+        // Override the stub's zero-allowance mock for the bridged asset to simulate a router that didn't
+        // pull the full approved amount.
+        vm.mockCall(
+            address(_mockUsdt),
+            abi.encodeWithSelector(
+                IERC20.allowance.selector, address(_accountingChainCcipAdapter), address(_mockCCIPRouter)
+            ),
+            abi.encode(leftoverAllowance)
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ICcipBridgeAdapter.UnexpectedCcipRouterAllowance.selector, address(_mockUsdt), leftoverAllowance
+            )
+        );
+        vm.prank(address(_mockAccountingChainGateway));
+        _accountingChainCcipAdapter.publishMessageWithFunds(
+            EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "", feePayer, DEFAULT_GAS_LIMIT, bridgeAdapterData
+        );
+    }
+
+    function test_publishMessageWithFunds_reverts_ifRouterLeavesFeeTokenAllowance_erc20FeePath() public {
+        // Bridged asset's allowance is fully consumed but the ERC-20 fee token's is not; the assertion must
+        // catch the fee-token leftover.
+        uint256 amountUsdt = 100_000000;
+        uint256 feeAmount = 10 ether;
+        uint256 leftoverAllowance = 7;
+        address feePayer = makeAddr("feePayer");
+
+        _mockTransferHelper.mockAsset(address(_mockUsdt), amountUsdt);
+        _stageTokenFeeFromPayer(address(_accountingChainCcipAdapter), feePayer, _mockGho, feeAmount);
+
+        bytes memory bridgeAdapterData =
+            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: address(_mockGho), feeRefundThreshold: 0}));
+
+        Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
+        ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
+        Client.EVM2AnyMessage memory expectedCcipMessage = Client.EVM2AnyMessage({
+            receiver: abi.encode(_earningChainCcipAdapter),
+            data: "",
+            tokenAmounts: ccipTokenAmounts,
+            feeToken: address(_mockGho),
+            extraArgs: Client._argsToBytes(
+                Client.GenericExtraArgsV2({gasLimit: DEFAULT_GAS_LIMIT, allowOutOfOrderExecution: true})
+            )
+        });
+        vm.mockCall(
+            address(_mockCCIPRouter),
+            abi.encodeWithSelector(IRouterClient.getFee.selector, EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage),
+            abi.encode(feeAmount)
+        );
+        _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, bytes32(0));
+
+        vm.mockCall(
+            address(_mockGho),
+            abi.encodeWithSelector(
+                IERC20.allowance.selector, address(_accountingChainCcipAdapter), address(_mockCCIPRouter)
+            ),
+            abi.encode(leftoverAllowance)
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ICcipBridgeAdapter.UnexpectedCcipRouterAllowance.selector, address(_mockGho), leftoverAllowance
+            )
+        );
+        vm.prank(address(_mockAccountingChainGateway));
+        _accountingChainCcipAdapter.publishMessageWithFunds(
+            EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "", feePayer, DEFAULT_GAS_LIMIT, bridgeAdapterData
+        );
+    }
+
+    function test_publishMessageWithFunds_reverts_ifRouterLeavesAssetAllowance_nativeFeePath() public {
+        // Native fee path: only the bridged asset is approved. Force its allowance non-zero after ccipSend.
+        uint256 amountUsdt = 100_000000;
+        uint256 feeAmount = 1 ether;
+        uint256 leftoverAllowance = 99;
+        address payable feePayer = payable(makeAddr("feePayer"));
+
+        _mockTransferHelper.mockAsset(address(_mockUsdt), amountUsdt);
+        vm.deal(address(_mockAccountingChainGateway), feeAmount);
+
+        bytes memory bridgeAdapterData =
+            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0}));
+
+        Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
+        ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
+        Client.EVM2AnyMessage memory expectedCcipMessage = Client.EVM2AnyMessage({
+            receiver: abi.encode(_earningChainCcipAdapter),
+            data: "",
+            tokenAmounts: ccipTokenAmounts,
+            feeToken: CCIP_NATIVE_FEE_TOKEN,
+            extraArgs: Client._argsToBytes(
+                Client.GenericExtraArgsV2({gasLimit: DEFAULT_GAS_LIMIT, allowOutOfOrderExecution: true})
+            )
+        });
+        vm.mockCall(
+            address(_mockCCIPRouter),
+            abi.encodeWithSelector(IRouterClient.getFee.selector, EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage),
+            abi.encode(feeAmount)
+        );
+        _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, bytes32(0));
+
+        vm.mockCall(
+            address(_mockUsdt),
+            abi.encodeWithSelector(
+                IERC20.allowance.selector, address(_accountingChainCcipAdapter), address(_mockCCIPRouter)
+            ),
+            abi.encode(leftoverAllowance)
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ICcipBridgeAdapter.UnexpectedCcipRouterAllowance.selector, address(_mockUsdt), leftoverAllowance
+            )
+        );
+        vm.prank(address(_mockAccountingChainGateway));
+        _accountingChainCcipAdapter.publishMessageWithFunds{value: feeAmount}(
+            EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "", feePayer, DEFAULT_GAS_LIMIT, bridgeAdapterData
+        );
+    }
+
+    function test_publishMessageWithFunds_reverts_ifRouterLeavesSharedAssetAllowance() public {
+        // Bridged asset == feeToken: a single allowance covers both legs. Force it non-zero after ccipSend.
+        uint256 amountUsdt = 100_000000;
+        uint256 feeAmount = 5_000000;
+        uint256 leftoverAllowance = 13;
+        address feePayer = makeAddr("feePayer");
+
+        _mockTransferHelper.mockAsset(address(_mockUsdt), amountUsdt);
+        _stageTokenFeeFromPayer(address(_accountingChainCcipAdapter), feePayer, _mockUsdt, feeAmount);
+
+        bytes memory bridgeAdapterData =
+            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: address(_mockUsdt), feeRefundThreshold: 0}));
+
+        Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
+        ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
+        Client.EVM2AnyMessage memory expectedCcipMessage = Client.EVM2AnyMessage({
+            receiver: abi.encode(_earningChainCcipAdapter),
+            data: "",
+            tokenAmounts: ccipTokenAmounts,
+            feeToken: address(_mockUsdt),
+            extraArgs: Client._argsToBytes(
+                Client.GenericExtraArgsV2({gasLimit: DEFAULT_GAS_LIMIT, allowOutOfOrderExecution: true})
+            )
+        });
+        vm.mockCall(
+            address(_mockCCIPRouter),
+            abi.encodeWithSelector(IRouterClient.getFee.selector, EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage),
+            abi.encode(feeAmount)
+        );
+        _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, bytes32(0));
+
+        vm.mockCall(
+            address(_mockUsdt),
+            abi.encodeWithSelector(
+                IERC20.allowance.selector, address(_accountingChainCcipAdapter), address(_mockCCIPRouter)
+            ),
+            abi.encode(leftoverAllowance)
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ICcipBridgeAdapter.UnexpectedCcipRouterAllowance.selector, address(_mockUsdt), leftoverAllowance
+            )
+        );
+        vm.prank(address(_mockAccountingChainGateway));
+        _accountingChainCcipAdapter.publishMessageWithFunds(
+            EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "", feePayer, DEFAULT_GAS_LIMIT, bridgeAdapterData
+        );
+    }
+
+    function test_publishDataOnlyMessage_reverts_ifRouterLeavesFeeTokenAllowance() public {
+        // Data-only path with ERC-20 fee: only the feeToken is approved. Force it non-zero after ccipSend.
+        uint256 feeAmount = 5 ether;
+        uint256 leftoverAllowance = 1;
+        address feePayer = makeAddr("feePayer");
+
+        _stageTokenFeeFromPayer(address(_accountingChainCcipAdapter), feePayer, _mockGho, feeAmount);
+
+        bytes memory bridgeAdapterData =
+            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: address(_mockGho), feeRefundThreshold: 0}));
+
+        Client.EVM2AnyMessage memory expectedCcipMessage = Client.EVM2AnyMessage({
+            receiver: abi.encode(_earningChainCcipAdapter),
+            data: "",
+            tokenAmounts: new Client.EVMTokenAmount[](0),
+            feeToken: address(_mockGho),
+            extraArgs: Client._argsToBytes(
+                Client.GenericExtraArgsV2({
+                    gasLimit: DEFAULT_GAS_LIMIT + _accountingChainCcipAdapter.getDataOnlyReceiveGasOverhead(),
+                    allowOutOfOrderExecution: true
+                })
+            )
+        });
+        vm.mockCall(
+            address(_mockCCIPRouter),
+            abi.encodeWithSelector(IRouterClient.getFee.selector, EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage),
+            abi.encode(feeAmount)
+        );
+        _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, bytes32(0));
+
+        vm.mockCall(
+            address(_mockGho),
+            abi.encodeWithSelector(
+                IERC20.allowance.selector, address(_accountingChainCcipAdapter), address(_mockCCIPRouter)
+            ),
+            abi.encode(leftoverAllowance)
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ICcipBridgeAdapter.UnexpectedCcipRouterAllowance.selector, address(_mockGho), leftoverAllowance
+            )
+        );
+        vm.prank(address(_mockAccountingChainGateway));
+        _accountingChainCcipAdapter.publishDataOnlyMessage(
+            EARNING_CHAIN_ID, "", feePayer, DEFAULT_GAS_LIMIT, bridgeAdapterData
+        );
+    }
+
+    function test_publishDataOnlyMessage_doesNotCheckAssetAllowance_nativeFee() public {
+        // Native-fee data-only: no ERC-20 approval is set, so the assertion must not query allowance() for
+        // any token. We assert this by recording that no IERC20.allowance call hits any address during the
+        // publish call.
+        uint256 feeAmount = 1 ether;
+        address feePayer = makeAddr("feePayer");
+
+        vm.deal(address(_mockAccountingChainGateway), feeAmount);
+
+        bytes memory bridgeAdapterData =
+            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0}));
+
+        Client.EVM2AnyMessage memory expectedCcipMessage = Client.EVM2AnyMessage({
+            receiver: abi.encode(_earningChainCcipAdapter),
+            data: "",
+            tokenAmounts: new Client.EVMTokenAmount[](0),
+            feeToken: CCIP_NATIVE_FEE_TOKEN,
+            extraArgs: Client._argsToBytes(
+                Client.GenericExtraArgsV2({
+                    gasLimit: DEFAULT_GAS_LIMIT + _accountingChainCcipAdapter.getDataOnlyReceiveGasOverhead(),
+                    allowOutOfOrderExecution: true
+                })
+            )
+        });
+        vm.mockCall(
+            address(_mockCCIPRouter),
+            abi.encodeWithSelector(IRouterClient.getFee.selector, EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage),
+            abi.encode(feeAmount)
+        );
+        _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, bytes32(0));
+
+        // No allowance mock override; if the adapter were to call allowance() on any token we would either
+        // fall through to the stubbed zero (set by _stubCcipRouterSend for tokens in the message and the
+        // ERC-20 fee token, neither of which exist on this path) or revert. The publish call must succeed.
+        vm.prank(address(_mockAccountingChainGateway));
+        _accountingChainCcipAdapter.publishDataOnlyMessage{value: feeAmount}(
+            EARNING_CHAIN_ID, "", feePayer, DEFAULT_GAS_LIMIT, bridgeAdapterData
+        );
+    }
+
+    function test_publishMessageWithFunds_assertionPasses_nativeFee_realRouter() public {
+        // Happy-path with real router: native fee + bridged ERC-20. After ccipSend the asset allowance is
+        // fully drained, so the assertion passes and the call succeeds.
+        uint256 amountUsdt = 100_000000;
+        uint256 feeAmount = 1 ether;
+        address payable feePayer = payable(makeAddr("feePayer"));
+
+        _mockTransferHelper.mockAsset(address(_mockUsdt), amountUsdt);
+        vm.deal(address(_mockAccountingChainGateway), feeAmount);
+
+        bytes memory bridgeAdapterData =
+            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0}));
+
+        _mockCCIPRouter.setSourceChainSelector(EARNING_CHAIN_CCIP_SELECTOR, ACCOUNTING_CHAIN_CCIP_SELECTOR);
+        _mockCCIPRouter.setFee(feeAmount);
+
+        vm.prank(address(_mockAccountingChainGateway));
+        _accountingChainCcipAdapter.publishMessageWithFunds{value: feeAmount}(
+            EARNING_CHAIN_ID, address(_mockUsdt), amountUsdt, "", feePayer, 200_000, bridgeAdapterData
+        );
+
+        assertEq(
+            _mockUsdt.allowance(address(_accountingChainCcipAdapter), address(_mockCCIPRouter)),
+            0,
+            "Bridged asset allowance must be 0 after a successful publish"
+        );
+    }
+
+    function test_publishDataOnlyMessage_assertionPasses_erc20Fee_realRouter() public {
+        // Happy-path with real router: data-only message + ERC-20 fee. After ccipSend the fee-token
+        // allowance is fully drained, so the assertion passes and the call succeeds.
+        uint256 feeAmount = 5 ether;
+        address feePayer = makeAddr("feePayer");
+
+        _stageTokenFeeFromPayer(address(_accountingChainCcipAdapter), feePayer, _mockGho, feeAmount);
+
+        bytes memory bridgeAdapterData =
+            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: address(_mockGho), feeRefundThreshold: 0}));
+
+        _mockCCIPRouter.setSourceChainSelector(EARNING_CHAIN_CCIP_SELECTOR, ACCOUNTING_CHAIN_CCIP_SELECTOR);
+        _mockCCIPRouter.setFee(feeAmount);
+
+        vm.prank(address(_mockAccountingChainGateway));
+        _accountingChainCcipAdapter.publishDataOnlyMessage(EARNING_CHAIN_ID, "", feePayer, 200_000, bridgeAdapterData);
+
+        assertEq(
+            _mockGho.allowance(address(_accountingChainCcipAdapter), address(_mockCCIPRouter)),
+            0,
+            "Fee-token allowance must be 0 after a successful data-only publish"
+        );
+    }
+
     function _expectBridgeAssetsApproval(Client.EVMTokenAmount[] memory tokens) internal {
         for (uint256 i = 0; i < tokens.length; i++) {
             address asset = tokens[i].token;
@@ -2008,6 +2353,32 @@ contract CcipAdapterTest is TestWithHelpers {
             address(_mockCCIPRouter),
             abi.encodeWithSelector(IRouterClient.ccipSend.selector, chainSelector, message),
             abi.encode(messageId)
+        );
+        // The adapter checks router allowance is zero after `ccipSend`; the real router drains it via
+        // `safeTransferFrom`, but `vm.mockCall` short-circuits that. Mock allowance to 0 for the bridged
+        // asset and ERC-20 fee token on both adapters so the post-send assertion mirrors the live behavior.
+        for (uint256 i = 0; i < message.tokenAmounts.length; i++) {
+            _mockZeroCcipRouterAllowance(message.tokenAmounts[i].token);
+        }
+        if (message.feeToken != CCIP_NATIVE_FEE_TOKEN) {
+            _mockZeroCcipRouterAllowance(message.feeToken);
+        }
+    }
+
+    function _mockZeroCcipRouterAllowance(address token) internal {
+        vm.mockCall(
+            token,
+            abi.encodeWithSelector(
+                IERC20.allowance.selector, address(_accountingChainCcipAdapter), address(_mockCCIPRouter)
+            ),
+            abi.encode(uint256(0))
+        );
+        vm.mockCall(
+            token,
+            abi.encodeWithSelector(
+                IERC20.allowance.selector, address(_earningChainCcipAdapter), address(_mockCCIPRouter)
+            ),
+            abi.encode(uint256(0))
         );
     }
 
