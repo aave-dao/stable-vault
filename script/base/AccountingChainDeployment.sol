@@ -36,6 +36,7 @@ import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {AssetRegistry} from "src/periphery/AssetRegistry.sol";
 import {EarningChainStateSchemaV1, SCHEMA_VERSION} from "src/periphery/EarningChainStateSchemaV1.sol";
 import {PolicyRegistry} from "src/periphery/PolicyRegistry.sol";
+import {SlippageCoverageVault} from "src/periphery/SlippageCoverageVault.sol";
 import {Swapper} from "src/periphery/Swapper.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
 import {DepositPolicy} from "src/policies/DepositPolicy.sol";
@@ -175,6 +176,7 @@ abstract contract AccountingChainDeployment is
         _deployAllocator();
         _deployFundsHandler();
         _deployGateway();
+        _deploySlippageCoverageVault();
         _deploySwapper();
         _deployCcipAdapter();
         _deployDepositPolicy();
@@ -499,11 +501,37 @@ abstract contract AccountingChainDeployment is
         return gateway;
     }
 
+    function _deploySlippageCoverageVault() internal returns (address) {
+        address slippageCoverageVault = _deploy_create3({
+            namespacedSaltSeed: SLIPPAGE_COVERAGE_VAULT_SALT_SEED,
+            deployer: _deployer(),
+            initCode: abi.encodePacked(
+                type(SlippageCoverageVault).creationCode,
+                abi.encode(
+                    getSwapperAddress(_deployer()),
+                    getAccessManagerAddress(_deployer()),
+                    uint16(vm.parseUint(_configString(".slippageCoverageVault.maxSlippageBps"))),
+                    uint16(vm.parseUint(_configString(".slippageCoverageVault.overrideMaxSlippageBps"))),
+                    _configBool(".slippageCoverageVault.initialOverrideMode")
+                )
+            )
+        });
+        require(
+            slippageCoverageVault == getSlippageCoverageVaultAddress(_deployer()),
+            "SlippageCoverageVault does not match expected address"
+        );
+        _logDeployment("SlippageCoverageVault", SLIPPAGE_COVERAGE_VAULT_SALT_SEED, slippageCoverageVault);
+        return slippageCoverageVault;
+    }
+
     function _deploySwapper() internal returns (address) {
         address swapper = _deploy_create3({
             namespacedSaltSeed: SWAPPER_SALT_SEED,
             deployer: _deployer(),
-            initCode: abi.encodePacked(type(Swapper).creationCode, abi.encode(getAllocatorAddress(_deployer())))
+            initCode: abi.encodePacked(
+                type(Swapper).creationCode,
+                abi.encode(getAllocatorAddress(_deployer()), getSlippageCoverageVaultAddress(_deployer()))
+            )
         });
         require(swapper == getSwapperAddress(_deployer()), "Swapper does not match expected address");
         _logDeployment("Swapper", SWAPPER_SALT_SEED, swapper);

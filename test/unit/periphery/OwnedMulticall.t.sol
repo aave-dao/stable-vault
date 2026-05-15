@@ -11,10 +11,13 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {Allocator} from "src/core/Allocator.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
+import {ISlippageCoverageVault} from "src/interfaces/ISlippageCoverageVault.sol";
+import {ISwapper} from "src/interfaces/ISwapper.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {OwnedMulticall} from "src/periphery/OwnedMulticall.sol";
 import {PolicyRegistry} from "src/periphery/PolicyRegistry.sol";
+import {SlippageCoverageVault} from "src/periphery/SlippageCoverageVault.sol";
 import {Swapper} from "src/periphery/Swapper.sol";
 
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
@@ -53,6 +56,7 @@ contract OwnedMulticallTest is TestWithHelpers {
     MockTransferHelper internal _mockTransferHelper;
 
     Allocator internal _allocator;
+    SlippageCoverageVault internal _slippageVault;
     Swapper internal _swapper;
     OwnedMulticall internal _ownedMulticall;
 
@@ -112,8 +116,27 @@ contract OwnedMulticallTest is TestWithHelpers {
         // Call flow: everyRoleAccount -> OwnedMulticall -> Allocator.rebalance
         _ownedMulticall = new OwnedMulticall(everyRoleAccount);
 
-        // Deploy Swapper owned by the Allocator
-        _swapper = new Swapper(address(_allocator));
+        // Deploy SlippageCoverageVault (non-upgradeable) bound to the predicted Swapper address.
+        uint256 nonce = vm.getNonce(address(this));
+        address predictedSwapper = vm.computeCreateAddress(address(this), nonce + 1);
+        _slippageVault = new SlippageCoverageVault(predictedSwapper, address(_mockAccessManager), 100, 5_000, false);
+
+        // Deploy Swapper owned by the Allocator and bound to the vault.
+        _swapper = new Swapper(address(_allocator), address(_slippageVault));
+        require(address(_swapper) == predictedSwapper, "Swapper address mismatch");
+
+        // Configure caps high enough that legacy slippage-coverage tests pass; allow up to 100% slippage in normal
+        // mode to mirror prior behavior.
+        uint256 LARGE_CAP = type(uint128).max - 1;
+        vm.startPrank(everyRoleAccount);
+        _slippageVault.raisePullCapPerTx(address(_mockGho), LARGE_CAP);
+        _slippageVault.raisePullCapPerTx(address(_mockUsdt), LARGE_CAP);
+        _slippageVault.raiseWindowCap(address(_mockGho), LARGE_CAP);
+        _slippageVault.raiseWindowSeconds(address(_mockGho), 1 days);
+        _slippageVault.raiseWindowCap(address(_mockUsdt), LARGE_CAP);
+        _slippageVault.raiseWindowSeconds(address(_mockUsdt), 1 days);
+        _slippageVault.setMaxSlippageBps(10_000);
+        vm.stopPrank();
 
         // Set up strategy vaults
         vm.prank(admin);
@@ -305,10 +328,10 @@ contract OwnedMulticallTest is TestWithHelpers {
         _mockGho.mint(address(_mockDex), minAmountOut);
         _mockDex.setSlippageBps(slippageToleranceBps);
 
-        // Mint slippage coverage tokens to the OwnedMulticall
-        _mockGho.mint(address(_ownedMulticall), slippageAmount);
+        // Fund the SlippageCoverageVault with the coverage amount. Push-based: no approval needed.
+        _mockGho.mint(address(_slippageVault), slippageAmount);
 
-        // Build swap data that encodes the DEX call + slippage params with OwnedMulticall as slippageCoverageSource
+        // Build swap data that encodes the DEX call + slippage params (vault is implicit via the Swapper's binding).
         bytes memory swapData =
             _buildSwapData(address(_mockUsdt), address(_mockGho), amountIn, minAmountOut, slippageToleranceBps);
 
@@ -317,20 +340,9 @@ contract OwnedMulticallTest is TestWithHelpers {
             address(_mockUsdt), address(_mockGho), amountIn, amountOutIfNoSlippage, swapData
         );
 
-        // Batch approve + rebalance into a single aggregate3 call:
-        // everyRoleAccount -> OwnedMulticall -> [approve slippage tokens, rebalance]
-        uint256 numCalls = slippageAmount > 0 ? 2 : 1;
-        OwnedMulticall.Call3[] memory multicallCalls = new OwnedMulticall.Call3[](numCalls);
-        uint256 idx = 0;
-        if (slippageAmount > 0) {
-            multicallCalls[idx] = OwnedMulticall.Call3({
-                target: address(_mockGho),
-                allowFailure: false,
-                callData: abi.encodeCall(IERC20.approve, (address(_swapper), slippageAmount))
-            });
-            idx++;
-        }
-        multicallCalls[idx] = OwnedMulticall.Call3({
+        // No more approve dance — push-based vault handles the outflow on its own.
+        OwnedMulticall.Call3[] memory multicallCalls = new OwnedMulticall.Call3[](1);
+        multicallCalls[0] = OwnedMulticall.Call3({
             target: address(_allocator),
             allowFailure: false,
             callData: abi.encodeCall(IAllocator.rebalance, (rebalanceParams, ""))
@@ -344,8 +356,28 @@ contract OwnedMulticallTest is TestWithHelpers {
         assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultGhoStrategy)), amountOutIfNoSlippage);
         assertEq(_allocator.getAssetBalance(address(_mockUsdt)), 0);
         assertEq(_allocator.getAssetBalance(address(_mockGho)), amountOutIfNoSlippage);
-        // OwnedMulticall slippage tokens should have been consumed
-        assertEq(IERC20(address(_mockGho)).balanceOf(address(_ownedMulticall)), 0);
+        // Vault slippage tokens should have been consumed.
+        assertEq(IERC20(address(_mockGho)).balanceOf(address(_slippageVault)), 0);
+    }
+
+    /// @dev Path A regression: a compromised manager crafts an `aggregate3` directly calling vault.pullCoverage.
+    /// The vault's `OnlyBeneficiary` check rejects.
+    function test_rebalance_viaOwnedMulticall_attemptDirectVaultCallReverts() public {
+        _mockGho.mint(address(_slippageVault), 1_000);
+
+        OwnedMulticall.Call3[] memory calls = new OwnedMulticall.Call3[](1);
+        calls[0] = OwnedMulticall.Call3({
+            target: address(_slippageVault),
+            allowFailure: false,
+            callData: abi.encodeCall(ISlippageCoverageVault.pullCoverage, (address(_mockGho), 1_000))
+        });
+
+        vm.expectRevert(); // Multicall3 wraps as a generic revert string; underlying is OnlyBeneficiary.
+        vm.prank(everyRoleAccount);
+        _ownedMulticall.aggregate3(calls);
+
+        // Vault balance unchanged — drain blocked.
+        assertEq(_mockGho.balanceOf(address(_slippageVault)), 1_000);
     }
 
     function test_rebalance_viaOwnedMulticall_entireFlow(uint256 amountIn) public {
@@ -530,9 +562,6 @@ contract OwnedMulticallTest is TestWithHelpers {
         uint256 minAmountOut,
         uint16 slippageToleranceBps
     ) internal view returns (bytes memory) {
-        Swapper.SlippageParams memory slippageParams = Swapper.SlippageParams({
-            slippageToleranceBps: slippageToleranceBps, slippageCoverageSource: address(_ownedMulticall)
-        });
         address[] memory targets = new address[](2);
         targets[0] = assetIn;
         targets[1] = address(_mockDex);
@@ -540,7 +569,7 @@ contract OwnedMulticallTest is TestWithHelpers {
         callDatas[0] = abi.encodeWithSelector(IERC20.approve.selector, address(_mockDex), amountIn);
         callDatas[1] =
             abi.encodeWithSelector(IMockDex.swapExactInput.selector, assetIn, assetOut, amountIn, minAmountOut);
-        return abi.encode(targets, callDatas, slippageParams);
+        return abi.encode(targets, callDatas, slippageToleranceBps);
     }
 
     function _buildEntireFlowRebalanceParams(

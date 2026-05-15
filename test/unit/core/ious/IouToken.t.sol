@@ -49,13 +49,13 @@ contract IouTokenTest is Test {
         assertEq(IouToken(iouToken).decimals(), Constants.RAY_DECIMALS, "decimals mismatch");
     }
 
-    /// @dev VA-98: `name()` returns the value passed to the constructor, allowing each IouToken deployment
+    /// @dev `name()` returns the value passed to the constructor, allowing each IouToken deployment
     /// (USD, EUR, etc.) to set its own ERC20 metadata for off-chain display.
     function test_name_returnsValuePassedToConstructor() public view {
         assertEq(IouToken(iouToken).name(), TEST_IOU_NAME, "name mismatch");
     }
 
-    /// @dev VA-98: `symbol()` returns the value passed to the constructor.
+    /// @dev `symbol()` returns the value passed to the constructor.
     function test_symbol_returnsValuePassedToConstructor() public view {
         assertEq(IouToken(iouToken).symbol(), TEST_IOU_SYMBOL, "symbol mismatch");
     }

@@ -16,6 +16,7 @@ import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
 import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
+import {ISlippageCoverageVault} from "src/interfaces/ISlippageCoverageVault.sol";
 import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {ChainBalanceOracle} from "src/oracles/balance/ChainBalanceOracle.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
@@ -732,8 +733,164 @@ abstract contract RolesConfig is DeploymentConfig {
         });
     }
 
+    /// @custom:delay None
+    /// @custom:location SlippageCoverageVault
+    function getRole__enableOverrideMode() internal pure returns (Role memory) {
+        bytes4 selector = ISlippageCoverageVault.enableOverrideMode.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: NO_DELAY,
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
+        });
+    }
+
+    /// @custom:delay None
+    /// @custom:location SlippageCoverageVault
+    function getRole__disableOverrideMode() internal pure returns (Role memory) {
+        bytes4 selector = ISlippageCoverageVault.disableOverrideMode.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: NO_DELAY,
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
+        });
+    }
+
+    /// @custom:delay High
+    /// @custom:location SlippageCoverageVault
+    function getRole__raisePullCapPerTx() internal view returns (Role memory) {
+        bytes4 selector = ISlippageCoverageVault.raisePullCapPerTx.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: HIGH_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
+        });
+    }
+
+    /// @custom:delay None
+    /// @custom:location SlippageCoverageVault
+    function getRole__lowerPullCapPerTx() internal pure returns (Role memory) {
+        bytes4 selector = ISlippageCoverageVault.lowerPullCapPerTx.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: NO_DELAY,
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
+        });
+    }
+
+    /// @custom:delay High
+    /// @custom:location SlippageCoverageVault
+    function getRole__raiseWindowCap() internal view returns (Role memory) {
+        bytes4 selector = ISlippageCoverageVault.raiseWindowCap.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: HIGH_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
+        });
+    }
+
+    /// @custom:delay None
+    /// @custom:location SlippageCoverageVault
+    function getRole__lowerWindowCap() internal pure returns (Role memory) {
+        bytes4 selector = ISlippageCoverageVault.lowerWindowCap.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: NO_DELAY,
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
+        });
+    }
+
+    /// @custom:delay None
+    /// @custom:location SlippageCoverageVault
+    function getRole__raiseWindowSeconds() internal pure returns (Role memory) {
+        bytes4 selector = ISlippageCoverageVault.raiseWindowSeconds.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: NO_DELAY,
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
+        });
+    }
+
+    /// @custom:delay High
+    /// @custom:location SlippageCoverageVault
+    function getRole__lowerWindowSeconds() internal view returns (Role memory) {
+        bytes4 selector = ISlippageCoverageVault.lowerWindowSeconds.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: HIGH_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
+        });
+    }
+
+    /// @custom:delay High
+    /// @custom:location SlippageCoverageVault
+    function getRole__setMaxSlippageBps() internal view returns (Role memory) {
+        bytes4 selector = ISlippageCoverageVault.setMaxSlippageBps.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: HIGH_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
+        });
+    }
+
+    /// @custom:delay High
+    /// @custom:location SlippageCoverageVault
+    function getRole__setOverrideMaxSlippageBps() internal view returns (Role memory) {
+        bytes4 selector = ISlippageCoverageVault.setOverrideMaxSlippageBps.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: HIGH_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
+        });
+    }
+
+    /// @custom:delay None
+    /// @custom:location SlippageCoverageVault
+    function getRole__fundCoverage() internal pure returns (Role memory) {
+        bytes4 selector = ISlippageCoverageVault.fundCoverage.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: NO_DELAY,
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
+        });
+    }
+
+    /// @custom:delay High
+    /// @custom:location SlippageCoverageVault
+    function getRole__sweepSlippageCoverageVault() internal view returns (Role memory) {
+        bytes4 selector = ISlippageCoverageVault.sweep.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: HIGH_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
+        });
+    }
+
     function getAllFunctionBasedRoles() internal view returns (Role[] memory) {
-        Role[] memory roles = new Role[](53);
+        Role[] memory roles = new Role[](65);
 
         // AssetRegistry
         roles[0] = getRole__setAssetConfig();
@@ -799,18 +956,32 @@ abstract contract RolesConfig is DeploymentConfig {
         roles[42] = getRole__claimMerklRewards();
         roles[43] = getRole__emergencyRescue();
 
+        // SlippageCoverageVault
+        roles[44] = getRole__enableOverrideMode();
+        roles[45] = getRole__disableOverrideMode();
+        roles[46] = getRole__raisePullCapPerTx();
+        roles[47] = getRole__lowerPullCapPerTx();
+        roles[48] = getRole__raiseWindowCap();
+        roles[49] = getRole__lowerWindowCap();
+        roles[50] = getRole__raiseWindowSeconds();
+        roles[51] = getRole__lowerWindowSeconds();
+        roles[52] = getRole__setMaxSlippageBps();
+        roles[53] = getRole__setOverrideMaxSlippageBps();
+        roles[54] = getRole__fundCoverage();
+        roles[55] = getRole__sweepSlippageCoverageVault();
+
         // PolicyRegistry
-        roles[44] = getRole__setPolicy();
+        roles[56] = getRole__setPolicy();
 
         // DepositPolicy / FundsBridgingPolicy
-        roles[45] = getRole__raiseDepositCapacity();
-        roles[46] = getRole__raiseDepositRefillRate();
-        roles[47] = getRole__lowerDepositCapacity();
-        roles[48] = getRole__lowerDepositRefillRate();
-        roles[49] = getRole__raiseBridgingCapacity();
-        roles[50] = getRole__raiseBridgingRefillRate();
-        roles[51] = getRole__lowerBridgingCapacity();
-        roles[52] = getRole__lowerBridgingRefillRate();
+        roles[57] = getRole__raiseDepositCapacity();
+        roles[58] = getRole__raiseDepositRefillRate();
+        roles[59] = getRole__lowerDepositCapacity();
+        roles[60] = getRole__lowerDepositRefillRate();
+        roles[61] = getRole__raiseBridgingCapacity();
+        roles[62] = getRole__raiseBridgingRefillRate();
+        roles[63] = getRole__lowerBridgingCapacity();
+        roles[64] = getRole__lowerBridgingRefillRate();
 
         return roles;
     }
