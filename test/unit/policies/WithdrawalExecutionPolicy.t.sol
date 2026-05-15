@@ -1498,7 +1498,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
     ) public {
         vm.assume(assetOut != address(0));
         assetFeeBps = bound(assetFeeBps, 1, FEE_CAP_BPS);
-        iouAmountRay = bound(iouAmountRay, 1, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        iouAmountRay = bound(iouAmountRay, 1, (type(uint128).max - 1) / 4);
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
@@ -1743,6 +1743,45 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
 
         vm.warp(block.timestamp + 100);
         policy.applyWithdrawalExecutionPolicy(_buildRequest(address(0xBEEF), address(0xCAFE), 1000, ""));
+    }
+
+    function test_previewWithdrawalExecutionPolicy_returnsZero_whenBucketExhausted() public {
+        WithdrawalExecutionPolicy policy = _deployPolicyWithCustomFloors(1, 1);
+        policy.lowerRedemptionCapacity(1000);
+        policy.lowerRedemptionRefillRate(1);
+        policy.applyWithdrawalExecutionPolicy(_buildRequest(address(0xBEEF), address(0xCAFE), 1000, ""));
+
+        uint256 previewed =
+            policy.previewWithdrawalExecutionPolicy(_buildRequest(address(0xBEEF), address(0xCAFE), 1, ""));
+        assertEq(previewed, 0, "Preview should return 0 when bucket is exhausted");
+    }
+
+    function test_previewWithdrawalExecutionPolicy_returnsAmount_whenWithinBucket(uint128 iouAmountRay) public view {
+        iouAmountRay = uint128(bound(iouAmountRay, 1, SEED_REDEMPTION_CAPACITY));
+        uint256 previewed = withdrawalExecutionPolicy.previewWithdrawalExecutionPolicy(
+            _buildRequest(address(0xBEEF), address(0xCAFE), iouAmountRay, "")
+        );
+        assertGt(previewed, 0, "Preview should be non-zero when within bucket");
+    }
+
+    function test_previewWithdrawalExecutionPolicy_returnsAmount_afterRefill() public {
+        WithdrawalExecutionPolicy policy = _deployPolicyWithCustomFloors(1, 1);
+        policy.lowerRedemptionCapacity(1000);
+        policy.lowerRedemptionRefillRate(10);
+
+        policy.applyWithdrawalExecutionPolicy(_buildRequest(address(0xBEEF), address(0xCAFE), 1000, ""));
+        assertEq(
+            policy.previewWithdrawalExecutionPolicy(_buildRequest(address(0xBEEF), address(0xCAFE), 1000, "")),
+            0,
+            "Preview should be 0 immediately after drain"
+        );
+
+        vm.warp(block.timestamp + 100);
+        assertGt(
+            policy.previewWithdrawalExecutionPolicy(_buildRequest(address(0xBEEF), address(0xCAFE), 1000, "")),
+            0,
+            "Preview should be non-zero after refill"
+        );
     }
 
     function test_applyWithdrawalExecutionPolicy_doesNotMarkNonceWhenRateLimited() public {
