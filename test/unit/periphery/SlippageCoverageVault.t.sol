@@ -671,7 +671,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
     }
 
     function test_raiseWindowCap_reverts_ifNewCapExceedsUint128Max() public {
-        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidAmount.selector));
+        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidParameter.selector));
         vm.prank(operator);
         _vault.raiseWindowCap(address(_usdc), uint256(type(uint128).max) + 1);
     }

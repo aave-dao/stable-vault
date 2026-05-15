@@ -104,7 +104,7 @@ contract SlippageCoverageVault is AccessManaged, Multicall, ReentrancyGuardTrans
 
     /// @inheritdoc ISlippageCoverageVault
     function raiseWindowCap(address asset, uint256 newCap) external override restricted {
-        require(newCap <= type(uint128).max, Errors.InvalidAmount());
+        require(newCap <= type(uint128).max, Errors.InvalidParameter());
         Window memory window = _windowByAsset[asset];
         uint256 oldCap = window.cap;
         require(newCap > oldCap, Errors.InvalidParameter());

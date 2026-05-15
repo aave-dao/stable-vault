@@ -746,7 +746,7 @@ contract BaseTest is TestWithHelpers {
         );
 
         // 14a. Slippage Coverage Vault (non-upgradeable). `false` keeps existing test scenarios deterministic; tests
-        // that exercise override mode flip it explicitly via `setOverrideMode`.
+        // that exercise override mode flip it explicitly via `enableOverrideMode`.
         slippageCoverageVault_earningChain = new SlippageCoverageVault(
             swapper_earningChainAddress, accessManager_earningChainAddress, 1_00, 50_00, false
         );
@@ -756,7 +756,7 @@ contract BaseTest is TestWithHelpers {
             "Slippage Coverage Vault (Earning Chain) address mismatch"
         );
 
-        // 14c. Swapper
+        // 14b. Swapper
         swapper_earningChain = new Swapper(allocator_earningChainAddress, slippageCoverageVault_earningChainAddress);
         Logger.log("\tSwapper: %s", address(swapper_earningChain));
         require(
