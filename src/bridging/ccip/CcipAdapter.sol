@@ -235,7 +235,7 @@ contract CcipAdapter is
         );
         if (feeToken == Constants.NATIVE_CURRENCY && msg.value > estimatedFeeAmount) {
             uint256 excessFee = msg.value - estimatedFeeAmount;
-            if (excessFee > feeRefundThreshold) {
+            if (excessFee >= feeRefundThreshold) {
                 _triggerNativeFeeRefund(feePayer, excessFee);
             }
         }

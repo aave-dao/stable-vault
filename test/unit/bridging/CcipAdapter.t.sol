@@ -1034,7 +1034,7 @@ contract CcipAdapterTest is TestWithHelpers {
         uint256 excessFee = feeAmount - actualFeeAmount;
 
         uint256 expectedFeeRefund;
-        if (excessFee > feeRefundThreshold) {
+        if (excessFee >= feeRefundThreshold) {
             expectedFeeRefund = excessFee;
         } else {
             // If the excess fee is less than the refund threshold, no refund is triggered nor expected
