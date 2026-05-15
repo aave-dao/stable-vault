@@ -273,11 +273,46 @@ contract EarningChainGatewayTest is TestWithHelpers {
     function test_removeBridgeAdapter_removesBridgeAdapter() public {
         vm.expectEmit(true, true, true, true);
         emit IChainGateway.BridgeAdapterRemoved(
+            address(_mockUsdt), ACCOUNTING_CHAIN_ID, address(_mockBridgeAdapterAssets)
+        );
+        vm.prank(admin);
+        _earningChainGateway.removeBridgeAdapter(
+            address(_mockUsdt), ACCOUNTING_CHAIN_ID, address(_mockBridgeAdapterAssets)
+        );
+    }
+
+    function test_removeBridgeAdapter_reverts_ifLastDataOnlyBridgeAdapter() public {
+        vm.expectRevert(IChainGateway.CannotRemoveLastDataOnlyBridgeAdapter.selector);
+        vm.prank(admin);
+        _earningChainGateway.removeBridgeAdapter(
+            Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ACCOUNTING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
+        );
+    }
+
+    function test_removeBridgeAdapter_removesDataOnlyBridgeAdapter_ifAnotherDataOnlyBridgeAdapterExists() public {
+        address bridgeAdapter = makeAddr("bridgeAdapter");
+
+        vm.prank(admin);
+        _earningChainGateway.addBridgeAdapter(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ACCOUNTING_CHAIN_ID, bridgeAdapter);
+
+        vm.expectEmit(true, true, true, true);
+        emit IChainGateway.BridgeAdapterRemoved(
             Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ACCOUNTING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
         );
         vm.prank(admin);
         _earningChainGateway.removeBridgeAdapter(
             Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ACCOUNTING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
+        );
+
+        assertFalse(
+            _earningChainGateway.isBridgeAdapterSupported(
+                Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ACCOUNTING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
+            )
+        );
+        assertTrue(
+            _earningChainGateway.isBridgeAdapterSupported(
+                Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ACCOUNTING_CHAIN_ID, bridgeAdapter
+            )
         );
     }
 
@@ -844,14 +879,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
     }
 
     function test_exchangeIouTokens_reverts_ifNotWhitelistedBridgeAdapter() public {
-        // Unset the bridge adapter for message bridge
-        vm.prank(admin);
-        _earningChainGateway.removeBridgeAdapter(
-            Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ACCOUNTING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
-        );
-
         uint256 iouTokenAmountRay = 100_000_000_000_000 * 10 ** 27;
         uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(address(_mockUsdt));
+        address unsupportedAdapter = makeAddr("unsupportedAdapter");
         // Put funds idle into TH to mimic withdrawal from Allocator
         _mockTransferHelper.mockAsset(address(_mockUsdt), amountOut);
 
@@ -865,7 +895,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockUsdt),
             0,
             tokenOutReceiver,
-            address(_mockBridgeCcipFeeParams),
+            unsupportedAdapter,
             DEFAULT_GAS_LIMIT,
             abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
             ""
@@ -1428,11 +1458,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     }
 
     function test_sendBridgeIouTokenMessageWithFeePayer_reverts_ifAdapterNotFound() public {
-        // Remove the bridge adapter for message bridge
-        vm.prank(admin);
-        _earningChainGateway.removeBridgeAdapter(
-            Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ACCOUNTING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
-        );
+        address unsupportedAdapter = makeAddr("unsupportedAdapter");
 
         vm.expectRevert(IChainGateway.AdapterNotFound.selector);
         vm.prank(address(_mockIouTokenManager));
@@ -1440,7 +1466,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             ACCOUNTING_CHAIN_ID,
             makeAddr("iouTokenRecipient"),
             100_000,
-            address(_mockBridgeCcipFeeParams),
+            unsupportedAdapter,
             address(this),
             DEFAULT_GAS_LIMIT,
             abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: address(_mockUsdt), feeRefundThreshold: 0}))
