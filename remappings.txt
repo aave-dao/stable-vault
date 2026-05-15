@@ -4,7 +4,9 @@
 @openzeppelin-upgradeable/=lib/aave-vault/lib/openzeppelin-contracts-upgradeable/contracts/
 @chainlink-ccip/contracts/=lib/chainlink-ccip/chains/evm/contracts/
 @solady/=lib/solady/src/
+solady/=lib/solady/
 @pcaversaccio/createx/=lib/createx/src/
 @aave-vault/=lib/aave-vault/src/
 @aave-v3-core/=lib/aave-vault/lib/aave-v3-core/contracts/
 @aave-v3-periphery/=lib/aave-vault/lib/aave-v3-periphery/contracts/
+pigeon/=lib/pigeon/
