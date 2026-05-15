@@ -20,6 +20,10 @@ interface IBridgeAdapter {
     /// @notice Emitted when the destination chain adapter is set.
     event DestinationChainAdapterSet(uint256 indexed chainId, address indexed destinationChainAdapter);
 
+    /// @notice Destination chain adapter is already configured for the chain.
+    /// @custom:selector 0x11b61b6a
+    error AlreadyConfigured();
+
     /// @notice Thrown when the number of tokens in a message is greater than the max expected.
     /// @custom:selector 0xe778681d
     error InvalidTokenCount();
@@ -31,10 +35,6 @@ interface IBridgeAdapter {
     /// @notice Address checked is not the bridge router.
     /// @custom:selector 0x60055a30
     error OnlyBridgeRouter();
-
-    /// @notice Destination chain adapter is already configured for the chain.
-    /// @custom:selector 0x11b61b6a
-    error AlreadyConfigured();
 
     /// @notice Getter for the address of the Gateway contract.
     /// @return gateway Address of the Gateway contract.
