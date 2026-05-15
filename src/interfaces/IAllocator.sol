@@ -220,6 +220,9 @@ interface IAllocator {
     /// @notice Distrusts a strategy, excluding its balance from the system's TVL.
     /// @dev As a side effect, deposits into the strategy are automatically disabled if currently enabled.
     /// @dev Trusting the strategy again does NOT re-enable deposits.
+    /// @dev If the strategy still holds assets, they stop contributing to trusted balances while vault obligations
+    /// remain unchanged. This can temporarily make obligations exceed `getAggregatedBalance()` and cause
+    /// `requestWithdrawal` to revert with `InsufficientAssets`.
     /// @param strategy Address of the strategy to distrust.
     function distrustStrategy(address strategy) external;
 
