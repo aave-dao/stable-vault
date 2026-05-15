@@ -54,6 +54,14 @@
         "usdt": { "capacity": "1000000000000", "refillRate": "11574074" }
       }
     },
+    "withdrawalExecutionPolicy": {
+      "redemptionLimit": {
+        "capacity": "1000000000000000000000000000000000000",
+        "refillRate": "11574074074074074074074074074"
+      },
+      "minRedemptionCapacity": "1000000000000000000000000000000",
+      "minRedemptionRefillRate": "11574074074074074074074074"
+    },
     "deploymentOutputPath": "deployments/vnet/v0.3/earning.json",
     "minBurnIouTokenGasLimit": "120000"
   },
@@ -100,6 +108,14 @@
         "usdc": { "capacity": "1000000000000", "refillRate": "11574074" },
         "usdt": { "capacity": "1000000000000", "refillRate": "11574074" }
       }
+    },
+    "withdrawalExecutionPolicy": {
+      "redemptionLimit": {
+        "capacity": "1000000000000000000000000000000000000",
+        "refillRate": "11574074074074074074074074074"
+      },
+      "minRedemptionCapacity": "1000000000000000000000000000000",
+      "minRedemptionRefillRate": "11574074074074074074074074"
     },
     "deploymentOutputPath": "deployments/vnet/v0.3/accounting.json"
   }

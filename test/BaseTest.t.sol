@@ -83,6 +83,12 @@ contract BaseTest is TestWithHelpers {
     uint256 internal constant DEFAULT_GAS_LIMIT = 300_000;
     uint256 internal constant BURN_IOU_TOKEN_GAS_LIMIT = 120_000;
 
+    // Redemption bucket sized to clear the existing e2e assertions; floors small enough that lower-side tests can run.
+    uint128 internal constant TEST_MIN_REDEMPTION_CAPACITY = 1;
+    uint128 internal constant TEST_MIN_REDEMPTION_REFILL_RATE = 1;
+    uint128 internal constant TEST_SEED_REDEMPTION_CAPACITY = type(uint128).max - 1;
+    uint128 internal constant TEST_SEED_REDEMPTION_REFILL_RATE = 1e30;
+
     // Transfer Helper
     address transferHelper_accountingChainAddress;
     address transferHelper_earningChainAddress;
@@ -395,8 +401,11 @@ contract BaseTest is TestWithHelpers {
         );
 
         // 8-9. Withdrawal Policy (Impl + Proxy)
-        address withdrawalExecutionPolicy_accountingChain_impl =
-            address(new WithdrawalExecutionPolicy(vault_accountingChainAddress));
+        address withdrawalExecutionPolicy_accountingChain_impl = address(
+            new WithdrawalExecutionPolicy(
+                vault_accountingChainAddress, TEST_MIN_REDEMPTION_CAPACITY, TEST_MIN_REDEMPTION_REFILL_RATE
+            )
+        );
         withdrawalExecutionPolicy_accountingChain = WithdrawalExecutionPolicy(
             address(
                 new TransparentUpgradeableProxy(
@@ -703,8 +712,11 @@ contract BaseTest is TestWithHelpers {
         );
 
         // 6-7. Withdrawal Policy (Impl + Proxy)
-        address withdrawalExecutionPolicy_earningChain_impl =
-            address(new WithdrawalExecutionPolicy(chainGateway_earningChainAddress));
+        address withdrawalExecutionPolicy_earningChain_impl = address(
+            new WithdrawalExecutionPolicy(
+                chainGateway_earningChainAddress, TEST_MIN_REDEMPTION_CAPACITY, TEST_MIN_REDEMPTION_REFILL_RATE
+            )
+        );
         withdrawalExecutionPolicy_earningChain = WithdrawalExecutionPolicy(
             address(
                 new TransparentUpgradeableProxy(
@@ -1060,6 +1072,9 @@ contract BaseTest is TestWithHelpers {
             address(slippageCoverageVault_accountingChain), vaultSelectors, OPERATOR_ROLE
         );
 
+        withdrawalExecutionPolicy_accountingChain.raiseRedemptionCapacity(TEST_SEED_REDEMPTION_CAPACITY);
+        withdrawalExecutionPolicy_accountingChain.raiseRedemptionRefillRate(TEST_SEED_REDEMPTION_REFILL_RATE);
+
         vm.stopPrank();
     }
 
@@ -1146,6 +1161,9 @@ contract BaseTest is TestWithHelpers {
         vaultSelectors[10] = ISlippageCoverageVault.fundCoverage.selector;
         vaultSelectors[11] = ISlippageCoverageVault.sweep.selector;
         accessManager.setTargetFunctionRole(address(slippageCoverageVault_earningChain), vaultSelectors, OPERATOR_ROLE);
+
+        withdrawalExecutionPolicy_earningChain.raiseRedemptionCapacity(TEST_SEED_REDEMPTION_CAPACITY);
+        withdrawalExecutionPolicy_earningChain.raiseRedemptionRefillRate(TEST_SEED_REDEMPTION_REFILL_RATE);
 
         vm.stopPrank();
     }

@@ -27,6 +27,7 @@ import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IEarningChainStateProvider} from "src/interfaces/IEarningChainStateProvider.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
+import {RateLimitBucketLib} from "src/libraries/RateLimitBucketLib.sol";
 import {ChainBalanceOracle} from "src/oracles/balance/ChainBalanceOracle.sol";
 import {IBundleBaseAggregator} from "src/oracles/balance/ChainlinkChainBalanceOracleAdapter.sol";
 import {ChainlinkL2ChainBalanceOracleAdapter} from "src/oracles/balance/ChainlinkL2ChainBalanceOracleAdapter.sol";
@@ -202,11 +203,19 @@ abstract contract AccountingChainDeployment is
     function _assertRequiredPoliciesSet() private view {
         IPolicyRegistry registry = IPolicyRegistry(getPolicyRegistryAddress(_deployer()));
         require(registry.getPolicy(DEPOSIT_POLICY_ID) != address(0), "missing accounting-chain deposit policy");
-        require(
-            registry.getPolicy(WITHDRAWAL_EXECUTION_POLICY_ID) != address(0),
-            "missing accounting-chain withdrawal-execution policy"
-        );
+        address policyAddress = registry.getPolicy(WITHDRAWAL_EXECUTION_POLICY_ID);
+        require(policyAddress != address(0), "missing accounting-chain withdrawal-execution policy");
         require(registry.getPolicy(BRIDGE_POLICY_ID) != address(0), "missing accounting-chain bridge policy");
+
+        WithdrawalExecutionPolicy policy = WithdrawalExecutionPolicy(policyAddress);
+        RateLimitBucketLib.Bucket memory bucket = policy.getRedemptionBucket();
+        require(
+            bucket.capacity >= policy.getMinRedemptionCapacity(), "accounting-chain redemption capacity below floor"
+        );
+        require(
+            bucket.refillRate >= policy.getMinRedemptionRefillRate(),
+            "accounting-chain redemption refill rate below floor"
+        );
     }
 
     function _accessManager() internal view virtual override returns (address) {
@@ -276,8 +285,19 @@ abstract contract AccountingChainDeployment is
         withdrawalExecutionPolicy.setDefaultFeeBps(uint16(_configUint(".withdrawalExecutionPolicy.defaultFeeBps")));
         withdrawalExecutionPolicy.addSigner(_configAddress(".withdrawalExecutionPolicy.signer"));
 
+        _initRedemptionLimit(withdrawalExecutionPolicy, ".accountingChain.withdrawalExecutionPolicy.redemptionLimit");
+
         IPolicyRegistry(getPolicyRegistryAddress(_deployer()))
             .setPolicy(WITHDRAWAL_EXECUTION_POLICY_ID, address(withdrawalExecutionPolicy));
+    }
+
+    function _initRedemptionLimit(WithdrawalExecutionPolicy policy, string memory configKey) private {
+        uint128 capacity = uint128(vm.parseUint(_configString(string.concat(configKey, ".capacity"))));
+        uint128 refillRate = uint128(vm.parseUint(_configString(string.concat(configKey, ".refillRate"))));
+        policy.raiseRedemptionCapacity(capacity);
+        if (refillRate > 0) {
+            policy.raiseRedemptionRefillRate(refillRate);
+        }
     }
 
     function _setupAssetRegistry() internal {
@@ -333,7 +353,15 @@ abstract contract AccountingChainDeployment is
     }
 
     function _deployWithdrawalExecutionPolicy() internal returns (address) {
-        address implementation = address(new WithdrawalExecutionPolicy(getStableVaultAddress(_deployer())));
+        uint128 minRedemptionCapacity =
+            uint128(vm.parseUint(_configString(".accountingChain.withdrawalExecutionPolicy.minRedemptionCapacity")));
+        uint128 minRedemptionRefillRate =
+            uint128(vm.parseUint(_configString(".accountingChain.withdrawalExecutionPolicy.minRedemptionRefillRate")));
+        address implementation = address(
+            new WithdrawalExecutionPolicy(
+                getStableVaultAddress(_deployer()), minRedemptionCapacity, minRedemptionRefillRate
+            )
+        );
         _logDeployment("WithdrawalExecutionPolicy::Implementation", "", implementation);
         address withdrawalExecutionPolicy = _deployTransparentProxy_create3({
             namespacedSaltSeed: WITHDRAWAL_EXECUTION_POLICY_SALT_SEED,

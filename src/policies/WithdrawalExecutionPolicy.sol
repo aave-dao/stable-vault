@@ -12,6 +12,7 @@ import {EfficientHashLib} from "@solady/utils/EfficientHashLib.sol";
 import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 
 import {IWithdrawalExecutionPolicy} from "src/interfaces/IWithdrawalExecutionPolicy.sol";
+import {RateLimitBucketLib} from "src/libraries/RateLimitBucketLib.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
@@ -28,6 +29,8 @@ import {Errors} from "src/types/Errors.sol";
 /// with the cap amount rounded up in favor of the protocol.
 /// @custom:upgradeable
 contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithdrawalExecutionPolicy {
+    using RateLimitBucketLib for RateLimitBucketLib.Bucket;
+
     /// @notice Emitted when a nonce is marked as used, either by a successful appliance of the withdrawal policy or by
     /// a nonce invalidation.
     event NonceUsed(address indexed signer, uint256 indexed nonce);
@@ -41,6 +44,18 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
     /// @notice Emitted when the asset fee in basis points is set.
     event AssetFeeBpsSet(address indexed asset, uint16 assetFeeBps, bool isSet);
 
+    /// @notice Emitted when the redemption bucket capacity is raised.
+    event RedemptionCapacityRaised(uint128 oldCapacity, uint128 newCapacity);
+
+    /// @notice Emitted when the redemption bucket capacity is lowered.
+    event RedemptionCapacityLowered(uint128 oldCapacity, uint128 newCapacity);
+
+    /// @notice Emitted when the redemption bucket refill rate is raised.
+    event RedemptionRefillRateRaised(uint128 oldRefillRate, uint128 newRefillRate);
+
+    /// @notice Emitted when the redemption bucket refill rate is lowered.
+    event RedemptionRefillRateLowered(uint128 oldRefillRate, uint128 newRefillRate);
+
     /// @notice Thrown when a recovered signer is not a whitelisted signer.
     /// @custom:selector 0x8baa579f
     error InvalidSignature();
@@ -53,6 +68,19 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
     /// @custom:selector 0x1ab7da6b
     error DeadlineExpired();
 
+    /// @notice Thrown when lowering the redemption capacity below the immutable floor.
+    error BelowMinRedemptionCapacity();
+
+    /// @notice Thrown when lowering the redemption refill rate below the immutable floor.
+    error BelowMinRedemptionRefillRate();
+
+    /// @notice Thrown when raising the redemption capacity to `RateLimitBucketLib.UNLIMITED_CAPACITY`.
+    /// @dev UNLIMITED disables the bucket and is incompatible with the always-exit invariant.
+    error UnlimitedNotAllowed();
+
+    /// @notice Thrown when the constructor receives a zero floor for either redemption parameter.
+    error ZeroFloorNotAllowed();
+
     // EIP-712 typeHash:
     // keccak256("SignedFee(address user,address assetOut,uint256 iouAmountRay,uint256 personalFeeAmountRay,uint256
     // nonce,uint256 deadline)").
@@ -62,6 +90,13 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
     uint16 internal constant FEE_CAP_BPS = 10_00;
 
     address internal immutable WITHDRAWAL_EXECUTION_POLICY_APPLIER;
+
+    /// @dev Minimum redemption bucket capacity. Locked at impl-deploy. The `lower*` setters cannot drop the bucket
+    /// below these floors, guaranteeing a minimum exit throughput for the lifetime of the implementation.
+    uint128 internal immutable MIN_REDEMPTION_CAPACITY;
+
+    /// @dev Minimum redemption bucket refill rate.
+    uint128 internal immutable MIN_REDEMPTION_REFILL_RATE;
 
     /// @notice Signed personal fee data (decoded from WithdrawalExecutionIntent.policyData).
     /// @param personalFeeAmountRay The personal fee amount in RAY signed by a whitelisted signer. Used directly as
@@ -90,6 +125,7 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
         mapping(address asset => AssetFeeConfig config) assetFeeConfigs;
         mapping(address account => bool isSigner) isSigner;
         mapping(address signer => mapping(uint256 nonce => bool used)) wasNonceUsed;
+        RateLimitBucketLib.Bucket redemptionBucket;
     }
 
     // keccak256(abi.encode(uint256(keccak256("aave.storage.WithdrawalExecutionPolicy")) - 1)) & ~bytes32(uint256(0xff))
@@ -109,10 +145,20 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
 
     /// @dev Constructor.
     /// @param withdrawalExecutionPolicyApplier Address allowed to apply the withdrawal policy.
-    constructor(address withdrawalExecutionPolicyApplier) EIP712Upgradeable() {
+    /// @param minRedemptionCapacity Floor for the redemption bucket capacity. Must be non-zero.
+    /// @param minRedemptionRefillRate Floor for the redemption bucket refill rate. Must be non-zero.
+    constructor(
+        address withdrawalExecutionPolicyApplier,
+        uint128 minRedemptionCapacity,
+        uint128 minRedemptionRefillRate
+    ) EIP712Upgradeable() {
         require(withdrawalExecutionPolicyApplier != address(0), Errors.ZeroAddress());
+        require(minRedemptionCapacity > 0, ZeroFloorNotAllowed());
+        require(minRedemptionRefillRate > 0, ZeroFloorNotAllowed());
         _disableInitializers();
         WITHDRAWAL_EXECUTION_POLICY_APPLIER = withdrawalExecutionPolicyApplier;
+        MIN_REDEMPTION_CAPACITY = minRedemptionCapacity;
+        MIN_REDEMPTION_REFILL_RATE = minRedemptionRefillRate;
     }
 
     /// @dev Initializer.
@@ -134,12 +180,16 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
     }
 
     /// @inheritdoc IWithdrawalExecutionPolicy
+    /// @dev Consumes the redemption bucket before any other state mutation. Reverts with
+    /// `RateLimitBucketLib.RateLimited` if the requested amount exceeds the current bucket availability.
     function applyWithdrawalExecutionPolicy(WithdrawalExecutionIntent calldata withdrawalExecution)
         external
         override
         onlyWithdrawalExecutionPolicyApplier
         returns (uint256)
     {
+        $storage().redemptionBucket.consume(withdrawalExecution.iouAmountRay);
+
         (uint256 amountOutRay, address signer, uint256 nonce) = _previewWithdrawalExecutionPolicy(withdrawalExecution);
         if (signer != address(0)) {
             _markNonceAsUsed(signer, nonce);
@@ -151,6 +201,8 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
     }
 
     /// @inheritdoc IWithdrawalExecutionPolicy
+    /// @dev Returns the fee-adjusted output amount. Does not reflect the redemption bucket state; integrators must
+    /// additionally read `getRedemptionBucket()` to determine whether `applyWithdrawalExecutionPolicy` will succeed.
     function previewWithdrawalExecutionPolicy(WithdrawalExecutionIntent calldata withdrawalExecution)
         external
         view
@@ -188,6 +240,21 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
     /// @return bool True if the nonce has been used, false otherwise.
     function wasNonceUsed(address signer, uint256 nonce) external view returns (bool) {
         return $storage().wasNonceUsed[signer][nonce];
+    }
+
+    /// @notice Returns the current redemption bucket.
+    function getRedemptionBucket() external view returns (RateLimitBucketLib.Bucket memory) {
+        return $storage().redemptionBucket;
+    }
+
+    /// @notice Returns the minimum redemption bucket capacity enforced by `lowerRedemptionCapacity`.
+    function getMinRedemptionCapacity() external view returns (uint128) {
+        return MIN_REDEMPTION_CAPACITY;
+    }
+
+    /// @notice Returns the minimum redemption bucket refill rate enforced by `lowerRedemptionRefillRate`.
+    function getMinRedemptionRefillRate() external view returns (uint128) {
+        return MIN_REDEMPTION_REFILL_RATE;
     }
 
     //////////////////////////////// RESTRICTED FUNCTIONS ////////////////////////////////
@@ -238,6 +305,40 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
         require($storage().isSigner[signer], Errors.NotAuthorized());
         require($storage().wasNonceUsed[signer][nonce] == false, NonceAlreadyUsed());
         _markNonceAsUsed(signer, nonce);
+    }
+
+    /// @notice Raises the redemption bucket capacity. `RateLimitBucketLib.UNLIMITED_CAPACITY` is rejected because the
+    /// bucket is load-bearing for the always-exit invariant.
+    /// @dev Starting with a full bucket, a caller could extract up to `2 * capacity` over a
+    /// `capacity / refillRate`-second interval. Set `capacity` accordingly.
+    function raiseRedemptionCapacity(uint128 newCapacity) external restricted {
+        require(newCapacity != RateLimitBucketLib.UNLIMITED_CAPACITY, UnlimitedNotAllowed());
+        uint128 oldCapacity = $storage().redemptionBucket.capacity;
+        $storage().redemptionBucket.raiseCapacity(newCapacity);
+        emit RedemptionCapacityRaised(oldCapacity, newCapacity);
+    }
+
+    /// @notice Lowers the redemption bucket capacity. Cannot drop below `MIN_REDEMPTION_CAPACITY`.
+    function lowerRedemptionCapacity(uint128 newCapacity) external restricted {
+        require(newCapacity >= MIN_REDEMPTION_CAPACITY, BelowMinRedemptionCapacity());
+        uint128 oldCapacity = $storage().redemptionBucket.capacity;
+        $storage().redemptionBucket.lowerCapacity(newCapacity);
+        emit RedemptionCapacityLowered(oldCapacity, newCapacity);
+    }
+
+    /// @notice Raises the redemption bucket refill rate.
+    function raiseRedemptionRefillRate(uint128 newRefillRate) external restricted {
+        uint128 oldRefillRate = $storage().redemptionBucket.refillRate;
+        $storage().redemptionBucket.raiseRefillRate(newRefillRate);
+        emit RedemptionRefillRateRaised(oldRefillRate, newRefillRate);
+    }
+
+    /// @notice Lowers the redemption bucket refill rate. Cannot drop below `MIN_REDEMPTION_REFILL_RATE`.
+    function lowerRedemptionRefillRate(uint128 newRefillRate) external restricted {
+        require(newRefillRate >= MIN_REDEMPTION_REFILL_RATE, BelowMinRedemptionRefillRate());
+        uint128 oldRefillRate = $storage().redemptionBucket.refillRate;
+        $storage().redemptionBucket.lowerRefillRate(newRefillRate);
+        emit RedemptionRefillRateLowered(oldRefillRate, newRefillRate);
     }
 
     //////////////////////////////// INTERNAL FUNCTIONS ////////////////////////////////

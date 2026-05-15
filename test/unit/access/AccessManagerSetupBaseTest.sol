@@ -228,7 +228,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     }
 
     function test_disablerProfile_hasTheExpectedRoles() public view {
-        uint64[] memory expected = new uint64[](21);
+        uint64[] memory expected = new uint64[](23);
         expected[0] = RolesConfig.getRole__rebalance().roleId;
         expected[1] = RolesConfig.getRole__removeStrategy().roleId;
         expected[2] = RolesConfig.getRole__rescueTokens().roleId;
@@ -251,6 +251,8 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         expected[18] = RolesConfig.getRole__lowerDepositRefillRate().roleId;
         expected[19] = RolesConfig.getRole__lowerBridgingCapacity().roleId;
         expected[20] = RolesConfig.getRole__lowerBridgingRefillRate().roleId;
+        expected[21] = RolesConfig.getRole__lowerRedemptionCapacity().roleId;
+        expected[22] = RolesConfig.getRole__lowerRedemptionRefillRate().roleId;
         _assertProfileHasExactlyTheseRoles(_getProfile__Disabler(), expected);
 
         for (uint256 i = 0; i < expected.length; i++) {

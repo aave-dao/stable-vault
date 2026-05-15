@@ -6,6 +6,7 @@ import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessMana
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {IWithdrawalExecutionPolicy} from "src/interfaces/IWithdrawalExecutionPolicy.sol";
+import {RateLimitBucketLib} from "src/libraries/RateLimitBucketLib.sol";
 import {WithdrawalExecutionPolicy} from "src/policies/WithdrawalExecutionPolicy.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
@@ -26,12 +27,32 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
 
     uint16 constant FEE_CAP_BPS = 10_00; // 10.00%
 
+    uint128 constant MIN_REDEMPTION_CAPACITY = 1;
+    uint128 constant MIN_REDEMPTION_REFILL_RATE = 1;
+    uint128 constant SEED_REDEMPTION_CAPACITY = type(uint128).max - 1;
+    uint128 constant SEED_REDEMPTION_REFILL_RATE = 1e30;
+
     function _deployWithdrawalExecutionPolicy(address accessManager, address withdrawalExecutionPolicyApplier)
         internal
         returns (WithdrawalExecutionPolicy)
     {
-        address withdrawalExecutionPolicyImpl = address(new WithdrawalExecutionPolicy(withdrawalExecutionPolicyApplier));
-        return WithdrawalExecutionPolicy(
+        return _deployWithdrawalExecutionPolicy(
+            accessManager, withdrawalExecutionPolicyApplier, MIN_REDEMPTION_CAPACITY, MIN_REDEMPTION_REFILL_RATE
+        );
+    }
+
+    function _deployWithdrawalExecutionPolicy(
+        address accessManager,
+        address withdrawalExecutionPolicyApplier,
+        uint128 minRedemptionCapacity,
+        uint128 minRedemptionRefillRate
+    ) internal returns (WithdrawalExecutionPolicy) {
+        address withdrawalExecutionPolicyImpl = address(
+            new WithdrawalExecutionPolicy(
+                withdrawalExecutionPolicyApplier, minRedemptionCapacity, minRedemptionRefillRate
+            )
+        );
+        WithdrawalExecutionPolicy policy = WithdrawalExecutionPolicy(
             address(
                 new TransparentUpgradeableProxy(
                     withdrawalExecutionPolicyImpl,
@@ -40,6 +61,9 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
                 )
             )
         );
+        policy.raiseRedemptionCapacity(SEED_REDEMPTION_CAPACITY);
+        policy.raiseRedemptionRefillRate(SEED_REDEMPTION_REFILL_RATE);
+        return policy;
     }
 
     function setUp() public {
@@ -63,7 +87,17 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
 
     function test_constructor_reverts_ifWithdrawalExecutionPolicyApplierIsZeroAddress() public {
         vm.expectRevert(Errors.ZeroAddress.selector);
-        new WithdrawalExecutionPolicy(address(0));
+        new WithdrawalExecutionPolicy(address(0), MIN_REDEMPTION_CAPACITY, MIN_REDEMPTION_REFILL_RATE);
+    }
+
+    function test_constructor_reverts_ifMinRedemptionCapacityIsZero() public {
+        vm.expectRevert(WithdrawalExecutionPolicy.ZeroFloorNotAllowed.selector);
+        new WithdrawalExecutionPolicy(address(this), 0, MIN_REDEMPTION_REFILL_RATE);
+    }
+
+    function test_constructor_reverts_ifMinRedemptionRefillRateIsZero() public {
+        vm.expectRevert(WithdrawalExecutionPolicy.ZeroFloorNotAllowed.selector);
+        new WithdrawalExecutionPolicy(address(this), MIN_REDEMPTION_CAPACITY, 0);
     }
 
     // Restricted functions access control tests
@@ -249,7 +283,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
         uint256 baseFeeBps
     ) public {
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
-        iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        iouAmountRay = bound(iouAmountRay, 0, (type(uint128).max - 1) / 4);
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
@@ -284,7 +318,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
         assetFeeBps = bound(assetFeeBps, 0, FEE_CAP_BPS);
         // Bound to prevent overflow in fee calculation: iouAmountRay * feeBps + MAX_BPS - 1
-        iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        iouAmountRay = bound(iouAmountRay, 0, (type(uint128).max - 1) / 4);
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
@@ -326,7 +360,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
         vm.assume(assetOut != address(0));
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
         assetFeeBps = bound(assetFeeBps, 0, FEE_CAP_BPS);
-        iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        iouAmountRay = bound(iouAmountRay, 0, (type(uint128).max - 1) / 4);
         uint256 activeFeeBps = isAssetFeeSet ? assetFeeBps : baseFeeBps;
         uint256 capRay = _capRay(iouAmountRay, activeFeeBps);
         // Bound the signed fee at-or-below the cap so it's applied verbatim.
@@ -382,7 +416,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
         uint256 baseFeeBps
     ) public {
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
-        iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        iouAmountRay = bound(iouAmountRay, 0, (type(uint128).max - 1) / 4);
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
@@ -447,7 +481,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
         vm.assume(assetOut != address(0));
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
         assetFeeBps = bound(assetFeeBps, 0, FEE_CAP_BPS);
-        iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        iouAmountRay = bound(iouAmountRay, 0, (type(uint128).max - 1) / 4);
         uint256 activeFeeBps = isAssetFeeSet ? assetFeeBps : baseFeeBps;
         uint256 capRay = _capRay(iouAmountRay, activeFeeBps);
         // Bound the signed fee strictly above the cap so the contract must clamp it.
@@ -507,7 +541,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
         vm.assume(withdrawalExecutionPolicy.isSigner(nonWhitelistedSigner) == false);
 
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
-        iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        iouAmountRay = bound(iouAmountRay, 0, (type(uint128).max - 1) / 4);
         personalFeeAmountRay = bound(personalFeeAmountRay, 0, _capRay(iouAmountRay, baseFeeBps));
 
         // Setup base fee
@@ -534,7 +568,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
     ) public {
         vm.assume(user != wrongUser);
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
-        iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        iouAmountRay = bound(iouAmountRay, 0, (type(uint128).max - 1) / 4);
         personalFeeAmountRay = bound(personalFeeAmountRay, 0, _capRay(iouAmountRay, baseFeeBps));
 
         // Setup base fee
@@ -566,7 +600,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
     ) public {
         vm.assume(assetOut != wrongAssetOut);
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
-        iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        iouAmountRay = bound(iouAmountRay, 0, (type(uint128).max - 1) / 4);
         personalFeeAmountRay = bound(personalFeeAmountRay, 0, _capRay(iouAmountRay, baseFeeBps));
 
         // Setup base fee
@@ -598,7 +632,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
     ) public {
         vm.assume(iouAmountRay != wrongIouAmountRay);
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
-        iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        iouAmountRay = bound(iouAmountRay, 0, (type(uint128).max - 1) / 4);
         wrongIouAmountRay = bound(wrongIouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
         vm.assume(iouAmountRay != wrongIouAmountRay);
         personalFeeAmountRay = bound(personalFeeAmountRay, 0, _capRay(iouAmountRay, baseFeeBps));
@@ -631,7 +665,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
         uint256 baseFeeBps
     ) public {
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
-        iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        iouAmountRay = bound(iouAmountRay, 0, (type(uint128).max - 1) / 4);
         uint256 capRay = _capRay(iouAmountRay, baseFeeBps);
         personalFeeAmountRay = bound(personalFeeAmountRay, 0, capRay);
         wrongPersonalFeeAmountRay = bound(wrongPersonalFeeAmountRay, 0, capRay);
@@ -673,7 +707,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
     ) public {
         vm.assume(malformedSignature.length != 65);
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
-        iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        iouAmountRay = bound(iouAmountRay, 0, (type(uint128).max - 1) / 4);
         personalFeeAmountRay = bound(personalFeeAmountRay, 0, _capRay(iouAmountRay, baseFeeBps));
 
         // Setup base fee
@@ -887,7 +921,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
         uint256 nonce
     ) public {
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
-        iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        iouAmountRay = bound(iouAmountRay, 0, (type(uint128).max - 1) / 4);
         personalFeeAmountRay = bound(personalFeeAmountRay, 0, _capRay(iouAmountRay, baseFeeBps));
 
         vm.prank(admin);
@@ -919,7 +953,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
         uint256 nonce
     ) public {
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
-        iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        iouAmountRay = bound(iouAmountRay, 0, (type(uint128).max - 1) / 4);
         personalFeeAmountRay = bound(personalFeeAmountRay, 0, _capRay(iouAmountRay, baseFeeBps));
 
         vm.prank(admin);
@@ -978,7 +1012,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
         uint256 deadlineOffset
     ) public {
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
-        iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        iouAmountRay = bound(iouAmountRay, 0, (type(uint128).max - 1) / 4);
         personalFeeAmountRay = bound(personalFeeAmountRay, 0, _capRay(iouAmountRay, baseFeeBps));
         deadlineOffset = bound(deadlineOffset, 1, 365 days);
 
@@ -1014,7 +1048,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
         uint256 nonce3
     ) public {
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
-        iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        iouAmountRay = bound(iouAmountRay, 0, (type(uint128).max - 1) / 4);
         personalFeeAmountRay = bound(personalFeeAmountRay, 0, _capRay(iouAmountRay, baseFeeBps));
         vm.assume(nonce1 != nonce2 && nonce2 != nonce3 && nonce1 != nonce3);
 
@@ -1085,7 +1119,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
         uint256 sharedNonce
     ) public {
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
-        iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        iouAmountRay = bound(iouAmountRay, 0, (type(uint128).max - 1) / 4);
         personalFeeAmountRay = bound(personalFeeAmountRay, 0, _capRay(iouAmountRay, baseFeeBps));
 
         vm.prank(admin);
@@ -1127,7 +1161,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
         uint256 baseFeeBps
     ) public {
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
-        iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        iouAmountRay = bound(iouAmountRay, 0, (type(uint128).max - 1) / 4);
         personalFeeAmountRay = bound(personalFeeAmountRay, 0, _capRay(iouAmountRay, baseFeeBps));
 
         vm.prank(admin);
@@ -1160,7 +1194,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
         uint256 baseFeeBps
     ) public {
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
-        iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        iouAmountRay = bound(iouAmountRay, 0, (type(uint128).max - 1) / 4);
         personalFeeAmountRay = bound(personalFeeAmountRay, 0, _capRay(iouAmountRay, baseFeeBps));
 
         vm.prank(admin);
@@ -1192,7 +1226,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
         uint256 baseFeeBps
     ) public {
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
-        iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        iouAmountRay = bound(iouAmountRay, 0, (type(uint128).max - 1) / 4);
         personalFeeAmountRay = bound(personalFeeAmountRay, 0, _capRay(iouAmountRay, baseFeeBps));
 
         vm.prank(admin);
@@ -1231,7 +1265,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
         uint256 baseFeeBps
     ) public {
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
-        iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        iouAmountRay = bound(iouAmountRay, 0, (type(uint128).max - 1) / 4);
         personalFeeAmountRay = bound(personalFeeAmountRay, 0, _capRay(iouAmountRay, baseFeeBps));
 
         vm.prank(admin);
@@ -1272,7 +1306,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
         uint256 baseFeeBps
     ) public {
         baseFeeBps = bound(baseFeeBps, 0, FEE_CAP_BPS);
-        iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        iouAmountRay = bound(iouAmountRay, 0, (type(uint128).max - 1) / 4);
         personalFeeAmountRay = bound(personalFeeAmountRay, 0, _capRay(iouAmountRay, baseFeeBps));
 
         vm.prank(admin);
@@ -1339,7 +1373,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
     ) public {
         vm.assume(assetOut != address(0));
         assetFeeBps = bound(assetFeeBps, 0, FEE_CAP_BPS);
-        iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        iouAmountRay = bound(iouAmountRay, 0, (type(uint128).max - 1) / 4);
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
@@ -1371,7 +1405,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
         vm.assume(assetOut != address(0));
         assetFeeBps = bound(assetFeeBps, 0, FEE_CAP_BPS);
         signedBps = bound(signedBps, 0, assetFeeBps);
-        iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        iouAmountRay = bound(iouAmountRay, 0, (type(uint128).max - 1) / 4);
 
         vm.prank(admin);
         // forge-lint: disable-next-line(unsafe-typecast)
@@ -1404,7 +1438,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
         uint256 personalFeeAmountRay
     ) public {
         vm.assume(assetOut != address(0));
-        iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        iouAmountRay = bound(iouAmountRay, 0, (type(uint128).max - 1) / 4);
 
         vm.prank(admin);
         withdrawalExecutionPolicy.setDefaultFeeBps(0);
@@ -1433,7 +1467,7 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
     ) public {
         vm.assume(assetOut != address(0));
         assetFeeBps = bound(assetFeeBps, 0, FEE_CAP_BPS);
-        iouAmountRay = bound(iouAmountRay, 0, (type(uint256).max - Constants.MAX_BPS) / Constants.MAX_BPS);
+        iouAmountRay = bound(iouAmountRay, 0, (type(uint128).max - 1) / 4);
         uint256 capRay = _capRay(iouAmountRay, assetFeeBps);
         vm.assume(capRay < type(uint256).max);
 
@@ -1568,6 +1602,220 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
             )
         );
 
+        return keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
+    }
+
+    // Redemption rate-limit tests
+
+    function _deployPolicyWithCustomFloors(uint128 minCapacity, uint128 minRefillRate)
+        internal
+        returns (WithdrawalExecutionPolicy)
+    {
+        return _deployWithdrawalExecutionPolicy(address(mockAccessManager), address(this), minCapacity, minRefillRate);
+    }
+
+    function test_raiseRedemptionCapacity_reverts_ifMsgSenderIsNotAuthorized(address caller, uint128 newCapacity)
+        public
+    {
+        vm.assume(caller != address(0));
+        _assumeNotProxyAdmin(caller, address(withdrawalExecutionPolicy));
+
+        mockAccessManager.mockRejectCall(
+            caller, address(withdrawalExecutionPolicy), WithdrawalExecutionPolicy.raiseRedemptionCapacity.selector
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, caller));
+        vm.prank(caller);
+        withdrawalExecutionPolicy.raiseRedemptionCapacity(newCapacity);
+    }
+
+    function test_lowerRedemptionCapacity_reverts_ifMsgSenderIsNotAuthorized(address caller, uint128 newCapacity)
+        public
+    {
+        vm.assume(caller != address(0));
+        _assumeNotProxyAdmin(caller, address(withdrawalExecutionPolicy));
+
+        mockAccessManager.mockRejectCall(
+            caller, address(withdrawalExecutionPolicy), WithdrawalExecutionPolicy.lowerRedemptionCapacity.selector
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, caller));
+        vm.prank(caller);
+        withdrawalExecutionPolicy.lowerRedemptionCapacity(newCapacity);
+    }
+
+    function test_raiseRedemptionRefillRate_reverts_ifMsgSenderIsNotAuthorized(address caller, uint128 newRate) public {
+        vm.assume(caller != address(0));
+        _assumeNotProxyAdmin(caller, address(withdrawalExecutionPolicy));
+
+        mockAccessManager.mockRejectCall(
+            caller, address(withdrawalExecutionPolicy), WithdrawalExecutionPolicy.raiseRedemptionRefillRate.selector
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, caller));
+        vm.prank(caller);
+        withdrawalExecutionPolicy.raiseRedemptionRefillRate(newRate);
+    }
+
+    function test_lowerRedemptionRefillRate_reverts_ifMsgSenderIsNotAuthorized(address caller, uint128 newRate) public {
+        vm.assume(caller != address(0));
+        _assumeNotProxyAdmin(caller, address(withdrawalExecutionPolicy));
+
+        mockAccessManager.mockRejectCall(
+            caller, address(withdrawalExecutionPolicy), WithdrawalExecutionPolicy.lowerRedemptionRefillRate.selector
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, caller));
+        vm.prank(caller);
+        withdrawalExecutionPolicy.lowerRedemptionRefillRate(newRate);
+    }
+
+    function test_raiseRedemptionCapacity_reverts_ifUnlimited() public {
+        vm.expectRevert(WithdrawalExecutionPolicy.UnlimitedNotAllowed.selector);
+        withdrawalExecutionPolicy.raiseRedemptionCapacity(uint128(RateLimitBucketLib.UNLIMITED_CAPACITY));
+    }
+
+    function test_lowerRedemptionCapacity_reverts_ifBelowFloor(uint128 belowFloor) public {
+        WithdrawalExecutionPolicy policy = _deployPolicyWithCustomFloors(1e30, 1e25);
+        belowFloor = uint128(bound(belowFloor, 0, 1e30 - 1));
+        // The seeded capacity sits above the floor, so a strict lowerCapacity below the floor reverts before
+        // the lib's strict-less-than check matters.
+        vm.expectRevert(WithdrawalExecutionPolicy.BelowMinRedemptionCapacity.selector);
+        policy.lowerRedemptionCapacity(belowFloor);
+    }
+
+    function test_lowerRedemptionRefillRate_reverts_ifBelowFloor(uint128 belowFloor) public {
+        WithdrawalExecutionPolicy policy = _deployPolicyWithCustomFloors(1e30, 1e25);
+        belowFloor = uint128(bound(belowFloor, 0, 1e25 - 1));
+        vm.expectRevert(WithdrawalExecutionPolicy.BelowMinRedemptionRefillRate.selector);
+        policy.lowerRedemptionRefillRate(belowFloor);
+    }
+
+    function test_lowerRedemptionCapacity_succeedsAtFloor() public {
+        WithdrawalExecutionPolicy policy = _deployPolicyWithCustomFloors(1e30, 1e25);
+        vm.expectEmit(true, true, true, true, address(policy));
+        emit WithdrawalExecutionPolicy.RedemptionCapacityLowered(SEED_REDEMPTION_CAPACITY, 1e30);
+        policy.lowerRedemptionCapacity(1e30);
+        assertEq(policy.getRedemptionBucket().capacity, 1e30, "Capacity should reach floor");
+    }
+
+    function test_lowerRedemptionRefillRate_succeedsAtFloor() public {
+        WithdrawalExecutionPolicy policy = _deployPolicyWithCustomFloors(1e30, 1e25);
+        vm.expectEmit(true, true, true, true, address(policy));
+        emit WithdrawalExecutionPolicy.RedemptionRefillRateLowered(SEED_REDEMPTION_REFILL_RATE, 1e25);
+        policy.lowerRedemptionRefillRate(1e25);
+        assertEq(policy.getRedemptionBucket().refillRate, 1e25, "Refill rate should reach floor");
+    }
+
+    function test_raiseRedemptionCapacity_revertsOnNonStrictGreater(uint128 newCapacity) public {
+        newCapacity = uint128(bound(newCapacity, 0, SEED_REDEMPTION_CAPACITY));
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        withdrawalExecutionPolicy.raiseRedemptionCapacity(newCapacity);
+    }
+
+    function test_applyWithdrawalExecutionPolicy_consumesBucket(uint128 iouAmountRay) public {
+        iouAmountRay = uint128(bound(iouAmountRay, 1, SEED_REDEMPTION_CAPACITY));
+        RateLimitBucketLib.Bucket memory before = withdrawalExecutionPolicy.getRedemptionBucket();
+
+        withdrawalExecutionPolicy.applyWithdrawalExecutionPolicy(
+            _buildRequest(address(0xBEEF), address(0xCAFE), iouAmountRay, "")
+        );
+
+        RateLimitBucketLib.Bucket memory afterApply = withdrawalExecutionPolicy.getRedemptionBucket();
+        assertEq(
+            afterApply.consumed, uint128(uint256(before.consumed) + iouAmountRay), "Consumed should reflect amount"
+        );
+    }
+
+    function test_applyWithdrawalExecutionPolicy_reverts_whenBucketExhausted() public {
+        WithdrawalExecutionPolicy policy = _deployPolicyWithCustomFloors(1, 1);
+        policy.lowerRedemptionCapacity(1000);
+        policy.lowerRedemptionRefillRate(1);
+
+        // Drain the bucket.
+        policy.applyWithdrawalExecutionPolicy(_buildRequest(address(0xBEEF), address(0xCAFE), 1000, ""));
+
+        vm.expectRevert(abi.encodeWithSelector(RateLimitBucketLib.RateLimited.selector, 1, 0));
+        policy.applyWithdrawalExecutionPolicy(_buildRequest(address(0xBEEF), address(0xCAFE), 1, ""));
+    }
+
+    function test_applyWithdrawalExecutionPolicy_succeedsAfterRefill() public {
+        WithdrawalExecutionPolicy policy = _deployPolicyWithCustomFloors(1, 1);
+        policy.lowerRedemptionCapacity(1000);
+        policy.lowerRedemptionRefillRate(10);
+
+        policy.applyWithdrawalExecutionPolicy(_buildRequest(address(0xBEEF), address(0xCAFE), 1000, ""));
+
+        vm.warp(block.timestamp + 100);
+        policy.applyWithdrawalExecutionPolicy(_buildRequest(address(0xBEEF), address(0xCAFE), 1000, ""));
+    }
+
+    function test_applyWithdrawalExecutionPolicy_doesNotMarkNonceWhenRateLimited() public {
+        WithdrawalExecutionPolicy policy = _deployPolicyWithCustomFloors(1, 1);
+        policy.lowerRedemptionCapacity(1000);
+        policy.lowerRedemptionRefillRate(1);
+        policy.applyWithdrawalExecutionPolicy(_buildRequest(address(0xBEEF), address(0xCAFE), 1000, ""));
+
+        (address signer, uint256 signerPk) = makeAddrAndKey("signer");
+        vm.prank(admin);
+        policy.addSigner(signer);
+
+        uint256 nonce = 42;
+        bytes memory sig = _createSignedFeeDataForPolicy(
+            policy, signerPk, address(0xBEEF), address(0xCAFE), 10, 0, nonce, DEFAULT_DEADLINE
+        );
+
+        vm.expectRevert();
+        policy.applyWithdrawalExecutionPolicy(_buildRequest(address(0xBEEF), address(0xCAFE), 10, sig));
+
+        assertFalse(policy.wasNonceUsed(signer, nonce), "Nonce should not be marked when consume reverts");
+    }
+
+    function _createSignedFeeDataForPolicy(
+        WithdrawalExecutionPolicy policy,
+        uint256 signerPk,
+        address user,
+        address assetOut,
+        uint256 iouAmountRay,
+        uint256 personalFeeAmountRay,
+        uint256 nonce,
+        uint256 deadline
+    ) internal view returns (bytes memory) {
+        bytes32 digest = _signedFeeDigestForPolicy(
+            address(policy), user, assetOut, iouAmountRay, personalFeeAmountRay, nonce, deadline
+        );
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, digest);
+        return abi.encode(
+            WithdrawalExecutionPolicy.SignedFee({
+                personalFeeAmountRay: personalFeeAmountRay,
+                nonce: nonce,
+                deadline: deadline,
+                signature: abi.encodePacked(r, s, v)
+            })
+        );
+    }
+
+    function _signedFeeDigestForPolicy(
+        address policyAddress,
+        address user,
+        address assetOut,
+        uint256 iouAmountRay,
+        uint256 personalFeeAmountRay,
+        uint256 nonce,
+        uint256 deadline
+    ) internal view returns (bytes32) {
+        bytes32 typeHash = WithdrawalExecutionPolicy(policyAddress).SIGNED_FEE_TYPEHASH();
+        bytes32 structHash =
+            keccak256(abi.encode(typeHash, user, assetOut, iouAmountRay, personalFeeAmountRay, nonce, deadline));
+        bytes32 domainSeparator = keccak256(
+            abi.encode(
+                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                keccak256("WithdrawalExecutionPolicy"),
+                keccak256("1"),
+                block.chainid,
+                policyAddress
+            )
+        );
         return keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
     }
 }

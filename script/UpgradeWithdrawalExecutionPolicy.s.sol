@@ -16,6 +16,11 @@ contract UpgradeWithdrawalExecutionPolicy is Create3AddressBook, Upgrade {
     address WITHDRAWAL_EXECUTION_POLICY_PROXY;
     address DEPLOYER = 0xBB700dA5CCC9Ec5605780Fc40695f1206B090303;
 
+    // TODO: source from deployment config before running. Floors are baked into the impl bytecode and cannot be
+    // changed by re-initialising the proxy.
+    uint128 constant MIN_REDEMPTION_CAPACITY = 1;
+    uint128 constant MIN_REDEMPTION_REFILL_RATE = 1;
+
     function run() public {
         WITHDRAWAL_EXECUTION_POLICY_PROXY = getWithdrawalExecutionPolicyAddress(DEPLOYER);
 
@@ -25,7 +30,11 @@ contract UpgradeWithdrawalExecutionPolicy is Create3AddressBook, Upgrade {
     }
 
     function _upgrade() internal {
-        address implementation = address(new WithdrawalExecutionPolicy(getStableVaultAddress(DEPLOYER)));
+        address implementation = address(
+            new WithdrawalExecutionPolicy(
+                getStableVaultAddress(DEPLOYER), MIN_REDEMPTION_CAPACITY, MIN_REDEMPTION_REFILL_RATE
+            )
+        );
         _logDeployment("WithdrawalExecutionPolicy::Implementation", "", implementation);
         address proxyAdmin = _getAdminFromSlot(WITHDRAWAL_EXECUTION_POLICY_PROXY);
         ProxyAdmin(proxyAdmin)

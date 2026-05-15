@@ -292,7 +292,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         address disablerProfile = _getProfile__Disabler();
         require(disablerProfile != address(0), "Disabler profile address not set");
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](21);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](23);
 
         roles[0] = RolesConfig.getRole__rebalance();
         roles[1] = RolesConfig.getRole__removeStrategy();
@@ -316,6 +316,8 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         roles[18] = RolesConfig.getRole__lowerDepositRefillRate();
         roles[19] = RolesConfig.getRole__lowerBridgingCapacity();
         roles[20] = RolesConfig.getRole__lowerBridgingRefillRate();
+        roles[21] = RolesConfig.getRole__lowerRedemptionCapacity();
+        roles[22] = RolesConfig.getRole__lowerRedemptionRefillRate();
 
         _grantRolesToProfile(disablerProfile, roles);
     }
@@ -381,12 +383,16 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     function _setupTarget__WithdrawalExecutionPolicy(address deployer) internal {
         address withdrawalExecutionPolicy = getWithdrawalExecutionPolicyAddress(deployer);
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](4);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](8);
 
         roles[0] = RolesConfig.getRole__setAssetFeeBps();
         roles[1] = RolesConfig.getRole__setDefaultFeeBps();
         roles[2] = RolesConfig.getRole__addSigner();
         roles[3] = RolesConfig.getRole__removeSigner();
+        roles[4] = RolesConfig.getRole__raiseRedemptionCapacity();
+        roles[5] = RolesConfig.getRole__raiseRedemptionRefillRate();
+        roles[6] = RolesConfig.getRole__lowerRedemptionCapacity();
+        roles[7] = RolesConfig.getRole__lowerRedemptionRefillRate();
 
         _setTargetFunctionRoles(withdrawalExecutionPolicy, roles);
     }
