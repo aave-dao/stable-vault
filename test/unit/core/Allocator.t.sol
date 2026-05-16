@@ -3234,6 +3234,22 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(queue[2], address(newStrategy));
     }
 
+    function test_addStrategy_emitsWithdrawalQueueSet() public {
+        TestErc4626 newStrategy = new TestErc4626(_mockUsdt);
+
+        // Expected queue reflects the post-add state: existing entries plus the newly appended strategy.
+        address[] memory expectedQueue = new address[](3);
+        expectedQueue[0] = address(_defaultUsdtStrategy);
+        expectedQueue[1] = address(_extraUsdtStrategy);
+        expectedQueue[2] = address(newStrategy);
+
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.WithdrawalQueueSet(address(_mockUsdt), expectedQueue);
+
+        vm.prank(admin);
+        _allocator.addStrategy(address(_mockUsdt), address(newStrategy));
+    }
+
     function test_removeStrategy_shiftsDownPreservingQueueOrder() public {
         // Set up a 3-strategy queue: [default, extra, third].
         TestErc4626 thirdStrategy = new TestErc4626(_mockUsdt);
@@ -3248,6 +3264,18 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(queue.length, 2);
         assertEq(queue[0], address(_defaultUsdtStrategy));
         assertEq(queue[1], address(thirdStrategy));
+    }
+
+    function test_removeStrategy_emitsWithdrawalQueueSet() public {
+        // Initial queue is [default, extra]. Removing `_extraUsdtStrategy` leaves [default].
+        address[] memory expectedQueue = new address[](1);
+        expectedQueue[0] = address(_defaultUsdtStrategy);
+
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.WithdrawalQueueSet(address(_mockUsdt), expectedQueue);
+
+        vm.prank(admin);
+        _allocator.removeStrategy(address(_extraUsdtStrategy));
     }
 
     function test_setWithdrawalQueue_reordersAndEmitsEvent() public {
@@ -3348,6 +3376,16 @@ contract AllocatorTest is TestWithHelpers {
         vm.prank(everyRoleAccount);
         vm.expectRevert(IAllocator.InvalidWithdrawalQueue.selector);
         _allocator.setWithdrawalQueue(address(_mockUsdt), duplicated);
+    }
+
+    function test_setWithdrawalQueue_reverts_ifAssetNotRegistered() public {
+        // `_mockUnsupportedAsset` is intentionally never registered in `_mockAssetRegistry`, so reordering its
+        // (empty) queue must revert rather than silently emit a no-op event.
+        address[] memory empty = new address[](0);
+
+        vm.prank(everyRoleAccount);
+        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidAsset.selector, address(_mockUnsupportedAsset)));
+        _allocator.setWithdrawalQueue(address(_mockUnsupportedAsset), empty);
     }
 
     function test_withdraw_honoursQueueOrderAfterReorder(uint256 amount) public {
