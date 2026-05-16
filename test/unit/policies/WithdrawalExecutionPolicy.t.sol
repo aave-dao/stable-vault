@@ -1708,6 +1708,17 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
         withdrawalExecutionPolicy.raiseRedemptionCapacity(newCapacity);
     }
 
+    /// @dev Regression guard for the `UNLIMITED_CAPACITY` rejection. The contract itself does not explicitly
+    /// reject the sentinel — the rejection rides on `RateLimitBucketLib.raiseCapacity`'s rule that UNLIMITED is
+    /// only admitted when `refillRate == 0`. In any post-seed state (which is the only state production users
+    /// encounter, since the floor pins `refillRate > 0`), that rule reduces to "always reject UNLIMITED". This
+    /// test locks the property in: any future library change that relaxes the rule, or any policy refactor that
+    /// drops the floor on `refillRate`, will surface here.
+    function test_raiseRedemptionCapacity_revertsOnUnlimited_postSeed_libraryGuard() public {
+        vm.expectRevert(Errors.InvalidParameter.selector);
+        withdrawalExecutionPolicy.raiseRedemptionCapacity(type(uint128).max);
+    }
+
     function test_applyWithdrawalExecutionPolicy_consumesBucket(uint128 iouAmountRay) public {
         iouAmountRay = uint128(bound(iouAmountRay, 1, SEED_REDEMPTION_CAPACITY));
         RateLimitBucketLib.Bucket memory before = withdrawalExecutionPolicy.getRedemptionBucket();
@@ -1803,6 +1814,79 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
         policy.applyWithdrawalExecutionPolicy(_buildRequest(address(0xBEEF), address(0xCAFE), 10, sig));
 
         assertFalse(policy.wasNonceUsed(signer, nonce), "Nonce should not be marked when consume reverts");
+    }
+
+    function test_previewWithdrawalExecutionPolicy_returnsZeroForZeroIouAmount() public view {
+        // Documents the pre-existing degenerate-input semantic: a 0-RAY intent previews to 0 even though it's not
+        // rate-limited. Locks in the overlap with the new "rate-limited → 0" return so future refactors don't
+        // accidentally swap which case yields 0.
+        uint256 previewed = withdrawalExecutionPolicy.previewWithdrawalExecutionPolicy(
+            _buildRequest(address(0xBEEF), address(0xCAFE), 0, "")
+        );
+        assertEq(previewed, 0, "Preview of 0 IOU should return 0");
+    }
+
+    function test_previewWithdrawalExecutionPolicy_revertsOnInvalidSignature_whenRateLimited() public {
+        // The preview must validate signatures BEFORE the bucket check — otherwise a rate-limited intent with a
+        // malformed payload would silently return 0 and a relayer couldn't distinguish "rate-limited" from
+        // "malformed".
+        WithdrawalExecutionPolicy policy = _deployPolicyWithCustomFloors(1, 1);
+        policy.lowerRedemptionCapacity(1000);
+        policy.lowerRedemptionRefillRate(1);
+        policy.applyWithdrawalExecutionPolicy(_buildRequest(address(0xBEEF), address(0xCAFE), 1000, ""));
+
+        // Forged signature (random key, not whitelisted) targeting a rate-limited intent.
+        (, uint256 attackerPk) = makeAddrAndKey("attacker");
+        bytes memory sig = _createSignedFeeDataForPolicy(
+            policy, attackerPk, address(0xBEEF), address(0xCAFE), 1, 0, DEFAULT_NONCE, DEFAULT_DEADLINE
+        );
+
+        vm.expectRevert(WithdrawalExecutionPolicy.InvalidSignature.selector);
+        policy.previewWithdrawalExecutionPolicy(_buildRequest(address(0xBEEF), address(0xCAFE), 1, sig));
+    }
+
+    function test_previewWithdrawalExecutionPolicy_revertsOnExpiredDeadline_whenRateLimited() public {
+        // Same ordering invariant, but exercised through the deadline branch of `_verifySignedFee`.
+        WithdrawalExecutionPolicy policy = _deployPolicyWithCustomFloors(1, 1);
+        policy.lowerRedemptionCapacity(1000);
+        policy.lowerRedemptionRefillRate(1);
+        policy.applyWithdrawalExecutionPolicy(_buildRequest(address(0xBEEF), address(0xCAFE), 1000, ""));
+
+        (address signer, uint256 signerPk) = makeAddrAndKey("signer");
+        vm.prank(admin);
+        policy.addSigner(signer);
+
+        vm.warp(1_000_000);
+        bytes memory sig = _createSignedFeeDataForPolicy(
+            policy, signerPk, address(0xBEEF), address(0xCAFE), 1, 0, DEFAULT_NONCE, block.timestamp - 1
+        );
+
+        vm.expectRevert(WithdrawalExecutionPolicy.DeadlineExpired.selector);
+        policy.previewWithdrawalExecutionPolicy(_buildRequest(address(0xBEEF), address(0xCAFE), 1, sig));
+    }
+
+    function test_applyWithdrawalExecutionPolicy_revertsBeforeNonceMarked_onInvalidSignature() public {
+        // Independent of rate-limit: invalid signatures must revert without marking the nonce. Complements
+        // `test_applyWithdrawalExecutionPolicy_doesNotMarkNonceWhenRateLimited` by isolating the signature-validation
+        // path so a regression that moves `_markNonceAsUsed` earlier is caught either way.
+        (address signer, uint256 attackerPk) = makeAddrAndKey("attackerPretendingToBeSigner");
+        // Note: `signer` is the address derived from the *attacker's* key. We do NOT whitelist it, so verification
+        // must reject the recovered signer.
+
+        uint256 nonce = 7;
+        bytes memory sig = _createSignedFeeDataForPolicy(
+            withdrawalExecutionPolicy, attackerPk, address(0xBEEF), address(0xCAFE), 10, 0, nonce, DEFAULT_DEADLINE
+        );
+
+        vm.expectRevert(WithdrawalExecutionPolicy.InvalidSignature.selector);
+        withdrawalExecutionPolicy.applyWithdrawalExecutionPolicy(
+            _buildRequest(address(0xBEEF), address(0xCAFE), 10, sig)
+        );
+
+        assertFalse(
+            withdrawalExecutionPolicy.wasNonceUsed(signer, nonce),
+            "Nonce must not be marked when signature verification reverts"
+        );
     }
 
     function _createSignedFeeDataForPolicy(

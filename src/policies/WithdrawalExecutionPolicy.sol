@@ -204,17 +204,18 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
 
     /// @inheritdoc IWithdrawalExecutionPolicy
     /// @dev Returns the fee-adjusted output amount, or 0 if the redemption bucket would rate-limit the request at
-    /// `block.timestamp`.
+    /// `block.timestamp`. Signature/deadline/nonce checks run before the bucket check so callers can still
+    /// distinguish a malformed intent from a rate-limited one (a bare `0` would otherwise overload both cases).
     function previewWithdrawalExecutionPolicy(WithdrawalExecutionIntent calldata withdrawalExecution)
         external
         view
         override
         returns (uint256)
     {
+        (uint256 amountOutRay,,) = _previewWithdrawalExecutionPolicy(withdrawalExecution);
         if (!$storage().redemptionBucket.canConsume(withdrawalExecution.iouAmountRay)) {
             return 0;
         }
-        (uint256 amountOutRay,,) = _previewWithdrawalExecutionPolicy(withdrawalExecution);
         return amountOutRay;
     }
 
