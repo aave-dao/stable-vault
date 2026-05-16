@@ -58,6 +58,7 @@ interface IAllocator {
     error ZeroShareBalance(address strategy);
 
     /// @notice Thrown when the proposed withdrawal queue is not a permutation of the asset's registered strategies.
+    /// @custom:selector 0x237f3e22
     error InvalidWithdrawalQueue();
 
     /// @notice The representation of an asset balance.
