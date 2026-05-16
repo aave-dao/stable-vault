@@ -88,4 +88,8 @@ abstract contract BaseBridgeAdapter is AccessManaged, TransferHelperClient, IBri
         _destinationChainAdapterOf[chainId] = destinationChainAdapter;
         emit DestinationChainAdapterSet(chainId, destinationChainAdapter);
     }
+
+    function _withReceiverOverhead(uint256 payloadExecutionGasLimit) internal pure virtual returns (uint256) {
+        return payloadExecutionGasLimit + getDataOnlyReceiveGasOverhead();
+    }
 }

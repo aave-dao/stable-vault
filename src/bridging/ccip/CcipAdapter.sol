@@ -323,10 +323,6 @@ contract CcipAdapter is
         return abi.decode(abiEncodedEvmSender, (address));
     }
 
-    function _withReceiverOverhead(uint256 gasLimit) internal pure returns (uint256) {
-        return gasLimit + DATA_ONLY_RECEIVE_GAS_OVERHEAD;
-    }
-
     receive() external payable {}
 
     function _beforeRescueNative(uint256) internal virtual override {

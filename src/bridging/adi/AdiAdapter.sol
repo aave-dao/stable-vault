@@ -24,7 +24,7 @@ contract AdiAdapter is BaseBridgeAdapter, RescuableNative, RescuableToken, IAdiB
     /// @dev Additional gas a.DI should allocate for this adapter before entering the destination Gateway.
     /// The current mocked Gateway trace measures the adapter wrapper at about 7.2k gas. Rounded up to 10k for
     /// calldata growth and cold access variance.
-    uint256 internal constant ADI_RECEIVER_GAS_OVERHEAD = 10_000;
+    uint256 internal constant DATA_ONLY_RECEIVE_GAS_OVERHEAD = 10_000;
 
     address internal immutable ADI_CROSS_CHAIN_CONTROLLER;
 
@@ -52,7 +52,7 @@ contract AdiAdapter is BaseBridgeAdapter, RescuableNative, RescuableToken, IAdiB
         override(BaseBridgeAdapter, IBridgeAdapter)
         returns (uint256 gasOverhead)
     {
-        return ADI_RECEIVER_GAS_OVERHEAD;
+        return DATA_ONLY_RECEIVE_GAS_OVERHEAD;
     }
 
     /// @inheritdoc IAdiBridgeAdapter
@@ -243,10 +243,6 @@ contract AdiAdapter is BaseBridgeAdapter, RescuableNative, RescuableToken, IAdiB
 
     function _getTransactionId(bytes calldata encodedTransaction) internal pure returns (bytes32) {
         return keccak256(encodedTransaction);
-    }
-
-    function _withReceiverOverhead(uint256 gasLimit) internal pure returns (uint256) {
-        return gasLimit + ADI_RECEIVER_GAS_OVERHEAD;
     }
 
     function _fundCrossChainController(address feePayer, uint256 nativeFee, IAdiCrossChainForwarder.Fee[] memory fees)
