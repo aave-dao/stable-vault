@@ -69,8 +69,8 @@ contract Allocator is
     /// @custom:storage-location erc7201:aave.storage.Allocator
     struct AllocatorStorage {
         mapping(address strategy => StrategyConfig strategyConfig) strategyConfigs;
-        // To iterate through all strategies for an asset.
-        mapping(address asset => EnumerableSet.AddressSet) assetStrategies;
+        mapping(address asset => EnumerableSet.AddressSet strategies) assetStrategies;
+        mapping(address asset => address[] withdrawalQueue) withdrawalQueues;
     }
 
     // keccak256(abi.encode(uint256(keccak256("aave.storage.Allocator")) - 1)) & ~bytes32(uint256(0xff))
@@ -177,6 +177,11 @@ contract Allocator is
     }
 
     /// @inheritdoc IAllocator
+    function getWithdrawalQueue(address asset) external view override returns (address[] memory) {
+        return $storage().withdrawalQueues[asset];
+    }
+
+    /// @inheritdoc IAllocator
     function isStrategySupportedForAsset(address asset, address strategy) external view override returns (bool) {
         return _isStrategySupportedForAsset({strategy: strategy, asset: asset});
     }
@@ -201,11 +206,12 @@ contract Allocator is
 
         uint256 idleBalance = IERC20(asset).balanceOf(address(this));
         if (idleBalance < amount) {
-            // Consume from idle balance first, then iterate registered strategies for the rest.
+            // Consume from idle balance first, then from all asset's strategies following the withdrawal queue order.
             uint256 amountRemaining = amount - idleBalance;
-            uint256 length = $storage().assetStrategies[asset].length();
-            for (uint256 i = 0; amountRemaining > 0 && i < length; i++) {
-                address strategy = $storage().assetStrategies[asset].at(i);
+            address[] storage withdrawalQueue = $storage().withdrawalQueues[asset];
+            uint256 strategiesCount = withdrawalQueue.length;
+            for (uint256 i = 0; amountRemaining > 0 && i < strategiesCount; i++) {
+                address strategy = withdrawalQueue[i];
                 try this.tryWithdrawFromStrategy(asset, amountRemaining, strategy) returns (uint256 withdrawn) {
                     amountRemaining = amountRemaining.satSub(withdrawn);
                 } catch {
@@ -281,6 +287,35 @@ contract Allocator is
     /// @inheritdoc IAllocator
     function removeStrategy(address strategy) external override restricted {
         _removeStrategy(strategy);
+    }
+
+    /// @inheritdoc IAllocator
+    function setWithdrawalQueue(address asset, address[] calldata newWithdrawalQueue) external override restricted {
+        require(IAssetRegistry(ASSET_REGISTRY).isAssetRegistered(asset), Errors.InvalidAsset(asset));
+        EnumerableSet.AddressSet storage strategies = $storage().assetStrategies[asset];
+        uint256 strategiesCount = strategies.length();
+        require(newWithdrawalQueue.length == strategiesCount, InvalidWithdrawalQueue());
+
+        // Verify that the withdrawal queue is a strict permutation of the asset's registered strategies.
+        for (uint256 i = 0; i < strategiesCount; i++) {
+            address strategy = strategies.at(i);
+            bool strategyFoundInQueue = false;
+            for (uint256 j = 0; j < strategiesCount; j++) {
+                if (newWithdrawalQueue[j] == strategy) {
+                    strategyFoundInQueue = true;
+                    break;
+                }
+            }
+            require(strategyFoundInQueue, InvalidWithdrawalQueue());
+        }
+
+        // Overwrite the current withdrawal queue with the new one.
+        address[] storage withdrawalQueue = $storage().withdrawalQueues[asset];
+        for (uint256 i = 0; i < strategiesCount; i++) {
+            withdrawalQueue[i] = newWithdrawalQueue[i];
+        }
+
+        emit WithdrawalQueueSet(asset, newWithdrawalQueue);
     }
 
     /// @inheritdoc IAllocator
@@ -551,6 +586,7 @@ contract Allocator is
         $storage().strategyConfigs[strategy] =
             StrategyConfig({asset: asset, isRegistered: true, depositAllowed: true, isTrusted: true});
         $storage().assetStrategies[asset].add(strategy);
+        _addToWithdrawalQueue(asset, strategy);
 
         require(
             $storage().assetStrategies[asset].length() <= MAX_STRATEGIES_PER_ASSET, IAllocator.TooManyStrategies(asset)
@@ -572,8 +608,32 @@ contract Allocator is
         // slippage.
         require(IERC4626(strategy).balanceOf(address(this)) == 0, StrategyStillHasFunds(strategy));
         $storage().assetStrategies[asset].remove(strategy);
+        _removeFromWithdrawalQueue(asset, strategy);
         delete $storage().strategyConfigs[strategy];
         emit StrategyRemoved(asset, strategy);
+    }
+
+    function _addToWithdrawalQueue(address asset, address strategy) internal {
+        address[] storage withdrawalQueue = $storage().withdrawalQueues[asset];
+        withdrawalQueue.push(strategy);
+        emit WithdrawalQueueSet(asset, withdrawalQueue);
+    }
+
+    /// @dev Removes `strategy` from the asset's withdrawal queue, shifting subsequent entries down by one so the
+    /// relative order of the remaining strategies is preserved.
+    function _removeFromWithdrawalQueue(address asset, address strategy) internal {
+        address[] storage withdrawalQueue = $storage().withdrawalQueues[asset];
+        uint256 strategiesCount = withdrawalQueue.length;
+        for (uint256 i = 0; i < strategiesCount; i++) {
+            if (withdrawalQueue[i] == strategy) {
+                for (uint256 j = i; j + 1 < strategiesCount; j++) {
+                    withdrawalQueue[j] = withdrawalQueue[j + 1];
+                }
+                withdrawalQueue.pop();
+                emit WithdrawalQueueSet(asset, withdrawalQueue);
+                return;
+            }
+        }
     }
 
     function _beforeRescueTokens(address token, uint256) internal virtual override {

@@ -276,7 +276,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         address rebalancerProfile = _getProfile__Rebalancer();
         require(rebalancerProfile != address(0), "Rebalancer profile address not set");
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](4);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](5);
 
         roles[0] = RolesConfig.getRole__rebalance();
         roles[1] = RolesConfig.getRole__disableDepositsToStrategy();
@@ -284,6 +284,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         roles[2] = RolesConfig.getRole__pushFundsToChain();
         // Only used on the Earning Chain (EarningChainGateway), but granted in both Accounting and Earning Chain setups
         roles[3] = RolesConfig.getRole__pushFundsToAccountingChain();
+        roles[4] = RolesConfig.getRole__setWithdrawalQueue();
 
         _grantRolesToProfile(rebalancerProfile, roles);
     }
@@ -378,7 +379,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     function _setupTarget__Allocator(address deployer) internal {
         address allocator = getAllocatorAddress(deployer);
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](8);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](9);
 
         roles[0] = RolesConfig.getRole__rebalance();
         roles[1] = RolesConfig.getRole__addStrategy();
@@ -388,6 +389,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         roles[5] = RolesConfig.getRole__topUp();
         roles[6] = RolesConfig.getRole__trustStrategy();
         roles[7] = RolesConfig.getRole__distrustStrategy();
+        roles[8] = RolesConfig.getRole__setWithdrawalQueue();
 
         _setTargetFunctionRoles(allocator, roles);
     }

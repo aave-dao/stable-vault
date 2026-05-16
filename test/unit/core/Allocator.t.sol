@@ -3206,6 +3206,220 @@ contract AllocatorTest is TestWithHelpers {
         IRescuableToken(address(_allocator)).rescueTokens(address(_mockUnsupportedAsset), 100);
     }
 
+    /////////////////////////////////////////// WITHDRAWAL QUEUE ///////////////////////////////////////////////////////
+
+    function test_withdrawalQueue_matchesInsertionOrderAfterSetup() public view {
+        address[] memory usdtQueue = _allocator.getWithdrawalQueue(address(_mockUsdt));
+        assertEq(usdtQueue.length, 2);
+        assertEq(usdtQueue[0], address(_defaultUsdtStrategy));
+        assertEq(usdtQueue[1], address(_extraUsdtStrategy));
+
+        address[] memory ghoQueue = _allocator.getWithdrawalQueue(address(_mockGho));
+        assertEq(ghoQueue.length, 2);
+        assertEq(ghoQueue[0], address(_defaultGhoStrategy));
+        assertEq(ghoQueue[1], address(_extraGhoStrategy));
+    }
+
+    function test_addStrategy_appendsToWithdrawalQueue() public {
+        TestErc4626 newStrategy = new TestErc4626(_mockUsdt);
+        vm.prank(admin);
+        _allocator.addStrategy(address(_mockUsdt), address(newStrategy));
+
+        address[] memory queue = _allocator.getWithdrawalQueue(address(_mockUsdt));
+        assertEq(queue.length, 3);
+        // Pre-existing entries keep their positions.
+        assertEq(queue[0], address(_defaultUsdtStrategy));
+        assertEq(queue[1], address(_extraUsdtStrategy));
+        // New strategy lands at the tail.
+        assertEq(queue[2], address(newStrategy));
+    }
+
+    function test_addStrategy_emitsWithdrawalQueueSet() public {
+        TestErc4626 newStrategy = new TestErc4626(_mockUsdt);
+
+        // Expected queue reflects the post-add state: existing entries plus the newly appended strategy.
+        address[] memory expectedQueue = new address[](3);
+        expectedQueue[0] = address(_defaultUsdtStrategy);
+        expectedQueue[1] = address(_extraUsdtStrategy);
+        expectedQueue[2] = address(newStrategy);
+
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.WithdrawalQueueSet(address(_mockUsdt), expectedQueue);
+
+        vm.prank(admin);
+        _allocator.addStrategy(address(_mockUsdt), address(newStrategy));
+    }
+
+    function test_removeStrategy_shiftsDownPreservingQueueOrder() public {
+        // Set up a 3-strategy queue: [default, extra, third].
+        TestErc4626 thirdStrategy = new TestErc4626(_mockUsdt);
+        vm.prank(admin);
+        _allocator.addStrategy(address(_mockUsdt), address(thirdStrategy));
+
+        // Remove the middle strategy. The remaining two should keep their relative order (no swap-and-pop).
+        vm.prank(admin);
+        _allocator.removeStrategy(address(_extraUsdtStrategy));
+
+        address[] memory queue = _allocator.getWithdrawalQueue(address(_mockUsdt));
+        assertEq(queue.length, 2);
+        assertEq(queue[0], address(_defaultUsdtStrategy));
+        assertEq(queue[1], address(thirdStrategy));
+    }
+
+    function test_removeStrategy_emitsWithdrawalQueueSet() public {
+        // Initial queue is [default, extra]. Removing `_extraUsdtStrategy` leaves [default].
+        address[] memory expectedQueue = new address[](1);
+        expectedQueue[0] = address(_defaultUsdtStrategy);
+
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.WithdrawalQueueSet(address(_mockUsdt), expectedQueue);
+
+        vm.prank(admin);
+        _allocator.removeStrategy(address(_extraUsdtStrategy));
+    }
+
+    function test_setWithdrawalQueue_reordersAndEmitsEvent() public {
+        address[] memory newOrder = new address[](2);
+        newOrder[0] = address(_extraUsdtStrategy);
+        newOrder[1] = address(_defaultUsdtStrategy);
+
+        vm.expectEmit(true, true, true, true);
+        emit IAllocator.WithdrawalQueueSet(address(_mockUsdt), newOrder);
+
+        vm.prank(everyRoleAccount);
+        _allocator.setWithdrawalQueue(address(_mockUsdt), newOrder);
+
+        address[] memory queue = _allocator.getWithdrawalQueue(address(_mockUsdt));
+        assertEq(queue.length, 2);
+        assertEq(queue[0], address(_extraUsdtStrategy));
+        assertEq(queue[1], address(_defaultUsdtStrategy));
+
+        // Other assets are untouched.
+        address[] memory ghoQueue = _allocator.getWithdrawalQueue(address(_mockGho));
+        assertEq(ghoQueue[0], address(_defaultGhoStrategy));
+        assertEq(ghoQueue[1], address(_extraGhoStrategy));
+    }
+
+    function test_setWithdrawalQueue_reverts_ifUnauthorizedCaller(address operator) public {
+        vm.assume(operator != everyRoleAccount);
+        vm.assume(operator != address(0));
+        _assumeNotProxyAdmin(operator, address(_allocator));
+
+        vm.mockCall(
+            address(_mockAccessManager),
+            abi.encodeWithSelector(
+                IAccessManager.canCall.selector,
+                operator,
+                address(_allocator),
+                bytes4(IAllocator.setWithdrawalQueue.selector)
+            ),
+            abi.encode(false)
+        );
+
+        address[] memory newOrder = new address[](2);
+        newOrder[0] = address(_extraUsdtStrategy);
+        newOrder[1] = address(_defaultUsdtStrategy);
+
+        vm.prank(operator);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, operator));
+        _allocator.setWithdrawalQueue(address(_mockUsdt), newOrder);
+    }
+
+    function test_setWithdrawalQueue_reverts_ifLengthIsTooShort() public {
+        address[] memory shorter = new address[](1);
+        shorter[0] = address(_defaultUsdtStrategy);
+
+        vm.prank(everyRoleAccount);
+        vm.expectRevert(IAllocator.InvalidWithdrawalQueue.selector);
+        _allocator.setWithdrawalQueue(address(_mockUsdt), shorter);
+    }
+
+    function test_setWithdrawalQueue_reverts_ifLengthIsTooLong() public {
+        address[] memory longer = new address[](3);
+        longer[0] = address(_defaultUsdtStrategy);
+        longer[1] = address(_extraUsdtStrategy);
+        longer[2] = makeAddr("EXTRANEOUS");
+
+        vm.prank(everyRoleAccount);
+        vm.expectRevert(IAllocator.InvalidWithdrawalQueue.selector);
+        _allocator.setWithdrawalQueue(address(_mockUsdt), longer);
+    }
+
+    function test_setWithdrawalQueue_reverts_ifContainsForeignAddress() public {
+        // Matching length but one registered strategy replaced with an unrelated address.
+        address[] memory tampered = new address[](2);
+        tampered[0] = address(_defaultUsdtStrategy);
+        tampered[1] = makeAddr("FOREIGN");
+
+        vm.prank(everyRoleAccount);
+        vm.expectRevert(IAllocator.InvalidWithdrawalQueue.selector);
+        _allocator.setWithdrawalQueue(address(_mockUsdt), tampered);
+    }
+
+    function test_setWithdrawalQueue_reverts_ifContainsStrategyFromAnotherAsset() public {
+        // Same length, the foreign entry is a real strategy — just registered for a different asset.
+        address[] memory tampered = new address[](2);
+        tampered[0] = address(_defaultUsdtStrategy);
+        tampered[1] = address(_defaultGhoStrategy);
+
+        vm.prank(everyRoleAccount);
+        vm.expectRevert(IAllocator.InvalidWithdrawalQueue.selector);
+        _allocator.setWithdrawalQueue(address(_mockUsdt), tampered);
+    }
+
+    function test_setWithdrawalQueue_reverts_ifDuplicateEntry() public {
+        // With matching lengths a duplicate implies another registered strategy is missing — same revert path.
+        address[] memory duplicated = new address[](2);
+        duplicated[0] = address(_defaultUsdtStrategy);
+        duplicated[1] = address(_defaultUsdtStrategy);
+
+        vm.prank(everyRoleAccount);
+        vm.expectRevert(IAllocator.InvalidWithdrawalQueue.selector);
+        _allocator.setWithdrawalQueue(address(_mockUsdt), duplicated);
+    }
+
+    function test_setWithdrawalQueue_reverts_ifAssetNotRegistered() public {
+        // `_mockUnsupportedAsset` is intentionally never registered in `_mockAssetRegistry`, so reordering its
+        // (empty) queue must revert rather than silently emit a no-op event.
+        address[] memory empty = new address[](0);
+
+        vm.prank(everyRoleAccount);
+        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidAsset.selector, address(_mockUnsupportedAsset)));
+        _allocator.setWithdrawalQueue(address(_mockUnsupportedAsset), empty);
+    }
+
+    function test_withdraw_honoursQueueOrderAfterReorder(uint256 amount) public {
+        _mockAssetRegistry.mockRegisteredAsset(address(_mockUsdt));
+        amount = _boundAssetAmount(address(_mockUsdt), amount);
+        vm.assume(amount > 1);
+
+        // Seed both strategies with the same amount.
+        _mockUsdt.mint(depositor, amount * 2);
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(_defaultUsdtStrategy), amount);
+        vm.prank(depositor);
+        _defaultUsdtStrategy.deposit(amount, address(_allocator));
+        vm.prank(depositor);
+        MockNonStandardErc20(address(_mockUsdt)).approve(address(_extraUsdtStrategy), amount);
+        vm.prank(depositor);
+        _extraUsdtStrategy.deposit(amount, address(_allocator));
+
+        // Default-first queue ordering would drain `_defaultUsdtStrategy` first; flip it so `_extra` is drained
+        // first instead.
+        address[] memory reordered = new address[](2);
+        reordered[0] = address(_extraUsdtStrategy);
+        reordered[1] = address(_defaultUsdtStrategy);
+        vm.prank(everyRoleAccount);
+        _allocator.setWithdrawalQueue(address(_mockUsdt), reordered);
+
+        // Withdraw exactly one strategy's worth — the first one in the queue should be fully drained.
+        vm.prank(withdrawer);
+        _allocator.withdraw(address(_mockUsdt), amount);
+
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_extraUsdtStrategy)), 0);
+        assertEq(_allocator.getAssetBalanceInStrategy(address(_defaultUsdtStrategy)), amount);
+    }
+
     ////////////////////////////////////////////////// HELPERS /////////////////////////////////////////////////////////
 
     function _initializeRebalanceParams(uint16 length) internal pure returns (IAllocator.RebalanceParams[] memory) {

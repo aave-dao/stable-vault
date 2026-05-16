@@ -60,6 +60,7 @@ contract MockAllocator is IAllocator {
 
     function getStrategyConfig(address strategy) external view override returns (StrategyConfig memory) {}
     function getStrategiesForAsset(address asset) external view override returns (address[] memory) {}
+    function getWithdrawalQueue(address asset) external view override returns (address[] memory) {}
     function isStrategySupportedForAsset(address asset, address strategy) external view override returns (bool) {}
     function isStrategySupported(address strategy) external view override returns (bool) {}
 
@@ -79,6 +80,7 @@ contract MockAllocator is IAllocator {
 
     function addStrategy(address asset, address strategy) external override {}
     function removeStrategy(address strategy) external override {}
+    function setWithdrawalQueue(address asset, address[] calldata newQueue) external override {}
     function disableDepositsToStrategy(address strategy) external override {}
     function enableDepositsToStrategy(address strategy) external override {}
     function trustStrategy(address strategy) external override {}
