@@ -291,6 +291,7 @@ contract Allocator is
 
     /// @inheritdoc IAllocator
     function setWithdrawalQueue(address asset, address[] calldata newWithdrawalQueue) external override restricted {
+        require(IAssetRegistry(ASSET_REGISTRY).isAssetRegistered(asset), Errors.InvalidAsset(asset));
         EnumerableSet.AddressSet storage strategies = $storage().assetStrategies[asset];
         uint256 strategiesCount = strategies.length();
         require(newWithdrawalQueue.length == strategiesCount, InvalidWithdrawalQueue());
@@ -585,7 +586,7 @@ contract Allocator is
         $storage().strategyConfigs[strategy] =
             StrategyConfig({asset: asset, isRegistered: true, depositAllowed: true, isTrusted: true});
         $storage().assetStrategies[asset].add(strategy);
-        $storage().withdrawalQueues[asset].push(strategy);
+        _addToWithdrawalQueue(asset, strategy);
 
         require(
             $storage().assetStrategies[asset].length() <= MAX_STRATEGIES_PER_ASSET, IAllocator.TooManyStrategies(asset)
@@ -612,6 +613,12 @@ contract Allocator is
         emit StrategyRemoved(asset, strategy);
     }
 
+    function _addToWithdrawalQueue(address asset, address strategy) internal {
+        address[] storage withdrawalQueue = $storage().withdrawalQueues[asset];
+        withdrawalQueue.push(strategy);
+        emit WithdrawalQueueSet(asset, withdrawalQueue);
+    }
+
     /// @dev Removes `strategy` from the asset's withdrawal queue, shifting subsequent entries down by one so the
     /// relative order of the remaining strategies is preserved.
     function _removeFromWithdrawalQueue(address asset, address strategy) internal {
@@ -623,6 +630,7 @@ contract Allocator is
                     withdrawalQueue[j] = withdrawalQueue[j + 1];
                 }
                 withdrawalQueue.pop();
+                emit WithdrawalQueueSet(asset, withdrawalQueue);
                 return;
             }
         }

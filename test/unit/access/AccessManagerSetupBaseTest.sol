@@ -602,6 +602,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         address rebalancer = _getProfile__Rebalancer();
 
         _assertCanCall(rebalancer, getAllocatorAddress(_deployer()), IAllocator.rebalance.selector, true, 0);
+        _assertCanCall(rebalancer, getAllocatorAddress(_deployer()), IAllocator.setWithdrawalQueue.selector, true, 0);
         // Unauthorized functions
         _assertCanCall(rebalancer, getAllocatorAddress(_deployer()), IAllocator.topUp.selector, false, 0);
         _assertCanCall(rebalancer, getAllocatorAddress(_deployer()), IAllocator.removeStrategy.selector, false, 0);
