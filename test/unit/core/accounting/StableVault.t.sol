@@ -165,8 +165,9 @@ contract StableVaultTest is TestWithHelpers {
         internal
         returns (WithdrawalExecutionPolicy)
     {
-        address withdrawalExecutionPolicyImpl = address(new WithdrawalExecutionPolicy(withdrawalExecutionPolicyApplier));
-        return WithdrawalExecutionPolicy(
+        address withdrawalExecutionPolicyImpl =
+            address(new WithdrawalExecutionPolicy(withdrawalExecutionPolicyApplier, 1, 1));
+        WithdrawalExecutionPolicy policy = WithdrawalExecutionPolicy(
             address(
                 new TransparentUpgradeableProxy(
                     withdrawalExecutionPolicyImpl,
@@ -175,6 +176,9 @@ contract StableVaultTest is TestWithHelpers {
                 )
             )
         );
+        policy.raiseRedemptionCapacity(type(uint128).max - 1);
+        policy.raiseRedemptionRefillRate(1e30);
+        return policy;
     }
 
     function setUp() public {
@@ -3881,7 +3885,7 @@ contract StableVaultTest is TestWithHelpers {
         _assumeNotProxyAdmin(user, address(stableVault));
         _assumeNotProxyAdmin(msgSender, address(stableVault));
         vm.assume(msgSender != user);
-        iouAmountRay = _boundRayAmount(iouAmountRay);
+        iouAmountRay = bound(_boundRayAmount(iouAmountRay), 1, type(uint128).max - 1);
         mockIouToken.mint(user, iouAmountRay);
 
         vm.expectRevert(IStableVault.OnlyUser.selector);
@@ -3901,7 +3905,7 @@ contract StableVaultTest is TestWithHelpers {
         _assumeNotProxyAdmin(user, address(stableVault));
         _assumeNotProxyAdmin(msgSender, address(stableVault));
         vm.assume(msgSender != user);
-        iouAmountRay = _boundRayAmount(iouAmountRay);
+        iouAmountRay = bound(_boundRayAmount(iouAmountRay), 1, type(uint128).max - 1);
         vm.assume(iouAmountRay.rayToAssetDecimals(address(mockAsset)) > 0);
         mockIouToken.mint(user, iouAmountRay);
 
@@ -3937,7 +3941,7 @@ contract StableVaultTest is TestWithHelpers {
         vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(stableVault));
         userIouBalance = _boundRayAmountAllowingZero(userIouBalance);
-        iouAmountRay = _boundRayAmount(iouAmountRay);
+        iouAmountRay = bound(_boundRayAmount(iouAmountRay), 1, type(uint128).max - 1);
         vm.assume(iouAmountRay > userIouBalance);
         mockIouToken.mint(user, userIouBalance);
 
@@ -3958,7 +3962,7 @@ contract StableVaultTest is TestWithHelpers {
         vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(stableVault));
         userIouBalance = _boundRayAmountAllowingZero(userIouBalance);
-        iouAmountRay = _boundRayAmount(iouAmountRay);
+        iouAmountRay = bound(_boundRayAmount(iouAmountRay), 1, type(uint128).max - 1);
         vm.assume(iouAmountRay <= userIouBalance);
         mockIouToken.mint(user, userIouBalance);
         assertEq(mockIouToken.balanceOf(user), userIouBalance);
@@ -3982,7 +3986,7 @@ contract StableVaultTest is TestWithHelpers {
         vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(stableVault));
         userIouBalance = _boundRayAmountAllowingZero(userIouBalance);
-        iouAmountRay = _boundRayAmount(iouAmountRay);
+        iouAmountRay = bound(_boundRayAmount(iouAmountRay), 1, type(uint128).max - 1);
         vm.assume(iouAmountRay <= userIouBalance);
         mockIouToken.mint(user, userIouBalance);
         assertEq(mockIouToken.balanceOf(user), userIouBalance);
@@ -4006,7 +4010,7 @@ contract StableVaultTest is TestWithHelpers {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(stableVault));
-        iouAmountRay = _boundRayAmount(iouAmountRay);
+        iouAmountRay = bound(_boundRayAmount(iouAmountRay), 1, type(uint128).max - 1);
         mockIouToken.mint(user, iouAmountRay);
 
         uint256 actualWithdrawnAssets = iouAmountRay.rayToAssetDecimals(address(mockAsset));
@@ -4029,7 +4033,7 @@ contract StableVaultTest is TestWithHelpers {
         vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(stableVault));
         userIouBalance = _boundRayAmountAllowingZero(userIouBalance);
-        iouAmountRay = _boundRayAmount(iouAmountRay);
+        iouAmountRay = bound(_boundRayAmount(iouAmountRay), 1, type(uint128).max - 1);
         vm.assume(iouAmountRay <= userIouBalance);
         mockIouToken.mint(user, userIouBalance);
         assertEq(mockIouToken.balanceOf(user), userIouBalance);
@@ -4048,7 +4052,7 @@ contract StableVaultTest is TestWithHelpers {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(stableVault));
-        iouAmountRay = _boundRayAmount(iouAmountRay);
+        iouAmountRay = bound(_boundRayAmount(iouAmountRay), 1, type(uint128).max - 1);
         mockIouToken.mint(user, iouAmountRay);
         vm.assume(iouAmountRay.rayToAssetDecimals(address(mockAsset)) > 0);
         vm.assume(mockAsset.balanceOf(user) == 0);
@@ -4072,7 +4076,7 @@ contract StableVaultTest is TestWithHelpers {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(stableVault));
-        iouAmountRay = _boundRayAmount(iouAmountRay);
+        iouAmountRay = bound(_boundRayAmount(iouAmountRay), 1, type(uint128).max - 1);
         vm.assume(iouAmountRay < type(uint256).max);
         policyReturnedAmountRay = bound(policyReturnedAmountRay, iouAmountRay + 1, type(uint256).max);
         mockIouToken.mint(user, iouAmountRay);
@@ -4096,7 +4100,7 @@ contract StableVaultTest is TestWithHelpers {
         vm.assume(user != address(0));
         vm.assume(user != address(mockFundsHandler));
         _assumeNotProxyAdmin(user, address(stableVault));
-        iouAmountRay = _boundRayAmount(iouAmountRay);
+        iouAmountRay = bound(_boundRayAmount(iouAmountRay), 1, type(uint128).max - 1);
         mockIouToken.mint(user, iouAmountRay);
         uint256 expectedWithdrawnAssets = iouAmountRay.rayToAssetDecimals(address(mockAsset));
         vm.assume(expectedWithdrawnAssets > 0);

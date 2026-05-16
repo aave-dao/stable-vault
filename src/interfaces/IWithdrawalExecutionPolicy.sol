@@ -33,7 +33,8 @@ interface IWithdrawalExecutionPolicy {
         returns (uint256);
 
     /// @notice Previews the withdrawal policy result without modifying state.
-    /// @dev Validates everything (asset, signature, deadline, nonce) but doesn't consume the nonce.
+    /// @dev Validates everything (asset, signature, deadline, nonce) but doesn't consume the nonce. Returns 0 if the
+    /// request would be rate-limited at `block.timestamp`.
     /// @param withdrawalExecution The withdrawal-execution intent.
     /// @return The amount of assets the user would receive (in RAY), after the withdrawal policy is applied.
     function previewWithdrawalExecutionPolicy(WithdrawalExecutionIntent calldata withdrawalExecution)

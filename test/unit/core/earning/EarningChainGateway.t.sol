@@ -114,8 +114,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
         internal
         returns (WithdrawalExecutionPolicy)
     {
-        address withdrawalExecutionPolicyImpl = address(new WithdrawalExecutionPolicy(withdrawalExecutionPolicyApplier));
-        return WithdrawalExecutionPolicy(
+        address withdrawalExecutionPolicyImpl =
+            address(new WithdrawalExecutionPolicy(withdrawalExecutionPolicyApplier, 1, 1));
+        WithdrawalExecutionPolicy policy = WithdrawalExecutionPolicy(
             address(
                 new TransparentUpgradeableProxy(
                     withdrawalExecutionPolicyImpl,
@@ -124,6 +125,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 )
             )
         );
+        policy.raiseRedemptionCapacity(type(uint128).max - 1);
+        policy.raiseRedemptionRefillRate(1e30);
+        return policy;
     }
 
     function setUp() public {
@@ -441,7 +445,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
         uint256 bridgeFeeAmount
     ) public {
         address bridgeFeePayer = tokenOutReceiver;
-        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        // Two exchanges happen below, both consume from the redemption bucket.
+        iouTokenAmountRay = bound(_boundRayAmount(iouTokenAmountRay), 1, (type(uint128).max - 1) / 2);
         bridgeFeeAmount = _boundNativeAmount(bridgeFeeAmount);
         vm.assume(tokenOutReceiver != address(0));
         _assumeNotProxyAdmin(tokenOutReceiver, address(_earningChainGateway));
@@ -586,7 +591,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         address tokenOutReceiver,
         uint256 bridgeFeeAmount
     ) public {
-        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        iouTokenAmountRay = bound(_boundRayAmount(iouTokenAmountRay), 1, type(uint128).max - 1);
         bridgeFeeAmount = _boundNativeAmount(bridgeFeeAmount);
         vm.assume(tokenOutReceiver != address(0));
         _assumeNotProxyAdmin(tokenOutReceiver, address(_earningChainGateway));
@@ -642,7 +647,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     }
 
     function test_exchangeIouTokens_emitsAssetOutflow(uint256 iouTokenAmountRay) public {
-        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        iouTokenAmountRay = bound(_boundRayAmount(iouTokenAmountRay), 1, type(uint128).max - 1);
         address tokenOut = address(_mockUsdt);
         uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(tokenOut);
         vm.assume(amountOut > 0);
@@ -676,7 +681,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         uint256 iouTokenAmountRay,
         uint256 policyReturnedAmountRay
     ) public {
-        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        iouTokenAmountRay = bound(_boundRayAmount(iouTokenAmountRay), 1, type(uint128).max - 1);
         vm.assume(iouTokenAmountRay < type(uint256).max);
         policyReturnedAmountRay = bound(policyReturnedAmountRay, iouTokenAmountRay + 1, type(uint256).max);
 
@@ -706,7 +711,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     /// @dev When the withdrawal-execution policy is unregistered, the gateway skips the policy call and treats the IOU
     /// amount as the post-fee amount, so the user receives the full `iouTokenAmountRay` truncated to asset decimals.
     function test_exchangeIouTokens_withdrawsFullIouAmountIfNoPolicyRegistered(uint256 iouTokenAmountRay) public {
-        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        iouTokenAmountRay = bound(_boundRayAmount(iouTokenAmountRay), 1, type(uint128).max - 1);
         address tokenOut = address(_mockUsdt);
         uint256 expectedAmountOut = iouTokenAmountRay.rayToAssetDecimals(tokenOut);
         vm.assume(expectedAmountOut > 0);
@@ -758,7 +763,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     }
 
     function test_exchangeIouTokens_reverts_ifBurnIouTokenGasLimitBelowMinimum(uint256 iouTokenAmountRay) public {
-        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        iouTokenAmountRay = bound(_boundRayAmount(iouTokenAmountRay), 1, type(uint128).max - 1);
 
         vm.expectRevert(Errors.InvalidGasLimit.selector);
         _earningChainGateway.exchangeIouTokens(
@@ -817,7 +822,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     }
 
     function test_exchangeIouTokens_reverts_ifInsufficientValueForNativeBridgeFee(uint256 iouTokenAmountRay) public {
-        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        iouTokenAmountRay = bound(_boundRayAmount(iouTokenAmountRay), 1, type(uint128).max - 1);
         uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(address(_mockUsdt));
         vm.assume(amountOut > 0);
         // Put funds idle into TH to mimic withdrawal from Allocator
@@ -838,7 +843,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     }
 
     function test_exchangeIouTokens_reverts_ifAssetWithdrawalNotAllowed(uint256 iouTokenAmountRay) public {
-        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        iouTokenAmountRay = bound(_boundRayAmount(iouTokenAmountRay), 1, type(uint128).max - 1);
         uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(address(_mockUnsupportedAsset));
         vm.assume(amountOut > 0);
         // Put funds idle into TH to mimic withdrawal from Allocator
@@ -879,7 +884,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     }
 
     function test_exchangeIouTokens_reverts_ifNotWhitelistedBridgeAdapter() public {
-        uint256 iouTokenAmountRay = 100_000_000_000_000 * 10 ** 27;
+        uint256 iouTokenAmountRay = 100_000 * 10 ** 27;
         uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(address(_mockUsdt));
         address unsupportedAdapter = makeAddr("unsupportedAdapter");
         // Put funds idle into TH to mimic withdrawal from Allocator
@@ -925,7 +930,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         uint256 iouTokenAmountRay,
         uint256 minAmountOut
     ) public {
-        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        iouTokenAmountRay = bound(_boundRayAmount(iouTokenAmountRay), 1, type(uint128).max - 1);
         uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(address(_mockUsdt));
         minAmountOut = bound(minAmountOut, amountOut + 1, type(uint256).max);
         // Put funds idle into TH to mimic withdrawal from Allocator
@@ -1345,7 +1350,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         uint256 iouTokenAmountRay
     ) public {
         feeAmount = _boundNativeAmount(feeAmount);
-        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        iouTokenAmountRay = bound(_boundRayAmount(iouTokenAmountRay), 1, type(uint128).max - 1);
         vm.assume(bridgeFeePayer != address(0));
 
         // Use GHO as the bridge fee token
@@ -1399,7 +1404,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         uint256 iouTokenAmountRay
     ) public {
         bridgeFeeAmount = _boundNativeAmount(bridgeFeeAmount);
-        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        iouTokenAmountRay = bound(_boundRayAmount(iouTokenAmountRay), 1, type(uint128).max - 1);
         vm.assume(bridgeFeePayer != address(0));
         // Under the opaque-bytes shape, native fee is supplied via msg.value to the gateway (not
         // pre-funded into TransferHelper). The adapter forwards it through on the wire.
@@ -1491,7 +1496,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         address iouTokenRecipient,
         uint256 iouTokenAmountRay
     ) public {
-        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        iouTokenAmountRay = bound(_boundRayAmount(iouTokenAmountRay), 1, type(uint128).max - 1);
         // Expect call to IouTokenManager to mint tokens
         vm.expectCall(
             address(_mockIouTokenManager),
@@ -1516,7 +1521,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     ) public {
         // Context: this should be the case for any valid message type
 
-        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        iouTokenAmountRay = bound(_boundRayAmount(iouTokenAmountRay), 1, type(uint128).max - 1);
 
         // Add a new whitelisted bridge bridge adapter for message bridge
         address unknownAdapter = makeAddr("unknownAdapter");
