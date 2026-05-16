@@ -3,6 +3,8 @@
 pragma solidity ^0.8.22;
 
 import {AccessManager} from "@openzeppelin/contracts/access/manager/AccessManager.sol";
+import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
+import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Test} from "forge-std/Test.sol";
 
@@ -88,9 +90,9 @@ contract WithdrawalExecutionPolicyAccessManagerIntegrationTest is Test {
 
     function test_raiseSelectors_revertWithoutSchedule() public {
         vm.startPrank(operator);
-        vm.expectRevert();
+        vm.expectPartialRevert(IAccessManager.AccessManagerNotScheduled.selector);
         policy.raiseRedemptionCapacity(DEFAULT_CAPACITY * 2);
-        vm.expectRevert();
+        vm.expectPartialRevert(IAccessManager.AccessManagerNotScheduled.selector);
         policy.raiseRedemptionRefillRate(DEFAULT_REFILL_RATE * 2);
         vm.stopPrank();
     }
@@ -102,8 +104,9 @@ contract WithdrawalExecutionPolicyAccessManagerIntegrationTest is Test {
         vm.prank(operator);
         accessManager.schedule(address(policy), raiseCapData, 0);
 
+        // Schedule exists but the delay hasn't elapsed, so AccessManager rejects with `AccessManagerNotReady`.
         vm.prank(operator);
-        vm.expectRevert();
+        vm.expectPartialRevert(IAccessManager.AccessManagerNotReady.selector);
         policy.raiseRedemptionCapacity(DEFAULT_CAPACITY * 2);
     }
 
@@ -136,7 +139,7 @@ contract WithdrawalExecutionPolicyAccessManagerIntegrationTest is Test {
         accessManager.grantRole(RATE_LIMIT_RAISER_ROLE, raiserOnly, RAISE_DELAY);
 
         vm.prank(raiserOnly);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, raiserOnly));
         policy.lowerRedemptionCapacity(DEFAULT_CAPACITY / 2);
     }
 }

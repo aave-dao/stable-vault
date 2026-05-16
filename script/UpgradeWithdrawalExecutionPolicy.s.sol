@@ -51,10 +51,12 @@ contract UpgradeWithdrawalExecutionPolicy is Create3AddressBook, Upgrade, Deploy
         ProxyAdmin(proxyAdmin)
             .upgradeAndCall(ITransparentUpgradeableProxy(WITHDRAWAL_EXECUTION_POLICY_PROXY), implementation, "");
 
-        // Proxy storage survives the upgrade. Confirm the already-seeded bucket still respects the new floors.
+        // Proxy storage survives the upgrade. Confirm the already-seeded bucket still has headroom above the new
+        // floors: at-floor would leave operators no room for `lower*` during incident response, matching the strict
+        // assertion in `_assertRequiredPoliciesSet` at deploy time.
         RateLimitBucketLib.Bucket memory bucket = policy.getRedemptionBucket();
-        require(bucket.capacity >= newMinCapacity, "Post-upgrade: bucket capacity below new floor");
-        require(bucket.refillRate >= newMinRefillRate, "Post-upgrade: bucket refill rate below new floor");
+        require(bucket.capacity > newMinCapacity, "Post-upgrade: bucket capacity at or below new floor");
+        require(bucket.refillRate > newMinRefillRate, "Post-upgrade: bucket refill rate at or below new floor");
     }
 
     function _logDeployment(string memory name, string memory saltSeed, address addr) internal {
