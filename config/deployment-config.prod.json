@@ -55,6 +55,14 @@
         "usdt": { "capacity": "1000000000000", "refillRate": "11574074" }
       }
     },
+    "withdrawalExecutionPolicy": {
+      "redemptionLimit": {
+        "capacity": "TBD",
+        "refillRate": "TBD"
+      },
+      "minRedemptionCapacity": "TBD",
+      "minRedemptionRefillRate": "TBD"
+    },
     "deploymentOutputPath": "deployments/prod/v1/earning.json",
     "minBurnIouTokenGasLimit": "120000"
   },
@@ -101,6 +109,14 @@
         "usdc": { "capacity": "1000000000000", "refillRate": "11574074" },
         "usdt": { "capacity": "1000000000000", "refillRate": "11574074" }
       }
+    },
+    "withdrawalExecutionPolicy": {
+      "redemptionLimit": {
+        "capacity": "TBD",
+        "refillRate": "TBD"
+      },
+      "minRedemptionCapacity": "TBD",
+      "minRedemptionRefillRate": "TBD"
     },
     "deploymentOutputPath": "deployments/prod/v1/accounting.json"
   }
