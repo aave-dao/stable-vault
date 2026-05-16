@@ -936,54 +936,52 @@ abstract contract RolesConfig is DeploymentConfig {
         roles[30] = getRole__topUp();
         roles[31] = getRole__trustStrategy();
         roles[32] = getRole__distrustStrategy();
+        roles[33] = getRole__setWithdrawalQueue();
 
         // Rescue
-        roles[33] = getRole__rescueTokens();
-        roles[34] = getRole__rescueNative();
+        roles[34] = getRole__rescueTokens();
+        roles[35] = getRole__rescueNative();
 
         // FundsHandler / EarningChainGateway
-        roles[35] = getRole__pushFundsToChain();
-        roles[36] = getRole__pushFundsToAccountingChain();
-        roles[37] = getRole__addEarningChain();
-        roles[38] = getRole__removeEarningChain();
+        roles[36] = getRole__pushFundsToChain();
+        roles[37] = getRole__pushFundsToAccountingChain();
+        roles[38] = getRole__addEarningChain();
+        roles[39] = getRole__removeEarningChain();
 
         // Oracles
-        roles[39] = getRole__setChainBalanceOracleAdapter();
-        roles[40] = getRole__setOracleAdapterForAsset();
+        roles[40] = getRole__setChainBalanceOracleAdapter();
+        roles[41] = getRole__setOracleAdapterForAsset();
 
         // External - aToken Vault
-        roles[41] = getRole__claimMerklRewards();
-        roles[42] = getRole__emergencyRescue();
+        roles[42] = getRole__claimMerklRewards();
+        roles[43] = getRole__emergencyRescue();
 
         // SlippageCoverageVault
-        roles[43] = getRole__enableOverrideMode();
-        roles[44] = getRole__disableOverrideMode();
-        roles[45] = getRole__raisePullCapPerTx();
-        roles[46] = getRole__lowerPullCapPerTx();
-        roles[47] = getRole__raiseWindowCap();
-        roles[48] = getRole__lowerWindowCap();
-        roles[49] = getRole__raiseWindowSeconds();
-        roles[50] = getRole__lowerWindowSeconds();
-        roles[51] = getRole__setMaxSlippageBps();
-        roles[52] = getRole__setOverrideMaxSlippageBps();
-        roles[53] = getRole__fundCoverage();
-        roles[54] = getRole__sweepSlippageCoverageVault();
+        roles[44] = getRole__enableOverrideMode();
+        roles[45] = getRole__disableOverrideMode();
+        roles[46] = getRole__raisePullCapPerTx();
+        roles[47] = getRole__lowerPullCapPerTx();
+        roles[48] = getRole__raiseWindowCap();
+        roles[49] = getRole__lowerWindowCap();
+        roles[50] = getRole__raiseWindowSeconds();
+        roles[51] = getRole__lowerWindowSeconds();
+        roles[52] = getRole__setMaxSlippageBps();
+        roles[53] = getRole__setOverrideMaxSlippageBps();
+        roles[54] = getRole__fundCoverage();
+        roles[55] = getRole__sweepSlippageCoverageVault();
 
         // PolicyRegistry
-        roles[55] = getRole__setPolicy();
+        roles[56] = getRole__setPolicy();
 
         // DepositPolicy / FundsBridgingPolicy
-        roles[56] = getRole__raiseDepositCapacity();
-        roles[57] = getRole__raiseDepositRefillRate();
-        roles[58] = getRole__lowerDepositCapacity();
-        roles[59] = getRole__lowerDepositRefillRate();
-        roles[60] = getRole__raiseBridgingCapacity();
-        roles[61] = getRole__raiseBridgingRefillRate();
-        roles[62] = getRole__lowerBridgingCapacity();
-        roles[63] = getRole__lowerBridgingRefillRate();
-
-        // Allocator (extension)
-        roles[64] = getRole__setWithdrawalQueue();
+        roles[57] = getRole__raiseDepositCapacity();
+        roles[58] = getRole__raiseDepositRefillRate();
+        roles[59] = getRole__lowerDepositCapacity();
+        roles[60] = getRole__lowerDepositRefillRate();
+        roles[61] = getRole__raiseBridgingCapacity();
+        roles[62] = getRole__raiseBridgingRefillRate();
+        roles[63] = getRole__lowerBridgingCapacity();
+        roles[64] = getRole__lowerBridgingRefillRate();
 
         return roles;
     }
