@@ -26,8 +26,9 @@ interface IAccountingChainGateway is IChainGateway {
     /// @param targetChainId The chain id of the Earning Chain to send the assets to.
     /// @param bridgeAdapter The whitelisted bridge adapter to use for bridging the asset.
     /// @param feePayer Address that will pay the bridge fee.
-    /// @param receiverExecutionGasLimit Gas limit for destination receiver execution. This includes adapter receive
-    /// logic, token handling, and the gateway call, but excludes bridge provider infrastructure.
+    /// @param receiverExecutionGasLimit Gas limit for destination receiver execution, including adapter receive logic,
+    /// token handling, gateway execution, and any non-empty arbitrary data processing. Excludes bridge provider
+    /// operations before and after the receiver call.
     /// @param bridgeAdapterData Any bridge adapter custom parameters that it may need to operate.
     function sendPushFundsToChainMessage(
         address asset,

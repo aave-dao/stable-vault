@@ -20,6 +20,10 @@ interface IBridgeAdapter {
     /// @notice Emitted when the destination chain adapter is set.
     event DestinationChainAdapterSet(uint256 indexed chainId, address indexed destinationChainAdapter);
 
+    /// @notice Destination chain adapter is already configured for the chain.
+    /// @custom:selector 0x11b61b6a
+    error AlreadyConfigured();
+
     /// @notice Thrown when the number of tokens in a message is greater than the max expected.
     /// @custom:selector 0xe778681d
     error InvalidTokenCount();
@@ -32,16 +36,13 @@ interface IBridgeAdapter {
     /// @custom:selector 0x60055a30
     error OnlyBridgeRouter();
 
-    /// @notice Destination chain adapter is already configured for the chain.
-    /// @custom:selector 0x11b61b6a
-    error AlreadyConfigured();
-
     /// @notice Getter for the address of the Gateway contract.
     /// @return gateway Address of the Gateway contract.
     function getGateway() external view returns (address);
 
-    /// @notice Getter for the gas overhead added to data-only payload execution.
-    /// @return dataOnlyReceiveGasOverhead Gas overhead added by the adapter before forwarding to the bridge provider.
+    /// @notice Getter for the additional gas overhead needed on destination receiver to ingest data-only messages.
+    /// @return dataOnlyReceiveGasOverhead Gas overhead added by the adapter when converting a payload execution gas
+    /// limit to a full destination receiver execution gas limit.
     function getDataOnlyReceiveGasOverhead() external view returns (uint256 dataOnlyReceiveGasOverhead);
 
     /// @notice Sets the destination chain adapter for a given chain id.
@@ -60,9 +61,10 @@ interface IBridgeAdapter {
     /// @param destinationChainId Chain id of the chain to publish the message to.
     /// @param messageData Data decoded and handled by the destination gateway.
     /// @param feePayer Address that will pay the bridge fee.
-    /// @param payloadExecutionGasLimit Gas limit for the destination gateway call and everything it executes.
+    /// @param payloadExecutionGasLimit Destination gateway payload gas limit. Excludes adapter receive logic and bridge
+    /// provider operations before and after the receiver call.
     /// @param bridgeAdapterData Any bridge adapter custom parameters that it may need to operate.
-    /// @dev The adapter must add its own gas overhead to `payloadExecutionGasLimit` when executing the message.
+    /// @dev The adapter must adjust `payloadExecutionGasLimit` to account for its own receive-logic overhead.
     function publishDataOnlyMessage(
         uint256 destinationChainId,
         bytes memory messageData,
@@ -77,10 +79,11 @@ interface IBridgeAdapter {
     /// @param destinationChainId Chain id of the chain to publish the message to.
     /// @param asset Asset to bridge.
     /// @param amount Amount of the asset to bridge.
-    /// @param messageData Data decoded and handled by the destination gateway.
+    /// @param messageData Optional data decoded and handled by the destination gateway.
     /// @param feePayer Address that will pay the bridge fee.
-    /// @param receiverExecutionGasLimit Gas limit for destination receiver execution. This includes adapter receive
-    /// logic, token handling, and the gateway call, but excludes bridge provider infrastructure.
+    /// @param receiverExecutionGasLimit Gas limit for destination receiver execution, including adapter receive logic,
+    /// token handling, gateway execution, and any non-empty `messageData` processing. Excludes bridge provider
+    /// operations before and after the receiver call.
     /// @param bridgeAdapterData Any bridge adapter custom parameters that it may need to operate.
     function publishMessageWithFunds(
         uint256 destinationChainId,

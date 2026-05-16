@@ -232,11 +232,18 @@ contract AdiAdapterTest is TestWithHelpers {
     function test_setDestinationChainAdapter_emitsDestinationChainAdapterSet(uint256 chainId, address adapter) public {
         vm.assume(chainId != EARNING_CHAIN_ID && chainId != ACCOUNTING_CHAIN_ID);
         vm.assume(chainId != 0 && chainId != block.chainid);
+        vm.assume(adapter != address(0));
 
         vm.expectEmit(true, true, true, true);
         emit IBridgeAdapter.DestinationChainAdapterSet(chainId, adapter);
         vm.prank(everyRoleAccount);
         _accountingChainAdiAdapter.setDestinationChainAdapter(chainId, adapter);
+    }
+
+    function test_setDestinationChainAdapter_reverts_ifAdapterIsZero() public {
+        vm.expectRevert(Errors.ZeroAddress.selector);
+        vm.prank(everyRoleAccount);
+        _accountingChainAdiAdapter.setDestinationChainAdapter(EARNING_CHAIN_ID, address(0));
     }
 
     function test_setDestinationChainAdapter_reverts_ifChainIdIsZero() public {
