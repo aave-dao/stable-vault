@@ -62,8 +62,8 @@ interface IFundsHandler {
     /// @param amount Amount of the asset to push to the destination chain.
     /// @param chainId Chain id of the destination chain.
     /// @param bridgeAdapter The whitelisted bridge adapter to use for bridging the asset.
-    /// @param receiverExecutionGasLimit Gas limit for destination receiver execution. This includes adapter receive
-    /// logic, token handling, and the gateway call, but excludes bridge provider infrastructure.
+    /// @param receiverExecutionGasLimit Gas limit for destination receiver execution, including adapter receive logic,
+    /// token handling, and gateway execution. Excludes bridge provider operations before and after the receiver call.
     /// @param bridgeAdapterData Any bridge adapter custom parameters that it may need to operate.
     /// @param policyData Additional data that the bridge-funds policy might need to operate.
     function pushFundsToChain(
