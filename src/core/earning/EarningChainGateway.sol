@@ -168,7 +168,7 @@ contract EarningChainGateway is
     }
 
     function _receiveFunds(address asset, uint256 amount) internal override {
-        IAllocator(ALLOCATOR).depositAllowIdle(asset, amount);
+        IAllocator(ALLOCATOR).deposit(asset, amount);
     }
 
     function _receiveCrossChainMessage(IChainGateway.CrossChainMessage memory crossChainMessage) private {

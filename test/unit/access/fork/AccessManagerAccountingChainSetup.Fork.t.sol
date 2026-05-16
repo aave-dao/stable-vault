@@ -40,8 +40,8 @@ contract AccessManagerAccountingChainSetupForkTest is AccessManagerAccountingCha
     {
         IAllocator allocator = IAllocator(getAllocatorAddress(_deployer()));
         address[] memory vaults = new address[](2);
-        vaults[0] = allocator.getDefaultStrategy(_gho());
-        vaults[1] = allocator.getDefaultStrategy(_usdc());
+        vaults[0] = allocator.getStrategiesForAsset(_gho())[0];
+        vaults[1] = allocator.getStrategiesForAsset(_usdc())[0];
         return vaults;
     }
 }

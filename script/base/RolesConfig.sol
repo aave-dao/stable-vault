@@ -434,19 +434,6 @@ abstract contract RolesConfig is DeploymentConfig {
         });
     }
 
-    /// @custom:delay None
-    /// @custom:location Allocator
-    function getRole__setDefaultStrategy() internal pure returns (Role memory) {
-        bytes4 selector = IAllocator.setDefaultStrategy.selector;
-        return Role({
-            roleId: _selectorToRoleId(selector),
-            selector: selector,
-            delay: NO_DELAY,
-            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
-            hasCriticalRisk: false
-        });
-    }
-
     /// @custom:delay High
     /// @custom:location Allocator
     function getRole__enableDepositsToStrategy() internal view returns (Role memory) {
@@ -469,6 +456,19 @@ abstract contract RolesConfig is DeploymentConfig {
             selector: selector,
             delay: HIGH_DELAY,
             guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
+        });
+    }
+
+    /// @custom:delay None
+    /// @custom:location Allocator
+    function getRole__setWithdrawalQueue() internal pure returns (Role memory) {
+        bytes4 selector = IAllocator.setWithdrawalQueue.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: NO_DELAY,
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
             hasCriticalRisk: false
         });
     }
@@ -707,6 +707,58 @@ abstract contract RolesConfig is DeploymentConfig {
         });
     }
 
+    /// @custom:delay High
+    /// @custom:location WithdrawalExecutionPolicy
+    function getRole__raiseRedemptionCapacity() internal view returns (Role memory) {
+        bytes4 selector = WithdrawalExecutionPolicy.raiseRedemptionCapacity.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: HIGH_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
+        });
+    }
+
+    /// @custom:delay High
+    /// @custom:location WithdrawalExecutionPolicy
+    function getRole__raiseRedemptionRefillRate() internal view returns (Role memory) {
+        bytes4 selector = WithdrawalExecutionPolicy.raiseRedemptionRefillRate.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: HIGH_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
+        });
+    }
+
+    /// @custom:delay None
+    /// @custom:location WithdrawalExecutionPolicy
+    function getRole__lowerRedemptionCapacity() internal pure returns (Role memory) {
+        bytes4 selector = WithdrawalExecutionPolicy.lowerRedemptionCapacity.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: NO_DELAY,
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
+        });
+    }
+
+    /// @custom:delay None
+    /// @custom:location WithdrawalExecutionPolicy
+    function getRole__lowerRedemptionRefillRate() internal pure returns (Role memory) {
+        bytes4 selector = WithdrawalExecutionPolicy.lowerRedemptionRefillRate.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: NO_DELAY,
+            guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: false
+        });
+    }
+
     /// @custom:delay None
     /// @custom:location aToken Vault
     function getRole__claimMerklRewards() internal pure returns (Role memory) {
@@ -890,7 +942,7 @@ abstract contract RolesConfig is DeploymentConfig {
     }
 
     function getAllFunctionBasedRoles() internal view returns (Role[] memory) {
-        Role[] memory roles = new Role[](65);
+        Role[] memory roles = new Role[](69);
 
         // AssetRegistry
         roles[0] = getRole__setAssetConfig();
@@ -932,11 +984,11 @@ abstract contract RolesConfig is DeploymentConfig {
         roles[26] = getRole__addStrategy();
         roles[27] = getRole__removeStrategy();
         roles[28] = getRole__disableDepositsToStrategy();
-        roles[29] = getRole__setDefaultStrategy();
-        roles[30] = getRole__enableDepositsToStrategy();
-        roles[31] = getRole__topUp();
-        roles[32] = getRole__trustStrategy();
-        roles[33] = getRole__distrustStrategy();
+        roles[29] = getRole__enableDepositsToStrategy();
+        roles[30] = getRole__topUp();
+        roles[31] = getRole__trustStrategy();
+        roles[32] = getRole__distrustStrategy();
+        roles[33] = getRole__setWithdrawalQueue();
 
         // Rescue
         roles[34] = getRole__rescueTokens();
@@ -982,6 +1034,12 @@ abstract contract RolesConfig is DeploymentConfig {
         roles[62] = getRole__raiseBridgingRefillRate();
         roles[63] = getRole__lowerBridgingCapacity();
         roles[64] = getRole__lowerBridgingRefillRate();
+
+        // WithdrawalExecutionPolicy redemption rate-limit
+        roles[65] = getRole__raiseRedemptionCapacity();
+        roles[66] = getRole__raiseRedemptionRefillRate();
+        roles[67] = getRole__lowerRedemptionCapacity();
+        roles[68] = getRole__lowerRedemptionRefillRate();
 
         return roles;
     }

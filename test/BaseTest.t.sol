@@ -83,6 +83,13 @@ contract BaseTest is TestWithHelpers {
     uint256 internal constant DEFAULT_GAS_LIMIT = 300_000;
     uint256 internal constant BURN_IOU_TOKEN_GAS_LIMIT = 120_000;
 
+    // Redemption bucket: realistic-ish floors so integration tests exercise the policy's apply-path guards rather
+    // than running with effectively-no-floor (which would mask regressions where `consume()` is bypassed).
+    uint128 internal constant TEST_MIN_REDEMPTION_CAPACITY = 1e30;
+    uint128 internal constant TEST_MIN_REDEMPTION_REFILL_RATE = 1e25;
+    uint128 internal constant TEST_SEED_REDEMPTION_CAPACITY = type(uint128).max - 1;
+    uint128 internal constant TEST_SEED_REDEMPTION_REFILL_RATE = 1e30;
+
     // Transfer Helper
     address transferHelper_accountingChainAddress;
     address transferHelper_earningChainAddress;
@@ -395,8 +402,11 @@ contract BaseTest is TestWithHelpers {
         );
 
         // 8-9. Withdrawal Policy (Impl + Proxy)
-        address withdrawalExecutionPolicy_accountingChain_impl =
-            address(new WithdrawalExecutionPolicy(vault_accountingChainAddress));
+        address withdrawalExecutionPolicy_accountingChain_impl = address(
+            new WithdrawalExecutionPolicy(
+                vault_accountingChainAddress, TEST_MIN_REDEMPTION_CAPACITY, TEST_MIN_REDEMPTION_REFILL_RATE
+            )
+        );
         withdrawalExecutionPolicy_accountingChain = WithdrawalExecutionPolicy(
             address(
                 new TransparentUpgradeableProxy(
@@ -703,8 +713,11 @@ contract BaseTest is TestWithHelpers {
         );
 
         // 6-7. Withdrawal Policy (Impl + Proxy)
-        address withdrawalExecutionPolicy_earningChain_impl =
-            address(new WithdrawalExecutionPolicy(chainGateway_earningChainAddress));
+        address withdrawalExecutionPolicy_earningChain_impl = address(
+            new WithdrawalExecutionPolicy(
+                chainGateway_earningChainAddress, TEST_MIN_REDEMPTION_CAPACITY, TEST_MIN_REDEMPTION_REFILL_RATE
+            )
+        );
         withdrawalExecutionPolicy_earningChain = WithdrawalExecutionPolicy(
             address(
                 new TransparentUpgradeableProxy(
@@ -917,14 +930,10 @@ contract BaseTest is TestWithHelpers {
         // Set up Allocator on Accounting chain
         allocator_accountingChain.addStrategy(address(GHO), address(ghoStrategyVault_accountingChain));
         allocator_accountingChain.addStrategy(address(USDC), address(usdcStrategyVault_accountingChain));
-        allocator_accountingChain.setDefaultStrategy(address(GHO), address(ghoStrategyVault_accountingChain));
-        allocator_accountingChain.setDefaultStrategy(address(USDC), address(usdcStrategyVault_accountingChain));
 
         // Set up Allocator on Earning chain
         allocator_earningChain.addStrategy(address(GHO), address(ghoStrategyVault_earningChain));
         allocator_earningChain.addStrategy(address(USDC), address(usdcStrategyVault_earningChain));
-        allocator_earningChain.setDefaultStrategy(address(GHO), address(ghoStrategyVault_earningChain));
-        allocator_earningChain.setDefaultStrategy(address(USDC), address(usdcStrategyVault_earningChain));
 
         // Configure the FundsHandler to track the earning chain balance via the oracle
         fundsHandler.addEarningChain(EARNING_CHAIN_ID);
@@ -1018,9 +1027,7 @@ contract BaseTest is TestWithHelpers {
 
         // For Allocator on Accounting chain
         accessManager.setTargetFunctionRole(
-            address(allocator_accountingChain),
-            _toSelectorArray(IAllocator.rebalance.selector, IAllocator.setDefaultStrategy.selector),
-            OPERATOR_ROLE
+            address(allocator_accountingChain), _toSelectorArray(IAllocator.rebalance.selector), OPERATOR_ROLE
         );
 
         // For StableVault
@@ -1059,6 +1066,9 @@ contract BaseTest is TestWithHelpers {
         accessManager.setTargetFunctionRole(
             address(slippageCoverageVault_accountingChain), vaultSelectors, OPERATOR_ROLE
         );
+
+        withdrawalExecutionPolicy_accountingChain.raiseRedemptionCapacity(TEST_SEED_REDEMPTION_CAPACITY);
+        withdrawalExecutionPolicy_accountingChain.raiseRedemptionRefillRate(TEST_SEED_REDEMPTION_REFILL_RATE);
 
         vm.stopPrank();
     }
@@ -1119,9 +1129,7 @@ contract BaseTest is TestWithHelpers {
 
         // For Allocator on Earning chain
         accessManager.setTargetFunctionRole(
-            address(allocator_earningChain),
-            _toSelectorArray(IAllocator.rebalance.selector, IAllocator.setDefaultStrategy.selector),
-            OPERATOR_ROLE
+            address(allocator_earningChain), _toSelectorArray(IAllocator.rebalance.selector), OPERATOR_ROLE
         );
 
         // For Earning Chain Gateway
@@ -1147,12 +1155,29 @@ contract BaseTest is TestWithHelpers {
         vaultSelectors[11] = ISlippageCoverageVault.sweep.selector;
         accessManager.setTargetFunctionRole(address(slippageCoverageVault_earningChain), vaultSelectors, OPERATOR_ROLE);
 
+        withdrawalExecutionPolicy_earningChain.raiseRedemptionCapacity(TEST_SEED_REDEMPTION_CAPACITY);
+        withdrawalExecutionPolicy_earningChain.raiseRedemptionRefillRate(TEST_SEED_REDEMPTION_REFILL_RATE);
+
         vm.stopPrank();
     }
 
     function _setUpRole(AccessManager accessManager, uint64 roleId, address account, uint32 executionDelay) internal {
         accessManager.grantRole(roleId, account, executionDelay);
         accessManager.setRoleGuardian(roleId, GUARDIAN_ROLE);
+    }
+
+    /// @dev Routes any idle balance of `asset` from the Allocator into `strategy` via a single-step rebalance.
+    /// Replaces the prior auto-deposit-into-default-strategy semantics now that default strategy is gone.
+    function _routeIdleToStrategy(Allocator allocator, address asset, address strategy, uint256 amount) internal {
+        IAllocator.RebalanceParams[] memory params = new IAllocator.RebalanceParams[](1);
+        params[0] = IAllocator.RebalanceParams({
+            deallocations: new IAllocator.DeallocationParams[](0),
+            swaps: new IAllocator.SwapParams[](0),
+            allocations: new IAllocator.AllocationParams[](1)
+        });
+        params[0].allocations[0] = IAllocator.AllocationParams({asset: asset, strategy: strategy, amount: amount});
+        vm.prank(everyRoleAccount);
+        allocator.rebalance(params, "");
     }
 
     function _publishChainBalanceFromEarningChainStateProvider() internal {

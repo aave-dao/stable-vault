@@ -23,6 +23,7 @@ import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
 import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
+import {RateLimitBucketLib} from "src/libraries/RateLimitBucketLib.sol";
 import {AggregatorV3Interface, ChainlinkPriceOracleAdapter} from "src/oracles/price/ChainlinkPriceOracleAdapter.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {AssetRegistry} from "src/periphery/AssetRegistry.sol";
@@ -71,6 +72,7 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
 
     function run() public {
         _validateExternalAddresses();
+        _validateRedemptionLimitConfig(".earningChain.withdrawalExecutionPolicy");
         vm.startBroadcast(_deployer());
         _deployContracts();
         _setupContracts();
@@ -146,11 +148,21 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
 
     function _assertRequiredPoliciesSet() private view {
         IPolicyRegistry registry = IPolicyRegistry(getPolicyRegistryAddress(_deployer()));
-        require(
-            registry.getPolicy(WITHDRAWAL_EXECUTION_POLICY_ID) != address(0),
-            "missing earning-chain withdrawal-execution policy"
-        );
+        address policyAddress = registry.getPolicy(WITHDRAWAL_EXECUTION_POLICY_ID);
+        require(policyAddress != address(0), "missing earning-chain withdrawal-execution policy");
         require(registry.getPolicy(BRIDGE_POLICY_ID) != address(0), "missing earning-chain bridge policy");
+
+        WithdrawalExecutionPolicy policy = WithdrawalExecutionPolicy(policyAddress);
+        RateLimitBucketLib.Bucket memory bucket = policy.getRedemptionBucket();
+        // Strict greater than: seeding at floor leaves the bucket pinned with no headroom for `lower*` during
+        // incident response. Force operator headroom by construction.
+        require(
+            bucket.capacity > policy.getMinRedemptionCapacity(), "earning-chain redemption capacity must exceed floor"
+        );
+        require(
+            bucket.refillRate > policy.getMinRedemptionRefillRate(),
+            "earning-chain redemption refill rate must exceed floor"
+        );
     }
 
     function _accessManager() internal view virtual override returns (address) {
@@ -190,8 +202,17 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         withdrawalExecutionPolicy.setDefaultFeeBps(uint16(_configUint(".withdrawalExecutionPolicy.defaultFeeBps")));
         withdrawalExecutionPolicy.addSigner(_configAddress(".withdrawalExecutionPolicy.signer"));
 
+        _initRedemptionLimit(withdrawalExecutionPolicy, ".earningChain.withdrawalExecutionPolicy.redemptionLimit");
+
         IPolicyRegistry(getPolicyRegistryAddress(_deployer()))
             .setPolicy(WITHDRAWAL_EXECUTION_POLICY_ID, address(withdrawalExecutionPolicy));
+    }
+
+    function _initRedemptionLimit(WithdrawalExecutionPolicy policy, string memory configKey) private {
+        uint128 capacity = uint128(vm.parseUint(_configString(string.concat(configKey, ".capacity"))));
+        uint128 refillRate = uint128(vm.parseUint(_configString(string.concat(configKey, ".refillRate"))));
+        policy.raiseRedemptionCapacity(capacity);
+        policy.raiseRedemptionRefillRate(refillRate);
     }
 
     function _setupAllocator() internal {
@@ -201,12 +222,10 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         address usdcYieldStrategy =
             _deployATokenVault(_usdc(), poolAddressProvider, getAccessManagerAddress(_deployer()), _deployer());
         allocator.addStrategy(_usdc(), usdcYieldStrategy);
-        allocator.setDefaultStrategy(_usdc(), usdcYieldStrategy);
 
         address usdtYieldStrategy =
             _deployATokenVault(_usdt(), poolAddressProvider, getAccessManagerAddress(_deployer()), _deployer());
         allocator.addStrategy(_usdt(), usdtYieldStrategy);
-        allocator.setDefaultStrategy(_usdt(), usdtYieldStrategy);
     }
 
     function _deployedATokenVaultAddresses() internal view virtual override returns (address[] memory) {
@@ -266,7 +285,15 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
     }
 
     function _deployWithdrawalExecutionPolicy() internal returns (address) {
-        address implementation = address(new WithdrawalExecutionPolicy(getGatewayAddress(_deployer())));
+        uint128 minRedemptionCapacity =
+            uint128(vm.parseUint(_configString(".earningChain.withdrawalExecutionPolicy.minRedemptionCapacity")));
+        uint128 minRedemptionRefillRate =
+            uint128(vm.parseUint(_configString(".earningChain.withdrawalExecutionPolicy.minRedemptionRefillRate")));
+        address implementation = address(
+            new WithdrawalExecutionPolicy(
+                getGatewayAddress(_deployer()), minRedemptionCapacity, minRedemptionRefillRate
+            )
+        );
         _logDeployment("WithdrawalExecutionPolicy::Implementation", "", implementation);
         address withdrawalExecutionPolicy = _deployTransparentProxy_create3({
             namespacedSaltSeed: WITHDRAWAL_EXECUTION_POLICY_SALT_SEED,

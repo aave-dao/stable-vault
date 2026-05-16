@@ -18,7 +18,8 @@
     "withdrawalPolicyManager": "0xFBcf8bA0aCaECbd90990A29e37B8be3F631c38F6",
     "aTokenVaultRewardClaimer": "0x35b029C7715c668DCD6058B7a52C0377f404a4e8",
     "stableVaultManager": "0x2A74c29e0Ee366788cc5EEa00c540264a3508fDB",
-    "coverageGuardian": "0x00000000000000000000000000000000C0FEC0FE"
+    "coverageGuardian": "0x00000000000000000000000000000000C0FEC0FE",
+    "funder": "0x00000000000000000000000000000000C0FE7EA5"
   },
   "withdrawalExecutionPolicy": {
     "defaultFeeBps": 625,
@@ -53,6 +54,14 @@
         "usdc": { "capacity": "1000000000000", "refillRate": "11574074" },
         "usdt": { "capacity": "1000000000000", "refillRate": "11574074" }
       }
+    },
+    "withdrawalExecutionPolicy": {
+      "redemptionLimit": {
+        "capacity": "TBD",
+        "refillRate": "TBD"
+      },
+      "minRedemptionCapacity": "TBD",
+      "minRedemptionRefillRate": "TBD"
     },
     "deploymentOutputPath": "deployments/prod/v1/earning.json",
     "minBurnIouTokenGasLimit": "120000"
@@ -100,6 +109,14 @@
         "usdc": { "capacity": "1000000000000", "refillRate": "11574074" },
         "usdt": { "capacity": "1000000000000", "refillRate": "11574074" }
       }
+    },
+    "withdrawalExecutionPolicy": {
+      "redemptionLimit": {
+        "capacity": "TBD",
+        "refillRate": "TBD"
+      },
+      "minRedemptionCapacity": "TBD",
+      "minRedemptionRefillRate": "TBD"
     },
     "deploymentOutputPath": "deployments/prod/v1/accounting.json"
   }

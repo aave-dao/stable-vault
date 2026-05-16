@@ -6,7 +6,9 @@ pragma solidity ^0.8.22;
 /// @author Aave Labs
 /// @notice Interface for the Allocator contract.
 interface IAllocator {
-    event AssetAllocated(address indexed asset, address indexed strategy, uint256 amount, uint256 netDepositAmount);
+    event AssetAllocated(
+        address indexed asset, address indexed strategy, uint256 amount, uint256 actualDepositedAmount
+    );
 
     event AssetDeallocated(address indexed asset, address indexed strategy, uint256 amount);
 
@@ -15,10 +17,6 @@ interface IAllocator {
     event AssetsSwapped(address indexed assetIn, address indexed assetOut, uint256 amountIn, uint256 amountOut);
 
     event AssetToppedUp(address indexed asset, uint256 amount);
-
-    event DefaultStrategySet(address indexed asset, address indexed strategy);
-
-    event StrategyDepositFailed(address indexed strategy, uint256 amount);
 
     event StrategyDepositsToggled(address indexed strategy, bool depositsEnabled);
 
@@ -32,10 +30,8 @@ interface IAllocator {
 
     event StrategyDistrusted(address indexed strategy);
 
-    /// @notice Thrown when setting as default a strategy that already is the default, or when removing a strategy
-    /// that is currently set as the default.
-    /// @custom:selector 0x13e93f82
-    error DefaultStrategy(address strategy);
+    /// @notice Emitted when the withdrawal queue for an asset is updated.
+    event WithdrawalQueueSet(address indexed asset, address[] queue);
 
     /// @notice Thrown when funds fail to deposit into a yield strategy.
     /// @custom:selector 0x3868bf52
@@ -60,6 +56,10 @@ interface IAllocator {
     /// @notice Thrown when a strategy has no shares to redeem.
     /// @custom:selector 0xdf4ff092
     error ZeroShareBalance(address strategy);
+
+    /// @notice Thrown when the proposed withdrawal queue is not a permutation of the asset's registered strategies.
+    /// @custom:selector 0x237f3e22
+    error InvalidWithdrawalQueue();
 
     /// @notice The representation of an asset balance.
     /// @param asset Address of the asset.
@@ -159,10 +159,18 @@ interface IAllocator {
     /// strategies).
     function getTrustedAssetBalance(address asset) external view returns (uint256);
 
-    /// @notice Getter for the default strategy for a given asset.
-    /// @param asset Address of the asset to get the default strategy for.
-    /// @return strategy Address of the default strategy for the asset.
-    function getDefaultStrategy(address asset) external view returns (address);
+    /// @notice Getter for the list of strategies registered for a given asset.
+    /// @param asset Address of the asset to get strategies for.
+    /// @return strategies Addresses of the registered strategies for the asset.
+    function getStrategiesForAsset(address asset) external view returns (address[] memory strategies);
+
+    /// @notice Getter for the ordered withdrawal queue for a given asset.
+    /// @dev The queue contains the same strategies as `getStrategiesForAsset` but in the order they will be drained
+    /// when fulfilling withdrawals. New strategies are appended to the queue on registration; the order is otherwise
+    /// preserved across removals and can be customized via `setWithdrawalQueue`.
+    /// @param asset Address of the asset to get the withdrawal queue for.
+    /// @return queue Strategies in the order they will be visited during withdrawal.
+    function getWithdrawalQueue(address asset) external view returns (address[] memory queue);
 
     /// @notice Getter for the configuration of a given strategy.
     /// @param strategy Address of the strategy to get the configuration for.
@@ -180,19 +188,10 @@ interface IAllocator {
     /// @return isSupported Whether the strategy is supported for allocating or deallocating.
     function isStrategySupported(address strategy) external view returns (bool);
 
-    /// @notice Deposits a given amount of an asset into the default strategy for the asset.
+    /// @notice Deposits assets into the Allocator.
     /// @param asset Address of the asset to deposit.
     /// @param amount Amount of the asset to deposit.
-    /// @return netDepositAmount Amount of the asset deposited after accounting for slippage.
-    function deposit(address asset, uint256 amount) external returns (uint256 netDepositAmount);
-
-    /// @notice Deposits a given amount of an asset into the default strategy for the asset, allowing idle funds if the
-    /// deposit fails.
-    /// @dev This function is to allow funds being bridged to the local chain to be kept in the Allocator
-    /// even during error scenarios.
-    /// @param asset Address of the asset to deposit.
-    /// @param amount Amount of the asset to deposit.
-    function depositAllowIdle(address asset, uint256 amount) external;
+    function deposit(address asset, uint256 amount) external;
 
     /// @notice Rebalances underlying assets.
     /// @dev A rebalance is an ordered combination of the following operations: deallocation of assets from strategies,
@@ -207,9 +206,8 @@ interface IAllocator {
     /// @param amount Amount of the asset to deposit.
     function topUp(address asset, uint256 amount) external;
 
-    /// @notice Withdraws a given amount of an asset, sourcing from idle funds, the default strategy, then
-    /// non-default strategies as needed.
-    /// @dev Prioritizes idle funds, default strategy, then non-default strategy(s).
+    /// @notice Withdraws a given amount of an asset, sourcing from idle funds first then iterating registered
+    /// strategies.
     /// @param asset Address of the asset to withdraw.
     /// @param amount Amount of the asset to withdraw.
     function withdraw(address asset, uint256 amount) external;
@@ -223,11 +221,13 @@ interface IAllocator {
     /// @param strategy Address of the ERC-4626 strategy to remove.
     function removeStrategy(address strategy) external;
 
-    /// @notice Sets the default yield strategy for an asset.
-    /// @dev Reverts if the strategy is not trusted or has deposits disabled.
-    /// @param asset Address of the asset to set the default strategy for.
-    /// @param strategy Address of the ERC-4626 strategy to set as the default.
-    function setDefaultStrategy(address asset, address strategy) external;
+    /// @notice Replaces the withdrawal queue order for a given asset.
+    /// @dev The new queue must be a permutation of the asset's currently registered strategies (same length, every
+    /// registered strategy present exactly once); otherwise the call reverts with `InvalidWithdrawalQueue`. This
+    /// guarantees no strategy can be silently dropped from the withdrawal path.
+    /// @param asset Address of the asset whose withdrawal queue is being set.
+    /// @param newQueue Strategies in the order they should be visited during withdrawal.
+    function setWithdrawalQueue(address asset, address[] calldata newQueue) external;
 
     /// @notice Disables deposits to a given strategy.
     /// @param strategy Address of the ERC-4626 strategy to disable deposits for.
@@ -243,9 +243,11 @@ interface IAllocator {
     function trustStrategy(address strategy) external;
 
     /// @notice Distrusts a strategy, excluding its balance from the system's TVL.
-    /// @dev As a side effect, deposits into the strategy are automatically disabled if currently enabled, and the
-    /// strategy is unset as the default for its asset if it is the current default.
-    /// @dev Trusting the strategy again does NOT re-enable deposits or restore it as the default.
+    /// @dev As a side effect, deposits into the strategy are automatically disabled if currently enabled.
+    /// @dev Trusting the strategy again does NOT re-enable deposits.
+    /// @dev If the strategy still holds assets, they stop contributing to trusted balances while vault obligations
+    /// remain unchanged. This can temporarily make obligations exceed `getAggregatedBalance()` and cause
+    /// `requestWithdrawal` to revert with `InsufficientAssets`.
     /// @param strategy Address of the strategy to distrust.
     function distrustStrategy(address strategy) external;
 

@@ -29,6 +29,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         /// @dev asset == `address(0xDA7ada7aDA7ADA7ADA7AdA7aDA7aDA7ADA7adA7a)` for data-only bridging.
         mapping(address asset => mapping(uint256 chainId => mapping(address bridgeAdapter => bool)))
             supportedBridgeAdapters;
+        mapping(uint256 chainId => uint256) dataOnlyBridgeAdapterCount;
     }
 
     // keccak256(abi.encode(uint256(keccak256("aave.storage.BaseChainGateway")) - 1)) & ~bytes32(uint256(0xff))
@@ -133,12 +134,19 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         require(chainId != block.chainid && chainId != 0, Errors.InvalidParameter());
         require(!$storage().supportedBridgeAdapters[asset][chainId][bridgeAdapter], Errors.AddressAlreadyWhitelisted());
         $storage().supportedBridgeAdapters[asset][chainId][bridgeAdapter] = true;
+        if (asset == Constants.ASSET_FOR_DATA_ONLY_BRIDGE) {
+            $storage().dataOnlyBridgeAdapterCount[chainId]++;
+        }
         emit BridgeAdapterAdded(asset, chainId, bridgeAdapter);
     }
 
     /// @inheritdoc IChainGateway
     function removeBridgeAdapter(address asset, uint256 chainId, address bridgeAdapter) external override restricted {
         require($storage().supportedBridgeAdapters[asset][chainId][bridgeAdapter], Errors.AddressNotWhitelisted());
+        if (asset == Constants.ASSET_FOR_DATA_ONLY_BRIDGE) {
+            require($storage().dataOnlyBridgeAdapterCount[chainId] > 1, CannotRemoveLastDataOnlyBridgeAdapter());
+            $storage().dataOnlyBridgeAdapterCount[chainId]--;
+        }
         delete $storage().supportedBridgeAdapters[asset][chainId][bridgeAdapter];
         emit BridgeAdapterRemoved(asset, chainId, bridgeAdapter);
     }

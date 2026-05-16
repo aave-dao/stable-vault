@@ -114,8 +114,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
         internal
         returns (WithdrawalExecutionPolicy)
     {
-        address withdrawalExecutionPolicyImpl = address(new WithdrawalExecutionPolicy(withdrawalExecutionPolicyApplier));
-        return WithdrawalExecutionPolicy(
+        address withdrawalExecutionPolicyImpl =
+            address(new WithdrawalExecutionPolicy(withdrawalExecutionPolicyApplier, 1, 1));
+        WithdrawalExecutionPolicy policy = WithdrawalExecutionPolicy(
             address(
                 new TransparentUpgradeableProxy(
                     withdrawalExecutionPolicyImpl,
@@ -124,6 +125,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 )
             )
         );
+        policy.raiseRedemptionCapacity(type(uint128).max - 1);
+        policy.raiseRedemptionRefillRate(1e30);
+        return policy;
     }
 
     function setUp() public {
@@ -273,11 +277,46 @@ contract EarningChainGatewayTest is TestWithHelpers {
     function test_removeBridgeAdapter_removesBridgeAdapter() public {
         vm.expectEmit(true, true, true, true);
         emit IChainGateway.BridgeAdapterRemoved(
+            address(_mockUsdt), ACCOUNTING_CHAIN_ID, address(_mockBridgeAdapterAssets)
+        );
+        vm.prank(admin);
+        _earningChainGateway.removeBridgeAdapter(
+            address(_mockUsdt), ACCOUNTING_CHAIN_ID, address(_mockBridgeAdapterAssets)
+        );
+    }
+
+    function test_removeBridgeAdapter_reverts_ifLastDataOnlyBridgeAdapter() public {
+        vm.expectRevert(IChainGateway.CannotRemoveLastDataOnlyBridgeAdapter.selector);
+        vm.prank(admin);
+        _earningChainGateway.removeBridgeAdapter(
+            Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ACCOUNTING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
+        );
+    }
+
+    function test_removeBridgeAdapter_removesDataOnlyBridgeAdapter_ifAnotherDataOnlyBridgeAdapterExists() public {
+        address bridgeAdapter = makeAddr("bridgeAdapter");
+
+        vm.prank(admin);
+        _earningChainGateway.addBridgeAdapter(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ACCOUNTING_CHAIN_ID, bridgeAdapter);
+
+        vm.expectEmit(true, true, true, true);
+        emit IChainGateway.BridgeAdapterRemoved(
             Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ACCOUNTING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
         );
         vm.prank(admin);
         _earningChainGateway.removeBridgeAdapter(
             Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ACCOUNTING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
+        );
+
+        assertFalse(
+            _earningChainGateway.isBridgeAdapterSupported(
+                Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ACCOUNTING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
+            )
+        );
+        assertTrue(
+            _earningChainGateway.isBridgeAdapterSupported(
+                Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ACCOUNTING_CHAIN_ID, bridgeAdapter
+            )
         );
     }
 
@@ -406,7 +445,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
         uint256 bridgeFeeAmount
     ) public {
         address bridgeFeePayer = tokenOutReceiver;
-        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        // Two exchanges happen below, both consume from the redemption bucket.
+        iouTokenAmountRay = bound(_boundRayAmount(iouTokenAmountRay), 1, (type(uint128).max - 1) / 2);
         bridgeFeeAmount = _boundNativeAmount(bridgeFeeAmount);
         vm.assume(tokenOutReceiver != address(0));
         _assumeNotProxyAdmin(tokenOutReceiver, address(_earningChainGateway));
@@ -550,7 +590,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         address tokenOutReceiver,
         uint256 bridgeFeeAmount
     ) public {
-        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        iouTokenAmountRay = bound(_boundRayAmount(iouTokenAmountRay), 1, type(uint128).max - 1);
         bridgeFeeAmount = _boundNativeAmount(bridgeFeeAmount);
         vm.assume(tokenOutReceiver != address(0));
         _assumeNotProxyAdmin(tokenOutReceiver, address(_earningChainGateway));
@@ -647,7 +687,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     }
 
     function test_exchangeIouTokens_emitsAssetOutflow(uint256 iouTokenAmountRay) public {
-        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        iouTokenAmountRay = bound(_boundRayAmount(iouTokenAmountRay), 1, type(uint128).max - 1);
         address tokenOut = address(_mockUsdt);
         uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(tokenOut);
         vm.assume(amountOut > 0);
@@ -681,7 +721,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         uint256 iouTokenAmountRay,
         uint256 policyReturnedAmountRay
     ) public {
-        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        iouTokenAmountRay = bound(_boundRayAmount(iouTokenAmountRay), 1, type(uint128).max - 1);
         vm.assume(iouTokenAmountRay < type(uint256).max);
         policyReturnedAmountRay = bound(policyReturnedAmountRay, iouTokenAmountRay + 1, type(uint256).max);
 
@@ -711,7 +751,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     /// @dev When the withdrawal-execution policy is unregistered, the gateway skips the policy call and treats the IOU
     /// amount as the post-fee amount, so the user receives the full `iouTokenAmountRay` truncated to asset decimals.
     function test_exchangeIouTokens_withdrawsFullIouAmountIfNoPolicyRegistered(uint256 iouTokenAmountRay) public {
-        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        iouTokenAmountRay = bound(_boundRayAmount(iouTokenAmountRay), 1, type(uint128).max - 1);
         address tokenOut = address(_mockUsdt);
         uint256 expectedAmountOut = iouTokenAmountRay.rayToAssetDecimals(tokenOut);
         vm.assume(expectedAmountOut > 0);
@@ -763,7 +803,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     }
 
     function test_exchangeIouTokens_reverts_ifBurnIouTokenGasLimitBelowMinimum(uint256 iouTokenAmountRay) public {
-        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        iouTokenAmountRay = bound(_boundRayAmount(iouTokenAmountRay), 1, type(uint128).max - 1);
 
         vm.expectRevert(Errors.InvalidGasLimit.selector);
         _earningChainGateway.exchangeIouTokens(
@@ -822,7 +862,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     }
 
     function test_exchangeIouTokens_reverts_ifInsufficientValueForNativeBridgeFee(uint256 iouTokenAmountRay) public {
-        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        iouTokenAmountRay = bound(_boundRayAmount(iouTokenAmountRay), 1, type(uint128).max - 1);
         uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(address(_mockUsdt));
         vm.assume(amountOut > 0);
         // Put funds idle into TH to mimic withdrawal from Allocator
@@ -843,7 +883,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     }
 
     function test_exchangeIouTokens_reverts_ifAssetWithdrawalNotAllowed(uint256 iouTokenAmountRay) public {
-        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        iouTokenAmountRay = bound(_boundRayAmount(iouTokenAmountRay), 1, type(uint128).max - 1);
         uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(address(_mockUnsupportedAsset));
         vm.assume(amountOut > 0);
         // Put funds idle into TH to mimic withdrawal from Allocator
@@ -884,14 +924,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
     }
 
     function test_exchangeIouTokens_reverts_ifNotWhitelistedBridgeAdapter() public {
-        // Unset the bridge adapter for message bridge
-        vm.prank(admin);
-        _earningChainGateway.removeBridgeAdapter(
-            Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ACCOUNTING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
-        );
-
-        uint256 iouTokenAmountRay = 100_000_000_000_000 * 10 ** 27;
+        uint256 iouTokenAmountRay = 100_000 * 10 ** 27;
         uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(address(_mockUsdt));
+        address unsupportedAdapter = makeAddr("unsupportedAdapter");
         // Put funds idle into TH to mimic withdrawal from Allocator
         _mockTransferHelper.mockAsset(address(_mockUsdt), amountOut);
 
@@ -905,7 +940,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockUsdt),
             0,
             tokenOutReceiver,
-            address(_mockBridgeCcipFeeParams),
+            unsupportedAdapter,
             DEFAULT_GAS_LIMIT,
             abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
             ""
@@ -935,7 +970,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         uint256 iouTokenAmountRay,
         uint256 minAmountOut
     ) public {
-        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        iouTokenAmountRay = bound(_boundRayAmount(iouTokenAmountRay), 1, type(uint128).max - 1);
         uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(address(_mockUsdt));
         minAmountOut = bound(minAmountOut, amountOut + 1, type(uint256).max);
         // Put funds idle into TH to mimic withdrawal from Allocator
@@ -1355,7 +1390,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         uint256 iouTokenAmountRay
     ) public {
         feeAmount = _boundNativeAmount(feeAmount);
-        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        iouTokenAmountRay = bound(_boundRayAmount(iouTokenAmountRay), 1, type(uint128).max - 1);
         vm.assume(bridgeFeePayer != address(0));
 
         // Use GHO as the bridge fee token
@@ -1409,7 +1444,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         uint256 iouTokenAmountRay
     ) public {
         bridgeFeeAmount = _boundNativeAmount(bridgeFeeAmount);
-        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        iouTokenAmountRay = bound(_boundRayAmount(iouTokenAmountRay), 1, type(uint128).max - 1);
         vm.assume(bridgeFeePayer != address(0));
         // Under the opaque-bytes shape, native fee is supplied via msg.value to the gateway (not
         // pre-funded into TransferHelper). The adapter forwards it through on the wire.
@@ -1468,11 +1503,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     }
 
     function test_sendBridgeIouTokenMessageWithFeePayer_reverts_ifAdapterNotFound() public {
-        // Remove the bridge adapter for message bridge
-        vm.prank(admin);
-        _earningChainGateway.removeBridgeAdapter(
-            Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ACCOUNTING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
-        );
+        address unsupportedAdapter = makeAddr("unsupportedAdapter");
 
         vm.expectRevert(IChainGateway.AdapterNotFound.selector);
         vm.prank(address(_mockIouTokenManager));
@@ -1480,7 +1511,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             ACCOUNTING_CHAIN_ID,
             makeAddr("iouTokenRecipient"),
             100_000,
-            address(_mockBridgeCcipFeeParams),
+            unsupportedAdapter,
             address(this),
             DEFAULT_GAS_LIMIT,
             abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: address(_mockUsdt), feeRefundThreshold: 0}))
@@ -1505,7 +1536,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         address iouTokenRecipient,
         uint256 iouTokenAmountRay
     ) public {
-        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        iouTokenAmountRay = bound(_boundRayAmount(iouTokenAmountRay), 1, type(uint128).max - 1);
         // Expect call to IouTokenManager to mint tokens
         vm.expectCall(
             address(_mockIouTokenManager),
@@ -1530,7 +1561,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     ) public {
         // Context: this should be the case for any valid message type
 
-        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        iouTokenAmountRay = bound(_boundRayAmount(iouTokenAmountRay), 1, type(uint128).max - 1);
 
         // Add a new whitelisted bridge bridge adapter for message bridge
         address unknownAdapter = makeAddr("unknownAdapter");
@@ -1557,9 +1588,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         vm.prank(address(_mockBridgeAdapterAssets));
         MockNonStandardErc20(address(_mockUsdt)).approve(address(_earningChainGateway), amountUsdt);
 
-        vm.expectCall(
-            address(_mockAllocator), abi.encodeCall(IAllocator.depositAllowIdle, (address(_mockUsdt), amountUsdt))
-        );
+        vm.expectCall(address(_mockAllocator), abi.encodeCall(IAllocator.deposit, (address(_mockUsdt), amountUsdt)));
 
         vm.prank(address(_mockBridgeAdapterAssets));
         _earningChainGateway.receiveMessage(ACCOUNTING_CHAIN_ID, address(_mockUsdt), amountUsdt, "");
@@ -1614,7 +1643,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
     function test_receiveMessage_noops_whenNoFundsAndNoData() public {
         vm.mockCallRevert(
-            address(_mockAllocator), abi.encodeWithSelector(IAllocator.depositAllowIdle.selector), bytes("unexpected")
+            address(_mockAllocator), abi.encodeWithSelector(IAllocator.deposit.selector), bytes("unexpected")
         );
 
         vm.prank(makeAddr("notAdapter"));

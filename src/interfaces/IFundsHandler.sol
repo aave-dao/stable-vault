@@ -47,8 +47,7 @@ interface IFundsHandler {
     /// @notice Forward a deposit to a liquidity source.
     /// @param asset Address of the asset to deposit.
     /// @param amount Amount of the asset to deposit.
-    /// @return netDepositAmount Amount of the asset deposited.
-    function processDeposit(address asset, uint256 amount) external returns (uint256);
+    function processDeposit(address asset, uint256 amount) external;
 
     /// @notice Executes a withdrawal request by pulling funds from the liquidity source and allowing them to be
     /// returned to the recipient with the data passed to the request.

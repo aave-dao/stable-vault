@@ -216,12 +216,45 @@ contract AccountingChainGatewayTest is TestWithHelpers {
 
     function test_removeBridgeAdapter_removesBridgeAdapter() public {
         vm.expectEmit(true, true, true, true);
+        emit IChainGateway.BridgeAdapterRemoved(address(_mockUsdt), EARNING_CHAIN_ID, address(_mockBridgeAdapterAssets));
+        vm.prank(admin);
+        _accountingChainGateway.removeBridgeAdapter(
+            address(_mockUsdt), EARNING_CHAIN_ID, address(_mockBridgeAdapterAssets)
+        );
+    }
+
+    function test_removeBridgeAdapter_reverts_ifLastDataOnlyBridgeAdapter() public {
+        vm.expectRevert(IChainGateway.CannotRemoveLastDataOnlyBridgeAdapter.selector);
+        vm.prank(admin);
+        _accountingChainGateway.removeBridgeAdapter(
+            Constants.ASSET_FOR_DATA_ONLY_BRIDGE, EARNING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
+        );
+    }
+
+    function test_removeBridgeAdapter_removesDataOnlyBridgeAdapter_ifAnotherDataOnlyBridgeAdapterExists() public {
+        address bridgeAdapter = makeAddr("bridgeAdapter");
+
+        vm.prank(admin);
+        _accountingChainGateway.addBridgeAdapter(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, EARNING_CHAIN_ID, bridgeAdapter);
+
+        vm.expectEmit(true, true, true, true);
         emit IChainGateway.BridgeAdapterRemoved(
             Constants.ASSET_FOR_DATA_ONLY_BRIDGE, EARNING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
         );
         vm.prank(admin);
         _accountingChainGateway.removeBridgeAdapter(
             Constants.ASSET_FOR_DATA_ONLY_BRIDGE, EARNING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
+        );
+
+        assertFalse(
+            _accountingChainGateway.isBridgeAdapterSupported(
+                Constants.ASSET_FOR_DATA_ONLY_BRIDGE, EARNING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
+            )
+        );
+        assertTrue(
+            _accountingChainGateway.isBridgeAdapterSupported(
+                Constants.ASSET_FOR_DATA_ONLY_BRIDGE, EARNING_CHAIN_ID, bridgeAdapter
+            )
         );
     }
 
@@ -271,6 +304,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         address bridgeAdapter
     ) public {
         _assumeFreshBridgeAdapterTuple(asset, chainId, bridgeAdapter);
+        vm.assume(asset != Constants.ASSET_FOR_DATA_ONLY_BRIDGE);
 
         vm.prank(everyRoleAccount);
         _accountingChainGateway.addBridgeAdapter(asset, chainId, bridgeAdapter);
@@ -450,11 +484,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
     }
 
     function test_sendBridgeIouTokenMessageWithFeePayer_reverts_ifAdapterNotFound() public {
-        // Remove the bridge adapter for message bridge
-        vm.prank(admin);
-        _accountingChainGateway.removeBridgeAdapter(
-            Constants.ASSET_FOR_DATA_ONLY_BRIDGE, EARNING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
-        );
+        address unsupportedAdapter = makeAddr("unsupportedAdapter");
 
         vm.expectRevert(IChainGateway.AdapterNotFound.selector);
         vm.prank(address(_mockIouTokenManager));
@@ -462,7 +492,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
             EARNING_CHAIN_ID,
             makeAddr("iouTokenRecipient"),
             100_000,
-            address(_mockBridgeCcipFeeParams),
+            unsupportedAdapter,
             address(this),
             DEFAULT_GAS_LIMIT,
             abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: address(_mockUsdt), feeRefundThreshold: 0}))
@@ -933,12 +963,6 @@ contract AccountingChainGatewayTest is TestWithHelpers {
     }
 
     function test_receiveMessage_reverts_ifMessageFromUnsupportedAdapter() public {
-        // Remove the bridge adapter for message bridge
-        vm.prank(admin);
-        _accountingChainGateway.removeBridgeAdapter(
-            Constants.ASSET_FOR_DATA_ONLY_BRIDGE, EARNING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
-        );
-
         // Build a valid burn IOU token message
         bytes memory data = abi.encode(
             IChainGateway.CrossChainMessage({

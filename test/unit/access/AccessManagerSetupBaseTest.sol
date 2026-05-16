@@ -195,19 +195,30 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     }
 
     function test_rebalancerProfile_hasTheExpectedRoles() public view {
-        uint64[] memory expected = new uint64[](7);
+        uint64[] memory expected = new uint64[](5);
         expected[0] = RolesConfig.getRole__rebalance().roleId;
-        expected[1] = RolesConfig.getRole__setDefaultStrategy().roleId;
-        expected[2] = RolesConfig.getRole__disableDepositsToStrategy().roleId;
-        expected[3] = RolesConfig.getRole__pushFundsToChain().roleId;
-        expected[4] = RolesConfig.getRole__pushFundsToAccountingChain().roleId;
-        expected[5] = RolesConfig.getRole__topUp().roleId;
-        expected[6] = RolesConfig.getRole__fundCoverage().roleId;
+        expected[1] = RolesConfig.getRole__disableDepositsToStrategy().roleId;
+        expected[2] = RolesConfig.getRole__pushFundsToChain().roleId;
+        expected[3] = RolesConfig.getRole__pushFundsToAccountingChain().roleId;
+        expected[4] = RolesConfig.getRole__setWithdrawalQueue().roleId;
         _assertProfileHasExactlyTheseRoles(_getProfile__Rebalancer(), expected);
 
         for (uint256 i = 0; i < expected.length; i++) {
             _assertProfileRoleDelay(_getProfile__Rebalancer(), expected[i], RolesConfig.NO_DELAY);
         }
+    }
+
+    function test_funderProfile_hasTheExpectedRoles() public view {
+        uint64[] memory expected = new uint64[](2);
+        expected[0] = RolesConfig.getRole__topUp().roleId;
+        expected[1] = RolesConfig.getRole__fundCoverage().roleId;
+        _assertProfileHasExactlyTheseRoles(_getProfile__Funder(), expected);
+
+        // Capital-provider roles live on their own profile, not on the operational Rebalancer.
+        assertTrue(_getProfile__Funder() != _getProfile__Rebalancer(), "funder == rebalancer");
+
+        _assertProfileRoleDelay(_getProfile__Funder(), expected[0], RolesConfig.NO_DELAY);
+        _assertProfileRoleDelay(_getProfile__Funder(), expected[1], RolesConfig.NO_DELAY);
     }
 
     function test_coverageGuardianProfile_hasTheExpectedRoles() public view {
@@ -228,7 +239,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     }
 
     function test_disablerProfile_hasTheExpectedRoles() public view {
-        uint64[] memory expected = new uint64[](21);
+        uint64[] memory expected = new uint64[](22);
         expected[0] = RolesConfig.getRole__rebalance().roleId;
         expected[1] = RolesConfig.getRole__removeStrategy().roleId;
         expected[2] = RolesConfig.getRole__rescueTokens().roleId;
@@ -240,17 +251,18 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         expected[8] = RolesConfig.getRole__distrustAsset().roleId;
         expected[9] = RolesConfig.getRole__removeBridgeAdapter().roleId;
         expected[10] = RolesConfig.getRole__disableDepositsToStrategy().roleId;
-        expected[11] = RolesConfig.getRole__setDefaultStrategy().roleId;
-        expected[12] = RolesConfig.getRole__distrustStrategy().roleId;
-        expected[13] = RolesConfig.getRole__removeSigner().roleId;
-        expected[14] = RolesConfig.getRole__lowerPullCapPerTx().roleId;
-        expected[15] = RolesConfig.getRole__lowerWindowCap().roleId;
+        expected[11] = RolesConfig.getRole__distrustStrategy().roleId;
+        expected[12] = RolesConfig.getRole__removeSigner().roleId;
+        expected[13] = RolesConfig.getRole__lowerPullCapPerTx().roleId;
+        expected[14] = RolesConfig.getRole__lowerWindowCap().roleId;
         // raiseWindowSeconds is tightening (longer window = slower rate), even though the prefix says raise.
-        expected[16] = RolesConfig.getRole__raiseWindowSeconds().roleId;
-        expected[17] = RolesConfig.getRole__lowerDepositCapacity().roleId;
-        expected[18] = RolesConfig.getRole__lowerDepositRefillRate().roleId;
-        expected[19] = RolesConfig.getRole__lowerBridgingCapacity().roleId;
-        expected[20] = RolesConfig.getRole__lowerBridgingRefillRate().roleId;
+        expected[15] = RolesConfig.getRole__raiseWindowSeconds().roleId;
+        expected[16] = RolesConfig.getRole__lowerDepositCapacity().roleId;
+        expected[17] = RolesConfig.getRole__lowerDepositRefillRate().roleId;
+        expected[18] = RolesConfig.getRole__lowerBridgingCapacity().roleId;
+        expected[19] = RolesConfig.getRole__lowerBridgingRefillRate().roleId;
+        expected[20] = RolesConfig.getRole__lowerRedemptionCapacity().roleId;
+        expected[21] = RolesConfig.getRole__lowerRedemptionRefillRate().roleId;
         _assertProfileHasExactlyTheseRoles(_getProfile__Disabler(), expected);
 
         for (uint256 i = 0; i < expected.length; i++) {
@@ -300,13 +312,14 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     }
 
     function _getAllProfiles() internal view virtual returns (address[] memory) {
-        address[] memory profiles = new address[](6);
+        address[] memory profiles = new address[](7);
         profiles[0] = _getProfile__MainAdmin();
         profiles[1] = _getProfile__SecondaryAdmin();
         profiles[2] = _getProfile__WithdrawalPolicyManager();
         profiles[3] = _getProfile__Rebalancer();
         profiles[4] = _getProfile__Disabler();
         profiles[5] = _getProfile__ATokenVaultRewardClaimer();
+        profiles[6] = _getProfile__Funder();
         return profiles;
     }
 
@@ -432,9 +445,6 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
             RolesConfig.getRole__disableDepositsToStrategy().roleId
         );
         _assertTargetFunctionRole(
-            target, IAllocator.setDefaultStrategy.selector, RolesConfig.getRole__setDefaultStrategy().roleId
-        );
-        _assertTargetFunctionRole(
             target, IAllocator.enableDepositsToStrategy.selector, RolesConfig.getRole__enableDepositsToStrategy().roleId
         );
         _assertTargetFunctionRole(target, IAllocator.topUp.selector, RolesConfig.getRole__topUp().roleId);
@@ -443,6 +453,9 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         );
         _assertTargetFunctionRole(
             target, IAllocator.distrustStrategy.selector, RolesConfig.getRole__distrustStrategy().roleId
+        );
+        _assertTargetFunctionRole(
+            target, IAllocator.setWithdrawalQueue.selector, RolesConfig.getRole__setWithdrawalQueue().roleId
         );
     }
 
@@ -591,10 +604,23 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         address rebalancer = _getProfile__Rebalancer();
 
         _assertCanCall(rebalancer, getAllocatorAddress(_deployer()), IAllocator.rebalance.selector, true, 0);
-        _assertCanCall(rebalancer, getAllocatorAddress(_deployer()), IAllocator.topUp.selector, true, 0);
+        _assertCanCall(rebalancer, getAllocatorAddress(_deployer()), IAllocator.setWithdrawalQueue.selector, true, 0);
         // Unauthorized functions
+        _assertCanCall(rebalancer, getAllocatorAddress(_deployer()), IAllocator.topUp.selector, false, 0);
         _assertCanCall(rebalancer, getAllocatorAddress(_deployer()), IAllocator.removeStrategy.selector, false, 0);
         _assertCanCall(rebalancer, getAllocatorAddress(_deployer()), IAllocator.addStrategy.selector, false, 0);
+    }
+
+    function test_canCall_funder() public view {
+        address funder = _getProfile__Funder();
+
+        _assertCanCall(funder, getAllocatorAddress(_deployer()), IAllocator.topUp.selector, true, 0);
+        _assertCanCall(
+            funder, getSlippageCoverageVaultAddress(_deployer()), ISlippageCoverageVault.fundCoverage.selector, true, 0
+        );
+        // Unauthorized functions
+        _assertCanCall(funder, getAllocatorAddress(_deployer()), IAllocator.rebalance.selector, false, 0);
+        _assertCanCall(funder, getAllocatorAddress(_deployer()), IAllocator.addStrategy.selector, false, 0);
     }
 
     function test_canCall_disabler() public view {
@@ -602,7 +628,6 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
 
         _assertCanCall(disabler, getAllocatorAddress(_deployer()), IAllocator.rebalance.selector, true, 0);
         _assertCanCall(disabler, getAssetRegistryAddress(_deployer()), IAssetRegistry.distrustAsset.selector, true, 0);
-        _assertCanCall(disabler, getAllocatorAddress(_deployer()), IAllocator.setDefaultStrategy.selector, true, 0);
         _assertCanCall(
             disabler, getAllocatorAddress(_deployer()), IAllocator.disableDepositsToStrategy.selector, true, 0
         );
