@@ -8,15 +8,6 @@ pragma solidity ^0.8.22;
 /// @dev Applied only on send-side entry points (e.g. `FundsHandler.pushFundsToChain`,
 /// `EarningChainGateway.pushFundsToAccountingChain`).
 interface IFundsBridgingPolicy {
-    /// @notice Emitted when the bridge-funds policy is applied.
-    event FundsBridgingPolicyApplied(
-        address indexed caller,
-        address bridgeAdapter,
-        uint256 indexed destChainId,
-        address indexed asset,
-        uint256 amount
-    );
-
     /// @notice Parameters for the funds-bearing dispatch path.
     /// @param caller `msg.sender` at the entry point (manager for `pushFundsToChain` /
     /// `pushFundsToAccountingChain`).
@@ -33,6 +24,15 @@ interface IFundsBridgingPolicy {
         uint256 amount;
         bytes policyData;
     }
+
+    /// @notice Emitted when the bridge-funds policy is applied.
+    event FundsBridgingPolicyApplied(
+        address indexed caller,
+        address bridgeAdapter,
+        uint256 indexed destChainId,
+        address indexed asset,
+        uint256 amount
+    );
 
     /// @notice Applies the bridge-funds policy. Reverts if the dispatch does not comply with the policy restrictions.
     /// @param fundsBridging The bridge-funds intent.

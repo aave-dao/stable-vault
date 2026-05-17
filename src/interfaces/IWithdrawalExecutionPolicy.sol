@@ -7,11 +7,6 @@ pragma solidity ^0.8.22;
 /// @notice Interface for the contract enforcing conditions on the IOU-to-asset exchange stage of a withdrawal (i.e.
 /// when a user calls `executeWithdrawal` / `exchangeIouTokens`).
 interface IWithdrawalExecutionPolicy {
-    /// @notice Emitted when the withdrawal-execution policy is applied and a fee is charged.
-    event WithdrawalExecutionPolicyApplied(
-        address indexed user, address assetOut, uint256 iouAmountRay, uint256 amountOutRay
-    );
-
     /// @notice Core parameters for the IOU to asset exchange stage.
     /// @param user Address of the user withdrawing.
     /// @param assetOut Address of the asset to receive.
@@ -23,6 +18,11 @@ interface IWithdrawalExecutionPolicy {
         uint256 iouAmountRay;
         bytes policyData;
     }
+
+    /// @notice Emitted when the withdrawal-execution policy is applied and a fee is charged.
+    event WithdrawalExecutionPolicyApplied(
+        address indexed user, address assetOut, uint256 iouAmountRay, uint256 amountOutRay
+    );
 
     /// @notice Applies the withdrawal-execution policy and returns the final amount the user receives.
     /// @dev May have side effects (e.g., consuming nonces). Reverts if policy is violated.

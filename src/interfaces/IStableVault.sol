@@ -22,6 +22,7 @@ interface IStableVault {
         uint256 newPerSecondRate;
     }
 
+    /// @notice Emitted when a user requests a withdrawal of their position from the vault.
     event WithdrawalRequested(
         address indexed user,
         uint256 subVaultId,
@@ -29,8 +30,10 @@ interface IStableVault {
         uint256 guaranteedWithdrawableAmountRay
     );
 
+    /// @notice Emitted when a user's withdrawal completes and assets are dispatched to them.
     event WithdrawalExecuted(address indexed user, address asset, uint256 amount);
 
+    /// @notice Emitted when a user deposits an asset into the vault.
     event Deposit(address indexed user, address indexed asset, uint256 amount);
 
     /// @notice Emitted on Stable Vault balance transfers (amount is denominated in RAY).
@@ -38,22 +41,31 @@ interface IStableVault {
     /// shares being added/removed from a user's position.
     event Transfer(address indexed from, address indexed to, uint256 amountRay);
 
+    /// @notice Emitted when a user's per-second rate is set or updated.
     event UserRateSet(address indexed user, uint256 indexed subVaultId, uint256 newPerSecondRate);
 
+    /// @notice Emitted when `setUserRate` is a no-op for a user (e.g. the user has no position to migrate).
     event SetUserRateSkipped(address indexed user);
 
+    /// @notice Emitted when the per-second rate of an existing sub-vault is updated.
     event SubVaultRateSet(uint256 indexed subVaultId, uint256 newPerSecondRate);
 
+    /// @notice Emitted when a new sub-vault is created for a given per-second rate.
     event SubVaultCreated(uint256 indexed subVaultId, uint256 perSecondRate);
 
+    /// @notice Emitted when the default sub-vault is set.
     event DefaultSubVaultSet(uint256 indexed subVaultId, uint256 perSecondRate);
 
+    /// @notice Emitted when surplus interest is claimed from the vault to the treasury.
     event SurplusInterestClaimed(address[] assets, uint256[] amounts);
 
+    /// @notice Emitted when the treasury address is set or updated.
     event TreasurySet(address indexed treasury);
 
+    /// @notice Emitted when a sub-vault transitions from empty to active (gains its first user).
     event SubVaultActivated(uint256 indexed subVaultId);
 
+    /// @notice Emitted when a sub-vault transitions from active to inactive (loses its last user).
     event SubVaultDeactivated(uint256 indexed subVaultId);
 
     /// @notice Thrown when the amount requested to withdraw is greater than the amount available.
@@ -125,58 +137,12 @@ interface IStableVault {
     /// @param userRateData Batch of user rates to set.
     function setUserRate(UserRateData[] calldata userRateData) external;
 
-    /// @notice Getter for the default sub-vault.
-    /// @return defaultSubVault Default sub-vault data.
-    function getDefaultSubVault() external view returns (SubVaultData memory defaultSubVault);
-
-    /// @notice Getter for the maximum rate that can be set for a sub-vault.
-    /// @return maxValidPerSecondRate Maximum valid per-second rate that can be set for a sub-vault.
-    function getMaxValidPerSecondRate() external view returns (uint256);
-
-    /// @notice Getter for the treasury address.
-    /// @return treasury The address of the treasury, where claimed surplus interest is sent to.
-    function getTreasury() external view returns (address);
-
-    /// @notice Getter for the rate for a sub-vault.
-    /// @param subVaultId ID of the sub-vault to get the rate for.
-    /// @return rate per-second rate of the sub-vault or 0 if the sub-vault does not exist.
-    function getSubVaultRateById(uint256 subVaultId) external view returns (uint256);
-
-    /// @notice Getter for the ID of a sub-vault for a given rate.
-    /// @dev Only one sub-vault can have a given rate.
-    /// @param perSecondRate Rate of the sub-vault to get the ID for.
-    /// @return subVaultId ID of the sub-vault for the given rate or 0 if no sub-vault exists for the given rate.
-    function getSubVaultIdByRate(uint256 perSecondRate) external view returns (uint256);
-
     /// @notice Deposits assets into the vault.
     /// @param user Address of the user depositing the assets.
     /// @param asset Address of the asset being deposited.
     /// @param amount Amount of assets being deposited.
     /// @param policyData Additional data that the deposit policy might need to operate.
     function deposit(address user, address asset, uint256 amount, bytes calldata policyData) external;
-
-    /// @notice ERC20-style total Stable Vault position supply in RAY.
-    /// @dev Excludes IOU supply; includes only active Stable Vault position obligations.
-    /// @return supplyRay Total Stable Vault position supply in RAY.
-    function totalSupply() external view returns (uint256 supplyRay);
-
-    /// @notice ERC20-style Stable Vault balance in RAY for a given account.
-    /// @param account Address of the account.
-    /// @return balanceRay Account's Stable Vault balance in RAY.
-    function balanceOf(address account) external view returns (uint256 balanceRay);
-
-    /// @notice ERC20-style name of the Stable Vault position token.
-    /// @return name Human-readable name (e.g. "Aave USD Stable Vault").
-    function name() external view returns (string memory);
-
-    /// @notice ERC20-style symbol of the Stable Vault position token.
-    /// @return symbol Short ticker (e.g. "ASV-USD").
-    function symbol() external view returns (string memory);
-
-    /// @notice ERC20-style decimals for the Stable Vault position token.
-    /// @dev Exposing this lets explorers and wallets display balances with correct decimal alignment.
-    /// @return decimals Number of decimals.
-    function decimals() external pure returns (uint8);
 
     /// @notice Transfers Stable Vault balance (denominated in RAY) to another user.
     /// @param to Address of the recipient.
@@ -213,6 +179,47 @@ interface IStableVault {
         uint256 iouAmountRay,
         bytes memory policyData
     ) external;
+
+    /// @notice Getter for the default sub-vault.
+    /// @return defaultSubVault Default sub-vault data.
+    function getDefaultSubVault() external view returns (SubVaultData memory defaultSubVault);
+
+    /// @notice Getter for the maximum rate that can be set for a sub-vault.
+    /// @return maxValidPerSecondRate Maximum valid per-second rate that can be set for a sub-vault.
+    function getMaxValidPerSecondRate() external view returns (uint256);
+
+    /// @notice Getter for the treasury address.
+    /// @return treasury The address of the treasury, where claimed surplus interest is sent to.
+    function getTreasury() external view returns (address);
+
+    /// @notice Getter for the rate for a sub-vault.
+    /// @param subVaultId ID of the sub-vault to get the rate for.
+    /// @return rate per-second rate of the sub-vault or 0 if the sub-vault does not exist.
+    function getSubVaultRateById(uint256 subVaultId) external view returns (uint256);
+
+    /// @notice Getter for the ID of a sub-vault for a given rate.
+    /// @dev Only one sub-vault can have a given rate.
+    /// @param perSecondRate Rate of the sub-vault to get the ID for.
+    /// @return subVaultId ID of the sub-vault for the given rate or 0 if no sub-vault exists for the given rate.
+    function getSubVaultIdByRate(uint256 perSecondRate) external view returns (uint256);
+
+    /// @notice ERC20-style total Stable Vault position supply in RAY.
+    /// @dev Excludes IOU supply; includes only active Stable Vault position obligations.
+    /// @return supplyRay Total Stable Vault position supply in RAY.
+    function totalSupply() external view returns (uint256 supplyRay);
+
+    /// @notice ERC20-style Stable Vault balance in RAY for a given account.
+    /// @param account Address of the account.
+    /// @return balanceRay Account's Stable Vault balance in RAY.
+    function balanceOf(address account) external view returns (uint256 balanceRay);
+
+    /// @notice ERC20-style name of the Stable Vault position token.
+    /// @return name Human-readable name (e.g. "Aave USD Stable Vault").
+    function name() external view returns (string memory);
+
+    /// @notice ERC20-style symbol of the Stable Vault position token.
+    /// @return symbol Short ticker (e.g. "ASV-USD").
+    function symbol() external view returns (string memory);
 
     /// @notice Getter for the aggregated obligations owed to depositors in RAY of the denominating currency.
     /// @dev Includes the total supply of IOU tokens across all chains (circulating + locked for bridging).
@@ -253,4 +260,9 @@ interface IStableVault {
     /// @param subVaultId ID of the sub-vault.
     /// @return conversionRate The conversion rate in RAY, reflecting interest accrued up to now.
     function getSubVaultConversionRate(uint256 subVaultId) external view returns (uint256 conversionRate);
+
+    /// @notice ERC20-style decimals for the Stable Vault position token.
+    /// @dev Exposing this lets explorers and wallets display balances with correct decimal alignment.
+    /// @return decimals Number of decimals.
+    function decimals() external pure returns (uint8);
 }

@@ -8,9 +8,6 @@ import {IAllocator} from "src/interfaces/IAllocator.sol";
 /// @author Aave Labs
 /// @notice Interface for the contract enforcing conditions on `Allocator.rebalance(...)` calls.
 interface IRebalancePolicy {
-    /// @notice Emitted when the rebalance policy is applied.
-    event RebalancePolicyApplied(address indexed caller, uint256 numRebalances);
-
     /// @notice Core parameters for a rebalance.
     /// @param caller `msg.sender` of `Allocator.rebalance`.
     /// @param params The native rebalance parameters (deallocations / swaps / allocations).
@@ -20,6 +17,9 @@ interface IRebalancePolicy {
         IAllocator.RebalanceParams[] params;
         bytes policyData;
     }
+
+    /// @notice Emitted when the rebalance policy is applied.
+    event RebalancePolicyApplied(address indexed caller, uint256 numRebalances);
 
     /// @notice Applies the rebalance policy. Reverts if the rebalance does not comply with the policy restrictions.
     /// @param rebalance The rebalance intent.

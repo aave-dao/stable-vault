@@ -6,61 +6,6 @@ pragma solidity ^0.8.22;
 /// @author Aave Labs
 /// @notice Interface for the Allocator contract.
 interface IAllocator {
-    event AssetAllocated(
-        address indexed asset, address indexed strategy, uint256 amount, uint256 actualDepositedAmount
-    );
-
-    event AssetDeallocated(address indexed asset, address indexed strategy, uint256 amount);
-
-    event AssetLeftIdle(address indexed asset, uint256 amount);
-
-    event AssetsSwapped(address indexed assetIn, address indexed assetOut, uint256 amountIn, uint256 amountOut);
-
-    event AssetToppedUp(address indexed asset, uint256 amount);
-
-    event StrategyDepositsToggled(address indexed strategy, bool depositsEnabled);
-
-    event StrategyWithdrawalFailed(address indexed strategy, address indexed asset, uint256 amount);
-
-    event StrategyAdded(address indexed asset, address indexed strategy);
-
-    event StrategyRemoved(address indexed asset, address indexed strategy);
-
-    event StrategyTrusted(address indexed strategy);
-
-    event StrategyDistrusted(address indexed strategy);
-
-    /// @notice Emitted when the withdrawal queue for an asset is updated.
-    event WithdrawalQueueSet(address indexed asset, address[] queue);
-
-    /// @notice Thrown when funds fail to deposit into a yield strategy.
-    /// @custom:selector 0x3868bf52
-    error DepositIntoStrategyFailed(address strategy);
-
-    /// @notice Thrown when deposits are not allowed to a strategy.
-    /// @custom:selector 0xbd54a981
-    error DepositsToStrategyDisabled(address strategy);
-
-    /// @notice Thrown when a strategy still has assets that belong to the Allocator.
-    /// @custom:selector 0xa01adeda
-    error StrategyStillHasFunds(address strategy);
-
-    /// @notice Thrown when performing an operation on a strategy that is not trusted.
-    /// @custom:selector 0x96547ce2
-    error StrategyNotTrusted(address strategy);
-
-    /// @notice Thrown when the maximum number of strategies per asset is exceeded.
-    /// @custom:selector 0x83864c08
-    error TooManyStrategies(address asset);
-
-    /// @notice Thrown when a strategy has no shares to redeem.
-    /// @custom:selector 0xdf4ff092
-    error ZeroShareBalance(address strategy);
-
-    /// @notice Thrown when the proposed withdrawal queue is not a permutation of the asset's registered strategies.
-    /// @custom:selector 0x237f3e22
-    error InvalidWithdrawalQueue();
-
     /// @notice The representation of an asset balance.
     /// @param asset Address of the asset.
     /// @param amount Amount of the asset.
@@ -132,61 +77,72 @@ interface IAllocator {
         bool isTrusted;
     }
 
-    /// @notice Getter for the balance of a given asset on the Allocator.
-    /// @dev Returns the balance regardless of whether the asset is registered or trusted. For solvency
-    /// calculations use `getTrustedAssetBalance()` which returns 0 for distrusted assets.
-    /// @param asset Address of the asset to get the balance of.
-    /// @return balance Balance of the asset in asset decimals in the Allocator (idle + aggregate balance in
-    /// strategies).
-    function getAssetBalance(address asset) external view returns (uint256);
+    /// @notice Emitted when assets are deposited into a strategy.
+    event AssetAllocated(
+        address indexed asset, address indexed strategy, uint256 amount, uint256 actualDepositedAmount
+    );
 
-    /// @notice Getter for the balance of a given strategy on the Allocator.
-    /// @dev Returns the balance regardless of whether the strategy or asset is registered or trusted.
-    /// Useful for admin/rescue operations.
-    /// @param strategy Address of the strategy to get the balance of.
-    /// @return balance Balance of tokens in the strategy in asset decimals (assumes one asset per strategy).
-    function getAssetBalanceInStrategy(address strategy) external view returns (uint256);
+    /// @notice Emitted when assets are withdrawn from a strategy back to the Allocator.
+    event AssetDeallocated(address indexed asset, address indexed strategy, uint256 amount);
 
-    /// @notice Getter for the balances on the Allocator.
-    /// @return balances Array of balances where each amount is denominated in the corresponding asset's decimals.
-    function getTrustedAssetBalances() external view returns (AllocatorBalance[] memory balances);
+    /// @notice Emitted when an allocation leaves a portion of `asset` idle on the Allocator instead of fully depositing
+    /// it into a strategy.
+    event AssetLeftIdle(address indexed asset, uint256 amount);
 
-    /// @notice Getter for the balance of a given asset on the Allocator.
-    /// @dev Total balance is grossly understated as zero if the asset is not trusted.
-    /// @dev Each strategy's balance is only counted if the strategy is trusted.
-    /// @param asset Address of the asset to get the balance of.
-    /// @return balance Balance of the asset in asset decimals in the Allocator (idle + aggregate balance in
-    /// strategies).
-    function getTrustedAssetBalance(address asset) external view returns (uint256);
+    /// @notice Emitted when one asset is swapped for another via a Swapper during a rebalance.
+    event AssetsSwapped(address indexed assetIn, address indexed assetOut, uint256 amountIn, uint256 amountOut);
 
-    /// @notice Getter for the list of strategies registered for a given asset.
-    /// @param asset Address of the asset to get strategies for.
-    /// @return strategies Addresses of the registered strategies for the asset.
-    function getStrategiesForAsset(address asset) external view returns (address[] memory strategies);
+    /// @notice Emitted when an external funder tops up the Allocator's idle balance for an asset.
+    event AssetToppedUp(address indexed asset, uint256 amount);
 
-    /// @notice Getter for the ordered withdrawal queue for a given asset.
-    /// @dev The queue contains the same strategies as `getStrategiesForAsset` but in the order they will be drained
-    /// when fulfilling withdrawals. New strategies are appended to the queue on registration; the order is otherwise
-    /// preserved across removals and can be customized via `setWithdrawalQueue`.
-    /// @param asset Address of the asset to get the withdrawal queue for.
-    /// @return queue Strategies in the order they will be visited during withdrawal.
-    function getWithdrawalQueue(address asset) external view returns (address[] memory queue);
+    /// @notice Emitted when deposits to a strategy are toggled enabled or disabled.
+    event StrategyDepositsToggled(address indexed strategy, bool depositsEnabled);
 
-    /// @notice Getter for the configuration of a given strategy.
-    /// @param strategy Address of the strategy to get the configuration for.
-    /// @return config Configuration of the strategy.
-    function getStrategyConfig(address strategy) external view returns (StrategyConfig memory);
+    /// @notice Emitted when a withdrawal attempt against a strategy fails (caught for the retry/iteration pattern).
+    event StrategyWithdrawalFailed(address indexed strategy, address indexed asset, uint256 amount);
 
-    /// @notice Getter for whether a strategy is supported for a given asset.
-    /// @param asset Address of the asset to check if the strategy is supported for.
-    /// @param strategy Address of the strategy to check if it is supported for the asset.
-    /// @return isSupported Whether the strategy is supported for the asset.
-    function isStrategySupportedForAsset(address asset, address strategy) external view returns (bool);
+    /// @notice Emitted when a strategy is added for an asset.
+    event StrategyAdded(address indexed asset, address indexed strategy);
 
-    /// @notice Getter for whether a strategy is supported for allocating or deallocating, regardless of the asset.
-    /// @param strategy Address of the strategy to check if it is supported for allocating or deallocating.
-    /// @return isSupported Whether the strategy is supported for allocating or deallocating.
-    function isStrategySupported(address strategy) external view returns (bool);
+    /// @notice Emitted when a strategy is removed for an asset.
+    event StrategyRemoved(address indexed asset, address indexed strategy);
+
+    /// @notice Emitted when a strategy is marked trusted (its balance contributes to system TVL).
+    event StrategyTrusted(address indexed strategy);
+
+    /// @notice Emitted when a strategy is marked distrusted (its balance no longer contributes to system TVL).
+    event StrategyDistrusted(address indexed strategy);
+
+    /// @notice Emitted when the withdrawal queue for an asset is updated.
+    event WithdrawalQueueSet(address indexed asset, address[] queue);
+
+    /// @notice Thrown when funds fail to deposit into a yield strategy.
+    /// @custom:selector 0x3868bf52
+    error DepositIntoStrategyFailed(address strategy);
+
+    /// @notice Thrown when deposits are not allowed to a strategy.
+    /// @custom:selector 0xbd54a981
+    error DepositsToStrategyDisabled(address strategy);
+
+    /// @notice Thrown when the proposed withdrawal queue is not a permutation of the asset's registered strategies.
+    /// @custom:selector 0x237f3e22
+    error InvalidWithdrawalQueue();
+
+    /// @notice Thrown when performing an operation on a strategy that is not trusted.
+    /// @custom:selector 0x96547ce2
+    error StrategyNotTrusted(address strategy);
+
+    /// @notice Thrown when a strategy still has assets that belong to the Allocator.
+    /// @custom:selector 0xa01adeda
+    error StrategyStillHasFunds(address strategy);
+
+    /// @notice Thrown when the maximum number of strategies per asset is exceeded.
+    /// @custom:selector 0x83864c08
+    error TooManyStrategies(address asset);
+
+    /// @notice Thrown when a strategy has no shares to redeem.
+    /// @custom:selector 0xdf4ff092
+    error ZeroShareBalance(address strategy);
 
     /// @notice Deposits assets into the Allocator.
     /// @param asset Address of the asset to deposit.
@@ -250,6 +206,62 @@ interface IAllocator {
     /// `requestWithdrawal` to revert with `InsufficientAssets`.
     /// @param strategy Address of the strategy to distrust.
     function distrustStrategy(address strategy) external;
+
+    /// @notice Getter for the balance of a given asset on the Allocator.
+    /// @dev Returns the balance regardless of whether the asset is registered or trusted. For solvency
+    /// calculations use `getTrustedAssetBalance()` which returns 0 for distrusted assets.
+    /// @param asset Address of the asset to get the balance of.
+    /// @return balance Balance of the asset in asset decimals in the Allocator (idle + aggregate balance in
+    /// strategies).
+    function getAssetBalance(address asset) external view returns (uint256);
+
+    /// @notice Getter for the balance of a given strategy on the Allocator.
+    /// @dev Returns the balance regardless of whether the strategy or asset is registered or trusted.
+    /// Useful for admin/rescue operations.
+    /// @param strategy Address of the strategy to get the balance of.
+    /// @return balance Balance of tokens in the strategy in asset decimals (assumes one asset per strategy).
+    function getAssetBalanceInStrategy(address strategy) external view returns (uint256);
+
+    /// @notice Getter for the balances on the Allocator.
+    /// @return balances Array of balances where each amount is denominated in the corresponding asset's decimals.
+    function getTrustedAssetBalances() external view returns (AllocatorBalance[] memory balances);
+
+    /// @notice Getter for the balance of a given asset on the Allocator.
+    /// @dev Total balance is grossly understated as zero if the asset is not trusted.
+    /// @dev Each strategy's balance is only counted if the strategy is trusted.
+    /// @param asset Address of the asset to get the balance of.
+    /// @return balance Balance of the asset in asset decimals in the Allocator (idle + aggregate balance in
+    /// strategies).
+    function getTrustedAssetBalance(address asset) external view returns (uint256);
+
+    /// @notice Getter for the list of strategies registered for a given asset.
+    /// @param asset Address of the asset to get strategies for.
+    /// @return strategies Addresses of the registered strategies for the asset.
+    function getStrategiesForAsset(address asset) external view returns (address[] memory strategies);
+
+    /// @notice Getter for the ordered withdrawal queue for a given asset.
+    /// @dev The queue contains the same strategies as `getStrategiesForAsset` but in the order they will be drained
+    /// when fulfilling withdrawals. New strategies are appended to the queue on registration; the order is otherwise
+    /// preserved across removals and can be customized via `setWithdrawalQueue`.
+    /// @param asset Address of the asset to get the withdrawal queue for.
+    /// @return queue Strategies in the order they will be visited during withdrawal.
+    function getWithdrawalQueue(address asset) external view returns (address[] memory queue);
+
+    /// @notice Getter for the configuration of a given strategy.
+    /// @param strategy Address of the strategy to get the configuration for.
+    /// @return config Configuration of the strategy.
+    function getStrategyConfig(address strategy) external view returns (StrategyConfig memory);
+
+    /// @notice Getter for whether a strategy is supported for a given asset.
+    /// @param asset Address of the asset to check if the strategy is supported for.
+    /// @param strategy Address of the strategy to check if it is supported for the asset.
+    /// @return isSupported Whether the strategy is supported for the asset.
+    function isStrategySupportedForAsset(address asset, address strategy) external view returns (bool);
+
+    /// @notice Getter for whether a strategy is supported for allocating or deallocating, regardless of the asset.
+    /// @param strategy Address of the strategy to check if it is supported for allocating or deallocating.
+    /// @return isSupported Whether the strategy is supported for allocating or deallocating.
+    function isStrategySupported(address strategy) external view returns (bool);
 
     /// @notice Getter for whether a strategy is trusted.
     /// @param strategy Address of the strategy to check.

@@ -23,15 +23,26 @@ interface ICcipBridgeAdapter is IBridgeAdapter {
     /// @notice Emitted when excess bridge fees are refunded to the fee payer.
     event FeeRefunded(address indexed feePayer, address indexed feeToken, uint256 amount);
 
-    /// @notice Encoded data length does not match the expected value.
-    /// @custom:selector 0x9546c78e
-    error UnexpectedDataLength();
-
     /// @notice Thrown when the CCIP router did not fully consume the allowance granted for a token used in
     /// `ccipSend` (bridged asset or ERC-20 fee token). Indicates the router pulled less than approved, leaving
     /// residual approval that this adapter does not expect.
     /// @custom:selector 0x8d63b92b
     error UnexpectedCcipRouterAllowance(address token, uint256 remainingAllowance);
+
+    /// @notice Encoded data length does not match the expected value.
+    /// @custom:selector 0x9546c78e
+    error UnexpectedDataLength();
+
+    /// @notice Sets the Chainlink CCIP chain selector for a given chain id.
+    /// @param chainId Chain id of the chain to set the Chainlink CCIP chain selector for.
+    /// @param ccipChainSelector Chainlink CCIP chain selector to set for the chain id.
+    function setChainSelector(uint256 chainId, uint64 ccipChainSelector) external;
+
+    /// @notice Triggers the receiving process for a given asset, allowing funds that got stuck
+    /// in the adapter to be re-injected into the system.
+    /// @param asset Asset to trigger the receiving process for.
+    /// @param amount Amount of the asset to process and receive.
+    function replayFundsReceiving(address asset, uint256 amount) external;
 
     /// @notice Getter for the address of the Chainlink CCIP router.
     /// @return router Address of the Chainlink CCIP router.
@@ -46,15 +57,4 @@ interface ICcipBridgeAdapter is IBridgeAdapter {
     /// @param ccipChainSelector Chainlink CCIP chain selector to get the chain id for.
     /// @return chainId Chain id for the given Chainlink CCIP chain selector.
     function getChainId(uint64 ccipChainSelector) external view returns (uint256);
-
-    /// @notice Sets the Chainlink CCIP chain selector for a given chain id.
-    /// @param chainId Chain id of the chain to set the Chainlink CCIP chain selector for.
-    /// @param ccipChainSelector Chainlink CCIP chain selector to set for the chain id.
-    function setChainSelector(uint256 chainId, uint64 ccipChainSelector) external;
-
-    /// @notice Triggers the receiving process for a given asset, allowing funds that got stuck
-    /// in the adapter to be re-injected into the system.
-    /// @param asset Asset to trigger the receiving process for.
-    /// @param amount Amount of the asset to process and receive.
-    function replayFundsReceiving(address asset, uint256 amount) external;
 }

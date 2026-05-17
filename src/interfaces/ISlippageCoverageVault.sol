@@ -60,13 +60,13 @@ interface ISlippageCoverageVault {
     /// @notice Emitted when the window length (in seconds) for an asset is raised.
     event WindowSecondsRaised(address indexed asset, uint64 oldWindowSeconds, uint64 newWindowSeconds);
 
-    /// @notice Thrown when an `enableOverrideMode` call is made while override mode is already enabled.
-    /// @custom:selector 0xf2a5f75a
-    error AlreadyEnabled();
-
     /// @notice Thrown when a `disableOverrideMode` call is made while override mode is already disabled.
     /// @custom:selector 0x005ecddb
     error AlreadyDisabled();
+
+    /// @notice Thrown when an `enableOverrideMode` call is made while override mode is already enabled.
+    /// @custom:selector 0xf2a5f75a
+    error AlreadyEnabled();
 
     /// @notice Thrown when a single pull would exceed the per-tx cap for the asset.
     /// @custom:selector 0x49aeece1

@@ -6,14 +6,19 @@ pragma solidity ^0.8.22;
 /// @author Aave Labs
 /// @notice Interface for the IOU token manager.
 interface IIouTokenManager {
+    /// @notice Emitted when IOU tokens are bridged to another chain.
     event TokensBridged(
         uint256 indexed destinationChainId, address indexed iouTokenRecipient, uint256 iouTokenAmountRay
     );
 
+    /// @notice Emitted when previously locked IOU tokens are released back to a recipient (e.g. when a withdrawal
+    /// request is cancelled).
     event LockedTokensReleased(address indexed to, uint256 amountRay);
 
+    /// @notice Emitted when locked IOU tokens are burned (e.g. when a withdrawal request is finalised).
     event LockedTokensBurned(address indexed from, uint256 amountRay);
 
+    /// @notice Emitted when IOU tokens are locked (e.g. when a user requests a withdrawal).
     event TokensLocked(address indexed from, uint256 amountRay);
 
     /// @notice Thrown when the amount of locked tokens is insufficient to burn or release.
@@ -24,18 +29,6 @@ interface IIouTokenManager {
     /// chain.
     /// @custom:selector 0x4f0475a7
     error OnlyAccountingChain();
-
-    /// @notice Getter for the address of the IOU token.
-    /// @return asset Address of the IOU token.
-    function getAsset() external view returns (address);
-
-    /// @notice Getter for the locked balance of the IOU token which has been bridged to Earning Chain(s).
-    /// @dev Locked IOU tokens sit in the contract until they are burned due to an asset exchange on an Earning Chain or
-    /// bridged back to the Accounting Chain.
-    /// @dev This function should return 0 on Earning Chains as IOU tokens are not
-    /// locked on Earning Chains.
-    /// @return lockedBalance Locked balance of the IOU token.
-    function getLockedBalance() external view returns (uint256);
 
     /// @notice Bridges the caller's IOU tokens to a destination chain. `msg.sender` is locked/burned and pays the
     /// bridge fee.
@@ -77,4 +70,16 @@ interface IIouTokenManager {
     /// @param to Address to send the unlocked IOU tokens to.
     /// @param amount Amount of IOU tokens to release.
     function releaseTokens(address to, uint256 amount) external;
+
+    /// @notice Getter for the address of the IOU token.
+    /// @return asset Address of the IOU token.
+    function getAsset() external view returns (address);
+
+    /// @notice Getter for the locked balance of the IOU token which has been bridged to Earning Chain(s).
+    /// @dev Locked IOU tokens sit in the contract until they are burned due to an asset exchange on an Earning Chain or
+    /// bridged back to the Accounting Chain.
+    /// @dev This function should return 0 on Earning Chains as IOU tokens are not
+    /// locked on Earning Chains.
+    /// @return lockedBalance Locked balance of the IOU token.
+    function getLockedBalance() external view returns (uint256);
 }

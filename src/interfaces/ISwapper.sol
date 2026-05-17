@@ -30,9 +30,6 @@ interface ISwapper {
     /// @custom:selector 0x232b3058
     error SlippageToleranceTooHigh();
 
-    /// @notice Returns the slippage coverage vault bound to this swapper, if any.
-    function getSlippageVault() external view returns (address);
-
     /// @notice Executes a swap. Encoding of `data` and any slippage / coverage policy is implementation-defined.
     /// @dev The caller must transfer `amountIn` of `assetIn` to the swapper before invocation.
     /// @dev The swapper must approve `amountOut` of `assetOut` to the caller before returning.
@@ -45,4 +42,7 @@ interface ISwapper {
     function executeSwap(address assetIn, address assetOut, uint256 amountIn, address msgSender, bytes memory data)
         external
         returns (uint256 amountOut);
+
+    /// @notice Returns the slippage coverage vault bound to this swapper, if any.
+    function getSlippageVault() external view returns (address);
 }

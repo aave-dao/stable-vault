@@ -28,22 +28,13 @@ interface IBridgeAdapter {
     /// @custom:selector 0xe778681d
     error InvalidTokenCount();
 
-    /// @notice Address checked is not the destination chain adapter.
-    /// @custom:selector 0x75503511
-    error OnlyDestinationChainAdapter();
-
     /// @notice Address checked is not the bridge router.
     /// @custom:selector 0x60055a30
     error OnlyBridgeRouter();
 
-    /// @notice Getter for the address of the Gateway contract.
-    /// @return gateway Address of the Gateway contract.
-    function getGateway() external view returns (address);
-
-    /// @notice Getter for the additional gas overhead needed on destination receiver to ingest data-only messages.
-    /// @return dataOnlyReceiveGasOverhead Gas overhead added by the adapter when converting a payload execution gas
-    /// limit to a full destination receiver execution gas limit.
-    function getDataOnlyReceiveGasOverhead() external view returns (uint256 dataOnlyReceiveGasOverhead);
+    /// @notice Address checked is not the destination chain adapter.
+    /// @custom:selector 0x75503511
+    error OnlyDestinationChainAdapter();
 
     /// @notice Sets the destination chain adapter for a given chain id.
     /// @dev The adapter on the destination chain must support receiving of messages from the bridge which this adapter
@@ -94,4 +85,13 @@ interface IBridgeAdapter {
         uint256 receiverExecutionGasLimit,
         bytes memory bridgeAdapterData
     ) external payable;
+
+    /// @notice Getter for the address of the Gateway contract.
+    /// @return gateway Address of the Gateway contract.
+    function getGateway() external view returns (address);
+
+    /// @notice Getter for the additional gas overhead needed on destination receiver to ingest data-only messages.
+    /// @return dataOnlyReceiveGasOverhead Gas overhead added by the adapter when converting a payload execution gas
+    /// limit to a full destination receiver execution gas limit.
+    function getDataOnlyReceiveGasOverhead() external view returns (uint256 dataOnlyReceiveGasOverhead);
 }
