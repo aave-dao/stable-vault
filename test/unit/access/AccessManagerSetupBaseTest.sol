@@ -914,7 +914,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         vm.prank(admin);
         accessManager.cancel(admin, getAllocatorAddress(_deployer()), callData);
 
-        assertEq(accessManager.getSchedule(operationId), 0, "Operation should be cancelled");
+        assertEq(accessManager.getSchedule(operationId), 0, "Operation should be canceled");
     }
 
     ////// SecondaryAdmin cannot cancel admin-tier operations //////

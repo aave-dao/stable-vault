@@ -494,7 +494,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 );
             }
 
-            // Check the bridge bridge adapter is called with expected parameters
+            // Check the bridge adapter is called with expected parameters
             _mockGho.mint(bridgeFeePayer, bridgeFeeAmount);
             vm.prank(bridgeFeePayer);
             MockNonStandardErc20(bridgeFeeToken).approve(address(_mockBridgeCcipFeeParams), bridgeFeeAmount);
@@ -1566,7 +1566,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         iouTokenAmountRay = bound(_boundRayAmount(iouTokenAmountRay), 1, type(uint128).max - 1);
 
-        // Add a new whitelisted bridge bridge adapter for message bridge
+        // Add a new whitelisted bridge adapter for message bridge
         address unknownAdapter = makeAddr("unknownAdapter");
         vm.prank(admin);
         _earningChainGateway.addBridgeAdapter(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ACCOUNTING_CHAIN_ID, unknownAdapter);
@@ -1768,7 +1768,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
         MockReentrantErc20 reentrantAsset = new MockReentrantErc20("Reentrant Token", "REENT", 18);
 
-        // Add bridge bridge adapter for the reentrant asset
+        // Add bridge adapter for the reentrant asset
         MockBridgeAdapter reentrantBridgeAdapter = new MockBridgeAdapter(address(_mockTransferHelper));
         vm.prank(admin);
         _earningChainGateway.addBridgeAdapter(

@@ -200,7 +200,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         // Check that supply on Earning Chain went up
         assertEq(iouToken_earningChain.totalSupply(), iouAmountRequestedRay, "Supply on Earning Chain should go up");
 
-        // Check that requesting another withdrawal fails because the user was alredy given IOUs.
+        // Check that requesting another withdrawal fails because the user was already given IOUs.
         vm.expectRevert(abi.encodeWithSelector(Errors.InvalidAmount.selector));
         vm.prank(user1);
         vault.requestWithdrawal(user1, iouAmountRequestedRay, "");

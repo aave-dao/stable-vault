@@ -541,7 +541,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
     }
 
     function test_receiveMessage_receiveFunds_succeedsWhenUnknownAdapter(uint256 amountUsdt) public {
-        // Context: non whitelisted bridge adapter can trigger receival of funds
+        // Context: non whitelisted bridge adapter can trigger receipt of funds
         amountUsdt = _boundAssetAmount(address(_mockUsdt), amountUsdt);
 
         // Create an unwhitelisted bridge adapter
@@ -583,7 +583,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
             address(_mockIouTokenManager),
             abi.encodeCall(IIouTokenManager.releaseTokens, (iouTokenRecipient, iouTokenAmountRay))
         );
-        // Call must come from whitelisted data bridge bridge adapter
+        // Call must come from whitelisted data bridge adapter
         vm.prank(address(_mockBridgeCcipFeeParams));
         _accountingChainGateway.receiveMessage(
             EARNING_CHAIN_ID,
@@ -635,7 +635,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         vm.expectCall(
             address(_mockIouTokenManager), abi.encodeCall(IIouTokenManager.burnLockedTokens, (iouTokenAmountBurnedRay))
         );
-        // Call must come from whitelisted data bridge bridge adapter
+        // Call must come from whitelisted data bridge adapter
         vm.prank(address(_mockBridgeCcipFeeParams));
         _accountingChainGateway.receiveMessage(
             EARNING_CHAIN_ID,
@@ -861,7 +861,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
             false
         );
 
-        // Add a new whitelisted bridge bridge adapter for message bridge
+        // Add a new whitelisted bridge adapter for message bridge
         address unknownAdapter = makeAddr("unknownAdapter");
         vm.prank(admin);
         _accountingChainGateway.addBridgeAdapter(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, EARNING_CHAIN_ID, unknownAdapter);
@@ -929,7 +929,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
 
     function test_receiveMessage_reverts_ifInvalidMessageType() public {
         vm.expectRevert(IChainGateway.InvalidDataOnlyMessage.selector);
-        // Call must come from whitelisted data bridge bridge adapter
+        // Call must come from whitelisted data bridge adapter
         vm.prank(address(_mockBridgeCcipFeeParams));
         _accountingChainGateway.receiveMessage(
             EARNING_CHAIN_ID,
@@ -939,7 +939,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         );
 
         vm.expectRevert(IChainGateway.InvalidDataOnlyMessage.selector);
-        // Call must come from whitelisted data bridge bridge adapter
+        // Call must come from whitelisted data bridge adapter
         vm.prank(address(_mockBridgeCcipFeeParams));
         _accountingChainGateway.receiveMessage(
             EARNING_CHAIN_ID,

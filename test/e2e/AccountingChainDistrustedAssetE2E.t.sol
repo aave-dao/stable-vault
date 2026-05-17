@@ -107,7 +107,7 @@ contract AccountingChainDistrustedAssetE2ETest is BaseTest {
 
         uint256 userBalanceAfterYear = vault.getUserBalance(user1);
 
-        // Epect revert because system balance is zero
+        // Expect revert because system balance is zero
         vm.expectRevert(
             abi.encodeWithSelector(
                 IStableVault.InsufficientAssets.selector,
