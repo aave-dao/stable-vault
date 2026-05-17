@@ -60,9 +60,11 @@ contract ATokenVaultDeployment is Script {
             (
                 owner,
                 0,
-                // TODO: Consider another name for prod deployment
+                // TODO(naming): finalize the aToken-vault name for prod; current value is a dev placeholder derived
+                // from the underlying.
                 string(abi.encodePacked("StableVault's ", IERC20Metadata(underlying).name())),
-                // TODO: Consider another symbol for prod deployment
+                // TODO(naming): finalize the aToken-vault symbol for prod; current value is a dev placeholder derived
+                // from the underlying.
                 string(abi.encodePacked("StableVault/", IERC20Metadata(underlying).symbol())),
                 initialLockDeposit
             )

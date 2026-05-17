@@ -5,7 +5,8 @@ pragma solidity ^0.8.22;
 /// @title ISlippageCoverageVault
 /// @author Aave Labs
 /// @notice Interface for the SlippageCoverageVault contract.
-// TODO: Remove non-essential declarations, avoid coupling the interface to the canonical implementation of it
+// TODO(design): narrow this interface to the caller-facing surface; current declarations leak impl-specific types
+// (`Window`, internal rate-limit shapes) from the canonical implementation.
 /// @dev Push-based outflows to the immutable `SLIPPAGE_BENEFICIARY`; the vault never grants ERC-20 allowances. The
 /// vault can be deployed in override mode (constructor flag) so the bound Swapper can pull coverage on day one
 /// without per-tx or window caps configured; operator flips override off and configures caps once risk-team has
