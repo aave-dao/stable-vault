@@ -292,8 +292,6 @@ contract Allocator is
     /// @inheritdoc IAllocator
     function setWithdrawalQueue(address asset, address[] calldata newWithdrawalQueue) external override restricted {
         require(IAssetRegistry(ASSET_REGISTRY).isAssetRegistered(asset), Errors.InvalidAsset(asset));
-        // Snapshot registered strategies into memory: the permutation check below indexes them n times and
-        // EnumerableSet.at performs an SLOAD per call.
         address[] memory registeredStrategies = $storage().assetStrategies[asset].values();
         uint256 strategiesCount = registeredStrategies.length;
         require(newWithdrawalQueue.length == strategiesCount, InvalidWithdrawalQueue());
@@ -622,8 +620,7 @@ contract Allocator is
     }
 
     /// @dev Removes `strategy` from the asset's withdrawal queue, shifting subsequent entries down by one so the
-    /// relative order of the remaining strategies is preserved. Reverts if the strategy is not in the queue, which
-    /// would signal a desync between `withdrawalQueues` and `assetStrategies` and should never happen.
+    /// relative order of the remaining strategies is preserved.
     function _removeFromWithdrawalQueue(address asset, address strategy) internal {
         address[] storage withdrawalQueue = $storage().withdrawalQueues[asset];
         uint256 strategiesCount = withdrawalQueue.length;
@@ -639,6 +636,8 @@ contract Allocator is
                 return;
             }
         }
+        // Revert as assertion, signaling a desynchronization between `withdrawalQueues` and `assetStrategies`.
+        // It should never happen as the strategy is guaranteed to be in the queue.
         revert InvalidWithdrawalQueue();
     }
 
