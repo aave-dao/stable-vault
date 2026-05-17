@@ -66,6 +66,16 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
         super._setup_Targets(deployer);
     }
 
+    function _isAdiAdapterDeployed()
+        internal
+        view
+        virtual
+        override(AccessManagerBaseSetup, AccountingChainDeployment)
+        returns (bool)
+    {
+        return AccountingChainDeployment._isAdiAdapterDeployed();
+    }
+
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // ACCOUNTING-CHAIN-SPECIFIC HELPERS
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -13,6 +13,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {IRouterClient} from "@chainlink-ccip/contracts/interfaces/IRouterClient.sol";
 
+import {AdiAdapter} from "src/bridging/adi/AdiAdapter.sol";
 import {CcipAdapter} from "src/bridging/ccip/CcipAdapter.sol";
 import {Allocator} from "src/core/Allocator.sol";
 import {AccountingChainGateway} from "src/core/accounting/AccountingChainGateway.sol";
@@ -21,8 +22,10 @@ import {StableVault} from "src/core/accounting/StableVault.sol";
 import {IouToken} from "src/core/ious/IouToken.sol";
 import {IouTokenManager} from "src/core/ious/IouTokenManager.sol";
 import {IAccountingChainGateway} from "src/interfaces/IAccountingChainGateway.sol";
+import {IAdiBridgeAdapter} from "src/interfaces/IAdiBridgeAdapter.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
+import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IEarningChainStateProvider} from "src/interfaces/IEarningChainStateProvider.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
@@ -181,6 +184,7 @@ abstract contract AccountingChainDeployment is
         _deploySlippageCoverageVault();
         _deploySwapper();
         _deployCcipAdapter();
+        _deployAdiAdapter();
         _deployDepositPolicy();
         _deployFundsBridgingPolicy();
     }
@@ -251,6 +255,16 @@ abstract contract AccountingChainDeployment is
 
         ICcipBridgeAdapter(localCcipAdapter).setChainSelector(earningChainId, earningChainCcipSelector);
         ICcipBridgeAdapter(localCcipAdapter).setDestinationChainAdapter(earningChainId, earningChainCcipAdapter);
+
+        // a.DI adapter is registered on the gateway and configured for the earning chain only when the per-chain flag
+        // is set. This lets us deploy the adapter without yet routing messages through it.
+        if (_isAdiAdapterDeployed() && _configBool(".accountingChain.adi.registerOnGateway")) {
+            address localAdiAdapter = getAdiAdapterAddress(_deployer());
+            // NOTE: This assumes the a.DI adapter has the same address on the earning chain (CREATE3 + same deployer).
+            address earningChainAdiAdapter = localAdiAdapter;
+            gateway.addBridgeAdapter(messageOnly, earningChainId, localAdiAdapter);
+            IBridgeAdapter(localAdiAdapter).setDestinationChainAdapter(earningChainId, earningChainAdiAdapter);
+        }
     }
 
     function _setupAllocator() internal {
@@ -583,6 +597,32 @@ abstract contract AccountingChainDeployment is
         require(ccipAdapter == getCcipAdapterAddress(_deployer()), "CcipAdapter does not match expected address");
         _logDeployment("CcipAdapter", CCIP_ADAPTER_SALT_SEED, ccipAdapter);
         return ccipAdapter;
+    }
+
+    function _isAdiAdapterDeployed() internal view virtual override returns (bool) {
+        return _configAddress(".accountingChain.adi.crossChainController") != address(0);
+    }
+
+    function _deployAdiAdapter() internal returns (address) {
+        if (!_isAdiAdapterDeployed()) {
+            return address(0);
+        }
+        address adiAdapter = _deploy_create3({
+            namespacedSaltSeed: ADI_ADAPTER_SALT_SEED,
+            deployer: _deployer(),
+            initCode: abi.encodePacked(
+                type(AdiAdapter).creationCode,
+                abi.encode(
+                    getAccessManagerAddress(_deployer()),
+                    getGatewayAddress(_deployer()),
+                    _configAddress(".accountingChain.adi.crossChainController"),
+                    getTransferHelperAddress(_deployer())
+                )
+            )
+        });
+        require(adiAdapter == getAdiAdapterAddress(_deployer()), "AdiAdapter does not match expected address");
+        _logDeployment("AdiAdapter", ADI_ADAPTER_SALT_SEED, adiAdapter);
+        return adiAdapter;
     }
 
     function _deployPriceOracle() internal returns (address) {

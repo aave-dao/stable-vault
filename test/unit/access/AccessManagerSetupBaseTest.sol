@@ -457,6 +457,9 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         _assertTargetFunctionRole(
             target, IAllocator.setWithdrawalQueue.selector, RolesConfig.getRole__setWithdrawalQueue().roleId
         );
+        _assertTargetFunctionRole(
+            target, IRescuableToken.rescueTokens.selector, RolesConfig.getRole__rescueTokens().roleId
+        );
     }
 
     function test_targetSetup_withdrawalExecutionPolicy() public view {

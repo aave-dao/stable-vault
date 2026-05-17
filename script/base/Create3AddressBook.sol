@@ -18,6 +18,7 @@ contract Create3AddressBook {
     string constant SLIPPAGE_COVERAGE_VAULT_SALT_SEED = "aave.stable-vault.SlippageCoverageVault";
     string constant SWAPPER_SALT_SEED = "aave.stable-vault.Swapper";
     string constant CCIP_ADAPTER_SALT_SEED = "aave.stable-vault.CcipAdapter";
+    string constant ADI_ADAPTER_SALT_SEED = "aave.stable-vault.AdiAdapter";
     string constant PRICE_ORACLE_SALT_SEED = "aave.stable-vault.PriceOracle";
     string constant CHAIN_BALANCE_ORACLE_SALT_SEED = "aave.stable-vault.ChainBalanceOracle";
     string constant EARNING_CHAIN_STATE_PROVIDER_SALT_SEED = "aave.stable-vault.EarningChainStateProvider";
@@ -75,6 +76,10 @@ contract Create3AddressBook {
 
     function getCcipAdapterAddress(address deployer) internal pure virtual returns (address) {
         return Create3AddressLib.computeCreate3Address(CCIP_ADAPTER_SALT_SEED, deployer);
+    }
+
+    function getAdiAdapterAddress(address deployer) internal pure virtual returns (address) {
+        return Create3AddressLib.computeCreate3Address(ADI_ADAPTER_SALT_SEED, deployer);
     }
 
     function getPriceOracleAddress(address deployer) internal pure virtual returns (address) {

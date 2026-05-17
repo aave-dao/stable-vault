@@ -266,7 +266,7 @@ abstract contract RolesConfig is DeploymentConfig {
     }
 
     /// @custom:delay High
-    /// @custom:location CcipAdapter
+    /// @custom:location CcipAdapter, AdiAdapter
     function getRole__setDestinationChainAdapter() internal view returns (Role memory) {
         bytes4 selector = IBridgeAdapter.setDestinationChainAdapter.selector;
         return Role({
@@ -487,7 +487,8 @@ abstract contract RolesConfig is DeploymentConfig {
     }
 
     /// @custom:delay None
-    /// @custom:location FundsHandler, EarningChainGateway, StableVault, AccountingChainGateway
+    /// @custom:location Allocator, FundsHandler, EarningChainGateway, StableVault, AccountingChainGateway, CcipAdapter,
+    /// AdiAdapter
     function getRole__rescueTokens() internal pure returns (Role memory) {
         bytes4 selector = IRescuableToken.rescueTokens.selector;
         return Role({
@@ -500,7 +501,7 @@ abstract contract RolesConfig is DeploymentConfig {
     }
 
     /// @custom:delay None
-    /// @custom:location CcipAdapter, StableVault, AccountingChainGateway, FundsHandler, EarningChainGateway
+    /// @custom:location CcipAdapter, AdiAdapter, StableVault, AccountingChainGateway, FundsHandler, EarningChainGateway
     function getRole__rescueNative() internal pure returns (Role memory) {
         bytes4 selector = IRescuableNative.rescueNative.selector;
         return Role({

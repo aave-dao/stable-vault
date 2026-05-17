@@ -144,6 +144,9 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
 
     function _setup_Targets(address deployer) internal virtual {
         _setupTarget__CcipAdapter(deployer);
+        if (_isAdiAdapterDeployed()) {
+            _setupTarget__AdiAdapter(deployer);
+        }
         _setupTarget__Allocator(deployer);
         _setupTarget__WithdrawalExecutionPolicy(deployer);
         _setupTarget__AssetRegistry(deployer);
@@ -152,6 +155,13 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         _setupTarget__PolicyRegistry(deployer);
         _setupTarget__FundsBridgingPolicy(deployer);
         _setupTarget__ATokenVaults();
+    }
+
+    /// @dev Whether an AdiAdapter is deployed by this setup. Defaults to false so the base contract makes no assumption
+    /// about a per-chain a.DI cross-chain controller. Chain-specific deployment scripts override this when they own a
+    /// JSON key resolving the controller address.
+    function _isAdiAdapterDeployed() internal view virtual returns (bool) {
+        return false;
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -376,10 +386,22 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         _setTargetFunctionRoles(ccipAdapter, roles);
     }
 
+    function _setupTarget__AdiAdapter(address deployer) internal {
+        address adiAdapter = getAdiAdapterAddress(deployer);
+
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](3);
+
+        roles[0] = RolesConfig.getRole__setDestinationChainAdapter();
+        roles[1] = RolesConfig.getRole__rescueNative();
+        roles[2] = RolesConfig.getRole__rescueTokens();
+
+        _setTargetFunctionRoles(adiAdapter, roles);
+    }
+
     function _setupTarget__Allocator(address deployer) internal {
         address allocator = getAllocatorAddress(deployer);
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](9);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](10);
 
         roles[0] = RolesConfig.getRole__rebalance();
         roles[1] = RolesConfig.getRole__addStrategy();
@@ -390,6 +412,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         roles[6] = RolesConfig.getRole__trustStrategy();
         roles[7] = RolesConfig.getRole__distrustStrategy();
         roles[8] = RolesConfig.getRole__setWithdrawalQueue();
+        roles[9] = RolesConfig.getRole__rescueTokens();
 
         _setTargetFunctionRoles(allocator, roles);
     }
