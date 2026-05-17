@@ -30,8 +30,14 @@ interface IAllocator {
 
     event StrategyDistrusted(address indexed strategy);
 
-    /// @notice Emitted when the withdrawal queue for an asset is updated.
+    /// @notice Emitted when the withdrawal queue for an asset is reordered via `setWithdrawalQueue`.
     event WithdrawalQueueSet(address indexed asset, address[] queue);
+
+    /// @notice Emitted when a strategy is appended to the withdrawal queue (paired with `StrategyAdded`).
+    event StrategyAppendedToQueue(address indexed asset, address indexed strategy);
+
+    /// @notice Emitted when a strategy is removed from the withdrawal queue (paired with `StrategyRemoved`).
+    event StrategyRemovedFromQueue(address indexed asset, address indexed strategy);
 
     /// @notice Thrown when funds fail to deposit into a yield strategy.
     /// @custom:selector 0x3868bf52
