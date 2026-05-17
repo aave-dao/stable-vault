@@ -21,8 +21,8 @@ import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
-import {ISlippageCoverageVault} from "src/interfaces/ISlippageCoverageVault.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
+import {SlippageCoverageVault} from "src/periphery/SlippageCoverageVault.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
 import {WithdrawalExecutionPolicy} from "src/policies/WithdrawalExecutionPolicy.sol";
 
@@ -528,44 +528,44 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     function test_targetSetup_slippageCoverageVault() public view {
         address target = getSlippageCoverageVaultAddress(_deployer());
         _assertTargetFunctionRole(
-            target, ISlippageCoverageVault.enableOverrideMode.selector, RolesConfig.getRole__enableOverrideMode().roleId
+            target, SlippageCoverageVault.enableOverrideMode.selector, RolesConfig.getRole__enableOverrideMode().roleId
         );
         _assertTargetFunctionRole(
             target,
-            ISlippageCoverageVault.disableOverrideMode.selector,
+            SlippageCoverageVault.disableOverrideMode.selector,
             RolesConfig.getRole__disableOverrideMode().roleId
         );
         _assertTargetFunctionRole(
-            target, ISlippageCoverageVault.raisePullCapPerTx.selector, RolesConfig.getRole__raisePullCapPerTx().roleId
+            target, SlippageCoverageVault.raisePullCapPerTx.selector, RolesConfig.getRole__raisePullCapPerTx().roleId
         );
         _assertTargetFunctionRole(
-            target, ISlippageCoverageVault.lowerPullCapPerTx.selector, RolesConfig.getRole__lowerPullCapPerTx().roleId
+            target, SlippageCoverageVault.lowerPullCapPerTx.selector, RolesConfig.getRole__lowerPullCapPerTx().roleId
         );
         _assertTargetFunctionRole(
-            target, ISlippageCoverageVault.raiseWindowCap.selector, RolesConfig.getRole__raiseWindowCap().roleId
+            target, SlippageCoverageVault.raiseWindowCap.selector, RolesConfig.getRole__raiseWindowCap().roleId
         );
         _assertTargetFunctionRole(
-            target, ISlippageCoverageVault.lowerWindowCap.selector, RolesConfig.getRole__lowerWindowCap().roleId
+            target, SlippageCoverageVault.lowerWindowCap.selector, RolesConfig.getRole__lowerWindowCap().roleId
         );
         _assertTargetFunctionRole(
-            target, ISlippageCoverageVault.raiseWindowSeconds.selector, RolesConfig.getRole__raiseWindowSeconds().roleId
+            target, SlippageCoverageVault.raiseWindowSeconds.selector, RolesConfig.getRole__raiseWindowSeconds().roleId
         );
         _assertTargetFunctionRole(
-            target, ISlippageCoverageVault.lowerWindowSeconds.selector, RolesConfig.getRole__lowerWindowSeconds().roleId
+            target, SlippageCoverageVault.lowerWindowSeconds.selector, RolesConfig.getRole__lowerWindowSeconds().roleId
         );
         _assertTargetFunctionRole(
-            target, ISlippageCoverageVault.setMaxSlippageBps.selector, RolesConfig.getRole__setMaxSlippageBps().roleId
+            target, SlippageCoverageVault.setMaxSlippageBps.selector, RolesConfig.getRole__setMaxSlippageBps().roleId
         );
         _assertTargetFunctionRole(
             target,
-            ISlippageCoverageVault.setOverrideMaxSlippageBps.selector,
+            SlippageCoverageVault.setOverrideMaxSlippageBps.selector,
             RolesConfig.getRole__setOverrideMaxSlippageBps().roleId
         );
         _assertTargetFunctionRole(
-            target, ISlippageCoverageVault.fundCoverage.selector, RolesConfig.getRole__fundCoverage().roleId
+            target, SlippageCoverageVault.fundCoverage.selector, RolesConfig.getRole__fundCoverage().roleId
         );
         _assertTargetFunctionRole(
-            target, ISlippageCoverageVault.sweep.selector, RolesConfig.getRole__sweepSlippageCoverageVault().roleId
+            target, SlippageCoverageVault.sweep.selector, RolesConfig.getRole__sweepSlippageCoverageVault().roleId
         );
     }
 
@@ -627,7 +627,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
 
         _assertCanCall(funder, getAllocatorAddress(_deployer()), IAllocator.topUp.selector, true, 0);
         _assertCanCall(
-            funder, getSlippageCoverageVaultAddress(_deployer()), ISlippageCoverageVault.fundCoverage.selector, true, 0
+            funder, getSlippageCoverageVaultAddress(_deployer()), SlippageCoverageVault.fundCoverage.selector, true, 0
         );
         // Unauthorized functions
         _assertCanCall(funder, getAllocatorAddress(_deployer()), IAllocator.rebalance.selector, false, 0);

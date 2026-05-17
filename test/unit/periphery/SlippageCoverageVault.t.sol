@@ -180,7 +180,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         assertEq(_usdc.balanceOf(beneficiary), amount);
         assertEq(_usdc.balanceOf(address(_vault)), 50_000e6 - amount);
 
-        ISlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
+        SlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
         assertEq(w.consumed, amount);
         assertEq(w.cap, 50_000e6);
         assertEq(w.windowSeconds, ONE_DAY);
@@ -241,7 +241,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 1_000e6);
 
-        ISlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
+        SlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
         assertEq(w.windowStart, block.timestamp);
         assertEq(w.consumed, 1_000e6);
     }
@@ -266,7 +266,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 50_000e6);
 
-        ISlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
+        SlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
         assertEq(w.windowStart, firstWindowStart + ONE_DAY);
         assertEq(w.consumed, 50_000e6);
     }
@@ -327,7 +327,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 1);
 
-        ISlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
+        SlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
         assertEq(w.consumed, 10_000e6);
     }
 
@@ -391,7 +391,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 10_000e6);
 
-        ISlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
+        SlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
         assertEq(w.consumed, 20_000e6);
     }
 
@@ -402,7 +402,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
         vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 5_000e6);
-        ISlippageCoverageVault.Window memory wBefore = _vault.getWindow(address(_usdc));
+        SlippageCoverageVault.Window memory wBefore = _vault.getWindow(address(_usdc));
         assertEq(wBefore.consumed, 5_000e6);
 
         // Lower window cap to 1k. consumed=5k > new cap=1k.
@@ -444,7 +444,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
         vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 500e6);
-        ISlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
+        SlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
         assertEq(w.consumed, 500e6);
         assertEq(w.windowStart, block.timestamp);
     }
@@ -464,14 +464,14 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
             totalPulled += amount;
         }
 
-        ISlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
+        SlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
         assertEq(w.consumed, totalPulled);
     }
 
     /* ============================ Override mode ============================ */
 
     function test_enableOverrideMode_revertsIfUnauthorized() public {
-        _accessManager.mockRejectCall(attacker, address(_vault), ISlippageCoverageVault.enableOverrideMode.selector);
+        _accessManager.mockRejectCall(attacker, address(_vault), SlippageCoverageVault.enableOverrideMode.selector);
         vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, attacker));
         vm.prank(attacker);
         _vault.enableOverrideMode();
@@ -480,7 +480,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
     function test_disableOverrideMode_revertsIfUnauthorized() public {
         vm.prank(operator);
         _vault.enableOverrideMode();
-        _accessManager.mockRejectCall(attacker, address(_vault), ISlippageCoverageVault.disableOverrideMode.selector);
+        _accessManager.mockRejectCall(attacker, address(_vault), SlippageCoverageVault.disableOverrideMode.selector);
         vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, attacker));
         vm.prank(attacker);
         _vault.disableOverrideMode();
@@ -558,7 +558,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 100_000e6);
 
-        ISlippageCoverageVault.Window memory wDuringOverride = _vault.getWindow(address(_usdc));
+        SlippageCoverageVault.Window memory wDuringOverride = _vault.getWindow(address(_usdc));
         assertEq(wDuringOverride.consumed, 0); // never touched
         assertEq(wDuringOverride.windowStart, 0); // first call was in override → window untouched
 
@@ -569,7 +569,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 5_000e6);
 
-        ISlippageCoverageVault.Window memory wAfter = _vault.getWindow(address(_usdc));
+        SlippageCoverageVault.Window memory wAfter = _vault.getWindow(address(_usdc));
         assertEq(wAfter.consumed, 5_000e6);
     }
 
@@ -616,7 +616,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
     }
 
     function test_raisePullCapPerTx_reverts_ifUnauthorized() public {
-        _accessManager.mockRejectCall(attacker, address(_vault), ISlippageCoverageVault.raisePullCapPerTx.selector);
+        _accessManager.mockRejectCall(attacker, address(_vault), SlippageCoverageVault.raisePullCapPerTx.selector);
         vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, attacker));
         vm.prank(attacker);
         _vault.raisePullCapPerTx(address(_usdc), 1);
@@ -665,7 +665,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         vm.prank(operator);
         _vault.raiseWindowCap(address(_usdc), 50_000e6);
 
-        ISlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
+        SlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
         assertEq(w.cap, 50_000e6);
     }
 
@@ -693,7 +693,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         vm.prank(operator);
         _vault.lowerWindowCap(address(_usdc), 10_000e6);
 
-        ISlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
+        SlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
         assertEq(w.cap, 10_000e6);
     }
 
@@ -714,7 +714,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         vm.prank(operator);
         _vault.raiseWindowSeconds(address(_usdc), uint64(ONE_DAY));
 
-        ISlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
+        SlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
         assertEq(w.windowSeconds, ONE_DAY);
     }
 
@@ -736,7 +736,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         vm.prank(operator);
         _vault.lowerWindowSeconds(address(_usdc), 1 hours);
 
-        ISlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
+        SlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
         assertEq(w.windowSeconds, 1 hours);
     }
 
@@ -856,7 +856,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
     }
 
     function test_fundCoverage_reverts_ifUnauthorized() public {
-        _accessManager.mockRejectCall(attacker, address(_vault), ISlippageCoverageVault.fundCoverage.selector);
+        _accessManager.mockRejectCall(attacker, address(_vault), SlippageCoverageVault.fundCoverage.selector);
         vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, attacker));
         vm.prank(attacker);
         _vault.fundCoverage(address(_usdc), 1);
@@ -937,7 +937,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 5_000e6);
 
-        ISlippageCoverageVault.Window memory wBefore = _vault.getWindow(address(_usdc));
+        SlippageCoverageVault.Window memory wBefore = _vault.getWindow(address(_usdc));
 
         // Return funds; window state must be byte-identical afterwards.
         _usdc.mint(beneficiary, 5_000e6);
@@ -946,7 +946,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         vm.prank(beneficiary);
         _vault.reimburseCoverage(address(_usdc), 5_000e6);
 
-        ISlippageCoverageVault.Window memory wAfter = _vault.getWindow(address(_usdc));
+        SlippageCoverageVault.Window memory wAfter = _vault.getWindow(address(_usdc));
         assertEq(wAfter.windowStart, wBefore.windowStart, "windowStart shifted");
         assertEq(wAfter.windowSeconds, wBefore.windowSeconds, "windowSeconds shifted");
         assertEq(wAfter.consumed, wBefore.consumed, "consumed shifted");
@@ -998,7 +998,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
     }
 
     function test_sweep_reverts_ifUnauthorized() public {
-        _accessManager.mockRejectCall(attacker, address(_vault), ISlippageCoverageVault.sweep.selector);
+        _accessManager.mockRejectCall(attacker, address(_vault), SlippageCoverageVault.sweep.selector);
         vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, attacker));
         vm.prank(attacker);
         _vault.sweep(address(_usdc), 1, sweepTo);
@@ -1041,9 +1041,9 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
     /// @dev If the asset has a malicious transfer hook that re-enters pullCoverage, the transient nonReentrant blocks.
     function test_adversarial_pullCoverage_reentrantTokenIsBlocked() public {
         MockReentrantErc20 hostile = new MockReentrantErc20("Hostile", "H", 18);
-        _accessManager.mockAllowCall(operator, address(_vault), ISlippageCoverageVault.raisePullCapPerTx.selector);
-        _accessManager.mockAllowCall(operator, address(_vault), ISlippageCoverageVault.raiseWindowCap.selector);
-        _accessManager.mockAllowCall(operator, address(_vault), ISlippageCoverageVault.raiseWindowSeconds.selector);
+        _accessManager.mockAllowCall(operator, address(_vault), SlippageCoverageVault.raisePullCapPerTx.selector);
+        _accessManager.mockAllowCall(operator, address(_vault), SlippageCoverageVault.raiseWindowCap.selector);
+        _accessManager.mockAllowCall(operator, address(_vault), SlippageCoverageVault.raiseWindowSeconds.selector);
 
         vm.prank(operator);
         _vault.raisePullCapPerTx(address(hostile), LARGE_CAP);
@@ -1116,7 +1116,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 1);
 
-        ISlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
+        SlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
         assertEq(w.consumed, 100);
     }
 
@@ -1158,7 +1158,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 4_000e6);
 
-        ISlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
+        SlippageCoverageVault.Window memory w = _vault.getWindow(address(_usdc));
         assertEq(w.windowStart, t0 + 1 hours);
         assertEq(w.consumed, 4_000e6);
     }
@@ -1216,7 +1216,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
     /* ============================ View functions ============================ */
 
     function test_getWindow_returnsZeroForUnconfiguredAsset() public view {
-        ISlippageCoverageVault.Window memory w = _vault.getWindow(address(_gho));
+        SlippageCoverageVault.Window memory w = _vault.getWindow(address(_gho));
         assertEq(w.windowStart, 0);
         assertEq(w.windowSeconds, 0);
         assertEq(w.consumed, 0);

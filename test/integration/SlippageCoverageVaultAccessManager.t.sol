@@ -5,7 +5,6 @@ pragma solidity ^0.8.22;
 import {AccessManager} from "@openzeppelin/contracts/access/manager/AccessManager.sol";
 import {Test} from "forge-std/Test.sol";
 
-import {ISlippageCoverageVault} from "src/interfaces/ISlippageCoverageVault.sol";
 import {SlippageCoverageVault} from "src/periphery/SlippageCoverageVault.sol";
 
 /// @dev Integration test for `SlippageCoverageVault` running behind a real `AccessManager`. Verifies that the new
@@ -38,16 +37,16 @@ contract SlippageCoverageVaultAccessManagerIntegrationTest is Test {
         vm.startPrank(admin);
 
         bytes4[] memory raiseSelectors = new bytes4[](3);
-        raiseSelectors[0] = ISlippageCoverageVault.raisePullCapPerTx.selector;
-        raiseSelectors[1] = ISlippageCoverageVault.raiseWindowCap.selector;
+        raiseSelectors[0] = SlippageCoverageVault.raisePullCapPerTx.selector;
+        raiseSelectors[1] = SlippageCoverageVault.raiseWindowCap.selector;
         // raiseWindowSeconds is tightening — kept on the same test role for simplicity; production wires it to a
         // no-delay operational role separate from the cap raiser.
-        raiseSelectors[2] = ISlippageCoverageVault.raiseWindowSeconds.selector;
+        raiseSelectors[2] = SlippageCoverageVault.raiseWindowSeconds.selector;
         accessManager.setTargetFunctionRole(address(vault), raiseSelectors, CAP_RAISER_ROLE);
 
         bytes4[] memory lowerSelectors = new bytes4[](2);
-        lowerSelectors[0] = ISlippageCoverageVault.lowerPullCapPerTx.selector;
-        lowerSelectors[1] = ISlippageCoverageVault.lowerWindowCap.selector;
+        lowerSelectors[0] = SlippageCoverageVault.lowerPullCapPerTx.selector;
+        lowerSelectors[1] = SlippageCoverageVault.lowerWindowCap.selector;
         accessManager.setTargetFunctionRole(address(vault), lowerSelectors, CAP_LOWERER_ROLE);
 
         // Grant raiser with no delay first to prime the caps, then re-grant with the actual raise delay.
@@ -70,8 +69,8 @@ contract SlippageCoverageVaultAccessManagerIntegrationTest is Test {
     function test_atomicLower_bothCaps_succeedsWithoutScheduling() public {
         uint256 newPerTx = DEFAULT_PER_TX_CAP / 2;
         uint256 newWindow = DEFAULT_WINDOW_CAP / 2;
-        bytes memory lowerPerTxData = abi.encodeCall(ISlippageCoverageVault.lowerPullCapPerTx, (asset, newPerTx));
-        bytes memory lowerWindowData = abi.encodeCall(ISlippageCoverageVault.lowerWindowCap, (asset, newWindow));
+        bytes memory lowerPerTxData = abi.encodeCall(SlippageCoverageVault.lowerPullCapPerTx, (asset, newPerTx));
+        bytes memory lowerWindowData = abi.encodeCall(SlippageCoverageVault.lowerWindowCap, (asset, newWindow));
 
         bytes[] memory calls = new bytes[](2);
         calls[0] = lowerPerTxData;
@@ -88,8 +87,8 @@ contract SlippageCoverageVaultAccessManagerIntegrationTest is Test {
     function test_atomicRaise_bothCaps_succeedsWhenBothScheduled() public {
         uint256 newPerTx = DEFAULT_PER_TX_CAP * 2;
         uint256 newWindow = DEFAULT_WINDOW_CAP * 2;
-        bytes memory raisePerTxData = abi.encodeCall(ISlippageCoverageVault.raisePullCapPerTx, (asset, newPerTx));
-        bytes memory raiseWindowData = abi.encodeCall(ISlippageCoverageVault.raiseWindowCap, (asset, newWindow));
+        bytes memory raisePerTxData = abi.encodeCall(SlippageCoverageVault.raisePullCapPerTx, (asset, newPerTx));
+        bytes memory raiseWindowData = abi.encodeCall(SlippageCoverageVault.raiseWindowCap, (asset, newWindow));
 
         vm.startPrank(raiser);
         accessManager.schedule(address(vault), raisePerTxData, 0);
@@ -117,8 +116,8 @@ contract SlippageCoverageVaultAccessManagerIntegrationTest is Test {
 
         uint256 newPerTx = DEFAULT_PER_TX_CAP / 2;
         uint256 newWindow = DEFAULT_WINDOW_CAP * 2;
-        bytes memory lowerPerTxData = abi.encodeCall(ISlippageCoverageVault.lowerPullCapPerTx, (asset, newPerTx));
-        bytes memory raiseWindowData = abi.encodeCall(ISlippageCoverageVault.raiseWindowCap, (asset, newWindow));
+        bytes memory lowerPerTxData = abi.encodeCall(SlippageCoverageVault.lowerPullCapPerTx, (asset, newPerTx));
+        bytes memory raiseWindowData = abi.encodeCall(SlippageCoverageVault.raiseWindowCap, (asset, newWindow));
 
         vm.prank(raiser);
         accessManager.schedule(address(vault), raiseWindowData, 0);
@@ -139,10 +138,10 @@ contract SlippageCoverageVaultAccessManagerIntegrationTest is Test {
     /// @dev Bubbling: when one inner call reverts, the whole multicall reverts.
     function test_atomicLower_revertsAndRollsBackIfOneCallFails() public {
         bytes memory lowerPerTxData =
-            abi.encodeCall(ISlippageCoverageVault.lowerPullCapPerTx, (asset, DEFAULT_PER_TX_CAP / 2));
+            abi.encodeCall(SlippageCoverageVault.lowerPullCapPerTx, (asset, DEFAULT_PER_TX_CAP / 2));
         // Window cap "lower" but with a value greater than current — must revert with InvalidParameter.
         bytes memory invalidLowerWindowData =
-            abi.encodeCall(ISlippageCoverageVault.lowerWindowCap, (asset, DEFAULT_WINDOW_CAP * 2));
+            abi.encodeCall(SlippageCoverageVault.lowerWindowCap, (asset, DEFAULT_WINDOW_CAP * 2));
 
         bytes[] memory calls = new bytes[](2);
         calls[0] = lowerPerTxData;

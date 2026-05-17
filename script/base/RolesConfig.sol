@@ -16,10 +16,10 @@ import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
 import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
-import {ISlippageCoverageVault} from "src/interfaces/ISlippageCoverageVault.sol";
 import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {ChainBalanceOracle} from "src/oracles/balance/ChainBalanceOracle.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
+import {SlippageCoverageVault} from "src/periphery/SlippageCoverageVault.sol";
 import {DepositPolicy} from "src/policies/DepositPolicy.sol";
 import {FundsBridgingPolicy} from "src/policies/FundsBridgingPolicy.sol";
 import {WithdrawalExecutionPolicy} from "src/policies/WithdrawalExecutionPolicy.sol";
@@ -789,7 +789,7 @@ abstract contract RolesConfig is DeploymentConfig {
     /// @custom:delay None
     /// @custom:location SlippageCoverageVault
     function getRole__enableOverrideMode() internal pure returns (Role memory) {
-        bytes4 selector = ISlippageCoverageVault.enableOverrideMode.selector;
+        bytes4 selector = SlippageCoverageVault.enableOverrideMode.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
@@ -802,7 +802,7 @@ abstract contract RolesConfig is DeploymentConfig {
     /// @custom:delay None
     /// @custom:location SlippageCoverageVault
     function getRole__disableOverrideMode() internal pure returns (Role memory) {
-        bytes4 selector = ISlippageCoverageVault.disableOverrideMode.selector;
+        bytes4 selector = SlippageCoverageVault.disableOverrideMode.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
@@ -815,7 +815,7 @@ abstract contract RolesConfig is DeploymentConfig {
     /// @custom:delay High
     /// @custom:location SlippageCoverageVault
     function getRole__raisePullCapPerTx() internal view returns (Role memory) {
-        bytes4 selector = ISlippageCoverageVault.raisePullCapPerTx.selector;
+        bytes4 selector = SlippageCoverageVault.raisePullCapPerTx.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
@@ -828,7 +828,7 @@ abstract contract RolesConfig is DeploymentConfig {
     /// @custom:delay None
     /// @custom:location SlippageCoverageVault
     function getRole__lowerPullCapPerTx() internal pure returns (Role memory) {
-        bytes4 selector = ISlippageCoverageVault.lowerPullCapPerTx.selector;
+        bytes4 selector = SlippageCoverageVault.lowerPullCapPerTx.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
@@ -841,7 +841,7 @@ abstract contract RolesConfig is DeploymentConfig {
     /// @custom:delay High
     /// @custom:location SlippageCoverageVault
     function getRole__raiseWindowCap() internal view returns (Role memory) {
-        bytes4 selector = ISlippageCoverageVault.raiseWindowCap.selector;
+        bytes4 selector = SlippageCoverageVault.raiseWindowCap.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
@@ -854,7 +854,7 @@ abstract contract RolesConfig is DeploymentConfig {
     /// @custom:delay None
     /// @custom:location SlippageCoverageVault
     function getRole__lowerWindowCap() internal pure returns (Role memory) {
-        bytes4 selector = ISlippageCoverageVault.lowerWindowCap.selector;
+        bytes4 selector = SlippageCoverageVault.lowerWindowCap.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
@@ -867,7 +867,7 @@ abstract contract RolesConfig is DeploymentConfig {
     /// @custom:delay None
     /// @custom:location SlippageCoverageVault
     function getRole__raiseWindowSeconds() internal pure returns (Role memory) {
-        bytes4 selector = ISlippageCoverageVault.raiseWindowSeconds.selector;
+        bytes4 selector = SlippageCoverageVault.raiseWindowSeconds.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
@@ -880,7 +880,7 @@ abstract contract RolesConfig is DeploymentConfig {
     /// @custom:delay High
     /// @custom:location SlippageCoverageVault
     function getRole__lowerWindowSeconds() internal view returns (Role memory) {
-        bytes4 selector = ISlippageCoverageVault.lowerWindowSeconds.selector;
+        bytes4 selector = SlippageCoverageVault.lowerWindowSeconds.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
@@ -893,7 +893,7 @@ abstract contract RolesConfig is DeploymentConfig {
     /// @custom:delay High
     /// @custom:location SlippageCoverageVault
     function getRole__setMaxSlippageBps() internal view returns (Role memory) {
-        bytes4 selector = ISlippageCoverageVault.setMaxSlippageBps.selector;
+        bytes4 selector = SlippageCoverageVault.setMaxSlippageBps.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
@@ -906,7 +906,7 @@ abstract contract RolesConfig is DeploymentConfig {
     /// @custom:delay High
     /// @custom:location SlippageCoverageVault
     function getRole__setOverrideMaxSlippageBps() internal view returns (Role memory) {
-        bytes4 selector = ISlippageCoverageVault.setOverrideMaxSlippageBps.selector;
+        bytes4 selector = SlippageCoverageVault.setOverrideMaxSlippageBps.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
@@ -919,7 +919,7 @@ abstract contract RolesConfig is DeploymentConfig {
     /// @custom:delay None
     /// @custom:location SlippageCoverageVault
     function getRole__fundCoverage() internal pure returns (Role memory) {
-        bytes4 selector = ISlippageCoverageVault.fundCoverage.selector;
+        bytes4 selector = SlippageCoverageVault.fundCoverage.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
@@ -932,7 +932,7 @@ abstract contract RolesConfig is DeploymentConfig {
     /// @custom:delay High
     /// @custom:location SlippageCoverageVault
     function getRole__sweepSlippageCoverageVault() internal view returns (Role memory) {
-        bytes4 selector = ISlippageCoverageVault.sweep.selector;
+        bytes4 selector = SlippageCoverageVault.sweep.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,

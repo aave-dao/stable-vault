@@ -84,8 +84,8 @@ contract Swapper is Ownable, ReentrancyGuardTransient, ISwapper {
         return amountOut;
     }
 
-    /// @inheritdoc ISwapper
-    function getSlippageVault() external view override returns (address) {
+    /// @notice Returns the slippage coverage vault bound to this swapper, if any.
+    function getSlippageVault() external view returns (address) {
         return SLIPPAGE_VAULT;
     }
 

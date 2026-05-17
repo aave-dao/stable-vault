@@ -5,8 +5,6 @@ pragma solidity ^0.8.22;
 /// @title ISwapper
 /// @author Aave Labs
 /// @notice Interface for the Swapper contract.
-// TODO(design): narrow this interface to the caller-facing surface; current declarations leak impl-specific types
-// from the canonical implementation.
 interface ISwapper {
     /// @notice Emitted when a slippage shortfall on `assetOut` is covered by an external source.
     event SlippageCovered(address indexed slippageCoverageSource, address indexed assetOut, uint256 amount);
@@ -42,7 +40,4 @@ interface ISwapper {
     function executeSwap(address assetIn, address assetOut, uint256 amountIn, address msgSender, bytes memory data)
         external
         returns (uint256 amountOut);
-
-    /// @notice Returns the slippage coverage vault bound to this swapper, if any.
-    function getSlippageVault() external view returns (address);
 }

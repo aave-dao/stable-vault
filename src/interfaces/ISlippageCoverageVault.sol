@@ -5,25 +5,11 @@ pragma solidity ^0.8.22;
 /// @title ISlippageCoverageVault
 /// @author Aave Labs
 /// @notice Interface for the SlippageCoverageVault contract.
-// TODO(design): narrow this interface to the caller-facing surface; current declarations leak impl-specific types
-// (`Window`, internal rate-limit shapes) from the canonical implementation.
 /// @dev Push-based outflows to the immutable `SLIPPAGE_BENEFICIARY`; the vault never grants ERC-20 allowances. The
 /// vault can be deployed in override mode (constructor flag) so the bound Swapper can pull coverage on day one
 /// without per-tx or window caps configured; operator flips override off and configures caps once risk-team has
 /// set the production targets.
 interface ISlippageCoverageVault {
-    /// @notice Fixed-window cap state for an asset.
-    /// @param windowStart Timestamp at which the current window started.
-    /// @param windowSeconds Length of the window in seconds.
-    /// @param consumed Amount consumed within the current window.
-    /// @param cap Maximum amount that can be consumed within a single window.
-    struct Window {
-        uint64 windowStart;
-        uint64 windowSeconds;
-        uint128 consumed;
-        uint128 cap;
-    }
-
     /// @notice Emitted when the vault is funded.
     event CoverageFunded(address indexed asset, address indexed from, uint256 amount);
 
@@ -97,77 +83,6 @@ interface ISlippageCoverageVault {
     /// @param asset The asset to reimburse.
     /// @param amount The amount to reimburse.
     function reimburseCoverage(address asset, uint256 amount) external;
-
-    /// @notice Enables override mode. While enabled, `pullCoverage` bypasses both per-tx and window caps and the
-    /// Swapper accepts the higher `overrideMaxSlippageBps`.
-    /// @dev Gated by the CoverageGuardian role (separate from the rebalancer, expected to be an N-of-M multisig).
-    /// No on-chain delay; compromise resistance is structural (quorum), not temporal. Reverts with `AlreadyEnabled`
-    /// if already on.
-    function enableOverrideMode() external;
-
-    /// @notice Disables override mode and restores per-tx + window cap enforcement and `maxSlippageBps`.
-    /// @dev Gated by the CoverageGuardian role with no delay so tightening is instant. Reverts with `AlreadyDisabled`
-    /// if already off.
-    function disableOverrideMode() external;
-
-    /// @notice Raises the per-tx cap for an asset. Reverts if `newCap <= current`.
-    function raisePullCapPerTx(address asset, uint256 newCap) external;
-
-    /// @notice Lowers the per-tx cap for an asset. Reverts if `newCap >= current`.
-    function lowerPullCapPerTx(address asset, uint256 newCap) external;
-
-    /// @notice Raises the window cap for an asset. Reverts if `newCap <= current`. Preserves `windowSeconds`.
-    /// @dev Boundary burst: under a fixed-window with lazy rollover, a caller can drain `newCap` at
-    /// `t = windowStart + windowSeconds - 1` and another full `newCap` at `t = windowStart + windowSeconds`, for
-    /// `2 * newCap` across a ~1-second span. Size `newCap` such that `2 * newCap` is an acceptable dollar exposure
-    /// within `windowSeconds`.
-    function raiseWindowCap(address asset, uint256 newCap) external;
-
-    /// @notice Lowers the window cap for an asset. Reverts if `newCap >= current`. Preserves `windowSeconds`.
-    function lowerWindowCap(address asset, uint256 newCap) external;
-
-    /// @notice Raises the window length (in seconds) for an asset, lengthening the window.
-    /// @dev Counter-intuitive risk direction: raising `windowSeconds` SLOWS the drain rate (same cap, more time)
-    /// and is therefore a **tightening** action, gated on the operational/no-delay path. Reverts if
-    /// `newWindowSeconds <= current`. Preserves `cap`. Boundary burst is `2 * cap` per `windowSeconds`; see
-    /// `raiseWindowCap`.
-    function raiseWindowSeconds(address asset, uint64 newWindowSeconds) external;
-
-    /// @notice Lowers the window length (in seconds) for an asset, shortening the window.
-    /// @dev Counter-intuitive risk direction: lowering `windowSeconds` SPEEDS UP the drain rate (same cap, less
-    /// time) and is therefore a **loosening** action, gated on the admin/high-delay path. Reverts if
-    /// `newWindowSeconds >= current`. Preserves `cap`.
-    function lowerWindowSeconds(address asset, uint64 newWindowSeconds) external;
-
-    /// @notice Sets the normal-mode max slippage tolerance in basis points.
-    function setMaxSlippageBps(uint16 newBps) external;
-
-    /// @notice Sets the override-mode max slippage tolerance in basis points.
-    function setOverrideMaxSlippageBps(uint16 newBps) external;
-
-    /// @notice Funds the vault with `amount` of `asset`. Pulls from the caller via `safeTransferFrom`.
-    function fundCoverage(address asset, uint256 amount) external;
-
-    /// @notice Sweeps `amount` of `asset` from the vault to `to`.
-    function sweep(address asset, uint256 amount, address to) external;
-
-    /// @notice Getter for the immutable bound beneficiary (the Swapper).
-    function getBeneficiary() external view returns (address);
-
-    /// @notice Getter for whether override mode is enabled.
-    function getOverrideMode() external view returns (bool);
-
-    /// @notice Getter for the per-tx cap for an asset.
-    function getPullCapPerTx(address asset) external view returns (uint256);
-
-    /// @notice Getter for the window state for an asset.
-    function getWindow(address asset) external view returns (Window memory);
-
-    /// @notice Getter for the normal-mode max slippage tolerance.
-    function getMaxSlippageBps() external view returns (uint16);
-
-    /// @notice Getter for the override-mode max slippage tolerance.
-    function getOverrideMaxSlippageBps() external view returns (uint16);
 
     /// @notice Max slippage tolerance currently in effect: `overrideMaxSlippageBps` if override mode is enabled,
     /// otherwise `maxSlippageBps`.
