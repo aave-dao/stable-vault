@@ -292,13 +292,13 @@ contract Allocator is
     /// @inheritdoc IAllocator
     function setWithdrawalQueue(address asset, address[] calldata newWithdrawalQueue) external override restricted {
         require(IAssetRegistry(ASSET_REGISTRY).isAssetRegistered(asset), Errors.InvalidAsset(asset));
-        EnumerableSet.AddressSet storage strategies = $storage().assetStrategies[asset];
-        uint256 strategiesCount = strategies.length();
+        address[] memory registeredStrategies = $storage().assetStrategies[asset].values();
+        uint256 strategiesCount = registeredStrategies.length;
         require(newWithdrawalQueue.length == strategiesCount, InvalidWithdrawalQueue());
 
         // Verify that the withdrawal queue is a strict permutation of the asset's registered strategies.
         for (uint256 i = 0; i < strategiesCount; i++) {
-            address strategy = strategies.at(i);
+            address strategy = registeredStrategies[i];
             bool strategyFoundInQueue = false;
             for (uint256 j = 0; j < strategiesCount; j++) {
                 if (newWithdrawalQueue[j] == strategy) {
@@ -626,14 +626,19 @@ contract Allocator is
         uint256 strategiesCount = withdrawalQueue.length;
         for (uint256 i = 0; i < strategiesCount; i++) {
             if (withdrawalQueue[i] == strategy) {
-                for (uint256 j = i; j + 1 < strategiesCount; j++) {
-                    withdrawalQueue[j] = withdrawalQueue[j + 1];
+                unchecked {
+                    for (uint256 j = i; j + 1 < strategiesCount; j++) {
+                        withdrawalQueue[j] = withdrawalQueue[j + 1];
+                    }
                 }
                 withdrawalQueue.pop();
                 emit WithdrawalQueueSet(asset, withdrawalQueue);
                 return;
             }
         }
+        // Revert as assertion, signaling a desynchronization between `withdrawalQueues` and `assetStrategies`.
+        // It should never happen as the strategy is guaranteed to be in the queue.
+        revert InvalidWithdrawalQueue();
     }
 
     function _beforeRescueTokens(address token, uint256) internal virtual override {

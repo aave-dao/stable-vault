@@ -3237,7 +3237,6 @@ contract AllocatorTest is TestWithHelpers {
     function test_addStrategy_emitsWithdrawalQueueSet() public {
         TestErc4626 newStrategy = new TestErc4626(_mockUsdt);
 
-        // Expected queue reflects the post-add state: existing entries plus the newly appended strategy.
         address[] memory expectedQueue = new address[](3);
         expectedQueue[0] = address(_defaultUsdtStrategy);
         expectedQueue[1] = address(_extraUsdtStrategy);
@@ -3267,7 +3266,6 @@ contract AllocatorTest is TestWithHelpers {
     }
 
     function test_removeStrategy_emitsWithdrawalQueueSet() public {
-        // Initial queue is [default, extra]. Removing `_extraUsdtStrategy` leaves [default].
         address[] memory expectedQueue = new address[](1);
         expectedQueue[0] = address(_defaultUsdtStrategy);
 
