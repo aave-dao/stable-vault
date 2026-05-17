@@ -7,8 +7,8 @@ import {IAdiCrossChainForwarder} from "src/interfaces/IAdiCrossChainForwarder.so
 
 contract MockAdiCrossChainController is IAdiCrossChainForwarder {
     error ForwardMessageFailed();
-    error UnexpectedQuoteGasLimit();
     error UnexpectedQuoteBandwidth();
+    error UnexpectedQuoteGasLimit();
 
     uint256 public lastDestinationChainId;
     address public lastDestination;

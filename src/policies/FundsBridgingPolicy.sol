@@ -18,13 +18,7 @@ import {Errors} from "src/types/Errors.sol";
 contract FundsBridgingPolicy is AccessManaged, Multicall, IFundsBridgingPolicy {
     using RateLimitBucketLib for RateLimitBucketLib.Bucket;
 
-    event BridgingCapacityRaised(
-        address indexed asset,
-        uint256 indexed destChainId,
-        address indexed bridgeAdapter,
-        uint128 oldCapacity,
-        uint128 newCapacity
-    );
+    /// @notice Emitted when a bridge route's capacity is lowered.
     event BridgingCapacityLowered(
         address indexed asset,
         uint256 indexed destChainId,
@@ -32,14 +26,27 @@ contract FundsBridgingPolicy is AccessManaged, Multicall, IFundsBridgingPolicy {
         uint128 oldCapacity,
         uint128 newCapacity
     );
-    event BridgingRefillRateRaised(
+
+    /// @notice Emitted when a bridge route's capacity is raised.
+    event BridgingCapacityRaised(
+        address indexed asset,
+        uint256 indexed destChainId,
+        address indexed bridgeAdapter,
+        uint128 oldCapacity,
+        uint128 newCapacity
+    );
+
+    /// @notice Emitted when a bridge route's refill rate is lowered.
+    event BridgingRefillRateLowered(
         address indexed asset,
         uint256 indexed destChainId,
         address indexed bridgeAdapter,
         uint128 oldRefillRate,
         uint128 newRefillRate
     );
-    event BridgingRefillRateLowered(
+
+    /// @notice Emitted when a bridge route's refill rate is raised.
+    event BridgingRefillRateRaised(
         address indexed asset,
         uint256 indexed destChainId,
         address indexed bridgeAdapter,
