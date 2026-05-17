@@ -21,8 +21,9 @@ interface IEarningChainGateway is IChainGateway {
     /// @param asset The asset to withdraw.
     /// @param amount The amount of the asset to withdraw in the asset's native decimals.
     /// @param bridgeAdapter The whitelisted bridge adapter to use for bridging the asset.
-    /// @param receiverExecutionGasLimit Gas limit for destination receiver execution. This includes adapter receive
-    /// logic, token handling, and the gateway call, but excludes bridge provider infrastructure.
+    /// @param receiverExecutionGasLimit Gas limit for destination receiver execution, including adapter receive logic,
+    /// token handling, gateway execution, and any non-empty arbitrary data processing. Excludes bridge provider
+    /// operations before and after the receiver call.
     /// @param bridgeAdapterData Any bridge adapter custom parameters that it may need to operate.
     /// @param policyData Additional data that the bridge-funds policy might need to operate.
     function pushFundsToAccountingChain(

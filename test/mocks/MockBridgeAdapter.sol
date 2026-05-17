@@ -11,11 +11,16 @@ import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
 
-/// @dev Mirrors the opaque-bytes shape of IBridgeAdapter and pulls the bridged amount from TransferHelper.
+/// @dev Mirrors the opaque-bytes shape of IBridgeAdapter and the adapter-owned bridge-fee staging in
+/// CcipAdapter: pulls feeToken directly from feePayer (or accepts native via msg.value) into itself,
+/// then pulls the bridged amount from TransferHelper. The fee never enters the TransferHelper.
 contract MockBridgeAdapter is IBridgeAdapter {
     using SafeERC20 for IERC20;
 
+    error PublishMessageFailed();
+
     address internal immutable TRANSFER_HELPER;
+    bool internal _shouldRevertPublish;
     uint256 internal _feeAmount;
 
     constructor(address transferHelper) {
@@ -74,16 +79,26 @@ contract MockBridgeAdapter is IBridgeAdapter {
         uint256 gasLimit,
         bytes memory bridgeAdapterData
     ) internal {
+        require(!_shouldRevertPublish, PublishMessageFailed());
+
         (destinationChainId, messageData, gasLimit);
         ICcipBridgeAdapter.CcipFeeParams memory ccipFeeParams =
             abi.decode(bridgeAdapterData, (ICcipBridgeAdapter.CcipFeeParams));
+        uint256 feeAmount = _feeAmount;
 
+        // Mirror CcipAdapter: adapter pulls fee directly from feePayer (no TransferHelper round-trip).
         if (ccipFeeParams.feeToken == Constants.NATIVE_CURRENCY) {
-            require(msg.value >= _feeAmount, Errors.InsufficientFunds());
+            if (feeAmount == 0) {
+                feeAmount = msg.value;
+            }
+            require(msg.value == feeAmount, Errors.InsufficientFunds());
         } else {
             require(msg.value == 0, Errors.InvalidParameter());
-            if (_feeAmount > 0) {
-                IERC20(ccipFeeParams.feeToken).safeTransferFrom(feePayer, address(this), _feeAmount);
+            if (feeAmount == 0) {
+                feeAmount = IERC20(ccipFeeParams.feeToken).allowance(feePayer, address(this));
+            }
+            if (feeAmount > 0) {
+                IERC20(ccipFeeParams.feeToken).safeTransferFrom(feePayer, address(this), feeAmount);
             }
         }
 
@@ -93,6 +108,10 @@ contract MockBridgeAdapter is IBridgeAdapter {
     }
 
     function setDestinationChainAdapter(uint256 chainId, address destinationChainAdapter) external override {}
+
+    function setShouldRevertPublish(bool shouldRevertPublish) external {
+        _shouldRevertPublish = shouldRevertPublish;
+    }
 
     receive() external payable {}
 }

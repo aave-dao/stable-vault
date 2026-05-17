@@ -51,6 +51,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     uint256 internal ACCOUNTING_CHAIN_ID = 1;
     uint256 internal EARNING_CHAIN_ID = 2;
     uint256 internal DEFAULT_GAS_LIMIT = BURN_IOU_TOKEN_GAS_LIMIT;
+    uint256 internal MAX_REDEMPTION_CAPACITY = type(uint128).max - 1;
 
     address admin = makeAddr("ADMIN");
     address everyRoleAccount = makeAddr("EVERY_ROLE_ACCOUNT");
@@ -125,7 +126,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 )
             )
         );
-        policy.raiseRedemptionCapacity(type(uint128).max - 1);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        policy.raiseRedemptionCapacity(uint128(MAX_REDEMPTION_CAPACITY));
         policy.raiseRedemptionRefillRate(1e30);
         return policy;
     }
@@ -499,7 +501,6 @@ contract EarningChainGatewayTest is TestWithHelpers {
 
             bytes memory bridgeAdapterData =
                 abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: bridgeFeeToken, feeRefundThreshold: 0}));
-            _mockBridgeCcipFeeParams.mockFeeAmount(bridgeFeeAmount);
 
             vm.expectCall(
                 bridgeFeeToken,
@@ -644,6 +645,48 @@ contract EarningChainGatewayTest is TestWithHelpers {
             bridgeAdapterData,
             ""
         );
+    }
+
+    function test_exchangeIouTokens_rollsBackBurnAndAssetTransferIfBurnMessagePublishReverts(uint256 iouTokenAmountRay)
+        public
+    {
+        iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        vm.assume(iouTokenAmountRay < MAX_REDEMPTION_CAPACITY);
+        address tokenOutReceiver = makeAddr("tokenOutReceiver");
+        address tokenOut = address(_mockUsdt);
+        uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(tokenOut);
+        vm.assume(amountOut > 0);
+
+        _mockUsdt.mint(address(_mockAllocator), amountOut);
+        _mockTransferHelper.mockAsset(tokenOut, amountOut);
+        IAllocator.AllocatorBalance[] memory allocatorBalances = _buildAllocatorBalances(123e18, 456e18);
+        vm.mockCall(
+            address(_mockAllocator),
+            abi.encodeWithSelector(MockAllocator.getTrustedAssetBalances.selector),
+            abi.encode(allocatorBalances)
+        );
+
+        bytes memory bridgeAdapterData =
+            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0}));
+        _mockBridgeCcipFeeParams.setShouldRevertPublish(true);
+
+        vm.expectRevert(MockBridgeAdapter.PublishMessageFailed.selector);
+        vm.prank(tokenOutReceiver);
+        _earningChainGateway.exchangeIouTokens(
+            iouTokenAmountRay,
+            tokenOut,
+            0,
+            tokenOutReceiver,
+            address(_mockBridgeCcipFeeParams),
+            BURN_IOU_TOKEN_GAS_LIMIT,
+            bridgeAdapterData,
+            ""
+        );
+
+        assertEq(_mockIouTokenManager.burnedAmount(tokenOutReceiver), 0, "IOU burn did not roll back");
+        assertEq(_mockIouTokenManager.totalBurned(), 0, "total IOU burn did not roll back");
+        assertEq(_mockUsdt.balanceOf(tokenOutReceiver), 0, "asset transfer should not happen");
+        assertEq(_mockUsdt.balanceOf(address(_mockTransferHelper)), amountOut, "TransferHelper balance changed");
     }
 
     function test_exchangeIouTokens_emitsAssetOutflow(uint256 iouTokenAmountRay) public {
@@ -1808,7 +1851,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     function _expectedBurnIouCalldata(
         uint256 iouTokenAmountRay,
         address feePayer,
-        uint256 payloadExecutionGasLimit,
+        uint256 gasLimit,
         bytes memory bridgeAdapterData
     ) internal view returns (bytes memory) {
         bytes memory data = abi.encode(
@@ -1824,8 +1867,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             })
         );
         return abi.encodeCall(
-            IBridgeAdapter.publishDataOnlyMessage,
-            (ACCOUNTING_CHAIN_ID, data, feePayer, payloadExecutionGasLimit, bridgeAdapterData)
+            IBridgeAdapter.publishDataOnlyMessage, (ACCOUNTING_CHAIN_ID, data, feePayer, gasLimit, bridgeAdapterData)
         );
     }
 }

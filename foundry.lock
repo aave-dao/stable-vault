@@ -26,6 +26,9 @@
       "rev": "e725abddf1e01cf05ace496e950fc8e243cc7cab"
     }
   },
+  "lib/pigeon": {
+    "rev": "dde8c8a87d51a53296543383c6bf297f4d228a8e"
+  },
   "lib/solady": {
     "tag": {
       "name": "v0.1.26",

@@ -5,6 +5,9 @@ pragma solidity ^0.8.22;
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
 
 contract MockDummyIouTokenManager is IIouTokenManager {
+    mapping(address account => uint256 amount) public burnedAmount;
+    uint256 public totalBurned;
+
     function getAsset() external view override returns (address) {}
 
     function getLockedBalance() external view override returns (uint256) {}
@@ -24,7 +27,10 @@ contract MockDummyIouTokenManager is IIouTokenManager {
 
     function mintTokens(address to, uint256 amount) external override {}
 
-    function burnTokens(address from, uint256 amount) external override {}
+    function burnTokens(address from, uint256 amount) external override {
+        burnedAmount[from] += amount;
+        totalBurned += amount;
+    }
 
     function burnLockedTokens(uint256 amount) external override {}
 

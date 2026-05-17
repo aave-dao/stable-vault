@@ -92,7 +92,12 @@ contract CcipAdapter is
     }
 
     /// @inheritdoc IBridgeAdapter
-    function getDataOnlyReceiveGasOverhead() external pure override returns (uint256 dataOnlyReceiveGasOverhead) {
+    function getDataOnlyReceiveGasOverhead()
+        public
+        pure
+        override(BaseBridgeAdapter, IBridgeAdapter)
+        returns (uint256 dataOnlyReceiveGasOverhead)
+    {
         return DATA_ONLY_RECEIVE_GAS_OVERHEAD;
     }
 
@@ -123,7 +128,7 @@ contract CcipAdapter is
     ) external payable override(BaseBridgeAdapter, IBridgeAdapter) onlyGateway {
         Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
         // Add this adapter's receive overhead to the gateway payload execution gas requested upstream.
-        uint256 receiverExecutionGasLimit = payloadExecutionGasLimit + DATA_ONLY_RECEIVE_GAS_OVERHEAD;
+        uint256 receiverExecutionGasLimit = _withReceiverOverhead(payloadExecutionGasLimit);
         _publishCcipMessage(
             destinationChainId,
             Constants.ASSET_FOR_DATA_ONLY_BRIDGE,

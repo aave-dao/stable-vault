@@ -49,6 +49,11 @@ abstract contract BaseBridgeAdapter is AccessManaged, TransferHelperClient, IBri
         return GATEWAY;
     }
 
+    /// @inheritdoc IBridgeAdapter
+    function getDataOnlyReceiveGasOverhead() public pure virtual override returns (uint256 gasOverhead) {
+        return 0;
+    }
+
     /// @notice Getter for the destination chain adapter for a given chain id.
     /// @param chainId Chain id of the destination chain.
     /// @return The address of the destination chain adapter.
@@ -78,7 +83,13 @@ abstract contract BaseBridgeAdapter is AccessManaged, TransferHelperClient, IBri
 
     function setDestinationChainAdapter(uint256 chainId, address destinationChainAdapter) external override restricted {
         require(chainId != 0 && chainId != block.chainid, Errors.InvalidParameter());
+        require(destinationChainAdapter != address(0), Errors.ZeroAddress());
+        require(_destinationChainAdapterOf[chainId] == address(0), AlreadyConfigured());
         _destinationChainAdapterOf[chainId] = destinationChainAdapter;
         emit DestinationChainAdapterSet(chainId, destinationChainAdapter);
+    }
+
+    function _withReceiverOverhead(uint256 payloadExecutionGasLimit) internal pure virtual returns (uint256) {
+        return payloadExecutionGasLimit + getDataOnlyReceiveGasOverhead();
     }
 }
