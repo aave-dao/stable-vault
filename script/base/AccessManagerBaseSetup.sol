@@ -288,13 +288,15 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
 
         RolesConfig.Role[] memory roles = new RolesConfig.Role[](5);
 
+        // Allocator
         roles[0] = RolesConfig.getRole__rebalance();
-        roles[1] = RolesConfig.getRole__disableDepositsToStrategy();
-        // Only used on the Accounting Chain (FundsHandler), but granted in both Accounting and Earning Chain setups
-        roles[2] = RolesConfig.getRole__pushFundsToChain();
-        // Only used on the Earning Chain (EarningChainGateway), but granted in both Accounting and Earning Chain setups
-        roles[3] = RolesConfig.getRole__pushFundsToAccountingChain();
-        roles[4] = RolesConfig.getRole__setWithdrawalQueue();
+        roles[1] = RolesConfig.getRole__setWithdrawalQueue();
+        roles[2] = RolesConfig.getRole__disableDepositsToStrategy();
+        // Cross-chain push. The first is only used on the Accounting Chain (FundsHandler) and the second only on the
+        // Earning Chain (EarningChainGateway), but both are granted in both chain setups so a single profile config can
+        // run either side.
+        roles[3] = RolesConfig.getRole__pushFundsToChain();
+        roles[4] = RolesConfig.getRole__pushFundsToAccountingChain();
 
         _grantRolesToProfile(rebalancerProfile, roles);
     }
@@ -307,29 +309,36 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
 
         RolesConfig.Role[] memory roles = new RolesConfig.Role[](22);
 
+        // Allocator (defensive)
         roles[0] = RolesConfig.getRole__rebalance();
         roles[1] = RolesConfig.getRole__removeStrategy();
-        roles[2] = RolesConfig.getRole__rescueTokens();
-        roles[3] = RolesConfig.getRole__rescueNative();
-        roles[4] = RolesConfig.getRole__disableAllocatorDeposits();
-        roles[5] = RolesConfig.getRole__disableUserDeposits();
-        roles[6] = RolesConfig.getRole__disableSwapInput();
-        roles[7] = RolesConfig.getRole__disableSwapOutput();
-        roles[8] = RolesConfig.getRole__distrustAsset();
-        roles[9] = RolesConfig.getRole__removeBridgeAdapter();
-        roles[10] = RolesConfig.getRole__disableDepositsToStrategy();
-        roles[11] = RolesConfig.getRole__distrustStrategy();
+        roles[2] = RolesConfig.getRole__disableDepositsToStrategy();
+        roles[3] = RolesConfig.getRole__distrustStrategy();
+        // Rescue (multi-target)
+        roles[4] = RolesConfig.getRole__rescueTokens();
+        roles[5] = RolesConfig.getRole__rescueNative();
+        // AssetRegistry (defensive)
+        roles[6] = RolesConfig.getRole__disableAllocatorDeposits();
+        roles[7] = RolesConfig.getRole__disableUserDeposits();
+        roles[8] = RolesConfig.getRole__disableSwapInput();
+        roles[9] = RolesConfig.getRole__disableSwapOutput();
+        roles[10] = RolesConfig.getRole__distrustAsset();
+        // Gateway
+        roles[11] = RolesConfig.getRole__removeBridgeAdapter();
+        // WithdrawalExecutionPolicy
         roles[12] = RolesConfig.getRole__removeSigner();
-        roles[13] = RolesConfig.getRole__lowerPullCapPerTx();
-        roles[14] = RolesConfig.getRole__lowerWindowCap();
-        roles[15] = RolesConfig.getRole__raiseWindowSeconds();
-        // Only used on the Accounting Chain (DepositPolicy is Accounting-only), but granted in both chain setups.
-        roles[16] = RolesConfig.getRole__lowerDepositCapacity();
-        roles[17] = RolesConfig.getRole__lowerDepositRefillRate();
-        roles[18] = RolesConfig.getRole__lowerBridgingCapacity();
-        roles[19] = RolesConfig.getRole__lowerBridgingRefillRate();
-        roles[20] = RolesConfig.getRole__lowerRedemptionCapacity();
-        roles[21] = RolesConfig.getRole__lowerRedemptionRefillRate();
+        roles[13] = RolesConfig.getRole__lowerRedemptionCapacity();
+        roles[14] = RolesConfig.getRole__lowerRedemptionRefillRate();
+        // SlippageCoverageVault
+        roles[15] = RolesConfig.getRole__lowerPullCapPerTx();
+        roles[16] = RolesConfig.getRole__lowerWindowCap();
+        roles[17] = RolesConfig.getRole__raiseWindowSeconds();
+        // DepositPolicy is Accounting Chain-only, but granted in both chain setups.
+        roles[18] = RolesConfig.getRole__lowerDepositCapacity();
+        roles[19] = RolesConfig.getRole__lowerDepositRefillRate();
+        // FundsBridgingPolicy
+        roles[20] = RolesConfig.getRole__lowerBridgingCapacity();
+        roles[21] = RolesConfig.getRole__lowerBridgingRefillRate();
 
         _grantRolesToProfile(disablerProfile, roles);
     }
@@ -379,9 +388,9 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
 
         roles[0] = RolesConfig.getRole__setDestinationChainAdapter();
         roles[1] = RolesConfig.getRole__setChainSelector();
-        roles[2] = RolesConfig.getRole__rescueNative();
-        roles[3] = RolesConfig.getRole__replayFundsReceiving();
-        roles[4] = RolesConfig.getRole__rescueTokens();
+        roles[2] = RolesConfig.getRole__replayFundsReceiving();
+        roles[3] = RolesConfig.getRole__rescueTokens();
+        roles[4] = RolesConfig.getRole__rescueNative();
 
         _setTargetFunctionRoles(ccipAdapter, roles);
     }
@@ -392,8 +401,8 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         RolesConfig.Role[] memory roles = new RolesConfig.Role[](3);
 
         roles[0] = RolesConfig.getRole__setDestinationChainAdapter();
-        roles[1] = RolesConfig.getRole__rescueNative();
-        roles[2] = RolesConfig.getRole__rescueTokens();
+        roles[1] = RolesConfig.getRole__rescueTokens();
+        roles[2] = RolesConfig.getRole__rescueNative();
 
         _setTargetFunctionRoles(adiAdapter, roles);
     }
@@ -403,15 +412,18 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
 
         RolesConfig.Role[] memory roles = new RolesConfig.Role[](10);
 
+        // Operations
         roles[0] = RolesConfig.getRole__rebalance();
-        roles[1] = RolesConfig.getRole__addStrategy();
-        roles[2] = RolesConfig.getRole__removeStrategy();
-        roles[3] = RolesConfig.getRole__disableDepositsToStrategy();
-        roles[4] = RolesConfig.getRole__enableDepositsToStrategy();
-        roles[5] = RolesConfig.getRole__topUp();
-        roles[6] = RolesConfig.getRole__trustStrategy();
-        roles[7] = RolesConfig.getRole__distrustStrategy();
-        roles[8] = RolesConfig.getRole__setWithdrawalQueue();
+        roles[1] = RolesConfig.getRole__topUp();
+        roles[2] = RolesConfig.getRole__setWithdrawalQueue();
+        // Strategy lifecycle
+        roles[3] = RolesConfig.getRole__addStrategy();
+        roles[4] = RolesConfig.getRole__removeStrategy();
+        roles[5] = RolesConfig.getRole__trustStrategy();
+        roles[6] = RolesConfig.getRole__distrustStrategy();
+        roles[7] = RolesConfig.getRole__enableDepositsToStrategy();
+        roles[8] = RolesConfig.getRole__disableDepositsToStrategy();
+        // Rescue
         roles[9] = RolesConfig.getRole__rescueTokens();
 
         _setTargetFunctionRoles(allocator, roles);
@@ -422,13 +434,16 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
 
         RolesConfig.Role[] memory roles = new RolesConfig.Role[](8);
 
-        roles[0] = RolesConfig.getRole__setAssetFeeBps();
-        roles[1] = RolesConfig.getRole__setDefaultFeeBps();
+        // Fees
+        roles[0] = RolesConfig.getRole__setDefaultFeeBps();
+        roles[1] = RolesConfig.getRole__setAssetFeeBps();
+        // Signers
         roles[2] = RolesConfig.getRole__addSigner();
         roles[3] = RolesConfig.getRole__removeSigner();
+        // Redemption rate limit (raise/lower pairs adjacent)
         roles[4] = RolesConfig.getRole__raiseRedemptionCapacity();
-        roles[5] = RolesConfig.getRole__raiseRedemptionRefillRate();
-        roles[6] = RolesConfig.getRole__lowerRedemptionCapacity();
+        roles[5] = RolesConfig.getRole__lowerRedemptionCapacity();
+        roles[6] = RolesConfig.getRole__raiseRedemptionRefillRate();
         roles[7] = RolesConfig.getRole__lowerRedemptionRefillRate();
 
         _setTargetFunctionRoles(withdrawalExecutionPolicy, roles);
@@ -500,9 +515,10 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
 
         RolesConfig.Role[] memory roles = new RolesConfig.Role[](4);
 
+        // Bridging rate limit (raise/lower pairs adjacent)
         roles[0] = RolesConfig.getRole__raiseBridgingCapacity();
-        roles[1] = RolesConfig.getRole__raiseBridgingRefillRate();
-        roles[2] = RolesConfig.getRole__lowerBridgingCapacity();
+        roles[1] = RolesConfig.getRole__lowerBridgingCapacity();
+        roles[2] = RolesConfig.getRole__raiseBridgingRefillRate();
         roles[3] = RolesConfig.getRole__lowerBridgingRefillRate();
 
         _setTargetFunctionRoles(fundsBridgingPolicy, roles);

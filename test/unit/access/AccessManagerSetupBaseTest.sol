@@ -197,10 +197,10 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     function test_rebalancerProfile_hasTheExpectedRoles() public view {
         uint64[] memory expected = new uint64[](5);
         expected[0] = RolesConfig.getRole__rebalance().roleId;
-        expected[1] = RolesConfig.getRole__disableDepositsToStrategy().roleId;
-        expected[2] = RolesConfig.getRole__pushFundsToChain().roleId;
-        expected[3] = RolesConfig.getRole__pushFundsToAccountingChain().roleId;
-        expected[4] = RolesConfig.getRole__setWithdrawalQueue().roleId;
+        expected[1] = RolesConfig.getRole__setWithdrawalQueue().roleId;
+        expected[2] = RolesConfig.getRole__disableDepositsToStrategy().roleId;
+        expected[3] = RolesConfig.getRole__pushFundsToChain().roleId;
+        expected[4] = RolesConfig.getRole__pushFundsToAccountingChain().roleId;
         _assertProfileHasExactlyTheseRoles(_getProfile__Rebalancer(), expected);
 
         for (uint256 i = 0; i < expected.length; i++) {
@@ -240,29 +240,37 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
 
     function test_disablerProfile_hasTheExpectedRoles() public view {
         uint64[] memory expected = new uint64[](22);
+        // Allocator (defensive)
         expected[0] = RolesConfig.getRole__rebalance().roleId;
         expected[1] = RolesConfig.getRole__removeStrategy().roleId;
-        expected[2] = RolesConfig.getRole__rescueTokens().roleId;
-        expected[3] = RolesConfig.getRole__rescueNative().roleId;
-        expected[4] = RolesConfig.getRole__disableAllocatorDeposits().roleId;
-        expected[5] = RolesConfig.getRole__disableUserDeposits().roleId;
-        expected[6] = RolesConfig.getRole__disableSwapInput().roleId;
-        expected[7] = RolesConfig.getRole__disableSwapOutput().roleId;
-        expected[8] = RolesConfig.getRole__distrustAsset().roleId;
-        expected[9] = RolesConfig.getRole__removeBridgeAdapter().roleId;
-        expected[10] = RolesConfig.getRole__disableDepositsToStrategy().roleId;
-        expected[11] = RolesConfig.getRole__distrustStrategy().roleId;
+        expected[2] = RolesConfig.getRole__disableDepositsToStrategy().roleId;
+        expected[3] = RolesConfig.getRole__distrustStrategy().roleId;
+        // Rescue (cross-target)
+        expected[4] = RolesConfig.getRole__rescueTokens().roleId;
+        expected[5] = RolesConfig.getRole__rescueNative().roleId;
+        // AssetRegistry (defensive)
+        expected[6] = RolesConfig.getRole__disableAllocatorDeposits().roleId;
+        expected[7] = RolesConfig.getRole__disableUserDeposits().roleId;
+        expected[8] = RolesConfig.getRole__disableSwapInput().roleId;
+        expected[9] = RolesConfig.getRole__disableSwapOutput().roleId;
+        expected[10] = RolesConfig.getRole__distrustAsset().roleId;
+        // Gateway
+        expected[11] = RolesConfig.getRole__removeBridgeAdapter().roleId;
+        // WithdrawalExecutionPolicy
         expected[12] = RolesConfig.getRole__removeSigner().roleId;
-        expected[13] = RolesConfig.getRole__lowerPullCapPerTx().roleId;
-        expected[14] = RolesConfig.getRole__lowerWindowCap().roleId;
+        expected[13] = RolesConfig.getRole__lowerRedemptionCapacity().roleId;
+        expected[14] = RolesConfig.getRole__lowerRedemptionRefillRate().roleId;
+        // SlippageCoverageVault
         // raiseWindowSeconds is tightening (longer window = slower rate), even though the prefix says raise.
-        expected[15] = RolesConfig.getRole__raiseWindowSeconds().roleId;
-        expected[16] = RolesConfig.getRole__lowerDepositCapacity().roleId;
-        expected[17] = RolesConfig.getRole__lowerDepositRefillRate().roleId;
-        expected[18] = RolesConfig.getRole__lowerBridgingCapacity().roleId;
-        expected[19] = RolesConfig.getRole__lowerBridgingRefillRate().roleId;
-        expected[20] = RolesConfig.getRole__lowerRedemptionCapacity().roleId;
-        expected[21] = RolesConfig.getRole__lowerRedemptionRefillRate().roleId;
+        expected[15] = RolesConfig.getRole__lowerPullCapPerTx().roleId;
+        expected[16] = RolesConfig.getRole__lowerWindowCap().roleId;
+        expected[17] = RolesConfig.getRole__raiseWindowSeconds().roleId;
+        // DepositPolicy
+        expected[18] = RolesConfig.getRole__lowerDepositCapacity().roleId;
+        expected[19] = RolesConfig.getRole__lowerDepositRefillRate().roleId;
+        // FundsBridgingPolicy
+        expected[20] = RolesConfig.getRole__lowerBridgingCapacity().roleId;
+        expected[21] = RolesConfig.getRole__lowerBridgingRefillRate().roleId;
         _assertProfileHasExactlyTheseRoles(_getProfile__Disabler(), expected);
 
         for (uint256 i = 0; i < expected.length; i++) {
