@@ -10,7 +10,7 @@ import {IMulticall} from "src/interfaces/IMulticall.sol";
 /// @dev Inspired by OpenZeppelin's Multicall contract.
 abstract contract Multicall is IMulticall {
     /// @inheritdoc IMulticall
-    function multicall(bytes[] calldata data) external returns (bytes[] memory) {
+    function multicall(bytes[] calldata data) external override returns (bytes[] memory) {
         bytes[] memory returnDatas = new bytes[](data.length);
         for (uint256 i; i < data.length; ++i) {
             (bool callSucceeded, bytes memory returnData) = address(this).delegatecall(data[i]);

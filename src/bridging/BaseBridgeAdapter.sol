@@ -80,6 +80,7 @@ abstract contract BaseBridgeAdapter is AccessManaged, TransferHelperClient, IBri
         bytes memory bridgeAdapterData
     ) external payable virtual override;
 
+    /// @inheritdoc IBridgeAdapter
     function setDestinationChainAdapter(uint256 chainId, address destinationChainAdapter) external override restricted {
         require(chainId != 0 && chainId != block.chainid, Errors.InvalidParameter());
         require(destinationChainAdapter != address(0), Errors.ZeroAddress());

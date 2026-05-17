@@ -262,7 +262,7 @@ contract StableVault is
         emit Transfer(address(0), user, amountInRay);
     }
 
-    /// @notice Transfers Stable Vault balance (denominated in RAY) between users.
+    /// @inheritdoc IStableVault
     /// @dev This is accounting-only (no IOUs, no assets, no WithdrawalExecutionPolicy).
     /// @dev For full balance transfers, use transferAll() instead.
     /// @dev Reverts if the remaining sender balance after transfer would be below dust threshold.
@@ -312,7 +312,7 @@ contract StableVault is
         return true;
     }
 
-    /// @notice Transfers the sender's full position to another user.
+    /// @inheritdoc IStableVault
     /// @dev Any remaining original deposit amount is also transferred to the recipient.
     function transferAll(address to) external virtual override nonReentrant returns (bool) {
         address from = msg.sender;
