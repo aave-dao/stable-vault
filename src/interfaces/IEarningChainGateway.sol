@@ -43,7 +43,7 @@ interface IEarningChainGateway is IChainGateway {
     /// @param bridgeAdapter The whitelisted bridge adapter to use for the data-only message.
     /// @param payloadExecutionGasLimit Gas limit for the destination gateway call and everything it executes.
     /// @param bridgeAdapterData Any bridge adapter custom parameters that it may need to operate.
-    /// @param policyData Additional data that the withdrawal execution policy might need to operate.
+    /// @param policyData Additional data that the withdrawal-execution policy might need to operate.
     /// @return amountOut The amount of the exchanged asset transferred to the receiver.
     function exchangeIouTokens(
         uint256 iouTokenAmountRay,

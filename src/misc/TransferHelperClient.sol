@@ -17,6 +17,8 @@ import {Errors} from "src/types/Errors.sol";
 abstract contract TransferHelperClient {
     using SafeERC20 for IERC20;
 
+    /// @notice Thrown when the TransferHelper balance is not fully consumed.
+    /// @custom:selector 0x4044e1f7
     error TransferHelperBalanceNotConsumed(address asset);
 
     address internal immutable TRANSFER_HELPER;

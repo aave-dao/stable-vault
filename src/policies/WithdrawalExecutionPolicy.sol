@@ -37,8 +37,8 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
     /// @notice Emitted when the default fee in basis points is set.
     event DefaultFeeBpsSet(uint16 defaultFeeBps);
 
-    /// @notice Emitted when a nonce is marked as used, either by a successful appliance of the withdrawal policy or by
-    /// a nonce invalidation.
+    /// @notice Emitted when a nonce is marked as used, either by a successful application of the withdrawal-execution
+    /// policy or by a nonce invalidation.
     event NonceUsed(address indexed signer, uint256 indexed nonce);
 
     /// @notice Emitted when the redemption bucket capacity is lowered.
@@ -146,7 +146,7 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
     }
 
     /// @dev Constructor.
-    /// @param withdrawalExecutionPolicyApplier Address allowed to apply the withdrawal policy.
+    /// @param withdrawalExecutionPolicyApplier Address allowed to apply the withdrawal-execution policy.
     /// @param minRedemptionCapacity Floor for the redemption bucket capacity. Must be non-zero.
     /// @param minRedemptionRefillRate Floor for the redemption bucket refill rate. Must be non-zero.
     constructor(

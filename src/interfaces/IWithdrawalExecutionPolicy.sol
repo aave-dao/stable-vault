@@ -7,7 +7,7 @@ pragma solidity ^0.8.22;
 /// @notice Interface for the contract enforcing conditions on the IOU-to-asset exchange stage of a withdrawal (i.e.
 /// when a user calls `executeWithdrawal` / `exchangeIouTokens`).
 interface IWithdrawalExecutionPolicy {
-    /// @notice Emitted when the withdrawal policy is applied and a fee is charged.
+    /// @notice Emitted when the withdrawal-execution policy is applied and a fee is charged.
     event WithdrawalExecutionPolicyApplied(
         address indexed user, address assetOut, uint256 iouAmountRay, uint256 amountOutRay
     );
@@ -24,19 +24,19 @@ interface IWithdrawalExecutionPolicy {
         bytes policyData;
     }
 
-    /// @notice Applies the withdrawal policy and returns the final amount the user receives.
+    /// @notice Applies the withdrawal-execution policy and returns the final amount the user receives.
     /// @dev May have side effects (e.g., consuming nonces). Reverts if policy is violated.
     /// @param withdrawalExecution The withdrawal-execution intent.
-    /// @return The amount of assets the user will receive (in RAY), after the withdrawal policy is applied.
+    /// @return The amount of assets the user will receive (in RAY), after the withdrawal-execution policy is applied.
     function applyWithdrawalExecutionPolicy(WithdrawalExecutionIntent calldata withdrawalExecution)
         external
         returns (uint256);
 
-    /// @notice Previews the withdrawal policy result without modifying state.
+    /// @notice Previews the withdrawal-execution policy result without modifying state.
     /// @dev Validates everything (asset, signature, deadline, nonce) but doesn't consume the nonce. Returns 0 if the
     /// request would be rate-limited at `block.timestamp`.
     /// @param withdrawalExecution The withdrawal-execution intent.
-    /// @return The amount of assets the user would receive (in RAY), after the withdrawal policy is applied.
+    /// @return The amount of assets the user would receive (in RAY), after the withdrawal-execution policy is applied.
     function previewWithdrawalExecutionPolicy(WithdrawalExecutionIntent calldata withdrawalExecution)
         external
         view
