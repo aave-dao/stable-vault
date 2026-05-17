@@ -3234,11 +3234,16 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(queue[2], address(newStrategy));
     }
 
-    function test_addStrategy_emitsStrategyAppendedToQueue() public {
+    function test_addStrategy_emitsWithdrawalQueueSet() public {
         TestErc4626 newStrategy = new TestErc4626(_mockUsdt);
 
+        address[] memory expectedQueue = new address[](3);
+        expectedQueue[0] = address(_defaultUsdtStrategy);
+        expectedQueue[1] = address(_extraUsdtStrategy);
+        expectedQueue[2] = address(newStrategy);
+
         vm.expectEmit(true, true, true, true);
-        emit IAllocator.StrategyAppendedToQueue(address(_mockUsdt), address(newStrategy));
+        emit IAllocator.WithdrawalQueueSet(address(_mockUsdt), expectedQueue);
 
         vm.prank(admin);
         _allocator.addStrategy(address(_mockUsdt), address(newStrategy));
@@ -3260,9 +3265,12 @@ contract AllocatorTest is TestWithHelpers {
         assertEq(queue[1], address(thirdStrategy));
     }
 
-    function test_removeStrategy_emitsStrategyRemovedFromQueue() public {
+    function test_removeStrategy_emitsWithdrawalQueueSet() public {
+        address[] memory expectedQueue = new address[](1);
+        expectedQueue[0] = address(_defaultUsdtStrategy);
+
         vm.expectEmit(true, true, true, true);
-        emit IAllocator.StrategyRemovedFromQueue(address(_mockUsdt), address(_extraUsdtStrategy));
+        emit IAllocator.WithdrawalQueueSet(address(_mockUsdt), expectedQueue);
 
         vm.prank(admin);
         _allocator.removeStrategy(address(_extraUsdtStrategy));

@@ -616,8 +616,9 @@ contract Allocator is
     }
 
     function _addToWithdrawalQueue(address asset, address strategy) internal {
-        $storage().withdrawalQueues[asset].push(strategy);
-        emit StrategyAppendedToQueue(asset, strategy);
+        address[] storage withdrawalQueue = $storage().withdrawalQueues[asset];
+        withdrawalQueue.push(strategy);
+        emit WithdrawalQueueSet(asset, withdrawalQueue);
     }
 
     /// @dev Removes `strategy` from the asset's withdrawal queue, shifting subsequent entries down by one so the
@@ -634,7 +635,7 @@ contract Allocator is
                     }
                 }
                 withdrawalQueue.pop();
-                emit StrategyRemovedFromQueue(asset, strategy);
+                emit WithdrawalQueueSet(asset, withdrawalQueue);
                 return;
             }
         }
