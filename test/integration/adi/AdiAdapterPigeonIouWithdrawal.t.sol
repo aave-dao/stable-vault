@@ -71,6 +71,8 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
     uint256 internal constant BURN_IOU_TOKEN_GAS_LIMIT = 120_000;
     uint256 internal constant MAX_ACTIVE_SUB_VAULTS = 201;
     uint8 internal constant MAX_STRATEGIES_PER_ASSET = 15;
+    uint128 internal constant TEST_MIN_REDEMPTION_CAPACITY = 1e30;
+    uint128 internal constant TEST_MIN_REDEMPTION_REFILL_RATE = 1e25;
 
     address internal _proxyAdmin = makeAddr("PROXY_ADMIN");
     address internal _admin = makeAddr("ADI_IOU_ADMIN");
@@ -315,7 +317,11 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         stack.withdrawalExecutionPolicy = WithdrawalExecutionPolicy(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new WithdrawalExecutionPolicy(vaultAddress)),
+                    address(
+                        new WithdrawalExecutionPolicy(
+                            vaultAddress, TEST_MIN_REDEMPTION_CAPACITY, TEST_MIN_REDEMPTION_REFILL_RATE
+                        )
+                    ),
                     _proxyAdmin,
                     abi.encodeCall(WithdrawalExecutionPolicy.initialize, (address(stack.accessManager), 0))
                 )
@@ -471,7 +477,11 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         stack.withdrawalExecutionPolicy = WithdrawalExecutionPolicy(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new WithdrawalExecutionPolicy(gatewayAddress)),
+                    address(
+                        new WithdrawalExecutionPolicy(
+                            gatewayAddress, TEST_MIN_REDEMPTION_CAPACITY, TEST_MIN_REDEMPTION_REFILL_RATE
+                        )
+                    ),
                     _proxyAdmin,
                     abi.encodeCall(WithdrawalExecutionPolicy.initialize, (address(stack.accessManager), 0))
                 )
