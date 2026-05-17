@@ -37,6 +37,7 @@ import {Swapper} from "src/periphery/Swapper.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
 import {FundsBridgingPolicy} from "src/policies/FundsBridgingPolicy.sol";
 import {WithdrawalExecutionPolicy} from "src/policies/WithdrawalExecutionPolicy.sol";
+import {Constants} from "src/types/Constants.sol";
 
 abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainSetup, ATokenVaultDeployment {
     using Strings for address;
@@ -192,22 +193,21 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         // USDT uses CCIP Adapter
         gateway.addBridgeAdapter(_usdt(), accountingChainId, localCcipAdapter);
 
-        // Message uses CCIP Adapter
-        address messageOnly = address(0);
-        gateway.addBridgeAdapter(messageOnly, accountingChainId, localCcipAdapter);
-
         ICcipBridgeAdapter(localCcipAdapter).setChainSelector(accountingChainId, accountingChainCcipSelector);
         ICcipBridgeAdapter(localCcipAdapter).setDestinationChainAdapter(accountingChainId, accountingCcipAdapter);
 
-        // a.DI adapter is registered on the gateway and configured for the accounting chain only when the per-chain
+        // Data-only messages use aDI.
+        // aDI adapter is registered on the gateway and configured for the accounting chain only when the per-chain
         // flag is set. This lets us deploy the adapter without yet routing messages through it.
-        if (_isAdiAdapterDeployed() && _configBool(".earningChain.adi.registerOnGateway")) {
+        if (_isAdiAdapterDeployed()) {
+            // NOTE: Assumes the aDI adapter has the same address on the accounting chain (CREATE3 + same
+            // deployer/salt).
             address localAdiAdapter = getAdiAdapterAddress(_deployer());
-            // NOTE: This assumes the a.DI adapter has the same address on the accounting chain (CREATE3 + same
-            // deployer).
-            address accountingAdiAdapter = localAdiAdapter;
-            gateway.addBridgeAdapter(messageOnly, accountingChainId, localAdiAdapter);
-            IBridgeAdapter(localAdiAdapter).setDestinationChainAdapter(accountingChainId, accountingAdiAdapter);
+            address accountingChainAdiAdapter = localAdiAdapter;
+            IBridgeAdapter(localAdiAdapter).setDestinationChainAdapter(accountingChainId, accountingChainAdiAdapter);
+            if (_configBool(".earningChain.adi.registerOnGateway")) {
+                gateway.addBridgeAdapter(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, accountingChainId, localAdiAdapter);
+            }
         }
     }
 
