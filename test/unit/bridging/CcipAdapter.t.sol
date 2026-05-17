@@ -394,7 +394,7 @@ contract CcipAdapterTest is TestWithHelpers {
         _stageTokenFeeFromPayer(address(_accountingChainCcipAdapter), feePayer, _mockGho, feeAmount);
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: feeToken, feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: feeToken, nativeFeeRefundThreshold: 0}));
 
         Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
         ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
@@ -464,7 +464,7 @@ contract CcipAdapterTest is TestWithHelpers {
         vm.deal(address(_mockAccountingChainGateway), feeAmount);
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: feeToken, feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: feeToken, nativeFeeRefundThreshold: 0}));
 
         Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
         ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
@@ -524,7 +524,7 @@ contract CcipAdapterTest is TestWithHelpers {
         _stageTokenFeeFromPayer(address(_accountingChainCcipAdapter), feePayer, _mockGho, feeAmount);
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: address(_mockGho), feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: address(_mockGho), nativeFeeRefundThreshold: 0}));
 
         Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
         ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
@@ -569,7 +569,7 @@ contract CcipAdapterTest is TestWithHelpers {
         uint256 thNativeBefore = address(_mockTransferHelper).balance;
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0}));
 
         Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
         ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
@@ -624,7 +624,7 @@ contract CcipAdapterTest is TestWithHelpers {
         _stageTokenFeeFromPayer(address(_accountingChainCcipAdapter), feePayer, _mockGho, feeAmount);
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: feeToken, feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: feeToken, nativeFeeRefundThreshold: 0}));
 
         Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
         ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
@@ -699,7 +699,7 @@ contract CcipAdapterTest is TestWithHelpers {
         vm.deal(address(_mockAccountingChainGateway), feeAmount);
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0}));
 
         Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
         ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
@@ -758,7 +758,7 @@ contract CcipAdapterTest is TestWithHelpers {
         vm.deal(address(_mockAccountingChainGateway), allocatedFeeAmount);
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0}));
 
         Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
         ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
@@ -802,7 +802,7 @@ contract CcipAdapterTest is TestWithHelpers {
         vm.deal(address(_mockAccountingChainGateway), allocatedFeeAmount);
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0}));
 
         Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
         ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
@@ -853,7 +853,7 @@ contract CcipAdapterTest is TestWithHelpers {
         vm.deal(address(_mockAccountingChainGateway), allocatedFeeAmount);
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0}));
 
         Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
         ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
@@ -892,12 +892,12 @@ contract CcipAdapterTest is TestWithHelpers {
     function test_publishMessageWithFunds_erc20FeePath_keepsUnspentApprovalWithFeePayer(
         address feePayer,
         uint256 feeAmount,
-        uint256 feeRefundThreshold,
+        uint256 nativeFeeRefundThreshold,
         uint256 actualFeeAmount
     ) public {
         // Context: Accounting Chain -> Earning Chain
         // The ERC-20 fee path pulls only the CCIP-quoted estimate from `feePayer`, so the unspent allowance
-        // (`feeAmount - actualFeeAmount`) always remains with `feePayer` regardless of `feeRefundThreshold`.
+        // (`feeAmount - actualFeeAmount`) always remains with `feePayer` regardless of `nativeFeeRefundThreshold`.
         // No `FeeRefunded` event is emitted on this path.
 
         vm.assume(feePayer != address(0));
@@ -908,7 +908,7 @@ contract CcipAdapterTest is TestWithHelpers {
 
         address feeToken = address(_mockGho);
         feeAmount = _boundAssetAmount(feeToken, feeAmount);
-        feeRefundThreshold = _boundAssetAmount(feeToken, feeRefundThreshold);
+        nativeFeeRefundThreshold = _boundAssetAmount(feeToken, nativeFeeRefundThreshold);
         actualFeeAmount = _boundAssetAmount(feeToken, actualFeeAmount);
 
         vm.assume(feeAmount >= actualFeeAmount);
@@ -916,8 +916,9 @@ contract CcipAdapterTest is TestWithHelpers {
         _mockTransferHelper.mockAsset(address(_mockUsdt), amountUsdt);
         _stageTokenFeeFromPayer(address(_accountingChainCcipAdapter), feePayer, _mockGho, feeAmount);
 
-        bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: feeToken, feeRefundThreshold: feeRefundThreshold}));
+        bytes memory bridgeAdapterData = abi.encode(
+            CcipAdapter.CcipFeeParams({feeToken: feeToken, nativeFeeRefundThreshold: nativeFeeRefundThreshold})
+        );
 
         Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
         ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
@@ -958,7 +959,7 @@ contract CcipAdapterTest is TestWithHelpers {
     function test_publishMessageWithFunds_refundThresholdWorksAsExpected_NativeBridgeFee(
         address feePayer,
         uint256 feeAmount,
-        uint256 feeRefundThreshold,
+        uint256 nativeFeeRefundThreshold,
         uint256 actualFeeAmount
     ) public {
         // Context: Accounting Chain -> Earning Chain
@@ -979,7 +980,7 @@ contract CcipAdapterTest is TestWithHelpers {
 
         address feeToken = Constants.NATIVE_CURRENCY;
         feeAmount = _boundNativeAmount(feeAmount);
-        feeRefundThreshold = _boundNativeAmount(feeRefundThreshold);
+        nativeFeeRefundThreshold = _boundNativeAmount(nativeFeeRefundThreshold);
         actualFeeAmount = _boundNativeAmount(actualFeeAmount);
 
         vm.assume(feeAmount >= actualFeeAmount);
@@ -987,8 +988,9 @@ contract CcipAdapterTest is TestWithHelpers {
         _mockTransferHelper.mockAsset(address(_mockUsdt), amountUsdt);
         vm.deal(address(_mockAccountingChainGateway), feeAmount);
 
-        bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: feeToken, feeRefundThreshold: feeRefundThreshold}));
+        bytes memory bridgeAdapterData = abi.encode(
+            CcipAdapter.CcipFeeParams({feeToken: feeToken, nativeFeeRefundThreshold: nativeFeeRefundThreshold})
+        );
 
         Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
         ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
@@ -1035,7 +1037,7 @@ contract CcipAdapterTest is TestWithHelpers {
         uint256 excessFee = feeAmount - actualFeeAmount;
 
         uint256 expectedFeeRefund;
-        if (excessFee > 0 && excessFee >= feeRefundThreshold) {
+        if (excessFee > 0 && excessFee >= nativeFeeRefundThreshold) {
             expectedFeeRefund = excessFee;
         } else {
             // If the excess fee is less than the refund threshold, no refund is triggered nor expected
@@ -1068,7 +1070,7 @@ contract CcipAdapterTest is TestWithHelpers {
         });
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: address(_mockGho), feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: address(_mockGho), nativeFeeRefundThreshold: 0}));
 
         _stubCcipRouterSend(EARNING_CHAIN_CCIP_SELECTOR, expectedCcipMessage, bytes32(0));
         vm.expectCall(
@@ -1090,7 +1092,7 @@ contract CcipAdapterTest is TestWithHelpers {
         vm.deal(address(_accountingChainCcipAdapter), idleNativeAssetAmount);
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0}));
 
         Client.EVM2AnyMessage memory expectedCcipMessage = Client.EVM2AnyMessage({
             receiver: abi.encode(_earningChainCcipAdapter),
@@ -1125,7 +1127,7 @@ contract CcipAdapterTest is TestWithHelpers {
         vm.deal(address(_mockAccountingChainGateway), msgValue);
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: address(_mockGho), feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: address(_mockGho), nativeFeeRefundThreshold: 0}));
 
         Client.EVM2AnyMessage memory expectedCcipMessage = Client.EVM2AnyMessage({
             receiver: abi.encode(_earningChainCcipAdapter),
@@ -1180,7 +1182,7 @@ contract CcipAdapterTest is TestWithHelpers {
             "",
             address(this),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0}))
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0}))
         );
 
         vm.prank(caller);
@@ -1190,7 +1192,7 @@ contract CcipAdapterTest is TestWithHelpers {
             "",
             address(this),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0}))
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0}))
         );
     }
 
@@ -1220,7 +1222,7 @@ contract CcipAdapterTest is TestWithHelpers {
             "",
             address(this),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0}))
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0}))
         );
     }
 
@@ -1235,7 +1237,7 @@ contract CcipAdapterTest is TestWithHelpers {
             "",
             address(this),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0}))
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0}))
         );
     }
 
@@ -1619,7 +1621,7 @@ contract CcipAdapterTest is TestWithHelpers {
         _stageTokenFeeFromPayer(address(_accountingChainCcipAdapter), feePayer, _mockUsdt, feeAmount);
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: feeToken, feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: feeToken, nativeFeeRefundThreshold: 0}));
 
         // Route messages back into the local test environment and use a real router fee pull.
         _mockCCIPRouter.setSourceChainSelector(EARNING_CHAIN_CCIP_SELECTOR, ACCOUNTING_CHAIN_CCIP_SELECTOR);
@@ -1657,7 +1659,7 @@ contract CcipAdapterTest is TestWithHelpers {
         _stageTokenFeeFromPayer(address(_accountingChainCcipAdapter), feePayer, _mockUsdt, feeAmount);
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: feeToken, feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: feeToken, nativeFeeRefundThreshold: 0}));
 
         // Route messages back into the local test environment and use a real router fee pull.
         _mockCCIPRouter.setSourceChainSelector(EARNING_CHAIN_CCIP_SELECTOR, ACCOUNTING_CHAIN_CCIP_SELECTOR);
@@ -1696,7 +1698,7 @@ contract CcipAdapterTest is TestWithHelpers {
         uint256 adapterBalanceBeforeBridge = _mockUsdt.balanceOf(address(_accountingChainCcipAdapter));
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: address(_mockUsdt), feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: address(_mockUsdt), nativeFeeRefundThreshold: 0}));
 
         // Route messages back into the local test environment and use a real router fee pull.
         _mockCCIPRouter.setSourceChainSelector(EARNING_CHAIN_CCIP_SELECTOR, ACCOUNTING_CHAIN_CCIP_SELECTOR);
@@ -1743,10 +1745,10 @@ contract CcipAdapterTest is TestWithHelpers {
         _stageTokenFeeFromPayer(address(_accountingChainCcipAdapter), feePayer, _mockUsdt, allocatedFeeAmount);
 
         bytes memory bridgeAdapterData = abi.encode(
-            ICcipBridgeAdapter.CcipFeeParams({
+            CcipAdapter.CcipFeeParams({
                 feeToken: address(_mockUsdt),
                 // Refund any excess.
-                feeRefundThreshold: 0
+                nativeFeeRefundThreshold: 0
             })
         );
 
@@ -1795,9 +1797,9 @@ contract CcipAdapterTest is TestWithHelpers {
         vm.deal(address(_mockAccountingChainGateway), nativeFeeAmount);
 
         bytes memory bridgeAdapterData = abi.encode(
-            ICcipBridgeAdapter.CcipFeeParams({
+            CcipAdapter.CcipFeeParams({
                 feeToken: Constants.NATIVE_CURRENCY, // Native currency
-                feeRefundThreshold: 0
+                nativeFeeRefundThreshold: 0
             })
         );
 
@@ -1917,14 +1919,14 @@ contract CcipAdapterTest is TestWithHelpers {
         uint256 amountUsdt = 100_000000; // 100 USDT
         uint256 feeAmount = 10 ether;
         uint256 actualFeeAmount = 7 ether;
-        uint256 feeRefundThreshold = 1 ether;
+        uint256 nativeFeeRefundThreshold = 1 ether;
 
         _mockTransferHelper.mockAsset(address(_mockUsdt), amountUsdt);
         vm.deal(address(_mockAccountingChainGateway), feeAmount);
 
         bytes memory bridgeAdapterData = abi.encode(
-            ICcipBridgeAdapter.CcipFeeParams({
-                feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: feeRefundThreshold
+            CcipAdapter.CcipFeeParams({
+                feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: nativeFeeRefundThreshold
             })
         );
 
@@ -1969,7 +1971,7 @@ contract CcipAdapterTest is TestWithHelpers {
         _stageTokenFeeFromPayer(address(_accountingChainCcipAdapter), feePayer, _mockGho, feeAmount);
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: feeToken, feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: feeToken, nativeFeeRefundThreshold: 0}));
 
         Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
         ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
@@ -2015,7 +2017,7 @@ contract CcipAdapterTest is TestWithHelpers {
         _stageTokenFeeFromPayer(address(_accountingChainCcipAdapter), feePayer, _mockGho, feeAmount);
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: address(_mockGho), feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: address(_mockGho), nativeFeeRefundThreshold: 0}));
 
         Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
         ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
@@ -2068,7 +2070,7 @@ contract CcipAdapterTest is TestWithHelpers {
         _stageTokenFeeFromPayer(address(_accountingChainCcipAdapter), feePayer, _mockGho, feeAmount);
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: address(_mockGho), feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: address(_mockGho), nativeFeeRefundThreshold: 0}));
 
         Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
         ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
@@ -2118,7 +2120,7 @@ contract CcipAdapterTest is TestWithHelpers {
         vm.deal(address(_mockAccountingChainGateway), feeAmount);
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0}));
 
         Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
         ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
@@ -2168,7 +2170,7 @@ contract CcipAdapterTest is TestWithHelpers {
         _stageTokenFeeFromPayer(address(_accountingChainCcipAdapter), feePayer, _mockUsdt, feeAmount);
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: address(_mockUsdt), feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: address(_mockUsdt), nativeFeeRefundThreshold: 0}));
 
         Client.EVMTokenAmount[] memory ccipTokenAmounts = new Client.EVMTokenAmount[](1);
         ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
@@ -2216,7 +2218,7 @@ contract CcipAdapterTest is TestWithHelpers {
         _stageTokenFeeFromPayer(address(_accountingChainCcipAdapter), feePayer, _mockGho, feeAmount);
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: address(_mockGho), feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: address(_mockGho), nativeFeeRefundThreshold: 0}));
 
         Client.EVM2AnyMessage memory expectedCcipMessage = Client.EVM2AnyMessage({
             receiver: abi.encode(_earningChainCcipAdapter),
@@ -2266,7 +2268,7 @@ contract CcipAdapterTest is TestWithHelpers {
         vm.deal(address(_mockAccountingChainGateway), feeAmount);
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0}));
 
         Client.EVM2AnyMessage memory expectedCcipMessage = Client.EVM2AnyMessage({
             receiver: abi.encode(_earningChainCcipAdapter),
@@ -2307,7 +2309,7 @@ contract CcipAdapterTest is TestWithHelpers {
         vm.deal(address(_mockAccountingChainGateway), feeAmount);
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0}));
 
         _mockCCIPRouter.setSourceChainSelector(EARNING_CHAIN_CCIP_SELECTOR, ACCOUNTING_CHAIN_CCIP_SELECTOR);
         _mockCCIPRouter.setFee(feeAmount);
@@ -2333,7 +2335,7 @@ contract CcipAdapterTest is TestWithHelpers {
         _stageTokenFeeFromPayer(address(_accountingChainCcipAdapter), feePayer, _mockGho, feeAmount);
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: address(_mockGho), feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: address(_mockGho), nativeFeeRefundThreshold: 0}));
 
         _mockCCIPRouter.setSourceChainSelector(EARNING_CHAIN_CCIP_SELECTOR, ACCOUNTING_CHAIN_CCIP_SELECTOR);
         _mockCCIPRouter.setFee(feeAmount);

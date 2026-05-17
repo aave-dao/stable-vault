@@ -4,7 +4,7 @@ pragma solidity ^0.8.22;
 
 import {EarningChainBaseScript} from "script/interact/earning/EarningChainBaseScript.s.sol";
 
-import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
+import {CcipAdapter} from "src/bridging/ccip/CcipAdapter.sol";
 import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
 
 /// @dev See example usage below:
@@ -20,8 +20,8 @@ contract EarningChainGatewayInteractionScript is EarningChainBaseScript {
     function pushFundsToAccountingChain() public {
         address asset = USDT;
         uint256 amount = 123 * 10 ** 6;
-        ICcipBridgeAdapter.CcipFeeParams memory bridgeAdapterData =
-            ICcipBridgeAdapter.CcipFeeParams({feeToken: LINK, feeRefundThreshold: 0});
+        CcipAdapter.CcipFeeParams memory bridgeAdapterData =
+            CcipAdapter.CcipFeeParams({feeToken: LINK, nativeFeeRefundThreshold: 0});
         uint256 gasLimit = 0; // NOTE: caller must set the destination gas limit before broadcasting.
 
         vm.startBroadcast(vm.envUint("ADMIN_PRIVATE_KEY"));

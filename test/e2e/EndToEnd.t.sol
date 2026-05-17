@@ -7,9 +7,9 @@ import {IERC20} from "forge-std/interfaces/IERC20.sol";
 import {IERC4626} from "forge-std/interfaces/IERC4626.sol";
 import {Logger} from "test/helpers/Logger.sol";
 
+import {CcipAdapter} from "src/bridging/ccip/CcipAdapter.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
-import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {ISwapper} from "src/interfaces/ISwapper.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
@@ -77,7 +77,7 @@ contract EndToEndTest is BaseTest {
                 address(ccipAdapter_accountingChain),
                 DEFAULT_GAS_LIMIT,
                 abi.encode(
-                    ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})
+                    CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})
                 ),
                 ""
             );
@@ -211,7 +211,7 @@ contract EndToEndTest is BaseTest {
             {
 
                 bytes memory bp = abi.encode(
-                    ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})
+                    CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})
                 );
                 earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
                     address(GHO), userEarningsInGho, address(ccipAdapter_earningChain), DEFAULT_GAS_LIMIT, bp, ""
@@ -358,7 +358,7 @@ contract EndToEndTest is BaseTest {
             {
 
                 bytes memory bp = abi.encode(
-                    ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})
+                    CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})
                 );
                 earningChainGateway.pushFundsToAccountingChain{value: bridgeFeeAmount}(
                     address(GHO), ghoBalanceOnVaultLeft, address(ccipAdapter_earningChain), DEFAULT_GAS_LIMIT, bp, ""

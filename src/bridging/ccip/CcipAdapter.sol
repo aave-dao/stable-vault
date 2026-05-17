@@ -48,6 +48,15 @@ contract CcipAdapter is
 {
     using SafeERC20 for IERC20;
 
+    /// @notice CCIP-specific fee parameters decoded by `CcipAdapter` when publishing a message.
+    /// @param feeToken Token to pay the bridge fee in.
+    /// @param nativeFeeRefundThreshold Minimum native-fee surplus over the CCIP-quote estimate that triggers a refund
+    /// to `feePayer`
+    struct CcipFeeParams {
+        address feeToken;
+        uint256 nativeFeeRefundThreshold;
+    }
+
     /// @dev CCIP's `EVM2AnyMessage.feeToken` uses `address(0)` for native. This adapter translates our own native
     /// currency constant convention to CCIP's convention.
     address internal constant CCIP_NATIVE_FEE_TOKEN = address(0);
@@ -176,8 +185,7 @@ contract CcipAdapter is
         uint256 receiverExecutionGasLimit,
         bytes memory bridgeAdapterData
     ) internal {
-        ICcipBridgeAdapter.CcipFeeParams memory ccipFeeParams =
-            abi.decode(bridgeAdapterData, (ICcipBridgeAdapter.CcipFeeParams));
+        CcipFeeParams memory ccipFeeParams = abi.decode(bridgeAdapterData, (CcipFeeParams));
 
         address destinationChainAdapter = _destinationChainAdapterOf[destinationChainId];
         require(destinationChainAdapter != address(0), Errors.InvalidParameter());
@@ -217,7 +225,7 @@ contract CcipAdapter is
             ccipMessage,
             feePayer,
             ccipFeeParams.feeToken,
-            ccipFeeParams.feeRefundThreshold,
+            ccipFeeParams.nativeFeeRefundThreshold,
             estimatedFeeAmount
         );
 
@@ -306,7 +314,7 @@ contract CcipAdapter is
         Client.EVM2AnyMessage memory message,
         address feePayer,
         address feeToken,
-        uint256 feeRefundThreshold,
+        uint256 nativeFeeRefundThreshold,
         uint256 estimatedFeeAmount
     ) internal {
         bytes32 messageId = IRouterClient(CCIP_ROUTER)
@@ -315,7 +323,7 @@ contract CcipAdapter is
         );
         if (feeToken == Constants.NATIVE_CURRENCY && msg.value > estimatedFeeAmount) {
             uint256 excessFee = msg.value - estimatedFeeAmount;
-            if (excessFee >= feeRefundThreshold) {
+            if (excessFee >= nativeFeeRefundThreshold) {
                 _triggerNativeFeeRefund(feePayer, excessFee);
             }
         }

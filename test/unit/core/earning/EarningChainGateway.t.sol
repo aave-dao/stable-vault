@@ -12,10 +12,10 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transpa
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+import {CcipAdapter} from "src/bridging/ccip/CcipAdapter.sol";
 import {EarningChainGateway} from "src/core/earning/EarningChainGateway.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
-import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
@@ -500,7 +500,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             MockNonStandardErc20(bridgeFeeToken).approve(address(_mockBridgeCcipFeeParams), bridgeFeeAmount);
 
             bytes memory bridgeAdapterData =
-                abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: bridgeFeeToken, feeRefundThreshold: 0}));
+                abi.encode(CcipAdapter.CcipFeeParams({feeToken: bridgeFeeToken, nativeFeeRefundThreshold: 0}));
 
             vm.expectCall(
                 bridgeFeeToken,
@@ -556,7 +556,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             MockNonStandardErc20(bridgeFeeToken).approve(address(_mockBridgeCcipFeeParams), bridgeFeeAmount);
 
             bytes memory bridgeAdapterData =
-                abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: bridgeFeeToken, feeRefundThreshold: 0}));
+                abi.encode(CcipAdapter.CcipFeeParams({feeToken: bridgeFeeToken, nativeFeeRefundThreshold: 0}));
 
             vm.expectCall(
                 bridgeFeeToken,
@@ -621,7 +621,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             );
 
             bridgeAdapterData = abi.encode(
-                ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})
+                CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})
             );
 
             uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(tokenOut);
@@ -667,7 +667,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         );
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0}));
         _mockBridgeCcipFeeParams.setShouldRevertPublish(true);
 
         vm.expectRevert(MockBridgeAdapter.PublishMessageFailed.selector);
@@ -712,7 +712,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             user,
             address(_mockBridgeCcipFeeParams),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})),
             ""
         );
     }
@@ -746,7 +746,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             user,
             address(_mockBridgeCcipFeeParams),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})),
             ""
         );
     }
@@ -783,7 +783,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             user,
             address(_mockBridgeCcipFeeParams),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})),
             ""
         );
 
@@ -800,7 +800,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             makeAddr("tokenOutReceiver"),
             address(_mockBridgeCcipFeeParams),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})),
             ""
         );
     }
@@ -816,7 +816,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             makeAddr("tokenOutReceiver"),
             address(_mockBridgeCcipFeeParams),
             BURN_IOU_TOKEN_GAS_LIMIT - 1,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})),
             ""
         );
     }
@@ -836,7 +836,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             makeAddr("tokenOutReceiver"),
             address(_mockBridgeCcipFeeParams),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})),
             ""
         );
     }
@@ -859,7 +859,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             makeAddr("tokenOutReceiver"),
             address(_mockBridgeCcipFeeParams),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})),
             ""
         );
     }
@@ -880,7 +880,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             makeAddr("tokenOutReceiver"),
             address(_mockBridgeCcipFeeParams),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})),
             ""
         );
     }
@@ -921,7 +921,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             makeAddr("tokenOutReceiver"),
             address(_mockBridgeCcipFeeParams),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})),
             ""
         );
     }
@@ -945,7 +945,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             tokenOutReceiver,
             unsupportedAdapter,
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})),
             ""
         );
     }
@@ -964,7 +964,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             tokenOutReceiver,
             bogusAdapter,
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})),
             ""
         );
     }
@@ -991,7 +991,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             tokenOutReceiver,
             address(_mockBridgeCcipFeeParams),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})),
             ""
         );
     }
@@ -1023,7 +1023,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         );
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: bridgeFeeToken, feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: bridgeFeeToken, nativeFeeRefundThreshold: 0}));
 
         vm.expectCall(
             address(_mockBridgeAdapterAssets),
@@ -1065,7 +1065,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         MockNonStandardErc20(bridgeFeeToken).approve(address(_mockBridgeAdapterAssets), bridgeFeeAmount);
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: bridgeFeeToken, feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: bridgeFeeToken, nativeFeeRefundThreshold: 0}));
 
         vm.expectCall(
             address(_policyRegistry),
@@ -1105,7 +1105,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         );
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: bridgeFeeToken, feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: bridgeFeeToken, nativeFeeRefundThreshold: 0}));
 
         vm.expectCall(
             address(_mockBridgeAdapterAssets),
@@ -1156,7 +1156,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         );
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: bridgeFeeToken, feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: bridgeFeeToken, nativeFeeRefundThreshold: 0}));
 
         vm.expectCall(
             address(_mockBridgeAdapterAssets),
@@ -1196,7 +1196,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             amountToken,
             address(_mockBridgeAdapterAssets),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})),
             ""
         );
     }
@@ -1215,7 +1215,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             amountToken,
             address(_mockBridgeAdapterAssets),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})),
             ""
         );
     }
@@ -1234,7 +1234,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             amountToken,
             address(_mockBridgeAdapterAssets),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})),
             ""
         );
     }
@@ -1262,7 +1262,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             100_000_000_000_000 * 10 ** 6,
             address(_mockBridgeAdapterAssets),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})),
             ""
         );
     }
@@ -1275,7 +1275,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             0,
             address(_mockBridgeAdapterAssets),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})),
             ""
         );
     }
@@ -1293,7 +1293,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             amount,
             address(_mockBridgeAdapterAssets),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})),
             ""
         );
     }
@@ -1325,7 +1325,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             amount,
             address(_mockBridgeAdapterAssets),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: bridgeFeeToken, feeRefundThreshold: 0})),
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: bridgeFeeToken, nativeFeeRefundThreshold: 0})),
             ""
         );
     }
@@ -1339,7 +1339,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             100,
             bogusAdapter,
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})),
             ""
         );
     }
@@ -1361,7 +1361,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             100,
             address(_mockBridgeCcipFeeParams),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})),
             ""
         );
     }
@@ -1376,7 +1376,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             100_000_000_000_000 * 10 ** 6,
             address(_mockBridgeAdapterAssets),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})),
             ""
         );
     }
@@ -1423,7 +1423,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     ),
                     bridgeFeePayer,
                     DEFAULT_GAS_LIMIT,
-                    abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: feeToken, feeRefundThreshold: 0}))
+                    abi.encode(CcipAdapter.CcipFeeParams({feeToken: feeToken, nativeFeeRefundThreshold: 0}))
                 )
             )
         );
@@ -1436,7 +1436,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockBridgeCcipFeeParams),
             bridgeFeePayer,
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: address(_mockGho), feeRefundThreshold: 0}))
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: address(_mockGho), nativeFeeRefundThreshold: 0}))
         );
     }
 
@@ -1473,7 +1473,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     bridgeFeePayer,
                     DEFAULT_GAS_LIMIT,
                     abi.encode(
-                        ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})
+                        CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})
                     )
                 )
             )
@@ -1487,7 +1487,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockBridgeCcipFeeParams),
             bridgeFeePayer,
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0}))
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0}))
         );
     }
 
@@ -1501,7 +1501,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             address(_mockBridgeCcipFeeParams),
             address(this),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: address(_mockUsdt), feeRefundThreshold: 0}))
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: address(_mockUsdt), nativeFeeRefundThreshold: 0}))
         );
     }
 
@@ -1517,7 +1517,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             unsupportedAdapter,
             address(this),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: address(_mockUsdt), feeRefundThreshold: 0}))
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: address(_mockUsdt), nativeFeeRefundThreshold: 0}))
         );
     }
 
@@ -1531,7 +1531,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             makeAddr("bridgeAdapter"),
             address(this),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: address(_mockUsdt), feeRefundThreshold: 0}))
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: address(_mockUsdt), nativeFeeRefundThreshold: 0}))
         );
     }
 
@@ -1798,7 +1798,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         vm.deal(attacker, bridgeFeeAmount * 2);
 
         bytes memory reentrantCcipFeeParams =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0}));
         reentrantAsset.setReentrantCall(
             address(_earningChainGateway),
             abi.encodeCall(

@@ -4,7 +4,7 @@ pragma solidity ^0.8.22;
 
 import {AccountingChainBaseScript} from "script/interact/accounting/AccountingChainBaseScript.s.sol";
 
-import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
+import {CcipAdapter} from "src/bridging/ccip/CcipAdapter.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 
 /// @dev See example usage below:
@@ -21,8 +21,8 @@ contract FundsHandlerInteractionScript is AccountingChainBaseScript {
         address token = GHO;
         uint256 amount = 234 * 10 ** 18;
         uint256 chainId = 1;
-        ICcipBridgeAdapter.CcipFeeParams memory bridgeAdapterData =
-            ICcipBridgeAdapter.CcipFeeParams({feeToken: LINK, feeRefundThreshold: 0});
+        CcipAdapter.CcipFeeParams memory bridgeAdapterData =
+            CcipAdapter.CcipFeeParams({feeToken: LINK, nativeFeeRefundThreshold: 0});
         uint256 gasLimit = 0; // NOTE: caller must set the destination gas limit before broadcasting.
 
         uint256 key = vm.envUint("ADMIN_PRIVATE_KEY");

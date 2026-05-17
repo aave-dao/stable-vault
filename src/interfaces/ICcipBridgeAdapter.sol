@@ -8,15 +8,6 @@ import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 /// @author Aave Labs
 /// @notice Interface for the CcipBridgeAdapter contract.
 interface ICcipBridgeAdapter is IBridgeAdapter {
-    /// @notice CCIP-specific fee parameters decoded by `CcipAdapter` when publishing a message.
-    /// @param feeToken Token to pay the bridge fee in.
-    /// @param feeRefundThreshold Minimum native-fee surplus over the CCIP-quote estimate that triggers a refund to
-    /// `feePayer`
-    struct CcipFeeParams {
-        address feeToken;
-        uint256 feeRefundThreshold;
-    }
-
     /// @notice Emitted when a CCIP chain selector mapping is set.
     event ChainSelectorSet(uint256 indexed chainId, uint64 indexed ccipChainSelector);
 

@@ -5,7 +5,7 @@ pragma solidity ^0.8.20;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
+import {CcipAdapter} from "src/bridging/ccip/CcipAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {Constants} from "src/types/Constants.sol";
@@ -49,8 +49,7 @@ contract MockGateway is IChainGateway {
         uint256, /*gasLimit*/
         bytes calldata bridgeAdapterData
     ) external payable override {
-        ICcipBridgeAdapter.CcipFeeParams memory ccipFeeParams =
-            abi.decode(bridgeAdapterData, (ICcipBridgeAdapter.CcipFeeParams));
+        CcipAdapter.CcipFeeParams memory ccipFeeParams = abi.decode(bridgeAdapterData, (CcipAdapter.CcipFeeParams));
         if (ccipFeeParams.feeToken == Constants.NATIVE_CURRENCY) {
             if (msg.value > 0) {
                 (bool ok,) = _transferHelper.call{value: msg.value}("");
