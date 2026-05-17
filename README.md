@@ -34,6 +34,7 @@ The protocol operates on a model where the Accounting Chain is the primary comma
 
 - **Accounting Chain**: Hosts the `StableVault`, `FundsHandler` and `Allocator` for local yield strategies. It tracks the global state of user deposits and total system liquidity.
 - **Earning Chains**: Host `EarningChainGateway` and local `Allocator`s. Funds are bridged here to access yield opportunities not available on the Accounting Chain.
+- **Bridge adapters**: Cross-chain messages and funds move through bridge adapters. The repository currently includes Chainlink CCIP and a.DI adapters.
 
 **Oracle Architecture:**
 - **Price oracles (both chains)**:
@@ -56,7 +57,7 @@ The protocol operates on a model where the Accounting Chain is the primary comma
    - Managers call `pushFundsToChain` on the `FundsHandler`. This bridges assets via the `AccountingChainGateway` to an Earning Chain.
    - Managers call `pushFundsToAccountingChain` on the `EarningChainGateway` to return funds to the Accounting Chain.
 2. **Strategy Management**:
-   - Managers add, remove, and set default strategies on the `Allocator` to direct funds into the most efficient yield sources.
+   - Managers add, remove, trust, distrust, and order strategies on the `Allocator` to direct funds into the most efficient yield sources.
 
 ## User Guide
 
@@ -64,7 +65,7 @@ The protocol operates on a model where the Accounting Chain is the primary comma
 
 Users can deposit supported assets into the vault (supported assets are managed on the `AssetRegistry` contract).
 
-1. **Call `deposit`**: The user calls the `deposit(address user, address asset, uint256 amount)` function on the `StableVault` contract.
+1. **Call `deposit`**: The user calls the `deposit(address user, address asset, uint256 amount, bytes calldata policyData)` function on the `StableVault` contract.
 2. **Share Calculation**: The deposited amount is converted into shares of a SubVault based on the current conversion rate.
 3. **Position Update**: The user's position is credited with the calculated shares.
 
@@ -73,7 +74,7 @@ Users can deposit supported assets into the vault (supported assets are managed 
 Withdrawals are a two-step process designed to ensure liquidity management and proper accounting.
 
 1. **Request Withdrawal**:
-   - The user calls `requestWithdrawal(address user, uint256 requestedAmountInRay)`.
+   - The user calls `requestWithdrawal(address user, uint256 requestedAmountInRay, bytes calldata policyData)`.
    - A corresponding amount of the user's shares are burned.
    - **IOU Tokens** are minted to the user, representing their claim on the underlying assets.
    - This action must be performed on the Accounting Chain since the `StableVault` is the source of truth for a user's claimable balance.
@@ -90,21 +91,21 @@ Withdrawals are a two-step process designed to ensure liquidity management and p
    - **Accounting Chain**:
      - **Contract**: `StableVault`
      - **Function**: `executeWithdrawal(...)`
-     - **Process**: IOUs are burned via `IouTokenManager`. The `WithdrawalPolicy` enforces the protocol's policies and operational costs associated with the withdrawal. Assets are withdrawn from the local `Allocator` then transferred to the user from the `TransferHelper`.
+     - **Process**: IOUs are burned via `IouTokenManager`. The `WithdrawalExecutionPolicy` enforces the protocol's policies and operational costs associated with the withdrawal. Assets are withdrawn from the local `Allocator` then transferred to the user from the `TransferHelper`.
 
    - **Earning Chains**:
      - **Contract**: `EarningChainGateway`
      - **Function**: `exchangeIouTokens(...)`
-     - **Process**: IOUs are burned locally. The `WithdrawalPolicy` enforces the protocol's policies and operational costs associated with the withdrawal. Assets are withdrawn from the local `Allocator`. A cross-chain message is sent to the Accounting Chain to burn the corresponding locked IOUs. Assets are transferred to the user from the `TransferHelper`.
+     - **Process**: IOUs are burned locally. The `WithdrawalExecutionPolicy` enforces the protocol's policies and operational costs associated with the withdrawal. Assets are withdrawn from the local `Allocator`. A cross-chain message is sent to the Accounting Chain to burn the corresponding locked IOUs. Assets are transferred to the user from the `TransferHelper`.
 
 ## Repository Structure
 
 ```
 stable-vault/
 ├── src/                          # Main source code
-│   ├── access/                   # Access control contracts
 │   ├── bridging/                 # Adapters used by protocol to interface with cross-chain bridges
-│   │   └── ccip/                 # Chainlink CCIP adapter logic and interfaces
+│   │   ├── adi/                  # a.DI adapter logic
+│   │   └── ccip/                 # Chainlink CCIP adapter logic
 │   ├── core/                     # Core protocol logic
 │   │   ├── accounting/           # Accounting chain logic (Vault, FundsHandler)
 │   │   ├── earning/              # Earning chain logic
@@ -113,9 +114,11 @@ stable-vault/
 │   ├── libraries/                # Shared libraries (Math, Assets, etc.)
 │   ├── misc/                     # Miscellaneous utils (contracts inherited by core/periphery contracts)
 │   ├── oracles/                  # Price and chain balance oracle contracts and adapters
-│   └── periphery/                # Peripheral contracts (WithdrawalPolicy, etc.)
+│   ├── periphery/                # Peripheral contracts (registries, swapper, coverage vault, etc.)
+│   ├── policies/                 # Deposit, withdrawal-execution, and funds-bridging policies
+│   └── types/                    # Shared constants and errors
 ├── test/                         # Test suite
-├── script/                       # Deployment scripts
+├── script/                       # Deployment, upgrade, setup, and interaction scripts
 └── lib/                          # Foundry dependencies
 ```
 
