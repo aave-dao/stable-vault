@@ -192,7 +192,7 @@ contract FundsHandler is
     }
 
     function _applyFundsBridgingPolicy(
-        uint256 chainId,
+        uint256 destChainId,
         address bridgeAdapter,
         address asset,
         uint256 amount,
@@ -207,7 +207,7 @@ contract FundsHandler is
                 IFundsBridgingPolicy.FundsBridgingIntent({
                 caller: msg.sender,
                 bridgeAdapter: bridgeAdapter,
-                destChainId: chainId,
+                destChainId: destChainId,
                 asset: asset,
                 amount: amount,
                 policyData: policyData

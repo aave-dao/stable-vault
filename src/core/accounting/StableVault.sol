@@ -928,8 +928,8 @@ contract StableVault is
         return IERC20(IIouTokenManager(IOU_TOKEN_MANAGER).getAsset()).totalSupply();
     }
 
-    function _mintIous(address user, uint256 amount) internal {
-        IIouTokenManager(IOU_TOKEN_MANAGER).mintTokens(user, amount);
+    function _mintIous(address user, uint256 iouAmountRay) internal {
+        IIouTokenManager(IOU_TOKEN_MANAGER).mintTokens(user, iouAmountRay);
     }
 
     function _isActiveSubVaultById(uint256 subVaultId) internal view returns (bool) {
