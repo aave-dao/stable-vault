@@ -51,6 +51,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
     uint256 internal ACCOUNTING_CHAIN_ID = 1;
     uint256 internal EARNING_CHAIN_ID = 2;
     uint256 internal DEFAULT_GAS_LIMIT = BURN_IOU_TOKEN_GAS_LIMIT;
+    uint256 internal MAX_REDEMPTION_CAPACITY = type(uint128).max - 1;
 
     address admin = makeAddr("ADMIN");
     address everyRoleAccount = makeAddr("EVERY_ROLE_ACCOUNT");
@@ -125,7 +126,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 )
             )
         );
-        policy.raiseRedemptionCapacity(type(uint128).max - 1);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        policy.raiseRedemptionCapacity(uint128(MAX_REDEMPTION_CAPACITY));
         policy.raiseRedemptionRefillRate(1e30);
         return policy;
     }
@@ -649,6 +651,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         public
     {
         iouTokenAmountRay = _boundRayAmount(iouTokenAmountRay);
+        vm.assume(iouTokenAmountRay < MAX_REDEMPTION_CAPACITY);
         address tokenOutReceiver = makeAddr("tokenOutReceiver");
         address tokenOut = address(_mockUsdt);
         uint256 amountOut = iouTokenAmountRay.rayToAssetDecimals(tokenOut);
