@@ -67,18 +67,6 @@ contract MutableChainBalanceOracle is IChainBalanceOracle {
 contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
     using AssetLib for uint256;
 
-    uint256 internal constant DEFAULT_MAX_PER_SECOND_RATE = 1000000005781378656804591713; // ~20% APY
-    uint256 internal constant BURN_IOU_TOKEN_GAS_LIMIT = 120_000;
-    uint256 internal constant MAX_ACTIVE_SUB_VAULTS = 201;
-    uint8 internal constant MAX_STRATEGIES_PER_ASSET = 15;
-    uint128 internal constant TEST_MIN_REDEMPTION_CAPACITY = 1e30;
-    uint128 internal constant TEST_MIN_REDEMPTION_REFILL_RATE = 1e25;
-
-    address internal _proxyAdmin = makeAddr("PROXY_ADMIN");
-    address internal _admin = makeAddr("ADI_IOU_ADMIN");
-    address internal _treasury = makeAddr("ADI_IOU_TREASURY");
-    address internal _user = makeAddr("ADI_IOU_USER");
-
     struct AccountingStack {
         MockAccessManager accessManager;
         TransferHelper transferHelper;
@@ -113,6 +101,18 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         AdiAdapter adiAdapter;
         TestErc4626 strategy;
     }
+
+    uint256 internal constant DEFAULT_MAX_PER_SECOND_RATE = 1000000005781378656804591713; // ~20% APY
+    uint256 internal constant BURN_IOU_TOKEN_GAS_LIMIT = 120_000;
+    uint256 internal constant MAX_ACTIVE_SUB_VAULTS = 201;
+    uint8 internal constant MAX_STRATEGIES_PER_ASSET = 15;
+    uint128 internal constant TEST_MIN_REDEMPTION_CAPACITY = 1e30;
+    uint128 internal constant TEST_MIN_REDEMPTION_REFILL_RATE = 1e25;
+
+    address internal _proxyAdmin = makeAddr("PROXY_ADMIN");
+    address internal _admin = makeAddr("ADI_IOU_ADMIN");
+    address internal _treasury = makeAddr("ADI_IOU_TREASURY");
+    address internal _user = makeAddr("ADI_IOU_USER");
 
     AccountingStack internal _accounting;
     EarningStack internal _earning;
