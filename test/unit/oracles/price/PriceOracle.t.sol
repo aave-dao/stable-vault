@@ -165,7 +165,7 @@ contract PriceOracleTest is TestWithHelpers {
     }
 
     function test_getPrice_reverts_ifAdapterNotFound() public {
-        vm.expectRevert(abi.encodeWithSelector(IPriceOracle.OracleAdapterNotFound.selector, asset1));
+        vm.expectRevert(abi.encodeWithSelector(PriceOracle.OracleAdapterNotFound.selector, asset1));
         _priceOracle.getPrice(asset1);
     }
 
@@ -189,7 +189,7 @@ contract PriceOracleTest is TestWithHelpers {
         burner.setBurnEnabled(true);
 
         // Cap forwarded gas so the inner loop OOGs while the outer frame can still execute the catch.
-        vm.expectRevert(IPriceOracle.InsufficientGasForExternalCall.selector);
+        vm.expectRevert(PriceOracle.InsufficientGasForExternalCall.selector);
         _priceOracle.getPrice{gas: 200_000}(asset1);
     }
 
@@ -255,7 +255,7 @@ contract PriceOracleTest is TestWithHelpers {
     }
 
     function test_validatePrice_reverts_ifAdapterNotFound() public {
-        vm.expectRevert(abi.encodeWithSelector(IPriceOracle.OracleAdapterNotFound.selector, asset1));
+        vm.expectRevert(abi.encodeWithSelector(PriceOracle.OracleAdapterNotFound.selector, asset1));
         _priceOracle.validatePrice(asset1);
     }
 

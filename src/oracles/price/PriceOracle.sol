@@ -22,6 +22,14 @@ contract PriceOracle is AccessManagedUpgradeable, IPriceOracle {
     /// @notice Emitted when an adapter is set for an asset.
     event OracleAdapterSet(address indexed asset, address indexed newAdapter, address indexed previousAdapter);
 
+    /// @notice Thrown when a price call to an adapter ran out of gas.
+    /// @custom:selector 0x24b593d9
+    error InsufficientGasForExternalCall();
+
+    /// @notice Thrown when the adapter for an asset is not found.
+    /// @custom:selector 0x2a40cc73
+    error OracleAdapterNotFound(address asset);
+
     uint256 immutable MIN_VALID_PRICE_RAY;
 
     uint256 constant MAX_PRICE_RAY = MathLib.RAY;
@@ -80,8 +88,8 @@ contract PriceOracle is AccessManagedUpgradeable, IPriceOracle {
         address oracleAdapter = $storage().oracleAdapterByAsset[asset];
         require(oracleAdapter != address(0), OracleAdapterNotFound(asset));
         IPriceOracleAdapter.OracleResponse memory response = IPriceOracleAdapter(oracleAdapter).getPrice(asset);
-        require(!response.isStale, IPriceOracle.StalePrice());
-        require(response.priceRay >= MIN_VALID_PRICE_RAY, IPriceOracle.PriceTooLow());
+        require(!response.isStale, StalePrice());
+        require(response.priceRay >= MIN_VALID_PRICE_RAY, PriceTooLow());
     }
 
     function getOracleAdapterForAsset(address asset) external view returns (address) {
@@ -113,7 +121,7 @@ contract PriceOracle is AccessManagedUpgradeable, IPriceOracle {
             // The "all but one 64th" gas check re-reverts when the catch fired from out-of-gas, so a healthy feed
             // cannot be silently induced to return zero. See EIP-150 for more details.
             if (gasleft() <= gasBefore / 64) {
-                revert IPriceOracle.InsufficientGasForExternalCall();
+                revert InsufficientGasForExternalCall();
             }
             return 0;
         }
