@@ -23,13 +23,6 @@ abstract contract TransferHelperClient {
     /// @custom:selector 0x4044e1f7
     error TransferHelperBalanceNotConsumed(address asset);
 
-    /// @dev Constructor.
-    /// @param transferHelper Address of the TransferHelper contract.
-    constructor(address transferHelper) {
-        ITransferHelper(transferHelper).getBalance(Constants.NATIVE_CURRENCY);
-        TRANSFER_HELPER = transferHelper;
-    }
-
     modifier assertingTransferHelperBalanceFor(address asset) {
         uint256 balanceBefore = _transferHelperBalance(asset);
         _;
@@ -48,6 +41,13 @@ abstract contract TransferHelperClient {
             uint256 balanceAfter = _transferHelperBalance(assets[i]);
             require(balanceAfter <= balancesBefore[i], TransferHelperBalanceNotConsumed(assets[i]));
         }
+    }
+
+    /// @dev Constructor.
+    /// @param transferHelper Address of the TransferHelper contract.
+    constructor(address transferHelper) {
+        ITransferHelper(transferHelper).getBalance(Constants.NATIVE_CURRENCY);
+        TRANSFER_HELPER = transferHelper;
     }
 
     function _transferHelperBalance(address asset) internal view returns (uint256) {

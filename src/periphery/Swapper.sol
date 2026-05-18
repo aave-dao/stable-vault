@@ -23,6 +23,8 @@ contract Swapper is Ownable, ReentrancyGuardTransient, ISwapper {
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
 
+    address internal immutable SLIPPAGE_VAULT;
+
     /// @notice Emitted when a slippage shortfall on `assetOut` is covered by an external source.
     event SlippageCovered(address indexed slippageCoverageSource, address indexed assetOut, uint256 amount);
 
@@ -44,8 +46,6 @@ contract Swapper is Ownable, ReentrancyGuardTransient, ISwapper {
     /// @notice Thrown when the requested slippage tolerance exceeds the on-chain bound.
     /// @custom:selector 0x232b3058
     error SlippageToleranceTooHigh();
-
-    address internal immutable SLIPPAGE_VAULT;
 
     /// @dev Constructor.
     /// @param allocator Address of the allocator which is the owner of the Swapper.
