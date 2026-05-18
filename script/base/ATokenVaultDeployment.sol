@@ -13,13 +13,13 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {ATokenVault} from "@aave-vault/ATokenVault.sol";
 
 contract ATokenVaultDeployment is Script {
-    using SafeERC20 for IERC20;
-    using Strings for address;
-
     struct ATokenVaultEntry {
         address addr;
         string assetSymbol;
     }
+
+    using SafeERC20 for IERC20;
+    using Strings for address;
 
     string[] internal _aTokenVaultAssets;
     address[] internal _aTokenVaultDeployedAddresses;

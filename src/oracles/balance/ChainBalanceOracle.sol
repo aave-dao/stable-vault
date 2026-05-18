@@ -18,13 +18,6 @@ import {IChainBalanceOracleAdapter} from "src/interfaces/IChainBalanceOracleAdap
 /// @dev This contract is only used on the Accounting Chain to inform the asset value vs. obligations calculations.
 /// @custom:upgradeable
 contract ChainBalanceOracle is AccessManagedUpgradeable, IChainBalanceOracle {
-    /// @notice Emitted when an adapter is set for a chain.
-    event ChainBalanceAdapterSet(uint256 indexed chainId, address indexed previousAdapter, address indexed newAdapter);
-
-    /// @notice Thrown when the adapter for a chain is not found.
-    /// @custom:selector 0x3f3e70bf
-    error ChainBalanceOracleAdapterNotFound(uint256 chainId);
-
     /// @custom:storage-location erc7201:aave.storage.ChainBalanceOracle
     struct ChainBalanceOracleStorage {
         mapping(uint256 chainId => address oracleAdapter) oracleAdapterByChainId;
@@ -33,6 +26,13 @@ contract ChainBalanceOracle is AccessManagedUpgradeable, IChainBalanceOracle {
     // keccak256(abi.encode(uint256(keccak256("aave.storage.ChainBalanceOracle")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant STORAGE_SLOT_CHAIN_BALANCE_ORACLE =
         0x6ac612655afeb35ba61923fff96d549bb19989dc9aae5077165522d8540af500;
+
+    /// @notice Emitted when an adapter is set for a chain.
+    event ChainBalanceAdapterSet(uint256 indexed chainId, address indexed previousAdapter, address indexed newAdapter);
+
+    /// @notice Thrown when the adapter for a chain is not found.
+    /// @custom:selector 0x3f3e70bf
+    error ChainBalanceOracleAdapterNotFound(uint256 chainId);
 
     function $storage() private pure returns (ChainBalanceOracleStorage storage _storage) {
         assembly {

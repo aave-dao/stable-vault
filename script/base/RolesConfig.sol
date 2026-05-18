@@ -25,6 +25,14 @@ import {FundsBridgingPolicy} from "src/policies/FundsBridgingPolicy.sol";
 import {WithdrawalExecutionPolicy} from "src/policies/WithdrawalExecutionPolicy.sol";
 
 abstract contract RolesConfig is DeploymentConfig {
+    struct Role {
+        uint64 roleId;
+        bytes4 selector;
+        uint32 delay;
+        uint64 guardianRoleId;
+        bool hasCriticalRisk;
+    }
+
     uint32 internal constant NO_DELAY = 0;
     uint32 internal immutable LOW_DELAY = uint32(_configUint(".lowDelay"));
     uint32 internal immutable MEDIUM_DELAY = uint32(_configUint(".mediumDelay"));
@@ -35,14 +43,6 @@ abstract contract RolesConfig is DeploymentConfig {
     uint64 constant ADMIN_ROLE = uint64(0);
     uint64 constant ADMIN_ROLE_GUARDIAN_ROLE = uint64(1);
     uint64 constant OPERATIONAL_ROLE_GUARDIAN_ROLE = uint64(2);
-
-    struct Role {
-        uint64 roleId;
-        bytes4 selector;
-        uint32 delay;
-        uint64 guardianRoleId;
-        bool hasCriticalRisk;
-    }
 
     /// @custom:delay High
     /// @custom:location AssetRegistry

@@ -20,6 +20,26 @@ import {Errors} from "src/types/Errors.sol";
 contract SlippageCoverageVault is AccessManaged, Multicall, ReentrancyGuardTransient, ISlippageCoverageVault {
     using SafeERC20 for IERC20;
 
+    /// @notice Fixed-window cap state for an asset.
+    /// @param windowStart Timestamp at which the current window started.
+    /// @param windowSeconds Length of the window in seconds.
+    /// @param consumed Amount consumed within the current window.
+    /// @param cap Maximum amount that can be consumed within a single window.
+    struct Window {
+        uint64 windowStart;
+        uint64 windowSeconds;
+        uint128 consumed;
+        uint128 cap;
+    }
+
+    address internal immutable SLIPPAGE_BENEFICIARY;
+
+    bool internal _overrideMode;
+    uint16 internal _maxSlippageBps;
+    uint16 internal _overrideMaxSlippageBps;
+    mapping(address asset => uint256) internal _pullCapPerTx;
+    mapping(address asset => Window) internal _windowByAsset;
+
     /// @notice Emitted when the vault is funded.
     event CoverageFunded(address indexed asset, address indexed from, uint256 amount);
 
@@ -60,26 +80,6 @@ contract SlippageCoverageVault is AccessManaged, Multicall, ReentrancyGuardTrans
     /// @notice Thrown when an `enableOverrideMode` call is made while override mode is already enabled.
     /// @custom:selector 0xf2a5f75a
     error AlreadyEnabled();
-
-    /// @notice Fixed-window cap state for an asset.
-    /// @param windowStart Timestamp at which the current window started.
-    /// @param windowSeconds Length of the window in seconds.
-    /// @param consumed Amount consumed within the current window.
-    /// @param cap Maximum amount that can be consumed within a single window.
-    struct Window {
-        uint64 windowStart;
-        uint64 windowSeconds;
-        uint128 consumed;
-        uint128 cap;
-    }
-
-    address internal immutable SLIPPAGE_BENEFICIARY;
-
-    bool internal _overrideMode;
-    uint16 internal _maxSlippageBps;
-    uint16 internal _overrideMaxSlippageBps;
-    mapping(address asset => uint256) internal _pullCapPerTx;
-    mapping(address asset => Window) internal _windowByAsset;
 
     /// @dev Constructor.
     /// @param slippageBeneficiary The bound puller (the Swapper).

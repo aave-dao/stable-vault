@@ -18,6 +18,13 @@ import {Errors} from "src/types/Errors.sol";
 contract FundsBridgingPolicy is AccessManaged, Multicall, IFundsBridgingPolicy {
     using RateLimitBucketLib for RateLimitBucketLib.Bucket;
 
+    address internal immutable POLICY_APPLIER;
+
+    mapping(
+        address asset
+            => mapping(uint256 destChainId => mapping(address bridgeAdapter => RateLimitBucketLib.Bucket bucket))
+    ) internal _buckets;
+
     /// @notice Emitted when a bridge route's capacity is lowered.
     event BridgingCapacityLowered(
         address indexed asset,
@@ -53,13 +60,6 @@ contract FundsBridgingPolicy is AccessManaged, Multicall, IFundsBridgingPolicy {
         uint128 oldRefillRate,
         uint128 newRefillRate
     );
-
-    address internal immutable POLICY_APPLIER;
-
-    mapping(
-        address asset
-            => mapping(uint256 destChainId => mapping(address bridgeAdapter => RateLimitBucketLib.Bucket bucket))
-    ) internal _buckets;
 
     modifier onlyPolicyApplier() {
         require(msg.sender == POLICY_APPLIER, Errors.NotAuthorized());

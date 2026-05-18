@@ -10,10 +10,6 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 /// @dev Based on Multicall3. Not backwards-compatible with Multicall2 due to the onlyOwner modifier.
 /// @dev Aggregate methods are marked `payable` to save 24 gas per call
 contract OwnedMulticall is Ownable {
-    /// @notice Thrown when renounceOwnership is called.
-    /// @custom:selector 0x96c553eb
-    error RenounceOwnershipNotAllowed();
-
     struct Call {
         address target;
         bytes callData;
@@ -36,6 +32,10 @@ contract OwnedMulticall is Ownable {
         bool success;
         bytes returnData;
     }
+
+    /// @notice Thrown when renounceOwnership is called.
+    /// @custom:selector 0x96c553eb
+    error RenounceOwnershipNotAllowed();
 
     /// @dev Constructor
     /// @param initialOwner address that is set as the initial owner of the contract.

@@ -17,11 +17,11 @@ import {Errors} from "src/types/Errors.sol";
 contract MockBridgeAdapter is IBridgeAdapter {
     using SafeERC20 for IERC20;
 
-    error PublishMessageFailed();
-
     address internal immutable TRANSFER_HELPER;
     bool internal _shouldRevertPublish;
     uint256 internal _feeAmount;
+
+    error PublishMessageFailed();
 
     constructor(address transferHelper) {
         TRANSFER_HELPER = transferHelper;

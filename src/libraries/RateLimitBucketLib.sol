@@ -14,8 +14,6 @@ import {Errors} from "src/types/Errors.sol";
 /// @dev This library does not emit events; callers are responsible for emitting any events they need around bucket
 /// state or configuration changes.
 library RateLimitBucketLib {
-    uint256 internal constant UNLIMITED_CAPACITY = type(uint128).max;
-
     /// @notice State and configuration of a rate-limit bucket. Grouped so a single mapping value carries both the
     /// admin-set parameters and the live consumption tracking. By default a bucket is fully rate-limited (zero
     /// capacity); set `capacity` to max uint128 to remove the limit entirely.
@@ -30,6 +28,8 @@ library RateLimitBucketLib {
         uint128 consumed;
         uint128 lastUpdate;
     }
+
+    uint256 internal constant UNLIMITED_CAPACITY = type(uint128).max;
 
     /// @notice Thrown by `consume` when the operation amount exceeds the available capacity.
     /// @custom:selector 0x40df7ba9

@@ -12,15 +12,15 @@ contract MockNonStandardErc20 {
     string internal _name;
     string internal _symbol;
 
+    mapping(address => uint256) private _balances;
+    mapping(address => mapping(address => uint256)) private _allowances;
+    uint256 private _totalSupply;
+
     constructor(string memory nameParam, string memory symbolParam, uint8 decimalParam) {
         _name = nameParam;
         _symbol = symbolParam;
         DECIMALS = decimalParam;
     }
-
-    mapping(address => uint256) private _balances;
-    mapping(address => mapping(address => uint256)) private _allowances;
-    uint256 private _totalSupply;
 
     // ////////////////////// USDT-BASED NON-STANDARD FUNCTIONS ////////////////////////
 

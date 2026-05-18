@@ -7,13 +7,13 @@ pragma solidity ^0.8.0;
 /// @dev There is code duplication in this library. This is done to not leave the assembly
 /// the blocks.
 library CallWithExactGas {
-    error NoContract();
-    error NoGasForCallExactCheck();
-    error NotEnoughGasForCall();
-
     bytes4 internal constant NO_CONTRACT_SIG = 0x0c3b563c;
     bytes4 internal constant NO_GAS_FOR_CALL_EXACT_CHECK_SIG = 0xafa32a2c;
     bytes4 internal constant NOT_ENOUGH_GAS_FOR_CALL_SIG = 0x37c3be29;
+
+    error NoContract();
+    error NoGasForCallExactCheck();
+    error NotEnoughGasForCall();
 
     /// @notice calls target address with exactly gasAmount gas and payload as calldata.
     /// Accounts for gasForCallExactCheck gas that will be used by this function. Will revert

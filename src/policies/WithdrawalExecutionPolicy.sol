@@ -31,6 +31,56 @@ import {Errors} from "src/types/Errors.sol";
 contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeable, IWithdrawalExecutionPolicy {
     using RateLimitBucketLib for RateLimitBucketLib.Bucket;
 
+    /// @notice Signed personal fee data (decoded from WithdrawalExecutionIntent.policyData).
+    /// @param personalFeeAmountRay The personal fee amount in RAY signed by a whitelisted signer. Used directly as
+    /// the fee charged, capped by the asset-specific bp limit.
+    /// @param nonce Unique nonce to prevent signature replay.
+    /// @param deadline Timestamp after which the signature is no longer valid.
+    /// @param signature The EIP-712 signature from a whitelisted signer.
+    struct SignedFee {
+        uint256 personalFeeAmountRay;
+        uint256 nonce;
+        uint256 deadline;
+        bytes signature;
+    }
+
+    /// @notice Configuration for an asset-specific fee.
+    /// @param feeBps Fee in basis points applied to the IOU quantity being exchanged for the asset.
+    /// @param isSet Whether the fee is set (used for lookups).
+    struct AssetFeeConfig {
+        uint16 feeBps;
+        bool isSet;
+    }
+
+    /// @custom:storage-location erc7201:aave.storage.WithdrawalExecutionPolicy
+    struct WithdrawalExecutionPolicyStorage {
+        uint16 defaultFeeBps;
+        mapping(address asset => AssetFeeConfig config) assetFeeConfigs;
+        mapping(address account => bool isSigner) isSigner;
+        mapping(address signer => mapping(uint256 nonce => bool used)) wasNonceUsed;
+        RateLimitBucketLib.Bucket redemptionBucket;
+    }
+
+    // EIP-712 typeHash:
+    // keccak256("SignedFee(address user,address assetOut,uint256 iouAmountRay,uint256 personalFeeAmountRay,uint256
+    // nonce,uint256 deadline)").
+    bytes32 public constant SIGNED_FEE_TYPEHASH = 0x48a45dffc693559aeb550fa1a83c6ef4cd8fdc3d24f3678f575959a279c212e3;
+
+    /// @dev The maximum fee in basis points that can be applied to a withdrawal. Set to 10.00%.
+    uint16 internal constant FEE_CAP_BPS = 10_00;
+
+    address internal immutable WITHDRAWAL_EXECUTION_POLICY_APPLIER;
+
+    /// @dev Minimum redemption bucket capacity, guaranteeing a minimum exit throughput.
+    uint128 internal immutable MIN_REDEMPTION_CAPACITY;
+
+    /// @dev Minimum redemption bucket refill rate, guaranteeing a minimum exit throughput.
+    uint128 internal immutable MIN_REDEMPTION_REFILL_RATE;
+
+    // keccak256(abi.encode(uint256(keccak256("aave.storage.WithdrawalExecutionPolicy")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant STORAGE_SLOT_WITHDRAWAL_EXECUTION_POLICY =
+        0xe0ede6c18863c23819b4a5a3a3bb65fcec772573189c09b6a86a044b146cb900;
+
     /// @notice Emitted when the asset fee in basis points is set.
     event AssetFeeBpsSet(address indexed asset, uint16 assetFeeBps, bool isSet);
 
@@ -84,65 +134,15 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
     /// @custom:selector 0xc4223463
     error ZeroMinRedemptionRefillRate();
 
-    // EIP-712 typeHash:
-    // keccak256("SignedFee(address user,address assetOut,uint256 iouAmountRay,uint256 personalFeeAmountRay,uint256
-    // nonce,uint256 deadline)").
-    bytes32 public constant SIGNED_FEE_TYPEHASH = 0x48a45dffc693559aeb550fa1a83c6ef4cd8fdc3d24f3678f575959a279c212e3;
-
-    /// @dev The maximum fee in basis points that can be applied to a withdrawal. Set to 10.00%.
-    uint16 internal constant FEE_CAP_BPS = 10_00;
-
-    address internal immutable WITHDRAWAL_EXECUTION_POLICY_APPLIER;
-
-    /// @dev Minimum redemption bucket capacity, guaranteeing a minimum exit throughput.
-    uint128 internal immutable MIN_REDEMPTION_CAPACITY;
-
-    /// @dev Minimum redemption bucket refill rate, guaranteeing a minimum exit throughput.
-    uint128 internal immutable MIN_REDEMPTION_REFILL_RATE;
-
-    /// @notice Signed personal fee data (decoded from WithdrawalExecutionIntent.policyData).
-    /// @param personalFeeAmountRay The personal fee amount in RAY signed by a whitelisted signer. Used directly as
-    /// the fee charged, capped by the asset-specific bp limit.
-    /// @param nonce Unique nonce to prevent signature replay.
-    /// @param deadline Timestamp after which the signature is no longer valid.
-    /// @param signature The EIP-712 signature from a whitelisted signer.
-    struct SignedFee {
-        uint256 personalFeeAmountRay;
-        uint256 nonce;
-        uint256 deadline;
-        bytes signature;
+    modifier onlyWithdrawalExecutionPolicyApplier() {
+        require(msg.sender == WITHDRAWAL_EXECUTION_POLICY_APPLIER, Errors.NotAuthorized());
+        _;
     }
-
-    /// @notice Configuration for an asset-specific fee.
-    /// @param feeBps Fee in basis points applied to the IOU quantity being exchanged for the asset.
-    /// @param isSet Whether the fee is set (used for lookups).
-    struct AssetFeeConfig {
-        uint16 feeBps;
-        bool isSet;
-    }
-
-    /// @custom:storage-location erc7201:aave.storage.WithdrawalExecutionPolicy
-    struct WithdrawalExecutionPolicyStorage {
-        uint16 defaultFeeBps;
-        mapping(address asset => AssetFeeConfig config) assetFeeConfigs;
-        mapping(address account => bool isSigner) isSigner;
-        mapping(address signer => mapping(uint256 nonce => bool used)) wasNonceUsed;
-        RateLimitBucketLib.Bucket redemptionBucket;
-    }
-
-    // keccak256(abi.encode(uint256(keccak256("aave.storage.WithdrawalExecutionPolicy")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant STORAGE_SLOT_WITHDRAWAL_EXECUTION_POLICY =
-        0xe0ede6c18863c23819b4a5a3a3bb65fcec772573189c09b6a86a044b146cb900;
 
     function $storage() private pure returns (WithdrawalExecutionPolicyStorage storage _storage) {
         assembly {
             _storage.slot := STORAGE_SLOT_WITHDRAWAL_EXECUTION_POLICY
         }
-    }
-
-    modifier onlyWithdrawalExecutionPolicyApplier() {
-        require(msg.sender == WITHDRAWAL_EXECUTION_POLICY_APPLIER, Errors.NotAuthorized());
-        _;
     }
 
     /// @dev Constructor.

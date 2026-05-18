@@ -52,6 +52,13 @@ contract Allocator is
     using MathLib for uint256;
     using EnumerableSet for EnumerableSet.AddressSet;
 
+    /// @custom:storage-location erc7201:aave.storage.Allocator
+    struct AllocatorStorage {
+        mapping(address strategy => StrategyConfig strategyConfig) strategyConfigs;
+        mapping(address asset => EnumerableSet.AddressSet strategies) assetStrategies;
+        mapping(address asset => address[] withdrawalQueue) withdrawalQueues;
+    }
+
     address internal immutable DEPOSITOR;
     address internal immutable WITHDRAWER;
     address internal immutable ASSET_REGISTRY;
@@ -66,22 +73,9 @@ contract Allocator is
     // keccak256("aave.stable-vault.Allocator.policy.rebalance")
     bytes32 internal constant REBALANCE_POLICY_ID = 0xc8677baa58e60e0903b82d16b92a11a49685a8844fe0f67b4f06e7d3ecef34cb;
 
-    /// @custom:storage-location erc7201:aave.storage.Allocator
-    struct AllocatorStorage {
-        mapping(address strategy => StrategyConfig strategyConfig) strategyConfigs;
-        mapping(address asset => EnumerableSet.AddressSet strategies) assetStrategies;
-        mapping(address asset => address[] withdrawalQueue) withdrawalQueues;
-    }
-
     // keccak256(abi.encode(uint256(keccak256("aave.storage.Allocator")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant STORAGE_SLOT_ALLOCATOR =
         0x1467d9b012834ae38d27bf9f208a39b5bf5f9a0c5f0adf25ec219f54e4610e00;
-
-    function $storage() private pure returns (AllocatorStorage storage _storage) {
-        assembly {
-            _storage.slot := STORAGE_SLOT_ALLOCATOR
-        }
-    }
 
     modifier onlyDepositor() {
         require(msg.sender == DEPOSITOR, Errors.AddressNotWhitelisted());
@@ -98,6 +92,12 @@ contract Allocator is
             revert Errors.OnlySelf();
         }
         _;
+    }
+
+    function $storage() private pure returns (AllocatorStorage storage _storage) {
+        assembly {
+            _storage.slot := STORAGE_SLOT_ALLOCATOR
+        }
     }
 
     /// @dev Constructor.

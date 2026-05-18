@@ -19,29 +19,19 @@ import {Errors} from "src/types/Errors.sol";
 contract IouTokenManager is TransferHelperClient, IIouTokenManager {
     using SafeERC20 for IERC20;
 
-    address internal immutable IOU_TOKEN;
-    address internal immutable CHAIN_GATEWAY;
-    address internal immutable VAULT;
-    bool internal immutable IS_ACCOUNTING_CHAIN;
-
     /// @custom:storage-location erc7201:aave.storage.IouTokenManager
     struct IouTokenManagerStorage {
         uint256 lockedBalance;
     }
 
+    address internal immutable IOU_TOKEN;
+    address internal immutable CHAIN_GATEWAY;
+    address internal immutable VAULT;
+    bool internal immutable IS_ACCOUNTING_CHAIN;
+
     // keccak256(abi.encode(uint256(keccak256("aave.storage.IouTokenManager")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant STORAGE_SLOT_IOU_TOKEN_MANAGER =
         0xc66e11a4855dc9db3d359cf776e012e79f530b562e1a94c415417157a76d1500;
-
-    function $storage() private pure returns (IouTokenManagerStorage storage _storage) {
-        assembly {
-            _storage.slot := STORAGE_SLOT_IOU_TOKEN_MANAGER
-        }
-    }
-
-    function $IouTokenManager() internal pure returns (IouTokenManagerStorage storage) {
-        return $storage();
-    }
 
     modifier onlyAllowedReleaser() {
         require(msg.sender == CHAIN_GATEWAY, Errors.NotAuthorized());
@@ -61,6 +51,16 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
     modifier onlyAccountingChain() {
         require(IS_ACCOUNTING_CHAIN, OnlyAccountingChain());
         _;
+    }
+
+    function $storage() private pure returns (IouTokenManagerStorage storage _storage) {
+        assembly {
+            _storage.slot := STORAGE_SLOT_IOU_TOKEN_MANAGER
+        }
+    }
+
+    function $IouTokenManager() internal pure returns (IouTokenManagerStorage storage) {
+        return $storage();
     }
 
     /// @dev Constructor.

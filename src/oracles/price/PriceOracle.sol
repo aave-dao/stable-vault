@@ -19,6 +19,20 @@ import {Errors} from "src/types/Errors.sol";
 /// @dev Assumes all configured assets have the same denomination.
 /// @custom:upgradeable
 contract PriceOracle is AccessManagedUpgradeable, IPriceOracle {
+    /// @custom:storage-location erc7201:aave.storage.PriceOracle
+    struct PriceOracleStorage {
+        /// @dev Set of asset specific adapters for asset price oracles.
+        mapping(address asset => address oracleAdapter) oracleAdapterByAsset;
+    }
+
+    uint256 immutable MIN_VALID_PRICE_RAY;
+
+    uint256 constant MAX_PRICE_RAY = MathLib.RAY;
+
+    // keccak256(abi.encode(uint256(keccak256("aave.storage.PriceOracle")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant STORAGE_SLOT_PRICE_ORACLE =
+        0xe000f1dda5abe64dd1a0f674dea4aff2aee707620120c15bf2636fc080c92900;
+
     /// @notice Emitted when an adapter is set for an asset.
     event OracleAdapterSet(address indexed asset, address indexed newAdapter, address indexed previousAdapter);
 
@@ -29,20 +43,6 @@ contract PriceOracle is AccessManagedUpgradeable, IPriceOracle {
     /// @notice Thrown when the adapter for an asset is not found.
     /// @custom:selector 0x2a40cc73
     error OracleAdapterNotFound(address asset);
-
-    uint256 immutable MIN_VALID_PRICE_RAY;
-
-    uint256 constant MAX_PRICE_RAY = MathLib.RAY;
-
-    /// @custom:storage-location erc7201:aave.storage.PriceOracle
-    struct PriceOracleStorage {
-        /// @dev Set of asset specific adapters for asset price oracles.
-        mapping(address asset => address oracleAdapter) oracleAdapterByAsset;
-    }
-
-    // keccak256(abi.encode(uint256(keccak256("aave.storage.PriceOracle")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant STORAGE_SLOT_PRICE_ORACLE =
-        0xe000f1dda5abe64dd1a0f674dea4aff2aee707620120c15bf2636fc080c92900;
 
     function $storage() private pure returns (PriceOracleStorage storage _storage) {
         assembly {
