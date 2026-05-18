@@ -17,19 +17,19 @@ contract MockCCIPRouter is IRouter, IRouterClient {
     using SafeERC20 for IERC20;
     using ERC165Checker for address;
 
-    error InvalidAddress(bytes encodedAddress);
-    error InvalidExtraArgsTag();
-    error ReceiverError(bytes err);
-
-    event MessageExecuted(bytes32 messageId, uint64 sourceChainSelector, address offRamp, bytes32 calldataHash);
-    event MsgExecuted(bool success, bytes retData, uint256 gasUsed);
-
     uint16 public constant GAS_FOR_CALL_EXACT_CHECK = 5_000;
     uint32 public constant DEFAULT_GAS_LIMIT = 200_000;
 
     uint256 internal s_mockFeeTokenAmount; // use setFee() to change to non-zero to test fees
     mapping(uint64 sourceChainSelector => uint64 destChainSelector) internal s_sourceChainSelector; // use
     // setSourceChainSelector() to change
+
+    event MessageExecuted(bytes32 messageId, uint64 sourceChainSelector, address offRamp, bytes32 calldataHash);
+    event MsgExecuted(bool success, bytes retData, uint256 gasUsed);
+
+    error InvalidAddress(bytes encodedAddress);
+    error InvalidExtraArgsTag();
+    error ReceiverError(bytes err);
 
     function routeMessage(
         Client.Any2EVMMessage calldata message,

@@ -7,7 +7,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {ISlippageCoverageVault} from "src/interfaces/ISlippageCoverageVault.sol";
-import {ISwapper} from "src/interfaces/ISwapper.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {SlippageCoverageVault} from "src/periphery/SlippageCoverageVault.sol";
 import {Swapper} from "src/periphery/Swapper.sol";
@@ -216,7 +215,7 @@ contract SwapperTest is TestWithHelpers {
         );
 
         vm.expectEmit(true, true, false, true);
-        emit ISwapper.SlippageCovered(address(_vault), address(_mockGho), slippageAmount);
+        emit Swapper.SlippageCovered(address(_vault), address(_mockGho), slippageAmount);
         vm.prank(allocator);
         _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
     }
@@ -280,7 +279,7 @@ contract SwapperTest is TestWithHelpers {
 
         _mockTransferIntoSwapper(_mockUsdt, 100);
 
-        vm.expectRevert(abi.encodeWithSelector(ISwapper.BadTarget.selector));
+        vm.expectRevert(abi.encodeWithSelector(Swapper.BadTarget.selector));
         vm.prank(allocator);
         _swapper.executeSwap(address(_mockUsdt), address(_mockGho), 100, rebalancer, data);
     }
@@ -294,7 +293,7 @@ contract SwapperTest is TestWithHelpers {
         bytes memory data = _encodeDexSwapExactInputData(address(_mockUsdt), address(_mockGho), 100, 0, 200);
 
         _mockTransferIntoSwapper(_mockUsdt, 100);
-        vm.expectRevert(abi.encodeWithSelector(ISwapper.SlippageToleranceTooHigh.selector));
+        vm.expectRevert(abi.encodeWithSelector(Swapper.SlippageToleranceTooHigh.selector));
         vm.prank(allocator);
         _swapper.executeSwap(address(_mockUsdt), address(_mockGho), 100, rebalancer, data);
     }
@@ -309,7 +308,7 @@ contract SwapperTest is TestWithHelpers {
         bytes memory data = _encodeDexSwapExactInputData(address(_mockUsdt), address(_mockGho), 100, 0, 2_001);
 
         _mockTransferIntoSwapper(_mockUsdt, 100);
-        vm.expectRevert(abi.encodeWithSelector(ISwapper.SlippageToleranceTooHigh.selector));
+        vm.expectRevert(abi.encodeWithSelector(Swapper.SlippageToleranceTooHigh.selector));
         vm.prank(allocator);
         _swapper.executeSwap(address(_mockUsdt), address(_mockGho), 100, rebalancer, data);
     }
@@ -331,7 +330,7 @@ contract SwapperTest is TestWithHelpers {
         uint256 vaultAssetInBefore = _mockUsdt.balanceOf(address(_vault));
 
         vm.expectEmit(true, false, false, true, address(_swapper));
-        emit ISwapper.AssetInSwept(address(_vault), address(_mockUsdt), amountIn);
+        emit Swapper.AssetInSwept(address(_vault), address(_mockUsdt), amountIn);
         vm.prank(allocator);
         _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
 
@@ -360,7 +359,7 @@ contract SwapperTest is TestWithHelpers {
         uint256 vaultAssetInBefore = _mockUsdt.balanceOf(address(_vault));
 
         vm.expectEmit(true, false, false, true, address(_swapper));
-        emit ISwapper.AssetInSwept(address(_vault), address(_mockUsdt), amountIn / 2);
+        emit Swapper.AssetInSwept(address(_vault), address(_mockUsdt), amountIn / 2);
         vm.prank(allocator);
         _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
 
@@ -393,7 +392,7 @@ contract SwapperTest is TestWithHelpers {
         bytes memory data =
             _encodeDexSwapExactInputData(address(_mockUsdt), address(_mockGho), amountIn, minAmountOut, 0);
         vm.expectEmit(true, false, false, true, address(_swapper));
-        emit ISwapper.AssetInSwept(address(_vault), address(_mockUsdt), donation);
+        emit Swapper.AssetInSwept(address(_vault), address(_mockUsdt), donation);
         vm.prank(allocator);
         uint256 actualAmountOut =
             _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
@@ -420,7 +419,7 @@ contract SwapperTest is TestWithHelpers {
         bytes memory data = abi.encode(targets, callDatas, uint16(0));
 
         vm.expectEmit(true, true, false, true, address(_vault));
-        emit ISlippageCoverageVault.CoverageFunded(address(_mockUsdt), address(_swapper), amountIn);
+        emit SlippageCoverageVault.CoverageFunded(address(_mockUsdt), address(_swapper), amountIn);
         vm.prank(allocator);
         _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
     }
@@ -475,11 +474,11 @@ contract SwapperTest is TestWithHelpers {
         vm.expectEmit(true, false, false, true, address(_vault));
         emit ISlippageCoverageVault.CoveragePulled(address(_mockGho), slippageShortfall, false);
         vm.expectEmit(true, true, false, true, address(_swapper));
-        emit ISwapper.SlippageCovered(address(_vault), address(_mockGho), slippageShortfall);
+        emit Swapper.SlippageCovered(address(_vault), address(_mockGho), slippageShortfall);
         vm.expectEmit(true, true, false, true, address(_vault));
-        emit ISlippageCoverageVault.CoverageFunded(address(_mockUsdt), address(_swapper), leftoverIn);
+        emit SlippageCoverageVault.CoverageFunded(address(_mockUsdt), address(_swapper), leftoverIn);
         vm.expectEmit(true, true, false, true, address(_swapper));
-        emit ISwapper.AssetInSwept(address(_vault), address(_mockUsdt), leftoverIn);
+        emit Swapper.AssetInSwept(address(_vault), address(_mockUsdt), leftoverIn);
 
         vm.prank(allocator);
         uint256 actualAmountOut =
@@ -540,7 +539,7 @@ contract SwapperTest is TestWithHelpers {
             address(_mockUsdt), address(_mockGho), amountIn, minAmountOut, slippageToleranceBps
         );
         vm.prank(allocator);
-        vm.expectRevert(abi.encodeWithSelector(ISwapper.SlippageToleranceExceeded.selector));
+        vm.expectRevert(abi.encodeWithSelector(Swapper.SlippageToleranceExceeded.selector));
         _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
     }
 
@@ -557,7 +556,7 @@ contract SwapperTest is TestWithHelpers {
 
         bytes memory data = _encodeDexSwapExactInputData(address(_mockUsdt), address(_mockGho), amountIn, 0, 0);
 
-        vm.expectRevert(abi.encodeWithSelector(ISwapper.CallToTargetFailed.selector));
+        vm.expectRevert(abi.encodeWithSelector(Swapper.CallToTargetFailed.selector));
         vm.prank(allocator);
         _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
     }

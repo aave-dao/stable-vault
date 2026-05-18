@@ -59,6 +59,16 @@ contract AccessManagerEarningChainSetupTest is AccessManagerSetupBaseTest, Earni
         super._setup_Targets(deployer);
     }
 
+    function _isAdiAdapterDeployed()
+        internal
+        view
+        virtual
+        override(AccessManagerBaseSetup, EarningChainDeployment)
+        returns (bool)
+    {
+        return EarningChainDeployment._isAdiAdapterDeployed();
+    }
+
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // CHAIN-SPECIFIC TESTS
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

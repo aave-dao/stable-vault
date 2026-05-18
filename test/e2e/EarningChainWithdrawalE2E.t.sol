@@ -7,9 +7,9 @@ import {IERC20} from "forge-std/interfaces/IERC20.sol";
 
 import {Logger} from "test/helpers/Logger.sol";
 
+import {CcipAdapter} from "src/bridging/ccip/CcipAdapter.sol";
 import {StableVault} from "src/core/accounting/StableVault.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
-import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {Constants} from "src/types/Constants.sol";
@@ -105,7 +105,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             EARNING_CHAIN_ID,
             address(ccipAdapter_accountingChain),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})),
             ""
         );
 
@@ -183,7 +183,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             iouAmountRequestedRay,
             address(ccipAdapter_accountingChain),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0}))
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0}))
         );
         // Check the IOU token balance on Accounting Chain went down
         assertEq(iouToken_accountingChain.balanceOf(user1), 0, "User should have bridged IOU tokens");
@@ -200,7 +200,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         // Check that supply on Earning Chain went up
         assertEq(iouToken_earningChain.totalSupply(), iouAmountRequestedRay, "Supply on Earning Chain should go up");
 
-        // Check that requesting another withdrawal fails because the user was alredy given IOUs.
+        // Check that requesting another withdrawal fails because the user was already given IOUs.
         vm.expectRevert(abi.encodeWithSelector(Errors.InvalidAmount.selector));
         vm.prank(user1);
         vault.requestWithdrawal(user1, iouAmountRequestedRay, "");
@@ -262,7 +262,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         {
 
             bytes memory bp = abi.encode(
-                ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})
+                CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})
             );
             iouTokenManager_accountingChain.bridgeTokens{value: bridgeFeeAmount}(
                 EARNING_CHAIN_ID,
@@ -289,7 +289,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
         {
 
             bytes memory bp = abi.encode(
-                ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})
+                CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})
             );
             iouTokenManager_earningChain.bridgeTokens{value: bridgeFeeAmount}(
                 ACCOUNTING_CHAIN_ID,
@@ -342,7 +342,7 @@ contract EarningChainWithdrawalE2ETest is BaseTest {
             // Use a higher gas limit to ensure the transaction is successful on Accounting Chain because the snapshot
             // struct will be pushed to the FH storage.
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})),
             ""
         );
 

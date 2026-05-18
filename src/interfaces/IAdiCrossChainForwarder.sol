@@ -50,6 +50,22 @@ interface IAdiCrossChainForwarder {
         external
         returns (bytes32 envelopeId, bytes32 transactionId);
 
+    /// @notice Retries a registered envelope as a new a.DI transaction.
+    /// @param envelope a.DI envelope to retry.
+    /// @param gasLimit Gas cost on receiving side of the message.
+    /// @return transactionId a.DI transaction id for the retry.
+    function retryEnvelope(Envelope calldata envelope, uint256 gasLimit) external returns (bytes32 transactionId);
+
+    /// @notice Retries an already forwarded a.DI transaction.
+    /// @param encodedTransaction ABI-encoded a.DI transaction to retry.
+    /// @param gasLimit Gas cost on receiving side of the message.
+    /// @param bridgeAdaptersToRetry Current-chain a.DI bridge adapters to retry.
+    function retryTransaction(
+        bytes calldata encodedTransaction,
+        uint256 gasLimit,
+        address[] calldata bridgeAdaptersToRetry
+    ) external;
+
     /// @notice Returns the configured optimal forwarding bandwidth for a destination chain.
     /// @param chainId Chain id of the destination chain.
     /// @return optimalBandwidth Number of adapters a.DI will select. Zero means all configured adapters.
@@ -98,20 +114,4 @@ interface IAdiCrossChainForwarder {
         uint256 gasLimit,
         address[] calldata bridgeAdaptersToRetry
     ) external view returns (uint256 nativeFee, Fee[] memory fees, uint256 successfulQuotes);
-
-    /// @notice Retries a registered envelope as a new a.DI transaction.
-    /// @param envelope a.DI envelope to retry.
-    /// @param gasLimit Gas cost on receiving side of the message.
-    /// @return transactionId a.DI transaction id for the retry.
-    function retryEnvelope(Envelope calldata envelope, uint256 gasLimit) external returns (bytes32 transactionId);
-
-    /// @notice Retries an already forwarded a.DI transaction.
-    /// @param encodedTransaction ABI-encoded a.DI transaction to retry.
-    /// @param gasLimit Gas cost on receiving side of the message.
-    /// @param bridgeAdaptersToRetry Current-chain a.DI bridge adapters to retry.
-    function retryTransaction(
-        bytes calldata encodedTransaction,
-        uint256 gasLimit,
-        address[] calldata bridgeAdaptersToRetry
-    ) external;
 }

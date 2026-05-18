@@ -6,6 +6,11 @@ import {Test} from "forge-std/Test.sol";
 import {MathLibWrapper} from "test/mocks/MathLibWrapper.sol";
 
 contract MathLibDifferentialTests is Test {
+    struct ApyVsrTestCase {
+        uint256 apy;
+        uint256 vsr;
+    }
+
     MathLibWrapper internal w;
 
     function setUp() public {
@@ -149,11 +154,6 @@ contract MathLibDifferentialTests is Test {
 
     // The tests below were taken from Spark Vaults v2 repo:
     // https://github.com/sparkdotfi/spark-vaults-v2/blob/dev/test/Math.t.sol
-
-    struct ApyVsrTestCase {
-        uint256 apy;
-        uint256 vsr;
-    }
 
     // NOTE: The CSV data was sourced from Sky Ecosystem's VSR conversion table:
     //       https://ipfs.io/ipfs/QmVp4mhhbwWGTfbh2BzwQB9eiBrQBKiqcPRZCaAxNUaar6

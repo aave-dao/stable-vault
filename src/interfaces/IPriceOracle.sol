@@ -6,17 +6,9 @@ pragma solidity ^0.8.22;
 /// @author Aave Labs
 /// @notice Interface for the Master Price Oracle contract.
 interface IPriceOracle {
-    /// @notice Thrown when a price call to an adapter ran out of gas.
-    /// @custom:selector 0x24b593d9
-    error InsufficientGasForExternalCall();
-
     /// @notice Thrown when minimum valid price is out of accepted range.
     /// @custom:selector 0x6dd066fe
     error InvalidMinPrice();
-
-    /// @notice Thrown when the adapter for an asset is not found.
-    /// @custom:selector 0x2a40cc73
-    error OracleAdapterNotFound(address asset);
 
     /// @notice Thrown when a price obtained from an oracle for an asset is below a minimum valid price.
     /// @custom:selector 0xdbbbe822
@@ -25,9 +17,6 @@ interface IPriceOracle {
     /// @notice Thrown when a price obtained from an oracle for an asset was updated before a threshold timestamp.
     /// @custom:selector 0x19abf40e
     error StalePrice();
-
-    /// @notice Emitted when an adapter is set for an asset.
-    event OracleAdapterSet(address indexed asset, address indexed newAdapter, address indexed previousAdapter);
 
     /// @notice Queries an oracle adapter for the price of an asset.
     /// @param asset The asset to get the price for.

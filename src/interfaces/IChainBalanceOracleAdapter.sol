@@ -15,13 +15,13 @@ interface IChainBalanceOracleAdapter is IERC165 {
     /// @custom:selector 0x331003b3
     error InvalidChainId(uint256 chainId);
 
-    /// @notice Thrown when the chain id of the snapshot is not what was expected.
-    /// @custom:selector 0x7689e196
-    error InvalidSnapshotChainId(uint256 expected, uint256 actual);
-
     /// @notice Thrown when the version of the IEarningChainStateProvider struct is not what was expected.
     /// @custom:selector 0xf680bfbb
     error InvalidEarningChainStateVersion(uint256 expected, uint256 actual);
+
+    /// @notice Thrown when the chain id of the snapshot is not what was expected.
+    /// @custom:selector 0x7689e196
+    error InvalidSnapshotChainId(uint256 expected, uint256 actual);
 
     /// @notice Calls a configured data source to fetch the aggregated balance on a given chain.
     /// @dev This function does not validate the data returned by reverting, it relies on the ChainBalanceOracle

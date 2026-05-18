@@ -19,19 +19,30 @@ import {Errors} from "src/types/Errors.sol";
 /// @dev Assumes all configured assets have the same denomination.
 /// @custom:upgradeable
 contract PriceOracle is AccessManagedUpgradeable, IPriceOracle {
-    uint256 immutable MIN_VALID_PRICE_RAY;
-
-    uint256 constant MAX_PRICE_RAY = MathLib.RAY;
-
     /// @custom:storage-location erc7201:aave.storage.PriceOracle
     struct PriceOracleStorage {
         /// @dev Set of asset specific adapters for asset price oracles.
         mapping(address asset => address oracleAdapter) oracleAdapterByAsset;
     }
 
+    uint256 immutable MIN_VALID_PRICE_RAY;
+
+    uint256 constant MAX_PRICE_RAY = MathLib.RAY;
+
     // keccak256(abi.encode(uint256(keccak256("aave.storage.PriceOracle")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant STORAGE_SLOT_PRICE_ORACLE =
         0xe000f1dda5abe64dd1a0f674dea4aff2aee707620120c15bf2636fc080c92900;
+
+    /// @notice Emitted when an adapter is set for an asset.
+    event OracleAdapterSet(address indexed asset, address indexed newAdapter, address indexed previousAdapter);
+
+    /// @notice Thrown when a price call to an adapter ran out of gas.
+    /// @custom:selector 0x24b593d9
+    error InsufficientGasForExternalCall();
+
+    /// @notice Thrown when the adapter for an asset is not found.
+    /// @custom:selector 0x2a40cc73
+    error OracleAdapterNotFound(address asset);
 
     function $storage() private pure returns (PriceOracleStorage storage _storage) {
         assembly {
@@ -77,8 +88,8 @@ contract PriceOracle is AccessManagedUpgradeable, IPriceOracle {
         address oracleAdapter = $storage().oracleAdapterByAsset[asset];
         require(oracleAdapter != address(0), OracleAdapterNotFound(asset));
         IPriceOracleAdapter.OracleResponse memory response = IPriceOracleAdapter(oracleAdapter).getPrice(asset);
-        require(!response.isStale, IPriceOracle.StalePrice());
-        require(response.priceRay >= MIN_VALID_PRICE_RAY, IPriceOracle.PriceTooLow());
+        require(!response.isStale, StalePrice());
+        require(response.priceRay >= MIN_VALID_PRICE_RAY, PriceTooLow());
     }
 
     function getOracleAdapterForAsset(address asset) external view returns (address) {
@@ -110,7 +121,7 @@ contract PriceOracle is AccessManagedUpgradeable, IPriceOracle {
             // The "all but one 64th" gas check re-reverts when the catch fired from out-of-gas, so a healthy feed
             // cannot be silently induced to return zero. See EIP-150 for more details.
             if (gasleft() <= gasBefore / 64) {
-                revert IPriceOracle.InsufficientGasForExternalCall();
+                revert InsufficientGasForExternalCall();
             }
             return 0;
         }

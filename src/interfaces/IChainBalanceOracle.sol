@@ -6,13 +6,6 @@ pragma solidity ^0.8.22;
 /// @author Aave Labs
 /// @notice Interface for chain balance oracle functionality required on the Accounting Chain.
 interface IChainBalanceOracle {
-    /// @notice Thrown when the adapter for a chain is not found.
-    /// @custom:selector 0x3f3e70bf
-    error ChainBalanceOracleAdapterNotFound(uint256 chainId);
-
-    /// @notice Emitted when an adapter is set for a chain.
-    event ChainBalanceAdapterSet(uint256 indexed chainId, address indexed previousAdapter, address indexed newAdapter);
-
     /// @notice The representation of the response from the oracle adapter.
     /// @param balanceRay The aggregated balance on a given chain in ray units.
     /// @param lastUpdateTimestamp The timestamp of the last update published to the destination chain.

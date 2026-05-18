@@ -7,10 +7,10 @@ import {IERC20} from "forge-std/interfaces/IERC20.sol";
 
 import {Logger} from "test/helpers/Logger.sol";
 
+import {CcipAdapter} from "src/bridging/ccip/CcipAdapter.sol";
 import {StableVault} from "src/core/accounting/StableVault.sol";
 import {IAccountingChainGateway} from "src/interfaces/IAccountingChainGateway.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
-import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IChainBalanceOracle} from "src/interfaces/IChainBalanceOracle.sol";
 import {IChainBalanceOracleAdapter} from "src/interfaces/IChainBalanceOracleAdapter.sol";
 import {IEarningChainStateProvider} from "src/interfaces/IEarningChainStateProvider.sol";
@@ -240,7 +240,7 @@ contract OracleFeedE2ETest is BaseTest {
             userBalanceWithInterest,
             address(ccipAdapter_accountingChain),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0}))
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0}))
         );
         assertEq(iouToken_accountingChain.balanceOf(user1), 0, "User should have bridged IOU tokens");
 
@@ -267,7 +267,7 @@ contract OracleFeedE2ETest is BaseTest {
             user1,
             address(ccipAdapter_earningChain),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})),
             ""
         );
 
@@ -816,7 +816,7 @@ contract OracleFeedE2ETest is BaseTest {
             returnAmount,
             address(ccipAdapter_earningChain),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})),
             ""
         );
 
@@ -874,7 +874,7 @@ contract OracleFeedE2ETest is BaseTest {
             returnAmount,
             address(ccipAdapter_earningChain),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})),
             ""
         );
 
@@ -937,7 +937,7 @@ contract OracleFeedE2ETest is BaseTest {
             depositAmount,
             address(ccipAdapter_earningChain),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})),
             ""
         );
     }
@@ -963,7 +963,7 @@ contract OracleFeedE2ETest is BaseTest {
             depositAmount,
             address(ccipAdapter_earningChain),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})),
             ""
         );
         _publishAndSyncOracle();
@@ -1020,7 +1020,7 @@ contract OracleFeedE2ETest is BaseTest {
             EARNING_CHAIN_ID,
             address(ccipAdapter_accountingChain),
             DEFAULT_GAS_LIMIT,
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0})),
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0})),
             ""
         );
     }

@@ -21,8 +21,8 @@ import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
-import {ISlippageCoverageVault} from "src/interfaces/ISlippageCoverageVault.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
+import {SlippageCoverageVault} from "src/periphery/SlippageCoverageVault.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
 import {WithdrawalExecutionPolicy} from "src/policies/WithdrawalExecutionPolicy.sol";
 
@@ -197,10 +197,10 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     function test_rebalancerProfile_hasTheExpectedRoles() public view {
         uint64[] memory expected = new uint64[](5);
         expected[0] = RolesConfig.getRole__rebalance().roleId;
-        expected[1] = RolesConfig.getRole__disableDepositsToStrategy().roleId;
-        expected[2] = RolesConfig.getRole__pushFundsToChain().roleId;
-        expected[3] = RolesConfig.getRole__pushFundsToAccountingChain().roleId;
-        expected[4] = RolesConfig.getRole__setWithdrawalQueue().roleId;
+        expected[1] = RolesConfig.getRole__setWithdrawalQueue().roleId;
+        expected[2] = RolesConfig.getRole__disableDepositsToStrategy().roleId;
+        expected[3] = RolesConfig.getRole__pushFundsToChain().roleId;
+        expected[4] = RolesConfig.getRole__pushFundsToAccountingChain().roleId;
         _assertProfileHasExactlyTheseRoles(_getProfile__Rebalancer(), expected);
 
         for (uint256 i = 0; i < expected.length; i++) {
@@ -240,29 +240,37 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
 
     function test_disablerProfile_hasTheExpectedRoles() public view {
         uint64[] memory expected = new uint64[](22);
+        // Allocator (defensive)
         expected[0] = RolesConfig.getRole__rebalance().roleId;
         expected[1] = RolesConfig.getRole__removeStrategy().roleId;
-        expected[2] = RolesConfig.getRole__rescueTokens().roleId;
-        expected[3] = RolesConfig.getRole__rescueNative().roleId;
-        expected[4] = RolesConfig.getRole__disableAllocatorDeposits().roleId;
-        expected[5] = RolesConfig.getRole__disableUserDeposits().roleId;
-        expected[6] = RolesConfig.getRole__disableSwapInput().roleId;
-        expected[7] = RolesConfig.getRole__disableSwapOutput().roleId;
-        expected[8] = RolesConfig.getRole__distrustAsset().roleId;
-        expected[9] = RolesConfig.getRole__removeBridgeAdapter().roleId;
-        expected[10] = RolesConfig.getRole__disableDepositsToStrategy().roleId;
-        expected[11] = RolesConfig.getRole__distrustStrategy().roleId;
+        expected[2] = RolesConfig.getRole__disableDepositsToStrategy().roleId;
+        expected[3] = RolesConfig.getRole__distrustStrategy().roleId;
+        // Rescue (cross-target)
+        expected[4] = RolesConfig.getRole__rescueTokens().roleId;
+        expected[5] = RolesConfig.getRole__rescueNative().roleId;
+        // AssetRegistry (defensive)
+        expected[6] = RolesConfig.getRole__disableAllocatorDeposits().roleId;
+        expected[7] = RolesConfig.getRole__disableUserDeposits().roleId;
+        expected[8] = RolesConfig.getRole__disableSwapInput().roleId;
+        expected[9] = RolesConfig.getRole__disableSwapOutput().roleId;
+        expected[10] = RolesConfig.getRole__distrustAsset().roleId;
+        // Gateway
+        expected[11] = RolesConfig.getRole__removeBridgeAdapter().roleId;
+        // WithdrawalExecutionPolicy
         expected[12] = RolesConfig.getRole__removeSigner().roleId;
-        expected[13] = RolesConfig.getRole__lowerPullCapPerTx().roleId;
-        expected[14] = RolesConfig.getRole__lowerWindowCap().roleId;
+        expected[13] = RolesConfig.getRole__lowerRedemptionCapacity().roleId;
+        expected[14] = RolesConfig.getRole__lowerRedemptionRefillRate().roleId;
+        // SlippageCoverageVault
         // raiseWindowSeconds is tightening (longer window = slower rate), even though the prefix says raise.
-        expected[15] = RolesConfig.getRole__raiseWindowSeconds().roleId;
-        expected[16] = RolesConfig.getRole__lowerDepositCapacity().roleId;
-        expected[17] = RolesConfig.getRole__lowerDepositRefillRate().roleId;
-        expected[18] = RolesConfig.getRole__lowerBridgingCapacity().roleId;
-        expected[19] = RolesConfig.getRole__lowerBridgingRefillRate().roleId;
-        expected[20] = RolesConfig.getRole__lowerRedemptionCapacity().roleId;
-        expected[21] = RolesConfig.getRole__lowerRedemptionRefillRate().roleId;
+        expected[15] = RolesConfig.getRole__lowerPullCapPerTx().roleId;
+        expected[16] = RolesConfig.getRole__lowerWindowCap().roleId;
+        expected[17] = RolesConfig.getRole__raiseWindowSeconds().roleId;
+        // DepositPolicy
+        expected[18] = RolesConfig.getRole__lowerDepositCapacity().roleId;
+        expected[19] = RolesConfig.getRole__lowerDepositRefillRate().roleId;
+        // FundsBridgingPolicy
+        expected[20] = RolesConfig.getRole__lowerBridgingCapacity().roleId;
+        expected[21] = RolesConfig.getRole__lowerBridgingRefillRate().roleId;
         _assertProfileHasExactlyTheseRoles(_getProfile__Disabler(), expected);
 
         for (uint256 i = 0; i < expected.length; i++) {
@@ -457,6 +465,9 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         _assertTargetFunctionRole(
             target, IAllocator.setWithdrawalQueue.selector, RolesConfig.getRole__setWithdrawalQueue().roleId
         );
+        _assertTargetFunctionRole(
+            target, IRescuableToken.rescueTokens.selector, RolesConfig.getRole__rescueTokens().roleId
+        );
     }
 
     function test_targetSetup_withdrawalExecutionPolicy() public view {
@@ -517,44 +528,44 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     function test_targetSetup_slippageCoverageVault() public view {
         address target = getSlippageCoverageVaultAddress(_deployer());
         _assertTargetFunctionRole(
-            target, ISlippageCoverageVault.enableOverrideMode.selector, RolesConfig.getRole__enableOverrideMode().roleId
+            target, SlippageCoverageVault.enableOverrideMode.selector, RolesConfig.getRole__enableOverrideMode().roleId
         );
         _assertTargetFunctionRole(
             target,
-            ISlippageCoverageVault.disableOverrideMode.selector,
+            SlippageCoverageVault.disableOverrideMode.selector,
             RolesConfig.getRole__disableOverrideMode().roleId
         );
         _assertTargetFunctionRole(
-            target, ISlippageCoverageVault.raisePullCapPerTx.selector, RolesConfig.getRole__raisePullCapPerTx().roleId
+            target, SlippageCoverageVault.raisePullCapPerTx.selector, RolesConfig.getRole__raisePullCapPerTx().roleId
         );
         _assertTargetFunctionRole(
-            target, ISlippageCoverageVault.lowerPullCapPerTx.selector, RolesConfig.getRole__lowerPullCapPerTx().roleId
+            target, SlippageCoverageVault.lowerPullCapPerTx.selector, RolesConfig.getRole__lowerPullCapPerTx().roleId
         );
         _assertTargetFunctionRole(
-            target, ISlippageCoverageVault.raiseWindowCap.selector, RolesConfig.getRole__raiseWindowCap().roleId
+            target, SlippageCoverageVault.raiseWindowCap.selector, RolesConfig.getRole__raiseWindowCap().roleId
         );
         _assertTargetFunctionRole(
-            target, ISlippageCoverageVault.lowerWindowCap.selector, RolesConfig.getRole__lowerWindowCap().roleId
+            target, SlippageCoverageVault.lowerWindowCap.selector, RolesConfig.getRole__lowerWindowCap().roleId
         );
         _assertTargetFunctionRole(
-            target, ISlippageCoverageVault.raiseWindowSeconds.selector, RolesConfig.getRole__raiseWindowSeconds().roleId
+            target, SlippageCoverageVault.raiseWindowSeconds.selector, RolesConfig.getRole__raiseWindowSeconds().roleId
         );
         _assertTargetFunctionRole(
-            target, ISlippageCoverageVault.lowerWindowSeconds.selector, RolesConfig.getRole__lowerWindowSeconds().roleId
+            target, SlippageCoverageVault.lowerWindowSeconds.selector, RolesConfig.getRole__lowerWindowSeconds().roleId
         );
         _assertTargetFunctionRole(
-            target, ISlippageCoverageVault.setMaxSlippageBps.selector, RolesConfig.getRole__setMaxSlippageBps().roleId
+            target, SlippageCoverageVault.setMaxSlippageBps.selector, RolesConfig.getRole__setMaxSlippageBps().roleId
         );
         _assertTargetFunctionRole(
             target,
-            ISlippageCoverageVault.setOverrideMaxSlippageBps.selector,
+            SlippageCoverageVault.setOverrideMaxSlippageBps.selector,
             RolesConfig.getRole__setOverrideMaxSlippageBps().roleId
         );
         _assertTargetFunctionRole(
-            target, ISlippageCoverageVault.fundCoverage.selector, RolesConfig.getRole__fundCoverage().roleId
+            target, SlippageCoverageVault.fundCoverage.selector, RolesConfig.getRole__fundCoverage().roleId
         );
         _assertTargetFunctionRole(
-            target, ISlippageCoverageVault.sweep.selector, RolesConfig.getRole__sweepSlippageCoverageVault().roleId
+            target, SlippageCoverageVault.sweep.selector, RolesConfig.getRole__sweepSlippageCoverageVault().roleId
         );
     }
 
@@ -616,7 +627,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
 
         _assertCanCall(funder, getAllocatorAddress(_deployer()), IAllocator.topUp.selector, true, 0);
         _assertCanCall(
-            funder, getSlippageCoverageVaultAddress(_deployer()), ISlippageCoverageVault.fundCoverage.selector, true, 0
+            funder, getSlippageCoverageVaultAddress(_deployer()), SlippageCoverageVault.fundCoverage.selector, true, 0
         );
         // Unauthorized functions
         _assertCanCall(funder, getAllocatorAddress(_deployer()), IAllocator.rebalance.selector, false, 0);
@@ -903,7 +914,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         vm.prank(admin);
         accessManager.cancel(admin, getAllocatorAddress(_deployer()), callData);
 
-        assertEq(accessManager.getSchedule(operationId), 0, "Operation should be cancelled");
+        assertEq(accessManager.getSchedule(operationId), 0, "Operation should be canceled");
     }
 
     ////// SecondaryAdmin cannot cancel admin-tier operations //////

@@ -8,7 +8,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
-import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
 import {Errors} from "src/types/Errors.sol";
 
@@ -81,6 +80,7 @@ abstract contract BaseBridgeAdapter is AccessManaged, TransferHelperClient, IBri
         bytes memory bridgeAdapterData
     ) external payable virtual override;
 
+    /// @inheritdoc IBridgeAdapter
     function setDestinationChainAdapter(uint256 chainId, address destinationChainAdapter) external override restricted {
         require(chainId != 0 && chainId != block.chainid, Errors.InvalidParameter());
         require(destinationChainAdapter != address(0), Errors.ZeroAddress());

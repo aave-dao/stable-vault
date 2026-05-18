@@ -6,9 +6,6 @@ pragma solidity ^0.8.22;
 /// @author Aave Labs
 /// @notice Interface for the contract enforcing conditions during deposits into the StableVault.
 interface IDepositPolicy {
-    /// @notice Emitted when the deposit policy is applied.
-    event DepositPolicyApplied(address indexed caller, address indexed user, address indexed asset, uint256 amount);
-
     /// @notice Core parameters for a deposit.
     /// @param caller `msg.sender` of `StableVault.deposit` (may differ from `user`, e.g. relayer/custodian flows).
     /// @param user The position beneficiary.
@@ -22,6 +19,9 @@ interface IDepositPolicy {
         uint256 amount;
         bytes policyData;
     }
+
+    /// @notice Emitted when the deposit policy is applied.
+    event DepositPolicyApplied(address indexed caller, address indexed user, address indexed asset, uint256 amount);
 
     /// @notice Applies the deposit policy. Reverts if the deposit does not comply with the policy restrictions.
     /// @param deposit The deposit intent.

@@ -6,10 +6,10 @@ import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessMana
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+import {CcipAdapter} from "src/bridging/ccip/CcipAdapter.sol";
 import {FundsHandler} from "src/core/accounting/FundsHandler.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
-import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
 import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
@@ -366,7 +366,7 @@ contract FundsHandlerTest is TestWithHelpers {
         bridgeAdapterData_feeAmount = _boundNativeAmount(bridgeAdapterData_feeAmount);
         vm.deal(address(unauthorizedMsgSender), bridgeAdapterData_feeAmount);
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0}));
 
         vm.assume(chainId != block.chainid);
         vm.prank(ADMIN);
@@ -410,7 +410,7 @@ contract FundsHandlerTest is TestWithHelpers {
         vm.deal(address(this), bridgeAdapterData_feeAmount);
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0}));
 
         vm.expectRevert(abi.encodeWithSelector(Errors.ZeroAmount.selector));
         fundsHandler.pushFundsToChain{value: bridgeAdapterData_feeAmount}(
@@ -431,7 +431,7 @@ contract FundsHandlerTest is TestWithHelpers {
         bridgeAdapterData_feeAmount = _boundAssetAmount(address(mockAsset), bridgeAdapterData_feeAmount);
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: address(mockAsset), feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: address(mockAsset), nativeFeeRefundThreshold: 0}));
 
         mockAsset.mint(address(mockAllocator), amount);
         mockAllocator.mockToPushToTransferHelperInNextCall(address(mockAsset), amount);
@@ -471,7 +471,7 @@ contract FundsHandlerTest is TestWithHelpers {
         bridgeAdapterData_feeAmount = _boundAssetAmount(feeToken, bridgeAdapterData_feeAmount);
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: feeToken, feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: feeToken, nativeFeeRefundThreshold: 0}));
 
         mockAsset.mint(address(mockAllocator), amount);
         mockAllocator.mockToPushToTransferHelperInNextCall(address(mockAsset), amount);
@@ -515,7 +515,7 @@ contract FundsHandlerTest is TestWithHelpers {
         mockAsset.mint(unauthorizedFeePayer, bridgeAdapterData_feeAmount);
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: address(mockAsset), feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: address(mockAsset), nativeFeeRefundThreshold: 0}));
 
         mockAsset.mint(address(mockAllocator), amount);
         mockAllocator.mockToPushToTransferHelperInNextCall(address(mockAsset), amount);
@@ -544,7 +544,7 @@ contract FundsHandlerTest is TestWithHelpers {
         bridgeAdapterData_feeAmount = _boundAssetAmount(address(mockAsset), bridgeAdapterData_feeAmount);
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: address(mockAsset), feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: address(mockAsset), nativeFeeRefundThreshold: 0}));
 
         vm.expectRevert(abi.encodeWithSelector(Errors.InvalidDestinationChainId.selector));
         fundsHandler.pushFundsToChain(
@@ -577,7 +577,7 @@ contract FundsHandlerTest is TestWithHelpers {
         mockAsset.forceApprove(address(mockBridgeAdapter), bridgeAdapterData_feeAmount);
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: address(mockAsset), feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: address(mockAsset), nativeFeeRefundThreshold: 0}));
 
         mockAsset.mint(address(mockAllocator), amount);
         mockAllocator.mockToPushToTransferHelperInNextCall(address(mockAsset), amount);
@@ -625,7 +625,7 @@ contract FundsHandlerTest is TestWithHelpers {
         mockAsset.forceApprove(address(mockBridgeAdapter), bridgeAdapterData_feeAmount);
 
         bytes memory bridgeAdapterData =
-            abi.encode(ICcipBridgeAdapter.CcipFeeParams({feeToken: address(mockAsset), feeRefundThreshold: 0}));
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: address(mockAsset), nativeFeeRefundThreshold: 0}));
 
         mockAsset.mint(address(mockAllocator), amount);
         mockAllocator.mockToPushToTransferHelperInNextCall(address(mockAsset), amount);

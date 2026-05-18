@@ -6,9 +6,13 @@ pragma solidity ^0.8.22;
 /// @author Aave Labs
 /// @notice Interface for the FundsHandler contract.
 interface IFundsHandler {
-    /// @notice Thrown when the caller is not the StableVault.
-    /// @custom:selector 0x53dad68c
-    error OnlyStableVault();
+    /// @notice Emitted when an earning chain is added.
+    /// @param chainId Chain id of the earning chain that was added.
+    event EarningChainAdded(uint256 chainId);
+
+    /// @notice Emitted when an earning chain is removed.
+    /// @param chainId Chain id of the earning chain that was removed.
+    event EarningChainRemoved(uint256 chainId);
 
     /// @notice Thrown when the chain id is already present in the Earning chain set.
     /// @custom:selector 0xff514c10
@@ -18,19 +22,9 @@ interface IFundsHandler {
     /// @custom:selector 0x20be9c4b
     error ChainIdNotPresent();
 
-    /// @notice Emitted when an earning chain is added.
-    /// @param chainId Chain id of the earning chain that was added.
-    event EarningChainAdded(uint256 chainId);
-
-    /// @notice Emitted when an earning chain is removed.
-    /// @param chainId Chain id of the earning chain that was removed.
-    event EarningChainRemoved(uint256 chainId);
-
-    /// @notice Getter for the total assets in the local Allocator and the Allocators on all Earning Chains.
-    /// @dev May underestimate when trust or freshness guarantees cannot be satisfied for a given contribution
-    /// (conservative by design). See the implementation for specific policies.
-    /// @return aggregatedBalance Total liquidity across all supported chains in RAY of the denominating currency.
-    function getAggregatedBalance() external view returns (uint256);
+    /// @notice Thrown when the caller is not the StableVault.
+    /// @custom:selector 0x53dad68c
+    error OnlyStableVault();
 
     /// @notice Adds an earning chain to the list of supported earning chains.
     /// @dev An Earning chain must be added to bridge funds to the chain and to obtain balances on the chain from an
@@ -79,4 +73,10 @@ interface IFundsHandler {
     /// @param asset Address of the asset that arrived from the chain.
     /// @param amount Amount of the asset that arrived from the chain.
     function fundsArrivedFromChainCallback(address asset, uint256 amount) external;
+
+    /// @notice Getter for the total assets in the local Allocator and the Allocators on all Earning Chains.
+    /// @dev May underestimate when trust or freshness guarantees cannot be satisfied for a given contribution
+    /// (conservative by design). See the implementation for specific policies.
+    /// @return aggregatedBalance Total liquidity across all supported chains in RAY of the denominating currency.
+    function getAggregatedBalance() external view returns (uint256);
 }

@@ -74,29 +74,6 @@ contract StableVault is
         uint256 shares;
     }
 
-    address internal immutable ASSET_REGISTRY;
-
-    address internal immutable IOU_TOKEN_MANAGER;
-
-    uint256 internal immutable MAX_VALID_PER_SECOND_RATE;
-
-    address internal immutable FUNDS_HANDLER;
-
-    address internal immutable PRICE_ORACLE;
-
-    uint256 internal immutable MAX_ACTIVE_SUB_VAULTS;
-
-    address internal immutable POLICY_REGISTRY;
-
-    // keccak256("aave.stable-vault.StableVault.policy.deposit")
-    bytes32 internal constant DEPOSIT_POLICY_ID = 0x780c69a8d1890ef009c0e82622a8ad8b5fcebdb4655a550589c95587ab9f8737;
-    // keccak256("aave.stable-vault.StableVault.policy.withdrawal-request")
-    bytes32 internal constant WITHDRAWAL_REQUEST_POLICY_ID =
-        0x9c238a3c8b0489eb6352e8961b4f7a11406d8d4dea0b75e9f2b5cab473d164d8;
-    // keccak256("aave.stable-vault.StableVault.policy.withdrawal-execution")
-    bytes32 internal constant WITHDRAWAL_EXECUTION_POLICY_ID =
-        0x0b31c7380981f7a065b16980994765a46c7c2446175bc97b41109919817f1ca2;
-
     /// @custom:storage-location erc7201:aave.storage.StableVault
     struct StableVaultStorage {
         /// @dev Keeps track of the sum of all users' original deposits.
@@ -134,6 +111,29 @@ contract StableVault is
         /// @dev ERC20-style symbol of the Stable Vault position token.
         string symbol;
     }
+
+    address internal immutable ASSET_REGISTRY;
+
+    address internal immutable IOU_TOKEN_MANAGER;
+
+    uint256 internal immutable MAX_VALID_PER_SECOND_RATE;
+
+    address internal immutable FUNDS_HANDLER;
+
+    address internal immutable PRICE_ORACLE;
+
+    uint256 internal immutable MAX_ACTIVE_SUB_VAULTS;
+
+    address internal immutable POLICY_REGISTRY;
+
+    // keccak256("aave.stable-vault.StableVault.policy.deposit")
+    bytes32 internal constant DEPOSIT_POLICY_ID = 0x780c69a8d1890ef009c0e82622a8ad8b5fcebdb4655a550589c95587ab9f8737;
+    // keccak256("aave.stable-vault.StableVault.policy.withdrawal-request")
+    bytes32 internal constant WITHDRAWAL_REQUEST_POLICY_ID =
+        0x9c238a3c8b0489eb6352e8961b4f7a11406d8d4dea0b75e9f2b5cab473d164d8;
+    // keccak256("aave.stable-vault.StableVault.policy.withdrawal-execution")
+    bytes32 internal constant WITHDRAWAL_EXECUTION_POLICY_ID =
+        0x0b31c7380981f7a065b16980994765a46c7c2446175bc97b41109919817f1ca2;
 
     // keccak256(abi.encode(uint256(keccak256("aave.storage.StableVault")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant STORAGE_SLOT_STABLE_VAULT =
@@ -262,7 +262,7 @@ contract StableVault is
         emit Transfer(address(0), user, amountInRay);
     }
 
-    /// @notice Transfers Stable Vault balance (denominated in RAY) between users.
+    /// @inheritdoc IStableVault
     /// @dev This is accounting-only (no IOUs, no assets, no WithdrawalExecutionPolicy).
     /// @dev For full balance transfers, use transferAll() instead.
     /// @dev Reverts if the remaining sender balance after transfer would be below dust threshold.
@@ -312,7 +312,7 @@ contract StableVault is
         return true;
     }
 
-    /// @notice Transfers the sender's full position to another user.
+    /// @inheritdoc IStableVault
     /// @dev Any remaining original deposit amount is also transferred to the recipient.
     function transferAll(address to) external virtual override nonReentrant returns (bool) {
         address from = msg.sender;
@@ -928,8 +928,8 @@ contract StableVault is
         return IERC20(IIouTokenManager(IOU_TOKEN_MANAGER).getAsset()).totalSupply();
     }
 
-    function _mintIous(address user, uint256 amount) internal {
-        IIouTokenManager(IOU_TOKEN_MANAGER).mintTokens(user, amount);
+    function _mintIous(address user, uint256 iouAmountRay) internal {
+        IIouTokenManager(IOU_TOKEN_MANAGER).mintTokens(user, iouAmountRay);
     }
 
     function _isActiveSubVaultById(uint256 subVaultId) internal view returns (bool) {

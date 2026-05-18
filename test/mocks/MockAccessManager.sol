@@ -5,15 +5,15 @@ pragma solidity ^0.8.22;
 contract MockAccessManager {
     address internal immutable ADMIN;
 
-    constructor(address initialAdminParam) {
-        ADMIN = initialAdminParam;
-    }
-
     // Allow by default, require to reject explicitly.
     mapping(address caller => mapping(address target => mapping(bytes4 selector => bool callRejected))) internal
         _callRejected;
     // A delay + timestamp approach can be used if we want to make it compatible with vm.warp.
     mapping(address caller => mapping(address target => mapping(bytes4 selector => uint32 delay))) internal _mockDelay;
+
+    constructor(address initialAdminParam) {
+        ADMIN = initialAdminParam;
+    }
 
     function mockCanCall(address caller, address target, bytes4 selector, bool allowCall, uint32 delay) external {
         _callRejected[caller][target][selector] = !allowCall;

@@ -26,11 +26,14 @@ interface IAssetRegistry {
         bool swapOutputTokenAllowed;
     }
 
+    /// @notice Emitted when the asset configuration is set or updated.
     event AssetConfigSet(address asset, AssetConfig config);
 
-    event AssetTrusted(address asset);
-
+    /// @notice Emitted when an asset is marked distrusted.
     event AssetDistrusted(address asset);
+
+    /// @notice Emitted when an asset is marked trusted.
+    event AssetTrusted(address asset);
 
     /// @notice Thrown when attempting to disable a feature that is already disabled.
     /// @custom:selector 0x005ecddb

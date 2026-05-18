@@ -6,10 +6,6 @@ import {AdiAdapter} from "src/bridging/adi/AdiAdapter.sol";
 import {IAdiCrossChainForwarder} from "src/interfaces/IAdiCrossChainForwarder.sol";
 
 contract MockAdiCrossChainController is IAdiCrossChainForwarder {
-    error ForwardMessageFailed();
-    error UnexpectedQuoteGasLimit();
-    error UnexpectedQuoteBandwidth();
-
     uint256 public lastDestinationChainId;
     address public lastDestination;
     uint256 public lastGasLimit;
@@ -25,6 +21,10 @@ contract MockAdiCrossChainController is IAdiCrossChainForwarder {
     bytes internal _lastMessage;
     IAdiCrossChainForwarder.Fee[] internal _fees;
     bool internal _shouldRevertForwardMessage;
+
+    error ForwardMessageFailed();
+    error UnexpectedQuoteBandwidth();
+    error UnexpectedQuoteGasLimit();
 
     receive() external payable {}
 

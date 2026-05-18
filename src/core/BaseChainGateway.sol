@@ -19,8 +19,6 @@ import {Errors} from "src/types/Errors.sol";
 /// @notice Abstract base contract for ChainGateway contracts.
 /// @custom:upgradeable
 abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative, RescuableToken, IChainGateway {
-    address internal immutable IOU_TOKEN_MANAGER;
-
     /// @custom:storage-location erc7201:aave.storage.BaseChainGateway
     struct BaseChainGatewayStorage {
         /// @dev Set of adapters whitelisted for usage.
@@ -31,6 +29,8 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
             supportedBridgeAdapters;
         mapping(uint256 chainId => uint256) dataOnlyBridgeAdapterCount;
     }
+
+    address internal immutable IOU_TOKEN_MANAGER;
 
     // keccak256(abi.encode(uint256(keccak256("aave.storage.BaseChainGateway")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant STORAGE_SLOT_BASE_CHAIN_GATEWAY =

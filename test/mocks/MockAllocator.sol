@@ -12,6 +12,9 @@ contract MockAllocator is IAllocator {
 
     mapping(address asset => uint256 balance) _mockedAssetBalances;
     address[] _mockedAssets;
+    address _transferHelper;
+    address[] _assetsToPushToTransferHelperInNextCall;
+    uint256[] _amountsToPushToTransferHelperInNextCall;
 
     function mockAssetBalance(address asset, uint256 amount) external {
         _mockedAssetBalances[asset] = amount;
@@ -44,10 +47,6 @@ contract MockAllocator is IAllocator {
         }
         return balances;
     }
-
-    address _transferHelper;
-    address[] _assetsToPushToTransferHelperInNextCall;
-    uint256[] _amountsToPushToTransferHelperInNextCall;
 
     function mockToPushToTransferHelperInNextCall(address asset, uint256 amount) external {
         _assetsToPushToTransferHelperInNextCall.push(asset);

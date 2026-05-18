@@ -13,13 +13,16 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {IRouterClient} from "@chainlink-ccip/contracts/interfaces/IRouterClient.sol";
 
+import {AdiAdapter} from "src/bridging/adi/AdiAdapter.sol";
 import {CcipAdapter} from "src/bridging/ccip/CcipAdapter.sol";
 import {Allocator} from "src/core/Allocator.sol";
 import {EarningChainGateway} from "src/core/earning/EarningChainGateway.sol";
 import {IouToken} from "src/core/ious/IouToken.sol";
 import {IouTokenManager} from "src/core/ious/IouTokenManager.sol";
+import {IAdiBridgeAdapter} from "src/interfaces/IAdiBridgeAdapter.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
+import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IEarningChainGateway} from "src/interfaces/IEarningChainGateway.sol";
 import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
@@ -34,6 +37,7 @@ import {Swapper} from "src/periphery/Swapper.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
 import {FundsBridgingPolicy} from "src/policies/FundsBridgingPolicy.sol";
 import {WithdrawalExecutionPolicy} from "src/policies/WithdrawalExecutionPolicy.sol";
+import {Constants} from "src/types/Constants.sol";
 
 abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarningChainSetup, ATokenVaultDeployment {
     using Strings for address;
@@ -129,6 +133,7 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         _deploySlippageCoverageVault();
         _deploySwapper();
         _deployCcipAdapter();
+        _deployAdiAdapter();
         _deployEarningChainStateProvider();
         _deployFundsBridgingPolicy();
     }
@@ -188,12 +193,22 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         // USDT uses CCIP Adapter
         gateway.addBridgeAdapter(_usdt(), accountingChainId, localCcipAdapter);
 
-        // Message uses CCIP Adapter
-        address messageOnly = address(0);
-        gateway.addBridgeAdapter(messageOnly, accountingChainId, localCcipAdapter);
-
         ICcipBridgeAdapter(localCcipAdapter).setChainSelector(accountingChainId, accountingChainCcipSelector);
         ICcipBridgeAdapter(localCcipAdapter).setDestinationChainAdapter(accountingChainId, accountingCcipAdapter);
+
+        // Data-only messages use aDI.
+        // aDI adapter is registered on the gateway and configured for the accounting chain only when the per-chain
+        // flag is set. This lets us deploy the adapter without yet routing messages through it.
+        if (_isAdiAdapterDeployed()) {
+            // NOTE: Assumes the aDI adapter has the same address on the accounting chain (CREATE3 + same
+            // deployer/salt).
+            address localAdiAdapter = getAdiAdapterAddress(_deployer());
+            address accountingChainAdiAdapter = localAdiAdapter;
+            IBridgeAdapter(localAdiAdapter).setDestinationChainAdapter(accountingChainId, accountingChainAdiAdapter);
+            if (_configBool(".earningChain.adi.registerOnGateway")) {
+                gateway.addBridgeAdapter(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, accountingChainId, localAdiAdapter);
+            }
+        }
     }
 
     function _setupWithdrawalExecutionPolicy() internal {
@@ -460,6 +475,32 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         require(ccipAdapter == getCcipAdapterAddress(_deployer()), "CcipAdapter does not match expected address");
         _logDeployment("CcipAdapter", CCIP_ADAPTER_SALT_SEED, ccipAdapter);
         return ccipAdapter;
+    }
+
+    function _isAdiAdapterDeployed() internal view virtual override returns (bool) {
+        return _configAddress(".earningChain.adi.crossChainController") != address(0);
+    }
+
+    function _deployAdiAdapter() internal returns (address) {
+        if (!_isAdiAdapterDeployed()) {
+            return address(0);
+        }
+        address adiAdapter = _deploy_create3({
+            namespacedSaltSeed: ADI_ADAPTER_SALT_SEED,
+            deployer: _deployer(),
+            initCode: abi.encodePacked(
+                type(AdiAdapter).creationCode,
+                abi.encode(
+                    getAccessManagerAddress(_deployer()),
+                    getGatewayAddress(_deployer()),
+                    _configAddress(".earningChain.adi.crossChainController"),
+                    getTransferHelperAddress(_deployer())
+                )
+            )
+        });
+        require(adiAdapter == getAdiAdapterAddress(_deployer()), "AdiAdapter does not match expected address");
+        _logDeployment("AdiAdapter", ADI_ADAPTER_SALT_SEED, adiAdapter);
+        return adiAdapter;
     }
 
     function _deployPriceOracle() internal returns (address) {

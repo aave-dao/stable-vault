@@ -38,6 +38,11 @@ contract FundsHandler is
     using MathLib for uint256;
     using EnumerableSet for EnumerableSet.UintSet;
 
+    /// @custom:storage-location erc7201:aave.storage.FundsHandler
+    struct FundsHandlerStorage {
+        EnumerableSet.UintSet earningChainIds;
+    }
+
     address internal immutable VAULT;
     address internal immutable GATEWAY;
     address internal immutable CHAIN_BALANCE_ORACLE;
@@ -46,20 +51,9 @@ contract FundsHandler is
     // keccak256("aave.stable-vault.FundsHandler.policy.bridge")
     bytes32 internal constant BRIDGE_POLICY_ID = 0xe8134dfa9ba78c8f4bc7215c2603da92d80f826e18cf8cf1673b973cae3e6165;
 
-    /// @custom:storage-location erc7201:aave.storage.FundsHandler
-    struct FundsHandlerStorage {
-        EnumerableSet.UintSet earningChainIds;
-    }
-
     // keccak256(abi.encode(uint256(keccak256("aave.storage.FundsHandler")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant STORAGE_SLOT_FUNDS_HANDLER =
         0xffa5bdc69644e89163c8759837db1aeb0b569037bb5259c74309b23147440c00;
-
-    function $storage() private pure returns (FundsHandlerStorage storage _storage) {
-        assembly {
-            _storage.slot := STORAGE_SLOT_FUNDS_HANDLER
-        }
-    }
 
     modifier onlyStableVault() {
         require(msg.sender == VAULT, OnlyStableVault());
@@ -69,6 +63,12 @@ contract FundsHandler is
     modifier onlyGateway() {
         require(msg.sender == GATEWAY, Errors.OnlyGateway());
         _;
+    }
+
+    function $storage() private pure returns (FundsHandlerStorage storage _storage) {
+        assembly {
+            _storage.slot := STORAGE_SLOT_FUNDS_HANDLER
+        }
     }
 
     /// @dev Constructor.
@@ -192,7 +192,7 @@ contract FundsHandler is
     }
 
     function _applyFundsBridgingPolicy(
-        uint256 chainId,
+        uint256 destChainId,
         address bridgeAdapter,
         address asset,
         uint256 amount,
@@ -207,7 +207,7 @@ contract FundsHandler is
                 IFundsBridgingPolicy.FundsBridgingIntent({
                 caller: msg.sender,
                 bridgeAdapter: bridgeAdapter,
-                destChainId: chainId,
+                destChainId: destChainId,
                 asset: asset,
                 amount: amount,
                 policyData: policyData

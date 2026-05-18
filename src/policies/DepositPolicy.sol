@@ -19,14 +19,21 @@ import {Errors} from "src/types/Errors.sol";
 contract DepositPolicy is AccessManaged, Multicall, IDepositPolicy {
     using RateLimitBucketLib for RateLimitBucketLib.Bucket;
 
-    event DepositCapacityRaised(address indexed asset, uint128 oldCapacity, uint128 newCapacity);
-    event DepositCapacityLowered(address indexed asset, uint128 oldCapacity, uint128 newCapacity);
-    event DepositRefillRateRaised(address indexed asset, uint128 oldRefillRate, uint128 newRefillRate);
-    event DepositRefillRateLowered(address indexed asset, uint128 oldRefillRate, uint128 newRefillRate);
-
     address internal immutable POLICY_APPLIER;
 
     mapping(address asset => RateLimitBucketLib.Bucket bucket) internal _buckets;
+
+    /// @notice Emitted when an asset's deposit capacity is lowered.
+    event DepositCapacityLowered(address indexed asset, uint128 oldCapacity, uint128 newCapacity);
+
+    /// @notice Emitted when an asset's deposit capacity is raised.
+    event DepositCapacityRaised(address indexed asset, uint128 oldCapacity, uint128 newCapacity);
+
+    /// @notice Emitted when an asset's deposit refill rate is lowered.
+    event DepositRefillRateLowered(address indexed asset, uint128 oldRefillRate, uint128 newRefillRate);
+
+    /// @notice Emitted when an asset's deposit refill rate is raised.
+    event DepositRefillRateRaised(address indexed asset, uint128 oldRefillRate, uint128 newRefillRate);
 
     modifier onlyPolicyApplier() {
         require(msg.sender == POLICY_APPLIER, Errors.NotAuthorized());

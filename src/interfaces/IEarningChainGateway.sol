@@ -14,9 +14,6 @@ interface IEarningChainGateway is IChainGateway {
     /// @param amount The amount of the asset that was removed.
     event AssetOutflow(address indexed asset, uint256 amount);
 
-    /// @notice The aggregated balance of the Earning Chain.
-    function getAggregatedBalance() external view returns (uint256);
-
     /// @notice Withdraws a specific asset from the Allocator and bridges it to the Accounting Chain.
     /// @param asset The asset to withdraw.
     /// @param amount The amount of the asset to withdraw in the asset's native decimals.
@@ -43,7 +40,7 @@ interface IEarningChainGateway is IChainGateway {
     /// @param bridgeAdapter The whitelisted bridge adapter to use for the data-only message.
     /// @param payloadExecutionGasLimit Gas limit for the destination gateway call and everything it executes.
     /// @param bridgeAdapterData Any bridge adapter custom parameters that it may need to operate.
-    /// @param policyData Additional data that the withdrawal execution policy might need to operate.
+    /// @param policyData Additional data that the withdrawal-execution policy might need to operate.
     /// @return amountOut The amount of the exchanged asset transferred to the receiver.
     function exchangeIouTokens(
         uint256 iouTokenAmountRay,
@@ -55,4 +52,7 @@ interface IEarningChainGateway is IChainGateway {
         bytes calldata bridgeAdapterData,
         bytes memory policyData
     ) external payable returns (uint256);
+
+    /// @notice The aggregated balance of the Earning Chain.
+    function getAggregatedBalance() external view returns (uint256);
 }

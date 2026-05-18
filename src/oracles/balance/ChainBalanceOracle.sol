@@ -27,6 +27,13 @@ contract ChainBalanceOracle is AccessManagedUpgradeable, IChainBalanceOracle {
     bytes32 private constant STORAGE_SLOT_CHAIN_BALANCE_ORACLE =
         0x6ac612655afeb35ba61923fff96d549bb19989dc9aae5077165522d8540af500;
 
+    /// @notice Emitted when an adapter is set for a chain.
+    event ChainBalanceAdapterSet(uint256 indexed chainId, address indexed previousAdapter, address indexed newAdapter);
+
+    /// @notice Thrown when the adapter for a chain is not found.
+    /// @custom:selector 0x3f3e70bf
+    error ChainBalanceOracleAdapterNotFound(uint256 chainId);
+
     function $storage() private pure returns (ChainBalanceOracleStorage storage _storage) {
         assembly {
             _storage.slot := STORAGE_SLOT_CHAIN_BALANCE_ORACLE

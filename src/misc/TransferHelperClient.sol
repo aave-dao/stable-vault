@@ -17,16 +17,11 @@ import {Errors} from "src/types/Errors.sol";
 abstract contract TransferHelperClient {
     using SafeERC20 for IERC20;
 
-    error TransferHelperBalanceNotConsumed(address asset);
-
     address internal immutable TRANSFER_HELPER;
 
-    /// @dev Constructor.
-    /// @param transferHelper Address of the TransferHelper contract.
-    constructor(address transferHelper) {
-        ITransferHelper(transferHelper).getBalance(Constants.NATIVE_CURRENCY);
-        TRANSFER_HELPER = transferHelper;
-    }
+    /// @notice Thrown when the TransferHelper balance is not fully consumed.
+    /// @custom:selector 0x4044e1f7
+    error TransferHelperBalanceNotConsumed(address asset);
 
     modifier assertingTransferHelperBalanceFor(address asset) {
         uint256 balanceBefore = _transferHelperBalance(asset);
@@ -46,6 +41,13 @@ abstract contract TransferHelperClient {
             uint256 balanceAfter = _transferHelperBalance(assets[i]);
             require(balanceAfter <= balancesBefore[i], TransferHelperBalanceNotConsumed(assets[i]));
         }
+    }
+
+    /// @dev Constructor.
+    /// @param transferHelper Address of the TransferHelper contract.
+    constructor(address transferHelper) {
+        ITransferHelper(transferHelper).getBalance(Constants.NATIVE_CURRENCY);
+        TRANSFER_HELPER = transferHelper;
     }
 
     function _transferHelperBalance(address asset) internal view returns (uint256) {

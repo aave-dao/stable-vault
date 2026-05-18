@@ -5,8 +5,8 @@ pragma solidity ^0.8.22;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+import {CcipAdapter} from "src/bridging/ccip/CcipAdapter.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
-import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {ITransferHelper} from "src/interfaces/ITransferHelper.sol";
 import {Constants} from "src/types/Constants.sol";
 import {Errors} from "src/types/Errors.sol";
@@ -17,11 +17,11 @@ import {Errors} from "src/types/Errors.sol";
 contract MockBridgeAdapter is IBridgeAdapter {
     using SafeERC20 for IERC20;
 
-    error PublishMessageFailed();
-
     address internal immutable TRANSFER_HELPER;
     bool internal _shouldRevertPublish;
     uint256 internal _feeAmount;
+
+    error PublishMessageFailed();
 
     constructor(address transferHelper) {
         TRANSFER_HELPER = transferHelper;
@@ -82,8 +82,7 @@ contract MockBridgeAdapter is IBridgeAdapter {
         require(!_shouldRevertPublish, PublishMessageFailed());
 
         (destinationChainId, messageData, gasLimit);
-        ICcipBridgeAdapter.CcipFeeParams memory ccipFeeParams =
-            abi.decode(bridgeAdapterData, (ICcipBridgeAdapter.CcipFeeParams));
+        CcipAdapter.CcipFeeParams memory ccipFeeParams = abi.decode(bridgeAdapterData, (CcipAdapter.CcipFeeParams));
         uint256 feeAmount = _feeAmount;
 
         // Mirror CcipAdapter: adapter pulls fee directly from feePayer (no TransferHelper round-trip).

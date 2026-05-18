@@ -69,7 +69,7 @@ contract ChainBalanceOracleTest is TestWithHelpers {
         );
 
         vm.expectEmit(true, true, true, true);
-        emit IChainBalanceOracle.ChainBalanceAdapterSet(chainId, address(0), address(_mockAdapter));
+        emit ChainBalanceOracle.ChainBalanceAdapterSet(chainId, address(0), address(_mockAdapter));
 
         vm.prank(everyRoleAccount);
         _chainBalanceOracle.setChainBalanceOracleAdapter(chainId, address(_mockAdapter));
@@ -100,7 +100,7 @@ contract ChainBalanceOracleTest is TestWithHelpers {
 
         // Setting a new adapter should emit event with previous adapter
         vm.expectEmit(true, true, true, true);
-        emit IChainBalanceOracle.ChainBalanceAdapterSet(chainId, address(_mockAdapter), address(newAdapter));
+        emit ChainBalanceOracle.ChainBalanceAdapterSet(chainId, address(_mockAdapter), address(newAdapter));
 
         vm.prank(everyRoleAccount);
         _chainBalanceOracle.setChainBalanceOracleAdapter(chainId, address(newAdapter));
@@ -314,7 +314,7 @@ contract ChainBalanceOracleTest is TestWithHelpers {
     }
 
     function test_getChainBalance_reverts_ifNoAdapterSet(uint256 chainId) public {
-        vm.expectRevert(abi.encodeWithSelector(IChainBalanceOracle.ChainBalanceOracleAdapterNotFound.selector, chainId));
+        vm.expectRevert(abi.encodeWithSelector(ChainBalanceOracle.ChainBalanceOracleAdapterNotFound.selector, chainId));
         _chainBalanceOracle.getChainBalance(chainId);
     }
 

@@ -40,8 +40,8 @@ abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
 
         roles[0] = RolesConfig.getRole__setUserRate();
         roles[1] = RolesConfig.getRole__setSubVaultRate();
-        roles[2] = RolesConfig.getRole__claimSurplusInterest();
-        roles[3] = RolesConfig.getRole__setDefaultSubVault();
+        roles[2] = RolesConfig.getRole__setDefaultSubVault();
+        roles[3] = RolesConfig.getRole__claimSurplusInterest();
 
         _grantRolesToProfile(stableVaultManager, roles);
     }
@@ -58,8 +58,8 @@ abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
         roles[2] = RolesConfig.getRole__setDefaultSubVault();
         roles[3] = RolesConfig.getRole__claimSurplusInterest();
         roles[4] = RolesConfig.getRole__setTreasury();
-        roles[5] = RolesConfig.getRole__rescueNative();
-        roles[6] = RolesConfig.getRole__rescueTokens();
+        roles[5] = RolesConfig.getRole__rescueTokens();
+        roles[6] = RolesConfig.getRole__rescueNative();
 
         _setTargetFunctionRoles(stableVault, roles);
     }
@@ -70,10 +70,10 @@ abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
         RolesConfig.Role[] memory roles = new RolesConfig.Role[](5);
 
         roles[0] = RolesConfig.getRole__pushFundsToChain();
-        roles[1] = RolesConfig.getRole__rescueTokens();
-        roles[2] = RolesConfig.getRole__rescueNative();
-        roles[3] = RolesConfig.getRole__addEarningChain();
-        roles[4] = RolesConfig.getRole__removeEarningChain();
+        roles[1] = RolesConfig.getRole__addEarningChain();
+        roles[2] = RolesConfig.getRole__removeEarningChain();
+        roles[3] = RolesConfig.getRole__rescueTokens();
+        roles[4] = RolesConfig.getRole__rescueNative();
 
         _setTargetFunctionRoles(fundsHandler, roles);
     }
@@ -106,9 +106,10 @@ abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
 
         RolesConfig.Role[] memory roles = new RolesConfig.Role[](4);
 
+        // Deposit rate limit (raise/lower pairs adjacent)
         roles[0] = RolesConfig.getRole__raiseDepositCapacity();
-        roles[1] = RolesConfig.getRole__raiseDepositRefillRate();
-        roles[2] = RolesConfig.getRole__lowerDepositCapacity();
+        roles[1] = RolesConfig.getRole__lowerDepositCapacity();
+        roles[2] = RolesConfig.getRole__raiseDepositRefillRate();
         roles[3] = RolesConfig.getRole__lowerDepositRefillRate();
 
         _setTargetFunctionRoles(depositPolicy, roles);

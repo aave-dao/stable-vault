@@ -7,35 +7,6 @@ pragma solidity ^0.8.22;
 /// @notice Interface for handling the communication between chains for bridging assets and data.
 /// @dev Supports funds-only, data-only, and explicitly allowed funds-with-data bridge messages.
 interface IChainGateway {
-    /// @notice Thrown when a bridge adapter is not found for a given asset and chain.
-    /// @custom:selector 0xf7b1bf8e
-    error AdapterNotFound();
-
-    /// @notice Thrown when removing an adapter would leave a chain without a data-only message route.
-    /// @custom:selector 0xaa601040
-    error CannotRemoveLastDataOnlyBridgeAdapter();
-
-    /// @notice Thrown when a given message contains both funds and a data payload which is not allowed.
-    /// @custom:selector 0x9d73280d
-    error DataNotAllowedWithFunds();
-
-    /// @notice Thrown when a message type does not match the expected message types, for a data-only message.
-    /// @custom:selector 0x82d8a626
-    error InvalidDataOnlyMessage();
-
-    /// @notice Thrown when the message type for the arbitrary message data is not recognized.
-    /// @custom:selector 0x5b60892f
-    error InvalidMessageType();
-
-    /// @notice Thrown when the caller is not the IOU token manager.
-    /// @custom:selector 0x4084b1f2
-    error OnlyIouTokenManager();
-
-    event BridgeAdapterAdded(address asset, uint256 chainId, address bridgeAdapter);
-    event BridgeAdapterRemoved(address asset, uint256 chainId, address bridgeAdapter);
-    event FundsReceived(address asset, uint256 amount, uint256 sourceChainId);
-    event FundsSent(address asset, uint256 amount, uint256 destinationChainId);
-
     enum MessageType {
         INVALID,
         BRIDGE_IOU_TOKEN,
@@ -82,8 +53,41 @@ interface IChainGateway {
         uint256 blockNumber;
     }
 
-    /// @notice Returns the address of the IOU token manager.
-    function getIouTokenManager() external view returns (address);
+    /// @notice Emitted when a bridge adapter is whitelisted for an asset and destination chain.
+    event BridgeAdapterAdded(address asset, uint256 chainId, address bridgeAdapter);
+
+    /// @notice Emitted when a bridge adapter is removed from the whitelist for an asset and destination chain.
+    event BridgeAdapterRemoved(address asset, uint256 chainId, address bridgeAdapter);
+
+    /// @notice Emitted when funds arrive on this chain from a source chain via a bridge adapter.
+    event FundsReceived(address asset, uint256 amount, uint256 sourceChainId);
+
+    /// @notice Emitted when funds are dispatched from this chain to a destination chain via a bridge adapter.
+    event FundsSent(address asset, uint256 amount, uint256 destinationChainId);
+
+    /// @notice Thrown when a bridge adapter is not found for a given asset and chain.
+    /// @custom:selector 0xf7b1bf8e
+    error AdapterNotFound();
+
+    /// @notice Thrown when removing an adapter would leave a chain without a data-only message route.
+    /// @custom:selector 0xaa601040
+    error CannotRemoveLastDataOnlyBridgeAdapter();
+
+    /// @notice Thrown when a given message contains both funds and a data payload which is not allowed.
+    /// @custom:selector 0x9d73280d
+    error DataNotAllowedWithFunds();
+
+    /// @notice Thrown when a message type does not match the expected message types, for a data-only message.
+    /// @custom:selector 0x82d8a626
+    error InvalidDataOnlyMessage();
+
+    /// @notice Thrown when the message type for the arbitrary message data is not recognized.
+    /// @custom:selector 0x5b60892f
+    error InvalidMessageType();
+
+    /// @notice Thrown when the caller is not the IOU token manager.
+    /// @custom:selector 0x4084b1f2
+    error OnlyIouTokenManager();
 
     /// @notice Adds a bridge adapter to the gateway's set of whitelisted adapters.
     /// @dev The bridge adapter must not be already whitelisted for the asset and chain.
@@ -122,4 +126,7 @@ interface IChainGateway {
         uint256 payloadExecutionGasLimit,
         bytes calldata bridgeAdapterData
     ) external payable;
+
+    /// @notice Returns the address of the IOU token manager.
+    function getIouTokenManager() external view returns (address);
 }

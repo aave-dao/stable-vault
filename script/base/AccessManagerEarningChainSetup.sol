@@ -20,11 +20,11 @@ abstract contract AccessManagerEarningChainSetup is AccessManagerBaseSetup {
 
         RolesConfig.Role[] memory roles = new RolesConfig.Role[](5);
 
-        roles[0] = RolesConfig.getRole__addBridgeAdapter();
-        roles[1] = RolesConfig.getRole__removeBridgeAdapter();
-        roles[2] = RolesConfig.getRole__rescueTokens();
-        roles[3] = RolesConfig.getRole__rescueNative();
-        roles[4] = RolesConfig.getRole__pushFundsToAccountingChain();
+        roles[0] = RolesConfig.getRole__pushFundsToAccountingChain();
+        roles[1] = RolesConfig.getRole__addBridgeAdapter();
+        roles[2] = RolesConfig.getRole__removeBridgeAdapter();
+        roles[3] = RolesConfig.getRole__rescueTokens();
+        roles[4] = RolesConfig.getRole__rescueNative();
 
         _setTargetFunctionRoles(gateway, roles);
     }

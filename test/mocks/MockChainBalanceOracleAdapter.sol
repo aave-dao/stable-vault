@@ -8,10 +8,10 @@ import {IChainBalanceOracle} from "src/interfaces/IChainBalanceOracle.sol";
 import {IChainBalanceOracleAdapter} from "src/interfaces/IChainBalanceOracleAdapter.sol";
 
 contract MockChainBalanceOracleAdapter is IChainBalanceOracleAdapter {
-    error SomethingWentWrong();
-
     mapping(uint256 chainId => IChainBalanceOracle.ChainBalance) internal _responses;
     bool public shouldRevert;
+
+    error SomethingWentWrong();
 
     function mockResponse(
         uint256 chainId,
