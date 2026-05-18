@@ -19,6 +19,9 @@ import {Errors} from "src/types/Errors.sol";
 /// @dev Assumes all configured assets have the same denomination.
 /// @custom:upgradeable
 contract PriceOracle is AccessManagedUpgradeable, IPriceOracle {
+    /// @notice Emitted when an adapter is set for an asset.
+    event OracleAdapterSet(address indexed asset, address indexed newAdapter, address indexed previousAdapter);
+
     uint256 immutable MIN_VALID_PRICE_RAY;
 
     uint256 constant MAX_PRICE_RAY = MathLib.RAY;

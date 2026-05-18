@@ -87,11 +87,11 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
     function test_constructor_emitsInitialBoundsEvents_overrideOff() public {
         vm.expectEmit(false, false, false, true);
-        emit ISlippageCoverageVault.MaxSlippageBpsSet(0, DEFAULT_MAX_BPS);
+        emit SlippageCoverageVault.MaxSlippageBpsSet(0, DEFAULT_MAX_BPS);
         vm.expectEmit(false, false, false, true);
-        emit ISlippageCoverageVault.OverrideMaxSlippageBpsSet(0, DEFAULT_OVERRIDE_MAX_BPS);
+        emit SlippageCoverageVault.OverrideMaxSlippageBpsSet(0, DEFAULT_OVERRIDE_MAX_BPS);
         vm.expectEmit(false, false, false, true);
-        emit ISlippageCoverageVault.OverrideModeSet(false);
+        emit SlippageCoverageVault.OverrideModeSet(false);
         new SlippageCoverageVault(
             beneficiary, address(_accessManager), DEFAULT_MAX_BPS, DEFAULT_OVERRIDE_MAX_BPS, false
         );
@@ -99,11 +99,11 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
     function test_constructor_emitsInitialBoundsEvents_overrideOn() public {
         vm.expectEmit(false, false, false, true);
-        emit ISlippageCoverageVault.MaxSlippageBpsSet(0, DEFAULT_MAX_BPS);
+        emit SlippageCoverageVault.MaxSlippageBpsSet(0, DEFAULT_MAX_BPS);
         vm.expectEmit(false, false, false, true);
-        emit ISlippageCoverageVault.OverrideMaxSlippageBpsSet(0, DEFAULT_OVERRIDE_MAX_BPS);
+        emit SlippageCoverageVault.OverrideMaxSlippageBpsSet(0, DEFAULT_OVERRIDE_MAX_BPS);
         vm.expectEmit(false, false, false, true);
-        emit ISlippageCoverageVault.OverrideModeSet(true);
+        emit SlippageCoverageVault.OverrideModeSet(true);
         new SlippageCoverageVault(beneficiary, address(_accessManager), DEFAULT_MAX_BPS, DEFAULT_OVERRIDE_MAX_BPS, true);
     }
 
@@ -488,7 +488,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
     function test_enableOverrideMode_emitsEvent() public {
         vm.expectEmit(false, false, false, true);
-        emit ISlippageCoverageVault.OverrideModeSet(true);
+        emit SlippageCoverageVault.OverrideModeSet(true);
         vm.prank(operator);
         _vault.enableOverrideMode();
     }
@@ -497,7 +497,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         vm.prank(operator);
         _vault.enableOverrideMode();
         vm.expectEmit(false, false, false, true);
-        emit ISlippageCoverageVault.OverrideModeSet(false);
+        emit SlippageCoverageVault.OverrideModeSet(false);
         vm.prank(operator);
         _vault.disableOverrideMode();
     }
@@ -505,13 +505,13 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
     function test_enableOverrideMode_revertsIfAlreadyEnabled() public {
         vm.prank(operator);
         _vault.enableOverrideMode();
-        vm.expectRevert(abi.encodeWithSelector(ISlippageCoverageVault.AlreadyEnabled.selector));
+        vm.expectRevert(abi.encodeWithSelector(SlippageCoverageVault.AlreadyEnabled.selector));
         vm.prank(operator);
         _vault.enableOverrideMode();
     }
 
     function test_disableOverrideMode_revertsIfAlreadyDisabled() public {
-        vm.expectRevert(abi.encodeWithSelector(ISlippageCoverageVault.AlreadyDisabled.selector));
+        vm.expectRevert(abi.encodeWithSelector(SlippageCoverageVault.AlreadyDisabled.selector));
         vm.prank(operator);
         _vault.disableOverrideMode();
     }
@@ -595,7 +595,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
     function test_raisePullCapPerTx_setsAndEmits() public {
         vm.expectEmit(true, false, false, true);
-        emit ISlippageCoverageVault.PullCapPerTxRaised(address(_usdc), 0, 5_000e6);
+        emit SlippageCoverageVault.PullCapPerTxRaised(address(_usdc), 0, 5_000e6);
         vm.prank(operator);
         _vault.raisePullCapPerTx(address(_usdc), 5_000e6);
 
@@ -627,7 +627,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         _vault.raisePullCapPerTx(address(_usdc), 5_000e6);
 
         vm.expectEmit(true, false, false, true);
-        emit ISlippageCoverageVault.PullCapPerTxLowered(address(_usdc), 5_000e6, 1_000e6);
+        emit SlippageCoverageVault.PullCapPerTxLowered(address(_usdc), 5_000e6, 1_000e6);
         vm.prank(operator);
         _vault.lowerPullCapPerTx(address(_usdc), 1_000e6);
 
@@ -661,7 +661,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
     function test_raiseWindowCap_setsAndEmits() public {
         vm.expectEmit(true, false, false, true);
-        emit ISlippageCoverageVault.WindowCapRaised(address(_usdc), 0, 50_000e6);
+        emit SlippageCoverageVault.WindowCapRaised(address(_usdc), 0, 50_000e6);
         vm.prank(operator);
         _vault.raiseWindowCap(address(_usdc), 50_000e6);
 
@@ -689,7 +689,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         _vault.raiseWindowCap(address(_usdc), 50_000e6);
 
         vm.expectEmit(true, false, false, true);
-        emit ISlippageCoverageVault.WindowCapLowered(address(_usdc), 50_000e6, 10_000e6);
+        emit SlippageCoverageVault.WindowCapLowered(address(_usdc), 50_000e6, 10_000e6);
         vm.prank(operator);
         _vault.lowerWindowCap(address(_usdc), 10_000e6);
 
@@ -710,7 +710,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
     function test_raiseWindowSeconds_setsAndEmits() public {
         vm.expectEmit(true, false, false, true);
-        emit ISlippageCoverageVault.WindowSecondsRaised(address(_usdc), 0, uint64(ONE_DAY));
+        emit SlippageCoverageVault.WindowSecondsRaised(address(_usdc), 0, uint64(ONE_DAY));
         vm.prank(operator);
         _vault.raiseWindowSeconds(address(_usdc), uint64(ONE_DAY));
 
@@ -732,7 +732,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         _vault.raiseWindowSeconds(address(_usdc), uint64(ONE_DAY));
 
         vm.expectEmit(true, false, false, true);
-        emit ISlippageCoverageVault.WindowSecondsLowered(address(_usdc), uint64(ONE_DAY), 1 hours);
+        emit SlippageCoverageVault.WindowSecondsLowered(address(_usdc), uint64(ONE_DAY), 1 hours);
         vm.prank(operator);
         _vault.lowerWindowSeconds(address(_usdc), 1 hours);
 
@@ -762,7 +762,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
     function test_setMaxSlippageBps_setsAndEmits() public {
         vm.expectEmit(false, false, false, true);
-        emit ISlippageCoverageVault.MaxSlippageBpsSet(DEFAULT_MAX_BPS, 250);
+        emit SlippageCoverageVault.MaxSlippageBpsSet(DEFAULT_MAX_BPS, 250);
         vm.prank(operator);
         _vault.setMaxSlippageBps(250);
 
@@ -783,7 +783,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
 
     function test_setOverrideMaxSlippageBps_setsAndEmits() public {
         vm.expectEmit(false, false, false, true);
-        emit ISlippageCoverageVault.OverrideMaxSlippageBpsSet(DEFAULT_OVERRIDE_MAX_BPS, 7_500);
+        emit SlippageCoverageVault.OverrideMaxSlippageBpsSet(DEFAULT_OVERRIDE_MAX_BPS, 7_500);
         vm.prank(operator);
         _vault.setOverrideMaxSlippageBps(7_500);
 
@@ -840,7 +840,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         _usdc.approve(address(_vault), 10_000e6);
 
         vm.expectEmit(true, true, false, true);
-        emit ISlippageCoverageVault.CoverageFunded(address(_usdc), funder, 10_000e6);
+        emit SlippageCoverageVault.CoverageFunded(address(_usdc), funder, 10_000e6);
 
         vm.prank(funder);
         _vault.fundCoverage(address(_usdc), 10_000e6);
@@ -918,7 +918,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         _usdc.approve(address(_vault), 1_000e6);
 
         vm.expectEmit(true, true, false, true);
-        emit ISlippageCoverageVault.CoverageFunded(address(_usdc), beneficiary, 1_000e6);
+        emit SlippageCoverageVault.CoverageFunded(address(_usdc), beneficiary, 1_000e6);
 
         vm.prank(beneficiary);
         _vault.reimburseCoverage(address(_usdc), 1_000e6);
@@ -975,7 +975,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         _fund(_usdc, 10_000e6);
 
         vm.expectEmit(true, true, false, true);
-        emit ISlippageCoverageVault.Swept(address(_usdc), sweepTo, 10_000e6);
+        emit SlippageCoverageVault.Swept(address(_usdc), sweepTo, 10_000e6);
 
         vm.prank(operator);
         _vault.sweep(address(_usdc), 10_000e6, sweepTo);

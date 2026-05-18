@@ -253,7 +253,7 @@ contract CcipAdapter is
 
     function _processMessage(Client.Any2EVMMessage memory message) internal {
         uint256 tokenCount = message.destTokenAmounts.length;
-        require(tokenCount < 2, IBridgeAdapter.InvalidTokenCount());
+        require(tokenCount < 2, InvalidTokenCount());
         uint256 sourceChainId = _chainIdOf[message.sourceChainSelector];
 
         address asset = Constants.ASSET_FOR_DATA_ONLY_BRIDGE;

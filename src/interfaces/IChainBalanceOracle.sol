@@ -20,13 +20,6 @@ interface IChainBalanceOracle {
         bool isStale;
     }
 
-    /// @notice Emitted when an adapter is set for a chain.
-    event ChainBalanceAdapterSet(uint256 indexed chainId, address indexed previousAdapter, address indexed newAdapter);
-
-    /// @notice Thrown when the adapter for a chain is not found.
-    /// @custom:selector 0x3f3e70bf
-    error ChainBalanceOracleAdapterNotFound(uint256 chainId);
-
     /// @notice Queries an oracle feed for data representing the aggregate price-adjusted balance of an asset from a
     /// given Earning Chain.
     /// @param chainId Earning chain id to query data for.

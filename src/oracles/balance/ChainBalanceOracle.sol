@@ -18,6 +18,13 @@ import {IChainBalanceOracleAdapter} from "src/interfaces/IChainBalanceOracleAdap
 /// @dev This contract is only used on the Accounting Chain to inform the asset value vs. obligations calculations.
 /// @custom:upgradeable
 contract ChainBalanceOracle is AccessManagedUpgradeable, IChainBalanceOracle {
+    /// @notice Emitted when an adapter is set for a chain.
+    event ChainBalanceAdapterSet(uint256 indexed chainId, address indexed previousAdapter, address indexed newAdapter);
+
+    /// @notice Thrown when the adapter for a chain is not found.
+    /// @custom:selector 0x3f3e70bf
+    error ChainBalanceOracleAdapterNotFound(uint256 chainId);
+
     /// @custom:storage-location erc7201:aave.storage.ChainBalanceOracle
     struct ChainBalanceOracleStorage {
         mapping(uint256 chainId => address oracleAdapter) oracleAdapterByChainId;

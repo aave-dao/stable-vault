@@ -23,6 +23,28 @@ contract Swapper is Ownable, ReentrancyGuardTransient, ISwapper {
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
 
+    /// @notice Emitted when a slippage shortfall on `assetOut` is covered by an external source.
+    event SlippageCovered(address indexed slippageCoverageSource, address indexed assetOut, uint256 amount);
+
+    /// @notice Emitted when unconsumed `assetIn` is pushed to an external destination.
+    event AssetInSwept(address indexed to, address indexed asset, uint256 amount);
+
+    /// @notice Thrown when a target invariant required by the implementation is violated.
+    /// @custom:selector 0x13496fda
+    error BadTarget();
+
+    /// @notice Thrown when an implementation-specific subcall fails.
+    /// @custom:selector 0x7f1f16cd
+    error CallToTargetFailed();
+
+    /// @notice Thrown when the amount of `assetOut` received is below the minimum acceptable amount.
+    /// @custom:selector 0x6728a9f6
+    error SlippageToleranceExceeded();
+
+    /// @notice Thrown when the requested slippage tolerance exceeds the on-chain bound.
+    /// @custom:selector 0x232b3058
+    error SlippageToleranceTooHigh();
+
     address internal immutable SLIPPAGE_VAULT;
 
     /// @dev Constructor.
@@ -48,13 +70,13 @@ contract Swapper is Ownable, ReentrancyGuardTransient, ISwapper {
 
         // Bound the slippage tolerance against vault config; read before the loop to fail fast.
         uint16 maxBps = ISlippageCoverageVault(SLIPPAGE_VAULT).getEffectiveMaxSlippageBps();
-        require(slippageToleranceBps <= maxBps, ISwapper.SlippageToleranceTooHigh());
+        require(slippageToleranceBps <= maxBps, SlippageToleranceTooHigh());
 
         // Targets cannot be the bound vault, otherwise the loop could call `pullCoverage` directly.
         for (uint256 i = 0; i < targets.length; i++) {
-            require(targets[i] != SLIPPAGE_VAULT, ISwapper.BadTarget());
+            require(targets[i] != SLIPPAGE_VAULT, BadTarget());
             (bool callSucceeded,) = targets[i].call(callDatas[i]);
-            require(callSucceeded, ISwapper.CallToTargetFailed());
+            require(callSucceeded, CallToTargetFailed());
         }
 
         uint256 amountOut = IERC20(assetOut).balanceOf(address(this));
@@ -65,11 +87,11 @@ contract Swapper is Ownable, ReentrancyGuardTransient, ISwapper {
         if (amountOut < expectedAmountOut) {
             require(
                 _minToleratedAmountOut(expectedAmountOut, slippageToleranceBps) <= amountOut,
-                ISwapper.SlippageToleranceExceeded()
+                SlippageToleranceExceeded()
             );
             uint256 slippageAmount = expectedAmountOut - amountOut;
             ISlippageCoverageVault(SLIPPAGE_VAULT).pullCoverage(assetOut, slippageAmount);
-            emit ISwapper.SlippageCovered(SLIPPAGE_VAULT, assetOut, slippageAmount);
+            emit SlippageCovered(SLIPPAGE_VAULT, assetOut, slippageAmount);
             amountOut = expectedAmountOut;
         }
 
@@ -108,6 +130,6 @@ contract Swapper is Ownable, ReentrancyGuardTransient, ISwapper {
     function _reimburseCoverage(address asset, uint256 amount) internal {
         IERC20(asset).forceApprove(address(SLIPPAGE_VAULT), amount);
         ISlippageCoverageVault(SLIPPAGE_VAULT).reimburseCoverage(asset, amount);
-        emit ISwapper.AssetInSwept(SLIPPAGE_VAULT, asset, amount);
+        emit AssetInSwept(SLIPPAGE_VAULT, asset, amount);
     }
 }

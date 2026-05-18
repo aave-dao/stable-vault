@@ -20,6 +20,47 @@ import {Errors} from "src/types/Errors.sol";
 contract SlippageCoverageVault is AccessManaged, Multicall, ReentrancyGuardTransient, ISlippageCoverageVault {
     using SafeERC20 for IERC20;
 
+    /// @notice Emitted when the vault is funded.
+    event CoverageFunded(address indexed asset, address indexed from, uint256 amount);
+
+    /// @notice Emitted when the normal-mode max slippage tolerance is set.
+    event MaxSlippageBpsSet(uint16 oldBps, uint16 newBps);
+
+    /// @notice Emitted when the override-mode max slippage tolerance is set.
+    event OverrideMaxSlippageBpsSet(uint16 oldBps, uint16 newBps);
+
+    /// @notice Emitted when override mode is toggled.
+    event OverrideModeSet(bool enabled);
+
+    /// @notice Emitted when the per-tx cap for an asset is lowered.
+    event PullCapPerTxLowered(address indexed asset, uint256 oldCap, uint256 newCap);
+
+    /// @notice Emitted when the per-tx cap for an asset is raised.
+    event PullCapPerTxRaised(address indexed asset, uint256 oldCap, uint256 newCap);
+
+    /// @notice Emitted when the vault is swept.
+    event Swept(address indexed asset, address indexed to, uint256 amount);
+
+    /// @notice Emitted when the window cap for an asset is lowered.
+    event WindowCapLowered(address indexed asset, uint256 oldCap, uint256 newCap);
+
+    /// @notice Emitted when the window cap for an asset is raised.
+    event WindowCapRaised(address indexed asset, uint256 oldCap, uint256 newCap);
+
+    /// @notice Emitted when the window length (in seconds) for an asset is lowered.
+    event WindowSecondsLowered(address indexed asset, uint64 oldWindowSeconds, uint64 newWindowSeconds);
+
+    /// @notice Emitted when the window length (in seconds) for an asset is raised.
+    event WindowSecondsRaised(address indexed asset, uint64 oldWindowSeconds, uint64 newWindowSeconds);
+
+    /// @notice Thrown when a `disableOverrideMode` call is made while override mode is already disabled.
+    /// @custom:selector 0x005ecddb
+    error AlreadyDisabled();
+
+    /// @notice Thrown when an `enableOverrideMode` call is made while override mode is already enabled.
+    /// @custom:selector 0xf2a5f75a
+    error AlreadyEnabled();
+
     /// @notice Fixed-window cap state for an asset.
     /// @param windowStart Timestamp at which the current window started.
     /// @param windowSeconds Length of the window in seconds.

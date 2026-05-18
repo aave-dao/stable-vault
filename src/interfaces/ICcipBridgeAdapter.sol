@@ -14,6 +14,14 @@ interface ICcipBridgeAdapter is IBridgeAdapter {
     /// @notice Emitted when excess bridge fees are refunded to the fee payer.
     event FeeRefunded(address indexed feePayer, address indexed feeToken, uint256 amount);
 
+    /// @notice Thrown when the number of tokens in a message is greater than the max expected.
+    /// @custom:selector 0xe778681d
+    error InvalidTokenCount();
+
+    /// @notice Address checked is not the bridge router.
+    /// @custom:selector 0x60055a30
+    error OnlyBridgeRouter();
+
     /// @notice Thrown when the CCIP router did not fully consume the allowance granted for a token used in
     /// `ccipSend` (bridged asset or ERC-20 fee token). Indicates the router pulled less than approved, leaving
     /// residual approval that this adapter does not expect.

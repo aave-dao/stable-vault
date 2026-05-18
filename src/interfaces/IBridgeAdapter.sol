@@ -24,14 +24,6 @@ interface IBridgeAdapter {
     /// @custom:selector 0x11b61b6a
     error AlreadyConfigured();
 
-    /// @notice Thrown when the number of tokens in a message is greater than the max expected.
-    /// @custom:selector 0xe778681d
-    error InvalidTokenCount();
-
-    /// @notice Address checked is not the bridge router.
-    /// @custom:selector 0x60055a30
-    error OnlyBridgeRouter();
-
     /// @notice Address checked is not the destination chain adapter.
     /// @custom:selector 0x75503511
     error OnlyDestinationChainAdapter();

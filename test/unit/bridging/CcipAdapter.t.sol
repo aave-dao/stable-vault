@@ -1408,7 +1408,7 @@ contract CcipAdapterTest is TestWithHelpers {
         ccipTokenAmounts[0] = Client.EVMTokenAmount({token: address(_mockUsdt), amount: amountUsdt});
         ccipTokenAmounts[1] = Client.EVMTokenAmount({token: address(_mockGho), amount: amountGho});
 
-        vm.expectRevert(IBridgeAdapter.InvalidTokenCount.selector);
+        vm.expectRevert(ICcipBridgeAdapter.InvalidTokenCount.selector);
         vm.prank(address(_mockCCIPRouter));
         _accountingChainCcipAdapter.ccipReceive(
             Client.Any2EVMMessage({
@@ -1439,7 +1439,7 @@ contract CcipAdapterTest is TestWithHelpers {
     function test_ccipReceive_reverts_ifNotRouter(address caller) public {
         vm.assume(caller != address(_mockCCIPRouter));
         vm.prank(caller);
-        vm.expectRevert(IBridgeAdapter.OnlyBridgeRouter.selector);
+        vm.expectRevert(ICcipBridgeAdapter.OnlyBridgeRouter.selector);
         _accountingChainCcipAdapter.ccipReceive(
             Client.Any2EVMMessage({
                 messageId: 0,
