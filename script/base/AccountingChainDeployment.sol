@@ -29,6 +29,7 @@ import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
 import {IEarningChainStateProvider} from "src/interfaces/IEarningChainStateProvider.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
+import {MathLib} from "src/libraries/MathLib.sol";
 import {RateLimitBucketLib} from "src/libraries/RateLimitBucketLib.sol";
 import {ChainBalanceOracle} from "src/oracles/balance/ChainBalanceOracle.sol";
 import {IBundleBaseAggregator} from "src/oracles/balance/ChainlinkChainBalanceOracleAdapter.sol";
@@ -99,11 +100,31 @@ abstract contract AccountingChainDeployment is
     function run() public {
         _validateExternalAddresses();
         _validateProfileAddresses();
+        _validateDeploymentParameters();
         _validateRedemptionLimitConfig(".accountingChain.withdrawalExecutionPolicy");
         vm.startBroadcast(_deployer());
         _deployContracts();
         _setupContracts();
         vm.stopBroadcast();
+    }
+
+    function _validateDeploymentParameters() internal view {
+        _validateCommonDeploymentParameters();
+
+        uint256 defaultMaxPerSecondRate = _configUint(".accountingChain.defaultMaxPerSecondRate");
+        require(defaultMaxPerSecondRate > MathLib.RAY, "defaultMaxPerSecondRate must be > RAY");
+
+        uint256 defaultSubVaultPerSecondRate = _configUint(".accountingChain.defaultSubVaultPerSecondRate");
+        require(defaultSubVaultPerSecondRate >= MathLib.RAY, "defaultSubVaultPerSecondRate must be >= RAY");
+        require(
+            defaultSubVaultPerSecondRate <= defaultMaxPerSecondRate,
+            "defaultSubVaultPerSecondRate must be <= defaultMaxPerSecondRate"
+        );
+
+        require(_configUint(".accountingChain.defaultMaxActiveSubVaults") > 0, "defaultMaxActiveSubVaults must be > 0");
+        require(
+            _configUint(".chainlinkChainBalanceOracleHeartbeat") > 0, "chainlinkChainBalanceOracleHeartbeat must be > 0"
+        );
     }
 
     function _validateExternalAddresses() internal view {
@@ -445,7 +466,7 @@ abstract contract AccountingChainDeployment is
     function _deployStableVault() internal returns (address) {
         address implementation = address(
             new StableVault({
-                maxValidPerSecondRate: vm.parseUint(_configString(".accountingChain.defaultMaxPerSecondRate")),
+                maxValidPerSecondRate: _configUint(".accountingChain.defaultMaxPerSecondRate"),
                 assetRegistry: getAssetRegistryAddress(_deployer()),
                 iouTokenManager: getIouTokenManagerAddress(_deployer()),
                 fundsHandler: getFundsHandlerAddress(_deployer()),
@@ -466,7 +487,7 @@ abstract contract AccountingChainDeployment is
                 (
                     getAccessManagerAddress(_deployer()),
                     TREASURY,
-                    vm.parseUint(_configString(".accountingChain.defaultSubVaultPerSecondRate")),
+                    _configUint(".accountingChain.defaultSubVaultPerSecondRate"),
                     _configString(".accountingChain.stableVaultName"),
                     _configString(".accountingChain.stableVaultSymbol")
                 )
@@ -632,7 +653,7 @@ abstract contract AccountingChainDeployment is
     }
 
     function _deployPriceOracle() internal returns (address) {
-        address implementation = address(new PriceOracle(vm.parseUint(_configString(".priceOracleMinValidPriceRay"))));
+        address implementation = address(new PriceOracle(_configUint(".priceOracleMinValidPriceRay")));
         _logDeployment("PriceOracle::Implementation", "", implementation);
         address priceOracle = _deployTransparentProxy_create3({
             namespacedSaltSeed: PRICE_ORACLE_SALT_SEED,

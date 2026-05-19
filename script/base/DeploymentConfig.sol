@@ -4,6 +4,8 @@ pragma solidity ^0.8.20;
 
 import {Script} from "forge-std/Script.sol";
 
+import {MathLib} from "src/libraries/MathLib.sol";
+
 abstract contract DeploymentConfig is Script {
     error ConfigUintTooLarge(string key, uint256 value, uint256 max);
 
@@ -61,6 +63,16 @@ abstract contract DeploymentConfig is Script {
             revert ConfigUintTooLarge(key, value, max);
         }
         return value;
+    }
+
+    function _validateCommonDeploymentParameters() internal view {
+        require(_configUint8(".maxStrategiesPerAsset") > 0, "maxStrategiesPerAsset must be > 0");
+        require(_configUint(".chainlinkPriceOracleHeartbeat") > 0, "chainlinkPriceOracleHeartbeat must be > 0");
+
+        uint256 minValidPriceRay = _configUint(".priceOracleMinValidPriceRay");
+        require(
+            minValidPriceRay > 0 && minValidPriceRay <= MathLib.RAY, "priceOracleMinValidPriceRay must be in (0, RAY]"
+        );
     }
 
     /// @dev Pre-flight validator for the redemption-limit config block under `configPrefix` (e.g.

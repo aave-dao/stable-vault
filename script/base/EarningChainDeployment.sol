@@ -76,11 +76,17 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
     function run() public {
         _validateExternalAddresses();
         _validateProfileAddresses();
+        _validateDeploymentParameters();
         _validateRedemptionLimitConfig(".earningChain.withdrawalExecutionPolicy");
         vm.startBroadcast(_deployer());
         _deployContracts();
         _setupContracts();
         vm.stopBroadcast();
+    }
+
+    function _validateDeploymentParameters() internal view {
+        _validateCommonDeploymentParameters();
+        require(_configUint(".earningChain.minBurnIouTokenGasLimit") > 0, "minBurnIouTokenGasLimit must be > 0");
     }
 
     function _validateExternalAddresses() internal view {
@@ -508,7 +514,7 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
     }
 
     function _deployPriceOracle() internal returns (address) {
-        address implementation = address(new PriceOracle(vm.parseUint(_configString(".priceOracleMinValidPriceRay"))));
+        address implementation = address(new PriceOracle(_configUint(".priceOracleMinValidPriceRay")));
         _logDeployment("PriceOracle::Implementation", "", implementation);
         address priceOracle = _deployTransparentProxy_create3({
             namespacedSaltSeed: PRICE_ORACLE_SALT_SEED,
