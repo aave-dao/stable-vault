@@ -98,10 +98,10 @@ abstract contract AccountingChainDeployment is
     }
 
     function run() public {
-        _validateExternalAddresses();
         _validateProfileAddresses();
         _validateDeploymentParameters();
         _validateRedemptionLimitConfig(".accountingChain.withdrawalExecutionPolicy");
+        _validateExternalAddresses();
         vm.startBroadcast(_deployer());
         _deployContracts();
         _setupContracts();
