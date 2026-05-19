@@ -86,6 +86,7 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
 
     function _validateDeploymentParameters() internal view {
         _validateCommonDeploymentParameters();
+        require(block.chainid == _configUint(".earningChain.chainId"), "must deploy on earning chain");
         require(_configUint(".earningChain.minBurnIouTokenGasLimit") > 0, "minBurnIouTokenGasLimit must be > 0");
     }
 

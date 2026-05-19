@@ -110,6 +110,7 @@ abstract contract AccountingChainDeployment is
 
     function _validateDeploymentParameters() internal view {
         _validateCommonDeploymentParameters();
+        require(block.chainid == _configUint(".accountingChain.chainId"), "must deploy on accounting chain");
 
         uint256 defaultMaxPerSecondRate = _configUint(".accountingChain.defaultMaxPerSecondRate");
         require(defaultMaxPerSecondRate > MathLib.RAY, "defaultMaxPerSecondRate must be > RAY");
