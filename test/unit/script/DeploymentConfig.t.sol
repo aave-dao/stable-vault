@@ -8,7 +8,7 @@ import {DeploymentConfig} from "script/base/DeploymentConfig.sol";
 
 contract DeploymentConfigHarness is DeploymentConfig {
     function _configPath() internal pure override returns (string memory) {
-        return "config/test-config-uint-bounds.json";
+        return "test/resources/config/config-uint-bounds.json";
     }
 
     function configUint8(string memory key) external view returns (uint8) {

@@ -4,7 +4,7 @@ out = "out"
 libs = ["lib"]
 solc_version = "0.8.28"
 fs_permissions = [
-    { access = "read", path = "test/tables" },
+    { access = "read", path = "test/resources" },
     { access = "read", path = "lib/createx/artifacts" },
     { access = "read-write", path = "deployments" },
     { access = "read", path = "out" },

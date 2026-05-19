@@ -160,7 +160,7 @@ contract MathLibDifferentialTests is Test {
     function fixtureApyVsr() public view returns (ApyVsrTestCase[] memory) {
         // It's OK to use the readFile cheatcode here for the rpow tests cases.
         // forge-lint: disable-next-line(unsafe-cheatcode)
-        string memory csv = vm.readFile("test/tables/rpow-apy.csv");
+        string memory csv = vm.readFile("test/resources/tables/rpow-apy.csv");
         string[] memory rows = vm.split(csv, "\n");
         ApyVsrTestCase[] memory testCases = new ApyVsrTestCase[](rows.length);
         for (uint256 i = 0; i < rows.length; i++) {
