@@ -108,6 +108,8 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
     uint8 internal constant MAX_STRATEGIES_PER_ASSET = 15;
     uint128 internal constant TEST_MIN_REDEMPTION_CAPACITY = 1e30;
     uint128 internal constant TEST_MIN_REDEMPTION_REFILL_RATE = 1e25;
+    uint128 internal constant TEST_REDEMPTION_CAPACITY = type(uint128).max - 1;
+    uint128 internal constant TEST_REDEMPTION_REFILL_RATE = 1e30;
 
     address internal _proxyAdmin = makeAddr("PROXY_ADMIN");
     address internal _admin = makeAddr("ADI_IOU_ADMIN");
@@ -331,6 +333,7 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
             address(stack.withdrawalExecutionPolicy) == withdrawalExecutionPolicyAddress,
             "withdrawal execution policy address mismatch"
         );
+        _seedWithdrawalExecutionPolicy(stack.withdrawalExecutionPolicy);
 
         stack.iouToken = new IouToken(iouTokenManagerAddress, "IOU: Fork Stable Vault", "IOU-FORK");
         require(address(stack.iouToken) == iouTokenAddress, "accounting IOU token address mismatch");
@@ -491,6 +494,7 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
             address(stack.withdrawalExecutionPolicy) == withdrawalExecutionPolicyAddress,
             "earning withdrawal execution policy address mismatch"
         );
+        _seedWithdrawalExecutionPolicy(stack.withdrawalExecutionPolicy);
 
         stack.iouToken = new IouToken(iouTokenManagerAddress, "IOU: Fork Stable Vault", "IOU-FORK");
         require(address(stack.iouToken) == iouTokenAddress, "earning IOU token address mismatch");
@@ -591,6 +595,11 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         stack.assetRegistry.setAssetConfig(address(stack.asset), assetConfig);
         stack.allocator.addStrategy(address(stack.asset), address(stack.strategy));
         stack.gateway.addBridgeAdapter(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ETH_CHAIN_ID, address(stack.adiAdapter));
+    }
+
+    function _seedWithdrawalExecutionPolicy(WithdrawalExecutionPolicy withdrawalExecutionPolicy) internal {
+        withdrawalExecutionPolicy.raiseRedemptionCapacity(TEST_REDEMPTION_CAPACITY);
+        withdrawalExecutionPolicy.raiseRedemptionRefillRate(TEST_REDEMPTION_REFILL_RATE);
     }
 
     function _wireStacks() internal {
