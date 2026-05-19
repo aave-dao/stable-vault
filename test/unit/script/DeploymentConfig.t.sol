@@ -33,6 +33,13 @@ contract DeploymentConfigHarness is DeploymentConfig {
 }
 
 contract DeploymentConfigTest is Test {
+    struct ExistingErc4626StrategyConfig {
+        address addr;
+        string assetSymbol;
+        string strategySymbol;
+        address underlyingAddress;
+    }
+
     DeploymentConfigHarness internal _config = new DeploymentConfigHarness();
 
     function test_configUintN_acceptsMaxValues() public view {
@@ -87,5 +94,17 @@ contract DeploymentConfigTest is Test {
             )
         );
         _config.configUint128(".uint128Overflow");
+    }
+
+    function test_earningChainExistingErc4626StrategyConfig_decodes() public view {
+        string memory config = vm.readFile("test/resources/config/deployment-config.test.json");
+        bytes memory raw = vm.parseJson(config, ".earningChain.erc4626Strategies");
+        ExistingErc4626StrategyConfig[] memory strategies = abi.decode(raw, (ExistingErc4626StrategyConfig[]));
+
+        assertEq(strategies.length, 1);
+        assertEq(strategies[0].addr, 0xE1753F2e00940cC31213dd92013cF019DFE4ca1d);
+        assertEq(strategies[0].assetSymbol, "GHO");
+        assertEq(strategies[0].strategySymbol, "sGho");
+        assertEq(strategies[0].underlyingAddress, 0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f);
     }
 }

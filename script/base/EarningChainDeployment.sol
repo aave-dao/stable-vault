@@ -9,6 +9,7 @@ import {ATokenVaultDeployment} from "script/base/ATokenVaultDeployment.sol";
 import {AccessManagerEarningChainSetup} from "script/base/AccessManagerEarningChainSetup.sol";
 import {Create3Deployment} from "script/base/Create3Deployment.sol";
 
+import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {IRouterClient} from "@chainlink-ccip/contracts/interfaces/IRouterClient.sol";
@@ -61,6 +62,14 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
     // keccak256("aave.stable-vault.EarningChainGateway.policy.bridge")
     bytes32 internal constant BRIDGE_POLICY_ID = 0x537fb58e71f5b54dc09d8afff5cbf9bf5e630233f65f0531590f8cfa4a81bc6c;
 
+    // Keep field order aligned with Foundry's JSON object encoding order.
+    struct ExistingErc4626StrategyConfig {
+        address addr;
+        string assetSymbol;
+        string strategySymbol;
+        address underlyingAddress;
+    }
+
     function _gho() internal view returns (address) {
         return _configAddress(".earningChain.assets.gho");
     }
@@ -95,6 +104,8 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         IERC20(_gho()).balanceOf(_deployer());
         IERC20(_usdc()).balanceOf(_deployer());
         IERC20(_usdt()).balanceOf(_deployer());
+
+        _validateExistingErc4626Strategies();
 
         // Validate Chainlink price feed addresses
         address ghoUsdFeed = _configAddress(".earningChain.chainlinkFeeds.ghoUsd");
@@ -242,6 +253,12 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         IAllocator allocator = IAllocator(getAllocatorAddress(_deployer()));
         address poolAddressProvider = _configAddress(".earningChain.aaveV3PoolAddressesProvider");
 
+        ExistingErc4626StrategyConfig[] memory existingStrategies = _existingErc4626Strategies();
+        for (uint256 i = 0; i < existingStrategies.length; i++) {
+            // These are existing ERC4626 vaults, not aTokenVaults deployed by this script.
+            allocator.addStrategy(existingStrategies[i].underlyingAddress, existingStrategies[i].addr);
+        }
+
         address usdcYieldStrategy =
             _deployATokenVault(_usdc(), poolAddressProvider, getAccessManagerAddress(_deployer()), _deployer());
         allocator.addStrategy(_usdc(), usdcYieldStrategy);
@@ -257,6 +274,50 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
 
     function _aTokenVaultProxyDeployerSaltSeed(address underlying) internal pure override returns (string memory) {
         return getATokenVaultProxyDeployerSaltSeed(underlying);
+    }
+
+    function _existingErc4626Strategies() internal view returns (ExistingErc4626StrategyConfig[] memory) {
+        bytes memory raw = vm.parseJson(_readConfig(), ".earningChain.erc4626Strategies");
+        return abi.decode(raw, (ExistingErc4626StrategyConfig[]));
+    }
+
+    function _validateExistingErc4626Strategies() private view {
+        ExistingErc4626StrategyConfig[] memory existingStrategies = _existingErc4626Strategies();
+        bool ghoStrategyConfigured = false;
+
+        for (uint256 i = 0; i < existingStrategies.length; i++) {
+            ExistingErc4626StrategyConfig memory strategy = existingStrategies[i];
+            address asset = _assetAddressFromSymbol(strategy.assetSymbol);
+
+            require(strategy.addr != address(0), "ERC4626 strategy not set");
+            require(strategy.underlyingAddress != address(0), "ERC4626 underlying not set");
+            require(strategy.underlyingAddress == asset, "ERC4626 underlying config mismatch");
+            require(IERC4626(strategy.addr).asset() == strategy.underlyingAddress, "ERC4626 underlying mismatch");
+            require(
+                keccak256(bytes(IERC4626(strategy.addr).symbol())) == keccak256(bytes(strategy.strategySymbol)),
+                "ERC4626 strategy symbol mismatch"
+            );
+
+            if (strategy.underlyingAddress == _gho()) {
+                ghoStrategyConfigured = true;
+            }
+        }
+
+        require(ghoStrategyConfigured, "GHO ERC4626 strategy not set");
+    }
+
+    function _assetAddressFromSymbol(string memory assetSymbol) private view returns (address) {
+        bytes32 symbolHash = keccak256(bytes(assetSymbol));
+        if (symbolHash == keccak256("GHO")) {
+            return _gho();
+        }
+        if (symbolHash == keccak256("USDC")) {
+            return _usdc();
+        }
+        if (symbolHash == keccak256("USDT")) {
+            return _usdt();
+        }
+        revert("unsupported ERC4626 asset symbol");
     }
 
     function _setupAssetRegistry() internal {
