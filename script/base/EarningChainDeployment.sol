@@ -19,7 +19,6 @@ import {Allocator} from "src/core/Allocator.sol";
 import {EarningChainGateway} from "src/core/earning/EarningChainGateway.sol";
 import {IouToken} from "src/core/ious/IouToken.sol";
 import {IouTokenManager} from "src/core/ious/IouTokenManager.sol";
-import {IAdiBridgeAdapter} from "src/interfaces/IAdiBridgeAdapter.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
@@ -245,6 +244,10 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
 
     function _deployedATokenVaultAddresses() internal view virtual override returns (address[] memory) {
         return _readATokenVaultAddresses(_configString(".earningChain.deploymentOutputPath"));
+    }
+
+    function _aTokenVaultProxyDeployerSaltSeed(address underlying) internal pure override returns (string memory) {
+        return getATokenVaultProxyDeployerSaltSeed(underlying);
     }
 
     function _setupAssetRegistry() internal {

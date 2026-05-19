@@ -4,17 +4,18 @@ pragma solidity ^0.8.20;
 
 import {Script} from "forge-std/Script.sol";
 
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
+import {ICreateX} from "@pcaversaccio/createx/ICreateX.sol";
 
 import {ATokenVault} from "@aave-vault/ATokenVault.sol";
+import {ATokenVaultCreate3ProxyDeployer} from "script/base/ATokenVaultCreate3ProxyDeployer.sol";
+import {ATokenVaultProxyAddressLib} from "script/libraries/ATokenVaultProxyAddressLib.sol";
+import {Create3AddressLib} from "script/libraries/Create3AddressLib.sol";
 
-contract ATokenVaultDeployment is Script {
+abstract contract ATokenVaultDeployment is Script {
     using SafeERC20 for IERC20;
-    using Strings for address;
 
     struct ATokenVaultEntry {
         address addr;
@@ -30,6 +31,16 @@ contract ATokenVaultDeployment is Script {
     {
         // One unit of the underlying asset.
         uint256 initialLockDeposit = 1 * 10 ** IERC20Metadata(underlying).decimals();
+
+        string memory proxyDeployerSaltSeed = _aTokenVaultProxyDeployerSaltSeed(underlying);
+        address proxyDeployerAddress = Create3AddressLib.computeCreate3Address(proxyDeployerSaltSeed, deployer);
+        address vaultAddress = ATokenVaultProxyAddressLib.computeProxyAddress(proxyDeployerAddress);
+        if (vaultAddress.code.length != 0) {
+            _trackATokenVaultDeployment(underlying, vaultAddress);
+            _logATokenVaultDeployments();
+            return vaultAddress;
+        }
+        require(proxyDeployerAddress.code.length == 0, "aTokenVault proxy deployer already deployed");
 
         // Do not import `ATokenVaultMerklRewardClaimer` contract here, as it will force the entire set of dependencies
         // of this contract (and any other contract using it) to be compiled with the size-optimized profile.
@@ -49,12 +60,6 @@ contract ATokenVaultDeployment is Script {
             require(implementation != address(0), "ATokenVaultMerklRewardClaimer deployment failed");
         }
 
-        // Compute proxy address: approve call consumes a nonce, then proxy deploy consumes the next.
-        uint64 proxyNonce = vm.getNonce(deployer) + 1;
-        address vaultAddress = vm.computeCreateAddress(deployer, proxyNonce);
-
-        IERC20(underlying).forceApprove(vaultAddress, initialLockDeposit);
-
         bytes memory initCalldata = abi.encodeCall(
             ATokenVault.initialize,
             (
@@ -70,30 +75,42 @@ contract ATokenVaultDeployment is Script {
             )
         );
 
-        address proxyAddress = address(new TransparentUpgradeableProxy(implementation, owner, initCalldata));
+        IERC20(underlying).forceApprove(proxyDeployerAddress, initialLockDeposit);
 
-        require(proxyAddress == vaultAddress, "aTokenVault address does not match expected address");
+        bytes memory proxyDeployerInitCode = abi.encodePacked(
+            type(ATokenVaultCreate3ProxyDeployer).creationCode,
+            abi.encode(underlying, implementation, owner, initCalldata, deployer, initialLockDeposit)
+        );
+        bytes32 proxyDeployerSalt = Create3AddressLib.computeCreate3Salt(proxyDeployerSaltSeed, deployer);
+        address proxyDeployer = ICreateX(Create3AddressLib.CREATEX_ADDRESS)
+            .deployCreate3({salt: proxyDeployerSalt, initCode: proxyDeployerInitCode});
+        require(proxyDeployer == proxyDeployerAddress, "aTokenVault proxy deployer address mismatch");
 
+        _trackATokenVaultDeployment(underlying, vaultAddress);
+        _logATokenVaultDeployments();
+
+        return vaultAddress;
+    }
+
+    function _trackATokenVaultDeployment(address underlying, address vaultAddress) private {
         string memory symbol = IERC20Metadata(underlying).symbol();
         bool found = false;
         for (uint256 i = 0; i < _aTokenVaultAssets.length; i++) {
             if (keccak256(bytes(_aTokenVaultAssets[i])) == keccak256(bytes(symbol))) {
-                _aTokenVaultDeployedAddresses[i] = proxyAddress;
+                _aTokenVaultDeployedAddresses[i] = vaultAddress;
                 found = true;
                 break;
             }
         }
         if (!found) {
             _aTokenVaultAssets.push(symbol);
-            _aTokenVaultDeployedAddresses.push(proxyAddress);
+            _aTokenVaultDeployedAddresses.push(vaultAddress);
         }
-
-        _logATokenVaultDeployments();
-
-        return proxyAddress;
     }
 
     function _logATokenVaultDeployments() internal virtual {}
+
+    function _aTokenVaultProxyDeployerSaltSeed(address underlying) internal pure virtual returns (string memory);
 
     function _buildATokenVaultsJson() internal returns (string memory) {
         string memory json = "[";

@@ -2,9 +2,13 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.20;
 
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
+import {ATokenVaultProxyAddressLib} from "script/libraries/ATokenVaultProxyAddressLib.sol";
 import {Create3AddressLib} from "script/libraries/Create3AddressLib.sol";
 
 contract Create3AddressBook {
+    using Strings for address;
+
     string constant STABLE_VAULT_SALT_SEED = "aave.stable-vault.StableVault";
     string constant TRANSFER_HELPER_SALT_SEED = "aave.stable-vault.TransferHelper";
     string constant WITHDRAWAL_EXECUTION_POLICY_SALT_SEED = "aave.stable-vault.WithdrawalExecutionPolicy";
@@ -25,6 +29,7 @@ contract Create3AddressBook {
     string constant POLICY_REGISTRY_SALT_SEED = "aave.stable-vault.PolicyRegistry";
     string constant DEPOSIT_POLICY_SALT_SEED = "aave.stable-vault.DepositPolicy";
     string constant FUNDS_BRIDGING_POLICY_SALT_SEED = "aave.stable-vault.FundsBridgingPolicy";
+    string constant ATOKEN_VAULT_PROXY_DEPLOYER_SALT_SEED_PREFIX = "aave.stable-vault.ATokenVault.ProxyDeployer.";
 
     function getStableVaultAddress(address deployer) internal pure virtual returns (address) {
         return Create3AddressLib.computeCreate3Address(STABLE_VAULT_SALT_SEED, deployer);
@@ -104,5 +109,17 @@ contract Create3AddressBook {
 
     function getFundsBridgingPolicyAddress(address deployer) internal pure virtual returns (address) {
         return Create3AddressLib.computeCreate3Address(FUNDS_BRIDGING_POLICY_SALT_SEED, deployer);
+    }
+
+    function getATokenVaultAddress(address underlying, address deployer) internal pure virtual returns (address) {
+        return ATokenVaultProxyAddressLib.computeProxyAddress(_getATokenVaultProxyDeployerAddress(underlying, deployer));
+    }
+
+    function getATokenVaultProxyDeployerSaltSeed(address underlying) internal pure virtual returns (string memory) {
+        return string.concat(ATOKEN_VAULT_PROXY_DEPLOYER_SALT_SEED_PREFIX, underlying.toHexString());
+    }
+
+    function _getATokenVaultProxyDeployerAddress(address underlying, address deployer) private pure returns (address) {
+        return Create3AddressLib.computeCreate3Address(getATokenVaultProxyDeployerSaltSeed(underlying), deployer);
     }
 }

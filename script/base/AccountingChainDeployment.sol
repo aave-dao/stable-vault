@@ -22,7 +22,6 @@ import {StableVault} from "src/core/accounting/StableVault.sol";
 import {IouToken} from "src/core/ious/IouToken.sol";
 import {IouTokenManager} from "src/core/ious/IouTokenManager.sol";
 import {IAccountingChainGateway} from "src/interfaces/IAccountingChainGateway.sol";
-import {IAdiBridgeAdapter} from "src/interfaces/IAdiBridgeAdapter.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
@@ -288,6 +287,10 @@ abstract contract AccountingChainDeployment is
 
     function _deployedATokenVaultAddresses() internal view virtual override returns (address[] memory) {
         return _readATokenVaultAddresses(_configString(".accountingChain.deploymentOutputPath"));
+    }
+
+    function _aTokenVaultProxyDeployerSaltSeed(address underlying) internal pure override returns (string memory) {
+        return getATokenVaultProxyDeployerSaltSeed(underlying);
     }
 
     function _setupFundsHandler() internal {
