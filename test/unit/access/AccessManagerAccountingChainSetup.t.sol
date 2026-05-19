@@ -15,6 +15,7 @@ import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {ChainBalanceOracle} from "src/oracles/balance/ChainBalanceOracle.sol";
+import {DepositPolicy} from "src/policies/DepositPolicy.sol";
 
 import {AccessManagerSetupBaseTest} from "test/unit/access/AccessManagerSetupBaseTest.sol";
 
@@ -216,6 +217,22 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
             target,
             ChainBalanceOracle.setChainBalanceOracleAdapter.selector,
             RolesConfig.getRole__setChainBalanceOracleAdapter().roleId
+        );
+    }
+
+    function test_targetSetup_depositPolicy() public view {
+        address target = getDepositPolicyAddress(_deployer());
+        _assertTargetFunctionRole(
+            target, DepositPolicy.raiseDepositCapacity.selector, RolesConfig.getRole__raiseDepositCapacity().roleId
+        );
+        _assertTargetFunctionRole(
+            target, DepositPolicy.lowerDepositCapacity.selector, RolesConfig.getRole__lowerDepositCapacity().roleId
+        );
+        _assertTargetFunctionRole(
+            target, DepositPolicy.raiseDepositRefillRate.selector, RolesConfig.getRole__raiseDepositRefillRate().roleId
+        );
+        _assertTargetFunctionRole(
+            target, DepositPolicy.lowerDepositRefillRate.selector, RolesConfig.getRole__lowerDepositRefillRate().roleId
         );
     }
 }

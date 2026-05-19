@@ -19,11 +19,13 @@ import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
+import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
 import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {SlippageCoverageVault} from "src/periphery/SlippageCoverageVault.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
+import {FundsBridgingPolicy} from "src/policies/FundsBridgingPolicy.sol";
 import {WithdrawalExecutionPolicy} from "src/policies/WithdrawalExecutionPolicy.sol";
 
 abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
@@ -586,6 +588,35 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         );
         _assertTargetFunctionRole(
             target, SlippageCoverageVault.sweep.selector, RolesConfig.getRole__sweepSlippageCoverageVault().roleId
+        );
+    }
+
+    function test_targetSetup_policyRegistry() public view {
+        address target = getPolicyRegistryAddress(_deployer());
+        _assertTargetFunctionRole(target, IPolicyRegistry.setPolicy.selector, RolesConfig.getRole__setPolicy().roleId);
+    }
+
+    function test_targetSetup_fundsBridgingPolicy() public view {
+        address target = getFundsBridgingPolicyAddress(_deployer());
+        _assertTargetFunctionRole(
+            target,
+            FundsBridgingPolicy.raiseBridgingCapacity.selector,
+            RolesConfig.getRole__raiseBridgingCapacity().roleId
+        );
+        _assertTargetFunctionRole(
+            target,
+            FundsBridgingPolicy.lowerBridgingCapacity.selector,
+            RolesConfig.getRole__lowerBridgingCapacity().roleId
+        );
+        _assertTargetFunctionRole(
+            target,
+            FundsBridgingPolicy.raiseBridgingRefillRate.selector,
+            RolesConfig.getRole__raiseBridgingRefillRate().roleId
+        );
+        _assertTargetFunctionRole(
+            target,
+            FundsBridgingPolicy.lowerBridgingRefillRate.selector,
+            RolesConfig.getRole__lowerBridgingRefillRate().roleId
         );
     }
 
