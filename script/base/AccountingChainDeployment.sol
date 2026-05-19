@@ -199,6 +199,7 @@ abstract contract AccountingChainDeployment is
         _setupChainBalanceOracleAdapters();
         _setupDepositPolicy();
         _setupFundsBridgingPolicy();
+        _setupSlippageCoverageVault();
         // Enforce required policies are set before the deployer loses ADMIN_ROLE. Otherwise, a missing policy
         // would only surface in prod, where setting is gated by `CRITICAL_DELAY`.
         _assertRequiredPoliciesSet();
@@ -823,6 +824,63 @@ abstract contract AccountingChainDeployment is
         if (refillRate > 0) {
             policy.raiseBridgingRefillRate(asset, destChainId, bridgeAdapter, refillRate);
         }
+    }
+
+    function _setupSlippageCoverageVault() internal {
+        SlippageCoverageVault vault = SlippageCoverageVault(getSlippageCoverageVaultAddress(_deployer()));
+        _ensureNonZeroSlippageCoverageVaultAssetCaps(vault, _gho(), ".slippageCoverageVault.perAssetCaps.gho");
+        _ensureNonZeroSlippageCoverageVaultAssetCaps(vault, _usdc(), ".slippageCoverageVault.perAssetCaps.usdc");
+        _ensureNonZeroSlippageCoverageVaultAssetCaps(vault, _usdt(), ".slippageCoverageVault.perAssetCaps.usdt");
+    }
+
+    function _ensureNonZeroSlippageCoverageVaultAssetCaps(
+        SlippageCoverageVault vault,
+        address asset,
+        string memory configKey
+    ) private {
+        uint256 pullCapPerTx = _configUint(string.concat(configKey, ".pullCapPerTx"));
+        uint128 windowCap = _configUint128(string.concat(configKey, ".windowCap"));
+        uint64 windowSeconds = _configUint64(string.concat(configKey, ".windowSeconds"));
+
+        require(pullCapPerTx > 0, "SCV pullCapPerTx must be > 0");
+        require(windowCap > 0, "SCV windowCap must be > 0");
+        require(windowSeconds > 0, "SCV windowSeconds must be > 0");
+
+        uint256 currentPullCap = vault.getPullCapPerTx(asset);
+        if (currentPullCap == 0) {
+            vault.raisePullCapPerTx(asset, pullCapPerTx);
+        } else {
+            require(currentPullCap == pullCapPerTx, "SCV pullCapPerTx mismatch");
+        }
+
+        SlippageCoverageVault.Window memory window = vault.getWindow(asset);
+        if (window.cap == 0) {
+            vault.raiseWindowCap(asset, windowCap);
+        } else {
+            require(window.cap == windowCap, "SCV windowCap mismatch");
+        }
+
+        window = vault.getWindow(asset);
+        if (window.windowSeconds == 0) {
+            vault.raiseWindowSeconds(asset, windowSeconds);
+        } else {
+            require(window.windowSeconds == windowSeconds, "SCV windowSeconds mismatch");
+        }
+
+        _assertSlippageCoverageVaultCaps(vault, asset, pullCapPerTx, windowCap, windowSeconds);
+    }
+
+    function _assertSlippageCoverageVaultCaps(
+        SlippageCoverageVault vault,
+        address asset,
+        uint256 pullCapPerTx,
+        uint128 windowCap,
+        uint64 windowSeconds
+    ) private view {
+        require(vault.getPullCapPerTx(asset) == pullCapPerTx, "SCV pullCapPerTx not configured");
+        SlippageCoverageVault.Window memory window = vault.getWindow(asset);
+        require(window.cap == windowCap, "SCV windowCap not configured");
+        require(window.windowSeconds == windowSeconds, "SCV windowSeconds not configured");
     }
 
     function _logDeployment(string memory name, string memory saltSeed, address addr) internal virtual override {

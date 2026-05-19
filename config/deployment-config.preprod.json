@@ -28,7 +28,16 @@
   "slippageCoverageVault": {
     "maxSlippageBps": "100",
     "overrideMaxSlippageBps": "5000",
-    "initialOverrideMode": true
+    "initialOverrideMode": true,
+    "perAssetCaps": {
+      "gho": {
+        "pullCapPerTx": "1000000000000000000000000",
+        "windowCap": "1000000000000000000000000",
+        "windowSeconds": 86400
+      },
+      "usdc": { "pullCapPerTx": "1000000000000", "windowCap": "1000000000000", "windowSeconds": 86400 },
+      "usdt": { "pullCapPerTx": "1000000000000", "windowCap": "1000000000000", "windowSeconds": 86400 }
+    }
   },
   "earningChain": {
     "chainId": 1,
