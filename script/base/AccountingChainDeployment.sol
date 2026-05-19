@@ -128,7 +128,7 @@ abstract contract AccountingChainDeployment is
         // Validate CCIP router
         require(
             IRouterClient(_configAddress(".accountingChain.ccipRouterAddress"))
-                .isChainSupported(uint64(vm.parseUint(_configString(".earningChain.ccipSelector")))),
+                .isChainSupported(_configUint64(".earningChain.ccipSelector")),
             "CCIP Router does not support earning chain"
         );
 
@@ -239,7 +239,7 @@ abstract contract AccountingChainDeployment is
         IAccountingChainGateway gateway = IAccountingChainGateway(getGatewayAddress(_deployer()));
 
         uint256 earningChainId = _configUint(".earningChain.chainId");
-        uint64 earningChainCcipSelector = uint64(vm.parseUint(_configString(".earningChain.ccipSelector")));
+        uint64 earningChainCcipSelector = _configUint64(".earningChain.ccipSelector");
 
         // GHO uses CCIP Adapter
         gateway.addBridgeAdapter(_gho(), earningChainId, localCcipAdapter);
@@ -298,7 +298,7 @@ abstract contract AccountingChainDeployment is
     function _setupWithdrawalExecutionPolicy() internal {
         WithdrawalExecutionPolicy withdrawalExecutionPolicy =
             WithdrawalExecutionPolicy(getWithdrawalExecutionPolicyAddress(_deployer()));
-        withdrawalExecutionPolicy.setDefaultFeeBps(uint16(_configUint(".withdrawalExecutionPolicy.defaultFeeBps")));
+        withdrawalExecutionPolicy.setDefaultFeeBps(_configUint16(".withdrawalExecutionPolicy.defaultFeeBps"));
         withdrawalExecutionPolicy.addSigner(_configAddress(".withdrawalExecutionPolicy.signer"));
 
         _initRedemptionLimit(withdrawalExecutionPolicy, ".accountingChain.withdrawalExecutionPolicy.redemptionLimit");
@@ -308,8 +308,8 @@ abstract contract AccountingChainDeployment is
     }
 
     function _initRedemptionLimit(WithdrawalExecutionPolicy policy, string memory configKey) private {
-        uint128 capacity = uint128(vm.parseUint(_configString(string.concat(configKey, ".capacity"))));
-        uint128 refillRate = uint128(vm.parseUint(_configString(string.concat(configKey, ".refillRate"))));
+        uint128 capacity = _configUint128(string.concat(configKey, ".capacity"));
+        uint128 refillRate = _configUint128(string.concat(configKey, ".refillRate"));
         policy.raiseRedemptionCapacity(capacity);
         policy.raiseRedemptionRefillRate(refillRate);
     }
@@ -368,9 +368,9 @@ abstract contract AccountingChainDeployment is
 
     function _deployWithdrawalExecutionPolicy() internal returns (address) {
         uint128 minRedemptionCapacity =
-            uint128(vm.parseUint(_configString(".accountingChain.withdrawalExecutionPolicy.minRedemptionCapacity")));
+            _configUint128(".accountingChain.withdrawalExecutionPolicy.minRedemptionCapacity");
         uint128 minRedemptionRefillRate =
-            uint128(vm.parseUint(_configString(".accountingChain.withdrawalExecutionPolicy.minRedemptionRefillRate")));
+            _configUint128(".accountingChain.withdrawalExecutionPolicy.minRedemptionRefillRate");
         address implementation = address(
             new WithdrawalExecutionPolicy(
                 getStableVaultAddress(_deployer()), minRedemptionCapacity, minRedemptionRefillRate
@@ -480,7 +480,7 @@ abstract contract AccountingChainDeployment is
                 withdrawer: ALLOCATOR_WITHDRAWER,
                 priceOracle: getPriceOracleAddress(_deployer()),
                 transferHelper: getTransferHelperAddress(_deployer()),
-                maxStrategiesPerAsset: uint8(_configUint(".maxStrategiesPerAsset")),
+                maxStrategiesPerAsset: _configUint8(".maxStrategiesPerAsset"),
                 policyRegistry: getPolicyRegistryAddress(_deployer())
             })
         );
@@ -552,8 +552,8 @@ abstract contract AccountingChainDeployment is
                 abi.encode(
                     getSwapperAddress(_deployer()),
                     getAccessManagerAddress(_deployer()),
-                    uint16(vm.parseUint(_configString(".slippageCoverageVault.maxSlippageBps"))),
-                    uint16(vm.parseUint(_configString(".slippageCoverageVault.overrideMaxSlippageBps"))),
+                    _configUint16(".slippageCoverageVault.maxSlippageBps"),
+                    _configUint16(".slippageCoverageVault.overrideMaxSlippageBps"),
                     _configBool(".slippageCoverageVault.initialOverrideMode")
                 )
             )
@@ -780,8 +780,8 @@ abstract contract AccountingChainDeployment is
     }
 
     function _initDepositLimit(DepositPolicy policy, address asset, string memory configKey) private {
-        uint128 capacity = uint128(vm.parseUint(_configString(string.concat(configKey, ".capacity"))));
-        uint128 refillRate = uint128(vm.parseUint(_configString(string.concat(configKey, ".refillRate"))));
+        uint128 capacity = _configUint128(string.concat(configKey, ".capacity"));
+        uint128 refillRate = _configUint128(string.concat(configKey, ".refillRate"));
         policy.raiseDepositCapacity(asset, capacity);
         if (refillRate > 0) {
             policy.raiseDepositRefillRate(asset, refillRate);
@@ -814,8 +814,8 @@ abstract contract AccountingChainDeployment is
         address bridgeAdapter,
         string memory configKey
     ) private {
-        uint128 capacity = uint128(vm.parseUint(_configString(string.concat(configKey, ".capacity"))));
-        uint128 refillRate = uint128(vm.parseUint(_configString(string.concat(configKey, ".refillRate"))));
+        uint128 capacity = _configUint128(string.concat(configKey, ".capacity"));
+        uint128 refillRate = _configUint128(string.concat(configKey, ".refillRate"));
         policy.raiseBridgingCapacity(asset, destChainId, bridgeAdapter, capacity);
         if (refillRate > 0) {
             policy.raiseBridgingRefillRate(asset, destChainId, bridgeAdapter, refillRate);

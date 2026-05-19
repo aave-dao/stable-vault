@@ -5,6 +5,8 @@ pragma solidity ^0.8.20;
 import {Script} from "forge-std/Script.sol";
 
 abstract contract DeploymentConfig is Script {
+    error ConfigUintTooLarge(string key, uint256 value, uint256 max);
+
     function _configPath() internal view virtual returns (string memory);
 
     function _readConfig() internal view returns (string memory) {
@@ -17,7 +19,32 @@ abstract contract DeploymentConfig is Script {
     }
 
     function _configUint(string memory key) internal view returns (uint256) {
-        return vm.parseJsonUint(_readConfig(), key);
+        string memory config = _readConfig();
+        try vm.parseJsonUint(config, key) returns (uint256 value) {
+            return value;
+        } catch {
+            return vm.parseUint(vm.parseJsonString(config, key));
+        }
+    }
+
+    function _configUint8(string memory key) internal view returns (uint8) {
+        return uint8(_configUintMax(key, type(uint8).max));
+    }
+
+    function _configUint16(string memory key) internal view returns (uint16) {
+        return uint16(_configUintMax(key, type(uint16).max));
+    }
+
+    function _configUint32(string memory key) internal view returns (uint32) {
+        return uint32(_configUintMax(key, type(uint32).max));
+    }
+
+    function _configUint64(string memory key) internal view returns (uint64) {
+        return uint64(_configUintMax(key, type(uint64).max));
+    }
+
+    function _configUint128(string memory key) internal view returns (uint128) {
+        return uint128(_configUintMax(key, type(uint128).max));
     }
 
     function _configString(string memory key) internal view returns (string memory) {
@@ -26,6 +53,14 @@ abstract contract DeploymentConfig is Script {
 
     function _configBool(string memory key) internal view returns (bool) {
         return vm.parseJsonBool(_readConfig(), key);
+    }
+
+    function _configUintMax(string memory key, uint256 max) private view returns (uint256) {
+        uint256 value = _configUint(key);
+        if (value > max) {
+            revert ConfigUintTooLarge(key, value, max);
+        }
+        return value;
     }
 
     /// @dev Pre-flight validator for the redemption-limit config block under `configPrefix` (e.g.
@@ -40,20 +75,19 @@ abstract contract DeploymentConfig is Script {
     /// Run this before any deploy side effect — a misconfig must not burn the deterministic CREATE3 address
     /// namespace.
     function _validateRedemptionLimitConfig(string memory configPrefix) internal view {
-        uint256 minCap = vm.parseUint(_configString(string.concat(configPrefix, ".minRedemptionCapacity")));
-        require(minCap > 0 && minCap <= type(uint128).max, "minRedemptionCapacity: must be in (0, uint128.max]");
+        uint128 minCap = _configUint128(string.concat(configPrefix, ".minRedemptionCapacity"));
+        require(minCap > 0, "minRedemptionCapacity: must be in (0, uint128.max]");
 
-        uint256 minRefill = vm.parseUint(_configString(string.concat(configPrefix, ".minRedemptionRefillRate")));
-        require(minRefill > 0 && minRefill <= type(uint128).max, "minRedemptionRefillRate: must be in (0, uint128.max]");
+        uint128 minRefill = _configUint128(string.concat(configPrefix, ".minRedemptionRefillRate"));
+        require(minRefill > 0, "minRedemptionRefillRate: must be in (0, uint128.max]");
 
-        uint256 seedCap = vm.parseUint(_configString(string.concat(configPrefix, ".redemptionLimit.capacity")));
+        uint128 seedCap = _configUint128(string.concat(configPrefix, ".redemptionLimit.capacity"));
         require(
             seedCap < type(uint128).max, "redemptionLimit.capacity: must be < uint128.max (UNLIMITED_CAPACITY sentinel)"
         );
         require(seedCap > minCap, "redemptionLimit.capacity: must exceed minRedemptionCapacity");
 
-        uint256 seedRefill = vm.parseUint(_configString(string.concat(configPrefix, ".redemptionLimit.refillRate")));
-        require(seedRefill <= type(uint128).max, "redemptionLimit.refillRate: exceeds uint128");
+        uint128 seedRefill = _configUint128(string.concat(configPrefix, ".redemptionLimit.refillRate"));
         require(seedRefill > minRefill, "redemptionLimit.refillRate: must exceed minRedemptionRefillRate");
     }
 }

@@ -105,7 +105,7 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         // Validate CCIP router
         require(
             IRouterClient(_configAddress(".earningChain.ccipRouterAddress"))
-                .isChainSupported(uint64(vm.parseUint(_configString(".accountingChain.ccipSelector")))),
+                .isChainSupported(_configUint64(".accountingChain.ccipSelector")),
             "CCIP Router does not support accounting chain"
         );
 
@@ -182,7 +182,7 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         IEarningChainGateway gateway = IEarningChainGateway(getGatewayAddress(_deployer()));
 
         uint256 accountingChainId = _configUint(".accountingChain.chainId");
-        uint64 accountingChainCcipSelector = uint64(vm.parseUint(_configString(".accountingChain.ccipSelector")));
+        uint64 accountingChainCcipSelector = _configUint64(".accountingChain.ccipSelector");
 
         // GHO uses CCIP Adapter
         gateway.addBridgeAdapter(_gho(), accountingChainId, localCcipAdapter);
@@ -214,7 +214,7 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
     function _setupWithdrawalExecutionPolicy() internal {
         WithdrawalExecutionPolicy withdrawalExecutionPolicy =
             WithdrawalExecutionPolicy(getWithdrawalExecutionPolicyAddress(_deployer()));
-        withdrawalExecutionPolicy.setDefaultFeeBps(uint16(_configUint(".withdrawalExecutionPolicy.defaultFeeBps")));
+        withdrawalExecutionPolicy.setDefaultFeeBps(_configUint16(".withdrawalExecutionPolicy.defaultFeeBps"));
         withdrawalExecutionPolicy.addSigner(_configAddress(".withdrawalExecutionPolicy.signer"));
 
         _initRedemptionLimit(withdrawalExecutionPolicy, ".earningChain.withdrawalExecutionPolicy.redemptionLimit");
@@ -224,8 +224,8 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
     }
 
     function _initRedemptionLimit(WithdrawalExecutionPolicy policy, string memory configKey) private {
-        uint128 capacity = uint128(vm.parseUint(_configString(string.concat(configKey, ".capacity"))));
-        uint128 refillRate = uint128(vm.parseUint(_configString(string.concat(configKey, ".refillRate"))));
+        uint128 capacity = _configUint128(string.concat(configKey, ".capacity"));
+        uint128 refillRate = _configUint128(string.concat(configKey, ".refillRate"));
         policy.raiseRedemptionCapacity(capacity);
         policy.raiseRedemptionRefillRate(refillRate);
     }
@@ -300,10 +300,9 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
     }
 
     function _deployWithdrawalExecutionPolicy() internal returns (address) {
-        uint128 minRedemptionCapacity =
-            uint128(vm.parseUint(_configString(".earningChain.withdrawalExecutionPolicy.minRedemptionCapacity")));
+        uint128 minRedemptionCapacity = _configUint128(".earningChain.withdrawalExecutionPolicy.minRedemptionCapacity");
         uint128 minRedemptionRefillRate =
-            uint128(vm.parseUint(_configString(".earningChain.withdrawalExecutionPolicy.minRedemptionRefillRate")));
+            _configUint128(".earningChain.withdrawalExecutionPolicy.minRedemptionRefillRate");
         address implementation = address(
             new WithdrawalExecutionPolicy(
                 getGatewayAddress(_deployer()), minRedemptionCapacity, minRedemptionRefillRate
@@ -378,7 +377,7 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
                 withdrawer: ALLOCATOR_WITHDRAWER,
                 priceOracle: getPriceOracleAddress(_deployer()),
                 transferHelper: getTransferHelperAddress(_deployer()),
-                maxStrategiesPerAsset: uint8(_configUint(".maxStrategiesPerAsset")),
+                maxStrategiesPerAsset: _configUint8(".maxStrategiesPerAsset"),
                 policyRegistry: getPolicyRegistryAddress(_deployer())
             })
         );
@@ -429,8 +428,8 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
                 abi.encode(
                     getSwapperAddress(_deployer()),
                     getAccessManagerAddress(_deployer()),
-                    uint16(vm.parseUint(_configString(".slippageCoverageVault.maxSlippageBps"))),
-                    uint16(vm.parseUint(_configString(".slippageCoverageVault.overrideMaxSlippageBps"))),
+                    _configUint16(".slippageCoverageVault.maxSlippageBps"),
+                    _configUint16(".slippageCoverageVault.overrideMaxSlippageBps"),
                     _configBool(".slippageCoverageVault.initialOverrideMode")
                 )
             )
@@ -624,8 +623,8 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         address bridgeAdapter,
         string memory configKey
     ) private {
-        uint128 capacity = uint128(vm.parseUint(_configString(string.concat(configKey, ".capacity"))));
-        uint128 refillRate = uint128(vm.parseUint(_configString(string.concat(configKey, ".refillRate"))));
+        uint128 capacity = _configUint128(string.concat(configKey, ".capacity"));
+        uint128 refillRate = _configUint128(string.concat(configKey, ".refillRate"));
         policy.raiseBridgingCapacity(asset, destChainId, bridgeAdapter, capacity);
         if (refillRate > 0) {
             policy.raiseBridgingRefillRate(asset, destChainId, bridgeAdapter, refillRate);
