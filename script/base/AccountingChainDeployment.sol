@@ -98,6 +98,7 @@ abstract contract AccountingChainDeployment is
 
     function run() public {
         _validateExternalAddresses();
+        _validateProfileAddresses();
         _validateRedemptionLimitConfig(".accountingChain.withdrawalExecutionPolicy");
         vm.startBroadcast(_deployer());
         _deployContracts();

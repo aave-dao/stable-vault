@@ -75,6 +75,7 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
 
     function run() public {
         _validateExternalAddresses();
+        _validateProfileAddresses();
         _validateRedemptionLimitConfig(".earningChain.withdrawalExecutionPolicy");
         vm.startBroadcast(_deployer());
         _deployContracts();

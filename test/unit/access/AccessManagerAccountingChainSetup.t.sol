@@ -58,6 +58,15 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
         super._setup_Profiles();
     }
 
+    function _validateProfileAddresses()
+        internal
+        view
+        virtual
+        override(AccessManagerBaseSetup, AccessManagerAccountingChainSetup)
+    {
+        super._validateProfileAddresses();
+    }
+
     function _setup_Targets(address deployer)
         internal
         virtual

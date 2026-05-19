@@ -99,6 +99,21 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+    function _validateProfileAddresses() internal view virtual {
+        require(_getProfile__MainAdmin() != address(0), "MainAdmin profile address not set");
+        require(_getProfile__SecondaryAdmin() != address(0), "SecondaryAdmin profile address not set");
+        require(_getProfile__WithdrawalPolicyManager() != address(0), "WithdrawalPolicyManager profile address not set");
+        require(
+            _getProfile__ATokenVaultRewardClaimer() != address(0), "ATokenVaultRewardClaimer profile address not set"
+        );
+        require(_getProfile__CoverageGuardian() != address(0), "CoverageGuardian profile address not set");
+        require(_getProfile__Funder() != address(0), "Funder profile address not set");
+        require(_getRebalancerMulticallOwner() != address(0), "Rebalancer Profile OwnedMulticall owner is not set");
+        require(_getDisablerMulticallOwner() != address(0), "Disabler Profile OwnedMulticall owner is not set");
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////
+
     function _deployOwnedMulticallForRebalancerProfile() internal virtual returns (address) {
         address rebalancerMulticallOwner = _getRebalancerMulticallOwner();
         require(rebalancerMulticallOwner != address(0), "Rebalancer Profile OwnedMulticall owner is not set");
