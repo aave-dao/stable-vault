@@ -127,6 +127,8 @@ abstract contract ATokenVaultDeployment is Script {
     }
 
     function _readATokenVaultAddresses(string memory outputPath) internal view returns (address[] memory) {
+        // Read from the deployment output so interrupted scripts can be resumed and still wire every previously
+        // recorded aTokenVault target.
         // forge-lint: disable-next-line(unsafe-cheatcode)
         string memory json = vm.readFile(outputPath);
         bytes memory raw = vm.parseJson(json, ".aTokenVaults");

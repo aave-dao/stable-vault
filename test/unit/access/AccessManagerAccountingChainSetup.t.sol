@@ -21,6 +21,7 @@ import {AccessManagerSetupBaseTest} from "test/unit/access/AccessManagerSetupBas
 contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, AccountingChainDeployment {
     function setUp() public virtual {
         _deployCreateXTo(Create3AddressLib.CREATEX_ADDRESS);
+        vm.etch(_testATokenVault(), hex"00");
         vm.startPrank(_deployer());
         _deployContracts();
         _setupAccessManager(_deployer());
@@ -50,8 +51,12 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
         returns (address[] memory)
     {
         address[] memory vaults = new address[](1);
-        vaults[0] = address(uint160(uint256(keccak256("test.aTokenVault"))));
+        vaults[0] = _testATokenVault();
         return vaults;
+    }
+
+    function _testATokenVault() private pure returns (address) {
+        return address(uint160(uint256(keccak256("test.aTokenVault"))));
     }
 
     function _setup_Profiles() internal virtual override(AccessManagerBaseSetup, AccessManagerAccountingChainSetup) {

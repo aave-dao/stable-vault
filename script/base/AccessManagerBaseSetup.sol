@@ -542,6 +542,9 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     function _setupTarget__ATokenVaults() internal {
         address[] memory vaults = _deployedATokenVaultAddresses();
         for (uint256 i = 0; i < vaults.length; i++) {
+            // The vault list comes from the deployment artifact; fail loudly if it is stale or was written before the
+            // corresponding deployment completed.
+            require(vaults[i].code.length != 0, "aTokenVault target not deployed");
             _setupTarget__ATokenVault(vaults[i]);
         }
     }
