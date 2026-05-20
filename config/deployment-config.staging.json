@@ -26,17 +26,18 @@
     "signer": "0x8eFCe8C8cF3d1B198D95B3067EcF43Fb0A1039e2"
   },
   "slippageCoverageVault": {
-    "maxSlippageBps": "100",
+    // Amounts are asset-native decimals; windowSeconds is the rolling coverage window length.
+    "maxSlippageBps": "50",
     "overrideMaxSlippageBps": "5000",
     "initialOverrideMode": true,
     "perAssetCaps": {
       "gho": {
-        "pullCapPerTx": "1000000000000000000000000",
-        "windowCap": "1000000000000000000000000",
-        "windowSeconds": 86400
+        "pullCapPerTx": "1000000000000000000",
+        "windowCap": "5000000000000000000",
+        "windowSeconds": 3600
       },
-      "usdc": { "pullCapPerTx": "1000000000000", "windowCap": "1000000000000", "windowSeconds": 86400 },
-      "usdt": { "pullCapPerTx": "1000000000000", "windowCap": "1000000000000", "windowSeconds": 86400 }
+      "usdc": { "pullCapPerTx": "1000000", "windowCap": "5000000", "windowSeconds": 3600 },
+      "usdt": { "pullCapPerTx": "1000000", "windowCap": "5000000", "windowSeconds": 3600 }
     }
   },
   "earningChain": {
@@ -67,22 +68,24 @@
       "registerOnGateway": false
     },
     "fundsBridgingPolicy": {
+      // Amounts are asset-native decimals; refillRate is amount per second.
       "perAssetLimits": {
         "gho": {
-          "capacity": "1000000000000000000000000",
-          "refillRate": "11574074074074074074"
+          "capacity": "500000000000000000000",
+          "refillRate": "5787037037037037"
         },
-        "usdc": { "capacity": "1000000000000", "refillRate": "11574074" },
-        "usdt": { "capacity": "1000000000000", "refillRate": "11574074" }
+        "usdc": { "capacity": "500000000", "refillRate": "5787" },
+        "usdt": { "capacity": "500000000", "refillRate": "5787" }
       }
     },
     "withdrawalExecutionPolicy": {
+      // Redemption amounts are denominated in RAY.
       "redemptionLimit": {
-        "capacity": "TBD",
-        "refillRate": "TBD"
+        "capacity": "200000000000000000000000000000",
+        "refillRate": "2314814814814814814814814"
       },
-      "minRedemptionCapacity": "TBD",
-      "minRedemptionRefillRate": "TBD"
+      "minRedemptionCapacity": "10000000000000000000000000000",
+      "minRedemptionRefillRate": "115740740740740740740740"
     },
     "deploymentOutputPath": "deployments/vnet/v0.3/earning.json",
     "minBurnIouTokenGasLimit": "120000"
@@ -116,32 +119,35 @@
     "chainlinkBundleAggregatorProxy": "0x0000000000000000000000000000000000000000",
     "sequencerUptimeFeed": "0x0000000000000000000000000000000000000000",
     "depositPolicy": {
+      // Amounts are asset-native decimals; refillRate is amount per second.
       "perAssetLimits": {
         "gho": {
-          "capacity": "1000000000000000000000000",
-          "refillRate": "11574074074074074074"
+          "capacity": "100000000000000000000",
+          "refillRate": "1157407407407407"
         },
-        "usdc": { "capacity": "1000000000000", "refillRate": "11574074" },
-        "usdt": { "capacity": "1000000000000", "refillRate": "11574074" }
+        "usdc": { "capacity": "100000000", "refillRate": "1157" },
+        "usdt": { "capacity": "100000000", "refillRate": "1157" }
       }
     },
     "fundsBridgingPolicy": {
+      // Amounts are asset-native decimals; refillRate is amount per second.
       "perAssetLimits": {
         "gho": {
-          "capacity": "1000000000000000000000000",
-          "refillRate": "11574074074074074074"
+          "capacity": "500000000000000000000",
+          "refillRate": "5787037037037037"
         },
-        "usdc": { "capacity": "1000000000000", "refillRate": "11574074" },
-        "usdt": { "capacity": "1000000000000", "refillRate": "11574074" }
+        "usdc": { "capacity": "500000000", "refillRate": "5787" },
+        "usdt": { "capacity": "500000000", "refillRate": "5787" }
       }
     },
     "withdrawalExecutionPolicy": {
+      // Redemption amounts are denominated in RAY.
       "redemptionLimit": {
-        "capacity": "TBD",
-        "refillRate": "TBD"
+        "capacity": "200000000000000000000000000000",
+        "refillRate": "2314814814814814814814814"
       },
-      "minRedemptionCapacity": "TBD",
-      "minRedemptionRefillRate": "TBD"
+      "minRedemptionCapacity": "10000000000000000000000000000",
+      "minRedemptionRefillRate": "115740740740740740740740"
     },
     "deploymentOutputPath": "deployments/vnet/v0.3/accounting.json"
   }
