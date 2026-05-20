@@ -17,9 +17,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 CONFIGS=(
-    "$ROOT/config/deployment-config.prod.json"
-    "$ROOT/config/deployment-config.preprod.json"
-    "$ROOT/config/deployment-config.staging.json"
+    "$ROOT/config/deployment-config.prod.jsonc"
+    "$ROOT/config/deployment-config.preprod.jsonc"
+    "$ROOT/config/deployment-config.staging.jsonc"
 )
 
 for f in "${CONFIGS[@]}"; do
