@@ -108,6 +108,37 @@ jobs:
       - name: Run Forge tests
         run: forge test -vvv
 
+  pigeon-preprod:
+    name: Pigeon Preprod
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    env:
+      ALCHEMY_KEY: ${{ secrets.ALCHEMY_KEY || secrets.ALCHEMY_API_KEY }}
+      ADI_FORK_MODE: deployed
+      ADI_DEPLOYMENT_ENV: preprod
+      ADI_DEPLOY_REF: pull/2/head
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - name: Check RPC secret
+        run: |
+          if [ -z "$ALCHEMY_KEY" ]; then
+            echo "Missing ALCHEMY_KEY or ALCHEMY_API_KEY secret for Pigeon fork tests." >&2
+            exit 1
+          fi
+
+      - name: Run Pigeon fork tests
+        run: ./run-adi-pigeon-fork-test.sh
+
   gas-diff:
     name: Gas Diff
     runs-on: ubuntu-latest
