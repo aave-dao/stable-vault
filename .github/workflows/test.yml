@@ -123,6 +123,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          persist-credentials: false
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
@@ -135,6 +136,35 @@ jobs:
             echo "Missing ALCHEMY_KEY or ALCHEMY_API_KEY secret for Pigeon fork tests." >&2
             exit 1
           fi
+
+      - name: Check dependency access secrets
+        env:
+          DEPENDENCIES_APP_ID: ${{ secrets.DEPENDENCIES_APP_ID }}
+          DEPENDENCIES_PRIVATE_KEY: ${{ secrets.DEPENDENCIES_PRIVATE_KEY }}
+        run: |
+          if [ -z "$DEPENDENCIES_APP_ID" ] || [ -z "$DEPENDENCIES_PRIVATE_KEY" ]; then
+            echo "Missing DEPENDENCIES_APP_ID or DEPENDENCIES_PRIVATE_KEY secret for private dependency access." >&2
+            exit 1
+          fi
+
+      - name: Create dependencies token
+        uses: actions/create-github-app-token@v3
+        id: dependencies-token
+        with:
+          app-id: ${{ secrets.DEPENDENCIES_APP_ID }}
+          private-key: ${{ secrets.DEPENDENCIES_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: |
+            adi-deploy
+            aave-delivery-infrastructure
+          permission-contents: read
+
+      - name: Configure private dependency access
+        env:
+          DEPENDENCIES_TOKEN: ${{ steps.dependencies-token.outputs.token }}
+        run: |
+          git config --global url."https://x-access-token:${DEPENDENCIES_TOKEN}@github.com/aave/adi-deploy".insteadOf "https://github.com/aave/adi-deploy"
+          git config --global url."https://x-access-token:${DEPENDENCIES_TOKEN}@github.com/aave/aave-delivery-infrastructure".insteadOf "https://github.com/aave/aave-delivery-infrastructure"
 
       - name: Run Pigeon fork tests
         run: ./run-adi-pigeon-fork-test.sh
