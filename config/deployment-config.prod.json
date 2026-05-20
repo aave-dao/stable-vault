@@ -26,18 +26,25 @@
     "signer": "0x2F87296892feD4AEE35D02eA71B3d04A5Be151a0"
   },
   "slippageCoverageVault": {
-    // Amounts are asset-native decimals; windowSeconds is the rolling coverage window length.
-    "maxSlippageBps": "50",
-    "overrideMaxSlippageBps": "5000",
+    "maxSlippageBps": "50", // 50 bps
+    "overrideMaxSlippageBps": "5000", // 50%
     "initialOverrideMode": true,
     "perAssetCaps": {
       "gho": {
-        "pullCapPerTx": "1000000000000000000",
-        "windowCap": "5000000000000000000",
-        "windowSeconds": 3600
+        "pullCapPerTx": "1000000000000000000", // 1 GHO
+        "windowCap": "5000000000000000000", // 5 GHO
+        "windowSeconds": 3600 // 1 hour
       },
-      "usdc": { "pullCapPerTx": "1000000", "windowCap": "5000000", "windowSeconds": 3600 },
-      "usdt": { "pullCapPerTx": "1000000", "windowCap": "5000000", "windowSeconds": 3600 }
+      "usdc": {
+        "pullCapPerTx": "1000000", // 1 USDC
+        "windowCap": "5000000", // 5 USDC
+        "windowSeconds": 3600 // 1 hour
+      },
+      "usdt": {
+        "pullCapPerTx": "1000000", // 1 USDT
+        "windowCap": "5000000", // 5 USDT
+        "windowSeconds": 3600 // 1 hour
+      }
     }
   },
   "earningChain": {
@@ -68,24 +75,28 @@
       "registerOnGateway": false
     },
     "fundsBridgingPolicy": {
-      // Amounts are asset-native decimals; refillRate is amount per second.
       "perAssetLimits": {
         "gho": {
-          "capacity": "500000000000000000000",
-          "refillRate": "5787037037037037"
+          "capacity": "500000000000000000000", // 500 GHO
+          "refillRate": "5787037037037037" // 500 GHO/day
         },
-        "usdc": { "capacity": "500000000", "refillRate": "5787" },
-        "usdt": { "capacity": "500000000", "refillRate": "5787" }
+        "usdc": {
+          "capacity": "500000000", // 500 USDC
+          "refillRate": "5787" // 500 USDC/day
+        },
+        "usdt": {
+          "capacity": "500000000", // 500 USDT
+          "refillRate": "5787" // 500 USDT/day
+        }
       }
     },
     "withdrawalExecutionPolicy": {
-      // Redemption amounts are denominated in RAY.
       "redemptionLimit": {
-        "capacity": "200000000000000000000000000000",
-        "refillRate": "2314814814814814814814814"
+        "capacity": "200000000000000000000000000000", // $200
+        "refillRate": "2314814814814814814814814" // $200/day
       },
-      "minRedemptionCapacity": "10000000000000000000000000000",
-      "minRedemptionRefillRate": "115740740740740740740740"
+      "minRedemptionCapacity": "10000000000000000000000000000", // $10
+      "minRedemptionRefillRate": "115740740740740740740740" // $10/day
     },
     "deploymentOutputPath": "deployments/prod/v1/earning.json",
     "minBurnIouTokenGasLimit": "120000"
@@ -119,35 +130,44 @@
     "chainlinkBundleAggregatorProxy": "0x0000000000000000000000000000000000000000",
     "sequencerUptimeFeed": "0xFdB631F5EE196F0ed6FAa767959853A9F217697D",
     "depositPolicy": {
-      // Amounts are asset-native decimals; refillRate is amount per second.
       "perAssetLimits": {
         "gho": {
-          "capacity": "100000000000000000000",
-          "refillRate": "1157407407407407"
+          "capacity": "100000000000000000000", // 100 GHO
+          "refillRate": "1157407407407407" // 100 GHO/day
         },
-        "usdc": { "capacity": "100000000", "refillRate": "1157" },
-        "usdt": { "capacity": "100000000", "refillRate": "1157" }
+        "usdc": {
+          "capacity": "100000000", // 100 USDC
+          "refillRate": "1157" // 100 USDC/day
+        },
+        "usdt": {
+          "capacity": "100000000", // 100 USDT
+          "refillRate": "1157" // 100 USDT/day
+        }
       }
     },
     "fundsBridgingPolicy": {
-      // Amounts are asset-native decimals; refillRate is amount per second.
       "perAssetLimits": {
         "gho": {
-          "capacity": "500000000000000000000",
-          "refillRate": "5787037037037037"
+          "capacity": "500000000000000000000", // 500 GHO
+          "refillRate": "5787037037037037" // 500 GHO/day
         },
-        "usdc": { "capacity": "500000000", "refillRate": "5787" },
-        "usdt": { "capacity": "500000000", "refillRate": "5787" }
+        "usdc": {
+          "capacity": "500000000", // 500 USDC
+          "refillRate": "5787" // 500 USDC/day
+        },
+        "usdt": {
+          "capacity": "500000000", // 500 USDT
+          "refillRate": "5787" // 500 USDT/day
+        }
       }
     },
     "withdrawalExecutionPolicy": {
-      // Redemption amounts are denominated in RAY.
       "redemptionLimit": {
-        "capacity": "200000000000000000000000000000",
-        "refillRate": "2314814814814814814814814"
+        "capacity": "200000000000000000000000000000", // $200
+        "refillRate": "2314814814814814814814814" // $200/day
       },
-      "minRedemptionCapacity": "10000000000000000000000000000",
-      "minRedemptionRefillRate": "115740740740740740740740"
+      "minRedemptionCapacity": "10000000000000000000000000000", // $10
+      "minRedemptionRefillRate": "115740740740740740740740" // $10/day
     },
     "deploymentOutputPath": "deployments/prod/v1/accounting.json"
   }
