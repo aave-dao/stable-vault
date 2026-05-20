@@ -11,8 +11,8 @@
   "iouTokenName": "IOU: Aave USD Stable Vault",
   "iouTokenSymbol": "IOU-USD",
   "profiles": {
-    "mainAdmin": "0xD70024EE82c20C30918b30FAd3Bf8D945268e6f2",
-    "secondaryAdmin": "0x449516D402DD0f8caA229C754887555CA149AF5B",
+    "mainAdmin": "0x3641e760fCB45cCC6eF1f8a40f9c6048e719C6a5",
+    "secondaryAdmin": "0x1eD5a8f85b4381F7Ef151890aeeD6fD3dCD32093",
     "rebalancerMulticallOwner": "0x9d2c7064121B35D72670a7E78667423807f42b33",
     "disablerMulticallOwner": "0x22B9ea794cD3A014E46a9d3E1A617cF68a69Cad7",
     "withdrawalPolicyManager": "0xBdE1e349F4117d7202939929251eDa13c60A0639",
