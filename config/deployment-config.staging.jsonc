@@ -1,13 +1,13 @@
 {
   "deployer": "0xBB700dA5CCC9Ec5605780Fc40695f1206B090303",
-  "lowDelay": 1800,
-  "mediumDelay": 2700,
-  "highDelay": 3600,
-  "criticalDelay": 7200,
+  "lowDelay": 1800, // 30 minutes
+  "mediumDelay": 2700, // 45 minutes
+  "highDelay": 3600, // 1 hour
+  "criticalDelay": 7200, // 2 hours
   "maxStrategiesPerAsset": 15,
-  "chainlinkPriceOracleHeartbeat": 86400,
-  "chainlinkChainBalanceOracleHeartbeat": 86400,
-  "priceOracleMinValidPriceRay": "997000000000000000000000000",
+  "chainlinkPriceOracleHeartbeat": 86400, // 1 day
+  "chainlinkChainBalanceOracleHeartbeat": 86400, // 1 day
+  "priceOracleMinValidPriceRay": "997000000000000000000000000", // $0.997
   "iouTokenName": "IOU: Aave USD Stable Vault",
   "iouTokenSymbol": "IOU-USD",
   "profiles": {
@@ -22,21 +22,29 @@
     "funder": "0x00000000000000000000000000000000C0FE7EA5"
   },
   "withdrawalExecutionPolicy": {
-    "defaultFeeBps": 625,
+    "defaultFeeBps": 625, // 6.25%
     "signer": "0x8eFCe8C8cF3d1B198D95B3067EcF43Fb0A1039e2"
   },
   "slippageCoverageVault": {
-    "maxSlippageBps": "100",
-    "overrideMaxSlippageBps": "5000",
+    "maxSlippageBps": "50", // 0.5%
+    "overrideMaxSlippageBps": "5000", // 50%
     "initialOverrideMode": true,
     "perAssetCaps": {
       "gho": {
-        "pullCapPerTx": "1000000000000000000000000",
-        "windowCap": "1000000000000000000000000",
-        "windowSeconds": 86400
+        "pullCapPerTx": "1000000000000000000", // 1 GHO
+        "windowCap": "5000000000000000000", // 5 GHO
+        "windowSeconds": 3600 // 1 hour
       },
-      "usdc": { "pullCapPerTx": "1000000000000", "windowCap": "1000000000000", "windowSeconds": 86400 },
-      "usdt": { "pullCapPerTx": "1000000000000", "windowCap": "1000000000000", "windowSeconds": 86400 }
+      "usdc": {
+        "pullCapPerTx": "1000000", // 1 USDC
+        "windowCap": "5000000", // 5 USDC
+        "windowSeconds": 3600 // 1 hour
+      },
+      "usdt": {
+        "pullCapPerTx": "1000000", // 1 USDT
+        "windowCap": "5000000", // 5 USDT
+        "windowSeconds": 3600 // 1 hour
+      }
     }
   },
   "earningChain": {
@@ -63,26 +71,32 @@
     "ccipRouterAddress": "0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D",
     "aaveV3PoolAddressesProvider": "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e",
     "adi": {
-      "crossChainController": "0x0000000000000000000000000000000000000000",
-      "registerOnGateway": false
+      "crossChainController": "0xBFCf66026E303648238f8F3E3A3A491eb74e645A",
+      "registerOnGateway": true
     },
     "fundsBridgingPolicy": {
       "perAssetLimits": {
         "gho": {
-          "capacity": "1000000000000000000000000",
-          "refillRate": "11574074074074074074"
+          "capacity": "500000000000000000000", // 500 GHO
+          "refillRate": "5787037037037037" // 500 GHO/day
         },
-        "usdc": { "capacity": "1000000000000", "refillRate": "11574074" },
-        "usdt": { "capacity": "1000000000000", "refillRate": "11574074" }
+        "usdc": {
+          "capacity": "500000000", // 500 USDC
+          "refillRate": "5787" // 500 USDC/day
+        },
+        "usdt": {
+          "capacity": "500000000", // 500 USDT
+          "refillRate": "5787" // 500 USDT/day
+        }
       }
     },
     "withdrawalExecutionPolicy": {
       "redemptionLimit": {
-        "capacity": "TBD",
-        "refillRate": "TBD"
+        "capacityRay": "200000000000000000000000000000", // $200
+        "refillRateRay": "2314814814814814814814814" // $200/day
       },
-      "minRedemptionCapacity": "TBD",
-      "minRedemptionRefillRate": "TBD"
+      "minRedemptionCapacityRay": "10000000000000000000000000000", // $10
+      "minRedemptionRefillRateRay": "115740740740740740740740" // $10/day
     },
     "deploymentOutputPath": "deployments/vnet/v0.3/earning.json",
     "minBurnIouTokenGasLimit": "120000"
@@ -102,8 +116,8 @@
     },
     "ccipRouterAddress": "0x141fa059441E0ca23ce184B6A78bafD2A517DdE8",
     "adi": {
-      "crossChainController": "0x0000000000000000000000000000000000000000",
-      "registerOnGateway": false
+      "crossChainController": "0xeBBD7BE5fa28BcEaD8398C7205f12E651DCf6250",
+      "registerOnGateway": true
     },
     "defaultMaxPerSecondRate": "1000000005781378656804591713",
     "defaultSubVaultPerSecondRate": "1000000001243680656318820313",
@@ -118,30 +132,42 @@
     "depositPolicy": {
       "perAssetLimits": {
         "gho": {
-          "capacity": "1000000000000000000000000",
-          "refillRate": "11574074074074074074"
+          "capacity": "100000000000000000000", // 100 GHO
+          "refillRate": "1157407407407407" // 100 GHO/day
         },
-        "usdc": { "capacity": "1000000000000", "refillRate": "11574074" },
-        "usdt": { "capacity": "1000000000000", "refillRate": "11574074" }
+        "usdc": {
+          "capacity": "100000000", // 100 USDC
+          "refillRate": "1157" // 100 USDC/day
+        },
+        "usdt": {
+          "capacity": "100000000", // 100 USDT
+          "refillRate": "1157" // 100 USDT/day
+        }
       }
     },
     "fundsBridgingPolicy": {
       "perAssetLimits": {
         "gho": {
-          "capacity": "1000000000000000000000000",
-          "refillRate": "11574074074074074074"
+          "capacity": "500000000000000000000", // 500 GHO
+          "refillRate": "5787037037037037" // 500 GHO/day
         },
-        "usdc": { "capacity": "1000000000000", "refillRate": "11574074" },
-        "usdt": { "capacity": "1000000000000", "refillRate": "11574074" }
+        "usdc": {
+          "capacity": "500000000", // 500 USDC
+          "refillRate": "5787" // 500 USDC/day
+        },
+        "usdt": {
+          "capacity": "500000000", // 500 USDT
+          "refillRate": "5787" // 500 USDT/day
+        }
       }
     },
     "withdrawalExecutionPolicy": {
       "redemptionLimit": {
-        "capacity": "TBD",
-        "refillRate": "TBD"
+        "capacityRay": "200000000000000000000000000000", // $200
+        "refillRateRay": "2314814814814814814814814" // $200/day
       },
-      "minRedemptionCapacity": "TBD",
-      "minRedemptionRefillRate": "TBD"
+      "minRedemptionCapacityRay": "10000000000000000000000000000", // $10
+      "minRedemptionRefillRateRay": "115740740740740740740740" // $10/day
     },
     "deploymentOutputPath": "deployments/vnet/v0.3/accounting.json"
   }

@@ -1,0 +1,10 @@
+{
+  // This is a single-line comment
+  "name": "test",
+  "value": 42,
+  // Another comment
+  "nested": {
+    "key": "hello" // trailing comment
+  },
+  "url": "https://example.com/a//b"
+}

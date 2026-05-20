@@ -335,10 +335,10 @@ abstract contract AccountingChainDeployment is
     }
 
     function _initRedemptionLimit(WithdrawalExecutionPolicy policy, string memory configKey) private {
-        uint128 capacity = _configUint128(string.concat(configKey, ".capacity"));
-        uint128 refillRate = _configUint128(string.concat(configKey, ".refillRate"));
-        policy.raiseRedemptionCapacity(capacity);
-        policy.raiseRedemptionRefillRate(refillRate);
+        uint128 capacityRay = _configUint128(string.concat(configKey, ".capacityRay"));
+        uint128 refillRateRay = _configUint128(string.concat(configKey, ".refillRateRay"));
+        policy.raiseRedemptionCapacity(capacityRay);
+        policy.raiseRedemptionRefillRate(refillRateRay);
     }
 
     function _setupAssetRegistry() internal {
@@ -394,13 +394,13 @@ abstract contract AccountingChainDeployment is
     }
 
     function _deployWithdrawalExecutionPolicy() internal returns (address) {
-        uint128 minRedemptionCapacity =
-            _configUint128(".accountingChain.withdrawalExecutionPolicy.minRedemptionCapacity");
-        uint128 minRedemptionRefillRate =
-            _configUint128(".accountingChain.withdrawalExecutionPolicy.minRedemptionRefillRate");
+        uint128 minRedemptionCapacityRay =
+            _configUint128(".accountingChain.withdrawalExecutionPolicy.minRedemptionCapacityRay");
+        uint128 minRedemptionRefillRateRay =
+            _configUint128(".accountingChain.withdrawalExecutionPolicy.minRedemptionRefillRateRay");
         address implementation = address(
             new WithdrawalExecutionPolicy(
-                getStableVaultAddress(_deployer()), minRedemptionCapacity, minRedemptionRefillRate
+                getStableVaultAddress(_deployer()), minRedemptionCapacityRay, minRedemptionRefillRateRay
             )
         );
         _logDeployment("WithdrawalExecutionPolicy::Implementation", "", implementation);

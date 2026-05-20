@@ -105,7 +105,12 @@ jobs:
       - name: Show Forge version
         run: forge --version
 
+      - name: Pre-strip JSONC comments
+        run: ./.github/workflows/strip-jsonc.sh
+
       - name: Run Forge tests
+        env:
+          JSONC_PRESTRIPPED: "true"
         run: forge test -vvv
 
   gas-diff:
@@ -127,7 +132,12 @@ jobs:
         with:
           version: stable
 
+      - name: Pre-strip JSONC comments
+        run: ./.github/workflows/strip-jsonc.sh
+
       - name: Run gas tests
+        env:
+          JSONC_PRESTRIPPED: "true"
         run: forge test
 
       - name: Upload baseline (master push only)

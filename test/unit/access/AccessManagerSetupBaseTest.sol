@@ -293,14 +293,17 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
 
     function test_criticalRoles_areOnlyAssignedToMainAdmin() public view {
         RolesConfig.Role[] memory roles = RolesConfig.getAllFunctionBasedRoles();
-
         address[] memory allProfiles = _getAllProfiles();
+        // Cache: each call hits _configAddress which re-reads + strips comments from the JSON config. Without this,
+        // the nested loop re-reads the config hundreds of times and the test trips Foundry's 1B-gas call cap.
+        IAccessManager accessManager = IAccessManager(_accessManager());
+        address mainAdmin = _getProfile__MainAdmin();
 
         for (uint256 i = 0; i < roles.length; i++) {
             if (roles[i].hasCriticalRisk) {
                 for (uint256 j = 0; j < allProfiles.length; j++) {
-                    (bool has,) = IAccessManager(_accessManager()).hasRole(roles[i].roleId, allProfiles[j]);
-                    if (allProfiles[j] == _getProfile__MainAdmin()) {
+                    (bool has,) = accessManager.hasRole(roles[i].roleId, allProfiles[j]);
+                    if (allProfiles[j] == mainAdmin) {
                         assertTrue(
                             has,
                             string.concat("MainAdmin should have critical role ", vm.toString(uint256(roles[i].roleId)))
