@@ -18,8 +18,8 @@
     "withdrawalPolicyManager": "0xFBcf8bA0aCaECbd90990A29e37B8be3F631c38F6",
     "aTokenVaultRewardClaimer": "0x35b029C7715c668DCD6058B7a52C0377f404a4e8",
     "stableVaultManager": "0x2A74c29e0Ee366788cc5EEa00c540264a3508fDB",
-    "coverageGuardian": "0x00000000000000000000000000000000C0FEC0FE",
-    "funder": "0x00000000000000000000000000000000C0FE7EA5"
+    "coverageGuardian": "0x0000000000000000000000000000000000000000", // TODO: set
+    "funder": "0x0000000000000000000000000000000000000000" // TODO: set
   },
   "withdrawalExecutionPolicy": {
     "defaultFeeBps": 625, // 6.25%
@@ -92,11 +92,11 @@
     },
     "withdrawalExecutionPolicy": {
       "redemptionLimit": {
-        "capacityRay": "TBD",
-        "refillRateRay": "TBD"
+        "capacityRay": "TBD", // TODO: set
+        "refillRateRay": "TBD" // TODO: set
       },
-      "minRedemptionCapacityRay": "TBD",
-      "minRedemptionRefillRateRay": "TBD"
+      "minRedemptionCapacityRay": "TBD", // TODO: set
+      "minRedemptionRefillRateRay": "TBD" // TODO: set
     },
     "deploymentOutputPath": "deployments/prod/v1/earning.json",
     "minBurnIouTokenGasLimit": "120000"
@@ -127,7 +127,7 @@
     "aaveV3PoolAddressesProvider": "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb",
     "useMockBundleFeed": false,
     "useMockSequencerUptimeFeed": false,
-    "chainlinkBundleAggregatorProxy": "0x0000000000000000000000000000000000000000",
+    "chainlinkBundleAggregatorProxy": "0x0000000000000000000000000000000000000000", // TODO: set
     "sequencerUptimeFeed": "0xFdB631F5EE196F0ed6FAa767959853A9F217697D",
     "depositPolicy": {
       "perAssetLimits": {
@@ -163,11 +163,11 @@
     },
     "withdrawalExecutionPolicy": {
       "redemptionLimit": {
-        "capacityRay": "TBD",
-        "refillRateRay": "TBD"
+        "capacityRay": "TBD", // TODO: set
+        "refillRateRay": "TBD" // TODO: set
       },
-      "minRedemptionCapacityRay": "TBD",
-      "minRedemptionRefillRateRay": "TBD"
+      "minRedemptionCapacityRay": "TBD", // TODO: set
+      "minRedemptionRefillRateRay": "TBD" // TODO: set
     },
     "deploymentOutputPath": "deployments/prod/v1/accounting.json"
   }

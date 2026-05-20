@@ -18,8 +18,8 @@
     "withdrawalPolicyManager": "0xBdE1e349F4117d7202939929251eDa13c60A0639",
     "aTokenVaultRewardClaimer": "0xE79945842036F0f3a015C8f815657523503D7037",
     "stableVaultManager": "0xc93fb5428553de74E859b08032Be33Ebb8Fb6171",
-    "coverageGuardian": "0x00000000000000000000000000000000C0FEC0FE",
-    "funder": "0x00000000000000000000000000000000C0FE7EA5"
+    "coverageGuardian": "0x0000000000000000000000000000000000000000", // TODO: set
+    "funder": "0x0000000000000000000000000000000000000000" // TODO: set
   },
   "withdrawalExecutionPolicy": {
     "defaultFeeBps": 625, // 6.25%
