@@ -28,7 +28,7 @@ contract JsoncConfigHarness is DeploymentConfig {
 
 contract JsoncSupportTest is Test {
     function test_configReaderAllowsJsoncLineComments() public {
-        JsoncConfigHarness config = new JsoncConfigHarness("test/jsonc-test/fixture.jsonc");
+        JsoncConfigHarness config = new JsoncConfigHarness("test/resources/jsonc/fixture.jsonc");
 
         assertEq(config.configString(".name"), "test");
         assertEq(config.configUint(".value"), 42);
@@ -37,7 +37,7 @@ contract JsoncSupportTest is Test {
     }
 
     function test_configReaderAllowsCommentsInJsonFile() public {
-        JsoncConfigHarness config = new JsoncConfigHarness("test/jsonc-test/fixture-comments.json");
+        JsoncConfigHarness config = new JsoncConfigHarness("test/resources/jsonc/fixture-comments.json");
 
         assertEq(config.configString(".name"), "test");
         assertEq(config.configUint(".value"), 42);
