@@ -13,9 +13,8 @@ abstract contract DeploymentConfig is Script {
 
     function _configPath() internal view virtual returns (string memory);
 
-    function _readConfig() internal view returns (string memory) {
-        // forge-lint: disable-next-line(unsafe-cheatcode)
-        return JsoncLib.stripComments(vm.readFile(_configPath()));
+    function _readConfig() internal view virtual returns (string memory) {
+        return JsoncLib.read(_configPath());
     }
 
     function _configAddress(string memory key) internal view returns (address) {

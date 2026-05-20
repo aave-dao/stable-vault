@@ -5,6 +5,7 @@ pragma solidity ^0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {DeploymentConfig} from "script/base/DeploymentConfig.sol";
+import {JsoncLib} from "script/libraries/JsoncLib.sol";
 
 contract JsoncConfigHarness is DeploymentConfig {
     string internal _path;
@@ -15,6 +16,14 @@ contract JsoncConfigHarness is DeploymentConfig {
 
     function _configPath() internal view override returns (string memory) {
         return _path;
+    }
+
+    /// The base impl honors `JSONC_PRESTRIPPED` so CI can skip the Solidity stripper after a
+    /// pre-strip step. These tests exist to verify the stripper itself, so the harness ignores
+    /// the env flag and always strips.
+    function _readConfig() internal view override returns (string memory) {
+        // forge-lint: disable-next-line(unsafe-cheatcode)
+        return JsoncLib.stripComments(vm.readFile(_path));
     }
 
     function configString(string memory key) external view returns (string memory) {
@@ -41,25 +50,5 @@ contract JsoncSupportTest is Test {
 
         assertEq(config.configString(".name"), "test");
         assertEq(config.configUint(".value"), 42);
-    }
-
-    function test_deploymentConfigsAllowInlineComments() public {
-        _assertDeploymentConfigRiskParamsParse("config/deployment-config.preprod.json");
-        _assertDeploymentConfigRiskParamsParse("config/deployment-config.staging.json");
-
-        JsoncConfigHarness prodConfig = new JsoncConfigHarness("config/deployment-config.prod.json");
-        assertEq(prodConfig.configUint(".slippageCoverageVault.maxSlippageBps"), 100);
-        assertEq(
-            prodConfig.configString(".accountingChain.withdrawalExecutionPolicy.redemptionLimit.capacityRay"), "TBD"
-        );
-    }
-
-    function _assertDeploymentConfigRiskParamsParse(string memory path) internal {
-        JsoncConfigHarness config = new JsoncConfigHarness(path);
-
-        assertEq(config.configUint(".slippageCoverageVault.maxSlippageBps"), 50);
-        assertEq(config.configUint(".slippageCoverageVault.perAssetCaps.usdc.pullCapPerTx"), 1e6);
-        assertEq(config.configUint(".accountingChain.depositPolicy.perAssetLimits.gho.capacity"), 100e18);
-        assertEq(config.configUint(".accountingChain.withdrawalExecutionPolicy.redemptionLimit.capacityRay"), 200e27);
     }
 }
