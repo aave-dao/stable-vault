@@ -78,11 +78,11 @@
     },
     "withdrawalExecutionPolicy": {
       "redemptionLimit": {
-        "capacity": "1000000000000000000000000000000000000",
-        "refillRate": "11574074074074074074074074074"
+        "capacityRay": "1000000000000000000000000000000000000",
+        "refillRateRay": "11574074074074074074074074074"
       },
-      "minRedemptionCapacity": "1000000000000000000000000000000",
-      "minRedemptionRefillRate": "11574074074074074074074074"
+      "minRedemptionCapacityRay": "1000000000000000000000000000000",
+      "minRedemptionRefillRateRay": "11574074074074074074074074"
     },
     "deploymentOutputPath": "deployments/vnet/v0.3/earning.json",
     "minBurnIouTokenGasLimit": "120000"
@@ -137,11 +137,11 @@
     },
     "withdrawalExecutionPolicy": {
       "redemptionLimit": {
-        "capacity": "1000000000000000000000000000000000000",
-        "refillRate": "11574074074074074074074074074"
+        "capacityRay": "1000000000000000000000000000000000000",
+        "refillRateRay": "11574074074074074074074074074"
       },
-      "minRedemptionCapacity": "1000000000000000000000000000000",
-      "minRedemptionRefillRate": "11574074074074074074074074"
+      "minRedemptionCapacityRay": "1000000000000000000000000000000",
+      "minRedemptionRefillRateRay": "11574074074074074074074074"
     },
     "deploymentOutputPath": "deployments/vnet/v0.3/accounting.json"
   }

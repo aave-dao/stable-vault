@@ -44,17 +44,22 @@ contract JsoncSupportTest is Test {
     }
 
     function test_deploymentConfigsAllowInlineComments() public {
-        _assertDeploymentConfigParses("config/deployment-config.preprod.json");
-        _assertDeploymentConfigParses("config/deployment-config.staging.json");
-        _assertDeploymentConfigParses("config/deployment-config.prod.json");
+        _assertDeploymentConfigRiskParamsParse("config/deployment-config.preprod.json");
+        _assertDeploymentConfigRiskParamsParse("config/deployment-config.staging.json");
+
+        JsoncConfigHarness prodConfig = new JsoncConfigHarness("config/deployment-config.prod.json");
+        assertEq(prodConfig.configUint(".slippageCoverageVault.maxSlippageBps"), 100);
+        assertEq(
+            prodConfig.configString(".accountingChain.withdrawalExecutionPolicy.redemptionLimit.capacityRay"), "TBD"
+        );
     }
 
-    function _assertDeploymentConfigParses(string memory path) internal {
+    function _assertDeploymentConfigRiskParamsParse(string memory path) internal {
         JsoncConfigHarness config = new JsoncConfigHarness(path);
 
         assertEq(config.configUint(".slippageCoverageVault.maxSlippageBps"), 50);
         assertEq(config.configUint(".slippageCoverageVault.perAssetCaps.usdc.pullCapPerTx"), 1e6);
         assertEq(config.configUint(".accountingChain.depositPolicy.perAssetLimits.gho.capacity"), 100e18);
-        assertEq(config.configUint(".accountingChain.withdrawalExecutionPolicy.redemptionLimit.capacity"), 200e27);
+        assertEq(config.configUint(".accountingChain.withdrawalExecutionPolicy.redemptionLimit.capacityRay"), 200e27);
     }
 }

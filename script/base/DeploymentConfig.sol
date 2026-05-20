@@ -4,6 +4,8 @@ pragma solidity ^0.8.20;
 
 import {Script} from "forge-std/Script.sol";
 
+import {JsoncLib} from "script/libraries/JsoncLib.sol";
+
 import {MathLib} from "src/libraries/MathLib.sol";
 
 abstract contract DeploymentConfig is Script {
@@ -13,7 +15,7 @@ abstract contract DeploymentConfig is Script {
 
     function _readConfig() internal view returns (string memory) {
         // forge-lint: disable-next-line(unsafe-cheatcode)
-        return _stripJsonComments(vm.readFile(_configPath()));
+        return JsoncLib.stripComments(vm.readFile(_configPath()));
     }
 
     function _configAddress(string memory key) internal view returns (address) {
@@ -65,70 +67,6 @@ abstract contract DeploymentConfig is Script {
         return value;
     }
 
-    function _stripJsonComments(string memory input) internal pure returns (string memory) {
-        bytes memory inputBytes = bytes(input);
-        bytes memory outputBytes = new bytes(inputBytes.length);
-        uint256 outputLength;
-        bool inString;
-        bool escaped;
-
-        for (uint256 i = 0; i < inputBytes.length; i++) {
-            bytes1 char = inputBytes[i];
-
-            if (inString) {
-                outputBytes[outputLength++] = char;
-
-                if (escaped) {
-                    escaped = false;
-                } else if (char == "\\") {
-                    escaped = true;
-                } else if (char == '"') {
-                    inString = false;
-                }
-                continue;
-            }
-
-            if (char == '"') {
-                inString = true;
-                outputBytes[outputLength++] = char;
-                continue;
-            }
-
-            if (char == "/" && i + 1 < inputBytes.length) {
-                bytes1 nextChar = inputBytes[i + 1];
-                if (nextChar == "/") {
-                    i += 2;
-                    while (i < inputBytes.length && inputBytes[i] != "\n" && inputBytes[i] != "\r") {
-                        i++;
-                    }
-                    if (i < inputBytes.length) {
-                        outputBytes[outputLength++] = inputBytes[i];
-                    }
-                    continue;
-                }
-                if (nextChar == "*") {
-                    i += 2;
-                    while (i + 1 < inputBytes.length && !(inputBytes[i] == "*" && inputBytes[i + 1] == "/")) {
-                        if (inputBytes[i] == "\n" || inputBytes[i] == "\r") {
-                            outputBytes[outputLength++] = inputBytes[i];
-                        }
-                        i++;
-                    }
-                    i++;
-                    continue;
-                }
-            }
-
-            outputBytes[outputLength++] = char;
-        }
-
-        bytes memory stripped = new bytes(outputLength);
-        for (uint256 i = 0; i < outputLength; i++) {
-            stripped[i] = outputBytes[i];
-        }
-        return string(stripped);
-    }
-
     function _validateCommonDeploymentParameters() internal view {
         require(_configUint8(".maxStrategiesPerAsset") > 0, "maxStrategiesPerAsset must be > 0");
         require(_configUint(".chainlinkPriceOracleHeartbeat") > 0, "chainlinkPriceOracleHeartbeat must be > 0");
@@ -151,19 +89,23 @@ abstract contract DeploymentConfig is Script {
     /// Run this before any deploy side effect — a misconfig must not burn the deterministic CREATE3 address
     /// namespace.
     function _validateRedemptionLimitConfig(string memory configPrefix) internal view {
-        uint128 minCap = _configUint128(string.concat(configPrefix, ".minRedemptionCapacity"));
-        require(minCap > 0, "minRedemptionCapacity: must be in (0, uint128.max]");
+        uint128 minCapRay = _configUint128(string.concat(configPrefix, ".minRedemptionCapacityRay"));
+        require(minCapRay > 0, "minRedemptionCapacityRay: must be in (0, uint128.max]");
 
-        uint128 minRefill = _configUint128(string.concat(configPrefix, ".minRedemptionRefillRate"));
-        require(minRefill > 0, "minRedemptionRefillRate: must be in (0, uint128.max]");
+        uint128 minRefillRateRay = _configUint128(string.concat(configPrefix, ".minRedemptionRefillRateRay"));
+        require(minRefillRateRay > 0, "minRedemptionRefillRateRay: must be in (0, uint128.max]");
 
-        uint128 seedCap = _configUint128(string.concat(configPrefix, ".redemptionLimit.capacity"));
+        uint128 seedCapRay = _configUint128(string.concat(configPrefix, ".redemptionLimit.capacityRay"));
         require(
-            seedCap < type(uint128).max, "redemptionLimit.capacity: must be < uint128.max (UNLIMITED_CAPACITY sentinel)"
+            seedCapRay < type(uint128).max,
+            "redemptionLimit.capacityRay: must be < uint128.max (UNLIMITED_CAPACITY sentinel)"
         );
-        require(seedCap > minCap, "redemptionLimit.capacity: must exceed minRedemptionCapacity");
+        require(seedCapRay > minCapRay, "redemptionLimit.capacityRay: must exceed minRedemptionCapacityRay");
 
-        uint128 seedRefill = _configUint128(string.concat(configPrefix, ".redemptionLimit.refillRate"));
-        require(seedRefill > minRefill, "redemptionLimit.refillRate: must exceed minRedemptionRefillRate");
+        uint128 seedRefillRateRay = _configUint128(string.concat(configPrefix, ".redemptionLimit.refillRateRay"));
+        require(
+            seedRefillRateRay > minRefillRateRay,
+            "redemptionLimit.refillRateRay: must exceed minRedemptionRefillRateRay"
+        );
     }
 }

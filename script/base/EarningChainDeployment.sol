@@ -243,10 +243,10 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
     }
 
     function _initRedemptionLimit(WithdrawalExecutionPolicy policy, string memory configKey) private {
-        uint128 capacity = _configUint128(string.concat(configKey, ".capacity"));
-        uint128 refillRate = _configUint128(string.concat(configKey, ".refillRate"));
-        policy.raiseRedemptionCapacity(capacity);
-        policy.raiseRedemptionRefillRate(refillRate);
+        uint128 capacityRay = _configUint128(string.concat(configKey, ".capacityRay"));
+        uint128 refillRateRay = _configUint128(string.concat(configKey, ".refillRateRay"));
+        policy.raiseRedemptionCapacity(capacityRay);
+        policy.raiseRedemptionRefillRate(refillRateRay);
     }
 
     function _setupAllocator() internal {
@@ -373,12 +373,13 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
     }
 
     function _deployWithdrawalExecutionPolicy() internal returns (address) {
-        uint128 minRedemptionCapacity = _configUint128(".earningChain.withdrawalExecutionPolicy.minRedemptionCapacity");
-        uint128 minRedemptionRefillRate =
-            _configUint128(".earningChain.withdrawalExecutionPolicy.minRedemptionRefillRate");
+        uint128 minRedemptionCapacityRay =
+            _configUint128(".earningChain.withdrawalExecutionPolicy.minRedemptionCapacityRay");
+        uint128 minRedemptionRefillRateRay =
+            _configUint128(".earningChain.withdrawalExecutionPolicy.minRedemptionRefillRateRay");
         address implementation = address(
             new WithdrawalExecutionPolicy(
-                getGatewayAddress(_deployer()), minRedemptionCapacity, minRedemptionRefillRate
+                getGatewayAddress(_deployer()), minRedemptionCapacityRay, minRedemptionRefillRateRay
             )
         );
         _logDeployment("WithdrawalExecutionPolicy::Implementation", "", implementation);
