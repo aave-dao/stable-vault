@@ -1,0 +1,15 @@
+{
+  /* leading single-line block */
+  "name": "test",
+  /* multi-line block
+     that spans several lines
+     to verify newline preservation */
+  "value": 42,
+  "nested": {
+    "key": "hello" /* trailing block */
+  },
+  /*
+   * decorated block, common in source files
+   */
+  "url": "https://example.com/a/*b*/c"
+}
