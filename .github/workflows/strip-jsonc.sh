@@ -1,17 +1,9 @@
 #!/usr/bin/env bash
-# Strip JSON comments in place from deployment config files. Pairs with
-# `JsoncLib.read(path)`: when this script has run, export `JSONC_PRESTRIPPED=true`
-# so the Solidity stripper short-circuits and `vm.readFile` returns parseable JSON
-# directly. CI calls this before `forge test`; the workspace is ephemeral so the
-# in-place edits are thrown away with it. Run locally before `JSONC_PRESTRIPPED=true
-# forge test` for the same speedup (the .json files are gitignored from comments
-# being added, see CONTRIBUTING).
+# Strip `//` comments from deployment JSONC configs in place before CI runs tests.
+# `JSONC_PRESTRIPPED=true` lets `JsoncLib.read(path)` skip Solidity-side stripping.
 #
-# Handles `//` end-of-line comments only, which is all current configs use. If
-# `/* */` block comments are ever added, swap sed for a string-safe parser
-# (e.g. node's jsonc-parser). The script also asserts no JSON string contains
-# `//`, so an accidental URL slipping in is caught early instead of silently
-# corrupting the config.
+# This sed pass only supports end-of-line comments. Reject strings containing
+# `//` so values like URLs are caught before they can be corrupted.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
