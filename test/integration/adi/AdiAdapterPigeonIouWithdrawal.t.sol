@@ -287,6 +287,103 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         assertEq(_accounting.iouToken.totalSupply(), 0, "accounting IOU supply not burned by retry");
     }
 
+    function test_iouBurnOverAdi_quorumThenNoDuplicateBurn() public onlyForkTest {
+        uint256 depositAmount = 500e6;
+        vm.selectFork(_ethFork);
+        uint256 iouAmountRay = depositAmount.assetDecimalsToRay(address(_accounting.asset));
+
+        _depositIntoStableVault(depositAmount);
+        _airdropEarningLiquidity(depositAmount);
+
+        vm.selectFork(_ethFork);
+        vm.prank(_user);
+        _accounting.vault.requestWithdrawal(_user, iouAmountRay, "");
+
+        Vm.Log[] memory bridgeLogs = _bridgeAccountingIousToEarning(iouAmountRay);
+        _adiHelper.helpEthToArb(
+            AdiHelper.EthToArbArgs({
+                l2ForkId: _arbFork, l1Inbox: ARB_INBOX, l1Bridge: ARB_BRIDGE, expectedL1CCC: _ethCcc, logs: bridgeLogs
+            })
+        );
+
+        vm.selectFork(_arbFork);
+        assertEq(_earning.iouToken.balanceOf(_user), iouAmountRay, "earning IOUs not minted before quorum test");
+        uint256 burnSourceBlock = block.number;
+        Vm.Log[] memory burnLogs = _exchangeEarningIousForAssets(iouAmountRay);
+
+        vm.selectFork(_ethFork);
+        assertEq(_accounting.iouTokenManager.getLockedBalance(), iouAmountRay, "locked IOUs burned before relay");
+        _accounting.chainBalanceOracle
+            .setChainBalance(
+                ARB_CHAIN_ID,
+                IChainBalanceOracle.ChainBalance({
+                    balanceRay: 0,
+                    lastUpdateTimestamp: block.timestamp,
+                    sourceChainTimestamp: block.timestamp,
+                    sourceChainBlockNumber: burnSourceBlock,
+                    isStale: false
+                })
+            );
+
+        _adiHelper.helpMultiBridge(
+            AdiHelper.MultiBridgeArgs({
+                dstForkId: _ethFork,
+                dstCcipRouter: ETH_CCIP_ROUTER,
+                dstCcipChainSelector: ETH_CCIP_CHAIN_SELECTOR,
+                srcCcipOnRamp: address(0),
+                dstLzEndpoint: address(0),
+                srcHlMailbox: address(0),
+                dstHlMailbox: address(0),
+                logs: burnLogs
+            })
+        );
+        vm.selectFork(_ethFork);
+        assertEq(_accounting.iouTokenManager.getLockedBalance(), iouAmountRay, "single relay should not burn IOUs");
+        assertEq(
+            _accounting.iouToken.balanceOf(address(_accounting.iouTokenManager)),
+            iouAmountRay,
+            "single relay changed locked IOU balance"
+        );
+
+        _adiHelper.helpMultiBridge(
+            AdiHelper.MultiBridgeArgs({
+                dstForkId: _ethFork,
+                dstCcipRouter: address(0),
+                dstCcipChainSelector: 0,
+                srcCcipOnRamp: address(0),
+                dstLzEndpoint: LZ_ENDPOINT_V2,
+                srcHlMailbox: address(0),
+                dstHlMailbox: address(0),
+                logs: burnLogs
+            })
+        );
+        vm.selectFork(_ethFork);
+        assertEq(_accounting.iouTokenManager.getLockedBalance(), 0, "second relay should burn locked IOUs");
+        assertEq(_accounting.iouToken.balanceOf(address(_accounting.iouTokenManager)), 0, "manager still holds IOUs");
+        assertEq(_accounting.iouToken.totalSupply(), 0, "accounting IOU supply not burned");
+
+        _adiHelper.helpMultiBridge(
+            AdiHelper.MultiBridgeArgs({
+                dstForkId: _ethFork,
+                dstCcipRouter: address(0),
+                dstCcipChainSelector: 0,
+                srcCcipOnRamp: address(0),
+                dstLzEndpoint: address(0),
+                srcHlMailbox: ARB_HL_MAILBOX,
+                dstHlMailbox: ETH_HL_MAILBOX,
+                logs: burnLogs
+            })
+        );
+        vm.selectFork(_ethFork);
+        assertEq(_accounting.iouTokenManager.getLockedBalance(), 0, "extra relay should not relock or reburn IOUs");
+        assertEq(
+            _accounting.iouToken.balanceOf(address(_accounting.iouTokenManager)),
+            0,
+            "extra relay changed manager IOU balance"
+        );
+        assertEq(_accounting.iouToken.totalSupply(), 0, "extra relay changed accounting IOU supply");
+    }
+
     function _deployAccountingStack() internal returns (AccountingStack memory stack) {
         stack.accessManager = new MockAccessManager(_admin);
         stack.transferHelper = new TransferHelper();
