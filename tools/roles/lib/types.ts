@@ -101,15 +101,20 @@ export interface ProfileJson {
 
 export type ChainContext = "AC" | "EC" | "AC+EC" | "";
 
+export type AssetLabel = "GHO" | "USDC" | "USDT" | "";
+
 export interface ParameterJson {
   key: string;
+  jsonPath: string;
   contract: string;
   category: string;
   chainContext: ChainContext;
+  asset: AssetLabel;
   setterKeys: string[];
   unit: string;
   onChainLimits: string;
-  valueByEnv: Record<Env, string>;
+  rawValueByEnv: Record<Env, string>;
+  humanValueByEnv: Record<Env, string>;
   status: "Active";
 }
 

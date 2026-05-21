@@ -102,11 +102,15 @@ function main(): void {
 
   const activeParameters = (artifact.parameters ?? []).filter((p) => p.status === "Active");
   assertUniqueBy(activeParameters, (p) => p.key, "parameter key", fail);
+  assertUniqueBy(activeParameters, (p) => p.jsonPath, "parameter jsonPath", fail);
   const roleKeys = new Set(activeRoles.map((r) => r.key));
   const contractOptions = new Set(activeRoles.map((r) => r.contract));
   for (const param of activeParameters) {
     if (!contractOptions.has(param.contract)) {
       fail(`Parameter ${param.key}: contract "${param.contract}" is not in the Roles contract set`);
+    }
+    if (!param.jsonPath) {
+      fail(`Parameter ${param.key}: empty jsonPath`);
     }
     for (const setter of param.setterKeys) {
       if (!roleKeys.has(setter)) {
@@ -114,8 +118,11 @@ function main(): void {
       }
     }
     for (const env of ENVS) {
-      if (param.valueByEnv[env] === undefined) {
-        fail(`Parameter ${param.key}: missing valueByEnv.${env}`);
+      if (param.rawValueByEnv?.[env] === undefined) {
+        fail(`Parameter ${param.key}: missing rawValueByEnv.${env}`);
+      }
+      if (param.humanValueByEnv?.[env] === undefined) {
+        fail(`Parameter ${param.key}: missing humanValueByEnv.${env}`);
       }
     }
   }

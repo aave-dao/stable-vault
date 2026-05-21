@@ -27,19 +27,20 @@ export const ASSET_SYMBOL: Record<AssetKey, string> = {
 };
 
 export type ValueFormat =
-  | "raw" // print as-is
-  | "bps" // append "bps"
-  | "seconds" // append "s" or humanise (s/h/d)
-  | "ray" // format as RAY with optional $ humanisation
-  | "assetWei" // wei-encoded amount in asset-native decimals (per-asset rows only)
+  | "raw"
+  | "bps"
+  | "seconds"
+  | "ray" // RAY-encoded balance/price: renders as $X or 0.YYY
+  | "rayPerSec" // RAY-encoded rate: renders as $X/day
+  | "assetWei" // wei in asset-native decimals: renders as "X SYMBOL"
+  | "assetWeiPerSec" // wei in asset-native decimals per second: renders as "X SYMBOL/day"
   | "bool"
   | "address"
   | "uint";
 
 export type ValueSpec =
   | { type: "scalar"; path: string; format: ValueFormat }
-  | { type: "perAsset"; pathTemplate: string; assets: AssetKey[]; format: "assetWei" | "raw" | "seconds" }
-  | { type: "constant"; raw: string };
+  | { type: "perAsset"; pathTemplate: string; assets: AssetKey[]; format: ValueFormat };
 
 export interface ParameterSpec {
   key: string;
@@ -146,7 +147,7 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
       type: "perAsset",
       pathTemplate: "accountingChain.depositPolicy.perAssetLimits.{asset}.refillRate",
       assets: ["gho", "usdc", "usdt"],
-      format: "assetWei",
+      format: "assetWeiPerSec",
     },
   },
 
@@ -178,7 +179,7 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
       type: "perAsset",
       pathTemplate: "accountingChain.fundsBridgingPolicy.perAssetLimits.{asset}.refillRate",
       assets: ["gho", "usdc", "usdt"],
-      format: "assetWei",
+      format: "assetWeiPerSec",
     },
   },
   {
@@ -208,7 +209,7 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
       type: "perAsset",
       pathTemplate: "earningChain.fundsBridgingPolicy.perAssetLimits.{asset}.refillRate",
       assets: ["gho", "usdc", "usdt"],
-      format: "assetWei",
+      format: "assetWeiPerSec",
     },
   },
 
@@ -244,7 +245,7 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     value: {
       type: "scalar",
       path: "accountingChain.withdrawalExecutionPolicy.redemptionLimit.refillRateRay",
-      format: "ray",
+      format: "rayPerSec",
     },
   },
   {
@@ -272,7 +273,7 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     value: {
       type: "scalar",
       path: "accountingChain.withdrawalExecutionPolicy.minRedemptionRefillRateRay",
-      format: "ray",
+      format: "rayPerSec",
     },
   },
   {
@@ -306,7 +307,7 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     value: {
       type: "scalar",
       path: "earningChain.withdrawalExecutionPolicy.redemptionLimit.refillRateRay",
-      format: "ray",
+      format: "rayPerSec",
     },
   },
   {
@@ -334,7 +335,7 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     value: {
       type: "scalar",
       path: "earningChain.withdrawalExecutionPolicy.minRedemptionRefillRateRay",
-      format: "ray",
+      format: "rayPerSec",
     },
   },
 

@@ -205,21 +205,22 @@ async function syncParameters(
 
     const props: Record<string, unknown> = {
       Key: { title: [{ text: { content: param.key } }] },
+      "JSON path": richTextProp(param.jsonPath),
       Contract: { select: { name: param.contract } },
       Category: { select: { name: param.category } },
+      Chain: param.chainContext ? { select: { name: param.chainContext } } : { select: null },
+      Asset: param.asset ? { select: { name: param.asset } } : { select: null },
       Setters: { relation: setterPageIds.map((id) => ({ id })) },
       Unit: richTextProp(param.unit),
-      "Value (staging)": richTextProp(param.valueByEnv.staging),
-      "Value (preprod)": richTextProp(param.valueByEnv.preprod),
-      "Value (prod)": richTextProp(param.valueByEnv.prod),
+      "Raw (staging)": richTextProp(param.rawValueByEnv.staging),
+      "Raw (preprod)": richTextProp(param.rawValueByEnv.preprod),
+      "Raw (prod)": richTextProp(param.rawValueByEnv.prod),
+      "Human (staging)": richTextProp(param.humanValueByEnv.staging),
+      "Human (preprod)": richTextProp(param.humanValueByEnv.preprod),
+      "Human (prod)": richTextProp(param.humanValueByEnv.prod),
       "On-chain limits": richTextProp(param.onChainLimits),
       Status: { select: { name: "Active" } },
     };
-    if (param.chainContext) {
-      props.Chain = { select: { name: param.chainContext } };
-    } else {
-      props.Chain = { select: null };
-    }
 
     const found = existing.get(param.key);
     if (found) {

@@ -1843,16 +1843,23 @@
   "parameters": [
     {
       "key": "StableVault.defaultSubVaultPerSecondRate",
+      "jsonPath": "accountingChain.defaultSubVaultPerSecondRate",
       "contract": "StableVault",
       "category": "Yield economics",
       "chainContext": "AC",
+      "asset": "",
       "setterKeys": [
         "StableVault.setSubVaultRate",
         "StableVault.setDefaultSubVault"
       ],
       "unit": "RAY/sec",
       "onChainLimits": "≤ MAX_VALID_PER_SECOND_RATE (≈ 20% APY)",
-      "valueByEnv": {
+      "rawValueByEnv": {
+        "staging": "1000000001243680656318820313",
+        "preprod": "1000000001243680656318820313",
+        "prod": "1000000001243680656318820313"
+      },
+      "humanValueByEnv": {
         "staging": "1000000001243680656318820313",
         "preprod": "1000000001243680656318820313",
         "prod": "1000000001243680656318820313"
@@ -1861,13 +1868,20 @@
     },
     {
       "key": "StableVault.defaultMaxPerSecondRate",
+      "jsonPath": "accountingChain.defaultMaxPerSecondRate",
       "contract": "StableVault",
       "category": "Yield economics",
       "chainContext": "AC",
+      "asset": "",
       "setterKeys": [],
       "unit": "RAY/sec",
       "onChainLimits": "Constructor-set ceiling; immutable after deploy",
-      "valueByEnv": {
+      "rawValueByEnv": {
+        "staging": "1000000005781378656804591713",
+        "preprod": "1000000005781378656804591713",
+        "prod": "1000000005781378656804591713"
+      },
+      "humanValueByEnv": {
         "staging": "1000000005781378656804591713",
         "preprod": "1000000005781378656804591713",
         "prod": "1000000005781378656804591713"
@@ -1876,13 +1890,20 @@
     },
     {
       "key": "StableVault.defaultMaxActiveSubVaults",
+      "jsonPath": "accountingChain.defaultMaxActiveSubVaults",
       "contract": "StableVault",
       "category": "Yield economics",
       "chainContext": "AC",
+      "asset": "",
       "setterKeys": [],
       "unit": "count",
       "onChainLimits": "Hard cap; immutable",
-      "valueByEnv": {
+      "rawValueByEnv": {
+        "staging": "201",
+        "preprod": "201",
+        "prod": "201"
+      },
+      "humanValueByEnv": {
         "staging": "201",
         "preprod": "201",
         "prod": "201"
@@ -1891,33 +1912,47 @@
     },
     {
       "key": "WithdrawalExecutionPolicy.defaultFeeBps",
+      "jsonPath": "withdrawalExecutionPolicy.defaultFeeBps",
       "contract": "WithdrawalExecutionPolicy",
       "category": "Withdrawal fees + signers",
       "chainContext": "AC+EC",
+      "asset": "",
       "setterKeys": [
         "WithdrawalExecutionPolicy.setDefaultFeeBps"
       ],
       "unit": "bps",
       "onChainLimits": "≤ FEE_CAP_BPS = 1000 (10%)",
-      "valueByEnv": {
-        "staging": "625 bps",
-        "preprod": "625 bps",
-        "prod": "625 bps"
+      "rawValueByEnv": {
+        "staging": "625",
+        "preprod": "625",
+        "prod": "625"
+      },
+      "humanValueByEnv": {
+        "staging": "6.25%",
+        "preprod": "6.25%",
+        "prod": "6.25%"
       },
       "status": "Active"
     },
     {
       "key": "WithdrawalExecutionPolicy.signer",
+      "jsonPath": "withdrawalExecutionPolicy.signer",
       "contract": "WithdrawalExecutionPolicy",
       "category": "Withdrawal fees + signers",
       "chainContext": "AC+EC",
+      "asset": "",
       "setterKeys": [
         "WithdrawalExecutionPolicy.addSigner",
         "WithdrawalExecutionPolicy.removeSigner"
       ],
       "unit": "address",
       "onChainLimits": "",
-      "valueByEnv": {
+      "rawValueByEnv": {
+        "staging": "0x8eFCe8C8cF3d1B198D95B3067EcF43Fb0A1039e2",
+        "preprod": "0x037a5B223b89222a422cfa95ee935335Ab0755AC",
+        "prod": "0x2F87296892feD4AEE35D02eA71B3d04A5Be151a0"
+      },
+      "humanValueByEnv": {
         "staging": "0x8eFCe8C8cF3d1B198D95B3067EcF43Fb0A1039e2",
         "preprod": "0x037a5B223b89222a422cfa95ee935335Ab0755AC",
         "prod": "0x2F87296892feD4AEE35D02eA71B3d04A5Be151a0"
@@ -1925,409 +1960,1027 @@
       "status": "Active"
     },
     {
-      "key": "DepositPolicy.bucket.capacity",
+      "key": "DepositPolicy.bucket.capacity[GHO]",
+      "jsonPath": "accountingChain.depositPolicy.perAssetLimits.gho.capacity",
       "contract": "DepositPolicy",
       "category": "Rate-limit buckets — Deposit",
       "chainContext": "AC",
+      "asset": "GHO",
       "setterKeys": [
         "DepositPolicy.raiseDepositCapacity",
         "DepositPolicy.lowerDepositCapacity"
       ],
       "unit": "asset-native dec, per asset",
       "onChainLimits": "",
-      "valueByEnv": {
-        "staging": "100 GHO / 100 USDC / 100 USDT",
-        "preprod": "100 GHO / 100 USDC / 100 USDT",
-        "prod": "1,000,000 GHO / 1,000,000 USDC / 1,000,000 USDT"
+      "rawValueByEnv": {
+        "staging": "100000000000000000000",
+        "preprod": "100000000000000000000",
+        "prod": "1000000000000000000000000"
+      },
+      "humanValueByEnv": {
+        "staging": "100 GHO",
+        "preprod": "100 GHO",
+        "prod": "1,000,000 GHO"
       },
       "status": "Active"
     },
     {
-      "key": "DepositPolicy.bucket.refillRate",
+      "key": "DepositPolicy.bucket.capacity[USDC]",
+      "jsonPath": "accountingChain.depositPolicy.perAssetLimits.usdc.capacity",
       "contract": "DepositPolicy",
       "category": "Rate-limit buckets — Deposit",
       "chainContext": "AC",
+      "asset": "USDC",
+      "setterKeys": [
+        "DepositPolicy.raiseDepositCapacity",
+        "DepositPolicy.lowerDepositCapacity"
+      ],
+      "unit": "asset-native dec, per asset",
+      "onChainLimits": "",
+      "rawValueByEnv": {
+        "staging": "100000000",
+        "preprod": "100000000",
+        "prod": "1000000000000"
+      },
+      "humanValueByEnv": {
+        "staging": "100 USDC",
+        "preprod": "100 USDC",
+        "prod": "1,000,000 USDC"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "DepositPolicy.bucket.capacity[USDT]",
+      "jsonPath": "accountingChain.depositPolicy.perAssetLimits.usdt.capacity",
+      "contract": "DepositPolicy",
+      "category": "Rate-limit buckets — Deposit",
+      "chainContext": "AC",
+      "asset": "USDT",
+      "setterKeys": [
+        "DepositPolicy.raiseDepositCapacity",
+        "DepositPolicy.lowerDepositCapacity"
+      ],
+      "unit": "asset-native dec, per asset",
+      "onChainLimits": "",
+      "rawValueByEnv": {
+        "staging": "100000000",
+        "preprod": "100000000",
+        "prod": "1000000000000"
+      },
+      "humanValueByEnv": {
+        "staging": "100 USDT",
+        "preprod": "100 USDT",
+        "prod": "1,000,000 USDT"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "DepositPolicy.bucket.refillRate[GHO]",
+      "jsonPath": "accountingChain.depositPolicy.perAssetLimits.gho.refillRate",
+      "contract": "DepositPolicy",
+      "category": "Rate-limit buckets — Deposit",
+      "chainContext": "AC",
+      "asset": "GHO",
       "setterKeys": [
         "DepositPolicy.raiseDepositRefillRate",
         "DepositPolicy.lowerDepositRefillRate"
       ],
       "unit": "asset-native dec / sec, per asset",
       "onChainLimits": "",
-      "valueByEnv": {
-        "staging": "0 GHO / 0 USDC / 0 USDT",
-        "preprod": "0 GHO / 0 USDC / 0 USDT",
-        "prod": "11 GHO / 11 USDC / 11 USDT"
+      "rawValueByEnv": {
+        "staging": "1157407407407407",
+        "preprod": "1157407407407407",
+        "prod": "11574074074074074074"
+      },
+      "humanValueByEnv": {
+        "staging": "99 GHO/day",
+        "preprod": "99 GHO/day",
+        "prod": "999,999 GHO/day"
       },
       "status": "Active"
     },
     {
-      "key": "FundsBridgingPolicy.bucket.capacity (AC)",
+      "key": "DepositPolicy.bucket.refillRate[USDC]",
+      "jsonPath": "accountingChain.depositPolicy.perAssetLimits.usdc.refillRate",
+      "contract": "DepositPolicy",
+      "category": "Rate-limit buckets — Deposit",
+      "chainContext": "AC",
+      "asset": "USDC",
+      "setterKeys": [
+        "DepositPolicy.raiseDepositRefillRate",
+        "DepositPolicy.lowerDepositRefillRate"
+      ],
+      "unit": "asset-native dec / sec, per asset",
+      "onChainLimits": "",
+      "rawValueByEnv": {
+        "staging": "1157",
+        "preprod": "1157",
+        "prod": "11574074"
+      },
+      "humanValueByEnv": {
+        "staging": "99 USDC/day",
+        "preprod": "99 USDC/day",
+        "prod": "999,999 USDC/day"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "DepositPolicy.bucket.refillRate[USDT]",
+      "jsonPath": "accountingChain.depositPolicy.perAssetLimits.usdt.refillRate",
+      "contract": "DepositPolicy",
+      "category": "Rate-limit buckets — Deposit",
+      "chainContext": "AC",
+      "asset": "USDT",
+      "setterKeys": [
+        "DepositPolicy.raiseDepositRefillRate",
+        "DepositPolicy.lowerDepositRefillRate"
+      ],
+      "unit": "asset-native dec / sec, per asset",
+      "onChainLimits": "",
+      "rawValueByEnv": {
+        "staging": "1157",
+        "preprod": "1157",
+        "prod": "11574074"
+      },
+      "humanValueByEnv": {
+        "staging": "99 USDT/day",
+        "preprod": "99 USDT/day",
+        "prod": "999,999 USDT/day"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "FundsBridgingPolicy.bucket.capacity (AC)[GHO]",
+      "jsonPath": "accountingChain.fundsBridgingPolicy.perAssetLimits.gho.capacity",
       "contract": "FundsBridgingPolicy",
       "category": "Rate-limit buckets — Bridging",
       "chainContext": "AC",
+      "asset": "GHO",
       "setterKeys": [
         "FundsBridgingPolicy.raiseBridgingCapacity",
         "FundsBridgingPolicy.lowerBridgingCapacity"
       ],
       "unit": "asset-native dec, per asset",
       "onChainLimits": "",
-      "valueByEnv": {
-        "staging": "500 GHO / 500 USDC / 500 USDT",
-        "preprod": "500 GHO / 500 USDC / 500 USDT",
-        "prod": "1,000,000 GHO / 1,000,000 USDC / 1,000,000 USDT"
+      "rawValueByEnv": {
+        "staging": "500000000000000000000",
+        "preprod": "500000000000000000000",
+        "prod": "1000000000000000000000000"
+      },
+      "humanValueByEnv": {
+        "staging": "500 GHO",
+        "preprod": "500 GHO",
+        "prod": "1,000,000 GHO"
       },
       "status": "Active"
     },
     {
-      "key": "FundsBridgingPolicy.bucket.refillRate (AC)",
+      "key": "FundsBridgingPolicy.bucket.capacity (AC)[USDC]",
+      "jsonPath": "accountingChain.fundsBridgingPolicy.perAssetLimits.usdc.capacity",
       "contract": "FundsBridgingPolicy",
       "category": "Rate-limit buckets — Bridging",
       "chainContext": "AC",
-      "setterKeys": [
-        "FundsBridgingPolicy.raiseBridgingRefillRate",
-        "FundsBridgingPolicy.lowerBridgingRefillRate"
-      ],
-      "unit": "asset-native dec / sec, per asset",
-      "onChainLimits": "",
-      "valueByEnv": {
-        "staging": "0 GHO / 0 USDC / 0 USDT",
-        "preprod": "0 GHO / 0 USDC / 0 USDT",
-        "prod": "11 GHO / 11 USDC / 11 USDT"
-      },
-      "status": "Active"
-    },
-    {
-      "key": "FundsBridgingPolicy.bucket.capacity (EC)",
-      "contract": "FundsBridgingPolicy",
-      "category": "Rate-limit buckets — Bridging",
-      "chainContext": "EC",
+      "asset": "USDC",
       "setterKeys": [
         "FundsBridgingPolicy.raiseBridgingCapacity",
         "FundsBridgingPolicy.lowerBridgingCapacity"
       ],
       "unit": "asset-native dec, per asset",
       "onChainLimits": "",
-      "valueByEnv": {
-        "staging": "500 GHO / 500 USDC / 500 USDT",
-        "preprod": "500 GHO / 500 USDC / 500 USDT",
-        "prod": "1,000,000 GHO / 1,000,000 USDC / 1,000,000 USDT"
+      "rawValueByEnv": {
+        "staging": "500000000",
+        "preprod": "500000000",
+        "prod": "1000000000000"
+      },
+      "humanValueByEnv": {
+        "staging": "500 USDC",
+        "preprod": "500 USDC",
+        "prod": "1,000,000 USDC"
       },
       "status": "Active"
     },
     {
-      "key": "FundsBridgingPolicy.bucket.refillRate (EC)",
+      "key": "FundsBridgingPolicy.bucket.capacity (AC)[USDT]",
+      "jsonPath": "accountingChain.fundsBridgingPolicy.perAssetLimits.usdt.capacity",
       "contract": "FundsBridgingPolicy",
       "category": "Rate-limit buckets — Bridging",
-      "chainContext": "EC",
+      "chainContext": "AC",
+      "asset": "USDT",
+      "setterKeys": [
+        "FundsBridgingPolicy.raiseBridgingCapacity",
+        "FundsBridgingPolicy.lowerBridgingCapacity"
+      ],
+      "unit": "asset-native dec, per asset",
+      "onChainLimits": "",
+      "rawValueByEnv": {
+        "staging": "500000000",
+        "preprod": "500000000",
+        "prod": "1000000000000"
+      },
+      "humanValueByEnv": {
+        "staging": "500 USDT",
+        "preprod": "500 USDT",
+        "prod": "1,000,000 USDT"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "FundsBridgingPolicy.bucket.refillRate (AC)[GHO]",
+      "jsonPath": "accountingChain.fundsBridgingPolicy.perAssetLimits.gho.refillRate",
+      "contract": "FundsBridgingPolicy",
+      "category": "Rate-limit buckets — Bridging",
+      "chainContext": "AC",
+      "asset": "GHO",
       "setterKeys": [
         "FundsBridgingPolicy.raiseBridgingRefillRate",
         "FundsBridgingPolicy.lowerBridgingRefillRate"
       ],
       "unit": "asset-native dec / sec, per asset",
       "onChainLimits": "",
-      "valueByEnv": {
-        "staging": "0 GHO / 0 USDC / 0 USDT",
-        "preprod": "0 GHO / 0 USDC / 0 USDT",
-        "prod": "11 GHO / 11 USDC / 11 USDT"
+      "rawValueByEnv": {
+        "staging": "5787037037037037",
+        "preprod": "5787037037037037",
+        "prod": "11574074074074074074"
+      },
+      "humanValueByEnv": {
+        "staging": "499 GHO/day",
+        "preprod": "499 GHO/day",
+        "prod": "999,999 GHO/day"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "FundsBridgingPolicy.bucket.refillRate (AC)[USDC]",
+      "jsonPath": "accountingChain.fundsBridgingPolicy.perAssetLimits.usdc.refillRate",
+      "contract": "FundsBridgingPolicy",
+      "category": "Rate-limit buckets — Bridging",
+      "chainContext": "AC",
+      "asset": "USDC",
+      "setterKeys": [
+        "FundsBridgingPolicy.raiseBridgingRefillRate",
+        "FundsBridgingPolicy.lowerBridgingRefillRate"
+      ],
+      "unit": "asset-native dec / sec, per asset",
+      "onChainLimits": "",
+      "rawValueByEnv": {
+        "staging": "5787",
+        "preprod": "5787",
+        "prod": "11574074"
+      },
+      "humanValueByEnv": {
+        "staging": "499 USDC/day",
+        "preprod": "499 USDC/day",
+        "prod": "999,999 USDC/day"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "FundsBridgingPolicy.bucket.refillRate (AC)[USDT]",
+      "jsonPath": "accountingChain.fundsBridgingPolicy.perAssetLimits.usdt.refillRate",
+      "contract": "FundsBridgingPolicy",
+      "category": "Rate-limit buckets — Bridging",
+      "chainContext": "AC",
+      "asset": "USDT",
+      "setterKeys": [
+        "FundsBridgingPolicy.raiseBridgingRefillRate",
+        "FundsBridgingPolicy.lowerBridgingRefillRate"
+      ],
+      "unit": "asset-native dec / sec, per asset",
+      "onChainLimits": "",
+      "rawValueByEnv": {
+        "staging": "5787",
+        "preprod": "5787",
+        "prod": "11574074"
+      },
+      "humanValueByEnv": {
+        "staging": "499 USDT/day",
+        "preprod": "499 USDT/day",
+        "prod": "999,999 USDT/day"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "FundsBridgingPolicy.bucket.capacity (EC)[GHO]",
+      "jsonPath": "earningChain.fundsBridgingPolicy.perAssetLimits.gho.capacity",
+      "contract": "FundsBridgingPolicy",
+      "category": "Rate-limit buckets — Bridging",
+      "chainContext": "EC",
+      "asset": "GHO",
+      "setterKeys": [
+        "FundsBridgingPolicy.raiseBridgingCapacity",
+        "FundsBridgingPolicy.lowerBridgingCapacity"
+      ],
+      "unit": "asset-native dec, per asset",
+      "onChainLimits": "",
+      "rawValueByEnv": {
+        "staging": "500000000000000000000",
+        "preprod": "500000000000000000000",
+        "prod": "1000000000000000000000000"
+      },
+      "humanValueByEnv": {
+        "staging": "500 GHO",
+        "preprod": "500 GHO",
+        "prod": "1,000,000 GHO"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "FundsBridgingPolicy.bucket.capacity (EC)[USDC]",
+      "jsonPath": "earningChain.fundsBridgingPolicy.perAssetLimits.usdc.capacity",
+      "contract": "FundsBridgingPolicy",
+      "category": "Rate-limit buckets — Bridging",
+      "chainContext": "EC",
+      "asset": "USDC",
+      "setterKeys": [
+        "FundsBridgingPolicy.raiseBridgingCapacity",
+        "FundsBridgingPolicy.lowerBridgingCapacity"
+      ],
+      "unit": "asset-native dec, per asset",
+      "onChainLimits": "",
+      "rawValueByEnv": {
+        "staging": "500000000",
+        "preprod": "500000000",
+        "prod": "1000000000000"
+      },
+      "humanValueByEnv": {
+        "staging": "500 USDC",
+        "preprod": "500 USDC",
+        "prod": "1,000,000 USDC"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "FundsBridgingPolicy.bucket.capacity (EC)[USDT]",
+      "jsonPath": "earningChain.fundsBridgingPolicy.perAssetLimits.usdt.capacity",
+      "contract": "FundsBridgingPolicy",
+      "category": "Rate-limit buckets — Bridging",
+      "chainContext": "EC",
+      "asset": "USDT",
+      "setterKeys": [
+        "FundsBridgingPolicy.raiseBridgingCapacity",
+        "FundsBridgingPolicy.lowerBridgingCapacity"
+      ],
+      "unit": "asset-native dec, per asset",
+      "onChainLimits": "",
+      "rawValueByEnv": {
+        "staging": "500000000",
+        "preprod": "500000000",
+        "prod": "1000000000000"
+      },
+      "humanValueByEnv": {
+        "staging": "500 USDT",
+        "preprod": "500 USDT",
+        "prod": "1,000,000 USDT"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "FundsBridgingPolicy.bucket.refillRate (EC)[GHO]",
+      "jsonPath": "earningChain.fundsBridgingPolicy.perAssetLimits.gho.refillRate",
+      "contract": "FundsBridgingPolicy",
+      "category": "Rate-limit buckets — Bridging",
+      "chainContext": "EC",
+      "asset": "GHO",
+      "setterKeys": [
+        "FundsBridgingPolicy.raiseBridgingRefillRate",
+        "FundsBridgingPolicy.lowerBridgingRefillRate"
+      ],
+      "unit": "asset-native dec / sec, per asset",
+      "onChainLimits": "",
+      "rawValueByEnv": {
+        "staging": "5787037037037037",
+        "preprod": "5787037037037037",
+        "prod": "11574074074074074074"
+      },
+      "humanValueByEnv": {
+        "staging": "499 GHO/day",
+        "preprod": "499 GHO/day",
+        "prod": "999,999 GHO/day"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "FundsBridgingPolicy.bucket.refillRate (EC)[USDC]",
+      "jsonPath": "earningChain.fundsBridgingPolicy.perAssetLimits.usdc.refillRate",
+      "contract": "FundsBridgingPolicy",
+      "category": "Rate-limit buckets — Bridging",
+      "chainContext": "EC",
+      "asset": "USDC",
+      "setterKeys": [
+        "FundsBridgingPolicy.raiseBridgingRefillRate",
+        "FundsBridgingPolicy.lowerBridgingRefillRate"
+      ],
+      "unit": "asset-native dec / sec, per asset",
+      "onChainLimits": "",
+      "rawValueByEnv": {
+        "staging": "5787",
+        "preprod": "5787",
+        "prod": "11574074"
+      },
+      "humanValueByEnv": {
+        "staging": "499 USDC/day",
+        "preprod": "499 USDC/day",
+        "prod": "999,999 USDC/day"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "FundsBridgingPolicy.bucket.refillRate (EC)[USDT]",
+      "jsonPath": "earningChain.fundsBridgingPolicy.perAssetLimits.usdt.refillRate",
+      "contract": "FundsBridgingPolicy",
+      "category": "Rate-limit buckets — Bridging",
+      "chainContext": "EC",
+      "asset": "USDT",
+      "setterKeys": [
+        "FundsBridgingPolicy.raiseBridgingRefillRate",
+        "FundsBridgingPolicy.lowerBridgingRefillRate"
+      ],
+      "unit": "asset-native dec / sec, per asset",
+      "onChainLimits": "",
+      "rawValueByEnv": {
+        "staging": "5787",
+        "preprod": "5787",
+        "prod": "11574074"
+      },
+      "humanValueByEnv": {
+        "staging": "499 USDT/day",
+        "preprod": "499 USDT/day",
+        "prod": "999,999 USDT/day"
       },
       "status": "Active"
     },
     {
       "key": "WithdrawalExecutionPolicy.redemptionBucket.capacity (AC)",
+      "jsonPath": "accountingChain.withdrawalExecutionPolicy.redemptionLimit.capacityRay",
       "contract": "WithdrawalExecutionPolicy",
       "category": "Rate-limit buckets — Redemption",
       "chainContext": "AC",
+      "asset": "",
       "setterKeys": [
         "WithdrawalExecutionPolicy.raiseRedemptionCapacity",
         "WithdrawalExecutionPolicy.lowerRedemptionCapacity"
       ],
       "unit": "RAY",
       "onChainLimits": "≥ MIN_REDEMPTION_CAPACITY (immutable per impl)",
-      "valueByEnv": {
-        "staging": "$200 (200000000000000000000000000000)",
-        "preprod": "$200 (200000000000000000000000000000)",
+      "rawValueByEnv": {
+        "staging": "200000000000000000000000000000",
+        "preprod": "200000000000000000000000000000",
+        "prod": "TBD"
+      },
+      "humanValueByEnv": {
+        "staging": "$200",
+        "preprod": "$200",
         "prod": "TBD"
       },
       "status": "Active"
     },
     {
       "key": "WithdrawalExecutionPolicy.redemptionBucket.refillRate (AC)",
+      "jsonPath": "accountingChain.withdrawalExecutionPolicy.redemptionLimit.refillRateRay",
       "contract": "WithdrawalExecutionPolicy",
       "category": "Rate-limit buckets — Redemption",
       "chainContext": "AC",
+      "asset": "",
       "setterKeys": [
         "WithdrawalExecutionPolicy.raiseRedemptionRefillRate",
         "WithdrawalExecutionPolicy.lowerRedemptionRefillRate"
       ],
       "unit": "RAY/sec",
       "onChainLimits": "≥ MIN_REDEMPTION_REFILL_RATE (immutable per impl)",
-      "valueByEnv": {
-        "staging": "0.002314814814814814814814814 (2314814814814814814814814)",
-        "preprod": "0.002314814814814814814814814 (2314814814814814814814814)",
+      "rawValueByEnv": {
+        "staging": "2314814814814814814814814",
+        "preprod": "2314814814814814814814814",
+        "prod": "TBD"
+      },
+      "humanValueByEnv": {
+        "staging": "$199/day",
+        "preprod": "$199/day",
         "prod": "TBD"
       },
       "status": "Active"
     },
     {
       "key": "WithdrawalExecutionPolicy.minRedemptionCapacityRay (AC)",
+      "jsonPath": "accountingChain.withdrawalExecutionPolicy.minRedemptionCapacityRay",
       "contract": "WithdrawalExecutionPolicy",
       "category": "Rate-limit buckets — Redemption",
       "chainContext": "AC",
+      "asset": "",
       "setterKeys": [],
       "unit": "RAY",
       "onChainLimits": "Immutable floor; bakes into impl bytecode",
-      "valueByEnv": {
-        "staging": "$10 (10000000000000000000000000000)",
-        "preprod": "$10 (10000000000000000000000000000)",
+      "rawValueByEnv": {
+        "staging": "10000000000000000000000000000",
+        "preprod": "10000000000000000000000000000",
+        "prod": "TBD"
+      },
+      "humanValueByEnv": {
+        "staging": "$10",
+        "preprod": "$10",
         "prod": "TBD"
       },
       "status": "Active"
     },
     {
       "key": "WithdrawalExecutionPolicy.minRedemptionRefillRateRay (AC)",
+      "jsonPath": "accountingChain.withdrawalExecutionPolicy.minRedemptionRefillRateRay",
       "contract": "WithdrawalExecutionPolicy",
       "category": "Rate-limit buckets — Redemption",
       "chainContext": "AC",
+      "asset": "",
       "setterKeys": [],
       "unit": "RAY/sec",
       "onChainLimits": "Immutable floor; bakes into impl bytecode",
-      "valueByEnv": {
-        "staging": "0.00011574074074074074074074 (115740740740740740740740)",
-        "preprod": "0.00011574074074074074074074 (115740740740740740740740)",
+      "rawValueByEnv": {
+        "staging": "115740740740740740740740",
+        "preprod": "115740740740740740740740",
+        "prod": "TBD"
+      },
+      "humanValueByEnv": {
+        "staging": "$9/day",
+        "preprod": "$9/day",
         "prod": "TBD"
       },
       "status": "Active"
     },
     {
       "key": "WithdrawalExecutionPolicy.redemptionBucket.capacity (EC)",
+      "jsonPath": "earningChain.withdrawalExecutionPolicy.redemptionLimit.capacityRay",
       "contract": "WithdrawalExecutionPolicy",
       "category": "Rate-limit buckets — Redemption",
       "chainContext": "EC",
+      "asset": "",
       "setterKeys": [
         "WithdrawalExecutionPolicy.raiseRedemptionCapacity",
         "WithdrawalExecutionPolicy.lowerRedemptionCapacity"
       ],
       "unit": "RAY",
       "onChainLimits": "≥ MIN_REDEMPTION_CAPACITY (immutable per impl)",
-      "valueByEnv": {
-        "staging": "$200 (200000000000000000000000000000)",
-        "preprod": "$200 (200000000000000000000000000000)",
+      "rawValueByEnv": {
+        "staging": "200000000000000000000000000000",
+        "preprod": "200000000000000000000000000000",
+        "prod": "TBD"
+      },
+      "humanValueByEnv": {
+        "staging": "$200",
+        "preprod": "$200",
         "prod": "TBD"
       },
       "status": "Active"
     },
     {
       "key": "WithdrawalExecutionPolicy.redemptionBucket.refillRate (EC)",
+      "jsonPath": "earningChain.withdrawalExecutionPolicy.redemptionLimit.refillRateRay",
       "contract": "WithdrawalExecutionPolicy",
       "category": "Rate-limit buckets — Redemption",
       "chainContext": "EC",
+      "asset": "",
       "setterKeys": [
         "WithdrawalExecutionPolicy.raiseRedemptionRefillRate",
         "WithdrawalExecutionPolicy.lowerRedemptionRefillRate"
       ],
       "unit": "RAY/sec",
       "onChainLimits": "≥ MIN_REDEMPTION_REFILL_RATE (immutable per impl)",
-      "valueByEnv": {
-        "staging": "0.002314814814814814814814814 (2314814814814814814814814)",
-        "preprod": "0.002314814814814814814814814 (2314814814814814814814814)",
+      "rawValueByEnv": {
+        "staging": "2314814814814814814814814",
+        "preprod": "2314814814814814814814814",
+        "prod": "TBD"
+      },
+      "humanValueByEnv": {
+        "staging": "$199/day",
+        "preprod": "$199/day",
         "prod": "TBD"
       },
       "status": "Active"
     },
     {
       "key": "WithdrawalExecutionPolicy.minRedemptionCapacityRay (EC)",
+      "jsonPath": "earningChain.withdrawalExecutionPolicy.minRedemptionCapacityRay",
       "contract": "WithdrawalExecutionPolicy",
       "category": "Rate-limit buckets — Redemption",
       "chainContext": "EC",
+      "asset": "",
       "setterKeys": [],
       "unit": "RAY",
       "onChainLimits": "Immutable floor; bakes into impl bytecode",
-      "valueByEnv": {
-        "staging": "$10 (10000000000000000000000000000)",
-        "preprod": "$10 (10000000000000000000000000000)",
+      "rawValueByEnv": {
+        "staging": "10000000000000000000000000000",
+        "preprod": "10000000000000000000000000000",
+        "prod": "TBD"
+      },
+      "humanValueByEnv": {
+        "staging": "$10",
+        "preprod": "$10",
         "prod": "TBD"
       },
       "status": "Active"
     },
     {
       "key": "WithdrawalExecutionPolicy.minRedemptionRefillRateRay (EC)",
+      "jsonPath": "earningChain.withdrawalExecutionPolicy.minRedemptionRefillRateRay",
       "contract": "WithdrawalExecutionPolicy",
       "category": "Rate-limit buckets — Redemption",
       "chainContext": "EC",
+      "asset": "",
       "setterKeys": [],
       "unit": "RAY/sec",
       "onChainLimits": "Immutable floor; bakes into impl bytecode",
-      "valueByEnv": {
-        "staging": "0.00011574074074074074074074 (115740740740740740740740)",
-        "preprod": "0.00011574074074074074074074 (115740740740740740740740)",
+      "rawValueByEnv": {
+        "staging": "115740740740740740740740",
+        "preprod": "115740740740740740740740",
+        "prod": "TBD"
+      },
+      "humanValueByEnv": {
+        "staging": "$9/day",
+        "preprod": "$9/day",
         "prod": "TBD"
       },
       "status": "Active"
     },
     {
       "key": "PriceOracle.chainlinkHeartbeat",
+      "jsonPath": "chainlinkPriceOracleHeartbeat",
       "contract": "PriceOracle",
       "category": "Oracle",
       "chainContext": "AC+EC",
+      "asset": "",
       "setterKeys": [
         "PriceOracle.setOracleAdapterForAsset"
       ],
       "unit": "seconds (per adapter, constructor)",
       "onChainLimits": "+ HEARTBEAT_BUFFER_SECONDS = 90",
-      "valueByEnv": {
-        "staging": "1 d (86400s)",
-        "preprod": "1 d (86400s)",
-        "prod": "1 d (86400s)"
+      "rawValueByEnv": {
+        "staging": "86400",
+        "preprod": "86400",
+        "prod": "86400"
+      },
+      "humanValueByEnv": {
+        "staging": "1 d",
+        "preprod": "1 d",
+        "prod": "1 d"
       },
       "status": "Active"
     },
     {
       "key": "ChainBalanceOracle.chainlinkHeartbeat",
+      "jsonPath": "chainlinkChainBalanceOracleHeartbeat",
       "contract": "ChainBalanceOracle",
       "category": "Oracle",
       "chainContext": "AC",
+      "asset": "",
       "setterKeys": [
         "ChainBalanceOracle.setChainBalanceOracleAdapter"
       ],
       "unit": "seconds (per adapter, constructor)",
       "onChainLimits": "+ PUBLISH_BUFFER_SECONDS = 90",
-      "valueByEnv": {
-        "staging": "1 d (86400s)",
-        "preprod": "1 d (86400s)",
-        "prod": "1 d (86400s)"
+      "rawValueByEnv": {
+        "staging": "86400",
+        "preprod": "86400",
+        "prod": "86400"
+      },
+      "humanValueByEnv": {
+        "staging": "1 d",
+        "preprod": "1 d",
+        "prod": "1 d"
       },
       "status": "Active"
     },
     {
       "key": "PriceOracle.minValidPriceRay",
+      "jsonPath": "priceOracleMinValidPriceRay",
       "contract": "PriceOracle",
       "category": "Oracle",
       "chainContext": "AC+EC",
+      "asset": "",
       "setterKeys": [],
       "unit": "RAY",
       "onChainLimits": "Immutable on impl; floors validatePrice() reverts",
-      "valueByEnv": {
-        "staging": "0.997 (997000000000000000000000000)",
-        "preprod": "0.997 (997000000000000000000000000)",
-        "prod": "0.997 (997000000000000000000000000)"
+      "rawValueByEnv": {
+        "staging": "997000000000000000000000000",
+        "preprod": "997000000000000000000000000",
+        "prod": "997000000000000000000000000"
+      },
+      "humanValueByEnv": {
+        "staging": "$0.997",
+        "preprod": "$0.997",
+        "prod": "$0.997"
       },
       "status": "Active"
     },
     {
       "key": "SlippageCoverageVault.maxSlippageBps",
+      "jsonPath": "slippageCoverageVault.maxSlippageBps",
       "contract": "SlippageCoverageVault",
       "category": "Slippage coverage",
       "chainContext": "AC",
+      "asset": "",
       "setterKeys": [
         "SlippageCoverageVault.setMaxSlippageBps"
       ],
       "unit": "bps",
       "onChainLimits": "< 10_000 bps",
-      "valueByEnv": {
-        "staging": "50 bps",
-        "preprod": "50 bps",
-        "prod": "100 bps"
+      "rawValueByEnv": {
+        "staging": "50",
+        "preprod": "50",
+        "prod": "100"
+      },
+      "humanValueByEnv": {
+        "staging": "0.50%",
+        "preprod": "0.50%",
+        "prod": "1%"
       },
       "status": "Active"
     },
     {
       "key": "SlippageCoverageVault.overrideMaxSlippageBps",
+      "jsonPath": "slippageCoverageVault.overrideMaxSlippageBps",
       "contract": "SlippageCoverageVault",
       "category": "Slippage coverage",
       "chainContext": "AC",
+      "asset": "",
       "setterKeys": [
         "SlippageCoverageVault.setOverrideMaxSlippageBps"
       ],
       "unit": "bps",
       "onChainLimits": "",
-      "valueByEnv": {
-        "staging": "5,000 bps",
-        "preprod": "5,000 bps",
-        "prod": "5,000 bps"
+      "rawValueByEnv": {
+        "staging": "5000",
+        "preprod": "5000",
+        "prod": "5000"
+      },
+      "humanValueByEnv": {
+        "staging": "50%",
+        "preprod": "50%",
+        "prod": "50%"
       },
       "status": "Active"
     },
     {
       "key": "SlippageCoverageVault.initialOverrideMode",
+      "jsonPath": "slippageCoverageVault.initialOverrideMode",
       "contract": "SlippageCoverageVault",
       "category": "Slippage coverage",
       "chainContext": "AC",
+      "asset": "",
       "setterKeys": [
         "SlippageCoverageVault.enableOverrideMode",
         "SlippageCoverageVault.disableOverrideMode"
       ],
       "unit": "bool (seed via constructor)",
       "onChainLimits": "",
-      "valueByEnv": {
+      "rawValueByEnv": {
         "staging": "true",
         "preprod": "true",
         "prod": "true"
       },
+      "humanValueByEnv": {
+        "staging": "Yes",
+        "preprod": "Yes",
+        "prod": "Yes"
+      },
       "status": "Active"
     },
     {
-      "key": "SlippageCoverageVault.pullCapPerTx",
+      "key": "SlippageCoverageVault.pullCapPerTx[GHO]",
+      "jsonPath": "slippageCoverageVault.perAssetCaps.gho.pullCapPerTx",
       "contract": "SlippageCoverageVault",
       "category": "Slippage coverage",
       "chainContext": "AC",
+      "asset": "GHO",
       "setterKeys": [
         "SlippageCoverageVault.raisePullCapPerTx",
         "SlippageCoverageVault.lowerPullCapPerTx"
       ],
       "unit": "asset-native dec, per asset",
       "onChainLimits": "",
-      "valueByEnv": {
-        "staging": "1 GHO / 1 USDC / 1 USDT",
-        "preprod": "1 GHO / 1 USDC / 1 USDT",
-        "prod": "1,000,000 GHO / 1,000,000 USDC / 1,000,000 USDT"
+      "rawValueByEnv": {
+        "staging": "1000000000000000000",
+        "preprod": "1000000000000000000",
+        "prod": "1000000000000000000000000"
+      },
+      "humanValueByEnv": {
+        "staging": "1 GHO",
+        "preprod": "1 GHO",
+        "prod": "1,000,000 GHO"
       },
       "status": "Active"
     },
     {
-      "key": "SlippageCoverageVault.windowCap",
+      "key": "SlippageCoverageVault.pullCapPerTx[USDC]",
+      "jsonPath": "slippageCoverageVault.perAssetCaps.usdc.pullCapPerTx",
       "contract": "SlippageCoverageVault",
       "category": "Slippage coverage",
       "chainContext": "AC",
+      "asset": "USDC",
+      "setterKeys": [
+        "SlippageCoverageVault.raisePullCapPerTx",
+        "SlippageCoverageVault.lowerPullCapPerTx"
+      ],
+      "unit": "asset-native dec, per asset",
+      "onChainLimits": "",
+      "rawValueByEnv": {
+        "staging": "1000000",
+        "preprod": "1000000",
+        "prod": "1000000000000"
+      },
+      "humanValueByEnv": {
+        "staging": "1 USDC",
+        "preprod": "1 USDC",
+        "prod": "1,000,000 USDC"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "SlippageCoverageVault.pullCapPerTx[USDT]",
+      "jsonPath": "slippageCoverageVault.perAssetCaps.usdt.pullCapPerTx",
+      "contract": "SlippageCoverageVault",
+      "category": "Slippage coverage",
+      "chainContext": "AC",
+      "asset": "USDT",
+      "setterKeys": [
+        "SlippageCoverageVault.raisePullCapPerTx",
+        "SlippageCoverageVault.lowerPullCapPerTx"
+      ],
+      "unit": "asset-native dec, per asset",
+      "onChainLimits": "",
+      "rawValueByEnv": {
+        "staging": "1000000",
+        "preprod": "1000000",
+        "prod": "1000000000000"
+      },
+      "humanValueByEnv": {
+        "staging": "1 USDT",
+        "preprod": "1 USDT",
+        "prod": "1,000,000 USDT"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "SlippageCoverageVault.windowCap[GHO]",
+      "jsonPath": "slippageCoverageVault.perAssetCaps.gho.windowCap",
+      "contract": "SlippageCoverageVault",
+      "category": "Slippage coverage",
+      "chainContext": "AC",
+      "asset": "GHO",
       "setterKeys": [
         "SlippageCoverageVault.raiseWindowCap",
         "SlippageCoverageVault.lowerWindowCap"
       ],
       "unit": "asset-native dec, per asset",
       "onChainLimits": "",
-      "valueByEnv": {
-        "staging": "5 GHO / 5 USDC / 5 USDT",
-        "preprod": "5 GHO / 5 USDC / 5 USDT",
-        "prod": "1,000,000 GHO / 1,000,000 USDC / 1,000,000 USDT"
+      "rawValueByEnv": {
+        "staging": "5000000000000000000",
+        "preprod": "5000000000000000000",
+        "prod": "1000000000000000000000000"
+      },
+      "humanValueByEnv": {
+        "staging": "5 GHO",
+        "preprod": "5 GHO",
+        "prod": "1,000,000 GHO"
       },
       "status": "Active"
     },
     {
-      "key": "SlippageCoverageVault.windowSeconds",
+      "key": "SlippageCoverageVault.windowCap[USDC]",
+      "jsonPath": "slippageCoverageVault.perAssetCaps.usdc.windowCap",
       "contract": "SlippageCoverageVault",
       "category": "Slippage coverage",
       "chainContext": "AC",
+      "asset": "USDC",
+      "setterKeys": [
+        "SlippageCoverageVault.raiseWindowCap",
+        "SlippageCoverageVault.lowerWindowCap"
+      ],
+      "unit": "asset-native dec, per asset",
+      "onChainLimits": "",
+      "rawValueByEnv": {
+        "staging": "5000000",
+        "preprod": "5000000",
+        "prod": "1000000000000"
+      },
+      "humanValueByEnv": {
+        "staging": "5 USDC",
+        "preprod": "5 USDC",
+        "prod": "1,000,000 USDC"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "SlippageCoverageVault.windowCap[USDT]",
+      "jsonPath": "slippageCoverageVault.perAssetCaps.usdt.windowCap",
+      "contract": "SlippageCoverageVault",
+      "category": "Slippage coverage",
+      "chainContext": "AC",
+      "asset": "USDT",
+      "setterKeys": [
+        "SlippageCoverageVault.raiseWindowCap",
+        "SlippageCoverageVault.lowerWindowCap"
+      ],
+      "unit": "asset-native dec, per asset",
+      "onChainLimits": "",
+      "rawValueByEnv": {
+        "staging": "5000000",
+        "preprod": "5000000",
+        "prod": "1000000000000"
+      },
+      "humanValueByEnv": {
+        "staging": "5 USDT",
+        "preprod": "5 USDT",
+        "prod": "1,000,000 USDT"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "SlippageCoverageVault.windowSeconds[GHO]",
+      "jsonPath": "slippageCoverageVault.perAssetCaps.gho.windowSeconds",
+      "contract": "SlippageCoverageVault",
+      "category": "Slippage coverage",
+      "chainContext": "AC",
+      "asset": "GHO",
       "setterKeys": [
         "SlippageCoverageVault.raiseWindowSeconds",
         "SlippageCoverageVault.lowerWindowSeconds"
       ],
       "unit": "seconds, per asset",
       "onChainLimits": "> 0",
-      "valueByEnv": {
-        "staging": "GHO: 1 h (3600s) / USDC: 1 h (3600s) / USDT: 1 h (3600s)",
-        "preprod": "GHO: 1 h (3600s) / USDC: 1 h (3600s) / USDT: 1 h (3600s)",
-        "prod": "GHO: 1 d (86400s) / USDC: 1 d (86400s) / USDT: 1 d (86400s)"
+      "rawValueByEnv": {
+        "staging": "3600",
+        "preprod": "3600",
+        "prod": "86400"
+      },
+      "humanValueByEnv": {
+        "staging": "1 h",
+        "preprod": "1 h",
+        "prod": "1 d"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "SlippageCoverageVault.windowSeconds[USDC]",
+      "jsonPath": "slippageCoverageVault.perAssetCaps.usdc.windowSeconds",
+      "contract": "SlippageCoverageVault",
+      "category": "Slippage coverage",
+      "chainContext": "AC",
+      "asset": "USDC",
+      "setterKeys": [
+        "SlippageCoverageVault.raiseWindowSeconds",
+        "SlippageCoverageVault.lowerWindowSeconds"
+      ],
+      "unit": "seconds, per asset",
+      "onChainLimits": "> 0",
+      "rawValueByEnv": {
+        "staging": "3600",
+        "preprod": "3600",
+        "prod": "86400"
+      },
+      "humanValueByEnv": {
+        "staging": "1 h",
+        "preprod": "1 h",
+        "prod": "1 d"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "SlippageCoverageVault.windowSeconds[USDT]",
+      "jsonPath": "slippageCoverageVault.perAssetCaps.usdt.windowSeconds",
+      "contract": "SlippageCoverageVault",
+      "category": "Slippage coverage",
+      "chainContext": "AC",
+      "asset": "USDT",
+      "setterKeys": [
+        "SlippageCoverageVault.raiseWindowSeconds",
+        "SlippageCoverageVault.lowerWindowSeconds"
+      ],
+      "unit": "seconds, per asset",
+      "onChainLimits": "> 0",
+      "rawValueByEnv": {
+        "staging": "3600",
+        "preprod": "3600",
+        "prod": "86400"
+      },
+      "humanValueByEnv": {
+        "staging": "1 h",
+        "preprod": "1 h",
+        "prod": "1 d"
       },
       "status": "Active"
     },
     {
       "key": "Allocator.maxStrategiesPerAsset",
+      "jsonPath": "maxStrategiesPerAsset",
       "contract": "Allocator",
       "category": "Strategy onboarding",
       "chainContext": "AC",
+      "asset": "",
       "setterKeys": [],
       "unit": "count",
       "onChainLimits": "Immutable; caps strategy iteration in Allocator.withdraw",
-      "valueByEnv": {
+      "rawValueByEnv": {
+        "staging": "15",
+        "preprod": "15",
+        "prod": "15"
+      },
+      "humanValueByEnv": {
         "staging": "15",
         "preprod": "15",
         "prod": "15"
@@ -2336,16 +2989,23 @@
     },
     {
       "key": "FundsHandler.earningChainId",
+      "jsonPath": "earningChain.chainId",
       "contract": "FundsHandler",
       "category": "Cross-chain topology",
       "chainContext": "AC",
+      "asset": "",
       "setterKeys": [
         "FundsHandler.addEarningChain",
         "FundsHandler.removeEarningChain"
       ],
       "unit": "chainId",
       "onChainLimits": "",
-      "valueByEnv": {
+      "rawValueByEnv": {
+        "staging": "1",
+        "preprod": "1",
+        "prod": "1"
+      },
+      "humanValueByEnv": {
         "staging": "1",
         "preprod": "1",
         "prod": "1"
@@ -2354,15 +3014,22 @@
     },
     {
       "key": "CcipBridgeAdapter.earningChainSelector",
+      "jsonPath": "earningChain.ccipSelector",
       "contract": "CcipBridgeAdapter",
       "category": "Cross-chain topology",
       "chainContext": "AC",
+      "asset": "",
       "setterKeys": [
         "CcipBridgeAdapter.setChainSelector"
       ],
       "unit": "uint64 (CCIP)",
       "onChainLimits": "",
-      "valueByEnv": {
+      "rawValueByEnv": {
+        "staging": "5009297550715157269",
+        "preprod": "5009297550715157269",
+        "prod": "5009297550715157269"
+      },
+      "humanValueByEnv": {
         "staging": "5009297550715157269",
         "preprod": "5009297550715157269",
         "prod": "5009297550715157269"
@@ -2371,15 +3038,22 @@
     },
     {
       "key": "CcipBridgeAdapter.accountingChainSelector",
+      "jsonPath": "accountingChain.ccipSelector",
       "contract": "CcipBridgeAdapter",
       "category": "Cross-chain topology",
       "chainContext": "EC",
+      "asset": "",
       "setterKeys": [
         "CcipBridgeAdapter.setChainSelector"
       ],
       "unit": "uint64 (CCIP)",
       "onChainLimits": "",
-      "valueByEnv": {
+      "rawValueByEnv": {
+        "staging": "4949039107694359620",
+        "preprod": "4949039107694359620",
+        "prod": "4949039107694359620"
+      },
+      "humanValueByEnv": {
         "staging": "4949039107694359620",
         "preprod": "4949039107694359620",
         "prod": "4949039107694359620"
@@ -2388,13 +3062,20 @@
     },
     {
       "key": "EarningChainGateway.minBurnIouTokenGasLimit",
+      "jsonPath": "earningChain.minBurnIouTokenGasLimit",
       "contract": "EarningChainGateway",
       "category": "Cross-chain topology",
       "chainContext": "EC",
+      "asset": "",
       "setterKeys": [],
       "unit": "gas",
       "onChainLimits": "Constant in source (MIN_BURN_IOU_TOKEN_GAS_LIMIT)",
-      "valueByEnv": {
+      "rawValueByEnv": {
+        "staging": "120000",
+        "preprod": "120000",
+        "prod": "120000"
+      },
+      "humanValueByEnv": {
         "staging": "120,000",
         "preprod": "120,000",
         "prod": "120,000"
@@ -2403,13 +3084,20 @@
     },
     {
       "key": "StableVault.iouTokenName",
+      "jsonPath": "iouTokenName",
       "contract": "StableVault",
       "category": "Token metadata",
       "chainContext": "AC",
+      "asset": "",
       "setterKeys": [],
       "unit": "string",
       "onChainLimits": "Set in constructor; immutable",
-      "valueByEnv": {
+      "rawValueByEnv": {
+        "staging": "IOU: Aave USD Stable Vault",
+        "preprod": "IOU: Aave USD Stable Vault",
+        "prod": "IOU: Aave USD Stable Vault"
+      },
+      "humanValueByEnv": {
         "staging": "IOU: Aave USD Stable Vault",
         "preprod": "IOU: Aave USD Stable Vault",
         "prod": "IOU: Aave USD Stable Vault"
@@ -2418,13 +3106,20 @@
     },
     {
       "key": "StableVault.iouTokenSymbol",
+      "jsonPath": "iouTokenSymbol",
       "contract": "StableVault",
       "category": "Token metadata",
       "chainContext": "AC",
+      "asset": "",
       "setterKeys": [],
       "unit": "string",
       "onChainLimits": "Set in constructor; immutable",
-      "valueByEnv": {
+      "rawValueByEnv": {
+        "staging": "IOU-USD",
+        "preprod": "IOU-USD",
+        "prod": "IOU-USD"
+      },
+      "humanValueByEnv": {
         "staging": "IOU-USD",
         "preprod": "IOU-USD",
         "prod": "IOU-USD"
@@ -2433,13 +3128,20 @@
     },
     {
       "key": "StableVault.assetTokenName",
+      "jsonPath": "accountingChain.stableVaultName",
       "contract": "StableVault",
       "category": "Token metadata",
       "chainContext": "AC",
+      "asset": "",
       "setterKeys": [],
       "unit": "string",
       "onChainLimits": "Set in constructor; immutable",
-      "valueByEnv": {
+      "rawValueByEnv": {
+        "staging": "Aave USD Stable Vault",
+        "preprod": "Aave USD Stable Vault",
+        "prod": "Aave USD Stable Vault"
+      },
+      "humanValueByEnv": {
         "staging": "Aave USD Stable Vault",
         "preprod": "Aave USD Stable Vault",
         "prod": "Aave USD Stable Vault"
@@ -2448,13 +3150,20 @@
     },
     {
       "key": "StableVault.assetTokenSymbol",
+      "jsonPath": "accountingChain.stableVaultSymbol",
       "contract": "StableVault",
       "category": "Token metadata",
       "chainContext": "AC",
+      "asset": "",
       "setterKeys": [],
       "unit": "string",
       "onChainLimits": "Set in constructor; immutable",
-      "valueByEnv": {
+      "rawValueByEnv": {
+        "staging": "ASV-USD",
+        "preprod": "ASV-USD",
+        "prod": "ASV-USD"
+      },
+      "humanValueByEnv": {
         "staging": "ASV-USD",
         "preprod": "ASV-USD",
         "prod": "ASV-USD"
