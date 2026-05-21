@@ -3,7 +3,12 @@
     "rolesConfigSha": "c20087e0f41dd655c0c6ea51ed265203aa5b0d2e58afc9ec0a8e9f031125f3bb",
     "accessManagerBaseSetupSha": "ce4b20db9f1b2726bfd29d1439476a8f5a5de912d352f73ad44fc8c6b8e8407b",
     "accessManagerAccountingChainSetupSha": "3dbff6191ccf11cd5ac399a3c8f19d68c8c78761537babbff531e2b24be32981",
-    "accessManagerEarningChainSetupSha": "aaa24f21d5bad9b851ccd6d54285acb264e06482d60b66bc1632984b902fd252"
+    "accessManagerEarningChainSetupSha": "aaa24f21d5bad9b851ccd6d54285acb264e06482d60b66bc1632984b902fd252",
+    "deploymentConfigShas": {
+      "staging": "a4af3b56411cffd375f709b08ddf48b602f7e10ca4a839578e76190f9399945a",
+      "preprod": "34a060c7df6832ff521d7066cd9bfb6c96608989575f47c17eeea6bcd3e0d00f",
+      "prod": "cf237ef6d956ffcf27737f6b34332bcc9774239385e1feb6caf9a68bd1d0d4bd"
+    }
   },
   "delayTiers": [
     {
@@ -1832,6 +1837,628 @@
       },
       "roleId": "620506685600956416",
       "getRoleFn": "getRole__lowerRedemptionRefillRate",
+      "status": "Active"
+    }
+  ],
+  "parameters": [
+    {
+      "key": "StableVault.defaultSubVaultPerSecondRate",
+      "contract": "StableVault",
+      "category": "Yield economics",
+      "chainContext": "AC",
+      "setterKeys": [
+        "StableVault.setSubVaultRate",
+        "StableVault.setDefaultSubVault"
+      ],
+      "unit": "RAY/sec",
+      "onChainLimits": "≤ MAX_VALID_PER_SECOND_RATE (≈ 20% APY)",
+      "valueByEnv": {
+        "staging": "1000000001243680656318820313",
+        "preprod": "1000000001243680656318820313",
+        "prod": "1000000001243680656318820313"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "StableVault.defaultMaxPerSecondRate",
+      "contract": "StableVault",
+      "category": "Yield economics",
+      "chainContext": "AC",
+      "setterKeys": [],
+      "unit": "RAY/sec",
+      "onChainLimits": "Constructor-set ceiling; immutable after deploy",
+      "valueByEnv": {
+        "staging": "1000000005781378656804591713",
+        "preprod": "1000000005781378656804591713",
+        "prod": "1000000005781378656804591713"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "StableVault.defaultMaxActiveSubVaults",
+      "contract": "StableVault",
+      "category": "Yield economics",
+      "chainContext": "AC",
+      "setterKeys": [],
+      "unit": "count",
+      "onChainLimits": "Hard cap; immutable",
+      "valueByEnv": {
+        "staging": "201",
+        "preprod": "201",
+        "prod": "201"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "WithdrawalExecutionPolicy.defaultFeeBps",
+      "contract": "WithdrawalExecutionPolicy",
+      "category": "Withdrawal fees + signers",
+      "chainContext": "AC+EC",
+      "setterKeys": [
+        "WithdrawalExecutionPolicy.setDefaultFeeBps"
+      ],
+      "unit": "bps",
+      "onChainLimits": "≤ FEE_CAP_BPS = 1000 (10%)",
+      "valueByEnv": {
+        "staging": "625 bps",
+        "preprod": "625 bps",
+        "prod": "625 bps"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "WithdrawalExecutionPolicy.signer",
+      "contract": "WithdrawalExecutionPolicy",
+      "category": "Withdrawal fees + signers",
+      "chainContext": "AC+EC",
+      "setterKeys": [
+        "WithdrawalExecutionPolicy.addSigner",
+        "WithdrawalExecutionPolicy.removeSigner"
+      ],
+      "unit": "address",
+      "onChainLimits": "",
+      "valueByEnv": {
+        "staging": "0x8eFCe8C8cF3d1B198D95B3067EcF43Fb0A1039e2",
+        "preprod": "0x037a5B223b89222a422cfa95ee935335Ab0755AC",
+        "prod": "0x2F87296892feD4AEE35D02eA71B3d04A5Be151a0"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "DepositPolicy.bucket.capacity",
+      "contract": "DepositPolicy",
+      "category": "Rate-limit buckets — Deposit",
+      "chainContext": "AC",
+      "setterKeys": [
+        "DepositPolicy.raiseDepositCapacity",
+        "DepositPolicy.lowerDepositCapacity"
+      ],
+      "unit": "asset-native dec, per asset",
+      "onChainLimits": "",
+      "valueByEnv": {
+        "staging": "100 GHO / 100 USDC / 100 USDT",
+        "preprod": "100 GHO / 100 USDC / 100 USDT",
+        "prod": "1,000,000 GHO / 1,000,000 USDC / 1,000,000 USDT"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "DepositPolicy.bucket.refillRate",
+      "contract": "DepositPolicy",
+      "category": "Rate-limit buckets — Deposit",
+      "chainContext": "AC",
+      "setterKeys": [
+        "DepositPolicy.raiseDepositRefillRate",
+        "DepositPolicy.lowerDepositRefillRate"
+      ],
+      "unit": "asset-native dec / sec, per asset",
+      "onChainLimits": "",
+      "valueByEnv": {
+        "staging": "0 GHO / 0 USDC / 0 USDT",
+        "preprod": "0 GHO / 0 USDC / 0 USDT",
+        "prod": "11 GHO / 11 USDC / 11 USDT"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "FundsBridgingPolicy.bucket.capacity (AC)",
+      "contract": "FundsBridgingPolicy",
+      "category": "Rate-limit buckets — Bridging",
+      "chainContext": "AC",
+      "setterKeys": [
+        "FundsBridgingPolicy.raiseBridgingCapacity",
+        "FundsBridgingPolicy.lowerBridgingCapacity"
+      ],
+      "unit": "asset-native dec, per asset",
+      "onChainLimits": "",
+      "valueByEnv": {
+        "staging": "500 GHO / 500 USDC / 500 USDT",
+        "preprod": "500 GHO / 500 USDC / 500 USDT",
+        "prod": "1,000,000 GHO / 1,000,000 USDC / 1,000,000 USDT"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "FundsBridgingPolicy.bucket.refillRate (AC)",
+      "contract": "FundsBridgingPolicy",
+      "category": "Rate-limit buckets — Bridging",
+      "chainContext": "AC",
+      "setterKeys": [
+        "FundsBridgingPolicy.raiseBridgingRefillRate",
+        "FundsBridgingPolicy.lowerBridgingRefillRate"
+      ],
+      "unit": "asset-native dec / sec, per asset",
+      "onChainLimits": "",
+      "valueByEnv": {
+        "staging": "0 GHO / 0 USDC / 0 USDT",
+        "preprod": "0 GHO / 0 USDC / 0 USDT",
+        "prod": "11 GHO / 11 USDC / 11 USDT"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "FundsBridgingPolicy.bucket.capacity (EC)",
+      "contract": "FundsBridgingPolicy",
+      "category": "Rate-limit buckets — Bridging",
+      "chainContext": "EC",
+      "setterKeys": [
+        "FundsBridgingPolicy.raiseBridgingCapacity",
+        "FundsBridgingPolicy.lowerBridgingCapacity"
+      ],
+      "unit": "asset-native dec, per asset",
+      "onChainLimits": "",
+      "valueByEnv": {
+        "staging": "500 GHO / 500 USDC / 500 USDT",
+        "preprod": "500 GHO / 500 USDC / 500 USDT",
+        "prod": "1,000,000 GHO / 1,000,000 USDC / 1,000,000 USDT"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "FundsBridgingPolicy.bucket.refillRate (EC)",
+      "contract": "FundsBridgingPolicy",
+      "category": "Rate-limit buckets — Bridging",
+      "chainContext": "EC",
+      "setterKeys": [
+        "FundsBridgingPolicy.raiseBridgingRefillRate",
+        "FundsBridgingPolicy.lowerBridgingRefillRate"
+      ],
+      "unit": "asset-native dec / sec, per asset",
+      "onChainLimits": "",
+      "valueByEnv": {
+        "staging": "0 GHO / 0 USDC / 0 USDT",
+        "preprod": "0 GHO / 0 USDC / 0 USDT",
+        "prod": "11 GHO / 11 USDC / 11 USDT"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "WithdrawalExecutionPolicy.redemptionBucket.capacity (AC)",
+      "contract": "WithdrawalExecutionPolicy",
+      "category": "Rate-limit buckets — Redemption",
+      "chainContext": "AC",
+      "setterKeys": [
+        "WithdrawalExecutionPolicy.raiseRedemptionCapacity",
+        "WithdrawalExecutionPolicy.lowerRedemptionCapacity"
+      ],
+      "unit": "RAY",
+      "onChainLimits": "≥ MIN_REDEMPTION_CAPACITY (immutable per impl)",
+      "valueByEnv": {
+        "staging": "$200 (200000000000000000000000000000)",
+        "preprod": "$200 (200000000000000000000000000000)",
+        "prod": "TBD"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "WithdrawalExecutionPolicy.redemptionBucket.refillRate (AC)",
+      "contract": "WithdrawalExecutionPolicy",
+      "category": "Rate-limit buckets — Redemption",
+      "chainContext": "AC",
+      "setterKeys": [
+        "WithdrawalExecutionPolicy.raiseRedemptionRefillRate",
+        "WithdrawalExecutionPolicy.lowerRedemptionRefillRate"
+      ],
+      "unit": "RAY/sec",
+      "onChainLimits": "≥ MIN_REDEMPTION_REFILL_RATE (immutable per impl)",
+      "valueByEnv": {
+        "staging": "0.002314814814814814814814814 (2314814814814814814814814)",
+        "preprod": "0.002314814814814814814814814 (2314814814814814814814814)",
+        "prod": "TBD"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "WithdrawalExecutionPolicy.minRedemptionCapacityRay (AC)",
+      "contract": "WithdrawalExecutionPolicy",
+      "category": "Rate-limit buckets — Redemption",
+      "chainContext": "AC",
+      "setterKeys": [],
+      "unit": "RAY",
+      "onChainLimits": "Immutable floor; bakes into impl bytecode",
+      "valueByEnv": {
+        "staging": "$10 (10000000000000000000000000000)",
+        "preprod": "$10 (10000000000000000000000000000)",
+        "prod": "TBD"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "WithdrawalExecutionPolicy.minRedemptionRefillRateRay (AC)",
+      "contract": "WithdrawalExecutionPolicy",
+      "category": "Rate-limit buckets — Redemption",
+      "chainContext": "AC",
+      "setterKeys": [],
+      "unit": "RAY/sec",
+      "onChainLimits": "Immutable floor; bakes into impl bytecode",
+      "valueByEnv": {
+        "staging": "0.00011574074074074074074074 (115740740740740740740740)",
+        "preprod": "0.00011574074074074074074074 (115740740740740740740740)",
+        "prod": "TBD"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "WithdrawalExecutionPolicy.redemptionBucket.capacity (EC)",
+      "contract": "WithdrawalExecutionPolicy",
+      "category": "Rate-limit buckets — Redemption",
+      "chainContext": "EC",
+      "setterKeys": [
+        "WithdrawalExecutionPolicy.raiseRedemptionCapacity",
+        "WithdrawalExecutionPolicy.lowerRedemptionCapacity"
+      ],
+      "unit": "RAY",
+      "onChainLimits": "≥ MIN_REDEMPTION_CAPACITY (immutable per impl)",
+      "valueByEnv": {
+        "staging": "$200 (200000000000000000000000000000)",
+        "preprod": "$200 (200000000000000000000000000000)",
+        "prod": "TBD"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "WithdrawalExecutionPolicy.redemptionBucket.refillRate (EC)",
+      "contract": "WithdrawalExecutionPolicy",
+      "category": "Rate-limit buckets — Redemption",
+      "chainContext": "EC",
+      "setterKeys": [
+        "WithdrawalExecutionPolicy.raiseRedemptionRefillRate",
+        "WithdrawalExecutionPolicy.lowerRedemptionRefillRate"
+      ],
+      "unit": "RAY/sec",
+      "onChainLimits": "≥ MIN_REDEMPTION_REFILL_RATE (immutable per impl)",
+      "valueByEnv": {
+        "staging": "0.002314814814814814814814814 (2314814814814814814814814)",
+        "preprod": "0.002314814814814814814814814 (2314814814814814814814814)",
+        "prod": "TBD"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "WithdrawalExecutionPolicy.minRedemptionCapacityRay (EC)",
+      "contract": "WithdrawalExecutionPolicy",
+      "category": "Rate-limit buckets — Redemption",
+      "chainContext": "EC",
+      "setterKeys": [],
+      "unit": "RAY",
+      "onChainLimits": "Immutable floor; bakes into impl bytecode",
+      "valueByEnv": {
+        "staging": "$10 (10000000000000000000000000000)",
+        "preprod": "$10 (10000000000000000000000000000)",
+        "prod": "TBD"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "WithdrawalExecutionPolicy.minRedemptionRefillRateRay (EC)",
+      "contract": "WithdrawalExecutionPolicy",
+      "category": "Rate-limit buckets — Redemption",
+      "chainContext": "EC",
+      "setterKeys": [],
+      "unit": "RAY/sec",
+      "onChainLimits": "Immutable floor; bakes into impl bytecode",
+      "valueByEnv": {
+        "staging": "0.00011574074074074074074074 (115740740740740740740740)",
+        "preprod": "0.00011574074074074074074074 (115740740740740740740740)",
+        "prod": "TBD"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "PriceOracle.chainlinkHeartbeat",
+      "contract": "PriceOracle",
+      "category": "Oracle",
+      "chainContext": "AC+EC",
+      "setterKeys": [
+        "PriceOracle.setOracleAdapterForAsset"
+      ],
+      "unit": "seconds (per adapter, constructor)",
+      "onChainLimits": "+ HEARTBEAT_BUFFER_SECONDS = 90",
+      "valueByEnv": {
+        "staging": "1 d (86400s)",
+        "preprod": "1 d (86400s)",
+        "prod": "1 d (86400s)"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "ChainBalanceOracle.chainlinkHeartbeat",
+      "contract": "ChainBalanceOracle",
+      "category": "Oracle",
+      "chainContext": "AC",
+      "setterKeys": [
+        "ChainBalanceOracle.setChainBalanceOracleAdapter"
+      ],
+      "unit": "seconds (per adapter, constructor)",
+      "onChainLimits": "+ PUBLISH_BUFFER_SECONDS = 90",
+      "valueByEnv": {
+        "staging": "1 d (86400s)",
+        "preprod": "1 d (86400s)",
+        "prod": "1 d (86400s)"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "PriceOracle.minValidPriceRay",
+      "contract": "PriceOracle",
+      "category": "Oracle",
+      "chainContext": "AC+EC",
+      "setterKeys": [],
+      "unit": "RAY",
+      "onChainLimits": "Immutable on impl; floors validatePrice() reverts",
+      "valueByEnv": {
+        "staging": "0.997 (997000000000000000000000000)",
+        "preprod": "0.997 (997000000000000000000000000)",
+        "prod": "0.997 (997000000000000000000000000)"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "SlippageCoverageVault.maxSlippageBps",
+      "contract": "SlippageCoverageVault",
+      "category": "Slippage coverage",
+      "chainContext": "AC",
+      "setterKeys": [
+        "SlippageCoverageVault.setMaxSlippageBps"
+      ],
+      "unit": "bps",
+      "onChainLimits": "< 10_000 bps",
+      "valueByEnv": {
+        "staging": "50 bps",
+        "preprod": "50 bps",
+        "prod": "100 bps"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "SlippageCoverageVault.overrideMaxSlippageBps",
+      "contract": "SlippageCoverageVault",
+      "category": "Slippage coverage",
+      "chainContext": "AC",
+      "setterKeys": [
+        "SlippageCoverageVault.setOverrideMaxSlippageBps"
+      ],
+      "unit": "bps",
+      "onChainLimits": "",
+      "valueByEnv": {
+        "staging": "5,000 bps",
+        "preprod": "5,000 bps",
+        "prod": "5,000 bps"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "SlippageCoverageVault.initialOverrideMode",
+      "contract": "SlippageCoverageVault",
+      "category": "Slippage coverage",
+      "chainContext": "AC",
+      "setterKeys": [
+        "SlippageCoverageVault.enableOverrideMode",
+        "SlippageCoverageVault.disableOverrideMode"
+      ],
+      "unit": "bool (seed via constructor)",
+      "onChainLimits": "",
+      "valueByEnv": {
+        "staging": "true",
+        "preprod": "true",
+        "prod": "true"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "SlippageCoverageVault.pullCapPerTx",
+      "contract": "SlippageCoverageVault",
+      "category": "Slippage coverage",
+      "chainContext": "AC",
+      "setterKeys": [
+        "SlippageCoverageVault.raisePullCapPerTx",
+        "SlippageCoverageVault.lowerPullCapPerTx"
+      ],
+      "unit": "asset-native dec, per asset",
+      "onChainLimits": "",
+      "valueByEnv": {
+        "staging": "1 GHO / 1 USDC / 1 USDT",
+        "preprod": "1 GHO / 1 USDC / 1 USDT",
+        "prod": "1,000,000 GHO / 1,000,000 USDC / 1,000,000 USDT"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "SlippageCoverageVault.windowCap",
+      "contract": "SlippageCoverageVault",
+      "category": "Slippage coverage",
+      "chainContext": "AC",
+      "setterKeys": [
+        "SlippageCoverageVault.raiseWindowCap",
+        "SlippageCoverageVault.lowerWindowCap"
+      ],
+      "unit": "asset-native dec, per asset",
+      "onChainLimits": "",
+      "valueByEnv": {
+        "staging": "5 GHO / 5 USDC / 5 USDT",
+        "preprod": "5 GHO / 5 USDC / 5 USDT",
+        "prod": "1,000,000 GHO / 1,000,000 USDC / 1,000,000 USDT"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "SlippageCoverageVault.windowSeconds",
+      "contract": "SlippageCoverageVault",
+      "category": "Slippage coverage",
+      "chainContext": "AC",
+      "setterKeys": [
+        "SlippageCoverageVault.raiseWindowSeconds",
+        "SlippageCoverageVault.lowerWindowSeconds"
+      ],
+      "unit": "seconds, per asset",
+      "onChainLimits": "> 0",
+      "valueByEnv": {
+        "staging": "GHO: 1 h (3600s) / USDC: 1 h (3600s) / USDT: 1 h (3600s)",
+        "preprod": "GHO: 1 h (3600s) / USDC: 1 h (3600s) / USDT: 1 h (3600s)",
+        "prod": "GHO: 1 d (86400s) / USDC: 1 d (86400s) / USDT: 1 d (86400s)"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "Allocator.maxStrategiesPerAsset",
+      "contract": "Allocator",
+      "category": "Strategy onboarding",
+      "chainContext": "AC",
+      "setterKeys": [],
+      "unit": "count",
+      "onChainLimits": "Immutable; caps strategy iteration in Allocator.withdraw",
+      "valueByEnv": {
+        "staging": "15",
+        "preprod": "15",
+        "prod": "15"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "FundsHandler.earningChainId",
+      "contract": "FundsHandler",
+      "category": "Cross-chain topology",
+      "chainContext": "AC",
+      "setterKeys": [
+        "FundsHandler.addEarningChain",
+        "FundsHandler.removeEarningChain"
+      ],
+      "unit": "chainId",
+      "onChainLimits": "",
+      "valueByEnv": {
+        "staging": "1",
+        "preprod": "1",
+        "prod": "1"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "CcipBridgeAdapter.earningChainSelector",
+      "contract": "CcipBridgeAdapter",
+      "category": "Cross-chain topology",
+      "chainContext": "AC",
+      "setterKeys": [
+        "CcipBridgeAdapter.setChainSelector"
+      ],
+      "unit": "uint64 (CCIP)",
+      "onChainLimits": "",
+      "valueByEnv": {
+        "staging": "5009297550715157269",
+        "preprod": "5009297550715157269",
+        "prod": "5009297550715157269"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "CcipBridgeAdapter.accountingChainSelector",
+      "contract": "CcipBridgeAdapter",
+      "category": "Cross-chain topology",
+      "chainContext": "EC",
+      "setterKeys": [
+        "CcipBridgeAdapter.setChainSelector"
+      ],
+      "unit": "uint64 (CCIP)",
+      "onChainLimits": "",
+      "valueByEnv": {
+        "staging": "4949039107694359620",
+        "preprod": "4949039107694359620",
+        "prod": "4949039107694359620"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "EarningChainGateway.minBurnIouTokenGasLimit",
+      "contract": "EarningChainGateway",
+      "category": "Cross-chain topology",
+      "chainContext": "EC",
+      "setterKeys": [],
+      "unit": "gas",
+      "onChainLimits": "Constant in source (MIN_BURN_IOU_TOKEN_GAS_LIMIT)",
+      "valueByEnv": {
+        "staging": "120,000",
+        "preprod": "120,000",
+        "prod": "120,000"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "StableVault.iouTokenName",
+      "contract": "StableVault",
+      "category": "Token metadata",
+      "chainContext": "AC",
+      "setterKeys": [],
+      "unit": "string",
+      "onChainLimits": "Set in constructor; immutable",
+      "valueByEnv": {
+        "staging": "IOU: Aave USD Stable Vault",
+        "preprod": "IOU: Aave USD Stable Vault",
+        "prod": "IOU: Aave USD Stable Vault"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "StableVault.iouTokenSymbol",
+      "contract": "StableVault",
+      "category": "Token metadata",
+      "chainContext": "AC",
+      "setterKeys": [],
+      "unit": "string",
+      "onChainLimits": "Set in constructor; immutable",
+      "valueByEnv": {
+        "staging": "IOU-USD",
+        "preprod": "IOU-USD",
+        "prod": "IOU-USD"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "StableVault.assetTokenName",
+      "contract": "StableVault",
+      "category": "Token metadata",
+      "chainContext": "AC",
+      "setterKeys": [],
+      "unit": "string",
+      "onChainLimits": "Set in constructor; immutable",
+      "valueByEnv": {
+        "staging": "Aave USD Stable Vault",
+        "preprod": "Aave USD Stable Vault",
+        "prod": "Aave USD Stable Vault"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "StableVault.assetTokenSymbol",
+      "contract": "StableVault",
+      "category": "Token metadata",
+      "chainContext": "AC",
+      "setterKeys": [],
+      "unit": "string",
+      "onChainLimits": "Set in constructor; immutable",
+      "valueByEnv": {
+        "staging": "ASV-USD",
+        "preprod": "ASV-USD",
+        "prod": "ASV-USD"
+      },
       "status": "Active"
     }
   ]

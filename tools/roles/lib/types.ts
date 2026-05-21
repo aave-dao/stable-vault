@@ -99,14 +99,30 @@ export interface ProfileJson {
   addressByEnv: Record<Env, string>;
 }
 
+export type ChainContext = "AC" | "EC" | "AC+EC" | "";
+
+export interface ParameterJson {
+  key: string;
+  contract: string;
+  category: string;
+  chainContext: ChainContext;
+  setterKeys: string[];
+  unit: string;
+  onChainLimits: string;
+  valueByEnv: Record<Env, string>;
+  status: "Active";
+}
+
 export interface RolesArtifact {
   source: {
     rolesConfigSha: string;
     accessManagerBaseSetupSha: string;
     accessManagerAccountingChainSetupSha: string;
     accessManagerEarningChainSetupSha: string;
+    deploymentConfigShas: Record<Env, string>;
   };
   delayTiers: DelayTierJson[];
   profiles: ProfileJson[];
   roles: RoleJson[];
+  parameters: ParameterJson[];
 }

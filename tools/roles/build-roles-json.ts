@@ -7,8 +7,9 @@
  *   1. Three Forge dumps (`script/output/roles.dump.{staging,preprod,prod}.json`), one per env.
  *   2. `script/base/RolesConfig.sol`            → natspec, selector source, getAllFunctionBasedRoles ordering.
  *   3. `script/base/AccessManager*Setup.sol`    → profile → role grants, guardian-role membership.
- *   4. `config/deployment-config.*.jsonc`       → per-env profile addresses.
+ *   4. `config/deployment-config.*.jsonc`       → per-env profile addresses + deployment parameter values.
  *   5. `out/<Contract>.sol/<Contract>.json`     → canonical function signatures via methodIdentifiers.
+ *   6. `tools/roles/lib/parameters-spec.ts`     → hand-curated parameter catalogue (key → setter, unit, limits).
  *
  * Output schema is the `RolesArtifact` defined in `tools/roles/lib/types.ts`.
  */
@@ -17,6 +18,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { loadSignatureLookup, lookupSignature } from "./lib/load-signatures.js";
+import { buildParameters, loadDeploymentConfigs } from "./lib/parameters.js";
 import { parseGetAllFunctionBasedRolesOrder, parseProfiles, parseRolesConfig } from "./lib/parse-solidity.js";
 import {
   DELAY_TIER_NAMES,
@@ -72,20 +74,49 @@ function main(): void {
     signatures,
   });
 
+  const { configs, sources: configSources } = loadDeploymentConfigs(REPO_ROOT);
+  const parameters = buildParameters(configs);
+  assertParameterSettersResolve(parameters, roles);
+
+  const deploymentConfigShas = ENVS.reduce(
+    (acc, env) => {
+      acc[env] = sha256OfBytes(configSources[env]);
+      return acc;
+    },
+    {} as Record<Env, string>,
+  );
+
   const artifact: RolesArtifact = {
     source: {
       rolesConfigSha: sha256OfFile(ROLES_CONFIG_PATH),
       accessManagerBaseSetupSha: sha256OfFile(ACCESS_MANAGER_PATHS[0] ?? ""),
       accessManagerAccountingChainSetupSha: sha256OfFile(ACCESS_MANAGER_PATHS[1] ?? ""),
       accessManagerEarningChainSetupSha: sha256OfFile(ACCESS_MANAGER_PATHS[2] ?? ""),
+      deploymentConfigShas,
     },
     delayTiers,
     profiles: profilesJson,
     roles,
+    parameters,
   };
 
   writeFileSync(OUT_PATH, JSON.stringify(artifact, null, 2) + "\n");
-  console.log(`Wrote ${roles.length} roles, ${profilesJson.length} profiles, ${delayTiers.length} delay tiers → ${OUT_PATH}`);
+  console.log(
+    `Wrote ${roles.length} roles, ${profilesJson.length} profiles, ${delayTiers.length} delay tiers, ${parameters.length} parameters → ${OUT_PATH}`,
+  );
+}
+
+function assertParameterSettersResolve(parameters: ReturnType<typeof buildParameters>, roles: RoleJson[]): void {
+  const roleKeys = new Set(roles.map((r) => r.key));
+  const unknown: { paramKey: string; setterKey: string }[] = [];
+  for (const param of parameters) {
+    for (const setter of param.setterKeys) {
+      if (!roleKeys.has(setter)) unknown.push({ paramKey: param.key, setterKey: setter });
+    }
+  }
+  if (unknown.length === 0) return;
+  const details = unknown.map((u) => `  - ${u.paramKey} → ${u.setterKey}`).join("\n");
+  throw new Error(`Parameter spec references ${unknown.length} unknown role key(s):\n${details}`);
 }
 
 function loadDumps(): Record<Env, ForgeDump> {
@@ -303,6 +334,10 @@ function guardianFor(guardianRoleId: number, dump: ForgeDump): GuardianName {
 function sha256OfFile(path: string): string {
   if (!path) return "";
   return createHash("sha256").update(readFileSync(path)).digest("hex");
+}
+
+function sha256OfBytes(content: string): string {
+  return createHash("sha256").update(content).digest("hex");
 }
 
 main();

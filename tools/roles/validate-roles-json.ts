@@ -100,9 +100,29 @@ function main(): void {
     }
   }
 
+  const activeParameters = (artifact.parameters ?? []).filter((p) => p.status === "Active");
+  assertUniqueBy(activeParameters, (p) => p.key, "parameter key", fail);
+  const roleKeys = new Set(activeRoles.map((r) => r.key));
+  const contractOptions = new Set(activeRoles.map((r) => r.contract));
+  for (const param of activeParameters) {
+    if (!contractOptions.has(param.contract)) {
+      fail(`Parameter ${param.key}: contract "${param.contract}" is not in the Roles contract set`);
+    }
+    for (const setter of param.setterKeys) {
+      if (!roleKeys.has(setter)) {
+        fail(`Parameter ${param.key}: setter "${setter}" does not match any active role key`);
+      }
+    }
+    for (const env of ENVS) {
+      if (param.valueByEnv[env] === undefined) {
+        fail(`Parameter ${param.key}: missing valueByEnv.${env}`);
+      }
+    }
+  }
+
   if (failures.length === 0) {
     console.log(
-      `OK: ${activeRoles.length} active roles, ${artifact.profiles.length} profiles, ${artifact.delayTiers.length} delay tiers — all invariants hold.`,
+      `OK: ${activeRoles.length} active roles, ${artifact.profiles.length} profiles, ${artifact.delayTiers.length} delay tiers, ${activeParameters.length} parameters — all invariants hold.`,
     );
     return;
   }

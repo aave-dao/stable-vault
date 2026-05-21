@@ -21,6 +21,7 @@ import {
   type DelayTierJson,
   type Env,
   type GuardianName,
+  type ParameterJson,
   type ProfileJson,
   type RoleJson,
   type RolesArtifact,
@@ -34,6 +35,7 @@ const ROLES_JSON_PATH = join(process.cwd(), "script/output/roles.json");
 const DELAY_TIERS_DB_ID = process.env.NOTION_DB_DELAY_TIERS ?? "d80957bc-1120-483f-8c2a-e579400b2fd7";
 const PROFILES_DB_ID = process.env.NOTION_DB_PROFILES ?? "ccde62bc-c67a-4a0f-be99-c496a2cc0c5c";
 const ROLES_DB_ID = process.env.NOTION_DB_ROLES ?? "23ceb4ce-dd69-429d-89b6-ff070554680c";
+const PARAMETERS_DB_ID = process.env.NOTION_DB_PARAMETERS ?? "13399574-f21b-46a9-af5a-c6dad3438e49";
 
 const DRY_RUN = process.env.NOTION_DRY_RUN === "1";
 
@@ -58,10 +60,18 @@ async function main(): Promise<void> {
   const roleRowsBySelector = await fetchAllRows(notion, ROLES_DB_ID, (page) =>
     richTextOf(page, "Selector").toLowerCase(),
   );
+  const parameterRowsByKey = await fetchAllRows(notion, PARAMETERS_DB_ID, (page) => titleOf(page, "Key"));
 
   const tierPageIdByName = await syncDelayTiers(notion, artifact.delayTiers, tierRowsByName);
   const profilePageIdByName = await syncProfiles(notion, artifact.profiles, profileRowsByName);
-  await syncRoles(notion, artifact.roles, roleRowsBySelector, tierPageIdByName, profilePageIdByName);
+  const rolePageIdByKey = await syncRoles(
+    notion,
+    artifact.roles,
+    roleRowsBySelector,
+    tierPageIdByName,
+    profilePageIdByName,
+  );
+  await syncParameters(notion, artifact.parameters ?? [], parameterRowsByKey, rolePageIdByKey);
 
   await markOrphans(notion, "Delay Tier", tierRowsByName, new Set(artifact.delayTiers.map((t) => t.name)));
   await markOrphans(notion, "Profile", profileRowsByName, new Set(artifact.profiles.map((p) => p.name)));
@@ -70,6 +80,12 @@ async function main(): Promise<void> {
     "Role",
     roleRowsBySelector,
     new Set(artifact.roles.map((r) => r.selector.toLowerCase())),
+  );
+  await markOrphans(
+    notion,
+    "Parameter",
+    parameterRowsByKey,
+    new Set((artifact.parameters ?? []).map((p) => p.key)),
   );
 
   console.log(DRY_RUN ? "Dry-run complete (no writes performed)." : "Sync complete.");
@@ -136,7 +152,8 @@ async function syncRoles(
   existing: Map<string, ExistingRow>,
   tierPageIdByName: Map<string, string>,
   profilePageIdByName: Map<string, string>,
-): Promise<void> {
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
   for (const role of roles) {
     const tierPageId = tierPageIdByName.get(role.delayTier);
     if (!tierPageId) throw new Error(`No Notion page id for delay tier ${role.delayTier}`);
@@ -163,8 +180,52 @@ async function syncRoles(
     const found = existing.get(role.selector.toLowerCase());
     if (found) {
       await update(notion, found.pageId, props, `role ${role.key}`);
+      out.set(role.key, found.pageId);
     } else {
-      await create(notion, ROLES_DB_ID, props, `role ${role.key}`);
+      const pageId = await create(notion, ROLES_DB_ID, props, `role ${role.key}`);
+      out.set(role.key, pageId);
+    }
+  }
+  return out;
+}
+
+async function syncParameters(
+  notion: Client,
+  parameters: ParameterJson[],
+  existing: Map<string, ExistingRow>,
+  rolePageIdByKey: Map<string, string>,
+): Promise<void> {
+  for (const param of parameters) {
+    const setterPageIds: string[] = [];
+    for (const setterKey of param.setterKeys) {
+      const id = rolePageIdByKey.get(setterKey);
+      if (!id) throw new Error(`Parameter ${param.key}: no Notion page id for setter role ${setterKey}`);
+      setterPageIds.push(id);
+    }
+
+    const props: Record<string, unknown> = {
+      Key: { title: [{ text: { content: param.key } }] },
+      Contract: { select: { name: param.contract } },
+      Category: { select: { name: param.category } },
+      Setters: { relation: setterPageIds.map((id) => ({ id })) },
+      Unit: richTextProp(param.unit),
+      "Value (staging)": richTextProp(param.valueByEnv.staging),
+      "Value (preprod)": richTextProp(param.valueByEnv.preprod),
+      "Value (prod)": richTextProp(param.valueByEnv.prod),
+      "On-chain limits": richTextProp(param.onChainLimits),
+      Status: { select: { name: "Active" } },
+    };
+    if (param.chainContext) {
+      props.Chain = { select: { name: param.chainContext } };
+    } else {
+      props.Chain = { select: null };
+    }
+
+    const found = existing.get(param.key);
+    if (found) {
+      await update(notion, found.pageId, props, `parameter ${param.key}`);
+    } else {
+      await create(notion, PARAMETERS_DB_ID, props, `parameter ${param.key}`);
     }
   }
 }
