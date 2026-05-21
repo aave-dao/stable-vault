@@ -2668,6 +2668,240 @@
       "status": "Active"
     },
     {
+      "key": "PriceOracle.chainlinkFeed (AC)[GHO]",
+      "jsonPath": "accountingChain.chainlinkFeeds.ghoUsd",
+      "contract": "PriceOracle",
+      "category": "Oracle",
+      "chainContext": "AC",
+      "asset": "GHO",
+      "setterKeys": [
+        "PriceOracle.setOracleAdapterForAsset"
+      ],
+      "unit": "address, per asset (Chainlink USD feed)",
+      "onChainLimits": "Swappable only by replacing the whole adapter",
+      "rawValueByEnv": {
+        "staging": "0x3c786e934F23375Ca345C9b8D5aD54838796E8e7",
+        "preprod": "0x3c786e934F23375Ca345C9b8D5aD54838796E8e7",
+        "prod": "0x3c786e934F23375Ca345C9b8D5aD54838796E8e7"
+      },
+      "humanValueByEnv": {
+        "staging": "0x3c786e934F23375Ca345C9b8D5aD54838796E8e7",
+        "preprod": "0x3c786e934F23375Ca345C9b8D5aD54838796E8e7",
+        "prod": "0x3c786e934F23375Ca345C9b8D5aD54838796E8e7"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "PriceOracle.chainlinkFeed (AC)[USDC]",
+      "jsonPath": "accountingChain.chainlinkFeeds.usdcUsd",
+      "contract": "PriceOracle",
+      "category": "Oracle",
+      "chainContext": "AC",
+      "asset": "USDC",
+      "setterKeys": [
+        "PriceOracle.setOracleAdapterForAsset"
+      ],
+      "unit": "address, per asset (Chainlink USD feed)",
+      "onChainLimits": "Swappable only by replacing the whole adapter",
+      "rawValueByEnv": {
+        "staging": "0x50834F3163758fcC1Df9973b6e91f0F0F0434aD3",
+        "preprod": "0x50834F3163758fcC1Df9973b6e91f0F0F0434aD3",
+        "prod": "0x50834F3163758fcC1Df9973b6e91f0F0F0434aD3"
+      },
+      "humanValueByEnv": {
+        "staging": "0x50834F3163758fcC1Df9973b6e91f0F0F0434aD3",
+        "preprod": "0x50834F3163758fcC1Df9973b6e91f0F0F0434aD3",
+        "prod": "0x50834F3163758fcC1Df9973b6e91f0F0F0434aD3"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "PriceOracle.chainlinkFeed (AC)[USDT]",
+      "jsonPath": "accountingChain.chainlinkFeeds.usdtUsd",
+      "contract": "PriceOracle",
+      "category": "Oracle",
+      "chainContext": "AC",
+      "asset": "USDT",
+      "setterKeys": [
+        "PriceOracle.setOracleAdapterForAsset"
+      ],
+      "unit": "address, per asset (Chainlink USD feed)",
+      "onChainLimits": "Swappable only by replacing the whole adapter",
+      "rawValueByEnv": {
+        "staging": "0x3f3f5dF88dC9F13eac63DF89EC16ef6e7E25DdE7",
+        "preprod": "0x3f3f5dF88dC9F13eac63DF89EC16ef6e7E25DdE7",
+        "prod": "0x3f3f5dF88dC9F13eac63DF89EC16ef6e7E25DdE7"
+      },
+      "humanValueByEnv": {
+        "staging": "0x3f3f5dF88dC9F13eac63DF89EC16ef6e7E25DdE7",
+        "preprod": "0x3f3f5dF88dC9F13eac63DF89EC16ef6e7E25DdE7",
+        "prod": "0x3f3f5dF88dC9F13eac63DF89EC16ef6e7E25DdE7"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "PriceOracle.chainlinkFeed (EC)[GHO]",
+      "jsonPath": "earningChain.chainlinkFeeds.ghoUsd",
+      "contract": "PriceOracle",
+      "category": "Oracle",
+      "chainContext": "EC",
+      "asset": "GHO",
+      "setterKeys": [
+        "PriceOracle.setOracleAdapterForAsset"
+      ],
+      "unit": "address, per asset (Chainlink USD feed)",
+      "onChainLimits": "Swappable only by replacing the whole adapter",
+      "rawValueByEnv": {
+        "staging": "0x3f12643D3f6f874d39C2a4c9f2Cd6f2DbAC877FC",
+        "preprod": "0x3f12643D3f6f874d39C2a4c9f2Cd6f2DbAC877FC",
+        "prod": "0x3f12643D3f6f874d39C2a4c9f2Cd6f2DbAC877FC"
+      },
+      "humanValueByEnv": {
+        "staging": "0x3f12643D3f6f874d39C2a4c9f2Cd6f2DbAC877FC",
+        "preprod": "0x3f12643D3f6f874d39C2a4c9f2Cd6f2DbAC877FC",
+        "prod": "0x3f12643D3f6f874d39C2a4c9f2Cd6f2DbAC877FC"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "PriceOracle.chainlinkFeed (EC)[USDC]",
+      "jsonPath": "earningChain.chainlinkFeeds.usdcUsd",
+      "contract": "PriceOracle",
+      "category": "Oracle",
+      "chainContext": "EC",
+      "asset": "USDC",
+      "setterKeys": [
+        "PriceOracle.setOracleAdapterForAsset"
+      ],
+      "unit": "address, per asset (Chainlink USD feed)",
+      "onChainLimits": "Swappable only by replacing the whole adapter",
+      "rawValueByEnv": {
+        "staging": "0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6",
+        "preprod": "0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6",
+        "prod": "0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6"
+      },
+      "humanValueByEnv": {
+        "staging": "0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6",
+        "preprod": "0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6",
+        "prod": "0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "PriceOracle.chainlinkFeed (EC)[USDT]",
+      "jsonPath": "earningChain.chainlinkFeeds.usdtUsd",
+      "contract": "PriceOracle",
+      "category": "Oracle",
+      "chainContext": "EC",
+      "asset": "USDT",
+      "setterKeys": [
+        "PriceOracle.setOracleAdapterForAsset"
+      ],
+      "unit": "address, per asset (Chainlink USD feed)",
+      "onChainLimits": "Swappable only by replacing the whole adapter",
+      "rawValueByEnv": {
+        "staging": "0x3E7d1eAB13ad0104d2750B8863b489D65364e32D",
+        "preprod": "0x3E7d1eAB13ad0104d2750B8863b489D65364e32D",
+        "prod": "0x3E7d1eAB13ad0104d2750B8863b489D65364e32D"
+      },
+      "humanValueByEnv": {
+        "staging": "0x3E7d1eAB13ad0104d2750B8863b489D65364e32D",
+        "preprod": "0x3E7d1eAB13ad0104d2750B8863b489D65364e32D",
+        "prod": "0x3E7d1eAB13ad0104d2750B8863b489D65364e32D"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "PriceOracle.sequencerUptimeFeed",
+      "jsonPath": "accountingChain.sequencerUptimeFeed",
+      "contract": "PriceOracle",
+      "category": "Oracle",
+      "chainContext": "AC",
+      "asset": "",
+      "setterKeys": [],
+      "unit": "address (L2 sequencer uptime feed)",
+      "onChainLimits": "GRACE_PERIOD_TIME_SECONDS = 7200 buffer after recovery",
+      "rawValueByEnv": {
+        "staging": "0x0000000000000000000000000000000000000000",
+        "preprod": "0xFdB631F5EE196F0ed6FAa767959853A9F217697D",
+        "prod": "0xFdB631F5EE196F0ed6FAa767959853A9F217697D"
+      },
+      "humanValueByEnv": {
+        "staging": "0x0000000000000000000000000000000000000000",
+        "preprod": "0xFdB631F5EE196F0ed6FAa767959853A9F217697D",
+        "prod": "0xFdB631F5EE196F0ed6FAa767959853A9F217697D"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "PriceOracle.useMockSequencerUptimeFeed",
+      "jsonPath": "accountingChain.useMockSequencerUptimeFeed",
+      "contract": "PriceOracle",
+      "category": "Oracle",
+      "chainContext": "AC",
+      "asset": "",
+      "setterKeys": [],
+      "unit": "bool (deploy-only)",
+      "onChainLimits": "",
+      "rawValueByEnv": {
+        "staging": "true",
+        "preprod": "false",
+        "prod": "false"
+      },
+      "humanValueByEnv": {
+        "staging": "Yes",
+        "preprod": "No",
+        "prod": "No"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "ChainBalanceOracle.bundleAggregatorProxy",
+      "jsonPath": "accountingChain.chainlinkBundleAggregatorProxy",
+      "contract": "ChainBalanceOracle",
+      "category": "Oracle",
+      "chainContext": "AC",
+      "asset": "",
+      "setterKeys": [
+        "ChainBalanceOracle.setChainBalanceOracleAdapter"
+      ],
+      "unit": "address (Chainlink CCIP bundle aggregator proxy)",
+      "onChainLimits": "+ PUBLISH_BUFFER_SECONDS = 90",
+      "rawValueByEnv": {
+        "staging": "0x0000000000000000000000000000000000000000",
+        "preprod": "0x37B669dA39C79e8a0D5005b44c193f7198A19Fa2",
+        "prod": "0x0000000000000000000000000000000000000000"
+      },
+      "humanValueByEnv": {
+        "staging": "0x0000000000000000000000000000000000000000",
+        "preprod": "0x37B669dA39C79e8a0D5005b44c193f7198A19Fa2",
+        "prod": "0x0000000000000000000000000000000000000000"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "ChainBalanceOracle.useMockBundleFeed",
+      "jsonPath": "accountingChain.useMockBundleFeed",
+      "contract": "ChainBalanceOracle",
+      "category": "Oracle",
+      "chainContext": "AC",
+      "asset": "",
+      "setterKeys": [],
+      "unit": "bool (deploy-only)",
+      "onChainLimits": "",
+      "rawValueByEnv": {
+        "staging": "true",
+        "preprod": "false",
+        "prod": "false"
+      },
+      "humanValueByEnv": {
+        "staging": "Yes",
+        "preprod": "No",
+        "prod": "No"
+      },
+      "status": "Active"
+    },
+    {
       "key": "SlippageCoverageVault.maxSlippageBps",
       "jsonPath": "slippageCoverageVault.maxSlippageBps",
       "contract": "SlippageCoverageVault",
@@ -2966,6 +3200,156 @@
       "status": "Active"
     },
     {
+      "key": "AssetRegistry.assetAddress (AC)[GHO]",
+      "jsonPath": "accountingChain.assets.gho",
+      "contract": "AssetRegistry",
+      "category": "Asset registry",
+      "chainContext": "AC",
+      "asset": "GHO",
+      "setterKeys": [
+        "AssetRegistry.trustAsset",
+        "AssetRegistry.distrustAsset"
+      ],
+      "unit": "address, per asset",
+      "onChainLimits": "Trusted at deploy; toggled via trustAsset / distrustAsset",
+      "rawValueByEnv": {
+        "staging": "0x7dfF72693f6A4149b17e7C6314655f6A9F7c8B33",
+        "preprod": "0x7dfF72693f6A4149b17e7C6314655f6A9F7c8B33",
+        "prod": "0x7dfF72693f6A4149b17e7C6314655f6A9F7c8B33"
+      },
+      "humanValueByEnv": {
+        "staging": "0x7dfF72693f6A4149b17e7C6314655f6A9F7c8B33",
+        "preprod": "0x7dfF72693f6A4149b17e7C6314655f6A9F7c8B33",
+        "prod": "0x7dfF72693f6A4149b17e7C6314655f6A9F7c8B33"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "AssetRegistry.assetAddress (AC)[USDC]",
+      "jsonPath": "accountingChain.assets.usdc",
+      "contract": "AssetRegistry",
+      "category": "Asset registry",
+      "chainContext": "AC",
+      "asset": "USDC",
+      "setterKeys": [
+        "AssetRegistry.trustAsset",
+        "AssetRegistry.distrustAsset"
+      ],
+      "unit": "address, per asset",
+      "onChainLimits": "Trusted at deploy; toggled via trustAsset / distrustAsset",
+      "rawValueByEnv": {
+        "staging": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+        "preprod": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+        "prod": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831"
+      },
+      "humanValueByEnv": {
+        "staging": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+        "preprod": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+        "prod": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "AssetRegistry.assetAddress (AC)[USDT]",
+      "jsonPath": "accountingChain.assets.usdt",
+      "contract": "AssetRegistry",
+      "category": "Asset registry",
+      "chainContext": "AC",
+      "asset": "USDT",
+      "setterKeys": [
+        "AssetRegistry.trustAsset",
+        "AssetRegistry.distrustAsset"
+      ],
+      "unit": "address, per asset",
+      "onChainLimits": "Trusted at deploy; toggled via trustAsset / distrustAsset",
+      "rawValueByEnv": {
+        "staging": "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9",
+        "preprod": "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9",
+        "prod": "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9"
+      },
+      "humanValueByEnv": {
+        "staging": "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9",
+        "preprod": "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9",
+        "prod": "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "AssetRegistry.assetAddress (EC)[GHO]",
+      "jsonPath": "earningChain.assets.gho",
+      "contract": "AssetRegistry",
+      "category": "Asset registry",
+      "chainContext": "EC",
+      "asset": "GHO",
+      "setterKeys": [
+        "AssetRegistry.trustAsset",
+        "AssetRegistry.distrustAsset"
+      ],
+      "unit": "address, per asset",
+      "onChainLimits": "Trusted at deploy; toggled via trustAsset / distrustAsset",
+      "rawValueByEnv": {
+        "staging": "0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f",
+        "preprod": "0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f",
+        "prod": "0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f"
+      },
+      "humanValueByEnv": {
+        "staging": "0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f",
+        "preprod": "0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f",
+        "prod": "0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "AssetRegistry.assetAddress (EC)[USDC]",
+      "jsonPath": "earningChain.assets.usdc",
+      "contract": "AssetRegistry",
+      "category": "Asset registry",
+      "chainContext": "EC",
+      "asset": "USDC",
+      "setterKeys": [
+        "AssetRegistry.trustAsset",
+        "AssetRegistry.distrustAsset"
+      ],
+      "unit": "address, per asset",
+      "onChainLimits": "Trusted at deploy; toggled via trustAsset / distrustAsset",
+      "rawValueByEnv": {
+        "staging": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "preprod": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "prod": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+      },
+      "humanValueByEnv": {
+        "staging": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "preprod": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "prod": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "AssetRegistry.assetAddress (EC)[USDT]",
+      "jsonPath": "earningChain.assets.usdt",
+      "contract": "AssetRegistry",
+      "category": "Asset registry",
+      "chainContext": "EC",
+      "asset": "USDT",
+      "setterKeys": [
+        "AssetRegistry.trustAsset",
+        "AssetRegistry.distrustAsset"
+      ],
+      "unit": "address, per asset",
+      "onChainLimits": "Trusted at deploy; toggled via trustAsset / distrustAsset",
+      "rawValueByEnv": {
+        "staging": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+        "preprod": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+        "prod": "0xdAC17F958D2ee523a2206206994597C13D831ec7"
+      },
+      "humanValueByEnv": {
+        "staging": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+        "preprod": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+        "prod": "0xdAC17F958D2ee523a2206206994597C13D831ec7"
+      },
+      "status": "Active"
+    },
+    {
       "key": "Allocator.maxStrategiesPerAsset",
       "jsonPath": "maxStrategiesPerAsset",
       "contract": "Allocator",
@@ -2984,6 +3368,50 @@
         "staging": "15",
         "preprod": "15",
         "prod": "15"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "Allocator.aaveV3PoolAddressesProvider (AC)",
+      "jsonPath": "accountingChain.aaveV3PoolAddressesProvider",
+      "contract": "Allocator",
+      "category": "Strategy onboarding",
+      "chainContext": "AC",
+      "asset": "",
+      "setterKeys": [],
+      "unit": "address (PoolAddressesProvider)",
+      "onChainLimits": "Set at deploy; consumed by aToken strategy deployment",
+      "rawValueByEnv": {
+        "staging": "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb",
+        "preprod": "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb",
+        "prod": "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb"
+      },
+      "humanValueByEnv": {
+        "staging": "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb",
+        "preprod": "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb",
+        "prod": "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "Allocator.aaveV3PoolAddressesProvider (EC)",
+      "jsonPath": "earningChain.aaveV3PoolAddressesProvider",
+      "contract": "Allocator",
+      "category": "Strategy onboarding",
+      "chainContext": "EC",
+      "asset": "",
+      "setterKeys": [],
+      "unit": "address (PoolAddressesProvider)",
+      "onChainLimits": "Set at deploy; consumed by aToken strategy deployment",
+      "rawValueByEnv": {
+        "staging": "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e",
+        "preprod": "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e",
+        "prod": "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e"
+      },
+      "humanValueByEnv": {
+        "staging": "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e",
+        "preprod": "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e",
+        "prod": "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e"
       },
       "status": "Active"
     },
@@ -3079,6 +3507,138 @@
         "staging": "120,000",
         "preprod": "120,000",
         "prod": "120,000"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "CcipBridgeAdapter.ccipRouter (AC)",
+      "jsonPath": "accountingChain.ccipRouterAddress",
+      "contract": "CcipBridgeAdapter",
+      "category": "Cross-chain topology",
+      "chainContext": "AC",
+      "asset": "",
+      "setterKeys": [],
+      "unit": "address (CCIP router, constructor)",
+      "onChainLimits": "Swappable only by deploying a new adapter",
+      "rawValueByEnv": {
+        "staging": "0x141fa059441E0ca23ce184B6A78bafD2A517DdE8",
+        "preprod": "0x141fa059441E0ca23ce184B6A78bafD2A517DdE8",
+        "prod": "0x141fa059441E0ca23ce184B6A78bafD2A517DdE8"
+      },
+      "humanValueByEnv": {
+        "staging": "0x141fa059441E0ca23ce184B6A78bafD2A517DdE8",
+        "preprod": "0x141fa059441E0ca23ce184B6A78bafD2A517DdE8",
+        "prod": "0x141fa059441E0ca23ce184B6A78bafD2A517DdE8"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "CcipBridgeAdapter.ccipRouter (EC)",
+      "jsonPath": "earningChain.ccipRouterAddress",
+      "contract": "CcipBridgeAdapter",
+      "category": "Cross-chain topology",
+      "chainContext": "EC",
+      "asset": "",
+      "setterKeys": [],
+      "unit": "address (CCIP router, constructor)",
+      "onChainLimits": "Swappable only by deploying a new adapter",
+      "rawValueByEnv": {
+        "staging": "0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D",
+        "preprod": "0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D",
+        "prod": "0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D"
+      },
+      "humanValueByEnv": {
+        "staging": "0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D",
+        "preprod": "0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D",
+        "prod": "0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "AdiAdapter.crossChainController (AC)",
+      "jsonPath": "accountingChain.adi.crossChainController",
+      "contract": "AdiAdapter",
+      "category": "Cross-chain topology",
+      "chainContext": "AC",
+      "asset": "",
+      "setterKeys": [],
+      "unit": "address (a.DI controller, constructor)",
+      "onChainLimits": "",
+      "rawValueByEnv": {
+        "staging": "0xeBBD7BE5fa28BcEaD8398C7205f12E651DCf6250",
+        "preprod": "0xeBBD7BE5fa28BcEaD8398C7205f12E651DCf6250",
+        "prod": "0x0000000000000000000000000000000000000000"
+      },
+      "humanValueByEnv": {
+        "staging": "0xeBBD7BE5fa28BcEaD8398C7205f12E651DCf6250",
+        "preprod": "0xeBBD7BE5fa28BcEaD8398C7205f12E651DCf6250",
+        "prod": "0x0000000000000000000000000000000000000000"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "AdiAdapter.crossChainController (EC)",
+      "jsonPath": "earningChain.adi.crossChainController",
+      "contract": "AdiAdapter",
+      "category": "Cross-chain topology",
+      "chainContext": "EC",
+      "asset": "",
+      "setterKeys": [],
+      "unit": "address (a.DI controller, constructor)",
+      "onChainLimits": "",
+      "rawValueByEnv": {
+        "staging": "0xBFCf66026E303648238f8F3E3A3A491eb74e645A",
+        "preprod": "0xBFCf66026E303648238f8F3E3A3A491eb74e645A",
+        "prod": "0x0000000000000000000000000000000000000000"
+      },
+      "humanValueByEnv": {
+        "staging": "0xBFCf66026E303648238f8F3E3A3A491eb74e645A",
+        "preprod": "0xBFCf66026E303648238f8F3E3A3A491eb74e645A",
+        "prod": "0x0000000000000000000000000000000000000000"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "AdiAdapter.registerOnGateway (AC)",
+      "jsonPath": "accountingChain.adi.registerOnGateway",
+      "contract": "AdiAdapter",
+      "category": "Cross-chain topology",
+      "chainContext": "AC",
+      "asset": "",
+      "setterKeys": [],
+      "unit": "bool (deploy-only)",
+      "onChainLimits": "Wires AdiAdapter into ChainGateway at deploy",
+      "rawValueByEnv": {
+        "staging": "true",
+        "preprod": "true",
+        "prod": "false"
+      },
+      "humanValueByEnv": {
+        "staging": "Yes",
+        "preprod": "Yes",
+        "prod": "No"
+      },
+      "status": "Active"
+    },
+    {
+      "key": "AdiAdapter.registerOnGateway (EC)",
+      "jsonPath": "earningChain.adi.registerOnGateway",
+      "contract": "AdiAdapter",
+      "category": "Cross-chain topology",
+      "chainContext": "EC",
+      "asset": "",
+      "setterKeys": [],
+      "unit": "bool (deploy-only)",
+      "onChainLimits": "Wires AdiAdapter into ChainGateway at deploy",
+      "rawValueByEnv": {
+        "staging": "true",
+        "preprod": "true",
+        "prod": "false"
+      },
+      "humanValueByEnv": {
+        "staging": "Yes",
+        "preprod": "Yes",
+        "prod": "No"
       },
       "status": "Active"
     },

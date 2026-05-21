@@ -53,6 +53,7 @@ export interface ParameterSpec {
     | "Rate-limit buckets — Redemption"
     | "Oracle"
     | "Slippage coverage"
+    | "Asset registry"
     | "Strategy onboarding"
     | "Cross-chain topology"
     | "Token metadata";
@@ -370,6 +371,76 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     onChainLimits: "Immutable on impl; floors validatePrice() reverts",
     value: { type: "scalar", path: "priceOracleMinValidPriceRay", format: "ray" },
   },
+  {
+    key: "PriceOracle.chainlinkFeed (AC)",
+    contract: "PriceOracle",
+    category: "Oracle",
+    chainContext: "AC",
+    setterKeys: ["PriceOracle.setOracleAdapterForAsset"],
+    unit: "address, per asset (Chainlink USD feed)",
+    onChainLimits: "Swappable only by replacing the whole adapter",
+    value: {
+      type: "perAsset",
+      pathTemplate: "accountingChain.chainlinkFeeds.{asset}Usd",
+      assets: ["gho", "usdc", "usdt"],
+      format: "address",
+    },
+  },
+  {
+    key: "PriceOracle.chainlinkFeed (EC)",
+    contract: "PriceOracle",
+    category: "Oracle",
+    chainContext: "EC",
+    setterKeys: ["PriceOracle.setOracleAdapterForAsset"],
+    unit: "address, per asset (Chainlink USD feed)",
+    onChainLimits: "Swappable only by replacing the whole adapter",
+    value: {
+      type: "perAsset",
+      pathTemplate: "earningChain.chainlinkFeeds.{asset}Usd",
+      assets: ["gho", "usdc", "usdt"],
+      format: "address",
+    },
+  },
+  {
+    key: "PriceOracle.sequencerUptimeFeed",
+    contract: "PriceOracle",
+    category: "Oracle",
+    chainContext: "AC",
+    setterKeys: [],
+    unit: "address (L2 sequencer uptime feed)",
+    onChainLimits: "GRACE_PERIOD_TIME_SECONDS = 7200 buffer after recovery",
+    value: { type: "scalar", path: "accountingChain.sequencerUptimeFeed", format: "address" },
+  },
+  {
+    key: "PriceOracle.useMockSequencerUptimeFeed",
+    contract: "PriceOracle",
+    category: "Oracle",
+    chainContext: "AC",
+    setterKeys: [],
+    unit: "bool (deploy-only)",
+    onChainLimits: "",
+    value: { type: "scalar", path: "accountingChain.useMockSequencerUptimeFeed", format: "bool" },
+  },
+  {
+    key: "ChainBalanceOracle.bundleAggregatorProxy",
+    contract: "ChainBalanceOracle",
+    category: "Oracle",
+    chainContext: "AC",
+    setterKeys: ["ChainBalanceOracle.setChainBalanceOracleAdapter"],
+    unit: "address (Chainlink CCIP bundle aggregator proxy)",
+    onChainLimits: "+ PUBLISH_BUFFER_SECONDS = 90",
+    value: { type: "scalar", path: "accountingChain.chainlinkBundleAggregatorProxy", format: "address" },
+  },
+  {
+    key: "ChainBalanceOracle.useMockBundleFeed",
+    contract: "ChainBalanceOracle",
+    category: "Oracle",
+    chainContext: "AC",
+    setterKeys: [],
+    unit: "bool (deploy-only)",
+    onChainLimits: "",
+    value: { type: "scalar", path: "accountingChain.useMockBundleFeed", format: "bool" },
+  },
 
   // -------- Slippage coverage (AC) --------
   {
@@ -448,6 +519,38 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     },
   },
 
+  // -------- Asset registry (deploy-seed asset addresses per chain) --------
+  {
+    key: "AssetRegistry.assetAddress (AC)",
+    contract: "AssetRegistry",
+    category: "Asset registry",
+    chainContext: "AC",
+    setterKeys: ["AssetRegistry.trustAsset", "AssetRegistry.distrustAsset"],
+    unit: "address, per asset",
+    onChainLimits: "Trusted at deploy; toggled via trustAsset / distrustAsset",
+    value: {
+      type: "perAsset",
+      pathTemplate: "accountingChain.assets.{asset}",
+      assets: ["gho", "usdc", "usdt"],
+      format: "address",
+    },
+  },
+  {
+    key: "AssetRegistry.assetAddress (EC)",
+    contract: "AssetRegistry",
+    category: "Asset registry",
+    chainContext: "EC",
+    setterKeys: ["AssetRegistry.trustAsset", "AssetRegistry.distrustAsset"],
+    unit: "address, per asset",
+    onChainLimits: "Trusted at deploy; toggled via trustAsset / distrustAsset",
+    value: {
+      type: "perAsset",
+      pathTemplate: "earningChain.assets.{asset}",
+      assets: ["gho", "usdc", "usdt"],
+      format: "address",
+    },
+  },
+
   // -------- Strategy onboarding (AC) --------
   {
     key: "Allocator.maxStrategiesPerAsset",
@@ -458,6 +561,26 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     unit: "count",
     onChainLimits: "Immutable; caps strategy iteration in Allocator.withdraw",
     value: { type: "scalar", path: "maxStrategiesPerAsset", format: "uint" },
+  },
+  {
+    key: "Allocator.aaveV3PoolAddressesProvider (AC)",
+    contract: "Allocator",
+    category: "Strategy onboarding",
+    chainContext: "AC",
+    setterKeys: [],
+    unit: "address (PoolAddressesProvider)",
+    onChainLimits: "Set at deploy; consumed by aToken strategy deployment",
+    value: { type: "scalar", path: "accountingChain.aaveV3PoolAddressesProvider", format: "address" },
+  },
+  {
+    key: "Allocator.aaveV3PoolAddressesProvider (EC)",
+    contract: "Allocator",
+    category: "Strategy onboarding",
+    chainContext: "EC",
+    setterKeys: [],
+    unit: "address (PoolAddressesProvider)",
+    onChainLimits: "Set at deploy; consumed by aToken strategy deployment",
+    value: { type: "scalar", path: "earningChain.aaveV3PoolAddressesProvider", format: "address" },
   },
 
   // -------- Cross-chain topology --------
@@ -500,6 +623,66 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     unit: "gas",
     onChainLimits: "Constant in source (MIN_BURN_IOU_TOKEN_GAS_LIMIT)",
     value: { type: "scalar", path: "earningChain.minBurnIouTokenGasLimit", format: "uint" },
+  },
+  {
+    key: "CcipBridgeAdapter.ccipRouter (AC)",
+    contract: "CcipBridgeAdapter",
+    category: "Cross-chain topology",
+    chainContext: "AC",
+    setterKeys: [],
+    unit: "address (CCIP router, constructor)",
+    onChainLimits: "Swappable only by deploying a new adapter",
+    value: { type: "scalar", path: "accountingChain.ccipRouterAddress", format: "address" },
+  },
+  {
+    key: "CcipBridgeAdapter.ccipRouter (EC)",
+    contract: "CcipBridgeAdapter",
+    category: "Cross-chain topology",
+    chainContext: "EC",
+    setterKeys: [],
+    unit: "address (CCIP router, constructor)",
+    onChainLimits: "Swappable only by deploying a new adapter",
+    value: { type: "scalar", path: "earningChain.ccipRouterAddress", format: "address" },
+  },
+  {
+    key: "AdiAdapter.crossChainController (AC)",
+    contract: "AdiAdapter",
+    category: "Cross-chain topology",
+    chainContext: "AC",
+    setterKeys: [],
+    unit: "address (a.DI controller, constructor)",
+    onChainLimits: "",
+    value: { type: "scalar", path: "accountingChain.adi.crossChainController", format: "address" },
+  },
+  {
+    key: "AdiAdapter.crossChainController (EC)",
+    contract: "AdiAdapter",
+    category: "Cross-chain topology",
+    chainContext: "EC",
+    setterKeys: [],
+    unit: "address (a.DI controller, constructor)",
+    onChainLimits: "",
+    value: { type: "scalar", path: "earningChain.adi.crossChainController", format: "address" },
+  },
+  {
+    key: "AdiAdapter.registerOnGateway (AC)",
+    contract: "AdiAdapter",
+    category: "Cross-chain topology",
+    chainContext: "AC",
+    setterKeys: [],
+    unit: "bool (deploy-only)",
+    onChainLimits: "Wires AdiAdapter into ChainGateway at deploy",
+    value: { type: "scalar", path: "accountingChain.adi.registerOnGateway", format: "bool" },
+  },
+  {
+    key: "AdiAdapter.registerOnGateway (EC)",
+    contract: "AdiAdapter",
+    category: "Cross-chain topology",
+    chainContext: "EC",
+    setterKeys: [],
+    unit: "bool (deploy-only)",
+    onChainLimits: "Wires AdiAdapter into ChainGateway at deploy",
+    value: { type: "scalar", path: "earningChain.adi.registerOnGateway", format: "bool" },
   },
 
   // -------- Token metadata (deploy-only) --------

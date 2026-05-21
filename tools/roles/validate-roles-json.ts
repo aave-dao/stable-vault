@@ -104,7 +104,11 @@ function main(): void {
   assertUniqueBy(activeParameters, (p) => p.key, "parameter key", fail);
   assertUniqueBy(activeParameters, (p) => p.jsonPath, "parameter jsonPath", fail);
   const roleKeys = new Set(activeRoles.map((r) => r.key));
-  const contractOptions = new Set(activeRoles.map((r) => r.contract));
+  // Contracts with no restricted setters of their own but that still carry deploy-time parameters
+  // (constructor args, immutables). Allow-listed so the Roles-membership check still catches typos
+  // on regular contracts.
+  const EXTRA_PARAMETER_CONTRACTS = new Set(["AdiAdapter"]);
+  const contractOptions = new Set([...activeRoles.map((r) => r.contract), ...EXTRA_PARAMETER_CONTRACTS]);
   for (const param of activeParameters) {
     if (!contractOptions.has(param.contract)) {
       fail(`Parameter ${param.key}: contract "${param.contract}" is not in the Roles contract set`);
