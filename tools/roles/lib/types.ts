@@ -100,7 +100,6 @@ export interface ProfileJson {
 }
 
 export interface RolesArtifact {
-  generatedAt: string;
   source: {
     rolesConfigSha: string;
     accessManagerBaseSetupSha: string;

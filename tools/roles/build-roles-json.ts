@@ -73,7 +73,6 @@ function main(): void {
   });
 
   const artifact: RolesArtifact = {
-    generatedAt: new Date().toISOString(),
     source: {
       rolesConfigSha: sha256OfFile(ROLES_CONFIG_PATH),
       accessManagerBaseSetupSha: sha256OfFile(ACCESS_MANAGER_PATHS[0] ?? ""),
