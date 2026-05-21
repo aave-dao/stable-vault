@@ -1,6 +1,10 @@
 {
   "devDependencies": {
-    "husky": "^9.1.7"
+    "@notionhq/client": "^4.0.2",
+    "@types/node": "^22.10.5",
+    "husky": "^9.1.7",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
   },
   "lint-staged": {
     "**/*.sol": "forge fmt"
@@ -13,6 +17,11 @@
     "rs:bind": "rm -rf ./out/__BINDINGS__ && forge bind --bindings-path ./out/__BINDINGS__ --alloy --skip '(test|script)/**/*.sol'",
     "rs:abis": "forge build --out ./out/__FOLDER_ABIS__ --skip '(test|script)/**/*.sol' --extra-output-files abi && rm -rf ./out/__ABIS__ && mkdir -p ./out/__ABIS__ && find ./out/__FOLDER_ABIS__ -name '*.abi.json' -exec cp {} ./out/__ABIS__/ \\;",
     "rs:generate": "npm run rs:bind && npm run rs:abis && rm -rf ./out/__FOLDER_ABIS__",
-    "setup": "git submodule update --init --recursive"
+    "setup": "git submodule update --init --recursive",
+    "roles:dump": "TARGET_ENV=staging forge script script/tooling/DumpRoles.s.sol && TARGET_ENV=preprod forge script script/tooling/DumpRoles.s.sol && TARGET_ENV=prod forge script script/tooling/DumpRoles.s.sol",
+    "roles:build": "tsx tools/roles/build-roles-json.ts",
+    "roles:validate": "tsx tools/roles/validate-roles-json.ts",
+    "roles:all": "yarn roles:dump && yarn roles:build && yarn roles:validate",
+    "roles:notion-sync": "tsx --env-file-if-exists=.env tools/roles/notion-sync.ts"
   }
 }
