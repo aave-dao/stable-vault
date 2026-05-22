@@ -1,5 +1,5 @@
 {
-  "deployer": "0xBB700dA5CCC9Ec5605780Fc40695f1206B090303",
+  "deployer": "0x94F4Db0f0b169B9Fc4c9cDFC3086C21eDAF54d2F",
   "lowDelay": 1800, // 30 minutes
   "mediumDelay": 2700, // 45 minutes
   "highDelay": 3600, // 1 hour
