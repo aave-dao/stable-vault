@@ -98,7 +98,7 @@
       "minRedemptionCapacityRay": "10000000000000000000000000000", // $10
       "minRedemptionRefillRateRay": "115740740740740740740740" // $10/day
     },
-    "deploymentOutputPath": "deployments/vnet/v0.3/earning.json",
+    "deploymentOutputPath": "deployments/staging/v2/earning.json",
     "minBurnIouTokenGasLimit": "120000"
   },
   "accountingChain": {
@@ -169,6 +169,6 @@
       "minRedemptionCapacityRay": "10000000000000000000000000000", // $10
       "minRedemptionRefillRateRay": "115740740740740740740740" // $10/day
     },
-    "deploymentOutputPath": "deployments/vnet/v0.3/accounting.json"
+    "deploymentOutputPath": "deployments/staging/v2/accounting.json"
   }
 }
