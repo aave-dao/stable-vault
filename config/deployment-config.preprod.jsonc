@@ -18,7 +18,7 @@
     "withdrawalPolicyManager": "0xBdE1e349F4117d7202939929251eDa13c60A0639",
     "aTokenVaultRewardClaimer": "0xE79945842036F0f3a015C8f815657523503D7037",
     "stableVaultManager": "0xc93fb5428553de74E859b08032Be33Ebb8Fb6171",
-    "coverageGuardian": "0x0000000000000000000000000000000000000000", // TODO: set
+    "coverageGuardian": "0xc9bDdf3fF47216b60cfA3400D0A414d84dAB1055",
     "funder": "0x569c8D2D5fA781cef3D8799b15a4F651aFf1b806"
   },
   "withdrawalExecutionPolicy": {
