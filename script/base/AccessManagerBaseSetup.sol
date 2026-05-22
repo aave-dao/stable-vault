@@ -26,6 +26,17 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     function _setupAccessManager(address deployer) internal {
         IAccessManager accessManager = IAccessManager(_accessManager());
 
+        /// @custom:tx-already-executed-check Revoking the deployer's ADMIN_ROLE is the last step of this routine, so
+        /// observing it already revoked means a prior run completed the whole block. Short-circuiting here is also
+        /// necessary because some sub-steps below probe currently-effective values that can lag behind an in-flight
+        /// scheduled change from a prior run, which would otherwise cause a re-attempt that now reverts with
+        /// `AccessManagerUnauthorizedAccount` since the deployer no longer holds ADMIN_ROLE.
+        (bool deployerStillAdmin,) = accessManager.hasRole(RolesConfig.ADMIN_ROLE, deployer);
+        if (!deployerStillAdmin) {
+            logSkip("_setupAccessManager", "deployer's ADMIN_ROLE already revoked - skipping entire setup");
+            return;
+        }
+
         // Setup all profiles by granting roles to them, with their respective execution delays
         _setup_Profiles();
 
@@ -50,15 +61,9 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         // Setup the link between target and its allowed role, with
         _setup_Targets(deployer);
 
-        // Revoke deployer's access to ADMIN_ROLE
-        /// @custom:tx-already-executed-check Skip when a prior run already revoked deployer's ADMIN_ROLE (i.e.
-        // completed / the very last step of this setup).
-        (bool deployerStillAdmin,) = accessManager.hasRole(RolesConfig.ADMIN_ROLE, deployer);
-        if (deployerStillAdmin) {
-            accessManager.revokeRole(RolesConfig.ADMIN_ROLE, deployer);
-        } else {
-            logSkip("_setupAccessManager", "deployer's ADMIN_ROLE already revoked");
-        }
+        // Revoke deployer's access to ADMIN_ROLE. Unconditional - the early-return guard at the top of this function
+        // already covers the "already revoked" resume case.
+        accessManager.revokeRole(RolesConfig.ADMIN_ROLE, deployer);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////

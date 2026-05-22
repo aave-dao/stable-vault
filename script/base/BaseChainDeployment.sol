@@ -2,6 +2,7 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.20;
 
+import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {AccessManager} from "openzeppelin-contracts/contracts/access/manager/AccessManager.sol";
 
@@ -276,9 +277,19 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
     function _addBridgeAdapterIdempotent(IChainGateway gateway, address asset, uint256 chainId, address bridgeAdapter)
         private
     {
+        /// @custom:tx-already-executed-check Skip when the deployer can no longer call `addBridgeAdapter` on the
+        /// gateway — `_setupAccessManager` revokes the deployer's ADMIN_ROLE as its very last step, so losing call
+        /// access means a prior run completed everything up to and including the bridge-adapter setup. We can't
+        /// pre-check the registration via a getter (the gateway exposes none), so this guards both the resume-after-
+        /// revoke and resume-after-full-completion paths.
+        if (!_deployerCanCall(address(gateway), IChainGateway.addBridgeAdapter.selector)) {
+            logSkip("_addBridgeAdapterIdempotent", "deployer lacks call access - prior run completed");
+            return;
+        }
         try gateway.addBridgeAdapter(asset, chainId, bridgeAdapter) {}
         catch (bytes memory err) {
-            /// @custom:tx-already-executed-check Reverts with `AddressAlreadyWhitelisted` on duplicate.
+            /// @custom:tx-already-executed-check Reverts with `AddressAlreadyWhitelisted` on duplicate. Reachable on
+            /// a partial mid-setup resume (deployer still holds ADMIN_ROLE, some adapters already registered).
             // Truncating `err` to its first 4 bytes intentionally extracts the revert selector.
             // forge-lint: disable-next-line(unsafe-typecast)
             require(bytes4(err) == Errors.AddressAlreadyWhitelisted.selector, "addBridgeAdapter: unexpected revert");
@@ -287,9 +298,15 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
     }
 
     function _setDestinationChainAdapterIdempotent(address adapter, uint256 chainId, address destAdapter) private {
+        /// @custom:tx-already-executed-check See `_addBridgeAdapterIdempotent` for the same canCall-based reasoning.
+        if (!_deployerCanCall(adapter, IBridgeAdapter.setDestinationChainAdapter.selector)) {
+            logSkip("_setDestinationChainAdapterIdempotent", "deployer lacks call access - prior run completed");
+            return;
+        }
         try IBridgeAdapter(adapter).setDestinationChainAdapter(chainId, destAdapter) {}
         catch (bytes memory err) {
             /// @custom:tx-already-executed-check Reverts with `AlreadyConfigured` on duplicate.
+            // Truncating `err` to its first 4 bytes intentionally extracts the revert selector.
             // forge-lint: disable-next-line(unsafe-typecast)
             bytes4 errSelector = bytes4(err);
             require(
@@ -298,6 +315,15 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
             );
             logSkip("_setDestinationChainAdapterIdempotent", "destination chain adapter configured");
         }
+    }
+
+    /// @dev Returns whether the deployer can currently invoke `selector` on `target` via the configured AccessManager.
+    /// Used to short-circuit access-managed idempotent helpers on resume after the deployer's ADMIN_ROLE has been
+    /// revoked - calling regardless would revert and, more importantly, be captured by forge for broadcast and fail
+    /// the broadcast simulation even if the script's try/catch suppressed the in-memory revert.
+    function _deployerCanCall(address target, bytes4 selector) private view returns (bool) {
+        (bool ok,) = IAccessManager(_accessManager()).canCall(_deployer(), target, selector);
+        return ok;
     }
 
     function _setupAssetRegistry() internal {
