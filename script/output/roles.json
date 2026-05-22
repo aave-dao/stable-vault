@@ -1,13 +1,13 @@
 {
   "source": {
     "rolesConfigSha": "c20087e0f41dd655c0c6ea51ed265203aa5b0d2e58afc9ec0a8e9f031125f3bb",
-    "accessManagerBaseSetupSha": "ce4b20db9f1b2726bfd29d1439476a8f5a5de912d352f73ad44fc8c6b8e8407b",
+    "accessManagerBaseSetupSha": "d2e8a2cd2b0ae32a9bc54ca6e45dc20d994584190bc77457c139be7df5b534d4",
     "accessManagerAccountingChainSetupSha": "3dbff6191ccf11cd5ac399a3c8f19d68c8c78761537babbff531e2b24be32981",
     "accessManagerEarningChainSetupSha": "aaa24f21d5bad9b851ccd6d54285acb264e06482d60b66bc1632984b902fd252",
     "deploymentConfigShas": {
-      "staging": "a4af3b56411cffd375f709b08ddf48b602f7e10ca4a839578e76190f9399945a",
-      "preprod": "34a060c7df6832ff521d7066cd9bfb6c96608989575f47c17eeea6bcd3e0d00f",
-      "prod": "cf237ef6d956ffcf27737f6b34332bcc9774239385e1feb6caf9a68bd1d0d4bd"
+      "staging": "0f71d9d124c125b01562fee080ad8fc92a743e6cdc5279804d66a02f48813a1d",
+      "preprod": "e23d5bfba982510c76d36fbea71272904d7b82b3c39684bada6fda500e29607b",
+      "prod": "8a9c9bd8741e3b7d426883fa99580f89c7b623d695443db88273bf3fdf5cd4a9"
     }
   },
   "delayTiers": [
@@ -88,9 +88,9 @@
       "grantPolicy": "EXPLICIT",
       "holdsGuardians": [],
       "addressByEnv": {
-        "staging": "0x0000000000000000000000000000000000000000",
-        "preprod": "0x0000000000000000000000000000000000000000",
-        "prod": "0x0000000000000000000000000000000000000000"
+        "staging": "0x569c8D2D5fA781cef3D8799b15a4F651aFf1b806",
+        "preprod": "0x569c8D2D5fA781cef3D8799b15a4F651aFf1b806",
+        "prod": "0x3348F31a6d4852AE273aedCF8EEb284c523E4dDF"
       }
     },
     {
