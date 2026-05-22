@@ -414,6 +414,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
 
     function _setupTarget__AdiCrossChainController() internal {
         address adiCrossChainController = _adiCrossChainController();
+        require(adiCrossChainController != address(0), "Adi CCC address not set");
 
         RolesConfig.Role[] memory roles = new RolesConfig.Role[](16);
 
