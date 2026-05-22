@@ -17,6 +17,10 @@ contract Create3Deployment {
         address proxyAdminOwner,
         bytes memory initCalldata
     ) internal returns (address) {
+        address predicted = Create3AddressLib.computeCreate3Address(namespacedSaltSeed, deployer);
+        if (predicted.code.length != 0) {
+            return predicted;
+        }
         return CREATE3_FACTORY.deployCreate3({
             salt: Create3AddressLib.computeCreate3Salt(namespacedSaltSeed, deployer),
             initCode: abi.encodePacked(
@@ -30,8 +34,20 @@ contract Create3Deployment {
         internal
         returns (address)
     {
+        address predicted = Create3AddressLib.computeCreate3Address(namespacedSaltSeed, deployer);
+        if (predicted.code.length != 0) {
+            return predicted;
+        }
         return CREATE3_FACTORY.deployCreate3({
             salt: Create3AddressLib.computeCreate3Salt(namespacedSaltSeed, deployer), initCode: initCode
         });
+    }
+
+    /// @dev Reverts if the deployed runtime code at `addr` does not match `expectedRuntimeCodeHash`. Pass
+    /// `keccak256(type(X).runtimeCode)` for contracts without immutables; for contracts with immutables the deployed
+    /// code differs from the template, so this check is not applicable and callers should fall back to a presence
+    /// check.
+    function _assertDeployedRuntimeCode(address addr, bytes32 expectedRuntimeCodeHash) internal view {
+        require(keccak256(addr.code) == expectedRuntimeCodeHash, "deployed runtime code hash mismatch");
     }
 }

@@ -13,6 +13,7 @@ import {ATokenVault} from "@aave-vault/ATokenVault.sol";
 import {ATokenVaultCreate3ProxyDeployer} from "script/base/ATokenVaultCreate3ProxyDeployer.sol";
 import {ATokenVaultProxyAddressLib} from "script/libraries/ATokenVaultProxyAddressLib.sol";
 import {Create3AddressLib} from "script/libraries/Create3AddressLib.sol";
+import {logSkip} from "script/libraries/DeploymentLogLib.sol";
 
 abstract contract ATokenVaultDeployment is Script {
     using SafeERC20 for IERC20;
@@ -36,29 +37,24 @@ abstract contract ATokenVaultDeployment is Script {
         address proxyDeployerAddress = Create3AddressLib.computeCreate3Address(proxyDeployerSaltSeed, deployer);
         address vaultAddress = ATokenVaultProxyAddressLib.computeProxyAddress(proxyDeployerAddress);
         if (vaultAddress.code.length != 0) {
+            /// @custom:tx-already-executed-check Predicted vault address (derived from the CREATE3 proxy-deployer)
+            /// already has code — a prior run deployed both the impl and the proxy via the proxy-deployer contract.
+            logSkip("_deployATokenVault", "aTokenVault already deployed for underlying");
             _trackATokenVaultDeployment(underlying, vaultAddress);
             _logATokenVaultDeployments();
             return vaultAddress;
         }
-        require(proxyDeployerAddress.code.length == 0, "aTokenVault proxy deployer already deployed");
+        require(proxyDeployerAddress.code.length == 0, "aTokenVault proxy deployer");
 
         // Do not import `ATokenVaultMerklRewardClaimer` contract here, as it will force the entire set of dependencies
         // of this contract (and any other contract using it) to be compiled with the size-optimized profile.
         // Instead, we deploy manually reading the bytecode from the compiled artifact.
         // See `CompileATokenVaultMerklRewardClaimer.sol` for more details.
-        address implementation;
-        {
-            string memory artifactPath = "out/ATokenVaultMerklRewardClaimer.sol/ATokenVaultMerklRewardClaimer.json";
-            // forge-lint: disable-next-line(unsafe-cheatcode)
-            string memory artifact = vm.readFile(artifactPath);
-            bytes memory initCode = abi.encodePacked(
-                vm.parseJsonBytes(artifact, ".bytecode.object"), abi.encode(underlying, uint16(0), poolAddressProvider)
-            );
-            assembly {
-                implementation := create(0, add(initCode, 0x20), mload(initCode))
-            }
-            require(implementation != address(0), "ATokenVaultMerklRewardClaimer deployment failed");
-        }
+        //
+        // CREATE3-deploy so the impl address is deterministic across re-runs (otherwise its address depends on
+        // deployer nonce, which would cascade into a different ATokenVaultCreate3ProxyDeployer address since the impl
+        // is encoded into its constructor args).
+        address implementation = _deployATokenVaultMerklRewardClaimerImpl(underlying, poolAddressProvider, deployer);
 
         bytes memory initCalldata = abi.encodeCall(
             ATokenVault.initialize,
@@ -92,6 +88,31 @@ abstract contract ATokenVaultDeployment is Script {
         return vaultAddress;
     }
 
+    function _deployATokenVaultMerklRewardClaimerImpl(address underlying, address poolAddressProvider, address deployer)
+        private
+        returns (address)
+    {
+        string memory implSaltSeed = _aTokenVaultMerklRewardClaimerImplSaltSeed(underlying);
+        address predictedImpl = Create3AddressLib.computeCreate3Address(implSaltSeed, deployer);
+        if (predictedImpl.code.length != 0) {
+            /// @custom:tx-already-executed-check Predicted address has code.
+            logSkip(
+                "_deployATokenVaultMerklRewardClaimerImpl",
+                "ATokenVaultMerklRewardClaimer impl already deployed for underlying"
+            );
+            return predictedImpl;
+        }
+        // forge-lint: disable-next-line(unsafe-cheatcode)
+        string memory artifact = vm.readFile("out/ATokenVaultMerklRewardClaimer.sol/ATokenVaultMerklRewardClaimer.json");
+        bytes memory implInitCode = abi.encodePacked(
+            vm.parseJsonBytes(artifact, ".bytecode.object"), abi.encode(underlying, uint16(0), poolAddressProvider)
+        );
+        address implementation = ICreateX(Create3AddressLib.CREATEX_ADDRESS)
+            .deployCreate3({salt: Create3AddressLib.computeCreate3Salt(implSaltSeed, deployer), initCode: implInitCode});
+        require(implementation == predictedImpl, "ATokenVaultMerklRewardClaimer impl address mismatch");
+        return implementation;
+    }
+
     function _trackATokenVaultDeployment(address underlying, address vaultAddress) private {
         string memory symbol = IERC20Metadata(underlying).symbol();
         bool found = false;
@@ -111,6 +132,12 @@ abstract contract ATokenVaultDeployment is Script {
     function _logATokenVaultDeployments() internal virtual {}
 
     function _aTokenVaultProxyDeployerSaltSeed(address underlying) internal pure virtual returns (string memory);
+
+    function _aTokenVaultMerklRewardClaimerImplSaltSeed(address underlying)
+        internal
+        pure
+        virtual
+        returns (string memory);
 
     function _buildATokenVaultsJson() internal returns (string memory) {
         string memory json = "[";
