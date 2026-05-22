@@ -315,12 +315,11 @@ abstract contract AccountingChainDeployment is
     function _setDestinationChainAdapterIdempotent(address adapter, uint256 chainId, address destAdapter) private {
         try IBridgeAdapter(adapter).setDestinationChainAdapter(chainId, destAdapter) {}
         catch (bytes memory err) {
-            /// @custom:tx-already-executed-check `setDestinationChainAdapter` reverts with `AlreadyConfigured` when the
-            /// chain is already wired; matching the selector tells us a prior run applied it.
-            // Truncating `err` to its first 4 bytes intentionally extracts the revert selector.
+            /// @custom:tx-already-executed-check Reverts with `AlreadyConfigured` on duplicate.
             // forge-lint: disable-next-line(unsafe-typecast)
+            bytes4 errSelector = bytes4(err);
             require(
-                bytes4(err) == IBridgeAdapter.AlreadyConfigured.selector,
+                errSelector == IBridgeAdapter.AlreadyConfigured.selector,
                 "setDestinationChainAdapter: unexpected revert"
             );
             logSkip("_setDestinationChainAdapterIdempotent", "destination chain adapter already configured");

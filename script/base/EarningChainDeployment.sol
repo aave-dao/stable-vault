@@ -254,10 +254,10 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         try IBridgeAdapter(adapter).setDestinationChainAdapter(chainId, destAdapter) {}
         catch (bytes memory err) {
             /// @custom:tx-already-executed-check Reverts with `AlreadyConfigured` on duplicate.
-            // Truncating `err` to its first 4 bytes intentionally extracts the revert selector.
             // forge-lint: disable-next-line(unsafe-typecast)
+            bytes4 errSelector = bytes4(err);
             require(
-                bytes4(err) == IBridgeAdapter.AlreadyConfigured.selector,
+                errSelector == IBridgeAdapter.AlreadyConfigured.selector,
                 "setDestinationChainAdapter: unexpected revert"
             );
             logSkip("_setDestinationChainAdapterIdempotent", "destination chain adapter configured");
