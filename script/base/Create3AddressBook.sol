@@ -30,6 +30,15 @@ contract Create3AddressBook {
     string constant DEPOSIT_POLICY_SALT_SEED = "aave.stable-vault.DepositPolicy";
     string constant FUNDS_BRIDGING_POLICY_SALT_SEED = "aave.stable-vault.FundsBridgingPolicy";
     string constant ATOKEN_VAULT_PROXY_DEPLOYER_SALT_SEED_PREFIX = "aave.stable-vault.ATokenVault.ProxyDeployer.";
+    string constant ATOKEN_VAULT_MERKL_REWARD_CLAIMER_IMPL_SALT_SEED_PREFIX =
+        "aave.stable-vault.ATokenVaultMerklRewardClaimer.Impl.";
+    string constant CHAINLINK_PRICE_ORACLE_ADAPTER_SALT_SEED_PREFIX = "aave.stable-vault.ChainlinkPriceOracleAdapter.";
+    string constant CHAINLINK_L2_PRICE_ORACLE_ADAPTER_SALT_SEED_PREFIX =
+        "aave.stable-vault.ChainlinkL2PriceOracleAdapter.";
+    string constant CHAINLINK_L2_CHAIN_BALANCE_ORACLE_ADAPTER_SALT_SEED_PREFIX =
+        "aave.stable-vault.ChainlinkL2ChainBalanceOracleAdapter.";
+    string constant MOCK_BUNDLE_FEED_SALT_SEED = "aave.stable-vault.MockBundleFeed";
+    string constant MOCK_SEQUENCER_UPTIME_FEED_SALT_SEED = "aave.stable-vault.MockSequencerUptimeFeed";
 
     function getStableVaultAddress(address deployer) internal pure virtual returns (address) {
         return Create3AddressLib.computeCreate3Address(STABLE_VAULT_SALT_SEED, deployer);
@@ -117,6 +126,69 @@ contract Create3AddressBook {
 
     function getATokenVaultProxyDeployerSaltSeed(address underlying) internal pure virtual returns (string memory) {
         return string.concat(ATOKEN_VAULT_PROXY_DEPLOYER_SALT_SEED_PREFIX, underlying.toHexString());
+    }
+
+    function getATokenVaultMerklRewardClaimerImplSaltSeed(address underlying)
+        internal
+        pure
+        virtual
+        returns (string memory)
+    {
+        return string.concat(ATOKEN_VAULT_MERKL_REWARD_CLAIMER_IMPL_SALT_SEED_PREFIX, underlying.toHexString());
+    }
+
+    function getChainlinkPriceOracleAdapterSaltSeed(address asset) internal pure virtual returns (string memory) {
+        return string.concat(CHAINLINK_PRICE_ORACLE_ADAPTER_SALT_SEED_PREFIX, asset.toHexString());
+    }
+
+    function getChainlinkPriceOracleAdapterAddress(address asset, address deployer)
+        internal
+        pure
+        virtual
+        returns (address)
+    {
+        return Create3AddressLib.computeCreate3Address(getChainlinkPriceOracleAdapterSaltSeed(asset), deployer);
+    }
+
+    function getChainlinkL2PriceOracleAdapterSaltSeed(address asset) internal pure virtual returns (string memory) {
+        return string.concat(CHAINLINK_L2_PRICE_ORACLE_ADAPTER_SALT_SEED_PREFIX, asset.toHexString());
+    }
+
+    function getChainlinkL2PriceOracleAdapterAddress(address asset, address deployer)
+        internal
+        pure
+        virtual
+        returns (address)
+    {
+        return Create3AddressLib.computeCreate3Address(getChainlinkL2PriceOracleAdapterSaltSeed(asset), deployer);
+    }
+
+    function getChainlinkL2ChainBalanceOracleAdapterSaltSeed(uint256 chainId)
+        internal
+        pure
+        virtual
+        returns (string memory)
+    {
+        return string.concat(CHAINLINK_L2_CHAIN_BALANCE_ORACLE_ADAPTER_SALT_SEED_PREFIX, Strings.toString(chainId));
+    }
+
+    function getChainlinkL2ChainBalanceOracleAdapterAddress(uint256 chainId, address deployer)
+        internal
+        pure
+        virtual
+        returns (address)
+    {
+        return Create3AddressLib.computeCreate3Address(
+            getChainlinkL2ChainBalanceOracleAdapterSaltSeed(chainId), deployer
+        );
+    }
+
+    function getMockBundleFeedAddress(address deployer) internal pure virtual returns (address) {
+        return Create3AddressLib.computeCreate3Address(MOCK_BUNDLE_FEED_SALT_SEED, deployer);
+    }
+
+    function getMockSequencerUptimeFeedAddress(address deployer) internal pure virtual returns (address) {
+        return Create3AddressLib.computeCreate3Address(MOCK_SEQUENCER_UPTIME_FEED_SALT_SEED, deployer);
     }
 
     function _getATokenVaultProxyDeployerAddress(address underlying, address deployer) private pure returns (address) {

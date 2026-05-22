@@ -8,6 +8,7 @@ import {Create3AddressBook} from "script/base/Create3AddressBook.sol";
 import {Create3Deployment} from "script/base/Create3Deployment.sol";
 import {RolesConfig} from "script/base/RolesConfig.sol";
 import {Create3AddressLib} from "script/libraries/Create3AddressLib.sol";
+import {logSkip} from "script/libraries/DeploymentLogLib.sol";
 import {IMulticall} from "src/interfaces/IMulticall.sol";
 import {OwnedMulticall} from "src/periphery/OwnedMulticall.sol";
 import {_toSelectorArray} from "test/helpers/TypeHelpers.sol";
@@ -38,13 +39,26 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         _setupRoleAdmins();
 
         // Setup the ADMIN_ROLE delay
-        accessManager.setTargetAdminDelay(address(accessManager), CRITICAL_DELAY);
+        /// @custom:tx-already-executed-check Skip when a prior run already applied CRITICAL_DELAY to the
+        // AccessManager's / own target-admin delay.
+        if (accessManager.getTargetAdminDelay(address(accessManager)) != CRITICAL_DELAY) {
+            accessManager.setTargetAdminDelay(address(accessManager), CRITICAL_DELAY);
+        } else {
+            logSkip("_setupAccessManager", "AccessManager target admin delay already at CRITICAL_DELAY");
+        }
 
         // Setup the link between target and its allowed role, with
         _setup_Targets(deployer);
 
         // Revoke deployer's access to ADMIN_ROLE
-        accessManager.revokeRole(RolesConfig.ADMIN_ROLE, deployer);
+        /// @custom:tx-already-executed-check Skip when a prior run already revoked deployer's ADMIN_ROLE (i.e.
+        // completed / the very last step of this setup).
+        (bool deployerStillAdmin,) = accessManager.hasRole(RolesConfig.ADMIN_ROLE, deployer);
+        if (deployerStillAdmin) {
+            accessManager.revokeRole(RolesConfig.ADMIN_ROLE, deployer);
+        } else {
+            logSkip("_setupAccessManager", "deployer's ADMIN_ROLE already revoked");
+        }
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -115,6 +129,13 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
     function _deployOwnedMulticallForRebalancerProfile() internal virtual returns (address) {
+        address predicted = _getProfile__Rebalancer();
+        if (predicted.code.length != 0) {
+            /// @custom:tx-already-executed-check Predicted address has code.
+            logSkip("_deployOwnedMulticallForRebalancerProfile", "RebalancerMulticall");
+            _logDeployment("RebalancerMulticall", REBALANCER_MULTICALL_SALT_SEED, predicted);
+            return predicted;
+        }
         address rebalancerMulticallOwner = _getRebalancerMulticallOwner();
         require(rebalancerMulticallOwner != address(0), "Rebalancer Profile OwnedMulticall owner is not set");
         address rebalancerMulticall = _deploy_create3({
@@ -122,12 +143,19 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
             deployer: _deployer(),
             initCode: abi.encodePacked(type(OwnedMulticall).creationCode, abi.encode(rebalancerMulticallOwner))
         });
-        require(rebalancerMulticall == _getProfile__Rebalancer(), "RebalancerMulticall does not match expected address");
+        require(rebalancerMulticall == predicted, "RebalancerMulticall does not match expected address");
         _logDeployment("RebalancerMulticall", REBALANCER_MULTICALL_SALT_SEED, rebalancerMulticall);
         return rebalancerMulticall;
     }
 
     function _deployOwnedMulticallForDisablerProfile() internal virtual returns (address) {
+        address predicted = _getProfile__Disabler();
+        if (predicted.code.length != 0) {
+            /// @custom:tx-already-executed-check Predicted address has code.
+            logSkip("_deployOwnedMulticallForDisablerProfile", "DisablerMulticall");
+            _logDeployment("DisablerMulticall", DISABLER_MULTICALL_SALT_SEED, predicted);
+            return predicted;
+        }
         address disablerMulticallOwner = _getDisablerMulticallOwner();
         require(disablerMulticallOwner != address(0), "Disabler Profile OwnedMulticall owner is not set");
         address disablerMulticall = _deploy_create3({
@@ -135,7 +163,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
             deployer: _deployer(),
             initCode: abi.encodePacked(type(OwnedMulticall).creationCode, abi.encode(disablerMulticallOwner))
         });
-        require(disablerMulticall == _getProfile__Disabler(), "DisablerMulticall does not match expected address");
+        require(disablerMulticall == predicted, "DisablerMulticall does not match expected address");
         _logDeployment("DisablerMulticall", DISABLER_MULTICALL_SALT_SEED, disablerMulticall);
         return disablerMulticall;
     }
@@ -182,7 +210,15 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
     function _setupRoleGuardians() internal {
+        IAccessManager accessManager = IAccessManager(_accessManager());
         RolesConfig.Role[] memory roles = RolesConfig.getAllFunctionBasedRoles();
+        if (accessManager.getRoleGuardian(roles[0].roleId) == roles[0].guardianRoleId) {
+            /// @custom:tx-already-executed-check The whole batch below executes atomically in one multicall tx, so
+            /// observing the first role's guardian already matches the target is enough to conclude a prior run
+            /// completed this step.
+            logSkip("_setupRoleGuardians", "role guardians already configured");
+            return;
+        }
         bytes[] memory multicallCalldata = new bytes[](roles.length);
         for (uint256 i = 0; i < roles.length; i++) {
             multicallCalldata[i] =
@@ -194,7 +230,15 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
     function _setupRoleAdmins() internal {
+        IAccessManager accessManager = IAccessManager(_accessManager());
         RolesConfig.Role[] memory roles = RolesConfig.getAllFunctionBasedRoles();
+        if (accessManager.getRoleAdmin(roles[0].roleId) == roles[0].guardianRoleId) {
+            /// @custom:tx-already-executed-check The whole batch below executes atomically in one multicall tx, so
+            /// observing the first role's admin already matches the target is enough to conclude a prior run
+            /// completed this step.
+            logSkip("_setupRoleAdmins", "role admins already configured");
+            return;
+        }
         bytes[] memory multicallCalldata = new bytes[](roles.length);
         for (uint256 i = 0; i < roles.length; i++) {
             multicallCalldata[i] =
@@ -206,7 +250,17 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
     function _setupRoleGrantingDelays() internal {
+        IAccessManager accessManager = IAccessManager(_accessManager());
         RolesConfig.Role[] memory roles = RolesConfig.getAllFunctionBasedRoles();
+        if (accessManager.getRoleGrantDelay(roles[0].roleId) == roles[0].delay) {
+            /// @custom:tx-already-executed-check The whole batch below executes atomically in one multicall tx, so
+            /// observing the first role's grant delay already matches the target is enough to conclude a prior run
+            /// completed this step. Note: getRoleGrantDelay returns the *currently effective* delay, so an in-flight
+            /// setback from a prior run can mask completion until it elapses; functionally harmless on replay (the
+            /// final delay still converges to `roles[0].delay`), but may emit redundant events on rapid resumes.
+            logSkip("_setupRoleGrantingDelays", "role grant delays already configured");
+            return;
+        }
         bytes[] memory multicallCalldata = new bytes[](roles.length);
         for (uint256 i = 0; i < roles.length; i++) {
             multicallCalldata[i] = abi.encodeCall(IAccessManager.setGrantDelay, (roles[i].roleId, roles[i].delay));
@@ -219,6 +273,16 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     function _setupProfile__MainAdmin() internal {
         address mainAdminProfile = _getProfile__MainAdmin();
         require(mainAdminProfile != address(0), "MainAdmin profile address not set");
+
+        (bool isMember, uint32 currentDelay) =
+            IAccessManager(_accessManager()).hasRole(RolesConfig.ADMIN_ROLE, mainAdminProfile);
+        if (isMember && currentDelay == CRITICAL_DELAY) {
+            /// @custom:tx-already-executed-check The whole batch below executes atomically in one multicall tx, so
+            /// observing ADMIN_ROLE (the first op in the bundle) already granted to MainAdmin with CRITICAL_DELAY is
+            /// enough to conclude a prior run completed this step.
+            logSkip("_setupProfile__MainAdmin", "MainAdmin profile setup already applied");
+            return;
+        }
 
         RolesConfig.Role[] memory functionBasedRoles = RolesConfig.getAllFunctionBasedRoles();
         bytes[] memory multicallCalldata = new bytes[](functionBasedRoles.length + 3);
@@ -249,6 +313,16 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     function _setupProfile__SecondaryAdmin() internal {
         address secondaryAdminProfile = _getProfile__SecondaryAdmin();
         require(secondaryAdminProfile != address(0), "SecondaryAdmin profile address not set");
+
+        (bool isMember,) =
+            IAccessManager(_accessManager()).hasRole(RolesConfig.OPERATIONAL_ROLE_GUARDIAN_ROLE, secondaryAdminProfile);
+        if (isMember) {
+            /// @custom:tx-already-executed-check The whole batch below executes atomically in one multicall tx, so
+            /// observing OPERATIONAL_ROLE_GUARDIAN_ROLE (the first op in the bundle) already granted to SecondaryAdmin
+            /// is enough to conclude a prior run completed this step.
+            logSkip("_setupProfile__SecondaryAdmin", "SecondaryAdmin profile setup already applied");
+            return;
+        }
 
         RolesConfig.Role[] memory functionBasedRoles = RolesConfig.getAllFunctionBasedRoles();
 
@@ -561,6 +635,14 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
     function _grantRolesToProfile(address profileAddress, RolesConfig.Role[] memory roles) internal {
+        (bool isMember, uint32 currentDelay) = IAccessManager(_accessManager()).hasRole(roles[0].roleId, profileAddress);
+        if (isMember && currentDelay == roles[0].delay) {
+            /// @custom:tx-already-executed-check The whole batch below executes atomically in one multicall tx, so
+            /// observing the first role already granted with the expected execution delay is enough to conclude a
+            /// prior run completed this step.
+            logSkip("_grantRolesToProfile", "roles already granted to profile");
+            return;
+        }
         bytes[] memory multicallCalldata = new bytes[](roles.length);
         for (uint256 i = 0; i < roles.length; i++) {
             multicallCalldata[i] =
@@ -570,6 +652,13 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     }
 
     function _setTargetFunctionRoles(address target, RolesConfig.Role[] memory roles) internal {
+        if (IAccessManager(_accessManager()).getTargetFunctionRole(target, roles[0].selector) == roles[0].roleId) {
+            /// @custom:tx-already-executed-check The whole batch below executes atomically in one multicall tx, so
+            /// observing the first selector already bound to the target role is enough to conclude a prior run
+            /// completed this step.
+            logSkip("_setTargetFunctionRoles", "target function roles already configured");
+            return;
+        }
         bytes[] memory multicallCalldata = new bytes[](roles.length);
         for (uint256 i = 0; i < roles.length; i++) {
             multicallCalldata[i] = abi.encodeCall(
