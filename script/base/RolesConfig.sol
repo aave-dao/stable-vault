@@ -559,19 +559,6 @@ abstract contract RolesConfig is DeploymentConfig {
 
     /// @custom:delay Critical
     /// @custom:location AdiCrossChainController
-    function getRole__adiRenounceOwnership() internal view returns (Role memory) {
-        bytes4 selector = Ownable.renounceOwnership.selector;
-        return Role({
-            roleId: _selectorToRoleId(selector),
-            selector: selector,
-            delay: CRITICAL_DELAY,
-            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
-            hasCriticalRisk: true
-        });
-    }
-
-    /// @custom:delay Critical
-    /// @custom:location AdiCrossChainController
     function getRole__adiUpdateGuardian() internal view returns (Role memory) {
         bytes4 selector = IWithGuardian.updateGuardian.selector;
         return Role({
@@ -1157,7 +1144,7 @@ abstract contract RolesConfig is DeploymentConfig {
     }
 
     function getAllFunctionBasedRoles() internal view returns (Role[] memory) {
-        Role[] memory roles = new Role[](85);
+        Role[] memory roles = new Role[](84);
 
         // AssetRegistry
         roles[0] = getRole__setAssetConfig();
@@ -1271,8 +1258,7 @@ abstract contract RolesConfig is DeploymentConfig {
         roles[80] = getRole__adiEmergencyTokenTransfer();
         roles[81] = getRole__adiEmergencyEtherTransfer();
         roles[82] = getRole__adiTransferOwnership();
-        roles[83] = getRole__adiRenounceOwnership();
-        roles[84] = getRole__adiUpdateGuardian();
+        roles[83] = getRole__adiUpdateGuardian();
 
         return roles;
     }

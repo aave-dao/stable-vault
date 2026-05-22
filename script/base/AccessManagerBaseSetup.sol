@@ -416,7 +416,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         address adiCrossChainController = _adiCrossChainController();
         require(adiCrossChainController != address(0), "Adi CCC address not set");
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](16);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](15);
 
         // Forwarder
         roles[0] = RolesConfig.getRole__adiApproveSenders();
@@ -435,8 +435,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         roles[11] = RolesConfig.getRole__adiEmergencyTokenTransfer();
         roles[12] = RolesConfig.getRole__adiEmergencyEtherTransfer();
         roles[13] = RolesConfig.getRole__adiTransferOwnership();
-        roles[14] = RolesConfig.getRole__adiRenounceOwnership();
-        roles[15] = RolesConfig.getRole__adiUpdateGuardian();
+        roles[14] = RolesConfig.getRole__adiUpdateGuardian();
 
         _setTargetFunctionRoles(adiCrossChainController, roles);
     }

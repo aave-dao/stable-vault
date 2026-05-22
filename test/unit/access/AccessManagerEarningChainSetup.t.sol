@@ -179,11 +179,6 @@ contract AccessManagerEarningChainWithAdiSetupTest is AccessManagerEarningChainS
             RolesConfig.getRole__adiTransferOwnership().roleId
         );
         _assertTargetFunctionRole(
-            target,
-            RolesConfig.getRole__adiRenounceOwnership().selector,
-            RolesConfig.getRole__adiRenounceOwnership().roleId
-        );
-        _assertTargetFunctionRole(
             target, RolesConfig.getRole__adiUpdateGuardian().selector, RolesConfig.getRole__adiUpdateGuardian().roleId
         );
     }
