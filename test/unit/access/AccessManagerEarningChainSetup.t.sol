@@ -3,7 +3,6 @@
 pragma solidity ^0.8.20;
 
 import {AccessManagerBaseSetup} from "script/base/AccessManagerBaseSetup.sol";
-import {AccessManagerEarningChainSetup} from "script/base/AccessManagerEarningChainSetup.sol";
 import {EarningChainDeployment} from "script/base/EarningChainDeployment.sol";
 import {RolesConfig} from "script/base/RolesConfig.sol";
 import {Create3AddressLib} from "script/libraries/Create3AddressLib.sol";
@@ -59,7 +58,7 @@ contract AccessManagerEarningChainSetupTest is AccessManagerSetupBaseTest, Earni
     function _setup_Targets(address deployer)
         internal
         virtual
-        override(AccessManagerBaseSetup, AccessManagerEarningChainSetup)
+        override(AccessManagerBaseSetup, EarningChainDeployment)
     {
         super._setup_Targets(deployer);
     }

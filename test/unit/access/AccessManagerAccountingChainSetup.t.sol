@@ -2,7 +2,6 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.20;
 
-import {AccessManagerAccountingChainSetup} from "script/base/AccessManagerAccountingChainSetup.sol";
 import {AccessManagerBaseSetup} from "script/base/AccessManagerBaseSetup.sol";
 import {AccountingChainDeployment} from "script/base/AccountingChainDeployment.sol";
 import {RolesConfig} from "script/base/RolesConfig.sol";
@@ -60,7 +59,7 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
         return address(uint160(uint256(keccak256("test.aTokenVault"))));
     }
 
-    function _setup_Profiles() internal virtual override(AccessManagerBaseSetup, AccessManagerAccountingChainSetup) {
+    function _setup_Profiles() internal virtual override(AccessManagerBaseSetup, AccountingChainDeployment) {
         super._setup_Profiles();
     }
 
@@ -68,7 +67,7 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
         internal
         view
         virtual
-        override(AccessManagerBaseSetup, AccessManagerAccountingChainSetup)
+        override(AccessManagerBaseSetup, AccountingChainDeployment)
     {
         super._validateProfileAddresses();
     }
@@ -76,7 +75,7 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
     function _setup_Targets(address deployer)
         internal
         virtual
-        override(AccessManagerBaseSetup, AccessManagerAccountingChainSetup)
+        override(AccessManagerBaseSetup, AccountingChainDeployment)
     {
         super._setup_Targets(deployer);
     }

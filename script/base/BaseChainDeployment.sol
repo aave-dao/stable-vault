@@ -1,0 +1,864 @@
+// SPDX-License-Identifier: UNLICENSED
+// Copyright (c) 2025 Aave Labs
+pragma solidity ^0.8.20;
+
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
+import {AccessManager} from "openzeppelin-contracts/contracts/access/manager/AccessManager.sol";
+
+import {ATokenVaultDeployment} from "script/base/ATokenVaultDeployment.sol";
+import {AccessManagerBaseSetup} from "script/base/AccessManagerBaseSetup.sol";
+import {Create3Deployment} from "script/base/Create3Deployment.sol";
+import {logSkip} from "script/libraries/DeploymentLogLib.sol";
+
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+import {IRouterClient} from "@chainlink-ccip/contracts/interfaces/IRouterClient.sol";
+
+import {AdiAdapter} from "src/bridging/adi/AdiAdapter.sol";
+import {CcipAdapter} from "src/bridging/ccip/CcipAdapter.sol";
+import {Allocator} from "src/core/Allocator.sol";
+import {IouToken} from "src/core/ious/IouToken.sol";
+import {IouTokenManager} from "src/core/ious/IouTokenManager.sol";
+import {IAllocator} from "src/interfaces/IAllocator.sol";
+import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
+import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
+import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
+import {IChainGateway} from "src/interfaces/IChainGateway.sol";
+import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
+import {RateLimitBucketLib} from "src/libraries/RateLimitBucketLib.sol";
+import {AggregatorV3Interface} from "src/oracles/price/ChainlinkPriceOracleAdapter.sol";
+import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
+import {AssetRegistry} from "src/periphery/AssetRegistry.sol";
+import {PolicyRegistry} from "src/periphery/PolicyRegistry.sol";
+import {SlippageCoverageVault} from "src/periphery/SlippageCoverageVault.sol";
+import {Swapper} from "src/periphery/Swapper.sol";
+import {TransferHelper} from "src/periphery/TransferHelper.sol";
+import {FundsBridgingPolicy} from "src/policies/FundsBridgingPolicy.sol";
+import {WithdrawalExecutionPolicy} from "src/policies/WithdrawalExecutionPolicy.sol";
+import {Constants} from "src/types/Constants.sol";
+import {Errors} from "src/types/Errors.sol";
+
+abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSetup, ATokenVaultDeployment {
+    using Strings for address;
+
+    address immutable PROXY_ADMIN_OWNER = getAccessManagerAddress(_deployer());
+    address immutable ALLOCATOR_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
+    address immutable WITHDRAWAL_EXECUTION_POLICY_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
+    address immutable ASSET_REGISTRY_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
+    address immutable GATEWAY_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
+    address immutable IOU_TOKEN_MANAGER_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
+    address immutable PRICE_ORACLE_PROXY_ADMIN_OWNER = PROXY_ADMIN_OWNER;
+
+    address immutable ACCESS_MANAGER_ADMIN = _deployer();
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////
+    // Chain-specific hooks (provided by subclasses).
+    ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /// @dev Config key prefix for this chain's section (e.g. ".accountingChain").
+    function _chainConfigPrefix() internal pure virtual returns (string memory);
+
+    /// @dev Config key prefix for the counterparty chain.
+    function _remoteChainConfigPrefix() internal pure virtual returns (string memory);
+
+    /// @dev Human-readable chain label used in revert reasons (e.g. "accounting-chain").
+    function _chainName() internal pure virtual returns (string memory);
+
+    function _withdrawalExecutionPolicyId() internal pure virtual returns (bytes32);
+
+    function _bridgePolicyId() internal pure virtual returns (bytes32);
+
+    /// @dev Target contract that the WithdrawalExecutionPolicy guards (StableVault on accounting chain, Gateway on
+    /// earning chain).
+    function _withdrawalExecutionPolicyTarget() internal view virtual returns (address);
+
+    /// @dev StableVault address for the IouTokenManager (zero on earning chain).
+    function _iouTokenManagerVault() internal view virtual returns (address);
+
+    function _isAccountingChain() internal pure virtual returns (bool);
+
+    function _allocatorDepositor() internal view virtual returns (address);
+
+    function _allocatorWithdrawer() internal view virtual returns (address);
+
+    function _deployContracts() internal virtual;
+
+    function _setupContracts() internal virtual;
+
+    /// @dev Optional chain-specific validation extensions.
+    function _validateChainSpecificDeploymentParameters() internal view virtual {}
+
+    function _validateChainSpecificExternalAddresses() internal view virtual {}
+
+    function _assertChainSpecificRequiredPoliciesSet() internal view virtual {}
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////
+    // Asset accessors.
+    ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+    function _gho() internal view returns (address) {
+        return _configAddress(string.concat(_chainConfigPrefix(), ".assets.gho"));
+    }
+
+    function _usdc() internal view returns (address) {
+        return _configAddress(string.concat(_chainConfigPrefix(), ".assets.usdc"));
+    }
+
+    function _usdt() internal view returns (address) {
+        return _configAddress(string.concat(_chainConfigPrefix(), ".assets.usdt"));
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////
+    // Entry point.
+    ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+    function run() public {
+        _validateProfileAddresses();
+        _validateDeploymentParameters();
+        _validateRedemptionLimitConfig(string.concat(_chainConfigPrefix(), ".withdrawalExecutionPolicy"));
+        _validateExternalAddresses();
+        vm.startBroadcast(_deployer());
+        _deployContracts();
+        _setupContracts();
+        vm.stopBroadcast();
+    }
+
+    function _validateDeploymentParameters() internal view virtual {
+        _validateCommonDeploymentParameters();
+        require(
+            block.chainid == _configUint(string.concat(_chainConfigPrefix(), ".chainId")),
+            string.concat("must deploy on ", _chainName())
+        );
+        _validateChainSpecificDeploymentParameters();
+    }
+
+    function _validateExternalAddresses() internal view virtual {
+        // Validate ERC20 token addresses
+        IERC20(_gho()).balanceOf(_deployer());
+        IERC20(_usdc()).balanceOf(_deployer());
+        IERC20(_usdt()).balanceOf(_deployer());
+
+        // Validate Chainlink price feed addresses
+        address ghoUsdFeed = _configAddress(string.concat(_chainConfigPrefix(), ".chainlinkFeeds.ghoUsd"));
+        require(ghoUsdFeed != address(0), "Chainlink GHO/USD data feed not set");
+        AggregatorV3Interface(ghoUsdFeed).latestRoundData();
+
+        address usdcUsdFeed = _configAddress(string.concat(_chainConfigPrefix(), ".chainlinkFeeds.usdcUsd"));
+        require(usdcUsdFeed != address(0), "Chainlink USDC/USD data feed not set");
+        AggregatorV3Interface(usdcUsdFeed).latestRoundData();
+
+        address usdtUsdFeed = _configAddress(string.concat(_chainConfigPrefix(), ".chainlinkFeeds.usdtUsd"));
+        require(usdtUsdFeed != address(0), "Chainlink USDT/USD data feed not set");
+        AggregatorV3Interface(usdtUsdFeed).latestRoundData();
+
+        // Validate CCIP router supports the counterparty chain
+        require(
+            IRouterClient(_configAddress(string.concat(_chainConfigPrefix(), ".ccipRouterAddress")))
+                .isChainSupported(_configUint64(string.concat(_remoteChainConfigPrefix(), ".ccipSelector"))),
+            "CCIP Router does not support counterparty chain"
+        );
+
+        // Validate Aave V3 pool addresses provider
+        require(
+            _configAddress(string.concat(_chainConfigPrefix(), ".aaveV3PoolAddressesProvider")) != address(0),
+            "Aave V3 pool addresses provider not set"
+        );
+
+        // Validate withdrawal policy signer
+        require(_configAddress(".withdrawalExecutionPolicy.signer") != address(0), "Withdrawal policy signer not set");
+
+        _validateChainSpecificExternalAddresses();
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////
+    // AccessManagerBaseSetup overrides.
+    ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+    function _accessManager() internal view virtual override returns (address) {
+        return getAccessManagerAddress(_deployer());
+    }
+
+    function _isAdiAdapterDeployed() internal view virtual override returns (bool) {
+        return _configAddress(string.concat(_chainConfigPrefix(), ".adi.crossChainController")) != address(0);
+    }
+
+    function _deployedATokenVaultAddresses() internal view virtual override returns (address[] memory) {
+        return _readATokenVaultAddresses(_configString(string.concat(_chainConfigPrefix(), ".deploymentOutputPath")));
+    }
+
+    function _aTokenVaultProxyDeployerSaltSeed(address underlying) internal pure override returns (string memory) {
+        return getATokenVaultProxyDeployerSaltSeed(underlying);
+    }
+
+    function _aTokenVaultMerklRewardClaimerImplSaltSeed(address underlying)
+        internal
+        pure
+        override
+        returns (string memory)
+    {
+        return getATokenVaultMerklRewardClaimerImplSaltSeed(underlying);
+    }
+
+    function _logDeployment(string memory name, string memory saltSeed, address addr) internal virtual override {
+        string memory jsonObject =
+            string.concat('{ "address": "', addr.toHexString(), '", "saltSeed": "', saltSeed, '" }');
+        vm.writeJson(
+            jsonObject,
+            _configString(string.concat(_chainConfigPrefix(), ".deploymentOutputPath")),
+            string.concat(".", name)
+        );
+    }
+
+    function _logATokenVaultDeployments() internal override {
+        vm.writeJson(
+            _buildATokenVaultsJson(),
+            _configString(string.concat(_chainConfigPrefix(), ".deploymentOutputPath")),
+            ".aTokenVaults"
+        );
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////
+    // Shared setup helpers.
+    ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+    function _setupBridgeAdapters() internal {
+        // NOTE: This assumes adapters of same type are having the same address on all chains.
+        address localCcipAdapter = getCcipAdapterAddress(_deployer());
+        address remoteCcipAdapter = localCcipAdapter;
+
+        IChainGateway gateway = IChainGateway(getGatewayAddress(_deployer()));
+
+        uint256 remoteChainId = _configUint(string.concat(_remoteChainConfigPrefix(), ".chainId"));
+        uint64 remoteCcipSelector = _configUint64(string.concat(_remoteChainConfigPrefix(), ".ccipSelector"));
+
+        _addBridgeAdapterIdempotent(gateway, _gho(), remoteChainId, localCcipAdapter);
+        _addBridgeAdapterIdempotent(gateway, _usdc(), remoteChainId, localCcipAdapter);
+        _addBridgeAdapterIdempotent(gateway, _usdt(), remoteChainId, localCcipAdapter);
+
+        /// @custom:tx-already-executed-check CCIP chain selector already set.
+        if (ICcipBridgeAdapter(localCcipAdapter).getChainSelector(remoteChainId) != remoteCcipSelector) {
+            ICcipBridgeAdapter(localCcipAdapter).setChainSelector(remoteChainId, remoteCcipSelector);
+        } else {
+            logSkip("_setupBridgeAdapters", "CCIP chain selector");
+        }
+        _setDestinationChainAdapterIdempotent(localCcipAdapter, remoteChainId, remoteCcipAdapter);
+
+        // Data-only messages use aDI.
+        // aDI adapter is registered on the gateway and configured for the counterparty chain only when the per-chain
+        // flag is set. This lets us deploy the adapter without yet routing messages through it.
+        if (_isAdiAdapterDeployed()) {
+            // NOTE: Assumes the aDI adapter has the same address on both chains (CREATE3 + same deployer/salt).
+            address localAdiAdapter = getAdiAdapterAddress(_deployer());
+            address remoteAdiAdapter = localAdiAdapter;
+            _setDestinationChainAdapterIdempotent(localAdiAdapter, remoteChainId, remoteAdiAdapter);
+            if (_configBool(string.concat(_chainConfigPrefix(), ".adi.registerOnGateway"))) {
+                _addBridgeAdapterIdempotent(
+                    gateway, Constants.ASSET_FOR_DATA_ONLY_BRIDGE, remoteChainId, localAdiAdapter
+                );
+            }
+        }
+    }
+
+    function _addBridgeAdapterIdempotent(IChainGateway gateway, address asset, uint256 chainId, address bridgeAdapter)
+        private
+    {
+        try gateway.addBridgeAdapter(asset, chainId, bridgeAdapter) {}
+        catch (bytes memory err) {
+            /// @custom:tx-already-executed-check Reverts with `AddressAlreadyWhitelisted` on duplicate.
+            // Truncating `err` to its first 4 bytes intentionally extracts the revert selector.
+            // forge-lint: disable-next-line(unsafe-typecast)
+            require(bytes4(err) == Errors.AddressAlreadyWhitelisted.selector, "addBridgeAdapter: unexpected revert");
+            logSkip("_addBridgeAdapterIdempotent", "bridge adapter registered");
+        }
+    }
+
+    function _setDestinationChainAdapterIdempotent(address adapter, uint256 chainId, address destAdapter) private {
+        try IBridgeAdapter(adapter).setDestinationChainAdapter(chainId, destAdapter) {}
+        catch (bytes memory err) {
+            /// @custom:tx-already-executed-check Reverts with `AlreadyConfigured` on duplicate.
+            // forge-lint: disable-next-line(unsafe-typecast)
+            bytes4 errSelector = bytes4(err);
+            require(
+                errSelector == IBridgeAdapter.AlreadyConfigured.selector,
+                "setDestinationChainAdapter: unexpected revert"
+            );
+            logSkip("_setDestinationChainAdapterIdempotent", "destination chain adapter configured");
+        }
+    }
+
+    function _setupAssetRegistry() internal {
+        IAssetRegistry assetRegistry = IAssetRegistry(getAssetRegistryAddress(_deployer()));
+        IAssetRegistry.AssetConfig memory unrestrictedAssetConfig = IAssetRegistry.AssetConfig({
+            depositFromUserAllowed: true,
+            depositIntoAllocatorAllowed: true,
+            swapInputTokenAllowed: true,
+            swapOutputTokenAllowed: true
+        });
+        _setAssetConfigIdempotent(assetRegistry, _gho(), unrestrictedAssetConfig);
+        _setAssetConfigIdempotent(assetRegistry, _usdc(), unrestrictedAssetConfig);
+        _setAssetConfigIdempotent(assetRegistry, _usdt(), unrestrictedAssetConfig);
+    }
+
+    function _setAssetConfigIdempotent(
+        IAssetRegistry assetRegistry,
+        address asset,
+        IAssetRegistry.AssetConfig memory config
+    ) private {
+        /// @custom:tx-already-executed-check Asset already registered.
+        if (!assetRegistry.isAssetRegistered(asset)) {
+            assetRegistry.setAssetConfig(asset, config);
+        } else {
+            logSkip("_setAssetConfigIdempotent", "asset registered");
+        }
+    }
+
+    function _addStrategyIdempotent(IAllocator allocator, address asset, address strategy) internal {
+        /// @custom:tx-already-executed-check Strategy already registered.
+        if (!allocator.isStrategySupportedForAsset(asset, strategy)) {
+            allocator.addStrategy(asset, strategy);
+        } else {
+            logSkip("_addStrategyIdempotent", "strategy");
+        }
+    }
+
+    function _setupWithdrawalExecutionPolicy() internal {
+        WithdrawalExecutionPolicy withdrawalExecutionPolicy =
+            WithdrawalExecutionPolicy(getWithdrawalExecutionPolicyAddress(_deployer()));
+
+        uint16 defaultFeeBps = _configUint16(".withdrawalExecutionPolicy.defaultFeeBps");
+        /// @custom:tx-already-executed-check Default fee already at target.
+        if (withdrawalExecutionPolicy.getDefaultFeeBps() != defaultFeeBps) {
+            withdrawalExecutionPolicy.setDefaultFeeBps(defaultFeeBps);
+        } else {
+            logSkip("_setupWithdrawalExecutionPolicy", "default fee bps");
+        }
+
+        address signer = _configAddress(".withdrawalExecutionPolicy.signer");
+        /// @custom:tx-already-executed-check Signer already registered.
+        if (!withdrawalExecutionPolicy.isSigner(signer)) {
+            withdrawalExecutionPolicy.addSigner(signer);
+        } else {
+            logSkip("_setupWithdrawalExecutionPolicy", "signer");
+        }
+
+        _initRedemptionLimit(
+            withdrawalExecutionPolicy, string.concat(_chainConfigPrefix(), ".withdrawalExecutionPolicy.redemptionLimit")
+        );
+
+        IPolicyRegistry policyRegistry = IPolicyRegistry(getPolicyRegistryAddress(_deployer()));
+        /// @custom:tx-already-executed-check Registry already points at this policy.
+        if (policyRegistry.getPolicy(_withdrawalExecutionPolicyId()) != address(withdrawalExecutionPolicy)) {
+            policyRegistry.setPolicy(_withdrawalExecutionPolicyId(), address(withdrawalExecutionPolicy));
+        } else {
+            logSkip("_setupWithdrawalExecutionPolicy", "policy registry entry");
+        }
+    }
+
+    function _initRedemptionLimit(WithdrawalExecutionPolicy policy, string memory configKey) private {
+        uint128 capacityRay = _configUint128(string.concat(configKey, ".capacityRay"));
+        uint128 refillRateRay = _configUint128(string.concat(configKey, ".refillRateRay"));
+        RateLimitBucketLib.Bucket memory bucket = policy.getRedemptionBucket();
+        if (bucket.capacity < capacityRay) {
+            policy.raiseRedemptionCapacity(capacityRay);
+        } else {
+            /// @custom:tx-already-executed-check Capacity matches target; reject drift above target.
+            require(bucket.capacity == capacityRay, "redemption capacity mismatch");
+            logSkip("_initRedemptionLimit", "redemption capacity");
+        }
+        if (bucket.refillRate < refillRateRay) {
+            policy.raiseRedemptionRefillRate(refillRateRay);
+        } else {
+            /// @custom:tx-already-executed-check Refill rate matches target; reject drift above target.
+            require(bucket.refillRate == refillRateRay, "redemption refill rate mismatch");
+            logSkip("_initRedemptionLimit", "redemption refill rate");
+        }
+    }
+
+    function _setupFundsBridgingPolicy() internal {
+        FundsBridgingPolicy policy = FundsBridgingPolicy(getFundsBridgingPolicyAddress(_deployer()));
+
+        IPolicyRegistry policyRegistry = IPolicyRegistry(getPolicyRegistryAddress(_deployer()));
+        /// @custom:tx-already-executed-check Registry already points at this policy.
+        if (policyRegistry.getPolicy(_bridgePolicyId()) != address(policy)) {
+            policyRegistry.setPolicy(_bridgePolicyId(), address(policy));
+        } else {
+            logSkip("_setupFundsBridgingPolicy", "policy registry entry");
+        }
+
+        uint256 destChainId = _configUint(string.concat(_remoteChainConfigPrefix(), ".chainId"));
+        address bridgeAdapter = getCcipAdapterAddress(_deployer());
+        string memory limitsPrefix = string.concat(_chainConfigPrefix(), ".fundsBridgingPolicy.perAssetLimits");
+
+        _initBridgingLimit(policy, _gho(), destChainId, bridgeAdapter, string.concat(limitsPrefix, ".gho"));
+        _initBridgingLimit(policy, _usdc(), destChainId, bridgeAdapter, string.concat(limitsPrefix, ".usdc"));
+        _initBridgingLimit(policy, _usdt(), destChainId, bridgeAdapter, string.concat(limitsPrefix, ".usdt"));
+    }
+
+    function _initBridgingLimit(
+        FundsBridgingPolicy policy,
+        address asset,
+        uint256 destChainId,
+        address bridgeAdapter,
+        string memory configKey
+    ) private {
+        uint128 capacity = _configUint128(string.concat(configKey, ".capacity"));
+        uint128 refillRate = _configUint128(string.concat(configKey, ".refillRate"));
+        RateLimitBucketLib.Bucket memory bucket = policy.getBridgingLimit(asset, destChainId, bridgeAdapter);
+        if (bucket.capacity < capacity) {
+            policy.raiseBridgingCapacity(asset, destChainId, bridgeAdapter, capacity);
+        } else {
+            /// @custom:tx-already-executed-check Capacity matches target; reject drift above target.
+            require(bucket.capacity == capacity, "bridging capacity mismatch");
+            logSkip("_initBridgingLimit", "bridging capacity");
+        }
+        if (bucket.refillRate < refillRate) {
+            policy.raiseBridgingRefillRate(asset, destChainId, bridgeAdapter, refillRate);
+        } else {
+            /// @custom:tx-already-executed-check Refill rate matches target; reject drift above target.
+            require(bucket.refillRate == refillRate, "bridging refill rate mismatch");
+            logSkip("_initBridgingLimit", "bridging refill rate");
+        }
+    }
+
+    function _setupSlippageCoverageVault() internal {
+        SlippageCoverageVault vault = SlippageCoverageVault(getSlippageCoverageVaultAddress(_deployer()));
+        _ensureNonZeroSlippageCoverageVaultAssetCaps(vault, _gho(), ".slippageCoverageVault.perAssetCaps.gho");
+        _ensureNonZeroSlippageCoverageVaultAssetCaps(vault, _usdc(), ".slippageCoverageVault.perAssetCaps.usdc");
+        _ensureNonZeroSlippageCoverageVaultAssetCaps(vault, _usdt(), ".slippageCoverageVault.perAssetCaps.usdt");
+    }
+
+    function _ensureNonZeroSlippageCoverageVaultAssetCaps(
+        SlippageCoverageVault vault,
+        address asset,
+        string memory configKey
+    ) private {
+        uint256 pullCapPerTx = _configUint(string.concat(configKey, ".pullCapPerTx"));
+        uint128 windowCap = _configUint128(string.concat(configKey, ".windowCap"));
+        uint64 windowSeconds = _configUint64(string.concat(configKey, ".windowSeconds"));
+
+        require(pullCapPerTx > 0, "SCV pullCapPerTx must be > 0");
+        require(windowCap > 0, "SCV windowCap must be > 0");
+        require(windowSeconds > 0, "SCV windowSeconds must be > 0");
+
+        uint256 currentPullCap = vault.getPullCapPerTx(asset);
+        if (currentPullCap == 0) {
+            vault.raisePullCapPerTx(asset, pullCapPerTx);
+        } else {
+            /// @custom:tx-already-executed-check Pull cap already configured; assert it matches target.
+            require(currentPullCap == pullCapPerTx, "SCV pullCapPerTx mismatch");
+            logSkip("_ensureNonZeroSlippageCoverageVaultAssetCaps", "SCV pull cap per tx");
+        }
+
+        SlippageCoverageVault.Window memory window = vault.getWindow(asset);
+        if (window.cap == 0) {
+            vault.raiseWindowCap(asset, windowCap);
+        } else {
+            /// @custom:tx-already-executed-check Window cap already configured; assert it matches target.
+            require(window.cap == windowCap, "SCV windowCap mismatch");
+            logSkip("_ensureNonZeroSlippageCoverageVaultAssetCaps", "SCV window cap");
+        }
+
+        window = vault.getWindow(asset);
+        if (window.windowSeconds == 0) {
+            vault.raiseWindowSeconds(asset, windowSeconds);
+        } else {
+            /// @custom:tx-already-executed-check Window seconds already configured; assert it matches target.
+            require(window.windowSeconds == windowSeconds, "SCV windowSeconds mismatch");
+            logSkip("_ensureNonZeroSlippageCoverageVaultAssetCaps", "SCV window seconds");
+        }
+
+        _assertSlippageCoverageVaultCaps(vault, asset, pullCapPerTx, windowCap, windowSeconds);
+    }
+
+    function _assertSlippageCoverageVaultCaps(
+        SlippageCoverageVault vault,
+        address asset,
+        uint256 pullCapPerTx,
+        uint128 windowCap,
+        uint64 windowSeconds
+    ) private view {
+        require(vault.getPullCapPerTx(asset) == pullCapPerTx, "SCV pullCapPerTx not configured");
+        SlippageCoverageVault.Window memory window = vault.getWindow(asset);
+        require(window.cap == windowCap, "SCV windowCap not configured");
+        require(window.windowSeconds == windowSeconds, "SCV windowSeconds not configured");
+    }
+
+    function _assertRequiredPoliciesSet() internal view {
+        IPolicyRegistry registry = IPolicyRegistry(getPolicyRegistryAddress(_deployer()));
+        address policyAddress = registry.getPolicy(_withdrawalExecutionPolicyId());
+        require(policyAddress != address(0), string.concat("missing ", _chainName(), " withdrawal-execution policy"));
+        require(
+            registry.getPolicy(_bridgePolicyId()) != address(0),
+            string.concat("missing ", _chainName(), " bridge policy")
+        );
+
+        WithdrawalExecutionPolicy policy = WithdrawalExecutionPolicy(policyAddress);
+        RateLimitBucketLib.Bucket memory bucket = policy.getRedemptionBucket();
+        // Strict greater than: seeding at floor leaves the bucket pinned with no headroom for `lower*` during
+        // incident response. Force operator headroom by construction.
+        require(
+            bucket.capacity > policy.getMinRedemptionCapacity(),
+            string.concat(_chainName(), " redemption capacity must exceed floor")
+        );
+        require(
+            bucket.refillRate > policy.getMinRedemptionRefillRate(),
+            string.concat(_chainName(), " redemption refill rate must exceed floor")
+        );
+
+        _assertChainSpecificRequiredPoliciesSet();
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////
+    // Shared deploys.
+    ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+    function _deployTransferHelper() internal returns (address) {
+        address predicted = getTransferHelperAddress(_deployer());
+        if (predicted.code.length != 0) {
+            /// @custom:tx-already-executed-check Predicted address has code.
+            _assertDeployedRuntimeCode(predicted, keccak256(type(TransferHelper).runtimeCode));
+            logSkip("_deployTransferHelper", "TransferHelper");
+            _logDeployment("TransferHelper", TRANSFER_HELPER_SALT_SEED, predicted);
+            return predicted;
+        }
+        address transferHelper = _deploy_create3({
+            namespacedSaltSeed: TRANSFER_HELPER_SALT_SEED,
+            deployer: _deployer(),
+            initCode: abi.encodePacked(type(TransferHelper).creationCode)
+        });
+        require(transferHelper == predicted, "TransferHelper does not match expected address");
+        _logDeployment("TransferHelper", TRANSFER_HELPER_SALT_SEED, transferHelper);
+        return transferHelper;
+    }
+
+    function _deployAccessManager() internal returns (address) {
+        address predicted = getAccessManagerAddress(_deployer());
+        if (predicted.code.length != 0) {
+            /// @custom:tx-already-executed-check Predicted address has code.
+            logSkip("_deployAccessManager", "AccessManager");
+            _logDeployment("AccessManager", ACCESS_MANAGER_SALT_SEED, predicted);
+            return predicted;
+        }
+        address accessManager = _deploy_create3({
+            namespacedSaltSeed: ACCESS_MANAGER_SALT_SEED,
+            deployer: _deployer(),
+            initCode: abi.encodePacked(type(AccessManager).creationCode, abi.encode(ACCESS_MANAGER_ADMIN))
+        });
+        require(accessManager == predicted, "AccessManager does not match expected address");
+        _logDeployment("AccessManager", ACCESS_MANAGER_SALT_SEED, accessManager);
+        return accessManager;
+    }
+
+    function _deployAssetRegistry() internal returns (address) {
+        address predicted = getAssetRegistryAddress(_deployer());
+        if (predicted.code.length != 0) {
+            /// @custom:tx-already-executed-check Predicted address has code.
+            logSkip("_deployAssetRegistry", "AssetRegistry");
+            _logDeployment("AssetRegistry", ASSET_REGISTRY_SALT_SEED, predicted);
+            return predicted;
+        }
+        address implementation = address(new AssetRegistry());
+        _logDeployment("AssetRegistry::Implementation", "", implementation);
+        address assetRegistry = _deployTransparentProxy_create3({
+            namespacedSaltSeed: ASSET_REGISTRY_SALT_SEED,
+            deployer: _deployer(),
+            implementation: implementation,
+            proxyAdminOwner: ASSET_REGISTRY_PROXY_ADMIN_OWNER,
+            initCalldata: abi.encodeCall(AssetRegistry.initialize, (getAccessManagerAddress(_deployer())))
+        });
+        require(assetRegistry == predicted, "AssetRegistry does not match expected address");
+        _logDeployment("AssetRegistry", ASSET_REGISTRY_SALT_SEED, assetRegistry);
+        return assetRegistry;
+    }
+
+    function _deployWithdrawalExecutionPolicy() internal returns (address) {
+        address predicted = getWithdrawalExecutionPolicyAddress(_deployer());
+        if (predicted.code.length != 0) {
+            /// @custom:tx-already-executed-check Predicted address has code.
+            logSkip("_deployWithdrawalExecutionPolicy", "WithdrawalExecutionPolicy");
+            _logDeployment("WithdrawalExecutionPolicy", WITHDRAWAL_EXECUTION_POLICY_SALT_SEED, predicted);
+            return predicted;
+        }
+        uint128 minRedemptionCapacityRay =
+            _configUint128(string.concat(_chainConfigPrefix(), ".withdrawalExecutionPolicy.minRedemptionCapacityRay"));
+        uint128 minRedemptionRefillRateRay = _configUint128(
+            string.concat(_chainConfigPrefix(), ".withdrawalExecutionPolicy.minRedemptionRefillRateRay")
+        );
+        address implementation = address(
+            new WithdrawalExecutionPolicy(
+                _withdrawalExecutionPolicyTarget(), minRedemptionCapacityRay, minRedemptionRefillRateRay
+            )
+        );
+        _logDeployment("WithdrawalExecutionPolicy::Implementation", "", implementation);
+        address withdrawalExecutionPolicy = _deployTransparentProxy_create3({
+            namespacedSaltSeed: WITHDRAWAL_EXECUTION_POLICY_SALT_SEED,
+            deployer: _deployer(),
+            implementation: implementation,
+            proxyAdminOwner: WITHDRAWAL_EXECUTION_POLICY_PROXY_ADMIN_OWNER,
+            initCalldata: abi.encodeCall(
+                WithdrawalExecutionPolicy.initialize, (getAccessManagerAddress(_deployer()), 0)
+            )
+        });
+        require(withdrawalExecutionPolicy == predicted, "WithdrawalExecutionPolicy does not match expected address");
+        _logDeployment("WithdrawalExecutionPolicy", WITHDRAWAL_EXECUTION_POLICY_SALT_SEED, withdrawalExecutionPolicy);
+        return withdrawalExecutionPolicy;
+    }
+
+    function _deployIouToken() internal returns (address) {
+        address predicted = getIouTokenAddress(_deployer());
+        if (predicted.code.length != 0) {
+            /// @custom:tx-already-executed-check Predicted address has code.
+            logSkip("_deployIouToken", "IouToken");
+            _logDeployment("IouToken", IOU_TOKEN_SALT_SEED, predicted);
+            return predicted;
+        }
+        address iouToken = _deploy_create3({
+            namespacedSaltSeed: IOU_TOKEN_SALT_SEED,
+            deployer: _deployer(),
+            initCode: abi.encodePacked(
+                type(IouToken).creationCode,
+                abi.encode(
+                    getIouTokenManagerAddress(_deployer()),
+                    _configString(".iouTokenName"),
+                    _configString(".iouTokenSymbol")
+                )
+            )
+        });
+        require(iouToken == predicted, "IouToken does not match expected address");
+        _logDeployment("IouToken", IOU_TOKEN_SALT_SEED, iouToken);
+        return iouToken;
+    }
+
+    function _deployIouTokenManager() internal returns (address) {
+        address predicted = getIouTokenManagerAddress(_deployer());
+        if (predicted.code.length != 0) {
+            /// @custom:tx-already-executed-check Predicted address has code.
+            logSkip("_deployIouTokenManager", "IouTokenManager");
+            _logDeployment("IouTokenManager", IOU_TOKEN_MANAGER_SALT_SEED, predicted);
+            return predicted;
+        }
+        address implementation = address(
+            new IouTokenManager({
+                iouToken: getIouTokenAddress(_deployer()),
+                chainGateway: getGatewayAddress(_deployer()),
+                vault: _iouTokenManagerVault(),
+                transferHelper: getTransferHelperAddress(_deployer()),
+                isAccountingChain: _isAccountingChain()
+            })
+        );
+        _logDeployment("IouTokenManager::Implementation", "", implementation);
+        address iouTokenManager = _deployTransparentProxy_create3({
+            namespacedSaltSeed: IOU_TOKEN_MANAGER_SALT_SEED,
+            deployer: _deployer(),
+            implementation: implementation,
+            proxyAdminOwner: IOU_TOKEN_MANAGER_PROXY_ADMIN_OWNER,
+            initCalldata: ""
+        });
+        require(iouTokenManager == predicted, "IouTokenManager does not match expected address");
+        _logDeployment("IouTokenManager", IOU_TOKEN_MANAGER_SALT_SEED, iouTokenManager);
+        return iouTokenManager;
+    }
+
+    function _deployAllocator() internal returns (address) {
+        address predicted = getAllocatorAddress(_deployer());
+        if (predicted.code.length != 0) {
+            /// @custom:tx-already-executed-check Predicted address has code.
+            logSkip("_deployAllocator", "Allocator");
+            _logDeployment("Allocator", ALLOCATOR_SALT_SEED, predicted);
+            return predicted;
+        }
+        address implementation = address(
+            new Allocator({
+                assetRegistry: getAssetRegistryAddress(_deployer()),
+                depositor: _allocatorDepositor(),
+                withdrawer: _allocatorWithdrawer(),
+                priceOracle: getPriceOracleAddress(_deployer()),
+                transferHelper: getTransferHelperAddress(_deployer()),
+                maxStrategiesPerAsset: _configUint8(".maxStrategiesPerAsset"),
+                policyRegistry: getPolicyRegistryAddress(_deployer())
+            })
+        );
+        _logDeployment("Allocator::Implementation", "", implementation);
+        address allocator = _deployTransparentProxy_create3({
+            namespacedSaltSeed: ALLOCATOR_SALT_SEED,
+            deployer: _deployer(),
+            implementation: implementation,
+            proxyAdminOwner: ALLOCATOR_PROXY_ADMIN_OWNER,
+            initCalldata: abi.encodeCall(Allocator.initialize, (getAccessManagerAddress(_deployer())))
+        });
+        require(allocator == predicted, "Allocator does not match expected address");
+        _logDeployment("Allocator", ALLOCATOR_SALT_SEED, allocator);
+        return allocator;
+    }
+
+    function _deploySlippageCoverageVault() internal returns (address) {
+        address predicted = getSlippageCoverageVaultAddress(_deployer());
+        if (predicted.code.length != 0) {
+            /// @custom:tx-already-executed-check Predicted address has code.
+            logSkip("_deploySlippageCoverageVault", "SlippageCoverageVault");
+            _logDeployment("SlippageCoverageVault", SLIPPAGE_COVERAGE_VAULT_SALT_SEED, predicted);
+            return predicted;
+        }
+        address slippageCoverageVault = _deploy_create3({
+            namespacedSaltSeed: SLIPPAGE_COVERAGE_VAULT_SALT_SEED,
+            deployer: _deployer(),
+            initCode: abi.encodePacked(
+                type(SlippageCoverageVault).creationCode,
+                abi.encode(
+                    getSwapperAddress(_deployer()),
+                    getAccessManagerAddress(_deployer()),
+                    _configUint16(".slippageCoverageVault.maxSlippageBps"),
+                    _configUint16(".slippageCoverageVault.overrideMaxSlippageBps"),
+                    _configBool(".slippageCoverageVault.initialOverrideMode")
+                )
+            )
+        });
+        require(slippageCoverageVault == predicted, "SlippageCoverageVault does not match expected address");
+        _logDeployment("SlippageCoverageVault", SLIPPAGE_COVERAGE_VAULT_SALT_SEED, slippageCoverageVault);
+        return slippageCoverageVault;
+    }
+
+    function _deploySwapper() internal returns (address) {
+        address predicted = getSwapperAddress(_deployer());
+        if (predicted.code.length != 0) {
+            /// @custom:tx-already-executed-check Predicted address has code.
+            logSkip("_deploySwapper", "Swapper");
+            _logDeployment("Swapper", SWAPPER_SALT_SEED, predicted);
+            return predicted;
+        }
+        address swapper = _deploy_create3({
+            namespacedSaltSeed: SWAPPER_SALT_SEED,
+            deployer: _deployer(),
+            initCode: abi.encodePacked(
+                type(Swapper).creationCode,
+                abi.encode(getAllocatorAddress(_deployer()), getSlippageCoverageVaultAddress(_deployer()))
+            )
+        });
+        require(swapper == predicted, "Swapper does not match expected address");
+        _logDeployment("Swapper", SWAPPER_SALT_SEED, swapper);
+        return swapper;
+    }
+
+    function _deployCcipAdapter() internal returns (address) {
+        address predicted = getCcipAdapterAddress(_deployer());
+        if (predicted.code.length != 0) {
+            /// @custom:tx-already-executed-check Predicted address has code.
+            logSkip("_deployCcipAdapter", "CcipAdapter");
+            _logDeployment("CcipAdapter", CCIP_ADAPTER_SALT_SEED, predicted);
+            return predicted;
+        }
+        address ccipAdapter = _deploy_create3({
+            namespacedSaltSeed: CCIP_ADAPTER_SALT_SEED,
+            deployer: _deployer(),
+            initCode: abi.encodePacked(
+                type(CcipAdapter).creationCode,
+                abi.encode(
+                    getAccessManagerAddress(_deployer()),
+                    getGatewayAddress(_deployer()),
+                    _configAddress(string.concat(_chainConfigPrefix(), ".ccipRouterAddress")),
+                    getTransferHelperAddress(_deployer()),
+                    getAssetRegistryAddress(_deployer())
+                )
+            )
+        });
+        require(ccipAdapter == predicted, "CcipAdapter does not match expected address");
+        _logDeployment("CcipAdapter", CCIP_ADAPTER_SALT_SEED, ccipAdapter);
+        return ccipAdapter;
+    }
+
+    function _deployAdiAdapter() internal returns (address) {
+        if (!_isAdiAdapterDeployed()) {
+            return address(0);
+        }
+        address predicted = getAdiAdapterAddress(_deployer());
+        if (predicted.code.length != 0) {
+            /// @custom:tx-already-executed-check Predicted address has code.
+            logSkip("_deployAdiAdapter", "AdiAdapter");
+            _logDeployment("AdiAdapter", ADI_ADAPTER_SALT_SEED, predicted);
+            return predicted;
+        }
+        address adiAdapter = _deploy_create3({
+            namespacedSaltSeed: ADI_ADAPTER_SALT_SEED,
+            deployer: _deployer(),
+            initCode: abi.encodePacked(
+                type(AdiAdapter).creationCode,
+                abi.encode(
+                    getAccessManagerAddress(_deployer()),
+                    getGatewayAddress(_deployer()),
+                    _configAddress(string.concat(_chainConfigPrefix(), ".adi.crossChainController")),
+                    getTransferHelperAddress(_deployer())
+                )
+            )
+        });
+        require(adiAdapter == predicted, "AdiAdapter does not match expected address");
+        _logDeployment("AdiAdapter", ADI_ADAPTER_SALT_SEED, adiAdapter);
+        return adiAdapter;
+    }
+
+    function _deployPriceOracle() internal returns (address) {
+        address predicted = getPriceOracleAddress(_deployer());
+        if (predicted.code.length != 0) {
+            /// @custom:tx-already-executed-check Predicted address has code.
+            logSkip("_deployPriceOracle", "PriceOracle");
+            _logDeployment("PriceOracle", PRICE_ORACLE_SALT_SEED, predicted);
+            return predicted;
+        }
+        address implementation = address(new PriceOracle(_configUint(".priceOracleMinValidPriceRay")));
+        _logDeployment("PriceOracle::Implementation", "", implementation);
+        address priceOracle = _deployTransparentProxy_create3({
+            namespacedSaltSeed: PRICE_ORACLE_SALT_SEED,
+            deployer: _deployer(),
+            implementation: implementation,
+            proxyAdminOwner: PRICE_ORACLE_PROXY_ADMIN_OWNER,
+            initCalldata: abi.encodeCall(PriceOracle.initialize, (getAccessManagerAddress(_deployer())))
+        });
+        require(priceOracle == predicted, "PriceOracle does not match expected address");
+        _logDeployment("PriceOracle", PRICE_ORACLE_SALT_SEED, priceOracle);
+        return priceOracle;
+    }
+
+    function _deployPolicyRegistry() internal returns (address) {
+        address predicted = getPolicyRegistryAddress(_deployer());
+        if (predicted.code.length != 0) {
+            /// @custom:tx-already-executed-check Predicted address has code.
+            logSkip("_deployPolicyRegistry", "PolicyRegistry");
+            _logDeployment("PolicyRegistry", POLICY_REGISTRY_SALT_SEED, predicted);
+            return predicted;
+        }
+        address policyRegistry = _deploy_create3({
+            namespacedSaltSeed: POLICY_REGISTRY_SALT_SEED,
+            deployer: _deployer(),
+            initCode: abi.encodePacked(
+                type(PolicyRegistry).creationCode, abi.encode(getAccessManagerAddress(_deployer()))
+            )
+        });
+        require(policyRegistry == predicted, "PolicyRegistry does not match expected address");
+        _logDeployment("PolicyRegistry", POLICY_REGISTRY_SALT_SEED, policyRegistry);
+        return policyRegistry;
+    }
+
+    function _deployFundsBridgingPolicy() internal returns (address) {
+        address predicted = getFundsBridgingPolicyAddress(_deployer());
+        if (predicted.code.length != 0) {
+            /// @custom:tx-already-executed-check Predicted address has code.
+            logSkip("_deployFundsBridgingPolicy", "FundsBridgingPolicy");
+            _logDeployment("FundsBridgingPolicy", FUNDS_BRIDGING_POLICY_SALT_SEED, predicted);
+            return predicted;
+        }
+        address fundsBridgingPolicy = _deploy_create3({
+            namespacedSaltSeed: FUNDS_BRIDGING_POLICY_SALT_SEED,
+            deployer: _deployer(),
+            initCode: abi.encodePacked(
+                type(FundsBridgingPolicy).creationCode,
+                abi.encode(getAccessManagerAddress(_deployer()), _fundsBridgingPolicyHolder())
+            )
+        });
+        require(fundsBridgingPolicy == predicted, "FundsBridgingPolicy does not match expected address");
+        _logDeployment("FundsBridgingPolicy", FUNDS_BRIDGING_POLICY_SALT_SEED, fundsBridgingPolicy);
+        return fundsBridgingPolicy;
+    }
+
+    /// @dev Funds-holding contract whose bridging the policy guards (FundsHandler on accounting chain, Gateway on
+    /// earning chain).
+    function _fundsBridgingPolicyHolder() internal view virtual returns (address);
+}
