@@ -40,7 +40,12 @@ export type ValueFormat =
 
 export type ValueSpec =
   | { type: "scalar"; path: string; format: ValueFormat }
-  | { type: "perAsset"; pathTemplate: string; assets: AssetKey[]; format: ValueFormat };
+  | {
+      type: "perAsset";
+      pathTemplate: string;
+      assets: AssetKey[];
+      format: ValueFormat;
+    };
 
 export interface ParameterSpec {
   key: string;
@@ -72,10 +77,17 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     contract: "StableVault",
     category: "Yield economics",
     chainContext: "AC",
-    setterKeys: ["StableVault.setSubVaultRate", "StableVault.setDefaultSubVault"],
+    setterKeys: [
+      "StableVault.setSubVaultRate",
+      "StableVault.setDefaultSubVault",
+    ],
     unit: "RAY/sec",
     onChainLimits: "≤ MAX_VALID_PER_SECOND_RATE (≈ 20% APY)",
-    value: { type: "scalar", path: "accountingChain.defaultSubVaultPerSecondRate", format: "ray" },
+    value: {
+      type: "scalar",
+      path: "accountingChain.defaultSubVaultPerSecondRate",
+      format: "ray",
+    },
   },
   {
     key: "StableVault.defaultMaxPerSecondRate",
@@ -85,7 +97,11 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     setterKeys: [],
     unit: "RAY/sec",
     onChainLimits: "Constructor-set ceiling; immutable after deploy",
-    value: { type: "scalar", path: "accountingChain.defaultMaxPerSecondRate", format: "ray" },
+    value: {
+      type: "scalar",
+      path: "accountingChain.defaultMaxPerSecondRate",
+      format: "ray",
+    },
   },
   {
     key: "StableVault.defaultMaxActiveSubVaults",
@@ -95,7 +111,11 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     setterKeys: [],
     unit: "count",
     onChainLimits: "Hard cap; immutable",
-    value: { type: "scalar", path: "accountingChain.defaultMaxActiveSubVaults", format: "uint" },
+    value: {
+      type: "scalar",
+      path: "accountingChain.defaultMaxActiveSubVaults",
+      format: "uint",
+    },
   },
 
   // -------- Withdrawal fees + signers (top-level, applies to AC + EC instances of the policy) --------
@@ -107,17 +127,28 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     setterKeys: ["WithdrawalExecutionPolicy.setDefaultFeeBps"],
     unit: "bps",
     onChainLimits: "≤ FEE_CAP_BPS = 1000 (10%)",
-    value: { type: "scalar", path: "withdrawalExecutionPolicy.defaultFeeBps", format: "bps" },
+    value: {
+      type: "scalar",
+      path: "withdrawalExecutionPolicy.defaultFeeBps",
+      format: "bps",
+    },
   },
   {
     key: "WithdrawalExecutionPolicy.signer",
     contract: "WithdrawalExecutionPolicy",
     category: "Withdrawal fees + signers",
     chainContext: "AC+EC",
-    setterKeys: ["WithdrawalExecutionPolicy.addSigner", "WithdrawalExecutionPolicy.removeSigner"],
+    setterKeys: [
+      "WithdrawalExecutionPolicy.addSigner",
+      "WithdrawalExecutionPolicy.removeSigner",
+    ],
     unit: "address",
     onChainLimits: "",
-    value: { type: "scalar", path: "withdrawalExecutionPolicy.signer", format: "address" },
+    value: {
+      type: "scalar",
+      path: "withdrawalExecutionPolicy.signer",
+      format: "address",
+    },
   },
 
   // -------- Rate-limit buckets — Deposit (AC) --------
@@ -126,12 +157,16 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     contract: "DepositPolicy",
     category: "Rate-limit buckets — Deposit",
     chainContext: "AC",
-    setterKeys: ["DepositPolicy.raiseDepositCapacity", "DepositPolicy.lowerDepositCapacity"],
+    setterKeys: [
+      "DepositPolicy.raiseDepositCapacity",
+      "DepositPolicy.lowerDepositCapacity",
+    ],
     unit: "asset-native dec, per asset",
     onChainLimits: "",
     value: {
       type: "perAsset",
-      pathTemplate: "accountingChain.depositPolicy.perAssetLimits.{asset}.capacity",
+      pathTemplate:
+        "accountingChain.depositPolicy.perAssetLimits.{asset}.capacity",
       assets: ["gho", "usdc", "usdt"],
       format: "assetWei",
     },
@@ -141,12 +176,16 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     contract: "DepositPolicy",
     category: "Rate-limit buckets — Deposit",
     chainContext: "AC",
-    setterKeys: ["DepositPolicy.raiseDepositRefillRate", "DepositPolicy.lowerDepositRefillRate"],
+    setterKeys: [
+      "DepositPolicy.raiseDepositRefillRate",
+      "DepositPolicy.lowerDepositRefillRate",
+    ],
     unit: "asset-native dec / sec, per asset",
     onChainLimits: "",
     value: {
       type: "perAsset",
-      pathTemplate: "accountingChain.depositPolicy.perAssetLimits.{asset}.refillRate",
+      pathTemplate:
+        "accountingChain.depositPolicy.perAssetLimits.{asset}.refillRate",
       assets: ["gho", "usdc", "usdt"],
       format: "assetWeiPerSec",
     },
@@ -158,12 +197,16 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     contract: "FundsBridgingPolicy",
     category: "Rate-limit buckets — Bridging",
     chainContext: "AC",
-    setterKeys: ["FundsBridgingPolicy.raiseBridgingCapacity", "FundsBridgingPolicy.lowerBridgingCapacity"],
+    setterKeys: [
+      "FundsBridgingPolicy.raiseBridgingCapacity",
+      "FundsBridgingPolicy.lowerBridgingCapacity",
+    ],
     unit: "asset-native dec, per asset",
     onChainLimits: "",
     value: {
       type: "perAsset",
-      pathTemplate: "accountingChain.fundsBridgingPolicy.perAssetLimits.{asset}.capacity",
+      pathTemplate:
+        "accountingChain.fundsBridgingPolicy.perAssetLimits.{asset}.capacity",
       assets: ["gho", "usdc", "usdt"],
       format: "assetWei",
     },
@@ -173,12 +216,16 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     contract: "FundsBridgingPolicy",
     category: "Rate-limit buckets — Bridging",
     chainContext: "AC",
-    setterKeys: ["FundsBridgingPolicy.raiseBridgingRefillRate", "FundsBridgingPolicy.lowerBridgingRefillRate"],
+    setterKeys: [
+      "FundsBridgingPolicy.raiseBridgingRefillRate",
+      "FundsBridgingPolicy.lowerBridgingRefillRate",
+    ],
     unit: "asset-native dec / sec, per asset",
     onChainLimits: "",
     value: {
       type: "perAsset",
-      pathTemplate: "accountingChain.fundsBridgingPolicy.perAssetLimits.{asset}.refillRate",
+      pathTemplate:
+        "accountingChain.fundsBridgingPolicy.perAssetLimits.{asset}.refillRate",
       assets: ["gho", "usdc", "usdt"],
       format: "assetWeiPerSec",
     },
@@ -188,12 +235,16 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     contract: "FundsBridgingPolicy",
     category: "Rate-limit buckets — Bridging",
     chainContext: "EC",
-    setterKeys: ["FundsBridgingPolicy.raiseBridgingCapacity", "FundsBridgingPolicy.lowerBridgingCapacity"],
+    setterKeys: [
+      "FundsBridgingPolicy.raiseBridgingCapacity",
+      "FundsBridgingPolicy.lowerBridgingCapacity",
+    ],
     unit: "asset-native dec, per asset",
     onChainLimits: "",
     value: {
       type: "perAsset",
-      pathTemplate: "earningChain.fundsBridgingPolicy.perAssetLimits.{asset}.capacity",
+      pathTemplate:
+        "earningChain.fundsBridgingPolicy.perAssetLimits.{asset}.capacity",
       assets: ["gho", "usdc", "usdt"],
       format: "assetWei",
     },
@@ -203,12 +254,16 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     contract: "FundsBridgingPolicy",
     category: "Rate-limit buckets — Bridging",
     chainContext: "EC",
-    setterKeys: ["FundsBridgingPolicy.raiseBridgingRefillRate", "FundsBridgingPolicy.lowerBridgingRefillRate"],
+    setterKeys: [
+      "FundsBridgingPolicy.raiseBridgingRefillRate",
+      "FundsBridgingPolicy.lowerBridgingRefillRate",
+    ],
     unit: "asset-native dec / sec, per asset",
     onChainLimits: "",
     value: {
       type: "perAsset",
-      pathTemplate: "earningChain.fundsBridgingPolicy.perAssetLimits.{asset}.refillRate",
+      pathTemplate:
+        "earningChain.fundsBridgingPolicy.perAssetLimits.{asset}.refillRate",
       assets: ["gho", "usdc", "usdt"],
       format: "assetWeiPerSec",
     },
@@ -349,7 +404,11 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     setterKeys: ["PriceOracle.setOracleAdapterForAsset"],
     unit: "seconds (per adapter, constructor)",
     onChainLimits: "+ HEARTBEAT_BUFFER_SECONDS = 90",
-    value: { type: "scalar", path: "chainlinkPriceOracleHeartbeat", format: "seconds" },
+    value: {
+      type: "scalar",
+      path: "chainlinkPriceOracleHeartbeat",
+      format: "seconds",
+    },
   },
   {
     key: "ChainBalanceOracle.chainlinkHeartbeat",
@@ -359,7 +418,11 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     setterKeys: ["ChainBalanceOracle.setChainBalanceOracleAdapter"],
     unit: "seconds (per adapter, constructor)",
     onChainLimits: "+ PUBLISH_BUFFER_SECONDS = 90",
-    value: { type: "scalar", path: "chainlinkChainBalanceOracleHeartbeat", format: "seconds" },
+    value: {
+      type: "scalar",
+      path: "chainlinkChainBalanceOracleHeartbeat",
+      format: "seconds",
+    },
   },
   {
     key: "PriceOracle.minValidPriceRay",
@@ -369,7 +432,11 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     setterKeys: [],
     unit: "RAY",
     onChainLimits: "Immutable on impl; floors validatePrice() reverts",
-    value: { type: "scalar", path: "priceOracleMinValidPriceRay", format: "ray" },
+    value: {
+      type: "scalar",
+      path: "priceOracleMinValidPriceRay",
+      format: "ray",
+    },
   },
   {
     key: "PriceOracle.chainlinkFeed (AC)",
@@ -409,7 +476,11 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     setterKeys: [],
     unit: "address (L2 sequencer uptime feed)",
     onChainLimits: "GRACE_PERIOD_TIME_SECONDS = 7200 buffer after recovery",
-    value: { type: "scalar", path: "accountingChain.sequencerUptimeFeed", format: "address" },
+    value: {
+      type: "scalar",
+      path: "accountingChain.sequencerUptimeFeed",
+      format: "address",
+    },
   },
   {
     key: "PriceOracle.useMockSequencerUptimeFeed",
@@ -419,7 +490,11 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     setterKeys: [],
     unit: "bool (deploy-only)",
     onChainLimits: "",
-    value: { type: "scalar", path: "accountingChain.useMockSequencerUptimeFeed", format: "bool" },
+    value: {
+      type: "scalar",
+      path: "accountingChain.useMockSequencerUptimeFeed",
+      format: "bool",
+    },
   },
   {
     key: "ChainBalanceOracle.bundleAggregatorProxy",
@@ -429,7 +504,11 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     setterKeys: ["ChainBalanceOracle.setChainBalanceOracleAdapter"],
     unit: "address (Chainlink CCIP bundle aggregator proxy)",
     onChainLimits: "+ PUBLISH_BUFFER_SECONDS = 90",
-    value: { type: "scalar", path: "accountingChain.chainlinkBundleAggregatorProxy", format: "address" },
+    value: {
+      type: "scalar",
+      path: "accountingChain.chainlinkBundleAggregatorProxy",
+      format: "address",
+    },
   },
   {
     key: "ChainBalanceOracle.useMockBundleFeed",
@@ -439,7 +518,11 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     setterKeys: [],
     unit: "bool (deploy-only)",
     onChainLimits: "",
-    value: { type: "scalar", path: "accountingChain.useMockBundleFeed", format: "bool" },
+    value: {
+      type: "scalar",
+      path: "accountingChain.useMockBundleFeed",
+      format: "bool",
+    },
   },
 
   // -------- Slippage coverage (AC) --------
@@ -451,7 +534,11 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     setterKeys: ["SlippageCoverageVault.setMaxSlippageBps"],
     unit: "bps",
     onChainLimits: "< 10_000 bps",
-    value: { type: "scalar", path: "slippageCoverageVault.maxSlippageBps", format: "bps" },
+    value: {
+      type: "scalar",
+      path: "slippageCoverageVault.maxSlippageBps",
+      format: "bps",
+    },
   },
   {
     key: "SlippageCoverageVault.overrideMaxSlippageBps",
@@ -461,24 +548,38 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     setterKeys: ["SlippageCoverageVault.setOverrideMaxSlippageBps"],
     unit: "bps",
     onChainLimits: "",
-    value: { type: "scalar", path: "slippageCoverageVault.overrideMaxSlippageBps", format: "bps" },
+    value: {
+      type: "scalar",
+      path: "slippageCoverageVault.overrideMaxSlippageBps",
+      format: "bps",
+    },
   },
   {
     key: "SlippageCoverageVault.initialOverrideMode",
     contract: "SlippageCoverageVault",
     category: "Slippage coverage",
     chainContext: "AC",
-    setterKeys: ["SlippageCoverageVault.enableOverrideMode", "SlippageCoverageVault.disableOverrideMode"],
+    setterKeys: [
+      "SlippageCoverageVault.enableOverrideMode",
+      "SlippageCoverageVault.disableOverrideMode",
+    ],
     unit: "bool (seed via constructor)",
     onChainLimits: "",
-    value: { type: "scalar", path: "slippageCoverageVault.initialOverrideMode", format: "bool" },
+    value: {
+      type: "scalar",
+      path: "slippageCoverageVault.initialOverrideMode",
+      format: "bool",
+    },
   },
   {
     key: "SlippageCoverageVault.pullCapPerTx",
     contract: "SlippageCoverageVault",
     category: "Slippage coverage",
     chainContext: "AC",
-    setterKeys: ["SlippageCoverageVault.raisePullCapPerTx", "SlippageCoverageVault.lowerPullCapPerTx"],
+    setterKeys: [
+      "SlippageCoverageVault.raisePullCapPerTx",
+      "SlippageCoverageVault.lowerPullCapPerTx",
+    ],
     unit: "asset-native dec, per asset",
     onChainLimits: "",
     value: {
@@ -493,7 +594,10 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     contract: "SlippageCoverageVault",
     category: "Slippage coverage",
     chainContext: "AC",
-    setterKeys: ["SlippageCoverageVault.raiseWindowCap", "SlippageCoverageVault.lowerWindowCap"],
+    setterKeys: [
+      "SlippageCoverageVault.raiseWindowCap",
+      "SlippageCoverageVault.lowerWindowCap",
+    ],
     unit: "asset-native dec, per asset",
     onChainLimits: "",
     value: {
@@ -508,7 +612,10 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     contract: "SlippageCoverageVault",
     category: "Slippage coverage",
     chainContext: "AC",
-    setterKeys: ["SlippageCoverageVault.raiseWindowSeconds", "SlippageCoverageVault.lowerWindowSeconds"],
+    setterKeys: [
+      "SlippageCoverageVault.raiseWindowSeconds",
+      "SlippageCoverageVault.lowerWindowSeconds",
+    ],
     unit: "seconds, per asset",
     onChainLimits: "> 0",
     value: {
@@ -570,7 +677,11 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     setterKeys: [],
     unit: "address (PoolAddressesProvider)",
     onChainLimits: "Set at deploy; consumed by aToken strategy deployment",
-    value: { type: "scalar", path: "accountingChain.aaveV3PoolAddressesProvider", format: "address" },
+    value: {
+      type: "scalar",
+      path: "accountingChain.aaveV3PoolAddressesProvider",
+      format: "address",
+    },
   },
   {
     key: "Allocator.aaveV3PoolAddressesProvider (EC)",
@@ -580,7 +691,11 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     setterKeys: [],
     unit: "address (PoolAddressesProvider)",
     onChainLimits: "Set at deploy; consumed by aToken strategy deployment",
-    value: { type: "scalar", path: "earningChain.aaveV3PoolAddressesProvider", format: "address" },
+    value: {
+      type: "scalar",
+      path: "earningChain.aaveV3PoolAddressesProvider",
+      format: "address",
+    },
   },
 
   // -------- Cross-chain topology --------
@@ -589,7 +704,10 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     contract: "FundsHandler",
     category: "Cross-chain topology",
     chainContext: "AC",
-    setterKeys: ["FundsHandler.addEarningChain", "FundsHandler.removeEarningChain"],
+    setterKeys: [
+      "FundsHandler.addEarningChain",
+      "FundsHandler.removeEarningChain",
+    ],
     unit: "chainId",
     onChainLimits: "",
     value: { type: "scalar", path: "earningChain.chainId", format: "uint" },
@@ -612,7 +730,11 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     setterKeys: ["CcipBridgeAdapter.setChainSelector"],
     unit: "uint64 (CCIP)",
     onChainLimits: "",
-    value: { type: "scalar", path: "accountingChain.ccipSelector", format: "raw" },
+    value: {
+      type: "scalar",
+      path: "accountingChain.ccipSelector",
+      format: "raw",
+    },
   },
   {
     key: "EarningChainGateway.minBurnIouTokenGasLimit",
@@ -622,7 +744,11 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     setterKeys: [],
     unit: "gas",
     onChainLimits: "Constant in source (MIN_BURN_IOU_TOKEN_GAS_LIMIT)",
-    value: { type: "scalar", path: "earningChain.minBurnIouTokenGasLimit", format: "uint" },
+    value: {
+      type: "scalar",
+      path: "earningChain.minBurnIouTokenGasLimit",
+      format: "uint",
+    },
   },
   {
     key: "CcipBridgeAdapter.ccipRouter (AC)",
@@ -632,7 +758,11 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     setterKeys: [],
     unit: "address (CCIP router, constructor)",
     onChainLimits: "Swappable only by deploying a new adapter",
-    value: { type: "scalar", path: "accountingChain.ccipRouterAddress", format: "address" },
+    value: {
+      type: "scalar",
+      path: "accountingChain.ccipRouterAddress",
+      format: "address",
+    },
   },
   {
     key: "CcipBridgeAdapter.ccipRouter (EC)",
@@ -642,7 +772,11 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     setterKeys: [],
     unit: "address (CCIP router, constructor)",
     onChainLimits: "Swappable only by deploying a new adapter",
-    value: { type: "scalar", path: "earningChain.ccipRouterAddress", format: "address" },
+    value: {
+      type: "scalar",
+      path: "earningChain.ccipRouterAddress",
+      format: "address",
+    },
   },
   {
     key: "AdiAdapter.crossChainController (AC)",
@@ -652,7 +786,11 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     setterKeys: [],
     unit: "address (a.DI controller, constructor)",
     onChainLimits: "",
-    value: { type: "scalar", path: "accountingChain.adi.crossChainController", format: "address" },
+    value: {
+      type: "scalar",
+      path: "accountingChain.adi.crossChainController",
+      format: "address",
+    },
   },
   {
     key: "AdiAdapter.crossChainController (EC)",
@@ -662,7 +800,11 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     setterKeys: [],
     unit: "address (a.DI controller, constructor)",
     onChainLimits: "",
-    value: { type: "scalar", path: "earningChain.adi.crossChainController", format: "address" },
+    value: {
+      type: "scalar",
+      path: "earningChain.adi.crossChainController",
+      format: "address",
+    },
   },
   {
     key: "AdiAdapter.registerOnGateway (AC)",
@@ -672,7 +814,11 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     setterKeys: [],
     unit: "bool (deploy-only)",
     onChainLimits: "Wires AdiAdapter into ChainGateway at deploy",
-    value: { type: "scalar", path: "accountingChain.adi.registerOnGateway", format: "bool" },
+    value: {
+      type: "scalar",
+      path: "accountingChain.adi.registerOnGateway",
+      format: "bool",
+    },
   },
   {
     key: "AdiAdapter.registerOnGateway (EC)",
@@ -682,7 +828,11 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     setterKeys: [],
     unit: "bool (deploy-only)",
     onChainLimits: "Wires AdiAdapter into ChainGateway at deploy",
-    value: { type: "scalar", path: "earningChain.adi.registerOnGateway", format: "bool" },
+    value: {
+      type: "scalar",
+      path: "earningChain.adi.registerOnGateway",
+      format: "bool",
+    },
   },
 
   // -------- Token metadata (deploy-only) --------
@@ -714,7 +864,11 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     setterKeys: [],
     unit: "string",
     onChainLimits: "Set in constructor; immutable",
-    value: { type: "scalar", path: "accountingChain.stableVaultName", format: "raw" },
+    value: {
+      type: "scalar",
+      path: "accountingChain.stableVaultName",
+      format: "raw",
+    },
   },
   {
     key: "StableVault.assetTokenSymbol",
@@ -724,7 +878,11 @@ export const PARAMETER_SPECS: ParameterSpec[] = [
     setterKeys: [],
     unit: "string",
     onChainLimits: "Set in constructor; immutable",
-    value: { type: "scalar", path: "accountingChain.stableVaultSymbol", format: "raw" },
+    value: {
+      type: "scalar",
+      path: "accountingChain.stableVaultSymbol",
+      format: "raw",
+    },
   },
 ];
 
@@ -736,6 +894,7 @@ export const PARAMETER_CATEGORIES = [
   "Rate-limit buckets — Redemption",
   "Oracle",
   "Slippage coverage",
+  "Asset registry",
   "Strategy onboarding",
   "Cross-chain topology",
   "Token metadata",

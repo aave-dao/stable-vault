@@ -30,7 +30,10 @@ export interface ConfigByEnv {
   prod: unknown;
 }
 
-export function loadDeploymentConfigs(repoRoot: string): { configs: ConfigByEnv; sources: Record<Env, string> } {
+export function loadDeploymentConfigs(repoRoot: string): {
+  configs: ConfigByEnv;
+  sources: Record<Env, string>;
+} {
   const configs = {} as ConfigByEnv;
   const sources = {} as Record<Env, string>;
   for (const env of ENVS) {
@@ -39,7 +42,9 @@ export function loadDeploymentConfigs(repoRoot: string): { configs: ConfigByEnv;
     const errors: { error: number; offset: number; length: number }[] = [];
     const parsed = parseJsonc(raw, errors, { allowTrailingComma: true });
     if (errors.length > 0) {
-      throw new Error(`Failed to parse ${path}: ${errors.length} JSONC error(s) — first at offset ${errors[0]!.offset}`);
+      throw new Error(
+        `Failed to parse ${path}: ${errors.length} JSONC error(s) — first at offset ${errors[0]!.offset}`,
+      );
     }
     configs[env] = parsed;
     sources[env] = raw;
@@ -74,7 +79,8 @@ function buildRow(
   for (const env of ENVS) {
     const raw = getByPath(configs[env], jsonPath);
     rawValueByEnv[env] = raw === undefined ? "(missing)" : formatRaw(raw);
-    humanValueByEnv[env] = raw === undefined ? "(missing)" : formatHuman(raw, format, asset);
+    humanValueByEnv[env] =
+      raw === undefined ? "(missing)" : formatHuman(raw, format, asset);
   }
   const assetLabel = asset ? ASSET_SYMBOL[asset] : "";
   const key = asset ? `${spec.key}[${assetLabel}]` : spec.key;
@@ -101,7 +107,11 @@ function formatRaw(raw: unknown): string {
   return JSON.stringify(raw);
 }
 
-function formatHuman(raw: unknown, format: ValueFormat, asset: AssetKey | ""): string {
+function formatHuman(
+  raw: unknown,
+  format: ValueFormat,
+  asset: AssetKey | "",
+): string {
   const s = raw === null || raw === undefined ? "" : String(raw);
   switch (format) {
     case "raw":
@@ -146,7 +156,8 @@ function humaniseAssetWeiPerSec(raw: string, asset: AssetKey): string {
   const decimals = ASSET_DECIMALS[asset];
   const symbol = ASSET_SYMBOL[asset];
   try {
-    const perDay = (BigInt(raw) * BigInt(86400)) / BigInt(10) ** BigInt(decimals);
+    const perDay =
+      (BigInt(raw) * BigInt(86400)) / BigInt(10) ** BigInt(decimals);
     return `${withThousandsSeparators(perDay)} ${symbol}/day`;
   } catch {
     return `${raw} ${symbol}/sec`;
@@ -162,7 +173,8 @@ function humaniseRay(raw: string): string {
     const remainder = value % RAY;
     if (remainder === BigInt(0)) return `$${withThousandsSeparators(whole)}`;
     if (whole === BigInt(0)) {
-      const fractional = remainder.toString().padStart(27, "0").replace(/0+$/, "") || "0";
+      const fractional =
+        remainder.toString().padStart(27, "0").replace(/0+$/, "") || "0";
       return `$0.${fractional}`;
     }
     return raw;
@@ -224,7 +236,8 @@ function getByPath(obj: unknown, path: string): unknown {
   const segments = path.split(".");
   let cur: unknown = obj;
   for (const seg of segments) {
-    if (cur === undefined || cur === null || typeof cur !== "object") return undefined;
+    if (cur === undefined || cur === null || typeof cur !== "object")
+      return undefined;
     cur = (cur as Record<string, unknown>)[seg];
   }
   return cur;

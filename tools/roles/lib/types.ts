@@ -4,7 +4,13 @@ export const ENVS: Env[] = ["staging", "preprod", "prod"];
 
 export type DelayTierName = "NO_DELAY" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
-export const DELAY_TIER_NAMES: DelayTierName[] = ["NO_DELAY", "LOW", "MEDIUM", "HIGH", "CRITICAL"];
+export const DELAY_TIER_NAMES: DelayTierName[] = [
+  "NO_DELAY",
+  "LOW",
+  "MEDIUM",
+  "HIGH",
+  "CRITICAL",
+];
 
 export type GuardianName = "admin" | "operational";
 
