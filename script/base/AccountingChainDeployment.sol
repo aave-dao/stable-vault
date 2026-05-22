@@ -415,7 +415,7 @@ abstract contract AccountingChainDeployment is BaseChainDeployment, AccessManage
         address predicted = getMockBundleFeedAddress(_deployer());
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
-            _assertDeployedRuntimeCode(predicted, keccak256(type(MockBundleFeed).runtimeCode));
+            _assertDeployedRuntimeCode(predicted, keccak256(type(MockBundleFeed).runtimeCode), "MockBundleFeed");
             logSkip("_deployMockBundleFeed", "MockBundleFeed");
             _chainlinkBundleAggregatorProxy = predicted;
             _logDeployment("MockBundleFeed", MOCK_BUNDLE_FEED_SALT_SEED, predicted);
@@ -451,7 +451,9 @@ abstract contract AccountingChainDeployment is BaseChainDeployment, AccessManage
         address predicted = getMockSequencerUptimeFeedAddress(_deployer());
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
-            _assertDeployedRuntimeCode(predicted, keccak256(type(MockSequencerUptimeFeed).runtimeCode));
+            _assertDeployedRuntimeCode(
+                predicted, keccak256(type(MockSequencerUptimeFeed).runtimeCode), "MockSequencerUptimeFeed"
+            );
             logSkip("_deployMockSequencerUptimeFeed", "MockSequencerUptimeFeed");
             _sequencerUptimeFeed = predicted;
             _logDeployment("MockSequencerUptimeFeed", MOCK_SEQUENCER_UPTIME_FEED_SALT_SEED, predicted);

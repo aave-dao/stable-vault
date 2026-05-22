@@ -531,9 +531,15 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         internal
     {
         address impl = address(uint160(uint256(vm.load(proxy, ERC1967_IMPLEMENTATION_SLOT))));
-        require(impl != address(0), string.concat(name, ": ERC-1967 implementation slot is zero"));
+        require(
+            impl != address(0),
+            string.concat(name, "::Proxy at ", Strings.toHexString(proxy), ": ERC-1967 implementation slot is zero")
+        );
         address admin = address(uint160(uint256(vm.load(proxy, ERC1967_ADMIN_SLOT))));
-        require(admin != address(0), string.concat(name, ": ERC-1967 admin slot is zero"));
+        require(
+            admin != address(0),
+            string.concat(name, "::Proxy at ", Strings.toHexString(proxy), ": ERC-1967 admin slot is zero")
+        );
         _assertDeployedMatchesReference(impl, implCreationCode, string.concat(name, "::Implementation"));
     }
 
@@ -554,8 +560,13 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         if (_isBroadcasting) {
             vm.startBroadcast(_deployer());
         }
-        require(ref != address(0), string.concat(name, ": reference deploy failed"));
-        require(keccak256(actual.code) == keccak256(ref.code), string.concat(name, ": deployed bytecode mismatch"));
+        require(
+            ref != address(0), string.concat(name, " at ", Strings.toHexString(actual), ": reference deploy failed")
+        );
+        require(
+            keccak256(actual.code) == keccak256(ref.code),
+            string.concat(name, " at ", Strings.toHexString(actual), ": deployed bytecode mismatch")
+        );
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -566,7 +577,7 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         address predicted = getTransferHelperAddress(_deployer());
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
-            _assertDeployedRuntimeCode(predicted, keccak256(type(TransferHelper).runtimeCode));
+            _assertDeployedRuntimeCode(predicted, keccak256(type(TransferHelper).runtimeCode), "TransferHelper");
             logSkip("_deployTransferHelper", "TransferHelper");
             _logDeployment("TransferHelper", TRANSFER_HELPER_SALT_SEED, predicted);
             return predicted;
@@ -585,7 +596,7 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         address predicted = getAccessManagerAddress(_deployer());
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
-            _assertDeployedRuntimeCode(predicted, keccak256(type(AccessManager).runtimeCode));
+            _assertDeployedRuntimeCode(predicted, keccak256(type(AccessManager).runtimeCode), "AccessManager");
             logSkip("_deployAccessManager", "AccessManager");
             _logDeployment("AccessManager", ACCESS_MANAGER_SALT_SEED, predicted);
             return predicted;
@@ -666,7 +677,7 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         address predicted = getIouTokenAddress(_deployer());
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
-            _assertDeployedRuntimeCode(predicted, keccak256(type(IouToken).runtimeCode));
+            _assertDeployedRuntimeCode(predicted, keccak256(type(IouToken).runtimeCode), "IouToken");
             logSkip("_deployIouToken", "IouToken");
             _logDeployment("IouToken", IOU_TOKEN_SALT_SEED, predicted);
             return predicted;
@@ -904,7 +915,7 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         address predicted = getPolicyRegistryAddress(_deployer());
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
-            _assertDeployedRuntimeCode(predicted, keccak256(type(PolicyRegistry).runtimeCode));
+            _assertDeployedRuntimeCode(predicted, keccak256(type(PolicyRegistry).runtimeCode), "PolicyRegistry");
             logSkip("_deployPolicyRegistry", "PolicyRegistry");
             _logDeployment("PolicyRegistry", POLICY_REGISTRY_SALT_SEED, predicted);
             return predicted;

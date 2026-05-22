@@ -3,6 +3,7 @@
 pragma solidity ^0.8.20;
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {ICreateX} from "@pcaversaccio/createx/ICreateX.sol";
 
 import {Create3AddressLib} from "script/libraries/Create3AddressLib.sol";
@@ -47,7 +48,13 @@ contract Create3Deployment {
     /// `keccak256(type(X).runtimeCode)` for contracts without immutables; for contracts with immutables the deployed
     /// code differs from the template, so this check is not applicable and callers should fall back to a presence
     /// check.
-    function _assertDeployedRuntimeCode(address addr, bytes32 expectedRuntimeCodeHash) internal view {
-        require(keccak256(addr.code) == expectedRuntimeCodeHash, "deployed runtime code hash mismatch");
+    function _assertDeployedRuntimeCode(address addr, bytes32 expectedRuntimeCodeHash, string memory name)
+        internal
+        view
+    {
+        require(
+            keccak256(addr.code) == expectedRuntimeCodeHash,
+            string.concat(name, " at ", Strings.toHexString(addr), ": deployed runtime code hash mismatch")
+        );
     }
 }
