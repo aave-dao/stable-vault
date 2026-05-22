@@ -601,7 +601,11 @@ abstract contract AccountingChainDeployment is
     }
 
     function _isAdiAdapterDeployed() internal view virtual override returns (bool) {
-        return _configAddress(".accountingChain.adi.crossChainController") != address(0);
+        return _adiCrossChainController() != address(0);
+    }
+
+    function _adiCrossChainController() internal view virtual override returns (address) {
+        return _configAddress(".accountingChain.adi.crossChainController");
     }
 
     function _deployAdiAdapter() internal returns (address) {
@@ -616,7 +620,7 @@ abstract contract AccountingChainDeployment is
                 abi.encode(
                     getAccessManagerAddress(_deployer()),
                     getGatewayAddress(_deployer()),
-                    _configAddress(".accountingChain.adi.crossChainController"),
+                    _adiCrossChainController(),
                     getTransferHelperAddress(_deployer())
                 )
             )

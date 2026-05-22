@@ -478,7 +478,11 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
     }
 
     function _isAdiAdapterDeployed() internal view virtual override returns (bool) {
-        return _configAddress(".earningChain.adi.crossChainController") != address(0);
+        return _adiCrossChainController() != address(0);
+    }
+
+    function _adiCrossChainController() internal view virtual override returns (address) {
+        return _configAddress(".earningChain.adi.crossChainController");
     }
 
     function _deployAdiAdapter() internal returns (address) {
@@ -493,7 +497,7 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
                 abi.encode(
                     getAccessManagerAddress(_deployer()),
                     getGatewayAddress(_deployer()),
-                    _configAddress(".earningChain.adi.crossChainController"),
+                    _adiCrossChainController(),
                     getTransferHelperAddress(_deployer())
                 )
             )

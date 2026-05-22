@@ -69,6 +69,16 @@ contract AccessManagerEarningChainSetupTest is AccessManagerSetupBaseTest, Earni
         return EarningChainDeployment._isAdiAdapterDeployed();
     }
 
+    function _adiCrossChainController()
+        internal
+        view
+        virtual
+        override(AccessManagerBaseSetup, EarningChainDeployment)
+        returns (address)
+    {
+        return EarningChainDeployment._adiCrossChainController();
+    }
+
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // CHAIN-SPECIFIC TESTS
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -93,5 +103,92 @@ contract AccessManagerEarningChainSetupTest is AccessManagerSetupBaseTest, Earni
             IEarningChainGateway.pushFundsToAccountingChain.selector,
             RolesConfig.getRole__pushFundsToAccountingChain().roleId
         );
+    }
+}
+
+contract AccessManagerEarningChainWithAdiSetupTest is AccessManagerEarningChainSetupTest {
+    function _adiCrossChainController() internal view virtual override returns (address) {
+        return _testAdiCrossChainController();
+    }
+
+    function test_targetSetup_adiCrossChainController() public view {
+        address target = _testAdiCrossChainController();
+
+        _assertTargetFunctionRole(
+            target, RolesConfig.getRole__adiApproveSenders().selector, RolesConfig.getRole__adiApproveSenders().roleId
+        );
+        _assertTargetFunctionRole(
+            target, RolesConfig.getRole__adiRemoveSenders().selector, RolesConfig.getRole__adiRemoveSenders().roleId
+        );
+        _assertTargetFunctionRole(
+            target,
+            RolesConfig.getRole__adiEnableBridgeAdapters().selector,
+            RolesConfig.getRole__adiEnableBridgeAdapters().roleId
+        );
+        _assertTargetFunctionRole(
+            target,
+            RolesConfig.getRole__adiDisableBridgeAdapters().selector,
+            RolesConfig.getRole__adiDisableBridgeAdapters().roleId
+        );
+        _assertTargetFunctionRole(
+            target,
+            RolesConfig.getRole__adiUpdateOptimalBandwidthByChain().selector,
+            RolesConfig.getRole__adiUpdateOptimalBandwidthByChain().roleId
+        );
+        _assertTargetFunctionRole(
+            target, RolesConfig.getRole__adiConfigAdapter().selector, RolesConfig.getRole__adiConfigAdapter().roleId
+        );
+        _assertTargetFunctionRole(
+            target,
+            RolesConfig.getRole__adiUpdateRequiredForwardingSuccessesByChain().selector,
+            RolesConfig.getRole__adiUpdateRequiredForwardingSuccessesByChain().roleId
+        );
+        _assertTargetFunctionRole(
+            target,
+            RolesConfig.getRole__adiUpdateConfirmations().selector,
+            RolesConfig.getRole__adiUpdateConfirmations().roleId
+        );
+        _assertTargetFunctionRole(
+            target,
+            RolesConfig.getRole__adiUpdateMessagesValidityTimestamp().selector,
+            RolesConfig.getRole__adiUpdateMessagesValidityTimestamp().roleId
+        );
+        _assertTargetFunctionRole(
+            target,
+            RolesConfig.getRole__adiAllowReceiverBridgeAdapters().selector,
+            RolesConfig.getRole__adiAllowReceiverBridgeAdapters().roleId
+        );
+        _assertTargetFunctionRole(
+            target,
+            RolesConfig.getRole__adiDisallowReceiverBridgeAdapters().selector,
+            RolesConfig.getRole__adiDisallowReceiverBridgeAdapters().roleId
+        );
+        _assertTargetFunctionRole(
+            target,
+            RolesConfig.getRole__adiEmergencyTokenTransfer().selector,
+            RolesConfig.getRole__adiEmergencyTokenTransfer().roleId
+        );
+        _assertTargetFunctionRole(
+            target,
+            RolesConfig.getRole__adiEmergencyEtherTransfer().selector,
+            RolesConfig.getRole__adiEmergencyEtherTransfer().roleId
+        );
+        _assertTargetFunctionRole(
+            target,
+            RolesConfig.getRole__adiTransferOwnership().selector,
+            RolesConfig.getRole__adiTransferOwnership().roleId
+        );
+        _assertTargetFunctionRole(
+            target,
+            RolesConfig.getRole__adiRenounceOwnership().selector,
+            RolesConfig.getRole__adiRenounceOwnership().roleId
+        );
+        _assertTargetFunctionRole(
+            target, RolesConfig.getRole__adiUpdateGuardian().selector, RolesConfig.getRole__adiUpdateGuardian().roleId
+        );
+    }
+
+    function _testAdiCrossChainController() internal pure returns (address) {
+        return address(uint160(uint256(keccak256("test.adiCrossChainController"))));
     }
 }
