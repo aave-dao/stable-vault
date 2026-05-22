@@ -178,8 +178,21 @@ abstract contract EarningChainDeployment is BaseChainDeployment, AccessManagerEa
 
     function _deployGateway() internal returns (address) {
         address predicted = getGatewayAddress(_deployer());
+        bytes memory implCreationCode = abi.encodePacked(
+            type(EarningChainGateway).creationCode,
+            abi.encode(
+                _configUint(".accountingChain.chainId"),
+                getAllocatorAddress(_deployer()),
+                getPriceOracleAddress(_deployer()),
+                getIouTokenManagerAddress(_deployer()),
+                getTransferHelperAddress(_deployer()),
+                getPolicyRegistryAddress(_deployer()),
+                _configUint(".earningChain.minBurnIouTokenGasLimit")
+            )
+        );
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
+            _assertDeployedTransparentProxy(predicted, implCreationCode, "EarningChainGateway");
             logSkip("_deployGateway", "EarningChainGateway");
             _logDeployment("EarningChainGateway", GATEWAY_SALT_SEED, predicted);
             return predicted;
@@ -210,8 +223,11 @@ abstract contract EarningChainDeployment is BaseChainDeployment, AccessManagerEa
 
     function _deployEarningChainStateProvider() internal returns (address) {
         address predicted = getEarningChainStateProviderAddress(_deployer());
+        bytes memory implCreationCode =
+            abi.encodePacked(type(EarningChainStateProvider).creationCode, abi.encode(getGatewayAddress(_deployer())));
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
+            _assertDeployedTransparentProxy(predicted, implCreationCode, "EarningChainStateProvider");
             logSkip("_deployEarningChainStateProvider", "EarningChainStateProvider");
             _logDeployment("EarningChainStateProvider", EARNING_CHAIN_STATE_PROVIDER_SALT_SEED, predicted);
             return predicted;
@@ -284,19 +300,18 @@ abstract contract EarningChainDeployment is BaseChainDeployment, AccessManagerEa
     ) private {
         string memory saltSeed = getChainlinkPriceOracleAdapterSaltSeed(asset);
         address predicted = getChainlinkPriceOracleAdapterAddress(asset, _deployer());
+        bytes memory initCode =
+            abi.encodePacked(type(ChainlinkPriceOracleAdapter).creationCode, abi.encode(asset, feed, heartbeat));
         address adapter;
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
+            _assertDeployedMatchesReference(
+                predicted, initCode, string.concat("ChainlinkPriceOracleAdapter::", assetSymbol)
+            );
             adapter = predicted;
             logSkip("_wireChainlinkPriceOracleAdapter", string.concat("adapter for ", assetSymbol));
         } else {
-            adapter = _deploy_create3({
-                namespacedSaltSeed: saltSeed,
-                deployer: _deployer(),
-                initCode: abi.encodePacked(
-                    type(ChainlinkPriceOracleAdapter).creationCode, abi.encode(asset, feed, heartbeat)
-                )
-            });
+            adapter = _deploy_create3({namespacedSaltSeed: saltSeed, deployer: _deployer(), initCode: initCode});
             require(adapter == predicted, "ChainlinkPriceOracleAdapter does not match expected address");
         }
         _logDeployment(string.concat("ChainlinkPriceOracleAdapter::", assetSymbol), saltSeed, adapter);

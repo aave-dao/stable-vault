@@ -112,15 +112,22 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
     // Entry point.
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+    /// @dev Tracks whether `vm.startBroadcast` is active so reference-deploy helpers can pause/resume the broadcast
+    /// without leaking auxiliary contracts to chain. Set on entry to `run()`, cleared on exit. Not used by tests, which
+    /// drive `_deployContracts` under `vm.startPrank` instead of `vm.startBroadcast`.
+    bool private _isBroadcasting;
+
     function run() public {
         _validateProfileAddresses();
         _validateDeploymentParameters();
         _validateRedemptionLimitConfig(string.concat(_chainConfigPrefix(), ".withdrawalExecutionPolicy"));
         _validateExternalAddresses();
+        _isBroadcasting = true;
         vm.startBroadcast(_deployer());
         _deployContracts();
         _setupContracts();
         vm.stopBroadcast();
+        _isBroadcasting = false;
     }
 
     function _validateDeploymentParameters() internal view virtual {
@@ -197,6 +204,13 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         returns (string memory)
     {
         return getATokenVaultMerklRewardClaimerImplSaltSeed(underlying);
+    }
+
+    function _assertATokenVaultMerklRewardClaimerImplBytecode(address actual, bytes memory implInitCode)
+        internal
+        override
+    {
+        _assertDeployedMatchesReference(actual, implInitCode, "ATokenVaultMerklRewardClaimer::Implementation");
     }
 
     function _logDeployment(string memory name, string memory saltSeed, address addr) internal virtual override {
@@ -508,6 +522,42 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         _assertChainSpecificRequiredPoliciesSet();
     }
 
+    /// @dev ERC-1967 storage slots; used to sanity-check transparent proxies on the idempotency skip path.
+    bytes32 private constant ERC1967_IMPLEMENTATION_SLOT =
+        0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+    bytes32 private constant ERC1967_ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
+
+    function _assertDeployedTransparentProxy(address proxy, bytes memory implCreationCode, string memory name)
+        internal
+    {
+        address impl = address(uint160(uint256(vm.load(proxy, ERC1967_IMPLEMENTATION_SLOT))));
+        require(impl != address(0), string.concat(name, ": ERC-1967 implementation slot is zero"));
+        address admin = address(uint160(uint256(vm.load(proxy, ERC1967_ADMIN_SLOT))));
+        require(admin != address(0), string.concat(name, ": ERC-1967 admin slot is zero"));
+        _assertDeployedMatchesReference(impl, implCreationCode, string.concat(name, "::Implementation"));
+    }
+
+    /// @dev Deploys a reference copy of the contract described by `creationCode` (creation bytecode + ABI-encoded
+    /// constructor args) and asserts the on-chain runtime code at `actual` matches the reference byte-for-byte. The
+    /// reference is created via inline-assembly `CREATE`, which bypasses Foundry's broadcast hook even when called from
+    /// within a `vm.startBroadcast` block; we pause/resume broadcast anyway so the reference is never published to
+    /// chain. Catches the case where `actual` has code that resembles "ours" but was produced from different
+    /// constructor args (e.g. a stale prior deploy, or a same-salt collision with a different deployer flow).
+    function _assertDeployedMatchesReference(address actual, bytes memory creationCode, string memory name) internal {
+        if (_isBroadcasting) {
+            vm.stopBroadcast();
+        }
+        address ref;
+        assembly {
+            ref := create(0, add(creationCode, 0x20), mload(creationCode))
+        }
+        if (_isBroadcasting) {
+            vm.startBroadcast(_deployer());
+        }
+        require(ref != address(0), string.concat(name, ": reference deploy failed"));
+        require(keccak256(actual.code) == keccak256(ref.code), string.concat(name, ": deployed bytecode mismatch"));
+    }
+
     ///////////////////////////////////////////////////////////////////////////////////////////////////
     // Shared deploys.
     ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -535,6 +585,7 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         address predicted = getAccessManagerAddress(_deployer());
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
+            _assertDeployedRuntimeCode(predicted, keccak256(type(AccessManager).runtimeCode));
             logSkip("_deployAccessManager", "AccessManager");
             _logDeployment("AccessManager", ACCESS_MANAGER_SALT_SEED, predicted);
             return predicted;
@@ -551,8 +602,10 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
 
     function _deployAssetRegistry() internal returns (address) {
         address predicted = getAssetRegistryAddress(_deployer());
+        bytes memory implCreationCode = type(AssetRegistry).creationCode;
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
+            _assertDeployedTransparentProxy(predicted, implCreationCode, "AssetRegistry");
             logSkip("_deployAssetRegistry", "AssetRegistry");
             _logDeployment("AssetRegistry", ASSET_REGISTRY_SALT_SEED, predicted);
             return predicted;
@@ -573,17 +626,22 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
 
     function _deployWithdrawalExecutionPolicy() internal returns (address) {
         address predicted = getWithdrawalExecutionPolicyAddress(_deployer());
-        if (predicted.code.length != 0) {
-            /// @custom:tx-already-executed-check Predicted address has code.
-            logSkip("_deployWithdrawalExecutionPolicy", "WithdrawalExecutionPolicy");
-            _logDeployment("WithdrawalExecutionPolicy", WITHDRAWAL_EXECUTION_POLICY_SALT_SEED, predicted);
-            return predicted;
-        }
         uint128 minRedemptionCapacityRay =
             _configUint128(string.concat(_chainConfigPrefix(), ".withdrawalExecutionPolicy.minRedemptionCapacityRay"));
         uint128 minRedemptionRefillRateRay = _configUint128(
             string.concat(_chainConfigPrefix(), ".withdrawalExecutionPolicy.minRedemptionRefillRateRay")
         );
+        bytes memory implCreationCode = abi.encodePacked(
+            type(WithdrawalExecutionPolicy).creationCode,
+            abi.encode(_withdrawalExecutionPolicyTarget(), minRedemptionCapacityRay, minRedemptionRefillRateRay)
+        );
+        if (predicted.code.length != 0) {
+            /// @custom:tx-already-executed-check Predicted address has code.
+            _assertDeployedTransparentProxy(predicted, implCreationCode, "WithdrawalExecutionPolicy");
+            logSkip("_deployWithdrawalExecutionPolicy", "WithdrawalExecutionPolicy");
+            _logDeployment("WithdrawalExecutionPolicy", WITHDRAWAL_EXECUTION_POLICY_SALT_SEED, predicted);
+            return predicted;
+        }
         address implementation = address(
             new WithdrawalExecutionPolicy(
                 _withdrawalExecutionPolicyTarget(), minRedemptionCapacityRay, minRedemptionRefillRateRay
@@ -608,6 +666,7 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         address predicted = getIouTokenAddress(_deployer());
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
+            _assertDeployedRuntimeCode(predicted, keccak256(type(IouToken).runtimeCode));
             logSkip("_deployIouToken", "IouToken");
             _logDeployment("IouToken", IOU_TOKEN_SALT_SEED, predicted);
             return predicted;
@@ -631,8 +690,19 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
 
     function _deployIouTokenManager() internal returns (address) {
         address predicted = getIouTokenManagerAddress(_deployer());
+        bytes memory implCreationCode = abi.encodePacked(
+            type(IouTokenManager).creationCode,
+            abi.encode(
+                getIouTokenAddress(_deployer()),
+                getGatewayAddress(_deployer()),
+                _iouTokenManagerVault(),
+                getTransferHelperAddress(_deployer()),
+                _isAccountingChain()
+            )
+        );
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
+            _assertDeployedTransparentProxy(predicted, implCreationCode, "IouTokenManager");
             logSkip("_deployIouTokenManager", "IouTokenManager");
             _logDeployment("IouTokenManager", IOU_TOKEN_MANAGER_SALT_SEED, predicted);
             return predicted;
@@ -661,8 +731,21 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
 
     function _deployAllocator() internal returns (address) {
         address predicted = getAllocatorAddress(_deployer());
+        bytes memory implCreationCode = abi.encodePacked(
+            type(Allocator).creationCode,
+            abi.encode(
+                getAssetRegistryAddress(_deployer()),
+                _allocatorDepositor(),
+                _allocatorWithdrawer(),
+                getPriceOracleAddress(_deployer()),
+                getTransferHelperAddress(_deployer()),
+                _configUint8(".maxStrategiesPerAsset"),
+                getPolicyRegistryAddress(_deployer())
+            )
+        );
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
+            _assertDeployedTransparentProxy(predicted, implCreationCode, "Allocator");
             logSkip("_deployAllocator", "Allocator");
             _logDeployment("Allocator", ALLOCATOR_SALT_SEED, predicted);
             return predicted;
@@ -693,25 +776,25 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
 
     function _deploySlippageCoverageVault() internal returns (address) {
         address predicted = getSlippageCoverageVaultAddress(_deployer());
+        bytes memory initCode = abi.encodePacked(
+            type(SlippageCoverageVault).creationCode,
+            abi.encode(
+                getSwapperAddress(_deployer()),
+                getAccessManagerAddress(_deployer()),
+                _configUint16(".slippageCoverageVault.maxSlippageBps"),
+                _configUint16(".slippageCoverageVault.overrideMaxSlippageBps"),
+                _configBool(".slippageCoverageVault.initialOverrideMode")
+            )
+        );
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
+            _assertDeployedMatchesReference(predicted, initCode, "SlippageCoverageVault");
             logSkip("_deploySlippageCoverageVault", "SlippageCoverageVault");
             _logDeployment("SlippageCoverageVault", SLIPPAGE_COVERAGE_VAULT_SALT_SEED, predicted);
             return predicted;
         }
         address slippageCoverageVault = _deploy_create3({
-            namespacedSaltSeed: SLIPPAGE_COVERAGE_VAULT_SALT_SEED,
-            deployer: _deployer(),
-            initCode: abi.encodePacked(
-                type(SlippageCoverageVault).creationCode,
-                abi.encode(
-                    getSwapperAddress(_deployer()),
-                    getAccessManagerAddress(_deployer()),
-                    _configUint16(".slippageCoverageVault.maxSlippageBps"),
-                    _configUint16(".slippageCoverageVault.overrideMaxSlippageBps"),
-                    _configBool(".slippageCoverageVault.initialOverrideMode")
-                )
-            )
+            namespacedSaltSeed: SLIPPAGE_COVERAGE_VAULT_SALT_SEED, deployer: _deployer(), initCode: initCode
         });
         require(slippageCoverageVault == predicted, "SlippageCoverageVault does not match expected address");
         _logDeployment("SlippageCoverageVault", SLIPPAGE_COVERAGE_VAULT_SALT_SEED, slippageCoverageVault);
@@ -720,20 +803,19 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
 
     function _deploySwapper() internal returns (address) {
         address predicted = getSwapperAddress(_deployer());
+        bytes memory initCode = abi.encodePacked(
+            type(Swapper).creationCode,
+            abi.encode(getAllocatorAddress(_deployer()), getSlippageCoverageVaultAddress(_deployer()))
+        );
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
+            _assertDeployedMatchesReference(predicted, initCode, "Swapper");
             logSkip("_deploySwapper", "Swapper");
             _logDeployment("Swapper", SWAPPER_SALT_SEED, predicted);
             return predicted;
         }
-        address swapper = _deploy_create3({
-            namespacedSaltSeed: SWAPPER_SALT_SEED,
-            deployer: _deployer(),
-            initCode: abi.encodePacked(
-                type(Swapper).creationCode,
-                abi.encode(getAllocatorAddress(_deployer()), getSlippageCoverageVaultAddress(_deployer()))
-            )
-        });
+        address swapper =
+            _deploy_create3({namespacedSaltSeed: SWAPPER_SALT_SEED, deployer: _deployer(), initCode: initCode});
         require(swapper == predicted, "Swapper does not match expected address");
         _logDeployment("Swapper", SWAPPER_SALT_SEED, swapper);
         return swapper;
@@ -741,26 +823,25 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
 
     function _deployCcipAdapter() internal returns (address) {
         address predicted = getCcipAdapterAddress(_deployer());
+        bytes memory initCode = abi.encodePacked(
+            type(CcipAdapter).creationCode,
+            abi.encode(
+                getAccessManagerAddress(_deployer()),
+                getGatewayAddress(_deployer()),
+                _configAddress(string.concat(_chainConfigPrefix(), ".ccipRouterAddress")),
+                getTransferHelperAddress(_deployer()),
+                getAssetRegistryAddress(_deployer())
+            )
+        );
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
+            _assertDeployedMatchesReference(predicted, initCode, "CcipAdapter");
             logSkip("_deployCcipAdapter", "CcipAdapter");
             _logDeployment("CcipAdapter", CCIP_ADAPTER_SALT_SEED, predicted);
             return predicted;
         }
-        address ccipAdapter = _deploy_create3({
-            namespacedSaltSeed: CCIP_ADAPTER_SALT_SEED,
-            deployer: _deployer(),
-            initCode: abi.encodePacked(
-                type(CcipAdapter).creationCode,
-                abi.encode(
-                    getAccessManagerAddress(_deployer()),
-                    getGatewayAddress(_deployer()),
-                    _configAddress(string.concat(_chainConfigPrefix(), ".ccipRouterAddress")),
-                    getTransferHelperAddress(_deployer()),
-                    getAssetRegistryAddress(_deployer())
-                )
-            )
-        });
+        address ccipAdapter =
+            _deploy_create3({namespacedSaltSeed: CCIP_ADAPTER_SALT_SEED, deployer: _deployer(), initCode: initCode});
         require(ccipAdapter == predicted, "CcipAdapter does not match expected address");
         _logDeployment("CcipAdapter", CCIP_ADAPTER_SALT_SEED, ccipAdapter);
         return ccipAdapter;
@@ -771,25 +852,24 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
             return address(0);
         }
         address predicted = getAdiAdapterAddress(_deployer());
+        bytes memory initCode = abi.encodePacked(
+            type(AdiAdapter).creationCode,
+            abi.encode(
+                getAccessManagerAddress(_deployer()),
+                getGatewayAddress(_deployer()),
+                _configAddress(string.concat(_chainConfigPrefix(), ".adi.crossChainController")),
+                getTransferHelperAddress(_deployer())
+            )
+        );
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
+            _assertDeployedMatchesReference(predicted, initCode, "AdiAdapter");
             logSkip("_deployAdiAdapter", "AdiAdapter");
             _logDeployment("AdiAdapter", ADI_ADAPTER_SALT_SEED, predicted);
             return predicted;
         }
-        address adiAdapter = _deploy_create3({
-            namespacedSaltSeed: ADI_ADAPTER_SALT_SEED,
-            deployer: _deployer(),
-            initCode: abi.encodePacked(
-                type(AdiAdapter).creationCode,
-                abi.encode(
-                    getAccessManagerAddress(_deployer()),
-                    getGatewayAddress(_deployer()),
-                    _configAddress(string.concat(_chainConfigPrefix(), ".adi.crossChainController")),
-                    getTransferHelperAddress(_deployer())
-                )
-            )
-        });
+        address adiAdapter =
+            _deploy_create3({namespacedSaltSeed: ADI_ADAPTER_SALT_SEED, deployer: _deployer(), initCode: initCode});
         require(adiAdapter == predicted, "AdiAdapter does not match expected address");
         _logDeployment("AdiAdapter", ADI_ADAPTER_SALT_SEED, adiAdapter);
         return adiAdapter;
@@ -797,8 +877,11 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
 
     function _deployPriceOracle() internal returns (address) {
         address predicted = getPriceOracleAddress(_deployer());
+        bytes memory implCreationCode =
+            abi.encodePacked(type(PriceOracle).creationCode, abi.encode(_configUint(".priceOracleMinValidPriceRay")));
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
+            _assertDeployedTransparentProxy(predicted, implCreationCode, "PriceOracle");
             logSkip("_deployPriceOracle", "PriceOracle");
             _logDeployment("PriceOracle", PRICE_ORACLE_SALT_SEED, predicted);
             return predicted;
@@ -821,6 +904,7 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         address predicted = getPolicyRegistryAddress(_deployer());
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
+            _assertDeployedRuntimeCode(predicted, keccak256(type(PolicyRegistry).runtimeCode));
             logSkip("_deployPolicyRegistry", "PolicyRegistry");
             _logDeployment("PolicyRegistry", POLICY_REGISTRY_SALT_SEED, predicted);
             return predicted;
@@ -839,19 +923,19 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
 
     function _deployFundsBridgingPolicy() internal returns (address) {
         address predicted = getFundsBridgingPolicyAddress(_deployer());
+        bytes memory initCode = abi.encodePacked(
+            type(FundsBridgingPolicy).creationCode,
+            abi.encode(getAccessManagerAddress(_deployer()), _fundsBridgingPolicyHolder())
+        );
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
+            _assertDeployedMatchesReference(predicted, initCode, "FundsBridgingPolicy");
             logSkip("_deployFundsBridgingPolicy", "FundsBridgingPolicy");
             _logDeployment("FundsBridgingPolicy", FUNDS_BRIDGING_POLICY_SALT_SEED, predicted);
             return predicted;
         }
         address fundsBridgingPolicy = _deploy_create3({
-            namespacedSaltSeed: FUNDS_BRIDGING_POLICY_SALT_SEED,
-            deployer: _deployer(),
-            initCode: abi.encodePacked(
-                type(FundsBridgingPolicy).creationCode,
-                abi.encode(getAccessManagerAddress(_deployer()), _fundsBridgingPolicyHolder())
-            )
+            namespacedSaltSeed: FUNDS_BRIDGING_POLICY_SALT_SEED, deployer: _deployer(), initCode: initCode
         });
         require(fundsBridgingPolicy == predicted, "FundsBridgingPolicy does not match expected address");
         _logDeployment("FundsBridgingPolicy", FUNDS_BRIDGING_POLICY_SALT_SEED, fundsBridgingPolicy);

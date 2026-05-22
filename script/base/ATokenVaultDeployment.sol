@@ -94,24 +94,32 @@ abstract contract ATokenVaultDeployment is Script {
     {
         string memory implSaltSeed = _aTokenVaultMerklRewardClaimerImplSaltSeed(underlying);
         address predictedImpl = Create3AddressLib.computeCreate3Address(implSaltSeed, deployer);
+        // forge-lint: disable-next-line(unsafe-cheatcode)
+        string memory artifact = vm.readFile("out/ATokenVaultMerklRewardClaimer.sol/ATokenVaultMerklRewardClaimer.json");
+        bytes memory implInitCode = abi.encodePacked(
+            vm.parseJsonBytes(artifact, ".bytecode.object"), abi.encode(underlying, uint16(0), poolAddressProvider)
+        );
         if (predictedImpl.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
+            _assertATokenVaultMerklRewardClaimerImplBytecode(predictedImpl, implInitCode);
             logSkip(
                 "_deployATokenVaultMerklRewardClaimerImpl",
                 "ATokenVaultMerklRewardClaimer impl already deployed for underlying"
             );
             return predictedImpl;
         }
-        // forge-lint: disable-next-line(unsafe-cheatcode)
-        string memory artifact = vm.readFile("out/ATokenVaultMerklRewardClaimer.sol/ATokenVaultMerklRewardClaimer.json");
-        bytes memory implInitCode = abi.encodePacked(
-            vm.parseJsonBytes(artifact, ".bytecode.object"), abi.encode(underlying, uint16(0), poolAddressProvider)
-        );
         address implementation = ICreateX(Create3AddressLib.CREATEX_ADDRESS)
             .deployCreate3({salt: Create3AddressLib.computeCreate3Salt(implSaltSeed, deployer), initCode: implInitCode});
         require(implementation == predictedImpl, "ATokenVaultMerklRewardClaimer impl address mismatch");
         return implementation;
     }
+
+    /// @dev Reference-deploys the claimer impl with the same init code and compares bytecode. Defined as an abstract
+    /// hook so the concrete check (and broadcast pause) lives on `BaseChainDeployment`, which holds the broadcast
+    /// state flag; here we don't want to take a dependency on that contract.
+    function _assertATokenVaultMerklRewardClaimerImplBytecode(address actual, bytes memory implInitCode)
+        internal
+        virtual;
 
     function _trackATokenVaultDeployment(address underlying, address vaultAddress) private {
         string memory symbol = IERC20Metadata(underlying).symbol();

@@ -251,8 +251,22 @@ abstract contract AccountingChainDeployment is BaseChainDeployment, AccessManage
 
     function _deployStableVault() internal returns (address) {
         address predicted = getStableVaultAddress(_deployer());
+        bytes memory implCreationCode = abi.encodePacked(
+            type(StableVault).creationCode,
+            abi.encode(
+                _configUint(".accountingChain.defaultMaxPerSecondRate"),
+                getAssetRegistryAddress(_deployer()),
+                getIouTokenManagerAddress(_deployer()),
+                getFundsHandlerAddress(_deployer()),
+                getTransferHelperAddress(_deployer()),
+                getPriceOracleAddress(_deployer()),
+                _configUint(".accountingChain.defaultMaxActiveSubVaults"),
+                getPolicyRegistryAddress(_deployer())
+            )
+        );
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
+            _assertDeployedTransparentProxy(predicted, implCreationCode, "StableVault");
             logSkip("_deployStableVault", "StableVault");
             _logDeployment("StableVault", STABLE_VAULT_SALT_SEED, predicted);
             return predicted;
@@ -293,8 +307,21 @@ abstract contract AccountingChainDeployment is BaseChainDeployment, AccessManage
 
     function _deployFundsHandler() internal returns (address) {
         address predicted = getFundsHandlerAddress(_deployer());
+        bytes memory implCreationCode = abi.encodePacked(
+            type(FundsHandler).creationCode,
+            abi.encode(
+                getStableVaultAddress(_deployer()),
+                getGatewayAddress(_deployer()),
+                getAllocatorAddress(_deployer()),
+                getPriceOracleAddress(_deployer()),
+                getTransferHelperAddress(_deployer()),
+                getChainBalanceOracleAddress(_deployer()),
+                getPolicyRegistryAddress(_deployer())
+            )
+        );
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
+            _assertDeployedTransparentProxy(predicted, implCreationCode, "FundsHandler");
             logSkip("_deployFundsHandler", "FundsHandler");
             _logDeployment("FundsHandler", FUNDS_HANDLER_SALT_SEED, predicted);
             return predicted;
@@ -325,8 +352,17 @@ abstract contract AccountingChainDeployment is BaseChainDeployment, AccessManage
 
     function _deployGateway() internal returns (address) {
         address predicted = getGatewayAddress(_deployer());
+        bytes memory implCreationCode = abi.encodePacked(
+            type(AccountingChainGateway).creationCode,
+            abi.encode(
+                getFundsHandlerAddress(_deployer()),
+                getIouTokenManagerAddress(_deployer()),
+                getChainBalanceOracleAddress(_deployer())
+            )
+        );
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
+            _assertDeployedTransparentProxy(predicted, implCreationCode, "AccountingChainGateway");
             logSkip("_deployGateway", "AccountingChainGateway");
             _logDeployment("AccountingChainGateway", GATEWAY_SALT_SEED, predicted);
             return predicted;
@@ -353,8 +389,10 @@ abstract contract AccountingChainDeployment is BaseChainDeployment, AccessManage
 
     function _deployChainBalanceOracle() internal returns (address) {
         address predicted = getChainBalanceOracleAddress(_deployer());
+        bytes memory implCreationCode = type(ChainBalanceOracle).creationCode;
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
+            _assertDeployedTransparentProxy(predicted, implCreationCode, "ChainBalanceOracle");
             logSkip("_deployChainBalanceOracle", "ChainBalanceOracle");
             _logDeployment("ChainBalanceOracle", CHAIN_BALANCE_ORACLE_SALT_SEED, predicted);
             return predicted;
@@ -377,6 +415,7 @@ abstract contract AccountingChainDeployment is BaseChainDeployment, AccessManage
         address predicted = getMockBundleFeedAddress(_deployer());
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
+            _assertDeployedRuntimeCode(predicted, keccak256(type(MockBundleFeed).runtimeCode));
             logSkip("_deployMockBundleFeed", "MockBundleFeed");
             _chainlinkBundleAggregatorProxy = predicted;
             _logDeployment("MockBundleFeed", MOCK_BUNDLE_FEED_SALT_SEED, predicted);
@@ -412,6 +451,7 @@ abstract contract AccountingChainDeployment is BaseChainDeployment, AccessManage
         address predicted = getMockSequencerUptimeFeedAddress(_deployer());
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
+            _assertDeployedRuntimeCode(predicted, keccak256(type(MockSequencerUptimeFeed).runtimeCode));
             logSkip("_deployMockSequencerUptimeFeed", "MockSequencerUptimeFeed");
             _sequencerUptimeFeed = predicted;
             _logDeployment("MockSequencerUptimeFeed", MOCK_SEQUENCER_UPTIME_FEED_SALT_SEED, predicted);
@@ -429,20 +469,19 @@ abstract contract AccountingChainDeployment is BaseChainDeployment, AccessManage
 
     function _deployDepositPolicy() internal returns (address) {
         address predicted = getDepositPolicyAddress(_deployer());
+        bytes memory initCode = abi.encodePacked(
+            type(DepositPolicy).creationCode,
+            abi.encode(getAccessManagerAddress(_deployer()), getStableVaultAddress(_deployer()))
+        );
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
+            _assertDeployedMatchesReference(predicted, initCode, "DepositPolicy");
             logSkip("_deployDepositPolicy", "DepositPolicy");
             _logDeployment("DepositPolicy", DEPOSIT_POLICY_SALT_SEED, predicted);
             return predicted;
         }
-        address depositPolicy = _deploy_create3({
-            namespacedSaltSeed: DEPOSIT_POLICY_SALT_SEED,
-            deployer: _deployer(),
-            initCode: abi.encodePacked(
-                type(DepositPolicy).creationCode,
-                abi.encode(getAccessManagerAddress(_deployer()), getStableVaultAddress(_deployer()))
-            )
-        });
+        address depositPolicy =
+            _deploy_create3({namespacedSaltSeed: DEPOSIT_POLICY_SALT_SEED, deployer: _deployer(), initCode: initCode});
         require(depositPolicy == predicted, "DepositPolicy does not match expected address");
         _logDeployment("DepositPolicy", DEPOSIT_POLICY_SALT_SEED, depositPolicy);
         return depositPolicy;
@@ -508,23 +547,22 @@ abstract contract AccountingChainDeployment is BaseChainDeployment, AccessManage
     ) private {
         string memory saltSeed = getChainlinkL2PriceOracleAdapterSaltSeed(asset);
         address predicted = getChainlinkL2PriceOracleAdapterAddress(asset, _deployer());
+        bytes memory initCode = abi.encodePacked(
+            type(ChainlinkL2PriceOracleAdapter).creationCode, abi.encode(asset, feed, heartbeat, _sequencerUptimeFeed)
+        );
         address adapter;
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
+            _assertDeployedMatchesReference(
+                predicted, initCode, string.concat("ChainlinkL2PriceOracleAdapter::", assetSymbol)
+            );
             adapter = predicted;
             logSkip(
                 "_wireChainlinkL2PriceOracleAdapter",
                 string.concat("ChainlinkL2PriceOracleAdapter for ", assetSymbol, " deployed")
             );
         } else {
-            adapter = _deploy_create3({
-                namespacedSaltSeed: saltSeed,
-                deployer: _deployer(),
-                initCode: abi.encodePacked(
-                    type(ChainlinkL2PriceOracleAdapter).creationCode,
-                    abi.encode(asset, feed, heartbeat, _sequencerUptimeFeed)
-                )
-            });
+            adapter = _deploy_create3({namespacedSaltSeed: saltSeed, deployer: _deployer(), initCode: initCode});
             require(adapter == predicted, "ChainlinkL2PriceOracleAdapter does not match expected address");
         }
         _logDeployment(string.concat("ChainlinkL2PriceOracleAdapter::", assetSymbol), saltSeed, adapter);
@@ -544,25 +582,23 @@ abstract contract AccountingChainDeployment is BaseChainDeployment, AccessManage
         uint256 earningChainId = _configUint(".earningChain.chainId");
         string memory saltSeed = getChainlinkL2ChainBalanceOracleAdapterSaltSeed(earningChainId);
         address predicted = getChainlinkL2ChainBalanceOracleAdapterAddress(earningChainId, _deployer());
+        bytes memory initCode = abi.encodePacked(
+            type(ChainlinkL2ChainBalanceOracleAdapter).creationCode,
+            abi.encode(
+                earningChainId,
+                _chainlinkBundleAggregatorProxy,
+                _configUint(".chainlinkChainBalanceOracleHeartbeat"),
+                _sequencerUptimeFeed
+            )
+        );
         address adapter;
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
+            _assertDeployedMatchesReference(predicted, initCode, "ChainlinkL2ChainBalanceOracleAdapter");
             adapter = predicted;
             logSkip("_setupChainBalanceOracleAdapters", "ChainlinkL2ChainBalanceOracleAdapter");
         } else {
-            adapter = _deploy_create3({
-                namespacedSaltSeed: saltSeed,
-                deployer: _deployer(),
-                initCode: abi.encodePacked(
-                    type(ChainlinkL2ChainBalanceOracleAdapter).creationCode,
-                    abi.encode(
-                        earningChainId,
-                        _chainlinkBundleAggregatorProxy,
-                        _configUint(".chainlinkChainBalanceOracleHeartbeat"),
-                        _sequencerUptimeFeed
-                    )
-                )
-            });
+            adapter = _deploy_create3({namespacedSaltSeed: saltSeed, deployer: _deployer(), initCode: initCode});
             require(adapter == predicted, "ChainlinkL2ChainBalanceOracleAdapter does not match expected address");
         }
         _logDeployment("ChainlinkL2ChainBalanceOracleAdapter", saltSeed, adapter);
