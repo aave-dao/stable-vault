@@ -133,6 +133,13 @@ abstract contract AccountingChainDeployment is BaseChainDeployment, AccessManage
         require(registry.getPolicy(DEPOSIT_POLICY_ID) != address(0), "missing accounting-chain deposit policy");
     }
 
+    function _aTokenVaultUnderlyings() internal view override returns (address[] memory underlyings) {
+        underlyings = new address[](3);
+        underlyings[0] = _gho();
+        underlyings[1] = _usdc();
+        underlyings[2] = _usdt();
+    }
+
     function _accessManager()
         internal
         view
@@ -492,24 +499,6 @@ abstract contract AccountingChainDeployment is BaseChainDeployment, AccessManage
     ///////////////////////////////////////////////////////////////////////////////////////////////////
     // Chain-specific setups.
     ///////////////////////////////////////////////////////////////////////////////////////////////////
-
-    function _setupAllocator() internal {
-        IAllocator allocator = IAllocator(getAllocatorAddress(_deployer()));
-
-        address poolAddressProvider = _configAddress(".accountingChain.aaveV3PoolAddressesProvider");
-
-        address ghoYieldStrategy =
-            _deployATokenVault(_gho(), poolAddressProvider, getAccessManagerAddress(_deployer()), _deployer());
-        _addStrategyIdempotent(allocator, _gho(), ghoYieldStrategy);
-
-        address usdcYieldStrategy =
-            _deployATokenVault(_usdc(), poolAddressProvider, getAccessManagerAddress(_deployer()), _deployer());
-        _addStrategyIdempotent(allocator, _usdc(), usdcYieldStrategy);
-
-        address usdtYieldStrategy =
-            _deployATokenVault(_usdt(), poolAddressProvider, getAccessManagerAddress(_deployer()), _deployer());
-        _addStrategyIdempotent(allocator, _usdt(), usdtYieldStrategy);
-    }
 
     function _setupFundsHandler() internal {
         FundsHandler fundsHandler = FundsHandler(getFundsHandlerAddress(_deployer()));

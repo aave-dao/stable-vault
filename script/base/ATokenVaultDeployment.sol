@@ -44,7 +44,10 @@ abstract contract ATokenVaultDeployment is Script {
             _logATokenVaultDeployments();
             return vaultAddress;
         }
-        require(proxyDeployerAddress.code.length == 0, "aTokenVault proxy deployer");
+        require(
+            proxyDeployerAddress.code.length == 0,
+            "aTokenVault proxy-deployer (CREATE3 helper contract) address unexpectedly has code"
+        );
 
         // Do not import `ATokenVaultMerklRewardClaimer` contract here, as it will force the entire set of dependencies
         // of this contract (and any other contract using it) to be compiled with the size-optimized profile.
@@ -80,7 +83,10 @@ abstract contract ATokenVaultDeployment is Script {
         bytes32 proxyDeployerSalt = Create3AddressLib.computeCreate3Salt(proxyDeployerSaltSeed, deployer);
         address proxyDeployer = ICreateX(Create3AddressLib.CREATEX_ADDRESS)
             .deployCreate3({salt: proxyDeployerSalt, initCode: proxyDeployerInitCode});
-        require(proxyDeployer == proxyDeployerAddress, "aTokenVault proxy deployer address mismatch");
+        require(
+            proxyDeployer == proxyDeployerAddress,
+            "aTokenVault proxy-deployer (CREATE3 helper contract) deployed at unexpected address"
+        );
 
         _trackATokenVaultDeployment(underlying, vaultAddress);
         _logATokenVaultDeployments();
@@ -140,6 +146,17 @@ abstract contract ATokenVaultDeployment is Script {
     function _logATokenVaultDeployments() internal virtual {}
 
     function _aTokenVaultProxyDeployerSaltSeed(address underlying) internal pure virtual returns (string memory);
+
+    /// @dev Predicted aTokenVault proxy address for `underlying`, matching the CREATE3-derived address used by
+    /// `_deployATokenVault`. `deployer` is the broadcasting EOA whose CREATE3 namespace produces the per-vault
+    /// `ATokenVaultCreate3ProxyDeployer` contract (a separate, throwaway deployer used to give the vault proxy a
+    /// deterministic address). Returns the address regardless of whether the vault has actually been deployed yet;
+    /// callers should check `.code.length` to determine that.
+    function _predictedATokenVaultAddress(address underlying, address deployer) internal pure returns (address) {
+        address aTokenVaultProxyDeployerAddress =
+            Create3AddressLib.computeCreate3Address(_aTokenVaultProxyDeployerSaltSeed(underlying), deployer);
+        return ATokenVaultProxyAddressLib.computeProxyAddress(aTokenVaultProxyDeployerAddress);
+    }
 
     function _aTokenVaultMerklRewardClaimerImplSaltSeed(address underlying)
         internal

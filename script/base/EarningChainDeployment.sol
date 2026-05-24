@@ -89,6 +89,13 @@ abstract contract EarningChainDeployment is BaseChainDeployment, AccessManagerEa
         _validateExistingErc4626Strategies();
     }
 
+    function _aTokenVaultUnderlyings() internal view override returns (address[] memory underlyings) {
+        // GHO routes to an existing sGho ERC4626 strategy on the earning chain, so no aTokenVault is deployed for it.
+        underlyings = new address[](2);
+        underlyings[0] = _usdc();
+        underlyings[1] = _usdt();
+    }
+
     function _accessManager()
         internal
         view
@@ -250,23 +257,12 @@ abstract contract EarningChainDeployment is BaseChainDeployment, AccessManagerEa
     // Chain-specific setups.
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-    function _setupAllocator() internal {
-        IAllocator allocator = IAllocator(getAllocatorAddress(_deployer()));
-        address poolAddressProvider = _configAddress(".earningChain.aaveV3PoolAddressesProvider");
-
+    function _registerExtraAllocatorStrategies(IAllocator allocator) internal override {
+        // Existing ERC4626 vaults configured for the earning chain (e.g. sGho), not deployed by this script.
         ExistingErc4626StrategyConfig[] memory existingStrategies = _existingErc4626Strategies();
         for (uint256 i = 0; i < existingStrategies.length; i++) {
-            // These are existing ERC4626 vaults, not aTokenVaults deployed by this script.
             _addStrategyIdempotent(allocator, existingStrategies[i].underlyingAddress, existingStrategies[i].addr);
         }
-
-        address usdcYieldStrategy =
-            _deployATokenVault(_usdc(), poolAddressProvider, getAccessManagerAddress(_deployer()), _deployer());
-        _addStrategyIdempotent(allocator, _usdc(), usdcYieldStrategy);
-
-        address usdtYieldStrategy =
-            _deployATokenVault(_usdt(), poolAddressProvider, getAccessManagerAddress(_deployer()), _deployer());
-        _addStrategyIdempotent(allocator, _usdt(), usdtYieldStrategy);
     }
 
     function _setupPriceOracleAdapters() internal {

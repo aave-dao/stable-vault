@@ -12,12 +12,15 @@ import {Create3Deployment} from "script/base/Create3Deployment.sol";
 import {logSkip} from "script/libraries/DeploymentLogLib.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import {IRouterClient} from "@chainlink-ccip/contracts/interfaces/IRouterClient.sol";
 
+import {BaseBridgeAdapter} from "src/bridging/BaseBridgeAdapter.sol";
 import {AdiAdapter} from "src/bridging/adi/AdiAdapter.sol";
 import {CcipAdapter} from "src/bridging/ccip/CcipAdapter.sol";
 import {Allocator} from "src/core/Allocator.sol";
+import {BaseChainGateway} from "src/core/BaseChainGateway.sol";
 import {IouToken} from "src/core/ious/IouToken.sol";
 import {IouTokenManager} from "src/core/ious/IouTokenManager.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
@@ -37,7 +40,6 @@ import {TransferHelper} from "src/periphery/TransferHelper.sol";
 import {FundsBridgingPolicy} from "src/policies/FundsBridgingPolicy.sol";
 import {WithdrawalExecutionPolicy} from "src/policies/WithdrawalExecutionPolicy.sol";
 import {Constants} from "src/types/Constants.sol";
-import {Errors} from "src/types/Errors.sol";
 
 abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSetup, ATokenVaultDeployment {
     using Strings for address;
@@ -93,6 +95,15 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
 
     function _assertChainSpecificRequiredPoliciesSet() internal view virtual {}
 
+    /// @dev Underlyings that this chain's `_setupAllocator` deploys a fresh aTokenVault for. Drives both the
+    /// pre-deploy funding check (1 unit of each underlying must be on the deployer) and the actual aTokenVault
+    /// deployments inside `_setupAllocator`.
+    function _aTokenVaultUnderlyings() internal view virtual returns (address[] memory);
+
+    /// @dev Chain-specific extra Allocator strategies to register on top of the aTokenVaults deployed for
+    /// `_aTokenVaultUnderlyings()`. Earning chain uses this to register existing ERC4626 strategies (e.g. sGho).
+    function _registerExtraAllocatorStrategies(IAllocator allocator) internal virtual {}
+
     ///////////////////////////////////////////////////////////////////////////////////////////////////
     // Asset accessors.
     ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -123,6 +134,7 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         _validateDeploymentParameters();
         _validateRedemptionLimitConfig(string.concat(_chainConfigPrefix(), ".withdrawalExecutionPolicy"));
         _validateExternalAddresses();
+        _validateDeployerFunding();
         _isBroadcasting = true;
         vm.startBroadcast(_deployer());
         _deployContracts();
@@ -176,6 +188,33 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         require(_configAddress(".withdrawalExecutionPolicy.signer") != address(0), "Withdrawal policy signer not set");
 
         _validateChainSpecificExternalAddresses();
+    }
+
+    /// @dev Asserts that the deployer holds enough native + ERC20 balance to complete the deploy. Runs before
+    /// `vm.startBroadcast` so a missing pre-setup fails fast with a clear message instead of mid-broadcast.
+    function _validateDeployerFunding() internal view virtual {
+        address deployer = _deployer();
+        require(deployer.balance > 0, "deployer has zero native balance");
+
+        address[] memory underlyings = _aTokenVaultUnderlyings();
+        for (uint256 i = 0; i < underlyings.length; i++) {
+            address underlying = underlyings[i];
+            // Skip already-deployed vaults: a prior run already pulled the 1-unit initial-lock deposit, so the
+            // deployer's balance can legitimately be below the threshold on resume.
+            if (_predictedATokenVaultAddress(underlying, deployer).code.length != 0) {
+                continue;
+            }
+            uint256 required = 10 ** IERC20Metadata(underlying).decimals();
+            require(
+                IERC20(underlying).balanceOf(deployer) >= required,
+                string.concat(
+                    "deployer underfunded for aTokenVault initial-lock deposit: ",
+                    IERC20Metadata(underlying).symbol(),
+                    " at ",
+                    Strings.toHexString(underlying)
+                )
+            );
+        }
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -277,44 +316,38 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
     function _addBridgeAdapterIdempotent(IChainGateway gateway, address asset, uint256 chainId, address bridgeAdapter)
         private
     {
-        /// @custom:tx-already-executed-check Skip when the deployer can no longer call `addBridgeAdapter` on the
-        /// gateway — `_setupAccessManager` revokes the deployer's ADMIN_ROLE as its very last step, so losing call
-        /// access means a prior run completed everything up to and including the bridge-adapter setup. We can't
-        /// pre-check the registration via a getter (the gateway exposes none), so this guards both the resume-after-
-        /// revoke and resume-after-full-completion paths.
+        /// @custom:tx-already-executed-check Skip when the (asset, chainId, bridgeAdapter) triple is already
+        /// whitelisted on the gateway. This is the primary resume signal - a fresh attempt would revert with
+        /// `AddressAlreadyWhitelisted`, and crucially forge would still capture that reverting call into the
+        /// post-script broadcast simulation, failing the run.
+        if (BaseChainGateway(address(gateway)).isBridgeAdapterSupported(asset, chainId, bridgeAdapter)) {
+            logSkip("_addBridgeAdapterIdempotent", "bridge adapter registered");
+            return;
+        }
+        /// @custom:tx-already-executed-check Skip when the deployer can no longer call `addBridgeAdapter` -
+        /// `_setupAccessManager` revokes the deployer's ADMIN_ROLE as its last step, so losing call access means a
+        /// prior run completed everything up to and including bridge-adapter setup. This branch is reachable only if
+        /// the registration check above somehow missed (e.g. on a future schema change), kept as a safety net.
         if (!_deployerCanCall(address(gateway), IChainGateway.addBridgeAdapter.selector)) {
             logSkip("_addBridgeAdapterIdempotent", "deployer lacks call access - prior run completed");
             return;
         }
-        try gateway.addBridgeAdapter(asset, chainId, bridgeAdapter) {}
-        catch (bytes memory err) {
-            /// @custom:tx-already-executed-check Reverts with `AddressAlreadyWhitelisted` on duplicate. Reachable on
-            /// a partial mid-setup resume (deployer still holds ADMIN_ROLE, some adapters already registered).
-            // Truncating `err` to its first 4 bytes intentionally extracts the revert selector.
-            // forge-lint: disable-next-line(unsafe-typecast)
-            require(bytes4(err) == Errors.AddressAlreadyWhitelisted.selector, "addBridgeAdapter: unexpected revert");
-            logSkip("_addBridgeAdapterIdempotent", "bridge adapter registered");
-        }
+        gateway.addBridgeAdapter(asset, chainId, bridgeAdapter);
     }
 
     function _setDestinationChainAdapterIdempotent(address adapter, uint256 chainId, address destAdapter) private {
-        /// @custom:tx-already-executed-check See `_addBridgeAdapterIdempotent` for the same canCall-based reasoning.
+        /// @custom:tx-already-executed-check Skip when a destination adapter is already set for `chainId` (the
+        /// adapter only allows a one-shot set, so any non-zero value means a prior run already configured it).
+        if (BaseBridgeAdapter(adapter).getDestinationChainAdapter(chainId) != address(0)) {
+            logSkip("_setDestinationChainAdapterIdempotent", "destination chain adapter configured");
+            return;
+        }
+        /// @custom:tx-already-executed-check See `_addBridgeAdapterIdempotent` for the same canCall safety-net.
         if (!_deployerCanCall(adapter, IBridgeAdapter.setDestinationChainAdapter.selector)) {
             logSkip("_setDestinationChainAdapterIdempotent", "deployer lacks call access - prior run completed");
             return;
         }
-        try IBridgeAdapter(adapter).setDestinationChainAdapter(chainId, destAdapter) {}
-        catch (bytes memory err) {
-            /// @custom:tx-already-executed-check Reverts with `AlreadyConfigured` on duplicate.
-            // Truncating `err` to its first 4 bytes intentionally extracts the revert selector.
-            // forge-lint: disable-next-line(unsafe-typecast)
-            bytes4 errSelector = bytes4(err);
-            require(
-                errSelector == IBridgeAdapter.AlreadyConfigured.selector,
-                "setDestinationChainAdapter: unexpected revert"
-            );
-            logSkip("_setDestinationChainAdapterIdempotent", "destination chain adapter configured");
-        }
+        IBridgeAdapter(adapter).setDestinationChainAdapter(chainId, destAdapter);
     }
 
     /// @dev Returns whether the deployer can currently invoke `selector` on `target` via the configured AccessManager.
@@ -358,6 +391,19 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
             allocator.addStrategy(asset, strategy);
         } else {
             logSkip("_addStrategyIdempotent", "strategy");
+        }
+    }
+
+    function _setupAllocator() internal {
+        IAllocator allocator = IAllocator(getAllocatorAddress(_deployer()));
+        _registerExtraAllocatorStrategies(allocator);
+        address poolAddressProvider =
+            _configAddress(string.concat(_chainConfigPrefix(), ".aaveV3PoolAddressesProvider"));
+        address accessManager = getAccessManagerAddress(_deployer());
+        address[] memory underlyings = _aTokenVaultUnderlyings();
+        for (uint256 i = 0; i < underlyings.length; i++) {
+            address strategy = _deployATokenVault(underlyings[i], poolAddressProvider, accessManager, _deployer());
+            _addStrategyIdempotent(allocator, underlyings[i], strategy);
         }
     }
 
