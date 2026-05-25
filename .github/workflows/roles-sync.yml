@@ -17,8 +17,6 @@ jobs:
   build-and-validate:
     name: Build & Validate
     runs-on: ubuntu-latest
-    outputs:
-      artifact-changed: ${{ steps.diff.outputs.changed }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -49,18 +47,13 @@ jobs:
       - name: Validate invariants
         run: yarn roles:validate
 
-      - name: Diff against committed artifact
-        id: diff
-        run: |
-          if git diff --quiet -- .github/workflows/tooling/roles-sync/output/roles.json; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "Committed .github/workflows/tooling/roles-sync/output/roles.json is up to date."
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "::error::.github/workflows/tooling/roles-sync/output/roles.json is stale. Run \`yarn roles:all\` and commit the result."
-            git --no-pager diff -- .github/workflows/tooling/roles-sync/output/roles.json
-            exit 1
-          fi
+      - name: Upload roles.json artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: roles-json
+          path: .github/workflows/tooling/roles-sync/output/roles.json
+          retention-days: 7
+          if-no-files-found: error
 
   notion-sync:
     name: Notion Sync
@@ -83,6 +76,12 @@ jobs:
 
       - name: Install JS deps
         run: yarn install --frozen-lockfile
+
+      - name: Download roles.json artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: roles-json
+          path: .github/workflows/tooling/roles-sync/output/
 
       - name: Push to Notion
         env:

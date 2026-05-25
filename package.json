@@ -22,7 +22,6 @@
     "roles:dump": "TARGET_ENV=staging forge script .github/workflows/tooling/roles-sync/DumpRoles.s.sol && TARGET_ENV=preprod forge script .github/workflows/tooling/roles-sync/DumpRoles.s.sol && TARGET_ENV=prod forge script .github/workflows/tooling/roles-sync/DumpRoles.s.sol",
     "roles:build": "tsx .github/workflows/tooling/roles-sync/build-roles-json.ts",
     "roles:validate": "tsx .github/workflows/tooling/roles-sync/validate-roles-json.ts",
-    "roles:all": "yarn roles:dump && yarn roles:build && yarn roles:validate",
     "roles:notion-sync": "tsx --env-file-if-exists=.env .github/workflows/tooling/roles-sync/notion-sync.ts"
   }
 }
