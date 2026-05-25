@@ -2,20 +2,26 @@
   "devDependencies": {
     "@notionhq/client": "^4.0.2",
     "@types/node": "^22.10.5",
-    "cli-table3": "^0.6.5",
+    "cli-table3": "0.6.5",
     "husky": "^9.1.7",
     "jsonc-parser": "^3.3.1",
-    "picocolors": "^1.1.1",
+    "picocolors": "1.1.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",
-    "viem": "^2.51.0",
-    "vitest": "^2.1.8"
+    "viem": "2.49.3",
+    "vitest": "3.2.4"
   },
   "lint-staged": {
     "**/*.sol": "forge fmt"
   },
   "dependencies": {
     "lint-staged": "^16.2.4"
+  },
+  "resolutions": {
+    "ws": "8.20.1"
+  },
+  "overrides": {
+    "ws": "8.20.1"
   },
   "scripts": {
     "prepare": "husky || true",
@@ -34,6 +40,7 @@
     "smoke:staging:accounting": "tsx tools/smoke/run.ts --env staging --chain accounting",
     "smoke:staging:earning": "tsx tools/smoke/run.ts --env staging --chain earning",
     "smoke:test": "vitest run tools/smoke/__tests__",
-    "smoke:typecheck": "tsc --noEmit -p tools/smoke/tsconfig.json"
+    "smoke:typecheck": "tsc --noEmit -p tools/smoke/tsconfig.json",
+    "smoke:audit-deps": "tsx tools/smoke/scripts/check-deps-age.ts"
   }
 }

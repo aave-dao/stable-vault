@@ -66,6 +66,23 @@ tools/smoke/
 └── output/                 Per-run JSON reports (gitignored)
 ```
 
+## Supply-chain policy
+
+Smoke-harness direct deps follow two rules to bound exposure to compromised npm packages:
+
+1. **Pinned exact versions** — no `^` or `~`. A lockfile + exact pin means `yarn install` cannot silently pick up a new version.
+2. **Minimum age of 7 days** on the npm registry. A version published less than 7 days ago is rejected by the audit script. Freshly compromised packages are typically detected and yanked within hours; a 7-day floor avoids that window.
+
+Audit on every lockfile change:
+
+```sh
+yarn smoke:audit-deps
+```
+
+Script: `tools/smoke/scripts/check-deps-age.ts`. Scope: the smoke-harness direct deps (`SMOKE_DIRECT_DEPS` constant — `viem`, `vitest`, `picocolors`, `cli-table3`). Transitive deps are governed by the lockfile + `resolutions`/`overrides` in `package.json` (e.g. `ws@8.20.1` is forced to clear CVE GHSA-58qx-3vcg-4xpx).
+
+`yarn audit` and `npm audit` both pass with zero vulnerabilities at the time of writing.
+
 ## Adding coverage
 
 A new parameter in `config/deployment-config.*.jsonc` is covered by adding one entry to `lib/catalogue/getters.ts`. The parity engine and renderer handle the rest. The catalogue is keyed by the same `ParameterSpec.key` as `tools/roles/lib/parameters-spec.ts`, so paired setters/getters stay in lockstep.
