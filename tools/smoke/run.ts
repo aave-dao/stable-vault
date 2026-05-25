@@ -14,6 +14,7 @@ import { parse as parseJsonc } from "jsonc-parser";
 import { keccak256, toHex, type Address, type Hex } from "viem";
 
 import { loadArtefact } from "./lib/artefact.js";
+import { runLiveProbes } from "./lib/checks/live-probes.js";
 import { runTopology } from "./lib/checks/topology.js";
 import { buildGetterSpecs } from "./lib/catalogue/getters.js";
 import { runParity } from "./lib/parity.js";
@@ -168,7 +169,7 @@ async function main(): Promise<number> {
 
   const loaded = loadConfig(args.env, args.chain);
   const artefact = loadArtefact(args.env, args.chain, REPO_ROOT);
-  const rpc = resolveRpc(args.env, args.chain, args.rpc);
+  const rpc = resolveRpc(args.env, args.chain, loaded.expectedChainId, args.rpc);
   const client = makeClient(rpc);
 
   let chainId: number;
@@ -204,12 +205,27 @@ async function main(): Promise<number> {
     repoRoot: REPO_ROOT,
   });
 
-  const getterSpecs = buildGetterSpecs({ config: loaded.config, artefact, chain: args.chain });
+  const getterSpecs = buildGetterSpecs({
+    env: args.env,
+    chain: args.chain,
+    config: loaded.config,
+    artefact,
+    deployer: loaded.deployer,
+    repoRoot: REPO_ROOT,
+  });
   const parity = await runParity({ client, blockNumber, specs: getterSpecs });
 
-  // TODO(VA-229): live probes (PriceOracle.getPrice, ChainBalanceOracle.getChainBalance,
-  // CCIPRouter.isChainSupported, L2 sequencer feed) when --no-live-probes is not set.
-  const liveProbes: typeof topology = [];
+  const liveProbes = args.noLiveProbes
+    ? []
+    : await runLiveProbes({
+        env: args.env,
+        chain: args.chain,
+        artefact,
+        client,
+        blockNumber,
+        blockTimestamp: timestamp,
+        config: loaded.config,
+      });
 
   let results = [...topology, ...parity, ...liveProbes];
   if (args.strict) {

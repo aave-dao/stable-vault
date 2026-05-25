@@ -1,5 +1,5 @@
 // Resolve the RPC URL for an (env, chain) tuple and build a viem public client
-// with multicall batching tuned for ~150 reads against a single endpoint.
+// tuned for ~200 reads against a single endpoint via multicall3 batching.
 //
 // RPC URLs come from env vars (SMOKE_RPC_<ENV>_<CHAIN>) or --rpc <url> CLI override.
 // We never log the full URL — only the host portion — so secrets in URLs don't
@@ -7,6 +7,7 @@
 
 import { createPublicClient, http, type Address, type PublicClient } from "viem";
 
+import { chainById } from "./chains.js";
 import type { ChainKind, Env } from "./types.js";
 
 export interface RpcConfig {
@@ -15,21 +16,24 @@ export interface RpcConfig {
   masked: string;
   chainKind: ChainKind;
   env: Env;
+  /** Expected chain id from JSONC config. Used to bind the viem client to a chain definition. */
+  expectedChainId: number;
 }
 
-export function resolveRpc(env: Env, chain: ChainKind, override?: string): RpcConfig {
+export function resolveRpc(env: Env, chain: ChainKind, expectedChainId: number, override?: string): RpcConfig {
   const url = override ?? process.env[`SMOKE_RPC_${env.toUpperCase()}_${chain.toUpperCase()}`] ?? "";
   if (!url) {
     throw new Error(
       `No RPC URL configured. Set SMOKE_RPC_${env.toUpperCase()}_${chain.toUpperCase()} or pass --rpc <url>.`,
     );
   }
-  return { url, masked: maskUrl(url), chainKind: chain, env };
+  return { url, masked: maskUrl(url), chainKind: chain, env, expectedChainId };
 }
 
 export function makeClient(rpc: RpcConfig): PublicClient {
   return createPublicClient({
-    transport: http(rpc.url, { batch: { wait: 16 } }),
+    chain: chainById(rpc.expectedChainId),
+    transport: http(rpc.url, { retryCount: 3, retryDelay: 1000, batch: true }),
     batch: { multicall: { wait: 16, batchSize: 4096 } },
   });
 }

@@ -87,27 +87,34 @@ Script: `tools/smoke/scripts/check-deps-age.ts`. Scope: the smoke-harness direct
 
 A new parameter in `config/deployment-config.*.jsonc` is covered by adding one entry to `lib/catalogue/getters.ts`. The parity engine and renderer handle the rest. The catalogue is keyed by the same `ParameterSpec.key` as `tools/roles/lib/parameters-spec.ts`, so paired setters/getters stay in lockstep.
 
-## Status
+## Coverage
 
-v1 ships:
+Catalogue size against the current preprod artefact (`tsx tools/smoke/scripts/dump-catalogue.ts preprod accounting`):
 
-- Topology: CREATE3 re-derivation, code.length, bytecode-hash equivalence, ERC-1967 impl slot reads for transparent proxies
-- Parity: `DepositPolicy`, `FundsBridgingPolicy`, `SlippageCoverageVault` end-to-end (per-asset + scalars)
-- All four render modes + JSON report
-- CLI: flags, exit-code policy, RPC resolution, masking
-- Yarn scripts (`smoke:preprod:*`, `smoke:staging:*`) and `make smoke`
+| Group | AC specs | EC specs |
+|---|---:|---:|
+| AccessManager (driven by `script/output/roles.json`) | 157 | 123 |
+| AssetRegistry | 18 | 18 |
+| WithdrawalExecutionPolicy | 6 | 6 |
+| StableVault | 5 | — |
+| Allocator | 4 | 6 |
+| Oracles (PriceOracle + ChainBalanceOracle wiring) | 4 | 3 |
+| BridgeAdapters | 3 | 3 |
+| IouToken | 2 | — |
+| **Total** | **199** | **159** |
 
-Deferred — same catalogue pattern, more entries (tracked by `// TODO(VA-229)` markers in `lib/catalogue/getters.ts`):
+Plus **live probes** (a separate group, batched into a single multicall):
 
-- `AssetRegistry` per-asset trust + deposit/swap flags
-- `Allocator` trusted strategies + per-asset list (EC: sGHO)
-- `StableVault` (`getTreasury`, `getDefaultSubVault`, `getMaxValidPerSecondRate`)
-- `WithdrawalExecutionPolicy` (`getDefaultFeeBps`, `getRedemptionBucket`, `isSigner`)
-- `AccessManager` role grant delays + profile assignments per role
-- `PriceOracle` + `ChainBalanceOracle` adapter wiring
-- `BridgeAdapter` whitelist enumeration
-- `IouTokenManager.minBurnIouTokenGasLimit` immutable
-- Live probes: `PriceOracle.getPrice`, `ChainBalanceOracle.getChainBalance.isStale`, `CCIPRouter.isChainSupported`, L2 sequencer feed
-- `--check-cross-chain` mode
+- `PriceOracle.getPrice(asset) > 0` per asset
+- `ChainBalanceOracle.getChainBalance(remoteChainId).isStale == false` (AC only)
+- `CCIPRouter.isChainSupported(counterpartySelector) == true`
+- L2 sequencer feed `latestRoundData().answer == 0` (AC, when `useMockSequencerUptimeFeed=false`)
 
-The cross-reference immutables (`StableVault.ASSET_REGISTRY` etc., `internal immutable` with no public getter) are verified transitively via the topology bytecode-hash equivalence — see `specs/deployment-smoke-tests/research/specflow-analysis.md` (M3).
+`DepositPolicy`, `FundsBridgingPolicy`, and `SlippageCoverageVault` parity entries will appear automatically when a fresh deploy adds those contracts to the artefact — the catalogue is wired for them but skips when the artefact entry is missing.
+
+The cross-reference immutables (`StableVault.ASSET_REGISTRY` etc., `internal immutable` with no public getter) are verified transitively via the topology bytecode-hash equivalence — the constructor args derive from CREATE3 (deterministic) and the runtime code embeds the immutables, so a matching `keccak256(actual.code) == keccak256(forge inspect deployedBytecode)` proves drift-free wiring.
+
+## Deferred
+
+- `--check-cross-chain` mode — verify AC and EC agree on shared invariants (delay tiers, profile addresses, `iouTokenName`, `priceOracleMinValidPriceRay`, peer `ccipSelector`).
+- Optional functional smoke (`--with-functional`) — tiny deposit/withdraw/rebalance against a forked anvil.
