@@ -150,6 +150,6 @@ lcov.info
 # Forge gas snapshots — generated at test time, baseline is uploaded as a CI artifact
 snapshots/
 
-# Per-env intermediate dumps from script/tooling/DumpRoles.s.sol; the canonical merged artifact
-# (script/output/roles.json) is what we commit and review.
-script/output/roles.dump.*.json
+# Per-env intermediate dumps from .github/workflows/tooling/roles-sync/DumpRoles.s.sol; the canonical
+# merged artifact (.github/workflows/tooling/roles-sync/output/roles.json) is what we commit and review.
+.github/workflows/tooling/roles-sync/output/roles.dump.*.json

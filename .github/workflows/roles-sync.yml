@@ -52,13 +52,13 @@ jobs:
       - name: Diff against committed artifact
         id: diff
         run: |
-          if git diff --quiet -- script/output/roles.json; then
+          if git diff --quiet -- .github/workflows/tooling/roles-sync/output/roles.json; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "Committed script/output/roles.json is up to date."
+            echo "Committed .github/workflows/tooling/roles-sync/output/roles.json is up to date."
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "::error::script/output/roles.json is stale. Run \`yarn roles:all\` and commit the result."
-            git --no-pager diff -- script/output/roles.json
+            echo "::error::.github/workflows/tooling/roles-sync/output/roles.json is stale. Run \`yarn roles:all\` and commit the result."
+            git --no-pager diff -- .github/workflows/tooling/roles-sync/output/roles.json
             exit 1
           fi
 

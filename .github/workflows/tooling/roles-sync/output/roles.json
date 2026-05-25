@@ -7,7 +7,7 @@
     "deploymentConfigShas": {
       "staging": "624304a346c290a789172d941f5b586ae8173ea44bdaab93e62f72a489770032",
       "preprod": "340aadab811267c40f63b879bdf3e58f844c71455c8216bccd6f8c1721ccbc97",
-      "prod": "8a9c9bd8741e3b7d426883fa99580f89c7b623d695443db88273bf3fdf5cd4a9"
+      "prod": "bfeae547e6bff7f987efed590faf14270689676f2b96b75ab77e0becbc56d51d"
     }
   },
   "delayTiers": [
@@ -70,7 +70,7 @@
       "addressByEnv": {
         "staging": "0x18D55163745898A086681b4d72b5b0dF1a8f0740",
         "preprod": "0xC9bDdF3ff47216B60cFa3400d0A414D84DAb1055",
-        "prod": "0x0000000000000000000000000000000000000000"
+        "prod": "0x448fB6999911C2E4d3FB183E573e5BcDa96C4667"
       }
     },
     {

@@ -1,5 +1,5 @@
 /**
- * Validates `script/output/roles.json` against the invariants that the rest of the pipeline relies on. Fails non-zero
+ * Validates `.github/workflows/tooling/roles-sync/output/roles.json` against the invariants that the rest of the pipeline relies on. Fails non-zero
  * on any violation so it can be wired into CI as a blocking check. Designed to catch the kinds of slow drift that
  * audit reviewers would otherwise have to chase manually: selector collisions, key collisions, delay tier inversions,
  * orphaned profile grants.
@@ -9,7 +9,7 @@ import { join } from "node:path";
 
 import { DELAY_TIER_NAMES, ENVS, type Env, type RolesArtifact } from "./lib/types.js";
 
-const ROLES_JSON_PATH = join(process.cwd(), "script/output/roles.json");
+const ROLES_JSON_PATH = join(process.cwd(), ".github/workflows/tooling/roles-sync/output/roles.json");
 
 function main(): void {
   const artifact = JSON.parse(readFileSync(ROLES_JSON_PATH, "utf8")) as RolesArtifact;

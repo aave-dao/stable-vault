@@ -34,7 +34,7 @@ jobs:
         run: forge fmt --check
 
       - name: Check Error Selectors
-        run: ./.github/workflows/check-error-selectors.sh
+        run: ./.github/workflows/tooling/test/check-error-selectors.sh
 
   build:
     name: Build
@@ -106,7 +106,7 @@ jobs:
         run: forge --version
 
       - name: Pre-strip JSONC comments
-        run: ./.github/workflows/strip-jsonc.sh
+        run: ./.github/workflows/tooling/test/strip-jsonc.sh
 
       - name: Run Forge tests
         env:
@@ -133,7 +133,7 @@ jobs:
           version: stable
 
       - name: Pre-strip JSONC comments
-        run: ./.github/workflows/strip-jsonc.sh
+        run: ./.github/workflows/tooling/test/strip-jsonc.sh
 
       - name: Run gas tests
         env:
@@ -186,7 +186,7 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          comment=$(./.github/workflows/gas-diff.sh baseline snapshots || true)
+          comment=$(./.github/workflows/tooling/test/gas-diff.sh baseline snapshots || true)
           if [[ -n "$comment" ]]; then
             {
               echo 'comment<<GAS_DIFF_EOF'
