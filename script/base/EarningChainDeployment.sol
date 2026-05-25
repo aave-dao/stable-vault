@@ -185,13 +185,13 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
         uint64 accountingChainCcipSelector = uint64(vm.parseUint(_configString(".accountingChain.ccipSelector")));
 
         // GHO uses CCIP Adapter
-        gateway.addBridgeAdapter(_gho(), accountingChainId, localCcipAdapter);
+        gateway.addFundsBridgeAdapter(_gho(), accountingChainId, localCcipAdapter);
 
         // USDC uses CCIP Adapter
-        gateway.addBridgeAdapter(_usdc(), accountingChainId, localCcipAdapter);
+        gateway.addFundsBridgeAdapter(_usdc(), accountingChainId, localCcipAdapter);
 
         // USDT uses CCIP Adapter
-        gateway.addBridgeAdapter(_usdt(), accountingChainId, localCcipAdapter);
+        gateway.addFundsBridgeAdapter(_usdt(), accountingChainId, localCcipAdapter);
 
         ICcipBridgeAdapter(localCcipAdapter).setChainSelector(accountingChainId, accountingChainCcipSelector);
         ICcipBridgeAdapter(localCcipAdapter).setDestinationChainAdapter(accountingChainId, accountingCcipAdapter);
@@ -206,7 +206,7 @@ abstract contract EarningChainDeployment is Create3Deployment, AccessManagerEarn
             address accountingChainAdiAdapter = localAdiAdapter;
             IBridgeAdapter(localAdiAdapter).setDestinationChainAdapter(accountingChainId, accountingChainAdiAdapter);
             if (_configBool(".earningChain.adi.registerOnGateway")) {
-                gateway.addBridgeAdapter(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, accountingChainId, localAdiAdapter);
+                gateway.addDataOnlyBridgeAdapter(accountingChainId, localAdiAdapter);
             }
         }
     }

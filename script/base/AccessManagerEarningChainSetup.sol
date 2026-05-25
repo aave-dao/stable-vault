@@ -18,13 +18,16 @@ abstract contract AccessManagerEarningChainSetup is AccessManagerBaseSetup {
     function _setupTarget__EarningChainGateway(address deployer) internal {
         address gateway = getGatewayAddress(deployer);
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](5);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](8);
 
         roles[0] = RolesConfig.getRole__pushFundsToAccountingChain();
-        roles[1] = RolesConfig.getRole__addBridgeAdapter();
-        roles[2] = RolesConfig.getRole__removeBridgeAdapter();
-        roles[3] = RolesConfig.getRole__rescueTokens();
-        roles[4] = RolesConfig.getRole__rescueNative();
+        roles[1] = RolesConfig.getRole__addFundsBridgeAdapter();
+        roles[2] = RolesConfig.getRole__removeFundsBridgeAdapter();
+        roles[3] = RolesConfig.getRole__addDataOnlyBridgeAdapter();
+        roles[4] = RolesConfig.getRole__disableDataOnlyBridgeAdapterSending();
+        roles[5] = RolesConfig.getRole__removeDataOnlyBridgeAdapter();
+        roles[6] = RolesConfig.getRole__rescueTokens();
+        roles[7] = RolesConfig.getRole__rescueNative();
 
         _setTargetFunctionRoles(gateway, roles);
     }

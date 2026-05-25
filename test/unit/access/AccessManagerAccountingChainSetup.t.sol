@@ -183,10 +183,27 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
         address gateway = getGatewayAddress(_deployer());
 
         _assertTargetFunctionRole(
-            gateway, IChainGateway.addBridgeAdapter.selector, RolesConfig.getRole__addBridgeAdapter().roleId
+            gateway, IChainGateway.addFundsBridgeAdapter.selector, RolesConfig.getRole__addFundsBridgeAdapter().roleId
         );
         _assertTargetFunctionRole(
-            gateway, IChainGateway.removeBridgeAdapter.selector, RolesConfig.getRole__removeBridgeAdapter().roleId
+            gateway,
+            IChainGateway.removeFundsBridgeAdapter.selector,
+            RolesConfig.getRole__removeFundsBridgeAdapter().roleId
+        );
+        _assertTargetFunctionRole(
+            gateway,
+            IChainGateway.addDataOnlyBridgeAdapter.selector,
+            RolesConfig.getRole__addDataOnlyBridgeAdapter().roleId
+        );
+        _assertTargetFunctionRole(
+            gateway,
+            IChainGateway.disableDataOnlyBridgeAdapterSending.selector,
+            RolesConfig.getRole__disableDataOnlyBridgeAdapterSending().roleId
+        );
+        _assertTargetFunctionRole(
+            gateway,
+            IChainGateway.removeDataOnlyBridgeAdapter.selector,
+            RolesConfig.getRole__removeDataOnlyBridgeAdapter().roleId
         );
         _assertTargetFunctionRole(
             gateway, IRescuableToken.rescueTokens.selector, RolesConfig.getRole__rescueTokens().roleId

@@ -52,9 +52,15 @@ contract RecordingGateway is IChainGateway {
         return address(0);
     }
 
-    function addBridgeAdapter(address, uint256, address) external {}
+    function addFundsBridgeAdapter(address, uint256, address) external {}
 
-    function removeBridgeAdapter(address, uint256, address) external {}
+    function removeFundsBridgeAdapter(address, uint256, address) external {}
+
+    function addDataOnlyBridgeAdapter(uint256, address) external {}
+
+    function disableDataOnlyBridgeAdapterSending(uint256, address) external {}
+
+    function removeDataOnlyBridgeAdapter(uint256, address) external {}
 
     function receiveMessage(uint256 sourceChainId, address asset, uint256 amount, bytes memory data) external {
         receiveCount++;

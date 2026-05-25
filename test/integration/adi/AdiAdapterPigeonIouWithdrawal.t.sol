@@ -679,7 +679,7 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         stack.assetRegistry.setAssetConfig(address(stack.asset), assetConfig);
         stack.allocator.addStrategy(address(stack.asset), address(stack.strategy));
         stack.fundsHandler.addEarningChain(ARB_CHAIN_ID);
-        stack.gateway.addBridgeAdapter(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ARB_CHAIN_ID, address(stack.adiAdapter));
+        stack.gateway.addDataOnlyBridgeAdapter(ARB_CHAIN_ID, address(stack.adiAdapter));
     }
 
     function _configureEarningStack(EarningStack memory stack) internal {
@@ -691,7 +691,7 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         });
         stack.assetRegistry.setAssetConfig(address(stack.asset), assetConfig);
         stack.allocator.addStrategy(address(stack.asset), address(stack.strategy));
-        stack.gateway.addBridgeAdapter(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ETH_CHAIN_ID, address(stack.adiAdapter));
+        stack.gateway.addDataOnlyBridgeAdapter(ETH_CHAIN_ID, address(stack.adiAdapter));
     }
 
     function _seedWithdrawalExecutionPolicy(WithdrawalExecutionPolicy withdrawalExecutionPolicy) internal {

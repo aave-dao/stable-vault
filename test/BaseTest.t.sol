@@ -892,18 +892,18 @@ contract BaseTest is TestWithHelpers {
 
         // Set up Accounting Chain Gateway (Accounting chain) // These should be done cross-wise cause it's destination
         // chainId
-        accountingChainGateway.addBridgeAdapter(address(GHO), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain));
-        accountingChainGateway.addBridgeAdapter(address(USDC), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain));
-        accountingChainGateway.addBridgeAdapter(
-            Constants.ASSET_FOR_DATA_ONLY_BRIDGE, EARNING_CHAIN_ID, address(ccipAdapter_accountingChain)
+        accountingChainGateway.addFundsBridgeAdapter(
+            address(GHO), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain)
         );
+        accountingChainGateway.addFundsBridgeAdapter(
+            address(USDC), EARNING_CHAIN_ID, address(ccipAdapter_accountingChain)
+        );
+        accountingChainGateway.addDataOnlyBridgeAdapter(EARNING_CHAIN_ID, address(ccipAdapter_accountingChain));
 
         // Set up Earning Chain Gateway (Earning chain)
-        earningChainGateway.addBridgeAdapter(address(GHO), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
-        earningChainGateway.addBridgeAdapter(address(USDC), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
-        earningChainGateway.addBridgeAdapter(
-            Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain)
-        );
+        earningChainGateway.addFundsBridgeAdapter(address(GHO), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
+        earningChainGateway.addFundsBridgeAdapter(address(USDC), ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
+        earningChainGateway.addDataOnlyBridgeAdapter(ACCOUNTING_CHAIN_ID, address(ccipAdapter_earningChain));
 
         ccipAdapter_accountingChain.setChainSelector(EARNING_CHAIN_ID, EARNING_CHAIN_CCIP_SELECTOR);
         ccipAdapter_accountingChain.setDestinationChainAdapter(EARNING_CHAIN_ID, address(ccipAdapter_earningChain));
@@ -982,7 +982,11 @@ contract BaseTest is TestWithHelpers {
             APPENDER_ROLE
         );
         accessManager.setTargetFunctionRole(
-            address(accountingChainGateway), _toSelectorArray(IChainGateway.addBridgeAdapter.selector), APPENDER_ROLE
+            address(accountingChainGateway),
+            _toSelectorArray(
+                IChainGateway.addFundsBridgeAdapter.selector, IChainGateway.addDataOnlyBridgeAdapter.selector
+            ),
+            APPENDER_ROLE
         );
         accessManager.setTargetFunctionRole(
             address(ccipAdapter_accountingChain),
@@ -1003,7 +1007,11 @@ contract BaseTest is TestWithHelpers {
             address(allocator_accountingChain), _toSelectorArray(IAllocator.removeStrategy.selector), REMOVER_ROLE
         );
         accessManager.setTargetFunctionRole(
-            address(accountingChainGateway), _toSelectorArray(IChainGateway.removeBridgeAdapter.selector), REMOVER_ROLE
+            address(accountingChainGateway),
+            _toSelectorArray(
+                IChainGateway.removeFundsBridgeAdapter.selector, IChainGateway.removeDataOnlyBridgeAdapter.selector
+            ),
+            REMOVER_ROLE
         );
 
         // ----- Set up Rescuer -----
@@ -1095,7 +1103,11 @@ contract BaseTest is TestWithHelpers {
             APPENDER_ROLE
         );
         accessManager.setTargetFunctionRole(
-            address(earningChainGateway), _toSelectorArray(IChainGateway.addBridgeAdapter.selector), APPENDER_ROLE
+            address(earningChainGateway),
+            _toSelectorArray(
+                IChainGateway.addFundsBridgeAdapter.selector, IChainGateway.addDataOnlyBridgeAdapter.selector
+            ),
+            APPENDER_ROLE
         );
         accessManager.setTargetFunctionRole(
             address(ccipAdapter_earningChain),
@@ -1111,7 +1123,11 @@ contract BaseTest is TestWithHelpers {
             address(allocator_earningChain), _toSelectorArray(IAllocator.removeStrategy.selector), REMOVER_ROLE
         );
         accessManager.setTargetFunctionRole(
-            address(earningChainGateway), _toSelectorArray(IChainGateway.removeBridgeAdapter.selector), REMOVER_ROLE
+            address(earningChainGateway),
+            _toSelectorArray(
+                IChainGateway.removeFundsBridgeAdapter.selector, IChainGateway.removeDataOnlyBridgeAdapter.selector
+            ),
+            REMOVER_ROLE
         );
 
         // ----- Set up Rescuer -----

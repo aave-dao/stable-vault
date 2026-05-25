@@ -324,7 +324,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         roles[9] = RolesConfig.getRole__disableSwapOutput();
         roles[10] = RolesConfig.getRole__distrustAsset();
         // Gateway
-        roles[11] = RolesConfig.getRole__removeBridgeAdapter();
+        roles[11] = RolesConfig.getRole__removeFundsBridgeAdapter();
         // WithdrawalExecutionPolicy
         roles[12] = RolesConfig.getRole__removeSigner();
         roles[13] = RolesConfig.getRole__lowerRedemptionCapacity();
