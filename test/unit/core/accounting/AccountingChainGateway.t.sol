@@ -264,7 +264,13 @@ contract AccountingChainGatewayTest is TestWithHelpers {
     }
 
     function test_removeDataOnlyBridgeAdapter_reverts_ifNotWhitelisted() public {
-        vm.expectRevert(Errors.AddressNotWhitelisted.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IChainGateway.UnexpectedDataOnlyAdapterState.selector,
+                IChainGateway.DataOnlyBridgeAdapterState.NotSupported,
+                IChainGateway.DataOnlyBridgeAdapterState.ReceivingOnly
+            )
+        );
         vm.prank(admin);
         _accountingChainGateway.removeDataOnlyBridgeAdapter(EARNING_CHAIN_ID, makeAddr("bridgeAdapter"));
     }

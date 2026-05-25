@@ -59,20 +59,20 @@ interface IChainGateway {
         uint256 blockNumber;
     }
 
+    /// @notice Emitted when a data-only bridge adapter is enabled for a destination chain.
+    event DataOnlyBridgeAdapterAdded(uint256 chainId, address bridgeAdapter);
+
+    /// @notice Emitted when a data-only bridge adapter is removed for a destination chain.
+    event DataOnlyBridgeAdapterRemoved(uint256 chainId, address bridgeAdapter);
+
+    /// @notice Emitted when a data-only bridge adapter stops being usable for new sends.
+    event DataOnlyBridgeAdapterSendingDisabled(uint256 chainId, address bridgeAdapter);
+
     /// @notice Emitted when a funds bridge adapter is whitelisted for an asset and destination chain.
     event FundsBridgeAdapterAdded(address asset, uint256 chainId, address bridgeAdapter);
 
     /// @notice Emitted when a funds bridge adapter is removed from the whitelist for an asset and destination chain.
     event FundsBridgeAdapterRemoved(address asset, uint256 chainId, address bridgeAdapter);
-
-    /// @notice Emitted when a data-only bridge adapter is enabled for a destination chain.
-    event DataOnlyBridgeAdapterAdded(uint256 chainId, address bridgeAdapter);
-
-    /// @notice Emitted when a data-only bridge adapter stops being usable for new sends.
-    event DataOnlyBridgeAdapterSendingDisabled(uint256 chainId, address bridgeAdapter);
-
-    /// @notice Emitted when a data-only bridge adapter is removed for a destination chain.
-    event DataOnlyBridgeAdapterRemoved(uint256 chainId, address bridgeAdapter);
 
     /// @notice Emitted when funds arrive on this chain from a source chain via a bridge adapter.
     event FundsReceived(address asset, uint256 amount, uint256 sourceChainId);
@@ -87,10 +87,6 @@ interface IChainGateway {
     /// @notice Thrown when disabling an adapter would leave a chain without a data-only sending route.
     /// @custom:selector 0xd0ec6568
     error CannotDisableLastDataOnlyBridgeAdapter();
-
-    /// @notice Thrown when removing a data-only adapter before disabling sending through it.
-    /// @custom:selector 0xd366fdb9
-    error DataOnlyBridgeAdapterSendingEnabled();
 
     /// @notice Thrown when a given message contains both funds and a data payload which is not allowed.
     /// @custom:selector 0x9d73280d
@@ -107,6 +103,10 @@ interface IChainGateway {
     /// @notice Thrown when the caller is not the IOU token manager.
     /// @custom:selector 0x4084b1f2
     error OnlyIouTokenManager();
+
+    /// @notice Thrown when a data-only bridge adapter is in an unexpected state.
+    /// @custom:selector 0xcacd4024
+    error UnexpectedDataOnlyAdapterState(DataOnlyBridgeAdapterState actual, DataOnlyBridgeAdapterState expected);
 
     /// @notice Adds a funds bridge adapter to the gateway's set of whitelisted adapters.
     /// @dev The bridge adapter must not be already whitelisted for the asset and chain.

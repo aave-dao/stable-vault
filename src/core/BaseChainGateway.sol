@@ -151,7 +151,6 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         override
         restricted
     {
-        require(asset != Constants.ASSET_FOR_DATA_ONLY_BRIDGE, Errors.InvalidParameter());
         require($storage().supportedFundsBridgeAdapters[asset][chainId][bridgeAdapter], Errors.AddressNotWhitelisted());
 
         delete $storage().supportedFundsBridgeAdapters[asset][chainId][bridgeAdapter];
@@ -161,10 +160,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
     /// @inheritdoc IChainGateway
     function addDataOnlyBridgeAdapter(uint256 chainId, address bridgeAdapter) external override restricted {
         _validateBridgeAdapterParams(chainId, bridgeAdapter);
-        require(
-            $storage().dataOnlyBridgeAdapters[chainId][bridgeAdapter] == DataOnlyBridgeAdapterState.NotSupported,
-            Errors.AddressAlreadyWhitelisted()
-        );
+        _validateDataOnlyBridgeAdapterState(chainId, bridgeAdapter, DataOnlyBridgeAdapterState.NotSupported);
 
         $storage().dataOnlyBridgeAdapters[chainId][bridgeAdapter] = DataOnlyBridgeAdapterState.Enabled;
         $storage().dataOnlySendEnabledBridgeAdapterCount[chainId]++;
@@ -173,10 +169,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
 
     /// @inheritdoc IChainGateway
     function disableDataOnlyBridgeAdapterSending(uint256 chainId, address bridgeAdapter) external override restricted {
-        require(
-            $storage().dataOnlyBridgeAdapters[chainId][bridgeAdapter] == DataOnlyBridgeAdapterState.Enabled,
-            Errors.AddressNotWhitelisted()
-        );
+        _validateDataOnlyBridgeAdapterState(chainId, bridgeAdapter, DataOnlyBridgeAdapterState.Enabled);
         require($storage().dataOnlySendEnabledBridgeAdapterCount[chainId] > 1, CannotDisableLastDataOnlyBridgeAdapter());
 
         $storage().dataOnlyBridgeAdapters[chainId][bridgeAdapter] = DataOnlyBridgeAdapterState.ReceivingOnly;
@@ -186,9 +179,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
 
     /// @inheritdoc IChainGateway
     function removeDataOnlyBridgeAdapter(uint256 chainId, address bridgeAdapter) external override restricted {
-        DataOnlyBridgeAdapterState state = $storage().dataOnlyBridgeAdapters[chainId][bridgeAdapter];
-        require(state != DataOnlyBridgeAdapterState.NotSupported, Errors.AddressNotWhitelisted());
-        require(state == DataOnlyBridgeAdapterState.ReceivingOnly, DataOnlyBridgeAdapterSendingEnabled());
+        _validateDataOnlyBridgeAdapterState(chainId, bridgeAdapter, DataOnlyBridgeAdapterState.ReceivingOnly);
 
         delete $storage().dataOnlyBridgeAdapters[chainId][bridgeAdapter];
         emit DataOnlyBridgeAdapterRemoved(chainId, bridgeAdapter);
@@ -232,6 +223,15 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
     function _validateBridgeAdapterParams(uint256 chainId, address bridgeAdapter) internal view {
         require(bridgeAdapter != address(0), Errors.ZeroAddress());
         require(chainId != block.chainid && chainId != 0, Errors.InvalidParameter());
+    }
+
+    function _validateDataOnlyBridgeAdapterState(
+        uint256 chainId,
+        address bridgeAdapter,
+        DataOnlyBridgeAdapterState expected
+    ) internal view {
+        DataOnlyBridgeAdapterState actual = $storage().dataOnlyBridgeAdapters[chainId][bridgeAdapter];
+        require(actual == expected, UnexpectedDataOnlyAdapterState(actual, expected));
     }
 
     /// @dev Validates that the bridge adapter is whitelisted for the given asset and chain.
