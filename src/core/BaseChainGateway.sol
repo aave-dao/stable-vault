@@ -231,7 +231,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         DataOnlyBridgeAdapterState expected
     ) internal view {
         DataOnlyBridgeAdapterState actual = $storage().dataOnlyBridgeAdapters[chainId][bridgeAdapter];
-        require(actual == expected, UnexpectedDataOnlyAdapterState(actual, expected));
+        require(actual == expected, UnexpectedDataOnlyAdapterState(uint8(actual), uint8(expected)));
     }
 
     /// @dev Validates that the bridge adapter is whitelisted for the given asset and chain.

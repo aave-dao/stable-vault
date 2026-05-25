@@ -106,7 +106,7 @@ interface IChainGateway {
 
     /// @notice Thrown when a data-only bridge adapter is in an unexpected state.
     /// @custom:selector 0xcacd4024
-    error UnexpectedDataOnlyAdapterState(DataOnlyBridgeAdapterState actual, DataOnlyBridgeAdapterState expected);
+    error UnexpectedDataOnlyAdapterState(uint8 actual, uint8 expected);
 
     /// @notice Adds a funds bridge adapter to the gateway's set of whitelisted adapters.
     /// @dev The bridge adapter must not be already whitelisted for the asset and chain.

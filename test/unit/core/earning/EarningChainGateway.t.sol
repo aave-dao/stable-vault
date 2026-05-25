@@ -329,8 +329,8 @@ contract EarningChainGatewayTest is TestWithHelpers {
         vm.expectRevert(
             abi.encodeWithSelector(
                 IChainGateway.UnexpectedDataOnlyAdapterState.selector,
-                IChainGateway.DataOnlyBridgeAdapterState.NotSupported,
-                IChainGateway.DataOnlyBridgeAdapterState.ReceivingOnly
+                uint8(IChainGateway.DataOnlyBridgeAdapterState.NotSupported),
+                uint8(IChainGateway.DataOnlyBridgeAdapterState.ReceivingOnly)
             )
         );
         vm.prank(admin);
