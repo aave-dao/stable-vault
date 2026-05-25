@@ -13,6 +13,7 @@ fs_permissions = [
     { access = "read-write", path = "deployments" },
     { access = "read", path = "out" },
     { access = "read", path = "config" },
+    { access = "read-write", path = "script/output" },
 ]
 cbor_metadata = true
 ignored_warnings_from = ["lib/"]
