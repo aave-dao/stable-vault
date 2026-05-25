@@ -153,3 +153,6 @@ snapshots/
 # Per-env intermediate dumps from script/tooling/DumpRoles.s.sol; the canonical merged artifact
 # (script/output/roles.json) is what we commit and review.
 script/output/roles.dump.*.json
+
+# Smoke-test JSON reports; the directory is kept (via .gitkeep) but per-run reports are local-only.
+tools/smoke/output/*.json

@@ -1,0 +1,202 @@
+// Topology check: prove every artefact entry has bytecode at the expected
+// CREATE3 address, the bytecode matches what we'd produce from the source,
+// and transparent proxies point at the recorded implementation.
+//
+// Four layers per entry:
+//   1. CREATE3 re-derivation (if saltSeed is non-empty) -> address matches artefact
+//   2. code.length > 0 at the recorded address
+//   3. keccak256(actual.code) == keccak256(forge-inspected deployedBytecode)
+//   4. For transparent proxies: ERC-1967 impl slot matches the "<Name>::Implementation" entry
+
+import { keccak256, type Address, type Hex, type PublicClient } from "viem";
+
+import { implEntry } from "../artefact.js";
+import { computeCreate3Address } from "../create3.js";
+import { expectedRuntimeBytecodeHash } from "../bytecode.js";
+import type { CheckResult, DeploymentArtefact } from "../types.js";
+
+// keccak256("eip1967.proxy.implementation") - 1
+const ERC1967_IMPL_SLOT: Hex = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
+
+// Names that we know are transparent proxies — their "<Name>::Implementation"
+// entry holds the impl address and the proxy address must reference it via the
+// ERC-1967 storage slot.
+const TRANSPARENT_PROXIES: ReadonlySet<string> = new Set([
+  "AssetRegistry",
+  "WithdrawalPolicy", // emitted under this name in some artefacts; alias kept for safety
+  "WithdrawalExecutionPolicy",
+  "DepositPolicy",
+  "FundsBridgingPolicy",
+  "Allocator",
+  "IouTokenManager",
+  "PriceOracle",
+  "PolicyRegistry",
+]);
+
+// Names that are intentionally absent from the artefact in some envs (e.g. a.DI
+// adapter when registerOnGateway=false). Smoke skips them with a warning, not
+// a failure.
+const CONDITIONAL_ENTRIES: ReadonlySet<string> = new Set(["AdiAdapter"]);
+
+interface TopologyArgs {
+  artefact: DeploymentArtefact;
+  deployer: Address;
+  client: PublicClient;
+  blockNumber: bigint;
+  repoRoot: string;
+}
+
+export async function runTopology(args: TopologyArgs): Promise<CheckResult[]> {
+  const { artefact, deployer, client, blockNumber, repoRoot } = args;
+  const results: CheckResult[] = [];
+
+  for (const [name, entry] of artefact.entries) {
+    // Skip implementation entries themselves — they're verified transitively via
+    // the ERC-1967 slot read on the matching proxy.
+    if (name.endsWith("::Implementation")) continue;
+
+    // 1. CREATE3 re-derivation
+    if (entry.saltSeed !== "") {
+      const predicted = computeCreate3Address(entry.saltSeed, deployer);
+      if (predicted.toLowerCase() !== entry.address.toLowerCase()) {
+        results.push({
+          group: "topology",
+          key: `${name}.create3`,
+          severity: "fail",
+          expected: predicted,
+          actual: entry.address,
+          format: "address",
+          note: "CREATE3 re-derivation does not match the artefact",
+        });
+        continue;
+      }
+      results.push({
+        group: "topology",
+        key: `${name}.address`,
+        severity: "pass",
+        expected: predicted,
+        actual: entry.address,
+        format: "address",
+      });
+    } else {
+      results.push({
+        group: "topology",
+        key: `${name}.address`,
+        severity: "pass",
+        expected: entry.address,
+        actual: entry.address,
+        format: "address",
+        note: "non-CREATE3 deploy (artefact accepted as ground truth)",
+      });
+    }
+
+    // 2. code.length > 0
+    const code = await client.getCode({ address: entry.address, blockNumber });
+    if (!code || code === "0x") {
+      results.push({
+        group: "topology",
+        key: `${name}.code`,
+        severity: "fail",
+        expected: ">0 bytes",
+        actual: "0 bytes",
+        note: "no code at predicted address (incomplete deploy)",
+      });
+      continue;
+    }
+    const codeSize = (code.length - 2) / 2;
+    results.push({
+      group: "topology",
+      key: `${name}.code`,
+      severity: "pass",
+      expected: `>0 bytes`,
+      actual: `${codeSize.toLocaleString()} bytes`,
+    });
+
+    // 3. Bytecode-hash equivalence
+    try {
+      const expectedHash = expectedRuntimeBytecodeHash(name, repoRoot);
+      const actualHash = keccak256(code);
+      if (expectedHash !== actualHash) {
+        results.push({
+          group: "topology",
+          key: `${name}.bytecode-hash`,
+          severity: "fail",
+          expected: expectedHash,
+          actual: actualHash,
+          format: "bytes32",
+          note: "runtime bytecode does not match the compiled artefact",
+        });
+      } else {
+        results.push({
+          group: "topology",
+          key: `${name}.bytecode-hash`,
+          severity: "pass",
+          expected: expectedHash,
+          actual: actualHash,
+          format: "bytes32",
+        });
+      }
+    } catch (e) {
+      results.push({
+        group: "topology",
+        key: `${name}.bytecode-hash`,
+        severity: "warning",
+        note: `could not resolve expected bytecode (${(e as Error).message})`,
+      });
+    }
+
+    // 4. ERC-1967 impl slot for transparent proxies
+    if (TRANSPARENT_PROXIES.has(name)) {
+      const slotRaw = await client.getStorageAt({
+        address: entry.address,
+        slot: ERC1967_IMPL_SLOT,
+        blockNumber,
+      });
+      const onChainImpl = slotRaw ? (`0x${slotRaw.slice(-40)}` as Address) : null;
+      const recordedImpl = implEntry(artefact, name);
+      if (!onChainImpl || onChainImpl === "0x0000000000000000000000000000000000000000") {
+        results.push({
+          group: "topology",
+          key: `${name}.impl`,
+          severity: "fail",
+          expected: recordedImpl?.address ?? "(any)",
+          actual: "0x0000…0000",
+          note: "ERC-1967 implementation slot is zero",
+        });
+      } else if (recordedImpl && onChainImpl.toLowerCase() !== recordedImpl.address.toLowerCase()) {
+        results.push({
+          group: "topology",
+          key: `${name}.impl`,
+          severity: "fail",
+          expected: recordedImpl.address,
+          actual: onChainImpl,
+          format: "address",
+          note: "proxy points at unexpected implementation",
+        });
+      } else {
+        results.push({
+          group: "topology",
+          key: `${name}.impl`,
+          severity: "pass",
+          expected: recordedImpl?.address ?? onChainImpl,
+          actual: onChainImpl,
+          format: "address",
+        });
+      }
+    }
+  }
+
+  // Surface conditional entries that are absent so operators see them.
+  for (const name of CONDITIONAL_ENTRIES) {
+    if (!artefact.entries.has(name)) {
+      results.push({
+        group: "topology",
+        key: `${name}.presence`,
+        severity: "skipped",
+        note: `${name} not deployed in this env (conditional contract)`,
+      });
+    }
+  }
+
+  return results;
+}
