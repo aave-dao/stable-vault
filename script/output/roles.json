@@ -1,12 +1,12 @@
 {
   "source": {
     "rolesConfigSha": "c20087e0f41dd655c0c6ea51ed265203aa5b0d2e58afc9ec0a8e9f031125f3bb",
-    "accessManagerBaseSetupSha": "d2e8a2cd2b0ae32a9bc54ca6e45dc20d994584190bc77457c139be7df5b534d4",
+    "accessManagerBaseSetupSha": "cc6854de8783ff054b91123e3b3f8f0f09a043c7692dcbfae025d405f50f6f0b",
     "accessManagerAccountingChainSetupSha": "3dbff6191ccf11cd5ac399a3c8f19d68c8c78761537babbff531e2b24be32981",
     "accessManagerEarningChainSetupSha": "aaa24f21d5bad9b851ccd6d54285acb264e06482d60b66bc1632984b902fd252",
     "deploymentConfigShas": {
-      "staging": "0f71d9d124c125b01562fee080ad8fc92a743e6cdc5279804d66a02f48813a1d",
-      "preprod": "e23d5bfba982510c76d36fbea71272904d7b82b3c39684bada6fda500e29607b",
+      "staging": "624304a346c290a789172d941f5b586ae8173ea44bdaab93e62f72a489770032",
+      "preprod": "340aadab811267c40f63b879bdf3e58f844c71455c8216bccd6f8c1721ccbc97",
       "prod": "8a9c9bd8741e3b7d426883fa99580f89c7b623d695443db88273bf3fdf5cd4a9"
     }
   },
@@ -68,8 +68,8 @@
       "grantPolicy": "EXPLICIT",
       "holdsGuardians": [],
       "addressByEnv": {
-        "staging": "0x0000000000000000000000000000000000000000",
-        "preprod": "0x0000000000000000000000000000000000000000",
+        "staging": "0x18D55163745898A086681b4d72b5b0dF1a8f0740",
+        "preprod": "0xC9bDdF3ff47216B60cFa3400d0A414D84DAb1055",
         "prod": "0x0000000000000000000000000000000000000000"
       }
     },
@@ -78,8 +78,8 @@
       "grantPolicy": "EXPLICIT",
       "holdsGuardians": [],
       "addressByEnv": {
-        "staging": "0x171C6F2ad8E626265E35aF6E2D814418a5AE2bfe",
-        "preprod": "0x171C6F2ad8E626265E35aF6E2D814418a5AE2bfe",
+        "staging": "0x53023407B6EBE20735c903A6A03d1C82A0606705",
+        "preprod": "0x18820b8BCE5945dD3EEE6B6dD3082AE0F3e6003F",
         "prod": "0x481AF6B96c4565392C53E0546109E368Bb67007e"
       }
     },
@@ -111,8 +111,8 @@
       "grantPolicy": "EXPLICIT",
       "holdsGuardians": [],
       "addressByEnv": {
-        "staging": "0x5fe41A2ecA0a13f5a4600Da38251C100a0aF279c",
-        "preprod": "0x5fe41A2ecA0a13f5a4600Da38251C100a0aF279c",
+        "staging": "0x170C95E0539Cd099E0a315A53a725aE7a78EE034",
+        "preprod": "0x3fb05A739e391eb9ab57C6393373AD486A97169D",
         "prod": "0x045F6313D8870230B0217FC5773A0B479AdA3e32"
       }
     },
@@ -2869,12 +2869,12 @@
       "onChainLimits": "+ PUBLISH_BUFFER_SECONDS = 90",
       "rawValueByEnv": {
         "staging": "0x0000000000000000000000000000000000000000",
-        "preprod": "0x37B669dA39C79e8a0D5005b44c193f7198A19Fa2",
+        "preprod": "0x44eed2D41939C1F8096A27a5FF998f134Ccd3dc2",
         "prod": "0x0000000000000000000000000000000000000000"
       },
       "humanValueByEnv": {
         "staging": "0x0000000000000000000000000000000000000000",
-        "preprod": "0x37B669dA39C79e8a0D5005b44c193f7198A19Fa2",
+        "preprod": "0x44eed2D41939C1F8096A27a5FF998f134Ccd3dc2",
         "prod": "0x0000000000000000000000000000000000000000"
       },
       "status": "Active"
