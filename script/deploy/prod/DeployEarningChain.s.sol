@@ -6,6 +6,6 @@ import {EarningChainDeployment} from "script/base/EarningChainDeployment.sol";
 
 contract DeployEarningChain is EarningChainDeployment {
     function _configPath() internal pure override returns (string memory) {
-        return "config/deployment-config.prod.json";
+        return "config/deployment-config.prod.jsonc";
     }
 }

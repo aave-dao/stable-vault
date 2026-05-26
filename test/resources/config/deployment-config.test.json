@@ -28,7 +28,16 @@
   "slippageCoverageVault": {
     "maxSlippageBps": "100",
     "overrideMaxSlippageBps": "5000",
-    "initialOverrideMode": true
+    "initialOverrideMode": true,
+    "perAssetCaps": {
+      "gho": {
+        "pullCapPerTx": "1000000000000000000000000",
+        "windowCap": "1000000000000000000000000",
+        "windowSeconds": 86400
+      },
+      "usdc": { "pullCapPerTx": "1000000000000", "windowCap": "1000000000000", "windowSeconds": 86400 },
+      "usdt": { "pullCapPerTx": "1000000000000", "windowCap": "1000000000000", "windowSeconds": 86400 }
+    }
   },
   "earningChain": {
     "chainId": 1,
@@ -38,6 +47,14 @@
       "usdc": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
       "usdt": "0xdAC17F958D2ee523a2206206994597C13D831ec7"
     },
+    "erc4626Strategies": [
+      {
+        "strategyAddress": "0xE1753F2e00940cC31213dd92013cF019DFE4ca1d",
+        "underlyingAddress": "0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f",
+        "assetSymbol": "GHO",
+        "strategySymbol": "sGho"
+      }
+    ],
     "chainlinkFeeds": {
       "ghoUsd": "0x3f12643D3f6f874d39C2a4c9f2Cd6f2DbAC877FC",
       "usdcUsd": "0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6",
@@ -61,11 +78,11 @@
     },
     "withdrawalExecutionPolicy": {
       "redemptionLimit": {
-        "capacity": "1000000000000000000000000000000000000",
-        "refillRate": "11574074074074074074074074074"
+        "capacityRay": "1000000000000000000000000000000000000",
+        "refillRateRay": "11574074074074074074074074074"
       },
-      "minRedemptionCapacity": "1000000000000000000000000000000",
-      "minRedemptionRefillRate": "11574074074074074074074074"
+      "minRedemptionCapacityRay": "1000000000000000000000000000000",
+      "minRedemptionRefillRateRay": "11574074074074074074074074"
     },
     "deploymentOutputPath": "deployments/vnet/v0.3/earning.json",
     "minBurnIouTokenGasLimit": "120000"
@@ -120,11 +137,11 @@
     },
     "withdrawalExecutionPolicy": {
       "redemptionLimit": {
-        "capacity": "1000000000000000000000000000000000000",
-        "refillRate": "11574074074074074074074074074"
+        "capacityRay": "1000000000000000000000000000000000000",
+        "refillRateRay": "11574074074074074074074074074"
       },
-      "minRedemptionCapacity": "1000000000000000000000000000000",
-      "minRedemptionRefillRate": "11574074074074074074074074"
+      "minRedemptionCapacityRay": "1000000000000000000000000000000",
+      "minRedemptionRefillRateRay": "11574074074074074074074074"
     },
     "deploymentOutputPath": "deployments/vnet/v0.3/accounting.json"
   }
