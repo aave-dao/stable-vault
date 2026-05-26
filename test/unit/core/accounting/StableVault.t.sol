@@ -895,8 +895,8 @@ contract StableVaultTest is TestWithHelpers {
         IStableVault.UserRateData[] memory userRateData = new IStableVault.UserRateData[](1);
         userRateData[0] = IStableVault.UserRateData(user, newRate);
 
-        vm.expectEmit(true, false, false, true);
-        emit IStableVault.SetUserRateSkipped(user);
+        vm.expectEmit(true, true, false, true);
+        emit IStableVault.SetUserRateSkipped(user, 0, newRate);
 
         vm.prank(manager);
         stableVault.setUserRate(userRateData);
@@ -1162,11 +1162,13 @@ contract StableVaultTest is TestWithHelpers {
 
         IStableVault.SubVaultData memory user2VaultBefore = stableVault.getUserSubVault(user2);
 
+        uint256 newSubVaultId = stableVault.getUserSubVault(user1).id;
+
         vm.prank(manager);
         userRateData = new IStableVault.UserRateData[](1);
         userRateData[0] = IStableVault.UserRateData(user2, newRate);
-        vm.expectEmit(true, false, false, true);
-        emit IStableVault.SetUserRateSkipped(user2);
+        vm.expectEmit(true, true, false, true);
+        emit IStableVault.SetUserRateSkipped(user2, newSubVaultId, newRate);
 
         // Migration is skipped instead of reverting when the user would end up with 0 shares in the new sub-vault.
         // The call succeeds and user2's position is left untouched.
@@ -1236,8 +1238,10 @@ contract StableVaultTest is TestWithHelpers {
         batch[0] = IStableVault.UserRateData(dustUser, newRate);
         batch[1] = IStableVault.UserRateData(normalUser, newRate);
 
-        vm.expectEmit(true, false, false, true);
-        emit IStableVault.SetUserRateSkipped(dustUser);
+        uint256 newSubVaultId = stableVault.getUserSubVault(seeder).id;
+
+        vm.expectEmit(true, true, false, true);
+        emit IStableVault.SetUserRateSkipped(dustUser, newSubVaultId, newRate);
 
         vm.prank(manager);
         stableVault.setUserRate(batch);
