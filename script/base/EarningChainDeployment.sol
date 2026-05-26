@@ -199,7 +199,9 @@ abstract contract EarningChainDeployment is BaseChainDeployment, AccessManagerEa
         );
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
-            _assertDeployedTransparentProxy(predicted, implCreationCode, "EarningChainGateway");
+            _assertDeployedTransparentProxy(
+                predicted, implCreationCode, GATEWAY_PROXY_ADMIN_OWNER, "EarningChainGateway"
+            );
             logSkip("_deployGateway", "EarningChainGateway");
             _logDeployment("EarningChainGateway", GATEWAY_SALT_SEED, predicted);
             return predicted;
@@ -234,7 +236,9 @@ abstract contract EarningChainDeployment is BaseChainDeployment, AccessManagerEa
             abi.encodePacked(type(EarningChainStateProvider).creationCode, abi.encode(getGatewayAddress(_deployer())));
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
-            _assertDeployedTransparentProxy(predicted, implCreationCode, "EarningChainStateProvider");
+            _assertDeployedTransparentProxy(
+                predicted, implCreationCode, EARNING_CHAIN_STATE_PROVIDER_PROXY_ADMIN_OWNER, "EarningChainStateProvider"
+            );
             logSkip("_deployEarningChainStateProvider", "EarningChainStateProvider");
             _logDeployment("EarningChainStateProvider", EARNING_CHAIN_STATE_PROVIDER_SALT_SEED, predicted);
             return predicted;

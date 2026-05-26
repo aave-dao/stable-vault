@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 
 import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {AccessManager} from "openzeppelin-contracts/contracts/access/manager/AccessManager.sol";
 
@@ -600,9 +601,12 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         _assertChainSpecificRequiredPoliciesSet();
     }
 
-    function _assertDeployedTransparentProxy(address proxy, bytes memory implCreationCode, string memory name)
-        internal
-    {
+    function _assertDeployedTransparentProxy(
+        address proxy,
+        bytes memory implCreationCode,
+        address expectedProxyAdminOwner,
+        string memory name
+    ) internal {
         address impl = address(uint160(uint256(vm.load(proxy, ERC1967Utils.IMPLEMENTATION_SLOT))));
         require(
             impl != address(0),
@@ -612,6 +616,15 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         require(
             admin != address(0),
             string.concat(name, "::Proxy at ", Strings.toHexString(proxy), ": ERC-1967 admin slot is zero")
+        );
+        require(
+            ProxyAdmin(admin).owner() == expectedProxyAdminOwner,
+            string.concat(
+                name,
+                "::ProxyAdmin at ",
+                Strings.toHexString(admin),
+                ": owner does not match expected upgrade-authority address"
+            )
         );
         _assertDeployedMatchesReference(impl, implCreationCode, string.concat(name, "::Implementation"));
     }
@@ -689,7 +702,9 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         bytes memory implCreationCode = type(AssetRegistry).creationCode;
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
-            _assertDeployedTransparentProxy(predicted, implCreationCode, "AssetRegistry");
+            _assertDeployedTransparentProxy(
+                predicted, implCreationCode, ASSET_REGISTRY_PROXY_ADMIN_OWNER, "AssetRegistry"
+            );
             logSkip("_deployAssetRegistry", "AssetRegistry");
             _logDeployment("AssetRegistry", ASSET_REGISTRY_SALT_SEED, predicted);
             return predicted;
@@ -721,7 +736,9 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         );
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
-            _assertDeployedTransparentProxy(predicted, implCreationCode, "WithdrawalExecutionPolicy");
+            _assertDeployedTransparentProxy(
+                predicted, implCreationCode, WITHDRAWAL_EXECUTION_POLICY_PROXY_ADMIN_OWNER, "WithdrawalExecutionPolicy"
+            );
             logSkip("_deployWithdrawalExecutionPolicy", "WithdrawalExecutionPolicy");
             _logDeployment("WithdrawalExecutionPolicy", WITHDRAWAL_EXECUTION_POLICY_SALT_SEED, predicted);
             return predicted;
@@ -786,7 +803,9 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         );
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
-            _assertDeployedTransparentProxy(predicted, implCreationCode, "IouTokenManager");
+            _assertDeployedTransparentProxy(
+                predicted, implCreationCode, IOU_TOKEN_MANAGER_PROXY_ADMIN_OWNER, "IouTokenManager"
+            );
             logSkip("_deployIouTokenManager", "IouTokenManager");
             _logDeployment("IouTokenManager", IOU_TOKEN_MANAGER_SALT_SEED, predicted);
             return predicted;
@@ -829,7 +848,7 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         );
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
-            _assertDeployedTransparentProxy(predicted, implCreationCode, "Allocator");
+            _assertDeployedTransparentProxy(predicted, implCreationCode, ALLOCATOR_PROXY_ADMIN_OWNER, "Allocator");
             logSkip("_deployAllocator", "Allocator");
             _logDeployment("Allocator", ALLOCATOR_SALT_SEED, predicted);
             return predicted;
@@ -965,7 +984,7 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
             abi.encodePacked(type(PriceOracle).creationCode, abi.encode(_configUint(".priceOracleMinValidPriceRay")));
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
-            _assertDeployedTransparentProxy(predicted, implCreationCode, "PriceOracle");
+            _assertDeployedTransparentProxy(predicted, implCreationCode, PRICE_ORACLE_PROXY_ADMIN_OWNER, "PriceOracle");
             logSkip("_deployPriceOracle", "PriceOracle");
             _logDeployment("PriceOracle", PRICE_ORACLE_SALT_SEED, predicted);
             return predicted;
