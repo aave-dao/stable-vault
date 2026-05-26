@@ -6,7 +6,7 @@
 # `//` so values like URLs are caught before they can be corrupted.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+ROOT="$(git rev-parse --show-toplevel)"
 
 CONFIGS=(
     "$ROOT/config/deployment-config.prod.jsonc"
