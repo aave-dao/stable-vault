@@ -365,15 +365,14 @@ contract StableVault is
     function setSubVaultRate(uint256 subVaultId, uint256 newPerSecondRate) external override restricted {
         _validateRate(newPerSecondRate);
         require(!_existsSubVaultWithRate(newPerSecondRate), SubVaultAlreadyExists());
-        StableVaultStorage storage s = $storage();
-        uint256 oldPerSecondRate = s.subVaultById[subVaultId].perSecondRate;
+        uint256 oldPerSecondRate = $storage().subVaultById[subVaultId].perSecondRate;
         require(oldPerSecondRate != 0, SubVaultDoesNotExist());
         _accrueSubVaultConversionRate(subVaultId);
-        delete s.subVaultIdByRate[oldPerSecondRate];
-        s.subVaultById[subVaultId].perSecondRate = newPerSecondRate;
-        s.subVaultIdByRate[newPerSecondRate] = subVaultId;
+        delete $storage().subVaultIdByRate[oldPerSecondRate];
+        $storage().subVaultById[subVaultId].perSecondRate = newPerSecondRate;
+        $storage().subVaultIdByRate[newPerSecondRate] = subVaultId;
         emit SubVaultRateSet(subVaultId, newPerSecondRate);
-        if (s.defaultSubVaultId == subVaultId) {
+        if ($storage().defaultSubVaultId == subVaultId) {
             emit DefaultSubVaultSet(subVaultId, newPerSecondRate);
         }
     }
@@ -529,12 +528,11 @@ contract StableVault is
 
     /// @inheritdoc IStableVault
     function getActiveSubVaults() external view override returns (SubVaultData[] memory) {
-        StableVaultStorage storage s = $storage();
-        uint256 activeSubVaultsCount = s.activeSubVaultsIds.length;
+        uint256 activeSubVaultsCount = $storage().activeSubVaultsIds.length;
         SubVaultData[] memory activeSubVaults = new SubVaultData[](activeSubVaultsCount);
         for (uint256 i = 0; i < activeSubVaultsCount; i++) {
-            uint256 subVaultId = s.activeSubVaultsIds[i];
-            uint256 perSecondRate = s.subVaultById[subVaultId].perSecondRate;
+            uint256 subVaultId = $storage().activeSubVaultsIds[i];
+            uint256 perSecondRate = $storage().subVaultById[subVaultId].perSecondRate;
             activeSubVaults[i] = SubVaultData({perSecondRate: perSecondRate, id: subVaultId});
         }
         return activeSubVaults;
@@ -635,15 +633,14 @@ contract StableVault is
 
     function _createSubVault(uint256 newPerSecondRate) internal returns (uint256) {
         _validateRate(newPerSecondRate);
-        StableVaultStorage storage s = $storage();
-        uint256 newSubVaultId = ++s.lastSubVaultId;
-        s.subVaultById[newSubVaultId] = SubVault({
+        uint256 newSubVaultId = ++$storage().lastSubVaultId;
+        $storage().subVaultById[newSubVaultId] = SubVault({
             perSecondRate: newPerSecondRate,
             conversionRate: MathLib.RAY,
             lastAccrualTimestamp: uint256(block.timestamp),
             totalShares: 0
         });
-        s.subVaultIdByRate[newPerSecondRate] = newSubVaultId;
+        $storage().subVaultIdByRate[newPerSecondRate] = newSubVaultId;
         emit SubVaultCreated(newSubVaultId, newPerSecondRate);
         return newSubVaultId;
     }
@@ -700,19 +697,18 @@ contract StableVault is
             }
         }
 
-        StableVaultStorage storage s = $storage();
         if (from == to) {
             // Sanity check. If the user is the same - this cannot be a partial transfer.
             require(remainingShares == 0, Errors.InvalidAmount());
             require(guaranteedAmountToMoveRay == 0, Errors.InvalidAmount());
-            s.positions[to].subVaultId = toSubVaultId;
+            $storage().positions[to].subVaultId = toSubVaultId;
         } else {
             if (remainingShares == 0) {
-                delete s.positions[from];
+                delete $storage().positions[from];
             } else {
-                s.positions[from].originalDepositRay -= guaranteedAmountToMoveRay;
+                $storage().positions[from].originalDepositRay -= guaranteedAmountToMoveRay;
             }
-            s.positions[to].originalDepositRay += guaranteedAmountToMoveRay;
+            $storage().positions[to].originalDepositRay += guaranteedAmountToMoveRay;
         }
 
         _issueShares(to, toSubVaultId, sharesToIssue);
@@ -721,12 +717,11 @@ contract StableVault is
     /// @dev Gets the user's subVaultId or assigns a default subVaultId if the user has no position.
     /// @dev A position is created for the user if they do not have one.
     function _getOrAssignUserSubVaultId(address user) internal returns (uint256) {
-        StableVaultStorage storage s = $storage();
-        uint256 subVaultId = s.positions[user].subVaultId;
+        uint256 subVaultId = $storage().positions[user].subVaultId;
         if (subVaultId == 0) {
-            subVaultId = s.defaultSubVaultId;
-            s.positions[user].subVaultId = subVaultId;
-            emit UserRateSet(user, subVaultId, s.subVaultById[subVaultId].perSecondRate);
+            subVaultId = $storage().defaultSubVaultId;
+            $storage().positions[user].subVaultId = subVaultId;
+            emit UserRateSet(user, subVaultId, $storage().subVaultById[subVaultId].perSecondRate);
         }
         return subVaultId;
     }
@@ -776,24 +771,22 @@ contract StableVault is
     }
 
     function _addSubVaultToActive(uint256 subVaultId) internal {
-        StableVaultStorage storage s = $storage();
-        s.activeSubVaultsIds.push(subVaultId);
-        s.activeSubVaultIndexById[subVaultId] = s.activeSubVaultsIds.length - 1;
+        $storage().activeSubVaultsIds.push(subVaultId);
+        $storage().activeSubVaultIndexById[subVaultId] = $storage().activeSubVaultsIds.length - 1;
         emit SubVaultActivated(subVaultId);
     }
 
     // Assumes that if it is called then `subVaultId` is indeed active, thus `$storage().activeSubVaultsIds.length > 0`
     function _removeSubVaultFromActive(uint256 subVaultId) internal {
-        StableVaultStorage storage s = $storage();
-        uint256 subVaultIndex = s.activeSubVaultIndexById[subVaultId];
-        uint256 lastSubVaultIndex = s.activeSubVaultsIds.length - 1;
+        uint256 subVaultIndex = $storage().activeSubVaultIndexById[subVaultId];
+        uint256 lastSubVaultIndex = $storage().activeSubVaultsIds.length - 1;
         if (subVaultIndex != lastSubVaultIndex) {
-            uint256 lastSubVaultId = s.activeSubVaultsIds[lastSubVaultIndex];
-            s.activeSubVaultsIds[subVaultIndex] = lastSubVaultId;
-            s.activeSubVaultIndexById[lastSubVaultId] = subVaultIndex;
+            uint256 lastSubVaultId = $storage().activeSubVaultsIds[lastSubVaultIndex];
+            $storage().activeSubVaultsIds[subVaultIndex] = lastSubVaultId;
+            $storage().activeSubVaultIndexById[lastSubVaultId] = subVaultIndex;
         }
-        s.activeSubVaultsIds.pop();
-        delete s.activeSubVaultIndexById[subVaultId];
+        $storage().activeSubVaultsIds.pop();
+        delete $storage().activeSubVaultIndexById[subVaultId];
         emit SubVaultDeactivated(subVaultId);
     }
 
@@ -838,16 +831,15 @@ contract StableVault is
     }
 
     function _previewFullWithdrawalRequest(address user) internal view returns (uint256, uint256, uint256) {
-        StableVaultStorage storage s = $storage();
-        uint256 subVaultId = s.positions[user].subVaultId;
+        uint256 subVaultId = $storage().positions[user].subVaultId;
         // The conversion rate was accrued in the higher order withdrawal function using rounding that favors the
         // protocol. We want the conversion rate's calculation to be rounded down so that we undershoot result of
         // sharesToRedeem * conversionRate.
-        uint256 conversionRate = s.subVaultById[subVaultId].conversionRate;
-        uint256 sharesToRedeem = s.positions[user].shares;
+        uint256 conversionRate = $storage().subVaultById[subVaultId].conversionRate;
+        uint256 sharesToRedeem = $storage().positions[user].shares;
         // Round down the withdrawal amount, so that the rounding is in favor of the protocol.
         uint256 actualAmountOfWithdrawalRay = sharesToRedeem.rayMulDown(conversionRate);
-        uint256 originalDepositRay = s.positions[user].originalDepositRay;
+        uint256 originalDepositRay = $storage().positions[user].originalDepositRay;
         // Due to rounding in rayDivDown (deposit) and rayMulDown (withdrawal),
         // actualAmountOfWithdrawalRay can be slightly less than originalDepositRay.
         // We guarantee the user gets at least their original deposit back.
@@ -912,13 +904,12 @@ contract StableVault is
     }
 
     function _getActiveSubVaultsObligations() internal view returns (uint256) {
-        StableVaultStorage storage s = $storage();
         uint256 activeSubVaultsObligations;
-        uint256 activeSubVaultsCount = s.activeSubVaultsIds.length;
+        uint256 activeSubVaultsCount = $storage().activeSubVaultsIds.length;
         for (uint256 i = 0; i < activeSubVaultsCount; i++) {
-            uint256 subVaultId = s.activeSubVaultsIds[i];
+            uint256 subVaultId = $storage().activeSubVaultsIds[i];
             // Round up the obligations to avoid understating liabilities.
-            activeSubVaultsObligations += s.subVaultById[subVaultId].totalShares
+            activeSubVaultsObligations += $storage().subVaultById[subVaultId].totalShares
             .rayMulUp(_previewSubVaultConversionRate(subVaultId));
         }
         return activeSubVaultsObligations;
@@ -951,15 +942,15 @@ contract StableVault is
 
     function _setUserRate(address user, uint256 newPerSecondRate) internal {
         require(user != address(0), Errors.ZeroAddress());
-        StableVaultStorage storage s = $storage();
-        uint256 oldSubVaultId = s.positions[user].subVaultId;
+        uint256 oldSubVaultId = $storage().positions[user].subVaultId;
         if (oldSubVaultId == 0) {
             // Skip users without a position (e.g., withdrew or transferred out between batch
             // preparation and execution) to avoid reverting the entire batch.
             emit SetUserRateSkipped(user, 0, newPerSecondRate);
         } else {
             require(
-                newPerSecondRate != s.subVaultById[oldSubVaultId].perSecondRate, RedundantRate(user, newPerSecondRate)
+                newPerSecondRate != $storage().subVaultById[oldSubVaultId].perSecondRate,
+                RedundantRate(user, newPerSecondRate)
             );
             uint256 newSubVaultId = _getOrCreateSubVaultWithRate(newPerSecondRate);
             if (_migrateUserToSubVault(user, oldSubVaultId, newSubVaultId)) {
