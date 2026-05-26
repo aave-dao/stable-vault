@@ -336,12 +336,17 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
     }
 
     function _setDestinationChainAdapterIdempotent(address adapter, uint256 chainId, address destAdapter) private {
-        /// @custom:tx-already-executed-check Skip when a destination adapter is already set for `chainId` (the
-        /// adapter only allows a one-shot set, so any non-zero value means a prior run already configured it).
-        if (BaseBridgeAdapter(adapter).getDestinationChainAdapter(chainId) != address(0)) {
+        /// @custom:tx-already-executed-check Skip when the destination adapter is already set to  `destAdapter`
+        /// for `chainId`.
+        address current = BaseBridgeAdapter(adapter).getDestinationChainAdapter(chainId);
+        if (current == destAdapter) {
             logSkip("_setDestinationChainAdapterIdempotent", "destination chain adapter configured");
             return;
         }
+        require(
+            current == address(0),
+            "setDestinationChainAdapter: existing destination adapter does not match expected value"
+        );
         /// @custom:tx-already-executed-check See `_addBridgeAdapterIdempotent` for the same canCall safety-net.
         if (!_deployerCanCall(adapter, IBridgeAdapter.setDestinationChainAdapter.selector)) {
             logSkip("_setDestinationChainAdapterIdempotent", "deployer lacks call access - prior run completed");
