@@ -12,7 +12,7 @@ fs_permissions = [
     { access = "read", path = "lib/createx/artifacts" },
     { access = "read-write", path = "deployments" },
     { access = "read", path = "out" },
-    { access = "read", path = "config" },
+    { access = "read-write", path = "config" },
     { access = "read-write", path = ".github/workflows" },
 ]
 cbor_metadata = true
