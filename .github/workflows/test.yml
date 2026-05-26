@@ -231,7 +231,7 @@ jobs:
       ALCHEMY_KEY: ${{ secrets.ALCHEMY_KEY || secrets.ALCHEMY_API_KEY }}
       ADI_FORK_MODE: deployed
       ADI_DEPLOYMENT_ENV: preprod
-      ADI_DEPLOY_REF: pull/2/head
+      ADI_DEPLOY_REF: master
     steps:
       - uses: actions/checkout@v4
         with:
