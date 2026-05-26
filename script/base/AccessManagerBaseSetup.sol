@@ -217,10 +217,17 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     function _setupRoleGuardians() internal {
         IAccessManager accessManager = IAccessManager(_accessManager());
         RolesConfig.Role[] memory roles = RolesConfig.getAllFunctionBasedRoles();
-        if (accessManager.getRoleGuardian(roles[0].roleId) == roles[0].guardianRoleId) {
-            /// @custom:tx-already-executed-check The whole batch below executes atomically in one multicall tx, so
-            /// observing the first role's guardian already matches the target is enough to conclude a prior run
-            /// completed this step.
+        /// @custom:tx-already-executed-check Every entry's guardian is already what we'd set. Iterating the full set
+        /// (rather than only inspecting the first role) catches partial-prior-run state where the multicall got far
+        /// enough to set some but not all guardians.
+        bool allConfigured = true;
+        for (uint256 i = 0; i < roles.length; i++) {
+            if (accessManager.getRoleGuardian(roles[i].roleId) != roles[i].guardianRoleId) {
+                allConfigured = false;
+                break;
+            }
+        }
+        if (allConfigured) {
             logSkip("_setupRoleGuardians", "role guardians already configured");
             return;
         }
@@ -237,10 +244,16 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     function _setupRoleAdmins() internal {
         IAccessManager accessManager = IAccessManager(_accessManager());
         RolesConfig.Role[] memory roles = RolesConfig.getAllFunctionBasedRoles();
-        if (accessManager.getRoleAdmin(roles[0].roleId) == roles[0].guardianRoleId) {
-            /// @custom:tx-already-executed-check The whole batch below executes atomically in one multicall tx, so
-            /// observing the first role's admin already matches the target is enough to conclude a prior run
-            /// completed this step.
+        /// @custom:tx-already-executed-check Every entry's admin role is already what we'd set. See
+        /// `_setupRoleGuardians` for the rationale on iterating the full set.
+        bool allConfigured = true;
+        for (uint256 i = 0; i < roles.length; i++) {
+            if (accessManager.getRoleAdmin(roles[i].roleId) != roles[i].guardianRoleId) {
+                allConfigured = false;
+                break;
+            }
+        }
+        if (allConfigured) {
             logSkip("_setupRoleAdmins", "role admins already configured");
             return;
         }
@@ -257,12 +270,19 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     function _setupRoleGrantingDelays() internal {
         IAccessManager accessManager = IAccessManager(_accessManager());
         RolesConfig.Role[] memory roles = RolesConfig.getAllFunctionBasedRoles();
-        if (accessManager.getRoleGrantDelay(roles[0].roleId) == roles[0].delay) {
-            /// @custom:tx-already-executed-check The whole batch below executes atomically in one multicall tx, so
-            /// observing the first role's grant delay already matches the target is enough to conclude a prior run
-            /// completed this step. Note: getRoleGrantDelay returns the *currently effective* delay, so an in-flight
-            /// setback from a prior run can mask completion until it elapses; functionally harmless on replay (the
-            /// final delay still converges to `roles[0].delay`), but may emit redundant events on rapid resumes.
+        /// @custom:tx-already-executed-check Every entry's grant delay matches the configured target. Note that
+        /// `getRoleGrantDelay` returns the *currently effective* delay, so an in-flight scheduled change from a prior
+        /// run can mask completion until it elapses; functionally harmless on replay (the final delay still converges
+        /// to `roles[i].delay`), but may emit redundant events on rapid resumes. See `_setupRoleGuardians` for the
+        /// rationale on iterating the full set.
+        bool allConfigured = true;
+        for (uint256 i = 0; i < roles.length; i++) {
+            if (accessManager.getRoleGrantDelay(roles[i].roleId) != roles[i].delay) {
+                allConfigured = false;
+                break;
+            }
+        }
+        if (allConfigured) {
             logSkip("_setupRoleGrantingDelays", "role grant delays already configured");
             return;
         }
@@ -279,17 +299,16 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         address mainAdminProfile = _getProfile__MainAdmin();
         require(mainAdminProfile != address(0), "MainAdmin profile address not set");
 
-        (bool isMember, uint32 currentDelay) =
-            IAccessManager(_accessManager()).hasRole(RolesConfig.ADMIN_ROLE, mainAdminProfile);
-        if (isMember && currentDelay == CRITICAL_DELAY) {
-            /// @custom:tx-already-executed-check The whole batch below executes atomically in one multicall tx, so
-            /// observing ADMIN_ROLE (the first op in the bundle) already granted to MainAdmin with CRITICAL_DELAY is
-            /// enough to conclude a prior run completed this step.
+        IAccessManager accessManager = IAccessManager(_accessManager());
+        RolesConfig.Role[] memory functionBasedRoles = RolesConfig.getAllFunctionBasedRoles();
+        /// @custom:tx-already-executed-check Every role in the bundle is already granted to MainAdmin with the
+        /// expected delay - ADMIN_ROLE + ADMIN_ROLE_GUARDIAN_ROLE + OPERATIONAL_ROLE_GUARDIAN_ROLE + every function-
+        /// based role. Iterating the full bundle (rather than only inspecting ADMIN_ROLE) catches partial-prior-run
+        /// state where the multicall got far enough to grant some roles but not all.
+        if (_mainAdminProfileFullyGranted(accessManager, mainAdminProfile, functionBasedRoles)) {
             logSkip("_setupProfile__MainAdmin", "MainAdmin profile setup already applied");
             return;
         }
-
-        RolesConfig.Role[] memory functionBasedRoles = RolesConfig.getAllFunctionBasedRoles();
         bytes[] memory multicallCalldata = new bytes[](functionBasedRoles.length + 3);
 
         // Grant ADMIN_ROLE
@@ -319,17 +338,16 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         address secondaryAdminProfile = _getProfile__SecondaryAdmin();
         require(secondaryAdminProfile != address(0), "SecondaryAdmin profile address not set");
 
-        (bool isMember,) =
-            IAccessManager(_accessManager()).hasRole(RolesConfig.OPERATIONAL_ROLE_GUARDIAN_ROLE, secondaryAdminProfile);
-        if (isMember) {
-            /// @custom:tx-already-executed-check The whole batch below executes atomically in one multicall tx, so
-            /// observing OPERATIONAL_ROLE_GUARDIAN_ROLE (the first op in the bundle) already granted to SecondaryAdmin
-            /// is enough to conclude a prior run completed this step.
+        IAccessManager accessManager = IAccessManager(_accessManager());
+        RolesConfig.Role[] memory functionBasedRoles = RolesConfig.getAllFunctionBasedRoles();
+        /// @custom:tx-already-executed-check Every role in the bundle is already granted to SecondaryAdmin -
+        /// OPERATIONAL_ROLE_GUARDIAN_ROLE + every non-critical function-based role. Iterating the full bundle (rather
+        /// than only inspecting OPERATIONAL_ROLE_GUARDIAN_ROLE) catches partial-prior-run state where the multicall
+        /// got far enough to grant some roles but not all.
+        if (_secondaryAdminProfileFullyGranted(accessManager, secondaryAdminProfile, functionBasedRoles)) {
             logSkip("_setupProfile__SecondaryAdmin", "SecondaryAdmin profile setup already applied");
             return;
         }
-
-        RolesConfig.Role[] memory functionBasedRoles = RolesConfig.getAllFunctionBasedRoles();
 
         // Count non-critical roles
         uint256 nonCriticalCount = 0;
@@ -639,12 +657,79 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+    function _mainAdminProfileFullyGranted(
+        IAccessManager accessManager,
+        address mainAdminProfile,
+        RolesConfig.Role[] memory functionBasedRoles
+    ) private view returns (bool) {
+        if (!_hasRoleWithDelay(accessManager, RolesConfig.ADMIN_ROLE, mainAdminProfile, CRITICAL_DELAY)) {
+            return false;
+        }
+        if (!_hasRoleWithDelay(
+                accessManager, RolesConfig.ADMIN_ROLE_GUARDIAN_ROLE, mainAdminProfile, RolesConfig.NO_DELAY
+            )) {
+            return false;
+        }
+        if (!_hasRoleWithDelay(
+                accessManager, RolesConfig.OPERATIONAL_ROLE_GUARDIAN_ROLE, mainAdminProfile, RolesConfig.NO_DELAY
+            )) {
+            return false;
+        }
+        for (uint256 i = 0; i < functionBasedRoles.length; i++) {
+            if (!_hasRoleWithDelay(
+                    accessManager, functionBasedRoles[i].roleId, mainAdminProfile, functionBasedRoles[i].delay
+                )) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    function _secondaryAdminProfileFullyGranted(
+        IAccessManager accessManager,
+        address secondaryAdminProfile,
+        RolesConfig.Role[] memory functionBasedRoles
+    ) private view returns (bool) {
+        if (!_hasRoleWithDelay(
+                accessManager, RolesConfig.OPERATIONAL_ROLE_GUARDIAN_ROLE, secondaryAdminProfile, RolesConfig.NO_DELAY
+            )) {
+            return false;
+        }
+        for (uint256 i = 0; i < functionBasedRoles.length; i++) {
+            if (functionBasedRoles[i].hasCriticalRisk) {
+                continue;
+            }
+            if (!_hasRoleWithDelay(
+                    accessManager, functionBasedRoles[i].roleId, secondaryAdminProfile, functionBasedRoles[i].delay
+                )) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    function _hasRoleWithDelay(IAccessManager accessManager, uint64 roleId, address account, uint32 expectedDelay)
+        private
+        view
+        returns (bool)
+    {
+        (bool isMember, uint32 currentDelay) = accessManager.hasRole(roleId, account);
+        return isMember && currentDelay == expectedDelay;
+    }
+
     function _grantRolesToProfile(address profileAddress, RolesConfig.Role[] memory roles) internal {
-        (bool isMember, uint32 currentDelay) = IAccessManager(_accessManager()).hasRole(roles[0].roleId, profileAddress);
-        if (isMember && currentDelay == roles[0].delay) {
-            /// @custom:tx-already-executed-check The whole batch below executes atomically in one multicall tx, so
-            /// observing the first role already granted with the expected execution delay is enough to conclude a
-            /// prior run completed this step.
+        IAccessManager accessManager = IAccessManager(_accessManager());
+        /// @custom:tx-already-executed-check Every role in the bundle is already granted to `profileAddress` with the
+        /// expected delay. Iterating the full set (rather than only inspecting the first role) catches partial-prior-
+        /// run state where the multicall got far enough to grant some roles but not all.
+        bool allGranted = true;
+        for (uint256 i = 0; i < roles.length; i++) {
+            if (!_hasRoleWithDelay(accessManager, roles[i].roleId, profileAddress, roles[i].delay)) {
+                allGranted = false;
+                break;
+            }
+        }
+        if (allGranted) {
             logSkip("_grantRolesToProfile", "roles already granted to profile");
             return;
         }
@@ -657,10 +742,17 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
     }
 
     function _setTargetFunctionRoles(address target, RolesConfig.Role[] memory roles) internal {
-        if (IAccessManager(_accessManager()).getTargetFunctionRole(target, roles[0].selector) == roles[0].roleId) {
-            /// @custom:tx-already-executed-check The whole batch below executes atomically in one multicall tx, so
-            /// observing the first selector already bound to the target role is enough to conclude a prior run
-            /// completed this step.
+        IAccessManager accessManager = IAccessManager(_accessManager());
+        /// @custom:tx-already-executed-check Every selector in the bundle is already bound to the expected role on
+        /// `target`. See `_grantRolesToProfile` for the rationale on iterating the full set.
+        bool allConfigured = true;
+        for (uint256 i = 0; i < roles.length; i++) {
+            if (accessManager.getTargetFunctionRole(target, roles[i].selector) != roles[i].roleId) {
+                allConfigured = false;
+                break;
+            }
+        }
+        if (allConfigured) {
             logSkip("_setTargetFunctionRoles", "target function roles already configured");
             return;
         }
