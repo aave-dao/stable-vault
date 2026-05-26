@@ -3,6 +3,7 @@
 pragma solidity ^0.8.20;
 
 import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
+import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {AccessManager} from "openzeppelin-contracts/contracts/access/manager/AccessManager.sol";
 
@@ -599,20 +600,15 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         _assertChainSpecificRequiredPoliciesSet();
     }
 
-    /// @dev ERC-1967 storage slots; used to sanity-check transparent proxies on the idempotency skip path.
-    bytes32 private constant ERC1967_IMPLEMENTATION_SLOT =
-        0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
-    bytes32 private constant ERC1967_ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
-
     function _assertDeployedTransparentProxy(address proxy, bytes memory implCreationCode, string memory name)
         internal
     {
-        address impl = address(uint160(uint256(vm.load(proxy, ERC1967_IMPLEMENTATION_SLOT))));
+        address impl = address(uint160(uint256(vm.load(proxy, ERC1967Utils.IMPLEMENTATION_SLOT))));
         require(
             impl != address(0),
             string.concat(name, "::Proxy at ", Strings.toHexString(proxy), ": ERC-1967 implementation slot is zero")
         );
-        address admin = address(uint160(uint256(vm.load(proxy, ERC1967_ADMIN_SLOT))));
+        address admin = address(uint160(uint256(vm.load(proxy, ERC1967Utils.ADMIN_SLOT))));
         require(
             admin != address(0),
             string.concat(name, "::Proxy at ", Strings.toHexString(proxy), ": ERC-1967 admin slot is zero")
