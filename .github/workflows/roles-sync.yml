@@ -58,11 +58,8 @@ jobs:
   notion-sync:
     name: Notion Sync
     needs: build-and-validate
-    # Auto-syncs only from master to keep feature branches from racing each other against the live DBs. Manual
-    # `workflow_dispatch` runs are also allowed so a maintainer can verify a branch end-to-end before merging.
-    if: |
-      (github.event_name == 'push' && github.ref == 'refs/heads/master')
-      || github.event_name == 'workflow_dispatch'
+    # Only runs on master, so a branch can never push roles data to the live Notion DBs.
+    if: github.ref == 'refs/heads/master' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
