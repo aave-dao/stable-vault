@@ -33,7 +33,7 @@ By default, the wrapper:
 
 1. Clones `https://github.com/aave/adi-deploy.git` into
    `.local/adi-deploy-forktest`.
-2. Checks out `master`.
+2. Checks out `main`.
 3. Starts local Ethereum and Arbitrum Anvil forks at pinned blocks.
 4. Exports the configured deployment's a.DI addresses from
    `deployments/stable-vaults/<env>/ethereum.json` and
