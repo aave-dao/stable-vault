@@ -19,11 +19,13 @@ import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {ICcipBridgeAdapter} from "src/interfaces/ICcipBridgeAdapter.sol";
+import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
 import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {SlippageCoverageVault} from "src/periphery/SlippageCoverageVault.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
+import {FundsBridgingPolicy} from "src/policies/FundsBridgingPolicy.sol";
 import {WithdrawalExecutionPolicy} from "src/policies/WithdrawalExecutionPolicy.sol";
 
 abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
@@ -291,14 +293,17 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
 
     function test_criticalRoles_areOnlyAssignedToMainAdmin() public view {
         RolesConfig.Role[] memory roles = RolesConfig.getAllFunctionBasedRoles();
-
         address[] memory allProfiles = _getAllProfiles();
+        // Cache: each call hits _configAddress which re-reads + strips comments from the JSON config. Without this,
+        // the nested loop re-reads the config hundreds of times and the test trips Foundry's 1B-gas call cap.
+        IAccessManager accessManager = IAccessManager(_accessManager());
+        address mainAdmin = _getProfile__MainAdmin();
 
         for (uint256 i = 0; i < roles.length; i++) {
             if (roles[i].hasCriticalRisk) {
                 for (uint256 j = 0; j < allProfiles.length; j++) {
-                    (bool has,) = IAccessManager(_accessManager()).hasRole(roles[i].roleId, allProfiles[j]);
-                    if (allProfiles[j] == _getProfile__MainAdmin()) {
+                    (bool has,) = accessManager.hasRole(roles[i].roleId, allProfiles[j]);
+                    if (allProfiles[j] == mainAdmin) {
                         assertTrue(
                             has,
                             string.concat("MainAdmin should have critical role ", vm.toString(uint256(roles[i].roleId)))
@@ -484,6 +489,26 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         _assertTargetFunctionRole(
             target, WithdrawalExecutionPolicy.removeSigner.selector, RolesConfig.getRole__removeSigner().roleId
         );
+        _assertTargetFunctionRole(
+            target,
+            WithdrawalExecutionPolicy.raiseRedemptionCapacity.selector,
+            RolesConfig.getRole__raiseRedemptionCapacity().roleId
+        );
+        _assertTargetFunctionRole(
+            target,
+            WithdrawalExecutionPolicy.lowerRedemptionCapacity.selector,
+            RolesConfig.getRole__lowerRedemptionCapacity().roleId
+        );
+        _assertTargetFunctionRole(
+            target,
+            WithdrawalExecutionPolicy.raiseRedemptionRefillRate.selector,
+            RolesConfig.getRole__raiseRedemptionRefillRate().roleId
+        );
+        _assertTargetFunctionRole(
+            target,
+            WithdrawalExecutionPolicy.lowerRedemptionRefillRate.selector,
+            RolesConfig.getRole__lowerRedemptionRefillRate().roleId
+        );
     }
 
     function test_targetSetup_assetRegistry() public view {
@@ -566,6 +591,35 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         );
         _assertTargetFunctionRole(
             target, SlippageCoverageVault.sweep.selector, RolesConfig.getRole__sweepSlippageCoverageVault().roleId
+        );
+    }
+
+    function test_targetSetup_policyRegistry() public view {
+        address target = getPolicyRegistryAddress(_deployer());
+        _assertTargetFunctionRole(target, IPolicyRegistry.setPolicy.selector, RolesConfig.getRole__setPolicy().roleId);
+    }
+
+    function test_targetSetup_fundsBridgingPolicy() public view {
+        address target = getFundsBridgingPolicyAddress(_deployer());
+        _assertTargetFunctionRole(
+            target,
+            FundsBridgingPolicy.raiseBridgingCapacity.selector,
+            RolesConfig.getRole__raiseBridgingCapacity().roleId
+        );
+        _assertTargetFunctionRole(
+            target,
+            FundsBridgingPolicy.lowerBridgingCapacity.selector,
+            RolesConfig.getRole__lowerBridgingCapacity().roleId
+        );
+        _assertTargetFunctionRole(
+            target,
+            FundsBridgingPolicy.raiseBridgingRefillRate.selector,
+            RolesConfig.getRole__raiseBridgingRefillRate().roleId
+        );
+        _assertTargetFunctionRole(
+            target,
+            FundsBridgingPolicy.lowerBridgingRefillRate.selector,
+            RolesConfig.getRole__lowerBridgingRefillRate().roleId
         );
     }
 

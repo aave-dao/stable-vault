@@ -2,7 +2,7 @@
 # Verifies that all @custom:selector annotations in Solidity source files
 # match the actual computed selector (bytes4 of keccak256 of the signature).
 #
-# Usage: .github/workflows/check-error-selectors.sh [src_dir]
+# Usage: .github/workflows/tooling/test/check-error-selectors.sh [src_dir]
 # Requires: cast (from foundry)
 
 set -euo pipefail

@@ -1,0 +1,86 @@
+name: Roles
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: roles-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-validate:
+    name: Build & Validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install JS deps
+        run: yarn install --frozen-lockfile
+
+      - name: Build Forge artifacts
+        run: forge build --deny notes
+
+      - name: Dump roles per env
+        run: yarn roles:dump
+
+      - name: Build canonical roles.json
+        run: yarn roles:build
+
+      - name: Validate invariants
+        run: yarn roles:validate
+
+      - name: Upload roles.json artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: roles-json
+          path: .github/workflows/tooling/roles-sync/output/roles.json
+          retention-days: 7
+          if-no-files-found: error
+
+  notion-sync:
+    name: Notion Sync
+    needs: build-and-validate
+    # Only runs on master, so a branch can never push roles data to the live Notion DBs.
+    if: github.ref == 'refs/heads/master' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install JS deps
+        run: yarn install --frozen-lockfile
+
+      - name: Download roles.json artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: roles-json
+          path: .github/workflows/tooling/roles-sync/output/
+
+      - name: Push to Notion
+        env:
+          NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+        run: yarn roles:notion-sync

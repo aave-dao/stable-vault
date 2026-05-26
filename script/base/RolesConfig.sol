@@ -34,10 +34,10 @@ abstract contract RolesConfig is DeploymentConfig {
     }
 
     uint32 internal constant NO_DELAY = 0;
-    uint32 internal immutable LOW_DELAY = uint32(_configUint(".lowDelay"));
-    uint32 internal immutable MEDIUM_DELAY = uint32(_configUint(".mediumDelay"));
-    uint32 internal immutable HIGH_DELAY = uint32(_configUint(".highDelay"));
-    uint32 internal immutable CRITICAL_DELAY = uint32(_configUint(".criticalDelay"));
+    uint32 internal immutable LOW_DELAY = _configUint32(".lowDelay");
+    uint32 internal immutable MEDIUM_DELAY = _configUint32(".mediumDelay");
+    uint32 internal immutable HIGH_DELAY = _configUint32(".highDelay");
+    uint32 internal immutable CRITICAL_DELAY = _configUint32(".criticalDelay");
 
     // Special roles not associated with an specific selector
     uint64 constant ADMIN_ROLE = uint64(0);

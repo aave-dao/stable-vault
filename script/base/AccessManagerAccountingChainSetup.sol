@@ -19,6 +19,11 @@ abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
         _setupProfile__StableVaultManager();
     }
 
+    function _validateProfileAddresses() internal view virtual override {
+        super._validateProfileAddresses();
+        require(_getProfile__StableVaultManager() != address(0), "StableVaultManager profile address not set");
+    }
+
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
     function _setup_Targets(address deployer) internal virtual override {

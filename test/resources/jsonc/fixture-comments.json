@@ -1,0 +1,5 @@
+{
+  // Comments inside a regular .json file
+  "name": "test",
+  "value": 42
+}
