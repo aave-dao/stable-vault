@@ -6,6 +6,6 @@ import {AccountingChainDeployment} from "script/base/AccountingChainDeployment.s
 
 contract DeployAccountingChain is AccountingChainDeployment {
     function _configPath() internal pure override returns (string memory) {
-        return "config/deployment-config.prod.json";
+        return "config/deployment-config.prod.jsonc";
     }
 }

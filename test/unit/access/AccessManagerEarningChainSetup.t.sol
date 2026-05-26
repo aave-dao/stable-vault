@@ -3,7 +3,6 @@
 pragma solidity ^0.8.20;
 
 import {AccessManagerBaseSetup} from "script/base/AccessManagerBaseSetup.sol";
-import {AccessManagerEarningChainSetup} from "script/base/AccessManagerEarningChainSetup.sol";
 import {EarningChainDeployment} from "script/base/EarningChainDeployment.sol";
 import {RolesConfig} from "script/base/RolesConfig.sol";
 import {Create3AddressLib} from "script/libraries/Create3AddressLib.sol";
@@ -18,6 +17,7 @@ import {AccessManagerSetupBaseTest} from "test/unit/access/AccessManagerSetupBas
 contract AccessManagerEarningChainSetupTest is AccessManagerSetupBaseTest, EarningChainDeployment {
     function setUp() public virtual {
         _deployCreateXTo(Create3AddressLib.CREATEX_ADDRESS);
+        vm.etch(_testATokenVault(), hex"00");
         vm.startPrank(_deployer());
         _deployContracts();
         _setupAccessManager(_deployer());
@@ -30,7 +30,7 @@ contract AccessManagerEarningChainSetupTest is AccessManagerSetupBaseTest, Earni
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     function _configPath() internal pure override returns (string memory) {
-        return "config/deployment-config.test.json";
+        return "test/resources/config/deployment-config.test.json";
     }
 
     function _logDeployment(string memory, string memory, address)
@@ -47,14 +47,18 @@ contract AccessManagerEarningChainSetupTest is AccessManagerSetupBaseTest, Earni
         returns (address[] memory)
     {
         address[] memory vaults = new address[](1);
-        vaults[0] = address(uint160(uint256(keccak256("test.aTokenVault"))));
+        vaults[0] = _testATokenVault();
         return vaults;
+    }
+
+    function _testATokenVault() private pure returns (address) {
+        return address(uint160(uint256(keccak256("test.aTokenVault"))));
     }
 
     function _setup_Targets(address deployer)
         internal
         virtual
-        override(AccessManagerBaseSetup, AccessManagerEarningChainSetup)
+        override(AccessManagerBaseSetup, EarningChainDeployment)
     {
         super._setup_Targets(deployer);
     }

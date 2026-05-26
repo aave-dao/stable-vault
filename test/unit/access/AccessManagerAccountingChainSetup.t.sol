@@ -2,7 +2,6 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.20;
 
-import {AccessManagerAccountingChainSetup} from "script/base/AccessManagerAccountingChainSetup.sol";
 import {AccessManagerBaseSetup} from "script/base/AccessManagerBaseSetup.sol";
 import {AccountingChainDeployment} from "script/base/AccountingChainDeployment.sol";
 import {RolesConfig} from "script/base/RolesConfig.sol";
@@ -15,12 +14,14 @@ import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
 import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {IStableVault} from "src/interfaces/IStableVault.sol";
 import {ChainBalanceOracle} from "src/oracles/balance/ChainBalanceOracle.sol";
+import {DepositPolicy} from "src/policies/DepositPolicy.sol";
 
 import {AccessManagerSetupBaseTest} from "test/unit/access/AccessManagerSetupBaseTest.sol";
 
 contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, AccountingChainDeployment {
     function setUp() public virtual {
         _deployCreateXTo(Create3AddressLib.CREATEX_ADDRESS);
+        vm.etch(_testATokenVault(), hex"00");
         vm.startPrank(_deployer());
         _deployContracts();
         _setupAccessManager(_deployer());
@@ -33,7 +34,7 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     function _configPath() internal pure override returns (string memory) {
-        return "config/deployment-config.test.json";
+        return "test/resources/config/deployment-config.test.json";
     }
 
     function _logDeployment(string memory, string memory, address)
@@ -50,18 +51,31 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
         returns (address[] memory)
     {
         address[] memory vaults = new address[](1);
-        vaults[0] = address(uint160(uint256(keccak256("test.aTokenVault"))));
+        vaults[0] = _testATokenVault();
         return vaults;
     }
 
-    function _setup_Profiles() internal virtual override(AccessManagerBaseSetup, AccessManagerAccountingChainSetup) {
+    function _testATokenVault() private pure returns (address) {
+        return address(uint160(uint256(keccak256("test.aTokenVault"))));
+    }
+
+    function _setup_Profiles() internal virtual override(AccessManagerBaseSetup, AccountingChainDeployment) {
         super._setup_Profiles();
+    }
+
+    function _validateProfileAddresses()
+        internal
+        view
+        virtual
+        override(AccessManagerBaseSetup, AccountingChainDeployment)
+    {
+        super._validateProfileAddresses();
     }
 
     function _setup_Targets(address deployer)
         internal
         virtual
-        override(AccessManagerBaseSetup, AccessManagerAccountingChainSetup)
+        override(AccessManagerBaseSetup, AccountingChainDeployment)
     {
         super._setup_Targets(deployer);
     }
@@ -212,6 +226,22 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
             target,
             ChainBalanceOracle.setChainBalanceOracleAdapter.selector,
             RolesConfig.getRole__setChainBalanceOracleAdapter().roleId
+        );
+    }
+
+    function test_targetSetup_depositPolicy() public view {
+        address target = getDepositPolicyAddress(_deployer());
+        _assertTargetFunctionRole(
+            target, DepositPolicy.raiseDepositCapacity.selector, RolesConfig.getRole__raiseDepositCapacity().roleId
+        );
+        _assertTargetFunctionRole(
+            target, DepositPolicy.lowerDepositCapacity.selector, RolesConfig.getRole__lowerDepositCapacity().roleId
+        );
+        _assertTargetFunctionRole(
+            target, DepositPolicy.raiseDepositRefillRate.selector, RolesConfig.getRole__raiseDepositRefillRate().roleId
+        );
+        _assertTargetFunctionRole(
+            target, DepositPolicy.lowerDepositRefillRate.selector, RolesConfig.getRole__lowerDepositRefillRate().roleId
         );
     }
 }
