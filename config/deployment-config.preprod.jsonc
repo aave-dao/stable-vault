@@ -57,7 +57,7 @@
     },
     "erc4626Strategies": [
       {
-        "address": "0xE1753F2e00940cC31213dd92013cF019DFE4ca1d",
+        "strategyAddress": "0xE1753F2e00940cC31213dd92013cF019DFE4ca1d",
         "underlyingAddress": "0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f",
         "assetSymbol": "GHO",
         "strategySymbol": "sGho"
