@@ -75,7 +75,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
 
     /// @notice Checks whether a funds bridge adapter is whitelisted for a given asset and chain.
     /// @param asset The asset to check the bridge adapter for.
-    /// @param chainId The chain id to check the bridge adapter for.
+    /// @param chainId The chain ID to check the bridge adapter for.
     /// @param bridgeAdapter The bridge adapter to check.
     /// @return True if the bridge adapter is whitelisted, false otherwise.
     function isFundsBridgeAdapterSupported(address asset, uint256 chainId, address bridgeAdapter)
@@ -87,7 +87,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
     }
 
     /// @notice Returns the current mode for a data-only bridge adapter.
-    /// @param chainId The chain id to check the bridge adapter for.
+    /// @param chainId The chain ID to check the bridge adapter for.
     /// @param bridgeAdapter The bridge adapter to check.
     /// @return The adapter mode for the requested chain and adapter.
     function getDataOnlyBridgeAdapterMode(uint256 chainId, address bridgeAdapter)
