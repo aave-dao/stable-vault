@@ -98,6 +98,15 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         return $storage().dataOnlyBridgeAdapters[chainId][bridgeAdapter].mode;
     }
 
+    /// @notice Returns the removal ID for a data-only bridge adapter pending removal.
+    /// @dev Returns `bytes32(0)` if no removal has been initiated for the given chain and adapter.
+    /// @param chainId The chain ID to check the bridge adapter for.
+    /// @param bridgeAdapter The bridge adapter to check.
+    /// @return The removal ID that must be supplied to finalize removal.
+    function getDataOnlyBridgeAdapterRemovalId(uint256 chainId, address bridgeAdapter) external view returns (bytes32) {
+        return $storage().dataOnlyBridgeAdapters[chainId][bridgeAdapter].removalId;
+    }
+
     /// @inheritdoc IChainGateway
     function receiveMessage(uint256 sourceChainId, address asset, uint256 amount, bytes memory data) external override {
         bool hasFunds = asset != Constants.ASSET_FOR_DATA_ONLY_BRIDGE && amount > 0;

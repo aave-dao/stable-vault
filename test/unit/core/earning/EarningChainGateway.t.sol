@@ -344,6 +344,38 @@ contract EarningChainGatewayTest is TestWithHelpers {
         );
     }
 
+    function test_getDataOnlyBridgeAdapterRemovalId_tracksRemovalLifecycle() public {
+        address bridgeAdapter = makeAddr("bridgeAdapter");
+
+        assertEq(_earningChainGateway.getDataOnlyBridgeAdapterRemovalId(ACCOUNTING_CHAIN_ID, bridgeAdapter), bytes32(0));
+
+        vm.prank(admin);
+        _earningChainGateway.addDataOnlyBridgeAdapter(ACCOUNTING_CHAIN_ID, bridgeAdapter);
+        assertEq(_earningChainGateway.getDataOnlyBridgeAdapterRemovalId(ACCOUNTING_CHAIN_ID, bridgeAdapter), bytes32(0));
+
+        vm.prank(admin);
+        bytes32 removalId = _earningChainGateway.initiateDataOnlyBridgeAdapterRemoval(
+            ACCOUNTING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
+        );
+        assertEq(
+            _earningChainGateway.getDataOnlyBridgeAdapterRemovalId(
+                ACCOUNTING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
+            ),
+            removalId
+        );
+
+        vm.prank(admin);
+        _earningChainGateway.finalizeDataOnlyBridgeAdapterRemoval(
+            ACCOUNTING_CHAIN_ID, address(_mockBridgeCcipFeeParams), removalId
+        );
+        assertEq(
+            _earningChainGateway.getDataOnlyBridgeAdapterRemovalId(
+                ACCOUNTING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
+            ),
+            bytes32(0)
+        );
+    }
+
     function test_finalizeDataOnlyBridgeAdapterRemoval_reverts_ifRemovalIdDoesNotMatch() public {
         address bridgeAdapter = makeAddr("bridgeAdapter");
 
