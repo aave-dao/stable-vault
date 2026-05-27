@@ -340,7 +340,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         );
         assertEq(
             uint8(_earningChainGateway.getDataOnlyBridgeAdapterMode(ACCOUNTING_CHAIN_ID, bridgeAdapter)),
-            uint8(IChainGateway.DataOnlyBridgeAdapterMode.ENABLED)
+            uint8(IChainGateway.DataOnlyBridgeAdapterMode.SEND_AND_RECEIVE)
         );
     }
 
@@ -372,7 +372,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
             abi.encodeWithSelector(
                 IChainGateway.UnexpectedDataOnlyBridgeAdapterMode.selector,
                 uint8(IChainGateway.DataOnlyBridgeAdapterMode.NOT_SUPPORTED),
-                uint8(IChainGateway.DataOnlyBridgeAdapterMode.RECEIVING_ONLY)
+                uint8(IChainGateway.DataOnlyBridgeAdapterMode.RECEIVE_ONLY)
             )
         );
         vm.prank(admin);
@@ -381,7 +381,7 @@ contract EarningChainGatewayTest is TestWithHelpers {
         );
     }
 
-    function test_dataOnlyBridgeAdapterReceivingOnly_receivesButCannotSend() public {
+    function test_dataOnlyBridgeAdapterReceiveOnly_receivesButCannotSend() public {
         address replacementAdapter = makeAddr("replacementAdapter");
         address iouTokenRecipient = makeAddr("iouTokenRecipient");
         uint256 iouTokenAmountRay = 100_000;

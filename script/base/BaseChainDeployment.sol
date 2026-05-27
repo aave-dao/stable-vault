@@ -380,7 +380,7 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         IChainGateway.DataOnlyBridgeAdapterMode mode =
             BaseChainGateway(address(gateway)).getDataOnlyBridgeAdapterMode(chainId, bridgeAdapter);
         /// @custom:tx-already-executed-check Data-only adapter already registered.
-        if (mode == IChainGateway.DataOnlyBridgeAdapterMode.ENABLED) {
+        if (mode == IChainGateway.DataOnlyBridgeAdapterMode.SEND_AND_RECEIVE) {
             logSkip("_addDataOnlyBridgeAdapterIdempotent", "data-only bridge adapter registered");
             return;
         }

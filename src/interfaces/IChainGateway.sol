@@ -16,8 +16,8 @@ interface IChainGateway {
 
     enum DataOnlyBridgeAdapterMode {
         NOT_SUPPORTED,
-        ENABLED,
-        RECEIVING_ONLY
+        SEND_AND_RECEIVE,
+        RECEIVE_ONLY
     }
 
     /// @notice The representation of a cross-chain message.
