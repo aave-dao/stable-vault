@@ -132,7 +132,7 @@ interface IChainGateway {
     function addDataOnlyBridgeAdapter(uint256 chainId, address bridgeAdapter) external;
 
     /// @notice Stops using a data-only bridge adapter for new sends while keeping it as a valid receiver.
-    /// @dev The returned id is required for removal, so removal cannot be scheduled before sending is disabled.
+    /// @dev The returned id is required for removal, so removal depends on the sending disabling being executed priorly.
     /// @param chainId The chain id the bridge adapter is registered for.
     /// @param bridgeAdapter The bridge adapter to disable sending for.
     /// @return removalId The id that must be used to remove the adapter.
