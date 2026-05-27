@@ -2,10 +2,14 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.20;
 
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
+import {ICrossChainForwarder} from "aave-delivery-infrastructure/contracts/interfaces/ICrossChainForwarder.sol";
+import {ICrossChainReceiver} from "aave-delivery-infrastructure/contracts/interfaces/ICrossChainReceiver.sol";
+import {IWithGuardian} from "aave-delivery-infrastructure/contracts/old-oz/interfaces/IWithGuardian.sol";
 import {AccessManager} from "openzeppelin-contracts/contracts/access/manager/AccessManager.sol";
 
 import {ATokenVaultDeployment} from "script/base/ATokenVaultDeployment.sol";
@@ -189,7 +193,41 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         // Validate withdrawal policy signer
         require(_configAddress(".withdrawalExecutionPolicy.signer") != address(0), "Withdrawal policy signer not set");
 
+        if (_shouldRegisterAdiOnGateway()) {
+            _validateAdiConfiguration();
+        }
+
         _validateChainSpecificExternalAddresses();
+    }
+
+    function _validateAdiConfiguration() internal view virtual {
+        address adiCrossChainController = _adiCrossChainController();
+        require(adiCrossChainController != address(0), "Adi CCC address not set");
+        require(adiCrossChainController.code.length != 0, "Adi CCC has no code");
+        require(
+            Ownable(adiCrossChainController).owner() == getAccessManagerAddress(_deployer()),
+            "Adi CCC owner is not AccessManager"
+        );
+        require(
+            IWithGuardian(adiCrossChainController).guardian() == getAdiAdapterAddress(_deployer()),
+            "Adi CCC guardian is not AdiAdapter"
+        );
+
+        uint256 remoteChainId = _configUint(string.concat(_remoteChainConfigPrefix(), ".chainId"));
+        ICrossChainForwarder forwarder = ICrossChainForwarder(adiCrossChainController);
+        forwarder.getCurrentEnvelopeNonce();
+        forwarder.getCurrentTransactionNonce();
+        require(
+            forwarder.getForwarderBridgeAdaptersByChain(remoteChainId).length > 0, "Adi CCC forwarder adapters not set"
+        );
+
+        ICrossChainReceiver receiver = ICrossChainReceiver(adiCrossChainController);
+        require(
+            receiver.getReceiverBridgeAdaptersByChain(remoteChainId).length > 0, "Adi CCC receiver adapters not set"
+        );
+        ICrossChainReceiver.ReceiverConfiguration memory receiverConfiguration =
+            receiver.getConfigurationByChain(remoteChainId);
+        require(receiverConfiguration.requiredConfirmation > 0, "Adi CCC receiver confirmations not set");
     }
 
     /// @dev Asserts that the deployer holds enough native + ERC20 balance to complete the deploy. Runs before
@@ -227,8 +265,12 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         return getAccessManagerAddress(_deployer());
     }
 
-    function _isAdiAdapterDeployed() internal view virtual override returns (bool) {
-        return _configAddress(string.concat(_chainConfigPrefix(), ".adi.crossChainController")) != address(0);
+    function _shouldRegisterAdiOnGateway() internal view virtual override returns (bool) {
+        return _configBool(string.concat(_chainConfigPrefix(), ".adi.registerOnGateway"));
+    }
+
+    function _adiCrossChainController() internal view virtual override returns (address) {
+        return _configAddress(string.concat(_chainConfigPrefix(), ".adi.crossChainController"));
     }
 
     function _deployedATokenVaultAddresses() internal view virtual override returns (address[] memory) {
@@ -299,19 +341,12 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         }
         _setDestinationChainAdapterIdempotent(localCcipAdapter, remoteChainId, remoteCcipAdapter);
 
-        // Data-only messages use aDI.
-        // aDI adapter is registered on the gateway and configured for the counterparty chain only when the per-chain
-        // flag is set. This lets us deploy the adapter without yet routing messages through it.
-        if (_isAdiAdapterDeployed()) {
+        if (_shouldRegisterAdiOnGateway()) {
             // NOTE: Assumes the aDI adapter has the same address on both chains (CREATE3 + same deployer/salt).
             address localAdiAdapter = getAdiAdapterAddress(_deployer());
             address remoteAdiAdapter = localAdiAdapter;
             _setDestinationChainAdapterIdempotent(localAdiAdapter, remoteChainId, remoteAdiAdapter);
-            if (_configBool(string.concat(_chainConfigPrefix(), ".adi.registerOnGateway"))) {
-                _addBridgeAdapterIdempotent(
-                    gateway, Constants.ASSET_FOR_DATA_ONLY_BRIDGE, remoteChainId, localAdiAdapter
-                );
-            }
+            _addBridgeAdapterIdempotent(gateway, Constants.ASSET_FOR_DATA_ONLY_BRIDGE, remoteChainId, localAdiAdapter);
         }
     }
 
@@ -951,7 +986,7 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
     }
 
     function _deployAdiAdapter() internal returns (address) {
-        if (!_isAdiAdapterDeployed()) {
+        if (_shouldRegisterAdiOnGateway() == false) {
             return address(0);
         }
         address predicted = getAdiAdapterAddress(_deployer());
@@ -960,7 +995,7 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
             abi.encode(
                 getAccessManagerAddress(_deployer()),
                 getGatewayAddress(_deployer()),
-                _configAddress(string.concat(_chainConfigPrefix(), ".adi.crossChainController")),
+                _adiCrossChainController(),
                 getTransferHelperAddress(_deployer())
             )
         );

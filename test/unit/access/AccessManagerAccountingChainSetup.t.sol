@@ -80,14 +80,24 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
         super._setup_Targets(deployer);
     }
 
-    function _isAdiAdapterDeployed()
+    function _shouldRegisterAdiOnGateway()
         internal
         view
         virtual
         override(AccessManagerBaseSetup, AccountingChainDeployment)
         returns (bool)
     {
-        return AccountingChainDeployment._isAdiAdapterDeployed();
+        return AccountingChainDeployment._shouldRegisterAdiOnGateway();
+    }
+
+    function _adiCrossChainController()
+        internal
+        view
+        virtual
+        override(AccessManagerBaseSetup, AccountingChainDeployment)
+        returns (address)
+    {
+        return AccountingChainDeployment._adiCrossChainController();
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

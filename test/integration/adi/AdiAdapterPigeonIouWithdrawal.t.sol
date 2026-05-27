@@ -4,6 +4,7 @@ pragma solidity ^0.8.22;
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ICrossChainForwarder} from "aave-delivery-infrastructure/contracts/interfaces/ICrossChainForwarder.sol";
 import {Vm} from "forge-std/Vm.sol";
 
 import {AdiAdapter} from "src/bridging/adi/AdiAdapter.sol";
@@ -14,7 +15,6 @@ import {StableVault} from "src/core/accounting/StableVault.sol";
 import {EarningChainGateway} from "src/core/earning/EarningChainGateway.sol";
 import {IouToken} from "src/core/ious/IouToken.sol";
 import {IouTokenManager} from "src/core/ious/IouTokenManager.sol";
-import {IAdiCrossChainForwarder} from "src/interfaces/IAdiCrossChainForwarder.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {IChainBalanceOracle} from "src/interfaces/IChainBalanceOracle.sol";
@@ -761,7 +761,7 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         uint256 destinationChainId,
         bytes memory message
     ) internal returns (uint256 nativeFee) {
-        IAdiCrossChainForwarder.Fee[] memory fees;
+        ICrossChainForwarder.Fee[] memory fees;
         uint256 successfulQuotes;
         (nativeFee, fees, successfulQuotes) =
             adapter.quoteMessageToChain(destinationChainId, message, DEFAULT_GAS_LIMIT);

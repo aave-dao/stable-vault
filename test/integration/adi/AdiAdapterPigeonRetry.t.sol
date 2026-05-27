@@ -2,9 +2,10 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.22;
 
+import {ICrossChainForwarder} from "aave-delivery-infrastructure/contracts/interfaces/ICrossChainForwarder.sol";
+import {Envelope} from "aave-delivery-infrastructure/contracts/libs/EncodingUtils.sol";
 import {Vm} from "forge-std/Vm.sol";
 
-import {IAdiCrossChainForwarder} from "src/interfaces/IAdiCrossChainForwarder.sol";
 import {Constants} from "src/types/Constants.sol";
 
 import {AdiHelper} from "pigeon/src/adi/AdiHelper.sol";
@@ -75,14 +76,14 @@ contract AdiAdapterPigeonRetry is AdiAdapterPigeonLocalForkBase {
             ARB_CHAIN_ID, address(_ethAdiAdapter), address(this), DEFAULT_GAS_LIMIT, message
         );
         Vm.Log[] memory forwardLogs = vm.getRecordedLogs();
-        IAdiCrossChainForwarder.Envelope memory envelope = _envelopeFromFirstSuccessfulForward(forwardLogs);
+        Envelope memory envelope = _envelopeFromFirstSuccessfulForward(forwardLogs);
 
         vm.selectFork(_arbFork);
         assertEq(_arbGateway.receiveCount(), 0, "original envelope should not be relayed");
 
         vm.selectFork(_ethFork);
         _setGuardian(_ethCcc, _stableVaultsOwner);
-        uint256 quoteBw = IAdiCrossChainForwarder(_ethCcc).getOptimalBandwidthByChain(envelope.destinationChainId);
+        uint256 quoteBw = ICrossChainForwarder(_ethCcc).getOptimalBandwidthByChain(envelope.destinationChainId);
         uint256 badRetryFee;
         (badRetryFee,,) = _ethAdiAdapter.quoteRetryEnvelope(envelope, DEFAULT_GAS_LIMIT, quoteBw);
         vm.deal(address(this), badRetryFee);

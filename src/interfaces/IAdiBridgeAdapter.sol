@@ -2,7 +2,8 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.22;
 
-import {IAdiCrossChainForwarder} from "src/interfaces/IAdiCrossChainForwarder.sol";
+import {ICrossChainForwarder} from "aave-delivery-infrastructure/contracts/interfaces/ICrossChainForwarder.sol";
+import {Envelope} from "aave-delivery-infrastructure/contracts/libs/EncodingUtils.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 
 /// @title IAdiBridgeAdapter
@@ -32,7 +33,7 @@ interface IAdiBridgeAdapter is IBridgeAdapter {
     /// @param envelope a.DI envelope to retry.
     /// @param gasLimit Gas limit requested for Gateway payload execution on the destination chain.
     /// @return transactionId a.DI transaction id for the retry.
-    function retryEnvelope(IAdiCrossChainForwarder.Envelope calldata envelope, uint256 gasLimit)
+    function retryEnvelope(Envelope calldata envelope, uint256 gasLimit)
         external
         payable
         returns (bytes32 transactionId);
@@ -63,7 +64,7 @@ interface IAdiBridgeAdapter is IBridgeAdapter {
     function quoteMessageToChain(uint256 destinationChainId, bytes calldata messageData, uint256 gasLimit)
         external
         view
-        returns (uint256 nativeFee, IAdiCrossChainForwarder.Fee[] memory fees, uint256 successfulQuotes);
+        returns (uint256 nativeFee, ICrossChainForwarder.Fee[] memory fees, uint256 successfulQuotes);
 
     /// @notice Quotes the funding required to retry an already forwarded StableVault a.DI transaction.
     /// @param encodedTransaction ABI-encoded a.DI transaction to retry.
@@ -76,7 +77,7 @@ interface IAdiBridgeAdapter is IBridgeAdapter {
         bytes calldata encodedTransaction,
         uint256 gasLimit,
         address[] calldata bridgeAdaptersToRetry
-    ) external view returns (uint256 nativeFee, IAdiCrossChainForwarder.Fee[] memory fees, uint256 successfulQuotes);
+    ) external view returns (uint256 nativeFee, ICrossChainForwarder.Fee[] memory fees, uint256 successfulQuotes);
 
     /// @notice Quotes the funding required to retry a registered StableVault a.DI envelope as a new transaction.
     /// @dev `quoteBandwidth` is intentionally caller-selected so off-chain callers can quote a custom adapter set, such
@@ -88,9 +89,8 @@ interface IAdiBridgeAdapter is IBridgeAdapter {
     /// @return nativeFee Native funding required by a.DI.
     /// @return fees ERC20 funding required by a.DI.
     /// @return successfulQuotes Number of selected a.DI bridge adapters that quoted successfully.
-    function quoteRetryEnvelope(
-        IAdiCrossChainForwarder.Envelope calldata envelope,
-        uint256 gasLimit,
-        uint256 quoteBandwidth
-    ) external view returns (uint256 nativeFee, IAdiCrossChainForwarder.Fee[] memory fees, uint256 successfulQuotes);
+    function quoteRetryEnvelope(Envelope calldata envelope, uint256 gasLimit, uint256 quoteBandwidth)
+        external
+        view
+        returns (uint256 nativeFee, ICrossChainForwarder.Fee[] memory fees, uint256 successfulQuotes);
 }
