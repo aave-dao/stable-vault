@@ -55,9 +55,12 @@ contract MockEarningChainGateway is IEarningChainGateway {
 
     function addDataOnlyBridgeAdapter(uint256 chainId, address bridgeAdapter) external {}
 
-    function disableDataOnlyBridgeAdapterSending(uint256 chainId, address bridgeAdapter) external {}
+    function disableDataOnlyBridgeAdapterSending(uint256 chainId, address bridgeAdapter)
+        external
+        returns (bytes32 removalId)
+    {}
 
-    function removeDataOnlyBridgeAdapter(uint256 chainId, address bridgeAdapter) external {}
+    function removeDataOnlyBridgeAdapter(uint256 chainId, address bridgeAdapter, bytes32 removalId) external {}
 
     /// @dev Called by Bridge Adapters which use the TransferHelper modifiers that assert no funds left in the
     /// TransferHelper.
