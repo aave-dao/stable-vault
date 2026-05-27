@@ -192,7 +192,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
 
     function _setup_Targets(address deployer) internal virtual {
         _setupTarget__CcipAdapter(deployer);
-        if (_isAdiAdapterDeployed()) {
+        if (_shouldRegisterAdiOnGateway()) {
             _setupTarget__AdiAdapter(deployer);
             _setupTarget__AdiCrossChainController();
         }
@@ -206,10 +206,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         _setupTarget__ATokenVaults();
     }
 
-    /// @dev Whether an AdiAdapter is deployed by this setup. Defaults to false so the base contract makes no assumption
-    /// about a per-chain a.DI cross-chain controller. Chain-specific deployment scripts override this when they own a
-    /// JSON key resolving the controller address.
-    function _isAdiAdapterDeployed() internal view virtual returns (bool) {
+    function _shouldRegisterAdiOnGateway() internal view virtual returns (bool) {
         return false;
     }
 

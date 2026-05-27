@@ -150,14 +150,14 @@ abstract contract AccountingChainDeployment is BaseChainDeployment, AccessManage
         return BaseChainDeployment._accessManager();
     }
 
-    function _isAdiAdapterDeployed()
+    function _shouldRegisterAdiOnGateway()
         internal
         view
         virtual
         override(AccessManagerBaseSetup, BaseChainDeployment)
         returns (bool)
     {
-        return BaseChainDeployment._isAdiAdapterDeployed();
+        return BaseChainDeployment._shouldRegisterAdiOnGateway();
     }
 
     function _adiCrossChainController()

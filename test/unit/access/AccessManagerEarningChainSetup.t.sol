@@ -63,14 +63,14 @@ contract AccessManagerEarningChainSetupTest is AccessManagerSetupBaseTest, Earni
         super._setup_Targets(deployer);
     }
 
-    function _isAdiAdapterDeployed()
+    function _shouldRegisterAdiOnGateway()
         internal
         view
         virtual
         override(AccessManagerBaseSetup, EarningChainDeployment)
         returns (bool)
     {
-        return EarningChainDeployment._isAdiAdapterDeployed();
+        return EarningChainDeployment._shouldRegisterAdiOnGateway();
     }
 
     function _adiCrossChainController()
@@ -111,6 +111,10 @@ contract AccessManagerEarningChainSetupTest is AccessManagerSetupBaseTest, Earni
 }
 
 contract AccessManagerEarningChainWithAdiSetupTest is AccessManagerEarningChainSetupTest {
+    function _shouldRegisterAdiOnGateway() internal view virtual override returns (bool) {
+        return true;
+    }
+
     function _adiCrossChainController() internal view virtual override returns (address) {
         return _testAdiCrossChainController();
     }
