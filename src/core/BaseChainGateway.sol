@@ -19,6 +19,9 @@ import {Errors} from "src/types/Errors.sol";
 /// @notice Abstract base contract for ChainGateway contracts.
 /// @custom:upgradeable
 abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative, RescuableToken, IChainGateway {
+    /// @notice State tracked for a data-only bridge adapter.
+    /// @param mode Whether the adapter is not registered, enabled, or pending removal (receive only).
+    /// @param removalId ID that must be supplied to finalize removal after it is initiated.
     struct DataOnlyBridgeAdapterState {
         DataOnlyBridgeAdapterMode mode;
         bytes32 removalId;
@@ -31,7 +34,9 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         mapping(address asset => mapping(uint256 chainId => mapping(address bridgeAdapter => bool)))
             supportedFundsBridgeAdapters;
 
+        /// @dev Per-adapter mode and removal ID for data-only routes.
         mapping(uint256 chainId => mapping(address bridgeAdapter => DataOnlyBridgeAdapterState)) dataOnlyBridgeAdapters;
+        /// @dev Number of data-only adapters available for sending messages on each destination chain.
         mapping(uint256 chainId => uint256) dataOnlySendEnabledBridgeAdapterCount;
     }
 
@@ -70,6 +75,10 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
     }
 
     /// @notice Checks whether a funds bridge adapter is whitelisted for a given asset and chain.
+    /// @param asset The asset to check the bridge adapter for.
+    /// @param chainId The chain id to check the bridge adapter for.
+    /// @param bridgeAdapter The bridge adapter to check.
+    /// @return True if the bridge adapter is whitelisted, false otherwise.
     function isFundsBridgeAdapterSupported(address asset, uint256 chainId, address bridgeAdapter)
         external
         view
@@ -79,6 +88,9 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
     }
 
     /// @notice Returns the current mode for a data-only bridge adapter.
+    /// @param chainId The chain id to check the bridge adapter for.
+    /// @param bridgeAdapter The bridge adapter to check.
+    /// @return The adapter mode for the requested chain and adapter.
     function getDataOnlyBridgeAdapterMode(uint256 chainId, address bridgeAdapter)
         external
         view
@@ -145,7 +157,6 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         require(
             !$storage().supportedFundsBridgeAdapters[asset][chainId][bridgeAdapter], Errors.AddressAlreadyWhitelisted()
         );
-
         $storage().supportedFundsBridgeAdapters[asset][chainId][bridgeAdapter] = true;
         emit FundsBridgeAdapterAdded(asset, chainId, bridgeAdapter);
     }
@@ -157,7 +168,6 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         restricted
     {
         require($storage().supportedFundsBridgeAdapters[asset][chainId][bridgeAdapter], Errors.AddressNotWhitelisted());
-
         delete $storage().supportedFundsBridgeAdapters[asset][chainId][bridgeAdapter];
         emit FundsBridgeAdapterRemoved(asset, chainId, bridgeAdapter);
     }
@@ -165,48 +175,47 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
     /// @inheritdoc IChainGateway
     function addDataOnlyBridgeAdapter(uint256 chainId, address bridgeAdapter) external override restricted {
         _validateBridgeAdapterParams(chainId, bridgeAdapter);
-        _validateDataOnlyBridgeAdapterMode(chainId, bridgeAdapter, DataOnlyBridgeAdapterMode.NotSupported);
-
-        $storage().dataOnlyBridgeAdapters[chainId][bridgeAdapter].mode = DataOnlyBridgeAdapterMode.Enabled;
+        _validateDataOnlyBridgeAdapterMode(chainId, bridgeAdapter, DataOnlyBridgeAdapterMode.NOT_SUPPORTED);
+        $storage().dataOnlyBridgeAdapters[chainId][bridgeAdapter].mode = DataOnlyBridgeAdapterMode.ENABLED;
         $storage().dataOnlySendEnabledBridgeAdapterCount[chainId]++;
         emit DataOnlyBridgeAdapterAdded(chainId, bridgeAdapter);
     }
 
     /// @inheritdoc IChainGateway
-    function disableDataOnlyBridgeAdapterSending(uint256 chainId, address bridgeAdapter)
+    function initiateDataOnlyBridgeAdapterRemoval(uint256 chainId, address bridgeAdapter)
         external
         override
         restricted
         returns (bytes32 removalId)
     {
-        _validateDataOnlyBridgeAdapterMode(chainId, bridgeAdapter, DataOnlyBridgeAdapterMode.Enabled);
-        require($storage().dataOnlySendEnabledBridgeAdapterCount[chainId] > 1, CannotDisableLastDataOnlyBridgeAdapter());
-
+        _validateDataOnlyBridgeAdapterMode(chainId, bridgeAdapter, DataOnlyBridgeAdapterMode.ENABLED);
+        require($storage().dataOnlySendEnabledBridgeAdapterCount[chainId] > 1, CannotRemoveLastDataOnlyBridgeAdapter());
         DataOnlyBridgeAdapterState storage adapterState = $storage().dataOnlyBridgeAdapters[chainId][bridgeAdapter];
-        adapterState.mode = DataOnlyBridgeAdapterMode.ReceivingOnly;
-        removalId =
-            keccak256(abi.encode(chainId, bridgeAdapter, blockhash(block.number - 1), block.timestamp, address(this)));
+        adapterState.mode = DataOnlyBridgeAdapterMode.RECEIVING_ONLY;
+        removalId = keccak256(
+            abi.encode(
+                chainId, bridgeAdapter, blockhash(block.number - 1), block.prevrandao, block.timestamp, address(this)
+            )
+        );
         adapterState.removalId = removalId;
         $storage().dataOnlySendEnabledBridgeAdapterCount[chainId]--;
-        emit DataOnlyBridgeAdapterSendingDisabled(chainId, bridgeAdapter, removalId);
+        emit DataOnlyBridgeAdapterRemovalInitiated(chainId, bridgeAdapter, removalId);
     }
 
     /// @inheritdoc IChainGateway
-    function removeDataOnlyBridgeAdapter(uint256 chainId, address bridgeAdapter, bytes32 removalId)
+    function finalizeDataOnlyBridgeAdapterRemoval(uint256 chainId, address bridgeAdapter, bytes32 removalId)
         external
         override
         restricted
     {
-        _validateDataOnlyBridgeAdapterMode(chainId, bridgeAdapter, DataOnlyBridgeAdapterMode.ReceivingOnly);
-
+        _validateDataOnlyBridgeAdapterMode(chainId, bridgeAdapter, DataOnlyBridgeAdapterMode.RECEIVING_ONLY);
         bytes32 expectedRemovalId = $storage().dataOnlyBridgeAdapters[chainId][bridgeAdapter].removalId;
         require(
-            removalId == expectedRemovalId,
+            removalId != bytes32(0) && removalId == expectedRemovalId,
             InvalidDataOnlyBridgeAdapterRemovalId({actual: removalId, expected: expectedRemovalId})
         );
-
         delete $storage().dataOnlyBridgeAdapters[chainId][bridgeAdapter];
-        emit DataOnlyBridgeAdapterRemoved(chainId, bridgeAdapter);
+        emit DataOnlyBridgeAdapterRemovalFinalized(chainId, bridgeAdapter);
     }
 
     function _beforeRescueTokens(
@@ -270,7 +279,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
     /// @dev Validates that the data-only bridge adapter is enabled for new sends.
     function _validateDataOnlyBridgeAdapterCanSend(uint256 chainId, address bridgeAdapter) internal view {
         require(
-            $storage().dataOnlyBridgeAdapters[chainId][bridgeAdapter].mode == DataOnlyBridgeAdapterMode.Enabled,
+            $storage().dataOnlyBridgeAdapters[chainId][bridgeAdapter].mode == DataOnlyBridgeAdapterMode.ENABLED,
             AdapterNotFound()
         );
     }
@@ -279,7 +288,7 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
     function _validateDataOnlyBridgeAdapterCanReceive(uint256 chainId, address bridgeAdapter) internal view {
         DataOnlyBridgeAdapterMode mode = $storage().dataOnlyBridgeAdapters[chainId][bridgeAdapter].mode;
         require(
-            mode == DataOnlyBridgeAdapterMode.Enabled || mode == DataOnlyBridgeAdapterMode.ReceivingOnly,
+            mode == DataOnlyBridgeAdapterMode.ENABLED || mode == DataOnlyBridgeAdapterMode.RECEIVING_ONLY,
             AdapterNotFound()
         );
     }

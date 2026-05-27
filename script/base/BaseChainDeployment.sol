@@ -380,12 +380,12 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         IChainGateway.DataOnlyBridgeAdapterMode mode =
             BaseChainGateway(address(gateway)).getDataOnlyBridgeAdapterMode(chainId, bridgeAdapter);
         /// @custom:tx-already-executed-check Data-only adapter already registered.
-        if (mode == IChainGateway.DataOnlyBridgeAdapterMode.Enabled) {
+        if (mode == IChainGateway.DataOnlyBridgeAdapterMode.ENABLED) {
             logSkip("_addDataOnlyBridgeAdapterIdempotent", "data-only bridge adapter registered");
             return;
         }
         require(
-            mode == IChainGateway.DataOnlyBridgeAdapterMode.NotSupported,
+            mode == IChainGateway.DataOnlyBridgeAdapterMode.NOT_SUPPORTED,
             "data-only bridge adapter mode does not match expected value"
         );
         /// @custom:tx-already-executed-check See `_addFundsBridgeAdapterIdempotent` for the same canCall safety-net.

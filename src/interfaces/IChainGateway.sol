@@ -15,9 +15,9 @@ interface IChainGateway {
     }
 
     enum DataOnlyBridgeAdapterMode {
-        NotSupported,
-        Enabled,
-        ReceivingOnly
+        NOT_SUPPORTED,
+        ENABLED,
+        RECEIVING_ONLY
     }
 
     /// @notice The representation of a cross-chain message.
@@ -62,12 +62,12 @@ interface IChainGateway {
     /// @notice Emitted when a data-only bridge adapter is enabled for a destination chain.
     event DataOnlyBridgeAdapterAdded(uint256 chainId, address bridgeAdapter);
 
-    /// @notice Emitted when a data-only bridge adapter is removed for a destination chain.
-    event DataOnlyBridgeAdapterRemoved(uint256 chainId, address bridgeAdapter);
+    /// @notice Emitted when a data-only bridge adapter removal is finalized for a destination chain.
+    event DataOnlyBridgeAdapterRemovalFinalized(uint256 chainId, address bridgeAdapter);
 
-    /// @notice Emitted when a data-only bridge adapter stops being usable for new sends.
-    /// @param removalId The id that must be used to remove the adapter.
-    event DataOnlyBridgeAdapterSendingDisabled(uint256 chainId, address bridgeAdapter, bytes32 removalId);
+    /// @notice Emitted when a data-only bridge adapter removal is initiated.
+    /// @param removalId The ID that must be used to finalize the removal.
+    event DataOnlyBridgeAdapterRemovalInitiated(uint256 chainId, address bridgeAdapter, bytes32 removalId);
 
     /// @notice Emitted when a funds bridge adapter is whitelisted for an asset and destination chain.
     event FundsBridgeAdapterAdded(address asset, uint256 chainId, address bridgeAdapter);
@@ -85,15 +85,15 @@ interface IChainGateway {
     /// @custom:selector 0xf7b1bf8e
     error AdapterNotFound();
 
-    /// @notice Thrown when disabling an adapter would leave a chain without a data-only sending route.
-    /// @custom:selector 0xd0ec6568
-    error CannotDisableLastDataOnlyBridgeAdapter();
+    /// @notice Thrown when removal would leave a chain without a data-only sending route.
+    /// @custom:selector 0xaa601040
+    error CannotRemoveLastDataOnlyBridgeAdapter();
 
     /// @notice Thrown when a given message contains both funds and a data payload which is not allowed.
     /// @custom:selector 0x9d73280d
     error DataNotAllowedWithFunds();
 
-    /// @notice Thrown when the removal id does not match the stored id.
+    /// @notice Thrown when the removal ID does not match the stored ID.
     /// @custom:selector 0x5d6ce9ff
     error InvalidDataOnlyBridgeAdapterRemovalId(bytes32 actual, bytes32 expected);
 
@@ -131,20 +131,20 @@ interface IChainGateway {
     /// @param bridgeAdapter The bridge adapter to add.
     function addDataOnlyBridgeAdapter(uint256 chainId, address bridgeAdapter) external;
 
-    /// @notice Stops using a data-only bridge adapter for new sends while keeping it as a valid receiver.
-    /// @dev The returned id is required for removal, so removal depends on the sending disabling being executed priorly.
+    /// @notice Initiates removal of a data-only bridge adapter.
+    /// @dev The adapter remains valid for receiving in-flight messages but cannot be used for new sends.
     /// @param chainId The chain id the bridge adapter is registered for.
-    /// @param bridgeAdapter The bridge adapter to disable sending for.
-    /// @return removalId The id that must be used to remove the adapter.
-    function disableDataOnlyBridgeAdapterSending(uint256 chainId, address bridgeAdapter)
+    /// @param bridgeAdapter The bridge adapter to remove.
+    /// @return removalId The ID that must be used to finalize the removal.
+    function initiateDataOnlyBridgeAdapterRemoval(uint256 chainId, address bridgeAdapter)
         external
         returns (bytes32 removalId);
 
-    /// @notice Removes a data-only bridge adapter after sending has been disabled.
+    /// @notice Finalizes the removal of a data-only bridge adapter after its removal was initiated.
     /// @param chainId The chain id to remove the bridge adapter for.
     /// @param bridgeAdapter The bridge adapter to remove.
-    /// @param removalId The id returned when sending was disabled.
-    function removeDataOnlyBridgeAdapter(uint256 chainId, address bridgeAdapter, bytes32 removalId) external;
+    /// @param removalId The ID returned when removal was initiated.
+    function finalizeDataOnlyBridgeAdapterRemoval(uint256 chainId, address bridgeAdapter, bytes32 removalId) external;
 
     /// @notice Handle receiving of data and funds from a source chain.
     /// @param sourceChainId The chain from which the message was sent.

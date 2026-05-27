@@ -221,13 +221,13 @@ contract AccessManagerAccountingChainSetupTest is AccessManagerSetupBaseTest, Ac
         );
         _assertTargetFunctionRole(
             gateway,
-            IChainGateway.disableDataOnlyBridgeAdapterSending.selector,
-            RolesConfig.getRole__disableDataOnlyBridgeAdapterSending().roleId
+            IChainGateway.initiateDataOnlyBridgeAdapterRemoval.selector,
+            RolesConfig.getRole__initiateDataOnlyBridgeAdapterRemoval().roleId
         );
         _assertTargetFunctionRole(
             gateway,
-            IChainGateway.removeDataOnlyBridgeAdapter.selector,
-            RolesConfig.getRole__removeDataOnlyBridgeAdapter().roleId
+            IChainGateway.finalizeDataOnlyBridgeAdapterRemoval.selector,
+            RolesConfig.getRole__finalizeDataOnlyBridgeAdapterRemoval().roleId
         );
         _assertTargetFunctionRole(
             gateway, IRescuableToken.rescueTokens.selector, RolesConfig.getRole__rescueTokens().roleId

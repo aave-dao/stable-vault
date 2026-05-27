@@ -91,8 +91,8 @@ abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
         roles[0] = RolesConfig.getRole__addFundsBridgeAdapter();
         roles[1] = RolesConfig.getRole__removeFundsBridgeAdapter();
         roles[2] = RolesConfig.getRole__addDataOnlyBridgeAdapter();
-        roles[3] = RolesConfig.getRole__disableDataOnlyBridgeAdapterSending();
-        roles[4] = RolesConfig.getRole__removeDataOnlyBridgeAdapter();
+        roles[3] = RolesConfig.getRole__initiateDataOnlyBridgeAdapterRemoval();
+        roles[4] = RolesConfig.getRole__finalizeDataOnlyBridgeAdapterRemoval();
         roles[5] = RolesConfig.getRole__rescueTokens();
         roles[6] = RolesConfig.getRole__rescueNative();
 

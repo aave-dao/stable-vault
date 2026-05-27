@@ -289,13 +289,15 @@ contract EarningChainGatewayTest is TestWithHelpers {
         );
     }
 
-    function test_disableDataOnlyBridgeAdapterSending_reverts_ifLastDataOnlyBridgeAdapter() public {
-        vm.expectRevert(IChainGateway.CannotDisableLastDataOnlyBridgeAdapter.selector);
+    function test_initiateDataOnlyBridgeAdapterRemoval_reverts_ifLastDataOnlyBridgeAdapter() public {
+        vm.expectRevert(IChainGateway.CannotRemoveLastDataOnlyBridgeAdapter.selector);
         vm.prank(admin);
-        _earningChainGateway.disableDataOnlyBridgeAdapterSending(ACCOUNTING_CHAIN_ID, address(_mockBridgeCcipFeeParams));
+        _earningChainGateway.initiateDataOnlyBridgeAdapterRemoval(
+            ACCOUNTING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
+        );
     }
 
-    function test_removeDataOnlyBridgeAdapter_removesBridgeAdapter_ifSendingIsDisabled() public {
+    function test_finalizeDataOnlyBridgeAdapterRemoval_removesBridgeAdapter_ifRemovalWasInitiated() public {
         address bridgeAdapter = makeAddr("bridgeAdapter");
 
         vm.prank(admin);
@@ -306,24 +308,25 @@ contract EarningChainGatewayTest is TestWithHelpers {
                 ACCOUNTING_CHAIN_ID,
                 address(_mockBridgeCcipFeeParams),
                 blockhash(block.number - 1),
+                block.prevrandao,
                 block.timestamp,
                 address(_earningChainGateway)
             )
         );
         vm.expectEmit(true, true, true, true);
-        emit IChainGateway.DataOnlyBridgeAdapterSendingDisabled(
+        emit IChainGateway.DataOnlyBridgeAdapterRemovalInitiated(
             ACCOUNTING_CHAIN_ID, address(_mockBridgeCcipFeeParams), removalId
         );
         vm.prank(admin);
-        bytes32 actualRemovalId = _earningChainGateway.disableDataOnlyBridgeAdapterSending(
+        bytes32 actualRemovalId = _earningChainGateway.initiateDataOnlyBridgeAdapterRemoval(
             ACCOUNTING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
         );
         assertEq(actualRemovalId, removalId);
 
         vm.expectEmit(true, true, true, true);
-        emit IChainGateway.DataOnlyBridgeAdapterRemoved(ACCOUNTING_CHAIN_ID, address(_mockBridgeCcipFeeParams));
+        emit IChainGateway.DataOnlyBridgeAdapterRemovalFinalized(ACCOUNTING_CHAIN_ID, address(_mockBridgeCcipFeeParams));
         vm.prank(admin);
-        _earningChainGateway.removeDataOnlyBridgeAdapter(
+        _earningChainGateway.finalizeDataOnlyBridgeAdapterRemoval(
             ACCOUNTING_CHAIN_ID, address(_mockBridgeCcipFeeParams), removalId
         );
 
@@ -333,22 +336,22 @@ contract EarningChainGatewayTest is TestWithHelpers {
                     ACCOUNTING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
                 )
             ),
-            uint8(IChainGateway.DataOnlyBridgeAdapterMode.NotSupported)
+            uint8(IChainGateway.DataOnlyBridgeAdapterMode.NOT_SUPPORTED)
         );
         assertEq(
             uint8(_earningChainGateway.getDataOnlyBridgeAdapterMode(ACCOUNTING_CHAIN_ID, bridgeAdapter)),
-            uint8(IChainGateway.DataOnlyBridgeAdapterMode.Enabled)
+            uint8(IChainGateway.DataOnlyBridgeAdapterMode.ENABLED)
         );
     }
 
-    function test_removeDataOnlyBridgeAdapter_reverts_ifRemovalIdDoesNotMatch() public {
+    function test_finalizeDataOnlyBridgeAdapterRemoval_reverts_ifRemovalIdDoesNotMatch() public {
         address bridgeAdapter = makeAddr("bridgeAdapter");
 
         vm.prank(admin);
         _earningChainGateway.addDataOnlyBridgeAdapter(ACCOUNTING_CHAIN_ID, bridgeAdapter);
 
         vm.prank(admin);
-        bytes32 removalId = _earningChainGateway.disableDataOnlyBridgeAdapterSending(
+        bytes32 removalId = _earningChainGateway.initiateDataOnlyBridgeAdapterRemoval(
             ACCOUNTING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
         );
         bytes32 invalidRemovalId = bytes32(uint256(removalId) ^ 1);
@@ -359,21 +362,23 @@ contract EarningChainGatewayTest is TestWithHelpers {
             )
         );
         vm.prank(admin);
-        _earningChainGateway.removeDataOnlyBridgeAdapter(
+        _earningChainGateway.finalizeDataOnlyBridgeAdapterRemoval(
             ACCOUNTING_CHAIN_ID, address(_mockBridgeCcipFeeParams), invalidRemovalId
         );
     }
 
-    function test_removeDataOnlyBridgeAdapter_reverts_ifNotWhitelisted() public {
+    function test_finalizeDataOnlyBridgeAdapterRemoval_reverts_ifNotWhitelisted() public {
         vm.expectRevert(
             abi.encodeWithSelector(
                 IChainGateway.UnexpectedDataOnlyBridgeAdapterMode.selector,
-                uint8(IChainGateway.DataOnlyBridgeAdapterMode.NotSupported),
-                uint8(IChainGateway.DataOnlyBridgeAdapterMode.ReceivingOnly)
+                uint8(IChainGateway.DataOnlyBridgeAdapterMode.NOT_SUPPORTED),
+                uint8(IChainGateway.DataOnlyBridgeAdapterMode.RECEIVING_ONLY)
             )
         );
         vm.prank(admin);
-        _earningChainGateway.removeDataOnlyBridgeAdapter(ACCOUNTING_CHAIN_ID, makeAddr("bridgeAdapter"), bytes32(0));
+        _earningChainGateway.finalizeDataOnlyBridgeAdapterRemoval(
+            ACCOUNTING_CHAIN_ID, makeAddr("bridgeAdapter"), bytes32(0)
+        );
     }
 
     function test_dataOnlyBridgeAdapterReceivingOnly_receivesButCannotSend() public {
@@ -384,7 +389,9 @@ contract EarningChainGatewayTest is TestWithHelpers {
         vm.prank(admin);
         _earningChainGateway.addDataOnlyBridgeAdapter(ACCOUNTING_CHAIN_ID, replacementAdapter);
         vm.prank(admin);
-        _earningChainGateway.disableDataOnlyBridgeAdapterSending(ACCOUNTING_CHAIN_ID, address(_mockBridgeCcipFeeParams));
+        _earningChainGateway.initiateDataOnlyBridgeAdapterRemoval(
+            ACCOUNTING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
+        );
 
         vm.expectRevert(IChainGateway.AdapterNotFound.selector);
         vm.prank(address(_mockIouTokenManager));

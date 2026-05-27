@@ -1009,7 +1009,8 @@ contract BaseTest is TestWithHelpers {
         accessManager.setTargetFunctionRole(
             address(accountingChainGateway),
             _toSelectorArray(
-                IChainGateway.removeFundsBridgeAdapter.selector, IChainGateway.removeDataOnlyBridgeAdapter.selector
+                IChainGateway.removeFundsBridgeAdapter.selector,
+                IChainGateway.finalizeDataOnlyBridgeAdapterRemoval.selector
             ),
             REMOVER_ROLE
         );
@@ -1125,7 +1126,8 @@ contract BaseTest is TestWithHelpers {
         accessManager.setTargetFunctionRole(
             address(earningChainGateway),
             _toSelectorArray(
-                IChainGateway.removeFundsBridgeAdapter.selector, IChainGateway.removeDataOnlyBridgeAdapter.selector
+                IChainGateway.removeFundsBridgeAdapter.selector,
+                IChainGateway.finalizeDataOnlyBridgeAdapterRemoval.selector
             ),
             REMOVER_ROLE
         );

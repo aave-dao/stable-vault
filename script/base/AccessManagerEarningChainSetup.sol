@@ -24,8 +24,8 @@ abstract contract AccessManagerEarningChainSetup is AccessManagerBaseSetup {
         roles[1] = RolesConfig.getRole__addFundsBridgeAdapter();
         roles[2] = RolesConfig.getRole__removeFundsBridgeAdapter();
         roles[3] = RolesConfig.getRole__addDataOnlyBridgeAdapter();
-        roles[4] = RolesConfig.getRole__disableDataOnlyBridgeAdapterSending();
-        roles[5] = RolesConfig.getRole__removeDataOnlyBridgeAdapter();
+        roles[4] = RolesConfig.getRole__initiateDataOnlyBridgeAdapterRemoval();
+        roles[5] = RolesConfig.getRole__finalizeDataOnlyBridgeAdapterRemoval();
         roles[6] = RolesConfig.getRole__rescueTokens();
         roles[7] = RolesConfig.getRole__rescueNative();
 

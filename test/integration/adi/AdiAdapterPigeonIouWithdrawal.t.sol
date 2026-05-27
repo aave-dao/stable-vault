@@ -809,33 +809,34 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         vm.selectFork(_ethFork);
         _accounting.gateway.addDataOnlyBridgeAdapter(ARB_CHAIN_ID, address(ccip.accounting));
         bytes32 accountingAdiRemovalId =
-            _accounting.gateway.disableDataOnlyBridgeAdapterSending(ARB_CHAIN_ID, address(_accounting.adiAdapter));
+            _accounting.gateway.initiateDataOnlyBridgeAdapterRemoval(ARB_CHAIN_ID, address(_accounting.adiAdapter));
         _accounting.gateway
-            .removeDataOnlyBridgeAdapter(ARB_CHAIN_ID, address(_accounting.adiAdapter), accountingAdiRemovalId);
+            .finalizeDataOnlyBridgeAdapterRemoval(ARB_CHAIN_ID, address(_accounting.adiAdapter), accountingAdiRemovalId);
         assertEq(
             uint8(_accounting.gateway.getDataOnlyBridgeAdapterMode(ARB_CHAIN_ID, address(ccip.accounting))),
-            uint8(IChainGateway.DataOnlyBridgeAdapterMode.Enabled),
+            uint8(IChainGateway.DataOnlyBridgeAdapterMode.ENABLED),
             "accounting CCIP not enabled"
         );
         assertEq(
             uint8(_accounting.gateway.getDataOnlyBridgeAdapterMode(ARB_CHAIN_ID, address(_accounting.adiAdapter))),
-            uint8(IChainGateway.DataOnlyBridgeAdapterMode.NotSupported),
+            uint8(IChainGateway.DataOnlyBridgeAdapterMode.NOT_SUPPORTED),
             "accounting aDI still registered"
         );
 
         vm.selectFork(_arbFork);
         _earning.gateway.addDataOnlyBridgeAdapter(ETH_CHAIN_ID, address(ccip.earning));
         bytes32 earningAdiRemovalId =
-            _earning.gateway.disableDataOnlyBridgeAdapterSending(ETH_CHAIN_ID, address(_earning.adiAdapter));
-        _earning.gateway.removeDataOnlyBridgeAdapter(ETH_CHAIN_ID, address(_earning.adiAdapter), earningAdiRemovalId);
+            _earning.gateway.initiateDataOnlyBridgeAdapterRemoval(ETH_CHAIN_ID, address(_earning.adiAdapter));
+        _earning.gateway
+            .finalizeDataOnlyBridgeAdapterRemoval(ETH_CHAIN_ID, address(_earning.adiAdapter), earningAdiRemovalId);
         assertEq(
             uint8(_earning.gateway.getDataOnlyBridgeAdapterMode(ETH_CHAIN_ID, address(ccip.earning))),
-            uint8(IChainGateway.DataOnlyBridgeAdapterMode.Enabled),
+            uint8(IChainGateway.DataOnlyBridgeAdapterMode.ENABLED),
             "earning CCIP not enabled"
         );
         assertEq(
             uint8(_earning.gateway.getDataOnlyBridgeAdapterMode(ETH_CHAIN_ID, address(_earning.adiAdapter))),
-            uint8(IChainGateway.DataOnlyBridgeAdapterMode.NotSupported),
+            uint8(IChainGateway.DataOnlyBridgeAdapterMode.NOT_SUPPORTED),
             "earning aDI still registered"
         );
     }
@@ -847,29 +848,29 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         vm.selectFork(_ethFork);
         _accounting.gateway.addDataOnlyBridgeAdapter(ARB_CHAIN_ID, address(_accounting.adiAdapter));
         removalIds.accounting =
-            _accounting.gateway.disableDataOnlyBridgeAdapterSending(ARB_CHAIN_ID, address(ccip.accounting));
+            _accounting.gateway.initiateDataOnlyBridgeAdapterRemoval(ARB_CHAIN_ID, address(ccip.accounting));
         assertEq(
             uint8(_accounting.gateway.getDataOnlyBridgeAdapterMode(ARB_CHAIN_ID, address(ccip.accounting))),
-            uint8(IChainGateway.DataOnlyBridgeAdapterMode.ReceivingOnly),
+            uint8(IChainGateway.DataOnlyBridgeAdapterMode.RECEIVING_ONLY),
             "accounting CCIP not receiving-only"
         );
         assertEq(
             uint8(_accounting.gateway.getDataOnlyBridgeAdapterMode(ARB_CHAIN_ID, address(_accounting.adiAdapter))),
-            uint8(IChainGateway.DataOnlyBridgeAdapterMode.Enabled),
+            uint8(IChainGateway.DataOnlyBridgeAdapterMode.ENABLED),
             "accounting aDI not enabled"
         );
 
         vm.selectFork(_arbFork);
         _earning.gateway.addDataOnlyBridgeAdapter(ETH_CHAIN_ID, address(_earning.adiAdapter));
-        removalIds.earning = _earning.gateway.disableDataOnlyBridgeAdapterSending(ETH_CHAIN_ID, address(ccip.earning));
+        removalIds.earning = _earning.gateway.initiateDataOnlyBridgeAdapterRemoval(ETH_CHAIN_ID, address(ccip.earning));
         assertEq(
             uint8(_earning.gateway.getDataOnlyBridgeAdapterMode(ETH_CHAIN_ID, address(ccip.earning))),
-            uint8(IChainGateway.DataOnlyBridgeAdapterMode.ReceivingOnly),
+            uint8(IChainGateway.DataOnlyBridgeAdapterMode.RECEIVING_ONLY),
             "earning CCIP not receiving-only"
         );
         assertEq(
             uint8(_earning.gateway.getDataOnlyBridgeAdapterMode(ETH_CHAIN_ID, address(_earning.adiAdapter))),
-            uint8(IChainGateway.DataOnlyBridgeAdapterMode.Enabled),
+            uint8(IChainGateway.DataOnlyBridgeAdapterMode.ENABLED),
             "earning aDI not enabled"
         );
     }
@@ -878,28 +879,29 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         internal
     {
         vm.selectFork(_ethFork);
-        _accounting.gateway.removeDataOnlyBridgeAdapter(ARB_CHAIN_ID, address(ccip.accounting), removalIds.accounting);
+        _accounting.gateway
+            .finalizeDataOnlyBridgeAdapterRemoval(ARB_CHAIN_ID, address(ccip.accounting), removalIds.accounting);
         assertEq(
             uint8(_accounting.gateway.getDataOnlyBridgeAdapterMode(ARB_CHAIN_ID, address(ccip.accounting))),
-            uint8(IChainGateway.DataOnlyBridgeAdapterMode.NotSupported),
+            uint8(IChainGateway.DataOnlyBridgeAdapterMode.NOT_SUPPORTED),
             "accounting CCIP still registered"
         );
         assertEq(
             uint8(_accounting.gateway.getDataOnlyBridgeAdapterMode(ARB_CHAIN_ID, address(_accounting.adiAdapter))),
-            uint8(IChainGateway.DataOnlyBridgeAdapterMode.Enabled),
+            uint8(IChainGateway.DataOnlyBridgeAdapterMode.ENABLED),
             "accounting aDI not enabled after CCIP removal"
         );
 
         vm.selectFork(_arbFork);
-        _earning.gateway.removeDataOnlyBridgeAdapter(ETH_CHAIN_ID, address(ccip.earning), removalIds.earning);
+        _earning.gateway.finalizeDataOnlyBridgeAdapterRemoval(ETH_CHAIN_ID, address(ccip.earning), removalIds.earning);
         assertEq(
             uint8(_earning.gateway.getDataOnlyBridgeAdapterMode(ETH_CHAIN_ID, address(ccip.earning))),
-            uint8(IChainGateway.DataOnlyBridgeAdapterMode.NotSupported),
+            uint8(IChainGateway.DataOnlyBridgeAdapterMode.NOT_SUPPORTED),
             "earning CCIP still registered"
         );
         assertEq(
             uint8(_earning.gateway.getDataOnlyBridgeAdapterMode(ETH_CHAIN_ID, address(_earning.adiAdapter))),
-            uint8(IChainGateway.DataOnlyBridgeAdapterMode.Enabled),
+            uint8(IChainGateway.DataOnlyBridgeAdapterMode.ENABLED),
             "earning aDI not enabled after CCIP removal"
         );
     }

@@ -234,8 +234,8 @@ abstract contract RolesConfig is DeploymentConfig {
 
     /// @custom:delay High
     /// @custom:location EarningChainGateway, AccountingChainGateway
-    function getRole__disableDataOnlyBridgeAdapterSending() internal view returns (Role memory) {
-        bytes4 selector = IChainGateway.disableDataOnlyBridgeAdapterSending.selector;
+    function getRole__initiateDataOnlyBridgeAdapterRemoval() internal view returns (Role memory) {
+        bytes4 selector = IChainGateway.initiateDataOnlyBridgeAdapterRemoval.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
@@ -247,8 +247,8 @@ abstract contract RolesConfig is DeploymentConfig {
 
     /// @custom:delay High
     /// @custom:location EarningChainGateway, AccountingChainGateway
-    function getRole__removeDataOnlyBridgeAdapter() internal view returns (Role memory) {
-        bytes4 selector = IChainGateway.removeDataOnlyBridgeAdapter.selector;
+    function getRole__finalizeDataOnlyBridgeAdapterRemoval() internal view returns (Role memory) {
+        bytes4 selector = IChainGateway.finalizeDataOnlyBridgeAdapterRemoval.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
@@ -1202,8 +1202,8 @@ abstract contract RolesConfig is DeploymentConfig {
         roles[11] = getRole__addFundsBridgeAdapter();
         roles[12] = getRole__removeFundsBridgeAdapter();
         roles[13] = getRole__addDataOnlyBridgeAdapter();
-        roles[14] = getRole__disableDataOnlyBridgeAdapterSending();
-        roles[15] = getRole__removeDataOnlyBridgeAdapter();
+        roles[14] = getRole__initiateDataOnlyBridgeAdapterRemoval();
+        roles[15] = getRole__finalizeDataOnlyBridgeAdapterRemoval();
 
         // WithdrawalExecutionPolicy
         roles[16] = getRole__setAssetFeeBps();
