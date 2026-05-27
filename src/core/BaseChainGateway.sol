@@ -33,7 +33,6 @@ abstract contract BaseChainGateway is AccessManagedUpgradeable, RescuableNative,
         /// @dev An adapter whitelisted for a token is assumed to also be trusted to ingest data sent along with it.
         mapping(address asset => mapping(uint256 chainId => mapping(address bridgeAdapter => bool)))
             supportedFundsBridgeAdapters;
-
         /// @dev Per-adapter mode and removal ID for data-only routes.
         mapping(uint256 chainId => mapping(address bridgeAdapter => DataOnlyBridgeAdapterState)) dataOnlyBridgeAdapters;
         /// @dev Number of data-only adapters available for sending messages on each destination chain.
