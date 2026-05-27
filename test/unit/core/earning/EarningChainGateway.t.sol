@@ -376,6 +376,44 @@ contract EarningChainGatewayTest is TestWithHelpers {
         _earningChainGateway.removeDataOnlyBridgeAdapter(ACCOUNTING_CHAIN_ID, makeAddr("bridgeAdapter"), bytes32(0));
     }
 
+    function test_dataOnlyBridgeAdapterReceivingOnly_receivesButCannotSend() public {
+        address replacementAdapter = makeAddr("replacementAdapter");
+        address iouTokenRecipient = makeAddr("iouTokenRecipient");
+        uint256 iouTokenAmountRay = 100_000;
+
+        vm.prank(admin);
+        _earningChainGateway.addDataOnlyBridgeAdapter(ACCOUNTING_CHAIN_ID, replacementAdapter);
+        vm.prank(admin);
+        _earningChainGateway.disableDataOnlyBridgeAdapterSending(ACCOUNTING_CHAIN_ID, address(_mockBridgeCcipFeeParams));
+
+        vm.expectRevert(IChainGateway.AdapterNotFound.selector);
+        vm.prank(address(_mockIouTokenManager));
+        _earningChainGateway.sendBridgeIouTokenMessageWithFeePayer(
+            ACCOUNTING_CHAIN_ID,
+            iouTokenRecipient,
+            iouTokenAmountRay,
+            address(_mockBridgeCcipFeeParams),
+            address(this),
+            DEFAULT_GAS_LIMIT,
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0}))
+        );
+
+        bytes memory data = abi.encode(
+            IChainGateway.CrossChainMessage({
+                messageType: IChainGateway.MessageType.BRIDGE_IOU_TOKEN,
+                data: abi.encode(
+                    IChainGateway.IouTokenBridgeMessage({recipient: iouTokenRecipient, amount: iouTokenAmountRay})
+                )
+            })
+        );
+        vm.expectCall(
+            address(_mockIouTokenManager),
+            abi.encodeCall(IIouTokenManager.mintTokens, (iouTokenRecipient, iouTokenAmountRay))
+        );
+        vm.prank(address(_mockBridgeCcipFeeParams));
+        _earningChainGateway.receiveMessage(ACCOUNTING_CHAIN_ID, Constants.ASSET_FOR_DATA_ONLY_BRIDGE, 0, data);
+    }
+
     function test_rescueTokens_transfersIdleFundsToMsgSender() public {
         address asset = address(_mockUsdt);
         uint256 amount = 1000000000000000000;

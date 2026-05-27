@@ -314,6 +314,44 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         _accountingChainGateway.removeDataOnlyBridgeAdapter(EARNING_CHAIN_ID, makeAddr("bridgeAdapter"), bytes32(0));
     }
 
+    function test_dataOnlyBridgeAdapterReceivingOnly_receivesButCannotSend() public {
+        address replacementAdapter = makeAddr("replacementAdapter");
+        address iouTokenRecipient = makeAddr("iouTokenRecipient");
+        uint256 iouTokenAmountRay = 100_000;
+
+        vm.prank(admin);
+        _accountingChainGateway.addDataOnlyBridgeAdapter(EARNING_CHAIN_ID, replacementAdapter);
+        vm.prank(admin);
+        _accountingChainGateway.disableDataOnlyBridgeAdapterSending(EARNING_CHAIN_ID, address(_mockBridgeCcipFeeParams));
+
+        vm.expectRevert(IChainGateway.AdapterNotFound.selector);
+        vm.prank(address(_mockIouTokenManager));
+        _accountingChainGateway.sendBridgeIouTokenMessageWithFeePayer(
+            EARNING_CHAIN_ID,
+            iouTokenRecipient,
+            iouTokenAmountRay,
+            address(_mockBridgeCcipFeeParams),
+            address(this),
+            DEFAULT_GAS_LIMIT,
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0}))
+        );
+
+        bytes memory data = abi.encode(
+            IChainGateway.CrossChainMessage({
+                messageType: IChainGateway.MessageType.BRIDGE_IOU_TOKEN,
+                data: abi.encode(
+                    IChainGateway.IouTokenBridgeMessage({recipient: iouTokenRecipient, amount: iouTokenAmountRay})
+                )
+            })
+        );
+        vm.expectCall(
+            address(_mockIouTokenManager),
+            abi.encodeCall(IIouTokenManager.releaseTokens, (iouTokenRecipient, iouTokenAmountRay))
+        );
+        vm.prank(address(_mockBridgeCcipFeeParams));
+        _accountingChainGateway.receiveMessage(EARNING_CHAIN_ID, Constants.ASSET_FOR_DATA_ONLY_BRIDGE, 0, data);
+    }
+
     /// @dev `setUp` pre-wires (_mockUsdt, EARNING_CHAIN_ID, _mockBridgeAdapterAssets) and (_mockGho,
     /// EARNING_CHAIN_ID, _mockBridgeAdapterAssets). Fuzz inputs that hit either triple must be excluded.
     function _assumeFreshFundsBridgeAdapterTuple(address asset, uint256 chainId, address bridgeAdapter) internal view {
