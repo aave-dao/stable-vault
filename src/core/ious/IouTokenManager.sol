@@ -2,6 +2,9 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.22;
 
+import {
+    ReentrancyGuardTransientUpgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardTransientUpgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -16,7 +19,7 @@ import {Errors} from "src/types/Errors.sol";
 /// @author Aave Labs
 /// @notice Manages the IOU token locking, releasing, minting, burning, and user-initiated cross-chain bridging.
 /// @custom:upgradeable
-contract IouTokenManager is TransferHelperClient, IIouTokenManager {
+contract IouTokenManager is TransferHelperClient, ReentrancyGuardTransientUpgradeable, IIouTokenManager {
     using SafeERC20 for IERC20;
 
     /// @custom:storage-location erc7201:aave.storage.IouTokenManager
@@ -104,7 +107,7 @@ contract IouTokenManager is TransferHelperClient, IIouTokenManager {
         address bridgeAdapter,
         uint256 payloadExecutionGasLimit,
         bytes calldata bridgeAdapterData
-    ) external payable override {
+    ) external payable override nonReentrant {
         require(destinationChainId != block.chainid, Errors.InvalidDestinationChainId());
         require(iouTokenRecipient != address(0), Errors.InvalidParameter());
         require(iouTokenAmountRay > 0, Errors.ZeroAmount());
