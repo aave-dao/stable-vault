@@ -585,7 +585,7 @@ contract Allocator is
 
         $storage().strategyConfigs[strategy] =
             StrategyConfig({asset: asset, isRegistered: true, depositAllowed: true, isTrusted: true});
-        $storage().assetStrategies[asset].add(strategy);
+        require($storage().assetStrategies[asset].add(strategy), Errors.AddressAlreadyWhitelisted());
         _addToWithdrawalQueue(asset, strategy);
 
         require(
@@ -607,7 +607,7 @@ contract Allocator is
         // This function does not force max withdraw from a strategy to avoid unintended behavior e.g. incurring
         // slippage.
         require(IERC4626(strategy).balanceOf(address(this)) == 0, StrategyStillHasFunds(strategy));
-        $storage().assetStrategies[asset].remove(strategy);
+        require($storage().assetStrategies[asset].remove(strategy), Errors.AddressNotWhitelisted());
         _removeFromWithdrawalQueue(asset, strategy);
         delete $storage().strategyConfigs[strategy];
         emit StrategyRemoved(asset, strategy);
