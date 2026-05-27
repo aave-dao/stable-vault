@@ -192,8 +192,9 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
 
     function _setup_Targets(address deployer) internal virtual {
         _setupTarget__CcipAdapter(deployer);
-        if (_isAdiAdapterDeployed()) {
+        if (_shouldRegisterAdiOnGateway()) {
             _setupTarget__AdiAdapter(deployer);
+            _setupTarget__AdiCrossChainController();
         }
         _setupTarget__Allocator(deployer);
         _setupTarget__WithdrawalExecutionPolicy(deployer);
@@ -205,11 +206,12 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         _setupTarget__ATokenVaults();
     }
 
-    /// @dev Whether an AdiAdapter is deployed by this setup. Defaults to false so the base contract makes no assumption
-    /// about a per-chain a.DI cross-chain controller. Chain-specific deployment scripts override this when they own a
-    /// JSON key resolving the controller address.
-    function _isAdiAdapterDeployed() internal view virtual returns (bool) {
+    function _shouldRegisterAdiOnGateway() internal view virtual returns (bool) {
         return false;
+    }
+
+    function _adiCrossChainController() internal view virtual returns (address) {
+        return address(0);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -517,6 +519,34 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         roles[2] = RolesConfig.getRole__rescueNative();
 
         _setTargetFunctionRoles(adiAdapter, roles);
+    }
+
+    function _setupTarget__AdiCrossChainController() internal {
+        address adiCrossChainController = _adiCrossChainController();
+        require(adiCrossChainController != address(0), "Adi CCC address not set");
+
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](15);
+
+        // Forwarder
+        roles[0] = RolesConfig.getRole__adiApproveSenders();
+        roles[1] = RolesConfig.getRole__adiRemoveSenders();
+        roles[2] = RolesConfig.getRole__adiEnableBridgeAdapters();
+        roles[3] = RolesConfig.getRole__adiDisableBridgeAdapters();
+        roles[4] = RolesConfig.getRole__adiUpdateOptimalBandwidthByChain();
+        roles[5] = RolesConfig.getRole__adiConfigAdapter();
+        roles[6] = RolesConfig.getRole__adiUpdateRequiredForwardingSuccessesByChain();
+        // Receiver
+        roles[7] = RolesConfig.getRole__adiUpdateConfirmations();
+        roles[8] = RolesConfig.getRole__adiUpdateMessagesValidityTimestamp();
+        roles[9] = RolesConfig.getRole__adiAllowReceiverBridgeAdapters();
+        roles[10] = RolesConfig.getRole__adiDisallowReceiverBridgeAdapters();
+        // Rescue / ownership
+        roles[11] = RolesConfig.getRole__adiEmergencyTokenTransfer();
+        roles[12] = RolesConfig.getRole__adiEmergencyEtherTransfer();
+        roles[13] = RolesConfig.getRole__adiTransferOwnership();
+        roles[14] = RolesConfig.getRole__adiUpdateGuardian();
+
+        _setTargetFunctionRoles(adiCrossChainController, roles);
     }
 
     function _setupTarget__Allocator(address deployer) internal {

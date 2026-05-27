@@ -23,3 +23,6 @@
 [submodule "lib/pigeon"]
 	path = lib/pigeon
 	url = https://github.com/exp-table/pigeon
+[submodule "lib/aave-delivery-infrastructure"]
+	path = lib/aave-delivery-infrastructure
+	url = https://github.com/aave/aave-delivery-infrastructure

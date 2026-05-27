@@ -33,7 +33,7 @@ By default, the wrapper:
 
 1. Clones `https://github.com/aave/adi-deploy.git` into
    `.local/adi-deploy-forktest`.
-2. Checks out `pull/2/head`.
+2. Checks out `main`.
 3. Starts local Ethereum and Arbitrum Anvil forks at pinned blocks.
 4. Exports the configured deployment's a.DI addresses from
    `deployments/stable-vaults/<env>/ethereum.json` and
@@ -95,7 +95,7 @@ The script reads deployment JSONs from `ADI_DEPLOY_DIR`, which defaults to
 ## Useful Overrides
 
 ```sh
-ADI_DEPLOY_REF=main ./run-adi-pigeon-fork-test.sh
+ADI_DEPLOY_REF=pull/3/head ./run-adi-pigeon-fork-test.sh
 ADI_DEPLOYMENT_ENV=prod ./run-adi-pigeon-fork-test.sh
 ETH_PORT=9545 ARB_PORT=9546 ./run-adi-pigeon-fork-test.sh
 ENV_FILE=.env.forktest ./run-adi-pigeon-fork-test.sh

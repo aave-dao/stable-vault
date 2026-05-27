@@ -4,6 +4,12 @@ pragma solidity ^0.8.20;
 
 import {DeploymentConfig} from "script/base/DeploymentConfig.sol";
 
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {ICrossChainForwarder} from "aave-delivery-infrastructure/contracts/interfaces/ICrossChainForwarder.sol";
+import {ICrossChainReceiver} from "aave-delivery-infrastructure/contracts/interfaces/ICrossChainReceiver.sol";
+import {IWithGuardian} from "aave-delivery-infrastructure/contracts/old-oz/interfaces/IWithGuardian.sol";
+import {IRescuable} from "solidity-utils/contracts/utils/interfaces/IRescuable.sol";
+
 import {IATokenVault} from "lib/aave-vault/src/interfaces/IATokenVault.sol";
 import {IATokenVaultMerklRewardClaimer} from "lib/aave-vault/src/interfaces/IATokenVaultMerklRewardClaimer.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
@@ -405,6 +411,201 @@ abstract contract RolesConfig is DeploymentConfig {
             delay: NO_DELAY,
             guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
             hasCriticalRisk: false
+        });
+    }
+
+    /// @custom:delay Critical
+    /// @custom:location AdiCrossChainController
+    function getRole__adiApproveSenders() internal view returns (Role memory) {
+        bytes4 selector = ICrossChainForwarder.approveSenders.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: CRITICAL_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
+        });
+    }
+
+    /// @custom:delay Critical
+    /// @custom:location AdiCrossChainController
+    function getRole__adiRemoveSenders() internal view returns (Role memory) {
+        bytes4 selector = ICrossChainForwarder.removeSenders.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: CRITICAL_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
+        });
+    }
+
+    /// @custom:delay Critical
+    /// @custom:location AdiCrossChainController
+    function getRole__adiEnableBridgeAdapters() internal view returns (Role memory) {
+        bytes4 selector = ICrossChainForwarder.enableBridgeAdapters.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: CRITICAL_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
+        });
+    }
+
+    /// @custom:delay Critical
+    /// @custom:location AdiCrossChainController
+    function getRole__adiDisableBridgeAdapters() internal view returns (Role memory) {
+        bytes4 selector = ICrossChainForwarder.disableBridgeAdapters.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: CRITICAL_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
+        });
+    }
+
+    /// @custom:delay Critical
+    /// @custom:location AdiCrossChainController
+    function getRole__adiUpdateOptimalBandwidthByChain() internal view returns (Role memory) {
+        bytes4 selector = ICrossChainForwarder.updateOptimalBandwidthByChain.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: CRITICAL_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
+        });
+    }
+
+    /// @custom:delay Critical
+    /// @custom:location AdiCrossChainController
+    function getRole__adiConfigAdapter() internal view returns (Role memory) {
+        bytes4 selector = ICrossChainForwarder.configAdapter.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: CRITICAL_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
+        });
+    }
+
+    /// @custom:delay Critical
+    /// @custom:location AdiCrossChainController
+    function getRole__adiUpdateRequiredForwardingSuccessesByChain() internal view returns (Role memory) {
+        bytes4 selector = ICrossChainForwarder.updateRequiredForwardingSuccessesByChain.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: CRITICAL_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
+        });
+    }
+
+    /// @custom:delay Critical
+    /// @custom:location AdiCrossChainController
+    function getRole__adiUpdateConfirmations() internal view returns (Role memory) {
+        bytes4 selector = ICrossChainReceiver.updateConfirmations.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: CRITICAL_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
+        });
+    }
+
+    /// @custom:delay Critical
+    /// @custom:location AdiCrossChainController
+    function getRole__adiUpdateMessagesValidityTimestamp() internal view returns (Role memory) {
+        bytes4 selector = ICrossChainReceiver.updateMessagesValidityTimestamp.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: CRITICAL_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
+        });
+    }
+
+    /// @custom:delay Critical
+    /// @custom:location AdiCrossChainController
+    function getRole__adiAllowReceiverBridgeAdapters() internal view returns (Role memory) {
+        bytes4 selector = ICrossChainReceiver.allowReceiverBridgeAdapters.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: CRITICAL_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
+        });
+    }
+
+    /// @custom:delay Critical
+    /// @custom:location AdiCrossChainController
+    function getRole__adiDisallowReceiverBridgeAdapters() internal view returns (Role memory) {
+        bytes4 selector = ICrossChainReceiver.disallowReceiverBridgeAdapters.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: CRITICAL_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
+        });
+    }
+
+    /// @custom:delay Critical
+    /// @custom:location AdiCrossChainController
+    function getRole__adiEmergencyTokenTransfer() internal view returns (Role memory) {
+        bytes4 selector = IRescuable.emergencyTokenTransfer.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: CRITICAL_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
+        });
+    }
+
+    /// @custom:delay Critical
+    /// @custom:location AdiCrossChainController
+    function getRole__adiEmergencyEtherTransfer() internal view returns (Role memory) {
+        bytes4 selector = IRescuable.emergencyEtherTransfer.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: CRITICAL_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
+        });
+    }
+
+    /// @custom:delay Critical
+    /// @custom:location AdiCrossChainController
+    function getRole__adiTransferOwnership() internal view returns (Role memory) {
+        bytes4 selector = Ownable.transferOwnership.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: CRITICAL_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
+        });
+    }
+
+    /// @custom:delay Critical
+    /// @custom:location AdiCrossChainController
+    function getRole__adiUpdateGuardian() internal view returns (Role memory) {
+        bytes4 selector = IWithGuardian.updateGuardian.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: CRITICAL_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
         });
     }
 
@@ -982,7 +1183,7 @@ abstract contract RolesConfig is DeploymentConfig {
     }
 
     function getAllFunctionBasedRoles() internal view returns (Role[] memory) {
-        Role[] memory roles = new Role[](72);
+        Role[] memory roles = new Role[](87);
 
         // AssetRegistry
         roles[0] = getRole__setAssetConfig();
@@ -1083,6 +1284,23 @@ abstract contract RolesConfig is DeploymentConfig {
         roles[69] = getRole__raiseRedemptionRefillRate();
         roles[70] = getRole__lowerRedemptionCapacity();
         roles[71] = getRole__lowerRedemptionRefillRate();
+
+        // a.DI CrossChainController
+        roles[72] = getRole__adiApproveSenders();
+        roles[73] = getRole__adiRemoveSenders();
+        roles[74] = getRole__adiEnableBridgeAdapters();
+        roles[75] = getRole__adiDisableBridgeAdapters();
+        roles[76] = getRole__adiUpdateOptimalBandwidthByChain();
+        roles[77] = getRole__adiConfigAdapter();
+        roles[78] = getRole__adiUpdateRequiredForwardingSuccessesByChain();
+        roles[79] = getRole__adiUpdateConfirmations();
+        roles[80] = getRole__adiUpdateMessagesValidityTimestamp();
+        roles[81] = getRole__adiAllowReceiverBridgeAdapters();
+        roles[82] = getRole__adiDisallowReceiverBridgeAdapters();
+        roles[83] = getRole__adiEmergencyTokenTransfer();
+        roles[84] = getRole__adiEmergencyEtherTransfer();
+        roles[85] = getRole__adiTransferOwnership();
+        roles[86] = getRole__adiUpdateGuardian();
 
         return roles;
     }

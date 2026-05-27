@@ -22,8 +22,35 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Check dependency access secrets
+        env:
+          DEPENDENCIES_APP_ID: ${{ secrets.DEPENDENCIES_APP_ID }}
+          DEPENDENCIES_PRIVATE_KEY: ${{ secrets.DEPENDENCIES_PRIVATE_KEY }}
+        run: |
+          if [ -z "$DEPENDENCIES_APP_ID" ] || [ -z "$DEPENDENCIES_PRIVATE_KEY" ]; then
+            echo "Missing DEPENDENCIES_APP_ID or DEPENDENCIES_PRIVATE_KEY secret for private dependency access." >&2
+            exit 1
+          fi
+
+      - name: Create dependencies token
+        uses: actions/create-github-app-token@v3
+        id: dependencies-token
         with:
-          submodules: recursive
+          app-id: ${{ secrets.DEPENDENCIES_APP_ID }}
+          private-key: ${{ secrets.DEPENDENCIES_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: |
+            aave-delivery-infrastructure
+          permission-contents: read
+
+      - name: Initialize submodules
+        env:
+          DEPENDENCIES_TOKEN: ${{ steps.dependencies-token.outputs.token }}
+        run: |
+          git config --global url."https://x-access-token:${DEPENDENCIES_TOKEN}@github.com/aave/aave-delivery-infrastructure".insteadOf "https://github.com/aave/aave-delivery-infrastructure"
+          git submodule sync --recursive
+          git submodule update --init --recursive
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
@@ -41,8 +68,35 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Check dependency access secrets
+        env:
+          DEPENDENCIES_APP_ID: ${{ secrets.DEPENDENCIES_APP_ID }}
+          DEPENDENCIES_PRIVATE_KEY: ${{ secrets.DEPENDENCIES_PRIVATE_KEY }}
+        run: |
+          if [ -z "$DEPENDENCIES_APP_ID" ] || [ -z "$DEPENDENCIES_PRIVATE_KEY" ]; then
+            echo "Missing DEPENDENCIES_APP_ID or DEPENDENCIES_PRIVATE_KEY secret for private dependency access." >&2
+            exit 1
+          fi
+
+      - name: Create dependencies token
+        uses: actions/create-github-app-token@v3
+        id: dependencies-token
         with:
-          submodules: recursive
+          app-id: ${{ secrets.DEPENDENCIES_APP_ID }}
+          private-key: ${{ secrets.DEPENDENCIES_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: |
+            aave-delivery-infrastructure
+          permission-contents: read
+
+      - name: Initialize submodules
+        env:
+          DEPENDENCIES_TOKEN: ${{ steps.dependencies-token.outputs.token }}
+        run: |
+          git config --global url."https://x-access-token:${DEPENDENCIES_TOKEN}@github.com/aave/aave-delivery-infrastructure".insteadOf "https://github.com/aave/aave-delivery-infrastructure"
+          git submodule sync --recursive
+          git submodule update --init --recursive
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
@@ -67,8 +121,35 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Check dependency access secrets
+        env:
+          DEPENDENCIES_APP_ID: ${{ secrets.DEPENDENCIES_APP_ID }}
+          DEPENDENCIES_PRIVATE_KEY: ${{ secrets.DEPENDENCIES_PRIVATE_KEY }}
+        run: |
+          if [ -z "$DEPENDENCIES_APP_ID" ] || [ -z "$DEPENDENCIES_PRIVATE_KEY" ]; then
+            echo "Missing DEPENDENCIES_APP_ID or DEPENDENCIES_PRIVATE_KEY secret for private dependency access." >&2
+            exit 1
+          fi
+
+      - name: Create dependencies token
+        uses: actions/create-github-app-token@v3
+        id: dependencies-token
         with:
-          submodules: recursive
+          app-id: ${{ secrets.DEPENDENCIES_APP_ID }}
+          private-key: ${{ secrets.DEPENDENCIES_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: |
+            aave-delivery-infrastructure
+          permission-contents: read
+
+      - name: Initialize submodules
+        env:
+          DEPENDENCIES_TOKEN: ${{ steps.dependencies-token.outputs.token }}
+        run: |
+          git config --global url."https://x-access-token:${DEPENDENCIES_TOKEN}@github.com/aave/aave-delivery-infrastructure".insteadOf "https://github.com/aave/aave-delivery-infrastructure"
+          git submodule sync --recursive
+          git submodule update --init --recursive
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
@@ -89,8 +170,35 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Check dependency access secrets
+        env:
+          DEPENDENCIES_APP_ID: ${{ secrets.DEPENDENCIES_APP_ID }}
+          DEPENDENCIES_PRIVATE_KEY: ${{ secrets.DEPENDENCIES_PRIVATE_KEY }}
+        run: |
+          if [ -z "$DEPENDENCIES_APP_ID" ] || [ -z "$DEPENDENCIES_PRIVATE_KEY" ]; then
+            echo "Missing DEPENDENCIES_APP_ID or DEPENDENCIES_PRIVATE_KEY secret for private dependency access." >&2
+            exit 1
+          fi
+
+      - name: Create dependencies token
+        uses: actions/create-github-app-token@v3
+        id: dependencies-token
         with:
-          submodules: recursive
+          app-id: ${{ secrets.DEPENDENCIES_APP_ID }}
+          private-key: ${{ secrets.DEPENDENCIES_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: |
+            aave-delivery-infrastructure
+          permission-contents: read
+
+      - name: Initialize submodules
+        env:
+          DEPENDENCIES_TOKEN: ${{ steps.dependencies-token.outputs.token }}
+        run: |
+          git config --global url."https://x-access-token:${DEPENDENCIES_TOKEN}@github.com/aave/aave-delivery-infrastructure".insteadOf "https://github.com/aave/aave-delivery-infrastructure"
+          git submodule sync --recursive
+          git submodule update --init --recursive
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
@@ -123,17 +231,11 @@ jobs:
       ALCHEMY_KEY: ${{ secrets.ALCHEMY_KEY || secrets.ALCHEMY_API_KEY }}
       ADI_FORK_MODE: deployed
       ADI_DEPLOYMENT_ENV: preprod
-      ADI_DEPLOY_REF: pull/2/head
+      ADI_DEPLOY_REF: main
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
           persist-credentials: false
-
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: stable
 
       - name: Check RPC secret
         run: |
@@ -170,6 +272,13 @@ jobs:
         run: |
           git config --global url."https://x-access-token:${DEPENDENCIES_TOKEN}@github.com/aave/adi-deploy".insteadOf "https://github.com/aave/adi-deploy"
           git config --global url."https://x-access-token:${DEPENDENCIES_TOKEN}@github.com/aave/aave-delivery-infrastructure".insteadOf "https://github.com/aave/aave-delivery-infrastructure"
+          git submodule sync --recursive
+          git submodule update --init --recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
 
       - name: Run Pigeon fork tests
         run: ./run-adi-pigeon-fork-test.sh
@@ -185,8 +294,35 @@ jobs:
       FOUNDRY_PROFILE: gas
     steps:
       - uses: actions/checkout@v4
+
+      - name: Check dependency access secrets
+        env:
+          DEPENDENCIES_APP_ID: ${{ secrets.DEPENDENCIES_APP_ID }}
+          DEPENDENCIES_PRIVATE_KEY: ${{ secrets.DEPENDENCIES_PRIVATE_KEY }}
+        run: |
+          if [ -z "$DEPENDENCIES_APP_ID" ] || [ -z "$DEPENDENCIES_PRIVATE_KEY" ]; then
+            echo "Missing DEPENDENCIES_APP_ID or DEPENDENCIES_PRIVATE_KEY secret for private dependency access." >&2
+            exit 1
+          fi
+
+      - name: Create dependencies token
+        uses: actions/create-github-app-token@v3
+        id: dependencies-token
         with:
-          submodules: recursive
+          app-id: ${{ secrets.DEPENDENCIES_APP_ID }}
+          private-key: ${{ secrets.DEPENDENCIES_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: |
+            aave-delivery-infrastructure
+          permission-contents: read
+
+      - name: Initialize submodules
+        env:
+          DEPENDENCIES_TOKEN: ${{ steps.dependencies-token.outputs.token }}
+        run: |
+          git config --global url."https://x-access-token:${DEPENDENCIES_TOKEN}@github.com/aave/aave-delivery-infrastructure".insteadOf "https://github.com/aave/aave-delivery-infrastructure"
+          git submodule sync --recursive
+          git submodule update --init --recursive
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1

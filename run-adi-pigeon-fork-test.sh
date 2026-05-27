@@ -5,8 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEFAULT_ADI_DEPLOY_DIR="$ROOT_DIR/.local/adi-deploy-forktest"
 
 ADI_DEPLOY_REPO="${ADI_DEPLOY_REPO:-https://github.com/aave/adi-deploy.git}"
-ADI_DEPLOY_PR="${ADI_DEPLOY_PR:-2}"
-ADI_DEPLOY_REF="${ADI_DEPLOY_REF:-pull/${ADI_DEPLOY_PR}/head}"
+ADI_DEPLOY_REF="${ADI_DEPLOY_REF:-main}"
 ADI_DEPLOY_DIR="${ADI_DEPLOY_DIR:-$DEFAULT_ADI_DEPLOY_DIR}"
 
 ADI_FORK_MODE_WAS_SET="${ADI_FORK_MODE+x}"
