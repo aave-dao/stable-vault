@@ -152,7 +152,7 @@ contract SlippageCoverageVaultTest is TestWithHelpers {
         _vault.raisePullCapPerTx(address(_usdc), 5_000e6);
         _fund(_usdc, 1_000e6);
 
-        vm.expectRevert(abi.encodeWithSelector(ISlippageCoverageVault.ExceedsWindowCap.selector));
+        vm.expectRevert(abi.encodeWithSelector(ISlippageCoverageVault.WindowNotConfigured.selector));
         vm.prank(beneficiary);
         _vault.pullCoverage(address(_usdc), 1_000);
     }

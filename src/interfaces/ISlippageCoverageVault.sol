@@ -17,9 +17,13 @@ interface ISlippageCoverageVault {
     /// @custom:selector 0x49aeece1
     error ExceedsPerTxCap();
 
-    /// @notice Thrown when a pull would exceed the cumulative window cap for the asset, or the window is unconfigured.
+    /// @notice Thrown when a pull would exceed the cumulative window cap for the asset.
     /// @custom:selector 0x21ff5759
     error ExceedsWindowCap();
+
+    /// @notice Thrown when the window for the asset has never been configured (`cap == 0` or `windowSeconds == 0`).
+    /// @custom:selector 0xa844dadb
+    error WindowNotConfigured();
 
     /// @notice Thrown when the caller of a beneficiary-gated function is not the immutable bound beneficiary.
     /// @custom:selector 0x5e5a9749
