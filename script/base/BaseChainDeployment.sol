@@ -9,6 +9,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {ICrossChainForwarder} from "aave-delivery-infrastructure/contracts/interfaces/ICrossChainForwarder.sol";
 import {ICrossChainReceiver} from "aave-delivery-infrastructure/contracts/interfaces/ICrossChainReceiver.sol";
+import {IWithGuardian} from "aave-delivery-infrastructure/contracts/old-oz/interfaces/IWithGuardian.sol";
 import {AccessManager} from "openzeppelin-contracts/contracts/access/manager/AccessManager.sol";
 
 import {ATokenVaultDeployment} from "script/base/ATokenVaultDeployment.sol";
@@ -203,7 +204,14 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         address adiCrossChainController = _adiCrossChainController();
         require(adiCrossChainController != address(0), "Adi CCC address not set");
         require(adiCrossChainController.code.length != 0, "Adi CCC has no code");
-        require(Ownable(adiCrossChainController).owner() != address(0), "Adi CCC owner not set");
+        require(
+            Ownable(adiCrossChainController).owner() == getAccessManagerAddress(_deployer()),
+            "Adi CCC owner is not AccessManager"
+        );
+        require(
+            IWithGuardian(adiCrossChainController).guardian() == getAdiAdapterAddress(_deployer()),
+            "Adi CCC guardian is not AdiAdapter"
+        );
 
         uint256 remoteChainId = _configUint(string.concat(_remoteChainConfigPrefix(), ".chainId"));
         ICrossChainForwarder forwarder = ICrossChainForwarder(adiCrossChainController);
