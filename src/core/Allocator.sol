@@ -571,7 +571,7 @@ contract Allocator is
     }
 
     function _isStrategySupportedForAsset(address strategy, address asset) internal view returns (bool) {
-        return $storage().strategyConfigs[strategy].asset == asset;
+        return asset != address(0) && $storage().strategyConfigs[strategy].asset == asset;
     }
 
     function _isStrategySupported(address strategy) internal view returns (bool) {

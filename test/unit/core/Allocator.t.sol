@@ -381,6 +381,7 @@ contract AllocatorTest is TestWithHelpers {
             _allocator.isStrategySupportedForAsset(address(_mockUnsupportedAsset), address(_defaultGhoStrategy))
         );
         assertFalse(_allocator.isStrategySupportedForAsset(address(_mockUnsupportedAsset), address(_extraGhoStrategy)));
+        assertFalse(_allocator.isStrategySupportedForAsset(address(0), address(0)));
     }
 
     function test_isStrategySupported_returnsExpectedResult() public {
