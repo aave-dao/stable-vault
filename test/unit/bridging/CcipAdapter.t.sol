@@ -335,6 +335,52 @@ contract CcipAdapterTest is TestWithHelpers {
         _accountingChainCcipAdapter.setChainSelector(chainId, ccipChainSelector);
     }
 
+    function test_setChainSelector_clearsStaleReverseMapping_onSelectorChange() public {
+        uint256 chainId = 4242;
+        uint64 oldSelector = 999;
+        uint64 newSelector = 888;
+
+        vm.prank(everyRoleAccount);
+        _accountingChainCcipAdapter.setChainSelector(chainId, oldSelector);
+
+        vm.prank(everyRoleAccount);
+        _accountingChainCcipAdapter.setChainSelector(chainId, newSelector);
+
+        assertEq(_accountingChainCcipAdapter.getChainSelector(chainId), newSelector);
+        assertEq(_accountingChainCcipAdapter.getChainId(newSelector), chainId);
+        assertEq(_accountingChainCcipAdapter.getChainId(oldSelector), 0);
+    }
+
+    function test_setChainSelector_clearsStaleForwardMapping_onChainIdChange() public {
+        uint256 oldChainId = 4242;
+        uint256 newChainId = 5353;
+        uint64 selector = 777;
+
+        vm.prank(everyRoleAccount);
+        _accountingChainCcipAdapter.setChainSelector(oldChainId, selector);
+
+        vm.prank(everyRoleAccount);
+        _accountingChainCcipAdapter.setChainSelector(newChainId, selector);
+
+        assertEq(_accountingChainCcipAdapter.getChainId(selector), newChainId);
+        assertEq(_accountingChainCcipAdapter.getChainSelector(newChainId), selector);
+        assertEq(_accountingChainCcipAdapter.getChainSelector(oldChainId), 0);
+    }
+
+    function test_setChainSelector_idempotent_preservesBothLookups() public {
+        uint256 chainId = 4242;
+        uint64 selector = 666;
+
+        vm.prank(everyRoleAccount);
+        _accountingChainCcipAdapter.setChainSelector(chainId, selector);
+
+        vm.prank(everyRoleAccount);
+        _accountingChainCcipAdapter.setChainSelector(chainId, selector);
+
+        assertEq(_accountingChainCcipAdapter.getChainSelector(chainId), selector);
+        assertEq(_accountingChainCcipAdapter.getChainId(selector), chainId);
+    }
+
     function test_setDestinationChainAdapter_emitsDestinationChainAdapterSet(uint256 chainId, address adapter) public {
         vm.assume(chainId != EARNING_CHAIN_ID && chainId != ACCOUNTING_CHAIN_ID);
         vm.assume(chainId != 0 && chainId != block.chainid);
@@ -1510,38 +1556,26 @@ contract CcipAdapterTest is TestWithHelpers {
         );
     }
 
-    function test_ccipReceive_reverts_ifChainSelectorMismatch() public {
-        // This test covers the require that validates:
-        // message.sourceChainSelector == _chainSelectorOf[chainIdFromMessageChainSelector]
-        //
-        // Create an inconsistent state by setting a new chain selector for an existing chain ID.
-        // The old selector's reverse mapping (_chainIdOf) still points to the chain ID, but
-        // the chain ID now maps to a different selector.
+    function test_ccipReceive_reverts_ifSourceSelectorIsStaleAfterReassignment() public {
+        // After reassigning a chainId to a new selector, the previous selector's reverse mapping
+        // must be cleared so a message arriving with the stale selector resolves to chainId 0
+        // and is rejected at the first source-validation require.
 
         uint64 staleChainSelector = 999;
         uint64 newChainSelector = 888;
         uint256 testChainId = 42;
 
-        // First, set up a chain with selector 999
         vm.prank(everyRoleAccount);
         _accountingChainCcipAdapter.setChainSelector(testChainId, staleChainSelector);
 
-        // Set a destination adapter for this chain
         vm.prank(everyRoleAccount);
         _accountingChainCcipAdapter.setDestinationChainAdapter(testChainId, makeAddr("someAdapter"));
 
-        // Now update the chain to use a different selector (888)
-        // This overwrites _chainSelectorOf[testChainId] = 888
-        // But _chainIdOf[999] still equals testChainId (stale mapping)
         vm.prank(everyRoleAccount);
         _accountingChainCcipAdapter.setChainSelector(testChainId, newChainSelector);
 
         bytes memory arbitraryData = abi.encode(keccak256(hex"c0ffee"));
 
-        // Try to receive a message using the stale selector (999)
-        // _chainIdOf[999] = testChainId (still exists)
-        // _destinationChainAdapterOf[testChainId] = someAdapter (passes first check)
-        // _chainSelectorOf[testChainId] = 888 != 999 (fails second check)
         vm.expectRevert(Errors.InvalidParameter.selector);
         vm.prank(address(_mockCCIPRouter));
         _accountingChainCcipAdapter.ccipReceive(

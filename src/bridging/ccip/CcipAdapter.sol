@@ -122,6 +122,14 @@ contract CcipAdapter is
 
     /// @inheritdoc ICcipBridgeAdapter
     function setChainSelector(uint256 chainId, uint64 ccipChainSelector) external override restricted {
+        uint64 previousSelector = _chainSelectorOf[chainId];
+        if (previousSelector != 0 && previousSelector != ccipChainSelector) {
+            delete _chainIdOf[previousSelector];
+        }
+        uint256 previousChainId = _chainIdOf[ccipChainSelector];
+        if (previousChainId != 0 && previousChainId != chainId) {
+            delete _chainSelectorOf[previousChainId];
+        }
         _chainSelectorOf[chainId] = ccipChainSelector;
         _chainIdOf[ccipChainSelector] = chainId;
         emit ChainSelectorSet(chainId, ccipChainSelector);
