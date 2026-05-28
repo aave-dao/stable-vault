@@ -108,6 +108,10 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         return _configAddress(".profiles.funder");
     }
 
+    function _getProfile__Rescuer() internal view virtual returns (address) {
+        return _configAddress(".profiles.rescuer");
+    }
+
     function _getRebalancerMulticallOwner() internal view returns (address) {
         return _configAddress(".profiles.rebalancerMulticallOwner");
     }
@@ -127,6 +131,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         );
         require(_getProfile__CoverageGuardian() != address(0), "CoverageGuardian profile address not set");
         require(_getProfile__Funder() != address(0), "Funder profile address not set");
+        require(_getProfile__Rescuer() != address(0), "Rescuer profile address not set");
         require(_getRebalancerMulticallOwner() != address(0), "Rebalancer Profile OwnedMulticall owner is not set");
         require(_getDisablerMulticallOwner() != address(0), "Disabler Profile OwnedMulticall owner is not set");
     }
@@ -184,6 +189,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         _setupProfile__ATokenVaultRewardClaimer();
         _setupProfile__CoverageGuardian();
         _setupProfile__Funder();
+        _setupProfile__Rescuer();
     }
 
     function _logDeployment(string memory, string memory, address) internal virtual {}
@@ -421,38 +427,35 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         address disablerProfile = _getProfile__Disabler();
         require(disablerProfile != address(0), "Disabler profile address not set");
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](22);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](20);
 
         // Allocator (defensive)
         roles[0] = RolesConfig.getRole__rebalance();
         roles[1] = RolesConfig.getRole__removeStrategy();
         roles[2] = RolesConfig.getRole__disableDepositsToStrategy();
         roles[3] = RolesConfig.getRole__distrustStrategy();
-        // Rescue (multi-target)
-        roles[4] = RolesConfig.getRole__rescueTokens();
-        roles[5] = RolesConfig.getRole__rescueNative();
         // AssetRegistry (defensive)
-        roles[6] = RolesConfig.getRole__disableAllocatorDeposits();
-        roles[7] = RolesConfig.getRole__disableUserDeposits();
-        roles[8] = RolesConfig.getRole__disableSwapInput();
-        roles[9] = RolesConfig.getRole__disableSwapOutput();
-        roles[10] = RolesConfig.getRole__distrustAsset();
+        roles[4] = RolesConfig.getRole__disableAllocatorDeposits();
+        roles[5] = RolesConfig.getRole__disableUserDeposits();
+        roles[6] = RolesConfig.getRole__disableSwapInput();
+        roles[7] = RolesConfig.getRole__disableSwapOutput();
+        roles[8] = RolesConfig.getRole__distrustAsset();
         // Gateway
-        roles[11] = RolesConfig.getRole__removeFundsBridgeAdapter();
+        roles[9] = RolesConfig.getRole__removeFundsBridgeAdapter();
         // WithdrawalExecutionPolicy
-        roles[12] = RolesConfig.getRole__removeSigner();
-        roles[13] = RolesConfig.getRole__lowerRedemptionCapacity();
-        roles[14] = RolesConfig.getRole__lowerRedemptionRefillRate();
+        roles[10] = RolesConfig.getRole__removeSigner();
+        roles[11] = RolesConfig.getRole__lowerRedemptionCapacity();
+        roles[12] = RolesConfig.getRole__lowerRedemptionRefillRate();
         // SlippageCoverageVault
-        roles[15] = RolesConfig.getRole__lowerPullCapPerTx();
-        roles[16] = RolesConfig.getRole__lowerWindowCap();
-        roles[17] = RolesConfig.getRole__raiseWindowSeconds();
+        roles[13] = RolesConfig.getRole__lowerPullCapPerTx();
+        roles[14] = RolesConfig.getRole__lowerWindowCap();
+        roles[15] = RolesConfig.getRole__raiseWindowSeconds();
         // DepositPolicy is Accounting Chain-only, but granted in both chain setups.
-        roles[18] = RolesConfig.getRole__lowerDepositCapacity();
-        roles[19] = RolesConfig.getRole__lowerDepositRefillRate();
+        roles[16] = RolesConfig.getRole__lowerDepositCapacity();
+        roles[17] = RolesConfig.getRole__lowerDepositRefillRate();
         // FundsBridgingPolicy
-        roles[20] = RolesConfig.getRole__lowerBridgingCapacity();
-        roles[21] = RolesConfig.getRole__lowerBridgingRefillRate();
+        roles[18] = RolesConfig.getRole__lowerBridgingCapacity();
+        roles[19] = RolesConfig.getRole__lowerBridgingRefillRate();
 
         _grantRolesToProfile(disablerProfile, roles);
     }
@@ -491,6 +494,18 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         roles[1] = RolesConfig.getRole__fundCoverage();
 
         _grantRolesToProfile(funder, roles);
+    }
+
+    function _setupProfile__Rescuer() internal {
+        address rescuer = _getProfile__Rescuer();
+        require(rescuer != address(0), "Rescuer profile address not set");
+
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](2);
+
+        roles[0] = RolesConfig.getRole__rescueTokens();
+        roles[1] = RolesConfig.getRole__rescueNative();
+
+        _grantRolesToProfile(rescuer, roles);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////

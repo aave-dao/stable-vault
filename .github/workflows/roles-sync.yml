@@ -85,8 +85,8 @@ jobs:
   notion-sync:
     name: Notion Sync
     needs: build-and-validate
-    # Only runs on master, so a branch can never push roles data to the live Notion DBs.
-    if: github.ref == 'refs/heads/master' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    # Notion writes are manual-only to avoid rate-limit flakes blocking CI.
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
