@@ -139,9 +139,9 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
 
     /// @dev Constructor.
     /// @param withdrawalExecutionPolicyApplier Address allowed to apply the withdrawal-execution policy.
-    /// @param minRedemptionCapacity Floor for the redemption bucket capacity. May be zero to let the multisig
+    /// @param minRedemptionCapacity Floor for the redemption bucket capacity. May be zero to let the admin(s)
     /// halt redemptions via `lowerRedemptionCapacity(0)` in an emergency.
-    /// @param minRedemptionRefillRate Floor for the redemption bucket refill rate. May be zero to let the multisig
+    /// @param minRedemptionRefillRate Floor for the redemption bucket refill rate. May be zero to let the admin(s)
     /// halt the refill via `lowerRedemptionRefillRate(0)` in an emergency.
     constructor(
         address withdrawalExecutionPolicyApplier,

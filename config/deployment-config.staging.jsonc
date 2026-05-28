@@ -27,7 +27,7 @@
   },
   "slippageCoverageVault": {
     "maxSlippageBps": "50", // 0.5%
-    "overrideMaxSlippageBps": "10000", // 100% — emergency depeg flexibility; SecondaryAdmin controls when override is on
+    "overrideMaxSlippageBps": "10000", // 100%
     "initialOverrideMode": true,
     "perAssetCaps": {
       "gho": {
@@ -95,8 +95,8 @@
         "capacityRay": "200000000000000000000000000000", // $200
         "refillRateRay": "2314814814814814814814814" // $200/day
       },
-      "minRedemptionCapacityRay": "0", // allow multisig to halt redemptions
-      "minRedemptionRefillRateRay": "0" // allow multisig to halt refill
+      "minRedemptionCapacityRay": "0",
+      "minRedemptionRefillRateRay": "0"
     },
     "deploymentOutputPath": "deployments/staging/v2/earning.json",
     "minBurnIouTokenGasLimit": "120000"
@@ -166,8 +166,8 @@
         "capacityRay": "200000000000000000000000000000", // $200
         "refillRateRay": "2314814814814814814814814" // $200/day
       },
-      "minRedemptionCapacityRay": "0", // allow multisig to halt redemptions
-      "minRedemptionRefillRateRay": "0" // allow multisig to halt refill
+      "minRedemptionCapacityRay": "0",
+      "minRedemptionRefillRateRay": "0"
     },
     "deploymentOutputPath": "deployments/staging/v2/accounting.json"
   }
