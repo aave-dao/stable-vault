@@ -64,7 +64,13 @@ contract MockGateway is IChainGateway {
         _mockConsume();
     }
 
-    function addBridgeAdapter(address asset, uint256 chainId, address bridgeAdapter) external {}
-    function removeBridgeAdapter(address asset, uint256 chainId, address bridgeAdapter) external {}
+    function addFundsBridgeAdapter(address asset, uint256 chainId, address bridgeAdapter) external {}
+    function removeFundsBridgeAdapter(address asset, uint256 chainId, address bridgeAdapter) external {}
+    function addDataOnlyBridgeAdapter(uint256 chainId, address bridgeAdapter) external {}
+    function initiateDataOnlyBridgeAdapterRemoval(uint256 chainId, address bridgeAdapter)
+        external
+        returns (bytes32 removalId)
+    {}
+    function finalizeDataOnlyBridgeAdapterRemoval(uint256 chainId, address bridgeAdapter, bytes32 removalId) external {}
     function receiveMessage(uint256 sourceChainId, address asset, uint256 amount, bytes memory data) external {}
 }

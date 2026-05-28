@@ -9,4 +9,7 @@ solady/=lib/solady/
 @aave-vault/=lib/aave-vault/src/
 @aave-v3-core/=lib/aave-vault/lib/aave-v3-core/contracts/
 @aave-v3-periphery/=lib/aave-vault/lib/aave-v3-periphery/contracts/
+aave-delivery-infrastructure/=lib/aave-delivery-infrastructure/src/
+openzeppelin-contracts/=lib/openzeppelin-contracts/
 pigeon/=lib/pigeon/
+solidity-utils/=lib/aave-delivery-infrastructure/lib/solidity-utils/src/

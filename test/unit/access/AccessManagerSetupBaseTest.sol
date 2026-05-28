@@ -254,7 +254,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         expected[7] = RolesConfig.getRole__disableSwapOutput().roleId;
         expected[8] = RolesConfig.getRole__distrustAsset().roleId;
         // Gateway
-        expected[9] = RolesConfig.getRole__removeBridgeAdapter().roleId;
+        expected[9] = RolesConfig.getRole__removeFundsBridgeAdapter().roleId;
         // WithdrawalExecutionPolicy
         expected[10] = RolesConfig.getRole__removeSigner().roleId;
         expected[11] = RolesConfig.getRole__lowerRedemptionCapacity().roleId;

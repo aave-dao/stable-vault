@@ -79,13 +79,15 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         );
 
         vm.prank(admin);
-        accountingChainGateway.addBridgeAdapter(
-            Constants.ASSET_FOR_DATA_ONLY_BRIDGE, EARNING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
+        accountingChainGateway.addDataOnlyBridgeAdapter(EARNING_CHAIN_ID, address(_mockBridgeCcipFeeParams));
+        vm.prank(admin);
+        accountingChainGateway.addFundsBridgeAdapter(
+            address(_mockUsdt), EARNING_CHAIN_ID, address(_mockBridgeAdapterAssets)
         );
         vm.prank(admin);
-        accountingChainGateway.addBridgeAdapter(address(_mockUsdt), EARNING_CHAIN_ID, address(_mockBridgeAdapterAssets));
-        vm.prank(admin);
-        accountingChainGateway.addBridgeAdapter(address(_mockGho), EARNING_CHAIN_ID, address(_mockBridgeAdapterAssets));
+        accountingChainGateway.addFundsBridgeAdapter(
+            address(_mockGho), EARNING_CHAIN_ID, address(_mockBridgeAdapterAssets)
+        );
 
         return accountingChainGateway;
     }
@@ -214,67 +216,186 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         _accountingChainGateway.rescueNative(amount);
     }
 
-    function test_removeBridgeAdapter_removesBridgeAdapter() public {
+    function test_removeFundsBridgeAdapter_removesBridgeAdapter() public {
         vm.expectEmit(true, true, true, true);
-        emit IChainGateway.BridgeAdapterRemoved(address(_mockUsdt), EARNING_CHAIN_ID, address(_mockBridgeAdapterAssets));
+        emit IChainGateway.FundsBridgeAdapterRemoved(
+            address(_mockUsdt), EARNING_CHAIN_ID, address(_mockBridgeAdapterAssets)
+        );
         vm.prank(admin);
-        _accountingChainGateway.removeBridgeAdapter(
+        _accountingChainGateway.removeFundsBridgeAdapter(
             address(_mockUsdt), EARNING_CHAIN_ID, address(_mockBridgeAdapterAssets)
         );
     }
 
-    function test_removeBridgeAdapter_reverts_ifLastDataOnlyBridgeAdapter() public {
+    function test_initiateDataOnlyBridgeAdapterRemoval_reverts_ifLastDataOnlyBridgeAdapter() public {
         vm.expectRevert(IChainGateway.CannotRemoveLastDataOnlyBridgeAdapter.selector);
         vm.prank(admin);
-        _accountingChainGateway.removeBridgeAdapter(
-            Constants.ASSET_FOR_DATA_ONLY_BRIDGE, EARNING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
+        _accountingChainGateway.initiateDataOnlyBridgeAdapterRemoval(
+            EARNING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
         );
     }
 
-    function test_removeBridgeAdapter_removesDataOnlyBridgeAdapter_ifAnotherDataOnlyBridgeAdapterExists() public {
+    function test_finalizeDataOnlyBridgeAdapterRemoval_removesBridgeAdapter_ifRemovalWasInitiated() public {
         address bridgeAdapter = makeAddr("bridgeAdapter");
 
         vm.prank(admin);
-        _accountingChainGateway.addBridgeAdapter(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, EARNING_CHAIN_ID, bridgeAdapter);
+        _accountingChainGateway.addDataOnlyBridgeAdapter(EARNING_CHAIN_ID, bridgeAdapter);
+
+        bytes32 removalId = keccak256(
+            abi.encode(
+                EARNING_CHAIN_ID,
+                address(_mockBridgeCcipFeeParams),
+                blockhash(block.number - 1),
+                block.prevrandao,
+                block.timestamp,
+                address(_accountingChainGateway)
+            )
+        );
+        vm.expectEmit(true, true, true, true);
+        emit IChainGateway.DataOnlyBridgeAdapterRemovalInitiated(
+            EARNING_CHAIN_ID, address(_mockBridgeCcipFeeParams), removalId
+        );
+        vm.prank(admin);
+        bytes32 actualRemovalId = _accountingChainGateway.initiateDataOnlyBridgeAdapterRemoval(
+            EARNING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
+        );
+        assertEq(actualRemovalId, removalId);
 
         vm.expectEmit(true, true, true, true);
-        emit IChainGateway.BridgeAdapterRemoved(
-            Constants.ASSET_FOR_DATA_ONLY_BRIDGE, EARNING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
-        );
+        emit IChainGateway.DataOnlyBridgeAdapterRemovalFinalized(EARNING_CHAIN_ID, address(_mockBridgeCcipFeeParams));
         vm.prank(admin);
-        _accountingChainGateway.removeBridgeAdapter(
-            Constants.ASSET_FOR_DATA_ONLY_BRIDGE, EARNING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
+        _accountingChainGateway.finalizeDataOnlyBridgeAdapterRemoval(
+            EARNING_CHAIN_ID, address(_mockBridgeCcipFeeParams), removalId
         );
 
-        assertFalse(
-            _accountingChainGateway.isBridgeAdapterSupported(
-                Constants.ASSET_FOR_DATA_ONLY_BRIDGE, EARNING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
-            )
+        assertEq(
+            uint8(
+                _accountingChainGateway.getDataOnlyBridgeAdapterMode(
+                    EARNING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
+                )
+            ),
+            uint8(IChainGateway.DataOnlyBridgeAdapterMode.NOT_SUPPORTED)
         );
-        assertTrue(
-            _accountingChainGateway.isBridgeAdapterSupported(
-                Constants.ASSET_FOR_DATA_ONLY_BRIDGE, EARNING_CHAIN_ID, bridgeAdapter
-            )
+        assertEq(
+            uint8(_accountingChainGateway.getDataOnlyBridgeAdapterMode(EARNING_CHAIN_ID, bridgeAdapter)),
+            uint8(IChainGateway.DataOnlyBridgeAdapterMode.SEND_AND_RECEIVE)
         );
     }
 
-    function test_removeBridgeAdapter_reverts_ifNotWhitelisted() public {
-        vm.expectRevert(Errors.AddressNotWhitelisted.selector);
+    function test_getDataOnlyBridgeAdapterRemovalId_tracksRemovalLifecycle() public {
+        address bridgeAdapter = makeAddr("bridgeAdapter");
+
+        assertEq(_accountingChainGateway.getDataOnlyBridgeAdapterRemovalId(EARNING_CHAIN_ID, bridgeAdapter), bytes32(0));
+
         vm.prank(admin);
-        _accountingChainGateway.removeBridgeAdapter(
-            Constants.ASSET_FOR_DATA_ONLY_BRIDGE, EARNING_CHAIN_ID, makeAddr("bridgeAdapter")
+        _accountingChainGateway.addDataOnlyBridgeAdapter(EARNING_CHAIN_ID, bridgeAdapter);
+        assertEq(_accountingChainGateway.getDataOnlyBridgeAdapterRemovalId(EARNING_CHAIN_ID, bridgeAdapter), bytes32(0));
+
+        vm.prank(admin);
+        bytes32 removalId = _accountingChainGateway.initiateDataOnlyBridgeAdapterRemoval(
+            EARNING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
+        );
+        assertEq(
+            _accountingChainGateway.getDataOnlyBridgeAdapterRemovalId(
+                EARNING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
+            ),
+            removalId
+        );
+
+        vm.prank(admin);
+        _accountingChainGateway.finalizeDataOnlyBridgeAdapterRemoval(
+            EARNING_CHAIN_ID, address(_mockBridgeCcipFeeParams), removalId
+        );
+        assertEq(
+            _accountingChainGateway.getDataOnlyBridgeAdapterRemovalId(
+                EARNING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
+            ),
+            bytes32(0)
         );
     }
 
-    /// @dev `setUp` pre-wires (ASSET_FOR_DATA_ONLY_BRIDGE, EARNING_CHAIN_ID, _mockBridgeCcipFeeParams),
-    /// (_mockUsdt, EARNING_CHAIN_ID, _mockBridgeAdapterAssets), and (_mockGho, EARNING_CHAIN_ID,
-    /// _mockBridgeAdapterAssets). Fuzz inputs that hit any of those triples must be excluded.
-    function _assumeFreshBridgeAdapterTuple(address asset, uint256 chainId, address bridgeAdapter) internal view {
+    function test_finalizeDataOnlyBridgeAdapterRemoval_reverts_ifRemovalIdDoesNotMatch() public {
+        address bridgeAdapter = makeAddr("bridgeAdapter");
+
+        vm.prank(admin);
+        _accountingChainGateway.addDataOnlyBridgeAdapter(EARNING_CHAIN_ID, bridgeAdapter);
+
+        vm.prank(admin);
+        bytes32 removalId = _accountingChainGateway.initiateDataOnlyBridgeAdapterRemoval(
+            EARNING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
+        );
+        bytes32 invalidRemovalId = bytes32(uint256(removalId) ^ 1);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IChainGateway.InvalidDataOnlyBridgeAdapterRemovalId.selector, invalidRemovalId, removalId
+            )
+        );
+        vm.prank(admin);
+        _accountingChainGateway.finalizeDataOnlyBridgeAdapterRemoval(
+            EARNING_CHAIN_ID, address(_mockBridgeCcipFeeParams), invalidRemovalId
+        );
+    }
+
+    function test_finalizeDataOnlyBridgeAdapterRemoval_reverts_ifNotWhitelisted() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IChainGateway.UnexpectedDataOnlyBridgeAdapterMode.selector,
+                uint8(IChainGateway.DataOnlyBridgeAdapterMode.NOT_SUPPORTED),
+                uint8(IChainGateway.DataOnlyBridgeAdapterMode.RECEIVE_ONLY)
+            )
+        );
+        vm.prank(admin);
+        _accountingChainGateway.finalizeDataOnlyBridgeAdapterRemoval(
+            EARNING_CHAIN_ID, makeAddr("bridgeAdapter"), bytes32(0)
+        );
+    }
+
+    function test_dataOnlyBridgeAdapterReceiveOnly_receivesButCannotSend() public {
+        address replacementAdapter = makeAddr("replacementAdapter");
+        address iouTokenRecipient = makeAddr("iouTokenRecipient");
+        uint256 iouTokenAmountRay = 100_000;
+
+        vm.prank(admin);
+        _accountingChainGateway.addDataOnlyBridgeAdapter(EARNING_CHAIN_ID, replacementAdapter);
+        vm.prank(admin);
+        _accountingChainGateway.initiateDataOnlyBridgeAdapterRemoval(
+            EARNING_CHAIN_ID, address(_mockBridgeCcipFeeParams)
+        );
+
+        vm.expectRevert(IChainGateway.AdapterNotFound.selector);
+        vm.prank(address(_mockIouTokenManager));
+        _accountingChainGateway.sendBridgeIouTokenMessageWithFeePayer(
+            EARNING_CHAIN_ID,
+            iouTokenRecipient,
+            iouTokenAmountRay,
+            address(_mockBridgeCcipFeeParams),
+            address(this),
+            DEFAULT_GAS_LIMIT,
+            abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0}))
+        );
+
+        bytes memory data = abi.encode(
+            IChainGateway.CrossChainMessage({
+                messageType: IChainGateway.MessageType.BRIDGE_IOU_TOKEN,
+                data: abi.encode(
+                    IChainGateway.IouTokenBridgeMessage({recipient: iouTokenRecipient, amount: iouTokenAmountRay})
+                )
+            })
+        );
+        vm.expectCall(
+            address(_mockIouTokenManager),
+            abi.encodeCall(IIouTokenManager.releaseTokens, (iouTokenRecipient, iouTokenAmountRay))
+        );
+        vm.prank(address(_mockBridgeCcipFeeParams));
+        _accountingChainGateway.receiveMessage(EARNING_CHAIN_ID, Constants.ASSET_FOR_DATA_ONLY_BRIDGE, 0, data);
+    }
+
+    /// @dev `setUp` pre-wires (_mockUsdt, EARNING_CHAIN_ID, _mockBridgeAdapterAssets) and (_mockGho,
+    /// EARNING_CHAIN_ID, _mockBridgeAdapterAssets). Fuzz inputs that hit either triple must be excluded.
+    function _assumeFreshFundsBridgeAdapterTuple(address asset, uint256 chainId, address bridgeAdapter) internal view {
         vm.assume(asset != address(0) && bridgeAdapter != address(0) && chainId != 0 && chainId != block.chainid);
-        vm.assume(
-            !(asset == Constants.ASSET_FOR_DATA_ONLY_BRIDGE && chainId == EARNING_CHAIN_ID
-                    && bridgeAdapter == address(_mockBridgeCcipFeeParams))
-        );
+        vm.assume(asset != Constants.ASSET_FOR_DATA_ONLY_BRIDGE);
         vm.assume(
             !(asset == address(_mockUsdt) && chainId == EARNING_CHAIN_ID
                     && bridgeAdapter == address(_mockBridgeAdapterAssets))
@@ -285,81 +406,82 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         );
     }
 
-    function test_isBridgeAdapterSupported_returnsTrueAfterAdd(address asset, uint256 chainId, address bridgeAdapter)
-        public
-    {
-        _assumeFreshBridgeAdapterTuple(asset, chainId, bridgeAdapter);
-
-        assertFalse(_accountingChainGateway.isBridgeAdapterSupported(asset, chainId, bridgeAdapter));
-
-        vm.prank(everyRoleAccount);
-        _accountingChainGateway.addBridgeAdapter(asset, chainId, bridgeAdapter);
-
-        assertTrue(_accountingChainGateway.isBridgeAdapterSupported(asset, chainId, bridgeAdapter));
-    }
-
-    function test_isBridgeAdapterSupported_returnsFalseAfterRemove(
+    function test_isFundsBridgeAdapterSupported_returnsTrueAfterAdd(
         address asset,
         uint256 chainId,
         address bridgeAdapter
     ) public {
-        _assumeFreshBridgeAdapterTuple(asset, chainId, bridgeAdapter);
-        vm.assume(asset != Constants.ASSET_FOR_DATA_ONLY_BRIDGE);
+        _assumeFreshFundsBridgeAdapterTuple(asset, chainId, bridgeAdapter);
+
+        assertFalse(_accountingChainGateway.isFundsBridgeAdapterSupported(asset, chainId, bridgeAdapter));
 
         vm.prank(everyRoleAccount);
-        _accountingChainGateway.addBridgeAdapter(asset, chainId, bridgeAdapter);
-        assertTrue(_accountingChainGateway.isBridgeAdapterSupported(asset, chainId, bridgeAdapter));
+        _accountingChainGateway.addFundsBridgeAdapter(asset, chainId, bridgeAdapter);
 
-        vm.prank(everyRoleAccount);
-        _accountingChainGateway.removeBridgeAdapter(asset, chainId, bridgeAdapter);
-        assertFalse(_accountingChainGateway.isBridgeAdapterSupported(asset, chainId, bridgeAdapter));
+        assertTrue(_accountingChainGateway.isFundsBridgeAdapterSupported(asset, chainId, bridgeAdapter));
     }
 
-    function test_isBridgeAdapterSupported_returnsFalseForUnsetAdapter(
+    function test_isFundsBridgeAdapterSupported_returnsFalseAfterRemove(
+        address asset,
+        uint256 chainId,
+        address bridgeAdapter
+    ) public {
+        _assumeFreshFundsBridgeAdapterTuple(asset, chainId, bridgeAdapter);
+
+        vm.prank(everyRoleAccount);
+        _accountingChainGateway.addFundsBridgeAdapter(asset, chainId, bridgeAdapter);
+        assertTrue(_accountingChainGateway.isFundsBridgeAdapterSupported(asset, chainId, bridgeAdapter));
+
+        vm.prank(everyRoleAccount);
+        _accountingChainGateway.removeFundsBridgeAdapter(asset, chainId, bridgeAdapter);
+        assertFalse(_accountingChainGateway.isFundsBridgeAdapterSupported(asset, chainId, bridgeAdapter));
+    }
+
+    function test_isFundsBridgeAdapterSupported_returnsFalseForUnsetAdapter(
         address asset,
         uint256 chainId,
         address bridgeAdapter
     ) public view {
-        _assumeFreshBridgeAdapterTuple(asset, chainId, bridgeAdapter);
-        assertFalse(_accountingChainGateway.isBridgeAdapterSupported(asset, chainId, bridgeAdapter));
+        _assumeFreshFundsBridgeAdapterTuple(asset, chainId, bridgeAdapter);
+        assertFalse(_accountingChainGateway.isFundsBridgeAdapterSupported(asset, chainId, bridgeAdapter));
     }
 
-    function test_addBridgeAdapter_setsExpectedBridgeAdapter(address asset, uint256 chainId, address bridgeAdapter)
+    function test_addFundsBridgeAdapter_setsExpectedBridgeAdapter(address asset, uint256 chainId, address bridgeAdapter)
         public
     {
-        _assumeFreshBridgeAdapterTuple(asset, chainId, bridgeAdapter);
+        _assumeFreshFundsBridgeAdapterTuple(asset, chainId, bridgeAdapter);
         vm.prank(admin);
-        _accountingChainGateway.addBridgeAdapter(asset, chainId, bridgeAdapter);
-        assertTrue(_accountingChainGateway.isBridgeAdapterSupported(asset, chainId, bridgeAdapter));
+        _accountingChainGateway.addFundsBridgeAdapter(asset, chainId, bridgeAdapter);
+        assertTrue(_accountingChainGateway.isFundsBridgeAdapterSupported(asset, chainId, bridgeAdapter));
     }
 
-    function test_addBridgeAdapter_reverts_ifAlreadyAdded() public {
+    function test_addFundsBridgeAdapter_reverts_ifAlreadyAdded() public {
         address bridgeAdapter = makeAddr("bridgeAdapter");
         address asset = address(_mockUsdt);
 
         vm.prank(everyRoleAccount);
-        _accountingChainGateway.addBridgeAdapter(asset, EARNING_CHAIN_ID, bridgeAdapter);
+        _accountingChainGateway.addFundsBridgeAdapter(asset, EARNING_CHAIN_ID, bridgeAdapter);
         vm.expectRevert(Errors.AddressAlreadyWhitelisted.selector);
         vm.prank(everyRoleAccount);
-        _accountingChainGateway.addBridgeAdapter(asset, EARNING_CHAIN_ID, bridgeAdapter);
+        _accountingChainGateway.addFundsBridgeAdapter(asset, EARNING_CHAIN_ID, bridgeAdapter);
     }
 
-    function test_addBridgeAdapter_reverts_ifAdapterIsZeroAddress() public {
+    function test_addFundsBridgeAdapter_reverts_ifAdapterIsZeroAddress() public {
         vm.expectRevert(Errors.ZeroAddress.selector);
         vm.prank(everyRoleAccount);
-        _accountingChainGateway.addBridgeAdapter(address(_mockUsdt), EARNING_CHAIN_ID, address(0));
+        _accountingChainGateway.addFundsBridgeAdapter(address(_mockUsdt), EARNING_CHAIN_ID, address(0));
     }
 
-    function test_addBridgeAdapter_reverts_ifChainIdIsSelf() public {
+    function test_addFundsBridgeAdapter_reverts_ifChainIdIsSelf() public {
         vm.expectRevert(Errors.InvalidParameter.selector);
         vm.prank(everyRoleAccount);
-        _accountingChainGateway.addBridgeAdapter(address(_mockUsdt), block.chainid, makeAddr("bridgeAdapter"));
+        _accountingChainGateway.addFundsBridgeAdapter(address(_mockUsdt), block.chainid, makeAddr("bridgeAdapter"));
     }
 
-    function test_addBridgeAdapter_reverts_ifChainIdIsZero() public {
+    function test_addFundsBridgeAdapter_reverts_ifChainIdIsZero() public {
         vm.expectRevert(Errors.InvalidParameter.selector);
         vm.prank(everyRoleAccount);
-        _accountingChainGateway.addBridgeAdapter(address(_mockUsdt), 0, makeAddr("bridgeAdapter"));
+        _accountingChainGateway.addFundsBridgeAdapter(address(_mockUsdt), 0, makeAddr("bridgeAdapter"));
     }
 
     function test_sendBridgeIouTokenMessageWithFeePayer_withTokenBridgeFee(
@@ -864,7 +986,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         // Add a new whitelisted bridge adapter for message bridge
         address unknownAdapter = makeAddr("unknownAdapter");
         vm.prank(admin);
-        _accountingChainGateway.addBridgeAdapter(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, EARNING_CHAIN_ID, unknownAdapter);
+        _accountingChainGateway.addDataOnlyBridgeAdapter(EARNING_CHAIN_ID, unknownAdapter);
 
         vm.expectCall(
             address(_mockIouTokenManager), abi.encodeCall(IIouTokenManager.burnLockedTokens, (iouTokenAmountBurnedRay))
@@ -904,7 +1026,7 @@ contract AccountingChainGatewayTest is TestWithHelpers {
 
         address unknownAdapter = makeAddr("unknownAdapter");
         vm.prank(admin);
-        _accountingChainGateway.addBridgeAdapter(address(_mockUsdt), EARNING_CHAIN_ID, unknownAdapter);
+        _accountingChainGateway.addFundsBridgeAdapter(address(_mockUsdt), EARNING_CHAIN_ID, unknownAdapter);
 
         vm.expectCall(
             address(_mockFundsHandler),
@@ -1269,7 +1391,9 @@ contract AccountingChainGatewayTest is TestWithHelpers {
         // Unset the bridge adapter for asset bridging
         address assetToBridge = address(_mockUsdt);
         vm.prank(admin);
-        _accountingChainGateway.removeBridgeAdapter(assetToBridge, EARNING_CHAIN_ID, address(_mockBridgeAdapterAssets));
+        _accountingChainGateway.removeFundsBridgeAdapter(
+            assetToBridge, EARNING_CHAIN_ID, address(_mockBridgeAdapterAssets)
+        );
 
         bytes memory bridgeAdapterData =
             abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0}));

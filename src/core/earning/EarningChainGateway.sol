@@ -203,7 +203,7 @@ contract EarningChainGateway is
                 )
             })
         );
-        _validateBridgeAdapterIsSupported(asset, ACCOUNTING_CHAIN_ID, bridgeAdapter);
+        _validateFundsBridgeAdapterIsSupported(asset, ACCOUNTING_CHAIN_ID, bridgeAdapter);
         IBridgeAdapter(bridgeAdapter).publishMessageWithFunds{value: msg.value}(
             ACCOUNTING_CHAIN_ID,
             asset,
@@ -301,7 +301,7 @@ contract EarningChainGateway is
             })
         );
 
-        _validateBridgeAdapterIsSupported(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ACCOUNTING_CHAIN_ID, bridgeAdapter);
+        _validateDataOnlyBridgeAdapterCanSend(ACCOUNTING_CHAIN_ID, bridgeAdapter);
         IBridgeAdapter(bridgeAdapter).publishDataOnlyMessage{value: msg.value}(
             ACCOUNTING_CHAIN_ID, burnIouTokenMessageEncoded, feePayer, payloadExecutionGasLimit, bridgeAdapterData
         );

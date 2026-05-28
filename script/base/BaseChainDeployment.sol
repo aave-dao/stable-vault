@@ -2,10 +2,14 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.20;
 
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
+import {ICrossChainForwarder} from "aave-delivery-infrastructure/contracts/interfaces/ICrossChainForwarder.sol";
+import {ICrossChainReceiver} from "aave-delivery-infrastructure/contracts/interfaces/ICrossChainReceiver.sol";
+import {IWithGuardian} from "aave-delivery-infrastructure/contracts/old-oz/interfaces/IWithGuardian.sol";
 import {AccessManager} from "openzeppelin-contracts/contracts/access/manager/AccessManager.sol";
 
 import {ATokenVaultDeployment} from "script/base/ATokenVaultDeployment.sol";
@@ -41,7 +45,6 @@ import {Swapper} from "src/periphery/Swapper.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
 import {FundsBridgingPolicy} from "src/policies/FundsBridgingPolicy.sol";
 import {WithdrawalExecutionPolicy} from "src/policies/WithdrawalExecutionPolicy.sol";
-import {Constants} from "src/types/Constants.sol";
 
 abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSetup, ATokenVaultDeployment {
     using Strings for address;
@@ -189,7 +192,41 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         // Validate withdrawal policy signer
         require(_configAddress(".withdrawalExecutionPolicy.signer") != address(0), "Withdrawal policy signer not set");
 
+        if (_shouldRegisterAdiOnGateway()) {
+            _validateAdiConfiguration();
+        }
+
         _validateChainSpecificExternalAddresses();
+    }
+
+    function _validateAdiConfiguration() internal view virtual {
+        address adiCrossChainController = _adiCrossChainController();
+        require(adiCrossChainController != address(0), "Adi CCC address not set");
+        require(adiCrossChainController.code.length != 0, "Adi CCC has no code");
+        require(
+            Ownable(adiCrossChainController).owner() == getAccessManagerAddress(_deployer()),
+            "Adi CCC owner is not AccessManager"
+        );
+        require(
+            IWithGuardian(adiCrossChainController).guardian() == getAdiAdapterAddress(_deployer()),
+            "Adi CCC guardian is not AdiAdapter"
+        );
+
+        uint256 remoteChainId = _configUint(string.concat(_remoteChainConfigPrefix(), ".chainId"));
+        ICrossChainForwarder forwarder = ICrossChainForwarder(adiCrossChainController);
+        forwarder.getCurrentEnvelopeNonce();
+        forwarder.getCurrentTransactionNonce();
+        require(
+            forwarder.getForwarderBridgeAdaptersByChain(remoteChainId).length > 0, "Adi CCC forwarder adapters not set"
+        );
+
+        ICrossChainReceiver receiver = ICrossChainReceiver(adiCrossChainController);
+        require(
+            receiver.getReceiverBridgeAdaptersByChain(remoteChainId).length > 0, "Adi CCC receiver adapters not set"
+        );
+        ICrossChainReceiver.ReceiverConfiguration memory receiverConfiguration =
+            receiver.getConfigurationByChain(remoteChainId);
+        require(receiverConfiguration.requiredConfirmation > 0, "Adi CCC receiver confirmations not set");
     }
 
     /// @dev Asserts that the deployer holds enough native + ERC20 balance to complete the deploy. Runs before
@@ -227,8 +264,12 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         return getAccessManagerAddress(_deployer());
     }
 
-    function _isAdiAdapterDeployed() internal view virtual override returns (bool) {
-        return _configAddress(string.concat(_chainConfigPrefix(), ".adi.crossChainController")) != address(0);
+    function _shouldRegisterAdiOnGateway() internal view virtual override returns (bool) {
+        return _configBool(string.concat(_chainConfigPrefix(), ".adi.registerOnGateway"));
+    }
+
+    function _adiCrossChainController() internal view virtual override returns (address) {
+        return _configAddress(string.concat(_chainConfigPrefix(), ".adi.crossChainController"));
     }
 
     function _deployedATokenVaultAddresses() internal view virtual override returns (address[] memory) {
@@ -287,9 +328,9 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         uint256 remoteChainId = _configUint(string.concat(_remoteChainConfigPrefix(), ".chainId"));
         uint64 remoteCcipSelector = _configUint64(string.concat(_remoteChainConfigPrefix(), ".ccipSelector"));
 
-        _addBridgeAdapterIdempotent(gateway, _gho(), remoteChainId, localCcipAdapter);
-        _addBridgeAdapterIdempotent(gateway, _usdc(), remoteChainId, localCcipAdapter);
-        _addBridgeAdapterIdempotent(gateway, _usdt(), remoteChainId, localCcipAdapter);
+        _addFundsBridgeAdapterIdempotent(gateway, _gho(), remoteChainId, localCcipAdapter);
+        _addFundsBridgeAdapterIdempotent(gateway, _usdc(), remoteChainId, localCcipAdapter);
+        _addFundsBridgeAdapterIdempotent(gateway, _usdt(), remoteChainId, localCcipAdapter);
 
         /// @custom:tx-already-executed-check CCIP chain selector already set.
         if (ICcipBridgeAdapter(localCcipAdapter).getChainSelector(remoteChainId) != remoteCcipSelector) {
@@ -299,42 +340,60 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         }
         _setDestinationChainAdapterIdempotent(localCcipAdapter, remoteChainId, remoteCcipAdapter);
 
-        // Data-only messages use aDI.
-        // aDI adapter is registered on the gateway and configured for the counterparty chain only when the per-chain
-        // flag is set. This lets us deploy the adapter without yet routing messages through it.
-        if (_isAdiAdapterDeployed()) {
+        if (_shouldRegisterAdiOnGateway()) {
             // NOTE: Assumes the aDI adapter has the same address on both chains (CREATE3 + same deployer/salt).
             address localAdiAdapter = getAdiAdapterAddress(_deployer());
             address remoteAdiAdapter = localAdiAdapter;
             _setDestinationChainAdapterIdempotent(localAdiAdapter, remoteChainId, remoteAdiAdapter);
-            if (_configBool(string.concat(_chainConfigPrefix(), ".adi.registerOnGateway"))) {
-                _addBridgeAdapterIdempotent(
-                    gateway, Constants.ASSET_FOR_DATA_ONLY_BRIDGE, remoteChainId, localAdiAdapter
-                );
-            }
+            _addDataOnlyBridgeAdapterIdempotent(gateway, remoteChainId, localAdiAdapter);
         }
     }
 
-    function _addBridgeAdapterIdempotent(IChainGateway gateway, address asset, uint256 chainId, address bridgeAdapter)
-        private
-    {
+    function _addFundsBridgeAdapterIdempotent(
+        IChainGateway gateway,
+        address asset,
+        uint256 chainId,
+        address bridgeAdapter
+    ) private {
         /// @custom:tx-already-executed-check Skip when the (asset, chainId, bridgeAdapter) triple is already
         /// whitelisted on the gateway. This is the primary resume signal - a fresh attempt would revert with
         /// `AddressAlreadyWhitelisted`, and crucially forge would still capture that reverting call into the
         /// post-script broadcast simulation, failing the run.
-        if (BaseChainGateway(address(gateway)).isBridgeAdapterSupported(asset, chainId, bridgeAdapter)) {
-            logSkip("_addBridgeAdapterIdempotent", "bridge adapter registered");
+        if (BaseChainGateway(address(gateway)).isFundsBridgeAdapterSupported(asset, chainId, bridgeAdapter)) {
+            logSkip("_addFundsBridgeAdapterIdempotent", "funds bridge adapter registered");
             return;
         }
-        /// @custom:tx-already-executed-check Skip when the deployer can no longer call `addBridgeAdapter` -
+        /// @custom:tx-already-executed-check Skip when the deployer can no longer call `addFundsBridgeAdapter` -
         /// `_setupAccessManager` revokes the deployer's ADMIN_ROLE as its last step, so losing call access means a
         /// prior run completed everything up to and including bridge-adapter setup. This branch is reachable only if
         /// the registration check above somehow missed (e.g. on a future schema change), kept as a safety net.
-        if (!_deployerCanCall(address(gateway), IChainGateway.addBridgeAdapter.selector)) {
-            logSkip("_addBridgeAdapterIdempotent", "deployer lacks call access - prior run completed");
+        if (!_deployerCanCall(address(gateway), IChainGateway.addFundsBridgeAdapter.selector)) {
+            logSkip("_addFundsBridgeAdapterIdempotent", "deployer lacks call access - prior run completed");
             return;
         }
-        gateway.addBridgeAdapter(asset, chainId, bridgeAdapter);
+        gateway.addFundsBridgeAdapter(asset, chainId, bridgeAdapter);
+    }
+
+    function _addDataOnlyBridgeAdapterIdempotent(IChainGateway gateway, uint256 chainId, address bridgeAdapter)
+        private
+    {
+        IChainGateway.DataOnlyBridgeAdapterMode mode =
+            BaseChainGateway(address(gateway)).getDataOnlyBridgeAdapterMode(chainId, bridgeAdapter);
+        /// @custom:tx-already-executed-check Data-only adapter already registered.
+        if (mode == IChainGateway.DataOnlyBridgeAdapterMode.SEND_AND_RECEIVE) {
+            logSkip("_addDataOnlyBridgeAdapterIdempotent", "data-only bridge adapter registered");
+            return;
+        }
+        require(
+            mode == IChainGateway.DataOnlyBridgeAdapterMode.NOT_SUPPORTED,
+            "data-only bridge adapter mode does not match expected value"
+        );
+        /// @custom:tx-already-executed-check See `_addFundsBridgeAdapterIdempotent` for the same canCall safety-net.
+        if (!_deployerCanCall(address(gateway), IChainGateway.addDataOnlyBridgeAdapter.selector)) {
+            logSkip("_addDataOnlyBridgeAdapterIdempotent", "deployer lacks call access - prior run completed");
+            return;
+        }
+        gateway.addDataOnlyBridgeAdapter(chainId, bridgeAdapter);
     }
 
     function _setDestinationChainAdapterIdempotent(address adapter, uint256 chainId, address destAdapter) private {
@@ -349,7 +408,7 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
             current == address(0),
             "setDestinationChainAdapter: existing destination adapter does not match expected value"
         );
-        /// @custom:tx-already-executed-check See `_addBridgeAdapterIdempotent` for the same canCall safety-net.
+        /// @custom:tx-already-executed-check See `_addFundsBridgeAdapterIdempotent` for the same canCall safety-net.
         if (!_deployerCanCall(adapter, IBridgeAdapter.setDestinationChainAdapter.selector)) {
             logSkip("_setDestinationChainAdapterIdempotent", "deployer lacks call access - prior run completed");
             return;
@@ -951,7 +1010,7 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
     }
 
     function _deployAdiAdapter() internal returns (address) {
-        if (!_isAdiAdapterDeployed()) {
+        if (_shouldRegisterAdiOnGateway() == false) {
             return address(0);
         }
         address predicted = getAdiAdapterAddress(_deployer());
@@ -960,7 +1019,7 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
             abi.encode(
                 getAccessManagerAddress(_deployer()),
                 getGatewayAddress(_deployer()),
-                _configAddress(string.concat(_chainConfigPrefix(), ".adi.crossChainController")),
+                _adiCrossChainController(),
                 getTransferHelperAddress(_deployer())
             )
         );
