@@ -223,23 +223,6 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         _assertProfileRoleDelay(_getProfile__Funder(), expected[1], RolesConfig.NO_DELAY);
     }
 
-    function test_coverageGuardianProfile_hasTheExpectedRoles() public view {
-        uint64[] memory expected = new uint64[](2);
-        expected[0] = RolesConfig.getRole__enableOverrideMode().roleId;
-        expected[1] = RolesConfig.getRole__disableOverrideMode().roleId;
-        _assertProfileHasExactlyTheseRoles(_getProfile__CoverageGuardian(), expected);
-
-        // Trilemma: CoverageGuardian must NOT also be the Rebalancer.
-        assertTrue(_getProfile__CoverageGuardian() != _getProfile__Rebalancer(), "guardian == rebalancer");
-
-        // No on-chain delay on either selector; CoverageGuardian compromise resistance is structural (N-of-M
-        // multisig signer composition), not temporal. A timelock would slow legitimate depeg response without
-        // changing the worst case (CoverageGuardian + Rebalancer both compromised collapses to vault balance
-        // regardless).
-        _assertProfileRoleDelay(_getProfile__CoverageGuardian(), expected[0], RolesConfig.NO_DELAY);
-        _assertProfileRoleDelay(_getProfile__CoverageGuardian(), expected[1], RolesConfig.NO_DELAY);
-    }
-
     function test_disablerProfile_hasTheExpectedRoles() public view {
         uint64[] memory expected = new uint64[](20);
         // Allocator (defensive)

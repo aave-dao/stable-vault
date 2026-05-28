@@ -126,14 +126,6 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
     /// @custom:selector 0x1fb09b80
     error NonceAlreadyUsed();
 
-    /// @notice Thrown when the constructor receives a zero `minRedemptionCapacity` floor.
-    /// @custom:selector 0x0f29e556
-    error ZeroMinRedemptionCapacity();
-
-    /// @notice Thrown when the constructor receives a zero `minRedemptionRefillRate` floor.
-    /// @custom:selector 0xc4223463
-    error ZeroMinRedemptionRefillRate();
-
     modifier onlyWithdrawalExecutionPolicyApplier() {
         require(msg.sender == WITHDRAWAL_EXECUTION_POLICY_APPLIER, Errors.NotAuthorized());
         _;
@@ -147,16 +139,16 @@ contract WithdrawalExecutionPolicy is AccessManagedUpgradeable, EIP712Upgradeabl
 
     /// @dev Constructor.
     /// @param withdrawalExecutionPolicyApplier Address allowed to apply the withdrawal-execution policy.
-    /// @param minRedemptionCapacity Floor for the redemption bucket capacity. Must be non-zero.
-    /// @param minRedemptionRefillRate Floor for the redemption bucket refill rate. Must be non-zero.
+    /// @param minRedemptionCapacity Floor for the redemption bucket capacity. May be zero to let the admin(s)
+    /// halt redemptions via `lowerRedemptionCapacity(0)` in an emergency.
+    /// @param minRedemptionRefillRate Floor for the redemption bucket refill rate. May be zero to let the admin(s)
+    /// halt the refill via `lowerRedemptionRefillRate(0)` in an emergency.
     constructor(
         address withdrawalExecutionPolicyApplier,
         uint128 minRedemptionCapacity,
         uint128 minRedemptionRefillRate
     ) EIP712Upgradeable() {
         require(withdrawalExecutionPolicyApplier != address(0), Errors.ZeroAddress());
-        require(minRedemptionCapacity > 0, ZeroMinRedemptionCapacity());
-        require(minRedemptionRefillRate > 0, ZeroMinRedemptionRefillRate());
         _disableInitializers();
         WITHDRAWAL_EXECUTION_POLICY_APPLIER = withdrawalExecutionPolicyApplier;
         MIN_REDEMPTION_CAPACITY = minRedemptionCapacity;

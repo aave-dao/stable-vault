@@ -18,7 +18,6 @@
     "withdrawalPolicyManager": "0x43cEA7b37F81197fF60FE1700Fd97905f868A94C",
     "aTokenVaultRewardClaimer": "0xE49D14D7157412da6145a155DaeFdD1cA069f626",
     "stableVaultManager": "0x4B0353F7B7122862487d22C447bd9cDc91779133",
-    "coverageGuardian": "0x00000000000000000000000000000000C0FEC0FE",
     "funder": "0x00000000000000000000000000000000C0FE7EA5",
     "rescuer": "0x00000000000000000000000000000000DEADBABE"
   },
@@ -28,7 +27,7 @@
   },
   "slippageCoverageVault": {
     "maxSlippageBps": "100",
-    "overrideMaxSlippageBps": "5000",
+    "overrideMaxSlippageBps": "10000",
     "initialOverrideMode": true,
     "perAssetCaps": {
       "gho": {
@@ -82,8 +81,8 @@
         "capacityRay": "1000000000000000000000000000000000000",
         "refillRateRay": "11574074074074074074074074074"
       },
-      "minRedemptionCapacityRay": "1000000000000000000000000000000",
-      "minRedemptionRefillRateRay": "11574074074074074074074074"
+      "minRedemptionCapacityRay": "0",
+      "minRedemptionRefillRateRay": "0"
     },
     "deploymentOutputPath": "deployments/vnet/v0.3/earning.json",
     "minBurnIouTokenGasLimit": "120000"
@@ -141,8 +140,8 @@
         "capacityRay": "1000000000000000000000000000000000000",
         "refillRateRay": "11574074074074074074074074074"
       },
-      "minRedemptionCapacityRay": "1000000000000000000000000000000",
-      "minRedemptionRefillRateRay": "11574074074074074074074074"
+      "minRedemptionCapacityRay": "0",
+      "minRedemptionRefillRateRay": "0"
     },
     "deploymentOutputPath": "deployments/vnet/v0.3/accounting.json"
   }

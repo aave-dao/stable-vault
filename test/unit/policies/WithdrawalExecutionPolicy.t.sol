@@ -90,14 +90,10 @@ contract WithdrawalExecutionPolicyTest is TestWithHelpers {
         new WithdrawalExecutionPolicy(address(0), MIN_REDEMPTION_CAPACITY, MIN_REDEMPTION_REFILL_RATE);
     }
 
-    function test_constructor_reverts_ifMinRedemptionCapacityIsZero() public {
-        vm.expectRevert(WithdrawalExecutionPolicy.ZeroMinRedemptionCapacity.selector);
-        new WithdrawalExecutionPolicy(address(this), 0, MIN_REDEMPTION_REFILL_RATE);
-    }
-
-    function test_constructor_reverts_ifMinRedemptionRefillRateIsZero() public {
-        vm.expectRevert(WithdrawalExecutionPolicy.ZeroMinRedemptionRefillRate.selector);
-        new WithdrawalExecutionPolicy(address(this), MIN_REDEMPTION_CAPACITY, 0);
+    function test_constructor_acceptsZeroFloors() public {
+        WithdrawalExecutionPolicy policy = new WithdrawalExecutionPolicy(address(this), 0, 0);
+        assertEq(policy.getMinRedemptionCapacity(), 0);
+        assertEq(policy.getMinRedemptionRefillRate(), 0);
     }
 
     // Restricted functions access control tests
