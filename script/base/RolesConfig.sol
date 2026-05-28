@@ -195,8 +195,8 @@ abstract contract RolesConfig is DeploymentConfig {
 
     /// @custom:delay High
     /// @custom:location EarningChainGateway, AccountingChainGateway
-    function getRole__addBridgeAdapter() internal view returns (Role memory) {
-        bytes4 selector = IChainGateway.addBridgeAdapter.selector;
+    function getRole__addFundsBridgeAdapter() internal view returns (Role memory) {
+        bytes4 selector = IChainGateway.addFundsBridgeAdapter.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
@@ -208,14 +208,53 @@ abstract contract RolesConfig is DeploymentConfig {
 
     /// @custom:delay None
     /// @custom:location EarningChainGateway, AccountingChainGateway
-    function getRole__removeBridgeAdapter() internal pure returns (Role memory) {
-        bytes4 selector = IChainGateway.removeBridgeAdapter.selector;
+    function getRole__removeFundsBridgeAdapter() internal pure returns (Role memory) {
+        bytes4 selector = IChainGateway.removeFundsBridgeAdapter.selector;
         return Role({
             roleId: _selectorToRoleId(selector),
             selector: selector,
             delay: NO_DELAY,
             guardianRoleId: OPERATIONAL_ROLE_GUARDIAN_ROLE,
             hasCriticalRisk: false
+        });
+    }
+
+    /// @custom:delay High
+    /// @custom:location EarningChainGateway, AccountingChainGateway
+    function getRole__addDataOnlyBridgeAdapter() internal view returns (Role memory) {
+        bytes4 selector = IChainGateway.addDataOnlyBridgeAdapter.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: HIGH_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
+        });
+    }
+
+    /// @custom:delay High
+    /// @custom:location EarningChainGateway, AccountingChainGateway
+    function getRole__initiateDataOnlyBridgeAdapterRemoval() internal view returns (Role memory) {
+        bytes4 selector = IChainGateway.initiateDataOnlyBridgeAdapterRemoval.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: HIGH_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
+        });
+    }
+
+    /// @custom:delay High
+    /// @custom:location EarningChainGateway, AccountingChainGateway
+    function getRole__finalizeDataOnlyBridgeAdapterRemoval() internal view returns (Role memory) {
+        bytes4 selector = IChainGateway.finalizeDataOnlyBridgeAdapterRemoval.selector;
+        return Role({
+            roleId: _selectorToRoleId(selector),
+            selector: selector,
+            delay: HIGH_DELAY,
+            guardianRoleId: ADMIN_ROLE_GUARDIAN_ROLE,
+            hasCriticalRisk: true
         });
     }
 
@@ -1144,7 +1183,7 @@ abstract contract RolesConfig is DeploymentConfig {
     }
 
     function getAllFunctionBasedRoles() internal view returns (Role[] memory) {
-        Role[] memory roles = new Role[](84);
+        Role[] memory roles = new Role[](87);
 
         // AssetRegistry
         roles[0] = getRole__setAssetConfig();
@@ -1160,105 +1199,108 @@ abstract contract RolesConfig is DeploymentConfig {
         roles[10] = getRole__distrustAsset();
 
         // Gateway
-        roles[11] = getRole__addBridgeAdapter();
-        roles[12] = getRole__removeBridgeAdapter();
+        roles[11] = getRole__addFundsBridgeAdapter();
+        roles[12] = getRole__removeFundsBridgeAdapter();
+        roles[13] = getRole__addDataOnlyBridgeAdapter();
+        roles[14] = getRole__initiateDataOnlyBridgeAdapterRemoval();
+        roles[15] = getRole__finalizeDataOnlyBridgeAdapterRemoval();
 
         // WithdrawalExecutionPolicy
-        roles[13] = getRole__setAssetFeeBps();
-        roles[14] = getRole__setDefaultFeeBps();
-        roles[15] = getRole__addSigner();
-        roles[16] = getRole__removeSigner();
+        roles[16] = getRole__setAssetFeeBps();
+        roles[17] = getRole__setDefaultFeeBps();
+        roles[18] = getRole__addSigner();
+        roles[19] = getRole__removeSigner();
 
         // BridgeAdapter
-        roles[17] = getRole__setDestinationChainAdapter();
-        roles[18] = getRole__setChainSelector();
-        roles[19] = getRole__replayFundsReceiving();
+        roles[20] = getRole__setDestinationChainAdapter();
+        roles[21] = getRole__setChainSelector();
+        roles[22] = getRole__replayFundsReceiving();
 
         // StableVault
-        roles[20] = getRole__setUserRate();
-        roles[21] = getRole__setSubVaultRate();
-        roles[22] = getRole__setDefaultSubVault();
-        roles[23] = getRole__claimSurplusInterest();
-        roles[24] = getRole__setTreasury();
+        roles[23] = getRole__setUserRate();
+        roles[24] = getRole__setSubVaultRate();
+        roles[25] = getRole__setDefaultSubVault();
+        roles[26] = getRole__claimSurplusInterest();
+        roles[27] = getRole__setTreasury();
 
         // Allocator
-        roles[25] = getRole__rebalance();
-        roles[26] = getRole__addStrategy();
-        roles[27] = getRole__removeStrategy();
-        roles[28] = getRole__disableDepositsToStrategy();
-        roles[29] = getRole__enableDepositsToStrategy();
-        roles[30] = getRole__topUp();
-        roles[31] = getRole__trustStrategy();
-        roles[32] = getRole__distrustStrategy();
-        roles[33] = getRole__setWithdrawalQueue();
+        roles[28] = getRole__rebalance();
+        roles[29] = getRole__addStrategy();
+        roles[30] = getRole__removeStrategy();
+        roles[31] = getRole__disableDepositsToStrategy();
+        roles[32] = getRole__enableDepositsToStrategy();
+        roles[33] = getRole__topUp();
+        roles[34] = getRole__trustStrategy();
+        roles[35] = getRole__distrustStrategy();
+        roles[36] = getRole__setWithdrawalQueue();
 
         // Rescue
-        roles[34] = getRole__rescueTokens();
-        roles[35] = getRole__rescueNative();
+        roles[37] = getRole__rescueTokens();
+        roles[38] = getRole__rescueNative();
 
         // FundsHandler / EarningChainGateway
-        roles[36] = getRole__pushFundsToChain();
-        roles[37] = getRole__pushFundsToAccountingChain();
-        roles[38] = getRole__addEarningChain();
-        roles[39] = getRole__removeEarningChain();
+        roles[39] = getRole__pushFundsToChain();
+        roles[40] = getRole__pushFundsToAccountingChain();
+        roles[41] = getRole__addEarningChain();
+        roles[42] = getRole__removeEarningChain();
 
         // Oracles
-        roles[40] = getRole__setChainBalanceOracleAdapter();
-        roles[41] = getRole__setOracleAdapterForAsset();
+        roles[43] = getRole__setChainBalanceOracleAdapter();
+        roles[44] = getRole__setOracleAdapterForAsset();
 
         // External - aToken Vault
-        roles[42] = getRole__claimMerklRewards();
-        roles[43] = getRole__emergencyRescue();
+        roles[45] = getRole__claimMerklRewards();
+        roles[46] = getRole__emergencyRescue();
 
         // SlippageCoverageVault
-        roles[44] = getRole__enableOverrideMode();
-        roles[45] = getRole__disableOverrideMode();
-        roles[46] = getRole__raisePullCapPerTx();
-        roles[47] = getRole__lowerPullCapPerTx();
-        roles[48] = getRole__raiseWindowCap();
-        roles[49] = getRole__lowerWindowCap();
-        roles[50] = getRole__raiseWindowSeconds();
-        roles[51] = getRole__lowerWindowSeconds();
-        roles[52] = getRole__setMaxSlippageBps();
-        roles[53] = getRole__setOverrideMaxSlippageBps();
-        roles[54] = getRole__fundCoverage();
-        roles[55] = getRole__sweepSlippageCoverageVault();
+        roles[47] = getRole__enableOverrideMode();
+        roles[48] = getRole__disableOverrideMode();
+        roles[49] = getRole__raisePullCapPerTx();
+        roles[50] = getRole__lowerPullCapPerTx();
+        roles[51] = getRole__raiseWindowCap();
+        roles[52] = getRole__lowerWindowCap();
+        roles[53] = getRole__raiseWindowSeconds();
+        roles[54] = getRole__lowerWindowSeconds();
+        roles[55] = getRole__setMaxSlippageBps();
+        roles[56] = getRole__setOverrideMaxSlippageBps();
+        roles[57] = getRole__fundCoverage();
+        roles[58] = getRole__sweepSlippageCoverageVault();
 
         // PolicyRegistry
-        roles[56] = getRole__setPolicy();
+        roles[59] = getRole__setPolicy();
 
         // DepositPolicy / FundsBridgingPolicy
-        roles[57] = getRole__raiseDepositCapacity();
-        roles[58] = getRole__raiseDepositRefillRate();
-        roles[59] = getRole__lowerDepositCapacity();
-        roles[60] = getRole__lowerDepositRefillRate();
-        roles[61] = getRole__raiseBridgingCapacity();
-        roles[62] = getRole__raiseBridgingRefillRate();
-        roles[63] = getRole__lowerBridgingCapacity();
-        roles[64] = getRole__lowerBridgingRefillRate();
+        roles[60] = getRole__raiseDepositCapacity();
+        roles[61] = getRole__raiseDepositRefillRate();
+        roles[62] = getRole__lowerDepositCapacity();
+        roles[63] = getRole__lowerDepositRefillRate();
+        roles[64] = getRole__raiseBridgingCapacity();
+        roles[65] = getRole__raiseBridgingRefillRate();
+        roles[66] = getRole__lowerBridgingCapacity();
+        roles[67] = getRole__lowerBridgingRefillRate();
 
         // WithdrawalExecutionPolicy redemption rate-limit
-        roles[65] = getRole__raiseRedemptionCapacity();
-        roles[66] = getRole__raiseRedemptionRefillRate();
-        roles[67] = getRole__lowerRedemptionCapacity();
-        roles[68] = getRole__lowerRedemptionRefillRate();
+        roles[68] = getRole__raiseRedemptionCapacity();
+        roles[69] = getRole__raiseRedemptionRefillRate();
+        roles[70] = getRole__lowerRedemptionCapacity();
+        roles[71] = getRole__lowerRedemptionRefillRate();
 
         // a.DI CrossChainController
-        roles[69] = getRole__adiApproveSenders();
-        roles[70] = getRole__adiRemoveSenders();
-        roles[71] = getRole__adiEnableBridgeAdapters();
-        roles[72] = getRole__adiDisableBridgeAdapters();
-        roles[73] = getRole__adiUpdateOptimalBandwidthByChain();
-        roles[74] = getRole__adiConfigAdapter();
-        roles[75] = getRole__adiUpdateRequiredForwardingSuccessesByChain();
-        roles[76] = getRole__adiUpdateConfirmations();
-        roles[77] = getRole__adiUpdateMessagesValidityTimestamp();
-        roles[78] = getRole__adiAllowReceiverBridgeAdapters();
-        roles[79] = getRole__adiDisallowReceiverBridgeAdapters();
-        roles[80] = getRole__adiEmergencyTokenTransfer();
-        roles[81] = getRole__adiEmergencyEtherTransfer();
-        roles[82] = getRole__adiTransferOwnership();
-        roles[83] = getRole__adiUpdateGuardian();
+        roles[72] = getRole__adiApproveSenders();
+        roles[73] = getRole__adiRemoveSenders();
+        roles[74] = getRole__adiEnableBridgeAdapters();
+        roles[75] = getRole__adiDisableBridgeAdapters();
+        roles[76] = getRole__adiUpdateOptimalBandwidthByChain();
+        roles[77] = getRole__adiConfigAdapter();
+        roles[78] = getRole__adiUpdateRequiredForwardingSuccessesByChain();
+        roles[79] = getRole__adiUpdateConfirmations();
+        roles[80] = getRole__adiUpdateMessagesValidityTimestamp();
+        roles[81] = getRole__adiAllowReceiverBridgeAdapters();
+        roles[82] = getRole__adiDisallowReceiverBridgeAdapters();
+        roles[83] = getRole__adiEmergencyTokenTransfer();
+        roles[84] = getRole__adiEmergencyEtherTransfer();
+        roles[85] = getRole__adiTransferOwnership();
+        roles[86] = getRole__adiUpdateGuardian();
 
         return roles;
     }

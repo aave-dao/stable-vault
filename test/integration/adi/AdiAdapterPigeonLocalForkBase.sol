@@ -53,9 +53,15 @@ contract RecordingGateway is IChainGateway {
         return address(0);
     }
 
-    function addBridgeAdapter(address, uint256, address) external {}
+    function addFundsBridgeAdapter(address, uint256, address) external {}
 
-    function removeBridgeAdapter(address, uint256, address) external {}
+    function removeFundsBridgeAdapter(address, uint256, address) external {}
+
+    function addDataOnlyBridgeAdapter(uint256, address) external {}
+
+    function initiateDataOnlyBridgeAdapterRemoval(uint256, address) external returns (bytes32 removalId) {}
+
+    function finalizeDataOnlyBridgeAdapterRemoval(uint256, address, bytes32) external {}
 
     function receiveMessage(uint256 sourceChainId, address asset, uint256 amount, bytes memory data) external {
         receiveCount++;
@@ -90,6 +96,8 @@ abstract contract AdiAdapterPigeonLocalForkBase is Test {
     address internal constant ARB_BRIDGE = 0x8315177aB297bA92A06054cE80a67Ed4DBd7ed3a;
     address internal constant ETH_CCIP_ROUTER = 0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D;
     uint64 internal constant ETH_CCIP_CHAIN_SELECTOR = 5009297550715157269;
+    address internal constant ARB_CCIP_ROUTER = 0x141fa059441E0ca23ce184B6A78bafD2A517DdE8;
+    uint64 internal constant ARB_CCIP_CHAIN_SELECTOR = 4949039107694359620;
     address internal constant LZ_ENDPOINT_V2 = 0x1a44076050125825900e736c501f859c50fE728c;
     address internal constant ETH_HL_MAILBOX = 0xc005dc82818d67AF737725bD4bf75435d065D239;
     address internal constant ARB_HL_MAILBOX = 0x979Ca5202784112f4738403dBec5D0F3B9daabB9;

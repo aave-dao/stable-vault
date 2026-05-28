@@ -45,7 +45,6 @@ import {Swapper} from "src/periphery/Swapper.sol";
 import {TransferHelper} from "src/periphery/TransferHelper.sol";
 import {FundsBridgingPolicy} from "src/policies/FundsBridgingPolicy.sol";
 import {WithdrawalExecutionPolicy} from "src/policies/WithdrawalExecutionPolicy.sol";
-import {Constants} from "src/types/Constants.sol";
 
 abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSetup, ATokenVaultDeployment {
     using Strings for address;
@@ -329,9 +328,9 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         uint256 remoteChainId = _configUint(string.concat(_remoteChainConfigPrefix(), ".chainId"));
         uint64 remoteCcipSelector = _configUint64(string.concat(_remoteChainConfigPrefix(), ".ccipSelector"));
 
-        _addBridgeAdapterIdempotent(gateway, _gho(), remoteChainId, localCcipAdapter);
-        _addBridgeAdapterIdempotent(gateway, _usdc(), remoteChainId, localCcipAdapter);
-        _addBridgeAdapterIdempotent(gateway, _usdt(), remoteChainId, localCcipAdapter);
+        _addFundsBridgeAdapterIdempotent(gateway, _gho(), remoteChainId, localCcipAdapter);
+        _addFundsBridgeAdapterIdempotent(gateway, _usdc(), remoteChainId, localCcipAdapter);
+        _addFundsBridgeAdapterIdempotent(gateway, _usdt(), remoteChainId, localCcipAdapter);
 
         /// @custom:tx-already-executed-check CCIP chain selector already set.
         if (ICcipBridgeAdapter(localCcipAdapter).getChainSelector(remoteChainId) != remoteCcipSelector) {
@@ -346,30 +345,55 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
             address localAdiAdapter = getAdiAdapterAddress(_deployer());
             address remoteAdiAdapter = localAdiAdapter;
             _setDestinationChainAdapterIdempotent(localAdiAdapter, remoteChainId, remoteAdiAdapter);
-            _addBridgeAdapterIdempotent(gateway, Constants.ASSET_FOR_DATA_ONLY_BRIDGE, remoteChainId, localAdiAdapter);
+            _addDataOnlyBridgeAdapterIdempotent(gateway, remoteChainId, localAdiAdapter);
         }
     }
 
-    function _addBridgeAdapterIdempotent(IChainGateway gateway, address asset, uint256 chainId, address bridgeAdapter)
-        private
-    {
+    function _addFundsBridgeAdapterIdempotent(
+        IChainGateway gateway,
+        address asset,
+        uint256 chainId,
+        address bridgeAdapter
+    ) private {
         /// @custom:tx-already-executed-check Skip when the (asset, chainId, bridgeAdapter) triple is already
         /// whitelisted on the gateway. This is the primary resume signal - a fresh attempt would revert with
         /// `AddressAlreadyWhitelisted`, and crucially forge would still capture that reverting call into the
         /// post-script broadcast simulation, failing the run.
-        if (BaseChainGateway(address(gateway)).isBridgeAdapterSupported(asset, chainId, bridgeAdapter)) {
-            logSkip("_addBridgeAdapterIdempotent", "bridge adapter registered");
+        if (BaseChainGateway(address(gateway)).isFundsBridgeAdapterSupported(asset, chainId, bridgeAdapter)) {
+            logSkip("_addFundsBridgeAdapterIdempotent", "funds bridge adapter registered");
             return;
         }
-        /// @custom:tx-already-executed-check Skip when the deployer can no longer call `addBridgeAdapter` -
+        /// @custom:tx-already-executed-check Skip when the deployer can no longer call `addFundsBridgeAdapter` -
         /// `_setupAccessManager` revokes the deployer's ADMIN_ROLE as its last step, so losing call access means a
         /// prior run completed everything up to and including bridge-adapter setup. This branch is reachable only if
         /// the registration check above somehow missed (e.g. on a future schema change), kept as a safety net.
-        if (!_deployerCanCall(address(gateway), IChainGateway.addBridgeAdapter.selector)) {
-            logSkip("_addBridgeAdapterIdempotent", "deployer lacks call access - prior run completed");
+        if (!_deployerCanCall(address(gateway), IChainGateway.addFundsBridgeAdapter.selector)) {
+            logSkip("_addFundsBridgeAdapterIdempotent", "deployer lacks call access - prior run completed");
             return;
         }
-        gateway.addBridgeAdapter(asset, chainId, bridgeAdapter);
+        gateway.addFundsBridgeAdapter(asset, chainId, bridgeAdapter);
+    }
+
+    function _addDataOnlyBridgeAdapterIdempotent(IChainGateway gateway, uint256 chainId, address bridgeAdapter)
+        private
+    {
+        IChainGateway.DataOnlyBridgeAdapterMode mode =
+            BaseChainGateway(address(gateway)).getDataOnlyBridgeAdapterMode(chainId, bridgeAdapter);
+        /// @custom:tx-already-executed-check Data-only adapter already registered.
+        if (mode == IChainGateway.DataOnlyBridgeAdapterMode.SEND_AND_RECEIVE) {
+            logSkip("_addDataOnlyBridgeAdapterIdempotent", "data-only bridge adapter registered");
+            return;
+        }
+        require(
+            mode == IChainGateway.DataOnlyBridgeAdapterMode.NOT_SUPPORTED,
+            "data-only bridge adapter mode does not match expected value"
+        );
+        /// @custom:tx-already-executed-check See `_addFundsBridgeAdapterIdempotent` for the same canCall safety-net.
+        if (!_deployerCanCall(address(gateway), IChainGateway.addDataOnlyBridgeAdapter.selector)) {
+            logSkip("_addDataOnlyBridgeAdapterIdempotent", "deployer lacks call access - prior run completed");
+            return;
+        }
+        gateway.addDataOnlyBridgeAdapter(chainId, bridgeAdapter);
     }
 
     function _setDestinationChainAdapterIdempotent(address adapter, uint256 chainId, address destAdapter) private {
@@ -384,7 +408,7 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
             current == address(0),
             "setDestinationChainAdapter: existing destination adapter does not match expected value"
         );
-        /// @custom:tx-already-executed-check See `_addBridgeAdapterIdempotent` for the same canCall safety-net.
+        /// @custom:tx-already-executed-check See `_addFundsBridgeAdapterIdempotent` for the same canCall safety-net.
         if (!_deployerCanCall(adapter, IBridgeAdapter.setDestinationChainAdapter.selector)) {
             logSkip("_setDestinationChainAdapterIdempotent", "deployer lacks call access - prior run completed");
             return;

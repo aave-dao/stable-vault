@@ -91,10 +91,27 @@ contract AccessManagerEarningChainSetupTest is AccessManagerSetupBaseTest, Earni
         address gateway = getGatewayAddress(_deployer());
 
         _assertTargetFunctionRole(
-            gateway, IChainGateway.addBridgeAdapter.selector, RolesConfig.getRole__addBridgeAdapter().roleId
+            gateway, IChainGateway.addFundsBridgeAdapter.selector, RolesConfig.getRole__addFundsBridgeAdapter().roleId
         );
         _assertTargetFunctionRole(
-            gateway, IChainGateway.removeBridgeAdapter.selector, RolesConfig.getRole__removeBridgeAdapter().roleId
+            gateway,
+            IChainGateway.removeFundsBridgeAdapter.selector,
+            RolesConfig.getRole__removeFundsBridgeAdapter().roleId
+        );
+        _assertTargetFunctionRole(
+            gateway,
+            IChainGateway.addDataOnlyBridgeAdapter.selector,
+            RolesConfig.getRole__addDataOnlyBridgeAdapter().roleId
+        );
+        _assertTargetFunctionRole(
+            gateway,
+            IChainGateway.initiateDataOnlyBridgeAdapterRemoval.selector,
+            RolesConfig.getRole__initiateDataOnlyBridgeAdapterRemoval().roleId
+        );
+        _assertTargetFunctionRole(
+            gateway,
+            IChainGateway.finalizeDataOnlyBridgeAdapterRemoval.selector,
+            RolesConfig.getRole__finalizeDataOnlyBridgeAdapterRemoval().roleId
         );
         _assertTargetFunctionRole(
             gateway, IRescuableToken.rescueTokens.selector, RolesConfig.getRole__rescueTokens().roleId
