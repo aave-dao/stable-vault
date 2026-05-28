@@ -21,13 +21,13 @@ interface ISlippageCoverageVault {
     /// @custom:selector 0x21ff5759
     error ExceedsWindowCap();
 
-    /// @notice Thrown when the window for the asset has never been configured (`cap == 0` or `windowSeconds == 0`).
-    /// @custom:selector 0xa844dadb
-    error WindowNotConfigured();
-
     /// @notice Thrown when the caller of a beneficiary-gated function is not the immutable bound beneficiary.
     /// @custom:selector 0x5e5a9749
     error OnlyBeneficiary();
+
+    /// @notice Thrown when the window for the asset has never been configured (`cap == 0` or `windowSeconds == 0`).
+    /// @custom:selector 0xa844dadb
+    error WindowNotConfigured();
 
     /// @notice Pulls `amount` of `asset` from the vault to the bound beneficiary.
     /// @dev Callable only by `SLIPPAGE_BENEFICIARY`. Bypasses caps in override mode. Updates window state before the
