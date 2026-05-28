@@ -86,6 +86,8 @@ contract DumpRolesScript is AccessManagerAccountingChainSetup {
             ",\n",
             _profileEntry("Funder", _getProfile__Funder()),
             ",\n",
+            _profileEntry("Rescuer", _getProfile__Rescuer()),
+            ",\n",
             _profileEntry("StableVaultManager", _getProfile__StableVaultManager()),
             "\n  },\n",
             "  \"roles\": [\n",

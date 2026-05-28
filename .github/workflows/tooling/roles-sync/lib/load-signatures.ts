@@ -115,8 +115,18 @@ export function lookupSignature(
     throw new Error(`No signatures loaded for ${contract}`);
   }
   const sig = sigsForContract.get(selector.toLowerCase());
-  if (!sig) {
-    throw new Error(`Selector ${selector} not found in ${contract} methodIdentifiers`);
+  if (sig) {
+    return sig;
   }
-  return sig;
+
+  const inspected = loadViaForgeInspect(contract);
+  if (inspected) {
+    sigsByContract.set(contract, inspected);
+    const inspectedSig = inspected.get(selector.toLowerCase());
+    if (inspectedSig) {
+      return inspectedSig;
+    }
+  }
+
+  throw new Error(`Selector ${selector} not found in ${contract} methodIdentifiers`);
 }

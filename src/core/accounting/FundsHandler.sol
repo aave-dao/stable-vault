@@ -5,6 +5,9 @@ pragma solidity ^0.8.22;
 import {
     AccessManagedUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/manager/AccessManagedUpgradeable.sol";
+import {
+    ReentrancyGuardTransientUpgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardTransientUpgradeable.sol";
 import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
 
@@ -32,6 +35,7 @@ contract FundsHandler is
     RescuableToken,
     LocalBalanceAggregator,
     TransferHelperClient,
+    ReentrancyGuardTransientUpgradeable,
     IFundsHandler
 {
     using AssetLib for uint256;
@@ -164,7 +168,7 @@ contract FundsHandler is
         uint256 receiverExecutionGasLimit,
         bytes calldata bridgeAdapterData,
         bytes calldata policyData
-    ) external payable override restricted assertingTransferHelperBalanceFor(asset) {
+    ) external payable override restricted nonReentrant assertingTransferHelperBalanceFor(asset) {
         require(amount > 0, Errors.ZeroAmount());
         require($storage().earningChainIds.contains(chainId), Errors.InvalidDestinationChainId());
 

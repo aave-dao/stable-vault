@@ -31,10 +31,12 @@ abstract contract LocalBalanceAggregator {
         IAllocator.AllocatorBalance[] memory allocatorAssets = IAllocator(ALLOCATOR).getTrustedAssetBalances();
         uint256 localBalanceRay;
         for (uint256 i = 0; i < allocatorAssets.length; i++) {
-            uint256 priceRay = IPriceOracle(PRICE_ORACLE).getPrice(allocatorAssets[i].asset);
-            localBalanceRay += priceRay.rayMulDown(
-                allocatorAssets[i].amount.assetDecimalsToRay(allocatorAssets[i].asset)
-            );
+            if (allocatorAssets[i].amount > 0) {
+                uint256 priceRay = IPriceOracle(PRICE_ORACLE).getPrice(allocatorAssets[i].asset);
+                localBalanceRay += priceRay.rayMulDown(
+                    allocatorAssets[i].amount.assetDecimalsToRay(allocatorAssets[i].asset)
+                );
+            }
         }
         return localBalanceRay;
     }
