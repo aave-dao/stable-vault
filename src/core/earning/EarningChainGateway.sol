@@ -147,7 +147,7 @@ contract EarningChainGateway is
         uint256 receiverExecutionGasLimit,
         bytes calldata bridgeAdapterData,
         bytes calldata policyData
-    ) external payable override restricted assertingTransferHelperBalanceFor(asset) {
+    ) external payable override restricted nonReentrant assertingTransferHelperBalanceFor(asset) {
         require(amount > 0, Errors.ZeroAmount());
         _applyFundsBridgingPolicy(ACCOUNTING_CHAIN_ID, bridgeAdapter, asset, amount, policyData);
         // Pull funds from liquidity into the TransferHelper.
