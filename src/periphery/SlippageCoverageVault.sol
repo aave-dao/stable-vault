@@ -299,11 +299,11 @@ contract SlippageCoverageVault is AccessManaged, Multicall, ReentrancyGuardTrans
 
     /// @dev Updates the fixed-window cap state for `asset` (with lazy rollover). Resets when the elapsed time exceeds
     /// `windowSeconds`.
-    /// Reverts if the window is unconfigured (`cap == 0` or `windowSeconds == 0`) or if `consumed + amount` exceeds
-    /// `cap`.
+    /// Reverts with `WindowNotConfigured` if the window is unconfigured (`cap == 0` or `windowSeconds == 0`), or with
+    /// `ExceedsWindowCap` if `consumed + amount` exceeds `cap`.
     function _consumeWindow(address asset, uint256 amount) internal {
         Window memory window = _windowByAsset[asset];
-        require(window.cap > 0 && window.windowSeconds > 0, ExceedsWindowCap());
+        require(window.cap > 0 && window.windowSeconds > 0, WindowNotConfigured());
         if (block.timestamp >= uint256(window.windowStart) + uint256(window.windowSeconds)) {
             window.windowStart = uint64(block.timestamp);
             window.consumed = 0;

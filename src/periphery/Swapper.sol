@@ -70,10 +70,6 @@ contract Swapper is Ownable, ReentrancyGuardTransient, ISwapper {
             abi.decode(data, (address[], bytes[], uint16));
         require(targets.length == callDatas.length, Errors.InvalidParameter());
 
-        // Bound the slippage tolerance against vault config; read before the loop to fail fast.
-        uint16 maxBps = ISlippageCoverageVault(SLIPPAGE_VAULT).getEffectiveMaxSlippageBps();
-        require(slippageToleranceBps <= maxBps, SlippageToleranceTooHigh());
-
         // Targets cannot be the bound vault, otherwise the loop could call `pullCoverage` directly.
         for (uint256 i = 0; i < targets.length; i++) {
             require(targets[i] != SLIPPAGE_VAULT, BadTarget());
@@ -87,6 +83,9 @@ contract Swapper is Ownable, ReentrancyGuardTransient, ISwapper {
         uint256 expectedAmountOut = amountIn.convertAssetDecimals(assetIn, assetOut);
 
         if (amountOut < expectedAmountOut) {
+            // Bound the per-call tolerance against vault config; only relevant when coverage is actually pulled.
+            uint16 coverageSlippageMaxBps = ISlippageCoverageVault(SLIPPAGE_VAULT).getEffectiveMaxSlippageBps();
+            require(slippageToleranceBps <= coverageSlippageMaxBps, SlippageToleranceTooHigh());
             require(
                 _minToleratedAmountOut(expectedAmountOut, slippageToleranceBps) <= amountOut,
                 SlippageToleranceExceeded()

@@ -284,33 +284,49 @@ contract SwapperTest is TestWithHelpers {
         _swapper.executeSwap(address(_mockUsdt), address(_mockGho), 100, rebalancer, data);
     }
 
-    /// @dev Manager sets tolerance above the vault-bounded max in normal mode.
+    /// @dev Manager sets tolerance above the vault-bounded max in normal mode. The bound is only enforced when
+    /// coverage is actually pulled, so the DEX must produce a real shortfall to reach the check.
     function test_executeSwap_reverts_ifSlippageToleranceAboveMax_normalMode() public {
         // Tighten max to 1% and request 2%.
         vm.prank(operator);
         _vault.setMaxSlippageBps(1_00);
 
-        bytes memory data = _encodeDexSwapExactInputData(address(_mockUsdt), address(_mockGho), 100, 0, 200);
+        uint256 amountIn = 1_000_000;
+        uint256 expectedAmountOut = amountIn.convertAssetDecimals(address(_mockUsdt), address(_mockGho));
+        uint256 dexAmountOut = expectedAmountOut * (10_000 - 50) / 10_000; // 0.5% DEX slippage
 
-        _mockTransferIntoSwapper(_mockUsdt, 100);
+        _mockTransferIntoSwapper(_mockUsdt, amountIn);
+        _seedOutputToken(_mockGho, dexAmountOut);
+        _setSlippageBps(50);
+
+        bytes memory data = _encodeDexSwapExactInputData(address(_mockUsdt), address(_mockGho), amountIn, 0, 200);
+
         vm.expectRevert(abi.encodeWithSelector(Swapper.SlippageToleranceTooHigh.selector));
         vm.prank(allocator);
-        _swapper.executeSwap(address(_mockUsdt), address(_mockGho), 100, rebalancer, data);
+        _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
     }
 
-    /// @dev Override mode: override max is the upper bound.
+    /// @dev Override mode: override max is the upper bound. Same shape as the normal-mode test — needs a real
+    /// shortfall to reach the bound check.
     function test_executeSwap_reverts_ifSlippageToleranceAboveMax_overrideMode() public {
         vm.prank(operator);
         _vault.setOverrideMaxSlippageBps(2_000); // 20%
         vm.prank(operator);
         _vault.enableOverrideMode();
 
-        bytes memory data = _encodeDexSwapExactInputData(address(_mockUsdt), address(_mockGho), 100, 0, 2_001);
+        uint256 amountIn = 1_000_000;
+        uint256 expectedAmountOut = amountIn.convertAssetDecimals(address(_mockUsdt), address(_mockGho));
+        uint256 dexAmountOut = expectedAmountOut * (10_000 - 50) / 10_000; // 0.5% DEX slippage
 
-        _mockTransferIntoSwapper(_mockUsdt, 100);
+        _mockTransferIntoSwapper(_mockUsdt, amountIn);
+        _seedOutputToken(_mockGho, dexAmountOut);
+        _setSlippageBps(50);
+
+        bytes memory data = _encodeDexSwapExactInputData(address(_mockUsdt), address(_mockGho), amountIn, 0, 2_001);
+
         vm.expectRevert(abi.encodeWithSelector(Swapper.SlippageToleranceTooHigh.selector));
         vm.prank(allocator);
-        _swapper.executeSwap(address(_mockUsdt), address(_mockGho), 100, rebalancer, data);
+        _swapper.executeSwap(address(_mockUsdt), address(_mockGho), amountIn, rebalancer, data);
     }
 
     /// @dev Empty target loop: `assetIn` is never consumed. The full `amountIn` is returned to the vault (paying it
