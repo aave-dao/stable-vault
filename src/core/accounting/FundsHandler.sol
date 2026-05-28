@@ -146,7 +146,7 @@ contract FundsHandler is
 
     /// @inheritdoc IFundsHandler
     function addEarningChain(uint256 chainId) external override restricted {
-        require(chainId != block.chainid, Errors.InvalidDestinationChainId());
+        require(chainId != block.chainid && chainId != 0, Errors.InvalidDestinationChainId());
         require($storage().earningChainIds.add(chainId), ChainIdAlreadyPresent());
         emit EarningChainAdded(chainId);
     }
