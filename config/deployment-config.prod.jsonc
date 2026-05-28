@@ -95,8 +95,8 @@
         "capacityRay": "TBD", // TODO: set
         "refillRateRay": "TBD" // TODO: set
       },
-      "minRedemptionCapacityRay": "TBD", // TODO: set
-      "minRedemptionRefillRateRay": "TBD" // TODO: set
+      "minRedemptionCapacityRay": "0", // allow multisig to halt redemptions
+      "minRedemptionRefillRateRay": "0" // allow multisig to halt refill
     },
     "deploymentOutputPath": "deployments/prod/v1/earning.json",
     "minBurnIouTokenGasLimit": "120000"
@@ -166,8 +166,8 @@
         "capacityRay": "TBD", // TODO: set
         "refillRateRay": "TBD" // TODO: set
       },
-      "minRedemptionCapacityRay": "TBD", // TODO: set
-      "minRedemptionRefillRateRay": "TBD" // TODO: set
+      "minRedemptionCapacityRay": "0", // allow multisig to halt redemptions
+      "minRedemptionRefillRateRay": "0" // allow multisig to halt refill
     },
     "deploymentOutputPath": "deployments/prod/v1/accounting.json"
   }

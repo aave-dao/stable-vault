@@ -81,8 +81,8 @@
         "capacityRay": "1000000000000000000000000000000000000",
         "refillRateRay": "11574074074074074074074074074"
       },
-      "minRedemptionCapacityRay": "1000000000000000000000000000000",
-      "minRedemptionRefillRateRay": "11574074074074074074074074"
+      "minRedemptionCapacityRay": "0",
+      "minRedemptionRefillRateRay": "0"
     },
     "deploymentOutputPath": "deployments/vnet/v0.3/earning.json",
     "minBurnIouTokenGasLimit": "120000"
@@ -140,8 +140,8 @@
         "capacityRay": "1000000000000000000000000000000000000",
         "refillRateRay": "11574074074074074074074074074"
       },
-      "minRedemptionCapacityRay": "1000000000000000000000000000000",
-      "minRedemptionRefillRateRay": "11574074074074074074074074"
+      "minRedemptionCapacityRay": "0",
+      "minRedemptionRefillRateRay": "0"
     },
     "deploymentOutputPath": "deployments/vnet/v0.3/accounting.json"
   }
