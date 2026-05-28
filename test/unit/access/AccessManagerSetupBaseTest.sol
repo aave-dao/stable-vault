@@ -223,25 +223,27 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         _assertProfileRoleDelay(_getProfile__Funder(), expected[1], RolesConfig.NO_DELAY);
     }
 
-    function test_coverageGuardianProfile_hasTheExpectedRoles() public view {
-        uint64[] memory expected = new uint64[](2);
+    function test_vaultStewardProfile_hasTheExpectedRoles() public view {
+        uint64[] memory expected = new uint64[](4);
         expected[0] = RolesConfig.getRole__enableOverrideMode().roleId;
         expected[1] = RolesConfig.getRole__disableOverrideMode().roleId;
-        _assertProfileHasExactlyTheseRoles(_getProfile__CoverageGuardian(), expected);
+        expected[2] = RolesConfig.getRole__lowerRedemptionCapacity().roleId;
+        expected[3] = RolesConfig.getRole__lowerRedemptionRefillRate().roleId;
+        _assertProfileHasExactlyTheseRoles(_getProfile__VaultSteward(), expected);
 
-        // Trilemma: CoverageGuardian must NOT also be the Rebalancer.
-        assertTrue(_getProfile__CoverageGuardian() != _getProfile__Rebalancer(), "guardian == rebalancer");
+        // Trilemma: VaultSteward must NOT also be the Rebalancer.
+        assertTrue(_getProfile__VaultSteward() != _getProfile__Rebalancer(), "steward == rebalancer");
 
-        // No on-chain delay on either selector; CoverageGuardian compromise resistance is structural (N-of-M
-        // multisig signer composition), not temporal. A timelock would slow legitimate depeg response without
-        // changing the worst case (CoverageGuardian + Rebalancer both compromised collapses to vault balance
-        // regardless).
-        _assertProfileRoleDelay(_getProfile__CoverageGuardian(), expected[0], RolesConfig.NO_DELAY);
-        _assertProfileRoleDelay(_getProfile__CoverageGuardian(), expected[1], RolesConfig.NO_DELAY);
+        // No on-chain delay on any selector; VaultSteward compromise resistance is structural (N-of-M multisig
+        // signer composition), not temporal. A timelock would slow legitimate emergency response without changing
+        // the worst case.
+        for (uint256 i = 0; i < expected.length; i++) {
+            _assertProfileRoleDelay(_getProfile__VaultSteward(), expected[i], RolesConfig.NO_DELAY);
+        }
     }
 
     function test_disablerProfile_hasTheExpectedRoles() public view {
-        uint64[] memory expected = new uint64[](22);
+        uint64[] memory expected = new uint64[](20);
         // Allocator (defensive)
         expected[0] = RolesConfig.getRole__rebalance().roleId;
         expected[1] = RolesConfig.getRole__removeStrategy().roleId;
@@ -258,21 +260,19 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         expected[10] = RolesConfig.getRole__distrustAsset().roleId;
         // Gateway
         expected[11] = RolesConfig.getRole__removeFundsBridgeAdapter().roleId;
-        // WithdrawalExecutionPolicy
+        // WithdrawalExecutionPolicy (lowerRedemption* live on the VaultSteward profile)
         expected[12] = RolesConfig.getRole__removeSigner().roleId;
-        expected[13] = RolesConfig.getRole__lowerRedemptionCapacity().roleId;
-        expected[14] = RolesConfig.getRole__lowerRedemptionRefillRate().roleId;
         // SlippageCoverageVault
         // raiseWindowSeconds is tightening (longer window = slower rate), even though the prefix says raise.
-        expected[15] = RolesConfig.getRole__lowerPullCapPerTx().roleId;
-        expected[16] = RolesConfig.getRole__lowerWindowCap().roleId;
-        expected[17] = RolesConfig.getRole__raiseWindowSeconds().roleId;
+        expected[13] = RolesConfig.getRole__lowerPullCapPerTx().roleId;
+        expected[14] = RolesConfig.getRole__lowerWindowCap().roleId;
+        expected[15] = RolesConfig.getRole__raiseWindowSeconds().roleId;
         // DepositPolicy
-        expected[18] = RolesConfig.getRole__lowerDepositCapacity().roleId;
-        expected[19] = RolesConfig.getRole__lowerDepositRefillRate().roleId;
+        expected[16] = RolesConfig.getRole__lowerDepositCapacity().roleId;
+        expected[17] = RolesConfig.getRole__lowerDepositRefillRate().roleId;
         // FundsBridgingPolicy
-        expected[20] = RolesConfig.getRole__lowerBridgingCapacity().roleId;
-        expected[21] = RolesConfig.getRole__lowerBridgingRefillRate().roleId;
+        expected[18] = RolesConfig.getRole__lowerBridgingCapacity().roleId;
+        expected[19] = RolesConfig.getRole__lowerBridgingRefillRate().roleId;
         _assertProfileHasExactlyTheseRoles(_getProfile__Disabler(), expected);
 
         for (uint256 i = 0; i < expected.length; i++) {

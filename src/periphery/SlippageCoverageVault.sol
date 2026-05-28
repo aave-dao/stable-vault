@@ -135,7 +135,7 @@ contract SlippageCoverageVault is AccessManaged, Multicall, ReentrancyGuardTrans
 
     /// @notice Enables override mode. While enabled, `pullCoverage` bypasses both per-tx and window caps and the
     /// Swapper accepts the higher `overrideMaxSlippageBps`.
-    /// @dev Gated by the CoverageGuardian role (separate from the rebalancer, expected to be an N-of-M multisig).
+    /// @dev Gated by the VaultSteward role (separate from the rebalancer, expected to be an N-of-M multisig).
     /// No on-chain delay; compromise resistance is structural (quorum), not temporal. Reverts with `AlreadyEnabled`
     /// if already on.
     function enableOverrideMode() external restricted {
@@ -145,7 +145,7 @@ contract SlippageCoverageVault is AccessManaged, Multicall, ReentrancyGuardTrans
     }
 
     /// @notice Disables override mode and restores per-tx + window cap enforcement and `maxSlippageBps`.
-    /// @dev Gated by the CoverageGuardian role with no delay so tightening is instant. Reverts with `AlreadyDisabled`
+    /// @dev Gated by the VaultSteward role with no delay so tightening is instant. Reverts with `AlreadyDisabled`
     /// if already off.
     function disableOverrideMode() external restricted {
         require(_overrideMode, AlreadyDisabled());
