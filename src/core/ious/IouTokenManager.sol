@@ -12,14 +12,13 @@ import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {IIouToken} from "src/interfaces/IIouToken.sol";
 import {IIouTokenManager} from "src/interfaces/IIouTokenManager.sol";
 import {IMintableBurnableIERC20} from "src/interfaces/IMintableBurnableIERC20.sol";
-import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
 import {Errors} from "src/types/Errors.sol";
 
 /// @title IouTokenManager
 /// @author Aave Labs
 /// @notice Manages the IOU token locking, releasing, minting, burning, and user-initiated cross-chain bridging.
 /// @custom:upgradeable
-contract IouTokenManager is TransferHelperClient, ReentrancyGuardTransientUpgradeable, IIouTokenManager {
+contract IouTokenManager is ReentrancyGuardTransientUpgradeable, IIouTokenManager {
     using SafeERC20 for IERC20;
 
     /// @custom:storage-location erc7201:aave.storage.IouTokenManager
@@ -70,11 +69,8 @@ contract IouTokenManager is TransferHelperClient, ReentrancyGuardTransientUpgrad
     /// @param iouToken Address of the IOU token.
     /// @param chainGateway Address of the ChainGateway contract.
     /// @param vault Address of the Vault contract.
-    /// @param transferHelper Address of the TransferHelper contract.
     /// @param isAccountingChain Whether the current chain is the Accounting chain.
-    constructor(address iouToken, address chainGateway, address vault, address transferHelper, bool isAccountingChain)
-        TransferHelperClient(transferHelper)
-    {
+    constructor(address iouToken, address chainGateway, address vault, bool isAccountingChain) {
         require(iouToken != address(0), Errors.ZeroAddress());
         require(chainGateway != address(0), Errors.ZeroAddress());
         if (isAccountingChain) {

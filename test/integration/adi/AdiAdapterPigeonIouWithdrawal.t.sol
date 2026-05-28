@@ -506,13 +506,7 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         stack.iouTokenManager = IouTokenManager(
             address(
                 new TransparentUpgradeableProxy(
-                    address(
-                        new IouTokenManager(
-                            iouTokenAddress, gatewayAddress, vaultAddress, address(stack.transferHelper), true
-                        )
-                    ),
-                    _proxyAdmin,
-                    ""
+                    address(new IouTokenManager(iouTokenAddress, gatewayAddress, vaultAddress, true)), _proxyAdmin, ""
                 )
             )
         );
@@ -667,13 +661,7 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         stack.iouTokenManager = IouTokenManager(
             address(
                 new TransparentUpgradeableProxy(
-                    address(
-                        new IouTokenManager(
-                            iouTokenAddress, gatewayAddress, address(0), address(stack.transferHelper), false
-                        )
-                    ),
-                    _proxyAdmin,
-                    ""
+                    address(new IouTokenManager(iouTokenAddress, gatewayAddress, address(0), false)), _proxyAdmin, ""
                 )
             )
         );
