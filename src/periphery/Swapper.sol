@@ -19,6 +19,8 @@ import {Errors} from "src/types/Errors.sol";
 /// @dev Coverage is pulled from the immutable bound `SLIPPAGE_VAULT`, which also enforces caps and bounds the per-call
 /// `slippageToleranceBps` against `maxSlippageBps` (or `overrideMaxSlippageBps` in override mode). Any `assetIn`
 /// left on the Swapper after the swap is returned to the same vault.
+/// @dev The vault is an operational helper, not a strict on-chain bound: this Swapper drives the coverage flow and the
+/// return of leftover `assetIn`, so the vault's caps do not strictly impose the 1:1 invariant on their own.
 contract Swapper is Ownable, ReentrancyGuardTransient, ISwapper {
     using SafeERC20 for IERC20;
     using AssetLib for uint256;
