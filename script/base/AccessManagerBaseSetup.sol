@@ -100,10 +100,6 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         return _configAddress(".profiles.aTokenVaultRewardClaimer");
     }
 
-    function _getProfile__VaultSteward() internal view virtual returns (address) {
-        return _configAddress(".profiles.vaultSteward");
-    }
-
     function _getProfile__Funder() internal view virtual returns (address) {
         return _configAddress(".profiles.funder");
     }
@@ -125,7 +121,6 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         require(
             _getProfile__ATokenVaultRewardClaimer() != address(0), "ATokenVaultRewardClaimer profile address not set"
         );
-        require(_getProfile__VaultSteward() != address(0), "VaultSteward profile address not set");
         require(_getProfile__Funder() != address(0), "Funder profile address not set");
         require(_getRebalancerMulticallOwner() != address(0), "Rebalancer Profile OwnedMulticall owner is not set");
         require(_getDisablerMulticallOwner() != address(0), "Disabler Profile OwnedMulticall owner is not set");
@@ -182,7 +177,6 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         _setupProfile__Rebalancer();
         _setupProfile__Disabler();
         _setupProfile__ATokenVaultRewardClaimer();
-        _setupProfile__VaultSteward();
         _setupProfile__Funder();
     }
 
@@ -421,7 +415,7 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         address disablerProfile = _getProfile__Disabler();
         require(disablerProfile != address(0), "Disabler profile address not set");
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](20);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](22);
 
         // Allocator (defensive)
         roles[0] = RolesConfig.getRole__rebalance();
@@ -439,18 +433,20 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         roles[10] = RolesConfig.getRole__distrustAsset();
         // Gateway
         roles[11] = RolesConfig.getRole__removeFundsBridgeAdapter();
-        // WithdrawalExecutionPolicy (lowerRedemption* live on the VaultSteward profile)
+        // WithdrawalExecutionPolicy
         roles[12] = RolesConfig.getRole__removeSigner();
+        roles[13] = RolesConfig.getRole__lowerRedemptionCapacity();
+        roles[14] = RolesConfig.getRole__lowerRedemptionRefillRate();
         // SlippageCoverageVault
-        roles[13] = RolesConfig.getRole__lowerPullCapPerTx();
-        roles[14] = RolesConfig.getRole__lowerWindowCap();
-        roles[15] = RolesConfig.getRole__raiseWindowSeconds();
+        roles[15] = RolesConfig.getRole__lowerPullCapPerTx();
+        roles[16] = RolesConfig.getRole__lowerWindowCap();
+        roles[17] = RolesConfig.getRole__raiseWindowSeconds();
         // DepositPolicy is Accounting Chain-only, but granted in both chain setups.
-        roles[16] = RolesConfig.getRole__lowerDepositCapacity();
-        roles[17] = RolesConfig.getRole__lowerDepositRefillRate();
+        roles[18] = RolesConfig.getRole__lowerDepositCapacity();
+        roles[19] = RolesConfig.getRole__lowerDepositRefillRate();
         // FundsBridgingPolicy
-        roles[18] = RolesConfig.getRole__lowerBridgingCapacity();
-        roles[19] = RolesConfig.getRole__lowerBridgingRefillRate();
+        roles[20] = RolesConfig.getRole__lowerBridgingCapacity();
+        roles[21] = RolesConfig.getRole__lowerBridgingRefillRate();
 
         _grantRolesToProfile(disablerProfile, roles);
     }
@@ -465,22 +461,6 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         roles[1] = RolesConfig.getRole__emergencyRescue();
 
         _grantRolesToProfile(aTokenVaultRewardClaimer, roles);
-    }
-
-    function _setupProfile__VaultSteward() internal {
-        address vaultSteward = _getProfile__VaultSteward();
-        require(vaultSteward != address(0), "VaultSteward profile address not set");
-
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](4);
-
-        // SlippageCoverageVault override toggle
-        roles[0] = RolesConfig.getRole__enableOverrideMode();
-        roles[1] = RolesConfig.getRole__disableOverrideMode();
-        // WithdrawalExecutionPolicy emergency rate-limit (floors are zero, so these can halt redemptions)
-        roles[2] = RolesConfig.getRole__lowerRedemptionCapacity();
-        roles[3] = RolesConfig.getRole__lowerRedemptionRefillRate();
-
-        _grantRolesToProfile(vaultSteward, roles);
     }
 
     function _setupProfile__Funder() internal {

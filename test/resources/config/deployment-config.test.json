@@ -18,7 +18,6 @@
     "withdrawalPolicyManager": "0x43cEA7b37F81197fF60FE1700Fd97905f868A94C",
     "aTokenVaultRewardClaimer": "0xE49D14D7157412da6145a155DaeFdD1cA069f626",
     "stableVaultManager": "0x4B0353F7B7122862487d22C447bd9cDc91779133",
-    "vaultSteward": "0x00000000000000000000000000000000C0FEC0FE",
     "funder": "0x00000000000000000000000000000000C0FE7EA5"
   },
   "withdrawalExecutionPolicy": {
@@ -27,7 +26,7 @@
   },
   "slippageCoverageVault": {
     "maxSlippageBps": "100",
-    "overrideMaxSlippageBps": "5000",
+    "overrideMaxSlippageBps": "10000",
     "initialOverrideMode": true,
     "perAssetCaps": {
       "gho": {

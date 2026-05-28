@@ -18,7 +18,6 @@
     "withdrawalPolicyManager": "0x43cEA7b37F81197fF60FE1700Fd97905f868A94C",
     "aTokenVaultRewardClaimer": "0xE49D14D7157412da6145a155DaeFdD1cA069f626",
     "stableVaultManager": "0x4B0353F7B7122862487d22C447bd9cDc91779133",
-    "vaultSteward": "0x18d55163745898A086681B4d72b5B0DF1A8F0740",
     "funder": "0x569c8D2D5fA781cef3D8799b15a4F651aFf1b806"
   },
   "withdrawalExecutionPolicy": {
@@ -27,7 +26,7 @@
   },
   "slippageCoverageVault": {
     "maxSlippageBps": "50", // 0.5%
-    "overrideMaxSlippageBps": "5000", // 50%
+    "overrideMaxSlippageBps": "10000", // 100% — emergency depeg flexibility; SecondaryAdmin controls when override is on
     "initialOverrideMode": true,
     "perAssetCaps": {
       "gho": {
