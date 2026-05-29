@@ -272,8 +272,14 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
         return _configAddress(string.concat(_chainConfigPrefix(), ".adi.crossChainController"));
     }
 
+    /// @dev File the deployment writes its addresses to (and reads back to resume). Virtual so fork tests can redirect
+    /// it to a throwaway path and avoid mutating the tracked deployment JSON.
+    function _deploymentOutputPath() internal view virtual returns (string memory) {
+        return _configString(string.concat(_chainConfigPrefix(), ".deploymentOutputPath"));
+    }
+
     function _deployedATokenVaultAddresses() internal view virtual override returns (address[] memory) {
-        return _readATokenVaultAddresses(_configString(string.concat(_chainConfigPrefix(), ".deploymentOutputPath")));
+        return _readATokenVaultAddresses(_deploymentOutputPath());
     }
 
     function _aTokenVaultProxyDeployerSaltSeed(address underlying) internal pure override returns (string memory) {
@@ -299,19 +305,11 @@ abstract contract BaseChainDeployment is Create3Deployment, AccessManagerBaseSet
     function _logDeployment(string memory name, string memory saltSeed, address addr) internal virtual override {
         string memory jsonObject =
             string.concat('{ "address": "', addr.toHexString(), '", "saltSeed": "', saltSeed, '" }');
-        vm.writeJson(
-            jsonObject,
-            _configString(string.concat(_chainConfigPrefix(), ".deploymentOutputPath")),
-            string.concat(".", name)
-        );
+        vm.writeJson(jsonObject, _deploymentOutputPath(), string.concat(".", name));
     }
 
     function _logATokenVaultDeployments() internal override {
-        vm.writeJson(
-            _buildATokenVaultsJson(),
-            _configString(string.concat(_chainConfigPrefix(), ".deploymentOutputPath")),
-            ".aTokenVaults"
-        );
+        vm.writeJson(_buildATokenVaultsJson(), _deploymentOutputPath(), ".aTokenVaults");
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////

@@ -78,21 +78,18 @@ abstract contract DeploymentConfig is Script {
 
     /// @dev Pre-flight validator for the redemption-limit config block under `configPrefix` (e.g.
     /// `.accountingChain.withdrawalExecutionPolicy`). Asserts:
-    ///   - both floors are in `(0, uint128.max]`,
-    ///   - seed capacity is strictly greater than the floor AND strictly less than `uint128.max`. The latter is
+    ///   - seed capacity exceeds its floor and is strictly less than `uint128.max`. The latter is
     ///     `RateLimitBucketLib.UNLIMITED_CAPACITY`; if the bucket were ever raised into that state during the
     ///     bootstrap window (`refillRate == 0`, before `_initRedemptionLimit` runs), the rate-limit would be
-    ///     silently disabled and the always-exit floor would no longer be load-bearing. The contract itself may
-    ///     not reject this sentinel, so this pre-flight is the deploy-time guard.
-    ///   - seed refill rate is strictly greater than the floor and fits in `uint128`.
-    /// Run this before any deploy side effect — a misconfig must not burn the deterministic CREATE3 address
-    /// namespace.
+    ///     silently disabled. The contract itself may not reject this sentinel, so this pre-flight is the
+    ///     deploy-time guard.
+    ///   - seed refill rate exceeds its floor and fits in `uint128`.
+    /// Floors may be zero: a zero floor lets governance lower the redemption bucket all the way to a full
+    /// emergency halt. Run this before any deploy side effect — a misconfig must not burn the deterministic
+    /// CREATE3 address namespace.
     function _validateRedemptionLimitConfig(string memory configPrefix) internal view {
         uint128 minCapRay = _configUint128(string.concat(configPrefix, ".minRedemptionCapacityRay"));
-        require(minCapRay > 0, "minRedemptionCapacityRay: must be in (0, uint128.max]");
-
         uint128 minRefillRateRay = _configUint128(string.concat(configPrefix, ".minRedemptionRefillRateRay"));
-        require(minRefillRateRay > 0, "minRedemptionRefillRateRay: must be in (0, uint128.max]");
 
         uint128 seedCapRay = _configUint128(string.concat(configPrefix, ".redemptionLimit.capacityRay"));
         require(

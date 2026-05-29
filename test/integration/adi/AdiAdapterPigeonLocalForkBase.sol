@@ -2,6 +2,7 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.22;
 
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ICrossChainForwarder} from "aave-delivery-infrastructure/contracts/interfaces/ICrossChainForwarder.sol";
 import {Envelope, Transaction} from "aave-delivery-infrastructure/contracts/libs/EncodingUtils.sol";
@@ -27,6 +28,28 @@ interface IAdiControllerAdmin {
     function isSenderApproved(address sender) external view returns (bool);
     function updateGuardian(address newGuardian) external;
     function guardian() external view returns (address);
+}
+
+/// @dev Minimal getters for reading each AMB endpoint from its deployed a.DI bridge adapter on-chain, so tests
+/// follow whatever infrastructure the deployment wired instead of hardcoding canonical AMB addresses.
+interface ICcipAdapterLike {
+    function CCIP_ROUTER() external view returns (address);
+}
+
+interface ILzAdapterLike {
+    function LZ_ENDPOINT() external view returns (address);
+}
+
+interface IHlAdapterLike {
+    function HL_MAIL_BOX() external view returns (address);
+}
+
+interface IArbAdapterLike {
+    function INBOX() external view returns (address);
+}
+
+interface IArbInboxLike {
+    function bridge() external view returns (address);
 }
 
 /// @notice Minimal gateway that records receives and forwards publishes to a bridge adapter.
@@ -85,22 +108,18 @@ abstract contract AdiAdapterPigeonLocalForkBase is Test {
     string internal constant DEFAULT_ETH_FORK_RPC = "http://127.0.0.1:8545";
     string internal constant DEFAULT_ARB_FORK_RPC = "http://127.0.0.1:8546";
 
-    address internal constant DEFAULT_STABLE_VAULTS_OWNER = 0xfB65C68526969DA4AA3cEDF30b1C53846116D5a2;
-
-    address internal constant DEFAULT_ETH_CCC = 0x33E3B9D276f58A873e9Acc9f25A8a46F5b66F259;
-    address internal constant DEFAULT_ARB_CCC = 0x98cF75814a129845EA7d69dbD0B6923A6Dac0c6b;
-
-    address internal constant DEFAULT_ETH_ARB_ADAPTER = 0xC9B2A285B62c0eD494C3C23FAc7C169EaE740C59;
-
-    address internal constant ARB_INBOX = 0x4Dbd4fc535Ac27206064B68FfCf827b0A60BAB3f;
-    address internal constant ARB_BRIDGE = 0x8315177aB297bA92A06054cE80a67Ed4DBd7ed3a;
-    address internal constant ETH_CCIP_ROUTER = 0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D;
+    // CCIP chain selectors are CCIP protocol constants (not surfaced by the deployment), so they stay hardcoded.
     uint64 internal constant ETH_CCIP_CHAIN_SELECTOR = 5009297550715157269;
-    address internal constant ARB_CCIP_ROUTER = 0x141fa059441E0ca23ce184B6A78bafD2A517DdE8;
     uint64 internal constant ARB_CCIP_CHAIN_SELECTOR = 4949039107694359620;
-    address internal constant LZ_ENDPOINT_V2 = 0x1a44076050125825900e736c501f859c50fE728c;
-    address internal constant ETH_HL_MAILBOX = 0xc005dc82818d67AF737725bD4bf75435d065D239;
-    address internal constant ARB_HL_MAILBOX = 0x979Ca5202784112f4738403dBec5D0F3B9daabB9;
+
+    // AMB endpoints, resolved on-chain from the deployed a.DI adapters in `_loadAmbEndpointsFromAdapters`.
+    address internal ARB_INBOX;
+    address internal ARB_BRIDGE;
+    address internal ETH_CCIP_ROUTER;
+    address internal ARB_CCIP_ROUTER;
+    address internal LZ_ENDPOINT_V2;
+    address internal ETH_HL_MAILBOX;
+    address internal ARB_HL_MAILBOX;
 
     bytes32 internal constant TRANSACTION_FORWARDING_ATTEMPTED_SELECTOR =
         keccak256("TransactionForwardingAttempted(bytes32,bytes32,bytes,uint256,address,address,bool,bytes)");
@@ -114,7 +133,6 @@ abstract contract AdiAdapterPigeonLocalForkBase is Test {
     RecordingGateway internal _arbGateway;
     AdiAdapter internal _ethAdiAdapter;
     AdiAdapter internal _arbAdiAdapter;
-    address internal _stableVaultsOwner;
     address internal _ethCcc;
     address internal _arbCcc;
     address internal _ethArbAdapter;
@@ -140,6 +158,7 @@ abstract contract AdiAdapterPigeonLocalForkBase is Test {
         _ethFork = vm.createSelectFork(vm.envOr("ETH_FORK_RPC", DEFAULT_ETH_FORK_RPC));
         _arbFork = vm.createSelectFork(vm.envOr("ARB_FORK_RPC", DEFAULT_ARB_FORK_RPC));
         _loadForkDeploymentConfig();
+        _loadAmbEndpointsFromAdapters();
 
         vm.selectFork(_ethFork);
         (_ethGateway, _ethAdiAdapter) = _deployLocalAdapter(_ethCcc);
@@ -155,25 +174,47 @@ abstract contract AdiAdapterPigeonLocalForkBase is Test {
         internal
         returns (RecordingGateway gateway, AdiAdapter adapter)
     {
-        MockAccessManager accessManager = new MockAccessManager(_stableVaultsOwner);
+        MockAccessManager accessManager = new MockAccessManager(_cccOwnerOf(crossChainController));
         MockTransferHelper transferHelper = new MockTransferHelper();
         gateway = new RecordingGateway();
         adapter =
             new AdiAdapter(address(accessManager), address(gateway), crossChainController, address(transferHelper));
     }
 
+    /// @dev a.DI CrossChainController + bridge-adapter addresses come from env, exported by
+    /// run-adi-pigeon-fork-test.sh from the adi-deploy deployment JSONs. They are required (no hardcoded fallback) so
+    /// the tests can never silently run against a stale baked-in address.
     function _loadForkDeploymentConfig() internal virtual {
-        _stableVaultsOwner = vm.envOr("STABLE_VAULTS_OWNER", DEFAULT_STABLE_VAULTS_OWNER);
-        _ethCcc = vm.envOr("ETH_CCC", DEFAULT_ETH_CCC);
-        _arbCcc = vm.envOr("ARB_CCC", DEFAULT_ARB_CCC);
-        _ethArbAdapter = vm.envOr("ETH_ARB_ADAPTER", DEFAULT_ETH_ARB_ADAPTER);
+        _ethCcc = _requireEnvAddress("ETH_CCC");
+        _arbCcc = _requireEnvAddress("ARB_CCC");
+        _ethArbAdapter = _requireEnvAddress("ETH_ARB_ADAPTER");
 
-        _ethCcipAdapter = vm.envOr("ETH_CCIP_ADAPTER", address(0));
-        _ethLzAdapter = vm.envOr("ETH_LZ_ADAPTER", address(0));
-        _ethHlAdapter = vm.envOr("ETH_HL_ADAPTER", address(0));
-        _arbCcipAdapter = vm.envOr("ARB_CCIP_ADAPTER", address(0));
-        _arbLzAdapter = vm.envOr("ARB_LZ_ADAPTER", address(0));
-        _arbHlAdapter = vm.envOr("ARB_HL_ADAPTER", address(0));
+        _ethCcipAdapter = _requireEnvAddress("ETH_CCIP_ADAPTER");
+        _ethLzAdapter = _requireEnvAddress("ETH_LZ_ADAPTER");
+        _ethHlAdapter = _requireEnvAddress("ETH_HL_ADAPTER");
+        _arbCcipAdapter = _requireEnvAddress("ARB_CCIP_ADAPTER");
+        _arbLzAdapter = _requireEnvAddress("ARB_LZ_ADAPTER");
+        _arbHlAdapter = _requireEnvAddress("ARB_HL_ADAPTER");
+    }
+
+    function _requireEnvAddress(string memory key) private view returns (address value) {
+        value = vm.envOr(key, address(0));
+        require(value != address(0), string.concat(key, " not set; run via run-adi-pigeon-fork-test.sh"));
+    }
+
+    /// @dev Resolve each AMB endpoint from its deployed a.DI adapter, so the relay targets exactly the infrastructure
+    /// the deployment wired (and the Arbitrum bridge is read straight off the inbox).
+    function _loadAmbEndpointsFromAdapters() internal {
+        vm.selectFork(_ethFork);
+        ETH_CCIP_ROUTER = ICcipAdapterLike(_ethCcipAdapter).CCIP_ROUTER();
+        LZ_ENDPOINT_V2 = ILzAdapterLike(_ethLzAdapter).LZ_ENDPOINT();
+        ETH_HL_MAILBOX = IHlAdapterLike(_ethHlAdapter).HL_MAIL_BOX();
+        ARB_INBOX = IArbAdapterLike(_ethArbAdapter).INBOX();
+        ARB_BRIDGE = IArbInboxLike(ARB_INBOX).bridge();
+
+        vm.selectFork(_arbFork);
+        ARB_CCIP_ROUTER = ICcipAdapterLike(_arbCcipAdapter).CCIP_ROUTER();
+        ARB_HL_MAILBOX = IHlAdapterLike(_arbHlAdapter).HL_MAIL_BOX();
     }
 
     function _deployPigeonHelpers() internal {
@@ -200,7 +241,7 @@ abstract contract AdiAdapterPigeonLocalForkBase is Test {
         address[] memory senders = new address[](1);
         senders[0] = adiAdapter;
 
-        vm.startPrank(_stableVaultsOwner);
+        vm.startPrank(_cccOwnerOf(crossChainController));
         IAdiControllerAdmin(crossChainController).approveSenders(senders);
         IAdiControllerAdmin(crossChainController).updateGuardian(adiAdapter);
         vm.stopPrank();
@@ -210,9 +251,15 @@ abstract contract AdiAdapterPigeonLocalForkBase is Test {
     }
 
     function _setGuardian(address crossChainController, address guardian) internal {
-        vm.prank(_stableVaultsOwner);
+        vm.prank(_cccOwnerOf(crossChainController));
         IAdiControllerAdmin(crossChainController).updateGuardian(guardian);
         assertEq(IAdiControllerAdmin(crossChainController).guardian(), guardian, "unexpected guardian");
+    }
+
+    /// @dev Current owner of `target` (CrossChainController or bridge adapter), read on the active fork. Replaces a
+    /// hardcoded/env owner so the tests always prank whoever actually controls the deployed contract.
+    function _cccOwnerOf(address target) internal view returns (address) {
+        return Ownable(target).owner();
     }
 
     function _prepareForwardFees(AdiAdapter adapter, uint256 destinationChainId, bytes memory message)

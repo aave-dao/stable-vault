@@ -14,12 +14,12 @@ contract AdiAdapterPigeonAuthFunding is AdiAdapterPigeonLocalForkBase {
         vm.selectFork(_ethFork);
 
         RecordingGateway rogueGateway = new RecordingGateway();
-        MockAccessManager accessManager = new MockAccessManager(_stableVaultsOwner);
+        MockAccessManager accessManager = new MockAccessManager(_cccOwnerOf(_ethCcc));
         MockTransferHelper transferHelper = new MockTransferHelper();
         AdiAdapter rogueAdapter =
             new AdiAdapter(address(accessManager), address(rogueGateway), _ethCcc, address(transferHelper));
 
-        vm.startPrank(_stableVaultsOwner);
+        vm.startPrank(_cccOwnerOf(_ethCcc));
         rogueAdapter.setDestinationChainAdapter(ARB_CHAIN_ID, address(_arbAdiAdapter));
         vm.stopPrank();
 
