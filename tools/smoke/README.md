@@ -20,26 +20,44 @@ It does **not** mutate state, send transactions, or require a private key. It on
 
 ## Quick start
 
-```sh
-# After deploying preprod, run the harness on each chain.
-yarn smoke:preprod:accounting
-yarn smoke:preprod:earning
+One command per environment runs **every chain** for that env in parallel.
 
-# Same for staging.
-yarn smoke:staging:accounting
-yarn smoke:staging:earning
+```sh
+yarn smoke:staging      # runs accounting + earning + ... (vnet RPCs)
+yarn smoke:preprod      # runs accounting + earning + ... (mainnet RPCs)
+yarn smoke:prod         # runs accounting + earning + ... (mainnet RPCs)
 ```
 
-Need a non-default RPC?
+The list of chains per env lives in [`networks.json`](./networks.json) — adding a new earning chain is one entry there plus one env var.
+
+RPC URLs are read from environment variables, one per `(env, chain-kind)` pair:
+
+```sh
+SMOKE_RPC_STAGING_ACCOUNTING=<arb-vnet-rpc>
+SMOKE_RPC_STAGING_EARNING=<eth-vnet-rpc>
+
+SMOKE_RPC_PREPROD_ACCOUNTING=<arb-mainnet-rpc>
+SMOKE_RPC_PREPROD_EARNING=<eth-mainnet-rpc>
+
+SMOKE_RPC_PROD_ACCOUNTING=<arb-mainnet-rpc>
+SMOKE_RPC_PROD_EARNING=<eth-mainnet-rpc>
+```
+
+Easiest setup: copy `.env.example` → `.env` at the repo root, fill the values, and the smoke scripts will load it automatically (via `tsx --env-file-if-exists=.env`).
+
+Need to run just one chain (debugging a single failure)?
+
+```sh
+yarn smoke:staging:accounting
+yarn smoke:staging:earning
+yarn smoke:preprod:accounting
+# … and the matching :earning + :prod:* variants
+```
+
+Or pass `--rpc` inline if you don't want to set an env var:
 
 ```sh
 tsx tools/smoke/run.ts --env preprod --chain accounting --rpc <url>
-```
-
-Or via env var (one per env/chain):
-
-```sh
-SMOKE_RPC_PREPROD_ACCOUNTING=<url> yarn smoke:preprod:accounting
 ```
 
 ## Reading the output
@@ -111,7 +129,9 @@ The 7-day floor is the simplest defence against freshly-compromised npm packages
 
 ```
 tools/smoke/
-├── run.ts                  CLI entrypoint
+├── run-env.ts              multi-chain orchestrator for one env (parallel)
+├── run.ts                  single-chain CLI entrypoint
+├── networks.json           env → chains mapping (kind + network label)
 ├── lib/
 │   ├── checks/topology.ts  CREATE3 re-derivation, code.length, bytecode hash, ERC-1967 slots
 │   ├── checks/live-probes.ts
