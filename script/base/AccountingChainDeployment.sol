@@ -249,10 +249,10 @@ abstract contract AccountingChainDeployment is BaseChainDeployment, AccessManage
         _setupBridgeAdapters();
         _setupAssetRegistry();
         _setupAllocator();
+        _setupChainBalanceOracleAdapters();
         _setupFundsHandler();
         _setupWithdrawalExecutionPolicy();
         _setupPriceOracleAdapters();
-        _setupChainBalanceOracleAdapters();
         _setupDepositPolicy();
         _setupFundsBridgingPolicy();
         _setupSlippageCoverageVault();
