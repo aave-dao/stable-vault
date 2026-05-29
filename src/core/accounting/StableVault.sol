@@ -289,13 +289,16 @@ contract StableVault is
 
         uint256 toSubVaultId = _getOrAssignUserSubVaultId(to);
 
-        uint256 toUserShares;
+        uint256 toConversionRate;
         if (toSubVaultId == fromSubVaultId) {
-            toUserShares = fromUserShares;
+            toConversionRate = fromConversionRate;
         } else {
-            uint256 toConversionRate = _accrueSubVaultConversionRate(toSubVaultId);
-            toUserShares = amountRay.rayDivDown(toConversionRate);
+            toConversionRate = _accrueSubVaultConversionRate(toSubVaultId);
         }
+        // Issue recipient shares rounded down (sender's are burnt rounded up) recalculating them based on
+        // the `amountRay`, regardless of being in the same sub-vault or not, so we ensure that the aggregated
+        // value of all user positions in the system after the transfer is not greater than before the transfer.
+        uint256 toUserShares = amountRay.rayDivDown(toConversionRate);
         require(toUserShares > 0, Errors.InvalidAmount());
 
         _moveShares({
