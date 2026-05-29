@@ -148,4 +148,15 @@ contract ChainlinkChainBalanceOracleAdapterTest is Test {
         );
         _adapter.getChainBalance(SNAPSHOT_CHAIN_ID);
     }
+
+    function test_getChainBalance_returnsZeroedStale_ifBundleEmpty() public {
+        // No bundle has been published yet, so the feed returns empty bytes.
+        vm.mockCall(address(_bundleAggregator), abi.encodeWithSignature("latestBundle()"), abi.encode(bytes("")));
+        IChainBalanceOracle.ChainBalance memory response = _adapter.getChainBalance(SNAPSHOT_CHAIN_ID);
+        assertTrue(response.isStale, "Empty bundle should be reported as stale");
+        assertEq(response.balanceRay, 0);
+        assertEq(response.lastUpdateTimestamp, 0);
+        assertEq(response.sourceChainTimestamp, 0);
+        assertEq(response.sourceChainBlockNumber, 0);
+    }
 }
