@@ -348,6 +348,28 @@ export const BASE_CHAIN_GATEWAY_ABI = [
     ],
     outputs: [{ name: "", type: "bool" }],
   },
+  {
+    // Returns the DataOnlyBridgeAdapterMode enum: 0=NOT_SUPPORTED, 1=SEND_AND_RECEIVE, 2=RECEIVE_ONLY.
+    type: "function",
+    name: "getDataOnlyBridgeAdapterMode",
+    stateMutability: "view",
+    inputs: [
+      { name: "chainId", type: "uint256" },
+      { name: "bridgeAdapter", type: "address" },
+    ],
+    outputs: [{ name: "", type: "uint8" }],
+  },
+  {
+    // Returns bytes32(0) when no removal has been initiated for the (chainId, bridgeAdapter) pair.
+    type: "function",
+    name: "getDataOnlyBridgeAdapterRemovalId",
+    stateMutability: "view",
+    inputs: [
+      { name: "chainId", type: "uint256" },
+      { name: "bridgeAdapter", type: "address" },
+    ],
+    outputs: [{ name: "", type: "bytes32" }],
+  },
 ] as const;
 
 export const CCIP_ROUTER_ABI = [

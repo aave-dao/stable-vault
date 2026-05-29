@@ -664,6 +664,40 @@ function buildBridgeAdapterSpecs(args: BuildArgs): GetterSpec[] {
       });
     }
   }
+
+  // Data-only adapter lifecycle. Per `BaseChainDeployment._setupBridgeAdapters`, only AdiAdapter is registered
+  // as a data-only adapter (and only when adi.registerOnGateway = true); CcipAdapter is funds-only. Assert each
+  // registered data-only adapter is in mode SEND_AND_RECEIVE (1) with no removal initiated (removalId = 0).
+  const SEND_AND_RECEIVE = 1;
+  const ZERO_BYTES32 = `0x${"0".repeat(64)}` as const;
+  const dataOnlyAdapters: Array<{ name: string; addr: Address }> = [];
+  if (adiAdapter && adiConfig.registerOnGateway) {
+    dataOnlyAdapters.push({ name: "AdiAdapter", addr: adiAdapter.address });
+  }
+  const gatewayLabel =
+    gateway === tryEntry(artefact, "AccountingChainGateway") ? "AccountingChainGateway" : "EarningChainGateway";
+  for (const adapter of dataOnlyAdapters) {
+    specs.push({
+      group: "BridgeAdapters",
+      key: `${gatewayLabel}.${adapter.name}.dataOnlyMode`,
+      address: gateway.address,
+      abi: BASE_CHAIN_GATEWAY_ABI,
+      functionName: "getDataOnlyBridgeAdapterMode",
+      args: [BigInt(remoteChainId), adapter.addr],
+      expected: SEND_AND_RECEIVE,
+      format: "uint",
+    });
+    specs.push({
+      group: "BridgeAdapters",
+      key: `${gatewayLabel}.${adapter.name}.dataOnlyRemovalId`,
+      address: gateway.address,
+      abi: BASE_CHAIN_GATEWAY_ABI,
+      functionName: "getDataOnlyBridgeAdapterRemovalId",
+      args: [BigInt(remoteChainId), adapter.addr],
+      expected: ZERO_BYTES32,
+      format: "bytes32",
+    });
+  }
   return specs;
 }
 
