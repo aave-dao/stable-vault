@@ -434,11 +434,7 @@ contract BaseTest is TestWithHelpers {
         // 11-12. IOU Token Manager (Impl + Proxy)
         address iouTokenManager_accountingChain_impl = address(
             new IouTokenManager(
-                iouToken_accountingChainAddress,
-                chainGateway_accountingChainAddress,
-                vault_accountingChainAddress,
-                transferHelper_accountingChainAddress,
-                true
+                iouToken_accountingChainAddress, chainGateway_accountingChainAddress, vault_accountingChainAddress, true
             )
         );
         iouTokenManager_accountingChain = IouTokenManager(
@@ -755,13 +751,7 @@ contract BaseTest is TestWithHelpers {
 
         // 10-11. IOU Token Manager (Impl + Proxy)
         address iouTokenManager_earningChain_impl = address(
-            new IouTokenManager(
-                iouToken_earningChainAddress,
-                chainGateway_earningChainAddress,
-                address(0),
-                transferHelper_earningChainAddress,
-                false
-            )
+            new IouTokenManager(iouToken_earningChainAddress, chainGateway_earningChainAddress, address(0), false)
         );
         iouTokenManager_earningChain = IouTokenManager(
             address(new TransparentUpgradeableProxy(iouTokenManager_earningChain_impl, proxyAdmin, ""))

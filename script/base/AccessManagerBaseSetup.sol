@@ -100,10 +100,6 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         return _configAddress(".profiles.aTokenVaultRewardClaimer");
     }
 
-    function _getProfile__CoverageGuardian() internal view virtual returns (address) {
-        return _configAddress(".profiles.coverageGuardian");
-    }
-
     function _getProfile__Funder() internal view virtual returns (address) {
         return _configAddress(".profiles.funder");
     }
@@ -129,7 +125,6 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         require(
             _getProfile__ATokenVaultRewardClaimer() != address(0), "ATokenVaultRewardClaimer profile address not set"
         );
-        require(_getProfile__CoverageGuardian() != address(0), "CoverageGuardian profile address not set");
         require(_getProfile__Funder() != address(0), "Funder profile address not set");
         require(_getProfile__Rescuer() != address(0), "Rescuer profile address not set");
         require(_getRebalancerMulticallOwner() != address(0), "Rebalancer Profile OwnedMulticall owner is not set");
@@ -187,7 +182,6 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         _setupProfile__Rebalancer();
         _setupProfile__Disabler();
         _setupProfile__ATokenVaultRewardClaimer();
-        _setupProfile__CoverageGuardian();
         _setupProfile__Funder();
         _setupProfile__Rescuer();
     }
@@ -470,18 +464,6 @@ abstract contract AccessManagerBaseSetup is Create3AddressBook, Create3Deploymen
         roles[1] = RolesConfig.getRole__emergencyRescue();
 
         _grantRolesToProfile(aTokenVaultRewardClaimer, roles);
-    }
-
-    function _setupProfile__CoverageGuardian() internal {
-        address coverageGuardian = _getProfile__CoverageGuardian();
-        require(coverageGuardian != address(0), "CoverageGuardian profile address not set");
-
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](2);
-
-        roles[0] = RolesConfig.getRole__enableOverrideMode();
-        roles[1] = RolesConfig.getRole__disableOverrideMode();
-
-        _grantRolesToProfile(coverageGuardian, roles);
     }
 
     function _setupProfile__Funder() internal {
