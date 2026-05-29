@@ -18,7 +18,11 @@ contract EarningChainForkHarness is EarningChainDeployment {
     /// @notice Seed `throwawayPath` from the tracked deployment JSON (so mid-run aTokenVault reads resolve) and route
     /// every subsequent deployment write there. Call before `run()`.
     function redirectOutputTo(string memory throwawayPath) external {
-        vm.writeFile(throwawayPath, vm.readFile(super._deploymentOutputPath()));
+        // Seed from the tracked deployment JSON when it exists (so any mid-run aTokenVault read resolves); otherwise
+        // start from an empty skeleton, since a fresh fork deploy writes its records before reading them back. The
+        // tracked JSON only exists for environments already deployed from this repo (e.g. preprod), not staging.
+        string memory committed = super._deploymentOutputPath();
+        vm.writeFile(throwawayPath, vm.exists(committed) ? vm.readFile(committed) : "{ \"aTokenVaults\": [] }");
         _outputOverride = throwawayPath;
     }
 
@@ -72,7 +76,11 @@ contract AccountingChainForkHarness is AccountingChainDeployment {
     }
 
     function redirectOutputTo(string memory throwawayPath) external {
-        vm.writeFile(throwawayPath, vm.readFile(super._deploymentOutputPath()));
+        // Seed from the tracked deployment JSON when it exists (so any mid-run aTokenVault read resolves); otherwise
+        // start from an empty skeleton, since a fresh fork deploy writes its records before reading them back. The
+        // tracked JSON only exists for environments already deployed from this repo (e.g. preprod), not staging.
+        string memory committed = super._deploymentOutputPath();
+        vm.writeFile(throwawayPath, vm.exists(committed) ? vm.readFile(committed) : "{ \"aTokenVaults\": [] }");
         _outputOverride = throwawayPath;
     }
 

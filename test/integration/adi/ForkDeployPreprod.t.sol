@@ -26,8 +26,8 @@ contract ForkDeployPreprod is Test {
     uint256 internal constant ETH_CHAIN_ID = 1;
     uint256 internal constant ARB_CHAIN_ID = 42161;
 
-    string internal constant EARNING_OUTPUT = "deployments/preprod/v1/earning.forktest.json";
-    string internal constant ACCOUNTING_OUTPUT = "deployments/preprod/v1/accounting.forktest.json";
+    string internal constant EARNING_OUTPUT = "deployments/earning.forktest.json";
+    string internal constant ACCOUNTING_OUTPUT = "deployments/accounting.forktest.json";
 
     modifier onlyForkTest() {
         vm.skip(!vm.envOr("FORK_TEST", false), "Set FORK_TEST=true to run preprod fork deployment");

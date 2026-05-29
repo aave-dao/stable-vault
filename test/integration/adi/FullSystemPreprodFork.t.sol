@@ -25,8 +25,8 @@ import {AccountingChainForkHarness, EarningChainForkHarness} from "./PreprodFork
 /// earning chain = Ethereum, matching the preprod config. Skipped unless FORK_TEST=true; run via
 /// run-adi-pigeon-fork-test.sh.
 contract FullSystemPreprodFork is AdiAdapterPigeonLocalForkBase {
-    string internal constant EARNING_OUTPUT = "deployments/preprod/v1/earning.forktest.json";
-    string internal constant ACCOUNTING_OUTPUT = "deployments/preprod/v1/accounting.forktest.json";
+    string internal constant EARNING_OUTPUT = "deployments/earning.forktest.json";
+    string internal constant ACCOUNTING_OUTPUT = "deployments/accounting.forktest.json";
 
     uint256 internal constant DEPOSIT_AMOUNT = 80e6; // 80 USDC, under the 100 USDC deposit cap.
     uint256 internal constant WITHDRAWAL_RAY = 50e27; // $50 principal request, under the $200 redemption cap.
