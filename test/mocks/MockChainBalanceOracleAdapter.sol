@@ -2,8 +2,6 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.22;
 
-import {IERC165} from "@openzeppelin/contracts/interfaces/IERC165.sol";
-
 import {IChainBalanceOracle} from "src/interfaces/IChainBalanceOracle.sol";
 import {IChainBalanceOracleAdapter} from "src/interfaces/IChainBalanceOracleAdapter.sol";
 
@@ -39,12 +37,5 @@ contract MockChainBalanceOracleAdapter is IChainBalanceOracleAdapter {
             revert SomethingWentWrong();
         }
         return _responses[chainId];
-    }
-
-    function supportsInterface(bytes4 interfaceId) public view virtual override returns (bool) {
-        if (shouldRevert) {
-            revert SomethingWentWrong();
-        }
-        return interfaceId == type(IChainBalanceOracleAdapter).interfaceId || interfaceId == type(IERC165).interfaceId;
     }
 }

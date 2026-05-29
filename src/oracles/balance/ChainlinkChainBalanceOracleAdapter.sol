@@ -2,8 +2,6 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.22;
 
-import {IERC165} from "@openzeppelin/contracts/interfaces/IERC165.sol";
-
 import {IChainBalanceOracle} from "src/interfaces/IChainBalanceOracle.sol";
 import {IChainBalanceOracleAdapter} from "src/interfaces/IChainBalanceOracleAdapter.sol";
 import {IEarningChainStateProvider} from "src/interfaces/IEarningChainStateProvider.sol";
@@ -54,11 +52,6 @@ contract ChainlinkChainBalanceOracleAdapter is IChainBalanceOracleAdapter {
         returns (IChainBalanceOracle.ChainBalance memory)
     {
         return _getChainBalance(chainId);
-    }
-
-    /// @inheritdoc IERC165
-    function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
-        return interfaceId == type(IChainBalanceOracleAdapter).interfaceId || interfaceId == type(IERC165).interfaceId;
     }
 
     function _getChainBalance(uint256 chainId) internal view returns (IChainBalanceOracle.ChainBalance memory) {

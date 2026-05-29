@@ -114,9 +114,9 @@ contract ChainBalanceOracleTest is TestWithHelpers {
         _chainBalanceOracle.setChainBalanceOracleAdapter(chainId, address(_mockAdapter));
     }
 
-    function test_setChainBalanceOracleAdapter_reverts_ifDoesNotSupportInterface(uint256 chainId) public {
+    function test_setChainBalanceOracleAdapter_reverts_ifAdapterIsNotAContract(uint256 chainId) public {
         address notAContract = makeAddr("NOT_A_CONTRACT");
-        // Expect code size to be 0
+        // Expect code size to be 0, so the getChainBalance validation call reverts.
         assertEq(notAContract.code.length, 0);
 
         vm.expectRevert();
