@@ -75,6 +75,14 @@ contract ChainlinkChainBalanceOracleAdapter is IChainBalanceOracleAdapter {
 
         // Get balance snapshot from bundle.
         bytes memory bundle = IBundleBaseAggregator(BUNDLE_AGGREGATOR_PROXY).latestBundle();
+        // No bundle has been published yet. Treat it as stale with a zero balance rather than reverting on decode,
+        // so the consuming oracle conservatively contributes 0 for this chain.
+        // Timestamps and block number are also 0 so they cannot be used for checks that require them to be up to date.
+        if (bundle.length == 0) {
+            return IChainBalanceOracle.ChainBalance({
+                balanceRay: 0, lastUpdateTimestamp: 0, sourceChainTimestamp: 0, sourceChainBlockNumber: 0, isStale: true
+            });
+        }
         IEarningChainStateProvider.State memory state = abi.decode(bundle, (IEarningChainStateProvider.State));
         require(state.version == SCHEMA_VERSION, InvalidEarningChainStateVersion(SCHEMA_VERSION, state.version));
         EarningChainStateSchemaV1.BalanceSnapshot memory balanceSnapshot =
