@@ -147,6 +147,9 @@ contract FundsHandler is
     /// @inheritdoc IFundsHandler
     function addEarningChain(uint256 chainId) external override restricted {
         require(chainId != block.chainid, Errors.InvalidDestinationChainId());
+        // Reverts when the chain ID is not supported by the oracle, so that a registered chain can never make
+        // `getAggregatedBalance` revert. The returned balance is intentionally discarded.
+        IChainBalanceOracle(CHAIN_BALANCE_ORACLE).getChainBalance(chainId);
         require($storage().earningChainIds.add(chainId), ChainIdAlreadyPresent());
         emit EarningChainAdded(chainId);
     }
