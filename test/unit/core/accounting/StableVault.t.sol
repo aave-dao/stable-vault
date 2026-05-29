@@ -1539,7 +1539,7 @@ contract StableVaultTest is TestWithHelpers {
         stableVault.claimSurplusInterest(_toAddressArray(address(mockAsset)), _toUint256Array(1e6));
     }
 
-    /// @dev CS-04: getVaultObligations() (and totalSupply()) floor the share-derived sub-vault obligations at the
+    /// @dev getVaultObligations() (and totalSupply()) floor the share-derived sub-vault obligations at the
     /// aggregate original deposits, so the treasury cannot claim surplus interest down past the principal that
     /// requestWithdrawal() still guarantees, even when per-user deposit rounding makes the share-ceiling undershoot.
     function test_claimSurplusInterest_obligationsFlooredAtPrincipal_blocksClaimBelowOriginalDeposits() public {

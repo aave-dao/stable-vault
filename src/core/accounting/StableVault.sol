@@ -896,14 +896,16 @@ contract StableVault is
     }
 
     function _getUserBalance(address user) internal view returns (uint256) {
-        uint256 shares = $storage().positions[user].shares;
+        UserPosition memory position = $storage().positions[user];
+        uint256 shares = position.shares;
         if (shares == 0) {
             return 0;
         }
         // Round down the user balance, so that the rounding is in favor of the protocol.
-        uint256 balanceRay = shares.rayMulDown(_previewSubVaultConversionRate($storage().positions[user].subVaultId));
-        // Rounding can make the share-based balance be slightly lower. Never report under the users' original deposit.
-        return Math.max(balanceRay, $storage().positions[user].originalDepositRay);
+        uint256 balanceRay = shares.rayMulDown(_previewSubVaultConversionRate(position.subVaultId));
+        // Rounding can make the share-based balance be slightly lower.
+        // Never report under the users' original deposit.
+        return Math.max(balanceRay, position.originalDepositRay);
     }
 
     function _getActiveSubVaultsObligations() internal view returns (uint256) {
