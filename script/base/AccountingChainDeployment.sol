@@ -150,14 +150,24 @@ abstract contract AccountingChainDeployment is BaseChainDeployment, AccessManage
         return BaseChainDeployment._accessManager();
     }
 
-    function _isAdiAdapterDeployed()
+    function _shouldRegisterAdiOnGateway()
         internal
         view
         virtual
         override(AccessManagerBaseSetup, BaseChainDeployment)
         returns (bool)
     {
-        return BaseChainDeployment._isAdiAdapterDeployed();
+        return BaseChainDeployment._shouldRegisterAdiOnGateway();
+    }
+
+    function _adiCrossChainController()
+        internal
+        view
+        virtual
+        override(AccessManagerBaseSetup, BaseChainDeployment)
+        returns (address)
+    {
+        return BaseChainDeployment._adiCrossChainController();
     }
 
     function _deployedATokenVaultAddresses()
@@ -273,7 +283,7 @@ abstract contract AccountingChainDeployment is BaseChainDeployment, AccessManage
         );
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
-            _assertDeployedTransparentProxy(predicted, implCreationCode, "StableVault");
+            _assertDeployedTransparentProxy(predicted, implCreationCode, STABLE_VAULT_PROXY_ADMIN_OWNER, "StableVault");
             logSkip("_deployStableVault", "StableVault");
             _logDeployment("StableVault", STABLE_VAULT_SALT_SEED, predicted);
             return predicted;
@@ -328,7 +338,9 @@ abstract contract AccountingChainDeployment is BaseChainDeployment, AccessManage
         );
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
-            _assertDeployedTransparentProxy(predicted, implCreationCode, "FundsHandler");
+            _assertDeployedTransparentProxy(
+                predicted, implCreationCode, FUNDS_HANDLER_PROXY_ADMIN_OWNER, "FundsHandler"
+            );
             logSkip("_deployFundsHandler", "FundsHandler");
             _logDeployment("FundsHandler", FUNDS_HANDLER_SALT_SEED, predicted);
             return predicted;
@@ -369,7 +381,9 @@ abstract contract AccountingChainDeployment is BaseChainDeployment, AccessManage
         );
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
-            _assertDeployedTransparentProxy(predicted, implCreationCode, "AccountingChainGateway");
+            _assertDeployedTransparentProxy(
+                predicted, implCreationCode, GATEWAY_PROXY_ADMIN_OWNER, "AccountingChainGateway"
+            );
             logSkip("_deployGateway", "AccountingChainGateway");
             _logDeployment("AccountingChainGateway", GATEWAY_SALT_SEED, predicted);
             return predicted;
@@ -399,7 +413,9 @@ abstract contract AccountingChainDeployment is BaseChainDeployment, AccessManage
         bytes memory implCreationCode = type(ChainBalanceOracle).creationCode;
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
-            _assertDeployedTransparentProxy(predicted, implCreationCode, "ChainBalanceOracle");
+            _assertDeployedTransparentProxy(
+                predicted, implCreationCode, CHAIN_BALANCE_ORACLE_PROXY_ADMIN_OWNER, "ChainBalanceOracle"
+            );
             logSkip("_deployChainBalanceOracle", "ChainBalanceOracle");
             _logDeployment("ChainBalanceOracle", CHAIN_BALANCE_ORACLE_SALT_SEED, predicted);
             return predicted;

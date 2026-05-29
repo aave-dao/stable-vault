@@ -1,6 +1,7 @@
 // Humanise raw values for the operator view. RAY (1e27) values become "$X.XX",
 // per-second rates become "$/day", asset-wei values get scaled to the asset's
-// decimals + symbol, etc. Mirrors the algorithms in tools/roles/lib/parameters.ts.
+// decimals + symbol, etc. Mirrors the algorithms in
+// .github/workflows/tooling/roles-sync/lib/parameters.ts.
 
 import type { ValueFormat } from "./types.js";
 

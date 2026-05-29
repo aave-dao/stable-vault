@@ -656,7 +656,7 @@ function buildBridgeAdapterSpecs(args: BuildArgs): GetterSpec[] {
         key,
         address: gateway.address,
         abi: BASE_CHAIN_GATEWAY_ABI,
-        functionName: "isBridgeAdapterSupported",
+        functionName: "isFundsBridgeAdapterSupported",
         args: [getAddress(assetAddr), BigInt(remoteChainId), adapter.addr],
         expected: true,
         format: "bool",

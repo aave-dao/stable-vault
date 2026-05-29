@@ -223,61 +223,51 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         _assertProfileRoleDelay(_getProfile__Funder(), expected[1], RolesConfig.NO_DELAY);
     }
 
-    function test_coverageGuardianProfile_hasTheExpectedRoles() public view {
-        uint64[] memory expected = new uint64[](2);
-        expected[0] = RolesConfig.getRole__enableOverrideMode().roleId;
-        expected[1] = RolesConfig.getRole__disableOverrideMode().roleId;
-        _assertProfileHasExactlyTheseRoles(_getProfile__CoverageGuardian(), expected);
-
-        // Trilemma: CoverageGuardian must NOT also be the Rebalancer.
-        assertTrue(_getProfile__CoverageGuardian() != _getProfile__Rebalancer(), "guardian == rebalancer");
-
-        // No on-chain delay on either selector; CoverageGuardian compromise resistance is structural (N-of-M
-        // multisig signer composition), not temporal. A timelock would slow legitimate depeg response without
-        // changing the worst case (CoverageGuardian + Rebalancer both compromised collapses to vault balance
-        // regardless).
-        _assertProfileRoleDelay(_getProfile__CoverageGuardian(), expected[0], RolesConfig.NO_DELAY);
-        _assertProfileRoleDelay(_getProfile__CoverageGuardian(), expected[1], RolesConfig.NO_DELAY);
-    }
-
     function test_disablerProfile_hasTheExpectedRoles() public view {
-        uint64[] memory expected = new uint64[](22);
+        uint64[] memory expected = new uint64[](20);
         // Allocator (defensive)
         expected[0] = RolesConfig.getRole__rebalance().roleId;
         expected[1] = RolesConfig.getRole__removeStrategy().roleId;
         expected[2] = RolesConfig.getRole__disableDepositsToStrategy().roleId;
         expected[3] = RolesConfig.getRole__distrustStrategy().roleId;
-        // Rescue (cross-target)
-        expected[4] = RolesConfig.getRole__rescueTokens().roleId;
-        expected[5] = RolesConfig.getRole__rescueNative().roleId;
         // AssetRegistry (defensive)
-        expected[6] = RolesConfig.getRole__disableAllocatorDeposits().roleId;
-        expected[7] = RolesConfig.getRole__disableUserDeposits().roleId;
-        expected[8] = RolesConfig.getRole__disableSwapInput().roleId;
-        expected[9] = RolesConfig.getRole__disableSwapOutput().roleId;
-        expected[10] = RolesConfig.getRole__distrustAsset().roleId;
+        expected[4] = RolesConfig.getRole__disableAllocatorDeposits().roleId;
+        expected[5] = RolesConfig.getRole__disableUserDeposits().roleId;
+        expected[6] = RolesConfig.getRole__disableSwapInput().roleId;
+        expected[7] = RolesConfig.getRole__disableSwapOutput().roleId;
+        expected[8] = RolesConfig.getRole__distrustAsset().roleId;
         // Gateway
-        expected[11] = RolesConfig.getRole__removeBridgeAdapter().roleId;
+        expected[9] = RolesConfig.getRole__removeFundsBridgeAdapter().roleId;
         // WithdrawalExecutionPolicy
-        expected[12] = RolesConfig.getRole__removeSigner().roleId;
-        expected[13] = RolesConfig.getRole__lowerRedemptionCapacity().roleId;
-        expected[14] = RolesConfig.getRole__lowerRedemptionRefillRate().roleId;
+        expected[10] = RolesConfig.getRole__removeSigner().roleId;
+        expected[11] = RolesConfig.getRole__lowerRedemptionCapacity().roleId;
+        expected[12] = RolesConfig.getRole__lowerRedemptionRefillRate().roleId;
         // SlippageCoverageVault
         // raiseWindowSeconds is tightening (longer window = slower rate), even though the prefix says raise.
-        expected[15] = RolesConfig.getRole__lowerPullCapPerTx().roleId;
-        expected[16] = RolesConfig.getRole__lowerWindowCap().roleId;
-        expected[17] = RolesConfig.getRole__raiseWindowSeconds().roleId;
+        expected[13] = RolesConfig.getRole__lowerPullCapPerTx().roleId;
+        expected[14] = RolesConfig.getRole__lowerWindowCap().roleId;
+        expected[15] = RolesConfig.getRole__raiseWindowSeconds().roleId;
         // DepositPolicy
-        expected[18] = RolesConfig.getRole__lowerDepositCapacity().roleId;
-        expected[19] = RolesConfig.getRole__lowerDepositRefillRate().roleId;
+        expected[16] = RolesConfig.getRole__lowerDepositCapacity().roleId;
+        expected[17] = RolesConfig.getRole__lowerDepositRefillRate().roleId;
         // FundsBridgingPolicy
-        expected[20] = RolesConfig.getRole__lowerBridgingCapacity().roleId;
-        expected[21] = RolesConfig.getRole__lowerBridgingRefillRate().roleId;
+        expected[18] = RolesConfig.getRole__lowerBridgingCapacity().roleId;
+        expected[19] = RolesConfig.getRole__lowerBridgingRefillRate().roleId;
         _assertProfileHasExactlyTheseRoles(_getProfile__Disabler(), expected);
 
         for (uint256 i = 0; i < expected.length; i++) {
             _assertProfileRoleDelay(_getProfile__Disabler(), expected[i], RolesConfig.NO_DELAY);
         }
+    }
+
+    function test_rescuerProfile_hasTheExpectedRoles() public view {
+        uint64[] memory expected = new uint64[](2);
+        expected[0] = RolesConfig.getRole__rescueTokens().roleId;
+        expected[1] = RolesConfig.getRole__rescueNative().roleId;
+        _assertProfileHasExactlyTheseRoles(_getProfile__Rescuer(), expected);
+
+        _assertProfileRoleDelay(_getProfile__Rescuer(), expected[0], RolesConfig.NO_DELAY);
+        _assertProfileRoleDelay(_getProfile__Rescuer(), expected[1], RolesConfig.NO_DELAY);
     }
 
     function test_aTokenVaultRewardClaimerProfile_hasTheExpectedRoles() public view {
@@ -325,7 +315,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
     }
 
     function _getAllProfiles() internal view virtual returns (address[] memory) {
-        address[] memory profiles = new address[](7);
+        address[] memory profiles = new address[](8);
         profiles[0] = _getProfile__MainAdmin();
         profiles[1] = _getProfile__SecondaryAdmin();
         profiles[2] = _getProfile__WithdrawalPolicyManager();
@@ -333,6 +323,7 @@ abstract contract AccessManagerSetupBaseTest is AccessManagerBaseSetup, Test {
         profiles[4] = _getProfile__Disabler();
         profiles[5] = _getProfile__ATokenVaultRewardClaimer();
         profiles[6] = _getProfile__Funder();
+        profiles[7] = _getProfile__Rescuer();
         return profiles;
     }
 

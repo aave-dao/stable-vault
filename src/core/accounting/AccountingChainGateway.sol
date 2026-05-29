@@ -71,7 +71,7 @@ contract AccountingChainGateway is BaseChainGateway, IAccountingChainGateway {
         // may be unhealthy (e.g. chain or oracle infrastructure is down). Sending funds there risks locking assets or
         // DoSing withdrawals due to a lack of aggregated liquidity until the oracle staleness is resolved.
         require(!IChainBalanceOracle(CHAIN_BALANCE_ORACLE).getChainBalance(targetChainId).isStale, StaleChainBalance());
-        _validateBridgeAdapterIsSupported(asset, targetChainId, bridgeAdapter);
+        _validateFundsBridgeAdapterIsSupported(asset, targetChainId, bridgeAdapter);
         IBridgeAdapter(bridgeAdapter).publishMessageWithFunds{value: msg.value}(
             targetChainId, asset, amount, "", feePayer, receiverExecutionGasLimit, bridgeAdapterData
         );

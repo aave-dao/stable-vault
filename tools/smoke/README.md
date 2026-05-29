@@ -85,7 +85,7 @@ Script: `tools/smoke/scripts/check-deps-age.ts`. Scope: the smoke-harness direct
 
 ## Adding coverage
 
-A new parameter in `config/deployment-config.*.jsonc` is covered by adding one entry to `lib/catalogue/getters.ts`. The parity engine and renderer handle the rest. The catalogue is keyed by the same `ParameterSpec.key` as `tools/roles/lib/parameters-spec.ts`, so paired setters/getters stay in lockstep.
+A new parameter in `config/deployment-config.*.jsonc` is covered by adding one entry to `lib/catalogue/getters.ts`. The parity engine and renderer handle the rest. The catalogue is keyed by the same `ParameterSpec.key` as `.github/workflows/tooling/roles-sync/lib/parameters-spec.ts`, so paired setters/getters stay in lockstep.
 
 ## Coverage
 
@@ -93,7 +93,7 @@ Catalogue size against the current preprod artefact (`tsx tools/smoke/scripts/du
 
 | Group | AC specs | EC specs |
 |---|---:|---:|
-| AccessManager (driven by `script/output/roles.json`) | 157 | 123 |
+| AccessManager (driven by `.github/workflows/tooling/roles-sync/output/roles.json`) | 157 | 123 |
 | AssetRegistry | 18 | 18 |
 | WithdrawalExecutionPolicy | 6 | 6 |
 | StableVault | 5 | — |

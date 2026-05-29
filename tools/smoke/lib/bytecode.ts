@@ -3,7 +3,7 @@
 // `forge inspect <name> deployedBytecode --json` when the artefact path is
 // non-trivial (case-sensitive FS, suffixed compiler profiles, etc.).
 //
-// Mirrors tools/roles/lib/load-signatures.ts walking strategy.
+// Mirrors .github/workflows/tooling/roles-sync/lib/load-signatures.ts walking strategy.
 
 import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, statSync } from "node:fs";

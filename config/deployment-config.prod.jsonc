@@ -18,8 +18,8 @@
     "withdrawalPolicyManager": "0xFBcf8bA0aCaECbd90990A29e37B8be3F631c38F6",
     "aTokenVaultRewardClaimer": "0x35b029C7715c668DCD6058B7a52C0377f404a4e8",
     "stableVaultManager": "0x2A74c29e0Ee366788cc5EEa00c540264a3508fDB",
-    "coverageGuardian": "0x0000000000000000000000000000000000000000", // TODO: set
-    "funder": "0x3348F31a6d4852AE273aedCF8EEb284c523E4dDF"
+    "funder": "0x3348F31a6d4852AE273aedCF8EEb284c523E4dDF",
+    "rescuer": "0x3348F31a6d4852AE273aedCF8EEb284c523E4dDF"
   },
   "withdrawalExecutionPolicy": {
     "defaultFeeBps": 625, // 6.25%
@@ -27,7 +27,7 @@
   },
   "slippageCoverageVault": {
     "maxSlippageBps": "100", // 1%
-    "overrideMaxSlippageBps": "5000", // 50%
+    "overrideMaxSlippageBps": "10000", // 100%
     "initialOverrideMode": true,
     "perAssetCaps": {
       "gho": {
@@ -57,7 +57,7 @@
     },
     "erc4626Strategies": [
       {
-        "address": "0xE1753F2e00940cC31213dd92013cF019DFE4ca1d",
+        "strategyAddress": "0xE1753F2e00940cC31213dd92013cF019DFE4ca1d",
         "underlyingAddress": "0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f",
         "assetSymbol": "GHO",
         "strategySymbol": "sGho"
@@ -95,8 +95,8 @@
         "capacityRay": "TBD", // TODO: set
         "refillRateRay": "TBD" // TODO: set
       },
-      "minRedemptionCapacityRay": "TBD", // TODO: set
-      "minRedemptionRefillRateRay": "TBD" // TODO: set
+      "minRedemptionCapacityRay": "0",
+      "minRedemptionRefillRateRay": "0"
     },
     "deploymentOutputPath": "deployments/prod/v1/earning.json",
     "minBurnIouTokenGasLimit": "120000"
@@ -166,8 +166,8 @@
         "capacityRay": "TBD", // TODO: set
         "refillRateRay": "TBD" // TODO: set
       },
-      "minRedemptionCapacityRay": "TBD", // TODO: set
-      "minRedemptionRefillRateRay": "TBD" // TODO: set
+      "minRedemptionCapacityRay": "0",
+      "minRedemptionRefillRateRay": "0"
     },
     "deploymentOutputPath": "deployments/prod/v1/accounting.json"
   }

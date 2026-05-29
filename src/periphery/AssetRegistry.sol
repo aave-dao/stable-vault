@@ -61,8 +61,8 @@ contract AssetRegistry is AccessManagedUpgradeable, Multicall, IAssetRegistry {
         // The system uses RAY Math (27 decimals), so we leave a 9-decimal place (27 - 18) margin for better precision.
         require(IERC20Metadata(asset).decimals() <= Constants.MAX_SUPPORTED_ASSET_DECIMALS, Errors.InvalidAsset(asset));
         $storage().configByAsset[asset] = config;
-        $storage().assets.add(asset);
-        $storage().trustedAssets.add(asset);
+        require($storage().assets.add(asset), Errors.AddressAlreadyWhitelisted());
+        require($storage().trustedAssets.add(asset), Errors.AlreadyTrusted());
         emit AssetConfigSet(asset, config);
     }
 
@@ -136,7 +136,7 @@ contract AssetRegistry is AccessManagedUpgradeable, Multicall, IAssetRegistry {
     function trustAsset(address asset) external override restricted {
         require(_isAssetRegistered(asset), Errors.UnsupportedAsset(asset));
         require(!_isAssetTrusted(asset), Errors.AlreadyTrusted());
-        $storage().trustedAssets.add(asset);
+        require($storage().trustedAssets.add(asset), Errors.AlreadyTrusted());
         emit AssetTrusted(asset);
     }
 
@@ -144,7 +144,7 @@ contract AssetRegistry is AccessManagedUpgradeable, Multicall, IAssetRegistry {
     function distrustAsset(address asset) external override restricted {
         require(_isAssetRegistered(asset), Errors.UnsupportedAsset(asset));
         require(_isAssetTrusted(asset), Errors.AlreadyDistrusted());
-        $storage().trustedAssets.remove(asset);
+        require($storage().trustedAssets.remove(asset), Errors.AlreadyDistrusted());
         emit AssetDistrusted(asset);
         if (
             $storage().configByAsset[asset].depositFromUserAllowed

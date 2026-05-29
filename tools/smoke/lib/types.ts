@@ -1,5 +1,6 @@
-// Shared types for the smoke harness. Re-exports Env from tools/roles to keep
-// the source-of-truth for env identifiers in one place.
+// Shared types for the smoke harness. Re-exports Env from
+// .github/workflows/tooling/roles-sync to keep the source-of-truth for env
+// identifiers in one place.
 
 import type { Address, Hex } from "viem";
 

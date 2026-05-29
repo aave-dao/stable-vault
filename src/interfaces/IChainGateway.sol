@@ -14,6 +14,12 @@ interface IChainGateway {
         RETURN_FUNDS
     }
 
+    enum DataOnlyBridgeAdapterMode {
+        NOT_SUPPORTED,
+        SEND_AND_RECEIVE,
+        RECEIVE_ONLY
+    }
+
     /// @notice The representation of a cross-chain message.
     /// @param messageType Type of message used to determine how to decode the `data` field.
     /// @param data Arbitrary data that may be required by the message type.
@@ -53,11 +59,21 @@ interface IChainGateway {
         uint256 blockNumber;
     }
 
-    /// @notice Emitted when a bridge adapter is whitelisted for an asset and destination chain.
-    event BridgeAdapterAdded(address asset, uint256 chainId, address bridgeAdapter);
+    /// @notice Emitted when a data-only bridge adapter is enabled for a destination chain.
+    event DataOnlyBridgeAdapterAdded(uint256 chainId, address bridgeAdapter);
 
-    /// @notice Emitted when a bridge adapter is removed from the whitelist for an asset and destination chain.
-    event BridgeAdapterRemoved(address asset, uint256 chainId, address bridgeAdapter);
+    /// @notice Emitted when a data-only bridge adapter removal is finalized for a destination chain.
+    event DataOnlyBridgeAdapterRemovalFinalized(uint256 chainId, address bridgeAdapter);
+
+    /// @notice Emitted when a data-only bridge adapter removal is initiated.
+    /// @param removalId The ID that must be used to finalize the removal.
+    event DataOnlyBridgeAdapterRemovalInitiated(uint256 chainId, address bridgeAdapter, bytes32 removalId);
+
+    /// @notice Emitted when a funds bridge adapter is whitelisted for an asset and destination chain.
+    event FundsBridgeAdapterAdded(address asset, uint256 chainId, address bridgeAdapter);
+
+    /// @notice Emitted when a funds bridge adapter is removed from the whitelist for an asset and destination chain.
+    event FundsBridgeAdapterRemoved(address asset, uint256 chainId, address bridgeAdapter);
 
     /// @notice Emitted when funds arrive on this chain from a source chain via a bridge adapter.
     event FundsReceived(address asset, uint256 amount, uint256 sourceChainId);
@@ -69,13 +85,17 @@ interface IChainGateway {
     /// @custom:selector 0xf7b1bf8e
     error AdapterNotFound();
 
-    /// @notice Thrown when removing an adapter would leave a chain without a data-only message route.
+    /// @notice Thrown when removal would leave a chain without a data-only sending route.
     /// @custom:selector 0xaa601040
     error CannotRemoveLastDataOnlyBridgeAdapter();
 
     /// @notice Thrown when a given message contains both funds and a data payload which is not allowed.
     /// @custom:selector 0x9d73280d
     error DataNotAllowedWithFunds();
+
+    /// @notice Thrown when the removal ID does not match the stored ID.
+    /// @custom:selector 0x5d6ce9ff
+    error InvalidDataOnlyBridgeAdapterRemovalId(bytes32 actual, bytes32 expected);
 
     /// @notice Thrown when a message type does not match the expected message types, for a data-only message.
     /// @custom:selector 0x82d8a626
@@ -89,18 +109,42 @@ interface IChainGateway {
     /// @custom:selector 0x4084b1f2
     error OnlyIouTokenManager();
 
-    /// @notice Adds a bridge adapter to the gateway's set of whitelisted adapters.
+    /// @notice Thrown when a data-only bridge adapter is in an unexpected mode.
+    /// @custom:selector 0x881393c3
+    error UnexpectedDataOnlyBridgeAdapterMode(uint8 actual, uint8 expected);
+
+    /// @notice Adds a funds bridge adapter to the gateway's set of whitelisted adapters.
     /// @dev The bridge adapter must not be already whitelisted for the asset and chain.
     /// @param asset The asset to add the bridge adapter for.
     /// @param chainId The chain id to add the bridge adapter for.
     /// @param bridgeAdapter The bridge adapter to add.
-    function addBridgeAdapter(address asset, uint256 chainId, address bridgeAdapter) external;
+    function addFundsBridgeAdapter(address asset, uint256 chainId, address bridgeAdapter) external;
 
-    /// @notice Removes a bridge adapter from the gateway's set of whitelisted adapters.
+    /// @notice Removes a funds bridge adapter from the gateway's set of whitelisted adapters.
     /// @param asset The asset to remove the bridge adapter for.
     /// @param chainId The chain id to remove the bridge adapter for.
     /// @param bridgeAdapter The bridge adapter to remove.
-    function removeBridgeAdapter(address asset, uint256 chainId, address bridgeAdapter) external;
+    function removeFundsBridgeAdapter(address asset, uint256 chainId, address bridgeAdapter) external;
+
+    /// @notice Adds a data-only bridge adapter for a destination chain.
+    /// @param chainId The chain id to add the bridge adapter for.
+    /// @param bridgeAdapter The bridge adapter to add.
+    function addDataOnlyBridgeAdapter(uint256 chainId, address bridgeAdapter) external;
+
+    /// @notice Initiates removal of a data-only bridge adapter.
+    /// @dev The adapter remains valid for receiving in-flight messages but cannot be used for new sends.
+    /// @param chainId The chain id the bridge adapter is registered for.
+    /// @param bridgeAdapter The bridge adapter to remove.
+    /// @return removalId The ID that must be used to finalize the removal.
+    function initiateDataOnlyBridgeAdapterRemoval(uint256 chainId, address bridgeAdapter)
+        external
+        returns (bytes32 removalId);
+
+    /// @notice Finalizes the removal of a data-only bridge adapter after its removal was initiated.
+    /// @param chainId The chain id to remove the bridge adapter for.
+    /// @param bridgeAdapter The bridge adapter to remove.
+    /// @param removalId The ID returned when removal was initiated.
+    function finalizeDataOnlyBridgeAdapterRemoval(uint256 chainId, address bridgeAdapter, bytes32 removalId) external;
 
     /// @notice Handle receiving of data and funds from a source chain.
     /// @param sourceChainId The chain from which the message was sent.

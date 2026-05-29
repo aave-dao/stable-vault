@@ -368,7 +368,7 @@ contract FundsHandlerTest is TestWithHelpers {
         bytes memory bridgeAdapterData =
             abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0}));
 
-        vm.assume(chainId != block.chainid);
+        vm.assume(chainId != block.chainid && chainId != 0);
         vm.prank(ADMIN);
         fundsHandler.addEarningChain(chainId);
 
@@ -402,7 +402,7 @@ contract FundsHandlerTest is TestWithHelpers {
         uint256 bridgeAdapterData_feeAmount,
         uint256 bridgeAdapterData_gasLimit
     ) public {
-        vm.assume(chainId != block.chainid);
+        vm.assume(chainId != block.chainid && chainId != 0);
         vm.prank(ADMIN);
         fundsHandler.addEarningChain(chainId);
 
@@ -424,7 +424,7 @@ contract FundsHandlerTest is TestWithHelpers {
         uint256 bridgeAdapterData_feeAmount,
         uint256 bridgeAdapterData_gasLimit
     ) public {
-        vm.assume(chainId != block.chainid);
+        vm.assume(chainId != block.chainid && chainId != 0);
         vm.prank(ADMIN);
         fundsHandler.addEarningChain(chainId);
         amount = _boundAssetAmount(address(mockAsset), amount);
@@ -463,7 +463,7 @@ contract FundsHandlerTest is TestWithHelpers {
         uint256 bridgeAdapterData_feeAmount,
         uint256 bridgeAdapterData_gasLimit
     ) public {
-        vm.assume(chainId != block.chainid);
+        vm.assume(chainId != block.chainid && chainId != 0);
         vm.prank(ADMIN);
         fundsHandler.addEarningChain(chainId);
         address feeToken = _deployAssetWithSalt(feeTokenSalt, feeTokenDecimals);
@@ -505,7 +505,7 @@ contract FundsHandlerTest is TestWithHelpers {
         uint256 bridgeAdapterData_feeAmount,
         uint256 bridgeAdapterData_gasLimit
     ) public {
-        vm.assume(chainId != block.chainid);
+        vm.assume(chainId != block.chainid && chainId != 0);
         vm.prank(ADMIN);
         fundsHandler.addEarningChain(chainId);
         amount = _boundAssetAmount(address(mockAsset), amount);
@@ -564,7 +564,7 @@ contract FundsHandlerTest is TestWithHelpers {
         uint256 bridgeAdapterData_feeAmount,
         uint256 bridgeAdapterData_gasLimit
     ) public {
-        vm.assume(chainId != block.chainid);
+        vm.assume(chainId != block.chainid && chainId != 0);
 
         vm.prank(ADMIN);
         fundsHandler.addEarningChain(chainId);
@@ -614,7 +614,7 @@ contract FundsHandlerTest is TestWithHelpers {
         uint256 bridgeAdapterData_feeAmount,
         uint256 bridgeAdapterData_gasLimit
     ) public {
-        vm.assume(chainId != block.chainid);
+        vm.assume(chainId != block.chainid && chainId != 0);
 
         vm.prank(ADMIN);
         fundsHandler.addEarningChain(chainId);
@@ -652,8 +652,8 @@ contract FundsHandlerTest is TestWithHelpers {
 
     function test_getEarningChainIds_returnsAddedChains(uint256 chainId1, uint256 chainId2) public {
         vm.assume(chainId1 != chainId2);
-        vm.assume(chainId1 != block.chainid);
-        vm.assume(chainId2 != block.chainid);
+        vm.assume(chainId1 != block.chainid && chainId1 != 0);
+        vm.assume(chainId2 != block.chainid && chainId2 != 0);
 
         vm.prank(ADMIN);
         fundsHandler.addEarningChain(chainId1);
@@ -673,8 +673,8 @@ contract FundsHandlerTest is TestWithHelpers {
 
     function test_getEarningChainIds_reflectsRemoval(uint256 chainId1, uint256 chainId2) public {
         vm.assume(chainId1 != chainId2);
-        vm.assume(chainId1 != block.chainid);
-        vm.assume(chainId2 != block.chainid);
+        vm.assume(chainId1 != block.chainid && chainId1 != 0);
+        vm.assume(chainId2 != block.chainid && chainId2 != 0);
 
         vm.prank(ADMIN);
         fundsHandler.addEarningChain(chainId1);
@@ -729,8 +729,8 @@ contract FundsHandlerTest is TestWithHelpers {
         uint256 chainBalance2
     ) public {
         vm.assume(chainId1 != chainId2);
-        vm.assume(chainId1 != block.chainid);
-        vm.assume(chainId2 != block.chainid);
+        vm.assume(chainId1 != block.chainid && chainId1 != 0);
+        vm.assume(chainId2 != block.chainid && chainId2 != 0);
         chainBalance1 = _boundAssetAmount(address(mockAsset), chainBalance1);
         chainBalance2 = _boundAssetAmount(address(mockAsset), chainBalance2);
 
@@ -775,7 +775,7 @@ contract FundsHandlerTest is TestWithHelpers {
     }
 
     function test_addEarningChain_reverts_ifChainIdAlreadyPresent(uint256 chainId) public {
-        vm.assume(chainId != block.chainid);
+        vm.assume(chainId != block.chainid && chainId != 0);
         vm.prank(ADMIN);
         fundsHandler.addEarningChain(chainId);
         vm.prank(ADMIN);
@@ -789,8 +789,14 @@ contract FundsHandlerTest is TestWithHelpers {
         fundsHandler.addEarningChain(block.chainid);
     }
 
+    function test_addEarningChain_reverts_ifChainIdIsZero() public {
+        vm.prank(ADMIN);
+        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidDestinationChainId.selector));
+        fundsHandler.addEarningChain(0);
+    }
+
     function test_removeEarningChain_reverts_ifChainIdNotPresent(uint256 chainId) public {
-        vm.assume(chainId != block.chainid);
+        vm.assume(chainId != block.chainid && chainId != 0);
         vm.prank(ADMIN);
         vm.expectRevert(abi.encodeWithSelector(IFundsHandler.ChainIdNotPresent.selector));
         fundsHandler.removeEarningChain(chainId);

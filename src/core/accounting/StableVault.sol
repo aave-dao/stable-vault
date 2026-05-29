@@ -946,7 +946,7 @@ contract StableVault is
         if (oldSubVaultId == 0) {
             // Skip users without a position (e.g., withdrew or transferred out between batch
             // preparation and execution) to avoid reverting the entire batch.
-            emit SetUserRateSkipped(user);
+            emit SetUserRateSkipped(user, 0, newPerSecondRate);
         } else {
             require(
                 newPerSecondRate != $storage().subVaultById[oldSubVaultId].perSecondRate,
@@ -956,9 +956,9 @@ contract StableVault is
             if (_migrateUserToSubVault(user, oldSubVaultId, newSubVaultId)) {
                 emit UserRateSet(user, newSubVaultId, newPerSecondRate);
             } else {
-                // Migration to new sub-vault did not happen.
+                // Migration to new sub-vault did not happen (shares would round to zero).
                 // Skip the user, do not revert, so we avoid blocking the entire `setUserRate` batch.
-                emit SetUserRateSkipped(user);
+                emit SetUserRateSkipped(user, newSubVaultId, newPerSecondRate);
             }
         }
         // `_validateAmountOfActiveSubVaults()` is intentionally not called here: this is invoked per-user inside

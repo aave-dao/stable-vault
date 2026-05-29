@@ -147,7 +147,7 @@ contract EarningChainGateway is
         uint256 receiverExecutionGasLimit,
         bytes calldata bridgeAdapterData,
         bytes calldata policyData
-    ) external payable override restricted assertingTransferHelperBalanceFor(asset) {
+    ) external payable override restricted nonReentrant assertingTransferHelperBalanceFor(asset) {
         require(amount > 0, Errors.ZeroAmount());
         _applyFundsBridgingPolicy(ACCOUNTING_CHAIN_ID, bridgeAdapter, asset, amount, policyData);
         // Pull funds from liquidity into the TransferHelper.
@@ -203,7 +203,7 @@ contract EarningChainGateway is
                 )
             })
         );
-        _validateBridgeAdapterIsSupported(asset, ACCOUNTING_CHAIN_ID, bridgeAdapter);
+        _validateFundsBridgeAdapterIsSupported(asset, ACCOUNTING_CHAIN_ID, bridgeAdapter);
         IBridgeAdapter(bridgeAdapter).publishMessageWithFunds{value: msg.value}(
             ACCOUNTING_CHAIN_ID,
             asset,
@@ -301,7 +301,7 @@ contract EarningChainGateway is
             })
         );
 
-        _validateBridgeAdapterIsSupported(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ACCOUNTING_CHAIN_ID, bridgeAdapter);
+        _validateDataOnlyBridgeAdapterCanSend(ACCOUNTING_CHAIN_ID, bridgeAdapter);
         IBridgeAdapter(bridgeAdapter).publishDataOnlyMessage{value: msg.value}(
             ACCOUNTING_CHAIN_ID, burnIouTokenMessageEncoded, feePayer, payloadExecutionGasLimit, bridgeAdapterData
         );

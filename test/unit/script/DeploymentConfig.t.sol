@@ -34,8 +34,8 @@ contract DeploymentConfigHarness is DeploymentConfig {
 
 contract DeploymentConfigTest is Test {
     struct ExistingErc4626StrategyConfig {
-        address addr;
         string assetSymbol;
+        address strategyAddress;
         string strategySymbol;
         address underlyingAddress;
     }
@@ -102,7 +102,7 @@ contract DeploymentConfigTest is Test {
         ExistingErc4626StrategyConfig[] memory strategies = abi.decode(raw, (ExistingErc4626StrategyConfig[]));
 
         assertEq(strategies.length, 1);
-        assertEq(strategies[0].addr, 0xE1753F2e00940cC31213dd92013cF019DFE4ca1d);
+        assertEq(strategies[0].strategyAddress, 0xE1753F2e00940cC31213dd92013cF019DFE4ca1d);
         assertEq(strategies[0].assetSymbol, "GHO");
         assertEq(strategies[0].strategySymbol, "sGho");
         assertEq(strategies[0].underlyingAddress, 0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f);

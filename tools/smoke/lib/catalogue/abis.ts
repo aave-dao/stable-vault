@@ -339,7 +339,7 @@ export const CHAIN_BALANCE_ORACLE_ABI = [
 export const BASE_CHAIN_GATEWAY_ABI = [
   {
     type: "function",
-    name: "isBridgeAdapterSupported",
+    name: "isFundsBridgeAdapterSupported",
     stateMutability: "view",
     inputs: [
       { name: "asset", type: "address" },

@@ -4,9 +4,11 @@ pragma solidity ^0.8.22;
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ICrossChainForwarder} from "aave-delivery-infrastructure/contracts/interfaces/ICrossChainForwarder.sol";
 import {Vm} from "forge-std/Vm.sol";
 
 import {AdiAdapter} from "src/bridging/adi/AdiAdapter.sol";
+import {CcipAdapter} from "src/bridging/ccip/CcipAdapter.sol";
 import {Allocator} from "src/core/Allocator.sol";
 import {AccountingChainGateway} from "src/core/accounting/AccountingChainGateway.sol";
 import {FundsHandler} from "src/core/accounting/FundsHandler.sol";
@@ -14,7 +16,6 @@ import {StableVault} from "src/core/accounting/StableVault.sol";
 import {EarningChainGateway} from "src/core/earning/EarningChainGateway.sol";
 import {IouToken} from "src/core/ious/IouToken.sol";
 import {IouTokenManager} from "src/core/ious/IouTokenManager.sol";
-import {IAdiCrossChainForwarder} from "src/interfaces/IAdiCrossChainForwarder.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IAssetRegistry} from "src/interfaces/IAssetRegistry.sol";
 import {IChainBalanceOracle} from "src/interfaces/IChainBalanceOracle.sol";
@@ -29,6 +30,7 @@ import {WithdrawalExecutionPolicy} from "src/policies/WithdrawalExecutionPolicy.
 import {Constants} from "src/types/Constants.sol";
 
 import {AdiHelper} from "pigeon/src/adi/AdiHelper.sol";
+import {CcipHelper} from "pigeon/src/ccip/CcipHelper.sol";
 
 import {MockAccessManager} from "test/mocks/MockAccessManager.sol";
 import {MockErc20} from "test/mocks/MockErc20.sol";
@@ -102,12 +104,25 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         TestErc4626 strategy;
     }
 
+    struct CcipDataOnlyAdapters {
+        CcipAdapter accounting;
+        CcipAdapter earning;
+    }
+
+    struct DataOnlyBridgeRemovalIds {
+        bytes32 accounting;
+        bytes32 earning;
+    }
+
     uint256 internal constant DEFAULT_MAX_PER_SECOND_RATE = 1000000005781378656804591713; // ~20% APY
     uint256 internal constant BURN_IOU_TOKEN_GAS_LIMIT = 120_000;
+    uint256 internal constant CCIP_NATIVE_FEE_PAYMENT = 1 ether;
     uint256 internal constant MAX_ACTIVE_SUB_VAULTS = 201;
     uint8 internal constant MAX_STRATEGIES_PER_ASSET = 15;
     uint128 internal constant TEST_MIN_REDEMPTION_CAPACITY = 1e30;
     uint128 internal constant TEST_MIN_REDEMPTION_REFILL_RATE = 1e25;
+    uint128 internal constant TEST_REDEMPTION_CAPACITY = type(uint128).max - 1;
+    uint128 internal constant TEST_REDEMPTION_REFILL_RATE = 1e30;
 
     address internal _proxyAdmin = makeAddr("PROXY_ADMIN");
     address internal _admin = makeAddr("ADI_IOU_ADMIN");
@@ -285,6 +300,158 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         assertEq(_accounting.iouToken.totalSupply(), 0, "accounting IOU supply not burned by retry");
     }
 
+    function test_iouBurnOverAdi_quorumThenNoDuplicateBurn() public onlyForkTest {
+        uint256 depositAmount = 500e6;
+        vm.selectFork(_ethFork);
+        uint256 iouAmountRay = depositAmount.assetDecimalsToRay(address(_accounting.asset));
+
+        _depositIntoStableVault(depositAmount);
+        _airdropEarningLiquidity(depositAmount);
+
+        vm.selectFork(_ethFork);
+        vm.prank(_user);
+        _accounting.vault.requestWithdrawal(_user, iouAmountRay, "");
+
+        Vm.Log[] memory bridgeLogs = _bridgeAccountingIousToEarning(iouAmountRay);
+        _adiHelper.helpEthToArb(
+            AdiHelper.EthToArbArgs({
+                l2ForkId: _arbFork, l1Inbox: ARB_INBOX, l1Bridge: ARB_BRIDGE, expectedL1CCC: _ethCcc, logs: bridgeLogs
+            })
+        );
+
+        vm.selectFork(_arbFork);
+        assertEq(_earning.iouToken.balanceOf(_user), iouAmountRay, "earning IOUs not minted before quorum test");
+        uint256 burnSourceBlock = block.number;
+        Vm.Log[] memory burnLogs = _exchangeEarningIousForAssets(iouAmountRay);
+
+        vm.selectFork(_ethFork);
+        assertEq(_accounting.iouTokenManager.getLockedBalance(), iouAmountRay, "locked IOUs burned before relay");
+        _accounting.chainBalanceOracle
+            .setChainBalance(
+                ARB_CHAIN_ID,
+                IChainBalanceOracle.ChainBalance({
+                    balanceRay: 0,
+                    lastUpdateTimestamp: block.timestamp,
+                    sourceChainTimestamp: block.timestamp,
+                    sourceChainBlockNumber: burnSourceBlock,
+                    isStale: false
+                })
+            );
+
+        _adiHelper.helpMultiBridge(
+            AdiHelper.MultiBridgeArgs({
+                dstForkId: _ethFork,
+                dstCcipRouter: ETH_CCIP_ROUTER,
+                dstCcipChainSelector: ETH_CCIP_CHAIN_SELECTOR,
+                srcCcipOnRamp: address(0),
+                dstLzEndpoint: address(0),
+                srcHlMailbox: address(0),
+                dstHlMailbox: address(0),
+                logs: burnLogs
+            })
+        );
+        vm.selectFork(_ethFork);
+        assertEq(_accounting.iouTokenManager.getLockedBalance(), iouAmountRay, "single relay should not burn IOUs");
+        assertEq(
+            _accounting.iouToken.balanceOf(address(_accounting.iouTokenManager)),
+            iouAmountRay,
+            "single relay changed locked IOU balance"
+        );
+
+        _adiHelper.helpMultiBridge(
+            AdiHelper.MultiBridgeArgs({
+                dstForkId: _ethFork,
+                dstCcipRouter: address(0),
+                dstCcipChainSelector: 0,
+                srcCcipOnRamp: address(0),
+                dstLzEndpoint: LZ_ENDPOINT_V2,
+                srcHlMailbox: address(0),
+                dstHlMailbox: address(0),
+                logs: burnLogs
+            })
+        );
+        vm.selectFork(_ethFork);
+        assertEq(_accounting.iouTokenManager.getLockedBalance(), 0, "second relay should burn locked IOUs");
+        assertEq(_accounting.iouToken.balanceOf(address(_accounting.iouTokenManager)), 0, "manager still holds IOUs");
+        assertEq(_accounting.iouToken.totalSupply(), 0, "accounting IOU supply not burned");
+
+        _adiHelper.helpMultiBridge(
+            AdiHelper.MultiBridgeArgs({
+                dstForkId: _ethFork,
+                dstCcipRouter: address(0),
+                dstCcipChainSelector: 0,
+                srcCcipOnRamp: address(0),
+                dstLzEndpoint: address(0),
+                srcHlMailbox: ARB_HL_MAILBOX,
+                dstHlMailbox: ETH_HL_MAILBOX,
+                logs: burnLogs
+            })
+        );
+        vm.selectFork(_ethFork);
+        assertEq(_accounting.iouTokenManager.getLockedBalance(), 0, "extra relay should not relock or reburn IOUs");
+        assertEq(
+            _accounting.iouToken.balanceOf(address(_accounting.iouTokenManager)),
+            0,
+            "extra relay changed manager IOU balance"
+        );
+        assertEq(_accounting.iouToken.totalSupply(), 0, "extra relay changed accounting IOU supply");
+    }
+
+    function test_iouBridge_replacesCcipDataOnlyBridgeWithAdi() public onlyForkTest {
+        uint256 depositAmount = 500e6;
+        vm.selectFork(_ethFork);
+        uint256 iouAmountRay = depositAmount.assetDecimalsToRay(address(_accounting.asset));
+        CcipDataOnlyAdapters memory ccip = _deployCcipDataOnlyAdapters();
+
+        _replaceAdiWithCcip(ccip);
+
+        _depositIntoStableVault(depositAmount);
+        _requestAccountingWithdrawal(iouAmountRay);
+        Vm.Log[] memory ccipLogs = _bridgeAccountingIousToEarningViaCcip(iouAmountRay, ccip.accounting);
+
+        vm.selectFork(_arbFork);
+        assertEq(_earning.iouToken.balanceOf(_user), 0, "CCIP IOUs should be in flight");
+
+        DataOnlyBridgeRemovalIds memory ccipRemovalIds = _migrateCcipToAdi(ccip);
+
+        _depositIntoStableVault(depositAmount);
+        _requestAccountingWithdrawal(iouAmountRay);
+        Vm.Log[] memory adiLogs = _bridgeAccountingIousToEarning(iouAmountRay);
+        _relayAccountingToEarningViaAdi(adiLogs);
+
+        vm.selectFork(_arbFork);
+        assertEq(_earning.iouToken.balanceOf(_user), iouAmountRay, "aDI IOUs not minted during migration");
+
+        _relayAccountingToEarningViaCcip(ccipLogs);
+
+        vm.selectFork(_arbFork);
+        assertEq(_earning.iouToken.balanceOf(_user), iouAmountRay * 2, "CCIP in-flight IOUs not minted");
+
+        _removeCcipDataOnlyAdapters(ccip, ccipRemovalIds);
+
+        _depositIntoStableVault(depositAmount);
+        _requestAccountingWithdrawal(iouAmountRay);
+        Vm.Log[] memory postRemovalAdiLogs = _bridgeAccountingIousToEarning(iouAmountRay);
+        _relayAccountingToEarningViaAdi(postRemovalAdiLogs);
+
+        vm.selectFork(_arbFork);
+        assertEq(_earning.iouToken.balanceOf(_user), iouAmountRay * 3, "post-removal aDI IOUs not minted");
+
+        vm.selectFork(_ethFork);
+        vm.expectRevert(IChainGateway.AdapterNotFound.selector);
+        vm.prank(address(_accounting.iouTokenManager));
+        _accounting.gateway
+            .sendBridgeIouTokenMessageWithFeePayer(
+                ARB_CHAIN_ID,
+                _user,
+                iouAmountRay,
+                address(ccip.accounting),
+                _user,
+                DEFAULT_GAS_LIMIT,
+                _ccipNativeFeeData()
+            );
+    }
+
     function _deployAccountingStack() internal returns (AccountingStack memory stack) {
         stack.accessManager = new MockAccessManager(_admin);
         stack.transferHelper = new TransferHelper();
@@ -331,6 +498,7 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
             address(stack.withdrawalExecutionPolicy) == withdrawalExecutionPolicyAddress,
             "withdrawal execution policy address mismatch"
         );
+        _seedWithdrawalExecutionPolicy(stack.withdrawalExecutionPolicy);
 
         stack.iouToken = new IouToken(iouTokenManagerAddress, "IOU: Fork Stable Vault", "IOU-FORK");
         require(address(stack.iouToken) == iouTokenAddress, "accounting IOU token address mismatch");
@@ -338,13 +506,7 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         stack.iouTokenManager = IouTokenManager(
             address(
                 new TransparentUpgradeableProxy(
-                    address(
-                        new IouTokenManager(
-                            iouTokenAddress, gatewayAddress, vaultAddress, address(stack.transferHelper), true
-                        )
-                    ),
-                    _proxyAdmin,
-                    ""
+                    address(new IouTokenManager(iouTokenAddress, gatewayAddress, vaultAddress, true)), _proxyAdmin, ""
                 )
             )
         );
@@ -491,6 +653,7 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
             address(stack.withdrawalExecutionPolicy) == withdrawalExecutionPolicyAddress,
             "earning withdrawal execution policy address mismatch"
         );
+        _seedWithdrawalExecutionPolicy(stack.withdrawalExecutionPolicy);
 
         stack.iouToken = new IouToken(iouTokenManagerAddress, "IOU: Fork Stable Vault", "IOU-FORK");
         require(address(stack.iouToken) == iouTokenAddress, "earning IOU token address mismatch");
@@ -498,13 +661,7 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         stack.iouTokenManager = IouTokenManager(
             address(
                 new TransparentUpgradeableProxy(
-                    address(
-                        new IouTokenManager(
-                            iouTokenAddress, gatewayAddress, address(0), address(stack.transferHelper), false
-                        )
-                    ),
-                    _proxyAdmin,
-                    ""
+                    address(new IouTokenManager(iouTokenAddress, gatewayAddress, address(0), false)), _proxyAdmin, ""
                 )
             )
         );
@@ -578,7 +735,7 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         stack.assetRegistry.setAssetConfig(address(stack.asset), assetConfig);
         stack.allocator.addStrategy(address(stack.asset), address(stack.strategy));
         stack.fundsHandler.addEarningChain(ARB_CHAIN_ID);
-        stack.gateway.addBridgeAdapter(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ARB_CHAIN_ID, address(stack.adiAdapter));
+        stack.gateway.addDataOnlyBridgeAdapter(ARB_CHAIN_ID, address(stack.adiAdapter));
     }
 
     function _configureEarningStack(EarningStack memory stack) internal {
@@ -590,7 +747,12 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         });
         stack.assetRegistry.setAssetConfig(address(stack.asset), assetConfig);
         stack.allocator.addStrategy(address(stack.asset), address(stack.strategy));
-        stack.gateway.addBridgeAdapter(Constants.ASSET_FOR_DATA_ONLY_BRIDGE, ETH_CHAIN_ID, address(stack.adiAdapter));
+        stack.gateway.addDataOnlyBridgeAdapter(ETH_CHAIN_ID, address(stack.adiAdapter));
+    }
+
+    function _seedWithdrawalExecutionPolicy(WithdrawalExecutionPolicy withdrawalExecutionPolicy) internal {
+        withdrawalExecutionPolicy.raiseRedemptionCapacity(TEST_REDEMPTION_CAPACITY);
+        withdrawalExecutionPolicy.raiseRedemptionRefillRate(TEST_REDEMPTION_REFILL_RATE);
     }
 
     function _wireStacks() internal {
@@ -603,6 +765,135 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         _approveAdiAdapter(_arbCcc, address(_earning.adiAdapter));
     }
 
+    function _deployCcipDataOnlyAdapters() internal returns (CcipDataOnlyAdapters memory adapters) {
+        vm.selectFork(_ethFork);
+        adapters.accounting = new CcipAdapter(
+            address(_accounting.accessManager),
+            address(_accounting.gateway),
+            ETH_CCIP_ROUTER,
+            address(_accounting.transferHelper),
+            address(_accounting.assetRegistry)
+        );
+
+        vm.selectFork(_arbFork);
+        adapters.earning = new CcipAdapter(
+            address(_earning.accessManager),
+            address(_earning.gateway),
+            ARB_CCIP_ROUTER,
+            address(_earning.transferHelper),
+            address(_earning.assetRegistry)
+        );
+
+        vm.selectFork(_ethFork);
+        adapters.accounting.setChainSelector(ARB_CHAIN_ID, ARB_CCIP_CHAIN_SELECTOR);
+        adapters.accounting.setDestinationChainAdapter(ARB_CHAIN_ID, address(adapters.earning));
+
+        vm.selectFork(_arbFork);
+        adapters.earning.setChainSelector(ETH_CHAIN_ID, ETH_CCIP_CHAIN_SELECTOR);
+        adapters.earning.setDestinationChainAdapter(ETH_CHAIN_ID, address(adapters.accounting));
+    }
+
+    function _replaceAdiWithCcip(CcipDataOnlyAdapters memory ccip) internal {
+        vm.selectFork(_ethFork);
+        _accounting.gateway.addDataOnlyBridgeAdapter(ARB_CHAIN_ID, address(ccip.accounting));
+        bytes32 accountingAdiRemovalId =
+            _accounting.gateway.initiateDataOnlyBridgeAdapterRemoval(ARB_CHAIN_ID, address(_accounting.adiAdapter));
+        _accounting.gateway
+            .finalizeDataOnlyBridgeAdapterRemoval(ARB_CHAIN_ID, address(_accounting.adiAdapter), accountingAdiRemovalId);
+        assertEq(
+            uint8(_accounting.gateway.getDataOnlyBridgeAdapterMode(ARB_CHAIN_ID, address(ccip.accounting))),
+            uint8(IChainGateway.DataOnlyBridgeAdapterMode.SEND_AND_RECEIVE),
+            "accounting CCIP not enabled"
+        );
+        assertEq(
+            uint8(_accounting.gateway.getDataOnlyBridgeAdapterMode(ARB_CHAIN_ID, address(_accounting.adiAdapter))),
+            uint8(IChainGateway.DataOnlyBridgeAdapterMode.NOT_SUPPORTED),
+            "accounting aDI still registered"
+        );
+
+        vm.selectFork(_arbFork);
+        _earning.gateway.addDataOnlyBridgeAdapter(ETH_CHAIN_ID, address(ccip.earning));
+        bytes32 earningAdiRemovalId =
+            _earning.gateway.initiateDataOnlyBridgeAdapterRemoval(ETH_CHAIN_ID, address(_earning.adiAdapter));
+        _earning.gateway
+            .finalizeDataOnlyBridgeAdapterRemoval(ETH_CHAIN_ID, address(_earning.adiAdapter), earningAdiRemovalId);
+        assertEq(
+            uint8(_earning.gateway.getDataOnlyBridgeAdapterMode(ETH_CHAIN_ID, address(ccip.earning))),
+            uint8(IChainGateway.DataOnlyBridgeAdapterMode.SEND_AND_RECEIVE),
+            "earning CCIP not enabled"
+        );
+        assertEq(
+            uint8(_earning.gateway.getDataOnlyBridgeAdapterMode(ETH_CHAIN_ID, address(_earning.adiAdapter))),
+            uint8(IChainGateway.DataOnlyBridgeAdapterMode.NOT_SUPPORTED),
+            "earning aDI still registered"
+        );
+    }
+
+    function _migrateCcipToAdi(CcipDataOnlyAdapters memory ccip)
+        internal
+        returns (DataOnlyBridgeRemovalIds memory removalIds)
+    {
+        vm.selectFork(_ethFork);
+        _accounting.gateway.addDataOnlyBridgeAdapter(ARB_CHAIN_ID, address(_accounting.adiAdapter));
+        removalIds.accounting =
+            _accounting.gateway.initiateDataOnlyBridgeAdapterRemoval(ARB_CHAIN_ID, address(ccip.accounting));
+        assertEq(
+            uint8(_accounting.gateway.getDataOnlyBridgeAdapterMode(ARB_CHAIN_ID, address(ccip.accounting))),
+            uint8(IChainGateway.DataOnlyBridgeAdapterMode.RECEIVE_ONLY),
+            "accounting CCIP not receive-only"
+        );
+        assertEq(
+            uint8(_accounting.gateway.getDataOnlyBridgeAdapterMode(ARB_CHAIN_ID, address(_accounting.adiAdapter))),
+            uint8(IChainGateway.DataOnlyBridgeAdapterMode.SEND_AND_RECEIVE),
+            "accounting aDI not enabled"
+        );
+
+        vm.selectFork(_arbFork);
+        _earning.gateway.addDataOnlyBridgeAdapter(ETH_CHAIN_ID, address(_earning.adiAdapter));
+        removalIds.earning = _earning.gateway.initiateDataOnlyBridgeAdapterRemoval(ETH_CHAIN_ID, address(ccip.earning));
+        assertEq(
+            uint8(_earning.gateway.getDataOnlyBridgeAdapterMode(ETH_CHAIN_ID, address(ccip.earning))),
+            uint8(IChainGateway.DataOnlyBridgeAdapterMode.RECEIVE_ONLY),
+            "earning CCIP not receive-only"
+        );
+        assertEq(
+            uint8(_earning.gateway.getDataOnlyBridgeAdapterMode(ETH_CHAIN_ID, address(_earning.adiAdapter))),
+            uint8(IChainGateway.DataOnlyBridgeAdapterMode.SEND_AND_RECEIVE),
+            "earning aDI not enabled"
+        );
+    }
+
+    function _removeCcipDataOnlyAdapters(CcipDataOnlyAdapters memory ccip, DataOnlyBridgeRemovalIds memory removalIds)
+        internal
+    {
+        vm.selectFork(_ethFork);
+        _accounting.gateway
+            .finalizeDataOnlyBridgeAdapterRemoval(ARB_CHAIN_ID, address(ccip.accounting), removalIds.accounting);
+        assertEq(
+            uint8(_accounting.gateway.getDataOnlyBridgeAdapterMode(ARB_CHAIN_ID, address(ccip.accounting))),
+            uint8(IChainGateway.DataOnlyBridgeAdapterMode.NOT_SUPPORTED),
+            "accounting CCIP still registered"
+        );
+        assertEq(
+            uint8(_accounting.gateway.getDataOnlyBridgeAdapterMode(ARB_CHAIN_ID, address(_accounting.adiAdapter))),
+            uint8(IChainGateway.DataOnlyBridgeAdapterMode.SEND_AND_RECEIVE),
+            "accounting aDI not enabled after CCIP removal"
+        );
+
+        vm.selectFork(_arbFork);
+        _earning.gateway.finalizeDataOnlyBridgeAdapterRemoval(ETH_CHAIN_ID, address(ccip.earning), removalIds.earning);
+        assertEq(
+            uint8(_earning.gateway.getDataOnlyBridgeAdapterMode(ETH_CHAIN_ID, address(ccip.earning))),
+            uint8(IChainGateway.DataOnlyBridgeAdapterMode.NOT_SUPPORTED),
+            "earning CCIP still registered"
+        );
+        assertEq(
+            uint8(_earning.gateway.getDataOnlyBridgeAdapterMode(ETH_CHAIN_ID, address(_earning.adiAdapter))),
+            uint8(IChainGateway.DataOnlyBridgeAdapterMode.SEND_AND_RECEIVE),
+            "earning aDI not enabled after CCIP removal"
+        );
+    }
+
     function _depositIntoStableVault(uint256 depositAmount) internal {
         vm.selectFork(_ethFork);
         _accounting.asset.mint(_user, depositAmount);
@@ -610,6 +901,13 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         _accounting.asset.approve(address(_accounting.vault), depositAmount);
         _accounting.vault.deposit(_user, address(_accounting.asset), depositAmount, "");
         vm.stopPrank();
+    }
+
+    function _requestAccountingWithdrawal(uint256 iouAmountRay) internal {
+        vm.selectFork(_ethFork);
+        vm.prank(_user);
+        uint256 mintedIous = _accounting.vault.requestWithdrawal(_user, iouAmountRay, "");
+        assertEq(mintedIous, iouAmountRay, "unexpected requested IOU amount");
     }
 
     function _airdropEarningLiquidity(uint256 amount) internal {
@@ -634,6 +932,44 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         assertEq(_adiHelper.countSuccessfulForwards(logs), 1, "ETH->ARB IOU bridge should forward once");
     }
 
+    function _bridgeAccountingIousToEarningViaCcip(uint256 amountRay, CcipAdapter ccipAdapter)
+        internal
+        returns (Vm.Log[] memory logs)
+    {
+        vm.selectFork(_ethFork);
+        vm.deal(_user, CCIP_NATIVE_FEE_PAYMENT);
+
+        vm.recordLogs();
+        vm.prank(_user);
+        _accounting.iouTokenManager.bridgeTokens{value: CCIP_NATIVE_FEE_PAYMENT}(
+            ARB_CHAIN_ID, _user, amountRay, address(ccipAdapter), DEFAULT_GAS_LIMIT, _ccipNativeFeeData()
+        );
+        logs = vm.getRecordedLogs();
+
+        _assertOneCcipMessage(logs);
+    }
+
+    function _relayAccountingToEarningViaAdi(Vm.Log[] memory logs) internal {
+        _adiHelper.helpEthToArb(
+            AdiHelper.EthToArbArgs({
+                l2ForkId: _arbFork, l1Inbox: ARB_INBOX, l1Bridge: ARB_BRIDGE, expectedL1CCC: _ethCcc, logs: logs
+            })
+        );
+    }
+
+    function _relayAccountingToEarningViaCcip(Vm.Log[] memory logs) internal {
+        new CcipHelper()
+            .help(
+                CcipHelper.HelpArgs({
+                dstForkId: _arbFork,
+                dstRouter: ARB_CCIP_ROUTER,
+                expDstChainSelector: ARB_CCIP_CHAIN_SELECTOR,
+                srcOnRamp: address(0),
+                logs: logs
+            })
+            );
+    }
+
     function _exchangeEarningIousForAssets(uint256 amountRay) internal returns (Vm.Log[] memory logs) {
         vm.selectFork(_arbFork);
         bytes memory message = _burnIouTokenMessage(amountRay, block.timestamp, block.number);
@@ -655,7 +991,7 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         uint256 destinationChainId,
         bytes memory message
     ) internal returns (uint256 nativeFee) {
-        IAdiCrossChainForwarder.Fee[] memory fees;
+        ICrossChainForwarder.Fee[] memory fees;
         uint256 successfulQuotes;
         (nativeFee, fees, successfulQuotes) =
             adapter.quoteMessageToChain(destinationChainId, message, DEFAULT_GAS_LIMIT);
@@ -673,6 +1009,21 @@ contract AdiAdapterPigeonIouWithdrawal is AdiAdapterPigeonLocalForkBase {
         if (nativeFee > 0) {
             vm.deal(feePayer, nativeFee);
         }
+    }
+
+    function _assertOneCcipMessage(Vm.Log[] memory logs) internal {
+        CcipHelper ccipHelper = new CcipHelper();
+        Vm.Log[] memory ccipLogs = ccipHelper.findLogs(logs, 1);
+        bytes32 selector = ccipLogs[0].topics[0];
+        assertTrue(
+            selector == ccipHelper.CCIP_MESSAGE_SENT_SELECTOR()
+                || selector == ccipHelper.CCIP_SEND_REQUESTED_SELECTOR(),
+            "CCIP IOU bridge should emit one message"
+        );
+    }
+
+    function _ccipNativeFeeData() internal pure returns (bytes memory) {
+        return abi.encode(CcipAdapter.CcipFeeParams({feeToken: Constants.NATIVE_CURRENCY, nativeFeeRefundThreshold: 0}));
     }
 
     function _bridgeIouTokenMessage(address recipient, uint256 amountRay) internal pure returns (bytes memory) {

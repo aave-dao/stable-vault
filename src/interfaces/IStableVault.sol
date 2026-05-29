@@ -44,8 +44,13 @@ interface IStableVault {
     /// @notice Emitted when a user's per-second rate is set or updated.
     event UserRateSet(address indexed user, uint256 indexed subVaultId, uint256 newPerSecondRate);
 
-    /// @notice Emitted when `setUserRate` is a no-op for a user (e.g. the user has no position to migrate).
-    event SetUserRateSkipped(address indexed user);
+    /// @notice Emitted when `setUserRate` is a no-op for a user (e.g. the user has no position to
+    /// migrate, or the migration would round their shares to zero in the target sub-vault).
+    /// @dev `attemptedSubVaultId` is `0` when no migration was attempted (user has no position);
+    /// otherwise it is the sub-vault the user would have been migrated to.
+    event SetUserRateSkipped(
+        address indexed user, uint256 indexed attemptedSubVaultId, uint256 attemptedNewPerSecondRate
+    );
 
     /// @notice Emitted when the per-second rate of an existing sub-vault is updated.
     event SubVaultRateSet(uint256 indexed subVaultId, uint256 newPerSecondRate);

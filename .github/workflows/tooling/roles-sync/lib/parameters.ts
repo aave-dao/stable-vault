@@ -1,6 +1,6 @@
 /**
  * Expands the hand-curated parameter spec against the three deployment configs and produces the
- * env-aware `ParameterJson[]` that lands in `script/output/roles.json`.
+ * env-aware `ParameterJson[]` that lands in `.github/workflows/tooling/roles-sync/output/roles.json`.
  *
  * Each leaf-value in `deployment-config.*.jsonc` becomes one row: per-asset specs expand to one
  * row per asset, per-chain specs to one row per chain. Every row carries both the literal config

@@ -86,12 +86,15 @@ abstract contract AccessManagerAccountingChainSetup is AccessManagerBaseSetup {
     function _setupTarget__AccountingChainGateway(address deployer) internal {
         address gateway = getGatewayAddress(deployer);
 
-        RolesConfig.Role[] memory roles = new RolesConfig.Role[](4);
+        RolesConfig.Role[] memory roles = new RolesConfig.Role[](7);
 
-        roles[0] = RolesConfig.getRole__addBridgeAdapter();
-        roles[1] = RolesConfig.getRole__removeBridgeAdapter();
-        roles[2] = RolesConfig.getRole__rescueTokens();
-        roles[3] = RolesConfig.getRole__rescueNative();
+        roles[0] = RolesConfig.getRole__addFundsBridgeAdapter();
+        roles[1] = RolesConfig.getRole__removeFundsBridgeAdapter();
+        roles[2] = RolesConfig.getRole__addDataOnlyBridgeAdapter();
+        roles[3] = RolesConfig.getRole__initiateDataOnlyBridgeAdapterRemoval();
+        roles[4] = RolesConfig.getRole__finalizeDataOnlyBridgeAdapterRemoval();
+        roles[5] = RolesConfig.getRole__rescueTokens();
+        roles[6] = RolesConfig.getRole__rescueNative();
 
         _setTargetFunctionRoles(gateway, roles);
     }

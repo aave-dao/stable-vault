@@ -8,8 +8,8 @@ import {AccessManagerAccountingChainSetup} from "script/base/AccessManagerAccoun
 import {RolesConfig} from "script/base/RolesConfig.sol";
 
 /// @notice Resolves the function-based role set and the addresses of every named profile against a chosen env's
-/// deployment config, then writes both to JSON. Consumed by `tools/roles/build-roles-json.ts`, which merges per-env
-/// dumps with the natspec/profile-grant data it parses out of Solidity. Pick the env with
+/// deployment config, then writes both to JSON. Consumed by `.github/workflows/tooling/roles-sync/build-roles-json.ts`,
+/// which merges per-env dumps with the natspec/profile-grant data it parses out of Solidity. Pick the env with
 /// `TARGET_ENV={staging|preprod|prod}`.
 ///
 /// `_accessManager` and `_deployedATokenVaultAddresses` are stubbed out because no side-effecting setup is invoked —
@@ -82,9 +82,9 @@ contract DumpRolesScript is AccessManagerAccountingChainSetup {
             out,
             _profileEntry("ATokenVaultRewardClaimer", _getProfile__ATokenVaultRewardClaimer()),
             ",\n",
-            _profileEntry("CoverageGuardian", _getProfile__CoverageGuardian()),
-            ",\n",
             _profileEntry("Funder", _getProfile__Funder()),
+            ",\n",
+            _profileEntry("Rescuer", _getProfile__Rescuer()),
             ",\n",
             _profileEntry("StableVaultManager", _getProfile__StableVaultManager()),
             "\n  },\n",
@@ -94,7 +94,7 @@ contract DumpRolesScript is AccessManagerAccountingChainSetup {
             "}\n"
         );
 
-        string memory outPath = string.concat("script/output/roles.dump.", env, ".json");
+        string memory outPath = string.concat(".github/workflows/tooling/roles-sync/output/roles.dump.", env, ".json");
         // forge-lint: disable-next-line(unsafe-cheatcode)
         vm.writeFile(outPath, out);
         console.log("Wrote %s entries to %s", roles.length, outPath);

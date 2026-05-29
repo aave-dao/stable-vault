@@ -3,11 +3,12 @@
 pragma solidity ^0.8.22;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ICrossChainForwarder} from "aave-delivery-infrastructure/contracts/interfaces/ICrossChainForwarder.sol";
+import {Envelope, Transaction} from "aave-delivery-infrastructure/contracts/libs/EncodingUtils.sol";
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
 import {AdiAdapter} from "src/bridging/adi/AdiAdapter.sol";
-import {IAdiCrossChainForwarder} from "src/interfaces/IAdiCrossChainForwarder.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
 import {IChainGateway} from "src/interfaces/IChainGateway.sol";
 import {Constants} from "src/types/Constants.sol";
@@ -52,9 +53,15 @@ contract RecordingGateway is IChainGateway {
         return address(0);
     }
 
-    function addBridgeAdapter(address, uint256, address) external {}
+    function addFundsBridgeAdapter(address, uint256, address) external {}
 
-    function removeBridgeAdapter(address, uint256, address) external {}
+    function removeFundsBridgeAdapter(address, uint256, address) external {}
+
+    function addDataOnlyBridgeAdapter(uint256, address) external {}
+
+    function initiateDataOnlyBridgeAdapterRemoval(uint256, address) external returns (bytes32 removalId) {}
+
+    function finalizeDataOnlyBridgeAdapterRemoval(uint256, address, bytes32) external {}
 
     function receiveMessage(uint256 sourceChainId, address asset, uint256 amount, bytes memory data) external {
         receiveCount++;
@@ -89,6 +96,8 @@ abstract contract AdiAdapterPigeonLocalForkBase is Test {
     address internal constant ARB_BRIDGE = 0x8315177aB297bA92A06054cE80a67Ed4DBd7ed3a;
     address internal constant ETH_CCIP_ROUTER = 0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D;
     uint64 internal constant ETH_CCIP_CHAIN_SELECTOR = 5009297550715157269;
+    address internal constant ARB_CCIP_ROUTER = 0x141fa059441E0ca23ce184B6A78bafD2A517DdE8;
+    uint64 internal constant ARB_CCIP_CHAIN_SELECTOR = 4949039107694359620;
     address internal constant LZ_ENDPOINT_V2 = 0x1a44076050125825900e736c501f859c50fE728c;
     address internal constant ETH_HL_MAILBOX = 0xc005dc82818d67AF737725bD4bf75435d065D239;
     address internal constant ARB_HL_MAILBOX = 0x979Ca5202784112f4738403dBec5D0F3B9daabB9;
@@ -210,7 +219,7 @@ abstract contract AdiAdapterPigeonLocalForkBase is Test {
         internal
         returns (uint256 nativeFee)
     {
-        IAdiCrossChainForwarder.Fee[] memory fees;
+        ICrossChainForwarder.Fee[] memory fees;
         uint256 successfulQuotes;
         (nativeFee, fees, successfulQuotes) =
             adapter.quoteMessageToChain(destinationChainId, message, DEFAULT_GAS_LIMIT);
@@ -234,7 +243,7 @@ abstract contract AdiAdapterPigeonLocalForkBase is Test {
         bytes memory encodedTransaction,
         address[] memory bridgeAdaptersToRetry
     ) internal returns (uint256 nativeFee) {
-        IAdiCrossChainForwarder.Fee[] memory fees;
+        ICrossChainForwarder.Fee[] memory fees;
         uint256 successfulQuotes;
         (nativeFee, fees, successfulQuotes) =
             adapter.quoteRetryTransaction(encodedTransaction, DEFAULT_GAS_LIMIT, bridgeAdaptersToRetry);
@@ -253,13 +262,13 @@ abstract contract AdiAdapterPigeonLocalForkBase is Test {
         }
     }
 
-    function _prepareRetryEnvelopeFees(AdiAdapter adapter, IAdiCrossChainForwarder.Envelope memory envelope)
+    function _prepareRetryEnvelopeFees(AdiAdapter adapter, Envelope memory envelope)
         internal
         returns (uint256 nativeFee)
     {
-        uint256 quoteBandwidth = IAdiCrossChainForwarder(adapter.getCrossChainController())
+        uint256 quoteBandwidth = ICrossChainForwarder(adapter.getCrossChainController())
             .getOptimalBandwidthByChain(envelope.destinationChainId);
-        IAdiCrossChainForwarder.Fee[] memory fees;
+        ICrossChainForwarder.Fee[] memory fees;
         uint256 successfulQuotes;
         (nativeFee, fees, successfulQuotes) = adapter.quoteRetryEnvelope(envelope, DEFAULT_GAS_LIMIT, quoteBandwidth);
         assertGt(successfulQuotes, 0, "no successful retry envelope quotes");
@@ -301,12 +310,11 @@ abstract contract AdiAdapterPigeonLocalForkBase is Test {
     function _envelopeFromFirstSuccessfulForward(Vm.Log[] memory logs)
         internal
         pure
-        returns (IAdiCrossChainForwarder.Envelope memory envelope)
+        returns (Envelope memory envelope)
     {
         bytes memory encodedTransaction = _firstSuccessfulEncodedTransaction(logs);
-        IAdiCrossChainForwarder.Transaction memory transaction =
-            abi.decode(encodedTransaction, (IAdiCrossChainForwarder.Transaction));
-        envelope = abi.decode(transaction.encodedEnvelope, (IAdiCrossChainForwarder.Envelope));
+        Transaction memory transaction = abi.decode(encodedTransaction, (Transaction));
+        envelope = abi.decode(transaction.encodedEnvelope, (Envelope));
     }
 
     function _singleAddress(address value) internal pure returns (address[] memory values) {

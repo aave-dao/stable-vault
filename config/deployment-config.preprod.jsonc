@@ -18,8 +18,8 @@
     "withdrawalPolicyManager": "0xBdE1e349F4117d7202939929251eDa13c60A0639",
     "aTokenVaultRewardClaimer": "0xE79945842036F0f3a015C8f815657523503D7037",
     "stableVaultManager": "0xc93fb5428553de74E859b08032Be33Ebb8Fb6171",
-    "coverageGuardian": "0xc9bDdf3fF47216b60cfA3400D0A414d84dAB1055",
-    "funder": "0x569c8D2D5fA781cef3D8799b15a4F651aFf1b806"
+    "funder": "0x569c8D2D5fA781cef3D8799b15a4F651aFf1b806",
+    "rescuer": "0x569c8D2D5fA781cef3D8799b15a4F651aFf1b806"
   },
   "withdrawalExecutionPolicy": {
     "defaultFeeBps": 625, // 6.25%
@@ -27,7 +27,7 @@
   },
   "slippageCoverageVault": {
     "maxSlippageBps": "50", // 0.5%
-    "overrideMaxSlippageBps": "5000", // 50%
+    "overrideMaxSlippageBps": "10000", // 100%
     "initialOverrideMode": true,
     "perAssetCaps": {
       "gho": {
@@ -57,7 +57,7 @@
     },
     "erc4626Strategies": [
       {
-        "address": "0xE1753F2e00940cC31213dd92013cF019DFE4ca1d",
+        "strategyAddress": "0xE1753F2e00940cC31213dd92013cF019DFE4ca1d",
         "underlyingAddress": "0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f",
         "assetSymbol": "GHO",
         "strategySymbol": "sGho"
@@ -95,8 +95,8 @@
         "capacityRay": "200000000000000000000000000000", // $200
         "refillRateRay": "2314814814814814814814814" // $200/day
       },
-      "minRedemptionCapacityRay": "10000000000000000000000000000", // $10
-      "minRedemptionRefillRateRay": "115740740740740740740740" // $10/day
+      "minRedemptionCapacityRay": "0",
+      "minRedemptionRefillRateRay": "0"
     },
     "deploymentOutputPath": "deployments/preprod/v1/earning.json",
     "minBurnIouTokenGasLimit": "120000"
@@ -166,8 +166,8 @@
         "capacityRay": "200000000000000000000000000000", // $200
         "refillRateRay": "2314814814814814814814814" // $200/day
       },
-      "minRedemptionCapacityRay": "10000000000000000000000000000", // $10
-      "minRedemptionRefillRateRay": "115740740740740740740740" // $10/day
+      "minRedemptionCapacityRay": "0",
+      "minRedemptionRefillRateRay": "0"
     },
     "deploymentOutputPath": "deployments/preprod/v1/accounting.json"
   }

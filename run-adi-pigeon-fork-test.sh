@@ -5,16 +5,52 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEFAULT_ADI_DEPLOY_DIR="$ROOT_DIR/.local/adi-deploy-forktest"
 
 ADI_DEPLOY_REPO="${ADI_DEPLOY_REPO:-https://github.com/aave/adi-deploy.git}"
-ADI_DEPLOY_PR="${ADI_DEPLOY_PR:-2}"
-ADI_DEPLOY_REF="${ADI_DEPLOY_REF:-pull/${ADI_DEPLOY_PR}/head}"
+ADI_DEPLOY_REF="${ADI_DEPLOY_REF:-main}"
 ADI_DEPLOY_DIR="${ADI_DEPLOY_DIR:-$DEFAULT_ADI_DEPLOY_DIR}"
-RUN_ADI_DEPLOY="${RUN_ADI_DEPLOY:-true}"
-ADI_DEPLOY_SKIP_UPDATE="${ADI_DEPLOY_SKIP_UPDATE:-$([ "$RUN_ADI_DEPLOY" = "false" ] && echo true || echo false)}"
+
+ADI_FORK_MODE_WAS_SET="${ADI_FORK_MODE+x}"
+ADI_FORK_MODE="${ADI_FORK_MODE:-deployed}"
+ADI_DEPLOYMENT_ENV="${ADI_DEPLOYMENT_ENV:-preprod}"
+
+if [ -n "${RUN_ADI_DEPLOY:-}" ] && [ -z "$ADI_FORK_MODE_WAS_SET" ]; then
+  if [ "$RUN_ADI_DEPLOY" = "true" ]; then
+    ADI_FORK_MODE="fresh"
+  elif [ "$RUN_ADI_DEPLOY" = "false" ]; then
+    ADI_FORK_MODE="deployed"
+  fi
+fi
+
+case "$ADI_FORK_MODE" in
+  preprod|prod)
+    ADI_DEPLOYMENT_ENV="$ADI_FORK_MODE"
+    ADI_FORK_MODE="deployed"
+    ;;
+esac
+
+case "$ADI_FORK_MODE" in
+  deployed|fresh)
+    ;;
+  *)
+    echo "Unsupported ADI_FORK_MODE=$ADI_FORK_MODE. Use deployed or fresh." >&2
+    exit 1
+    ;;
+esac
+
+if [ "$ADI_FORK_MODE" = "deployed" ] && [ -z "$ADI_DEPLOYMENT_ENV" ]; then
+  echo "ADI_DEPLOYMENT_ENV must be set when ADI_FORK_MODE=deployed." >&2
+  exit 1
+fi
+
+RUN_ADI_DEPLOY="$([ "$ADI_FORK_MODE" = "fresh" ] && echo true || echo false)"
+ADI_DEPLOY_SKIP_UPDATE="${ADI_DEPLOY_SKIP_UPDATE:-false}"
 
 ETH_PORT="${ETH_PORT:-8545}"
 ARB_PORT="${ARB_PORT:-8546}"
 ETH_FORK_RPC="${ETH_FORK_RPC:-http://127.0.0.1:${ETH_PORT}}"
 ARB_FORK_RPC="${ARB_FORK_RPC:-http://127.0.0.1:${ARB_PORT}}"
+ETH_FORK_BLOCK="${ETH_FORK_BLOCK:-25196860}"
+ARB_FORK_BLOCK="${ARB_FORK_BLOCK:-467697210}"
+RUN_DIR="${RUN_DIR:-$ADI_DEPLOY_DIR/.forktest}"
 
 MATCH_CONTRACT="${MATCH_CONTRACT:-AdiAdapterPigeon}"
 FORGE_TEST_ARGS="${FORGE_TEST_ARGS:--vvv}"
@@ -34,8 +70,8 @@ function checkout_adi_deploy_ref() {
   if [[ "$ADI_DEPLOY_REF" =~ ^pull/([0-9]+)/head$ ]]; then
     local pr_number="${BASH_REMATCH[1]}"
     local pr_branch="adi-deploy-pr-${pr_number}"
-    git -C "$ADI_DEPLOY_DIR" fetch origin "$ADI_DEPLOY_REF:refs/heads/$pr_branch"
-    git -C "$ADI_DEPLOY_DIR" checkout "$pr_branch"
+    git -C "$ADI_DEPLOY_DIR" fetch origin "$ADI_DEPLOY_REF"
+    git -C "$ADI_DEPLOY_DIR" checkout -B "$pr_branch" FETCH_HEAD
   else
     git -C "$ADI_DEPLOY_DIR" fetch origin
     git -C "$ADI_DEPLOY_DIR" checkout "$ADI_DEPLOY_REF"
@@ -94,23 +130,155 @@ function resolve_env_file() {
   export ENV_FILE
 }
 
-function run_adi_deployment() {
-  if [ "$RUN_ADI_DEPLOY" != "true" ]; then
-    log "Skipping adi-deploy run; reading existing deployment JSONs"
-    return
+function load_env() {
+  resolve_env_file
+
+  if [ -f "$ENV_FILE" ]; then
+    set -a
+    # shellcheck disable=SC1090
+    source "$ENV_FILE"
+    set +a
   fi
 
-  resolve_env_file
-  log "Running adi-deploy local fork deployment with ENV_FILE=$ENV_FILE"
-  (
-    cd "$ADI_DEPLOY_DIR"
-    ENV_FILE="$ENV_FILE" \
-      ETH_PORT="$ETH_PORT" \
-      ARB_PORT="$ARB_PORT" \
-      RESTART_ANVIL="${RESTART_ANVIL:-true}" \
-      scripts/stable-vaults/run-local-fork-deployment.sh
-  )
-  log "adi-deploy local fork deployment completed"
+  if [ -z "${ETH_FORK_URL:-}" ]; then
+    if [ -n "${RPC_MAINNET:-}" ]; then
+      ETH_FORK_URL="$RPC_MAINNET"
+    elif [ -n "${ALCHEMY_KEY:-}" ]; then
+      ETH_FORK_URL="https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}"
+    else
+      echo "Missing ETH_FORK_URL, RPC_MAINNET, or ALCHEMY_KEY in $ENV_FILE." >&2
+      exit 1
+    fi
+  fi
+
+  if [ -z "${ARB_FORK_URL:-}" ]; then
+    if [ -n "${RPC_ARBITRUM:-}" ]; then
+      ARB_FORK_URL="$RPC_ARBITRUM"
+    elif [ -n "${ALCHEMY_KEY:-}" ]; then
+      ARB_FORK_URL="https://arb-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}"
+    else
+      echo "Missing ARB_FORK_URL, RPC_ARBITRUM, or ALCHEMY_KEY in $ENV_FILE." >&2
+      exit 1
+    fi
+  fi
+
+  export ETH_FORK_URL
+  export ARB_FORK_URL
+}
+
+function rpc_ready() {
+  cast chain-id --rpc-url "$1" >/dev/null 2>&1
+}
+
+function stop_pid_file() {
+  local pid_file="$1"
+  if [ -f "$pid_file" ]; then
+    local pid
+    pid="$(<"$pid_file")"
+    if [ -n "$pid" ] && kill -0 "$pid" >/dev/null 2>&1; then
+      kill "$pid"
+      sleep 1
+    fi
+    rm -f "$pid_file"
+  fi
+}
+
+function wait_for_rpc() {
+  local rpc_url="$1"
+  local expected_chain_id="$2"
+  local label="$3"
+
+  for _ in $(seq 1 60); do
+    if rpc_ready "$rpc_url"; then
+      local chain_id
+      chain_id="$(cast chain-id --rpc-url "$rpc_url")"
+      if [ "$chain_id" != "$expected_chain_id" ]; then
+        echo "$label RPC is up, but chain id is $chain_id instead of $expected_chain_id." >&2
+        exit 1
+      fi
+      return
+    fi
+    sleep 1
+  done
+
+  echo "$label RPC did not become ready: $rpc_url" >&2
+  exit 1
+}
+
+function start_deployed_anvil_forks() {
+  load_env
+  mkdir -p "$RUN_DIR"
+
+  if [ "${RESTART_ANVIL:-true}" = "true" ]; then
+    log "Stopping previous Anvil processes from ${RUN_DIR}, if any"
+    stop_pid_file "$RUN_DIR/anvil-ethereum.pid"
+    stop_pid_file "$RUN_DIR/anvil-arbitrum.pid"
+  fi
+
+  if rpc_ready "$ETH_FORK_RPC"; then
+    echo "Ethereum local RPC is already running at $ETH_FORK_RPC." >&2
+    echo "Use RESTART_ANVIL=true to restart processes tracked in $RUN_DIR, or choose ETH_PORT." >&2
+    exit 1
+  fi
+
+  if rpc_ready "$ARB_FORK_RPC"; then
+    echo "Arbitrum local RPC is already running at $ARB_FORK_RPC." >&2
+    echo "Use RESTART_ANVIL=true to restart processes tracked in $RUN_DIR, or choose ARB_PORT." >&2
+    exit 1
+  fi
+
+  log "Starting Ethereum Anvil fork on ${ETH_FORK_RPC} at block ${ETH_FORK_BLOCK}"
+  anvil \
+    --host 127.0.0.1 \
+    --port "$ETH_PORT" \
+    --fork-url "$ETH_FORK_URL" \
+    --fork-block-number "$ETH_FORK_BLOCK" \
+    --chain-id 1 \
+    --auto-impersonate \
+    >"$RUN_DIR/anvil-ethereum.log" 2>&1 &
+  echo "$!" >"$RUN_DIR/anvil-ethereum.pid"
+
+  log "Starting Arbitrum Anvil fork on ${ARB_FORK_RPC} at block ${ARB_FORK_BLOCK}"
+  anvil \
+    --host 127.0.0.1 \
+    --port "$ARB_PORT" \
+    --fork-url "$ARB_FORK_URL" \
+    --fork-block-number "$ARB_FORK_BLOCK" \
+    --chain-id 42161 \
+    --auto-impersonate \
+    >"$RUN_DIR/anvil-arbitrum.log" 2>&1 &
+  echo "$!" >"$RUN_DIR/anvil-arbitrum.pid"
+
+  wait_for_rpc "$ETH_FORK_RPC" "1" "Ethereum"
+  wait_for_rpc "$ARB_FORK_RPC" "42161" "Arbitrum"
+}
+
+function run_adi_deployment() {
+  case "$ADI_FORK_MODE" in
+    deployed)
+      log "Using ${ADI_DEPLOYMENT_ENV} a.DI deployment from adi-deploy JSONs"
+      start_deployed_anvil_forks
+      ;;
+    fresh)
+      load_env
+      log "Running adi-deploy local fork deployment with ENV_FILE=$ENV_FILE"
+      (
+        cd "$ADI_DEPLOY_DIR"
+        ENV_FILE="$ENV_FILE" \
+          ETH_PORT="$ETH_PORT" \
+          ARB_PORT="$ARB_PORT" \
+          ETH_FORK_BLOCK="$ETH_FORK_BLOCK" \
+          ARB_FORK_BLOCK="$ARB_FORK_BLOCK" \
+          RESTART_ANVIL="${RESTART_ANVIL:-true}" \
+          scripts/stable-vaults/run-local-fork-deployment.sh
+      )
+      log "adi-deploy local fork deployment completed"
+      ;;
+    *)
+      echo "Unsupported ADI_FORK_MODE=$ADI_FORK_MODE. Use deployed or fresh." >&2
+      exit 1
+      ;;
+  esac
 }
 
 function json_get() {
@@ -126,8 +294,13 @@ PY
 }
 
 function export_deployment_env() {
-  local eth_json="$ADI_DEPLOY_DIR/deployments/stable-vaults/ethereum.json"
-  local arb_json="$ADI_DEPLOY_DIR/deployments/stable-vaults/arbitrum.json"
+  local subdir=""
+  if [ "$ADI_FORK_MODE" = "deployed" ]; then
+    subdir="/$ADI_DEPLOYMENT_ENV"
+  fi
+
+  local eth_json="$ADI_DEPLOY_DIR/deployments/stable-vaults${subdir}/ethereum.json"
+  local arb_json="$ADI_DEPLOY_DIR/deployments/stable-vaults${subdir}/arbitrum.json"
 
   if [ ! -f "$eth_json" ] || [ ! -f "$arb_json" ]; then
     echo "Missing adi-deploy deployment JSONs:" >&2
@@ -162,6 +335,10 @@ function export_deployment_env() {
   ARB_HL_ADAPTER="${ARB_HL_ADAPTER:-$(json_get "$arb_json" hlAdapter)}"
 
   log "Stable Vaults fork test config"
+  echo "ADI_FORK_MODE=$ADI_FORK_MODE"
+  if [ "$ADI_FORK_MODE" = "deployed" ]; then
+    echo "ADI_DEPLOYMENT_ENV=$ADI_DEPLOYMENT_ENV"
+  fi
   echo "ETH_FORK_RPC=$ETH_FORK_RPC"
   echo "ARB_FORK_RPC=$ARB_FORK_RPC"
   echo "ETH_DEPLOYMENT_JSON=$eth_json"
@@ -203,6 +380,10 @@ function run_forge_tests() {
 require_command git
 require_command forge
 require_command python3
+if [ "$ADI_FORK_MODE" = "deployed" ]; then
+  require_command anvil
+  require_command cast
+fi
 
 ensure_adi_deploy_checkout
 run_adi_deployment

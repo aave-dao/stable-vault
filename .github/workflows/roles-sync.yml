@@ -17,12 +17,37 @@ jobs:
   build-and-validate:
     name: Build & Validate
     runs-on: ubuntu-latest
-    outputs:
-      artifact-changed: ${{ steps.diff.outputs.changed }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Check dependency access secrets
+        env:
+          DEPENDENCIES_APP_ID: ${{ secrets.DEPENDENCIES_APP_ID }}
+          DEPENDENCIES_PRIVATE_KEY: ${{ secrets.DEPENDENCIES_PRIVATE_KEY }}
+        run: |
+          if [ -z "$DEPENDENCIES_APP_ID" ] || [ -z "$DEPENDENCIES_PRIVATE_KEY" ]; then
+            echo "Missing DEPENDENCIES_APP_ID or DEPENDENCIES_PRIVATE_KEY secret for private dependency access." >&2
+            exit 1
+          fi
+
+      - name: Create dependencies token
+        uses: actions/create-github-app-token@v3
+        id: dependencies-token
         with:
-          submodules: recursive
+          app-id: ${{ secrets.DEPENDENCIES_APP_ID }}
+          private-key: ${{ secrets.DEPENDENCIES_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: |
+            aave-delivery-infrastructure
+          permission-contents: read
+
+      - name: Initialize submodules
+        env:
+          DEPENDENCIES_TOKEN: ${{ steps.dependencies-token.outputs.token }}
+        run: |
+          git config --global url."https://x-access-token:${DEPENDENCIES_TOKEN}@github.com/aave/aave-delivery-infrastructure".insteadOf "https://github.com/aave/aave-delivery-infrastructure"
+          git submodule sync --recursive
+          git submodule update --init --recursive
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
@@ -49,32 +74,51 @@ jobs:
       - name: Validate invariants
         run: yarn roles:validate
 
-      - name: Diff against committed artifact
-        id: diff
-        run: |
-          if git diff --quiet -- script/output/roles.json; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "Committed script/output/roles.json is up to date."
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "::error::script/output/roles.json is stale. Run \`yarn roles:all\` and commit the result."
-            git --no-pager diff -- script/output/roles.json
-            exit 1
-          fi
+      - name: Upload roles.json artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: roles-json
+          path: .github/workflows/tooling/roles-sync/output/roles.json
+          retention-days: 7
+          if-no-files-found: error
 
   notion-sync:
     name: Notion Sync
     needs: build-and-validate
-    # Auto-syncs only from master to keep feature branches from racing each other against the live DBs. Manual
-    # `workflow_dispatch` runs are also allowed so a maintainer can verify a branch end-to-end before merging.
-    if: |
-      (github.event_name == 'push' && github.ref == 'refs/heads/master')
-      || github.event_name == 'workflow_dispatch'
+    # Notion writes are manual-only to avoid rate-limit flakes blocking CI.
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Check dependency access secrets
+        env:
+          DEPENDENCIES_APP_ID: ${{ secrets.DEPENDENCIES_APP_ID }}
+          DEPENDENCIES_PRIVATE_KEY: ${{ secrets.DEPENDENCIES_PRIVATE_KEY }}
+        run: |
+          if [ -z "$DEPENDENCIES_APP_ID" ] || [ -z "$DEPENDENCIES_PRIVATE_KEY" ]; then
+            echo "Missing DEPENDENCIES_APP_ID or DEPENDENCIES_PRIVATE_KEY secret for private dependency access." >&2
+            exit 1
+          fi
+
+      - name: Create dependencies token
+        uses: actions/create-github-app-token@v3
+        id: dependencies-token
         with:
-          submodules: recursive
+          app-id: ${{ secrets.DEPENDENCIES_APP_ID }}
+          private-key: ${{ secrets.DEPENDENCIES_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: |
+            aave-delivery-infrastructure
+          permission-contents: read
+
+      - name: Initialize submodules
+        env:
+          DEPENDENCIES_TOKEN: ${{ steps.dependencies-token.outputs.token }}
+        run: |
+          git config --global url."https://x-access-token:${DEPENDENCIES_TOKEN}@github.com/aave/aave-delivery-infrastructure".insteadOf "https://github.com/aave/aave-delivery-infrastructure"
+          git submodule sync --recursive
+          git submodule update --init --recursive
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -83,6 +127,12 @@ jobs:
 
       - name: Install JS deps
         run: yarn install --frozen-lockfile
+
+      - name: Download roles.json artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: roles-json
+          path: .github/workflows/tooling/roles-sync/output/
 
       - name: Push to Notion
         env:

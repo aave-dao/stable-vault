@@ -1,4 +1,4 @@
-// AccessManager parity entries driven by script/output/roles.json.
+// AccessManager parity entries driven by .github/workflows/tooling/roles-sync/output/roles.json.
 //
 // For every role:
 //   1. getRoleGrantDelay(roleId) → expected delaySeconds[env]
@@ -50,7 +50,7 @@ export function buildAccessSpecs(args: AccessArgs): GetterSpec[] {
   const accessManager = tryEntry(artefact, "AccessManager");
   if (!accessManager) return [];
 
-  const rolesPath = resolve(repoRoot, "script/output/roles.json");
+  const rolesPath = resolve(repoRoot, ".github/workflows/tooling/roles-sync/output/roles.json");
   const roles = JSON.parse(readFileSync(rolesPath, "utf8")) as RolesJson;
   const profiles = new Map(roles.profiles.map((p) => [p.name, p.addressByEnv[env]]));
   const specs: GetterSpec[] = [];

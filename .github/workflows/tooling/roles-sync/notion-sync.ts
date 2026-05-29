@@ -1,5 +1,5 @@
 /**
- * Mirrors `script/output/roles.json` into the Notion databases under `Stable-Vaults: Access Control`. Idempotent:
+ * Mirrors `.github/workflows/tooling/roles-sync/output/roles.json` into the Notion databases under `Stable-Vaults: Access Control`. Idempotent:
  * writes only managed properties, leaves human-edited columns (`Notes`, `What it controls`, `Risks`) alone, and flips
  * orphaned rows to `Status=Removed` rather than deleting them so historical comments survive.
  *
@@ -29,7 +29,7 @@ import {
   type RolesArtifact,
 } from "./lib/types.js";
 
-const ROLES_JSON_PATH = join(process.cwd(), "script/output/roles.json");
+const ROLES_JSON_PATH = join(process.cwd(), ".github/workflows/tooling/roles-sync/output/roles.json");
 
 // Notion's REST API (version 2022-06-28, which @notionhq/client v4 still pins by default) addresses inline databases
 // by the **page id** of the database block itself — *not* by the data-source / collection id. The DS id is a separate

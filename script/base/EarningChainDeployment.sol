@@ -25,10 +25,10 @@ abstract contract EarningChainDeployment is BaseChainDeployment, AccessManagerEa
     bytes32 internal constant EARNING_BRIDGE_POLICY_ID =
         0x537fb58e71f5b54dc09d8afff5cbf9bf5e630233f65f0531590f8cfa4a81bc6c;
 
-    // Keep field order aligned with Foundry's JSON object encoding order.
+    // Keep field order aligned with Foundry's JSON object encoding order (alphabetical by key).
     struct ExistingErc4626StrategyConfig {
-        address addr;
         string assetSymbol;
+        address strategyAddress;
         string strategySymbol;
         address underlyingAddress;
     }
@@ -106,14 +106,24 @@ abstract contract EarningChainDeployment is BaseChainDeployment, AccessManagerEa
         return BaseChainDeployment._accessManager();
     }
 
-    function _isAdiAdapterDeployed()
+    function _shouldRegisterAdiOnGateway()
         internal
         view
         virtual
         override(AccessManagerBaseSetup, BaseChainDeployment)
         returns (bool)
     {
-        return BaseChainDeployment._isAdiAdapterDeployed();
+        return BaseChainDeployment._shouldRegisterAdiOnGateway();
+    }
+
+    function _adiCrossChainController()
+        internal
+        view
+        virtual
+        override(AccessManagerBaseSetup, BaseChainDeployment)
+        returns (address)
+    {
+        return BaseChainDeployment._adiCrossChainController();
     }
 
     function _deployedATokenVaultAddresses()
@@ -199,7 +209,9 @@ abstract contract EarningChainDeployment is BaseChainDeployment, AccessManagerEa
         );
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
-            _assertDeployedTransparentProxy(predicted, implCreationCode, "EarningChainGateway");
+            _assertDeployedTransparentProxy(
+                predicted, implCreationCode, GATEWAY_PROXY_ADMIN_OWNER, "EarningChainGateway"
+            );
             logSkip("_deployGateway", "EarningChainGateway");
             _logDeployment("EarningChainGateway", GATEWAY_SALT_SEED, predicted);
             return predicted;
@@ -234,7 +246,9 @@ abstract contract EarningChainDeployment is BaseChainDeployment, AccessManagerEa
             abi.encodePacked(type(EarningChainStateProvider).creationCode, abi.encode(getGatewayAddress(_deployer())));
         if (predicted.code.length != 0) {
             /// @custom:tx-already-executed-check Predicted address has code.
-            _assertDeployedTransparentProxy(predicted, implCreationCode, "EarningChainStateProvider");
+            _assertDeployedTransparentProxy(
+                predicted, implCreationCode, EARNING_CHAIN_STATE_PROVIDER_PROXY_ADMIN_OWNER, "EarningChainStateProvider"
+            );
             logSkip("_deployEarningChainStateProvider", "EarningChainStateProvider");
             _logDeployment("EarningChainStateProvider", EARNING_CHAIN_STATE_PROVIDER_SALT_SEED, predicted);
             return predicted;
@@ -261,7 +275,9 @@ abstract contract EarningChainDeployment is BaseChainDeployment, AccessManagerEa
         // Existing ERC4626 vaults configured for the earning chain (e.g. sGho), not deployed by this script.
         ExistingErc4626StrategyConfig[] memory existingStrategies = _existingErc4626Strategies();
         for (uint256 i = 0; i < existingStrategies.length; i++) {
-            _addStrategyIdempotent(allocator, existingStrategies[i].underlyingAddress, existingStrategies[i].addr);
+            _addStrategyIdempotent(
+                allocator, existingStrategies[i].underlyingAddress, existingStrategies[i].strategyAddress
+            );
         }
     }
 
@@ -336,12 +352,15 @@ abstract contract EarningChainDeployment is BaseChainDeployment, AccessManagerEa
             ExistingErc4626StrategyConfig memory strategy = existingStrategies[i];
             address asset = _assetAddressFromSymbol(strategy.assetSymbol);
 
-            require(strategy.addr != address(0), "ERC4626 strategy not set");
+            require(strategy.strategyAddress != address(0), "ERC4626 strategy not set");
             require(strategy.underlyingAddress != address(0), "ERC4626 underlying not set");
             require(strategy.underlyingAddress == asset, "ERC4626 underlying config mismatch");
-            require(IERC4626(strategy.addr).asset() == strategy.underlyingAddress, "ERC4626 underlying mismatch");
             require(
-                keccak256(bytes(IERC4626(strategy.addr).symbol())) == keccak256(bytes(strategy.strategySymbol)),
+                IERC4626(strategy.strategyAddress).asset() == strategy.underlyingAddress, "ERC4626 underlying mismatch"
+            );
+            require(
+                keccak256(bytes(IERC4626(strategy.strategyAddress).symbol()))
+                    == keccak256(bytes(strategy.strategySymbol)),
                 "ERC4626 strategy symbol mismatch"
             );
 

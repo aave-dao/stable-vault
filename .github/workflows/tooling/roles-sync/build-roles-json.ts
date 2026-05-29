@@ -1,17 +1,17 @@
 /**
- * Builds `script/output/roles.json` — the canonical, env-aware view of the access-control catalogue. The artifact is
+ * Builds `.github/workflows/tooling/roles-sync/output/roles.json` — the canonical, env-aware view of the access-control catalogue. The artifact is
  * derived from three independently parseable inputs and is the single source of truth that downstream consumers
  * (validation, Notion sync, audits) read.
  *
  * Pipeline:
- *   1. Three Forge dumps (`script/output/roles.dump.{staging,preprod,prod}.json`), one per env.
+ *   1. Three Forge dumps (`.github/workflows/tooling/roles-sync/output/roles.dump.{staging,preprod,prod}.json`), one per env.
  *   2. `script/base/RolesConfig.sol`            → natspec, selector source, getAllFunctionBasedRoles ordering.
  *   3. `script/base/AccessManager*Setup.sol`    → profile → role grants, guardian-role membership.
  *   4. `config/deployment-config.*.jsonc`       → per-env profile addresses + deployment parameter values.
  *   5. `out/<Contract>.sol/<Contract>.json`     → canonical function signatures via methodIdentifiers.
- *   6. `tools/roles/lib/parameters-spec.ts`     → hand-curated parameter catalogue (key → setter, unit, limits).
+ *   6. `.github/workflows/tooling/roles-sync/lib/parameters-spec.ts` → hand-curated parameter catalogue (key → setter, unit, limits).
  *
- * Output schema is the `RolesArtifact` defined in `tools/roles/lib/types.ts`.
+ * Output schema is the `RolesArtifact` defined in `.github/workflows/tooling/roles-sync/lib/types.ts`.
  */
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -43,7 +43,7 @@ const ACCESS_MANAGER_PATHS = [
   join(REPO_ROOT, "script/base/AccessManagerEarningChainSetup.sol"),
 ];
 const FORGE_OUT_DIR = join(REPO_ROOT, "out");
-const OUT_PATH = join(REPO_ROOT, "script/output/roles.json");
+const OUT_PATH = join(REPO_ROOT, ".github/workflows/tooling/roles-sync/output/roles.json");
 
 function main(): void {
   const natspec = parseRolesConfig(ROLES_CONFIG_PATH);
@@ -122,7 +122,7 @@ function assertParameterSettersResolve(parameters: ReturnType<typeof buildParame
 function loadDumps(): Record<Env, ForgeDump> {
   const out = {} as Record<Env, ForgeDump>;
   for (const env of ENVS) {
-    const path = join(REPO_ROOT, `script/output/roles.dump.${env}.json`);
+    const path = join(REPO_ROOT, `.github/workflows/tooling/roles-sync/output/roles.dump.${env}.json`);
     out[env] = JSON.parse(readFileSync(path, "utf8")) as ForgeDump;
   }
   return out;
