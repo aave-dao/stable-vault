@@ -1539,6 +1539,56 @@ contract StableVaultTest is TestWithHelpers {
         stableVault.claimSurplusInterest(_toAddressArray(address(mockAsset)), _toUint256Array(1e6));
     }
 
+    /// @dev getVaultObligations() (and totalSupply()) floor the share-derived sub-vault obligations at the
+    /// aggregate original deposits, so the treasury cannot claim surplus interest down past the principal that
+    /// requestWithdrawal() still guarantees, even when per-user deposit rounding makes the share-ceiling undershoot.
+    function test_claimSurplusInterest_obligationsFlooredAtPrincipal_blocksClaimBelowOriginalDeposits() public {
+        address user = makeAddr("user");
+        MockErc20 ghoToken = new MockErc20("GHO", "GHO", 18);
+
+        uint256 highRate = 3 * MathLib.RAY;
+        IStableVault highRateVault = _deployStableVault(
+            address(mockAccessManager),
+            highRate + 1,
+            highRate,
+            address(mockIouTokenManager),
+            address(mockFundsHandler),
+            address(mockAssetRegistry),
+            address(mockTransferHelper),
+            address(mockPriceOracle),
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+            treasury,
+            address(policyRegistry)
+        );
+
+        vm.warp(block.timestamp + 1);
+
+        uint256 depositAmount = 5;
+        uint256 depositAmountRay = depositAmount.assetDecimalsToRay(address(ghoToken));
+
+        ghoToken.mint(user, depositAmount);
+        vm.prank(user);
+        ghoToken.approve(address(highRateVault), depositAmount);
+        vm.prank(user);
+        highRateVault.deposit(user, address(ghoToken), depositAmount, "");
+
+        // The share-ceiling reconstruction undershoots the principal sum by 2 wei.
+        uint256 shareCeilingObligationRay = depositAmountRay.rayDivDown(highRate).rayMulUp(highRate);
+        assertEq(shareCeilingObligationRay, depositAmountRay - 2);
+
+        // Obligations and totalSupply are floored at the principal, not the lower share-ceiling value.
+        assertEq(highRateVault.getGlobalOriginalDepositAmount(), depositAmountRay);
+        assertEq(highRateVault.getVaultObligations(), depositAmountRay);
+        assertEq(highRateVault.totalSupply(), depositAmountRay);
+
+        // A claim that would draw the aggregated balance down to the share-ceiling value (1 wei below the principal
+        // floor) is rejected; without the floor the obligations check would have permitted it.
+        mockFundsHandler.mockAggregatedBalance(depositAmountRay - 1);
+        vm.prank(manager);
+        vm.expectRevert(abi.encodeWithSelector(IStableVault.SurplusInterestClaimLeadsToInsolvency.selector));
+        highRateVault.claimSurplusInterest(_toAddressArray(address(ghoToken)), _toUint256Array(1));
+    }
+
     function test_claimSurplusInterest_reverts_ifPullingMoreFundsThanTheAvailableFeesToClaim(
         uint256 surplusRay,
         uint256 requestedAssetsToClaim
@@ -2702,8 +2752,9 @@ contract StableVaultTest is TestWithHelpers {
         vm.prank(user);
         assertTrue(stableVault.transfer(recipient, amountRay));
 
-        // Cross sub-vault transfers recalculate shares via rayDivDown, so rounding can cause slight value loss.
-        assertLt(stableVault.getUserBalance(recipient), amountRay);
+        // Cross sub-vault transfers recalculate shares via rayDivDown, so the share-backed value rounds down below
+        // the transferred amount; the recipient inherits the moved principal, so balanceOf is floored back up to it.
+        assertEq(stableVault.getUserBalance(recipient), amountRay);
     }
 
     function test_transfer_allowsNearMinimumAmounts_evenWhenRoundingIsUnfavorable(uint256 amountRayDelta) public {
@@ -2828,8 +2879,9 @@ contract StableVaultTest is TestWithHelpers {
         vm.prank(user);
         assertTrue(stableVault.transfer(recipient, amountRay));
 
-        // Cross sub-vault transfers recalculate shares via rayDivDown, so rounding can cause slight value loss.
-        assertLt(stableVault.getUserBalance(recipient), amountRay);
+        // Cross sub-vault transfers recalculate shares via rayDivDown, so the share-backed value rounds down below
+        // the transferred amount; the recipient inherits the moved principal, so balanceOf is floored back up to it.
+        assertEq(stableVault.getUserBalance(recipient), amountRay);
 
         mockFundsHandler.mockAggregatedBalance(stableVault.getGlobalOriginalDepositAmount());
         vm.prank(recipient);
@@ -3000,10 +3052,15 @@ contract StableVaultTest is TestWithHelpers {
         vm.prank(user);
         highRateVault.deposit(user, address(ghoToken), depositAmount, "");
 
-        uint256 shareBackedBalanceRay = highRateVault.getUserBalance(user);
+        // The raw share-backed value rounds below the partial amount, which is what makes a partial transfer of it
+        // fall into the dead zone. balanceOf no longer exposes this value: it now surfaces the principal floor.
+        uint256 shareBackedBalanceRay = fullTransferAmountRay.rayDivDown(highRate).rayMulDown(highRate);
         assertEq(shareBackedBalanceRay, fullTransferAmountRay - 2);
         assertLt(shareBackedBalanceRay, partialTransferAmountRay);
+        assertEq(highRateVault.getUserBalance(user), fullTransferAmountRay);
 
+        // A manual partial transfer into the dead zone still reverts; the fix only changes what balanceOf reports,
+        // so the recommended transfer(to, balanceOf(user)) pattern now resolves to a full transfer instead.
         vm.prank(user);
         vm.expectRevert(Errors.InvalidAmount.selector);
         assertFalse(highRateVault.transfer(recipient, partialTransferAmountRay));
@@ -3047,7 +3104,9 @@ contract StableVaultTest is TestWithHelpers {
         assertTrue(highRateVault.transfer(recipient, maxPartialTransferAmountRay));
 
         assertEq(highRateVault.getUserBalance(recipient), maxPartialTransferAmountRay);
-        assertEq(highRateVault.getUserBalance(user), minSharesToRedeemOneWei.rayMulDown(highRate));
+        // The sender keeps the principal not moved to the recipient; balanceOf is floored to that remaining principal,
+        // which sits just above the share-backed remainder of minSharesToRedeemOneWei.rayMulDown(highRate).
+        assertEq(highRateVault.getUserBalance(user), fullTransferAmountRay - maxPartialTransferAmountRay);
     }
 
     function test_transfer_revertsWithInvalidAmount_atFirstAmountInsideGuaranteedPrincipalDeadZone() public {
@@ -3120,20 +3179,72 @@ contract StableVaultTest is TestWithHelpers {
         vm.prank(user);
         highRateVault.deposit(user, address(ghoToken), depositAmount, "");
 
-        uint256 senderShareBackedBalanceRay = highRateVault.getUserBalance(user);
+        // The raw share-backed value is strictly below the original deposit due to deposit rounding; balanceOf now
+        // surfaces the principal floor instead, so it reports the full amount.
+        uint256 senderShareBackedBalanceRay = fullTransferAmountRay.rayDivDown(highRate).rayMulDown(highRate);
         assertEq(senderShareBackedBalanceRay, fullTransferAmountRay - 2);
+        assertEq(highRateVault.getUserBalance(user), fullTransferAmountRay);
 
         vm.prank(user);
         assertTrue(highRateVault.transfer(recipient, fullTransferAmountRay));
 
         assertEq(highRateVault.getUserBalance(user), 0);
-        assertLt(highRateVault.getUserBalance(recipient), fullTransferAmountRay);
+        // The recipient inherits the guaranteed principal, so their balance is floored to the full amount.
+        assertEq(highRateVault.getUserBalance(recipient), fullTransferAmountRay);
 
         mockFundsHandler.mockAggregatedBalance(fullTransferAmountRay);
 
         vm.prank(recipient);
         uint256 iouTokenAmount = highRateVault.requestWithdrawal(recipient, 0, "");
         assertEq(iouTokenAmount, fullTransferAmountRay);
+    }
+
+    /// @dev balanceOf() floors at the user's original deposit, so the canonical
+    /// transfer(to, balanceOf(user)) pattern resolves to a full transfer instead of a reverting partial one when
+    /// per-user deposit rounding leaves the share-backed balance below the principal.
+    function test_transfer_usingBalanceOf_succeeds_whenShareBackedBalanceBelowPrincipal() public {
+        address user = makeAddr("user");
+        address recipient = makeAddr("recipient");
+        MockErc20 ghoToken = new MockErc20("GHO", "GHO", 18);
+
+        uint256 highRate = 3 * MathLib.RAY;
+        IStableVault highRateVault = _deployStableVault(
+            address(mockAccessManager),
+            highRate + 1,
+            highRate,
+            address(mockIouTokenManager),
+            address(mockFundsHandler),
+            address(mockAssetRegistry),
+            address(mockTransferHelper),
+            address(mockPriceOracle),
+            DEFAULT_MAX_ACTIVE_SUB_VAULTS,
+            treasury,
+            address(policyRegistry)
+        );
+
+        vm.warp(block.timestamp + 1);
+
+        uint256 depositAmount = 5;
+        uint256 depositAmountRay = depositAmount.assetDecimalsToRay(address(ghoToken));
+
+        ghoToken.mint(user, depositAmount);
+        vm.prank(user);
+        ghoToken.approve(address(highRateVault), depositAmount);
+        vm.prank(user);
+        highRateVault.deposit(user, address(ghoToken), depositAmount, "");
+
+        // The raw share-backed balance rounds 2 wei below the original deposit, while balanceOf surfaces the floor.
+        assertEq(depositAmountRay.rayDivDown(highRate).rayMulDown(highRate), depositAmountRay - 2);
+        uint256 balance = highRateVault.balanceOf(user);
+        assertEq(balance, depositAmountRay);
+
+        // Without the floor this would take the partial path and revert with InvalidAmount on leftover dust.
+        vm.prank(user);
+        assertTrue(highRateVault.transfer(recipient, balance));
+
+        assertEq(highRateVault.balanceOf(user), 0);
+        assertEq(highRateVault.getUserSubVault(user).id, 0);
+        assertEq(highRateVault.balanceOf(recipient), depositAmountRay);
     }
 
     function test_transfer_toRecipientWithExistingPositionInDifferentSubVault(
