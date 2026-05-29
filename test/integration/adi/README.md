@@ -140,8 +140,13 @@ export ARB_CCIP_ADAPTER=<arbitrum-ccip-adapter>
 export ARB_LZ_ADAPTER=<arbitrum-layerzero-adapter>
 export ARB_HL_ADAPTER=<arbitrum-hyperlane-adapter>
 
-forge test --match-contract AdiAdapterPigeon -vvv
+forge build
+forge test --match-contract 'AdiAdapterPigeon|ForkDeployPreprod|FullSystemPreprodFork' -vvv
 ```
 
-The wrapper is preferred because it exports these values from the deployment
-JSONs automatically.
+The `forge build` is required: the preprod deploy tests read the force-compiled
+`ATokenVaultMerklRewardClaimer` artifact from `out/`, which a sparse
+`forge test --match-contract` run does not produce on its own. The `*_ADAPTER`
+and `STABLE_VAULTS_OWNER` exports are only needed by the `AdiAdapterPigeon`
+suite; the deploy tests read addresses from the deployment config. The wrapper
+is preferred because it builds and exports these values automatically.

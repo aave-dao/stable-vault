@@ -370,8 +370,13 @@ function log_fork_status() {
 }
 
 function run_forge_tests() {
-  log "Running Stable Vaults Pigeon fork tests"
   cd "$ROOT_DIR"
+  # Full build first: the deploy scripts read the force-compiled ATokenVaultMerklRewardClaimer artifact from out/.
+  # It is intentionally not imported (size-optimized profile), so a sparse `forge test --match-contract` run on a
+  # clean checkout never produces it, and the preprod deploy fork tests would fail to read it.
+  log "Building contracts"
+  forge build
+  log "Running Stable Vaults Pigeon fork tests"
   # shellcheck disable=SC2086
   forge test --match-contract "$MATCH_CONTRACT" $FORGE_TEST_ARGS
   log "Stable Vaults Pigeon fork tests completed"
