@@ -71,7 +71,7 @@
     "ccipRouterAddress": "0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D",
     "aaveV3PoolAddressesProvider": "0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e",
     "adi": {
-      "crossChainController": "0xBFCf66026E303648238f8F3E3A3A491eb74e645A",
+      "crossChainController": "0xE440cD6Ab7E4F9B3c4555c798f11E20EF1209362",
       "registerOnGateway": true
     },
     "fundsBridgingPolicy": {
@@ -116,7 +116,7 @@
     },
     "ccipRouterAddress": "0x141fa059441E0ca23ce184B6A78bafD2A517DdE8",
     "adi": {
-      "crossChainController": "0xeBBD7BE5fa28BcEaD8398C7205f12E651DCf6250",
+      "crossChainController": "0x07598a411806aCFD9c6699d76648b61220D757Ed",
       "registerOnGateway": true
     },
     "defaultMaxPerSecondRate": "1000000005781378656804591713",
