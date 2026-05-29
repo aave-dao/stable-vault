@@ -29,13 +29,6 @@ contract ForkDeployPreprod is Test {
     string internal constant EARNING_OUTPUT = "deployments/preprod/v1/earning.forktest.json";
     string internal constant ACCOUNTING_OUTPUT = "deployments/preprod/v1/accounting.forktest.json";
 
-    address internal constant ETH_USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
-    address internal constant ETH_USDT = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
-
-    address internal constant ARB_GHO = 0x7dfF72693f6A4149b17e7C6314655f6A9F7c8B33;
-    address internal constant ARB_USDC = 0xaf88d065e77c8cC2239327C5EDb3A432268e5831;
-    address internal constant ARB_USDT = 0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9;
-
     modifier onlyForkTest() {
         vm.skip(!vm.envOr("FORK_TEST", false), "Set FORK_TEST=true to run preprod fork deployment");
         _;
@@ -50,8 +43,8 @@ contract ForkDeployPreprod is Test {
 
         address deployer = deployment.deployerAddr();
         vm.deal(deployer, 1000 ether);
-        deal(ETH_USDC, deployer, 1_000e6);
-        deal(ETH_USDT, deployer, 1_000e6);
+        deal(deployment.usdc(), deployer, 1_000e6);
+        deal(deployment.usdt(), deployer, 1_000e6);
 
         deployment.run();
 
@@ -70,9 +63,9 @@ contract ForkDeployPreprod is Test {
 
         address deployer = deployment.deployerAddr();
         vm.deal(deployer, 1000 ether);
-        deal(ARB_GHO, deployer, 1_000e18);
-        deal(ARB_USDC, deployer, 1_000e6);
-        deal(ARB_USDT, deployer, 1_000e6);
+        deal(deployment.gho(), deployer, 1_000e18);
+        deal(deployment.usdc(), deployer, 1_000e6);
+        deal(deployment.usdt(), deployer, 1_000e6);
 
         deployment.run();
 

@@ -312,7 +312,6 @@ function export_deployment_env() {
   export FORK_TEST=true
   export ETH_FORK_RPC
   export ARB_FORK_RPC
-  export STABLE_VAULTS_OWNER
   export ETH_CCC
   export ARB_CCC
   export ETH_ARB_ADAPTER
@@ -323,7 +322,6 @@ function export_deployment_env() {
   export ARB_LZ_ADAPTER
   export ARB_HL_ADAPTER
 
-  STABLE_VAULTS_OWNER="${STABLE_VAULTS_OWNER:-$(json_get "$eth_json" owner)}"
   ETH_CCC="${ETH_CCC:-$(json_get "$eth_json" crossChainController)}"
   ARB_CCC="${ARB_CCC:-$(json_get "$arb_json" crossChainController)}"
   ETH_ARB_ADAPTER="${ETH_ARB_ADAPTER:-$(json_get "$eth_json" arbAdapter)}"
@@ -343,7 +341,6 @@ function export_deployment_env() {
   echo "ARB_FORK_RPC=$ARB_FORK_RPC"
   echo "ETH_DEPLOYMENT_JSON=$eth_json"
   echo "ARB_DEPLOYMENT_JSON=$arb_json"
-  echo "STABLE_VAULTS_OWNER=$STABLE_VAULTS_OWNER"
   echo "ETH_CCC=$ETH_CCC"
   echo "ARB_CCC=$ARB_CCC"
   echo "ETH_ARB_ADAPTER=$ETH_ARB_ADAPTER"

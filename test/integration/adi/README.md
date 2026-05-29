@@ -75,7 +75,10 @@ FORGE_TEST_ARGS="--match-test test_iouWithdrawalOverAdi_bridgeMintAndBurnLockedA
 
 The default mode uses an a.DI deployment already committed in `adi-deploy`.
 `ADI_DEPLOYMENT_ENV` selects the deployment subfolder under
-`deployments/stable-vaults/`:
+`deployments/stable-vaults/`, and the deploy fork tests (`ForkDeployPreprod`,
+`FullSystemPreprodFork`) read the matching Stable Vaults config
+(`config/deployment-config.<env>.jsonc`) so both sides run against the same
+environment:
 
 ```sh
 ADI_FORK_MODE=deployed ADI_DEPLOYMENT_ENV=preprod ./run-adi-pigeon-fork-test.sh
@@ -129,7 +132,6 @@ export FORK_TEST=true
 export ETH_FORK_RPC=http://127.0.0.1:8545
 export ARB_FORK_RPC=http://127.0.0.1:8546
 
-export STABLE_VAULTS_OWNER=<owner-from-adi-deploy-json>
 export ETH_CCC=<ethereum-cross-chain-controller>
 export ARB_CCC=<arbitrum-cross-chain-controller>
 export ETH_ARB_ADAPTER=<ethereum-arbitrum-native-adapter>
@@ -144,9 +146,10 @@ forge build
 forge test --match-contract 'AdiAdapterPigeon|ForkDeployPreprod|FullSystemPreprodFork' -vvv
 ```
 
-The `forge build` is required: the preprod deploy tests read the force-compiled
+The `forge build` is required: the deploy tests read the force-compiled
 `ATokenVaultMerklRewardClaimer` artifact from `out/`, which a sparse
-`forge test --match-contract` run does not produce on its own. The `*_ADAPTER`
-and `STABLE_VAULTS_OWNER` exports are only needed by the `AdiAdapterPigeon`
-suite; the deploy tests read addresses from the deployment config. The wrapper
-is preferred because it builds and exports these values automatically.
+`forge test --match-contract` run does not produce on its own. Only the a.DI
+CrossChainController and bridge-adapter addresses come from env (the AMB endpoints
+and CCC owner are read on-chain from those adapters, and token addresses from the
+deploy config). The wrapper is preferred because it builds and exports these
+values automatically.

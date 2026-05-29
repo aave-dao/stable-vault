@@ -2,13 +2,18 @@
 // Copyright (c) 2025 Aave Labs
 pragma solidity ^0.8.22;
 
-import {DeployAccountingChain} from "script/deploy/preprod/DeployAccountingChain.s.sol";
-import {DeployEarningChain} from "script/deploy/preprod/DeployEarningChain.s.sol";
+import {AccountingChainDeployment} from "script/base/AccountingChainDeployment.sol";
+import {EarningChainDeployment} from "script/base/EarningChainDeployment.sol";
 
-/// @dev Earning-chain preprod deploy wrapped for fork tests: exposes deterministic CREATE3 addresses and redirects
-/// the deployment output JSON to a throwaway path so a run never mutates the tracked deployments/preprod/v1 files.
-contract EarningChainForkHarness is DeployEarningChain {
+/// @dev Earning-chain deploy wrapped for fork tests: selects the deployment config by `ADI_DEPLOYMENT_ENV` (default
+/// `preprod`, aligned with the a.DI side the wrapper points at), exposes deterministic CREATE3 + config-derived asset
+/// addresses, and redirects the deployment output JSON to a throwaway path so a run never mutates the tracked files.
+contract EarningChainForkHarness is EarningChainDeployment {
     string private _outputOverride;
+
+    function _configPath() internal view override returns (string memory) {
+        return string.concat("config/deployment-config.", vm.envOr("ADI_DEPLOYMENT_ENV", string("preprod")), ".jsonc");
+    }
 
     /// @notice Seed `throwawayPath` from the tracked deployment JSON (so mid-run aTokenVault reads resolve) and route
     /// every subsequent deployment write there. Call before `run()`.
@@ -48,11 +53,23 @@ contract EarningChainForkHarness is DeployEarningChain {
     function allocatorAddr() external view returns (address) {
         return getAllocatorAddress(_deployer());
     }
+
+    function usdc() external view returns (address) {
+        return _usdc();
+    }
+
+    function usdt() external view returns (address) {
+        return _usdt();
+    }
 }
 
 /// @dev Accounting-chain counterpart of {EarningChainForkHarness}.
-contract AccountingChainForkHarness is DeployAccountingChain {
+contract AccountingChainForkHarness is AccountingChainDeployment {
     string private _outputOverride;
+
+    function _configPath() internal view override returns (string memory) {
+        return string.concat("config/deployment-config.", vm.envOr("ADI_DEPLOYMENT_ENV", string("preprod")), ".jsonc");
+    }
 
     function redirectOutputTo(string memory throwawayPath) external {
         vm.writeFile(throwawayPath, vm.readFile(super._deploymentOutputPath()));
@@ -97,5 +114,17 @@ contract AccountingChainForkHarness is DeployAccountingChain {
 
     function chainBalanceOracleAddr() external view returns (address) {
         return getChainBalanceOracleAddress(_deployer());
+    }
+
+    function gho() external view returns (address) {
+        return _gho();
+    }
+
+    function usdc() external view returns (address) {
+        return _usdc();
+    }
+
+    function usdt() external view returns (address) {
+        return _usdt();
     }
 }

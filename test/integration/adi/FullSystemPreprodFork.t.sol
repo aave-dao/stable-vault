@@ -28,13 +28,6 @@ contract FullSystemPreprodFork is AdiAdapterPigeonLocalForkBase {
     string internal constant EARNING_OUTPUT = "deployments/preprod/v1/earning.forktest.json";
     string internal constant ACCOUNTING_OUTPUT = "deployments/preprod/v1/accounting.forktest.json";
 
-    address internal constant ETH_USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
-    address internal constant ETH_USDT = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
-
-    address internal constant ARB_GHO = 0x7dfF72693f6A4149b17e7C6314655f6A9F7c8B33;
-    address internal constant ARB_USDC = 0xaf88d065e77c8cC2239327C5EDb3A432268e5831;
-    address internal constant ARB_USDT = 0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9;
-
     uint256 internal constant DEPOSIT_AMOUNT = 80e6; // 80 USDC, under the 100 USDC deposit cap.
     uint256 internal constant WITHDRAWAL_RAY = 50e27; // $50 principal request, under the $200 redemption cap.
     uint256 internal constant EARNING_LIQUIDITY = 1_000e6; // Idle USDC seeded into the earning Allocator for the
@@ -51,11 +44,13 @@ contract FullSystemPreprodFork is AdiAdapterPigeonLocalForkBase {
     address internal _accIouTokenManager;
     address internal _accAdapter;
     address internal _accChainBalanceOracle;
+    address internal _accUsdc; // accounting-chain deposit asset, from the deploy config
 
     address internal _earnIouToken;
     address internal _earnGateway;
     address internal _earnAllocator;
     address internal _earnAdapter;
+    address internal _earnUsdc; // earning-chain payout asset, from the deploy config
 
     enum BridgeAmb {
         Ccip,
@@ -71,12 +66,18 @@ contract FullSystemPreprodFork is AdiAdapterPigeonLocalForkBase {
         _ethFork = vm.createSelectFork(vm.envOr("ETH_FORK_RPC", DEFAULT_ETH_FORK_RPC));
         _arbFork = vm.createSelectFork(vm.envOr("ARB_FORK_RPC", DEFAULT_ARB_FORK_RPC));
 
+        // a.DI CrossChainController + bridge-adapter addresses (env, from adi-deploy) and the AMB endpoints they wire,
+        // used to relay the cross-chain messages once the Stable Vaults system is deployed below.
+        _loadForkDeploymentConfig();
+        _loadAmbEndpointsFromAdapters();
+
         // Earning chain (Ethereum).
         vm.selectFork(_ethFork);
         assertEq(block.chainid, ETH_CHAIN_ID, "expected Ethereum fork for earning chain");
         EarningChainForkHarness earning = new EarningChainForkHarness();
         earning.redirectOutputTo(EARNING_OUTPUT);
-        _fundEarningDeployer(earning.deployerAddr());
+        _earnUsdc = earning.usdc();
+        _fundDeployer(earning.deployerAddr(), earning.usdc(), earning.usdt(), address(0));
         earning.run();
         _earnIouToken = earning.iouTokenAddr();
         _earnGateway = earning.gatewayAddr();
@@ -84,20 +85,22 @@ contract FullSystemPreprodFork is AdiAdapterPigeonLocalForkBase {
         _earnAdapter = earning.adiAdapterAddr();
         _accessManager = earning.accessManagerAddr();
         _adiAdapter = earning.adiAdapterAddr();
-        _ethCcc = earning.adiCccAddr();
+        assertEq(earning.adiCccAddr(), _ethCcc, "SV earning config CCC != adi-deploy ETH CCC");
 
         // Accounting chain (Arbitrum).
         vm.selectFork(_arbFork);
         assertEq(block.chainid, ARB_CHAIN_ID, "expected Arbitrum fork for accounting chain");
         AccountingChainForkHarness accounting = new AccountingChainForkHarness();
         accounting.redirectOutputTo(ACCOUNTING_OUTPUT);
-        _fundAccountingDeployer(accounting.deployerAddr());
+        _accUsdc = accounting.usdc();
+        _fundDeployer(accounting.deployerAddr(), accounting.usdc(), accounting.usdt(), accounting.gho());
         accounting.run();
         _accVault = accounting.stableVaultAddr();
         _accIouToken = accounting.iouTokenAddr();
         _accIouTokenManager = accounting.iouTokenManagerAddr();
         _accAdapter = accounting.adiAdapterAddr();
         _accChainBalanceOracle = accounting.chainBalanceOracleAddr();
+        assertEq(accounting.adiCccAddr(), _arbCcc, "SV accounting config CCC != adi-deploy ARB CCC");
 
         // Pigeon helpers, deployed while the Arbitrum fork is selected so the ARB->ETH relay runs from the src fork.
         _deployPigeonHelpers();
@@ -179,10 +182,10 @@ contract FullSystemPreprodFork is AdiAdapterPigeonLocalForkBase {
     /// control how the destination receives them. Asserts all three generic adapters forwarded and the IOUs are locked.
     function _depositRequestAndBridge() internal returns (Vm.Log[] memory bridgeLogs) {
         vm.selectFork(_arbFork);
-        deal(ARB_USDC, _user, DEPOSIT_AMOUNT);
+        deal(_accUsdc, _user, DEPOSIT_AMOUNT);
         vm.startPrank(_user);
-        IERC20(ARB_USDC).approve(_accVault, DEPOSIT_AMOUNT);
-        StableVault(_accVault).deposit(_user, ARB_USDC, DEPOSIT_AMOUNT, "");
+        IERC20(_accUsdc).approve(_accVault, DEPOSIT_AMOUNT);
+        StableVault(_accVault).deposit(_user, _accUsdc, DEPOSIT_AMOUNT, "");
         vm.stopPrank();
 
         vm.prank(_user);
@@ -230,8 +233,8 @@ contract FullSystemPreprodFork is AdiAdapterPigeonLocalForkBase {
         vm.selectFork(_ethFork);
 
         // Seed the earning Allocator with idle USDC so the withdrawal payout is served without touching strategies.
-        deal(ETH_USDC, _earnAllocator, EARNING_LIQUIDITY);
-        uint256 userAssetBefore = IERC20(ETH_USDC).balanceOf(_user);
+        deal(_earnUsdc, _earnAllocator, EARNING_LIQUIDITY);
+        uint256 userAssetBefore = IERC20(_earnUsdc).balanceOf(_user);
         uint256 burnBlockNumber = block.number;
 
         bytes memory burnMessage = _burnIouTokenMessage(WITHDRAWAL_RAY, block.timestamp, burnBlockNumber);
@@ -240,7 +243,7 @@ contract FullSystemPreprodFork is AdiAdapterPigeonLocalForkBase {
         vm.recordLogs();
         vm.prank(_user);
         EarningChainGateway(_earnGateway).exchangeIouTokens{value: nativeFee}(
-            WITHDRAWAL_RAY, ETH_USDC, 0, _user, _earnAdapter, DEFAULT_GAS_LIMIT, "", ""
+            WITHDRAWAL_RAY, _earnUsdc, 0, _user, _earnAdapter, DEFAULT_GAS_LIMIT, "", ""
         );
         Vm.Log[] memory burnLogs = vm.getRecordedLogs();
         // ETH->ARB uses the single Arbitrum-native adapter (Ethereum requiredForwardingSuccesses = 1, Arbitrum receiver
@@ -250,7 +253,7 @@ contract FullSystemPreprodFork is AdiAdapterPigeonLocalForkBase {
         // Earning IOUs burned, user paid out in earning-chain assets.
         assertEq(IERC20(_earnIouToken).balanceOf(_user), 0, "earning IOUs not burned");
         assertEq(IERC20(_earnIouToken).totalSupply(), 0, "earning IOU supply not burned");
-        assertGt(IERC20(ETH_USDC).balanceOf(_user), userAssetBefore, "user did not receive earning-chain assets");
+        assertGt(IERC20(_earnUsdc).balanceOf(_user), userAssetBefore, "user did not receive earning-chain assets");
 
         // Accounting IOUs still locked until the burn message is relayed.
         vm.selectFork(_arbFork);
@@ -289,17 +292,15 @@ contract FullSystemPreprodFork is AdiAdapterPigeonLocalForkBase {
         );
     }
 
-    function _fundEarningDeployer(address deployer) internal {
+    /// @dev Fund the deployer with native gas and 1-unit-plus of each aTokenVault underlying the deploy locks. `gho` is
+    /// address(0) on the earning chain (GHO routes to sGho there, no aTokenVault).
+    function _fundDeployer(address deployer, address usdc, address usdt, address gho) internal {
         vm.deal(deployer, 1000 ether);
-        deal(ETH_USDC, deployer, 1_000e6);
-        deal(ETH_USDT, deployer, 1_000e6);
-    }
-
-    function _fundAccountingDeployer(address deployer) internal {
-        vm.deal(deployer, 1000 ether);
-        deal(ARB_GHO, deployer, 1_000e18);
-        deal(ARB_USDC, deployer, 1_000e6);
-        deal(ARB_USDT, deployer, 1_000e6);
+        deal(usdc, deployer, 1_000e6);
+        deal(usdt, deployer, 1_000e6);
+        if (gho != address(0)) {
+            deal(gho, deployer, 1_000e18);
+        }
     }
 
     /// @dev Quote the a.DI forward, fund the fee payer with each required fee token plus native, and approve the

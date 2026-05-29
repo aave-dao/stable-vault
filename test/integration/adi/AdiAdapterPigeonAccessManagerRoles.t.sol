@@ -26,8 +26,13 @@ contract AdiAdapterPigeonAccessManagerRoles is AdiAdapterPigeonLocalForkBase {
     uint256 internal constant TEST_FORWARD_CHAIN_ID = 777_777;
     uint256 internal constant TEST_RECEIVER_CHAIN_ID = 888_888;
 
+    /// @dev The CCC owner before this test re-transfers ownership to its own AccessManager; captured once because
+    /// `owner()` changes during the test.
+    address internal _cccOwner;
+
     function test_adiCccRoles_executeThroughAccessManager() public onlyForkTest {
         vm.selectFork(_ethFork);
+        _cccOwner = _cccOwnerOf(_ethCcc);
 
         IAccessManager accessManager = _configureAccessManagerForCcc(_ethCcc);
         _transferCccOwnershipToAccessManager(accessManager);
@@ -166,29 +171,29 @@ contract AdiAdapterPigeonAccessManagerRoles is AdiAdapterPigeonLocalForkBase {
         for (uint256 i = 0; i < selectors.length; i++) {
             uint64 roleId = _selectorToRoleId(selectors[i]);
             accessManager.setTargetFunctionRole(ccc, _singleSelector(selectors[i]), roleId);
-            accessManager.grantRole(roleId, _stableVaultsOwner, ADI_ROLE_DELAY);
+            accessManager.grantRole(roleId, _cccOwner, ADI_ROLE_DELAY);
         }
     }
 
     function _transferCccOwnershipToAccessManager(IAccessManager accessManager) internal {
-        vm.prank(_stableVaultsOwner);
+        vm.prank(_cccOwner);
         Ownable(_ethCcc).transferOwnership(address(accessManager));
         assertEq(Ownable(_ethCcc).owner(), address(accessManager), "CCC owner not transferred");
     }
 
     function _assertDirectOwnerCallRejected(address testSender) internal {
         vm.expectRevert();
-        vm.prank(_stableVaultsOwner);
+        vm.prank(_cccOwner);
         ICrossChainForwarder(_ethCcc).approveSenders(_singleAddress(testSender));
     }
 
     function _executeViaAccessManager(IAccessManager accessManager, bytes memory data) internal {
-        vm.prank(_stableVaultsOwner);
+        vm.prank(_cccOwner);
         accessManager.schedule(_ethCcc, data, 0);
 
         vm.warp(block.timestamp + ADI_ROLE_DELAY + 1);
 
-        vm.prank(_stableVaultsOwner);
+        vm.prank(_cccOwner);
         accessManager.execute(_ethCcc, data);
     }
 
