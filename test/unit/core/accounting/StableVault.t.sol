@@ -3199,7 +3199,7 @@ contract StableVaultTest is TestWithHelpers {
         assertEq(iouTokenAmount, fullTransferAmountRay);
     }
 
-    /// @dev CS-04: balanceOf() floors at the user's original deposit, so the canonical
+    /// @dev balanceOf() floors at the user's original deposit, so the canonical
     /// transfer(to, balanceOf(user)) pattern resolves to a full transfer instead of a reverting partial one when
     /// per-user deposit rounding leaves the share-backed balance below the principal.
     function test_transfer_usingBalanceOf_succeeds_whenShareBackedBalanceBelowPrincipal() public {

@@ -841,9 +841,8 @@ contract StableVault is
         // Round down the withdrawal amount, so that the rounding is in favor of the protocol.
         uint256 actualAmountOfWithdrawalRay = sharesToRedeem.rayMulDown(conversionRate);
         uint256 originalDepositRay = $storage().positions[user].originalDepositRay;
-        // Due to rounding in rayDivDown (deposit) and rayMulDown (withdrawal),
-        // actualAmountOfWithdrawalRay can be slightly less than originalDepositRay.
-        // We guarantee the user gets at least their original deposit back.
+        // Rounding can make the share-based balance be slightly lower than the user's original deposit.
+        // Never report under the users' original deposit.
         if (actualAmountOfWithdrawalRay < originalDepositRay) {
             actualAmountOfWithdrawalRay = originalDepositRay;
         }
@@ -903,7 +902,7 @@ contract StableVault is
         }
         // Round down the user balance, so that the rounding is in favor of the protocol.
         uint256 balanceRay = shares.rayMulDown(_previewSubVaultConversionRate(position.subVaultId));
-        // Rounding can make the share-based balance be slightly lower.
+        // Rounding can make the share-based balance be slightly lower than the user's original deposit.
         // Never report under the users' original deposit.
         return Math.max(balanceRay, position.originalDepositRay);
     }
@@ -917,7 +916,7 @@ contract StableVault is
             activeSubVaultsObligations += $storage().subVaultById[subVaultId].totalShares
             .rayMulUp(_previewSubVaultConversionRate(subVaultId));
         }
-        // Rounding can make the share-based total obligations slightly lower.
+        // Rounding can make the share-based total obligations be slightly lower than the global original deposits.
         // Never report less than the total of users' original deposits.
         return Math.max(activeSubVaultsObligations, $storage().globalOriginalDepositsRay);
     }
