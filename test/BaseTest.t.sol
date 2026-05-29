@@ -933,9 +933,6 @@ contract BaseTest is TestWithHelpers {
         allocator_earningChain.addStrategy(address(GHO), address(ghoStrategyVault_earningChain));
         allocator_earningChain.addStrategy(address(USDC), address(usdcStrategyVault_earningChain));
 
-        // Configure the FundsHandler to track the earning chain balance via the oracle
-        fundsHandler.addEarningChain(EARNING_CHAIN_ID);
-
         // Set up EarningChainStateProvider -> MockBundleFeed -> Chainlink adapter -> ChainBalanceOracle.
         // Use a harness so snapshots encode the simulated Earning Chain id in single-EVM E2E tests.
         earningChainStateProvider = IEarningChainStateProvider(
@@ -953,6 +950,10 @@ contract BaseTest is TestWithHelpers {
         );
         _publishChainBalanceSnapshotToBundleFeed(0, block.timestamp, block.number);
         chainBalanceOracle.setChainBalanceOracleAdapter(EARNING_CHAIN_ID, address(chainBalanceOracleAdapter));
+
+        // Configure the FundsHandler to track the earning chain balance via the oracle. The oracle must support this
+        // chain first (configured above), otherwise addEarningChain() reverts.
+        fundsHandler.addEarningChain(EARNING_CHAIN_ID);
 
         vm.stopPrank();
     }

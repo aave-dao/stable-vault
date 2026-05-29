@@ -10,6 +10,7 @@ import {CcipAdapter} from "src/bridging/ccip/CcipAdapter.sol";
 import {FundsHandler} from "src/core/accounting/FundsHandler.sol";
 import {IAllocator} from "src/interfaces/IAllocator.sol";
 import {IBridgeAdapter} from "src/interfaces/IBridgeAdapter.sol";
+import {IChainBalanceOracle} from "src/interfaces/IChainBalanceOracle.sol";
 import {IFundsHandler} from "src/interfaces/IFundsHandler.sol";
 import {IPolicyRegistry} from "src/interfaces/IPolicyRegistry.sol";
 import {IRescuableNative} from "src/interfaces/IRescuableNative.sol";
@@ -17,6 +18,7 @@ import {IRescuableToken} from "src/interfaces/IRescuableToken.sol";
 import {AssetLib} from "src/libraries/AssetLib.sol";
 import {MathLib} from "src/libraries/MathLib.sol";
 import {TransferHelperClient} from "src/misc/TransferHelperClient.sol";
+import {ChainBalanceOracle} from "src/oracles/balance/ChainBalanceOracle.sol";
 import {PriceOracle} from "src/oracles/price/PriceOracle.sol";
 import {PolicyRegistry} from "src/periphery/PolicyRegistry.sol";
 import {Constants} from "src/types/Constants.sol";
@@ -787,6 +789,30 @@ contract FundsHandlerTest is TestWithHelpers {
         vm.prank(ADMIN);
         vm.expectRevert(abi.encodeWithSelector(Errors.InvalidDestinationChainId.selector));
         fundsHandler.addEarningChain(block.chainid);
+    }
+
+    function test_addEarningChain_reverts_ifChainIdNotSupportedByOracle(uint256 chainId) public {
+        vm.assume(chainId != block.chainid);
+        // A chain ID the oracle does not support makes getChainBalance revert, which addEarningChain propagates.
+        vm.mockCallRevert(
+            address(mockChainBalanceOracle),
+            abi.encodeCall(IChainBalanceOracle.getChainBalance, (chainId)),
+            abi.encodeWithSelector(ChainBalanceOracle.ChainBalanceOracleAdapterNotFound.selector, chainId)
+        );
+        vm.prank(ADMIN);
+        vm.expectRevert(abi.encodeWithSelector(ChainBalanceOracle.ChainBalanceOracleAdapterNotFound.selector, chainId));
+        fundsHandler.addEarningChain(chainId);
+    }
+
+    function test_addEarningChain_succeeds_whenChainIdSupportedByOracle(uint256 chainId) public {
+        vm.assume(chainId != block.chainid);
+        // The mock's getChainBalance does not revert, simulating a chain ID supported by the oracle.
+        vm.prank(ADMIN);
+        fundsHandler.addEarningChain(chainId);
+
+        uint256[] memory chainIds = fundsHandler.getEarningChainIds();
+        assertEq(chainIds.length, 1);
+        assertEq(chainIds[0], chainId);
     }
 
     function test_removeEarningChain_reverts_ifChainIdNotPresent(uint256 chainId) public {
