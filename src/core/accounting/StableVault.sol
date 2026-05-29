@@ -545,6 +545,7 @@ contract StableVault is
     }
 
     /// @inheritdoc IStableVault
+    /// @dev `totalSupply` might not always match the sum of all `balanceOf`
     function totalSupply() external view override returns (uint256) {
         return _getActiveSubVaultsObligations();
     }
