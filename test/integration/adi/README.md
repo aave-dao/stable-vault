@@ -1,8 +1,19 @@
 # ADI Pigeon Fork Tests
 
-These tests exercise the `AdiAdapter` against local Ethereum and Arbitrum forks,
-with a.DI bridge events relayed by Pigeon helpers. They are skipped during a
-normal `forge test` run unless `FORK_TEST=true` is set.
+These tests exercise the a.DI bridging path against local Ethereum and Arbitrum
+forks, with a.DI bridge events relayed by Pigeon helpers. Two layers run here:
+the `AdiAdapter` against locally-deployed mock periphery, and the real preprod
+`Deploy*Chain` scripts (`ForkDeployPreprod`, `FullSystemPreprodFork`) against the
+live preprod a.DI. They are skipped during a normal `forge test` run unless
+`FORK_TEST=true` is set.
+
+`ForkDeployPreprod` runs each chain's deploy script and checks the deterministic
+AccessManager / AdiAdapter land where the a.DI owner/guardian handoff delegated
+control. `FullSystemPreprodFork` deploys both chains and drives a full deposit ->
+bridge -> exchange -> burn-back round trip (plus a staged 2-of-3 quorum/replay
+check) through the deployed contracts. Both redirect their deployment output to
+throwaway `deployments/preprod/v1/*.forktest.json` files (gitignored), so they
+never touch the tracked deployment JSONs.
 
 ## Prerequisites
 
@@ -41,7 +52,7 @@ By default, the wrapper:
 5. Runs:
 
 ```sh
-forge test --match-contract AdiAdapterPigeon -vvv
+forge test --match-contract 'AdiAdapterPigeon|ForkDeployPreprod|FullSystemPreprodFork' -vvv
 ```
 
 ## Run One Contract or Test
@@ -100,7 +111,7 @@ ADI_DEPLOYMENT_ENV=prod ./run-adi-pigeon-fork-test.sh
 ETH_PORT=9545 ARB_PORT=9546 ./run-adi-pigeon-fork-test.sh
 ENV_FILE=.env.forktest ./run-adi-pigeon-fork-test.sh
 RESTART_ANVIL=false ./run-adi-pigeon-fork-test.sh
-ETH_FORK_BLOCK=25131000 ARB_FORK_BLOCK=464535000 ./run-adi-pigeon-fork-test.sh
+ETH_FORK_BLOCK=25196860 ARB_FORK_BLOCK=467697210 ./run-adi-pigeon-fork-test.sh
 ```
 
 `ETH_FORK_RPC` and `ARB_FORK_RPC` default to `http://127.0.0.1:8545` and

@@ -8,6 +8,9 @@ zkout/
 # Local deployments
 deployments-zk/inMemoryNode/
 
+# Throwaway deployment output written by FORK_TEST=true preprod deploy fork tests
+deployments/**/*.forktest.json
+
 # Ignores development broadcast logs
 !/broadcast
 /broadcast/*/31337/

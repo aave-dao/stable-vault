@@ -52,7 +52,7 @@ ETH_FORK_BLOCK="${ETH_FORK_BLOCK:-25196860}"
 ARB_FORK_BLOCK="${ARB_FORK_BLOCK:-467697210}"
 RUN_DIR="${RUN_DIR:-$ADI_DEPLOY_DIR/.forktest}"
 
-MATCH_CONTRACT="${MATCH_CONTRACT:-AdiAdapterPigeon}"
+MATCH_CONTRACT="${MATCH_CONTRACT:-AdiAdapterPigeon|ForkDeployPreprod|FullSystemPreprodFork}"
 FORGE_TEST_ARGS="${FORGE_TEST_ARGS:--vvv}"
 
 function log() {

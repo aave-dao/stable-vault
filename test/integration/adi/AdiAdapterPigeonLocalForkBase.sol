@@ -85,12 +85,14 @@ abstract contract AdiAdapterPigeonLocalForkBase is Test {
     string internal constant DEFAULT_ETH_FORK_RPC = "http://127.0.0.1:8545";
     string internal constant DEFAULT_ARB_FORK_RPC = "http://127.0.0.1:8546";
 
-    address internal constant DEFAULT_STABLE_VAULTS_OWNER = 0xfB65C68526969DA4AA3cEDF30b1C53846116D5a2;
+    // Post owner/guardian-handoff preprod a.DI: the CrossChainController is owned by the deployed AccessManager.
+    // These are only fallbacks for bare runs; run-adi-pigeon-fork-test.sh overrides them from the adi-deploy JSONs.
+    address internal constant DEFAULT_STABLE_VAULTS_OWNER = 0x0cA5A1F7F75C3F3294769C2B87a01E512e5e920B;
 
-    address internal constant DEFAULT_ETH_CCC = 0x33E3B9D276f58A873e9Acc9f25A8a46F5b66F259;
-    address internal constant DEFAULT_ARB_CCC = 0x98cF75814a129845EA7d69dbD0B6923A6Dac0c6b;
+    address internal constant DEFAULT_ETH_CCC = 0xBFCf66026E303648238f8F3E3A3A491eb74e645A;
+    address internal constant DEFAULT_ARB_CCC = 0xeBBD7BE5fa28BcEaD8398C7205f12E651DCf6250;
 
-    address internal constant DEFAULT_ETH_ARB_ADAPTER = 0xC9B2A285B62c0eD494C3C23FAc7C169EaE740C59;
+    address internal constant DEFAULT_ETH_ARB_ADAPTER = 0x3960b211DeeDb9b704939dD6295f1a70c1B29CeE;
 
     address internal constant ARB_INBOX = 0x4Dbd4fc535Ac27206064B68FfCf827b0A60BAB3f;
     address internal constant ARB_BRIDGE = 0x8315177aB297bA92A06054cE80a67Ed4DBd7ed3a;
