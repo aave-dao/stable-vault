@@ -895,7 +895,7 @@ contract StableVault is
     }
 
     function _getUserBalance(address user) internal view returns (uint256) {
-        UserPosition memory position = $storage().positions[user];
+        UserPosition storage position = $storage().positions[user];
         uint256 shares = position.shares;
         if (shares == 0) {
             return 0;
